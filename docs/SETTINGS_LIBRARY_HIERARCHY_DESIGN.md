@@ -34,7 +34,7 @@ Sources were checked on 2026-07-28 against the requested June 2026 baseline.
 ## Final Recommendation Stack
 
 1. Keep **Discovery scheduling** and automatic high-confidence download behavior visible.
-2. Place Source safety, History retention, How matches are ranked, Audio verification thresholds, and File naming inside **Advanced library controls**.
+2. Place Source safety, History retention, How matches are ranked, Audio verification thresholds, and File naming inside **Library controls**, categorized as Advanced in the interface.
 3. Retain each advanced area as a named inline disclosure, so an operator can open only the domain being changed.
 4. Use `h3` headings for nested disclosures beneath the `h2` advanced boundary to preserve a meaningful document outline.
 5. Preserve existing server validation, numeric ranges, CSRF-protected saves, and import safety checks; this is information architecture, not a policy relaxation.
@@ -42,7 +42,7 @@ Sources were checked on 2026-07-28 against the requested June 2026 baseline.
 ## Implementation
 
 - Added `headingLevel` support to the shared ESM `SettingsDisclosure` component.
-- Consolidated five top-level specialist cards under one `Advanced library controls` disclosure.
+- Consolidated five top-level specialist cards under one `Library controls` disclosure, categorized as Advanced in the interface.
 - Kept the existing field labels, reset actions, default/range help, and save behavior unchanged.
 - Updated browser proof to open the parent advanced boundary before Match ranking, which verifies the real keyboard and screen-reader path.
 
@@ -56,7 +56,7 @@ Sources were checked on 2026-07-28 against the requested June 2026 baseline.
 ## Verification
 
 - Focused presentation and source-contract tests verify the primary-to-advanced hierarchy and semantic heading support.
-- Browser coverage verifies expanding Advanced library controls, then Match ranking, before accessing Format tier.
+- Browser coverage verifies expanding Library controls, then Match ranking, before accessing Format tier.
 - Full validation and a no-cache walkthrough rebuild are required before release.
 
 ## Next Item

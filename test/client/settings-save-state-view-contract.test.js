@@ -22,6 +22,7 @@ import test from 'node:test';
 
 const VIEWS = [
   'SettingsConnectionsView.vue',
+  'SettingsGeneralView.vue',
   'SettingsMediaStorageView.vue',
   'SettingsLibraryView.vue',
 ];

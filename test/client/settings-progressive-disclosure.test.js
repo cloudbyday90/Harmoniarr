@@ -45,7 +45,7 @@ test('Media and storage leads with required folders and keeps supporting control
   assert.ok(source.indexOf('>Media folders<') < source.indexOf('title="Cover art"'));
   assert.match(source, /<SettingsFolderReadiness :validation="pathValidation" \/>/);
   assert.match(source, /v-model:open="isPathTranslationsOpen"/);
-  assert.match(source, /title="Additional folder options"/);
+  assert.match(source, /title="Additional folders"/);
   assert.match(source, /title="Artwork provider usage"/);
   assert.match(source, /isPathTranslationsOpen\.value = true/);
 });
@@ -53,11 +53,11 @@ test('Media and storage leads with required folders and keeps supporting control
 test('Library groups specialist tuning behind a single advanced boundary with nested headings', async () => {
   const source = await readFile(new URL('../../src/client/views/SettingsLibraryView.vue', import.meta.url), 'utf8');
 
-  assert.match(source, /title="Advanced library controls"/);
+  assert.match(source, /title="Library controls"/);
   assert.match(source, /show-label="Show advanced library controls"/);
   assert.match(source, /panel-id="settings-library-match-ranking"[\s\S]*?:heading-level="3"/);
   assert.match(source, /panel-id="settings-library-audio-verification"[\s\S]*?:heading-level="3"/);
-  assert.ok(source.indexOf('title="Advanced library controls"') < source.indexOf('panel-id="settings-library-source-safety"'));
+  assert.ok(source.indexOf('title="Library controls"') < source.indexOf('panel-id="settings-library-source-safety"'));
 });
 
 test('Settings disclosures allow nested sections to use a logical heading level', async () => {
@@ -75,9 +75,9 @@ test('System and security leads with saved posture and isolates routine system c
   assert.match(source, />Security configuration</);
   assert.match(source, /Saved deployment settings only/);
   assert.match(source, />Remote access protections</);
-  assert.match(source, /title="Advanced system controls"/);
+  assert.match(source, /title="System controls"/);
   assert.match(source, /show-label="Show advanced system controls"/);
-  assert.ok(source.indexOf('>Security configuration<') < source.indexOf('title="Advanced system controls"'));
+  assert.ok(source.indexOf('>Security configuration<') < source.indexOf('title="System controls"'));
 });
 
 test('Users and access leads with account posture and scopes maintenance by task', async () => {

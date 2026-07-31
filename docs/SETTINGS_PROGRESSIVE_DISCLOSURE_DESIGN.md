@@ -61,7 +61,7 @@ controls.
    behind named disclosures. See `SETTINGS_CONNECTIONS_HIERARCHY_DESIGN.md`.
 4. Keep library scheduling and automatic-download preference visible. Place
    source policy, retention, scoring, audio thresholds, and naming templates
-   behind one Advanced library controls boundary, then expose each as a named
+   behind one Library controls boundary categorized as Advanced, then expose each as a named
    inline disclosure. See `docs/SETTINGS_LIBRARY_HIERARCHY_DESIGN.md`.
 5. Keep Media folders and folder readiness visible; keep a missing path
    translation as a direct setup action, and place translation details,

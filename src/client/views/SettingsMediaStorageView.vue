@@ -40,6 +40,7 @@ import {
 import FolderBrowserModal from '../components/FolderBrowserModal.vue';
 import SettingsDisclosure from '../components/settings/SettingsDisclosure.vue';
 import SettingsFolderReadiness from '../components/settings/SettingsFolderReadiness.vue';
+import SettingsFormGroup from '../components/settings/SettingsFormGroup.vue';
 import SettingsSaveBar from '../components/settings/SettingsSaveBar.vue';
 import { useArtworkQuota } from '../composables/useArtworkQuota.js';
 import { useQuotaHistory } from '../composables/useQuotaHistory.js';
@@ -167,11 +168,15 @@ onBeforeUnmount(() => { quotaHistory.destroy(); });
         <header class="hx-card-header">
           <div>
             <h3 class="hx-card-title">Media folders</h3>
-            <p class="hx-card-subtitle">Choose the folders Harmoniarr needs to receive, prepare, and organize music.</p>
+            <p class="hx-card-subtitle">Required locations for downloads, staging, and your music library.</p>
           </div>
         </header>
         <div class="hx-card-body">
-          <div class="cfg-group" style="padding-top: 0; border-top: none">
+          <SettingsFormGroup
+            kind="core"
+            title="Required folders"
+            description="Harmoniarr must reach all three folders before it can download and add music automatically."
+          >
             <div class="hx-field">
               <label class="hx-field-label" for="settings-downloads-folder">Downloads folder</label>
               <div class="hx-field-with-browse">
@@ -186,7 +191,6 @@ onBeforeUnmount(() => { quotaHistory.destroy(); });
                 <input id="settings-music-library" class="hx-input" v-model="form.paths.music" />
                 <button type="button" class="hx-btn fb-trigger" @click="openBrowse('Music library', form.paths.music, v => form.paths.music = v)">Browse…</button>
               </div>
-              <p class="cfg-field-hint">Your organized music collection. Accepted imports are moved here.</p>
             </div>
             <div class="hx-field">
               <label class="hx-field-label" for="settings-staging-area">Staging area</label>
@@ -194,11 +198,9 @@ onBeforeUnmount(() => { quotaHistory.destroy(); });
                 <input id="settings-staging-area" class="hx-input" v-model="form.paths.staging" />
                 <button type="button" class="hx-btn fb-trigger" @click="openBrowse('Staging area', form.paths.staging, v => form.paths.staging = v)">Browse…</button>
               </div>
-              <p class="cfg-field-hint">A holding area where files wait while Harmoniarr prepares an import.</p>
             </div>
-          </div>
-
-          <SettingsFolderReadiness :validation="pathValidation" />
+            <SettingsFolderReadiness :validation="pathValidation" />
+          </SettingsFormGroup>
 
           <div v-if="pathTranslationSetupPrompt" class="cfg-download-setup" role="status">
             <div>
@@ -213,6 +215,8 @@ onBeforeUnmount(() => { quotaHistory.destroy(); });
           <SettingsDisclosure
             v-model:open="isPathTranslationsOpen"
             panel-id="settings-path-translations"
+            action-style="compact"
+            category="advanced"
             title="Path translations"
             :subtitle="buildPathTranslationsDescription()"
             show-label="Show path translations"
@@ -245,8 +249,10 @@ onBeforeUnmount(() => { quotaHistory.destroy(); });
 
           <SettingsDisclosure
             panel-id="settings-additional-folder-options"
-            title="Additional folder options"
-            subtitle="Use these only for audio conversion workspace or separate household library folders."
+            action-style="compact"
+            category="advanced"
+            title="Additional folders"
+            subtitle="Audio conversion workspace and separate household library folders."
             show-label="Show additional folder options"
             hide-label="Hide additional folder options"
             variant="inline"
@@ -294,8 +300,10 @@ onBeforeUnmount(() => { quotaHistory.destroy(); });
 
         <SettingsDisclosure
           panel-id="settings-cover-art"
+          action-style="compact"
+          category="optional"
           title="Cover art"
-          subtitle="Artwork is optional. Configure it when you want Harmoniarr to find and cache album images."
+          subtitle="Find and cache album images when you want them."
           show-label="Show cover art settings"
           hide-label="Hide cover art settings"
         >
@@ -412,6 +420,8 @@ onBeforeUnmount(() => { quotaHistory.destroy(); });
       <SettingsDisclosure
         v-if="artworkQuota.quota.value"
         panel-id="settings-artwork-provider-usage"
+        action-style="compact"
+        category="optional"
         title="Artwork provider usage"
         subtitle="Daily request usage for external artwork providers. Resets at midnight UTC."
         show-label="Show artwork provider usage"

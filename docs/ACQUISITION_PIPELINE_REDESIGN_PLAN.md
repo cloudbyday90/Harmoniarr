@@ -1695,7 +1695,13 @@ outcomes, reciprocal 404 reads, and complete cleanup.
   excluded from dirty-state baselines. See
   [SETTINGS_SAVE_STATE_CONSISTENCY_DESIGN.md](SETTINGS_SAVE_STATE_CONSISTENCY_DESIGN.md).
 
-Recommended next slice: complete a **Settings information hierarchy pass**.
-Reduce repeated helper copy, normalize required and advanced section cadence,
-and establish a consistently scannable primary action path across General,
-Connections, Library, and Media & storage.
+- [x] Complete a Settings information hierarchy pass. System & security,
+  Connections, Library, and Media & storage now share semantic primary form
+  groups, concise group-level guidance, compact category-labelled advanced or
+  optional disclosures, and one shared save path. See
+  [SETTINGS_INFORMATION_HIERARCHY_DESIGN.md](SETTINGS_INFORMATION_HIERARCHY_DESIGN.md).
+
+Recommended next slice: complete a **Settings setup readiness landing pass**.
+Make Setup the focused first-run and recovery entry point that summarizes the
+few prerequisites for automatic music handling and links to the appropriate
+normal Settings page.

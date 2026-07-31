@@ -20,6 +20,16 @@
 import { computed, ref } from 'vue';
 
 const props = defineProps({
+  actionStyle: {
+    default: 'full',
+    type: String,
+    validator: (value) => ['compact', 'full'].includes(value),
+  },
+  category: {
+    default: '',
+    type: String,
+    validator: (value) => ['', 'advanced', 'optional'].includes(value),
+  },
   headingLevel: {
     default: 2,
     type: Number,
@@ -66,6 +76,18 @@ const headingId = `${props.panelId}-heading`;
 const headingTag = computed(() => `h${props.headingLevel}`);
 const isControlled = computed(() => typeof props.open === 'boolean');
 const isOpen = computed(() => isControlled.value ? props.open : internalOpen.value);
+const categoryLabel = computed(() => ({
+  advanced: 'Advanced',
+  optional: 'Optional',
+}[props.category] ?? ''));
+const actionLabel = computed(() => {
+  if (props.actionStyle === 'compact') {
+    return isOpen.value ? 'Hide' : 'Show';
+  }
+
+  return isOpen.value ? props.hideLabel : props.showLabel;
+});
+const actionAriaLabel = computed(() => isOpen.value ? props.hideLabel : props.showLabel);
 
 function toggle() {
   const nextValue = !isOpen.value;
@@ -82,6 +104,7 @@ function toggle() {
   <section class="settings-disclosure" :class="{ 'settings-disclosure--inline': variant === 'inline' }">
     <div class="settings-disclosure__header">
       <div>
+        <p v-if="categoryLabel" class="settings-disclosure__category">{{ categoryLabel }}</p>
         <component :is="headingTag" :id="headingId" class="settings-disclosure__title">{{ title }}</component>
         <p v-if="subtitle" class="settings-disclosure__subtitle">{{ subtitle }}</p>
       </div>
@@ -90,9 +113,10 @@ function toggle() {
         class="hx-btn"
         :aria-controls="panelId"
         :aria-expanded="isOpen"
+        :aria-label="actionAriaLabel"
         @click="toggle"
       >
-        {{ isOpen ? hideLabel : showLabel }}
+        {{ actionLabel }}
       </button>
     </div>
 
@@ -128,6 +152,15 @@ function toggle() {
   color: var(--hx-text-strong);
   font-size: var(--hx-text-md);
   margin: 0;
+}
+
+.settings-disclosure__category {
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-xs);
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  margin: 0 0 var(--hx-space-1);
+  text-transform: uppercase;
 }
 
 .settings-disclosure__subtitle {

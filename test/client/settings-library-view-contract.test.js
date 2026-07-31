@@ -35,7 +35,7 @@ test('SettingsLibraryView renders the Discovery scheduling form in the default b
 
   assert.match(source, /<form @submit\.prevent="saveSettings" v-else>/);
   assert.match(source, /<h3 class="hx-card-title">Discovery scheduling<\/h3>/);
-  assert.match(source, /Control how often Harmoniarr searches/);
+  assert.match(source, /Recommended timing and automatic download behavior/);
 });
 
 test('SettingsLibraryView hides the form only when its initial load fails', async () => {
@@ -54,7 +54,7 @@ test('SettingsLibraryView wires discovery fields and automation toggle to form.l
   assert.match(source, /v-model\.number="form\.library\.discoveryBatchSize"/);
   assert.match(source, /v-model\.number="form\.library\.maxSearchAttempts"/);
   assert.match(source, /Automatically start download runs for high-confidence selections/);
-  assert.match(source, /Ambiguous or low-confidence matches still need review/);
+  assert.match(source, /Other matches remain in Music Queue for review/);
 });
 
 test('SettingsLibraryView constrains inputs to validator ranges', async () => {
@@ -69,10 +69,10 @@ test('SettingsLibraryView constrains inputs to validator ranges', async () => {
 test('SettingsLibraryView labels all fields with hx-field-label', async () => {
   const source = await readFile(VIEW_PATH, 'utf8');
 
-  assert.match(source, /<label class="hx-field-label">Automatic cooldown \(hours\)<\/label>/);
-  assert.match(source, /<label class="hx-field-label">Fallback cooldown \(hours\)<\/label>/);
+  assert.match(source, /<label class="hx-field-label" for="settings-library-discovery-cooldown">First retry \(hours\)<\/label>/);
+  assert.match(source, /<label class="hx-field-label" for="settings-library-discovery-fallback-cooldown">Later retries \(hours\)<\/label>/);
   assert.match(source, /<label class="hx-field-label" for="settings-library-discovery-batch-size">Batch size<\/label>/);
-  assert.match(source, /<label class="hx-field-label">Max search attempts<\/label>/);
+  assert.match(source, /<label class="hx-field-label" for="settings-library-max-search-attempts">Max search attempts<\/label>/);
 });
 
 test('SettingsLibraryView submits through saveSettings with save-state feedback', async () => {

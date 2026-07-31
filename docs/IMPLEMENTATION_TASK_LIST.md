@@ -141,6 +141,11 @@ Database model source: `docs/DATABASE_MODEL.md`
   secrets in dirty tracking, and asks for an explicit provider test only after
   saved Soulseek configuration changes. See
   `SETTINGS_SAVE_STATE_CONSISTENCY_DESIGN.md`.
+- Settings information hierarchy: System & security, Connections, Library, and
+  Media & storage now separate normal setup from Advanced and Optional work,
+  use semantic fieldsets for related controls, preserve concise contextual
+  guidance, and converge on one shared save action. See
+  `SETTINGS_INFORMATION_HIERARCHY_DESIGN.md`.
 - Activity advanced diagnostics boundary: match, library-add, and failed-add
   workbenches now use canonical `/app/activity/diagnostics/...` routes behind
   the Activity disclosure. Legacy candidate/import URLs redirect with their

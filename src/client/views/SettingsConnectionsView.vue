@@ -26,6 +26,7 @@ import {
   formatSlskdProviderModeLabel,
 } from '../lib/settings-connections-presentation.js';
 import SettingsDisclosure from '../components/settings/SettingsDisclosure.vue';
+import SettingsFormGroup from '../components/settings/SettingsFormGroup.vue';
 import SettingsProviderConnectionStatus from '../components/settings/SettingsProviderConnectionStatus.vue';
 import SettingsSaveBar from '../components/settings/SettingsSaveBar.vue';
 import SoulseekProviderModeGuidance from '../components/settings/SoulseekProviderModeGuidance.vue';
@@ -207,7 +208,7 @@ onMounted(() => {
             </span>
           </header>
           <div class="hx-card-body">
-            <div class="cfg-group" style="padding-top: 0; border-top: none">
+            <div class="settings-connections__provider-setup">
               <fieldset class="settings-connections__provider-modes">
                 <legend class="hx-field-label">Soulseek provider mode</legend>
                 <label class="settings-connections__provider-mode" :class="{ 'is-selected': isManagedSoulseek }">
@@ -234,32 +235,32 @@ onMounted(() => {
               </fieldset>
               <p v-if="isManagedDeployment" class="cfg-field-hint">This deployment supplies the managed provider address and API key. Select Disabled to pause Soulseek without changing deployment secrets.</p>
             </div>
-            <div v-if="isExternalSoulseek" class="cfg-group">
+            <SettingsFormGroup
+              v-if="isExternalSoulseek"
+              kind="core"
+              title="External service details"
+              description="Use an address Harmoniarr can reach. Leave the API key blank to retain the saved key."
+            >
               <div class="hx-field">
                 <label class="hx-field-label" for="settings-slskd-service-address">Service address</label>
                 <input id="settings-slskd-service-address" class="hx-input" v-model="form.slskd.baseUrl" placeholder="http://slskd:5030" />
               </div>
-              <p class="cfg-field-hint">The address of the separately managed download service. Use an address reachable from Harmoniarr.</p>
-            </div>
-            <div v-if="isExternalSoulseek" class="cfg-group">
-              <p class="cfg-group-title">API key</p>
               <div class="hx-field">
-                <label class="hx-field-label">API key</label>
-                <input class="hx-input" v-model="form.slskd.apiKey" type="password" autocomplete="new-password" :disabled="form.slskd.clearApiKey" placeholder="Leave blank to keep the current key" />
+                <label class="hx-field-label" for="settings-slskd-api-key">API key</label>
+                <input id="settings-slskd-api-key" class="hx-input" v-model="form.slskd.apiKey" type="password" autocomplete="new-password" :disabled="form.slskd.clearApiKey" placeholder="Leave blank to keep the current key" />
               </div>
-              <p class="cfg-field-hint">The API key from your slskd config. Stored securely — this field never shows the saved value. Leave blank to keep the current key.</p>
-              <label class="cfg-check" style="margin-top: var(--hx-space-2)">
+              <label class="cfg-check">
                 <input type="checkbox" v-model="form.slskd.clearApiKey" />
                 <span>Remove the stored API key on save</span>
               </label>
-            </div>
+            </SettingsFormGroup>
             <div v-else-if="isManagedSoulseek" class="cfg-group">
               <p class="cfg-group-title">Managed by deployment</p>
-              <p class="cfg-field-hint">Harmoniarr reads the API key from the managed Docker secret file. Change managed credentials in the deployment, not in Settings.</p>
+              <p class="cfg-field-hint">Deployment secrets supply the connection. Change managed credentials in the deployment, not here.</p>
             </div>
             <div v-else class="cfg-group">
               <p class="cfg-group-title">Downloads are off</p>
-              <p class="cfg-field-hint">Harmoniarr will not contact Soulseek, queue downloads, or poll the download service until you select Managed or External.</p>
+              <p class="cfg-field-hint">Harmoniarr will not search, queue downloads, or poll Soulseek until you select Managed or External.</p>
             </div>
             <SoulseekProviderModeGuidance
               :managed-deployment-detected="isManagedDeployment"
@@ -283,8 +284,10 @@ onMounted(() => {
       <div class="settings-connections__advanced-stack">
         <SettingsDisclosure
           panel-id="settings-connection-behavior"
-          title="Connection timing and playlist behavior"
-          subtitle="Change these only when a provider requires different behavior."
+          action-style="compact"
+          category="advanced"
+          title="Connection behavior"
+          subtitle="Timeouts and playlist discovery behavior."
           show-label="Show connection behavior"
           hide-label="Hide connection behavior"
         >
@@ -316,7 +319,9 @@ onMounted(() => {
 
         <SettingsDisclosure
           panel-id="settings-optional-music-sources"
-          title="Optional music-source connections"
+          action-style="compact"
+          category="optional"
+          title="Music-source connections"
           subtitle="Add playlist and artwork services only when you plan to use them. Secrets remain write-only."
           show-label="Set up optional services"
           hide-label="Hide optional services"
@@ -514,6 +519,10 @@ onMounted(() => {
 
 .settings-connections__primary {
   width: 100%;
+}
+
+.settings-connections__provider-setup {
+  margin-bottom: var(--hx-space-4);
 }
 
 .settings-connections__provider-modes {

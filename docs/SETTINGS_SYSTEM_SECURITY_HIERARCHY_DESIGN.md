@@ -36,7 +36,7 @@ Sources were checked on 2026-07-28 against the requested June 2026 baseline.
 1. Show **Security configuration** first, derived only from saved settings.
 2. Explicitly state that the summary does not test reverse-proxy, certificate, or network reachability.
 3. Keep **Remote access protections** visible: secure cookies, HTTPS enforcement, HSTS, and CSRF mode stay together.
-4. Put Base URL and logging in **Advanced system controls**.
+4. Put Base URL and logging in **System controls**, categorized as Advanced in the interface.
 5. Preserve server-authoritative validation, CSRF enforcement, session handling, and the separately protected local admin-recovery flow.
 
 ## Implementation
@@ -56,7 +56,7 @@ Sources were checked on 2026-07-28 against the requested June 2026 baseline.
 ## Verification
 
 - Pure helper tests cover local, incomplete remote, and saved HTTPS-ready configurations.
-- Browser verification proves the posture card leads the route and that Base URL appears only after opening Advanced system controls.
+- Browser verification proves the posture card leads the route and that Base URL appears only after opening System controls.
 - Full test/build/ESM checks and a no-cache walkthrough rebuild are required before release.
 
 ## Next Item

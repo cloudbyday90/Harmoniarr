@@ -18,6 +18,7 @@
 <script setup>
 import { computed, onMounted } from 'vue';
 import SettingsDisclosure from '../components/settings/SettingsDisclosure.vue';
+import SettingsFormGroup from '../components/settings/SettingsFormGroup.vue';
 import SettingsSaveBar from '../components/settings/SettingsSaveBar.vue';
 import { useSettingsForm } from '../composables/useSettingsForm.js';
 import { buildSettingsSaveState } from '../lib/settings-save-state-presentation.js';
@@ -114,63 +115,67 @@ onMounted(() => { void loadSettings(); });
         <header class="hx-card-header">
           <div>
             <h3 class="hx-card-title">Discovery scheduling</h3>
-            <p class="hx-card-subtitle">Control how often Harmoniarr searches for wanted releases and how many searches it runs per cycle.</p>
+            <p class="hx-card-subtitle">Recommended timing and automatic download behavior for wanted releases.</p>
           </div>
         </header>
         <div class="hx-card-body">
-          <div class="cfg-group" style="padding-top: 0; border-top: none">
-            <p class="cfg-group-title">Cooldown timers</p>
-            <p class="hx-text-muted">After a search comes up empty, Harmoniarr waits before trying again. The first wait uses the automatic cooldown. If the release still has no candidates after a second search, it switches to the shorter fallback cooldown.</p>
+          <SettingsFormGroup
+            kind="core"
+            title="Search timing"
+            description="Recommended: wait 6 hours after the first empty search, then 2 hours between later retries."
+          >
             <div class="hx-form-row">
               <div class="hx-field">
-                <label class="hx-field-label">Automatic cooldown (hours)</label>
-                <input class="hx-input" v-model.number="form.library.discoveryCooldownHours" type="number" min="1" max="168" step="1" />
-                <p class="cfg-field-hint">Wait this long before re-searching for a release that has never had a candidate. Default is 6 hours.</p>
+                <label class="hx-field-label" for="settings-library-discovery-cooldown">First retry (hours)</label>
+                <input id="settings-library-discovery-cooldown" class="hx-input" v-model.number="form.library.discoveryCooldownHours" type="number" min="1" max="168" step="1" />
               </div>
               <div class="hx-field">
-                <label class="hx-field-label">Fallback cooldown (hours)</label>
-                <input class="hx-input" v-model.number="form.library.discoveryFallbackCooldownHours" type="number" min="1" max="168" step="1" />
-                <p class="cfg-field-hint">Shorter wait between retries for releases that have already been searched at least once. Default is 2 hours.</p>
+                <label class="hx-field-label" for="settings-library-discovery-fallback-cooldown">Later retries (hours)</label>
+                <input id="settings-library-discovery-fallback-cooldown" class="hx-input" v-model.number="form.library.discoveryFallbackCooldownHours" type="number" min="1" max="168" step="1" />
               </div>
             </div>
-          </div>
-          <div class="cfg-group">
-            <p class="cfg-group-title">Search limits</p>
+          </SettingsFormGroup>
+          <SettingsFormGroup
+            title="Search limits"
+            description="Recommended: search 5 releases per cycle and stop after 3 empty attempts."
+          >
             <div class="hx-form-row">
               <div class="hx-field">
                 <label class="hx-field-label" for="settings-library-discovery-batch-size">Batch size</label>
                 <input id="settings-library-discovery-batch-size" class="hx-input" v-model.number="form.library.discoveryBatchSize" type="number" min="1" max="50" step="1" />
-                <p class="cfg-field-hint">How many releases to search for in a single dispatch cycle. Default is 5.</p>
               </div>
               <div class="hx-field">
-                <label class="hx-field-label">Max search attempts</label>
-                <input class="hx-input" v-model.number="form.library.maxSearchAttempts" type="number" min="1" max="10" step="1" />
-                <p class="cfg-field-hint">After this many empty searches, the release is marked as exhausted and Harmoniarr stops retrying. Default is 3.</p>
+                <label class="hx-field-label" for="settings-library-max-search-attempts">Max search attempts</label>
+                <input id="settings-library-max-search-attempts" class="hx-input" v-model.number="form.library.maxSearchAttempts" type="number" min="1" max="10" step="1" />
               </div>
             </div>
-          </div>
-          <div class="cfg-group">
-            <p class="cfg-group-title">Automation</p>
+          </SettingsFormGroup>
+          <SettingsFormGroup
+            title="Automatic downloads"
+            description="Starts downloads only for an unambiguous high-confidence match. Other matches remain in Music Queue for review."
+          >
             <label class="cfg-check">
               <input type="checkbox" v-model="form.library.autoStartDownloadsAfterSelection" />
               <span>Automatically start download runs for high-confidence selections</span>
             </label>
-            <p class="cfg-field-hint">When discovery finds one unambiguous high-confidence match, Harmoniarr selects it and starts the download. Ambiguous or low-confidence matches still need review.</p>
-          </div>
+          </SettingsFormGroup>
         </div>
       </article>
 
       <div class="settings-library__advanced-stack">
         <SettingsDisclosure
           panel-id="settings-library-advanced"
-          title="Advanced library controls"
-          subtitle="Keep the recommended automation in place unless you need to tune source safety, history, matching, audio checks, or future file names."
+          action-style="compact"
+          category="advanced"
+          title="Library controls"
+          subtitle="Source safety, history, matching, audio checks, and file names."
           show-label="Show advanced library controls"
           hide-label="Hide advanced library controls"
         >
           <SettingsDisclosure
             panel-id="settings-library-source-safety"
             title="Source safety"
+            action-style="compact"
             subtitle="Control how Harmoniarr responds to repeatedly unreliable music sources."
             show-label="Show source safety"
             hide-label="Hide source safety"
@@ -193,7 +198,8 @@ onMounted(() => { void loadSettings(); });
 
         <SettingsDisclosure
           panel-id="settings-library-retention"
-          title="History retention"
+            title="History retention"
+            action-style="compact"
           subtitle="Changing these limits can permanently remove older history on the next cleanup cycle."
           show-label="Show history retention"
           hide-label="Hide history retention"
@@ -227,7 +233,8 @@ onMounted(() => { void loadSettings(); });
 
         <SettingsDisclosure
           panel-id="settings-library-match-ranking"
-          title="How matches are ranked"
+            title="How matches are ranked"
+            action-style="compact"
           subtitle="Tune weighting only when you need to change how Harmoniarr chooses between otherwise acceptable matches."
           show-label="Show match ranking"
           hide-label="Hide match ranking"
@@ -312,7 +319,8 @@ onMounted(() => { void loadSettings(); });
 
         <SettingsDisclosure
           panel-id="settings-library-audio-verification"
-          title="Audio verification thresholds"
+            title="Audio verification thresholds"
+            action-style="compact"
           subtitle="Tune spectral and source-trust thresholds only when you need stricter or looser quality checks."
           show-label="Show audio verification thresholds"
           hide-label="Hide audio verification thresholds"
@@ -395,7 +403,8 @@ onMounted(() => { void loadSettings(); });
 
         <SettingsDisclosure
           panel-id="settings-library-naming"
-          title="File naming"
+            title="File naming"
+            action-style="compact"
           subtitle="Change these only when you want future organize runs to use a different folder or track-file format."
           show-label="Show file naming"
           hide-label="Hide file naming"

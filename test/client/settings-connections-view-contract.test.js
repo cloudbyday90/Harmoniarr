@@ -44,8 +44,8 @@ test('SettingsConnectionsView keeps optional service setup and timing controls b
   const source = await readFile(VIEW_PATH, 'utf8');
 
   assert.match(source, /import SettingsDisclosure from '\.\.\/components\/settings\/SettingsDisclosure\.vue'/);
-  assert.match(source, /title="Connection timing and playlist behavior"/);
-  assert.match(source, /title="Optional music-source connections"/);
+  assert.match(source, /title="Connection behavior"/);
+  assert.match(source, /title="Music-source connections"/);
   assert.match(source, /panel-id="settings-optional-music-sources"/);
 });
 
