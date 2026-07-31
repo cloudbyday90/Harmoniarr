@@ -230,6 +230,13 @@ Database model source: `docs/DATABASE_MODEL.md`
   retain the normal `Search again` action, while copied sibling release links
   remain generic unavailable responses in Docker and isolated browser sessions.
   See `MUSIC_QUEUE_SHARED_BOUNDED_STOP_ACCEPTANCE_DESIGN.md`.
+- Music Queue shared manual restart acceptance: a conditional global restart
+  gives concurrent owners one winning `Search again` action and an explicit
+  already-queued outcome. The packaged controlled-provider proof covers one
+  restart search and transfer, two scoped `Ready to add` outcomes, audit-only
+  actor attribution, redacted release Activity, copied-link denial, and
+  disposable fixture cleanup. See
+  `MUSIC_QUEUE_SHARED_MANUAL_RESTART_ACCEPTANCE_DESIGN.md`.
 - Music Queue file-backed Docker acceptance: a disposable production runtime
   now generates real lossless and MP3-derived FLAC fixtures, reconciles their
   completed transfers through persisted safe auto-add, and proves the genuine

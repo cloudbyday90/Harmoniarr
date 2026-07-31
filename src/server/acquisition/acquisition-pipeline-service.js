@@ -209,6 +209,28 @@ function buildSummary(releases) {
   };
 }
 
+function normalizeMusicQueueRediscoveryResult(result) {
+  if (!result) {
+    return null;
+  }
+
+  if (result.discoveryRequest && typeof result.discoveryRequest === 'object') {
+    return {
+      discoveryRequest: result.discoveryRequest,
+      restartDisposition: result.restartDisposition === 'already_queued'
+        ? 'already_queued'
+        : 'started',
+    };
+  }
+
+  // Preserve compatibility with integrations that have not yet adopted the
+  // structured store outcome.
+  return {
+    discoveryRequest: result,
+    restartDisposition: 'started',
+  };
+}
+
 const REDISCOVERY_ALLOWED_STATUS_CODES = new Set([
   'failed',
   'no_matches_left',
@@ -315,7 +337,7 @@ export function createAcquisitionPipelineService({
     }
 
     const requestedAt = getNow().toISOString();
-    const rediscovery = await requestMusicQueueRediscovery({
+    const restart = normalizeMusicQueueRediscoveryResult(await requestMusicQueueRediscovery({
       metadataReleaseId,
       reasonCode: projectedRelease.status?.code === 'quality_choice_needed'
         ? 'quality_choice_search_again'
@@ -323,28 +345,35 @@ export function createAcquisitionPipelineService({
       requestedAt,
       requestedByUserId: actorUserId,
       wantedReleaseId: scopedWantedReleaseId,
-    });
-    if (!rediscovery) {
+    }));
+    if (!restart) {
       throw createApiError(409, 'music_queue_retry_not_available', 'This release could not be queued for another search');
     }
 
-    const { dispatchAlreadyActive, run } = await startDiscoveryRunIfAvailable({
-      actorUserId,
-      requestMetadata,
-      triggerSource: 'music_queue_try_again',
-    });
+    const rediscovery = restart.discoveryRequest;
+    const restartAlreadyQueued = restart.restartDisposition === 'already_queued';
 
-    recordActivityEventSafely(
-      recordActivityEventFn,
-      buildMusicQueueSearchQueuedActivityEvent({
+    const { dispatchAlreadyActive, run } = restartAlreadyQueued
+      ? { dispatchAlreadyActive: false, run: null }
+      : await startDiscoveryRunIfAvailable({
         actorUserId,
-        discoveryRunId: run?.id ?? null,
-        dispatchAlreadyActive,
-        rediscovery,
-        release,
-        wantedReleaseId: scopedWantedReleaseId,
-      }),
-    );
+        requestMetadata,
+        triggerSource: 'music_queue_try_again',
+      });
+
+    if (!restartAlreadyQueued) {
+      recordActivityEventSafely(
+        recordActivityEventFn,
+        buildMusicQueueSearchQueuedActivityEvent({
+          actorUserId,
+          discoveryRunId: run?.id ?? null,
+          dispatchAlreadyActive,
+          rediscovery,
+          release,
+          wantedReleaseId: scopedWantedReleaseId,
+        }),
+      );
+    }
 
     const refreshed = await getMusicQueueRelease({
       appUserId: scopedAppUserId,
@@ -356,6 +385,7 @@ export function createAcquisitionPipelineService({
         code: 'search_again',
         dispatchAlreadyActive,
         discoveryRunId: run?.id ?? null,
+        restartAlreadyQueued,
         wantedReleaseId: scopedWantedReleaseId,
       },
       rediscovery,

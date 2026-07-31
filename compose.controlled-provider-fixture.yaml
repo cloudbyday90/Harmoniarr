@@ -2,6 +2,7 @@ services:
   harmoniarr:
     environment:
       CONTROLLED_PROVIDER_API_KEY: ${CONTROLLED_PROVIDER_API_KEY:?Set CONTROLLED_PROVIDER_API_KEY for the controlled provider test}
+      HARMONIARR_TEST_DISABLE_BACKGROUND_SERVICES: 'true'
     volumes:
       - "./testing/docker/controlled-provider-fixture-catalog.mjs:/validation/controlled-provider-fixture-catalog.mjs:ro"
       - "./testing/docker/controlled-provider-pipeline-verifier.mjs:/validation/controlled-provider-pipeline-verifier.mjs:ro"

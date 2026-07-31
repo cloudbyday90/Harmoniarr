@@ -1633,7 +1633,20 @@ operators receive their own `No matches left` projection and one redacted
 Activity handoff to the normal `Search again` action. Two isolated browser
 sessions prove the same user-facing state and reciprocal copied-link denial.
 
-Recommended next slice: prove a shared manual restart. One owner's `Search
-again` action should reset the global bounded stop once, start at most one
-rediscovery, preserve both owners' policy boundaries, and restore the normal
-automatic release story.
+### Shared Manual Restart Acceptance
+
+Implemented in
+[MUSIC_QUEUE_SHARED_MANUAL_RESTART_ACCEPTANCE_DESIGN.md](MUSIC_QUEUE_SHARED_MANUAL_RESTART_ACCEPTANCE_DESIGN.md).
+The terminal shared recovery stop now has one conditional global restart
+transition. A winning owner opens one normal discovery run while a concurrent
+owner receives an `already queued` outcome without another provider search,
+transfer, or Activity row. The global record holds only safe restart context;
+the initiating wanted-release link retains local provenance, audit keeps the
+actor, and Music Queue Activity remains identity-redacted. Controlled Docker
+evidence proves one restart search and transfer, two scoped `Ready to add`
+outcomes, reciprocal 404 reads, and complete cleanup.
+
+Recommended next slice: make post-download add blockers release-centred. A
+release blocked by an unsafe import plan, collision, path visibility issue, or
+media-verification failure should expose one clear `Needs help adding` action
+and Activity handoff; candidate and import detail remain Advanced diagnostics.

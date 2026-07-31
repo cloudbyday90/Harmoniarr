@@ -47,6 +47,23 @@ export function useMusicQueueReleaseDetail({
   let disposed = false;
   let requestSequence = 0;
 
+  function applyRelease(payloadRelease, { invalidatePending = true } = {}) {
+    const normalizedRelease = normalizeMusicQueueRelease(payloadRelease);
+    if (!normalizedRelease) {
+      return null;
+    }
+
+    if (invalidatePending) {
+      requestSequence += 1;
+      isLoading.value = false;
+    }
+
+    release.value = normalizedRelease;
+    errorMessage.value = '';
+    isNotFound.value = false;
+    return normalizedRelease;
+  }
+
   async function load() {
     const requestId = ++requestSequence;
     const currentWantedReleaseId = resolvedWantedReleaseId.value;
@@ -70,8 +87,7 @@ export function useMusicQueueReleaseDetail({
         throw new Error('Music Queue release failed to load');
       }
 
-      release.value = normalizeMusicQueueRelease(payload.release);
-      return release.value;
+      return applyRelease(payload.release, { invalidatePending: false });
     } catch (error) {
       if (disposed || requestId !== requestSequence) return null;
 
@@ -102,6 +118,7 @@ export function useMusicQueueReleaseDetail({
     errorMessage,
     isLoading,
     isNotFound,
+    applyRelease,
     load,
     release,
   };

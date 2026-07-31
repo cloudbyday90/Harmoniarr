@@ -147,6 +147,19 @@ test('deriveMusicQueueStatus keeps manually selected matches distinct from autom
   assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.DOWNLOAD_NOW);
 });
 
+test('deriveMusicQueueStatus shows the active download when automatic execution is queued for a selected match', () => {
+  const status = deriveMusicQueueStatus({
+    match: {
+      executionStatusCounts: { pending: 1 },
+      statusCounts: { selected: 1 },
+    },
+    release: { missingTrackCount: 10, wantedStatus: 'missing' },
+  });
+
+  assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.DOWNLOADING);
+  assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.OPEN_DOWNLOADER);
+});
+
 test('deriveMusicQueueStatus surfaces an automatically promoted fallback as trying another match', () => {
   const status = deriveMusicQueueStatus({
     match: {

@@ -158,7 +158,6 @@ export function buildMusicQueueRecoveryActivityEvent({
  * rediscovery request has persisted successfully.
  */
 export function buildMusicQueueSearchQueuedActivityEvent({
-  actorUserId = null,
   discoveryRunId = null,
   dispatchAlreadyActive = false,
   rediscovery = null,
@@ -171,7 +170,6 @@ export function buildMusicQueueSearchQueuedActivityEvent({
   }
 
   return {
-    actorUserId,
     entityArtist: normalizeOptionalString(release?.artistName),
     entityId: resolvedWantedReleaseId,
     entityTitle: normalizeOptionalString(release?.releaseTitle)

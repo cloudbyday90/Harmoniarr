@@ -143,6 +143,18 @@ function buildFixtureEvidence(fixtureId) {
   };
 }
 
+function countFixtureTransfers(fixture) {
+  const filenames = [
+    buildControlledProviderRemoteFilename(fixture),
+    buildControlledProviderRemoteFilename(fixture, { variant: 'fallback' }),
+  ];
+
+  return Array.from(transfersByUsername.values())
+    .flat()
+    .filter((transfer) => filenames.includes(transfer.filename))
+    .length;
+}
+
 async function enqueueTransfers(username, files) {
   const accepted = [];
   for (const file of files) {
@@ -157,8 +169,13 @@ async function enqueueTransfers(username, files) {
     const variant = remoteFilename === buildControlledProviderRemoteFilename(fixture, { variant: 'fallback' })
       ? 'fallback'
       : 'primary';
-    const transferFailed = ['recovery_fallback', 'shared_recovery_fallback', 'shared_recovery_exhausted'].includes(fixture.scenario)
-      && variant === 'primary';
+    const firstSharedBoundedStopAttempt = fixture.scenario === 'shared_recovery_exhausted'
+      && countFixtureTransfers(fixture) === 0;
+    const transferFailed = variant === 'primary'
+      && (
+        ['recovery_fallback', 'shared_recovery_fallback'].includes(fixture.scenario)
+        || firstSharedBoundedStopAttempt
+      );
     const destinationDirectory = resolve(downloadsRoot, 'complete', `${fixture.id}-${variant}`);
     if (!transferFailed) {
       await mkdir(destinationDirectory, { recursive: true });

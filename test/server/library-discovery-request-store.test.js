@@ -291,11 +291,17 @@ test('consumeProviderRecoveryPending atomically clears one durable provider-reco
 test('requestMusicQueueRediscovery resets one release into ready automatic search state', async (t) => {
   const query = t.mock.fn(async (sql, params) => {
     assert.match(sql, /request_status = 'ready'/);
+    assert.match(sql, /last_search_at = NULL/);
+    assert.match(sql, /manual_requested_at = NULL/);
     assert.match(sql, /next_search_after = \$2::timestamptz/);
+    assert.match(sql, /research_attempt_count = 0/);
     assert.match(sql, /- 'downloadRecoveryExhausted'/);
     assert.match(sql, /- 'downloadRecoveryRediscovery'/);
     assert.match(sql, /- 'searchExhausted'/);
+    assert.match(sql, /'priorResearchAttemptCount'/);
     assert.match(sql, /'musicQueueRediscovery'/);
+    assert.match(sql, /COALESCE\(library_discovery_request_wanted_release_links\.evidence, '\{\}'::jsonb\)/);
+    assert.match(sql, /request_status = ANY\(ARRAY\['cooldown', 'ready', 'running', 'searching'\]\)/);
     assert.deepEqual(params, [
       'release-1',
       '2026-06-29T12:00:00.000Z',
@@ -340,9 +346,60 @@ test('requestMusicQueueRediscovery resets one release into ready automatic searc
     wantedReleaseId: 'wanted-1',
   });
 
-  assert.equal(result.requestStatus, 'ready');
-  assert.equal(result.blockedReason, null);
-  assert.equal(result.nextSearchAfter, '2026-06-29T12:00:00.000Z');
+  assert.equal(result.restartDisposition, 'started');
+  assert.equal(result.discoveryRequest.requestStatus, 'ready');
+  assert.equal(result.discoveryRequest.blockedReason, null);
+  assert.equal(result.discoveryRequest.nextSearchAfter, '2026-06-29T12:00:00.000Z');
+});
+
+test('requestMusicQueueRediscovery reports an already queued restart without rewriting shared state', async (t) => {
+  const query = t.mock.fn(async (_sql, params) => {
+    if (params.length === 5) {
+      assert.deepEqual(params, [
+        'release-1',
+        '2026-06-29T12:00:00.000Z',
+        'music_queue_try_again',
+        'user-1',
+        'wanted-1',
+      ]);
+      return { rows: [] };
+    }
+
+    assert.deepEqual(params, ['release-1']);
+    return {
+      rows: [{
+        blocked_reason: null,
+        evidence: {
+          musicQueueRediscovery: {
+            reasonCode: 'music_queue_try_again',
+            requestedAt: '2026-06-29T12:00:00.000Z',
+          },
+        },
+        metadata_artist_id: 'artist-1',
+        metadata_release_group_id: 'group-1',
+        metadata_release_id: 'release-1',
+        request_status: 'cooldown',
+        search_attempt_count: 1,
+        search_mode: 'automatic',
+        wanted_status: 'missing',
+      }],
+    };
+  });
+  const store = createLibraryDiscoveryRequestStore({
+    getPoolFn: () => ({ query }),
+  });
+
+  const result = await store.requestMusicQueueRediscovery({
+    metadataReleaseId: 'release-1',
+    requestedAt: '2026-06-29T12:00:00.000Z',
+    requestedByUserId: 'user-1',
+    wantedReleaseId: 'wanted-1',
+  });
+
+  assert.equal(query.mock.callCount(), 2);
+  assert.equal(result.restartDisposition, 'already_queued');
+  assert.equal(result.discoveryRequest.requestStatus, 'cooldown');
+  assert.equal(result.discoveryRequest.evidence.musicQueueRediscovery.reasonCode, 'music_queue_try_again');
 });
 
 test('allowMusicQueueFallbackQuality records override and queues rediscovery', async (t) => {

@@ -212,7 +212,9 @@ export function useMusicQueue({
       applyMutationRelease(payload);
       setActionFeedback({
         actionKey,
-        message: payload?.action?.dispatchAlreadyActive
+        message: payload?.action?.restartAlreadyQueued
+          ? 'A search is already queued for this release. Harmoniarr will continue it automatically.'
+          : payload?.action?.dispatchAlreadyActive
           ? 'Search queued. Discovery is already running and will pick this up.'
           : 'Search queued. Harmoniarr will look for this release again.',
         phase: 'success',

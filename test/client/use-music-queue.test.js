@@ -211,3 +211,49 @@ test('Music Queue applies an authoritative mutation release before its list reva
   await action;
   app.unmount();
 });
+
+test('Music Queue explains when another owner has already restarted a shared release', async (t) => {
+  const originalDocument = globalThis.document;
+  globalThis.document = {
+    addEventListener() {},
+    hidden: false,
+    removeEventListener() {},
+  };
+  t.after(() => {
+    globalThis.document = originalDocument;
+  });
+
+  const restartedRelease = createMusicQueueRelease({
+    status: {
+      code: 'searching',
+      label: 'Searching',
+      nextAction: 'none',
+      tone: 'info',
+    },
+  });
+  const fetchMusicQueueReleases = t.mock.fn(async () => ({
+    pagination: { total: 1 },
+    releases: [restartedRelease],
+    summary: { counts: { searching: 1 }, total: 1 },
+  }));
+  const searchMusicQueueReleaseAgain = t.mock.fn(async () => ({
+    action: { restartAlreadyQueued: true },
+    release: restartedRelease,
+  }));
+  const { app, musicQueue } = mountMusicQueue({
+    fetchMusicQueueReleases,
+    searchMusicQueueReleaseAgain,
+  });
+
+  const result = await musicQueue.searchAgain({ wantedReleaseId: 'wanted-1' });
+
+  assert.equal(result.action.restartAlreadyQueued, true);
+  assert.deepEqual(musicQueue.actionFeedback.value, {
+    actionKey: 'wanted-1:search-again',
+    message: 'A search is already queued for this release. Harmoniarr will continue it automatically.',
+    phase: 'success',
+    wantedReleaseId: 'wanted-1',
+  });
+  assert.equal(fetchMusicQueueReleases.mock.callCount(), 1);
+  app.unmount();
+});

@@ -55,37 +55,57 @@ export async function installConfiguredMusicQueueProviderFixtures(browserContext
  * same generic 404 contract as the production scoped service.
  *
  * @param {import('playwright').BrowserContext} browserContext
- * @param {{ activityEvents?: Array<object>, release?: object, releaseSequence?: Array<object> }} options
- * @returns {Promise<{getReleaseReadCount: () => number}>}
+ * @param {{ activityEvents?: Array<object>, release?: object, releaseAfterSearchAgain?: object, releaseSequence?: Array<object>, searchAgainResponse?: object }} options
+ * @returns {Promise<{getReleaseReadCount: () => number, getSearchAgainRequestCount: () => number}>}
  */
 export async function installScopedMusicQueueReadModelFixtures(browserContext, {
   activityEvents = [],
   release = null,
+  releaseAfterSearchAgain = null,
   releaseSequence = null,
+  searchAgainResponse = null,
 } = {}) {
   const releases = Array.isArray(releaseSequence) && releaseSequence.length > 0
     ? releaseSequence
     : [release];
   const initialRelease = releases[0];
 
-  if (!initialRelease?.id || releases.some((entry) => entry?.id !== initialRelease.id)) {
+  if (!initialRelease?.id
+    || releases.some((entry) => entry?.id !== initialRelease.id)
+    || (releaseAfterSearchAgain && releaseAfterSearchAgain.id !== initialRelease.id)) {
     throw new TypeError('installScopedMusicQueueReadModelFixtures requires a release with an id');
   }
 
   let releaseReadCount = 0;
+  let searchAgainRequestCount = 0;
+  let currentRelease = initialRelease;
 
   await installConfiguredMusicQueueProviderFixtures(browserContext);
 
   await browserContext.route('**/api/v1/acquisition/releases**', async (route) => {
+    const requestUrl = new URL(route.request().url());
+    const listPath = '/api/v1/acquisition/releases';
+    const releasePath = `${listPath}/${encodeURIComponent(initialRelease.id)}`;
+    const searchAgainPath = `${releasePath}/search-again`;
+
+    if (route.request().method() === 'POST' && requestUrl.pathname === searchAgainPath && searchAgainResponse) {
+      searchAgainRequestCount += 1;
+      currentRelease = releaseAfterSearchAgain ?? currentRelease;
+      await route.fulfill({
+        body: JSON.stringify(searchAgainResponse),
+        contentType: 'application/json',
+      });
+      return;
+    }
+
     if (route.request().method() !== 'GET') {
       await route.continue();
       return;
     }
 
-    const requestUrl = new URL(route.request().url());
-    const listPath = '/api/v1/acquisition/releases';
-    const releasePath = `${listPath}/${encodeURIComponent(initialRelease.id)}`;
-    const currentRelease = releases[Math.min(releaseReadCount, releases.length - 1)];
+    if (!releaseAfterSearchAgain) {
+      currentRelease = releases[Math.min(releaseReadCount, releases.length - 1)];
+    }
 
     if (requestUrl.pathname === listPath) {
       releaseReadCount += 1;
@@ -138,5 +158,6 @@ export async function installScopedMusicQueueReadModelFixtures(browserContext, {
 
   return {
     getReleaseReadCount: () => releaseReadCount,
+    getSearchAgainRequestCount: () => searchAgainRequestCount,
   };
 }

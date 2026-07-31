@@ -450,6 +450,124 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
   assert.deepEqual(stderrWrites, []);
 });
 
+test('startServerRuntime leaves background services idle for isolated verification', async () => {
+  const startedServices = [];
+  const registeredServices = [];
+  const createService = (name) => ({
+    start() {
+      startedServices.push(name);
+    },
+    async stop() {},
+  });
+
+  const runtime = await startServerRuntime({
+    assertNoPendingMigrations: async () => {},
+    bootstrapDatabaseSchemaFromSnapshot: async () => ({
+      bootstrapped: false,
+      schemaSnapshotPath: 'schema.sql',
+    }),
+    createApp: () => ({
+      activityModule: {
+        sourceUserOutcomeLedgerStore: {},
+      },
+      app: {
+        listen(_port, _host, onListening) {
+          onListening();
+          return {
+            close(onClose) {
+              onClose();
+            },
+          };
+        },
+      },
+      appPort: 4124,
+      artworkModule: {},
+      fulfillmentModule: {
+        fulfillmentEvidenceService: {
+          correlateUnmatchedEvidence: async () => {},
+          deleteExpiredEvidence: async () => {},
+        },
+      },
+      importCandidateModule: {
+        importCandidateExecutionHeartbeatConfig: { intervalMs: 60_000 },
+        importCandidateExecutionHeartbeatState: {},
+        importCandidateExecutionReconciliationService: {
+          reconcileImportCandidateExecutionState: async () => {},
+        },
+        importCandidateExecutionSummaryService: {
+          buildImportCandidateExecutionSummary: async () => {},
+        },
+      },
+      libraryModule: {
+        libraryDiscoveryHeartbeatState: {},
+        libraryDiscoveryRequestStore: {
+          markDueAutomaticDiscoveryRequestsProviderPaused: async () => {},
+        },
+        libraryDiscoveryRunService: {
+          startLibraryDiscoveryRun: async () => {},
+        },
+        libraryDiscoveryRunStore: {
+          getActiveRun: async () => null,
+        },
+        libraryDiscoverySummaryStore: {
+          getLibraryDiscoverySnapshot: async () => ({}),
+        },
+      },
+      maintenanceLockOperationPauseService: null,
+      maintenanceLockService: {
+        listActiveMaintenanceLocks: async () => [],
+      },
+      metadataModule: {
+        metadataArtistRefreshService: {
+          startMetadataArtistRefresh: async () => {},
+        },
+        metadataRefreshDispatchPolicyService: {},
+        metadataRefreshHeartbeatConfig: { intervalMs: 60_000 },
+        metadataRefreshHeartbeatState: {},
+        metadataRefreshSchedulerService: {},
+      },
+      pushModule: null,
+      systemModule: {
+        idempotencyRecordCleanupHeartbeat: createService('idempotency cleanup'),
+        operatorNotificationFanoutHeartbeat: createService('operator notifications'),
+      },
+    }),
+    createFulfillmentCorrelationHeartbeat: () => createService('fulfillment correlation'),
+    createImportCandidateExecutionHeartbeat: () => createService('import execution'),
+    createLedgerRetentionHeartbeat: () => createService('ledger retention'),
+    createLedgerRetentionService: () => ({
+      applyLedgerRetention: async () => {},
+    }),
+    createLibraryDiscoveryDispatchPolicyService: () => ({}),
+    createLibraryDiscoveryHeartbeat: () => createService('library discovery'),
+    createMetadataRefreshHeartbeat: () => createService('metadata refresh'),
+    createOperationQueueDispatcher: () => createService('operation queue'),
+    createOperationQueueHandlers: () => ({}),
+    createOperationQueueStore: () => ({}),
+    createOperationStrandedRunRecoveryService: () => ({}),
+    createStartupServiceSupervisor: () => ({
+      installSignalHandlers() {},
+      registerService(service) {
+        registeredServices.push(service);
+      },
+      startAll() {
+        startedServices.push('supervisor');
+      },
+    }),
+    createStartupValidationService: () => ({
+      assertStartupReady: async () => {},
+    }),
+    resolveLibraryDiscoveryHeartbeatConfig: () => ({ intervalMs: 60_000 }),
+    startBackgroundServices: false,
+    stderr: { write() {} },
+    stdout: { write() {} },
+  });
+
+  assert.equal(runtime.server != null, true);
+  assert.equal(registeredServices.length, 8);
+  assert.deepEqual(startedServices, []);
+});
+
 test('startServerRuntime reports shutdown errors through stderr and sets exitCode', async () => {
   const processEmitter = new EventEmitter();
   const stderrWrites = [];

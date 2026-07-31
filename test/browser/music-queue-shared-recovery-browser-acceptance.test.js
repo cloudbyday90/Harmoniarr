@@ -43,6 +43,14 @@ const DOWNLOADING_STATUS = Object.freeze({
   tone: 'info',
 });
 
+const SEARCHING_STATUS = Object.freeze({
+  code: 'searching',
+  detail: 'Harmoniarr is looking for matching files.',
+  label: 'Searching',
+  nextAction: 'search_now',
+  tone: 'info',
+});
+
 const NO_MATCHES_LEFT_STATUS = Object.freeze({
   code: 'no_matches_left',
   detail: 'Harmoniarr has tried every acceptable match and stopped automatic recovery.',
@@ -462,5 +470,113 @@ suite('Music Queue shared recovery browser acceptance', { concurrency: 1 }, () =
         await operatorContext?.close().catch(() => {});
       }
     }, { scenarioName: 'music_queue_shared_bounded_stop_two_session_access' });
+  });
+
+  test('lets one owner restart a shared bounded stop while both sessions return to automatic progress', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) {
+      t.skip(runtimeUnavailableReason);
+      return;
+    }
+
+    await browserRuntime.runScenario(async ({ baseUrl, browser, browserContext, page }) => {
+      const adminReleaseId = 'wanted-shared-manual-restart-browser-admin';
+      const operatorReleaseId = 'wanted-shared-manual-restart-browser-operator';
+      const adminStoppedRelease = buildSharedRecoveryRelease({
+        policyMarker: ADMIN_POLICY_MARKER,
+        status: NO_MATCHES_LEFT_STATUS,
+        wantedReleaseId: adminReleaseId,
+      });
+      const adminSearchingRelease = buildSharedRecoveryRelease({
+        policyMarker: ADMIN_POLICY_MARKER,
+        status: SEARCHING_STATUS,
+        wantedReleaseId: adminReleaseId,
+      });
+      const operatorSearchingRelease = buildSharedRecoveryRelease({
+        policyMarker: OPERATOR_POLICY_MARKER,
+        status: SEARCHING_STATUS,
+        wantedReleaseId: operatorReleaseId,
+      });
+      const adminPageErrors = [];
+      const operatorPageErrors = [];
+      let operatorContext;
+
+      page.on('pageerror', (error) => adminPageErrors.push(error.message));
+
+      try {
+        await bootstrapAdminThroughUi(page, { baseUrl });
+        await createUserThroughApi(page, {
+          password: 'InitialPass123!',
+          role: 'operator',
+          username: 'shared-manual-restart-operator',
+        });
+        const adminReadModel = await installScopedMusicQueueReadModelFixtures(browserContext, {
+          release: adminStoppedRelease,
+          releaseAfterSearchAgain: adminSearchingRelease,
+          searchAgainResponse: {
+            action: {
+              code: 'search_again',
+              dispatchAlreadyActive: false,
+              discoveryRunId: 'run-shared-manual-restart',
+              restartAlreadyQueued: false,
+              wantedReleaseId: adminReleaseId,
+            },
+            release: adminSearchingRelease,
+          },
+        });
+
+        operatorContext = await browser.newContext({ serviceWorkers: 'block' });
+        const operatorPage = await operatorContext.newPage();
+        operatorPage.setDefaultTimeout(integrationRuntimeConfig.httpRequestTimeoutMs);
+        operatorPage.on('pageerror', (error) => operatorPageErrors.push(error.message));
+        await loginUserThroughUi(operatorPage, {
+          baseUrl,
+          initialPassword: 'InitialPass123!',
+          readyPassword: 'ReadyPass123!',
+          username: 'shared-manual-restart-operator',
+        });
+        const operatorReadModel = await installScopedMusicQueueReadModelFixtures(operatorContext, {
+          release: operatorSearchingRelease,
+        });
+
+        await page.goto(`${baseUrl}/app/music-queue`, { waitUntil: 'domcontentloaded' });
+        const adminReleaseRow = getReleaseRow(page);
+        const adminDetail = page.getByRole('complementary', { name: 'Music Queue details' });
+        await adminReleaseRow.getByText('No matches left', { exact: true }).waitFor();
+        await adminReleaseRow.getByRole('button', { name: 'Review recovery' }).click();
+        await adminDetail.getByRole('button', { name: 'Search again' }).click();
+        await adminDetail.getByText('Search queued. Harmoniarr will look for this release again.').waitFor();
+        await adminReleaseRow.getByText('Searching', { exact: true }).waitFor();
+        await adminDetail.getByText('Searching', { exact: true }).waitFor();
+        assert.equal(await adminDetail.getByRole('button', { name: 'Search again' }).count(), 0);
+        assert.equal(adminReadModel.getSearchAgainRequestCount(), 1);
+        assertNoPrivateSharedData(await page.getByRole('main').innerText(), {
+          otherPolicyMarker: OPERATOR_POLICY_MARKER,
+          otherWantedReleaseId: operatorReleaseId,
+          ownPolicyMarker: ADMIN_POLICY_MARKER,
+        });
+
+        await operatorPage.goto(`${baseUrl}/app/music-queue`, { waitUntil: 'domcontentloaded' });
+        const operatorReleaseRow = getReleaseRow(operatorPage);
+        const operatorDetail = operatorPage.getByRole('complementary', { name: 'Music Queue details' });
+        await operatorReleaseRow.getByText('Searching', { exact: true }).waitFor();
+        await operatorReleaseRow.getByRole('button', { name: 'View details' }).click();
+        await operatorDetail.getByRole('heading', { name: `${SHARED_RELEASE} by ${SHARED_ARTIST}` }).waitFor();
+        assert.equal(await operatorDetail.getByRole('button', { name: 'Search again' }).count(), 0);
+        assert.equal(operatorReadModel.getSearchAgainRequestCount(), 0);
+        assertNoPrivateSharedData(await operatorPage.getByRole('main').innerText(), {
+          otherPolicyMarker: ADMIN_POLICY_MARKER,
+          otherWantedReleaseId: adminReleaseId,
+          ownPolicyMarker: OPERATOR_POLICY_MARKER,
+        });
+
+        assert.deepEqual(adminPageErrors, [], `Unexpected admin page errors: ${adminPageErrors.join(' | ')}`);
+        assert.deepEqual(operatorPageErrors, [], `Unexpected operator page errors: ${operatorPageErrors.join(' | ')}`);
+      } finally {
+        await operatorContext?.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
+        await operatorContext?.close().catch(() => {});
+      }
+    }, { scenarioName: 'music_queue_shared_manual_restart_two_session_access' });
   });
 });

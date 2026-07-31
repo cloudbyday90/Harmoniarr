@@ -225,7 +225,6 @@ test('requestMusicQueueReleaseRediscovery verifies release scope before queuing 
     triggeredByUserId: 'user-1',
   }]);
   assert.deepEqual(recordActivityEventFn.mock.calls[0].arguments, [{
-    actorUserId: 'user-1',
     entityArtist: 'Forest Frank',
     entityId: 'wanted-1',
     entityTitle: 'Child of God',
@@ -359,6 +358,36 @@ test('requestMusicQueueReleaseRediscovery succeeds when discovery dispatch is al
 
   assert.equal(result.action.dispatchAlreadyActive, true);
   assert.equal(result.action.discoveryRunId, null);
+});
+
+test('requestMusicQueueReleaseRediscovery does not start duplicate shared work when a restart is already queued', async (t) => {
+  const startLibraryDiscoveryRun = t.mock.fn(async () => ({ accepted: true, run: { id: 'run-1' } }));
+  const recordActivityEventFn = t.mock.fn(async () => {});
+  const service = createService({
+    recordActivityEventFn,
+    requestMusicQueueRediscovery: async () => ({
+      discoveryRequest: {
+        metadataReleaseId: 'release-1',
+        requestStatus: 'cooldown',
+      },
+      restartDisposition: 'already_queued',
+    }),
+    startLibraryDiscoveryRun,
+    statusService: stoppedStatusService,
+  });
+
+  const result = await service.requestMusicQueueReleaseRediscovery({
+    actorUserId: 'user-1',
+    appUserId: 'user-1',
+    wantedReleaseId: 'wanted-1',
+  });
+
+  assert.equal(result.action.code, 'search_again');
+  assert.equal(result.action.restartAlreadyQueued, true);
+  assert.equal(result.action.dispatchAlreadyActive, false);
+  assert.equal(result.action.discoveryRunId, null);
+  assert.equal(startLibraryDiscoveryRun.mock.callCount(), 0);
+  assert.equal(recordActivityEventFn.mock.callCount(), 0);
 });
 
 test('requestMusicQueueReleaseRediscovery rejects unstopped releases before writing', async (t) => {

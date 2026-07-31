@@ -114,6 +114,20 @@ const FOLDER_SETUP_RECOVERY_REASONS = Object.freeze([
   'download_folder_unavailable',
 ]);
 
+const ACTIVE_MUSIC_QUEUE_REDISCOVERY_STATUSES = new Set([
+  'cooldown',
+  'ready',
+  'running',
+  'searching',
+]);
+
+function isMusicQueueRediscoveryInProgress(discoveryRequest) {
+  return discoveryRequest?.searchMode === 'automatic'
+    && discoveryRequest?.blockedReason == null
+    && ACTIVE_MUSIC_QUEUE_REDISCOVERY_STATUSES.has(discoveryRequest?.requestStatus)
+    && discoveryRequest?.evidence?.musicQueueRediscovery != null;
+}
+
 export function createLibraryDiscoveryRequestStore({
   getPoolFn = getPool,
   libraryDiscoveryRequestWantedReleaseLinkStore = createLibraryDiscoveryRequestWantedReleaseLinkStore(),
@@ -729,8 +743,11 @@ export function createLibraryDiscoveryRequestStore({
             search_mode = 'automatic',
             request_status = 'ready',
             blocked_reason = NULL,
+            last_search_at = NULL,
             next_search_after = $2::timestamptz,
+            manual_requested_at = NULL,
             search_attempt_count = 0,
+            research_attempt_count = 0,
             evidence = (
               COALESCE(evidence, '{}'::jsonb)
                 - 'downloadRecoveryExhausted'
@@ -740,6 +757,7 @@ export function createLibraryDiscoveryRequestStore({
               'musicQueueRediscovery',
               jsonb_build_object(
                 'priorBlockedReason', blocked_reason,
+                'priorResearchAttemptCount', research_attempt_count,
                 'priorRequestStatus', request_status,
                 'priorSearchAttemptCount', search_attempt_count,
                 'reasonCode', $3::text,
@@ -749,12 +767,17 @@ export function createLibraryDiscoveryRequestStore({
             updated_at = NOW()
           WHERE metadata_release_id = $1
             AND search_mode = 'automatic'
+            AND NOT (
+              COALESCE(evidence, '{}'::jsonb) ? 'musicQueueRediscovery'
+              AND request_status = ANY(ARRAY['cooldown', 'ready', 'running', 'searching'])
+              AND blocked_reason IS NULL
+            )
           RETURNING *
         ),
         link_intent AS (
           UPDATE library_discovery_request_wanted_release_links
           SET
-            evidence = COALESCE(evidence, '{}'::jsonb) || jsonb_build_object(
+            evidence = COALESCE(library_discovery_request_wanted_release_links.evidence, '{}'::jsonb) || jsonb_build_object(
               'musicQueueRediscovery',
               jsonb_build_object(
                 'reasonCode', $3::text,
@@ -797,7 +820,23 @@ export function createLibraryDiscoveryRequestStore({
       [metadataReleaseId, requestedAt, reasonCode, requestedByUserId, wantedReleaseId],
     );
 
-    return mapDiscoveryRequestStateRow(result.rows[0]);
+    const discoveryRequest = mapDiscoveryRequestStateRow(result.rows[0]);
+    if (discoveryRequest) {
+      return {
+        discoveryRequest,
+        restartDisposition: 'started',
+      };
+    }
+
+    const currentRequest = await getDownloadRecoveryRediscoveryState({ metadataReleaseId });
+    if (!isMusicQueueRediscoveryInProgress(currentRequest)) {
+      return null;
+    }
+
+    return {
+      discoveryRequest: currentRequest,
+      restartDisposition: 'already_queued',
+    };
   }
 
   async function allowMusicQueueFallbackQuality({

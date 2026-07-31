@@ -46,6 +46,19 @@ async function waitForRun(runStore, runId) {
   throw new Error(`Timed out waiting for run ${runId}`);
 }
 
+async function getOperationRunSummary(pool, runId) {
+  const result = await pool.query(
+    `
+      SELECT summary
+      FROM operation_runs
+      WHERE id = $1
+    `,
+    [runId],
+  );
+
+  return result.rows[0]?.summary ?? {};
+}
+
 async function waitForActiveRun(runStore) {
   const deadline = Date.now() + 20_000;
   while (Date.now() < deadline) {
@@ -458,6 +471,9 @@ async function runVerification() {
   });
   const acquisitionModule = createAcquisitionModule({
     buildLibraryWantedReleases: libraryModule.routeDependencies.buildLibraryWantedReleases,
+    recordActivityEventFn: activityModule.activityEventService.recordActivityEvent,
+    requestMusicQueueRediscovery: libraryModule.libraryDiscoveryRequestStore.requestMusicQueueRediscovery,
+    startLibraryDiscoveryRun: libraryModule.routeDependencies.startLibraryDiscoveryRun,
   });
 
   await persistSettings([
@@ -1205,6 +1221,190 @@ async function runVerification() {
     'repeat dispatches after the bounded stop must not queue another provider transfer',
   );
 
+  const sharedManualRestartResults = await Promise.all(sharedBoundedStopSeed.wantedReleases.map(({
+    appUserId,
+    wantedReleaseId,
+  }) => acquisitionModule.acquisitionPipelineService.requestMusicQueueReleaseRediscovery({
+    actorUserId: appUserId,
+    appUserId,
+    requestMetadata: { ipAddress: '127.0.0.1' },
+    wantedReleaseId,
+  })));
+  const sharedManualRestartStarted = sharedManualRestartResults.filter((result) => !result.action.restartAlreadyQueued);
+  const sharedManualRestartAlreadyQueued = sharedManualRestartResults.filter((result) => result.action.restartAlreadyQueued);
+  assert.equal(sharedManualRestartStarted.length, 1, 'two owners must transition one shared bounded stop only once');
+  assert.equal(sharedManualRestartAlreadyQueued.length, 1, 'the racing owner must observe the already queued shared restart');
+  const sharedManualRestartInitiator = sharedManualRestartStarted[0];
+  const sharedManualRestartInitiatorWantedReleaseId = sharedManualRestartInitiator.action.wantedReleaseId;
+  const sharedManualRestartRunId = sharedManualRestartInitiator.run?.id;
+  assert.ok(sharedManualRestartRunId, 'the accepted shared restart must create one discovery run');
+  assert.equal(sharedManualRestartAlreadyQueued[0].action.discoveryRunId, null, 'the already queued restart must not create a duplicate run');
+  assert.equal(sharedManualRestartAlreadyQueued[0].action.dispatchAlreadyActive, false, 'the already queued restart must not report a second dispatcher result');
+  assert.equal(sharedManualRestartInitiator.rediscovery.researchAttemptCount, 0, 'the accepted shared restart must reset the global recovery budget');
+  assert.equal(sharedManualRestartInitiator.rediscovery.searchAttemptCount, 0, 'the accepted shared restart must reset the global search counter');
+
+  const sharedManualRestartStateResult = await pool.query(
+    `
+      SELECT
+        blocked_reason AS "blockedReason",
+        evidence,
+        request_status AS "requestStatus",
+        research_attempt_count AS "researchAttemptCount",
+        search_attempt_count AS "searchAttemptCount"
+      FROM library_discovery_requests
+      WHERE metadata_release_id = $1
+    `,
+    [sharedBoundedStopSeed.metadataReleaseId],
+  );
+  const sharedManualRestartQueuedState = sharedManualRestartStateResult.rows[0];
+  assert.equal(sharedManualRestartQueuedState?.requestStatus, 'ready', 'the accepted restart must reopen the global request for automatic dispatch');
+  assert.equal(sharedManualRestartQueuedState?.blockedReason, null, 'the accepted restart must clear the bounded-stop reason');
+  assert.equal(sharedManualRestartQueuedState?.researchAttemptCount, 0, 'the accepted restart must clear the global recovery budget');
+  assert.equal(sharedManualRestartQueuedState?.searchAttemptCount, 0, 'the accepted restart must clear the global search attempt count');
+  assert.equal(sharedManualRestartQueuedState?.evidence?.downloadRecoveryExhausted, undefined, 'the accepted restart must remove terminal recovery evidence');
+  assert.equal(sharedManualRestartQueuedState?.evidence?.musicQueueRediscovery?.reasonCode, 'music_queue_try_again', 'the accepted restart must retain only safe global restart context');
+
+  const sharedManualRestartLinkState = await pool.query(
+    `
+      SELECT
+        wanted_release_id AS "wantedReleaseId",
+        evidence
+      FROM library_discovery_request_wanted_release_links
+      WHERE discovery_request_id = $1
+      ORDER BY wanted_release_id ASC
+    `,
+    [sharedBoundedStopSeed.discoveryRequestId],
+  );
+  assert.equal(sharedManualRestartLinkState.rowCount, sharedBoundedStopSeed.wantedReleases.length, 'the shared restart must retain every operator link');
+  for (const link of sharedManualRestartLinkState.rows) {
+    if (link.wantedReleaseId === sharedManualRestartInitiatorWantedReleaseId) {
+      assert.equal(link.evidence?.musicQueueRediscovery?.wantedReleaseId, sharedManualRestartInitiatorWantedReleaseId, 'only the initiating owner link may retain manual restart intent');
+      continue;
+    }
+    assert.equal(link.evidence?.musicQueueRediscovery, undefined, 'a shared restart must not write the other owner\'s local link evidence');
+  }
+
+  const sharedManualRestartActivity = await waitForActivityEvent(activityModule.activityEventService, {
+    entityId: sharedManualRestartInitiatorWantedReleaseId,
+    eventType: 'music_queue_search_queued',
+  });
+  assert.equal(sharedManualRestartActivity.entityId, sharedManualRestartInitiatorWantedReleaseId, 'manual restart Activity must remain scoped to its initiating release');
+  const sharedManualRestartActivityFeed = await activityModule.activityEventService.buildActivityFeed({
+    eventType: 'music_queue_search_queued',
+    limit: 10,
+  });
+  const sharedManualRestartActivities = sharedManualRestartActivityFeed.events.filter((event) => (
+    sharedBoundedStopWantedReleaseIds.includes(event.entityId)
+  ));
+  assert.equal(sharedManualRestartActivities.length, 1, 'a racing shared restart must create one owner-scoped Activity row');
+  assertSharedActivityFanoutIsRedacted({
+    activities: sharedManualRestartActivities,
+    sharedSeed: sharedBoundedStopSeed,
+    wantedReleaseIds: [sharedManualRestartInitiatorWantedReleaseId],
+  });
+
+  const sharedManualRestartEvidenceBefore = await getControlledProviderFixtureEvidence(sharedBoundedStopFixture.id);
+  await libraryModule.libraryDiscoveryWorker.startWorkerRun({
+    requestMetadata: { ipAddress: '127.0.0.1' },
+    runId: sharedManualRestartRunId,
+    triggerSource: 'music_queue_try_again',
+    triggeredByUserId: sharedBoundedStopSeed.wantedReleases.find((entry) => (
+      entry.wantedReleaseId === sharedManualRestartInitiatorWantedReleaseId
+    ))?.appUserId ?? null,
+  });
+  const sharedManualRestartRun = await waitForRun(libraryModule.libraryDiscoveryRunStore, sharedManualRestartRunId);
+  assert.equal(sharedManualRestartRun.candidateCount, 1, 'the accepted shared restart must dispatch one new global provider search');
+  const sharedManualRestartFinalStateResult = await pool.query(
+    `
+      SELECT
+        blocked_reason AS "blockedReason",
+        request_status AS "requestStatus",
+        research_attempt_count AS "researchAttemptCount",
+        search_attempt_count AS "searchAttemptCount"
+      FROM library_discovery_requests
+      WHERE metadata_release_id = $1
+    `,
+    [sharedBoundedStopSeed.metadataReleaseId],
+  );
+  const sharedManualRestartState = sharedManualRestartFinalStateResult.rows[0];
+  assert.equal(sharedManualRestartState?.requestStatus, 'cooldown', 'the completed restart search must return to automatic cooldown');
+  assert.equal(sharedManualRestartState?.blockedReason, 'automatic_cooldown', 'the completed restart search must return to the normal automatic cooldown marker');
+  assert.equal(sharedManualRestartState?.researchAttemptCount, 0, 'the completed restart search must retain the reset recovery budget');
+  assert.equal(sharedManualRestartState?.searchAttemptCount, 0, 'the completed restart search must clear the retry counter after finding a viable match');
+  const sharedManualRestartEvidenceAfterSearch = await getControlledProviderFixtureEvidence(sharedBoundedStopFixture.id);
+  assert.equal(
+    sharedManualRestartEvidenceAfterSearch.searchCount - sharedManualRestartEvidenceBefore.searchCount,
+    1,
+    'the accepted shared restart must issue exactly one provider search',
+  );
+  const sharedManualRestartSummary = await getOperationRunSummary(pool, sharedManualRestartRunId);
+  const sharedManualRestartSearch = sharedManualRestartSummary.dispatchedSearches?.find((search) => (
+    search.metadataReleaseId === sharedBoundedStopSeed.metadataReleaseId
+  ));
+  assert.ok(
+    sharedManualRestartSearch,
+    `the accepted shared restart must retain its provider-search evidence: ${JSON.stringify(sharedManualRestartSummary)}`,
+  );
+  const sharedManualRestartDownloadRunId = sharedManualRestartSearch?.autoDownloadStart?.runId;
+  assert.ok(
+    sharedManualRestartDownloadRunId,
+    `the accepted shared restart must create one automatic download run: ${JSON.stringify(sharedManualRestartSearch)}`,
+  );
+  await executeDownloadAndReconcile({
+    importCandidateModule,
+    runId: sharedManualRestartDownloadRunId,
+    triggerSource: 'controlled_provider_shared_manual_restart',
+  });
+  const sharedManualRestartEvidenceAfterTransfer = await getControlledProviderFixtureEvidence(sharedBoundedStopFixture.id);
+  assert.equal(
+    sharedManualRestartEvidenceAfterTransfer.transferCount - sharedManualRestartEvidenceBefore.transferCount,
+    1,
+    'the accepted shared restart must start exactly one shared automatic transfer',
+  );
+  const sharedManualRestartCandidateResult = await pool.query(
+    `
+      SELECT id
+      FROM import_candidates
+      WHERE normalized_payload #>> '{discoveryScope,metadataReleaseId}' = $1::text
+      ORDER BY created_at DESC, id ASC
+      LIMIT 1
+    `,
+    [sharedBoundedStopSeed.metadataReleaseId],
+  );
+  assert.equal(sharedManualRestartCandidateResult.rowCount, 1, 'the accepted restart must persist one shared candidate');
+  const sharedManualRestartCandidate = await importCandidateModule.importCandidateService.getImportCandidate({
+    importCandidateId: sharedManualRestartCandidateResult.rows[0].id,
+  });
+  assertSharedCandidateIsRedacted({
+    candidate: sharedManualRestartCandidate,
+    sharedSeed: sharedBoundedStopSeed,
+    wantedReleaseIds: sharedBoundedStopWantedReleaseIds,
+  });
+  const sharedManualRestartOutcomes = await Promise.all(sharedBoundedStopSeed.wantedReleases.map(async ({
+    appUserId,
+    wantedReleaseId,
+  }) => {
+    const detail = await acquisitionModule.acquisitionPipelineService.getMusicQueueRelease({
+      appUserId,
+      wantedReleaseId,
+    });
+    assert.equal(detail.release.id, wantedReleaseId, 'each owner must retain its own restarted Music Queue release');
+    assert.equal(detail.release.status.code, 'ready_to_add', 'both owners must see the recovered shared download ready to add');
+    assert.equal(detail.release.status.nextAction, 'add_to_library', 'both owners must receive the normal library-add handoff');
+    return detail.release.id;
+  }));
+  await Promise.all(sharedBoundedStopSeed.wantedReleases.map(async ({ appUserId }, index) => {
+    const other = sharedBoundedStopSeed.wantedReleases[(index + 1) % sharedBoundedStopSeed.wantedReleases.length];
+    await assert.rejects(
+      () => acquisitionModule.acquisitionPipelineService.getMusicQueueRelease({
+        appUserId,
+        wantedReleaseId: other.wantedReleaseId,
+      }),
+      (error) => error?.status === 404 && error?.code === 'music_queue_release_not_found',
+      'a shared restart must preserve reciprocal direct-detail isolation',
+    );
+  }));
+
   let catalogCandidateCount = 11;
   let noResponseCount = 0;
   for (const fixture of remainingCatalogFixtures) {
@@ -1308,6 +1508,22 @@ async function runVerification() {
       repeatDispatchCandidateCounts: sharedBoundedStopRepeatDispatches.map((result) => result.candidateCount),
       requestBlockedReason: sharedBoundedStopRequestState.blockedReason,
       requestStatus: sharedBoundedStopRequestState.requestStatus,
+    },
+    sharedManualRestart: {
+      activityCount: sharedManualRestartActivities.length,
+      activityPolicyRedacted: true,
+      candidatePolicyRedacted: Boolean(sharedManualRestartCandidate),
+      crossOperatorReadDenied: true,
+      musicQueueReadyToAddOutcomeCount: sharedManualRestartOutcomes.length,
+      operatorCount: sharedBoundedStopSeed.wantedReleases.length,
+      providerSearchCount: sharedManualRestartEvidenceAfterSearch.searchCount - sharedManualRestartEvidenceBefore.searchCount,
+      providerTransferCount: sharedManualRestartEvidenceAfterTransfer.transferCount - sharedManualRestartEvidenceBefore.transferCount,
+      researchAttemptCount: sharedManualRestartState.researchAttemptCount,
+      requestBlockedReason: sharedManualRestartState.blockedReason,
+      requestStatus: sharedManualRestartState.requestStatus,
+      restartAlreadyQueuedCount: sharedManualRestartAlreadyQueued.length,
+      restartRunId: sharedManualRestartRunId,
+      searchAttemptCount: sharedManualRestartState.searchAttemptCount,
     },
   };
 }

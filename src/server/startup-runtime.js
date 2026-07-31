@@ -72,6 +72,7 @@ export async function startServerRuntime({
   host = '0.0.0.0',
   processEmitter = process,
   resolveLibraryDiscoveryHeartbeatConfig: buildLibraryDiscoveryHeartbeatConfig = resolveLibraryDiscoveryHeartbeatConfig,
+  startBackgroundServices = process.env.HARMONIARR_TEST_DISABLE_BACKGROUND_SERVICES !== 'true',
   stderr = process.stderr,
   stdout = process.stdout,
 } = {}) {
@@ -224,7 +225,11 @@ export async function startServerRuntime({
   if (systemModule?.runtimeResourceMonitor) {
     startupServiceSupervisor.registerService(systemModule.runtimeResourceMonitor);
   }
-  startupServiceSupervisor.startAll();
+  // The controlled Docker verifier owns worker execution from a separate process.
+  // Keep ordinary deployments automatic while preventing competing lease claims there.
+  if (startBackgroundServices) {
+    startupServiceSupervisor.startAll();
+  }
 
   startupServiceSupervisor.installSignalHandlers(async () => {
     try {

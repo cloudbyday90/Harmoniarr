@@ -221,6 +221,8 @@ test('Music Queue search activity is release-scoped and records only safe schedu
   assert.equal(event.eventType, 'music_queue_search_queued');
   assert.equal(event.entityId, 'wanted-2');
   assert.equal(event.entityType, 'wanted_release');
+  assert.equal(Object.hasOwn(event, 'actorUserId'), false);
+  assert.equal(JSON.stringify(event).includes('user-1'), false);
   assert.deepEqual(Object.keys(event.extraPayload).sort(), [
     'discoveryRunId',
     'dispatchAlreadyActive',

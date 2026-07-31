@@ -126,6 +126,7 @@ async function generateFixtureAudio({ composeArgs, env }) {
     "ffmpeg -y -f lavfi -i 'aevalsrc=0.2*sin(2*PI*21000*t)+0.2*sin(2*PI*1100*t):s=44100:d=3' -c:a flac /data/downloads/controlled-provider-fixtures/track-13-fallback.flac >/dev/null 2>&1",
     "ffmpeg -y -f lavfi -i 'aevalsrc=0.2*sin(2*PI*12000*t)+0.2*sin(2*PI*1200*t):s=44100:d=3' -c:a flac /data/downloads/controlled-provider-fixtures/track-14.flac >/dev/null 2>&1",
     "ffmpeg -y -f lavfi -i 'aevalsrc=0.2*sin(2*PI*21000*t)+0.2*sin(2*PI*600*t):s=44100:d=3' -c:a flac /data/downloads/controlled-provider-fixtures/track-16-fallback.flac >/dev/null 2>&1",
+    "ffmpeg -y -f lavfi -i 'aevalsrc=0.2*sin(2*PI*21000*t)+0.2*sin(2*PI*400*t):s=44100:d=3' -c:a flac /data/downloads/controlled-provider-fixtures/track-17.flac >/dev/null 2>&1",
   ].join('; ');
   await runCompose({ args: ['exec', '-T', 'harmoniarr', 'sh', '-ec', command], composeArgs, env, timeoutMs: 30_000 });
 }
@@ -199,6 +200,21 @@ async function copyAndRunVerifier({ composeArgs, env }) {
     && parsed.sharedBoundedStop.crossOperatorReadDenied === true
     && parsed.sharedBoundedStop.candidatePolicyRedacted === true
     && parsed.sharedBoundedStop.activityPolicyRedacted === true;
+  const sharedManualRestartVerified = parsed?.sharedManualRestart?.providerSearchCount === 1
+    && parsed?.sharedManualRestart?.providerTransferCount === 1
+    && parsed.sharedManualRestart.operatorCount === 2
+    && parsed.sharedManualRestart.musicQueueReadyToAddOutcomeCount === 2
+    && parsed.sharedManualRestart.activityCount === 1
+    && parsed.sharedManualRestart.restartAlreadyQueuedCount === 1
+    && typeof parsed.sharedManualRestart.restartRunId === 'string'
+    && parsed.sharedManualRestart.restartRunId.length > 0
+    && parsed.sharedManualRestart.requestStatus === 'cooldown'
+    && parsed.sharedManualRestart.requestBlockedReason === 'automatic_cooldown'
+    && parsed.sharedManualRestart.researchAttemptCount === 0
+    && parsed.sharedManualRestart.searchAttemptCount === 0
+    && parsed.sharedManualRestart.crossOperatorReadDenied === true
+    && parsed.sharedManualRestart.candidatePolicyRedacted === true
+    && parsed.sharedManualRestart.activityPolicyRedacted === true;
   if (parsed?.pipeline?.finalStatus !== 'applied'
     || parsed.catalogFixtures !== 17
     || parsed.catalogCandidates !== 20
@@ -208,8 +224,9 @@ async function copyAndRunVerifier({ composeArgs, env }) {
     || !qualityExhaustionVerified
     || !sharedDiscoveryVerified
     || !sharedRecoveryVerified
-    || !sharedBoundedStopVerified) {
-    throw new Error('Controlled-provider verifier returned incomplete evidence');
+    || !sharedBoundedStopVerified
+    || !sharedManualRestartVerified) {
+    throw new Error(`Controlled-provider verifier returned incomplete evidence: ${JSON.stringify(parsed)}`);
   }
   return parsed;
 }

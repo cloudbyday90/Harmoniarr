@@ -67,6 +67,7 @@ const {
   useMatch,
 } = useMusicQueue({ immediate: !isProviderReadyRecoveryReturn });
 const {
+  applyRelease: applyReleaseDetail,
   errorMessage: releaseDetailErrorMessage,
   isLoading: isReleaseDetailLoading,
   isNotFound: isReleaseDetailNotFound,
@@ -182,30 +183,51 @@ function showAllReleases() {
   selectedScope.value = 'all';
 }
 
+async function refreshSelectedReleaseDetail(result) {
+  if (result?.release) {
+    applyReleaseDetail(result.release);
+    return;
+  }
+
+  await loadReleaseDetail();
+}
+
 async function handleUseMatch(match) {
-  await useMatch({
+  const result = await useMatch({
     matchId: match.matchId,
     wantedReleaseId: selectedRelease.value?.id,
   });
+  if (result) {
+    await refreshSelectedReleaseDetail(result);
+  }
 }
 
 async function handleRejectMatch(match) {
-  await rejectMatch({
+  const result = await rejectMatch({
     matchId: match.matchId,
     wantedReleaseId: selectedRelease.value?.id,
   });
+  if (result) {
+    await refreshSelectedReleaseDetail(result);
+  }
 }
 
 async function handleSearchAgain() {
-  await searchAgain({
+  const result = await searchAgain({
     wantedReleaseId: selectedRelease.value?.id,
   });
+  if (result) {
+    await refreshSelectedReleaseDetail(result);
+  }
 }
 
 async function handleAllowFallbackQuality() {
-  await allowFallbackQuality({
+  const result = await allowFallbackQuality({
     wantedReleaseId: selectedRelease.value?.id,
   });
+  if (result) {
+    await refreshSelectedReleaseDetail(result);
+  }
 }
 
 async function refreshMusicQueue() {

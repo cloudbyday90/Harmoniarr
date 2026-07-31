@@ -59,6 +59,15 @@ function createRelease(id = 'wanted-1') {
   };
 }
 
+function createDeferred() {
+  let resolve;
+  const promise = new Promise((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+
+  return { promise, resolve };
+}
+
 function mountReleaseDetail(options) {
   const { createApp } = createNoopRenderer();
   const root = { children: [] };
@@ -121,5 +130,34 @@ test('Music Queue release detail preserves non-authorization failures for the no
   assert.equal(releaseDetail.release.value, null);
   assert.equal(releaseDetail.isNotFound.value, false);
   assert.equal(releaseDetail.errorMessage.value, 'Music Queue release failed to load');
+  app.unmount();
+});
+
+test('Music Queue release detail keeps an authoritative action response ahead of an older in-flight read', async () => {
+  const wantedReleaseId = ref('wanted-1');
+  const pendingRead = createDeferred();
+  const { app, releaseDetail } = mountReleaseDetail({
+    fetchMusicQueueRelease: () => pendingRead.promise,
+    wantedReleaseId,
+  });
+  const updatedRelease = {
+    ...createRelease(),
+    status: {
+      code: 'searching',
+      detail: 'Harmoniarr is looking for matching files.',
+      label: 'Searching',
+      nextAction: 'show_advanced_diagnostics',
+      tone: 'info',
+    },
+  };
+
+  const load = releaseDetail.load();
+  releaseDetail.applyRelease(updatedRelease);
+  pendingRead.resolve({ release: createRelease() });
+  await load;
+
+  assert.equal(releaseDetail.release.value.statusCode, 'searching');
+  assert.equal(releaseDetail.release.value.status.label, 'Searching');
+  assert.equal(releaseDetail.isLoading.value, false);
   app.unmount();
 });
