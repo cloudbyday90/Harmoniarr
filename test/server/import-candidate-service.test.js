@@ -149,6 +149,30 @@ test('normalizeSlskdResponsesToImportCandidates includes formatMatchScore when f
   assert.equal(candidates[0].normalizedPayload.formatMatchLabel, 'Format match');
 });
 
+test('normalizeSlskdResponsesToImportCandidates preserves a sanitized discovery scope without request ownership', () => {
+  const candidates = normalizeSlskdResponsesToImportCandidates({
+    discoveryScope: {
+      metadataReleaseId: 'release-1',
+    },
+    searchId: 'search-1',
+    responses: [{
+      username: 'source-user',
+      files: [{
+        filename: 'Artist\\Album\\01 Track.flac',
+        size: 100,
+      }],
+    }],
+  });
+
+  assert.deepEqual(candidates[0].normalizedPayload.discoveryScope, {
+    metadataReleaseId: 'release-1',
+  });
+  assert.deepEqual(candidates[0].rawPayload.discoveryScope, {
+    metadataReleaseId: 'release-1',
+  });
+  assert.equal(candidates[0].normalizedPayload.requestOwnership, null);
+});
+
 test('normalizeSlskdResponsesToImportCandidates carries bounded Music Queue quality context', () => {
   const qualityOverride = {
     mode: 'allow_fallback_quality',

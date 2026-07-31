@@ -213,6 +213,24 @@ test('deriveMusicQueueStatus stops at no matches left only after recovery is exh
   assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.TRY_AGAIN);
 });
 
+test('deriveMusicQueueStatus surfaces a terminal bounded stop over stale failed matches', () => {
+  const status = deriveMusicQueueStatus({
+    match: {
+      readiness: { code: 'ambiguous' },
+      statusCounts: { failed: 1 },
+      totalCount: 1,
+    },
+    release: { missingTrackCount: 10, wantedStatus: 'missing' },
+    search: {
+      blockedReason: 'download_recovery_exhausted',
+      status: 'blocked',
+    },
+  });
+
+  assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.NO_MATCHES_LEFT);
+  assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.TRY_AGAIN);
+});
+
 test('deriveMusicQueueStatus asks users to pick a match for ambiguous evidence', () => {
   const status = deriveMusicQueueStatus({
     match: {

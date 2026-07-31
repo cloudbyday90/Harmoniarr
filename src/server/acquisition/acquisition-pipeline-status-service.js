@@ -177,6 +177,11 @@ function hasScheduledAutomaticSearch(search) {
   return Number.isFinite(nextSearchAfter);
 }
 
+function hasTerminalSearchStop(search) {
+  return search?.blockedReason === 'download_recovery_exhausted'
+    || (search?.status === 'blocked' && getCount(search?.searchAttemptCount) > 0);
+}
+
 export function deriveMusicQueueStatus({
   add = {},
   library = {},
@@ -289,6 +294,13 @@ export function deriveMusicQueueStatus({
     });
   }
 
+  if (hasTerminalSearchStop(search)) {
+    return buildStatus(MUSIC_QUEUE_STATUS_CODES.NO_MATCHES_LEFT, {
+      nextAction: MUSIC_QUEUE_ACTION_CODES.TRY_AGAIN,
+      progressStep: 'search',
+    });
+  }
+
   if (getCount(match.totalCount) > 0) {
     if (['ambiguous', 'low_confidence', 'not_reviewable', 'unscored'].includes(match.readiness?.code)) {
       return buildStatus(MUSIC_QUEUE_STATUS_CODES.PICK_MATCH, {
@@ -340,7 +352,7 @@ export function deriveMusicQueueStatus({
     });
   }
 
-  if (search.status === 'blocked' && getCount(search.searchAttemptCount) > 0) {
+  if (hasTerminalSearchStop(search)) {
     return buildStatus(MUSIC_QUEUE_STATUS_CODES.NO_MATCHES_LEFT, {
       nextAction: MUSIC_QUEUE_ACTION_CODES.TRY_AGAIN,
       progressStep: 'search',

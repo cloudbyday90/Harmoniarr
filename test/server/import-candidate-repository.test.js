@@ -246,7 +246,7 @@ test('findNextCandidateForRecovery scopes by search or metadata release and excl
         locked_file_count: 0,
         total_size_bytes: '456',
         raw_payload: { raw: true },
-        normalized_payload: { requestOwnership: { metadataReleaseId: values[2] }, compositeScore: 91 },
+        normalized_payload: { discoveryScope: { metadataReleaseId: values[2] }, compositeScore: 91 },
         selection_reason: null,
         discovered_at: '2026-04-30T14:00:00.000Z',
         created_at: '2026-04-30T14:00:00.000Z',
@@ -266,6 +266,7 @@ test('findNextCandidateForRecovery scopes by search or metadata release and excl
   assert.match(sql, /status IN \('pending', 'held'\)/);
   assert.match(sql, /download_attempt_count < \$4/);
   assert.match(sql, /source_search_id = \$2::text/);
+  assert.match(sql, /normalized_payload #>> '\{discoveryScope,metadataReleaseId\}' = \$3::text/);
   assert.match(sql, /normalized_payload #>> '\{requestOwnership,metadataReleaseId\}' = \$3::text/);
   assert.deepEqual(values, ['candidate-1', 'search-1', 'release-1', 3]);
   assert.equal(candidate.id, 'candidate-2');

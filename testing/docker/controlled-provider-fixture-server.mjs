@@ -77,7 +77,7 @@ function buildResponse(fixture) {
     lockedFileCount: lockedFiles.length,
     lockedFiles,
     queueLength: 0,
-    uploadSpeed: ['recovery_fallback', 'shared_recovery_fallback'].includes(fixture.scenario)
+    uploadSpeed: ['recovery_fallback', 'shared_recovery_fallback', 'shared_recovery_exhausted'].includes(fixture.scenario)
       ? 2_000_000
       : 1_000_000,
     username: `controlled-${fixture.id}`,
@@ -157,7 +157,7 @@ async function enqueueTransfers(username, files) {
     const variant = remoteFilename === buildControlledProviderRemoteFilename(fixture, { variant: 'fallback' })
       ? 'fallback'
       : 'primary';
-    const transferFailed = ['recovery_fallback', 'shared_recovery_fallback'].includes(fixture.scenario)
+    const transferFailed = ['recovery_fallback', 'shared_recovery_fallback', 'shared_recovery_exhausted'].includes(fixture.scenario)
       && variant === 'primary';
     const destinationDirectory = resolve(downloadsRoot, 'complete', `${fixture.id}-${variant}`);
     if (!transferFailed) {

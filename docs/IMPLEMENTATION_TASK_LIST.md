@@ -223,6 +223,13 @@ Database model source: `docs/DATABASE_MODEL.md`
   and reciprocal 404 detail reads. A two-session browser scenario proves the
   normal polling and Music Queue handoffs without candidate-first navigation.
   See `MUSIC_QUEUE_SHARED_RECOVERY_ACCEPTANCE_DESIGN.md`.
+- Music Queue shared bounded-stop acceptance: a one-match shared fixture now
+  proves the real global recovery cap persists `download_recovery_exhausted`,
+  creates neither a fallback worker nor repeat provider work, and fans out two
+  redacted `No matches left` Activity handoffs. Both scoped Music Queue details
+  retain the normal `Search again` action, while copied sibling release links
+  remain generic unavailable responses in Docker and isolated browser sessions.
+  See `MUSIC_QUEUE_SHARED_BOUNDED_STOP_ACCEPTANCE_DESIGN.md`.
 - Music Queue file-backed Docker acceptance: a disposable production runtime
   now generates real lossless and MP3-derived FLAC fixtures, reconciles their
   completed transfers through persisted safe auto-add, and proves the genuine

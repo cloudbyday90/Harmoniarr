@@ -128,6 +128,7 @@ export function createCandidateBrowseEnrichmentService({
    * @param {string} [params.albumTitle]
    * @param {number} [params.expectedTrackCount]
    * @param {Set<string>|Array<string>} [params.trustedUsernames]
+   * @param {object} [params.discoveryScope]
    * @param {object} [params.formatPreferences]
    * @param {object} [params.musicQueueContext]
    * @param {object} [params.requestOwnership]
@@ -139,6 +140,7 @@ export function createCandidateBrowseEnrichmentService({
     albumTitle = '',
     expectedTrackCount = null,
     trustedUsernames = null,
+    discoveryScope = null,
     formatPreferences = null,
     musicQueueContext = null,
     requestOwnership = null,
@@ -175,6 +177,7 @@ export function createCandidateBrowseEnrichmentService({
         });
 
         const browsedCandidates = normalizeSlskdResponsesFn({
+          discoveryScope,
           formatPreferences,
           musicQueueContext,
           requestOwnership,

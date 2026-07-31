@@ -327,6 +327,12 @@ test('getActivityEventLabel and detail make Music Queue recovery understandable 
     entityArtist: 'Boards of Canada',
     extraPayload: { rediscoveryScheduled: true },
   };
+  const boundedStop = {
+    eventType: 'music_queue_no_matches_left',
+    entityTitle: 'Geogaddi',
+    entityArtist: 'Boards of Canada',
+    extraPayload: { rediscoveryExhausted: true, rediscoveryScheduled: false },
+  };
 
   assert.equal(
     getActivityEventLabel(retrying),
@@ -341,6 +347,10 @@ test('getActivityEventLabel and detail make Music Queue recovery understandable 
     'No good matches left: Geogaddi by Boards of Canada',
   );
   assert.equal(getActivityEventDetail(exhausted), 'Harmoniarr will search again later.');
+  assert.equal(
+    getActivityEventDetail(boundedStop),
+    'Harmoniarr stopped automatic recovery. Open Music Queue to search again.',
+  );
 });
 
 test('getActivityEventLabel and detail make blocked library adds actionable without provider diagnostics', () => {

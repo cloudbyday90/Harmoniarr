@@ -256,7 +256,10 @@ export async function findNextCandidateForRecovery({
           ($2::text IS NOT NULL AND source_search_id = $2::text)
           OR (
             $3::text IS NOT NULL
-            AND normalized_payload #>> '{requestOwnership,metadataReleaseId}' = $3::text
+            AND (
+              normalized_payload #>> '{discoveryScope,metadataReleaseId}' = $3::text
+              OR normalized_payload #>> '{requestOwnership,metadataReleaseId}' = $3::text
+            )
           )
         )
       ORDER BY

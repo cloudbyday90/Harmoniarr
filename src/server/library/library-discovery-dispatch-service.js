@@ -142,8 +142,15 @@ export function createLibraryDiscoveryDispatchService({
   trackFallbackMaxQueries = MAX_TRACK_FALLBACK_QUERIES,
 } = {}) {
   function buildRequestOwnershipContext(claimedRequest) {
-    const sourceRequestedByUserId = claimedRequest?.evidence?.sourceRequestedByUserId ?? null;
-    const sourceRequestedForUserId = claimedRequest?.evidence?.sourceRequestedForUserId ?? sourceRequestedByUserId ?? null;
+    const sourceMediaRequestId = normalizeOptionalString(claimedRequest?.evidence?.sourceMediaRequestId);
+    if (!sourceMediaRequestId) {
+      return null;
+    }
+
+    const sourceRequestedByUserId = normalizeOptionalString(claimedRequest?.evidence?.sourceRequestedByUserId);
+    const sourceRequestedForUserId = normalizeOptionalString(
+      claimedRequest?.evidence?.sourceRequestedForUserId ?? sourceRequestedByUserId,
+    );
 
     if (!sourceRequestedForUserId) {
       return null;
@@ -153,12 +160,17 @@ export function createLibraryDiscoveryDispatchService({
       metadataArtistId: claimedRequest?.metadataArtistId ?? null,
       metadataReleaseGroupId: claimedRequest?.metadataReleaseGroupId ?? null,
       metadataReleaseId: claimedRequest?.metadataReleaseId ?? null,
-      sourceMediaRequestId: claimedRequest?.evidence?.sourceMediaRequestId ?? null,
-      sourceRequestKind: claimedRequest?.evidence?.sourceRequestKind ?? null,
+      sourceMediaRequestId,
+      sourceRequestKind: normalizeOptionalString(claimedRequest?.evidence?.sourceRequestKind),
       sourceRequestedByUserId,
       sourceRequestedForUserId,
       sourceType: 'media_request',
     };
+  }
+
+  function buildDiscoveryScope(claimedRequest) {
+    const metadataReleaseId = normalizeOptionalString(claimedRequest?.metadataReleaseId);
+    return metadataReleaseId ? { metadataReleaseId } : null;
   }
 
   function buildNextZeroCandidateSchedule({
@@ -563,6 +575,7 @@ export function createLibraryDiscoveryDispatchService({
       attemptedCount += 1;
 
       const ownership = buildRequestOwnershipContext(claimedRequest);
+      const discoveryScope = buildDiscoveryScope(claimedRequest);
       const sharedQualityContext = await resolveSharedDiscoveryQualityContext(claimedRequest);
       const {
         formatPreferences,
@@ -633,6 +646,7 @@ export function createLibraryDiscoveryDispatchService({
           expectedTrackTitles: tracklistExpectations?.expectedTrackTitles ?? null,
           expectedTrackCount: tracklistExpectations?.expectedTrackCount ?? null,
           expectedDurationSeconds: tracklistExpectations?.expectedDurationSeconds ?? null,
+          discoveryScope,
           formatPreferences: effectiveFormatPreferences,
           musicQueueContext: qualityContext,
           requestOwnership,

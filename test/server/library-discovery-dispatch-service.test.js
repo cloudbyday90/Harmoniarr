@@ -110,6 +110,9 @@ test('dispatchReadyDiscoveryRequests claims ready automatic requests, starts sea
   assert.deepEqual(ingestSlskdSearchResponses.mock.calls[0].arguments[0], {
     actorUserId: 'user-1',
     albumTitle: 'Confield',
+    discoveryScope: {
+      metadataReleaseId: 'release-1',
+    },
     expectedTrackTitles: null,
     expectedTrackCount: null,
     expectedDurationSeconds: null,
@@ -157,6 +160,54 @@ test('dispatchReadyDiscoveryRequests claims ready automatic requests, starts sea
     failedCount: 0,
     failures: [],
     fileCount: 5,
+  });
+});
+
+test('dispatchReadyDiscoveryRequests does not persist operator ownership for shared monitored discovery', async (t) => {
+  const claimedRequests = [{
+    artistName: 'Autechre',
+    evidence: {
+      sourceRequestedByUserId: 'operator-1',
+      sourceRequestedForUserId: 'operator-1',
+    },
+    metadataReleaseId: 'release-1',
+    operatorLinks: [
+      { appUserId: 'operator-1', wantedReleaseId: 'wanted-1' },
+      { appUserId: 'operator-2', wantedReleaseId: 'wanted-2' },
+    ],
+    releaseDate: '2001-04-30',
+    releaseGroupTitle: 'Confield',
+    releaseTitle: 'Confield',
+    wantedReleaseId: 'wanted-1',
+    wantedReleaseIds: ['wanted-1', 'wanted-2'],
+  }];
+  const ingestSlskdSearchResponses = t.mock.fn(async () => ({
+    candidateCount: 1,
+    fileCount: 4,
+  }));
+  const service = createLibraryDiscoveryDispatchService({
+    dispatchBatchSize: 1,
+    importCandidateService: { ingestSlskdSearchResponses },
+    libraryDiscoveryRequestStore: {
+      claimNextReadyAutomaticDiscoveryRequest: t.mock.fn(async () => claimedRequests.shift() ?? null),
+      markDiscoveryRequestExhausted: t.mock.fn(async () => {}),
+      recordDiscoverySearchFailure: t.mock.fn(async () => {}),
+      recordDiscoverySearchSuccess: t.mock.fn(async () => {}),
+    },
+    slskdService: {
+      startSearch: t.mock.fn(async () => ({ id: 'search-1' })),
+    },
+  });
+
+  await service.dispatchReadyDiscoveryRequests();
+
+  assert.equal(
+    ingestSlskdSearchResponses.mock.calls[0].arguments[0].requestOwnership,
+    null,
+    'shared monitored discovery must not persist an operator identity as media-request ownership',
+  );
+  assert.deepEqual(ingestSlskdSearchResponses.mock.calls[0].arguments[0].discoveryScope, {
+    metadataReleaseId: 'release-1',
   });
 });
 

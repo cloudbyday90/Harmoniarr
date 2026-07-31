@@ -96,6 +96,7 @@ function buildRecoveryPayload({
     operationRunId: normalizeOptionalString(operationRunId),
     retryAt: normalizeOptionalString(recovery?.retryAt),
     nextSearchAfter: normalizeOptionalString(rediscovery?.nextSearchAfter),
+    rediscoveryExhausted: rediscovery?.exhausted === true,
     rediscoveryScheduled: rediscovery?.scheduled === true,
     skippedCandidateCount: normalizeNonNegativeInteger(recovery?.skippedCandidateCount),
   };
@@ -137,7 +138,7 @@ export function buildMusicQueueRecoveryActivityEvent({
     eventType = recovery.retrySameCandidate === true
       ? 'music_queue_download_retrying'
       : 'music_queue_match_retrying';
-  } else if (recovery.rediscovery?.scheduled === true) {
+  } else if (recovery.rediscovery?.scheduled === true || recovery.rediscovery?.exhausted === true) {
     eventType = 'music_queue_no_matches_left';
   }
 

@@ -43,6 +43,14 @@ const DOWNLOADING_STATUS = Object.freeze({
   tone: 'info',
 });
 
+const NO_MATCHES_LEFT_STATUS = Object.freeze({
+  code: 'no_matches_left',
+  detail: 'Harmoniarr has tried every acceptable match and stopped automatic recovery.',
+  label: 'No matches left',
+  nextAction: 'try_again',
+  tone: 'warning',
+});
+
 function buildSharedRecoveryRelease({ policyMarker, status, wantedReleaseId }) {
   return {
     artistName: SHARED_ARTIST,
@@ -95,6 +103,24 @@ function buildSharedRecoveryActivity({ policyMarker, wantedReleaseId }) {
   ];
 }
 
+function buildSharedBoundedStopActivity({ policyMarker, wantedReleaseId }) {
+  return [{
+    entityArtist: SHARED_ARTIST,
+    entityId: wantedReleaseId,
+    entityTitle: SHARED_RELEASE,
+    entityType: 'wanted_release',
+    eventType: 'music_queue_no_matches_left',
+    extraPayload: {
+      policyMarker,
+      rediscoveryExhausted: true,
+      rediscoveryScheduled: false,
+      wantedReleaseId,
+    },
+    id: `shared-bounded-stop-${wantedReleaseId}`,
+    occurredAt: '2026-07-30T20:02:00.000Z',
+  }];
+}
+
 function getReleaseDetailPath(wantedReleaseId) {
   return `/app/music-queue/${encodeURIComponent(wantedReleaseId)}`;
 }
@@ -129,7 +155,7 @@ async function assertOwnSharedRecoveryJourney({
   await releaseRow.getByText('Trying another match', { exact: true }).waitFor();
   await releaseRow.getByRole('button', { name: 'View recovery' }).click();
   await detail.getByRole('heading', { name: `${SHARED_RELEASE} by ${SHARED_ARTIST}` }).waitFor();
-  await detail.getByText('No action is needed. Harmoniarr will continue this release automatically.').waitFor();
+  assert.equal(await detail.getByRole('button', { name: 'Search again' }).count(), 0);
   assert.equal(await detail.getByRole('link', { name: 'Advanced diagnostics' }).count(), 0);
   assertNoPrivateSharedData(await page.getByRole('main').innerText(), {
     otherPolicyMarker,
@@ -172,10 +198,48 @@ async function assertCopiedReleaseIsUnavailable({ baseUrl, page, privateMarkers,
   assert.doesNotMatch(await page.getByRole('main').innerText(), new RegExp(privateMarkers.join('|'), 'u'));
 }
 
+async function assertOwnSharedBoundedStopJourney({
+  baseUrl,
+  otherPolicyMarker,
+  otherWantedReleaseId,
+  ownPolicyMarker,
+  page,
+  release,
+}) {
+  await page.goto(`${baseUrl}/app/music-queue`, { waitUntil: 'domcontentloaded' });
+  const releaseRow = getReleaseRow(page);
+  const detail = page.getByRole('complementary', { name: 'Music Queue details' });
+
+  await releaseRow.getByText('No matches left', { exact: true }).waitFor();
+  await releaseRow.getByRole('button', { name: 'Review recovery' }).click();
+  await detail.getByRole('heading', { name: `${SHARED_RELEASE} by ${SHARED_ARTIST}` }).waitFor();
+  await detail.getByRole('heading', { name: 'No matches left' }).waitFor();
+  await detail.getByRole('button', { name: 'Search again' }).waitFor();
+  assert.equal(await detail.getByRole('link', { name: 'Advanced diagnostics' }).count(), 0);
+  assertNoPrivateSharedData(await page.getByRole('main').innerText(), {
+    otherPolicyMarker,
+    otherWantedReleaseId,
+    ownPolicyMarker,
+  });
+
+  await page.goto(`${baseUrl}/app/activity/feed`, { waitUntil: 'domcontentloaded' });
+  const boundedStopActivity = getActivityEntry(page, `No good matches left: ${SHARED_RELEASE} by ${SHARED_ARTIST}`);
+  await boundedStopActivity.getByText('Harmoniarr stopped automatic recovery. Open Music Queue to search again.').waitFor();
+  const handoff = boundedStopActivity.getByRole('link', { name: 'Open Music Queue' });
+  await handoff.waitFor();
+  assert.equal(await handoff.getAttribute('href'), getReleaseDetailPath(release.id));
+  assert.equal(await boundedStopActivity.getByRole('link', { name: /diagnostic/i }).count(), 0);
+  assertNoPrivateSharedData(await page.getByRole('main').innerText(), {
+    otherPolicyMarker,
+    otherWantedReleaseId,
+    ownPolicyMarker,
+  });
+}
+
 let browserRuntime;
 let runtimeUnavailableReason = null;
 
-suite('Music Queue shared recovery browser acceptance', () => {
+suite('Music Queue shared recovery browser acceptance', { concurrency: 1 }, () => {
   before(async () => {
     try {
       browserRuntime = await createBrowserSmokeRuntime({ config: integrationRuntimeConfig });
@@ -299,5 +363,104 @@ suite('Music Queue shared recovery browser acceptance', () => {
         await operatorContext?.close().catch(() => {});
       }
     }, { scenarioName: 'music_queue_shared_recovery_two_session_access' });
+  });
+
+  test('keeps a shared bounded stop release-scoped and offers only Search again in isolated sessions', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) {
+      t.skip(runtimeUnavailableReason);
+      return;
+    }
+
+    await browserRuntime.runScenario(async ({ baseUrl, browser, browserContext, page }) => {
+      const adminReleaseId = 'wanted-shared-bounded-stop-browser-admin';
+      const operatorReleaseId = 'wanted-shared-bounded-stop-browser-operator';
+      const adminRelease = buildSharedRecoveryRelease({
+        policyMarker: ADMIN_POLICY_MARKER,
+        status: NO_MATCHES_LEFT_STATUS,
+        wantedReleaseId: adminReleaseId,
+      });
+      const operatorRelease = buildSharedRecoveryRelease({
+        policyMarker: OPERATOR_POLICY_MARKER,
+        status: NO_MATCHES_LEFT_STATUS,
+        wantedReleaseId: operatorReleaseId,
+      });
+      const adminPageErrors = [];
+      const operatorPageErrors = [];
+      let operatorContext;
+
+      page.on('pageerror', (error) => adminPageErrors.push(error.message));
+
+      try {
+        await bootstrapAdminThroughUi(page, { baseUrl });
+        await createUserThroughApi(page, {
+          password: 'InitialPass123!',
+          role: 'operator',
+          username: 'shared-bounded-stop-operator',
+        });
+        await installScopedMusicQueueReadModelFixtures(browserContext, {
+          activityEvents: buildSharedBoundedStopActivity({
+            policyMarker: ADMIN_POLICY_MARKER,
+            wantedReleaseId: adminReleaseId,
+          }),
+          release: adminRelease,
+        });
+
+        operatorContext = await browser.newContext({ serviceWorkers: 'block' });
+        const operatorPage = await operatorContext.newPage();
+        operatorPage.setDefaultTimeout(integrationRuntimeConfig.httpRequestTimeoutMs);
+        operatorPage.on('pageerror', (error) => operatorPageErrors.push(error.message));
+        await loginUserThroughUi(operatorPage, {
+          baseUrl,
+          initialPassword: 'InitialPass123!',
+          readyPassword: 'ReadyPass123!',
+          username: 'shared-bounded-stop-operator',
+        });
+        await installScopedMusicQueueReadModelFixtures(operatorContext, {
+          activityEvents: buildSharedBoundedStopActivity({
+            policyMarker: OPERATOR_POLICY_MARKER,
+            wantedReleaseId: operatorReleaseId,
+          }),
+          release: operatorRelease,
+        });
+
+        await assertOwnSharedBoundedStopJourney({
+          baseUrl,
+          otherPolicyMarker: OPERATOR_POLICY_MARKER,
+          otherWantedReleaseId: operatorReleaseId,
+          ownPolicyMarker: ADMIN_POLICY_MARKER,
+          page,
+          release: adminRelease,
+        });
+        await assertOwnSharedBoundedStopJourney({
+          baseUrl,
+          otherPolicyMarker: ADMIN_POLICY_MARKER,
+          otherWantedReleaseId: adminReleaseId,
+          ownPolicyMarker: OPERATOR_POLICY_MARKER,
+          page: operatorPage,
+          release: operatorRelease,
+        });
+
+        await assertCopiedReleaseIsUnavailable({
+          baseUrl,
+          page,
+          privateMarkers: [ADMIN_POLICY_MARKER, OPERATOR_POLICY_MARKER, operatorReleaseId],
+          wantedReleaseId: operatorReleaseId,
+        });
+        await assertCopiedReleaseIsUnavailable({
+          baseUrl,
+          page: operatorPage,
+          privateMarkers: [ADMIN_POLICY_MARKER, OPERATOR_POLICY_MARKER, adminReleaseId],
+          wantedReleaseId: adminReleaseId,
+        });
+
+        assert.deepEqual(adminPageErrors, [], `Unexpected admin page errors: ${adminPageErrors.join(' | ')}`);
+        assert.deepEqual(operatorPageErrors, [], `Unexpected operator page errors: ${operatorPageErrors.join(' | ')}`);
+      } finally {
+        await operatorContext?.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
+        await operatorContext?.close().catch(() => {});
+      }
+    }, { scenarioName: 'music_queue_shared_bounded_stop_two_session_access' });
   });
 });

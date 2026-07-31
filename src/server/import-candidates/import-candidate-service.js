@@ -161,6 +161,14 @@ function normalizeMusicQueueContext(value) {
   };
 }
 
+function normalizeDiscoveryScope(value) {
+  const metadataReleaseId = typeof value?.metadataReleaseId === 'string' && value.metadataReleaseId.trim()
+    ? value.metadataReleaseId.trim()
+    : null;
+
+  return metadataReleaseId ? { metadataReleaseId } : null;
+}
+
 function normalizeExtension(filename, extension) {
   if (typeof extension === 'string' && extension.trim()) {
     return extension.trim().replace(/^\./, '').toLowerCase();
@@ -272,6 +280,7 @@ function normalizeResponseFile(file, {
 
 export function normalizeSlskdResponsesToImportCandidatesWithDiagnostics({
   blacklistedTitleTerms = null,
+  discoveryScope = null,
   formatPreferences = null,
   discoveredAt = new Date(),
   ignoredUsernames = null,
@@ -282,6 +291,7 @@ export function normalizeSlskdResponsesToImportCandidatesWithDiagnostics({
 }) {
   const groups = new Map();
   let sourceFileIndex = 0;
+  const normalizedDiscoveryScope = normalizeDiscoveryScope(discoveryScope);
   const normalizedMusicQueueContext = normalizeMusicQueueContext(musicQueueContext);
 
   const { responses: filteredResponses, summary: filterSummary } = filterSlskdResponsesForCandidates({
@@ -375,6 +385,7 @@ export function normalizeSlskdResponsesToImportCandidatesWithDiagnostics({
         username: group.username,
         folderPath: group.folderPath,
         requestOwnership,
+        ...(normalizedDiscoveryScope ? { discoveryScope: normalizedDiscoveryScope } : {}),
         response: {
           ...group.response,
           files: group.rawFiles,
@@ -387,6 +398,7 @@ export function normalizeSlskdResponsesToImportCandidatesWithDiagnostics({
         hasFreeUploadSlot: group.response.hasFreeUploadSlot ?? false,
         queueLength: group.response.queueLength ?? null,
         requestOwnership,
+        ...(normalizedDiscoveryScope ? { discoveryScope: normalizedDiscoveryScope } : {}),
         uploadSpeed: group.response.uploadSpeed ?? null,
         fileCount: group.files.length,
         lockedFileCount,
@@ -416,6 +428,7 @@ export function normalizeSlskdResponsesToImportCandidatesWithDiagnostics({
 
 export function normalizeSlskdResponsesToImportCandidates({
   blacklistedTitleTerms = null,
+  discoveryScope = null,
   formatPreferences = null,
   discoveredAt = new Date(),
   ignoredUsernames = null,
@@ -426,6 +439,7 @@ export function normalizeSlskdResponsesToImportCandidates({
 }) {
   return normalizeSlskdResponsesToImportCandidatesWithDiagnostics({
     blacklistedTitleTerms,
+    discoveryScope,
     formatPreferences,
     discoveredAt,
     ignoredUsernames,
@@ -970,6 +984,7 @@ export function createImportCandidateService({
     actorUserId = null,
     albumTitle = null,
     blacklistedTitleTerms = null,
+    discoveryScope = null,
     expectedTrackCount = null,
     expectedTrackTitles = null,
     expectedDurationSeconds = null,
@@ -996,6 +1011,7 @@ export function createImportCandidateService({
     }
     const normalizedResponses = normalizeSlskdResponsesFn({
       blacklistedTitleTerms,
+      discoveryScope,
       formatPreferences,
       ignoredUsernames: effectiveIgnoredUsernames,
       musicQueueContext,
@@ -1023,6 +1039,7 @@ export function createImportCandidateService({
         enrichedCandidates = await browseEnrichmentService.enrichCandidatesWithBrowse({
           candidates,
           albumTitle,
+          discoveryScope,
           expectedTrackCount,
           trustedUsernames: deriveTrustedUsernames(reputationIndex),
           formatPreferences,

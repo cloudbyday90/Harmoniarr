@@ -75,6 +75,7 @@ function buildSkippedRecoveryCandidate(candidate, { quality, reason }) {
 
 function resolveMetadataReleaseId(candidate) {
   return normalizeOptionalString(candidate?.metadataReleaseId)
+    ?? normalizeOptionalString(candidate?.normalizedPayload?.discoveryScope?.metadataReleaseId)
     ?? normalizeOptionalString(candidate?.normalizedPayload?.requestOwnership?.metadataReleaseId);
 }
 
@@ -172,6 +173,7 @@ export function createImportCandidateRecoveryService({
   }
 
   async function promoteNextRecoveryCandidate({
+    allowRediscovery = true,
     failedCandidate,
     failureReason = null,
     failedCandidateId,
@@ -236,7 +238,7 @@ export function createImportCandidateRecoveryService({
     }
 
     if (!nextCandidate) {
-      const rediscovery = typeof scheduleDownloadRecoveryRediscovery === 'function'
+      const rediscovery = allowRediscovery && typeof scheduleDownloadRecoveryRediscovery === 'function'
         ? await scheduleDownloadRecoveryRediscovery({
           failedCandidateId,
           failureReason,
@@ -373,6 +375,7 @@ export function createImportCandidateRecoveryService({
     }) ?? failedAfterTransition;
 
     return promoteNextRecoveryCandidate({
+      allowRediscovery: false,
       failedCandidate,
       failedCandidateId,
       failureReason,

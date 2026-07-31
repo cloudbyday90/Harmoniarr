@@ -29,7 +29,7 @@ test('import candidate recovery promotes the next scoped candidate and records a
     getImportCandidate: async () => ({
       id: 'failed-candidate',
       normalizedPayload: {
-        requestOwnership: {
+        discoveryScope: {
           metadataReleaseId: 'release-1',
         },
       },
@@ -108,7 +108,7 @@ test('import candidate recovery skips below-profile matches before promoting nex
         musicQueue: {
           profileCode: 'lossless_archive',
         },
-        requestOwnership: {
+        discoveryScope: {
           metadataReleaseId: 'release-1',
         },
       },
@@ -275,6 +275,9 @@ test('import candidate quality recovery keeps the release stopped when no qualit
     sourceSearchId: 'search-1',
   }));
   const createRecoveryExecutionRun = t.mock.fn(async () => ({ id: 'unexpected-recovery-run' }));
+  const scheduleDownloadRecoveryRediscovery = t.mock.fn(async () => ({
+    scheduled: true,
+  }));
   const service = createImportCandidateRecoveryService({
     createRecoveryExecutionRun,
     findNextCandidateForRecoveryFn: async () => null,
@@ -288,6 +291,7 @@ test('import candidate quality recovery keeps the release stopped when no qualit
     }),
     incrementImportCandidateDownloadAttemptCountFn,
     markImportCandidateQualityFailed,
+    scheduleDownloadRecoveryRediscovery,
   });
 
   const result = await service.handleImportCandidateQualityFailure({
@@ -303,6 +307,7 @@ test('import candidate quality recovery keeps the release stopped when no qualit
     reason: 'Downloaded audio did not pass verified lossless checks.',
   });
   assert.equal(createRecoveryExecutionRun.mock.callCount(), 0);
+  assert.equal(scheduleDownloadRecoveryRediscovery.mock.callCount(), 0);
   assert.deepEqual(result, {
     attemptedCandidateId: null,
     failedAttemptCount: 1,

@@ -277,6 +277,8 @@ export function getActivityEventDetail(event) {
   if (event.eventType === 'music_queue_no_matches_left') {
     return event.extraPayload?.rediscoveryScheduled === true
       ? 'Harmoniarr will search again later.'
+      : event.extraPayload?.rediscoveryExhausted === true
+        ? 'Harmoniarr stopped automatic recovery. Open Music Queue to search again.'
       : 'Harmoniarr could not find another safe match.';
   }
 

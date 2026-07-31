@@ -214,6 +214,83 @@ async function seedSharedOperatorDiscoveryRequest(pool, fixture) {
   };
 }
 
+async function seedPersistedSharedOperatorDiscoveryRequest({
+  libraryModule,
+  pool,
+  fixture,
+}) {
+  const discoverySeed = await seedDiscoveryRequest(pool, fixture);
+  const operatorIds = await Promise.all([seedAppUser(pool), seedAppUser(pool)]);
+  const privatePolicyMarkers = operatorIds.map((_, index) => `operator-${index + 1}-private-policy-${randomUUID()}`);
+
+  await Promise.all(operatorIds.map(async (appUserId, index) => {
+    await pool.query(
+      `
+        INSERT INTO operator_artist_monitoring (
+          app_user_id,
+          metadata_artist_id,
+          is_monitored,
+          monitored_release_group_types,
+          release_scope,
+          wanted_automation_mode,
+          acquisition_profile_key,
+          search_on_add_mode,
+          selection_source_mode
+        ) VALUES ($1, $2, TRUE, ARRAY['album']::text[], 'current_and_future', 'current_and_future_matching', $3, 'missing_now', 'policy_plus_overrides')
+      `,
+      [
+        appUserId,
+        discoverySeed.metadataArtistId,
+        index === 0 ? 'lossless_archive' : 'balanced_library',
+      ],
+    );
+  }));
+
+  await libraryModule.libraryWantedReleaseService.reconcileWantedReleases();
+  await libraryModule.libraryDiscoveryRequestService.reconcileDiscoveryRequests();
+
+  const wantedReleaseRows = await pool.query(
+    `
+      SELECT app_user_id AS "appUserId", id AS "wantedReleaseId"
+      FROM library_wanted_releases
+      WHERE metadata_release_id = $1
+        AND app_user_id = ANY($2::uuid[])
+    `,
+    [discoverySeed.metadataReleaseId, operatorIds],
+  );
+  assert.equal(wantedReleaseRows.rowCount, operatorIds.length, 'the persisted shared fixture must materialize every monitored operator release');
+  const wantedReleaseIdByOperatorId = new Map(wantedReleaseRows.rows.map((row) => [row.appUserId, row.wantedReleaseId]));
+  const wantedReleases = operatorIds.map((appUserId, index) => ({
+    appUserId,
+    wantedReleaseId: wantedReleaseIdByOperatorId.get(appUserId),
+    privatePolicyMarker: privatePolicyMarkers[index],
+  }));
+
+  for (const { privatePolicyMarker, wantedReleaseId } of wantedReleases) {
+    assert.ok(wantedReleaseId, 'every persisted shared operator must receive a wanted release identity');
+    await pool.query(
+      `
+        UPDATE library_discovery_request_wanted_release_links AS release_link
+        SET evidence = COALESCE(release_link.evidence, '{}'::jsonb) || jsonb_build_object(
+          'musicQueueQualityOverride',
+          jsonb_build_object('privatePolicyMarker', $3::text)
+        )
+        FROM library_discovery_requests AS discovery_request
+        WHERE release_link.discovery_request_id = discovery_request.id
+          AND discovery_request.metadata_release_id = $1
+          AND release_link.wanted_release_id = $2
+      `,
+      [discoverySeed.metadataReleaseId, wantedReleaseId, privatePolicyMarker],
+    );
+  }
+
+  return {
+    ...discoverySeed,
+    privatePolicyMarkers,
+    wantedReleases,
+  };
+}
+
 async function executeDownloadAndReconcile({
   importCandidateModule,
   runId,
@@ -357,14 +434,22 @@ async function runVerification() {
       requestTimeoutMs: 20_000,
     }),
   });
+  let libraryModule = null;
   const importCandidateModule = createImportCandidateModule({
     getMediaToolingStatus: async () => ({ details: { ffmpegAvailable: true, ffprobeAvailable: true }, status: 'healthy' }),
     recordActivityEventFn: activityModule.activityEventService.recordActivityEvent,
     recordSourceUserOutcomeEvidenceFn: async () => null,
     scheduleLibraryScan: async () => null,
+    scheduleDownloadRecoveryRediscovery: async (payload) => {
+      if (!libraryModule?.libraryDiscoveryRediscoveryService?.scheduleDownloadRecoveryRediscovery) {
+        throw new Error('Library discovery rediscovery service is not initialized');
+      }
+
+      return libraryModule.libraryDiscoveryRediscoveryService.scheduleDownloadRecoveryRediscovery(payload);
+    },
     slskdService,
   });
-  const libraryModule = createLibraryModule({
+  libraryModule = createLibraryModule({
     importCandidateAutoDownloadRunService: importCandidateModule.importCandidateAutoDownloadRunService,
     importCandidateAutoSelectionService: importCandidateModule.importCandidateAutoSelectionService,
     importCandidateService: importCandidateModule.importCandidateService,
@@ -386,6 +471,7 @@ async function runVerification() {
 
   const [pipelineFixture, ...catalogFixtures] = controlledProviderFixtureCatalog;
   const sharedDiscoveryFixture = catalogFixtures.find((fixture) => fixture.scenario === 'lossless');
+  const sharedBoundedStopFixture = catalogFixtures.find((fixture) => fixture.scenario === 'shared_recovery_exhausted');
   const sharedRecoveryFixture = catalogFixtures.find((fixture) => fixture.scenario === 'shared_recovery_fallback');
   const recoveryFixture = catalogFixtures.find((fixture) => fixture.scenario === 'recovery_fallback');
   const sourceDisappearanceFixture = catalogFixtures.find((fixture) => fixture.scenario === 'completed_source_disappears');
@@ -396,6 +482,7 @@ async function runVerification() {
       && fixture.id !== sourceDisappearanceFixture?.id
       && fixture.id !== qualityRecoveryFixture?.id
       && fixture.id !== qualityExhaustionFixture?.id
+      && fixture.id !== sharedBoundedStopFixture?.id
       && fixture.id !== sharedRecoveryFixture?.id
   ));
 
@@ -957,7 +1044,168 @@ async function runVerification() {
     );
   }));
 
-  let catalogCandidateCount = 10;
+  assert.ok(sharedBoundedStopFixture, 'the controlled catalog must include a shared bounded-stop fixture');
+  const sharedBoundedStopSeed = await seedPersistedSharedOperatorDiscoveryRequest({
+    fixture: sharedBoundedStopFixture,
+    libraryModule,
+    pool,
+  });
+  const sharedBoundedStopWantedReleaseIds = sharedBoundedStopSeed.wantedReleases.map(({ wantedReleaseId }) => wantedReleaseId);
+  const sharedBoundedStopEvidenceBefore = await getControlledProviderFixtureEvidence(sharedBoundedStopFixture.id);
+  const sharedBoundedStopDispatch = await libraryModule.libraryDiscoveryDispatchService.dispatchReadyDiscoveryRequests();
+  assert.equal(
+    sharedBoundedStopDispatch.candidateCount,
+    1,
+    'one shared bounded-stop request must ingest only its failing primary match',
+  );
+  const sharedBoundedStopSearch = sharedBoundedStopDispatch.dispatchedSearches[0];
+  assert.equal(
+    sharedBoundedStopSearch?.metadataReleaseId,
+    sharedBoundedStopSeed.metadataReleaseId,
+    'the shared bounded-stop fixture must dispatch its own global discovery request',
+  );
+  const sharedBoundedStopPrimaryRunId = sharedBoundedStopSearch?.autoDownloadStart?.runId;
+  const sharedBoundedStopPrimaryCandidateId = sharedBoundedStopSearch?.autoSelection?.selectedCandidateId;
+  assert.ok(sharedBoundedStopPrimaryRunId, 'the shared bounded-stop primary must automatically enter download handoff');
+  assert.ok(sharedBoundedStopPrimaryCandidateId, 'the shared bounded-stop primary must be available for redaction verification');
+  const sharedBoundedStopPrimaryCandidate = await importCandidateModule.importCandidateService.getImportCandidate({
+    importCandidateId: sharedBoundedStopPrimaryCandidateId,
+  });
+  assertSharedCandidateIsRedacted({
+    candidate: sharedBoundedStopPrimaryCandidate,
+    sharedSeed: sharedBoundedStopSeed,
+    wantedReleaseIds: sharedBoundedStopWantedReleaseIds,
+  });
+  assert.deepEqual(
+    sharedBoundedStopPrimaryCandidate.normalizedPayload?.discoveryScope,
+    { metadataReleaseId: sharedBoundedStopSeed.metadataReleaseId },
+    'the redacted shared candidate must retain only the metadata-release recovery scope',
+  );
+  const sharedBoundedStopRetryBudgetUpdate = await pool.query(
+    `
+      UPDATE library_discovery_requests
+      SET research_attempt_count = $2
+      WHERE metadata_release_id = $1
+      RETURNING
+        research_attempt_count AS "researchAttemptCount",
+        search_mode AS "searchMode"
+    `,
+    [sharedBoundedStopSeed.metadataReleaseId, 2],
+  );
+  assert.equal(sharedBoundedStopRetryBudgetUpdate.rowCount, 1, 'the shared bounded-stop fixture must preload exactly one current global retry budget');
+  assert.equal(sharedBoundedStopRetryBudgetUpdate.rows[0]?.searchMode, 'automatic', 'the shared bounded-stop fixture must retain automatic discovery mode');
+  assert.equal(sharedBoundedStopRetryBudgetUpdate.rows[0]?.researchAttemptCount, 2, 'the shared bounded-stop fixture must preload the production retry cap');
+
+  const sharedBoundedStopReconciliation = await executeDownloadAndReconcile({
+    importCandidateModule,
+    runId: sharedBoundedStopPrimaryRunId,
+    triggerSource: 'controlled_provider_shared_bounded_stop',
+  });
+  assert.equal(sharedBoundedStopReconciliation.summary.recovered, 0, 'an exhausted shared retry budget must not create a fallback download');
+  assert.equal(sharedBoundedStopReconciliation.summary.rediscovered, 0, 'an exhausted shared retry budget must not create another rediscovery run');
+  const sharedBoundedStopPrimaryFinalCandidate = await importCandidateModule.importCandidateService.getImportCandidate({
+    importCandidateId: sharedBoundedStopPrimaryCandidateId,
+  });
+  assert.equal(sharedBoundedStopPrimaryFinalCandidate.status, 'failed', 'the exhausted shared primary must remain blocked from reselection');
+  const sharedBoundedStopActiveRun = await importCandidateModule.importCandidateExecutionRunStore.getActiveRun();
+  assert.equal(sharedBoundedStopActiveRun, null, 'an exhausted shared retry budget must not leave a fallback worker active');
+
+  const sharedBoundedStopRequestStateResult = await pool.query(
+    `
+      SELECT
+        blocked_reason AS "blockedReason",
+        evidence,
+        next_search_after AS "nextSearchAfter",
+        request_status AS "requestStatus",
+        research_attempt_count AS "researchAttemptCount"
+      FROM library_discovery_requests
+      WHERE metadata_release_id = $1
+    `,
+    [sharedBoundedStopSeed.metadataReleaseId],
+  );
+  const sharedBoundedStopRequestState = sharedBoundedStopRequestStateResult.rows[0];
+  assert.equal(sharedBoundedStopRequestState?.requestStatus, 'blocked', 'the shared request must persist its terminal bounded-stop state');
+  assert.equal(sharedBoundedStopRequestState?.blockedReason, 'download_recovery_exhausted', 'the shared request must identify the bounded-stop reason');
+  assert.equal(sharedBoundedStopRequestState?.nextSearchAfter, null, 'the shared bounded stop must not leave an automatic search scheduled');
+  assert.equal(sharedBoundedStopRequestState?.researchAttemptCount, 2, 'the shared bounded stop must retain its global retry budget');
+  assert.equal(
+    sharedBoundedStopRequestState?.evidence?.downloadRecoveryExhausted?.researchAttemptCount,
+    2,
+    'the shared bounded stop must record only the global retry evidence',
+  );
+
+  const sharedBoundedStopOutcomes = await Promise.all(sharedBoundedStopSeed.wantedReleases.map(async ({
+    appUserId,
+    wantedReleaseId,
+  }) => {
+    const detail = await acquisitionModule.acquisitionPipelineService.getMusicQueueRelease({
+      appUserId,
+      wantedReleaseId,
+    });
+    assert.equal(detail.release.id, wantedReleaseId, 'each operator must retain its own bounded-stop release detail');
+    assert.equal(detail.release.status.code, 'no_matches_left', 'each operator must see the terminal shared recovery stop');
+    assert.equal(detail.release.status.nextAction, 'try_again', 'each operator must receive the normal release-level Search again action');
+    return detail.release.id;
+  }));
+  const sharedBoundedStopActivities = await waitForActivityEvents(activityModule.activityEventService, {
+    entityIds: sharedBoundedStopWantedReleaseIds,
+    eventType: 'music_queue_no_matches_left',
+    operationRunId: sharedBoundedStopPrimaryRunId,
+  });
+  assertSharedActivityFanoutIsRedacted({
+    activities: sharedBoundedStopActivities,
+    sharedSeed: sharedBoundedStopSeed,
+    wantedReleaseIds: sharedBoundedStopWantedReleaseIds,
+  });
+  for (const activity of sharedBoundedStopActivities) {
+    assert.equal(activity.extraPayload?.rediscoveryExhausted, true, 'bounded-stop Activity must identify the terminal automatic-recovery outcome');
+    assert.equal(activity.extraPayload?.rediscoveryScheduled, false, 'bounded-stop Activity must not imply a hidden retry');
+  }
+  await Promise.all(sharedBoundedStopSeed.wantedReleases.map(async ({ appUserId }, index) => {
+    const other = sharedBoundedStopSeed.wantedReleases[(index + 1) % sharedBoundedStopSeed.wantedReleases.length];
+    await assert.rejects(
+      () => acquisitionModule.acquisitionPipelineService.getMusicQueueRelease({
+        appUserId,
+        wantedReleaseId: other.wantedReleaseId,
+      }),
+      (error) => error?.status === 404 && error?.code === 'music_queue_release_not_found',
+      'an operator must not read another operator\'s shared bounded-stop detail',
+    );
+  }));
+
+  const sharedBoundedStopEvidenceAfterFailure = await getControlledProviderFixtureEvidence(sharedBoundedStopFixture.id);
+  assert.equal(
+    sharedBoundedStopEvidenceAfterFailure.searchCount - sharedBoundedStopEvidenceBefore.searchCount,
+    1,
+    'two operator links must issue one provider search before the bounded stop',
+  );
+  assert.equal(
+    sharedBoundedStopEvidenceAfterFailure.transferCount - sharedBoundedStopEvidenceBefore.transferCount,
+    1,
+    'the bounded stop must queue only the failed shared primary transfer',
+  );
+  const sharedBoundedStopRepeatDispatches = [
+    await libraryModule.libraryDiscoveryDispatchService.dispatchReadyDiscoveryRequests(),
+    await libraryModule.libraryDiscoveryDispatchService.dispatchReadyDiscoveryRequests(),
+  ];
+  assert.deepEqual(
+    sharedBoundedStopRepeatDispatches.map((result) => result.candidateCount),
+    [0, 0],
+    'repeat dispatches after the bounded stop must not start duplicate fallback or rediscovery work',
+  );
+  const sharedBoundedStopEvidenceAfterRepeat = await getControlledProviderFixtureEvidence(sharedBoundedStopFixture.id);
+  assert.equal(
+    sharedBoundedStopEvidenceAfterRepeat.searchCount,
+    sharedBoundedStopEvidenceAfterFailure.searchCount,
+    'repeat dispatches after the bounded stop must not issue another provider search',
+  );
+  assert.equal(
+    sharedBoundedStopEvidenceAfterRepeat.transferCount,
+    sharedBoundedStopEvidenceAfterFailure.transferCount,
+    'repeat dispatches after the bounded stop must not queue another provider transfer',
+  );
+
+  let catalogCandidateCount = 11;
   let noResponseCount = 0;
   for (const fixture of remainingCatalogFixtures) {
     const search = await slskdService.startSearch({ query: fixture.searchKey });
@@ -1046,6 +1294,20 @@ async function runVerification() {
       recoveryActivityCount: sharedRecoveryActivities.length,
       recoveryChainCount: sharedRecoveryReconciliation.recoveries.length,
       fallbackActivityCount: sharedFallbackActivities.length,
+    },
+    sharedBoundedStop: {
+      activityCount: sharedBoundedStopActivities.length,
+      activityPolicyRedacted: true,
+      candidatePolicyRedacted: true,
+      crossOperatorReadDenied: true,
+      musicQueueNoMatchesOutcomeCount: sharedBoundedStopOutcomes.length,
+      operatorCount: sharedBoundedStopSeed.wantedReleases.length,
+      primaryFinalStatus: sharedBoundedStopPrimaryFinalCandidate.status,
+      providerSearchCount: sharedBoundedStopEvidenceAfterFailure.searchCount - sharedBoundedStopEvidenceBefore.searchCount,
+      providerTransferCount: sharedBoundedStopEvidenceAfterFailure.transferCount - sharedBoundedStopEvidenceBefore.transferCount,
+      repeatDispatchCandidateCounts: sharedBoundedStopRepeatDispatches.map((result) => result.candidateCount),
+      requestBlockedReason: sharedBoundedStopRequestState.blockedReason,
+      requestStatus: sharedBoundedStopRequestState.requestStatus,
     },
   };
 }

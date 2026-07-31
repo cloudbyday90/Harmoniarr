@@ -1620,3 +1620,20 @@ Recommended next slice: add the shared bounded-stop branch. Exhaust every
 eligible shared match, prove no duplicate worker or rediscovery is launched,
 and retain one release-level recovery action plus one redacted `No good matches
 left` Activity story per operator.
+
+### Shared Bounded-Stop Acceptance
+
+Implemented in
+[MUSIC_QUEUE_SHARED_BOUNDED_STOP_ACCEPTANCE_DESIGN.md](MUSIC_QUEUE_SHARED_BOUNDED_STOP_ACCEPTANCE_DESIGN.md).
+The controlled-provider runtime now proves the terminal shared branch: one
+global retry budget is exhausted by one failed transfer, the discovery request
+becomes blocked with no future search, repeated dispatcher passes produce no
+additional provider work, and no fallback execution remains active. Both
+operators receive their own `No matches left` projection and one redacted
+Activity handoff to the normal `Search again` action. Two isolated browser
+sessions prove the same user-facing state and reciprocal copied-link denial.
+
+Recommended next slice: prove a shared manual restart. One owner's `Search
+again` action should reset the global bounded stop once, start at most one
+rediscovery, preserve both owners' policy boundaries, and restore the normal
+automatic release story.

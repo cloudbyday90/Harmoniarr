@@ -127,7 +127,9 @@ npm run validate:docker-controlled-provider-pipeline -- --no-cache
 
 ## Next High-Value Item
 
-Add shared-release bounded-stop acceptance: fail every eligible shared match,
-prove no duplicate rediscovery or fallback worker is created, and verify two
-redacted `No good matches left` Activity handoffs with the single normal
-release-level recovery action.
+Completed in
+[MUSIC_QUEUE_SHARED_BOUNDED_STOP_ACCEPTANCE_DESIGN.md](MUSIC_QUEUE_SHARED_BOUNDED_STOP_ACCEPTANCE_DESIGN.md).
+The next item is shared-release manual restart acceptance: prove one owner's
+`Search again` action safely resets the shared bounded stop once, starts no
+duplicate provider work, and returns both scoped releases to their normal
+automatic story without exposing or changing sibling policy.

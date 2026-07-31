@@ -135,7 +135,7 @@ async function copyAndRunVerifier({ composeArgs, env }) {
     args: ['exec', '-T', 'harmoniarr', 'node', '/validation/controlled-provider-pipeline-verifier.mjs'],
     composeArgs,
     env,
-    timeoutMs: 90_000,
+    timeoutMs: 180_000,
   });
   const payload = result.stdout.trim().split(/\r?\n/u).filter(Boolean).at(-1);
   if (!payload) throw new Error('Controlled-provider verifier did not produce a result');
@@ -186,15 +186,29 @@ async function copyAndRunVerifier({ composeArgs, env }) {
     && parsed.sharedRecovery.crossOperatorReadDenied === true
     && parsed.sharedRecovery.candidatePolicyRedacted === true
     && parsed.sharedRecovery.activityPolicyRedacted === true;
+  const sharedBoundedStopVerified = parsed?.sharedBoundedStop?.providerSearchCount === 1
+    && parsed?.sharedBoundedStop?.providerTransferCount === 1
+    && parsed.sharedBoundedStop.operatorCount === 2
+    && parsed.sharedBoundedStop.musicQueueNoMatchesOutcomeCount === 2
+    && parsed.sharedBoundedStop.activityCount === 2
+    && parsed.sharedBoundedStop.primaryFinalStatus === 'failed'
+    && parsed.sharedBoundedStop.requestStatus === 'blocked'
+    && parsed.sharedBoundedStop.requestBlockedReason === 'download_recovery_exhausted'
+    && Array.isArray(parsed.sharedBoundedStop.repeatDispatchCandidateCounts)
+    && parsed.sharedBoundedStop.repeatDispatchCandidateCounts.every((count) => count === 0)
+    && parsed.sharedBoundedStop.crossOperatorReadDenied === true
+    && parsed.sharedBoundedStop.candidatePolicyRedacted === true
+    && parsed.sharedBoundedStop.activityPolicyRedacted === true;
   if (parsed?.pipeline?.finalStatus !== 'applied'
-    || parsed.catalogFixtures !== 16
-    || parsed.catalogCandidates !== 19
+    || parsed.catalogFixtures !== 17
+    || parsed.catalogCandidates !== 20
     || !recoveryVerified
     || !sourceDisappearanceRecoveryVerified
     || !qualityRecoveryVerified
     || !qualityExhaustionVerified
     || !sharedDiscoveryVerified
-    || !sharedRecoveryVerified) {
+    || !sharedRecoveryVerified
+    || !sharedBoundedStopVerified) {
     throw new Error('Controlled-provider verifier returned incomplete evidence');
   }
   return parsed;

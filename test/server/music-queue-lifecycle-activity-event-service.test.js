@@ -61,6 +61,7 @@ test('Music Queue recovery activity describes a safe next-match fallback without
       operationRunId: 'run-1',
       retryAt: null,
       nextSearchAfter: null,
+      rediscoveryExhausted: false,
       rediscoveryScheduled: false,
       skippedCandidateCount: 2,
     },
@@ -69,7 +70,7 @@ test('Music Queue recovery activity describes a safe next-match fallback without
   assert.equal(JSON.stringify(event).includes('source-user'), false);
 });
 
-test('Music Queue recovery activity distinguishes retry, rediscovery, and terminal failure', () => {
+test('Music Queue recovery activity distinguishes retry, scheduled rediscovery, exhausted rediscovery, and terminal failure', () => {
   const sameCandidateRetry = buildMusicQueueRecoveryActivityEvent({
     candidate,
     recovery: {
@@ -97,10 +98,25 @@ test('Music Queue recovery activity distinguishes retry, rediscovery, and termin
       recovered: false,
     },
   });
+  const exhaustedRediscovery = buildMusicQueueRecoveryActivityEvent({
+    candidate,
+    recovery: {
+      reason: 'no_recovery_candidate_available',
+      recovered: false,
+      rediscovery: {
+        exhausted: true,
+        researchAttemptCount: 2,
+        scheduled: false,
+      },
+    },
+  });
 
   assert.equal(sameCandidateRetry.eventType, 'music_queue_download_retrying');
   assert.equal(rediscovery.eventType, 'music_queue_no_matches_left');
   assert.equal(rediscovery.extraPayload.rediscoveryScheduled, true);
+  assert.equal(exhaustedRediscovery.eventType, 'music_queue_no_matches_left');
+  assert.equal(exhaustedRediscovery.extraPayload.rediscoveryExhausted, true);
+  assert.equal(exhaustedRediscovery.extraPayload.rediscoveryScheduled, false);
   assert.equal(terminalFailure.eventType, 'music_queue_download_failed');
 });
 
@@ -144,6 +160,7 @@ test('Music Queue shared recovery fans out redacted retry events per wanted rele
         operationRunId: 'run-retry-1',
         retryAt: null,
         nextSearchAfter: null,
+        rediscoveryExhausted: false,
         rediscoveryScheduled: false,
         skippedCandidateCount: null,
       },
@@ -161,6 +178,7 @@ test('Music Queue shared recovery fans out redacted retry events per wanted rele
         operationRunId: 'run-retry-1',
         retryAt: null,
         nextSearchAfter: null,
+        rediscoveryExhausted: false,
         rediscoveryScheduled: false,
         skippedCandidateCount: null,
       },
