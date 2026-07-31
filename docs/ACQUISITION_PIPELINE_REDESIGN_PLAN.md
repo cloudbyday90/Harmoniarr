@@ -1659,8 +1659,16 @@ outcomes, reciprocal 404 reads, and complete cleanup.
   messages. See
   [MUSIC_QUEUE_RELEASE_SCOPED_LIBRARY_ADD_DIAGNOSTICS_DESIGN.md](MUSIC_QUEUE_RELEASE_SCOPED_LIBRARY_ADD_DIAGNOSTICS_DESIGN.md).
 
-Recommended next slice: add **release-scoped advanced-diagnostics reload and
-cross-operator acceptance coverage**. Two isolated sessions should prove an
-owner can reload a copied diagnostic URL into the same release context, a
-sibling operator receives a generic 404, and no direct route silently falls
-back to the unscoped library-add worklist.
+- [x] Add release-scoped advanced-diagnostics reload and cross-operator
+  acceptance coverage. Two independent administrator sessions now use the
+  real PostgreSQL read and API route to prove owner reloads retain their
+  release context, copied sibling URLs return a generic 404, and no failed
+  scoped read falls back to the global library-add worklist. This also caught
+  and corrected the UUIDv7 validation mismatch with the schema's preferred
+  identifier generator. See
+  [MUSIC_QUEUE_RELEASE_SCOPED_LIBRARY_ADD_DIAGNOSTICS_BROWSER_ACCEPTANCE_DESIGN.md](MUSIC_QUEUE_RELEASE_SCOPED_LIBRARY_ADD_DIAGNOSTICS_BROWSER_ACCEPTANCE_DESIGN.md).
+
+Recommended next slice: implement a **dedicated release-unavailable state for
+scoped library-add diagnostics**. A generic 404 should retain its secure
+semantics while replacing the mixed no-result/error presentation with one
+clear recovery action back to Music Queue.

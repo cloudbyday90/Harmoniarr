@@ -21,7 +21,8 @@ import { buildAcquisitionAddBlockerRepair } from '../acquisition/acquisition-add
 import { deriveImportCandidateAddBlockerCode } from './import-candidate-add-blocker.js';
 import { createImportCandidateReleaseAddDiagnosticRepository } from './import-candidate-release-add-diagnostic-repository.js';
 
-const wantedReleaseIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+// PostgreSQL 18 generates UUIDv7 while earlier supported versions fall back to UUIDv4.
+const wantedReleaseIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function normalizeLimit(value) {
   const parsed = Number.parseInt(String(value ?? 10), 10);

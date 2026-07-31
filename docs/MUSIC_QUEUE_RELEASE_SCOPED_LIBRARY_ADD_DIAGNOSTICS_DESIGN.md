@@ -99,12 +99,18 @@ Focused validation passed on 2026-07-31:
   primary/shared wanted-release context matching, parameterized limits, and no
   `status_message` projection;
 - service test confirms a bounded, redacted response and generic 404 behavior
-  for malformed and non-owned release IDs;
+  for malformed and non-owned release IDs, plus UUIDv7 compatibility with the
+  schema's preferred identifier generation;
 - route test confirms administrator enforcement and exact scoped arguments;
 - client contract and production client build passed;
 - Playwright verifies Music Queue opens the release-specific diagnostic route,
   shows the latest quality stop first, and keeps source/path fields out of the
   page.
+- two independent administrator browser contexts use the real PostgreSQL
+  repository and route to prove each owner can reload its direct URL, a copied
+  sibling URL receives a generic 404, and the scoped page never falls back to
+  the global library-add worklist. See
+  [MUSIC_QUEUE_RELEASE_SCOPED_LIBRARY_ADD_DIAGNOSTICS_BROWSER_ACCEPTANCE_DESIGN.md](MUSIC_QUEUE_RELEASE_SCOPED_LIBRARY_ADD_DIAGNOSTICS_BROWSER_ACCEPTANCE_DESIGN.md).
 
 ## 6. Outcome
 
@@ -115,8 +121,7 @@ file details require an intentional second handoff.
 
 ## 7. Follow-Up
 
-The next high-value item is **release-scoped advanced-diagnostics reload and
-cross-operator acceptance coverage**. It should use two isolated operator
-sessions to prove a copied URL returns the same selected release after reload
-for its owner, returns a generic 404 for another operator, and never falls
-back to an unscoped library-add worklist.
+Reload and cross-operator acceptance coverage is complete. The next logical
+work should improve the scoped route's unavailable-state presentation so a
+generic 404 renders a dedicated release-unavailable state rather than a
+no-result card plus an error notice.
