@@ -273,12 +273,19 @@ async function waitForActivityEvent(activityEventService, { entityId, eventType 
   throw new Error(`Timed out waiting for ${eventType} Activity evidence for ${entityId}; observed ${JSON.stringify(observedEvents)}`);
 }
 
-async function waitForActivityEvents(activityEventService, { entityIds, eventType }) {
+async function waitForActivityEvents(activityEventService, {
+  entityIds,
+  eventType,
+  operationRunId = null,
+}) {
   const expectedEntityIds = [...new Set(entityIds)].sort();
   const deadline = Date.now() + activityEvidenceTimeoutMs;
   while (Date.now() < deadline) {
     const feed = await activityEventService.buildActivityFeed({ eventType, limit: 50 });
-    const events = feed.events.filter((entry) => expectedEntityIds.includes(entry.entityId));
+    const events = feed.events.filter((entry) => (
+      expectedEntityIds.includes(entry.entityId)
+        && (operationRunId == null || entry.extraPayload?.operationRunId === operationRunId)
+    ));
     if (new Set(events.map((entry) => entry.entityId)).size === expectedEntityIds.length) {
       return events;
     }
@@ -294,6 +301,48 @@ async function getControlledProviderFixtureEvidence(fixtureId) {
   );
   assert.equal(response.status, 200, `controlled provider must expose fixture evidence for ${fixtureId}`);
   return response.json();
+}
+
+function assertSharedCandidateIsRedacted({ candidate, sharedSeed, wantedReleaseIds }) {
+  assert.deepEqual(
+    candidate.normalizedPayload?.musicQueue,
+    {
+      profileCode: 'lossless_archive',
+      wantedReleaseId: wantedReleaseIds[0],
+      wantedReleaseIds,
+    },
+    'the shared candidate must retain only the common quality profile and release identities',
+  );
+  const candidatePayload = JSON.stringify(candidate);
+  for (const { appUserId } of sharedSeed.wantedReleases) {
+    assert.equal(candidatePayload.includes(appUserId), false, 'candidate payloads must not expose operator identities');
+  }
+  for (const privatePolicyMarker of sharedSeed.privatePolicyMarkers) {
+    assert.equal(candidatePayload.includes(privatePolicyMarker), false, 'candidate payloads must not expose operator policy details');
+  }
+}
+
+function assertSharedActivityFanoutIsRedacted({ activities, sharedSeed, wantedReleaseIds }) {
+  assert.equal(activities.length, wantedReleaseIds.length, 'each shared release must receive one lifecycle Activity row');
+
+  for (const activity of activities) {
+    const activityPayload = JSON.stringify(activity);
+    assert.equal(activity.entityType, 'wanted_release', 'shared Music Queue activity must stay release-centred');
+    assert.ok(wantedReleaseIds.includes(activity.entityId), 'shared Music Queue activity must retain its own release identity');
+    assert.equal(activity.extraPayload?.wantedReleaseId, activity.entityId, 'Activity must retain its own release handoff ID');
+    assert.equal(Object.hasOwn(activity.extraPayload ?? {}, 'wantedReleaseIds'), false, 'Activity must not expose sibling release correlations');
+    for (const siblingWantedReleaseId of wantedReleaseIds) {
+      if (siblingWantedReleaseId !== activity.entityId) {
+        assert.equal(activityPayload.includes(siblingWantedReleaseId), false, 'Activity must not expose a sibling release identity');
+      }
+    }
+    for (const { appUserId } of sharedSeed.wantedReleases) {
+      assert.equal(activityPayload.includes(appUserId), false, 'Activity must not expose operator identities');
+    }
+    for (const privatePolicyMarker of sharedSeed.privatePolicyMarkers) {
+      assert.equal(activityPayload.includes(privatePolicyMarker), false, 'Activity must not expose operator policy details');
+    }
+  }
 }
 
 async function runVerification() {
@@ -337,6 +386,7 @@ async function runVerification() {
 
   const [pipelineFixture, ...catalogFixtures] = controlledProviderFixtureCatalog;
   const sharedDiscoveryFixture = catalogFixtures.find((fixture) => fixture.scenario === 'lossless');
+  const sharedRecoveryFixture = catalogFixtures.find((fixture) => fixture.scenario === 'shared_recovery_fallback');
   const recoveryFixture = catalogFixtures.find((fixture) => fixture.scenario === 'recovery_fallback');
   const sourceDisappearanceFixture = catalogFixtures.find((fixture) => fixture.scenario === 'completed_source_disappears');
   const qualityRecoveryFixture = catalogFixtures.find((fixture) => fixture.scenario === 'quality_recovery');
@@ -346,6 +396,7 @@ async function runVerification() {
       && fixture.id !== sourceDisappearanceFixture?.id
       && fixture.id !== qualityRecoveryFixture?.id
       && fixture.id !== qualityExhaustionFixture?.id
+      && fixture.id !== sharedRecoveryFixture?.id
   ));
 
   await seedDiscoveryRequest(pool, pipelineFixture);
@@ -712,22 +763,11 @@ async function runVerification() {
     importCandidateId: sharedDiscoveryCandidateId,
   });
   const sharedWantedReleaseIds = sharedDiscoverySeed.wantedReleases.map(({ wantedReleaseId }) => wantedReleaseId);
-  assert.deepEqual(
-    sharedCandidate.normalizedPayload?.musicQueue,
-    {
-      profileCode: 'lossless_archive',
-      wantedReleaseId: sharedWantedReleaseIds[0],
-      wantedReleaseIds: sharedWantedReleaseIds,
-    },
-    'the shared candidate must retain only the common quality profile and release identities',
-  );
-  const sharedCandidatePayload = JSON.stringify(sharedCandidate);
-  for (const { appUserId } of sharedDiscoverySeed.wantedReleases) {
-    assert.equal(sharedCandidatePayload.includes(appUserId), false, 'candidate payloads must not expose operator identities');
-  }
-  for (const privatePolicyMarker of sharedDiscoverySeed.privatePolicyMarkers) {
-    assert.equal(sharedCandidatePayload.includes(privatePolicyMarker), false, 'candidate payloads must not expose operator policy details');
-  }
+  assertSharedCandidateIsRedacted({
+    candidate: sharedCandidate,
+    sharedSeed: sharedDiscoverySeed,
+    wantedReleaseIds: sharedWantedReleaseIds,
+  });
 
   const sharedDiscoveryReconciliation = await executeDownloadAndReconcile({
     importCandidateModule,
@@ -779,21 +819,145 @@ async function runVerification() {
 
   const sharedActivities = await waitForActivityEvents(activityModule.activityEventService, {
     entityIds: sharedWantedReleaseIds,
-    eventType: 'music_queue_download_completed',
+    eventType: 'download_completed',
   });
-  for (const activity of sharedActivities) {
-    const activityPayload = JSON.stringify(activity);
-    assert.equal(activity.entityType, 'wanted_release', 'shared Music Queue activity must stay release-centred');
-    assert.ok(sharedWantedReleaseIds.includes(activity.entityId), 'shared Music Queue activity must retain its own release identity');
-    for (const { appUserId } of sharedDiscoverySeed.wantedReleases) {
-      assert.equal(activityPayload.includes(appUserId), false, 'Activity must not expose operator identities');
-    }
-    for (const privatePolicyMarker of sharedDiscoverySeed.privatePolicyMarkers) {
-      assert.equal(activityPayload.includes(privatePolicyMarker), false, 'Activity must not expose operator policy details');
-    }
-  }
+  assertSharedActivityFanoutIsRedacted({
+    activities: sharedActivities,
+    sharedSeed: sharedDiscoverySeed,
+    wantedReleaseIds: sharedWantedReleaseIds,
+  });
 
-  let catalogCandidateCount = 8;
+  assert.ok(sharedRecoveryFixture, 'the controlled catalog must include a shared recovery fixture');
+  const sharedRecoverySeed = await seedSharedOperatorDiscoveryRequest(pool, sharedRecoveryFixture);
+  const sharedRecoveryWantedReleaseIds = sharedRecoverySeed.wantedReleases.map(({ wantedReleaseId }) => wantedReleaseId);
+  const sharedRecoveryEvidenceBefore = await getControlledProviderFixtureEvidence(sharedRecoveryFixture.id);
+  const sharedRecoveryDispatch = await libraryModule.libraryDiscoveryDispatchService.dispatchReadyDiscoveryRequests();
+  assert.equal(
+    sharedRecoveryDispatch.candidateCount,
+    2,
+    'one shared recovery request must ingest one primary and one eligible fallback candidate',
+  );
+  const sharedRecoverySearch = sharedRecoveryDispatch.dispatchedSearches[0];
+  const sharedRecoveryPrimaryRunId = sharedRecoverySearch?.autoDownloadStart?.runId;
+  const sharedRecoveryPrimaryCandidateId = sharedRecoverySearch?.autoSelection?.selectedCandidateId;
+  assert.ok(sharedRecoveryPrimaryRunId, 'the shared recovery primary must automatically enter download handoff');
+  assert.ok(sharedRecoveryPrimaryCandidateId, 'the shared recovery primary must remain identifiable without an operator policy payload');
+
+  const sharedRecoveryPrimaryCandidate = await importCandidateModule.importCandidateService.getImportCandidate({
+    importCandidateId: sharedRecoveryPrimaryCandidateId,
+  });
+  assert.equal(
+    sharedRecoveryPrimaryCandidate.username,
+    `controlled-${sharedRecoveryFixture.id}`,
+    'the higher-scored shared recovery primary must be attempted before the fallback',
+  );
+  assertSharedCandidateIsRedacted({
+    candidate: sharedRecoveryPrimaryCandidate,
+    sharedSeed: sharedRecoverySeed,
+    wantedReleaseIds: sharedRecoveryWantedReleaseIds,
+  });
+
+  const sharedRecoveryReconciliation = await executeDownloadAndReconcile({
+    importCandidateModule,
+    runId: sharedRecoveryPrimaryRunId,
+    triggerSource: 'controlled_provider_shared_recovery',
+  });
+  assert.equal(sharedRecoveryReconciliation.summary.recovered, 1, 'one shared primary failure must promote one fallback');
+  assert.equal(sharedRecoveryReconciliation.recoveries.length, 1, 'one shared provider failure must create one recovery chain');
+  const sharedRecoveryFallbackRunId = sharedRecoveryReconciliation.recoveries[0]?.recoveryRunId;
+  const sharedRecoveryFallbackCandidateId = sharedRecoveryReconciliation.recoveries[0]?.nextCandidateId;
+  assert.ok(sharedRecoveryFallbackRunId, 'shared recovery must schedule one fallback download run');
+  assert.notEqual(
+    sharedRecoveryFallbackCandidateId,
+    sharedRecoveryPrimaryCandidateId,
+    'shared recovery must promote a different candidate',
+  );
+
+  const sharedRecoveryPrimaryFinalCandidate = await importCandidateModule.importCandidateService.getImportCandidate({
+    importCandidateId: sharedRecoveryPrimaryCandidateId,
+  });
+  assert.equal(sharedRecoveryPrimaryFinalCandidate.status, 'failed', 'the failed shared primary must remain blocked from reselection');
+  const sharedTryingNextOutcomes = await Promise.all(sharedRecoverySeed.wantedReleases.map(async ({
+    appUserId,
+    wantedReleaseId,
+  }) => {
+    const detail = await acquisitionModule.acquisitionPipelineService.getMusicQueueRelease({
+      appUserId,
+      wantedReleaseId,
+    });
+    assert.equal(detail.release.status.code, 'trying_next_match', 'each operator must see the shared fallback is being prepared');
+    assert.equal(detail.release.status.nextAction, 'view_recovery', 'each operator must receive the same automatic recovery handoff');
+    return detail.release.id;
+  }));
+  const sharedRecoveryActivities = await waitForActivityEvents(activityModule.activityEventService, {
+    entityIds: sharedRecoveryWantedReleaseIds,
+    eventType: 'music_queue_match_retrying',
+    operationRunId: sharedRecoveryPrimaryRunId,
+  });
+  assertSharedActivityFanoutIsRedacted({
+    activities: sharedRecoveryActivities,
+    sharedSeed: sharedRecoverySeed,
+    wantedReleaseIds: sharedRecoveryWantedReleaseIds,
+  });
+
+  await importCandidateModule.importCandidateExecutionWorker.startWorkerRun({
+    requestedCandidateCount: 1,
+    runId: sharedRecoveryFallbackRunId,
+    triggerSource: 'controlled_provider_shared_recovery',
+  });
+  await waitForRun(importCandidateModule.importCandidateExecutionRunStore, sharedRecoveryFallbackRunId);
+  const sharedRecoveryEvidenceAfter = await getControlledProviderFixtureEvidence(sharedRecoveryFixture.id);
+  assert.equal(
+    sharedRecoveryEvidenceAfter.searchCount - sharedRecoveryEvidenceBefore.searchCount,
+    1,
+    'two shared operator links must issue one provider search before recovery',
+  );
+  assert.equal(
+    sharedRecoveryEvidenceAfter.transferCount - sharedRecoveryEvidenceBefore.transferCount,
+    2,
+    'the shared retry chain must queue only its failed primary and selected fallback transfers',
+  );
+  const sharedRecoveryFallbackCandidate = await importCandidateModule.importCandidateService.getImportCandidate({
+    importCandidateId: sharedRecoveryFallbackCandidateId,
+  });
+  assert.equal(sharedRecoveryFallbackCandidate.status, 'downloading', 'the shared fallback must become the only active download');
+
+  const sharedDownloadingOutcomes = await Promise.all(sharedRecoverySeed.wantedReleases.map(async ({
+    appUserId,
+    wantedReleaseId,
+  }) => {
+    const detail = await acquisitionModule.acquisitionPipelineService.getMusicQueueRelease({
+      appUserId,
+      wantedReleaseId,
+    });
+    assert.equal(detail.release.id, wantedReleaseId, 'each operator must retain its own shared recovery detail');
+    assert.equal(detail.release.status.code, 'downloading', 'each operator must see the shared fallback download start');
+    assert.equal(detail.release.status.nextAction, 'open_downloader', 'each operator must receive the normal downloader handoff');
+    return detail.release.id;
+  }));
+  const sharedFallbackActivities = await waitForActivityEvents(activityModule.activityEventService, {
+    entityIds: sharedRecoveryWantedReleaseIds,
+    eventType: 'music_queue_download_started',
+    operationRunId: sharedRecoveryFallbackRunId,
+  });
+  assertSharedActivityFanoutIsRedacted({
+    activities: sharedFallbackActivities,
+    sharedSeed: sharedRecoverySeed,
+    wantedReleaseIds: sharedRecoveryWantedReleaseIds,
+  });
+  await Promise.all(sharedRecoverySeed.wantedReleases.map(async ({ appUserId }, index) => {
+    const other = sharedRecoverySeed.wantedReleases[(index + 1) % sharedRecoverySeed.wantedReleases.length];
+    await assert.rejects(
+      () => acquisitionModule.acquisitionPipelineService.getMusicQueueRelease({
+        appUserId,
+        wantedReleaseId: other.wantedReleaseId,
+      }),
+      (error) => error?.status === 404 && error?.code === 'music_queue_release_not_found',
+      'an operator must not read another operator\'s shared recovery detail',
+    );
+  }));
+
+  let catalogCandidateCount = 10;
   let noResponseCount = 0;
   for (const fixture of remainingCatalogFixtures) {
     const search = await slskdService.startSearch({ query: fixture.searchKey });
@@ -866,6 +1030,22 @@ async function runVerification() {
       operatorCount: sharedDiscoverySeed.wantedReleases.length,
       providerSearchCount: sharedDiscoveryEvidenceAfter.searchCount - sharedDiscoveryEvidenceBefore.searchCount,
       providerTransferCount: sharedDiscoveryEvidenceAfter.transferCount - sharedDiscoveryEvidenceBefore.transferCount,
+    },
+    sharedRecovery: {
+      activityPolicyRedacted: true,
+      candidatePolicyRedacted: true,
+      crossOperatorReadDenied: true,
+      fallbackCandidateStatus: sharedRecoveryFallbackCandidate.status,
+      fallbackRunId: sharedRecoveryFallbackRunId,
+      musicQueueDownloadingOutcomeCount: sharedDownloadingOutcomes.length,
+      musicQueueTryingNextOutcomeCount: sharedTryingNextOutcomes.length,
+      operatorCount: sharedRecoverySeed.wantedReleases.length,
+      primaryFinalStatus: sharedRecoveryPrimaryFinalCandidate.status,
+      providerSearchCount: sharedRecoveryEvidenceAfter.searchCount - sharedRecoveryEvidenceBefore.searchCount,
+      providerTransferCount: sharedRecoveryEvidenceAfter.transferCount - sharedRecoveryEvidenceBefore.transferCount,
+      recoveryActivityCount: sharedRecoveryActivities.length,
+      recoveryChainCount: sharedRecoveryReconciliation.recoveries.length,
+      fallbackActivityCount: sharedFallbackActivities.length,
     },
   };
 }

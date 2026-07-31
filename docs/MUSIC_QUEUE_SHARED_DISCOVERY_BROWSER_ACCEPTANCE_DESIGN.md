@@ -114,7 +114,9 @@ node --test --test-concurrency=1 test/browser/music-queue-shared-discovery-brows
 
 ## Next High-Value Item
 
-Add a shared-release recovery acceptance journey: force one selected provider
-match to fail, prove the provider retry chain is still singular, then prove
-both operator sessions receive their own `Trying another match` and eventual
-`Downloading` or bounded stop Activity story without sibling policy leakage.
+Implemented in
+[MUSIC_QUEUE_SHARED_RECOVERY_ACCEPTANCE_DESIGN.md](MUSIC_QUEUE_SHARED_RECOVERY_ACCEPTANCE_DESIGN.md):
+one selected match fails, one provider fallback chain continues, and two
+isolated sessions receive their own `Trying another match` and `Downloading`
+handoffs. Next, prove the shared bounded-stop branch when no eligible fallback
+remains.

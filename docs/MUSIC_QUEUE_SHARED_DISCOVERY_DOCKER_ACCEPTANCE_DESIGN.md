@@ -137,8 +137,8 @@ npm run validate:docker-controlled-provider-pipeline -- --no-cache
 
 ## Next High-Value Item
 
-The complementary two-session browser proof is now implemented in
-[MUSIC_QUEUE_SHARED_DISCOVERY_BROWSER_ACCEPTANCE_DESIGN.md](MUSIC_QUEUE_SHARED_DISCOVERY_BROWSER_ACCEPTANCE_DESIGN.md).
-Next, add a shared-release recovery acceptance journey proving that one failed
-selected match remains one provider retry chain while each operator receives
-only their own recovery and Activity projection.
+Implemented in
+[MUSIC_QUEUE_SHARED_RECOVERY_ACCEPTANCE_DESIGN.md](MUSIC_QUEUE_SHARED_RECOVERY_ACCEPTANCE_DESIGN.md):
+one failed selected match remains one provider retry chain while each operator
+receives only their own recovery and Activity projection. Next, add the
+complementary shared bounded-stop proof for exhausted eligible matches.

@@ -216,6 +216,13 @@ Database model source: `docs/DATABASE_MODEL.md`
   operator sessions receive the same shared status, only their own Activity
   handoff, and reciprocal copied URLs disclose neither sibling IDs nor private
   policy markers. See `MUSIC_QUEUE_SHARED_DISCOVERY_BROWSER_ACCEPTANCE_DESIGN.md`.
+- Music Queue shared-recovery acceptance: one synthetic shared primary now
+  fails before its quality-eligible fallback begins. Packaged Docker evidence
+  proves one retry chain, two provider transfers, scoped `Trying another
+  match` and `Downloading` projections, redacted lifecycle Activity fan-out,
+  and reciprocal 404 detail reads. A two-session browser scenario proves the
+  normal polling and Music Queue handoffs without candidate-first navigation.
+  See `MUSIC_QUEUE_SHARED_RECOVERY_ACCEPTANCE_DESIGN.md`.
 - Music Queue file-backed Docker acceptance: a disposable production runtime
   now generates real lossless and MP3-derived FLAC fixtures, reconciles their
   completed transfers through persisted safe auto-add, and proves the genuine

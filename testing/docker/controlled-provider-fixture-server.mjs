@@ -56,7 +56,12 @@ function buildProviderFile(fixture, { variant = 'primary' } = {}) {
 }
 
 function hasFallbackResponse(fixture) {
-  return ['completed_source_disappears', 'quality_recovery', 'recovery_fallback'].includes(fixture?.scenario);
+  return [
+    'completed_source_disappears',
+    'quality_recovery',
+    'recovery_fallback',
+    'shared_recovery_fallback',
+  ].includes(fixture?.scenario);
 }
 
 function buildResponse(fixture) {
@@ -72,7 +77,9 @@ function buildResponse(fixture) {
     lockedFileCount: lockedFiles.length,
     lockedFiles,
     queueLength: 0,
-    uploadSpeed: fixture.scenario === 'recovery_fallback' ? 2_000_000 : 1_000_000,
+    uploadSpeed: ['recovery_fallback', 'shared_recovery_fallback'].includes(fixture.scenario)
+      ? 2_000_000
+      : 1_000_000,
     username: `controlled-${fixture.id}`,
   };
   if (!hasFallbackResponse(fixture)) return [primaryResponse];
@@ -150,7 +157,8 @@ async function enqueueTransfers(username, files) {
     const variant = remoteFilename === buildControlledProviderRemoteFilename(fixture, { variant: 'fallback' })
       ? 'fallback'
       : 'primary';
-    const transferFailed = fixture.scenario === 'recovery_fallback' && variant === 'primary';
+    const transferFailed = ['recovery_fallback', 'shared_recovery_fallback'].includes(fixture.scenario)
+      && variant === 'primary';
     const destinationDirectory = resolve(downloadsRoot, 'complete', `${fixture.id}-${variant}`);
     if (!transferFailed) {
       await mkdir(destinationDirectory, { recursive: true });

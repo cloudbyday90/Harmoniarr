@@ -102,6 +102,7 @@ function buildMatchEvidence(release) {
     latestUpdatedAt: importReviewSummary.latestUpdatedAt ?? executionSummary.latestUpdatedAt ?? null,
     matches: Array.isArray(importReviewSummary.matches) ? importReviewSummary.matches : [],
     pendingCount: getStatusCount(statusCounts, 'pending') + getStatusCount(statusCounts, 'held'),
+    recoverySelectedCount: getCount(importReviewSummary.recoverySelectedCount),
     readiness: importReviewSummary.selectionReadiness ?? null,
     scoredCount: importReviewSummary.selectionReadiness?.scoredCandidateCount ?? 0,
     secondBestCompositeScore: importReviewSummary.secondBestCompositeScore ?? null,

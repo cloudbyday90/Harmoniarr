@@ -126,7 +126,7 @@ test('deriveMusicQueueStatus surfaces a recorded import blocker before generic m
   assert.equal(result.progressStep, 'add');
 });
 
-test('deriveMusicQueueStatus lets a promoted next match override stale quality-block evidence', () => {
+test('deriveMusicQueueStatus keeps manually selected matches distinct from automatic recovery', () => {
   const status = deriveMusicQueueStatus({
     add: {
       latestOutcome: 'quality_blocked',
@@ -145,6 +145,23 @@ test('deriveMusicQueueStatus lets a promoted next match override stale quality-b
 
   assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.CHECKING_MATCHES);
   assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.DOWNLOAD_NOW);
+});
+
+test('deriveMusicQueueStatus surfaces an automatically promoted fallback as trying another match', () => {
+  const status = deriveMusicQueueStatus({
+    match: {
+      recoverySelectedCount: 1,
+      statusCounts: {
+        failed: 1,
+        selected: 1,
+      },
+      totalCount: 2,
+    },
+    release: { missingTrackCount: 10, wantedStatus: 'missing' },
+  });
+
+  assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.TRYING_NEXT_MATCH);
+  assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.VIEW_RECOVERY);
 });
 
 test('deriveMusicQueueStatus shows trying next match when quality recovery leaves pending options', () => {

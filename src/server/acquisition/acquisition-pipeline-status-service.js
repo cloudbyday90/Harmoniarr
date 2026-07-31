@@ -224,7 +224,9 @@ export function deriveMusicQueueStatus({
     });
   }
 
-  if (hasAnyStatus(match.statusCounts, ['failed', 'rejected']) && getCount(match.pendingCount) > 0) {
+  const hasAutomaticRecoverySelection = getCount(match.recoverySelectedCount) > 0;
+  if (hasAnyStatus(match.statusCounts, ['failed', 'rejected'])
+    && (getCount(match.pendingCount) > 0 || hasAutomaticRecoverySelection)) {
     return buildStatus(MUSIC_QUEUE_STATUS_CODES.TRYING_NEXT_MATCH, {
       nextAction: MUSIC_QUEUE_ACTION_CODES.VIEW_RECOVERY,
       progressStep: 'download',

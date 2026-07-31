@@ -104,6 +104,73 @@ test('Music Queue recovery activity distinguishes retry, rediscovery, and termin
   assert.equal(terminalFailure.eventType, 'music_queue_download_failed');
 });
 
+test('Music Queue shared recovery fans out redacted retry events per wanted release', () => {
+  const recordedEvents = [];
+  const sharedCandidate = {
+    ...candidate,
+    normalizedPayload: {
+      musicQueue: {
+        profileCode: 'lossless_archive',
+        wantedReleaseId: 'wanted-1',
+        wantedReleaseIds: ['wanted-1', 'wanted-2'],
+      },
+    },
+  };
+  const event = buildMusicQueueRecoveryActivityEvent({
+    candidate: sharedCandidate,
+    operationRunId: 'run-retry-1',
+    recovery: {
+      nextCandidateId: 'candidate-2',
+      reason: 'candidate_promoted',
+      recovered: true,
+    },
+  });
+
+  recordActivityEventSafely((recordedEvent) => {
+    recordedEvents.push(recordedEvent);
+  }, event);
+
+  assert.deepEqual(recordedEvents, [
+    {
+      entityArtist: 'Boards of Canada',
+      entityId: 'wanted-1',
+      entityTitle: 'Music Has the Right to Children',
+      entityType: 'wanted_release',
+      eventType: 'music_queue_match_retrying',
+      extraPayload: {
+        schemaVersion: 1,
+        wantedReleaseId: 'wanted-1',
+        recoveryCode: 'candidate_promoted',
+        operationRunId: 'run-retry-1',
+        retryAt: null,
+        nextSearchAfter: null,
+        rediscoveryScheduled: false,
+        skippedCandidateCount: null,
+      },
+    },
+    {
+      entityArtist: 'Boards of Canada',
+      entityId: 'wanted-2',
+      entityTitle: 'Music Has the Right to Children',
+      entityType: 'wanted_release',
+      eventType: 'music_queue_match_retrying',
+      extraPayload: {
+        schemaVersion: 1,
+        wantedReleaseId: 'wanted-2',
+        recoveryCode: 'candidate_promoted',
+        operationRunId: 'run-retry-1',
+        retryAt: null,
+        nextSearchAfter: null,
+        rediscoveryScheduled: false,
+        skippedCandidateCount: null,
+      },
+    },
+  ]);
+  assert.equal(JSON.stringify(recordedEvents).includes('wantedReleaseIds'), false);
+  assert.equal(JSON.stringify(recordedEvents[0]).includes('wanted-2'), false);
+  assert.equal(JSON.stringify(recordedEvents[1]).includes('wanted-1'), false);
+});
+
 test('Music Queue recovery activity records a safe library-add stop without provider diagnostics', () => {
   const event = buildMusicQueueRecoveryActivityEvent({
     candidate,

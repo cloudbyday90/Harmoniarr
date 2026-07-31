@@ -138,6 +138,11 @@ function buildImportReviewSummary(row) {
     summary.selectionReadiness = selectionReadiness;
   }
 
+  const recoverySelectedCount = toInteger(row.import_candidate_recovery_selected_count);
+  if (recoverySelectedCount > 0) {
+    summary.recoverySelectedCount = recoverySelectedCount;
+  }
+
   const executionItemCount = toInteger(row.import_execution_item_total_count);
   if (executionItemCount > 0) {
     summary.downloadExecutionSummary = {
@@ -423,6 +428,7 @@ export function createLibraryWantedReleaseStore({
           import_review_summary.best_composite_score AS import_candidate_best_composite_score,
           import_review_summary.second_best_composite_score AS import_candidate_second_best_composite_score,
           import_review_summary.scored_candidate_count AS import_candidate_scored_count,
+          import_review_summary.recovery_selected_count AS import_candidate_recovery_selected_count,
           import_match_drilldown.matches AS import_candidate_matches,
           import_execution_summary.total_item_count AS import_execution_item_total_count,
           import_execution_summary.item_status_counts AS import_execution_item_status_counts,
@@ -448,6 +454,7 @@ export function createLibraryWantedReleaseStore({
             SELECT
               ic.id,
               ic.status,
+              ic.selection_reason,
               ic.updated_at,
               CASE
                 WHEN jsonb_typeof(ic.normalized_payload->'compositeScore') = 'number'
@@ -507,7 +514,13 @@ export function createLibraryWantedReleaseStore({
             (
               SELECT COUNT(candidate_rows.composite_score)::integer
               FROM candidate_rows
-            ) AS scored_candidate_count
+            ) AS scored_candidate_count,
+            (
+              SELECT COUNT(*)::integer
+              FROM candidate_rows
+              WHERE candidate_rows.status = 'selected'
+                AND candidate_rows.selection_reason = 'recovery_cascade'
+            ) AS recovery_selected_count
         ) import_review_summary ON TRUE
         LEFT JOIN LATERAL (
           SELECT COALESCE(

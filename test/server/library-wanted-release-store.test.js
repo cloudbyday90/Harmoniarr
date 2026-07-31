@@ -35,6 +35,7 @@ test('listWantedReleasesWithMetadata maps discovery request recovery evidence', 
             import_candidate_latest_event_type: 'import_candidate_selected',
             import_candidate_latest_updated_at: '2026-06-27T21:10:00.000Z',
             import_candidate_best_composite_score: 91,
+            import_candidate_recovery_selected_count: 1,
             import_candidate_matches: [{
               discoveredAt: '2026-06-27T21:09:00.000Z',
               fileCount: 10,
@@ -124,6 +125,7 @@ test('listWantedReleasesWithMetadata maps discovery request recovery evidence', 
   assert.match(observedSql, /ic\.source_search_id = NULLIF\(ldr\.evidence->>'lastSearchId', ''\)/);
   assert.match(observedSql, /jsonb_typeof\(ic\.normalized_payload->'compositeScore'\)/);
   assert.match(observedSql, /second_best_composite_score/);
+  assert.match(observedSql, /recovery_selected_count/);
   assert.match(observedSql, /latest_event_type/);
   assert.match(observedSql, /FROM import_candidate_events ice/);
   assert.match(observedSql, /import_match_drilldown\.matches AS import_candidate_matches/);
@@ -187,6 +189,7 @@ test('listWantedReleasesWithMetadata maps discovery request recovery evidence', 
         },
         tone: 'info',
       },
+      recoverySelectedCount: 1,
       statusCounts: {
         downloading: 2,
         pending: 1,

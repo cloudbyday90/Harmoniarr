@@ -125,6 +125,7 @@ async function generateFixtureAudio({ composeArgs, env }) {
     "ffmpeg -y -f lavfi -i 'aevalsrc=0.2*sin(2*PI*12000*t)+0.2*sin(2*PI*900*t):s=44100:d=3' -c:a flac /data/downloads/controlled-provider-fixtures/track-13.flac >/dev/null 2>&1",
     "ffmpeg -y -f lavfi -i 'aevalsrc=0.2*sin(2*PI*21000*t)+0.2*sin(2*PI*1100*t):s=44100:d=3' -c:a flac /data/downloads/controlled-provider-fixtures/track-13-fallback.flac >/dev/null 2>&1",
     "ffmpeg -y -f lavfi -i 'aevalsrc=0.2*sin(2*PI*12000*t)+0.2*sin(2*PI*1200*t):s=44100:d=3' -c:a flac /data/downloads/controlled-provider-fixtures/track-14.flac >/dev/null 2>&1",
+    "ffmpeg -y -f lavfi -i 'aevalsrc=0.2*sin(2*PI*21000*t)+0.2*sin(2*PI*600*t):s=44100:d=3' -c:a flac /data/downloads/controlled-provider-fixtures/track-16-fallback.flac >/dev/null 2>&1",
   ].join('; ');
   await runCompose({ args: ['exec', '-T', 'harmoniarr', 'sh', '-ec', command], composeArgs, env, timeoutMs: 30_000 });
 }
@@ -170,14 +171,30 @@ async function copyAndRunVerifier({ composeArgs, env }) {
     && parsed.sharedDiscovery.crossOperatorReadDenied === true
     && parsed.sharedDiscovery.candidatePolicyRedacted === true
     && parsed.sharedDiscovery.activityPolicyRedacted === true;
+  const sharedRecoveryVerified = parsed?.sharedRecovery?.providerSearchCount === 1
+    && parsed?.sharedRecovery?.providerTransferCount === 2
+    && parsed.sharedRecovery.operatorCount === 2
+    && parsed.sharedRecovery.recoveryChainCount === 1
+    && parsed.sharedRecovery.recoveryActivityCount === 2
+    && parsed.sharedRecovery.fallbackActivityCount === 2
+    && parsed.sharedRecovery.musicQueueTryingNextOutcomeCount === 2
+    && parsed.sharedRecovery.musicQueueDownloadingOutcomeCount === 2
+    && parsed.sharedRecovery.primaryFinalStatus === 'failed'
+    && parsed.sharedRecovery.fallbackCandidateStatus === 'downloading'
+    && typeof parsed.sharedRecovery.fallbackRunId === 'string'
+    && parsed.sharedRecovery.fallbackRunId.length > 0
+    && parsed.sharedRecovery.crossOperatorReadDenied === true
+    && parsed.sharedRecovery.candidatePolicyRedacted === true
+    && parsed.sharedRecovery.activityPolicyRedacted === true;
   if (parsed?.pipeline?.finalStatus !== 'applied'
-    || parsed.catalogFixtures !== 15
-    || parsed.catalogCandidates !== 17
+    || parsed.catalogFixtures !== 16
+    || parsed.catalogCandidates !== 19
     || !recoveryVerified
     || !sourceDisappearanceRecoveryVerified
     || !qualityRecoveryVerified
     || !qualityExhaustionVerified
-    || !sharedDiscoveryVerified) {
+    || !sharedDiscoveryVerified
+    || !sharedRecoveryVerified) {
     throw new Error('Controlled-provider verifier returned incomplete evidence');
   }
   return parsed;

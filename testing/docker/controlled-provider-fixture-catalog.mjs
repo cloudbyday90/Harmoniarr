@@ -48,6 +48,7 @@ export const controlledProviderFixtureCatalog = Object.freeze([
   createFixture(13, { format: 'flac', popularityTier: 'emerging', scenario: 'quality_recovery' }),
   createFixture(14, { format: 'flac', popularityTier: 'emerging', scenario: 'quality_exhausted' }),
   createFixture(15, { format: 'flac', popularityTier: 'emerging', scenario: 'no_response' }),
+  createFixture(16, { format: 'flac', popularityTier: 'emerging', scenario: 'shared_recovery_fallback' }),
 ]);
 
 export function findControlledProviderFixtureBySearchText(searchText) {

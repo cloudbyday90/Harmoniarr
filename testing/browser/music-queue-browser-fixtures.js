@@ -55,16 +55,24 @@ export async function installConfiguredMusicQueueProviderFixtures(browserContext
  * same generic 404 contract as the production scoped service.
  *
  * @param {import('playwright').BrowserContext} browserContext
- * @param {{ activityEvents?: Array<object>, release: object }} options
- * @returns {Promise<void>}
+ * @param {{ activityEvents?: Array<object>, release?: object, releaseSequence?: Array<object> }} options
+ * @returns {Promise<{getReleaseReadCount: () => number}>}
  */
 export async function installScopedMusicQueueReadModelFixtures(browserContext, {
   activityEvents = [],
-  release,
+  release = null,
+  releaseSequence = null,
 } = {}) {
-  if (!release?.id) {
+  const releases = Array.isArray(releaseSequence) && releaseSequence.length > 0
+    ? releaseSequence
+    : [release];
+  const initialRelease = releases[0];
+
+  if (!initialRelease?.id || releases.some((entry) => entry?.id !== initialRelease.id)) {
     throw new TypeError('installScopedMusicQueueReadModelFixtures requires a release with an id');
   }
+
+  let releaseReadCount = 0;
 
   await installConfiguredMusicQueueProviderFixtures(browserContext);
 
@@ -76,15 +84,17 @@ export async function installScopedMusicQueueReadModelFixtures(browserContext, {
 
     const requestUrl = new URL(route.request().url());
     const listPath = '/api/v1/acquisition/releases';
-    const releasePath = `${listPath}/${encodeURIComponent(release.id)}`;
+    const releasePath = `${listPath}/${encodeURIComponent(initialRelease.id)}`;
+    const currentRelease = releases[Math.min(releaseReadCount, releases.length - 1)];
 
     if (requestUrl.pathname === listPath) {
+      releaseReadCount += 1;
       await route.fulfill({
         body: JSON.stringify({
           checkedAt: '2026-07-30T20:00:00.000Z',
           pagination: { limit: 100, offset: 0, total: 1 },
-          releases: [release],
-          summary: { counts: { [release.status?.code ?? 'queued_for_search']: 1 }, total: 1 },
+          releases: [currentRelease],
+          summary: { counts: { [currentRelease.status?.code ?? 'queued_for_search']: 1 }, total: 1 },
         }),
         contentType: 'application/json',
       });
@@ -95,7 +105,7 @@ export async function installScopedMusicQueueReadModelFixtures(browserContext, {
       await route.fulfill({
         body: JSON.stringify({
           checkedAt: '2026-07-30T20:00:00.000Z',
-          release,
+          release: currentRelease,
         }),
         contentType: 'application/json',
       });
@@ -125,4 +135,8 @@ export async function installScopedMusicQueueReadModelFixtures(browserContext, {
       contentType: 'application/json',
     });
   });
+
+  return {
+    getReleaseReadCount: () => releaseReadCount,
+  };
 }

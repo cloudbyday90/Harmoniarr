@@ -1604,3 +1604,19 @@ without account IDs, sibling correlations, or private policy markers.
 Recommended next slice: add a two-session browser acceptance journey for this
 same shared Music Queue release. It should prove that normal UI and route
 layers retain the Docker-proven scope and redaction boundaries.
+
+### Shared Recovery Acceptance
+
+Implemented in
+[MUSIC_QUEUE_SHARED_RECOVERY_ACCEPTANCE_DESIGN.md](MUSIC_QUEUE_SHARED_RECOVERY_ACCEPTANCE_DESIGN.md).
+The controlled-provider runtime now proves one shared failed primary causes
+one provider fallback chain, while two operator-owned Music Queue projections
+move from `Trying another match` to `Downloading`. Recovery and download
+Activity fan out into two redacted release-specific rows, direct sibling reads
+remain generic 404s, and two isolated browser sessions prove the normal UI
+handoffs and automatic polling behavior.
+
+Recommended next slice: add the shared bounded-stop branch. Exhaust every
+eligible shared match, prove no duplicate worker or rediscovery is launched,
+and retain one release-level recovery action plus one redacted `No good matches
+left` Activity story per operator.
