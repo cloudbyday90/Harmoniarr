@@ -1681,7 +1681,14 @@ outcomes, reciprocal 404 reads, and complete cleanup.
   flattened into a generic retry. See
   [ACTIVITY_RESOURCE_STATE_CONSISTENCY_DESIGN.md](ACTIVITY_RESOURCE_STATE_CONSISTENCY_DESIGN.md).
 
-Recommended next slice: complete a **Settings provider-state and recovery
-consistency pass**. Normalize Managed, External, and Disabled provider
-readiness, connection-test results, and setup guidance into one concise status
-and one context-safe next action per provider.
+- [x] Complete a Settings provider-state and recovery consistency pass.
+  Managed, External, and Disabled modes now share one safe state/action model
+  across Settings setup and Connections. `Test saved connection` calls only
+  the scoped admin-only Soulseek status endpoint, while UI and route errors
+  cannot expose provider exception details. See
+  [SETTINGS_PROVIDER_STATE_RECOVERY_CONSISTENCY_DESIGN.md](SETTINGS_PROVIDER_STATE_RECOVERY_CONSISTENCY_DESIGN.md).
+
+Recommended next slice: complete a **Settings save-state consistency pass**.
+Normalize saved, saving, saved-but-unverified, and retryable-save failure
+feedback across Connections, Media & storage, and Library so each primary
+Settings surface has one clear outcome and one safe next action.

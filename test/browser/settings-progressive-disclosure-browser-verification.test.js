@@ -49,10 +49,13 @@ suite('Settings progressive disclosure browser verification', () => {
 
     await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
       const pageErrors = [];
+      let connectionStatusRequests = 0;
+      let overviewRequests = 0;
       page.on('pageerror', (error) => pageErrors.push(error.message));
 
       await bootstrapAdminThroughUi(page, { baseUrl });
       await browserContext.route('**/api/v1/system/overview', async (route) => {
+        overviewRequests += 1;
         await route.fulfill({
           body: JSON.stringify({
             dependencies: [{
@@ -68,6 +71,20 @@ suite('Settings progressive disclosure browser verification', () => {
               provider: 'media_tooling',
               status: 'healthy',
             }],
+          }),
+          contentType: 'application/json',
+        });
+      });
+      await browserContext.route('**/api/v1/slskd/status', async (route) => {
+        connectionStatusRequests += 1;
+        await route.fulfill({
+          body: JSON.stringify({
+            ok: true,
+            provider: 'slskd',
+            status: {
+              provider: 'slskd',
+              status: 'healthy',
+            },
           }),
           contentType: 'application/json',
         });
@@ -105,7 +122,7 @@ suite('Settings progressive disclosure browser verification', () => {
       await page.goto(`${baseUrl}/app/settings`, { waitUntil: 'domcontentloaded' });
       await page.getByRole('heading', { name: 'Setup readiness' }).waitFor();
       await page.getByText('Connect Soulseek', { exact: true }).waitFor();
-      await page.getByText('Managed setup required', { exact: true }).waitFor();
+      await page.getByText('Setup needed', { exact: true }).waitFor();
       await page.getByRole('link', { name: 'Finish managed setup' }).waitFor();
       await page.getByRole('link', { name: 'Manage folders' }).waitFor();
       assert.equal(await page.getByText('Choose library behavior', { exact: true }).isVisible(), false);
@@ -118,13 +135,8 @@ suite('Settings progressive disclosure browser verification', () => {
       await page.getByRole('link', { name: 'System & security' }).waitFor();
 
       await page.goto(`${baseUrl}/app/settings/connections`, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('button', { name: 'Test saved connection' }).waitFor();
-      await page.getByRole('heading', { name: 'Saved connection status' }).waitFor();
-      await page.getByText('Soulseek is connected and ready for downloads.', { exact: true }).waitFor();
-      const otherServiceStatus = page.getByRole('button', { name: 'Show other service status' });
-      await otherServiceStatus.click();
-      await page.getByText('MusicBrainz lookups are reachable.', { exact: true }).waitFor();
-      await page.getByText('Media inspection tooling is available.', { exact: true }).waitFor();
+      await page.getByRole('heading', { name: 'Soulseek status' }).waitFor();
+      await page.getByText('The managed Soulseek deployment is not available yet. Finish its Docker setup, then save and test the connection.', { exact: true }).waitFor();
       await page.getByRole('group', { name: 'Soulseek provider mode' }).waitFor();
       assert.equal(await page.getByRole('radio', { name: /Managed/ }).count(), 1);
       assert.equal(await page.getByRole('radio', { name: /External/ }).count(), 1);
@@ -134,9 +146,17 @@ suite('Settings progressive disclosure browser verification', () => {
       await page.getByRole('radio', { name: /External/ }).check();
       await page.getByRole('heading', { name: 'Make completed downloads available' }).waitFor();
       await page.getByRole('link', { name: 'Set up folders' }).waitFor();
+      const overviewRequestCountBeforeTest = overviewRequests;
+      const connectionStatusRequestCountBeforeTest = connectionStatusRequests;
+      await page.getByRole('button', { name: 'Test saved connection' }).click();
+      await page.getByText('Ready. Soulseek is connected and ready for searches and downloads.', { exact: true }).waitFor();
+      assert.equal(connectionStatusRequests, connectionStatusRequestCountBeforeTest + 1);
+      assert.equal(overviewRequests, overviewRequestCountBeforeTest);
       await page.getByRole('radio', { name: /Disabled/ }).check();
       assert.equal(await page.getByLabel('Service address').count(), 0);
-      assert.equal(await page.getByRole('button', { name: 'Soulseek is off' }).isDisabled(), true);
+      await page.getByRole('region', { name: 'Soulseek status' }).getByText('Downloads off', { exact: true }).waitFor();
+      await page.getByText('Next:', { exact: false }).waitFor();
+      assert.equal(await page.getByRole('button', { name: 'Test saved connection' }).count(), 0);
       const optionalSources = page.getByRole('button', { name: 'Set up optional services' });
       await optionalSources.click();
       await page.getByRole('heading', { name: 'Spotify' }).waitFor();

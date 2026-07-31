@@ -20,16 +20,16 @@
 import { computed, onMounted } from 'vue';
 import { RouterLink } from 'vue-router';
 import SettingsDisclosure from '../components/settings/SettingsDisclosure.vue';
-import { useDependencyHealth } from '../composables/useDependencyHealth.js';
 import { useSettingsSetupProgress } from '../composables/useSettingsSetupProgress.js';
+import { useSoulseekConnectionStatus } from '../composables/useSoulseekConnectionStatus.js';
 import { buildSettingsSetupOverview } from '../lib/settings-setup-presentation.js';
 
 const {
-  dependencies,
-  isLoading,
-  loadDependencyHealth,
-  loadError,
-} = useDependencyHealth();
+  connectionErrorCode,
+  connectionStatus,
+  isLoading: isLoadingConnection,
+  loadConnectionStatus,
+} = useSoulseekConnectionStatus();
 
 const {
   isLoading: isLoadingSetupProgress,
@@ -38,11 +38,11 @@ const {
   progress: setupProgress,
 } = useSettingsSetupProgress();
 
-const isCheckingSetup = computed(() => isLoading.value || isLoadingSetupProgress.value);
+const isCheckingSetup = computed(() => isLoadingConnection.value || isLoadingSetupProgress.value);
 
 const setupOverview = computed(() => buildSettingsSetupOverview({
-  dependencies: dependencies.value,
-  healthError: loadError.value,
+  connectionErrorCode: connectionErrorCode.value,
+  connectionStatus: connectionStatus.value,
   setupProgress: setupProgress.value,
   setupProgressError: setupProgressError.value,
 }));
@@ -54,7 +54,7 @@ const setupStatusMessage = computed(() => {
 });
 
 onMounted(() => {
-  void loadDependencyHealth();
+  void loadConnectionStatus();
   void loadSetupProgress();
 });
 </script>

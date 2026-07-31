@@ -73,12 +73,14 @@ function buildUnresolvedConfirmation(repairNotice) {
  * endpoints, secret metadata, or raw health errors.
  */
 export function buildMusicQueueProviderRepairRecoveryConfirmation({
+  connectionCheckFailed = false,
+  connectionStatus = null,
   dependencies,
   healthLoadFailed = false,
   setupProgress,
 } = {}) {
   const repairNotice = buildMusicQueueProviderRepairNotice({
-    dependencies,
+    dependencies: connectionStatus ? [connectionStatus] : dependencies,
     setupProgress,
   });
   if (repairNotice && [
@@ -88,7 +90,7 @@ export function buildMusicQueueProviderRepairRecoveryConfirmation({
     return buildUnresolvedConfirmation(repairNotice);
   }
 
-  if (healthLoadFailed) {
+  if (connectionCheckFailed || healthLoadFailed) {
     return buildConfirmation({
       copy: 'Settings were saved, but Harmoniarr could not verify Soulseek yet. Music Queue will retry when the connection is available.',
       outcome: 'not_verified',

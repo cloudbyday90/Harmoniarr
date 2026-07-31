@@ -26,13 +26,13 @@ const defaultRequestAuthDependencies = createRequestAuthDependencies();
 function normalizeSlskdError(error) {
   switch (error?.code) {
     case 'slskd_misconfigured':
-      return createApiError(503, error.code, error.message);
+      return createApiError(503, error.code, 'Soulseek connection settings need review');
     case 'slskd_unauthorized':
       return createApiError(503, error.code, 'slskd authentication failed');
     case 'slskd_unavailable':
       return createApiError(503, error.code, 'slskd is temporarily unavailable');
     case 'slskd_request_failed':
-      return createApiError(502, error.code, error.message);
+      return createApiError(502, error.code, 'Soulseek request failed. Try again.');
     default:
       return error;
   }

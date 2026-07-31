@@ -80,3 +80,29 @@ test('settings setup distinguishes a failed folder-readiness read from a missing
   assert.equal(folders.label, 'Review folders');
   assert.match(overview.readiness.copy, /2 required setup tasks remain/);
 });
+
+test('settings setup uses the focused Soulseek status result without exposing its message', () => {
+  const overview = buildSettingsSetupOverview({
+    connectionStatus: {
+      message: 'http://private-slskd.example accepted secret-value',
+      provider: 'slskd',
+      status: 'healthy',
+    },
+    setupProgress: {
+      folders: {
+        downloadsConfigured: true,
+        musicConfigured: true,
+        validationStatus: 'healthy',
+      },
+      soulseek: {
+        managedDeploymentMissing: false,
+        providerMode: 'external',
+      },
+    },
+  });
+
+  const soulseek = overview.coreSteps.find((step) => step.id === 'soulseek');
+  assert.equal(soulseek.status, 'Ready');
+  assert.equal(soulseek.label, 'Test saved connection');
+  assert.doesNotMatch(JSON.stringify(soulseek), /private-slskd|secret-value|https?:/i);
+});

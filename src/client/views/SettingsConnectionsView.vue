@@ -21,30 +21,35 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import {
   buildSlskdConnectionSubtitle,
-  formatDependencyStatusLabel,
   formatOAuthStatusLabel,
   formatProviderSecretStatusLabel,
   formatSlskdProviderModeLabel,
 } from '../lib/settings-connections-presentation.js';
 import SettingsDisclosure from '../components/settings/SettingsDisclosure.vue';
-import SettingsProviderHealthSummary from '../components/settings/SettingsProviderHealthSummary.vue';
+import SettingsProviderConnectionStatus from '../components/settings/SettingsProviderConnectionStatus.vue';
 import SoulseekProviderModeGuidance from '../components/settings/SoulseekProviderModeGuidance.vue';
 import MusicQueueProviderRepairRecoveryConfirmation from '../components/music-queue/MusicQueueProviderRepairRecoveryConfirmation.vue';
 import { useConnections } from '../composables/useConnections.js';
-import { useDependencyHealth } from '../composables/useDependencyHealth.js';
+import { useSettingsSetupProgress } from '../composables/useSettingsSetupProgress.js';
+import { useSoulseekConnectionStatus } from '../composables/useSoulseekConnectionStatus.js';
 import { useToast } from '../composables/useToast.js';
 import { buildMusicQueueProviderRepairRecoveryConfirmation, isMusicQueueProviderRepairReturnContext } from '../lib/music-queue-provider-repair-recovery-presentation.js';
-import { buildSettingsSetupProgress } from '../lib/settings-setup-progress.js';
+import { buildSettingsSoulseekProviderState } from '../lib/settings-provider-state-presentation.js';
 
 const toast = useToast();
 const route = useRoute();
 
 const {
-  dependencies: providerHealth,
-  isLoading: isTestingProviderHealth,
-  loadDependencyHealth,
-  loadError: providerHealthError,
-} = useDependencyHealth();
+  connectionErrorCode,
+  connectionStatus,
+  isLoading: isTestingProviderConnection,
+  loadConnectionStatus,
+} = useSoulseekConnectionStatus();
+
+const {
+  loadSetupProgress,
+  progress: setupProgress,
+} = useSettingsSetupProgress();
 
 const {
   connectSpotifyOAuth,
@@ -73,23 +78,27 @@ const isMusicQueueProviderRepairReturn = computed(() =>
   isMusicQueueProviderRepairReturnContext(route.query.repair),
 );
 const providerRepairConfirmation = ref(null);
-const safeSetupProgress = computed(() => buildSettingsSetupProgress({
-  secretStatus: {
-    slskd: {
-      providerMode: form.slskd.providerMode,
-      providerModeState: secretStatus.value?.slskd?.providerModeState,
-    },
-  },
+const soulseekProviderState = computed(() => buildSettingsSoulseekProviderState({
+  connectionErrorCode: connectionErrorCode.value,
+  connectionStatus: connectionStatus.value,
+  managedDeploymentDetected: isManagedDeployment.value,
+  providerMode: form.slskd.providerMode,
+  providerModeState: secretStatus.value?.slskd?.providerMode === form.slskd.providerMode
+    ? secretStatus.value?.slskd?.providerModeState
+    : null,
 }));
 
 async function refreshProviderRepairConfirmation() {
-  await loadDependencyHealth();
+  await Promise.all([
+    loadConnectionStatus(),
+    loadSetupProgress(),
+  ]);
   if (!isMusicQueueProviderRepairReturn.value) return;
 
   providerRepairConfirmation.value = buildMusicQueueProviderRepairRecoveryConfirmation({
-    dependencies: providerHealth.value,
-    healthLoadFailed: Boolean(providerHealthError.value),
-    setupProgress: safeSetupProgress.value,
+    connectionCheckFailed: Boolean(connectionErrorCode.value),
+    connectionStatus: connectionStatus.value,
+    setupProgress: setupProgress.value,
   });
 }
 
@@ -102,37 +111,28 @@ async function handleSaveSettings() {
 }
 
 async function testProviderConnection() {
-  if (isSoulseekDisabled.value) {
-    toast.info('Soulseek downloads are turned off. Choose Managed or External to test a connection.');
-    return;
+  await loadConnectionStatus();
+
+  const providerState = buildSettingsSoulseekProviderState({
+    connectionErrorCode: connectionErrorCode.value,
+    connectionStatus: connectionStatus.value,
+    managedDeploymentDetected: isManagedDeployment.value,
+    providerMode: form.slskd.providerMode,
+    providerModeState: secretStatus.value?.slskd?.providerMode === form.slskd.providerMode
+      ? secretStatus.value?.slskd?.providerModeState
+      : null,
+  });
+  const toastMessage = `${providerState.statusLabel}. ${providerState.message}`;
+
+  if (providerState.tone === 'success') {
+    toast.success(toastMessage);
+  } else if (providerState.tone === 'danger') {
+    toast.error(toastMessage);
+  } else if (providerState.tone === 'warning') {
+    toast.warning(toastMessage);
+  } else {
+    toast.info(toastMessage);
   }
-
-  await refreshProviderRepairConfirmation();
-
-  if (providerHealthError.value) {
-    toast.error(`Connection test failed: ${providerHealthError.value}`);
-    return;
-  }
-
-  const slskdStatus = providerHealth.value.find((dep) => dep.provider === 'slskd');
-  if (!slskdStatus) {
-    toast.info('Provider health refreshed.');
-    return;
-  }
-
-  if (slskdStatus.status === 'healthy') {
-    toast.success(slskdStatus.message ?? 'Soulseek connection is healthy.');
-    return;
-  }
-
-  const message = slskdStatus.message
-    ?? `Soulseek connection is ${formatDependencyStatusLabel(slskdStatus.status).toLowerCase()}.`;
-  if (slskdStatus.status === 'disabled') {
-    toast.warning(message);
-    return;
-  }
-
-  toast.error(message);
 }
 
 watch(
@@ -149,7 +149,8 @@ watch(
 
 onMounted(() => {
   void loadSettings();
-  void loadDependencyHealth();
+  void loadConnectionStatus();
+  void loadSetupProgress();
 });
 </script>
 
@@ -179,7 +180,7 @@ onMounted(() => {
               <p class="hx-card-subtitle">{{ buildSlskdConnectionSubtitle() }}</p>
             </div>
             <span class="review-status-pill" :class="isSoulseekDisabled ? 'review-status-held' : 'review-status-selected'">
-              {{ formatSlskdProviderModeLabel(secretStatus?.slskd ?? { providerMode: form.slskd.providerMode }) }}
+              {{ formatSlskdProviderModeLabel({ providerMode: form.slskd.providerMode }) }}
             </span>
           </header>
           <div class="hx-card-body">
@@ -241,11 +242,9 @@ onMounted(() => {
               :managed-deployment-detected="isManagedDeployment"
               :provider-mode="form.slskd.providerMode"
             />
-            <SettingsProviderHealthSummary
-              :dependencies="providerHealth"
-              :is-disabled="isSoulseekDisabled"
-              :is-testing="isTestingProviderHealth"
-              :load-error="providerHealthError"
+            <SettingsProviderConnectionStatus
+              :provider-state="soulseekProviderState"
+              :is-testing="isTestingProviderConnection"
               @test="testProviderConnection"
             />
           </div>

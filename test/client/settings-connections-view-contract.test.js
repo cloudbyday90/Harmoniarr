@@ -15,15 +15,17 @@ const VIEW_PATH = new URL('../../src/client/views/SettingsConnectionsView.vue', 
 test('SettingsConnectionsView keeps saved provider status beside the Soulseek setup controls', async () => {
   const source = await readFile(VIEW_PATH, 'utf8');
 
-  assert.match(source, /isLoading: isTestingProviderHealth/);
-  assert.match(source, /loadError: providerHealthError/);
+  assert.match(source, /isLoading: isTestingProviderConnection/);
+  assert.match(source, /useSoulseekConnectionStatus/);
+  assert.match(source, /loadConnectionStatus/);
   assert.match(source, /import \{ useToast \} from '\.\.\/composables\/useToast\.js'/);
   assert.match(source, /const toast = useToast\(\);/);
-  assert.match(source, /import SettingsProviderHealthSummary from '\.\.\/components\/settings\/SettingsProviderHealthSummary\.vue'/);
-  assert.match(source, /<SettingsProviderHealthSummary/);
+  assert.match(source, /import SettingsProviderConnectionStatus from '\.\.\/components\/settings\/SettingsProviderConnectionStatus\.vue'/);
+  assert.match(source, /<SettingsProviderConnectionStatus/);
   assert.match(source, /@test="testProviderConnection"/);
-  assert.match(source, /toast\.success\(slskdStatus\.message \?\? 'Soulseek connection is healthy\.'\)/);
-  assert.match(source, /toast\.error\(`Connection test failed: \$\{providerHealthError\.value\}`\)/);
+  assert.match(source, /buildSettingsSoulseekProviderState/);
+  assert.doesNotMatch(source, /useDependencyHealth/);
+  assert.doesNotMatch(source, /Connection test failed: \$\{/);
 });
 
 test('SettingsConnectionsView exposes explicit managed, external, and disabled provider modes', async () => {
@@ -56,9 +58,9 @@ test('SettingsConnectionsView confirms the Music Queue recovery state after save
   assert.match(source, /MusicQueueProviderRepairRecoveryConfirmation/);
 });
 
-test('SettingsConnectionsView passes provider health failure states to the local status component', async () => {
+test('SettingsConnectionsView passes the bounded provider state to the local status component', async () => {
   const source = await readFile(VIEW_PATH, 'utf8');
 
-  assert.match(source, /:dependencies="providerHealth"/);
-  assert.match(source, /:load-error="providerHealthError"/);
+  assert.match(source, /:provider-state="soulseekProviderState"/);
+  assert.match(source, /:is-testing="isTestingProviderConnection"/);
 });

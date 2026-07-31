@@ -16,70 +16,37 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { buildSettingsSoulseekProviderState } from './settings-provider-state-presentation.js';
+
 function findSoulseekHealth(dependencies) {
   return Array.isArray(dependencies)
     ? dependencies.find((dependency) => dependency?.provider === 'slskd') ?? null
     : null;
 }
 
-function buildSoulseekStep(dependencies, healthError, setupProgress) {
-  if (setupProgress?.soulseek?.managedDeploymentMissing) {
-    return {
-      copy: 'Managed Soulseek is selected, but the Harmoniarr managed Docker overlay is not available yet. Finish the managed setup before downloads can start.',
-      label: 'Finish managed setup',
-      routeName: 'settings-connections',
-      status: 'Managed setup required',
-      tone: 'warning',
-    };
-  }
-
-  if (healthError) {
-    return {
-      copy: 'Check the address and API key before Harmoniarr can start downloads.',
-      label: 'Check Soulseek connection',
-      routeName: 'settings-connections',
-      status: 'Needs a check',
-      tone: 'warning',
-    };
-  }
-
-  const health = findSoulseekHealth(dependencies);
-  if (health?.status === 'healthy') {
-    return {
-      copy: health.message || 'Soulseek is connected and ready for downloads.',
-      label: 'Manage connection',
-      routeName: 'settings-connections',
-      status: 'Ready',
-      tone: 'success',
-    };
-  }
-
-  if (health?.status === 'disabled') {
-    return {
-      copy: health.message || 'Soulseek downloads are turned off. Choose a provider mode when you are ready to download music.',
-      label: 'Choose provider mode',
-      routeName: 'settings-connections',
-      status: 'Optional',
-      tone: 'info',
-    };
-  }
-
-  if (health) {
-    return {
-      copy: health.message || 'Review the Soulseek address and API key, then test the connection.',
-      label: 'Fix connection',
-      routeName: 'settings-connections',
-      status: 'Needs attention',
-      tone: 'danger',
-    };
-  }
+function buildSoulseekStep({
+  connectionErrorCode,
+  connectionStatus,
+  dependencies,
+  healthError,
+  setupProgress,
+} = {}) {
+  const fallbackHealth = findSoulseekHealth(dependencies);
+  const providerState = buildSettingsSoulseekProviderState({
+    connectionErrorCode: connectionErrorCode || (healthError ? 'connection_check_failed' : null),
+    connectionStatus: connectionStatus ?? fallbackHealth,
+    providerMode: setupProgress?.soulseek?.providerMode,
+    providerModeState: setupProgress?.soulseek?.managedDeploymentMissing
+      ? 'managed_deployment_missing'
+      : null,
+  });
 
   return {
-    copy: 'Add a Soulseek address and API key to enable downloads.',
-    label: 'Set up Soulseek',
+    copy: providerState.message,
+    label: providerState.actionLabel,
     routeName: 'settings-connections',
-    status: 'Not connected',
-    tone: 'warning',
+    status: providerState.statusLabel,
+    tone: providerState.tone,
   };
 }
 
@@ -163,6 +130,8 @@ function buildReadinessStatus(coreSteps) {
  * available as an optional follow-up instead of competing for attention.
  */
 export function buildSettingsSetupOverview({
+  connectionErrorCode,
+  connectionStatus,
   dependencies,
   healthError,
   setupProgress,
@@ -170,7 +139,13 @@ export function buildSettingsSetupOverview({
 } = {}) {
   const coreSteps = [
     {
-      ...buildSoulseekStep(dependencies, healthError, setupProgress),
+      ...buildSoulseekStep({
+        connectionErrorCode,
+        connectionStatus,
+        dependencies,
+        healthError,
+        setupProgress,
+      }),
       id: 'soulseek',
       title: 'Connect Soulseek',
     },
@@ -192,7 +167,19 @@ export function buildSettingsSetupOverview({
  * Builds a short, non-sensitive setup sequence. It deliberately exposes only
  * actionable provider state and never returns connection addresses or secrets.
  */
-export function buildSettingsSetupSteps({ dependencies, healthError, setupProgress } = {}) {
-  const overview = buildSettingsSetupOverview({ dependencies, healthError, setupProgress });
+export function buildSettingsSetupSteps({
+  connectionErrorCode,
+  connectionStatus,
+  dependencies,
+  healthError,
+  setupProgress,
+} = {}) {
+  const overview = buildSettingsSetupOverview({
+    connectionErrorCode,
+    connectionStatus,
+    dependencies,
+    healthError,
+    setupProgress,
+  });
   return [...overview.coreSteps, ...overview.optionalSteps];
 }

@@ -297,6 +297,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   tooling remain available through a named supporting-service disclosure, so
   diagnostics do not compete with routine setup. See
   `SETTINGS_CONNECTIONS_HIERARCHY_DESIGN.md`.
+- Settings provider-state and recovery consistency: Settings setup and
+  Connections now share one bounded Managed, External, and Disabled
+  state/action model. `Test saved connection` calls only the admin-only
+  Soulseek status route rather than the broad system overview, and client and
+  route errors use generic recovery messages instead of raw provider details.
+  See `SETTINGS_PROVIDER_STATE_RECOVERY_CONSISTENCY_DESIGN.md`.
 - Soulseek provider-mode onboarding: Settings > Connections now makes Managed,
   External, and Disabled explicit. Managed deployments remain Compose-owned,
   external Unraid/VPN setups retain their URL and encrypted write-only key, and

@@ -141,9 +141,9 @@ test('Settings setup prioritizes a healthy Soulseek connection without exposing 
   });
 
   assert.deepEqual(soulseek, {
-    copy: 'Soulseek is reachable.',
+    copy: 'Soulseek is connected and ready for searches and downloads.',
     id: 'soulseek',
-    label: 'Manage connection',
+    label: 'Test saved connection',
     routeName: 'settings-connections',
     status: 'Ready',
     title: 'Connect Soulseek',
@@ -157,9 +157,9 @@ test('Settings setup makes a disabled Soulseek provider actionable', () => {
     dependencies: [{ provider: 'slskd', status: 'disabled' }],
   });
 
-  assert.equal(soulseek.label, 'Choose provider mode');
+  assert.equal(soulseek.label, 'Choose a download mode');
   assert.equal(soulseek.routeName, 'settings-connections');
-  assert.equal(soulseek.status, 'Optional');
+  assert.equal(soulseek.status, 'Downloads off');
   assert.equal(soulseek.tone, 'info');
 });
 
@@ -176,11 +176,11 @@ test('Settings setup prioritizes a missing Managed deployment over generic depen
   });
 
   assert.deepEqual(soulseek, {
-    copy: 'Managed Soulseek is selected, but the Harmoniarr managed Docker overlay is not available yet. Finish the managed setup before downloads can start.',
+    copy: 'The managed Soulseek deployment is not available yet. Finish its Docker setup, then save and test the connection.',
     id: 'soulseek',
     label: 'Finish managed setup',
     routeName: 'settings-connections',
-    status: 'Managed setup required',
+    status: 'Setup needed',
     title: 'Connect Soulseek',
     tone: 'warning',
   });

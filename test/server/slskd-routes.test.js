@@ -292,6 +292,31 @@ test('slskd routes normalize provider authentication errors to 503 responses', a
   });
 });
 
+test('slskd status route redacts unexpected configuration details', async () => {
+  const app = createSlskdRouteTestApp({
+    getConnectionStatus: async () => {
+      const error = new Error('http://private-slskd.example rejected secret-value');
+      error.code = 'slskd_misconfigured';
+      throw error;
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/slskd/status`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 503);
+    assert.deepEqual(payload, {
+      ok: false,
+      error: {
+        code: 'slskd_misconfigured',
+        message: 'Soulseek connection settings need review',
+      },
+    });
+    assert.doesNotMatch(JSON.stringify(payload), /private-slskd|secret-value|https?:/i);
+  });
+});
+
 test('slskd routes normalize provider request failures to 502 responses', async () => {
   const app = createSlskdRouteTestApp({
     getSearchResponses: async () => {
@@ -310,7 +335,7 @@ test('slskd routes normalize provider request failures to 502 responses', async 
       ok: false,
       error: {
         code: 'slskd_request_failed',
-        message: 'slskd search responses request failed with status 400',
+        message: 'Soulseek request failed. Try again.',
       },
     });
   });
