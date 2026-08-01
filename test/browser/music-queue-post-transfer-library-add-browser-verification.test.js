@@ -102,7 +102,7 @@ function buildQualityStopPayload() {
       status: {
         code: 'needs_help_adding',
         detail: 'This download claims to be lossless, but Harmoniarr could not verify that claim safely. It was not added to your library.',
-        label: 'Needs help adding',
+        label: 'Needs help',
         nextAction: 'review_add_plan',
         repair: {
           actionLabel: 'Review lossless check',
@@ -347,7 +347,7 @@ suite('Music Queue post-transfer library add browser verification', () => {
 
       await page.goto(`${baseUrl}/app/music-queue`, { waitUntil: 'domcontentloaded' });
       const releaseRow = page.locator('.music-queue-release-row').filter({ hasText: 'Child of God' });
-      await releaseRow.getByText('Needs help adding', { exact: true }).waitFor();
+      await releaseRow.getByText('Needs help', { exact: true }).waitFor();
       await releaseRow.getByText('This download claims to be lossless, but Harmoniarr could not verify that claim safely. It was not added to your library.').waitFor();
       assert.equal(
         await releaseRow.locator('.music-queue-release-row__actions button').innerText(),

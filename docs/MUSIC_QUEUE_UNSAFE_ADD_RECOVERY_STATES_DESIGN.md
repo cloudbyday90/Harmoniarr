@@ -14,7 +14,7 @@ claim, an unfinished audio check, or an unsafe file plan had stopped progress.
 
 The normal workflow must stay simple:
 
-`download complete -> verify safely -> add to library or Needs help adding`
+`download complete -> verify safely -> add to library or Needs help`
 
 Music Queue and Activity should explain the next safe step for the release.
 Candidate records, file paths, source users, and worker output remain behind
@@ -37,7 +37,7 @@ These official sources were rechecked on 2026-08-01 against the requested June
 
 | Option | Pros | Cons | Decision |
 | --- | --- | --- | --- |
-| Keep one generic `Needs help adding` message | Small implementation and no new state. | Does not explain the safe next step and sends every outcome through the same vague review. | Reject. |
+| Keep one generic `Needs help` message | Small implementation and no new state. | Does not explain the safe next step and sends every outcome through the same vague review. | Reject. |
 | Show raw quality-gate, ffprobe, path, and worker output in Music Queue | Gives maximum immediate detail. | Exposes filesystem and provider-adjacent details, makes normal UI noisy, and couples the normal workflow to diagnostics. | Reject. |
 | Add a high-cardinality database enum for every tool and file failure | Strong database typing. | Requires schema churn for every diagnostic code and turns implementation detail into public workflow state. | Reject. |
 | Persist the existing broad blocker category plus a bounded media-only recovery reason | Gives clear release-level recovery copy, preserves historical inference, keeps the API narrow, and does not leak raw details. | Requires a shared allow-list and read-model projection. | Adopt. |

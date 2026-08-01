@@ -112,5 +112,5 @@ Music Queue releases.
 
 Recommended next slice: make post-download add blockers release-centred. A
 path, media-verification, collision, or unsafe import-plan problem should
-present one clear `Needs help adding` action and Activity handoff, while
+present one clear `Needs help` action and Activity handoff, while
 candidate and import internals remain under Advanced diagnostics.

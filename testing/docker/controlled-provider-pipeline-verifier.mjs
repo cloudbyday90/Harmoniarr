@@ -819,7 +819,7 @@ async function runVerification() {
   assert.equal(qualityExhaustionQueue.summary.counts.needs_help_adding, 1, 'strict-quality exhaustion must project one release-centred add recovery');
   const qualityExhaustionMusicQueueRelease = qualityExhaustionQueue.releases[0];
   assert.equal(qualityExhaustionMusicQueueRelease.id, qualityExhaustionSeed.wantedReleaseId, 'Music Queue must preserve the persisted wanted release ID');
-  assert.equal(qualityExhaustionMusicQueueRelease.status.code, 'needs_help_adding', 'strict-quality exhaustion must project Needs help adding');
+  assert.equal(qualityExhaustionMusicQueueRelease.status.code, 'needs_help_adding', 'strict-quality exhaustion must project Needs help');
   assert.equal(qualityExhaustionMusicQueueRelease.status.nextAction, 'review_add_plan', 'the projected add stop must lead to release recovery');
   const qualityExhaustionReleaseDetail = await acquisitionModule.acquisitionPipelineService.getMusicQueueRelease({
     appUserId: qualityExhaustionAppUserId,

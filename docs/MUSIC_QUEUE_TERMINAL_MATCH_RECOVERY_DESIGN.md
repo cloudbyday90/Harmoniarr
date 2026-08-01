@@ -40,7 +40,7 @@ content.
 | Provider no longer reports a transfer after the missing-transfer grace period | Candidate becomes failed with `source_disappeared` evidence. | Yes, under the same bounded policy. | `Trying another match`, or the existing exhausted result. | Failure evidence. |
 | Verified quality failure | Candidate becomes failed with `quality_failed` evidence. | Only for a quality-eligible successor. | `Trying another match` or `Quality choice needed`. | Failure evidence. |
 | Completed download source no longer exists before add | Candidate becomes failed with `source_disappeared` evidence. | Yes, because a new remote download does not alter library files. | `Trying another match`, or the existing exhausted result. | Failure evidence. |
-| Collision, lossy acknowledgement requirement, or preview validation blocker | Candidate becomes failed with `import_blocked` evidence. | No. | `Needs help adding` with `Review library add plan`. | No source-user penalty. |
+| Collision, lossy acknowledgement requirement, or preview validation blocker | Candidate becomes failed with `import_blocked` evidence. | No. | `Needs help` with `Review library add plan`. | No source-user penalty. |
 
 The completed-source exception is intentionally narrow. A missing local source
 does not prove the next remote match is good, but it does make a fresh
@@ -84,7 +84,7 @@ reputation.
 The wanted-release store reads the latest candidate event for the current
 search. The Music Queue status projection prioritizes that durable
 `import_candidate_import_blocked` marker over generic failed-match states, so
-the release says `Needs help adding` and offers `Review library add plan`.
+the release says `Needs help` and offers `Review library add plan`.
 
 The new `music_queue_import_blocked` Activity event uses a release-centered
 label and a Music Queue handoff. It does not expose raw provider exceptions,
@@ -132,7 +132,7 @@ Focused unit coverage proves:
 - collision and validation blockers never select another match;
 - source-user reputation changes only for actual source disappearance;
 - the wanted-release read model carries the latest terminal event; and
-- Music Queue projects a durable import block as `Needs help adding`.
+- Music Queue projects a durable import block as `Needs help`.
 
 Schema validation includes the `music_queue_import_blocked` activity-event
 constraint and a Docker-generated schema snapshot. A scoped wanted-release

@@ -40,6 +40,7 @@ test('Music Queue release rows keep accepted quality compact', () => {
   });
 
   assert.deepEqual(buildMusicQueueReleaseRowPresentation(release), {
+    attentionLabel: null,
     facts: [
       { key: 'progress', label: '8 tracks still missing', tone: 'neutral' },
       { key: 'quality', label: 'Quality profile: Lossless archive', tone: 'neutral' },
@@ -80,6 +81,36 @@ test('Music Queue release rows elevate a quality stop without exposing match evi
     { key: 'progress', label: 'All 10 tracks matched', tone: 'neutral' },
     { key: 'quality', label: 'Quality: Needs verification', tone: 'warning' },
   ]);
+  assert.equal(presentation.attentionLabel, null);
+});
+
+test('Music Queue release rows name the safe stop without exposing diagnostics', () => {
+  const release = normalizeMusicQueueRelease({
+    expectedTrackCount: 10,
+    matchedTrackCount: 10,
+    missingTrackCount: 10,
+    quality: { code: 'accepted', profile: { code: 'lossless_archive' } },
+    releaseTitle: 'Northbound',
+    status: {
+      code: 'needs_help_adding',
+      detail: 'A file for this release already exists in your library, so Harmoniarr stopped before overwriting it.',
+      label: 'Needs help',
+      repair: {
+        actionCode: 'review_add_plan',
+        actionLabel: 'Review library conflict',
+        reasonCode: 'library_collision',
+        title: 'Existing library files need review',
+      },
+      tone: 'warning',
+    },
+  });
+
+  const presentation = buildMusicQueueReleaseRowPresentation(release);
+
+  assert.equal(presentation.attentionLabel, 'Existing library files need review');
+  assert.equal(presentation.qualityNeedsAttention, false);
+  assert.equal(presentation.statusTone, 'warning');
+  assert.doesNotMatch(presentation.attentionLabel, /candidate|path|source/i);
 });
 
 test('Music Queue release rows describe only recognized automatic handoffs', () => {

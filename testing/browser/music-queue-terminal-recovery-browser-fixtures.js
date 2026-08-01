@@ -46,9 +46,17 @@ const QUALITY_STOP_STATUS = Object.freeze({
 
 const IMPORT_STOP_STATUS = Object.freeze({
   code: 'needs_help_adding',
-  detail: 'The completed download needs a safe library-add decision.',
-  label: 'Needs help adding',
+  detail: 'A file for this release already exists in your library, so Harmoniarr stopped before overwriting it.',
+  label: 'Needs help',
   nextAction: 'review_add_plan',
+  repair: Object.freeze({
+    actionCode: 'review_add_plan',
+    actionLabel: 'Review library conflict',
+    detail: 'A file for this release already exists in your library, so Harmoniarr stopped before overwriting it.',
+    nextStep: 'Review the release, then use Advanced diagnostics to decide how to handle the existing library file.',
+    reasonCode: 'library_collision',
+    title: 'Existing library files need review',
+  }),
   tone: 'warning',
 });
 
@@ -111,7 +119,10 @@ function cloneQuality(quality) {
 }
 
 function cloneStatus(status) {
-  return { ...status };
+  return {
+    ...status,
+    repair: status.repair ? { ...status.repair } : null,
+  };
 }
 
 function buildRelease({ scenario, status }) {
@@ -136,6 +147,10 @@ function buildActivityExtraPayload(scenario) {
 
   if (scenario.activityEventType === 'music_queue_quality_blocked') {
     payload.message = 'A downloaded match did not pass verified lossless checks, and no other safe match is available.';
+  }
+
+  if (scenario.activityEventType === 'music_queue_import_blocked') {
+    payload.addBlockerCode = 'library_collision';
   }
 
   return payload;
@@ -181,12 +196,30 @@ export function buildMusicQueueTerminalRecoveryActivityPayload(scenario) {
  */
 export async function installMusicQueueTerminalRecoveryReadModelFixtures(browserContext, scenario) {
   let releaseReadCount = 0;
+  const listPath = '/api/v1/acquisition/releases';
+  const releasePath = `${listPath}/${encodeURIComponent(scenario.id)}`;
 
-  await browserContext.route(/\/api\/v1\/acquisition\/releases(?:\?.*)?$/, async (route) => {
-    const stage = scenario.automatic && releaseReadCount > 0 ? 'terminal' : 'initial';
-    releaseReadCount += 1;
+  function getListStage() {
+    return scenario.automatic && releaseReadCount > 0 ? 'terminal' : 'initial';
+  }
+
+  function getReleaseStage() {
+    return scenario.automatic && releaseReadCount > 1 ? 'terminal' : 'initial';
+  }
+
+  await browserContext.route(/\/api\/v1\/acquisition\/releases(?:\/[^/?]+)?(?:\?.*)?$/, async (route) => {
+    const requestUrl = new URL(route.request().url());
+    const stage = requestUrl.pathname === releasePath ? getReleaseStage() : getListStage();
+
+    if (requestUrl.pathname === listPath) {
+      releaseReadCount += 1;
+    }
+
+    const payload = buildMusicQueueTerminalRecoveryPayload({ scenario, stage });
     await route.fulfill({
-      body: JSON.stringify(buildMusicQueueTerminalRecoveryPayload({ scenario, stage })),
+      body: JSON.stringify(requestUrl.pathname === releasePath
+        ? { checkedAt: payload.checkedAt, release: payload.releases[0] }
+        : payload),
       contentType: 'application/json',
     });
   });

@@ -133,6 +133,10 @@ Database model source: `docs/DATABASE_MODEL.md`
   completed download through the existing preview and strict-quality gates;
   collisions and strict quality failures remain review-only. See
   `MUSIC_QUEUE_MEDIA_TOOLING_RECOVERY_ACCEPTANCE_DESIGN.md`.
+- Music Queue manual-stop action hierarchy: safe add stops now share the
+  user-facing `Needs help` label, name the release-level issue in the queue,
+  lead with one specific safe action, and keep protected diagnostics
+  secondary. See `MUSIC_QUEUE_NEEDS_HELP_ACTION_HIERARCHY_DESIGN.md`.
 - Music Queue and Activity surfacing: strict-quality safe-auto add stops now
   project back into Music Queue as `Quality choice needed`, record a sanitized
   `music_queue_quality_blocked` Activity event, and deep-link Activity back to

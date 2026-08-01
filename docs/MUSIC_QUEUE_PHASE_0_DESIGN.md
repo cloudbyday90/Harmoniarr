@@ -187,7 +187,7 @@ model. They should not be deleted in Phase 1.
 | Import apply | Add to library | Use "apply" only in worker/run diagnostics. |
 | Path mapping | Folder setup | Use "path mapping" only on advanced settings screens. |
 | Needs source review | Pick a match | The user is choosing between matches. |
-| Needs import review | Needs help adding | The system has files but cannot safely add them. |
+| Needs import review | Needs help | The system has files but cannot safely add them. |
 | Retry acquisition | Try again | Keep copy plain. |
 | Failed candidate | Match failed | Show release impact and next action. |
 
@@ -211,7 +211,7 @@ tables, but they are not table names.
 | `needs_setup` | Needs setup | warning | Provider, folder, music root, or media-tool setup blocks automation. | `Set up folders` or `Configure provider` |
 | `pick_match` | Pick a match | warning | Results exist, but confidence is too low or top matches are ambiguous. | `Review matches` |
 | `quality_choice_needed` | Quality choice needed | warning | Available matches do not satisfy the quality profile, or downloaded files failed verification. | `Review quality choice` |
-| `needs_help_adding` | Needs help adding | warning | Files are downloaded, but collision, missing file, policy, or inspection blockers prevent safe add. | `Review add plan` |
+| `needs_help_adding` | Needs help | warning | Files are downloaded, but collision, missing file, policy, or inspection blockers prevent safe add. | `Review add plan` |
 | `no_matches_left` | No matches left | danger | Harmoniarr exhausted acceptable matches for this release attempt. | `Search again` |
 | `failed` | Needs retry | danger | The latest attempt failed and no automatic next step is available. | `Try again` |
 | `ignored` | Ignored | neutral | The operator chose not to pursue this release. | `Include again` |
@@ -541,7 +541,7 @@ Blocked reason codes:
 
 ```js
 {
-  status: { code: 'needs_help_adding', label: 'Needs help adding', tone: 'warning' },
+  status: { code: 'needs_help_adding', label: 'Needs help', tone: 'warning' },
   explanation: 'A file with the same target path already exists in the library.',
   blockers: [{ code: 'library_collision', label: 'File already exists' }],
   nextAction: { code: 'review_add_plan', label: 'Review add plan', enabled: true },

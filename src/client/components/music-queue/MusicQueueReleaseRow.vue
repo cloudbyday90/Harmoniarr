@@ -83,6 +83,9 @@ function openReview() {
         <span aria-hidden="true">·</span>
         {{ release.releaseTypeLabel }}<template v-if="release.releaseYear"> · {{ release.releaseYear }}</template>
       </p>
+      <p v-if="presentation.attentionLabel" class="music-queue-release-row__attention">
+        {{ presentation.attentionLabel }}
+      </p>
       <p class="music-queue-release-row__detail">{{ release.detailText }}</p>
       <p v-if="presentation.transition" class="music-queue-release-row__next-step">
         <strong>{{ presentation.transition.label }}</strong>
@@ -207,6 +210,7 @@ function openReview() {
 
 .music-queue-release-row__updated,
 .music-queue-release-row__identity,
+.music-queue-release-row__attention,
 .music-queue-release-row__detail,
 .music-queue-release-row__next-step,
 .music-queue-release-row__facts {
@@ -230,6 +234,12 @@ function openReview() {
 
 .music-queue-release-row__identity {
   margin-top: var(--hx-space-1);
+}
+
+.music-queue-release-row__attention {
+  margin-top: var(--hx-space-2);
+  color: var(--hx-text-strong);
+  font-weight: 700;
 }
 
 .music-queue-release-row__detail {

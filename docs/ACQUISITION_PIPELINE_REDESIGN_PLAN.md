@@ -116,7 +116,7 @@ Suggested visible labels:
 | `needs_quality_review` | Quality choice needed |
 | `downloading` | Downloading |
 | `ready_to_import` | Ready to add |
-| `needs_import_review` | Needs help adding |
+| `needs_import_review` | Needs help |
 | `importing` | Adding to library |
 | `imported` | In library |
 | `blocked_setup` | Needs setup |
@@ -281,7 +281,7 @@ Candidate UI becomes exception UI:
 | No acceptable source found | `Needs help: no good match found` | `View search results` optional. |
 | FLAC required but only MP3 found | `Quality choice needed: only MP3 found` | `Review matches`. |
 | Two sources are close | `Pick a match` | Show simplified match choices. |
-| Import collision or path issue | `Needs help adding` or `Needs setup` | Show library-add plan, not raw candidate first. |
+| Import collision or path issue | `Needs help` or `Needs setup` | Show library-add plan, not raw candidate first. |
 | Transfer/import failure | `Needs retry` with `Try again` | Diagnostics drawer includes candidate/run detail. |
 
 The candidate table can remain as `Advanced diagnostics`, but it should stop
@@ -989,7 +989,10 @@ implemented; see
 `MUSIC_QUEUE_ACTIVITY_SURFACING_DESIGN.md` and
 `MUSIC_QUEUE_QUALITY_STOP_RECOVERY_AUTOMATION_DESIGN.md`. Temporary
 audio-tooling unavailability now persists a bounded recheckable release stop;
-see `MUSIC_QUEUE_MEDIA_TOOLING_RECOVERY_ACCEPTANCE_DESIGN.md`.
+see `MUSIC_QUEUE_MEDIA_TOOLING_RECOVERY_ACCEPTANCE_DESIGN.md`. The unified
+user-facing `Needs help` state now keeps safe-stop reasons and release actions
+ahead of protected diagnostics; see
+`MUSIC_QUEUE_NEEDS_HELP_ACTION_HIERARCHY_DESIGN.md`.
 
 Goal: make `FLAC` and other quality choices truthful before Harmoniarr claims a
 release is complete.
@@ -1021,8 +1024,10 @@ release is complete.
   `audio_check_failed` stop before safe add, then re-preview, re-gate, and
   resume only that release after tooling returns. See
   `MUSIC_QUEUE_MEDIA_TOOLING_RECOVERY_ACCEPTANCE_DESIGN.md`.
-- [ ] Route collisions, lossy decisions, suspicious FLAC, probe failures, and
-  unsafe import plans to `needs help`.
+- [x] Route collisions, lossy decisions, suspicious FLAC, probe failures, and
+  unsafe import plans to `needs help`, with a reason-specific release action
+  and secondary diagnostics. See
+  `MUSIC_QUEUE_NEEDS_HELP_ACTION_HIERARCHY_DESIGN.md`.
 - [ ] Add `Add to library` for manual safe adds.
 
 Acceptance:
@@ -1522,7 +1527,7 @@ Terminal failed and timed-out transfers, vanished provider records after their
 grace period, strict-quality failures, and completed-source disappearance now
 use one recovery policy. Only remote failures and a vanished completed source
 may promote a quality-eligible next match. Collision, lossy, and validation
-blocks stay at a durable `Needs help adding` stop with a focused add-plan
+blocks stay at a durable `Needs help` stop with a focused add-plan
 handoff. The implementation also keeps local blockers out of source-user
 reputation evidence.
 
@@ -1654,7 +1659,7 @@ outcomes, reciprocal 404 reads, and complete cleanup.
 
 - [x] Make post-download add blockers release-centred. A release blocked by an
   unsafe import plan, collision, path visibility issue, or media-verification
-  failure now exposes one `Needs help adding` action and Activity handoff;
+  failure now exposes one `Needs help` action and Activity handoff;
   candidate and import detail remain Advanced diagnostics. See
   [MUSIC_QUEUE_RELEASE_CENTRED_ADD_BLOCKER_RECOVERY_DESIGN.md](MUSIC_QUEUE_RELEASE_CENTRED_ADD_BLOCKER_RECOVERY_DESIGN.md).
 
@@ -1736,7 +1741,7 @@ Implemented in
 [MUSIC_QUEUE_UNSAFE_ADD_RECOVERY_STATES_DESIGN.md](MUSIC_QUEUE_UNSAFE_ADD_RECOVERY_STATES_DESIGN.md).
 Collision, low-quality audio, suspicious claimed-lossless audio, unfinished
 audio checks, unavailable completed files, unsafe add plans, and add failures
-now project one release-centred `Needs help adding` state with an
+now project one release-centred `Needs help` state with an
 outcome-specific action. The durable reason is bounded, historic quality-gate
 records remain compatible, normal Music Queue evidence excludes raw diagnostic
 data, and Activity uses the same safe recovery copy and handoff.

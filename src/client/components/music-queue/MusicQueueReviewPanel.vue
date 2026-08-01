@@ -104,8 +104,8 @@ function isReleaseActionRunning(action) {
       <section class="music-queue-review__section music-queue-review__outcome" aria-labelledby="music-queue-review-status">
         <p class="music-queue-review__label">Current status</p>
         <h3 id="music-queue-review-status" :data-tone="review.statusTone">{{ review.statusLabel }}</h3>
-        <p>{{ review.reason }}</p>
-        <p class="music-queue-review__next-step"><strong>Next step:</strong> {{ presentation.decisionCopy }}</p>
+        <p v-if="!review.repair">{{ review.reason }}</p>
+        <p v-if="!review.repair" class="music-queue-review__next-step"><strong>Next step:</strong> {{ presentation.decisionCopy }}</p>
         <div class="music-queue-review__feedback-live-region" aria-atomic="true" aria-live="polite">
           <p
             v-if="releaseActionFeedback && releaseActionFeedback.role === 'status'"
@@ -151,6 +151,7 @@ function isReleaseActionRunning(action) {
       <section v-if="review.repair" class="music-queue-review__section" aria-labelledby="music-queue-review-repair">
         <div>
           <h3 id="music-queue-review-repair">{{ review.repair.title }}</h3>
+          <p>{{ review.repair.detail }}</p>
           <p>{{ review.repair.nextStep }}</p>
         </div>
         <div class="music-queue-review__actions">
@@ -174,7 +175,7 @@ function isReleaseActionRunning(action) {
           </RouterLink>
           <RouterLink
             class="hx-btn"
-            :data-variant="review.repair.settingsRouteName || review.repair.actionCode === 'recheck_library_add' ? 'ghost' : 'primary'"
+            data-variant="ghost"
             :to="{
               name: 'activity-diagnostics-library-adds',
               query: { wantedReleaseId: review.releaseId },

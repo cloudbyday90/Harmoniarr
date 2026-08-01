@@ -91,9 +91,9 @@ const STATUS_PRESENTATION = Object.freeze({
     message: 'The desired release is already in the library.',
   }),
   [MUSIC_QUEUE_STATUS_CODES.NEEDS_HELP_ADDING]: Object.freeze({
-    label: 'Needs help adding',
+    label: 'Needs help',
     tone: 'warning',
-    message: 'Downloaded files need review before Harmoniarr can add them.',
+    message: 'This release needs a safe decision before Harmoniarr can add it to your library.',
   }),
   [MUSIC_QUEUE_STATUS_CODES.NEEDS_SETUP]: Object.freeze({
     label: 'Needs setup',

@@ -59,6 +59,7 @@ test('deriveMusicQueueStatus makes a post-download media verification stop relea
   });
 
   assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.NEEDS_HELP_ADDING);
+  assert.equal(status.label, 'Needs help');
   assert.equal(status.detail, 'This download claims to be lossless, but Harmoniarr could not verify that claim safely. It was not added to your library.');
   assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.REVIEW_ADD_PLAN);
   assert.equal(status.repair.code, 'media_verification');

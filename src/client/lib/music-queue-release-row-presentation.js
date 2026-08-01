@@ -54,7 +54,7 @@ function formatTrackProgress(release = {}) {
  * panel, so normal queue scanning never exposes provider diagnostics.
  *
  * @param {object} release
- * @returns {{ facts: Array<{key: string, label: string, tone: string}>, qualityNeedsAttention: boolean, statusTone: string, transition: { label: string, message: string } | null, updatedLabel: string }}
+ * @returns {{ attentionLabel: string | null, facts: Array<{key: string, label: string, tone: string}>, qualityNeedsAttention: boolean, statusTone: string, transition: { label: string, message: string } | null, updatedLabel: string }}
  */
 export function buildMusicQueueReleaseRowPresentation(release = {}) {
   const quality = release.qualitySummary ?? {};
@@ -66,6 +66,9 @@ export function buildMusicQueueReleaseRowPresentation(release = {}) {
     : `Quality profile: ${release.qualityProfileLabel ?? 'Not set'}`;
 
   return {
+    attentionLabel: statusCode === 'needs_help_adding'
+      ? (release.repair?.title ?? 'This release needs a safe decision')
+      : null,
     facts: [
       { key: 'progress', label: formatTrackProgress(release), tone: 'neutral' },
       {

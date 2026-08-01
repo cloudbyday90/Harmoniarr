@@ -42,7 +42,7 @@ handoffs they provide.
 | Timed-out transfer | `Trying another match` becomes `Downloading` through polling. | `View recovery`, then `Open Downloader`; no user retry. | `Open Music Queue`. | Candidate controls, diagnostics, provider timeout text. |
 | Completed source disappeared | `Trying another match` becomes `Downloading` through polling. | `View recovery`, then `Open Downloader`; no user retry. | `Open Music Queue`. | Candidate controls, file paths, provider source details. |
 | Strict-quality recovery exhausted | `Quality choice needed`. | `Review quality choice`. | `Review quality choice` returns to the selected release. | Download/library-success actions or candidate navigation. |
-| Collision before library add | `Needs help adding`. | `Review add plan` is the focused library-add route; `Details` explains the safe stop. | `Review library add plan` returns to the selected release. | Automatic retry, library-success action, raw collision paths, candidate-first handoff. |
+| Collision before library add | `Needs help`. | `Review library conflict` opens the selected release; `Advanced diagnostics` is secondary. | `Review library add plan` returns to the selected release. | Automatic retry, library-success action, raw collision paths, candidate-first handoff. |
 
 ## Approaches Considered
 

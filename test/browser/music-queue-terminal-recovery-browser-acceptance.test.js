@@ -144,14 +144,11 @@ suite('Music Queue terminal recovery browser acceptance', () => {
           assert.equal(await releaseRow.getByRole('link', { name: 'Open Downloader' }).count(), 0);
           assert.equal(await releaseRow.getByRole('link', { name: 'Open Library' }).count(), 0);
         } else {
-          await releaseRow.getByText('Needs help adding', { exact: true }).waitFor();
-          await releaseRow.getByRole('link', { name: 'Review add plan' }).waitFor();
-          assert.equal(
-            await releaseRow.getByRole('link', { name: 'Review add plan' }).getAttribute('href'),
-            '/app/activity/diagnostics/library-adds',
-          );
-          await releaseRow.getByRole('button', { name: 'Details' }).click();
-          await details.getByRole('link', { name: 'Review add plan' }).waitFor();
+          await releaseRow.getByText('Needs help', { exact: true }).waitFor();
+          await releaseRow.getByText('Existing library files need review', { exact: true }).waitFor();
+          await releaseRow.getByRole('button', { name: 'Review library conflict' }).click();
+          await details.getByRole('heading', { name: 'Existing library files need review' }).waitFor();
+          await details.getByRole('link', { name: 'Advanced diagnostics' }).waitFor();
           assert.equal(await details.getByRole('button', { name: 'Search again' }).count(), 0);
           assert.equal(await releaseRow.getByRole('link', { name: 'Open Library' }).count(), 0);
         }
@@ -162,7 +159,7 @@ suite('Music Queue terminal recovery browser acceptance', () => {
         const activity = getActivityEntry(page, scenario);
         const activityLinkName = scenario.key === 'strict_quality_exhaustion'
           ? 'Review quality choice'
-          : 'Review library add plan';
+          : 'Review library conflict';
         await activity.getByRole('link', { name: activityLinkName }).waitFor();
         assert.equal(await activity.getByRole('link', { name: /diagnostic/i }).count(), 0);
         assertNoNormalSurfaceDiagnostics(await activity.innerText());

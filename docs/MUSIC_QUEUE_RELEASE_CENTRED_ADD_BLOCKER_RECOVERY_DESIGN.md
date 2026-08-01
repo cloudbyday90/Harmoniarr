@@ -14,7 +14,7 @@ needs.
 
 The normal path must instead be:
 
-`completed download -> safe add check -> Needs help adding -> review this release -> optional advanced diagnostics`
+`completed download -> safe add check -> Needs help -> review this release -> optional advanced diagnostics`
 
 Candidate, path, provider, and worker evidence remain available to operators,
 but are not the primary recovery workflow.
@@ -37,7 +37,7 @@ is more reliable than assuming a historic URL.
 
 | Option | Pros | Cons | Decision |
 | --- | --- | --- | --- |
-| Link `Needs help adding` directly to Library-add diagnostics | Minimal change and retains every implementation detail. | Makes candidates/import runs the first thing a household user sees; weakens the Music Queue ownership model. | Reject. |
+| Link `Needs help` directly to Library-add diagnostics | Minimal change and retains every implementation detail. | Makes candidates/import runs the first thing a household user sees; weakens the Music Queue ownership model. | Reject. |
 | Treat every post-download stop as a generic retry | Simple action model. | Can repeat an unsafe operation, cannot distinguish folder setup from a collision, and hides quality evidence. | Reject. |
 | Put raw paths and worker messages in the Music Queue row | Gives maximal detail immediately. | Leaks internal filesystem/worker data into normal UI and makes the row noisy. | Reject. |
 | Persist a small allow-listed blocker category, project a release-centred repair, and keep the diagnostic route secondary | Explains the safe next step, preserves operator evidence, works with Activity handoffs, and has a narrow security boundary. | Requires one more bounded read-model field and presentation mapping. | Adopt. |
@@ -61,7 +61,7 @@ is more reliable than assuming a historic URL.
 
 ### Music Queue And Activity UX
 
-- A blocked release remains `Needs help adding` and its primary row action is
+- A blocked release remains `Needs help` and its primary row action is
   `Review what needs fixing`, which opens that release in Music Queue.
 - The release panel explains the category before presenting any low-level
   action.
@@ -120,7 +120,7 @@ Focused validation passed on 2026-07-31:
   healthy, and completed bootstrap validation.
 - `npm run validate:docker-controlled-provider-pipeline -- --no-cache`
   passed with 17 synthetic fixtures and 20 ingested matches, including
-  strict-quality exhaustion projecting `Needs help adding` with a
+  strict-quality exhaustion projecting `Needs help` with a
   `media_verification` recovery category and no library write.
 
 ## 6. Follow-Up

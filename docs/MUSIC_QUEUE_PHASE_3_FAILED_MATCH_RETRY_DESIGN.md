@@ -117,5 +117,5 @@ Continue Phase 3 with automatic completed-download handling:
 2. run add-to-library preview automatically when safe
 3. add the release to the library without manual Import Review navigation when
    the plan is safe
-4. stop as `Needs help adding` only when folder, collision, quality, or policy
+4. stop as `Needs help` only when folder, collision, quality, or policy
    checks require a human decision
