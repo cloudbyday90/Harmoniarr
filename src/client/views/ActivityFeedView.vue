@@ -98,8 +98,10 @@ function getFilterLabel(filter) {
   return ACTIVITY_TIMELINE_FILTERS.find((item) => item.value === filter)?.label ?? 'Activity';
 }
 
-function getEventLinkTarget(event) {
-  return buildActivityEventLinkTarget(event);
+function getAttentionEventLinkTarget(event, sectionId) {
+  return sectionId === 'attention'
+    ? buildActivityEventLinkTarget(event)
+    : null;
 }
 
 onMounted(() => {
@@ -230,11 +232,11 @@ onBeforeUnmount(() => {
                     </ol>
                   </details>
                   <RouterLink
-                    v-if="getEventLinkTarget(entry.event)"
+                    v-if="getAttentionEventLinkTarget(entry.event, section.id)"
                     class="activity-timeline-link"
-                    :to="getEventLinkTarget(entry.event).to"
+                    :to="getAttentionEventLinkTarget(entry.event, section.id).to"
                   >
-                    {{ getEventLinkTarget(entry.event).label }}
+                    {{ getAttentionEventLinkTarget(entry.event, section.id).label }}
                   </RouterLink>
                 </div>
               </article>

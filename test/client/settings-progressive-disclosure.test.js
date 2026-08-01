@@ -29,6 +29,7 @@ test('SettingsDisclosure uses a semantic disclosure button and preserves hidden 
   const source = await readFile(DISCLOSURE_PATH, 'utf8');
 
   assert.match(source, /type="button"/);
+  assert.match(source, /data-variant="ghost"/);
   assert.match(source, /:aria-controls="panelId"/);
   assert.match(source, /:aria-expanded="isOpen"/);
   assert.match(source, /v-show="isOpen"/);

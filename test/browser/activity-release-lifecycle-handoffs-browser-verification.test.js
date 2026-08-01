@@ -48,7 +48,7 @@ suite('Activity release lifecycle handoff browser verification', () => {
     await browserRuntime?.cleanup();
   }, { timeout: integrationRuntimeConfig.suiteTeardownTimeoutMs });
 
-  test('release milestones remain concise and point to the right next surface', {
+  test('release milestones keep routine history concise and expose focused attention handoffs', {
     timeout: integrationRuntimeConfig.scenarioTimeoutMs,
   }, async (t) => {
     if (runtimeUnavailableReason) {
@@ -121,15 +121,15 @@ suite('Activity release lifecycle handoff browser verification', () => {
       await page.getByRole('heading', { exact: true, name: 'Activity timeline' }).waitFor();
 
       const selected = page.getByRole('listitem').filter({ hasText: 'Match selected: Amber by Autechre' });
-      await selected.getByRole('link', { name: 'Open Music Queue' }).waitFor();
+      assert.equal(await selected.getByRole('link').count(), 0);
       const warning = page.getByRole('listitem').filter({ hasText: 'Audio check needs review: Amber by Autechre' });
       await warning.getByRole('link', { name: 'Review quality choice' }).waitFor();
       const unavailable = page.getByRole('listitem').filter({ hasText: 'Audio check could not run: Tri Repetae by Autechre' });
       await unavailable.getByRole('link', { name: 'Check connections' }).waitFor();
       const added = page.getByRole('listitem').filter({ hasText: 'Amber by Autechre added to library' });
-      await added.getByRole('link', { name: 'Open Library' }).waitFor();
+      assert.equal(await added.getByRole('link').count(), 0);
       const request = page.getByRole('listitem').filter({ hasText: 'Amber by Autechre added to library' });
-      await request.getByRole('link', { name: 'Open request' }).waitFor();
+      assert.equal(await request.getByRole('link').count(), 0);
 
       const attentionSection = page.locator('.activity-timeline-section--attention');
       await attentionSection.getByRole('heading', { exact: true, name: 'Needs attention' }).waitFor();

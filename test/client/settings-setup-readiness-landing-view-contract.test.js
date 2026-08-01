@@ -46,5 +46,7 @@ test('Settings setup uses one elevated next action only when a required task rem
   assert.match(nextAction, /:to="\{ name: step\.routeName \}"/);
   assert.match(view, /<SettingsSetupNextAction v-if="setupOverview\.nextStep" :step="setupOverview\.nextStep" \/>/);
   assert.match(view, /v-else class="settings-setup__complete"/);
+  assert.match(view, /class="settings-setup__status" role="status"/);
+  assert.doesNotMatch(view, /settings-setup__readiness/);
   assert.match(view, /@click="refreshSetup"/);
 });

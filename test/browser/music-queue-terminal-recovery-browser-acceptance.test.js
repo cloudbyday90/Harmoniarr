@@ -108,8 +108,7 @@ suite('Music Queue terminal recovery browser acceptance', () => {
         const activity = getActivityEntry(page, scenario);
         await activity.getByText(`Trying the next best match: ${scenario.releaseTitle} by ${scenario.artistName}`).waitFor();
         await activity.getByText('A download failed. Harmoniarr is trying the next best match.').waitFor();
-        await activity.getByRole('link', { name: 'Open Music Queue' }).waitFor();
-        assert.equal(await activity.getByRole('link', { name: /diagnostic/i }).count(), 0);
+        assert.equal(await activity.getByRole('link').count(), 0);
         assertNoNormalSurfaceDiagnostics(await activity.innerText());
         assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
       }, { scenarioName: `music_queue_${scenario.key}_browser_acceptance` });

@@ -1727,6 +1727,12 @@ outcomes, reciprocal 404 reads, and complete cleanup.
   and preserve safe release context without accepting arbitrary URLs. See
   [SETTINGS_RECOVERY_HANDOFF_CONSISTENCY_DESIGN.md](SETTINGS_RECOVERY_HANDOFF_CONSISTENCY_DESIGN.md).
 
+- [x] Complete a Settings and Activity action-hierarchy refinement. Direct
+  diagnostics now begin closed, routine automatic progress remains history
+  rather than repeated navigation, and shared Settings refresh, disclosure,
+  and verification controls are visually secondary to state-changing work.
+  See [SETTINGS_ACTIVITY_ACTION_HIERARCHY_REFINEMENT_DESIGN.md](SETTINGS_ACTIVITY_ACTION_HIERARCHY_REFINEMENT_DESIGN.md).
+
 Completed Activity navigation and copy cleanup:
 
 - legacy Activity queue bookmarks now route to top-level Music Queue without

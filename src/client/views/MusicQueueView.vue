@@ -309,6 +309,18 @@ watch(
     selectedReleaseId.value = wantedReleaseId;
   },
 );
+
+watch(releases, (updatedReleases) => {
+  const wantedReleaseId = requestedReleaseId.value;
+  if (!wantedReleaseId || releaseDetail.value?.id !== wantedReleaseId) {
+    return;
+  }
+
+  const refreshedRelease = updatedReleases.find((release) => release.id === wantedReleaseId);
+  if (refreshedRelease) {
+    applyReleaseDetail(refreshedRelease);
+  }
+});
 </script>
 
 <template>

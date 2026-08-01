@@ -48,7 +48,7 @@ suite('Activity Music Queue lifecycle browser verification', () => {
     await browserRuntime?.cleanup();
   }, { timeout: integrationRuntimeConfig.suiteTeardownTimeoutMs });
 
-  test('automatic recovery is readable, filterable, and links back to Music Queue', {
+  test('automatic recovery is readable and filterable without interrupting the normal Activity record', {
     timeout: integrationRuntimeConfig.scenarioTimeoutMs,
   }, async (t) => {
     if (runtimeUnavailableReason) {
@@ -117,8 +117,7 @@ suite('Activity Music Queue lifecycle browser verification', () => {
         hasText: 'Trying the next best match: Music Has the Right to Children by Boards of Canada',
       });
       await recovery.waitFor();
-      await recovery.getByRole('link', { name: 'Open Music Queue' }).waitFor();
-      assert.equal(await recovery.getByRole('link', { name: 'Open Music Queue' }).count(), 1);
+      assert.equal(await recovery.getByRole('link').count(), 0);
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
     }, { scenarioName: 'activity_music_queue_lifecycle' });
   });
@@ -196,7 +195,7 @@ suite('Activity Music Queue lifecycle browser verification', () => {
       const story = page.locator('.activity-timeline-item').filter({
         hasText: 'Music Has the Right to Children',
       });
-      await story.getByRole('link', { name: 'Open Library' }).waitFor();
+      assert.equal(await story.getByRole('link').count(), 0);
       assert.equal(
         (await page.locator('.activity-feed-status').textContent()).replace(/\s+/g, ' ').trim(),
         'Showing 2 timeline items from 5 events in all activity.',

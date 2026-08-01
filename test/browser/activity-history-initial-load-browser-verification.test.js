@@ -105,7 +105,7 @@ suite('Activity history initial-load browser verification', () => {
     await browserRuntime?.cleanup();
   }, { timeout: integrationRuntimeConfig.suiteTeardownTimeoutMs });
 
-  test('loads direct Activity routes without a false empty state and keeps normal handoffs scoped to the release or destination', {
+  test('loads direct Activity routes without a false empty state and limits handoffs to items needing attention', {
     timeout: integrationRuntimeConfig.scenarioTimeoutMs,
   }, async (t) => {
     if (runtimeUnavailableReason) {
@@ -159,11 +159,7 @@ suite('Activity history initial-load browser verification', () => {
       const downloadEntry = page.locator('.activity-timeline-item').filter({
         hasText: 'Download started: Amber by Autechre',
       });
-      await downloadEntry.getByRole('link', { name: 'Open Music Queue' }).waitFor();
-      assert.match(
-        await downloadEntry.getByRole('link', { name: 'Open Music Queue' }).getAttribute('href'),
-        /\/app\/music-queue\/wanted-download$/,
-      );
+      assert.equal(await downloadEntry.getByRole('link').count(), 0);
       assert.equal(await page.locator('.activity-timeline > .activity-timeline-item').count(), 1);
 
       await page.getByLabel('Show activity').selectOption('audio_checks');
@@ -180,22 +176,13 @@ suite('Activity history initial-load browser verification', () => {
       const libraryEntry = page.locator('.activity-timeline-item').filter({
         hasText: 'LP5 by Autechre added to library',
       });
-      await libraryEntry.getByRole('link', { name: 'Open Library' }).waitFor();
-      assert.match(
-        await libraryEntry.getByRole('link', { name: 'Open Library' }).getAttribute('href'),
-        /\/app\/library$/,
-      );
+      assert.equal(await libraryEntry.getByRole('link').count(), 0);
 
       await page.getByLabel('Show activity').selectOption('requests');
       const requestEntry = page.locator('.activity-timeline-item').filter({
         hasText: 'Confield by Autechre added to library',
       });
-      await requestEntry.getByRole('link', { name: 'Open request' }).waitFor();
-      assert.match(
-        await requestEntry.getByRole('link', { name: 'Open request' }).getAttribute('href'),
-        /\/app\/requests\/request-1$/,
-      );
-      assert.equal(await requestEntry.getByRole('link', { name: /diagnostic/i }).count(), 0);
+      assert.equal(await requestEntry.getByRole('link').count(), 0);
 
       await page.goto(`${baseUrl}/app/activity/history`, { waitUntil: 'domcontentloaded' });
       await page.getByRole('heading', { exact: true, name: 'System history' }).waitFor();

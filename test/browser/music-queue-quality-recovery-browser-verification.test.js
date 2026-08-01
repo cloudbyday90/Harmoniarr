@@ -155,18 +155,41 @@ suite('Music Queue strict-quality recovery browser verification', () => {
       let activityMode = 'recovery';
       let recoveryStageIndex = 0;
       let terminalQualityStop = false;
+      let visibleStage = RECOVERY_STAGES[0];
       page.on('pageerror', (error) => pageErrors.push(error.message));
 
       await bootstrapAdminThroughUi(page, { baseUrl });
       await installConfiguredMusicQueueProviderFixtures(browserContext);
-      await browserContext.route(/\/api\/v1\/acquisition\/releases(?:\?.*)?$/, async (route) => {
-        const stage = terminalQualityStop
-          ? TERMINAL_QUALITY_STAGE
-          : RECOVERY_STAGES[Math.min(recoveryStageIndex++, RECOVERY_STAGES.length - 1)];
-        await route.fulfill({
-          body: JSON.stringify(buildMusicQueuePayload(stage)),
-          contentType: 'application/json',
-        });
+      await browserContext.route('**/api/v1/acquisition/releases**', async (route) => {
+        if (route.request().method() !== 'GET') {
+          await route.continue();
+          return;
+        }
+
+        const requestUrl = new URL(route.request().url());
+        const collectionPath = '/api/v1/acquisition/releases';
+        const detailPath = `${collectionPath}/${wantedReleaseId}`;
+
+        if (requestUrl.pathname === collectionPath) {
+          visibleStage = terminalQualityStop
+            ? TERMINAL_QUALITY_STAGE
+            : RECOVERY_STAGES[Math.min(recoveryStageIndex++, RECOVERY_STAGES.length - 1)];
+          await route.fulfill({
+            body: JSON.stringify(buildMusicQueuePayload(visibleStage)),
+            contentType: 'application/json',
+          });
+          return;
+        }
+
+        if (requestUrl.pathname === detailPath) {
+          await route.fulfill({
+            body: JSON.stringify({ release: buildMusicQueuePayload(visibleStage).releases[0] }),
+            contentType: 'application/json',
+          });
+          return;
+        }
+
+        await route.continue();
       });
       await browserContext.route(/\/api\/v1\/activity\/feed(?:\?.*)?$/, async (route) => {
         await route.fulfill({
@@ -203,9 +226,8 @@ suite('Music Queue strict-quality recovery browser verification', () => {
       });
       await recoveryStory.getByText('Trying the next best match: Child of God by Forest Frank').waitFor();
       await recoveryStory.getByText('A download failed. Harmoniarr is trying the next best match.').waitFor();
-      await recoveryStory.getByRole('link', { name: 'Open Music Queue' }).waitFor();
+      assert.equal(await recoveryStory.getByRole('link').count(), 0);
       assert.doesNotMatch(await recoveryStory.innerText(), /\bcandidate(?:s)?\b/i);
-      assert.equal(await recoveryStory.getByRole('link', { name: /diagnostic/i }).count(), 0);
 
       terminalQualityStop = true;
       activityMode = 'terminal';

@@ -295,7 +295,7 @@ suite('Music Queue post-transfer library add browser verification', () => {
       await page.goto(`${baseUrl}/app/activity/feed`, { waitUntil: 'domcontentloaded' });
       const story = page.locator('.activity-timeline-entry').filter({ hasText: 'Child of God' });
       await story.getByRole('heading', { name: 'Child of God by Forest Frank added to library' }).waitFor();
-      await story.getByRole('link', { name: 'Open Library' }).waitFor();
+      assert.equal(await story.getByRole('link').count(), 0);
       await story.locator('summary').click();
       await story.getByText('Download started: Child of God by Forest Frank').waitFor();
       await story.getByText('Download completed: Child of God by Forest Frank').waitFor();

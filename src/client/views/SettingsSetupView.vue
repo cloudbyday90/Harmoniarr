@@ -71,21 +71,19 @@ async function refreshSetup() {
     <header class="settings-setup__header">
       <div>
         <h2 id="settings-setup-title">Setup readiness</h2>
-        <p>Check the two things Harmoniarr needs before it can handle music automatically.</p>
       </div>
       <div class="settings-setup__header-actions">
         <span v-if="isCheckingSetup" class="hx-pill" data-tone="info">Checking setup</span>
         <span v-else class="hx-pill" :data-tone="setupOverview.readiness.tone">{{ setupOverview.readiness.label }}</span>
-        <button type="button" class="hx-btn" :disabled="isCheckingSetup" @click="refreshSetup">
+        <button type="button" class="hx-btn" data-variant="ghost" :disabled="isCheckingSetup" @click="refreshSetup">
           {{ isCheckingSetup ? 'Checking status' : 'Check status' }}
         </button>
       </div>
     </header>
     <p class="settings-setup__status" role="status" aria-atomic="true">{{ setupStatusMessage }}</p>
-    <p class="settings-setup__readiness">{{ setupOverview.readiness.copy }}</p>
 
     <SettingsSetupNextAction v-if="setupOverview.nextStep" :step="setupOverview.nextStep" />
-    <p v-else class="settings-setup__complete">Required setup is complete. Harmoniarr can now search, download, and add music using your saved preferences.</p>
+    <p v-else class="settings-setup__complete">Required setup is complete. Harmoniarr is ready to handle music automatically.</p>
 
     <section class="settings-setup__required" aria-labelledby="settings-setup-required-title">
       <h3 id="settings-setup-required-title">Required setup</h3>
@@ -156,13 +154,6 @@ async function refreshSetup() {
   position: absolute;
   white-space: nowrap;
   width: 1px;
-}
-
-.settings-setup__header p,
-.settings-setup__readiness {
-  color: var(--hx-text-muted);
-  font-size: var(--hx-text-sm);
-  margin: var(--hx-space-1) 0 0;
 }
 
 .settings-setup__complete {

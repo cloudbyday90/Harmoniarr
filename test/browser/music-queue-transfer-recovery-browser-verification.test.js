@@ -14,6 +14,7 @@ import { after, before, suite, test } from 'node:test';
 import {
   buildMusicQueueTransferRecoveryActivityPayload,
   buildMusicQueueTransferRecoveryPayload,
+  musicQueueTransferRecoveryReleaseId,
   MUSIC_QUEUE_TRANSFER_RECOVERY_STAGES,
 } from '../../testing/browser/music-queue-transfer-recovery-browser-fixtures.js';
 import {
@@ -56,16 +57,39 @@ suite('Music Queue transfer recovery browser verification', () => {
     await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
       const pageErrors = [];
       let releaseReadCount = 0;
+      let visibleStage = MUSIC_QUEUE_TRANSFER_RECOVERY_STAGES[0];
       page.on('pageerror', (error) => pageErrors.push(error.message));
 
       await bootstrapAdminThroughUi(page, { baseUrl });
       await installConfiguredMusicQueueProviderFixtures(browserContext);
-      await browserContext.route(/\/api\/v1\/acquisition\/releases(?:\?.*)?$/, async (route) => {
-        const stage = MUSIC_QUEUE_TRANSFER_RECOVERY_STAGES[Math.min(releaseReadCount++, MUSIC_QUEUE_TRANSFER_RECOVERY_STAGES.length - 1)];
-        await route.fulfill({
-          body: JSON.stringify(buildMusicQueueTransferRecoveryPayload(stage)),
-          contentType: 'application/json',
-        });
+      await browserContext.route('**/api/v1/acquisition/releases**', async (route) => {
+        if (route.request().method() !== 'GET') {
+          await route.continue();
+          return;
+        }
+
+        const requestUrl = new URL(route.request().url());
+        const collectionPath = '/api/v1/acquisition/releases';
+        const detailPath = `${collectionPath}/${musicQueueTransferRecoveryReleaseId}`;
+
+        if (requestUrl.pathname === collectionPath) {
+          visibleStage = MUSIC_QUEUE_TRANSFER_RECOVERY_STAGES[Math.min(releaseReadCount++, MUSIC_QUEUE_TRANSFER_RECOVERY_STAGES.length - 1)];
+          await route.fulfill({
+            body: JSON.stringify(buildMusicQueueTransferRecoveryPayload(visibleStage)),
+            contentType: 'application/json',
+          });
+          return;
+        }
+
+        if (requestUrl.pathname === detailPath) {
+          await route.fulfill({
+            body: JSON.stringify({ release: buildMusicQueueTransferRecoveryPayload(visibleStage).releases[0] }),
+            contentType: 'application/json',
+          });
+          return;
+        }
+
+        await route.continue();
       });
       await browserContext.route(/\/api\/v1\/activity\/feed(?:\?.*)?$/, async (route) => {
         await route.fulfill({
@@ -99,9 +123,8 @@ suite('Music Queue transfer recovery browser verification', () => {
       });
       await recoveryStory.getByText('Trying the next best match: Automatic Recovery by Fixture Harbor').waitFor();
       await recoveryStory.getByText('A download failed. Harmoniarr is trying the next best match.').waitFor();
-      await recoveryStory.getByRole('link', { name: 'Open Music Queue' }).waitFor();
+      assert.equal(await recoveryStory.getByRole('link').count(), 0);
       assert.doesNotMatch(await recoveryStory.innerText(), /\bcandidate(?:s)?\b/i);
-      assert.equal(await recoveryStory.getByRole('link', { name: /diagnostic/i }).count(), 0);
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
     }, { scenarioName: 'music_queue_terminal_transfer_recovery' });
   });

@@ -107,16 +107,17 @@ suite('Activity advanced diagnostics boundary browser verification', () => {
       await page.waitForFunction(() => globalThis.location.pathname === '/app/activity/diagnostics/matches');
       await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
       assert.equal(
-        await page.getByRole('link', { name: 'Back to Activity' }).getAttribute('href'),
+        await page.getByRole('link', { name: 'Activity timeline' }).getAttribute('href'),
         '/app/activity/feed',
       );
+      assert.equal(await diagnostics.evaluate((element) => element.open), false);
       const directDiagnosticOrder = await page.locator('.activity-workspace').evaluate((workspace) => [
         ...workspace.children,
       ].filter((child) => child.classList.contains('activity-workspace-content') || child.matches('details'))
         .map((child) => child.classList.contains('activity-workspace-content') ? 'content' : 'diagnostics'));
       assert.deepEqual(directDiagnosticOrder, ['diagnostics', 'content']);
 
-      await page.getByRole('link', { name: 'Back to Activity' }).click();
+      await page.getByRole('link', { name: 'Activity timeline' }).click();
       await page.waitForFunction(() => globalThis.location.pathname === '/app/activity/feed');
       await page.getByRole('heading', { exact: true, name: 'Activity timeline' }).waitFor();
 

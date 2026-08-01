@@ -35,12 +35,12 @@ const isTimelineRoute = computed(() => route.name === 'activity-feed');
       </div>
       <div v-if="!isTimelineRoute" class="hx-page-actions">
         <RouterLink :to="{ name: 'activity-feed' }" class="hx-btn" data-variant="ghost">
-          Back to Activity
+          Activity timeline
         </RouterLink>
       </div>
     </header>
 
-    <ActivityDiagnosticsDisclosure v-if="!isTimelineRoute" :open="true" />
+    <ActivityDiagnosticsDisclosure v-if="!isTimelineRoute" />
 
     <div class="activity-workspace-content">
       <RouterView />

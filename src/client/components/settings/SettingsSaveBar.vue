@@ -52,6 +52,7 @@ const statusRole = computed(() => (
         v-if="saveState.verificationActionLabel"
         type="button"
         class="hx-btn"
+        data-variant="ghost"
         @click="emit('verify')"
       >
         {{ saveState.verificationActionLabel }}

@@ -118,7 +118,8 @@ suite('Settings setup readiness landing browser verification', () => {
 
       await page.goto(`${baseUrl}/app/settings`, { waitUntil: 'domcontentloaded' });
       await page.getByRole('heading', { name: 'Setup readiness' }).waitFor();
-      await page.getByText('1 required setup task remains before Harmoniarr can download music.', { exact: true }).waitFor();
+      await page.locator('.settings-setup-next-action').getByRole('heading', { name: 'Set your folders' }).waitFor();
+      assert.equal(await page.getByText('1 required setup task remains before Harmoniarr can download music.', { exact: true }).count(), 0);
       assert.equal(await page.getByText('/private/downloads', { exact: true }).count(), 0);
       assert.equal(await page.getByText('/private/music', { exact: true }).count(), 0);
 
@@ -138,8 +139,9 @@ suite('Settings setup readiness landing browser verification', () => {
 
       foldersAreReady = true;
       await page.goto(`${baseUrl}/app/settings`, { waitUntil: 'domcontentloaded' });
-      await page.getByText('Required setup is complete. Harmoniarr can now search, download, and add music using your saved preferences.', { exact: true }).waitFor();
+      await page.getByText('Required setup is complete. Harmoniarr is ready to handle music automatically.', { exact: true }).waitFor();
       assert.equal(await page.locator('.settings-setup-next-action').count(), 0);
+      assert.equal(await page.locator('.settings-setup__readiness').count(), 0);
 
       delayStatusCheck = true;
       const connectionRequestsBeforeRefresh = connectionStatusRequests;

@@ -102,10 +102,7 @@ async function assertOwnSharedMusicQueueJourney({
   const activity = page.locator('.activity-timeline-entry').filter({ hasText: SHARED_RELEASE });
   await activity.getByText(`Download started: ${SHARED_RELEASE} by ${SHARED_ARTIST}`).waitFor();
   await activity.getByText('10 files accepted for download.').waitFor();
-  const handoff = activity.getByRole('link', { name: 'Open Music Queue' });
-  await handoff.waitFor();
-  assert.equal(await handoff.getAttribute('href'), getReleaseDetailPath(release.id));
-  assert.equal(await activity.getByRole('link', { name: 'Advanced diagnostics' }).count(), 0);
+  assert.equal(await activity.getByRole('link').count(), 0);
   assert.doesNotMatch(await activity.innerText(), new RegExp(`${policyMarker}|${otherPolicyMarker}|${otherWantedReleaseId}`, 'u'));
 }
 

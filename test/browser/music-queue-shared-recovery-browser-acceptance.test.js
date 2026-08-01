@@ -178,17 +178,11 @@ async function assertOwnSharedRecoveryJourney({
   await page.goto(`${baseUrl}/app/activity/feed`, { waitUntil: 'domcontentloaded' });
   const retryActivity = getActivityEntry(page, `Trying the next best match: ${SHARED_RELEASE} by ${SHARED_ARTIST}`);
   await retryActivity.getByText('A download failed. Harmoniarr is trying the next best match.').waitFor();
-  const retryHandoff = retryActivity.getByRole('link', { name: 'Open Music Queue' });
-  await retryHandoff.waitFor();
-  assert.equal(await retryHandoff.getAttribute('href'), getReleaseDetailPath(release.id));
+  assert.equal(await retryActivity.getByRole('link').count(), 0);
 
   const downloadActivity = getActivityEntry(page, `Download started: ${SHARED_RELEASE} by ${SHARED_ARTIST}`);
   await downloadActivity.getByText('10 files accepted for download.').waitFor();
-  const downloadHandoff = downloadActivity.getByRole('link', { name: 'Open Music Queue' });
-  await downloadHandoff.waitFor();
-  assert.equal(await downloadHandoff.getAttribute('href'), getReleaseDetailPath(release.id));
-  assert.equal(await retryActivity.getByRole('link', { name: /diagnostic/i }).count(), 0);
-  assert.equal(await downloadActivity.getByRole('link', { name: /diagnostic/i }).count(), 0);
+  assert.equal(await downloadActivity.getByRole('link').count(), 0);
   assertNoPrivateSharedData(await page.getByRole('main').innerText(), {
     otherPolicyMarker,
     otherWantedReleaseId,

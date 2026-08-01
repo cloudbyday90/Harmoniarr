@@ -27,6 +27,8 @@ const VIEWS = [
   'SettingsLibraryView.vue',
 ];
 
+const SAVE_BAR_PATH = new URL('../../src/client/components/settings/SettingsSaveBar.vue', import.meta.url);
+
 test('primary Settings views separate load failure from retryable save state', async () => {
   for (const viewName of VIEWS) {
     const source = await readFile(new URL(`../../src/client/views/${viewName}`, import.meta.url), 'utf8');
@@ -46,4 +48,11 @@ test('connections moves the one saved-provider test action into the save state f
   assert.match(source, /requiresVerification: requiresConnectionVerification\.value/);
   assert.match(source, /:show-test-action="!requiresConnectionVerification"/);
   assert.match(source, /<SettingsSaveBar :save-state="settingsSaveState" @verify="testProviderConnection" \/>/);
+});
+
+test('saved-configuration verification remains secondary to the save action', async () => {
+  const source = await readFile(SAVE_BAR_PATH, 'utf8');
+
+  assert.match(source, /type="submit"[\s\S]*?data-variant="primary"/);
+  assert.match(source, /v-if="saveState\.verificationActionLabel"[\s\S]*?data-variant="ghost"/);
 });

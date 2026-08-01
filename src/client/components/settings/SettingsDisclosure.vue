@@ -111,6 +111,7 @@ function toggle() {
       <button
         type="button"
         class="hx-btn"
+        data-variant="ghost"
         :aria-controls="panelId"
         :aria-expanded="isOpen"
         :aria-label="actionAriaLabel"
