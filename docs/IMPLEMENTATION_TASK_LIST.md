@@ -146,6 +146,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   use semantic fieldsets for related controls, preserve concise contextual
   guidance, and converge on one shared save action. See
   `SETTINGS_INFORMATION_HIERARCHY_DESIGN.md`.
+- Settings setup readiness landing: the default Setup route now elevates only
+  the first incomplete prerequisite, renders required work as whole-row links
+  with non-interactive statuses, offers a safe read-only status refresh, and
+  keeps Library preferences optional. The safe projection continues to exclude
+  provider addresses, secrets, raw paths, and diagnostics. See
+  `SETTINGS_SETUP_READINESS_LANDING_DESIGN.md`.
 - Activity advanced diagnostics boundary: match, library-add, and failed-add
   workbenches now use canonical `/app/activity/diagnostics/...` routes behind
   the Activity disclosure. Legacy candidate/import URLs redirect with their

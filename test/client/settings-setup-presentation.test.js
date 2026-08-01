@@ -38,6 +38,7 @@ test('settings setup keeps the download provider and media folders as the only c
 
   assert.deepEqual(overview.coreSteps.map((step) => step.id), ['soulseek', 'folders']);
   assert.equal(overview.optionalSteps[0].id, 'library');
+  assert.equal(overview.nextStep, null);
   assert.deepEqual(overview.readiness, {
     copy: 'Soulseek and your media folders are ready for normal download and library work.',
     label: 'Ready for downloads',
@@ -68,6 +69,8 @@ test('settings setup asks for media folders without exposing their saved paths',
     tone: 'warning',
   });
   assert.doesNotMatch(JSON.stringify(overview), /\/data\/|api.?key|base.?url|secret/i);
+  assert.equal(overview.nextStep?.id, 'soulseek');
+  assert.equal(overview.nextStep?.label, 'Choose a download mode');
 });
 
 test('settings setup distinguishes a failed folder-readiness read from a missing folder', () => {
@@ -79,6 +82,7 @@ test('settings setup distinguishes a failed folder-readiness read from a missing
   assert.equal(folders.status, 'Needs a check');
   assert.equal(folders.label, 'Review folders');
   assert.match(overview.readiness.copy, /2 required setup tasks remain/);
+  assert.equal(overview.nextStep?.id, 'soulseek');
 });
 
 test('settings setup uses the focused Soulseek status result without exposing its message', () => {
@@ -105,4 +109,28 @@ test('settings setup uses the focused Soulseek status result without exposing it
   assert.equal(soulseek.status, 'Ready');
   assert.equal(soulseek.label, 'Test saved connection');
   assert.doesNotMatch(JSON.stringify(soulseek), /private-slskd|secret-value|https?:/i);
+});
+
+test('settings setup prioritizes the first incomplete required task without treating optional library behavior as blocking', () => {
+  const overview = buildSettingsSetupOverview({
+    connectionStatus: {
+      provider: 'slskd',
+      status: 'healthy',
+    },
+    setupProgress: {
+      folders: {
+        downloadsConfigured: false,
+        musicConfigured: true,
+        validationStatus: 'unavailable',
+      },
+      soulseek: {
+        managedDeploymentMissing: false,
+        providerMode: 'external',
+      },
+    },
+  });
+
+  assert.equal(overview.nextStep?.id, 'folders');
+  assert.equal(overview.nextStep?.title, 'Set your folders');
+  assert.equal(overview.optionalSteps[0].tone, 'info');
 });

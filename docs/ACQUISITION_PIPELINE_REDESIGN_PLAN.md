@@ -1701,7 +1701,15 @@ outcomes, reciprocal 404 reads, and complete cleanup.
   optional disclosures, and one shared save path. See
   [SETTINGS_INFORMATION_HIERARCHY_DESIGN.md](SETTINGS_INFORMATION_HIERARCHY_DESIGN.md).
 
-Recommended next slice: complete a **Settings setup readiness landing pass**.
-Make Setup the focused first-run and recovery entry point that summarizes the
-few prerequisites for automatic music handling and links to the appropriate
-normal Settings page.
+- [x] Complete a Settings setup readiness landing pass. Setup now prioritizes
+  one incomplete prerequisite as `Your next step`, presents required work as
+  whole-row links with readable static statuses, supports safe read-only status
+  refresh, and keeps Library preferences optional. It never exposes provider
+  secrets, addresses, raw paths, or diagnostics. See
+  [SETTINGS_SETUP_READINESS_LANDING_DESIGN.md](SETTINGS_SETUP_READINESS_LANDING_DESIGN.md).
+
+Recommended next slice: complete **setup recovery handoff consistency** across
+Music Queue, Downloader, and other blocked surfaces. Each should state the
+missing prerequisite in home-user language, link directly to its normal
+Settings page, and preserve the original operational context once the repair is
+complete.

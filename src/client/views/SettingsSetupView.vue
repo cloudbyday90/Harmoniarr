@@ -18,8 +18,9 @@
 
 <script setup>
 import { computed, onMounted } from 'vue';
-import { RouterLink } from 'vue-router';
 import SettingsDisclosure from '../components/settings/SettingsDisclosure.vue';
+import SettingsSetupNextAction from '../components/settings/SettingsSetupNextAction.vue';
+import SettingsSetupTaskList from '../components/settings/SettingsSetupTaskList.vue';
 import { useSettingsSetupProgress } from '../composables/useSettingsSetupProgress.js';
 import { useSoulseekConnectionStatus } from '../composables/useSoulseekConnectionStatus.js';
 import { buildSettingsSetupOverview } from '../lib/settings-setup-presentation.js';
@@ -54,9 +55,15 @@ const setupStatusMessage = computed(() => {
 });
 
 onMounted(() => {
-  void loadConnectionStatus();
-  void loadSetupProgress();
+  void refreshSetup();
 });
+
+async function refreshSetup() {
+  await Promise.all([
+    loadConnectionStatus(),
+    loadSetupProgress(),
+  ]);
+}
 </script>
 
 <template>
@@ -64,52 +71,44 @@ onMounted(() => {
     <header class="settings-setup__header">
       <div>
         <h2 id="settings-setup-title">Setup readiness</h2>
-        <p>Complete these two prerequisites once. Harmoniarr handles normal music progress after that.</p>
+        <p>Check the two things Harmoniarr needs before it can handle music automatically.</p>
       </div>
-      <span v-if="isCheckingSetup" class="hx-pill" data-tone="info">Checking setup</span>
-      <span v-else class="hx-pill" :data-tone="setupOverview.readiness.tone">{{ setupOverview.readiness.label }}</span>
+      <div class="settings-setup__header-actions">
+        <span v-if="isCheckingSetup" class="hx-pill" data-tone="info">Checking setup</span>
+        <span v-else class="hx-pill" :data-tone="setupOverview.readiness.tone">{{ setupOverview.readiness.label }}</span>
+        <button type="button" class="hx-btn" :disabled="isCheckingSetup" @click="refreshSetup">
+          {{ isCheckingSetup ? 'Checking status' : 'Check status' }}
+        </button>
+      </div>
     </header>
     <p class="settings-setup__status" role="status" aria-atomic="true">{{ setupStatusMessage }}</p>
     <p class="settings-setup__readiness">{{ setupOverview.readiness.copy }}</p>
 
-    <ol class="settings-setup__steps" aria-label="Required setup tasks">
-      <li v-for="step in setupOverview.coreSteps" :key="step.id" class="settings-setup__step">
-        <div class="settings-setup__content">
-          <div class="settings-setup__heading">
-            <h3>{{ step.title }}</h3>
-            <span class="hx-pill" :data-tone="step.tone">{{ step.status }}</span>
-          </div>
-          <p>{{ step.copy }}</p>
-          <RouterLink class="hx-btn" :to="{ name: step.routeName }">
-            {{ step.label }}
-          </RouterLink>
-        </div>
-      </li>
-    </ol>
+    <SettingsSetupNextAction v-if="setupOverview.nextStep" :step="setupOverview.nextStep" />
+    <p v-else class="settings-setup__complete">Required setup is complete. Harmoniarr can now search, download, and add music using your saved preferences.</p>
+
+    <section class="settings-setup__required" aria-labelledby="settings-setup-required-title">
+      <h3 id="settings-setup-required-title">Required setup</h3>
+      <SettingsSetupTaskList :steps="setupOverview.coreSteps" label="Required setup tasks" />
+    </section>
 
     <SettingsDisclosure
+      action-style="compact"
+      category="optional"
       heading-level="3"
       hide-label="Hide optional setup"
       panel-id="settings-setup-optional"
       show-label="Review optional setup"
-      subtitle="Tailor search timing and safe automatic downloads when you are ready."
-      title="Optional setup"
+      subtitle="Tailor search timing and automatic-download behavior when you are ready."
+      title="Library preferences"
       variant="inline"
     >
-      <ul class="settings-setup__optional-list">
-        <li v-for="step in setupOverview.optionalSteps" :key="step.id" class="settings-setup__optional-step">
-          <div>
-            <div class="settings-setup__heading">
-              <h4>{{ step.title }}</h4>
-              <span class="hx-pill" :data-tone="step.tone">{{ step.status }}</span>
-            </div>
-            <p>{{ step.copy }}</p>
-          </div>
-          <RouterLink class="hx-btn" :to="{ name: step.routeName }">
-            {{ step.label }}
-          </RouterLink>
-        </li>
-      </ul>
+      <SettingsSetupTaskList
+        heading-level="4"
+        id-prefix="settings-setup-optional-task"
+        label="Optional library preferences"
+        :steps="setupOverview.optionalSteps"
+      />
     </SettingsDisclosure>
   </section>
 </template>
@@ -129,9 +128,17 @@ onMounted(() => {
   justify-content: space-between;
 }
 
+.settings-setup__header-actions {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+  justify-content: flex-end;
+}
+
 .settings-setup__header h2,
-.settings-setup__heading h3,
-.settings-setup__heading h4 {
+.settings-setup__required h3 {
   color: var(--hx-text-strong);
   margin: 0;
 }
@@ -152,78 +159,35 @@ onMounted(() => {
 }
 
 .settings-setup__header p,
-.settings-setup__content p,
-.settings-setup__optional-step p,
 .settings-setup__readiness {
   color: var(--hx-text-muted);
   font-size: var(--hx-text-sm);
   margin: var(--hx-space-1) 0 0;
 }
 
-.settings-setup__steps {
-  display: grid;
-  gap: var(--hx-space-3);
-  list-style: none;
+.settings-setup__complete {
+  color: var(--hx-success);
+  font-size: var(--hx-text-sm);
   margin: var(--hx-space-4) 0 0;
-  padding: 0;
 }
 
-.settings-setup__step {
-  align-items: center;
-  border-top: 1px solid var(--hx-border-subtle);
-  display: block;
-  padding-top: var(--hx-space-3);
+.settings-setup__required {
+  margin-top: var(--hx-space-4);
 }
 
-.settings-setup__content {
-  display: grid;
-  gap: var(--hx-space-2);
-}
-
-.settings-setup__heading {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--hx-space-2);
-  justify-content: space-between;
-}
-
-.settings-setup__content p {
+.settings-setup__required h3 {
+  font-size: var(--hx-text-sm);
   margin: 0;
-}
-
-.settings-setup__content .hx-btn {
-  justify-self: start;
-}
-
-.settings-setup__optional-list {
-  display: grid;
-  gap: var(--hx-space-3);
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.settings-setup__optional-step {
-  align-items: flex-start;
-  display: flex;
-  gap: var(--hx-space-3);
-  justify-content: space-between;
-}
-
-.settings-setup__optional-step p {
-  margin: var(--hx-space-1) 0 0;
-}
-
-.settings-setup__optional-step .hx-btn {
-  flex: 0 0 auto;
 }
 
 @media (max-width: 640px) {
-  .settings-setup__header,
-  .settings-setup__optional-step {
+  .settings-setup__header {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .settings-setup__header-actions {
+    justify-content: flex-start;
   }
 }
 </style>

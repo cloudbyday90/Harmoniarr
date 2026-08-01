@@ -124,6 +124,10 @@ function buildReadinessStatus(coreSteps) {
   };
 }
 
+function buildNextStep(coreSteps) {
+  return coreSteps.find((step) => step.tone !== 'success') ?? null;
+}
+
 /**
  * Builds a compact, non-sensitive setup overview. Core readiness deliberately
  * includes only the connection and media prerequisites; library tuning remains
@@ -158,6 +162,7 @@ export function buildSettingsSetupOverview({
 
   return {
     coreSteps,
+    nextStep: buildNextStep(coreSteps),
     optionalSteps: [buildLibraryStep()],
     readiness: buildReadinessStatus(coreSteps),
   };

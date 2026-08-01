@@ -228,10 +228,14 @@ test('Settings setup loads safe readiness progress and keeps optional configurat
   assert.match(source, /useSettingsSetupProgress/);
   assert.match(source, /buildSettingsSetupOverview/);
   assert.match(source, /setupProgressError/);
-  assert.match(source, /void loadSetupProgress\(\)/);
+  assert.match(source, /SettingsSetupNextAction/);
+  assert.match(source, /SettingsSetupTaskList/);
+  assert.match(source, /void refreshSetup\(\)/);
+  assert.match(source, /await Promise\.all\(\[/);
   assert.match(source, /role="status"/);
   assert.match(source, /aria-atomic="true"/);
-  assert.match(source, /aria-label="Required setup tasks"/);
-  assert.match(source, /title="Optional setup"/);
+  assert.match(source, /label="Required setup tasks"/);
+  assert.match(source, /category="optional"/);
+  assert.match(source, /title="Library preferences"/);
   assert.match(source, /show-label="Review optional setup"/);
 });
