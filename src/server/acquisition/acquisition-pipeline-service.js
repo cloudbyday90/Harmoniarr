@@ -22,6 +22,7 @@ import {
   QUALITY_DECISION_CODES,
 } from './acquisition-quality-policy-service.js';
 import { createAcquisitionPipelineStatusService } from './acquisition-pipeline-status-service.js';
+import { deriveImportCandidateAddRecoveryReasonCode } from '../import-candidates/import-candidate-add-blocker.js';
 import {
   buildMusicQueueSearchQueuedActivityEvent,
   recordActivityEventSafely,
@@ -118,15 +119,19 @@ function buildAddEvidence(release) {
   const qualityGate = addSummary.latestQualityGate && typeof addSummary.latestQualityGate === 'object'
     ? addSummary.latestQualityGate
     : null;
+  const blockerCode = addSummary.latestAddBlockerCode ?? null;
   return {
-    blockerCode: addSummary.latestAddBlockerCode ?? null,
+    blockerCode,
     itemStatusCounts: addSummary.itemStatusCounts ?? {},
     latestOutcome: addSummary.latestOutcome ?? null,
     latestStatus: addSummary.latestItemStatus ?? null,
     latestUpdatedAt: addSummary.latestUpdatedAt ?? null,
-    message: addSummary.latestQualityBlockedMessage ?? qualityGate?.message ?? null,
     qualityBlockedCount: getCount(addSummary.qualityBlockedCount),
-    qualityGate,
+    recoveryReasonCode: deriveImportCandidateAddRecoveryReasonCode({
+      addBlockerCode: blockerCode,
+      qualityGate,
+      recoveryReasonCode: addSummary.latestRecoveryReasonCode,
+    }),
     totalItemCount: getCount(addSummary.totalItemCount),
   };
 }

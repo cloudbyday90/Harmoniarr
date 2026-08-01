@@ -148,6 +148,20 @@ test('buildMusicQueueAction maps setup and review actions to user outcomes', () 
     { code: 'review_matches', label: 'Review matches', type: 'review' },
   );
   assert.deepEqual(
+    buildMusicQueueAction({
+      nextAction: 'review_add_plan',
+      repair: { actionLabel: 'Review library conflict' },
+    }),
+    { code: 'review_add_plan', label: 'Review library conflict', type: 'review' },
+  );
+  assert.deepEqual(
+    buildMusicQueueAction({
+      nextAction: 'review_quality_choice',
+      repair: { actionLabel: 'Review audio quality' },
+    }),
+    { code: 'review_quality_choice', label: 'Review audio quality', type: 'review' },
+  );
+  assert.deepEqual(
     buildMusicQueueAction({ nextAction: 'add_to_library' }),
     { code: 'add_to_library', label: 'View details', type: 'review' },
   );

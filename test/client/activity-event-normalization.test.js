@@ -363,7 +363,7 @@ test('getActivityEventLabel and detail make blocked library adds actionable with
   assert.equal(getActivityEventLabel(event), 'Library add needs help: Amber by Autechre');
   assert.equal(
     getActivityEventDetail(event),
-    'Harmoniarr stopped before changing the library. Review the release to resolve the safety check.',
+    'Harmoniarr stopped before changing your library because the completed download needs a safe add review.',
   );
   assert.equal(getActivityEventIcon(event.eventType), 'alert');
 });
@@ -381,7 +381,7 @@ test('getActivityEventDetail gives a path blocker a safe, specific next step', (
 
   assert.equal(
     getActivityEventDetail(event),
-    'Harmoniarr cannot reach the completed download from its configured folders. Review the release to set up folders safely.',
+    'Harmoniarr cannot reach the completed download from its configured folders.',
   );
   assert.equal(getActivityEventDetail(event).includes('/data/downloads'), false);
 });

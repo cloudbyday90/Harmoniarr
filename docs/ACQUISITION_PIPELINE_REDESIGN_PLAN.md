@@ -1724,7 +1724,19 @@ Completed Activity navigation and copy cleanup:
   route back to normal Activity. See
   [ACTIVITY_NAVIGATION_AND_COPY_CLEANUP_DESIGN.md](ACTIVITY_NAVIGATION_AND_COPY_CLEANUP_DESIGN.md).
 
-Recommended next slice: complete the remaining **Phase 4 unsafe-add recovery
-states**. Route collision, lossy audio, suspicious FLAC, probe failure, and
-unsafe import plans must all land on one release-centred `Needs help adding`
-state with a safe, outcome-specific action and no candidate-first navigation.
+### Unsafe Add Recovery States
+
+Implemented in
+[MUSIC_QUEUE_UNSAFE_ADD_RECOVERY_STATES_DESIGN.md](MUSIC_QUEUE_UNSAFE_ADD_RECOVERY_STATES_DESIGN.md).
+Collision, low-quality audio, suspicious claimed-lossless audio, unfinished
+audio checks, unavailable completed files, unsafe add plans, and add failures
+now project one release-centred `Needs help adding` state with an
+outcome-specific action. The durable reason is bounded, historic quality-gate
+records remain compatible, normal Music Queue evidence excludes raw diagnostic
+data, and Activity uses the same safe recovery copy and handoff.
+
+Recommended next slice: add a **release-level safe recheck after a fixed
+prerequisite**. Folder and media-tool repairs should queue one scoped read-only
+add preview and resume the existing automatic add only when the resulting plan
+is safe. Collision and quality stops must remain confirmation-first, with no
+overwrite or blind retry.

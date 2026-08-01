@@ -190,15 +190,15 @@ function hasTerminalSearchStop(search) {
     || (search?.status === 'blocked' && getCount(search?.searchAttemptCount) > 0);
 }
 
-function buildAddBlockerRepair(blockerCode) {
-  return buildAcquisitionAddBlockerRepair(blockerCode);
+function buildAddBlockerRepair(blockerCode, recoveryReasonCode) {
+  return buildAcquisitionAddBlockerRepair(blockerCode, recoveryReasonCode);
 }
 
-function buildNeedsHelpAddingStatus({ blockerCode = null } = {}) {
-  const repair = buildAddBlockerRepair(blockerCode);
+function buildNeedsHelpAddingStatus({ blockerCode = null, recoveryReasonCode = null } = {}) {
+  const repair = buildAddBlockerRepair(blockerCode, recoveryReasonCode);
   return buildStatus(MUSIC_QUEUE_STATUS_CODES.NEEDS_HELP_ADDING, {
     detail: repair.detail,
-    nextAction: MUSIC_QUEUE_ACTION_CODES.REVIEW_ADD_PLAN,
+    nextAction: repair.actionCode ?? MUSIC_QUEUE_ACTION_CODES.REVIEW_ADD_PLAN,
     progressStep: 'add',
     repair,
   });
@@ -275,12 +275,16 @@ export function deriveMusicQueueStatus({
   if (hasSafeAutoQualityStop) {
     return buildNeedsHelpAddingStatus({
       blockerCode: add.blockerCode ?? IMPORT_CANDIDATE_ADD_BLOCKER_CODES.MEDIA_VERIFICATION,
+      recoveryReasonCode: add.recoveryReasonCode,
     });
   }
 
   if (hasAnyStatus(add.itemStatusCounts, ['blocked', 'apply_failed'])
     || ['apply_failed', 'blocked'].includes(add.latestOutcome)) {
-    return buildNeedsHelpAddingStatus({ blockerCode: add.blockerCode });
+    return buildNeedsHelpAddingStatus({
+      blockerCode: add.blockerCode,
+      recoveryReasonCode: add.recoveryReasonCode,
+    });
   }
 
   if (hasAnyStatus(executionStatusCounts, ['completed', 'complete']) || match.latestStatus === 'import_pending') {

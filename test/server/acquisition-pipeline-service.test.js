@@ -247,11 +247,13 @@ test('listMusicQueueReleases maps quality-blocked add evidence to a release-cent
     totalItemCount: 1,
   };
   release.discoveryRequest.importReviewSummary.libraryAddSummary = {
+    latestAddBlockerCode: 'media_verification',
     latestItemStatus: 'blocked',
     latestOutcome: 'quality_blocked',
     latestQualityBlockedMessage: '1 file did not pass verified lossless checks before automatic add.',
     latestQualityGate: {
       blockers: [{
+        code: 'safe_auto_spectral_transcoded',
         filename: '01 Fake.flac',
         message: 'Spectral analysis does not verify this lossless file.',
       }],
@@ -259,6 +261,7 @@ test('listMusicQueueReleases maps quality-blocked add evidence to a release-cent
       profileCode: 'lossless_archive',
       status: 'blocked',
     },
+    latestRecoveryReasonCode: 'suspicious_lossless',
     qualityBlockedCount: 1,
     totalItemCount: 1,
   };
@@ -278,9 +281,12 @@ test('listMusicQueueReleases maps quality-blocked add evidence to a release-cent
   assert.equal(result.releases[0].status.code, 'needs_help_adding');
   assert.equal(
     result.releases[0].status.detail,
-    'Harmoniarr could not verify the downloaded audio safely, so it was not added to your library.',
+    'This download claims to be lossless, but Harmoniarr could not verify that claim safely. It was not added to your library.',
   );
   assert.equal(result.releases[0].status.repair.code, 'media_verification');
+  assert.equal(result.releases[0].status.repair.reasonCode, 'suspicious_lossless');
+  assert.equal(result.releases[0].status.repair.actionLabel, 'Review lossless check');
+  assert.equal(Object.hasOwn(result.releases[0].evidence.add, 'qualityGate'), false);
   assert.equal(result.summary.counts.needs_help_adding, 1);
 });
 

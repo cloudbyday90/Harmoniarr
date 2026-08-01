@@ -453,9 +453,14 @@ test('import apply worker safe-auto mode blocks strict lossless candidates witho
   assert.equal(activityEvents[0].entityTitle, 'Album');
   assert.equal(activityEvents[0].entityArtist, 'Artist');
   assert.equal(activityEvents[0].extraPayload.addBlockerCode, 'media_verification');
+  assert.equal(activityEvents[0].extraPayload.recoveryReasonCode, 'lossy_audio');
   assert.equal(Object.hasOwn(activityEvents[0].extraPayload, 'blockers'), false);
   assert.equal(updateImportApplyRunItem.mock.callCount(), 1);
   assert.equal(updateImportApplyRunItem.mock.calls[0].arguments[0].itemStatus, 'blocked');
+  assert.equal(
+    updateImportApplyRunItem.mock.calls[0].arguments[0].applySnapshot.apply.recoveryReasonCode,
+    'lossy_audio',
+  );
   assert.match(updateImportApplyRunItem.mock.calls[0].arguments[0].statusMessage, /verified lossless checks/);
   assert.deepEqual(markRunCompleted.mock.calls[0].arguments, [{
     runId: 'run-safe-auto-quality-block',

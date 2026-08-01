@@ -18,7 +18,10 @@
 
 import { createApiError } from '../auth.js';
 import { buildAcquisitionAddBlockerRepair } from '../acquisition/acquisition-add-blocker-repair.js';
-import { deriveImportCandidateAddBlockerCode } from './import-candidate-add-blocker.js';
+import {
+  deriveImportCandidateAddBlockerCode,
+  deriveImportCandidateAddRecoveryReasonCode,
+} from './import-candidate-add-blocker.js';
 import { createImportCandidateReleaseAddDiagnosticRepository } from './import-candidate-release-add-diagnostic-repository.js';
 
 // PostgreSQL 18 generates UUIDv7 while earlier supported versions fall back to UUIDv4.
@@ -34,9 +37,9 @@ function normalizeWantedReleaseId(value) {
   return wantedReleaseIdPattern.test(normalized) ? normalized : null;
 }
 
-function buildOutcomePresentation({ applyOutcome, blockerCode, itemStatus }) {
+function buildOutcomePresentation({ applyOutcome, blockerCode, itemStatus, recoveryReasonCode }) {
   if (blockerCode) {
-    const repair = buildAcquisitionAddBlockerRepair(blockerCode);
+    const repair = buildAcquisitionAddBlockerRepair(blockerCode, recoveryReasonCode);
     return {
       code: repair.code,
       detail: repair.detail,
@@ -91,6 +94,11 @@ function projectReleaseAddOutcome(item) {
     itemStatus: item.itemStatus,
     previewBlockerCode: apply.addBlockerCode,
   });
+  const recoveryReasonCode = deriveImportCandidateAddRecoveryReasonCode({
+    addBlockerCode: blockerCode,
+    qualityGate: apply.qualityGate,
+    recoveryReasonCode: apply.recoveryReasonCode,
+  });
 
   return {
     diagnosticCandidateId: item.importCandidateId,
@@ -98,6 +106,7 @@ function projectReleaseAddOutcome(item) {
       applyOutcome,
       blockerCode,
       itemStatus: item.itemStatus,
+      recoveryReasonCode,
     }),
     updatedAt: item.updatedAt,
   };

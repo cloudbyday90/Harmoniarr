@@ -16,6 +16,11 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import {
+  MUSIC_QUEUE_ADD_RECOVERY_REASON_CODES,
+  normalizeMusicQueueAddRecoveryReasonCode,
+} from '../../shared/music-queue-add-recovery-presentation.js';
+
 export const IMPORT_CANDIDATE_ADD_BLOCKER_CODES = Object.freeze({
   ADD_FAILED: 'add_failed',
   LIBRARY_COLLISION: 'library_collision',
@@ -25,6 +30,19 @@ export const IMPORT_CANDIDATE_ADD_BLOCKER_CODES = Object.freeze({
 });
 
 const KNOWN_ADD_BLOCKER_CODES = new Set(Object.values(IMPORT_CANDIDATE_ADD_BLOCKER_CODES));
+
+const LOSSY_AUDIO_BLOCKER_CODE_PATTERN = /^safe_auto_quality_(below_minimum|codec_extension_mismatch|lossless_low_bitrate|low_bitrate)$/;
+const SUSPICIOUS_LOSSLESS_BLOCKER_CODE_PATTERN = /^safe_auto_spectral_(suspicious|transcoded)$/;
+
+function normalizeQualityGateBlockerCodes(qualityGate) {
+  if (!Array.isArray(qualityGate?.blockers)) {
+    return [];
+  }
+
+  return qualityGate.blockers
+    .map((blocker) => (typeof blocker?.code === 'string' ? blocker.code.trim().toLowerCase() : ''))
+    .filter(Boolean);
+}
 
 export function normalizeImportCandidateAddBlockerCode(value) {
   if (typeof value !== 'string') {
@@ -58,4 +76,36 @@ export function deriveImportCandidateAddBlockerCode({
   }
 
   return null;
+}
+
+/**
+ * Produces a small, allow-listed explanation for a post-download quality
+ * block. The diagnostic snapshot retains detailed evidence; Music Queue and
+ * Activity receive only this non-sensitive category.
+ */
+export function deriveImportCandidateAddRecoveryReasonCode({
+  addBlockerCode = null,
+  qualityGate = null,
+  recoveryReasonCode = null,
+} = {}) {
+  const normalizedAddBlockerCode = normalizeImportCandidateAddBlockerCode(addBlockerCode);
+  if (normalizedAddBlockerCode !== IMPORT_CANDIDATE_ADD_BLOCKER_CODES.MEDIA_VERIFICATION) {
+    return null;
+  }
+
+  const normalizedReasonCode = normalizeMusicQueueAddRecoveryReasonCode(recoveryReasonCode);
+  if (normalizedReasonCode) {
+    return normalizedReasonCode;
+  }
+
+  const blockerCodes = normalizeQualityGateBlockerCodes(qualityGate);
+  if (blockerCodes.some((code) => SUSPICIOUS_LOSSLESS_BLOCKER_CODE_PATTERN.test(code))) {
+    return MUSIC_QUEUE_ADD_RECOVERY_REASON_CODES.SUSPICIOUS_LOSSLESS;
+  }
+
+  if (blockerCodes.some((code) => LOSSY_AUDIO_BLOCKER_CODE_PATTERN.test(code))) {
+    return MUSIC_QUEUE_ADD_RECOVERY_REASON_CODES.LOSSY_AUDIO;
+  }
+
+  return MUSIC_QUEUE_ADD_RECOVERY_REASON_CODES.AUDIO_CHECK_FAILED;
 }

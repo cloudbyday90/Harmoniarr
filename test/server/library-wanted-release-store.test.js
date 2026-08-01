@@ -93,6 +93,7 @@ test('listWantedReleasesWithMetadata maps discovery request recovery evidence', 
               profileCode: 'lossless_archive',
               status: 'blocked',
             },
+            import_apply_latest_recovery_reason_code: 'suspicious_lossless',
             import_apply_latest_updated_at: '2026-06-27T21:15:00.000Z',
             import_apply_quality_blocked_count: 1,
             last_reconciled_at: '2026-05-31T14:00:00.000Z',
@@ -134,6 +135,7 @@ test('listWantedReleasesWithMetadata maps discovery request recovery evidence', 
   assert.match(observedSql, /FROM import_apply_run_items iai/);
   assert.match(observedSql, /jsonb_array_length\(latest_item\.planning_snapshot #> '\{execution,enqueuedTransfers\}'\)/);
   assert.match(observedSql, /latest_items\.apply_snapshot #>> '\{apply,outcome\}' = 'quality_blocked'/);
+  assert.match(observedSql, /latest_items\.apply_snapshot #>> '\{apply,recoveryReasonCode\}'/);
   assert.match(observedSql, /lwr\.app_user_id = \$1/);
   assert.deepEqual(observedParams, ['user-1', 25]);
   assert.equal(releases[0].appUserId, 'user-1');
@@ -225,6 +227,7 @@ test('listWantedReleasesWithMetadata maps discovery request recovery evidence', 
           profileCode: 'lossless_archive',
           status: 'blocked',
         },
+        latestRecoveryReasonCode: 'suspicious_lossless',
         latestUpdatedAt: '2026-06-27T21:15:00.000Z',
         qualityBlockedCount: 1,
         totalItemCount: 1,

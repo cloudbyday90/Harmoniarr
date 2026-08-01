@@ -26,6 +26,7 @@ import { assessDeliveredQuality } from '../media/media-delivery-quality.js';
 import { createImportCandidateSafeAutoAddQualityGateService } from './import-candidate-safe-auto-add-quality-gate.js';
 import {
   IMPORT_CANDIDATE_ADD_BLOCKER_CODES,
+  deriveImportCandidateAddRecoveryReasonCode,
   normalizeImportCandidateAddBlockerCode,
 } from './import-candidate-add-blocker.js';
 import {
@@ -333,6 +334,10 @@ export function createImportCandidateApplyWorker({
               summaryCandidate,
             });
             if (!qualityGate.eligible) {
+              const recoveryReasonCode = deriveImportCandidateAddRecoveryReasonCode({
+                addBlockerCode: IMPORT_CANDIDATE_ADD_BLOCKER_CODES.MEDIA_VERIFICATION,
+                qualityGate,
+              });
               counts.blocked += 1;
               counts.qualityBlocked += 1;
               await updateImportApplyRunItem({
@@ -343,6 +348,7 @@ export function createImportCandidateApplyWorker({
                     addBlockerCode: IMPORT_CANDIDATE_ADD_BLOCKER_CODES.MEDIA_VERIFICATION,
                     outcome: 'quality_blocked',
                     qualityGate,
+                    ...(recoveryReasonCode ? { recoveryReasonCode } : {}),
                   },
                   fullPreview: {
                     counts: applyPreview.counts,
@@ -357,6 +363,7 @@ export function createImportCandidateApplyWorker({
               if (typeof recordActivityEventFn === 'function') {
                 recordActivityEventSafely(recordActivityEventFn, buildMusicQueueAddBlockedActivityEvent({
                   blockerCode: IMPORT_CANDIDATE_ADD_BLOCKER_CODES.MEDIA_VERIFICATION,
+                  recoveryReasonCode,
                   runId,
                   summaryCandidate,
                 }));

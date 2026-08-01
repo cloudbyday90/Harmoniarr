@@ -13,6 +13,13 @@ Database model source: `docs/DATABASE_MODEL.md`
   Music Queue and download/import workflow work is tracked in focused design
   documents, led by
   `ACQUISITION_PIPELINE_REDESIGN_PLAN.md`.
+- Music Queue unsafe-add recovery states: Music Queue and Activity now use one
+  release-centred, allow-listed recovery presentation for library collisions,
+  low-quality audio, suspicious claimed lossless audio, incomplete audio
+  checks, unreachable completed files, unsafe plans, and stopped adds. Normal
+  reads exclude raw worker and quality-gate evidence; release-scoped Advanced
+  diagnostics retains the protected detail. See
+  `MUSIC_QUEUE_UNSAFE_ADD_RECOVERY_STATES_DESIGN.md`.
 - Activity Imports and artist reconciliation recovery: fixed the blank
   `Activity > Imports` view by importing its shared formatter helpers, added a
   bounded one-shot self-healing path for failed operator artist reconciliation

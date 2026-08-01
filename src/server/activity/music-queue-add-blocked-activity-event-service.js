@@ -16,7 +16,10 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { normalizeImportCandidateAddBlockerCode } from '../import-candidates/import-candidate-add-blocker.js';
+import {
+  deriveImportCandidateAddRecoveryReasonCode,
+  normalizeImportCandidateAddBlockerCode,
+} from '../import-candidates/import-candidate-add-blocker.js';
 import {
   addMusicQueueActivityFanoutScope,
   resolveMusicQueueWantedReleaseIds,
@@ -28,6 +31,7 @@ function normalizeOptionalString(value) {
 
 export function buildMusicQueueAddBlockedActivityEvent({
   blockerCode = null,
+  recoveryReasonCode = null,
   runId = null,
   summaryCandidate = {},
 } = {}) {
@@ -41,6 +45,10 @@ export function buildMusicQueueAddBlockedActivityEvent({
   const wantedReleaseIds = resolveMusicQueueWantedReleaseIds(summaryCandidate);
   const wantedReleaseId = wantedReleaseIds[0]
     ?? normalizeOptionalString(musicQueueContext.wantedReleaseId);
+  const normalizedRecoveryReasonCode = deriveImportCandidateAddRecoveryReasonCode({
+    addBlockerCode: normalizedBlockerCode,
+    recoveryReasonCode,
+  });
 
   return addMusicQueueActivityFanoutScope({
     actorUserId: null,
@@ -52,6 +60,7 @@ export function buildMusicQueueAddBlockedActivityEvent({
     extraPayload: {
       addBlockerCode: normalizedBlockerCode,
       importCandidateId: normalizeOptionalString(summaryCandidate.id),
+      ...(normalizedRecoveryReasonCode ? { recoveryReasonCode: normalizedRecoveryReasonCode } : {}),
       runId: normalizeOptionalString(runId),
       schemaVersion: 1,
       wantedReleaseId,

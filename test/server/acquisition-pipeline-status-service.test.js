@@ -48,18 +48,60 @@ test('deriveMusicQueueStatus treats completed downloads as ready to add', () => 
 test('deriveMusicQueueStatus makes a post-download media verification stop release-centred', () => {
   const status = deriveMusicQueueStatus({
     add: {
+      blockerCode: 'media_verification',
       latestOutcome: 'quality_blocked',
       message: '1 file did not pass verified lossless checks before automatic add.',
       qualityBlockedCount: 1,
+      recoveryReasonCode: 'suspicious_lossless',
     },
     match: { executionStatusCounts: { completed: 1 }, latestStatus: 'import_pending' },
     release: { missingTrackCount: 10, wantedStatus: 'missing' },
   });
 
   assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.NEEDS_HELP_ADDING);
-  assert.equal(status.detail, 'Harmoniarr could not verify the downloaded audio safely, so it was not added to your library.');
+  assert.equal(status.detail, 'This download claims to be lossless, but Harmoniarr could not verify that claim safely. It was not added to your library.');
   assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.REVIEW_ADD_PLAN);
   assert.equal(status.repair.code, 'media_verification');
+  assert.equal(status.repair.reasonCode, 'suspicious_lossless');
+  assert.equal(status.repair.actionLabel, 'Review lossless check');
+});
+
+test('deriveMusicQueueStatus gives each safe add stop one specific recovery action', () => {
+  const release = { missingTrackCount: 10, wantedStatus: 'missing' };
+  const cases = [
+    {
+      add: { latestOutcome: 'quality_blocked', qualityBlockedCount: 1, recoveryReasonCode: 'lossy_audio' },
+      expectedAction: MUSIC_QUEUE_ACTION_CODES.REVIEW_QUALITY_CHOICE,
+      expectedLabel: 'Review audio quality',
+      expectedReason: 'lossy_audio',
+    },
+    {
+      add: { latestOutcome: 'quality_blocked', qualityBlockedCount: 1, recoveryReasonCode: 'audio_check_failed' },
+      expectedAction: MUSIC_QUEUE_ACTION_CODES.REVIEW_ADD_PLAN,
+      expectedLabel: 'Review audio check',
+      expectedReason: 'audio_check_failed',
+    },
+    {
+      add: { itemStatusCounts: { blocked: 1 }, latestOutcome: 'blocked' },
+      expectedAction: MUSIC_QUEUE_ACTION_CODES.REVIEW_ADD_PLAN,
+      expectedLabel: 'Review add plan',
+      expectedReason: 'unsafe_add_plan',
+    },
+    {
+      match: { addBlockerCode: 'library_collision', latestEventType: 'import_candidate_import_blocked' },
+      expectedAction: MUSIC_QUEUE_ACTION_CODES.REVIEW_ADD_PLAN,
+      expectedLabel: 'Review library conflict',
+      expectedReason: 'library_collision',
+    },
+  ];
+
+  for (const scenario of cases) {
+    const status = deriveMusicQueueStatus({ release, ...scenario });
+    assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.NEEDS_HELP_ADDING);
+    assert.equal(status.nextAction, scenario.expectedAction);
+    assert.equal(status.repair.actionLabel, scenario.expectedLabel);
+    assert.equal(status.repair.reasonCode, scenario.expectedReason);
+  }
 });
 
 test('deriveMusicQueueStatus keeps a terminal media verification stop ahead of stale queued execution', () => {

@@ -506,11 +506,19 @@ export function buildMusicQueueAction(status, recovery = null) {
     case 'open_in_library':
       return { code: 'open_in_library', label: 'Open Library', type: 'route', routeName: 'library' };
     case 'review_add_plan':
-      return { code: 'review_add_plan', label: 'Review what needs fixing', type: 'review' };
+      return {
+        code: 'review_add_plan',
+        label: status?.repair?.actionLabel ?? 'Review add plan',
+        type: 'review',
+      };
     case 'review_matches':
       return { code: 'review_matches', label: 'Review matches', type: 'review' };
     case 'review_quality_choice':
-      return { code: 'review_quality_choice', label: 'Review quality choice', type: 'review' };
+      return {
+        code: 'review_quality_choice',
+        label: status?.repair?.actionLabel ?? 'Review quality choice',
+        type: 'review',
+      };
     case 'search_now':
       return { code: 'search_now', label: 'View details', type: 'review' };
     case 'set_up_folders':

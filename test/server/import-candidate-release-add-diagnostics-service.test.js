@@ -18,6 +18,7 @@ test('release add diagnostics returns the newest release-scoped safe outcome wit
           addBlockerCode: 'media_verification',
           outcome: 'quality_blocked',
           qualityGate: { hiddenPath: '/downloads/private/Child of God' },
+          recoveryReasonCode: 'suspicious_lossless',
         },
         candidate: {
           username: 'private-source-user',
@@ -56,7 +57,11 @@ test('release add diagnostics returns the newest release-scoped safe outcome wit
   assert.equal(diagnostics.release.releaseTitle, 'Child of God');
   assert.equal(diagnostics.latestOutcome.diagnosticCandidateId, 'candidate-latest');
   assert.equal(diagnostics.latestOutcome.presentation.code, 'media_verification');
-  assert.equal(diagnostics.latestOutcome.presentation.label, 'Audio verification needs review');
+  assert.equal(diagnostics.latestOutcome.presentation.label, 'Lossless audio needs review');
+  assert.equal(
+    diagnostics.latestOutcome.presentation.detail,
+    'This download claims to be lossless, but Harmoniarr could not verify that claim safely. It was not added to your library.',
+  );
   assert.equal(diagnostics.outcomes[1].presentation.code, 'added_to_library');
   assert.equal(JSON.stringify(diagnostics).includes('/downloads/private'), false);
   assert.equal(JSON.stringify(diagnostics).includes('private-source-user'), false);

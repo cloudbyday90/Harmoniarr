@@ -20,6 +20,11 @@
 import { computed, ref } from 'vue';
 import { buildMusicQueueReleaseActionFeedback } from '../../lib/music-queue-action-feedback-presentation.js';
 import { buildMusicQueueReviewPresentation } from '../../lib/music-queue-review-presentation.js';
+import {
+  SETTINGS_RECOVERY_CONTEXT,
+  buildSettingsRecoveryHandoffLocation,
+  createSettingsRecoveryContext,
+} from '../../lib/settings-recovery-handoff.js';
 import MusicQueueReviewMatchCard from './MusicQueueReviewMatchCard.vue';
 
 const props = defineProps({
@@ -55,6 +60,18 @@ const releaseActionFeedback = computed(() => buildMusicQueueReleaseActionFeedbac
   props.actionFeedback,
   props.review?.releaseId,
 ));
+const repairSettingsLocation = computed(() => {
+  const routeName = props.review?.repair?.settingsRouteName;
+  if (!routeName) return null;
+
+  return buildSettingsRecoveryHandoffLocation({
+    recoveryContext: createSettingsRecoveryContext({
+      context: SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE_RELEASE,
+      wantedReleaseId: props.review?.releaseId ?? null,
+    }),
+    routeName,
+  });
+});
 
 function getMatchActionState(match) {
   const activeAction = props.activeMatchActionKey;
@@ -140,7 +157,7 @@ function isReleaseActionRunning(action) {
             v-if="review.repair.settingsRouteName"
             class="hx-btn"
             data-variant="primary"
-            :to="{ name: review.repair.settingsRouteName }"
+            :to="repairSettingsLocation"
           >
             {{ review.repair.settingsRouteLabel }}
           </RouterLink>

@@ -101,13 +101,15 @@ function buildQualityStopPayload() {
       releaseTitle: 'Child of God',
       status: {
         code: 'needs_help_adding',
-        detail: 'Harmoniarr could not verify this claimed FLAC as lossless, so it was not added to your library.',
+        detail: 'This download claims to be lossless, but Harmoniarr could not verify that claim safely. It was not added to your library.',
         label: 'Needs help adding',
         nextAction: 'review_add_plan',
         repair: {
+          actionLabel: 'Review lossless check',
           code: 'media_verification',
-          nextStep: 'Check the audio result before choosing another file for this release.',
-          title: 'Audio check needs review',
+          nextStep: 'Review the audio check before choosing another match. Advanced diagnostics has the recorded verification result.',
+          reasonCode: 'suspicious_lossless',
+          title: 'Lossless audio needs review',
         },
         tone: 'warning',
       },
@@ -121,9 +123,9 @@ function buildReleaseAddDiagnosticsPayload() {
     diagnosticCandidateId: 'candidate-forest-frank-unsafe-media',
     presentation: {
       code: 'media_verification',
-      detail: 'Harmoniarr could not verify the downloaded audio safely, so it was not added to your library.',
-      label: 'Audio verification needs review',
-      nextStep: 'Review the release quality details before changing the quality choice or searching again.',
+      detail: 'This download claims to be lossless, but Harmoniarr could not verify that claim safely. It was not added to your library.',
+      label: 'Lossless audio needs review',
+      nextStep: 'Review the audio check before choosing another match. Advanced diagnostics has the recorded verification result.',
       settingsRouteLabel: null,
       settingsRouteName: null,
       tone: 'warning',
@@ -158,6 +160,7 @@ function buildActivityPayload({ unsafe = false } = {}) {
         eventType: 'music_queue_import_blocked',
         extraPayload: {
           addBlockerCode: 'media_verification',
+          recoveryReasonCode: 'suspicious_lossless',
           wantedReleaseId: 'wanted-forest-frank-unsafe-media',
         },
         id: 'quality-blocked',
@@ -345,11 +348,15 @@ suite('Music Queue post-transfer library add browser verification', () => {
       await page.goto(`${baseUrl}/app/music-queue`, { waitUntil: 'domcontentloaded' });
       const releaseRow = page.locator('.music-queue-release-row').filter({ hasText: 'Child of God' });
       await releaseRow.getByText('Needs help adding', { exact: true }).waitFor();
-      await releaseRow.getByText('Harmoniarr could not verify this claimed FLAC as lossless, so it was not added to your library.').waitFor();
-      await releaseRow.getByRole('button', { name: 'Review what needs fixing' }).click();
+      await releaseRow.getByText('This download claims to be lossless, but Harmoniarr could not verify that claim safely. It was not added to your library.').waitFor();
+      assert.equal(
+        await releaseRow.locator('.music-queue-release-row__actions button').innerText(),
+        'Review lossless check',
+      );
+      await releaseRow.getByRole('button', { name: 'Review lossless check' }).click();
       const reviewPanel = page.locator('.music-queue-review');
-      await reviewPanel.getByRole('heading', { name: 'Audio check needs review' }).waitFor();
-      await reviewPanel.getByText('Check the audio result before choosing another file for this release.').waitFor();
+      await reviewPanel.getByRole('heading', { name: 'Lossless audio needs review' }).waitFor();
+      await reviewPanel.getByText('Review the audio check before choosing another match. Advanced diagnostics has the recorded verification result.').waitFor();
       await reviewPanel.getByRole('link', { name: 'Advanced diagnostics' }).waitFor();
       assert.equal(await reviewPanel.getByRole('button', { name: 'Allow fallback quality' }).count(), 0);
       assert.equal(await releaseRow.getByRole('link', { name: 'Open Library' }).count(), 0);
@@ -357,7 +364,7 @@ suite('Music Queue post-transfer library add browser verification', () => {
       await reviewPanel.getByRole('link', { name: 'Advanced diagnostics' }).click();
       await page.getByRole('heading', { name: 'Library-add details' }).waitFor();
       await page.getByText('Recent safe library-add outcomes for Child of God by Forest Frank.').waitFor();
-      await page.getByRole('heading', { name: 'Audio verification needs review' }).waitFor();
+      await page.getByRole('heading', { name: 'Lossless audio needs review' }).waitFor();
       await page.getByRole('link', { name: 'Open match diagnostics' }).first().waitFor();
       assert.equal(new URL(page.url()).searchParams.get('wantedReleaseId'), 'wanted-forest-frank-unsafe-media');
       assert.equal(await page.getByText('Source path').count(), 0);
@@ -372,8 +379,8 @@ suite('Music Queue post-transfer library add browser verification', () => {
       await page.goto(`${baseUrl}/app/activity/feed`, { waitUntil: 'domcontentloaded' });
       const activity = page.locator('.activity-timeline-entry').filter({ hasText: 'Child of God' });
       await activity.getByText('Library add needs help: Child of God by Forest Frank').waitFor();
-      await activity.getByText('Harmoniarr could not verify the downloaded audio safely, so it was not added to the library.').waitFor();
-      await activity.getByRole('link', { name: 'Review what needs fixing' }).waitFor();
+      await activity.getByText('This download claims to be lossless, but Harmoniarr could not verify that claim safely. It was not added to your library.').waitFor();
+      await activity.getByRole('link', { name: 'Review lossless check' }).waitFor();
       assert.equal(await activity.getByRole('link', { name: 'Open Library' }).count(), 0);
 
       await browserContext.unrouteAll({ behavior: 'ignoreErrors' });

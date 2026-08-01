@@ -17,6 +17,7 @@
  */
 
 import { getArtistPolicyActivityRouteTarget } from './artist-policy-activity-presentation.js';
+import { buildMusicQueueAddRecoveryPresentation } from '../../shared/music-queue-add-recovery-presentation.js';
 import {
   SETTINGS_RECOVERY_CONTEXT,
   buildSettingsRecoveryHandoffLocation,
@@ -52,7 +53,10 @@ export function buildActivityEventLinkTarget(event = {}) {
             || event.eventType === 'music_queue_audio_warning'
             ? 'Review quality choice'
             : event.eventType === 'music_queue_import_blocked'
-              ? 'Review what needs fixing'
+              ? buildMusicQueueAddRecoveryPresentation({
+                blockerCode: event.extraPayload?.addBlockerCode,
+                recoveryReasonCode: event.extraPayload?.recoveryReasonCode,
+              }).actionLabel
             : 'Open Music Queue',
           to: {
             name: 'music-queue-release',

@@ -109,16 +109,35 @@ test('buildActivityEventLinkTarget resolves import safety stops to release-centr
     entityId: 'wanted-1',
     entityType: 'wanted_release',
     eventType: 'music_queue_import_blocked',
-    extraPayload: { wantedReleaseId: 'wanted-1' },
+    extraPayload: {
+      addBlockerCode: 'media_verification',
+      recoveryReasonCode: 'suspicious_lossless',
+      wantedReleaseId: 'wanted-1',
+    },
   });
 
   assert.deepEqual(target, {
-    label: 'Review what needs fixing',
+    label: 'Review lossless check',
     to: {
       name: 'music-queue-release',
       params: { wantedReleaseId: 'wanted-1' },
     },
   });
+});
+
+test('buildActivityEventLinkTarget does not let a reason override a non-media blocker', () => {
+  const target = buildActivityEventLinkTarget({
+    entityId: 'wanted-1',
+    entityType: 'wanted_release',
+    eventType: 'music_queue_import_blocked',
+    extraPayload: {
+      addBlockerCode: 'library_collision',
+      recoveryReasonCode: 'lossy_audio',
+      wantedReleaseId: 'wanted-1',
+    },
+  });
+
+  assert.equal(target.label, 'Review library conflict');
 });
 
 test('buildActivityEventLinkTarget resolves a recovered provider search to Music Queue', () => {

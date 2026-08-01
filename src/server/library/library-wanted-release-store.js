@@ -102,6 +102,7 @@ function buildLibraryAddSummary(row) {
     latestOutcome: row.import_apply_latest_outcome ?? null,
     latestQualityBlockedMessage: row.import_apply_latest_quality_blocked_message ?? null,
     latestQualityGate: normalizeQualityGate(row.import_apply_latest_quality_gate),
+    latestRecoveryReasonCode: row.import_apply_latest_recovery_reason_code ?? null,
     latestUpdatedAt: row.import_apply_latest_updated_at ?? null,
     qualityBlockedCount: toInteger(row.import_apply_quality_blocked_count),
     totalItemCount,
@@ -457,7 +458,8 @@ export function createLibraryWantedReleaseStore({
           import_apply_summary.latest_updated_at AS import_apply_latest_updated_at,
           import_apply_summary.quality_blocked_count AS import_apply_quality_blocked_count,
           import_apply_summary.latest_quality_blocked_message AS import_apply_latest_quality_blocked_message,
-          import_apply_summary.latest_quality_gate AS import_apply_latest_quality_gate
+          import_apply_summary.latest_quality_gate AS import_apply_latest_quality_gate,
+          import_apply_summary.latest_recovery_reason_code AS import_apply_latest_recovery_reason_code
         FROM library_wanted_releases lwr
         JOIN metadata_artists ma ON ma.id = lwr.metadata_artist_id
         JOIN metadata_release_groups mrg ON mrg.id = lwr.metadata_release_group_id
@@ -755,7 +757,13 @@ export function createLibraryWantedReleaseStore({
               WHERE latest_items.apply_snapshot #>> '{apply,outcome}' = 'quality_blocked'
               ORDER BY latest_items.updated_at DESC, latest_items.item_status ASC
               LIMIT 1
-            ) AS latest_quality_gate
+            ) AS latest_quality_gate,
+            (
+              SELECT latest_items.apply_snapshot #>> '{apply,recoveryReasonCode}'
+              FROM latest_items
+              ORDER BY latest_items.updated_at DESC, latest_items.item_status ASC
+              LIMIT 1
+            ) AS latest_recovery_reason_code
           FROM latest_items
         ) import_apply_summary ON TRUE
         ${whereClause}
