@@ -122,7 +122,7 @@ suite('Music Queue provider repair context browser verification', () => {
       await homeNotice.getByText('Finish the managed setup before queued music can continue.').waitFor();
       assert.equal(
         await homeNotice.getByRole('link', { name: 'Finish managed setup' }).getAttribute('href'),
-        '/app/settings/connections?repair=music_queue',
+        '/app/settings/connections?returnTo=dashboard',
       );
 
       await page.goto(`${baseUrl}/app/music-queue`, { waitUntil: 'domcontentloaded' });
@@ -131,7 +131,7 @@ suite('Music Queue provider repair context browser verification', () => {
       assert.equal(await queueNotice.count(), 1);
       assert.equal(
         await queueNotice.getByRole('link', { name: 'Finish managed setup' }).getAttribute('href'),
-        '/app/settings/connections?repair=music_queue',
+        '/app/settings/connections?returnTo=music_queue',
       );
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
     }, { scenarioName: 'music_queue_provider_repair_context' });

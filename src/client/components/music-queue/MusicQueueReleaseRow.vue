@@ -19,6 +19,11 @@
 <script setup>
 import { computed } from 'vue';
 import { buildMusicQueueReleaseRowPresentation } from '../../lib/music-queue-release-row-presentation.js';
+import {
+  SETTINGS_RECOVERY_CONTEXT,
+  buildSettingsRecoveryHandoffLocation,
+  createSettingsRecoveryContext,
+} from '../../lib/settings-recovery-handoff.js';
 
 const props = defineProps({
   release: {
@@ -34,6 +39,21 @@ const props = defineProps({
 const emit = defineEmits(['open-review']);
 
 const presentation = computed(() => buildMusicQueueReleaseRowPresentation(props.release));
+const routeActionLocation = computed(() => {
+  const action = props.release.action;
+  if (!action?.routeName) return null;
+  if (!action.routeName.startsWith('settings-')) {
+    return { name: action.routeName };
+  }
+
+  return buildSettingsRecoveryHandoffLocation({
+    recoveryContext: createSettingsRecoveryContext({
+      context: SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE_RELEASE,
+      wantedReleaseId: props.release.id,
+    }),
+    routeName: action.routeName,
+  });
+});
 
 function openReview() {
   emit('open-review', props.release);
@@ -96,7 +116,7 @@ function openReview() {
         v-else
         class="hx-btn"
         data-variant="primary"
-        :to="{ name: release.action.routeName }"
+        :to="routeActionLocation"
       >
         {{ release.action.label }}
       </RouterLink>

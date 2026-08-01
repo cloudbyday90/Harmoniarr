@@ -18,6 +18,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { useRoute } from 'vue-router';
 import {
   formatProviderLabel,
   formatQuotaPercentage,
@@ -41,13 +42,20 @@ import FolderBrowserModal from '../components/FolderBrowserModal.vue';
 import SettingsDisclosure from '../components/settings/SettingsDisclosure.vue';
 import SettingsFolderReadiness from '../components/settings/SettingsFolderReadiness.vue';
 import SettingsFormGroup from '../components/settings/SettingsFormGroup.vue';
+import SettingsRecoveryConfirmation from '../components/settings/SettingsRecoveryConfirmation.vue';
 import SettingsSaveBar from '../components/settings/SettingsSaveBar.vue';
 import { useArtworkQuota } from '../composables/useArtworkQuota.js';
 import { useQuotaHistory } from '../composables/useQuotaHistory.js';
 import { useSettingsForm } from '../composables/useSettingsForm.js';
+import {
+  buildSettingsFolderRecoveryConfirmation,
+  resolveSettingsRecoveryContext,
+} from '../lib/settings-recovery-handoff.js';
 import { buildSettingsSaveState } from '../lib/settings-save-state-presentation.js';
 
+const route = useRoute();
 const pathValidation = ref(null);
+const recoveryConfirmation = ref(null);
 
 const artworkQuota = useArtworkQuota();
 
@@ -136,6 +144,18 @@ const pathTranslationSetupPrompt = computed(() => buildPathTranslationSetupPromp
   downloadMappingCount: form.paths.downloadMappings.length,
   providerMode: form.slskd.providerMode,
 }));
+const recoveryContext = computed(() => resolveSettingsRecoveryContext(route.query));
+
+async function handleSaveSettings() {
+  recoveryConfirmation.value = null;
+  const outcome = await saveSettings();
+  if (!outcome?.ok || !recoveryContext.value) return;
+
+  recoveryConfirmation.value = buildSettingsFolderRecoveryConfirmation({
+    recoveryContext: recoveryContext.value,
+    validation: outcome.payload?.pathValidation ?? pathValidation.value,
+  });
+}
 
 onMounted(() => { void loadSettings(); });
 onMounted(() => { void artworkQuota.loadQuota(); });
@@ -163,7 +183,7 @@ onBeforeUnmount(() => { quotaHistory.destroy(); });
       </div>
     </article>
 
-    <form @submit.prevent="saveSettings" v-else>
+    <form @submit.prevent="handleSaveSettings" v-else>
       <article class="hx-card">
         <header class="hx-card-header">
           <div>
@@ -295,6 +315,8 @@ onBeforeUnmount(() => { quotaHistory.destroy(); });
           </SettingsDisclosure>
         </div>
       </article>
+
+      <SettingsRecoveryConfirmation :confirmation="recoveryConfirmation" />
 
       <div class="settings-media-storage__artwork-stack">
 

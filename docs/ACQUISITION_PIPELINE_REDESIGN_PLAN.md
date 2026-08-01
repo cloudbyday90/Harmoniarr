@@ -1706,10 +1706,15 @@ outcomes, reciprocal 404 reads, and complete cleanup.
   whole-row links with readable static statuses, supports safe read-only status
   refresh, and keeps Library preferences optional. It never exposes provider
   secrets, addresses, raw paths, or diagnostics. See
-  [SETTINGS_SETUP_READINESS_LANDING_DESIGN.md](SETTINGS_SETUP_READINESS_LANDING_DESIGN.md).
+[SETTINGS_SETUP_READINESS_LANDING_DESIGN.md](SETTINGS_SETUP_READINESS_LANDING_DESIGN.md).
 
-Recommended next slice: complete **setup recovery handoff consistency** across
-Music Queue, Downloader, and other blocked surfaces. Each should state the
-missing prerequisite in home-user language, link directly to its normal
-Settings page, and preserve the original operational context once the repair is
-complete.
+- [x] Complete Settings recovery handoff consistency. Home, Music Queue,
+  Downloader, Activity, and folder repair actions now use one allowlisted
+  return-context contract, verify the prerequisite before offering a return,
+  and preserve safe release context without accepting arbitrary URLs. See
+  [SETTINGS_RECOVERY_HANDOFF_CONSISTENCY_DESIGN.md](SETTINGS_RECOVERY_HANDOFF_CONSISTENCY_DESIGN.md).
+
+Recommended next slice: complete the remaining **Activity navigation and copy
+cleanup**. Remove Music Queue from the normal Activity tab mental model, make
+the timeline the single default workspace, and preserve direct deep links to
+advanced diagnostics for operators.

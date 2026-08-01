@@ -38,6 +38,11 @@ import {
   isMusicQueueAttentionRelease,
   isMusicQueueHomeProgressRelease,
 } from './music-queue-progress-state.js';
+import {
+  SETTINGS_RECOVERY_CONTEXT,
+  buildSettingsRecoveryHandoffLocation,
+  createSettingsRecoveryContext,
+} from './settings-recovery-handoff.js';
 
 function getPriority(release) {
   return STATUS_PRIORITY[release?.statusCode] ?? Number.MAX_SAFE_INTEGER;
@@ -69,7 +74,13 @@ function buildRowAction(release, { releaseDetailsOnly }) {
   if (release?.statusCode === 'needs_setup' && release?.action?.type === 'route') {
     return {
       label: release.action.label,
-      to: { name: release.action.routeName },
+      to: buildSettingsRecoveryHandoffLocation({
+        recoveryContext: createSettingsRecoveryContext({
+          context: SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE_RELEASE,
+          wantedReleaseId: release?.id,
+        }),
+        routeName: release.action.routeName,
+      }),
     };
   }
 

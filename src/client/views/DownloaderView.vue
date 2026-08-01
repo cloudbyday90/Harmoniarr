@@ -40,6 +40,11 @@ import {
   normalizeDownloaderTransferRouteQuery,
   omitDownloaderTransferRouteQuery,
 } from '../lib/downloader-transfer-route.js';
+import {
+  SETTINGS_RECOVERY_CONTEXT,
+  buildSettingsRecoveryHandoffLocation,
+  createSettingsRecoveryContext,
+} from '../lib/settings-recovery-handoff.js';
 import { useAsyncResource } from '../composables/useAsyncResource.js';
 
 const POLL_INTERVAL_MS = 5000;
@@ -53,6 +58,9 @@ const filterOptions = Object.freeze([
   { value: 'completed', label: 'Completed' },
   { value: 'failed', label: 'Failed' },
 ]);
+const downloaderRecoveryContext = Object.freeze(createSettingsRecoveryContext({
+  context: SETTINGS_RECOVERY_CONTEXT.DOWNLOADER,
+}));
 
 const selectedFilter = ref('all');
 const selectedTransferKey = ref(null);
@@ -93,6 +101,14 @@ const counts = computed(() => downloaderQueue.value?.queueHealth?.counts ?? empt
 const providerDisabled = computed(() => isDownloaderProviderDisabled(downloaderQueue.value));
 const activitySummary = computed(() => buildDownloaderActivitySummary(downloaderQueue.value));
 const emptyState = computed(() => buildDownloaderEmptyState(downloaderQueue.value));
+const emptyStateActionLocation = computed(() => (
+  emptyState.value.actionRouteName
+    ? buildSettingsRecoveryHandoffLocation({
+      recoveryContext: downloaderRecoveryContext,
+      routeName: emptyState.value.actionRouteName,
+    })
+    : null
+));
 
 const statusCards = computed(() => [
   { key: 'active', label: 'Active', value: counts.value.active, tone: counts.value.active > 0 ? 'warning' : 'info' },
@@ -335,7 +351,7 @@ async function clearCompletedTransfers() {
           <p class="hx-empty-title">{{ emptyState.title }}</p>
           <p class="hx-empty-copy">{{ emptyState.body }}</p>
           <div v-if="emptyState.actionRouteName && emptyState.actionLabel" class="hx-empty-actions">
-            <RouterLink class="hx-btn" :to="{ name: emptyState.actionRouteName }">
+            <RouterLink class="hx-btn" :to="emptyStateActionLocation">
               {{ emptyState.actionLabel }}
             </RouterLink>
           </div>

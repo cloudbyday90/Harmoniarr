@@ -27,20 +27,29 @@ const props = defineProps({
   },
 });
 
-const headingId = computed(() => `music-queue-provider-recovery-${props.confirmation?.outcome ?? 'status'}`);
+const headingId = computed(() => `settings-recovery-confirmation-${props.confirmation?.outcome ?? 'status'}`);
 const statusMessage = computed(() => (
   props.confirmation ? `${props.confirmation.title}. ${props.confirmation.copy}` : ''
 ));
+const actionLocation = computed(() => {
+  if (!props.confirmation?.action) return null;
+
+  return {
+    name: props.confirmation.action.routeName,
+    params: props.confirmation.action.params,
+    query: props.confirmation.action.query,
+  };
+});
 </script>
 
 <template>
-  <p class="music-queue-provider-recovery__status" role="status" aria-atomic="true">
+  <p class="settings-recovery-confirmation__status" role="status" aria-atomic="true">
     {{ statusMessage }}
   </p>
 
   <section
     v-if="confirmation"
-    class="music-queue-provider-recovery"
+    class="settings-recovery-confirmation"
     :aria-labelledby="headingId"
     :data-tone="confirmation.tone"
   >
@@ -49,10 +58,10 @@ const statusMessage = computed(() => (
       <p>{{ confirmation.copy }}</p>
     </div>
     <RouterLink
-      v-if="confirmation.action"
+      v-if="actionLocation"
       class="hx-btn"
       data-variant="ghost"
-      :to="{ name: confirmation.action.routeName, query: confirmation.action.query }"
+      :to="actionLocation"
     >
       {{ confirmation.action.label }}
     </RouterLink>
@@ -60,7 +69,7 @@ const statusMessage = computed(() => (
 </template>
 
 <style scoped>
-.music-queue-provider-recovery {
+.settings-recovery-confirmation {
   align-items: center;
   background: var(--hx-bg-surface-muted);
   border: 1px solid var(--hx-border);
@@ -72,33 +81,33 @@ const statusMessage = computed(() => (
   padding: var(--hx-space-3) var(--hx-space-4);
 }
 
-.music-queue-provider-recovery[data-tone='success'] {
+.settings-recovery-confirmation[data-tone='success'] {
   background: var(--hx-success-soft);
   border-color: var(--hx-success);
 }
 
-.music-queue-provider-recovery[data-tone='warning'] {
+.settings-recovery-confirmation[data-tone='warning'] {
   background: var(--hx-warning-soft);
   border-color: var(--hx-warning);
 }
 
-.music-queue-provider-recovery h2,
-.music-queue-provider-recovery p {
+.settings-recovery-confirmation h2,
+.settings-recovery-confirmation p {
   margin: 0;
 }
 
-.music-queue-provider-recovery h2 {
+.settings-recovery-confirmation h2 {
   color: var(--hx-text-strong);
   font-size: var(--hx-text-md);
 }
 
-.music-queue-provider-recovery p {
+.settings-recovery-confirmation p {
   color: var(--hx-text-muted);
   font-size: var(--hx-text-sm);
   margin-top: var(--hx-space-1);
 }
 
-.music-queue-provider-recovery__status {
+.settings-recovery-confirmation__status {
   clip: rect(0 0 0 0);
   clip-path: inset(50%);
   height: 1px;
@@ -110,7 +119,7 @@ const statusMessage = computed(() => (
 }
 
 @media (max-width: 640px) {
-  .music-queue-provider-recovery {
+  .settings-recovery-confirmation {
     align-items: flex-start;
     flex-direction: column;
   }

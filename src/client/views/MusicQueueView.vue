@@ -42,6 +42,10 @@ import {
   isMusicQueueProviderReadyRecoveryContext,
   omitMusicQueueProviderReadyRecoveryQuery,
 } from '../lib/music-queue-provider-recovery-visibility-presentation.js';
+import {
+  SETTINGS_RECOVERY_CONTEXT,
+  createSettingsRecoveryContext,
+} from '../lib/settings-recovery-handoff.js';
 import { sessionStore } from '../state/session.js';
 
 const route = useRoute();
@@ -50,6 +54,12 @@ const isProviderReadyRecoveryReturn = isMusicQueueProviderReadyRecoveryContext(r
 const requestedReleaseId = computed(() => (
   typeof route.params.wantedReleaseId === 'string' ? route.params.wantedReleaseId : null
 ));
+const musicQueueRecoveryContext = computed(() => createSettingsRecoveryContext({
+  context: requestedReleaseId.value
+    ? SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE_RELEASE
+    : SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE,
+  wantedReleaseId: requestedReleaseId.value,
+}));
 
 const {
   actionFeedback,
@@ -245,7 +255,8 @@ async function consumeProviderReadyRecoveryReturn() {
   });
 
   await router.replace({
-    name: 'music-queue',
+    name: requestedReleaseId.value ? 'music-queue-release' : 'music-queue',
+    params: requestedReleaseId.value ? { wantedReleaseId: requestedReleaseId.value } : undefined,
     query: omitMusicQueueProviderReadyRecoveryQuery(route.query),
   });
 }
@@ -280,7 +291,7 @@ watch(
     <MusicQueueProviderRepairNotice
       v-if="!isRequester"
       :notice="musicQueueProviderRepairNotice"
-      return-context="music_queue"
+      :return-context="musicQueueRecoveryContext"
     />
 
     <MusicQueueProviderRecoveryVisibility :visibility="providerRecoveryVisibility" />

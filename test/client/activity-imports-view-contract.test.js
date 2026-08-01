@@ -52,7 +52,9 @@ test('ActivityImportsView imports every formatter used by the imports table temp
   assert.match(source, /candidateStatusTone\(candidate\.status\)/);
   assert.match(source, /candidateStatusLabel\(candidate\.status\)/);
   assert.match(source, /buildImportReviewLocation\(candidate\.id\)/);
-  assert.match(source, /name: 'settings-media-storage'/);
+  assert.match(source, /routeName: 'settings-media-storage'/);
+  assert.match(source, /buildSettingsRecoveryHandoffLocation/);
+  assert.match(source, /ACTIVITY_LIBRARY_ADD_RELEASE/);
   assert.match(source, /candidate\.planning\?\.sourceFolderPath/);
   assert.match(source, /candidate\.importStatus\?\.message/);
   assert.match(source, /formatOperationTimestamp\(/);

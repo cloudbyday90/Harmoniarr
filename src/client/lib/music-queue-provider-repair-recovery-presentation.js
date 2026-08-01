@@ -16,56 +16,13 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { buildMusicQueueProviderRepairNotice } from './music-queue-provider-repair-presentation.js';
-import { MUSIC_QUEUE_PROVIDER_READY_RECOVERY_CONTEXT } from './music-queue-provider-recovery-visibility-presentation.js';
+import { buildSettingsProviderRecoveryConfirmation } from './settings-provider-recovery-presentation.js';
+import { SETTINGS_RECOVERY_CONTEXT } from './settings-recovery-handoff.js';
 
-export const MUSIC_QUEUE_PROVIDER_REPAIR_RETURN_CONTEXT = 'music_queue';
+export const MUSIC_QUEUE_PROVIDER_REPAIR_RETURN_CONTEXT = SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE;
 
 export function isMusicQueueProviderRepairReturnContext(value) {
   return value === MUSIC_QUEUE_PROVIDER_REPAIR_RETURN_CONTEXT;
-}
-
-function buildConfirmation({ action = null, copy, outcome, title, tone }) {
-  return {
-    action,
-    copy,
-    outcome,
-    title,
-    tone,
-  };
-}
-
-function buildUnresolvedConfirmation(repairNotice) {
-  switch (repairNotice.code) {
-    case 'downloads_off':
-      return buildConfirmation({
-        copy: 'Music Queue remains paused until you choose Managed or External and save the change.',
-        outcome: 'downloads_off',
-        title: 'Downloads are still off',
-        tone: 'warning',
-      });
-    case 'managed_setup_required':
-      return buildConfirmation({
-        copy: 'Complete the managed deployment, then test the connection again before Music Queue can continue.',
-        outcome: 'managed_setup_required',
-        title: 'Managed setup is still required',
-        tone: 'warning',
-      });
-    case 'external_setup_required':
-      return buildConfirmation({
-        copy: 'Add a reachable Soulseek service and API key, then save before Music Queue can continue.',
-        outcome: 'external_setup_required',
-        title: 'Soulseek still needs setup',
-        tone: 'warning',
-      });
-    default:
-      return buildConfirmation({
-        copy: 'Review the connection details, then test Soulseek again before Music Queue can continue.',
-        outcome: 'provider_attention_required',
-        title: 'Soulseek still needs attention',
-        tone: 'warning',
-      });
-  }
 }
 
 /**
@@ -79,39 +36,12 @@ export function buildMusicQueueProviderRepairRecoveryConfirmation({
   healthLoadFailed = false,
   setupProgress,
 } = {}) {
-  const repairNotice = buildMusicQueueProviderRepairNotice({
-    dependencies: connectionStatus ? [connectionStatus] : dependencies,
+  return buildSettingsProviderRecoveryConfirmation({
+    connectionCheckFailed,
+    connectionStatus,
+    dependencies,
+    healthLoadFailed,
+    recoveryContext: { context: SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE },
     setupProgress,
-  });
-  if (repairNotice && [
-    'downloads_off',
-    'managed_setup_required',
-  ].includes(repairNotice.code)) {
-    return buildUnresolvedConfirmation(repairNotice);
-  }
-
-  if (connectionCheckFailed || healthLoadFailed) {
-    return buildConfirmation({
-      copy: 'Settings were saved, but Harmoniarr could not verify Soulseek yet. Music Queue will retry when the connection is available.',
-      outcome: 'not_verified',
-      title: 'Connection not verified yet',
-      tone: 'warning',
-    });
-  }
-
-  if (repairNotice) {
-    return buildUnresolvedConfirmation(repairNotice);
-  }
-
-  return buildConfirmation({
-    action: {
-      label: 'Return to Music Queue',
-      query: { recovery: MUSIC_QUEUE_PROVIDER_READY_RECOVERY_CONTEXT },
-      routeName: 'music-queue',
-    },
-    copy: 'Music Queue can continue its normal checks. Harmoniarr has not started a download yet.',
-    outcome: 'ready',
-    title: 'Soulseek is ready',
-    tone: 'success',
   });
 }

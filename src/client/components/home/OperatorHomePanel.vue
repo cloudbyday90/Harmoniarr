@@ -36,6 +36,7 @@ import {
 } from '../../lib/operator-artist-card-presentation.js';
 import { hasMusicQueueProviderDependentWork } from '../../lib/music-queue-provider-repair-presentation.js';
 import { hasMusicQueueHomeProgress } from '../../lib/music-queue-progress-state.js';
+import { SETTINGS_RECOVERY_CONTEXT } from '../../lib/settings-recovery-handoff.js';
 
 const SORT_OPTIONS = [
   { value: 'name', label: 'Name' },
@@ -47,6 +48,10 @@ const OPERATOR_HOME_DEFAULTS = {
   sort: { field: 'name', order: 'asc' },
   filters: {},
 };
+
+const dashboardRecoveryContext = Object.freeze({
+  context: SETTINGS_RECOVERY_CONTEXT.DASHBOARD,
+});
 
 const {
   artists,
@@ -237,7 +242,7 @@ onBeforeUnmount(() => {
 
       <MusicQueueProviderRepairNotice
         :notice="musicQueueProviderRepairNotice"
-        return-context="music_queue"
+        :return-context="dashboardRecoveryContext"
       />
 
       <MusicQueueProgressStrip

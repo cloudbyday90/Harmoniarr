@@ -17,6 +17,11 @@
  */
 
 import { getArtistPolicyActivityRouteTarget } from './artist-policy-activity-presentation.js';
+import {
+  SETTINGS_RECOVERY_CONTEXT,
+  buildSettingsRecoveryHandoffLocation,
+  createSettingsRecoveryContext,
+} from './settings-recovery-handoff.js';
 
 export function buildActivityEventLinkTarget(event = {}) {
   if (event.eventType === 'artist_policy_saved') {
@@ -58,9 +63,19 @@ export function buildActivityEventLinkTarget(event = {}) {
   }
 
   if (event.eventType === 'music_queue_audio_check_failed') {
+    const wantedReleaseId = event.extraPayload?.wantedReleaseId
+      ?? (event.entityType === 'wanted_release' ? event.entityId : null);
     return {
       label: 'Check connections',
-      to: { name: 'settings-connections' },
+      to: buildSettingsRecoveryHandoffLocation({
+        recoveryContext: createSettingsRecoveryContext({
+          context: wantedReleaseId
+            ? SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE_RELEASE
+            : SETTINGS_RECOVERY_CONTEXT.ACTIVITY_TIMELINE,
+          wantedReleaseId,
+        }),
+        routeName: 'settings-connections',
+      }),
     };
   }
 

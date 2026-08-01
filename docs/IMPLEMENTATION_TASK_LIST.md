@@ -152,6 +152,11 @@ Database model source: `docs/DATABASE_MODEL.md`
   keeps Library preferences optional. The safe projection continues to exclude
   provider addresses, secrets, raw paths, and diagnostics. See
   `SETTINGS_SETUP_READINESS_LANDING_DESIGN.md`.
+- Settings recovery handoff consistency: Home, Music Queue, Downloader, and
+  Activity now identify the missing prerequisite, link to its normal Settings
+  page, and return only to an allowlisted workspace or bounded release detail
+  after provider or folder readiness is verified. See
+  `SETTINGS_RECOVERY_HANDOFF_CONSISTENCY_DESIGN.md`.
 - Activity advanced diagnostics boundary: match, library-add, and failed-add
   workbenches now use canonical `/app/activity/diagnostics/...` routes behind
   the Activity disclosure. Legacy candidate/import URLs redirect with their

@@ -19,6 +19,7 @@
 <script setup>
 import { computed } from 'vue';
 import { RouterLink } from 'vue-router';
+import { buildSettingsRecoveryHandoffLocation } from '../../lib/settings-recovery-handoff.js';
 
 const props = defineProps({
   notice: {
@@ -27,14 +28,19 @@ const props = defineProps({
   },
   returnContext: {
     default: null,
-    type: String,
+    type: [Object, String],
   },
 });
 
 const headingId = computed(() => `music-queue-provider-repair-${props.notice?.code ?? 'status'}`);
-const settingsLocation = computed(() => ({
-  name: props.notice?.actionRouteName,
-  query: props.returnContext ? { repair: props.returnContext } : undefined,
+const recoveryContext = computed(() => (
+  typeof props.returnContext === 'string'
+    ? { context: props.returnContext }
+    : props.returnContext
+));
+const settingsLocation = computed(() => buildSettingsRecoveryHandoffLocation({
+  recoveryContext: recoveryContext.value,
+  routeName: props.notice?.actionRouteName,
 }));
 const statusMessage = computed(() => (
   props.notice ? `${props.notice.title}. ${props.notice.copy}` : ''

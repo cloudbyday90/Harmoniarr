@@ -119,6 +119,14 @@ suite('Music Queue folder setup recovery confirmation browser verification', () 
           contentType: 'application/json',
         });
       });
+      await browserContext.route('**/api/v1/acquisition/releases/wanted-forest-frank-folders', async (route) => {
+        await route.fulfill({
+          body: JSON.stringify({
+            release: buildMusicQueuePayload({ isRecovered: recovered }).releases[0],
+          }),
+          contentType: 'application/json',
+        });
+      });
       await browserContext.route('**/api/v1/settings', async (route) => {
         if (route.request().method() === 'GET') {
           const response = await route.fetch();
@@ -147,10 +155,18 @@ suite('Music Queue folder setup recovery confirmation browser verification', () 
       await page.goto(`${baseUrl}/app/music-queue`, { waitUntil: 'domcontentloaded' });
       const stoppedRelease = page.locator('.music-queue-release-row').filter({ hasText: 'Child of God' });
       await stoppedRelease.getByText('Needs setup', { exact: true }).waitFor();
+      assert.equal(
+        await stoppedRelease.getByRole('link', { name: 'Set up folders' }).getAttribute('href'),
+        '/app/settings/media-storage?returnTo=music_queue_release&returnReleaseId=wanted-forest-frank-folders',
+      );
       await Promise.all([
-        page.waitForURL(/\/app\/settings\/media-storage$/),
+        page.waitForURL(/\/app\/settings\/media-storage(?:\?.*)?$/),
         stoppedRelease.getByRole('link', { name: 'Set up folders' }).click(),
       ]);
+      assert.match(
+        page.url(),
+        /\/app\/settings\/media-storage\?returnTo=music_queue_release&returnReleaseId=wanted-forest-frank-folders$/,
+      );
 
       await page.getByRole('heading', { name: 'Media folders' }).waitFor();
       await page.getByRole('heading', { name: 'Folder readiness' }).waitFor();
@@ -177,7 +193,18 @@ suite('Music Queue folder setup recovery confirmation browser verification', () 
       assert.equal(savedSettingsPayload.paths.staging, '/data/staging');
       await page.getByText('Your folders are ready for automatic downloads.').waitFor();
 
-      await page.goto(`${baseUrl}/app/music-queue`, { waitUntil: 'domcontentloaded' });
+      const recoveryConfirmation = page.locator('.settings-recovery-confirmation');
+      await recoveryConfirmation.getByRole('heading', { name: 'Folders are ready' }).waitFor();
+      await recoveryConfirmation.getByText("Return to Music Queue to see this release's next automatic step.").waitFor();
+      assert.equal(
+        await recoveryConfirmation.getByRole('link', { name: 'Return to Music Queue' }).getAttribute('href'),
+        '/app/music-queue/wanted-forest-frank-folders',
+      );
+
+      await Promise.all([
+        page.waitForURL(/\/app\/music-queue\/wanted-forest-frank-folders$/),
+        recoveryConfirmation.getByRole('link', { name: 'Return to Music Queue' }).click(),
+      ]);
       const recoveredRelease = page.locator('.music-queue-release-row').filter({ hasText: 'Child of God' });
       await recoveredRelease.getByText('Searching', { exact: true }).waitFor();
       await recoveredRelease.getByText('Harmoniarr is looking for an acceptable match.').waitFor();

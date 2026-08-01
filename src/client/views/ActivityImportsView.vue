@@ -37,6 +37,11 @@ import {
 } from '../lib/import-candidate-api.js';
 import MusicQueueReleaseUnavailable from '../components/music-queue/MusicQueueReleaseUnavailable.vue';
 import { useAsyncResource } from '../composables/useAsyncResource.js';
+import {
+  SETTINGS_RECOVERY_CONTEXT,
+  buildSettingsRecoveryHandoffLocation,
+  createSettingsRecoveryContext,
+} from '../lib/settings-recovery-handoff.js';
 
 const props = defineProps({
   status: { type: String, default: 'import_pending' },
@@ -55,6 +60,16 @@ const wantedReleaseId = computed(() => {
 const isReleaseScopedDiagnostics = computed(() => (
   isImportPendingRoute.value && wantedReleaseId.value.length > 0
 ));
+const mediaStorageRecoveryContext = computed(() => createSettingsRecoveryContext({
+  context: isReleaseScopedDiagnostics.value
+    ? SETTINGS_RECOVERY_CONTEXT.ACTIVITY_LIBRARY_ADD_RELEASE
+    : SETTINGS_RECOVERY_CONTEXT.ACTIVITY_LIBRARY_ADDS,
+  wantedReleaseId: wantedReleaseId.value,
+}));
+const mediaStorageRecoveryLocation = computed(() => buildSettingsRecoveryHandoffLocation({
+  recoveryContext: mediaStorageRecoveryContext.value,
+  routeName: 'settings-media-storage',
+}));
 
 function createEmptyImportPendingPayload() {
   return {
@@ -198,6 +213,13 @@ function buildImportReviewLocation(candidateId) {
   };
 }
 
+function buildSettingsRecoveryLocation(routeName) {
+  return buildSettingsRecoveryHandoffLocation({
+    recoveryContext: mediaStorageRecoveryContext.value,
+    routeName,
+  });
+}
+
 watch(wantedReleaseId, (nextWantedReleaseId, previousWantedReleaseId) => {
   if (nextWantedReleaseId !== previousWantedReleaseId) {
     void load();
@@ -235,7 +257,7 @@ watch(wantedReleaseId, (nextWantedReleaseId, previousWantedReleaseId) => {
             v-if="releaseAddLatestOutcome?.presentation?.settingsRouteName"
             class="hx-btn"
             data-variant="primary"
-            :to="{ name: releaseAddLatestOutcome.presentation.settingsRouteName }"
+            :to="buildSettingsRecoveryLocation(releaseAddLatestOutcome.presentation.settingsRouteName)"
           >
             {{ releaseAddLatestOutcome.presentation.settingsRouteLabel }}
           </RouterLink>
@@ -273,7 +295,7 @@ watch(wantedReleaseId, (nextWantedReleaseId, previousWantedReleaseId) => {
           <p class="hx-card-subtitle">{{ importPendingSummary.message }}</p>
         </div>
         <div class="hx-card-actions">
-          <RouterLink class="hx-btn" :to="{ name: 'settings-media-storage' }">
+          <RouterLink class="hx-btn" :to="mediaStorageRecoveryLocation">
             Check path mappings
           </RouterLink>
           <RouterLink class="hx-btn" data-variant="primary" :to="{ name: 'activity-diagnostics-matches', query: { status: 'import_pending' } }">

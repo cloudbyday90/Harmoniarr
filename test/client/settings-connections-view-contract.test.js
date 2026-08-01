@@ -49,14 +49,15 @@ test('SettingsConnectionsView keeps optional service setup and timing controls b
   assert.match(source, /panel-id="settings-optional-music-sources"/);
 });
 
-test('SettingsConnectionsView confirms the Music Queue recovery state after saved connection changes', async () => {
+test('SettingsConnectionsView confirms an allowlisted recovery context after connection changes or a connection test', async () => {
   const source = await readFile(VIEW_PATH, 'utf8');
 
   assert.match(source, /@submit\.prevent="handleSaveSettings"/);
   assert.match(source, /await refreshProviderRepairConfirmation\(\);/);
-  assert.match(source, /buildMusicQueueProviderRepairRecoveryConfirmation/);
-  assert.match(source, /isMusicQueueProviderRepairReturnContext\(route\.query\.repair\)/);
-  assert.match(source, /MusicQueueProviderRepairRecoveryConfirmation/);
+  assert.match(source, /buildSettingsProviderRecoveryConfirmation/);
+  assert.match(source, /resolveSettingsRecoveryContext\(route\.query\)/);
+  assert.match(source, /SettingsRecoveryConfirmation/);
+  assert.match(source, /if \(isProviderRecoveryReturn\.value\)/);
 });
 
 test('SettingsConnectionsView passes the bounded provider state to the local status component', async () => {

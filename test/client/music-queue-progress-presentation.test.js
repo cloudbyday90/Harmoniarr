@@ -72,7 +72,13 @@ test('Music Queue progress links setup blockers to their dedicated safe route', 
 
   assert.deepEqual(result.rows[0].action, {
     label: 'Set up folders',
-    to: { name: 'settings-media-storage' },
+    to: {
+      name: 'settings-media-storage',
+      query: {
+        returnReleaseId: 'setup',
+        returnTo: 'music_queue_release',
+      },
+    },
   });
 });
 

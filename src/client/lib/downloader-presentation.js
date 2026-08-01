@@ -17,16 +17,16 @@
  */
 
 const disabledEmptyState = Object.freeze({
-  actionLabel: 'Configure slskd',
+  actionLabel: 'Set up Soulseek',
   actionRouteName: 'settings-connections',
-  body: 'Add your Soulseek download client URL and slskd API key in Settings. Once connected, downloads queued from Search or Import Review will appear here.',
+  body: 'Choose Managed or connect an external Soulseek download client in Settings. Harmoniarr will not search, download, or check transfers while it is off.',
   title: 'Set up Soulseek to enable downloads',
 });
 
 const idleEmptyState = Object.freeze({
   actionLabel: null,
   actionRouteName: null,
-  body: 'When Harmoniarr queues a download from Search or Import Review, progress will appear here.',
+  body: 'When Harmoniarr queues a download, its progress will appear here.',
   title: 'Nothing downloading right now',
 });
 

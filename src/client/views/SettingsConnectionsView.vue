@@ -28,14 +28,15 @@ import {
 import SettingsDisclosure from '../components/settings/SettingsDisclosure.vue';
 import SettingsFormGroup from '../components/settings/SettingsFormGroup.vue';
 import SettingsProviderConnectionStatus from '../components/settings/SettingsProviderConnectionStatus.vue';
+import SettingsRecoveryConfirmation from '../components/settings/SettingsRecoveryConfirmation.vue';
 import SettingsSaveBar from '../components/settings/SettingsSaveBar.vue';
 import SoulseekProviderModeGuidance from '../components/settings/SoulseekProviderModeGuidance.vue';
-import MusicQueueProviderRepairRecoveryConfirmation from '../components/music-queue/MusicQueueProviderRepairRecoveryConfirmation.vue';
 import { useConnections } from '../composables/useConnections.js';
 import { useSettingsSetupProgress } from '../composables/useSettingsSetupProgress.js';
 import { useSoulseekConnectionStatus } from '../composables/useSoulseekConnectionStatus.js';
 import { useToast } from '../composables/useToast.js';
-import { buildMusicQueueProviderRepairRecoveryConfirmation, isMusicQueueProviderRepairReturnContext } from '../lib/music-queue-provider-repair-recovery-presentation.js';
+import { buildSettingsProviderRecoveryConfirmation } from '../lib/settings-provider-recovery-presentation.js';
+import { resolveSettingsRecoveryContext } from '../lib/settings-recovery-handoff.js';
 import { buildSettingsSoulseekProviderState } from '../lib/settings-provider-state-presentation.js';
 import { buildSettingsSaveState } from '../lib/settings-save-state-presentation.js';
 
@@ -82,9 +83,8 @@ const isManagedDeployment = computed(() => secretStatus.value?.slskd?.managedDep
 const isSoulseekDisabled = computed(() => form.slskd.providerMode === 'disabled');
 const isExternalSoulseek = computed(() => form.slskd.providerMode === 'external');
 const isManagedSoulseek = computed(() => form.slskd.providerMode === 'managed');
-const isMusicQueueProviderRepairReturn = computed(() =>
-  isMusicQueueProviderRepairReturnContext(route.query.repair),
-);
+const recoveryContext = computed(() => resolveSettingsRecoveryContext(route.query));
+const isProviderRecoveryReturn = computed(() => recoveryContext.value !== null);
 const providerRepairConfirmation = ref(null);
 const requiresConnectionVerification = ref(false);
 const soulseekProviderState = computed(() => buildSettingsSoulseekProviderState({
@@ -110,11 +110,12 @@ async function refreshProviderRepairConfirmation() {
     loadConnectionStatus(),
     loadSetupProgress(),
   ]);
-  if (!isMusicQueueProviderRepairReturn.value) return;
+  if (!isProviderRecoveryReturn.value) return;
 
-  providerRepairConfirmation.value = buildMusicQueueProviderRepairRecoveryConfirmation({
+  providerRepairConfirmation.value = buildSettingsProviderRecoveryConfirmation({
     connectionCheckFailed: Boolean(connectionErrorCode.value),
     connectionStatus: connectionStatus.value,
+    recoveryContext: recoveryContext.value,
     setupProgress: setupProgress.value,
   });
 }
@@ -127,7 +128,7 @@ async function handleSaveSettings() {
   if (!outcome?.ok) return;
 
   requiresConnectionVerification.value = shouldVerifySavedConnection;
-  if (!isMusicQueueProviderRepairReturn.value) return;
+  if (!isProviderRecoveryReturn.value) return;
 
   await refreshProviderRepairConfirmation();
 }
@@ -155,6 +156,10 @@ async function testProviderConnection() {
     toast.warning(toastMessage);
   } else {
     toast.info(toastMessage);
+  }
+
+  if (isProviderRecoveryReturn.value) {
+    await refreshProviderRepairConfirmation();
   }
 }
 
@@ -276,8 +281,8 @@ onMounted(() => {
         </article>
       </div>
 
-      <MusicQueueProviderRepairRecoveryConfirmation
-        v-if="isMusicQueueProviderRepairReturn"
+      <SettingsRecoveryConfirmation
+        v-if="isProviderRecoveryReturn"
         :confirmation="providerRepairConfirmation"
       />
 

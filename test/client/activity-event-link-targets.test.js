@@ -196,7 +196,24 @@ test('buildActivityEventLinkTarget offers one safe handoff for audio and request
     eventType: 'music_queue_audio_check_failed',
   }), {
     label: 'Check connections',
-    to: { name: 'settings-connections' },
+    to: {
+      name: 'settings-connections',
+      query: { returnTo: 'activity_timeline' },
+    },
+  });
+  assert.deepEqual(buildActivityEventLinkTarget({
+    entityId: 'wanted-1',
+    entityType: 'wanted_release',
+    eventType: 'music_queue_audio_check_failed',
+  }), {
+    label: 'Check connections',
+    to: {
+      name: 'settings-connections',
+      query: {
+        returnReleaseId: 'wanted-1',
+        returnTo: 'music_queue_release',
+      },
+    },
   });
   assert.deepEqual(buildActivityEventLinkTarget({
     entityId: 'wanted-1',

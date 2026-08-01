@@ -44,6 +44,9 @@ test('Media and storage leads with required folders and keeps supporting control
 
   assert.ok(source.indexOf('>Media folders<') < source.indexOf('title="Cover art"'));
   assert.match(source, /<SettingsFolderReadiness :validation="pathValidation" \/>/);
+  assert.match(source, /<SettingsRecoveryConfirmation :confirmation="recoveryConfirmation" \/>/);
+  assert.match(source, /buildSettingsFolderRecoveryConfirmation/);
+  assert.match(source, /@submit\.prevent="handleSaveSettings"/);
   assert.match(source, /v-model:open="isPathTranslationsOpen"/);
   assert.match(source, /title="Additional folders"/);
   assert.match(source, /title="Artwork provider usage"/);
