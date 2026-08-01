@@ -1714,7 +1714,17 @@ outcomes, reciprocal 404 reads, and complete cleanup.
   and preserve safe release context without accepting arbitrary URLs. See
   [SETTINGS_RECOVERY_HANDOFF_CONSISTENCY_DESIGN.md](SETTINGS_RECOVERY_HANDOFF_CONSISTENCY_DESIGN.md).
 
-Recommended next slice: complete the remaining **Activity navigation and copy
-cleanup**. Remove Music Queue from the normal Activity tab mental model, make
-the timeline the single default workspace, and preserve direct deep links to
-advanced diagnostics for operators.
+Completed Activity navigation and copy cleanup:
+
+- legacy Activity queue bookmarks now route to top-level Music Queue without
+  losing query or fragment state;
+- normal Music Queue links to the Activity timeline rather than diagnostic
+  System history; and
+- direct diagnostic pages retain their deep links while exposing an explicit
+  route back to normal Activity. See
+  [ACTIVITY_NAVIGATION_AND_COPY_CLEANUP_DESIGN.md](ACTIVITY_NAVIGATION_AND_COPY_CLEANUP_DESIGN.md).
+
+Recommended next slice: complete the remaining **Phase 4 unsafe-add recovery
+states**. Route collision, lossy audio, suspicious FLAC, probe failure, and
+unsafe import plans must all land on one release-centred `Needs help adding`
+state with a safe, outcome-specific action and no candidate-first navigation.

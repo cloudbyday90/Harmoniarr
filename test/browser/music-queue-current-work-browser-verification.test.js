@@ -156,10 +156,10 @@ suite('Music Queue current-work browser verification', () => {
       await page.getByText('1 release needs attention', { exact: true }).waitFor();
       await page.getByText('Harmoniarr is also working on 1 release.', { exact: true }).waitFor();
       await page.getByText('1 release is scheduled for automatic search.', { exact: true }).waitFor();
-      assert.equal(await page.getByLabel('Show').inputValue(), 'current');
-      assert.equal(
-        await page.getByRole('link', { name: 'History' }).getAttribute('href'),
-        '/app/activity/history',
+        assert.equal(await page.getByLabel('Show').inputValue(), 'current');
+        assert.equal(
+        await page.getByLabel('Music Queue filters').getByRole('link', { name: 'Activity' }).getAttribute('href'),
+        '/app/activity/feed',
       );
       await stabilizeVisualEvidencePage(page);
       await evidence.capture(page, {

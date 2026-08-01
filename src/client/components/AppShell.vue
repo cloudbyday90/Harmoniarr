@@ -365,7 +365,7 @@ onBeforeUnmount(() => {
           :to="{ name: 'activity-operations' }"
           class="hx-topbar-pill"
           :data-status="activeJobs > 0 ? 'busy' : 'idle'"
-          :title="`${activeJobs} active job${activeJobs === 1 ? '' : 's'} — open queue`"
+          :title="`${activeJobs} active job${activeJobs === 1 ? '' : 's'} — view background jobs`"
         >
           <span class="hx-topbar-pill-dot" aria-hidden="true"></span>
           {{ activeJobs }} {{ activeJobs === 1 ? 'job' : 'jobs' }}

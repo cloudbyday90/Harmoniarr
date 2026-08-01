@@ -130,6 +130,11 @@ Database model source: `docs/DATABASE_MODEL.md`
   Music Queue quality handoffs. The former twelve-tab workbench is preserved
   behind one `Advanced diagnostics` disclosure, without breaking diagnostic
   deep links. See `ACTIVITY_TIMELINE_NAVIGATION_DESIGN.md`.
+- Activity navigation and copy cleanup: legacy Activity queue bookmarks now
+  redirect to top-level Music Queue with their query and fragment state intact;
+  direct diagnostics offer `Back to Activity`; Music Queue targets the normal
+  Activity timeline; and `System history` is reserved for troubleshooting. See
+  `ACTIVITY_NAVIGATION_AND_COPY_CLEANUP_DESIGN.md`.
 - Activity resource-state consistency: Timeline, History, Monitored Artists,
   and Releases now share accessible loading, empty, and retryable read-failure
   states. Generic failures redact transport details, preserve stale data during

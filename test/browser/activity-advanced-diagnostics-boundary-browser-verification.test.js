@@ -106,11 +106,19 @@ suite('Activity advanced diagnostics boundary browser verification', () => {
       await diagnostics.getByRole('link', { name: 'Match diagnostics' }).click();
       await page.waitForFunction(() => globalThis.location.pathname === '/app/activity/diagnostics/matches');
       await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
+      assert.equal(
+        await page.getByRole('link', { name: 'Back to Activity' }).getAttribute('href'),
+        '/app/activity/feed',
+      );
       const directDiagnosticOrder = await page.locator('.activity-workspace').evaluate((workspace) => [
         ...workspace.children,
       ].filter((child) => child.classList.contains('activity-workspace-content') || child.matches('details'))
         .map((child) => child.classList.contains('activity-workspace-content') ? 'content' : 'diagnostics'));
       assert.deepEqual(directDiagnosticOrder, ['diagnostics', 'content']);
+
+      await page.getByRole('link', { name: 'Back to Activity' }).click();
+      await page.waitForFunction(() => globalThis.location.pathname === '/app/activity/feed');
+      await page.getByRole('heading', { exact: true, name: 'Activity timeline' }).waitFor();
 
       await page.goto(`${baseUrl}/app/activity/candidates?candidate=legacy-candidate#import-review-selection-stage`, {
         waitUntil: 'domcontentloaded',
@@ -131,6 +139,16 @@ suite('Activity advanced diagnostics boundary browser verification', () => {
         return url.pathname === '/app/activity/diagnostics/matches'
           && url.searchParams.get('candidate') === 'legacy-candidate'
           && url.hash === '#import-review-selection-stage';
+      });
+
+      await page.goto(`${baseUrl}/app/activity/queue?artist=legacy-artist#music-queue-release-list`, {
+        waitUntil: 'domcontentloaded',
+      });
+      await page.waitForFunction(() => {
+        const url = new URL(globalThis.location.href);
+        return url.pathname === '/app/music-queue'
+          && url.searchParams.get('artist') === 'legacy-artist'
+          && url.hash === '#music-queue-release-list';
       });
 
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);

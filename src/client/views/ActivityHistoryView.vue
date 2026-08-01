@@ -54,9 +54,9 @@ onMounted(() => {
   <section>
     <header class="hx-page-header">
       <div>
-        <h2 class="hx-page-title">History</h2>
+        <h2 class="hx-page-title">System history</h2>
         <p class="hx-page-subtitle">
-          Recent system activity ({{ formatActivityEntryCountLabel(entryCount) }}).
+          Detailed records for troubleshooting ({{ formatActivityEntryCountLabel(entryCount) }}).
           <span v-if="isRevalidating" class="history-revalidating" aria-label="Refreshing">↻</span>
         </p>
       </div>

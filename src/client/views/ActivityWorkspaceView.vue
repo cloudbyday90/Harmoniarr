@@ -33,6 +33,11 @@ const isTimelineRoute = computed(() => route.name === 'activity-feed');
         <h1 class="hx-page-title">Activity</h1>
         <p class="hx-page-subtitle">What Harmoniarr has done, and anything that needs your attention.</p>
       </div>
+      <div v-if="!isTimelineRoute" class="hx-page-actions">
+        <RouterLink :to="{ name: 'activity-feed' }" class="hx-btn" data-variant="ghost">
+          Back to Activity
+        </RouterLink>
+      </div>
     </header>
 
     <ActivityDiagnosticsDisclosure v-if="!isTimelineRoute" :open="true" />

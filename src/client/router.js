@@ -139,7 +139,7 @@ const router = createRouter({
             { path: 'diagnostics/failed-library-adds', name: 'activity-diagnostics-failed-library-adds', component: ActivityImportsView, props: { status: 'failed', title: 'Failed library adds', subtitle: 'Library-add records that need investigation.', emptyTitle: 'No failed library adds', emptyCopy: 'Failed library adds will appear here when the add worker reports them.' } },
             { path: 'candidates', name: 'activity-candidates', redirect: (to) => ({ name: 'activity-diagnostics-matches', query: to.query, hash: to.hash }) },
             { path: 'requests', name: 'activity-requests', component: RequestMusicView },
-            { path: 'queue', name: 'activity-queue', redirect: { name: 'activity-feed' } },
+            { path: 'queue', name: 'activity-queue', redirect: (to) => ({ name: 'music-queue', query: to.query, hash: to.hash }) },
             { path: 'wanted', name: 'activity-wanted', component: ActivityWantedView },
             { path: 'imports', name: 'activity-imports', redirect: (to) => ({ name: 'activity-diagnostics-library-adds', query: to.query, hash: to.hash }) },
             { path: 'releases', name: 'activity-releases', component: ActivityReleasesView },

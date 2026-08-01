@@ -173,7 +173,7 @@ suite('Activity history initial-load browser verification', () => {
       await audioEntry.getByRole('link', { name: 'Check connections' }).waitFor();
       assert.match(
         await audioEntry.getByRole('link', { name: 'Check connections' }).getAttribute('href'),
-        /\/app\/settings\/connections$/,
+        /\/app\/settings\/connections\?returnTo=music_queue_release&returnReleaseId=wanted-audio$/,
       );
 
       await page.getByLabel('Show activity').selectOption('library');
@@ -198,7 +198,7 @@ suite('Activity history initial-load browser verification', () => {
       assert.equal(await requestEntry.getByRole('link', { name: /diagnostic/i }).count(), 0);
 
       await page.goto(`${baseUrl}/app/activity/history`, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('heading', { exact: true, name: 'History' }).waitFor();
+      await page.getByRole('heading', { exact: true, name: 'System history' }).waitFor();
       await page.getByRole('cell', { exact: true, name: 'Library scan' }).waitFor();
       assert.equal(systemHistoryRequestCount, 1);
 

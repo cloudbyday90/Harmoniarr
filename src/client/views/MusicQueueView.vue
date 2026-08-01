@@ -336,8 +336,8 @@ watch(
               <input v-model="query" class="hx-input" type="search" placeholder="Artist or release" />
             </label>
             <div class="music-queue-filter-actions">
-              <RouterLink class="hx-btn" data-variant="ghost" :to="{ name: 'activity-history' }">
-                History
+              <RouterLink class="hx-btn" data-variant="ghost" :to="{ name: 'activity-feed' }">
+                Activity
               </RouterLink>
               <button
                 type="button"
