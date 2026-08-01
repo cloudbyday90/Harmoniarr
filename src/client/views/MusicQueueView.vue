@@ -35,6 +35,7 @@ import {
 import { useMusicQueue } from '../composables/useMusicQueue.js';
 import { useMusicQueueReleaseDetail } from '../composables/useMusicQueueReleaseDetail.js';
 import { useMusicQueueProviderRepairContext } from '../composables/useMusicQueueProviderRepairContext.js';
+import { useConfirm } from '../composables/useConfirm.js';
 import { hasMusicQueueProviderDependentWork } from '../lib/music-queue-provider-repair-presentation.js';
 import { buildMusicQueueStatusPresentation } from '../lib/music-queue-status-presentation.js';
 import {
@@ -50,6 +51,7 @@ import { sessionStore } from '../state/session.js';
 
 const route = useRoute();
 const router = useRouter();
+const confirm = useConfirm();
 const isProviderReadyRecoveryReturn = isMusicQueueProviderReadyRecoveryContext(route.query.recovery);
 const requestedReleaseId = computed(() => (
   typeof route.params.wantedReleaseId === 'string' ? route.params.wantedReleaseId : null
@@ -65,6 +67,7 @@ const {
   actionFeedback,
   activeMatchActionKey,
   activeReleaseActionKey,
+  addToLibrary,
   allowFallbackQuality,
   errorMessage,
   isLoading,
@@ -250,6 +253,31 @@ async function handleRecheckLibraryAdd() {
   }
 }
 
+async function handleAddToLibrary() {
+  const release = selectedRelease.value;
+  if (!release?.id) {
+    return;
+  }
+
+  const confirmed = await confirm({
+    cancelLabel: 'Keep reviewing',
+    confirmLabel: 'Add to library',
+    gateLabel: 'I understand Harmoniarr will add these verified files to my music library.',
+    level: 'checkbox',
+    message: 'Harmoniarr will check the completed files again before starting. It will not add this release if the library, quality, or audio checks no longer pass.',
+    title: `Add ${release.releaseTitle} to your library?`,
+    tone: 'primary',
+  });
+  if (!confirmed) {
+    return;
+  }
+
+  const result = await addToLibrary({ wantedReleaseId: release.id });
+  if (result) {
+    await refreshSelectedReleaseDetail(result);
+  }
+}
+
 async function refreshMusicQueue() {
   await Promise.all([load(), loadReleaseDetail()]);
   await refreshProviderRepairContext();
@@ -426,6 +454,7 @@ watch(
         :active-match-action-key="activeMatchActionKey"
         :active-release-action-key="activeReleaseActionKey"
         :review="matchReview"
+        @add-to-library="handleAddToLibrary"
         @allow-fallback-quality="handleAllowFallbackQuality"
         @close="closeReview"
         @recheck-library-add="handleRecheckLibraryAdd"

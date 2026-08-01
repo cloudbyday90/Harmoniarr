@@ -18,8 +18,12 @@
 
 const PRIMARY_QUALITY_ROW_LABELS = new Set(['Profile', 'Decision', 'Verification']);
 
-function getDecisionCopy({ hasMatchChoices, hasQualityChoice, hasRouteAction, recovery }) {
+function getDecisionCopy({ hasManualSafeAdd, hasMatchChoices, hasQualityChoice, hasRouteAction, recovery }) {
   if (recovery?.nextStep) return recovery.nextStep;
+
+  if (hasManualSafeAdd) {
+    return 'Review the completed release, then add it only when you are ready for Harmoniarr to check the files again.';
+  }
 
   if (hasMatchChoices) {
     return 'Choose a match only when Harmoniarr needs your decision. The selected match becomes the next download step.';
@@ -42,16 +46,18 @@ export function buildMusicQueueReviewPresentation(review) {
   const matchCards = Array.isArray(review.matchCards) ? review.matchCards : [];
   const decisionMatchCards = matchCards.filter((match) => match.canUseMatch || match.canRejectMatch);
   const hasMatchChoices = decisionMatchCards.length > 0;
+  const hasManualSafeAdd = review.canAddToLibrary === true;
   const hasQualityChoice = Boolean(review.canAllowFallbackQuality || review.canSearchAgain);
   const hasRouteAction = review.action?.type === 'route';
   const recovery = review.recovery ?? null;
   const qualityRows = Array.isArray(review.qualityRows) ? review.qualityRows : [];
 
   return {
-    decisionCopy: getDecisionCopy({ hasMatchChoices, hasQualityChoice, hasRouteAction, recovery }),
+    decisionCopy: getDecisionCopy({ hasManualSafeAdd, hasMatchChoices, hasQualityChoice, hasRouteAction, recovery }),
     decisionMatchCards,
     evidenceMatchCards: hasMatchChoices ? [] : matchCards,
-    hasDecision: hasMatchChoices || hasQualityChoice || hasRouteAction,
+    hasDecision: hasManualSafeAdd || hasMatchChoices || hasQualityChoice || hasRouteAction,
+    hasManualSafeAdd,
     hasEvidence: matchCards.length > 0 || qualityRows.length > 0 || (review.matchRows?.length ?? 0) > 0,
     hasMatchChoices,
     hasQualityChoice,

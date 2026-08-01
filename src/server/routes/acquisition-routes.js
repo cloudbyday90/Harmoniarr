@@ -23,6 +23,7 @@ import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
 const defaultRequestAuthDependencies = createRequestAuthDependencies();
 
 export function registerAcquisitionRoutes(app, {
+  addMusicQueueReleaseToLibrary,
   allowMusicQueueReleaseFallbackQuality,
   getRequestMetadata = defaultRequestAuthDependencies.getRequestMetadata,
   getMusicQueueRelease,
@@ -97,6 +98,22 @@ export function registerAcquisitionRoutes(app, {
     const session = await requireFreshSession(request);
     requireCsrf(request, session);
     const payload = await recheckMusicQueueReleaseSafeAdd({
+      actorUserId: session.user?.id ?? session.appUserId,
+      appUserId: session.user?.id ?? session.appUserId,
+      requestMetadata: getRequestMetadata(request),
+      wantedReleaseId: request.params.wantedReleaseId,
+    });
+
+    response.json({
+      ok: true,
+      ...payload,
+    });
+  }));
+
+  app.post('/api/v1/acquisition/releases/:wantedReleaseId/add-to-library', limitMusicQueueMutation, asyncRoute(async (request, response) => {
+    const session = await requireFreshSession(request);
+    requireCsrf(request, session);
+    const payload = await addMusicQueueReleaseToLibrary({
       actorUserId: session.user?.id ?? session.appUserId,
       appUserId: session.user?.id ?? session.appUserId,
       requestMetadata: getRequestMetadata(request),

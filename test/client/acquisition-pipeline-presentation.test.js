@@ -318,6 +318,36 @@ test('buildMusicQueueMatchReview exposes search again for quality-stopped releas
   assert.equal(review.searchAgainLabel, 'Search again');
 });
 
+test('buildMusicQueueMatchReview exposes manual library add only for a ready-to-add release', () => {
+  const ready = normalizeMusicQueueRelease({
+    artistName: 'Forest Frank',
+    id: 'wanted-1',
+    releaseTitle: 'Child of God',
+    status: {
+      code: 'ready_to_add',
+      label: 'Ready to add',
+      message: 'Files are ready.',
+      nextAction: 'add_to_library',
+      tone: 'success',
+    },
+  });
+  const blocked = normalizeMusicQueueRelease({
+    artistName: 'Forest Frank',
+    id: 'wanted-2',
+    releaseTitle: 'Good Day',
+    status: {
+      code: 'needs_help_adding',
+      label: 'Needs help',
+      message: 'Files need review.',
+      nextAction: 'review_add_plan',
+      tone: 'warning',
+    },
+  });
+
+  assert.equal(buildMusicQueueMatchReview(ready).canAddToLibrary, true);
+  assert.equal(buildMusicQueueMatchReview(blocked).canAddToLibrary, false);
+});
+
 test('buildMusicQueueMatchReview exposes fallback quality action for below-profile quality stops', () => {
   const release = normalizeMusicQueueRelease({
     artistName: 'Forest Frank',

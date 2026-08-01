@@ -1028,7 +1028,9 @@ release is complete.
   unsafe import plans to `needs help`, with a reason-specific release action
   and secondary diagnostics. See
   `MUSIC_QUEUE_NEEDS_HELP_ACTION_HIERARCHY_DESIGN.md`.
-- [ ] Add `Add to library` for manual safe adds.
+- [x] Add a release-scoped `Add to library` confirmation for manual safe adds;
+  it re-previews, re-gates, and queues only the current safe release. See
+  `MUSIC_QUEUE_MANUAL_SAFE_ADD_CONFIRMATION_DESIGN.md`.
 
 Acceptance:
 

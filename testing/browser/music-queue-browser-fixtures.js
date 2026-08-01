@@ -55,11 +55,12 @@ export async function installConfiguredMusicQueueProviderFixtures(browserContext
  * same generic 404 contract as the production scoped service.
  *
  * @param {import('playwright').BrowserContext} browserContext
- * @param {{ activityEvents?: Array<object>, release?: object, releaseAfterSearchAgain?: object, releaseSequence?: Array<object>, searchAgainResponse?: object }} options
- * @returns {Promise<{getReleaseReadCount: () => number, getSearchAgainRequestCount: () => number}>}
+ * @param {{ activityEvents?: Array<object>, addToLibraryResponse?: object, release?: object, releaseAfterSearchAgain?: object, releaseSequence?: Array<object>, searchAgainResponse?: object }} options
+ * @returns {Promise<{getAddToLibraryRequestCount: () => number, getReleaseReadCount: () => number, getSearchAgainRequestCount: () => number}>}
  */
 export async function installScopedMusicQueueReadModelFixtures(browserContext, {
   activityEvents = [],
+  addToLibraryResponse = null,
   release = null,
   releaseAfterSearchAgain = null,
   releaseSequence = null,
@@ -77,6 +78,7 @@ export async function installScopedMusicQueueReadModelFixtures(browserContext, {
   }
 
   let releaseReadCount = 0;
+  let addToLibraryRequestCount = 0;
   let searchAgainRequestCount = 0;
   let currentRelease = initialRelease;
 
@@ -86,7 +88,18 @@ export async function installScopedMusicQueueReadModelFixtures(browserContext, {
     const requestUrl = new URL(route.request().url());
     const listPath = '/api/v1/acquisition/releases';
     const releasePath = `${listPath}/${encodeURIComponent(initialRelease.id)}`;
+    const addToLibraryPath = `${releasePath}/add-to-library`;
     const searchAgainPath = `${releasePath}/search-again`;
+
+    if (route.request().method() === 'POST' && requestUrl.pathname === addToLibraryPath && addToLibraryResponse) {
+      addToLibraryRequestCount += 1;
+      currentRelease = addToLibraryResponse.release ?? currentRelease;
+      await route.fulfill({
+        body: JSON.stringify(addToLibraryResponse),
+        contentType: 'application/json',
+      });
+      return;
+    }
 
     if (route.request().method() === 'POST' && requestUrl.pathname === searchAgainPath && searchAgainResponse) {
       searchAgainRequestCount += 1;
@@ -157,6 +170,7 @@ export async function installScopedMusicQueueReadModelFixtures(browserContext, {
   });
 
   return {
+    getAddToLibraryRequestCount: () => addToLibraryRequestCount,
     getReleaseReadCount: () => releaseReadCount,
     getSearchAgainRequestCount: () => searchAgainRequestCount,
   };

@@ -33,6 +33,7 @@ export function createAcquisitionModule({
   recordActivityEventFn = null,
   requestMusicQueueRediscovery = null,
   selectImportCandidate = null,
+  startReleaseManualSafeAdd = null,
   startLibraryDiscoveryRun = null,
 } = {}) {
   const qualityPolicyService = createQualityPolicyService();
@@ -47,6 +48,7 @@ export function createAcquisitionModule({
     recordActivityEventFn,
     requestMusicQueueRediscovery,
     selectImportCandidate,
+    startReleaseManualSafeAdd,
     startLibraryDiscoveryRun,
     statusService,
   });
@@ -56,6 +58,7 @@ export function createAcquisitionModule({
     acquisitionPipelineStore,
     qualityPolicyService,
     routeDependencies: {
+      addMusicQueueReleaseToLibrary: acquisitionPipelineService.addMusicQueueReleaseToLibrary,
       getMusicQueueRelease: acquisitionPipelineService.getMusicQueueRelease,
       allowMusicQueueReleaseFallbackQuality: acquisitionPipelineService.allowMusicQueueReleaseFallbackQuality,
       listMusicQueueReleases: acquisitionPipelineService.listMusicQueueReleases,

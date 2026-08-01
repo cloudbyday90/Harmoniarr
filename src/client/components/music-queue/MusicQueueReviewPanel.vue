@@ -47,6 +47,7 @@ const props = defineProps({
 });
 
 const emit = defineEmits([
+  'add-to-library',
   'allow-fallback-quality',
   'close',
   'recheck-library-add',
@@ -183,6 +184,24 @@ function isReleaseActionRunning(action) {
           >
             Advanced diagnostics
           </RouterLink>
+        </div>
+      </section>
+
+      <section v-if="presentation.hasManualSafeAdd" class="music-queue-review__section" aria-labelledby="music-queue-review-add">
+        <div>
+          <h3 id="music-queue-review-add">Add to library</h3>
+          <p>Harmoniarr will check the completed files again and start only if they still pass the library, quality, and audio checks.</p>
+        </div>
+        <div class="music-queue-review__actions">
+          <button
+            type="button"
+            class="hx-btn"
+            data-variant="primary"
+            :disabled="Boolean(activeReleaseActionKey)"
+            @click="emit('add-to-library')"
+          >
+            {{ isReleaseActionRunning('add-to-library') ? 'Checking...' : 'Add to library' }}
+          </button>
         </div>
       </section>
 

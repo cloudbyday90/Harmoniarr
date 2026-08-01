@@ -589,6 +589,8 @@ export function createApp({
     buildLibraryWantedReleases: libraryModule.routeDependencies.buildLibraryWantedReleases,
     recheckReleaseSafeAdd: importCandidateModule.importCandidateReleaseSafeAddRecheckService?.recheckReleaseSafeAdd
       ?? null,
+    startReleaseManualSafeAdd: importCandidateModule.importCandidateReleaseManualSafeAddService?.startReleaseManualSafeAdd
+      ?? null,
     rejectImportCandidate: importCandidateModule.importCandidateService?.rejectImportCandidate
       ?? importCandidateModule.routeDependencies?.rejectImportCandidate
       ?? null,

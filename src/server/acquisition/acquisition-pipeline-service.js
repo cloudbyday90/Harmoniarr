@@ -57,6 +57,18 @@ function findReleaseMatch(release, matchId) {
   return matches.find((match) => normalizeString(match?.matchId) === matchId) ?? null;
 }
 
+function findReleaseImportPendingCandidateId(release) {
+  const matches = release?.discoveryRequest?.importReviewSummary?.matches;
+  if (!Array.isArray(matches)) return null;
+
+  const candidateIds = [...new Set(matches
+    .filter((match) => normalizeString(match?.status) === 'import_pending')
+    .map((match) => normalizeString(match?.matchId))
+    .filter(Boolean))];
+
+  return candidateIds.length === 1 ? candidateIds[0] : null;
+}
+
 function getCount(value) {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
@@ -254,6 +266,7 @@ export function createAcquisitionPipelineService({
   recordActivityEventFn = null,
   requestMusicQueueRediscovery = null,
   selectImportCandidate = null,
+  startReleaseManualSafeAdd = null,
   startLibraryDiscoveryRun = null,
   statusService = createAcquisitionPipelineStatusService(),
 } = {}) {
@@ -536,6 +549,59 @@ export function createAcquisitionPipelineService({
     };
   }
 
+  async function addMusicQueueReleaseToLibrary({
+    appUserId,
+    actorUserId = null,
+    requestMetadata = null,
+    wantedReleaseId,
+  } = {}) {
+    if (typeof startReleaseManualSafeAdd !== 'function') {
+      throw createApiError(503, 'music_queue_manual_add_unavailable', 'Music Queue library add is not available');
+    }
+
+    const scopedAppUserId = normalizeRequiredAppUserId(appUserId, 'addMusicQueueReleaseToLibrary');
+    const scopedWantedReleaseId = normalizeRequiredId(wantedReleaseId, 'wantedReleaseId');
+    const release = await acquisitionPipelineStore.getWantedReleaseEvidence({
+      appUserId: scopedAppUserId,
+      wantedReleaseId: scopedWantedReleaseId,
+    });
+    if (!release) {
+      throw createApiError(404, 'music_queue_release_not_found', 'Music Queue release was not found');
+    }
+
+    const projectedRelease = projectRelease(release, { qualityPolicyService, statusService });
+    if (projectedRelease.status?.code !== 'ready_to_add') {
+      throw createApiError(409, 'music_queue_manual_add_not_available', 'This release is not ready to add to the library');
+    }
+
+    const importCandidateId = findReleaseImportPendingCandidateId(release);
+    if (!importCandidateId) {
+      throw createApiError(409, 'music_queue_manual_add_not_available', 'This release does not have one ready completed download to add');
+    }
+
+    const add = await startReleaseManualSafeAdd({
+      actorUserId,
+      appUserId: scopedAppUserId,
+      importCandidateId,
+      requestMetadata,
+      wantedReleaseId: scopedWantedReleaseId,
+    });
+    const refreshed = await getMusicQueueRelease({
+      appUserId: scopedAppUserId,
+      wantedReleaseId: scopedWantedReleaseId,
+    });
+
+    return {
+      action: {
+        code: 'add_to_library',
+        outcome: add?.outcome ?? 'not_available',
+        ...(add?.runId ? { runId: add.runId } : {}),
+        wantedReleaseId: scopedWantedReleaseId,
+      },
+      release: refreshed.release,
+    };
+  }
+
   async function runScopedMatchAction({
     actionCode,
     appUserId,
@@ -650,6 +716,7 @@ export function createAcquisitionPipelineService({
   }
 
   return {
+    addMusicQueueReleaseToLibrary,
     allowMusicQueueReleaseFallbackQuality,
     getMusicQueueRelease,
     listMusicQueueReleases,

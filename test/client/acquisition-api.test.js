@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  addMusicQueueReleaseToLibrary,
   allowMusicQueueFallbackQuality,
   fetchMusicQueueRelease,
   fetchMusicQueueReleases,
@@ -122,6 +123,19 @@ test('acquisition-api recheckMusicQueueReleaseSafeAdd sends a CSRF-backed releas
 
   const [url, options] = globalThis.fetch.mock.calls[0].arguments;
   assert.equal(url, '/api/v1/acquisition/releases/wanted%2F1/recheck-library-add');
+  assert.equal(options.method, 'POST');
+  assert.equal(options.headers.get('X-CSRF-Token'), 'csrf-mq');
+  assert.deepEqual(JSON.parse(options.body), {});
+});
+
+test('acquisition-api addMusicQueueReleaseToLibrary sends a CSRF-backed release-only POST', async (t) => {
+  globalThis.document = { cookie: 'harmoniarr_csrf=csrf-mq' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse());
+
+  await addMusicQueueReleaseToLibrary({ wantedReleaseId: 'wanted/1' });
+
+  const [url, options] = globalThis.fetch.mock.calls[0].arguments;
+  assert.equal(url, '/api/v1/acquisition/releases/wanted%2F1/add-to-library');
   assert.equal(options.method, 'POST');
   assert.equal(options.headers.get('X-CSRF-Token'), 'csrf-mq');
   assert.deepEqual(JSON.parse(options.body), {});

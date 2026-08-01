@@ -212,6 +212,52 @@ test('Music Queue applies an authoritative mutation release before its list reva
   app.unmount();
 });
 
+test('Music Queue reports the bounded safe add outcome after manual confirmation', async (t) => {
+  const originalDocument = globalThis.document;
+  globalThis.document = {
+    addEventListener() {},
+    hidden: false,
+    removeEventListener() {},
+  };
+  t.after(() => {
+    globalThis.document = originalDocument;
+  });
+
+  const updatedRelease = createMusicQueueRelease({
+    status: {
+      code: 'adding_to_library',
+      label: 'Adding to library',
+      nextAction: 'none',
+      tone: 'info',
+    },
+  });
+  const fetchMusicQueueReleases = t.mock.fn(async () => ({
+    pagination: { total: 1 },
+    releases: [updatedRelease],
+    summary: { counts: { adding_to_library: 1 }, total: 1 },
+  }));
+  const addMusicQueueReleaseToLibrary = t.mock.fn(async () => ({
+    action: { outcome: 'queued' },
+    release: updatedRelease,
+  }));
+  const { app, musicQueue } = mountMusicQueue({
+    addMusicQueueReleaseToLibrary,
+    fetchMusicQueueReleases,
+  });
+
+  const result = await musicQueue.addToLibrary({ wantedReleaseId: 'wanted-1' });
+
+  assert.equal(result.action.outcome, 'queued');
+  assert.deepEqual(addMusicQueueReleaseToLibrary.mock.calls[0].arguments, [{ wantedReleaseId: 'wanted-1' }]);
+  assert.deepEqual(musicQueue.actionFeedback.value, {
+    actionKey: 'wanted-1:add-to-library',
+    message: 'Harmoniarr verified the completed files and queued this release to be added to your library.',
+    phase: 'success',
+    wantedReleaseId: 'wanted-1',
+  });
+  app.unmount();
+});
+
 test('Music Queue explains when another owner has already restarted a shared release', async (t) => {
   const originalDocument = globalThis.document;
   globalThis.document = {

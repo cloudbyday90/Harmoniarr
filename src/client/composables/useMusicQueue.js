@@ -19,6 +19,7 @@
 import { computed, readonly, ref, toValue, watch } from 'vue';
 import { useAsyncResource } from './useAsyncResource.js';
 import {
+  addMusicQueueReleaseToLibrary as defaultAddMusicQueueReleaseToLibrary,
   allowMusicQueueFallbackQuality as defaultAllowMusicQueueFallbackQuality,
   fetchMusicQueueReleases as defaultFetchMusicQueueReleases,
   recheckMusicQueueReleaseSafeAdd as defaultRecheckMusicQueueReleaseSafeAdd,
@@ -49,6 +50,7 @@ export function hasActiveMusicQueueProgress(payload) {
 }
 
 export function useMusicQueue({
+  addMusicQueueReleaseToLibrary = defaultAddMusicQueueReleaseToLibrary,
   allowMusicQueueFallbackQuality = defaultAllowMusicQueueFallbackQuality,
   fetchMusicQueueReleases = defaultFetchMusicQueueReleases,
   immediate = true,
@@ -325,11 +327,58 @@ export function useMusicQueue({
     }
   }
 
+  async function addToLibrary({ wantedReleaseId } = {}) {
+    if (!wantedReleaseId) {
+      return null;
+    }
+
+    const actionKey = `${wantedReleaseId}:add-to-library`;
+    activeReleaseActionKey.value = actionKey;
+    setActionFeedback({
+      actionKey,
+      message: 'Checking the completed files before adding them to your library...',
+      phase: 'working',
+      wantedReleaseId,
+    });
+
+    try {
+      const payload = await addMusicQueueReleaseToLibrary({ wantedReleaseId });
+      applyMutationRelease(payload);
+      const outcome = payload?.action?.outcome;
+      const message = outcome === 'queued'
+        ? 'Harmoniarr verified the completed files and queued this release to be added to your library.'
+        : outcome === 'deferred'
+        ? 'This release is safe to add, but another library add is already active. Harmoniarr will keep it ready.'
+        : outcome === 'still_needs_review'
+        ? 'Harmoniarr checked the completed files again and found something that needs review before adding.'
+        : 'This release is no longer ready to add. Harmoniarr refreshed its status.';
+      setActionFeedback({
+        actionKey,
+        message,
+        phase: ['queued', 'deferred'].includes(outcome) ? 'success' : 'error',
+        wantedReleaseId,
+      });
+      await resource.load();
+      return payload;
+    } catch (error) {
+      setActionFeedback({
+        actionKey,
+        message: getErrorMessage(error, 'Music Queue library add failed.') || 'Music Queue library add failed.',
+        phase: 'error',
+        wantedReleaseId,
+      });
+      return null;
+    } finally {
+      activeReleaseActionKey.value = '';
+    }
+  }
+
   return {
     ...resource,
     actionFeedback: readonly(actionFeedback),
     activeMatchActionKey: readonly(activeMatchActionKey),
     activeReleaseActionKey: readonly(activeReleaseActionKey),
+    addToLibrary,
     allowFallbackQuality,
     recheckLibraryAdd,
     rejectMatch,

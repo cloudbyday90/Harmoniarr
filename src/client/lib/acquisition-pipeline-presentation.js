@@ -719,9 +719,12 @@ export function buildMusicQueueMatchReview(release) {
   const recovery = release.recovery ?? null;
   const canSearchAgain = recovery?.canSearchAgain
     ?? ['failed', 'no_matches_left', 'quality_choice_needed'].includes(release.statusCode);
+  const canAddToLibrary = release.statusCode === 'ready_to_add'
+    && release.action?.code === 'add_to_library';
 
   return {
     action: release.action,
+    canAddToLibrary,
     canAllowFallbackQuality,
     canSearchAgain,
     fallbackQualityLabel: 'Allow fallback quality',

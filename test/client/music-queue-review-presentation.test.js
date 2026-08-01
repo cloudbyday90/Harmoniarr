@@ -72,6 +72,18 @@ test('Music Queue review keeps an automatic release calm while retaining evidenc
   assert.match(presentation.decisionCopy, /continue automatically/i);
 });
 
+test('Music Queue review presents manual library add as the one decision for a safe ready release', () => {
+  const presentation = buildMusicQueueReviewPresentation({
+    ...BASE_REVIEW,
+    canAddToLibrary: true,
+    matchCards: [],
+  });
+
+  assert.equal(presentation.hasDecision, true);
+  assert.equal(presentation.hasManualSafeAdd, true);
+  assert.match(presentation.decisionCopy, /check the files again/i);
+});
+
 test('Music Queue review explains automatic recovery without adding a decision', () => {
   const presentation = buildMusicQueueReviewPresentation({
     ...BASE_REVIEW,

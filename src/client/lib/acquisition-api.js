@@ -80,3 +80,14 @@ export function recheckMusicQueueReleaseSafeAdd({ wantedReleaseId } = {}) {
     },
   );
 }
+
+export function addMusicQueueReleaseToLibrary({ wantedReleaseId } = {}) {
+  return apiRequest(
+    `/api/v1/acquisition/releases/${encodeURIComponent(wantedReleaseId)}/add-to-library`,
+    {
+      body: {},
+      includeCsrf: true,
+      method: 'POST',
+    },
+  );
+}
