@@ -88,6 +88,7 @@ function escapeLikePattern(value) {
 }
 
 export async function listImportCandidates({
+  candidateIds = null,
   folderPath = null,
   limit,
   offset,
@@ -107,6 +108,13 @@ export async function listImportCandidates({
 
   if (status) {
     addClause('status = $value', status);
+  }
+
+  if (Array.isArray(candidateIds)) {
+    if (candidateIds.length === 0) {
+      return { items: [], total: 0 };
+    }
+    addClause('id::text = ANY($value::text[])', candidateIds);
   }
 
   if (sourceSearchId) {

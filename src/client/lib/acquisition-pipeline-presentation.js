@@ -505,6 +505,8 @@ export function buildMusicQueueAction(status, recovery = null) {
       return { code: 'open_downloader', label: 'Open Downloader', type: 'route', routeName: 'downloader' };
     case 'open_in_library':
       return { code: 'open_in_library', label: 'Open Library', type: 'route', routeName: 'library' };
+    case 'recheck_library_add':
+      return { code: 'recheck_library_add', label: status?.repair?.actionLabel ?? 'Try audio check again', type: 'review' };
     case 'review_add_plan':
       return {
         code: 'review_add_plan',

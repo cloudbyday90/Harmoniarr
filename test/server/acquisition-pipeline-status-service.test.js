@@ -77,8 +77,8 @@ test('deriveMusicQueueStatus gives each safe add stop one specific recovery acti
     },
     {
       add: { latestOutcome: 'quality_blocked', qualityBlockedCount: 1, recoveryReasonCode: 'audio_check_failed' },
-      expectedAction: MUSIC_QUEUE_ACTION_CODES.REVIEW_ADD_PLAN,
-      expectedLabel: 'Review audio check',
+      expectedAction: MUSIC_QUEUE_ACTION_CODES.RECHECK_LIBRARY_ADD,
+      expectedLabel: 'Try audio check again',
       expectedReason: 'audio_check_failed',
     },
     {

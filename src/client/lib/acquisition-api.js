@@ -69,3 +69,14 @@ export function allowMusicQueueFallbackQuality({ wantedReleaseId } = {}) {
     },
   );
 }
+
+export function recheckMusicQueueReleaseSafeAdd({ wantedReleaseId } = {}) {
+  return apiRequest(
+    `/api/v1/acquisition/releases/${encodeURIComponent(wantedReleaseId)}/recheck-library-add`,
+    {
+      body: {},
+      includeCsrf: true,
+      method: 'POST',
+    },
+  );
+}

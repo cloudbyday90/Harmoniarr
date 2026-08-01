@@ -83,6 +83,44 @@ test('startImportCandidateApplyRun queues safe-auto runs for ready candidates on
   assert.equal(recordAuditEventFn.mock.calls[0].arguments[0].details.warningCandidateCount, 2);
 });
 
+test('startImportCandidateApplyRun persists a validated candidate scope for a release repair', async (t) => {
+  const buildImportPendingCandidateSummary = t.mock.fn(async () => ({
+    counts: {
+      blocked: 0,
+      ready: 1,
+      readyWithWarnings: 0,
+      totalImportPending: 1,
+    },
+  }));
+  const createOperationRun = t.mock.fn(async () => ({ id: 'run-scoped-1', status: 'pending' }));
+  const service = createImportCandidateApplyService({
+    buildImportPendingCandidateSummary,
+    createOperationRun,
+    recordAuditEventFn: async () => {},
+  });
+
+  await service.startImportCandidateApplyRun({
+    applySafetyMode: 'safe_auto',
+    importCandidateIds: ['candidate-1'],
+    triggerSource: 'music_queue_prerequisite_recheck',
+  });
+
+  assert.deepEqual(buildImportPendingCandidateSummary.mock.calls[0].arguments, [{
+    candidateIds: ['candidate-1'],
+    limit: 1000,
+  }]);
+  assert.deepEqual(createOperationRun.mock.calls[0].arguments, [{
+    applySafetyMode: 'safe_auto',
+    executableCandidateCount: 1,
+    executionMode: 'move',
+    importCandidateIds: ['candidate-1'],
+    requestedCandidateCount: 1,
+    status: 'pending',
+    triggeredByUserId: null,
+    triggerSource: 'music_queue_prerequisite_recheck',
+  }]);
+});
+
 test('startImportCandidateApplyRun rejects when nothing import-pending is executable', async () => {
   const service = createImportCandidateApplyService({
     buildImportPendingCandidateSummary: async () => ({

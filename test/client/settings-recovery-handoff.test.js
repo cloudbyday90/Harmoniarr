@@ -28,6 +28,7 @@ import {
   createSettingsRecoveryContext,
   resolveSettingsRecoveryContext,
 } from '../../src/client/lib/settings-recovery-handoff.js';
+import { buildSettingsMusicQueueSafeAddRecheckConfirmation } from '../../src/client/lib/settings-music-queue-safe-add-recheck-presentation.js';
 
 test('Settings recovery contexts accept only fixed internal destinations', () => {
   assert.deepEqual(
@@ -101,4 +102,28 @@ test('Settings folder recovery returns only after server folder validation is he
   assert.equal(unresolved.action, null);
   assert.equal(unresolved.outcome, 'needs_attention');
   assert.doesNotMatch(JSON.stringify(unresolved), /private|mount failure/i);
+});
+
+test('Settings recheck feedback exposes only the scoped Music Queue release outcome', () => {
+  const recoveryContext = createSettingsRecoveryContext({
+    context: SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE_RELEASE,
+    wantedReleaseId: 'wanted-release-1',
+  });
+  const queued = buildSettingsMusicQueueSafeAddRecheckConfirmation({
+    recoveryContext,
+    recheck: { action: { outcome: 'queued', runId: 'apply-run-1' } },
+  });
+  const blocked = buildSettingsMusicQueueSafeAddRecheckConfirmation({
+    recoveryContext,
+    recheck: { action: { outcome: 'still_needs_review', internalPath: '/private/downloads' } },
+  });
+
+  assert.equal(queued.title, 'Library add resumed');
+  assert.deepEqual(queued.action, {
+    label: 'Return to Music Queue',
+    params: { wantedReleaseId: 'wanted-release-1' },
+    routeName: 'music-queue-release',
+  });
+  assert.equal(blocked.title, 'Library add still needs review');
+  assert.doesNotMatch(JSON.stringify(blocked), /private|downloads|apply-run/i);
 });

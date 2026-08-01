@@ -1735,8 +1735,18 @@ outcome-specific action. The durable reason is bounded, historic quality-gate
 records remain compatible, normal Music Queue evidence excludes raw diagnostic
 data, and Activity uses the same safe recovery copy and handoff.
 
-Recommended next slice: add a **release-level safe recheck after a fixed
-prerequisite**. Folder and media-tool repairs should queue one scoped read-only
-add preview and resume the existing automatic add only when the resulting plan
-is safe. Collision and quality stops must remain confirmation-first, with no
-overwrite or blind retry.
+### Safe Add Prerequisite Recheck
+
+Implemented the release-level safe recheck after a fixed prerequisite. A
+healthy folder save or an explicit audio-check retry now revalidates only the
+affected completed release through a fresh preview and safe-auto quality gate.
+The resulting operation run persists one candidate scope through the worker;
+it cannot turn into a batch-wide library add. Collisions, quality stops,
+suspicious lossless claims, generic unsafe plans, and add failures remain
+confirmation-first. See
+[MUSIC_QUEUE_SAFE_ADD_PREREQUISITE_RECHECK_DESIGN.md](MUSIC_QUEUE_SAFE_ADD_PREREQUISITE_RECHECK_DESIGN.md).
+
+Recommended next slice: add Docker-backed recovery acceptance for a mounted
+completed download. Prove one repaired folder mapping resumes only its scoped
+release, and prove collision and strict-quality recovery variants remain in
+review without creating an automatic add run.

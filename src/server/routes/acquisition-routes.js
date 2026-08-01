@@ -29,6 +29,7 @@ export function registerAcquisitionRoutes(app, {
   limitMusicQueueMutation = skipRateLimitMiddleware,
   limitMusicQueueRead = skipRateLimitMiddleware,
   listMusicQueueReleases,
+  recheckMusicQueueReleaseSafeAdd,
   requestMusicQueueReleaseRediscovery,
   rejectMusicQueueMatch,
   requireCsrf = defaultRequestAuthDependencies.requireCsrf,
@@ -80,6 +81,22 @@ export function registerAcquisitionRoutes(app, {
     const session = await requireFreshSession(request);
     requireCsrf(request, session);
     const payload = await requestMusicQueueReleaseRediscovery({
+      actorUserId: session.user?.id ?? session.appUserId,
+      appUserId: session.user?.id ?? session.appUserId,
+      requestMetadata: getRequestMetadata(request),
+      wantedReleaseId: request.params.wantedReleaseId,
+    });
+
+    response.json({
+      ok: true,
+      ...payload,
+    });
+  }));
+
+  app.post('/api/v1/acquisition/releases/:wantedReleaseId/recheck-library-add', limitMusicQueueMutation, asyncRoute(async (request, response) => {
+    const session = await requireFreshSession(request);
+    requireCsrf(request, session);
+    const payload = await recheckMusicQueueReleaseSafeAdd({
       actorUserId: session.user?.id ?? session.appUserId,
       appUserId: session.user?.id ?? session.appUserId,
       requestMetadata: getRequestMetadata(request),

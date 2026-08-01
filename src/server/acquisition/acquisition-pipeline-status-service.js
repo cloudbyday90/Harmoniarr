@@ -47,6 +47,7 @@ export const MUSIC_QUEUE_ACTION_CODES = Object.freeze({
   INCLUDE_AGAIN: 'include_again',
   OPEN_DOWNLOADER: 'open_downloader',
   OPEN_IN_LIBRARY: 'open_in_library',
+  RECHECK_LIBRARY_ADD: 'recheck_library_add',
   REVIEW_ADD_PLAN: 'review_add_plan',
   REVIEW_MATCHES: 'review_matches',
   REVIEW_QUALITY_CHOICE: 'review_quality_choice',

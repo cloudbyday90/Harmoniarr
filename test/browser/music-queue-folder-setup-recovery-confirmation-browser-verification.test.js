@@ -76,6 +76,49 @@ function buildHealthyPathValidation() {
   };
 }
 
+function buildAudioCheckRecoveryPayload({ isQueued }) {
+  const status = isQueued
+    ? {
+      code: 'adding_to_library',
+      detail: 'Harmoniarr is safely adding the checked download to your library.',
+      label: 'Adding to library',
+      nextAction: 'show_details',
+      tone: 'info',
+    }
+    : {
+      code: 'needs_help_adding',
+      detail: 'Harmoniarr could not finish checking the downloaded audio, so it was not added to your library.',
+      label: 'Needs help',
+      nextAction: 'recheck_library_add',
+      repair: {
+        actionCode: 'recheck_library_add',
+        actionLabel: 'Try audio check again',
+        code: 'media_verification',
+        detail: 'Harmoniarr could not finish checking the downloaded audio, so it was not added to your library.',
+        nextStep: 'When media tools are available again, try the audio check. Harmoniarr will safely recheck this same completed download before adding it.',
+        reasonCode: 'audio_check_failed',
+        title: 'Audio check could not finish',
+      },
+      tone: 'warning',
+    };
+
+  return {
+    checkedAt: '2026-08-01T15:00:00.000Z',
+    pagination: { limit: 100, offset: 0, total: 1 },
+    releases: [{
+      artistName: 'Forrest Frank',
+      expectedTrackCount: 12,
+      id: 'wanted-forrest-frank-audio',
+      missingTrackCount: 12,
+      releaseGroupTitle: 'Child of God',
+      releaseGroupType: 'Album',
+      releaseTitle: 'Child of God',
+      status,
+    }],
+    summary: { counts: { [status.code]: 1 }, total: 1 },
+  };
+}
+
 let browserRuntime;
 let runtimeUnavailableReason = null;
 
@@ -211,5 +254,75 @@ suite('Music Queue folder setup recovery confirmation browser verification', () 
       await browserContext.unrouteAll({ behavior: 'ignoreErrors' });
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
     }, { scenarioName: 'music_queue_folder_setup_recovery_confirmation' });
+  });
+
+  test('audio recheck resumes only the selected completed download after the media prerequisite returns', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) {
+      t.skip(runtimeUnavailableReason);
+      return;
+    }
+
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      const pageErrors = [];
+      let queued = false;
+      let recheckRequestBody = null;
+      page.on('pageerror', (error) => pageErrors.push(error.message));
+
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      await browserContext.route(/\/api\/v1\/acquisition\/releases(?:\?.*)?$/, async (route) => {
+        await route.fulfill({
+          body: JSON.stringify(buildAudioCheckRecoveryPayload({ isQueued: queued })),
+          contentType: 'application/json',
+        });
+      });
+      await browserContext.route('**/api/v1/acquisition/releases/wanted-forrest-frank-audio', async (route) => {
+        await route.fulfill({
+          body: JSON.stringify({
+            release: buildAudioCheckRecoveryPayload({ isQueued: queued }).releases[0],
+          }),
+          contentType: 'application/json',
+        });
+      });
+      await browserContext.route('**/api/v1/acquisition/releases/wanted-forrest-frank-audio/recheck-library-add', async (route) => {
+        assert.equal(route.request().method(), 'POST');
+        recheckRequestBody = route.request().postDataJSON();
+        queued = true;
+        await route.fulfill({
+          body: JSON.stringify({
+            action: {
+              code: 'recheck_library_add',
+              outcome: 'queued',
+              wantedReleaseId: 'wanted-forrest-frank-audio',
+            },
+            release: buildAudioCheckRecoveryPayload({ isQueued: true }).releases[0],
+          }),
+          contentType: 'application/json',
+        });
+      });
+
+      await page.goto(`${baseUrl}/app/music-queue/wanted-forrest-frank-audio`, { waitUntil: 'domcontentloaded' });
+      const review = page.locator('.music-queue-review');
+      await review.getByRole('heading', { name: 'Child of God by Forrest Frank' }).waitFor();
+      await review.getByRole('heading', { name: 'Audio check could not finish' }).waitFor();
+      await review.getByText('When media tools are available again, try the audio check. Harmoniarr will safely recheck this same completed download before adding it.').waitFor();
+      await review.getByRole('link', { name: 'Advanced diagnostics' }).waitFor();
+
+      await Promise.all([
+        page.waitForResponse((response) => response.url().endsWith('/recheck-library-add')
+          && response.request().method() === 'POST'),
+        review.getByRole('button', { name: 'Try audio check again' }).click(),
+      ]);
+
+      assert.deepEqual(recheckRequestBody, {});
+      await review.getByRole('status').filter({
+        hasText: 'Audio check passed. Harmoniarr queued this release for a safe library add.',
+      }).waitFor();
+      await review.getByText('Adding to library', { exact: true }).waitFor();
+      await review.getByText('Harmoniarr is safely adding the checked download to your library.').waitFor();
+      await browserContext.unrouteAll({ behavior: 'ignoreErrors' });
+      assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
+    }, { scenarioName: 'music_queue_audio_recheck_safe_add' });
   });
 });

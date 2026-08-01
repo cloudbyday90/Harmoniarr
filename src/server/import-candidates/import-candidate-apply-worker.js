@@ -24,6 +24,7 @@ import { classifyApplyOutcomeQuality } from '../activity/source-user-outcome-qua
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
 import { assessDeliveredQuality } from '../media/media-delivery-quality.js';
 import { createImportCandidateSafeAutoAddQualityGateService } from './import-candidate-safe-auto-add-quality-gate.js';
+import { readImportCandidateApplyScope } from './import-candidate-apply-scope.js';
 import {
   IMPORT_CANDIDATE_ADD_BLOCKER_CODES,
   deriveImportCandidateAddRecoveryReasonCode,
@@ -72,9 +73,10 @@ function resolveRunnableCandidates(importPendingCandidates, applySafetyMode) {
   return importPendingCandidates.filter(isSafeAutoCandidate);
 }
 
-function buildApplyTriggerSummary({ applySafetyMode, triggerSource }) {
+function buildApplyTriggerSummary({ applySafetyMode, importCandidateIds, triggerSource }) {
   return {
     ...(applySafetyMode !== 'manual' ? { applySafetyMode } : {}),
+    ...(Array.isArray(importCandidateIds) ? { scopedCandidateCount: importCandidateIds.length } : {}),
     ...(triggerSource !== 'manual' ? { triggerSource } : {}),
   };
 }
@@ -256,12 +258,14 @@ export function createImportCandidateApplyWorker({
   async function runApply({
     applySafetyMode = 'manual',
     executableCandidateCount,
+    importCandidateIds = null,
     requestedCandidateCount,
     runId,
     triggerSource = 'manual',
   }) {
     let finalLeaseStatus = 'completed';
     let leaseHeartbeat = null;
+    const scopedCandidateIds = readImportCandidateApplyScope(importCandidateIds);
 
     try {
       await acquireLease({ runId });
@@ -277,11 +281,14 @@ export function createImportCandidateApplyWorker({
           executionMode: 'move',
           executableCandidateCount,
           requestedCandidateCount,
-          ...buildApplyTriggerSummary({ applySafetyMode, triggerSource }),
+          ...buildApplyTriggerSummary({ applySafetyMode, importCandidateIds: scopedCandidateIds, triggerSource }),
         },
       });
 
-      const importPendingSummary = await buildImportPendingCandidateSummary({ limit: 1000 });
+      const importPendingSummary = await buildImportPendingCandidateSummary({
+        ...(Array.isArray(scopedCandidateIds) ? { candidateIds: scopedCandidateIds } : {}),
+        limit: 1000,
+      });
       const runnableCandidates = resolveRunnableCandidates(
         importPendingSummary.importPendingCandidates ?? [],
         applySafetyMode,
@@ -551,7 +558,7 @@ export function createImportCandidateApplyWorker({
           requestedCandidateCount,
           ...(counts.qualityBlocked > 0 ? { qualityBlockedCount: counts.qualityBlocked } : {}),
           ...buildQualityRecoverySummary(qualityRecoveries),
-          ...buildApplyTriggerSummary({ applySafetyMode, triggerSource }),
+          ...buildApplyTriggerSummary({ applySafetyMode, importCandidateIds: scopedCandidateIds, triggerSource }),
           ...buildSkippedUnsafeCandidateCount(importPendingSummary, runItems, applySafetyMode),
           totalImportPending: importPendingSummary.counts?.totalImportPending ?? runItems.length,
         },
@@ -594,7 +601,7 @@ export function createImportCandidateApplyWorker({
             pauseMessage: error.message,
             pauseProvider: error.pauseProvider ?? null,
             requestedCandidateCount,
-            ...buildApplyTriggerSummary({ applySafetyMode, triggerSource }),
+            ...buildApplyTriggerSummary({ applySafetyMode, importCandidateIds: scopedCandidateIds, triggerSource }),
           },
         });
         return;
@@ -609,7 +616,7 @@ export function createImportCandidateApplyWorker({
             executionMode: 'move',
             executableCandidateCount,
             requestedCandidateCount,
-            ...buildApplyTriggerSummary({ applySafetyMode, triggerSource }),
+            ...buildApplyTriggerSummary({ applySafetyMode, importCandidateIds: scopedCandidateIds, triggerSource }),
           },
         });
         return;
@@ -624,7 +631,7 @@ export function createImportCandidateApplyWorker({
           executionMode: 'move',
           executableCandidateCount,
           requestedCandidateCount,
-          ...buildApplyTriggerSummary({ applySafetyMode, triggerSource }),
+          ...buildApplyTriggerSummary({ applySafetyMode, importCandidateIds: scopedCandidateIds, triggerSource }),
         },
       });
     } finally {
@@ -637,6 +644,7 @@ export function createImportCandidateApplyWorker({
   async function startWorkerRun({
     applySafetyMode = 'manual',
     executableCandidateCount,
+    importCandidateIds = null,
     requestedCandidateCount,
     runId,
     triggerSource = 'manual',
@@ -650,6 +658,7 @@ export function createImportCandidateApplyWorker({
       void runApply({
         applySafetyMode,
         executableCandidateCount,
+        importCandidateIds,
         requestedCandidateCount,
         runId,
         triggerSource,

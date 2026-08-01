@@ -102,6 +102,7 @@ export function createImportCandidateAutoApplyRunService({
     try {
       const result = await startImportCandidateApplyRun({
         applySafetyMode: 'safe_auto',
+        importCandidateIds: [importCandidateId],
         requestMetadata,
         triggeredByUserId: null,
         triggerSource: 'download_completed',

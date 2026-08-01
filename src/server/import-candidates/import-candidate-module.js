@@ -48,6 +48,7 @@ import { createImportCandidateAutoSelectionService } from './import-candidate-au
 import { createImportCandidateSafeAutoAddQualityGateService } from './import-candidate-safe-auto-add-quality-gate.js';
 import { createImportCandidateImportPendingSummaryService } from './import-candidate-import-pending-summary-service.js';
 import { createImportCandidateReleaseAddDiagnosticsService } from './import-candidate-release-add-diagnostics-service.js';
+import { createImportCandidateReleaseSafeAddRecheckService } from './import-candidate-release-safe-add-recheck-service.js';
 import { listImportCandidateFileDecisions } from './import-candidate-file-decision-repository.js';
 import { replaceImportExecutionRunItems, updateImportExecutionRunItem, upsertImportExecutionRunItem } from './import-candidate-execution-repository.js';
 import { createImportCandidateReputationEnrichmentService } from './import-candidate-reputation-enrichment-service.js';
@@ -157,6 +158,7 @@ export function createImportCandidateModule({
     previewImportCandidateApply: importCandidateApplyPreviewService.previewImportCandidateApply,
   }),
   importCandidateReleaseAddDiagnosticsService = createImportCandidateReleaseAddDiagnosticsService(),
+  importCandidateReleaseSafeAddRecheckService = null,
   importCandidateExecutionHeartbeatConfig = resolveImportCandidateExecutionHeartbeatConfig(),
   importCandidateExecutionHeartbeatState = createImportCandidateExecutionHeartbeatState(),
   maintenanceLockService = createMaintenanceLockService(),
@@ -307,6 +309,16 @@ export function createImportCandidateModule({
     createOperationRun: importCandidateApplyRunStore.createOperationRun,
     getActiveRun: importCandidateApplyRunStore.getActiveRun,
   }),
+  importCandidateReleaseSafeAddRecheck = importCandidateReleaseSafeAddRecheckService
+    ?? createImportCandidateReleaseSafeAddRecheckService({
+      findLatestReleaseAddRecoveryCandidate: importCandidateReleaseAddDiagnosticsService.findLatestReleaseAddRecoveryCandidate,
+      getImportCandidate: importCandidateService.getImportCandidate,
+      getMediaToolingStatus,
+      previewImportCandidateApply: importCandidateApplyPreviewService.previewImportCandidateApply,
+      resumeImportCandidateForSafeAdd: importCandidateService.resumeImportCandidateForSafeAdd,
+      safeAutoAddQualityGateService: importCandidateSafeAutoAddQualityGateService,
+      startImportCandidateApplyRun: importCandidateApplyService.startImportCandidateApplyRun,
+    }),
   importCandidateAutoApplyRunService = createImportCandidateAutoApplyRunService({
     handleImportCandidateImportBlocker: importCandidateRecoveryService.handleImportCandidateImportBlocker,
     previewImportCandidateApply: importCandidateApplyPreviewService.previewImportCandidateApply,
@@ -400,6 +412,7 @@ export function createImportCandidateModule({
     importCandidateAutoSelectionService,
     importCandidateImportPendingSummaryService,
     importCandidateReleaseAddDiagnosticsService,
+    importCandidateReleaseSafeAddRecheckService: importCandidateReleaseSafeAddRecheck,
     importCandidateApplyPreviewService,
     importCandidatePreviewService,
     postApplyScanService,

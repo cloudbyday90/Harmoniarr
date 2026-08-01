@@ -19,6 +19,7 @@
 import { createApiError } from '../auth.js';
 import { recordAuditEvent } from '../audit.js';
 import { operationRunRegistry } from '../../shared/operation-run-descriptors.js';
+import { normalizeImportCandidateApplyScope } from './import-candidate-apply-scope.js';
 
 export function createImportCandidateApplyService({
   assertMaintenanceWriteAllowed = async () => {},
@@ -39,6 +40,7 @@ export function createImportCandidateApplyService({
 
   async function startImportCandidateApplyRun({
     applySafetyMode = 'manual',
+    importCandidateIds = null,
     requestMetadata = null,
     triggeredByUserId = null,
     triggerSource = 'manual',
@@ -50,7 +52,11 @@ export function createImportCandidateApplyService({
       throw createApiError(409, 'import_candidate_apply_in_progress', 'An import apply run is already running or queued');
     }
 
-    const importPendingSummary = await buildImportPendingCandidateSummary({ limit: 1000 });
+    const scopedCandidateIds = normalizeImportCandidateApplyScope(importCandidateIds);
+    const importPendingSummary = await buildImportPendingCandidateSummary({
+      ...(scopedCandidateIds ? { candidateIds: scopedCandidateIds } : {}),
+      limit: 1000,
+    });
     const requestedCandidateCount = importPendingSummary.counts?.totalImportPending ?? 0;
     const readyCandidateCount = importPendingSummary.counts?.ready ?? 0;
     const warningCandidateCount = importPendingSummary.counts?.readyWithWarnings ?? 0;
@@ -70,6 +76,7 @@ export function createImportCandidateApplyService({
       applySafetyMode,
       executableCandidateCount,
       executionMode: 'move',
+      ...(scopedCandidateIds ? { importCandidateIds: scopedCandidateIds } : {}),
       requestedCandidateCount,
       status: 'pending',
       triggeredByUserId,
@@ -83,6 +90,7 @@ export function createImportCandidateApplyService({
         blockedCandidateCount: importPendingSummary.counts?.blocked ?? 0,
         applySafetyMode,
         executableCandidateCount,
+        ...(scopedCandidateIds ? { scopedCandidateCount: scopedCandidateIds.length } : {}),
         requestedCandidateCount,
         runId: run.id,
         triggerSource,

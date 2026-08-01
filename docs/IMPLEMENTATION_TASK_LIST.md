@@ -169,6 +169,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   page, and return only to an allowlisted workspace or bounded release detail
   after provider or folder readiness is verified. See
   `SETTINGS_RECOVERY_HANDOFF_CONSISTENCY_DESIGN.md`.
+- Music Queue safe-add prerequisite recheck: a repaired folder path or restored
+  media tooling now rechecks only the affected completed release through a
+  server-owned preview and safe-auto quality gate. The persisted apply-run
+  scope prevents the recovery from adding unrelated completed downloads, while
+  collision and quality stops remain review-only. See
+  `MUSIC_QUEUE_SAFE_ADD_PREREQUISITE_RECHECK_DESIGN.md`.
 - Activity advanced diagnostics boundary: match, library-add, and failed-add
   workbenches now use canonical `/app/activity/diagnostics/...` routes behind
   the Activity disclosure. Legacy candidate/import URLs redirect with their

@@ -71,6 +71,7 @@ const {
   isRevalidating,
   load,
   rejectMatch,
+  recheckLibraryAdd,
   releases,
   searchAgain,
   summaryCards,
@@ -233,6 +234,15 @@ async function handleSearchAgain() {
 
 async function handleAllowFallbackQuality() {
   const result = await allowFallbackQuality({
+    wantedReleaseId: selectedRelease.value?.id,
+  });
+  if (result) {
+    await refreshSelectedReleaseDetail(result);
+  }
+}
+
+async function handleRecheckLibraryAdd() {
+  const result = await recheckLibraryAdd({
     wantedReleaseId: selectedRelease.value?.id,
   });
   if (result) {
@@ -418,6 +428,7 @@ watch(
         :review="matchReview"
         @allow-fallback-quality="handleAllowFallbackQuality"
         @close="closeReview"
+        @recheck-library-add="handleRecheckLibraryAdd"
         @reject-match="handleRejectMatch"
         @search-again="handleSearchAgain"
         @use-match="handleUseMatch"

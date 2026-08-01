@@ -112,15 +112,20 @@ export function createImportCandidateImportPendingSummaryService({
   async function buildImportPendingCandidateSummary({
     actorUserId = null,
     actorUserRole = null,
+    candidateIds = null,
     limit,
     targetUser = null,
   } = {}) {
     const normalizedLimit = normalizeStageSummaryLimit(limit);
+    if (Array.isArray(candidateIds) && candidateIds.length === 0) {
+      return createEmptyImportPendingSummary(normalizedLimit);
+    }
     const visibilityFilter = buildImportCandidateVisibilityFilter({
       actorUserId,
       actorUserRole,
     });
     const importPendingQueue = await listImportCandidates({
+      ...(Array.isArray(candidateIds) ? { candidateIds } : {}),
       limit: normalizedLimit,
       offset: 0,
       requestedForUserId: visibilityFilter.requestedForUserId,

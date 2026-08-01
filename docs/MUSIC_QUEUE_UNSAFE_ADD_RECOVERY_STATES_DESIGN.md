@@ -111,10 +111,9 @@ Focused validation passed on 2026-08-01:
   stop, its release-centred action, Advanced diagnostics secondary handoff,
   and matching Activity route.
 
-## 6. Next Step
+## 6. Follow-Up
 
-Implement a release-level safe recheck after a fixed prerequisite. Folder and
-media-tool repairs should queue a scoped read-only add preview and resume the
-existing automatic add only when the new plan is safe. Collision and quality
-stops must remain confirmation-first; no recovery may overwrite a library file
-or blindly retry a rejected quality result.
+The implemented release-level prerequisite recheck is documented in
+[MUSIC_QUEUE_SAFE_ADD_PREREQUISITE_RECHECK_DESIGN.md](MUSIC_QUEUE_SAFE_ADD_PREREQUISITE_RECHECK_DESIGN.md).
+It resumes only a folder- or audio-tool-blocked release after a fresh preview
+and quality gate. Collision and quality stops remain confirmation-first.

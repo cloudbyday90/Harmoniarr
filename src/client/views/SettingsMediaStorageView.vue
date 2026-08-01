@@ -51,7 +51,9 @@ import {
   buildSettingsFolderRecoveryConfirmation,
   resolveSettingsRecoveryContext,
 } from '../lib/settings-recovery-handoff.js';
+import { buildSettingsMusicQueueSafeAddRecheckConfirmation } from '../lib/settings-music-queue-safe-add-recheck-presentation.js';
 import { buildSettingsSaveState } from '../lib/settings-save-state-presentation.js';
+import { recheckMusicQueueReleaseSafeAdd } from '../lib/acquisition-api.js';
 
 const route = useRoute();
 const pathValidation = ref(null);
@@ -151,10 +153,26 @@ async function handleSaveSettings() {
   const outcome = await saveSettings();
   if (!outcome?.ok || !recoveryContext.value) return;
 
-  recoveryConfirmation.value = buildSettingsFolderRecoveryConfirmation({
+  const folderConfirmation = buildSettingsFolderRecoveryConfirmation({
     recoveryContext: recoveryContext.value,
     validation: outcome.payload?.pathValidation ?? pathValidation.value,
   });
+  if (folderConfirmation?.outcome !== 'ready' || !recoveryContext.value.wantedReleaseId) {
+    recoveryConfirmation.value = folderConfirmation;
+    return;
+  }
+
+  try {
+    const recheck = await recheckMusicQueueReleaseSafeAdd({
+      wantedReleaseId: recoveryContext.value.wantedReleaseId,
+    });
+    recoveryConfirmation.value = buildSettingsMusicQueueSafeAddRecheckConfirmation({
+      recoveryContext: recoveryContext.value,
+      recheck,
+    }) ?? folderConfirmation;
+  } catch {
+    recoveryConfirmation.value = folderConfirmation;
+  }
 }
 
 onMounted(() => { void loadSettings(); });

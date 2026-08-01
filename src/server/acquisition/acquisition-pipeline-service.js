@@ -249,6 +249,7 @@ export function createAcquisitionPipelineService({
   allowMusicQueueFallbackQuality = null,
   getNow = () => new Date(),
   qualityPolicyService = createAcquisitionQualityPolicyService(),
+  recheckReleaseSafeAdd = null,
   rejectImportCandidate = null,
   recordActivityEventFn = null,
   requestMusicQueueRediscovery = null,
@@ -493,6 +494,48 @@ export function createAcquisitionPipelineService({
     };
   }
 
+  async function recheckMusicQueueReleaseSafeAdd({
+    appUserId,
+    actorUserId = null,
+    requestMetadata = null,
+    wantedReleaseId,
+  } = {}) {
+    if (typeof recheckReleaseSafeAdd !== 'function') {
+      throw createApiError(503, 'music_queue_add_recheck_unavailable', 'Music Queue add recheck is not available');
+    }
+
+    const scopedAppUserId = normalizeRequiredAppUserId(appUserId, 'recheckMusicQueueReleaseSafeAdd');
+    const scopedWantedReleaseId = normalizeRequiredId(wantedReleaseId, 'wantedReleaseId');
+    const release = await acquisitionPipelineStore.getWantedReleaseEvidence({
+      appUserId: scopedAppUserId,
+      wantedReleaseId: scopedWantedReleaseId,
+    });
+    if (!release) {
+      throw createApiError(404, 'music_queue_release_not_found', 'Music Queue release was not found');
+    }
+
+    const recheck = await recheckReleaseSafeAdd({
+      actorUserId,
+      appUserId: scopedAppUserId,
+      requestMetadata,
+      wantedReleaseId: scopedWantedReleaseId,
+    });
+    const refreshed = await getMusicQueueRelease({
+      appUserId: scopedAppUserId,
+      wantedReleaseId: scopedWantedReleaseId,
+    });
+
+    return {
+      action: {
+        code: 'recheck_library_add',
+        outcome: recheck?.outcome ?? 'not_available',
+        ...(recheck?.runId ? { runId: recheck.runId } : {}),
+        wantedReleaseId: scopedWantedReleaseId,
+      },
+      release: refreshed.release,
+    };
+  }
+
   async function runScopedMatchAction({
     actionCode,
     appUserId,
@@ -610,6 +653,7 @@ export function createAcquisitionPipelineService({
     allowMusicQueueReleaseFallbackQuality,
     getMusicQueueRelease,
     listMusicQueueReleases,
+    recheckMusicQueueReleaseSafeAdd,
     requestMusicQueueReleaseRediscovery,
     rejectMusicQueueMatch,
     useMusicQueueMatch,

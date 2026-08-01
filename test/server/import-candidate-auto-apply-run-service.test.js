@@ -19,6 +19,7 @@ test('startSafeApplyRunAfterDownloadCompleted starts a safe-auto apply run', asy
 
   assert.deepEqual(startImportCandidateApplyRun.mock.calls[0].arguments, [{
     applySafetyMode: 'safe_auto',
+    importCandidateIds: ['candidate-1'],
     requestMetadata: { ipAddress: '127.0.0.1', userAgent: 'test-agent' },
     triggeredByUserId: null,
     triggerSource: 'download_completed',

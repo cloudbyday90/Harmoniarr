@@ -112,6 +112,34 @@ function projectReleaseAddOutcome(item) {
   };
 }
 
+function buildReleaseAddRecoveryCandidate(item) {
+  if (!item) {
+    return null;
+  }
+
+  const apply = item.applySnapshot?.apply ?? {};
+  const addBlockerCode = deriveImportCandidateAddBlockerCode({
+    applyOutcome: typeof apply.outcome === 'string' ? apply.outcome : null,
+    itemStatus: item.itemStatus,
+    previewBlockerCode: apply.addBlockerCode,
+  });
+  const recoveryReasonCode = deriveImportCandidateAddRecoveryReasonCode({
+    addBlockerCode,
+    qualityGate: apply.qualityGate,
+    recoveryReasonCode: apply.recoveryReasonCode,
+  });
+
+  if (!addBlockerCode || typeof item.importCandidateId !== 'string' || !item.importCandidateId) {
+    return null;
+  }
+
+  return {
+    addBlockerCode,
+    importCandidateId: item.importCandidateId,
+    recoveryReasonCode,
+  };
+}
+
 function createNotFoundError() {
   return createApiError(404, 'music_queue_release_not_found', 'Music Queue release not found');
 }
@@ -160,7 +188,37 @@ export function createImportCandidateReleaseAddDiagnosticsService({
     };
   }
 
+  /**
+   * The recovery service needs only an allow-listed candidate identifier and
+   * stop classification. It intentionally does not receive recorded file
+   * paths, media output, or other diagnostic snapshots.
+   */
+  async function findLatestReleaseAddRecoveryCandidate({
+    appUserId,
+    wantedReleaseId,
+  } = {}) {
+    const normalizedWantedReleaseId = normalizeWantedReleaseId(wantedReleaseId);
+    if (!normalizedWantedReleaseId || typeof appUserId !== 'string' || appUserId.trim().length < 1) {
+      return null;
+    }
+
+    const release = await releaseAddDiagnosticRepository.getScopedWantedRelease({
+      appUserId: appUserId.trim(),
+      wantedReleaseId: normalizedWantedReleaseId,
+    });
+    if (!release) {
+      return null;
+    }
+
+    const outcomes = await releaseAddDiagnosticRepository.listLatestReleaseAddOutcomes({
+      limit: 1,
+      wantedReleaseId: normalizedWantedReleaseId,
+    });
+    return buildReleaseAddRecoveryCandidate(outcomes[0]);
+  }
+
   return {
     buildReleaseAddDiagnostics,
+    findLatestReleaseAddRecoveryCandidate,
   };
 }

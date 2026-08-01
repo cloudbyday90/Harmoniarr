@@ -69,6 +69,7 @@ export function createOperationQueueHandlers({
     handlers[operationRunRegistry.importCandidateApply.operationType] = async ({ run }) => importCandidateModule.importCandidateApplyWorker.startWorkerRun({
       ...(run.summary.applySafetyMode ? { applySafetyMode: run.summary.applySafetyMode } : {}),
       executableCandidateCount: toNumberOrNull(run.summary.executableCandidateCount),
+      ...(Array.isArray(run.summary.importCandidateIds) ? { importCandidateIds: run.summary.importCandidateIds } : {}),
       requestedCandidateCount: toNumberOrNull(run.summary.requestedCandidateCount),
       runId: run.id,
       ...(run.summary.triggerSource ? { triggerSource: run.summary.triggerSource } : {}),

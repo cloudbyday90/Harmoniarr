@@ -105,6 +105,7 @@ test('operation queue handlers register shared operation types and map run summa
       summary: {
         applySafetyMode: 'safe_auto',
         executableCandidateCount: 4,
+        importCandidateIds: ['candidate-1'],
         requestedCandidateCount: 6,
         triggerSource: 'download_completed',
       },
@@ -218,6 +219,7 @@ test('operation queue handlers register shared operation types and map run summa
   assert.deepEqual(importCandidateApplyStartWorkerRun.mock.calls[0].arguments[0], {
     applySafetyMode: 'safe_auto',
     executableCandidateCount: 4,
+    importCandidateIds: ['candidate-1'],
     requestedCandidateCount: 6,
     runId: 'run-3',
     triggerSource: 'download_completed',

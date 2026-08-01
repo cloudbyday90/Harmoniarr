@@ -72,6 +72,7 @@ function createRelease({ matchId = 'candidate-1', status = 'pending' } = {}) {
 function createService({
   allowMusicQueueFallbackQuality = async () => ({ metadataReleaseId: 'release-1', requestStatus: 'ready' }),
   qualityPolicyService: serviceQualityPolicyService = qualityPolicyService,
+  recheckReleaseSafeAdd = async () => ({ outcome: 'queued', runId: 'apply-run-1' }),
   recordActivityEventFn = async () => {},
   requestMusicQueueRediscovery = async () => ({ metadataReleaseId: 'release-1', requestStatus: 'ready' }),
   release = createRelease(),
@@ -96,6 +97,7 @@ function createService({
     allowMusicQueueFallbackQuality,
     getNow: () => new Date('2026-06-29T12:00:00.000Z'),
     qualityPolicyService: serviceQualityPolicyService,
+    recheckReleaseSafeAdd,
     recordActivityEventFn,
     requestMusicQueueRediscovery,
     rejectImportCandidate,
@@ -104,6 +106,46 @@ function createService({
     statusService: serviceStatusService,
   });
 }
+
+test('recheckMusicQueueReleaseSafeAdd verifies release ownership before delegating the release-scoped repair', async (t) => {
+  const recheckReleaseSafeAdd = t.mock.fn(async () => ({ outcome: 'queued', runId: 'apply-run-1' }));
+  const service = createService({ recheckReleaseSafeAdd });
+
+  const result = await service.recheckMusicQueueReleaseSafeAdd({
+    actorUserId: 'user-1',
+    appUserId: 'user-1',
+    requestMetadata: { ipAddress: '127.0.0.1' },
+    wantedReleaseId: 'wanted-1',
+  });
+
+  assert.deepEqual(result.action, {
+    code: 'recheck_library_add',
+    outcome: 'queued',
+    runId: 'apply-run-1',
+    wantedReleaseId: 'wanted-1',
+  });
+  assert.equal(result.release.id, 'wanted-1');
+  assert.deepEqual(recheckReleaseSafeAdd.mock.calls[0].arguments, [{
+    actorUserId: 'user-1',
+    appUserId: 'user-1',
+    requestMetadata: { ipAddress: '127.0.0.1' },
+    wantedReleaseId: 'wanted-1',
+  }]);
+});
+
+test('recheckMusicQueueReleaseSafeAdd does not delegate an out-of-scope release', async (t) => {
+  const recheckReleaseSafeAdd = t.mock.fn(async () => ({ outcome: 'queued' }));
+  const service = createService({ recheckReleaseSafeAdd });
+
+  await assert.rejects(
+    () => service.recheckMusicQueueReleaseSafeAdd({
+      appUserId: 'user-1',
+      wantedReleaseId: 'wanted-outside-scope',
+    }),
+    (error) => error?.code === 'music_queue_release_not_found',
+  );
+  assert.equal(recheckReleaseSafeAdd.mock.callCount(), 0);
+});
 
 test('useMusicQueueMatch verifies release scope before selecting the underlying candidate', async (t) => {
   const selectImportCandidate = t.mock.fn(async ({ importCandidateId }) => ({ importCandidateId, toStatus: 'selected' }));

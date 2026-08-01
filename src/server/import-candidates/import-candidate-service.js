@@ -93,6 +93,29 @@ function normalizeCandidateStatus(value) {
   return normalized;
 }
 
+function normalizeCandidateIds(value) {
+  if (value == null) {
+    return null;
+  }
+
+  if (!Array.isArray(value)) {
+    throw createApiError(400, 'validation_error', 'candidateIds must be an array');
+  }
+
+  const candidateIds = [...new Set(value
+    .map((candidateId) => normalizeOptionalString(candidateId, {
+      fieldName: 'candidateIds',
+      maxLength: 100,
+    }))
+    .filter(Boolean))];
+
+  if (candidateIds.length > 25) {
+    throw createApiError(400, 'validation_error', 'candidateIds must contain 25 candidates or fewer');
+  }
+
+  return candidateIds;
+}
+
 function normalizeInteger(value, {
   fallback,
   fieldName,
@@ -538,6 +561,7 @@ export function createImportCandidateService({
   }
 
   async function listImportCandidates({
+    candidateIds,
     folderPath,
     limit,
     offset,
@@ -546,7 +570,9 @@ export function createImportCandidateService({
     status,
     username,
   } = {}) {
+    const normalizedCandidateIds = normalizeCandidateIds(candidateIds);
     const filters = {
+      ...(normalizedCandidateIds ? { candidateIds: normalizedCandidateIds } : {}),
       folderPath: normalizeOptionalString(folderPath, {
         fieldName: 'folderPath',
         maxLength: 500,
@@ -988,6 +1014,25 @@ export function createImportCandidateService({
     });
   }
 
+  function resumeImportCandidateForSafeAdd({
+    actorUserId = null,
+    importCandidateId,
+    reason = null,
+    requestMetadata = null,
+  }) {
+    return transitionCandidateReviewStatus({
+      actorUserId,
+      eventDetails: { recoveryKind: 'fixed_prerequisite' },
+      eventType: 'import_candidate_safe_add_recheck_queued',
+      fromStatuses: ['failed'],
+      importCandidateId,
+      reason,
+      requestMetadata,
+      summary: 'Completed download reopened for a safe library-add recheck',
+      toStatus: 'import_pending',
+    });
+  }
+
   async function ingestSlskdSearchResponses({
     actorUserId = null,
     albumTitle = null,
@@ -1157,6 +1202,7 @@ export function createImportCandidateService({
     markImportCandidateImportPending,
     rejectImportCandidate,
     reopenImportCandidate,
+    resumeImportCandidateForSafeAdd,
     retryImportCandidateDownload,
     selectImportCandidate,
   };

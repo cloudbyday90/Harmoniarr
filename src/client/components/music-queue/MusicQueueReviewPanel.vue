@@ -49,6 +49,7 @@ const props = defineProps({
 const emit = defineEmits([
   'allow-fallback-quality',
   'close',
+  'recheck-library-add',
   'reject-match',
   'search-again',
   'use-match',
@@ -153,6 +154,16 @@ function isReleaseActionRunning(action) {
           <p>{{ review.repair.nextStep }}</p>
         </div>
         <div class="music-queue-review__actions">
+          <button
+            v-if="review.repair.actionCode === 'recheck_library_add'"
+            type="button"
+            class="hx-btn"
+            data-variant="primary"
+            :disabled="Boolean(activeReleaseActionKey)"
+            @click="emit('recheck-library-add')"
+          >
+            {{ isReleaseActionRunning('recheck-library-add') ? 'Checking...' : review.repair.actionLabel }}
+          </button>
           <RouterLink
             v-if="review.repair.settingsRouteName"
             class="hx-btn"
@@ -163,7 +174,7 @@ function isReleaseActionRunning(action) {
           </RouterLink>
           <RouterLink
             class="hx-btn"
-            :data-variant="review.repair.settingsRouteName ? 'ghost' : 'primary'"
+            :data-variant="review.repair.settingsRouteName || review.repair.actionCode === 'recheck_library_add' ? 'ghost' : 'primary'"
             :to="{
               name: 'activity-diagnostics-library-adds',
               query: { wantedReleaseId: review.releaseId },

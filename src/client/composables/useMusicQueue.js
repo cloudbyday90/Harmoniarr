@@ -21,6 +21,7 @@ import { useAsyncResource } from './useAsyncResource.js';
 import {
   allowMusicQueueFallbackQuality as defaultAllowMusicQueueFallbackQuality,
   fetchMusicQueueReleases as defaultFetchMusicQueueReleases,
+  recheckMusicQueueReleaseSafeAdd as defaultRecheckMusicQueueReleaseSafeAdd,
   rejectMusicQueueMatch as defaultRejectMusicQueueMatch,
   searchMusicQueueReleaseAgain as defaultSearchMusicQueueReleaseAgain,
   useMusicQueueMatch as defaultUseMusicQueueMatch,
@@ -55,6 +56,7 @@ export function useMusicQueue({
   metadataArtistId = null,
   pollIntervalMs = 10000,
   rejectMusicQueueMatch = defaultRejectMusicQueueMatch,
+  recheckMusicQueueReleaseSafeAdd = defaultRecheckMusicQueueReleaseSafeAdd,
   searchMusicQueueReleaseAgain = defaultSearchMusicQueueReleaseAgain,
   useMusicQueueMatch = defaultUseMusicQueueMatch,
 } = {}) {
@@ -275,12 +277,61 @@ export function useMusicQueue({
     }
   }
 
+  async function recheckLibraryAdd({ wantedReleaseId } = {}) {
+    if (!wantedReleaseId) {
+      return null;
+    }
+
+    const actionKey = `${wantedReleaseId}:recheck-library-add`;
+    activeReleaseActionKey.value = actionKey;
+    setActionFeedback({
+      actionKey,
+      message: 'Rechecking this completed download...',
+      phase: 'working',
+      wantedReleaseId,
+    });
+
+    try {
+      const payload = await recheckMusicQueueReleaseSafeAdd({ wantedReleaseId });
+      applyMutationRelease(payload);
+      const outcome = payload?.action?.outcome;
+      const message = outcome === 'queued'
+        ? 'Audio check passed. Harmoniarr queued this release for a safe library add.'
+        : outcome === 'deferred'
+        ? 'Audio check passed, but another library add is already active. Try this release again after that work finishes.'
+        : outcome === 'prerequisite_not_ready'
+        ? 'Media tools are not ready yet, so Harmoniarr left this completed download unchanged.'
+        : outcome === 'still_needs_review'
+        ? 'This completed download still needs review before Harmoniarr can add it safely.'
+        : 'This release is no longer eligible for an automatic library-add recheck.';
+      setActionFeedback({
+        actionKey,
+        message,
+        phase: outcome === 'queued' ? 'success' : 'error',
+        wantedReleaseId,
+      });
+      await resource.load();
+      return payload;
+    } catch (error) {
+      setActionFeedback({
+        actionKey,
+        message: getErrorMessage(error, 'Music Queue library-add recheck failed.') || 'Music Queue library-add recheck failed.',
+        phase: 'error',
+        wantedReleaseId,
+      });
+      return null;
+    } finally {
+      activeReleaseActionKey.value = '';
+    }
+  }
+
   return {
     ...resource,
     actionFeedback: readonly(actionFeedback),
     activeMatchActionKey: readonly(activeMatchActionKey),
     activeReleaseActionKey: readonly(activeReleaseActionKey),
     allowFallbackQuality,
+    recheckLibraryAdd,
     rejectMatch,
     releases,
     searchAgain,

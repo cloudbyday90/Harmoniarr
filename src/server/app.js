@@ -587,6 +587,8 @@ export function createApp({
   const acquisitionModule = buildAcquisitionModule({
     allowMusicQueueFallbackQuality: libraryModule.libraryDiscoveryRequestStore?.allowMusicQueueFallbackQuality,
     buildLibraryWantedReleases: libraryModule.routeDependencies.buildLibraryWantedReleases,
+    recheckReleaseSafeAdd: importCandidateModule.importCandidateReleaseSafeAddRecheckService?.recheckReleaseSafeAdd
+      ?? null,
     rejectImportCandidate: importCandidateModule.importCandidateService?.rejectImportCandidate
       ?? importCandidateModule.routeDependencies?.rejectImportCandidate
       ?? null,
