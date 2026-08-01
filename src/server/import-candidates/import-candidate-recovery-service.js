@@ -21,7 +21,10 @@ import {
   incrementImportCandidateDownloadAttemptCount,
   promoteImportCandidateForRecovery,
 } from './import-candidate-repository.js';
-import { normalizeImportCandidateAddBlockerCode } from './import-candidate-add-blocker.js';
+import {
+  deriveImportCandidateAddRecoveryReasonCode,
+  normalizeImportCandidateAddBlockerCode,
+} from './import-candidate-add-blocker.js';
 import { TERMINAL_MATCH_OUTCOME_CODES } from './import-candidate-terminal-recovery-policy.js';
 
 export const MAX_CANDIDATE_DOWNLOAD_ATTEMPTS = 3;
@@ -87,6 +90,7 @@ function buildRecoveryResult({
   reason,
   recoveryRun = null,
   recovered,
+  recoveryReasonCode = null,
   rediscovery = null,
   requiresOperator = false,
   skippedCandidates = [],
@@ -111,6 +115,10 @@ function buildRecoveryResult({
   const normalizedAddBlockerCode = normalizeImportCandidateAddBlockerCode(addBlockerCode);
   if (normalizedAddBlockerCode) {
     result.addBlockerCode = normalizedAddBlockerCode;
+  }
+
+  if (recoveryReasonCode) {
+    result.recoveryReasonCode = recoveryReasonCode;
   }
 
   if (requiresOperator) {
@@ -403,6 +411,7 @@ export function createImportCandidateRecoveryService({
     operationRunId = null,
     profileCode = null,
     qualityOverride = null,
+    recoveryReasonCode = null,
     scheduleFollowUpRun = true,
   } = {}) {
     const failedBeforeAttempt = await getImportCandidate({ importCandidateId: failedCandidateId });
@@ -424,6 +433,13 @@ export function createImportCandidateRecoveryService({
     if (normalizedAddBlockerCode) {
       transitionInput.addBlockerCode = normalizedAddBlockerCode;
     }
+    const normalizedRecoveryReasonCode = deriveImportCandidateAddRecoveryReasonCode({
+      addBlockerCode: normalizedAddBlockerCode,
+      recoveryReasonCode,
+    });
+    if (normalizedRecoveryReasonCode) {
+      transitionInput.recoveryReasonCode = normalizedRecoveryReasonCode;
+    }
 
     const transitionResult = await markImportCandidateImportBlocked(transitionInput);
     const failedAfterTransition = transitionResult?.candidate ?? failedBeforeAttempt;
@@ -432,9 +448,12 @@ export function createImportCandidateRecoveryService({
       return buildRecoveryResult({
         addBlockerCode,
         failedCandidate: failedAfterTransition,
-        reason: 'import_blocker_requires_operator',
+        reason: normalizedRecoveryReasonCode
+          ? 'environmental_prerequisite_unavailable'
+          : 'import_blocker_requires_operator',
         recovered: false,
-        requiresOperator: true,
+        recoveryReasonCode: normalizedRecoveryReasonCode,
+        requiresOperator: !normalizedRecoveryReasonCode,
         terminalOutcome: TERMINAL_MATCH_OUTCOME_CODES.IMPORT_BLOCKED,
       });
     }

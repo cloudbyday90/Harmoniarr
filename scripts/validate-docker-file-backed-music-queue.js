@@ -22,6 +22,6 @@ export async function runDockerFileBackedMusicQueueValidationFromEnvironment(env
 
 await runDirectScriptTask(import.meta, {
   prefix: 'harmoniarr-validate-docker-file-backed-music-queue',
-  renderSuccessMessage: (result) => `Verified real media quality and scoped Music Queue recovery: ${result.authentic.candidateId} was added; ${result.transcoded.candidateId} and ${result.collision.candidateId} remained blocked; ${result.recovered.candidateId} resumed alone.`,
+  renderSuccessMessage: (result) => `Verified real media quality and scoped Music Queue recovery: ${result.authentic.candidateId} was added; ${result.transcoded.candidateId} and ${result.collision.candidateId} remained blocked; ${result.recovered.candidateId} and ${result.toolingRecovery.candidateId} each resumed alone after their prerequisite was restored.`,
   run: () => runDockerFileBackedMusicQueueValidationFromEnvironment(),
 });

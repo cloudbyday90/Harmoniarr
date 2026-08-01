@@ -436,6 +436,47 @@ test('import candidate recovery keeps import collisions available for a manual s
   });
 });
 
+test('import candidate recovery persists an audio-tooling stop without selecting another download', async (t) => {
+  const markImportCandidateImportBlocked = t.mock.fn(async () => ({
+    candidate: {
+      id: 'candidate-media-tooling',
+      sourceSearchId: 'search-1',
+      status: 'failed',
+    },
+  }));
+  const findNextCandidateForRecoveryFn = t.mock.fn(async () => {
+    throw new Error('media-tooling recovery must not select another remote match');
+  });
+  const service = createImportCandidateRecoveryService({
+    findNextCandidateForRecoveryFn,
+    getImportCandidate: async () => ({
+      id: 'candidate-media-tooling',
+      sourceSearchId: 'search-1',
+      status: 'import_pending',
+    }),
+    markImportCandidateImportBlocked,
+  });
+
+  const result = await service.handleImportCandidateImportBlocker({
+    addBlockerCode: 'media_verification',
+    canRecover: false,
+    failedCandidateId: 'candidate-media-tooling',
+    recoveryReasonCode: 'audio_check_failed',
+  });
+
+  assert.deepEqual(markImportCandidateImportBlocked.mock.calls[0].arguments[0], {
+    addBlockerCode: 'media_verification',
+    importCandidateId: 'candidate-media-tooling',
+    recordSourceFailure: false,
+    reason: null,
+    recoveryReasonCode: 'audio_check_failed',
+  });
+  assert.equal(findNextCandidateForRecoveryFn.mock.callCount(), 0);
+  assert.equal(result.reason, 'environmental_prerequisite_unavailable');
+  assert.equal(result.recoveryReasonCode, 'audio_check_failed');
+  assert.equal(result.requiresOperator, undefined);
+});
+
 test('import candidate recovery reports exhaustion when no scoped candidate remains', async (t) => {
   const createRecoveryExecutionRun = t.mock.fn(async () => ({
     id: 'unexpected-run',

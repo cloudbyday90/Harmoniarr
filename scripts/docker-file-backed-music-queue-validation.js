@@ -143,7 +143,8 @@ function parseVerifierResult(stdout) {
     if (!result?.authentic?.candidateId
       || !result?.transcoded?.candidateId
       || !result?.collision?.candidateId
-      || !result?.recovered?.candidateId) {
+      || !result?.recovered?.candidateId
+      || !result?.toolingRecovery?.candidateId) {
       throw new Error('candidate IDs are missing');
     }
     return result;
@@ -169,11 +170,12 @@ async function getContainerId({ composeArgs, env }) {
 async function generateFixtures({ composeArgs, env }) {
   const fixtureCommand = [
     'set -eu',
-    'mkdir -p /data/downloads/docker-file-backed-authentic /data/downloads/docker-file-backed-transcoded /data/downloads/docker-file-backed-collision /data/downloads/complete/docker-file-backed-folder-recovery /data/downloads/complete/docker-file-backed-unrelated',
+    'mkdir -p /data/downloads/docker-file-backed-authentic /data/downloads/docker-file-backed-transcoded /data/downloads/docker-file-backed-collision /data/downloads/docker-file-backed-tooling-recovery /data/downloads/complete/docker-file-backed-folder-recovery /data/downloads/complete/docker-file-backed-unrelated',
     "ffmpeg -y -f lavfi -i 'aevalsrc=0.2*sin(2*PI*21000*t)+0.2*sin(2*PI*1000*t):s=44100:d=5' -c:a flac /data/downloads/docker-file-backed-authentic/verified.flac >/dev/null 2>&1",
     'ffmpeg -y -i /data/downloads/docker-file-backed-authentic/verified.flac -c:a libmp3lame -b:a 128k /tmp/docker-file-backed-lossy.mp3 >/dev/null 2>&1',
     'ffmpeg -y -i /tmp/docker-file-backed-lossy.mp3 -c:a flac /data/downloads/docker-file-backed-transcoded/disguised.flac >/dev/null 2>&1',
     'cp /data/downloads/docker-file-backed-authentic/verified.flac /data/downloads/docker-file-backed-collision/collision.flac',
+    'cp /data/downloads/docker-file-backed-authentic/verified.flac /data/downloads/docker-file-backed-tooling-recovery/tooling-recovery.flac',
     'cp /data/downloads/docker-file-backed-authentic/verified.flac /data/downloads/complete/docker-file-backed-folder-recovery/recovered.flac',
     'cp /data/downloads/docker-file-backed-authentic/verified.flac /data/downloads/complete/docker-file-backed-unrelated/unrelated.flac',
   ].join('; ');

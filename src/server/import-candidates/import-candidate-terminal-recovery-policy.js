@@ -20,6 +20,7 @@ import {
   IMPORT_CANDIDATE_ADD_BLOCKER_CODES,
   normalizeImportCandidateAddBlockerCode,
 } from './import-candidate-add-blocker.js';
+import { MUSIC_QUEUE_ADD_RECOVERY_REASON_CODES } from '../../shared/music-queue-add-recovery-presentation.js';
 
 export const TERMINAL_MATCH_OUTCOME_CODES = Object.freeze({
   DOWNLOAD_FAILED: 'download_failed',
@@ -30,6 +31,7 @@ export const TERMINAL_MATCH_OUTCOME_CODES = Object.freeze({
 });
 
 const TIMED_OUT_TRANSFER_TOKENS = ['timedout', 'timed out', 'timeout'];
+const MEDIA_TOOLING_UNAVAILABLE_WARNING_CODE = 'media_inspection_unavailable';
 
 function normalizeToken(value) {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
@@ -45,6 +47,19 @@ function hasTimedOutTransfer(liveTransfers) {
     const exception = normalizeToken(transfer?.exception);
     return TIMED_OUT_TRANSFER_TOKENS.some((token) => state.includes(token) || exception.includes(token));
   });
+}
+
+function hasMediaToolingUnavailableWarning(applyPreview) {
+  const inspectionWarnings = [
+    ...(Array.isArray(applyPreview?.inspectionWarnings) ? applyPreview.inspectionWarnings : []),
+    ...(Array.isArray(applyPreview?.files)
+      ? applyPreview.files.flatMap((file) => file?.inspection?.warnings ?? [])
+      : []),
+  ];
+
+  return inspectionWarnings.some((warning) => (
+    warning?.code === MEDIA_TOOLING_UNAVAILABLE_WARNING_CODE
+  ));
 }
 
 /**
@@ -77,6 +92,18 @@ export function deriveTerminalTransferOutcome({
  * release- or environment-wide, so automatic fallback would be unsafe.
  */
 export function evaluateImportBlockerRecovery(applyPreview = {}) {
+  if (applyPreview?.summary?.status === 'attention'
+    && hasMediaToolingUnavailableWarning(applyPreview)) {
+    return {
+      addBlockerCode: IMPORT_CANDIDATE_ADD_BLOCKER_CODES.MEDIA_VERIFICATION,
+      canRecover: false,
+      outcomeCode: TERMINAL_MATCH_OUTCOME_CODES.IMPORT_BLOCKED,
+      recoveryReasonCode: MUSIC_QUEUE_ADD_RECOVERY_REASON_CODES.AUDIO_CHECK_FAILED,
+      requiresOperator: false,
+      skippedReason: 'media_tooling_unavailable',
+    };
+  }
+
   if (applyPreview?.summary?.status !== 'blocked') {
     return {
       addBlockerCode: null,

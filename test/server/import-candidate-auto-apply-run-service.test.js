@@ -134,6 +134,45 @@ test('startSafeApplyRunAfterDownloadCompleted stops collisions before any automa
   assert.equal(result.recovery.requiresOperator, true);
 });
 
+test('startSafeApplyRunAfterDownloadCompleted records an unavailable audio tool for release-scoped recheck', async (t) => {
+  const handleImportCandidateImportBlocker = t.mock.fn(async () => ({
+    addBlockerCode: 'media_verification',
+    reason: 'environmental_prerequisite_unavailable',
+    recovered: false,
+    recoveryReasonCode: 'audio_check_failed',
+  }));
+  const startImportCandidateApplyRun = t.mock.fn(async () => {
+    throw new Error('safe auto add should not start while ffprobe is unavailable');
+  });
+  const service = createImportCandidateAutoApplyRunService({
+    handleImportCandidateImportBlocker,
+    previewImportCandidateApply: async () => ({
+      inspectionWarnings: [{ code: 'media_inspection_unavailable' }],
+      summary: {
+        message: '1 media inspection warning is present in apply preview.',
+        status: 'attention',
+      },
+    }),
+    startImportCandidateApplyRun,
+  });
+
+  const result = await service.startSafeApplyRunAfterDownloadCompleted({
+    importCandidateId: 'candidate-media-tooling',
+  });
+
+  assert.deepEqual(handleImportCandidateImportBlocker.mock.calls[0].arguments[0], {
+    addBlockerCode: 'media_verification',
+    canRecover: false,
+    failedCandidateId: 'candidate-media-tooling',
+    failureReason: '1 media inspection warning is present in apply preview.',
+    recoveryReasonCode: 'audio_check_failed',
+    scheduleFollowUpRun: true,
+  });
+  assert.equal(startImportCandidateApplyRun.mock.callCount(), 0);
+  assert.equal(result.skippedReason, 'media_tooling_unavailable');
+  assert.equal(result.recovery.recoveryReasonCode, 'audio_check_failed');
+});
+
 test('startSafeApplyRunAfterDownloadCompleted rethrows unexpected errors', async () => {
   const service = createImportCandidateAutoApplyRunService({
     startImportCandidateApplyRun: async () => {

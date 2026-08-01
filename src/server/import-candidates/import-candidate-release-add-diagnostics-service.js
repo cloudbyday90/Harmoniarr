@@ -151,10 +151,15 @@ function buildImportBlockerEventRecoveryCandidate(event) {
     return null;
   }
 
+  const recoveryReasonCode = deriveImportCandidateAddRecoveryReasonCode({
+    addBlockerCode,
+    recoveryReasonCode: event?.recoveryReasonCode,
+  });
+
   return {
     addBlockerCode,
     importCandidateId,
-    recoveryReasonCode: null,
+    recoveryReasonCode,
   };
 }
 

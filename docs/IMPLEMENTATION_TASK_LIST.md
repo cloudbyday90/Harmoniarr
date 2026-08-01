@@ -127,6 +127,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   measurements for threshold reclassification, and blocks safe-auto add when
   proof is suspicious, transcoded, inconclusive, unavailable, or failed. See
   `MUSIC_QUEUE_PHASE_4_CACHED_SPECTRAL_PRE_ADD_PROOF_DESIGN.md`.
+- Music Queue media-tooling recovery: temporary FFprobe loss now creates a
+  bounded `media_verification` / `audio_check_failed` event before a safe
+  apply run begins. When tooling returns, the owned release rechecks the same
+  completed download through the existing preview and strict-quality gates;
+  collisions and strict quality failures remain review-only. See
+  `MUSIC_QUEUE_MEDIA_TOOLING_RECOVERY_ACCEPTANCE_DESIGN.md`.
 - Music Queue and Activity surfacing: strict-quality safe-auto add stops now
   project back into Music Queue as `Quality choice needed`, record a sanitized
   `music_queue_quality_blocked` Activity event, and deep-link Activity back to

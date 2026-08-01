@@ -70,6 +70,7 @@ export function createImportCandidateAutoApplyRunService({
       canRecover: policy.canRecover,
       failedCandidateId: importCandidateId,
       failureReason: applyPreview?.summary?.message ?? null,
+      ...(policy.recoveryReasonCode ? { recoveryReasonCode: policy.recoveryReasonCode } : {}),
       scheduleFollowUpRun: true,
     });
 
@@ -91,9 +92,10 @@ export function createImportCandidateAutoApplyRunService({
         attempted: true,
         importCandidateId,
         recovery: importBlockerRecovery.recovery,
-        skippedReason: importBlockerRecovery.policy.canRecover
-          ? 'completed_source_unavailable'
-          : 'import_blocker_requires_operator',
+        skippedReason: importBlockerRecovery.policy.skippedReason
+          ?? (importBlockerRecovery.policy.canRecover
+            ? 'completed_source_unavailable'
+            : 'import_blocker_requires_operator'),
         started: false,
         triggerSource: 'download_completed',
       };

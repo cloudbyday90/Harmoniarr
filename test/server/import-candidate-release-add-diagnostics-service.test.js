@@ -178,6 +178,30 @@ test('release add recovery lookup falls back only to the latest bounded source b
   assert.doesNotMatch(JSON.stringify(recovery), /private|downloads/i);
 });
 
+test('release add recovery accepts only the bounded audio-tooling recovery reason from an event', async (t) => {
+  const releaseAddDiagnosticRepository = {
+    findLatestReleaseImportBlockerEvent: t.mock.fn(async () => ({
+      addBlockerCode: 'media_verification',
+      importCandidateId: 'candidate-media-tooling',
+      recoveryReasonCode: 'audio_check_failed',
+    })),
+    getScopedWantedRelease: t.mock.fn(async () => ({ id: wantedReleaseId })),
+    listLatestReleaseAddOutcomes: t.mock.fn(async () => []),
+  };
+  const service = createImportCandidateReleaseAddDiagnosticsService({ releaseAddDiagnosticRepository });
+
+  const recovery = await service.findLatestReleaseAddRecoveryCandidate({
+    appUserId: 'c5c86d81-f611-49f6-b55e-cf617f5a842f',
+    wantedReleaseId,
+  });
+
+  assert.deepEqual(recovery, {
+    addBlockerCode: 'media_verification',
+    importCandidateId: 'candidate-media-tooling',
+    recoveryReasonCode: 'audio_check_failed',
+  });
+});
+
 test('release add recovery lookup does not revive an older event when an apply outcome is already recorded', async (t) => {
   const releaseAddDiagnosticRepository = {
     findLatestReleaseImportBlockerEvent: t.mock.fn(async () => ({

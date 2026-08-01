@@ -77,3 +77,22 @@ test('keeps collisions and validation blockers behind a manual import repair', (
     requiresOperator: true,
   });
 });
+
+test('records a recheckable media prerequisite stop without treating it as a candidate fallback', () => {
+  const recovery = evaluateImportBlockerRecovery({
+    inspectionWarnings: [{
+      code: 'media_inspection_unavailable',
+      message: 'ffprobe is unavailable.',
+    }],
+    summary: { status: 'attention' },
+  });
+
+  assert.deepEqual(recovery, {
+    addBlockerCode: 'media_verification',
+    canRecover: false,
+    outcomeCode: TERMINAL_MATCH_OUTCOME_CODES.IMPORT_BLOCKED,
+    recoveryReasonCode: 'audio_check_failed',
+    requiresOperator: false,
+    skippedReason: 'media_tooling_unavailable',
+  });
+});

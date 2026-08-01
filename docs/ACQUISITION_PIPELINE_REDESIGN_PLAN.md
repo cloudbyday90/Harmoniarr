@@ -987,7 +987,9 @@ implemented; see
 `MUSIC_QUEUE_PHASE_4_VERIFIED_QUALITY_AUTO_ADD_GATE_DESIGN.md`, and
 `MUSIC_QUEUE_PHASE_4_CACHED_SPECTRAL_PRE_ADD_PROOF_DESIGN.md` and
 `MUSIC_QUEUE_ACTIVITY_SURFACING_DESIGN.md` and
-`MUSIC_QUEUE_QUALITY_STOP_RECOVERY_AUTOMATION_DESIGN.md`.
+`MUSIC_QUEUE_QUALITY_STOP_RECOVERY_AUTOMATION_DESIGN.md`. Temporary
+audio-tooling unavailability now persists a bounded recheckable release stop;
+see `MUSIC_QUEUE_MEDIA_TOOLING_RECOVERY_ACCEPTANCE_DESIGN.md`.
 
 Goal: make `FLAC` and other quality choices truthful before Harmoniarr claims a
 release is complete.
@@ -1015,6 +1017,10 @@ release is complete.
   records a library add, so the final outcome joins the normal Music Queue
   Activity story rather than becoming an unrelated candidate event. See
   `MUSIC_QUEUE_POST_TRANSFER_LIBRARY_ADD_BROWSER_VERIFICATION_DESIGN.md`.
+- [x] Record temporary FFprobe unavailability as a bounded release-scoped
+  `audio_check_failed` stop before safe add, then re-preview, re-gate, and
+  resume only that release after tooling returns. See
+  `MUSIC_QUEUE_MEDIA_TOOLING_RECOVERY_ACCEPTANCE_DESIGN.md`.
 - [ ] Route collisions, lossy decisions, suspicious FLAC, probe failures, and
   unsafe import plans to `needs help`.
 - [ ] Add `Add to library` for manual safe adds.

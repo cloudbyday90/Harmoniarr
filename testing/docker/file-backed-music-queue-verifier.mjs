@@ -18,7 +18,7 @@
 
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { copyFile, mkdir, stat } from 'node:fs/promises';
+import { chmod, copyFile, mkdir, rm, stat } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
@@ -30,11 +30,15 @@ import {
   upsertImportCandidate,
 } from '/app/server-dist/import-candidates/import-candidate-repository.js';
 import { upsertImportExecutionRunItem } from '/app/server-dist/import-candidates/import-candidate-execution-repository.js';
+import { createMediaInspectionService } from '/app/server-dist/media/media-inspection-service.js';
+import { createMediaToolingStatusService } from '/app/server-dist/media/media-tooling-status-service.js';
 import { persistSettings } from '/app/server-dist/settings.js';
 
 const downloadsRoot = '/data/downloads';
 const musicRoot = '/data/music';
 const stagingRoot = '/data/staging';
+const packagedFfprobePath = '/usr/bin/ffprobe';
+const stagedFfprobePath = `${stagingRoot}/media-tooling-recovery/ffprobe`;
 
 function createProviderStub() {
   return {
@@ -403,6 +407,22 @@ async function assertFileExists(pathValue) {
   assert.equal(fileStats.isFile(), true, `${pathValue} must be a regular file`);
 }
 
+/**
+ * The packaged image is read-only, so this test uses a known package-owned
+ * binary copied into its disposable staging mount. Removing that one copy
+ * exercises the real allow-listed media command failure without altering the
+ * image or a user-installed FFprobe binary.
+ */
+async function restoreStagedFfprobe() {
+  await mkdir(dirname(stagedFfprobePath), { recursive: true });
+  await copyFile(packagedFfprobePath, stagedFfprobePath);
+  await chmod(stagedFfprobePath, 0o755);
+}
+
+async function removeStagedFfprobe() {
+  await rm(stagedFfprobePath, { force: true });
+}
+
 async function getOperationRunSummary(pool, runId) {
   const result = await pool.query(
     `
@@ -426,6 +446,21 @@ async function listApplyRunCandidateIds(pool, runId) {
     [runId],
   );
   return result.rows.map((row) => row.import_candidate_id);
+}
+
+async function getLatestImportBlockerEvent(pool, importCandidateId) {
+  const result = await pool.query(
+    `
+      SELECT details
+      FROM import_candidate_events
+      WHERE import_candidate_id = $1
+        AND event_type = 'import_candidate_import_blocked'
+      ORDER BY occurred_at DESC, created_at DESC, id DESC
+      LIMIT 1
+    `,
+    [importCandidateId],
+  );
+  return result.rows[0]?.details ?? null;
 }
 
 async function countApplyRunItemsForCandidate(pool, importCandidateId) {
@@ -461,14 +496,17 @@ async function previewCandidate(importCandidateModule, importCandidateId) {
 async function runVerification() {
   const pool = getPool();
   const activityModule = createActivityModule();
+  await restoreStagedFfprobe();
+  const mediaToolingStatusService = createMediaToolingStatusService({
+    ffprobeBinary: stagedFfprobePath,
+  });
+  const mediaInspectionService = createMediaInspectionService({
+    ffprobeBin: stagedFfprobePath,
+    getMediaToolingStatus: mediaToolingStatusService.getStatus,
+  });
   const importCandidateModule = createImportCandidateModule({
-    getMediaToolingStatus: async () => ({
-      details: {
-        ffmpegAvailable: true,
-        ffprobeAvailable: true,
-      },
-      status: 'healthy',
-    }),
+    getMediaToolingStatus: mediaToolingStatusService.getStatus,
+    mediaInspectionService,
     recordActivityEventFn: activityModule.activityEventService.recordActivityEvent,
     recordSourceUserOutcomeEvidenceFn: async () => null,
     scheduleLibraryScan: async () => null,
@@ -527,17 +565,6 @@ async function runVerification() {
   await waitForActivity(pool, { entityId: disguisedSeed.release.wantedReleaseId, eventType: 'music_queue_import_blocked' });
 
   const strictQualityRunItemCount = await countApplyRunItemsForCandidate(pool, disguisedCandidate.id);
-  const strictQualityRecheck = await importCandidateModule.importCandidateReleaseSafeAddRecheckService
-    .recheckReleaseSafeAdd({
-      appUserId,
-      wantedReleaseId: disguisedSeed.release.wantedReleaseId,
-    });
-  assert.equal(strictQualityRecheck.outcome, 'not_available', 'strict quality blocks must remain review-only');
-  assert.equal(
-    await countApplyRunItemsForCandidate(pool, disguisedCandidate.id),
-    strictQualityRunItemCount,
-    'strict quality recheck must not create a second automatic apply item',
-  );
 
   const collisionSeed = await seedCandidate(pool, {
     ...buildCandidateFixture({
@@ -567,18 +594,6 @@ async function runVerification() {
     0,
     'library collisions must not create an automatic apply item',
   );
-  const collisionRecheck = await importCandidateModule.importCandidateReleaseSafeAddRecheckService
-    .recheckReleaseSafeAdd({
-      appUserId,
-      wantedReleaseId: collisionSeed.release.wantedReleaseId,
-    });
-  assert.equal(collisionRecheck.outcome, 'not_available', 'collision review must not be reopened by a prerequisite repair');
-  assert.equal(
-    await countApplyRunItemsForCandidate(pool, collisionCandidate.id),
-    0,
-    'collision recheck must not create an automatic apply item',
-  );
-
   await persistPathSettings(pool, [{
     harmoniarrPrefix: `${downloadsRoot}/unreachable`,
     slskdPrefix: '/provider/complete',
@@ -677,6 +692,121 @@ async function runVerification() {
   await assertFileExists(recoveredPreview.files[0].libraryTarget.path);
   await assert.rejects(stat(unrelatedLibraryPath), { code: 'ENOENT' });
 
+  await persistPathSettings(pool, [{
+    harmoniarrPrefix: downloadsRoot,
+    slskdPrefix: downloadsRoot,
+  }]);
+  const toolingRecoverySeed = await seedCandidate(pool, {
+    ...buildCandidateFixture({
+      filename: 'tooling-recovery.flac',
+      folderName: 'docker-file-backed-tooling-recovery',
+      label: 'tooling-recovery',
+    }),
+    label: 'tooling-recovery',
+  }, { appUserId });
+  const toolingRecoveryCandidate = toolingRecoverySeed.candidate;
+  const toolingRecoveryPreview = await previewCandidate(
+    importCandidateModule,
+    toolingRecoveryCandidate.id,
+  );
+  const toolingRecoveryLibraryPath = toolingRecoveryPreview.files[0].libraryTarget.path;
+
+  await removeStagedFfprobe();
+  const unavailableToolingStatus = await mediaToolingStatusService.getStatus();
+  assert.notEqual(unavailableToolingStatus.status, 'healthy', 'removing the staged FFprobe must make tooling unavailable');
+  const unavailableReconciliation = await reconcileCompletedTransfer({
+    candidate: toolingRecoveryCandidate,
+    expectedAutoApplyStarted: 0,
+    importCandidateModule,
+  });
+  const unavailableCandidate = await importCandidateModule.importCandidateService.getImportCandidate({
+    importCandidateId: toolingRecoveryCandidate.id,
+  });
+  const unavailableEvent = await getLatestImportBlockerEvent(pool, toolingRecoveryCandidate.id);
+  assert.equal(
+    unavailableReconciliation.autoApplyRuns[0]?.skippedReason,
+    'media_tooling_unavailable',
+    'unavailable FFprobe must stop safe add before creating an apply run',
+  );
+  assert.equal(unavailableCandidate.status, 'failed', 'unavailable FFprobe must leave the candidate in recovery');
+  assert.equal(unavailableEvent?.addBlockerCode, 'media_verification');
+  assert.equal(unavailableEvent?.recoveryReasonCode, 'audio_check_failed');
+  assert.equal(
+    await countApplyRunItemsForCandidate(pool, toolingRecoveryCandidate.id),
+    0,
+    'unavailable FFprobe must not create an automatic apply item',
+  );
+  await assert.rejects(stat(toolingRecoveryLibraryPath), { code: 'ENOENT' });
+
+  await restoreStagedFfprobe();
+  const restoredToolingStatus = await mediaToolingStatusService.getStatus();
+  assert.equal(restoredToolingStatus.status, 'healthy', 'restoring the staged FFprobe must restore tooling health');
+  const toolingRecoveryRecheck = await importCandidateModule.importCandidateReleaseSafeAddRecheckService
+    .recheckReleaseSafeAdd({
+      appUserId,
+      wantedReleaseId: toolingRecoverySeed.release.wantedReleaseId,
+    });
+  assert.equal(toolingRecoveryRecheck.outcome, 'queued', 'restored FFprobe must queue only the affected release');
+  assert.ok(toolingRecoveryRecheck.runId, 'restored FFprobe must create a scoped apply run');
+  const toolingRecoveryRunSummary = await getOperationRunSummary(pool, toolingRecoveryRecheck.runId);
+  assert.deepEqual(
+    toolingRecoveryRunSummary.importCandidateIds,
+    [toolingRecoveryCandidate.id],
+    'tooling recovery must persist only the affected candidate scope',
+  );
+  assert.equal(toolingRecoveryRunSummary.scopedCandidateCount, 1, 'tooling recovery must remain single-candidate');
+  await importCandidateModule.importCandidateApplyWorker.startWorkerRun({
+    applySafetyMode: 'safe_auto',
+    executableCandidateCount: 1,
+    importCandidateIds: [toolingRecoveryCandidate.id],
+    requestedCandidateCount: 1,
+    runId: toolingRecoveryRecheck.runId,
+    triggerSource: 'music_queue_prerequisite_recheck',
+  });
+  const toolingRecoveryRun = await waitForRun(
+    importCandidateModule.importCandidateApplyRunStore,
+    toolingRecoveryRecheck.runId,
+  );
+  const toolingRecoveryFinalCandidate = await importCandidateModule.importCandidateService.getImportCandidate({
+    importCandidateId: toolingRecoveryCandidate.id,
+  });
+  const toolingRecoveryUnrelatedCandidate = await importCandidateModule.importCandidateService.getImportCandidate({
+    importCandidateId: unrelatedCandidate.id,
+  });
+  assert.equal(toolingRecoveryRun.appliedCount, 1, 'restored FFprobe must add the affected release');
+  assert.equal(toolingRecoveryFinalCandidate.status, 'applied', 'the rechecked candidate must be added after FFprobe recovers');
+  assert.equal(toolingRecoveryUnrelatedCandidate.status, 'import_pending', 'tooling recovery must not add unrelated downloads');
+  assert.deepEqual(
+    await listApplyRunCandidateIds(pool, toolingRecoveryRecheck.runId),
+    [toolingRecoveryCandidate.id],
+    'tooling recovery apply run must contain no unrelated candidate',
+  );
+  await assertFileExists(toolingRecoveryLibraryPath);
+  await assert.rejects(stat(unrelatedLibraryPath), { code: 'ENOENT' });
+
+  const strictQualityRecheck = await importCandidateModule.importCandidateReleaseSafeAddRecheckService
+    .recheckReleaseSafeAdd({
+      appUserId,
+      wantedReleaseId: disguisedSeed.release.wantedReleaseId,
+    });
+  assert.equal(strictQualityRecheck.outcome, 'not_available', 'strict quality blocks must remain review-only after tooling recovery');
+  assert.equal(
+    await countApplyRunItemsForCandidate(pool, disguisedCandidate.id),
+    strictQualityRunItemCount,
+    'strict quality recheck must not create a second automatic apply item',
+  );
+  const collisionRecheck = await importCandidateModule.importCandidateReleaseSafeAddRecheckService
+    .recheckReleaseSafeAdd({
+      appUserId,
+      wantedReleaseId: collisionSeed.release.wantedReleaseId,
+    });
+  assert.equal(collisionRecheck.outcome, 'not_available', 'collision review must not reopen after tooling recovery');
+  assert.equal(
+    await countApplyRunItemsForCandidate(pool, collisionCandidate.id),
+    0,
+    'collision recheck must not create an automatic apply item',
+  );
+
   return {
     authentic: {
       candidateId: authenticCandidate.id,
@@ -697,6 +827,12 @@ async function runVerification() {
       finalStatus: recoveryFinalCandidate.status,
       runId: recoveredRun.id,
       unrelatedCandidateStatus: unrelatedFinalCandidate.status,
+    },
+    toolingRecovery: {
+      candidateId: toolingRecoveryCandidate.id,
+      finalStatus: toolingRecoveryFinalCandidate.status,
+      runId: toolingRecoveryRun.id,
+      unrelatedCandidateStatus: toolingRecoveryUnrelatedCandidate.status,
     },
   };
 }

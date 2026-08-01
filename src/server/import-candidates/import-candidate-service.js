@@ -38,7 +38,10 @@ import {
   transitionImportCandidateStatus,
   upsertImportCandidate,
 } from './import-candidate-repository.js';
-import { normalizeImportCandidateAddBlockerCode } from './import-candidate-add-blocker.js';
+import {
+  deriveImportCandidateAddRecoveryReasonCode,
+  normalizeImportCandidateAddBlockerCode,
+} from './import-candidate-add-blocker.js';
 
 const candidateStatuses = new Set(['pending', 'held', 'rejected', 'selected', 'downloading', 'import_pending', 'applied', 'failed']);
 const DEFAULT_SLSKD_RESPONSE_POLL_ATTEMPTS = 15;
@@ -940,14 +943,26 @@ export function createImportCandidateService({
     addBlockerCode = null,
     importCandidateId,
     recordSourceFailure = false,
+    recoveryReasonCode = null,
     reason = null,
     requestMetadata = null,
   }) {
     const normalizedAddBlockerCode = normalizeImportCandidateAddBlockerCode(addBlockerCode);
+    const normalizedRecoveryReasonCode = deriveImportCandidateAddRecoveryReasonCode({
+      addBlockerCode: normalizedAddBlockerCode,
+      recoveryReasonCode,
+    });
+    const eventDetails = {};
+    if (normalizedAddBlockerCode) {
+      eventDetails.addBlockerCode = normalizedAddBlockerCode;
+    }
+    if (normalizedRecoveryReasonCode) {
+      eventDetails.recoveryReasonCode = normalizedRecoveryReasonCode;
+    }
 
     return transitionCandidateReviewStatus({
       actorUserId,
-      eventDetails: normalizedAddBlockerCode ? { addBlockerCode: normalizedAddBlockerCode } : null,
+      eventDetails: Object.keys(eventDetails).length > 0 ? eventDetails : null,
       eventType: 'import_candidate_import_blocked',
       fromStatuses: ['import_pending'],
       importCandidateId,
