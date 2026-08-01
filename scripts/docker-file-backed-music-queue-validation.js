@@ -6,7 +6,7 @@
  * See LICENSE file for details.
  */
 
-import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm } from 'node:fs/promises';
 import { once } from 'node:events';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -18,6 +18,7 @@ import { runBufferedCommand } from './process-runtime.js';
 
 const rootDir = fileURLToPath(new URL('..', import.meta.url));
 const verifierPath = resolve(rootDir, 'testing/docker/file-backed-music-queue-verifier.mjs');
+const verifierContainerPath = '/data/staging/file-backed-music-queue-verifier.mjs';
 const defaultStartupTimeoutSeconds = 180;
 
 function createProjectName(prefix = 'harmoniarrfilebacked') {
@@ -139,7 +140,10 @@ function parseVerifierResult(stdout) {
 
   try {
     const result = JSON.parse(payload);
-    if (!result?.authentic?.candidateId || !result?.transcoded?.candidateId) {
+    if (!result?.authentic?.candidateId
+      || !result?.transcoded?.candidateId
+      || !result?.collision?.candidateId
+      || !result?.recovered?.candidateId) {
       throw new Error('candidate IDs are missing');
     }
     return result;
@@ -165,10 +169,13 @@ async function getContainerId({ composeArgs, env }) {
 async function generateFixtures({ composeArgs, env }) {
   const fixtureCommand = [
     'set -eu',
-    'mkdir -p /data/downloads/docker-file-backed-authentic /data/downloads/docker-file-backed-transcoded',
+    'mkdir -p /data/downloads/docker-file-backed-authentic /data/downloads/docker-file-backed-transcoded /data/downloads/docker-file-backed-collision /data/downloads/complete/docker-file-backed-folder-recovery /data/downloads/complete/docker-file-backed-unrelated',
     "ffmpeg -y -f lavfi -i 'aevalsrc=0.2*sin(2*PI*21000*t)+0.2*sin(2*PI*1000*t):s=44100:d=5' -c:a flac /data/downloads/docker-file-backed-authentic/verified.flac >/dev/null 2>&1",
     'ffmpeg -y -i /data/downloads/docker-file-backed-authentic/verified.flac -c:a libmp3lame -b:a 128k /tmp/docker-file-backed-lossy.mp3 >/dev/null 2>&1',
     'ffmpeg -y -i /tmp/docker-file-backed-lossy.mp3 -c:a flac /data/downloads/docker-file-backed-transcoded/disguised.flac >/dev/null 2>&1',
+    'cp /data/downloads/docker-file-backed-authentic/verified.flac /data/downloads/docker-file-backed-collision/collision.flac',
+    'cp /data/downloads/docker-file-backed-authentic/verified.flac /data/downloads/complete/docker-file-backed-folder-recovery/recovered.flac',
+    'cp /data/downloads/docker-file-backed-authentic/verified.flac /data/downloads/complete/docker-file-backed-unrelated/unrelated.flac',
   ].join('; ');
 
   await runCompose({
@@ -180,21 +187,14 @@ async function generateFixtures({ composeArgs, env }) {
 }
 
 async function copyAndRunVerifier({ composeArgs, env }) {
-  const verifierContents = await readFile(verifierPath);
-  const encodedVerifier = verifierContents.toString('base64');
-  const writeVerifierProgram = [
-    "import { writeFile } from 'node:fs/promises';",
-    `await writeFile('/tmp/file-backed-music-queue-verifier.mjs', Buffer.from('${encodedVerifier}', 'base64'), { mode: 0o600 });`,
-  ].join(' ');
-
-  await runCompose({
-    args: ['exec', '-T', 'harmoniarr', 'node', '--input-type=module', '--eval', writeVerifierProgram],
-    composeArgs,
+  const containerId = await getContainerId({ composeArgs, env });
+  await runDocker({
+    args: ['cp', verifierPath, `${containerId}:${verifierContainerPath}`],
     env,
     timeoutMs: 20_000,
   });
   const result = await runCompose({
-    args: ['exec', '-T', 'harmoniarr', 'node', '/tmp/file-backed-music-queue-verifier.mjs'],
+    args: ['exec', '-T', 'harmoniarr', 'node', verifierContainerPath],
     composeArgs,
     env,
     timeoutMs: 60_000,

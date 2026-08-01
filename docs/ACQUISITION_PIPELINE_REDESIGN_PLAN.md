@@ -1750,3 +1750,21 @@ Recommended next slice: add Docker-backed recovery acceptance for a mounted
 completed download. Prove one repaired folder mapping resumes only its scoped
 release, and prove collision and strict-quality recovery variants remain in
 review without creating an automatic add run.
+
+### Safe Add Docker Recovery Acceptance
+
+Implemented in
+[MUSIC_QUEUE_SAFE_ADD_DOCKER_RECOVERY_ACCEPTANCE_DESIGN.md](MUSIC_QUEUE_SAFE_ADD_DOCKER_RECOVERY_ACCEPTANCE_DESIGN.md).
+The packaged file-backed validator now proves a completed download with an
+incorrect provider-to-container mapping stops before an apply run exists. Once
+the mapping is fixed, Harmoniarr derives the owned release candidate from its
+bounded event evidence, persists one candidate ID on the new operation run,
+and applies that release only. An unrelated completed download remains pending,
+while collision and strict-quality stops remain review-only. The verifier uses
+real mounted files and media tools, obeys the read-only application root, and
+cleans all temporary Docker resources.
+
+Recommended next slice: add Docker-backed recovery acceptance for temporary
+audio-tooling unavailability. It should restore the audio prerequisite and
+prove only the affected release is rechecked, while suspicious-lossless and
+other quality-policy stops remain manual review.

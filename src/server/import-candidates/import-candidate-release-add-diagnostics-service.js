@@ -21,6 +21,7 @@ import { buildAcquisitionAddBlockerRepair } from '../acquisition/acquisition-add
 import {
   deriveImportCandidateAddBlockerCode,
   deriveImportCandidateAddRecoveryReasonCode,
+  normalizeImportCandidateAddBlockerCode,
 } from './import-candidate-add-blocker.js';
 import { createImportCandidateReleaseAddDiagnosticRepository } from './import-candidate-release-add-diagnostic-repository.js';
 
@@ -140,6 +141,23 @@ function buildReleaseAddRecoveryCandidate(item) {
   };
 }
 
+function buildImportBlockerEventRecoveryCandidate(event) {
+  const addBlockerCode = normalizeImportCandidateAddBlockerCode(event?.addBlockerCode);
+  const importCandidateId = typeof event?.importCandidateId === 'string' && event.importCandidateId.trim()
+    ? event.importCandidateId.trim()
+    : null;
+
+  if (!addBlockerCode || !importCandidateId) {
+    return null;
+  }
+
+  return {
+    addBlockerCode,
+    importCandidateId,
+    recoveryReasonCode: null,
+  };
+}
+
 function createNotFoundError() {
   return createApiError(404, 'music_queue_release_not_found', 'Music Queue release not found');
 }
@@ -214,7 +232,20 @@ export function createImportCandidateReleaseAddDiagnosticsService({
       limit: 1,
       wantedReleaseId: normalizedWantedReleaseId,
     });
-    return buildReleaseAddRecoveryCandidate(outcomes[0]);
+    const applyOutcomeRecovery = buildReleaseAddRecoveryCandidate(outcomes[0]);
+    if (applyOutcomeRecovery || outcomes.length > 0) {
+      return applyOutcomeRecovery;
+    }
+
+    if (typeof releaseAddDiagnosticRepository.findLatestReleaseImportBlockerEvent !== 'function') {
+      return null;
+    }
+
+    return buildImportBlockerEventRecoveryCandidate(
+      await releaseAddDiagnosticRepository.findLatestReleaseImportBlockerEvent({
+        wantedReleaseId: normalizedWantedReleaseId,
+      }),
+    );
   }
 
   return {

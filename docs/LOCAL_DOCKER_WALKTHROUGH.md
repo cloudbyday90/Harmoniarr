@@ -196,6 +196,21 @@ docker compose -f compose.walkthrough.yaml up -d --wait --no-build harmoniarr
 docker compose -f compose.walkthrough.yaml --profile bootstrap run --rm --no-deps walkthrough-bootstrap
 ```
 
+## File-Backed Music Queue Recovery Validation
+
+The repository also has a disposable packaged-runtime proof for the completed
+download mapping and safe library-add recovery path:
+
+```powershell
+npm run validate:docker-file-backed-music-queue
+```
+
+It does not use your walkthrough provider, downloads, or music library. The
+validator creates temporary bind mounts, generates real FLAC fixtures inside
+the packaged container, proves one repaired folder mapping resumes only the
+affected release, and proves collision and strict-quality stops stay in review.
+It removes its project, volumes, and temporary directories on completion.
+
 ## Stop
 
 ```powershell

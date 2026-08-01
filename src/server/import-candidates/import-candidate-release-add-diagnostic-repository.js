@@ -39,6 +39,17 @@ function mapApplyOutcome(row) {
   };
 }
 
+function mapImportBlockerEvent(row) {
+  if (!row) {
+    return null;
+  }
+
+  return {
+    addBlockerCode: row.add_blocker_code,
+    importCandidateId: row.import_candidate_id,
+  };
+}
+
 export function createImportCandidateReleaseAddDiagnosticRepository({
   getPoolFn = getPool,
 } = {}) {
@@ -114,7 +125,52 @@ export function createImportCandidateReleaseAddDiagnosticRepository({
     return result.rows.map(mapApplyOutcome);
   }
 
+  /**
+   * A completed download can be stopped before an apply run exists when the
+   * source is not reachable through its configured provider-path mapping.
+   * That terminal candidate event is the only fallback accepted by the
+   * prerequisite recheck; it intentionally exposes no event reason, path, or
+   * arbitrary JSON details.
+   */
+  async function findLatestReleaseImportBlockerEvent({ wantedReleaseId }, queryable) {
+    const db = queryable ?? getPoolFn();
+    const result = await db.query(
+      `
+        SELECT
+          events.details ->> 'addBlockerCode' AS add_blocker_code,
+          events.import_candidate_id
+        FROM import_candidate_events events
+        JOIN import_candidates candidates
+          ON candidates.id = events.import_candidate_id
+        WHERE candidates.status = 'failed'
+          AND events.event_type = 'import_candidate_import_blocked'
+          AND events.details ->> 'addBlockerCode' IS NOT NULL
+          AND (
+            COALESCE(
+              candidates.normalized_payload #>> '{musicQueue,wantedReleaseId}',
+              candidates.normalized_payload #>> '{musicQueueContext,wantedReleaseId}',
+              ''
+            ) = $1
+            OR (
+              jsonb_typeof(candidates.normalized_payload #> '{musicQueue,wantedReleaseIds}') = 'array'
+              AND candidates.normalized_payload #> '{musicQueue,wantedReleaseIds}' ? $1
+            )
+            OR (
+              jsonb_typeof(candidates.normalized_payload #> '{musicQueueContext,wantedReleaseIds}') = 'array'
+              AND candidates.normalized_payload #> '{musicQueueContext,wantedReleaseIds}' ? $1
+            )
+          )
+        ORDER BY events.occurred_at DESC, events.created_at DESC, events.id DESC
+        LIMIT 1
+      `,
+      [wantedReleaseId],
+    );
+
+    return mapImportBlockerEvent(result.rows[0]);
+  }
+
   return {
+    findLatestReleaseImportBlockerEvent,
     getScopedWantedRelease,
     listLatestReleaseAddOutcomes,
   };

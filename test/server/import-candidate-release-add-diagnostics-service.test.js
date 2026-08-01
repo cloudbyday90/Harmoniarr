@@ -149,3 +149,55 @@ test('release add recovery lookup returns only an allow-listed candidate and blo
   }]);
   assert.doesNotMatch(JSON.stringify(recovery), /private|downloads/i);
 });
+
+test('release add recovery lookup falls back only to the latest bounded source blocker when no apply outcome exists', async (t) => {
+  const releaseAddDiagnosticRepository = {
+    findLatestReleaseImportBlockerEvent: t.mock.fn(async () => ({
+      addBlockerCode: 'source_path_unavailable',
+      importCandidateId: 'candidate-missing-source',
+      reason: '/private/downloads/Child of God',
+    })),
+    getScopedWantedRelease: t.mock.fn(async () => ({ id: wantedReleaseId })),
+    listLatestReleaseAddOutcomes: t.mock.fn(async () => []),
+  };
+  const service = createImportCandidateReleaseAddDiagnosticsService({ releaseAddDiagnosticRepository });
+
+  const recovery = await service.findLatestReleaseAddRecoveryCandidate({
+    appUserId: 'c5c86d81-f611-49f6-b55e-cf617f5a842f',
+    wantedReleaseId,
+  });
+
+  assert.deepEqual(recovery, {
+    addBlockerCode: 'source_path_unavailable',
+    importCandidateId: 'candidate-missing-source',
+    recoveryReasonCode: null,
+  });
+  assert.deepEqual(releaseAddDiagnosticRepository.findLatestReleaseImportBlockerEvent.mock.calls[0].arguments, [{
+    wantedReleaseId,
+  }]);
+  assert.doesNotMatch(JSON.stringify(recovery), /private|downloads/i);
+});
+
+test('release add recovery lookup does not revive an older event when an apply outcome is already recorded', async (t) => {
+  const releaseAddDiagnosticRepository = {
+    findLatestReleaseImportBlockerEvent: t.mock.fn(async () => ({
+      addBlockerCode: 'source_path_unavailable',
+      importCandidateId: 'candidate-missing-source',
+    })),
+    getScopedWantedRelease: t.mock.fn(async () => ({ id: wantedReleaseId })),
+    listLatestReleaseAddOutcomes: t.mock.fn(async () => [{
+      applySnapshot: { apply: { outcome: 'applied' } },
+      importCandidateId: 'candidate-applied',
+      itemStatus: 'applied',
+    }]),
+  };
+  const service = createImportCandidateReleaseAddDiagnosticsService({ releaseAddDiagnosticRepository });
+
+  const recovery = await service.findLatestReleaseAddRecoveryCandidate({
+    appUserId: 'c5c86d81-f611-49f6-b55e-cf617f5a842f',
+    wantedReleaseId,
+  });
+
+  assert.equal(recovery, null);
+  assert.equal(releaseAddDiagnosticRepository.findLatestReleaseImportBlockerEvent.mock.callCount(), 0);
+});
