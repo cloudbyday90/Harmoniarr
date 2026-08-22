@@ -16,6 +16,11 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import {
+  artistDetailCacheSampleCatalog,
+  artistDetailCacheSampleSearchQuery,
+} from './artist-detail-cache-sample-catalog.js';
+
 function buildArtworkKey(ownerType, ownerId, artworkRole = 'cover_front') {
   return `${ownerType}:${ownerId}:${artworkRole}`;
 }
@@ -304,6 +309,8 @@ function resolveTracklistPayload(tracklistsByReleaseGroupId, releaseGroupId, sea
 }
 
 const metadataFixture = {
+  artistDetailCacheSampleCatalog,
+  artistDetailCacheSampleSearchQuery,
   artistSearchResults: {
     'boards of canada': [boardsOfCanadaArtist],
     'fixture electronic': [boardsOfCanadaArtist, autechreArtist, aphexTwinArtist, tychoArtist],
@@ -863,9 +870,14 @@ export async function markMetadataReleaseRequestLinked(page, requestKey) {
 }
 
 export async function installMetadataBrowserFixtures(browserContext, {
+  includeArtistDetailCacheSamples = false,
   similarArtistsDelayMs = 0,
 } = {}) {
-  await browserContext.addInitScript(({ fixture, similarArtistsDelayMs: configuredSimilarArtistsDelayMs }) => {
+  await browserContext.addInitScript(({
+    fixture,
+    includeArtistDetailCacheSamples: includeCacheSamples,
+    similarArtistsDelayMs: configuredSimilarArtistsDelayMs,
+  }) => {
     const originalFetch = globalThis.fetch.bind(globalThis);
     const fixtureStateStorageKey = 'harmoniarr:metadata-browser-fixture-state:v1';
     const state = loadFixtureState();
@@ -898,7 +910,7 @@ export async function installMetadataBrowserFixtures(browserContext, {
     }
 
     function getArtistFixtureEntries() {
-      return [
+      const artistFixtures = [
         {
           localPayload: fixture.boardsLocalArtistPayload,
           musicBrainzArtistId: 'mb-artist-boards',
@@ -910,6 +922,10 @@ export async function installMetadataBrowserFixtures(browserContext, {
           releaseGroups: [],
         },
       ];
+
+      return includeCacheSamples
+        ? [...artistFixtures, ...fixture.artistDetailCacheSampleCatalog]
+        : artistFixtures;
     }
 
     function getArtistFixtureByMusicBrainzId(musicBrainzArtistId) {
@@ -2708,7 +2724,9 @@ export async function installMetadataBrowserFixtures(browserContext, {
 
       if (method === 'GET' && path === '/api/v1/metadata/musicbrainz/artists/search') {
         const normalized = normalizeSearchKey(url.searchParams.get('q'));
-        const results = fixture.artistSearchResults[normalized] ?? [];
+        const results = includeCacheSamples && normalized === fixture.artistDetailCacheSampleSearchQuery
+          ? fixture.artistDetailCacheSampleCatalog.map((sample) => sample.searchResult)
+          : fixture.artistSearchResults[normalized] ?? [];
         return buildJsonResponse({
           ok: true,
           provider: 'musicbrainz',
@@ -2852,9 +2870,12 @@ export async function installMetadataBrowserFixtures(browserContext, {
       if (method === 'GET' && path.startsWith('/api/v1/metadata/artists/') && path.endsWith('/similar')) {
         await delaySimilarArtistsResponse(input, init);
         const artistId = path.slice('/api/v1/metadata/artists/'.length, -'/similar'.length);
+        const artistFixture = getArtistFixtureByMusicBrainzId(artistId);
         return buildJsonResponse({
           ok: true,
-          ...(fixture.relatedArtistsById[artistId] ?? { similar: [] }),
+          ...(artistFixture?.relatedArtists
+            ? { similar: artistFixture.relatedArtists }
+            : fixture.relatedArtistsById[artistId] ?? { similar: [] }),
         });
       }
 
@@ -2952,6 +2973,7 @@ export async function installMetadataBrowserFixtures(browserContext, {
     };
   }, {
     fixture: metadataFixture,
+    includeArtistDetailCacheSamples,
     similarArtistsDelayMs,
   });
 
