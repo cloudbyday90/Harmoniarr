@@ -22,7 +22,7 @@ import {
   artistDetailCacheSampleCatalog,
   artistDetailCacheSampleSearchQuery,
   artistDetailCacheSampleTierCounts,
-} from '../../testing/browser/artist-detail-cache-sample-catalog.js';
+} from '../../testing/metadata/artist-detail-cache-sample-catalog.js';
 import {
   createBrowserSmokeRuntime,
   isSkippableBrowserRuntimeError,

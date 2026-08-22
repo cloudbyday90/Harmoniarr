@@ -33,8 +33,10 @@ balanced 20-artist Artist Detail set, so this catalog is separate from both.
 
 ## Design
 
-The catalog is a small ESM module at
-`testing/browser/artist-detail-cache-sample-catalog.js`. Each entry contains:
+The catalog is a small shared ESM module at
+`testing/metadata/artist-detail-cache-sample-catalog.js`. Browser fixtures and
+the server-side controlled cache workload import the same immutable entries,
+so their sample selection cannot drift. Each entry contains:
 
 - a synthetic MusicBrainz-style artist ID and local artist ID;
 - a synthetic Album release group, so Discography has an independently
@@ -158,7 +160,9 @@ one browser validation rather than the general Node test suite.
 
 ## Next Item
 
-Run the 20 deterministic inputs through the controlled local baseline workflow
-and compare the before/after cache aggregates in the same process window. If
-the measured result identifies a specific cold, stale, refresh, or store-error
-failure, address that failure rather than broadly increasing cache lifetimes.
+The deterministic cold, warm, and recreated-service proof is documented in
+[Artist Detail Cache Controlled Workload](ARTIST_DETAIL_CACHE_CONTROLLED_WORKLOAD.md).
+Next, run a real-provider paired sample through the administrator-only cache
+baseline view. If the measured result identifies a specific cold, stale,
+refresh, or store-error failure, address that failure rather than broadly
+increasing cache lifetimes.

@@ -19,7 +19,7 @@
 import {
   artistDetailCacheSampleCatalog,
   artistDetailCacheSampleSearchQuery,
-} from './artist-detail-cache-sample-catalog.js';
+} from '../metadata/artist-detail-cache-sample-catalog.js';
 
 function buildArtworkKey(ownerType, ownerId, artworkRole = 'cover_front') {
   return `${ownerType}:${ownerId}:${artworkRole}`;
