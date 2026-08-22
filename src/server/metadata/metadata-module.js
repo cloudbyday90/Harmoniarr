@@ -53,6 +53,8 @@ import { createMusicBrainzImportService } from './musicbrainz-import-service.js'
 import { createMusicBrainzSearchService } from './musicbrainz-search-service.js';
 import { createSimilarArtistsService } from './similar-artists-service.js';
 import { createReleaseGroupTracklistService } from './release-group-tracklist-service.js';
+import { createMetadataProviderCacheService } from './metadata-provider-cache-service.js';
+import { createMetadataProviderResponseCacheStore } from './metadata-provider-response-cache-store.js';
 import { forceCanonicalRelease } from './canonical-release-service.js';
 import { createOperationRunInterruptionGate } from '../operation-run-cancellation.js';
 
@@ -92,6 +94,8 @@ export function createMetadataModule({
   metadataReadService = null,
   metadataRefreshService = null,
   metadataReleaseMaterializationService = null,
+  metadataProviderCacheService = null,
+  metadataProviderResponseCacheStore = null,
   metadataSearchService = null,
   providerHealthRecorder = null,
   recordActivityEventFn = null,
@@ -197,7 +201,16 @@ export function createMetadataModule({
       listOperatorTrackOverrides: resolvedOperatorTrackOverrideStore.listOperatorTrackOverrides,
       operatorArtistReconciliationRequestService: resolvedOperatorArtistReconciliationRequestService,
     });
-  const resolvedMusicBrainzCatalogService = musicBrainzCatalogService ?? createMusicBrainzCatalogService({ providerHealthRecorder });
+  const resolvedMetadataProviderResponseCacheStore = metadataProviderResponseCacheStore
+    ?? createMetadataProviderResponseCacheStore();
+  const resolvedMetadataProviderCacheService = metadataProviderCacheService
+    ?? createMetadataProviderCacheService({
+      cacheStore: resolvedMetadataProviderResponseCacheStore,
+    });
+  const resolvedMusicBrainzCatalogService = musicBrainzCatalogService ?? createMusicBrainzCatalogService({
+    metadataProviderCacheService: resolvedMetadataProviderCacheService,
+    providerHealthRecorder,
+  });
   const resolvedMusicBrainzImportService = musicBrainzImportService ?? createMusicBrainzImportService({ providerHealthRecorder });
   const resolvedMetadataReleaseMaterializationService = metadataReleaseMaterializationService
     ?? createMetadataReleaseMaterializationService({
@@ -264,7 +277,9 @@ export function createMetadataModule({
   const resolvedMetadataRefreshHeartbeatState = metadataRefreshHeartbeatState ?? createMetadataRefreshHeartbeatState();
   const resolvedMetadataSearchService = metadataSearchService ?? createMetadataSearchService();
   const resolvedMusicBrainzSearchService = musicBrainzSearchService ?? createMusicBrainzSearchService({ providerHealthRecorder });
-  const resolvedSimilarArtistsService = similarArtistsService ?? createSimilarArtistsService();
+  const resolvedSimilarArtistsService = similarArtistsService ?? createSimilarArtistsService({
+    metadataProviderCacheService: resolvedMetadataProviderCacheService,
+  });
   const resolvedReleaseGroupTracklistService = releaseGroupTracklistService ?? createReleaseGroupTracklistService({
     musicBrainzCatalogService: resolvedMusicBrainzCatalogService,
     importMusicBrainzReleaseGroup: resolvedMusicBrainzImportService.importReleaseGroupById,
@@ -282,6 +297,8 @@ export function createMetadataModule({
     metadataRefreshSchedulingPolicyService: resolvedMetadataRefreshSchedulingPolicyService,
     metadataReadService: resolvedMetadataReadService,
     metadataMonitoredArtistStore: resolvedMetadataMonitoredArtistStore,
+    metadataProviderCacheService: resolvedMetadataProviderCacheService,
+    metadataProviderResponseCacheStore: resolvedMetadataProviderResponseCacheStore,
     operatorArtistMonitoringService: resolvedOperatorArtistMonitoringService,
     operatorArtistMonitoringStore: resolvedOperatorArtistMonitoringStore,
     operatorMonitoredArtistProjectionService: resolvedOperatorMonitoredArtistProjectionService,

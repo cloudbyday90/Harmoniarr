@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createMusicBrainzCatalogService } from '../../src/server/metadata/musicbrainz-catalog-service.js';
+import {
+  buildArtistReleaseGroupCacheKey,
+  createMusicBrainzCatalogService,
+} from '../../src/server/metadata/musicbrainz-catalog-service.js';
 
 function createProviderError() {
   const error = new Error('MusicBrainz request failed');
@@ -212,4 +215,68 @@ test('createMusicBrainzCatalogService preserves provider failure details', async
   assert.equal(providerHealthRecorder.recordSuccess.mock.callCount(), 0);
   assert.equal(providerHealthRecorder.recordError.mock.callCount(), 1);
   assert.deepEqual(providerHealthRecorder.recordError.mock.calls[0].arguments, ['musicbrainz', providerError]);
+});
+
+test('createMusicBrainzCatalogService reads artist discography through the persistent cache service', async (t) => {
+  const browseArtistReleaseGroups = t.mock.fn(async () => ({
+    count: 1,
+    'release-groups': [{
+      id: 'mb-rg-1',
+      title: 'Amber',
+    }],
+  }));
+  const getOrLoad = t.mock.fn(async (input) => ({
+    cache: { refresh: 'foreground', state: 'fresh' },
+    payload: await input.load(),
+  }));
+  const service = createMusicBrainzCatalogService({
+    metadataProviderCacheService: { getOrLoad },
+    musicBrainzClient: {
+      browseArtistReleaseGroups,
+      browseReleaseGroupReleases: async () => ({ releases: [] }),
+    },
+  });
+
+  const result = await service.browseArtistReleaseGroups({ artistId: 'mb-artist-1', limit: 25 });
+
+  assert.equal(browseArtistReleaseGroups.mock.callCount(), 1);
+  assert.equal(getOrLoad.mock.callCount(), 1);
+  const cacheInput = getOrLoad.mock.calls[0].arguments[0];
+  assert.equal(cacheInput.cacheNamespace, 'musicbrainz.artist_release_groups');
+  assert.equal(cacheInput.cacheKey, buildArtistReleaseGroupCacheKey({
+    artistId: 'mb-artist-1',
+    limit: 25,
+    offset: 0,
+    releaseGroupStatus: 'website-default',
+    type: null,
+  }));
+  assert.deepEqual(result.cache, { refresh: 'foreground', state: 'fresh' });
+  assert.equal(result.results[0].musicbrainzReleaseGroupId, 'mb-rg-1');
+});
+
+test('buildArtistReleaseGroupCacheKey varies for every provider browse input', () => {
+  const base = buildArtistReleaseGroupCacheKey({
+    artistId: 'mb-artist-1',
+    limit: 25,
+    offset: 0,
+    releaseGroupStatus: 'website-default',
+    type: null,
+  });
+  const changedOffset = buildArtistReleaseGroupCacheKey({
+    artistId: 'mb-artist-1',
+    limit: 25,
+    offset: 25,
+    releaseGroupStatus: 'website-default',
+    type: null,
+  });
+  const changedFilter = buildArtistReleaseGroupCacheKey({
+    artistId: 'mb-artist-1',
+    limit: 25,
+    offset: 0,
+    releaseGroupStatus: 'all',
+    type: 'album',
+  });
+
+  assert.notEqual(base, changedOffset);
+  assert.notEqual(base, changedFilter);
 });

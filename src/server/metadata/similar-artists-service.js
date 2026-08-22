@@ -20,6 +20,10 @@ import { createLastFmClient } from '../integrations/lastfm/lastfm-client.js';
 import { createListenBrainzClient } from '../integrations/listenbrainz/listenbrainz-client.js';
 import { createMusicBrainzClient } from '../integrations/musicbrainz/musicbrainz-client.js';
 import { createSimilarArtistsFallbackService } from './similar-artists-fallback-service.js';
+import {
+  metadataProviderCacheNamespaces,
+  metadataProviderCachePolicies,
+} from './metadata-provider-cache-policy.js';
 
 // MusicBrainz artist-to-artist relationship types and their similarity weights.
 // Lower-cased for case-insensitive matching against MB relation type strings.
@@ -248,6 +252,7 @@ export function mergeSimilarArtists(
 export function createSimilarArtistsService({
   lastFmClient = createLastFmClient(),
   listenBrainzClient = createListenBrainzClient(),
+  metadataProviderCacheService = null,
   musicBrainzClient = createMusicBrainzClient(),
   cacheTtlMs = 24 * 60 * 60 * 1000,
   cache = null,
@@ -296,13 +301,7 @@ export function createSimilarArtistsService({
     return [...candidateMap.values()];
   }
 
-  async function getSimilarArtists({ artistMbid, limit = 20 }) {
-    const safeLimit = Math.max(1, Math.min(Number(limit) || 20, 100));
-    const cached = ttlCache.get(artistMbid);
-    if (cached !== undefined) {
-      return { similar: cached.slice(0, safeLimit) };
-    }
-
+  async function loadSimilarArtistsFromProviders({ artistMbid, discoveryLimit = 100 }) {
     const [lbResult, mbResult, lastfmResult] = await Promise.allSettled([
       listenBrainzClient.getSimilarArtists({ mbid: artistMbid, limit: 100 }),
       musicBrainzClient.lookupArtistRelations({ artistId: artistMbid }),
@@ -368,7 +367,7 @@ export function createSimilarArtistsService({
       lbArtists,
       mbArtists,
       lastfmArtists,
-      safeLimit,
+      safeLimit: discoveryLimit,
     })) {
       const [lbRadioArtists, mbSearchArtists] = await Promise.all([
         fallbackService.getListenBrainzRadioFallback({
@@ -387,13 +386,42 @@ export function createSimilarArtistsService({
       mbArtists = mergeSourceCandidates(mbArtists, mbSearchArtists);
     }
 
-    const merged = mergeSimilarArtists(
+    return mergeSimilarArtists(
       lbArtists,
       mbArtists,
       { limit: 100 },
       lastfmArtists,
       { seedGenres, seedTags, genreOverrides },
     );
+  }
+
+  async function getSimilarArtists({ artistMbid, limit = 20 }) {
+    const safeLimit = Math.max(1, Math.min(Number(limit) || 20, 100));
+
+    if (metadataProviderCacheService) {
+      const cached = await metadataProviderCacheService.getOrLoad({
+        cacheKey: String(artistMbid),
+        cacheNamespace: metadataProviderCacheNamespaces.similarArtists,
+        load: async () => ({
+          similar: await loadSimilarArtistsFromProviders({ artistMbid }),
+        }),
+        policy: metadataProviderCachePolicies.similarArtists,
+      });
+
+      return {
+        cache: cached.cache,
+        similar: Array.isArray(cached.payload?.similar)
+          ? cached.payload.similar.slice(0, safeLimit)
+          : [],
+      };
+    }
+
+    const cached = ttlCache.get(artistMbid);
+    if (cached !== undefined) {
+      return { similar: cached.slice(0, safeLimit) };
+    }
+
+    const merged = await loadSimilarArtistsFromProviders({ artistMbid });
     ttlCache.set(artistMbid, merged);
 
     return { similar: merged.slice(0, safeLimit) };

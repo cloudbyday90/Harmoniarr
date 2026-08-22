@@ -294,6 +294,40 @@ test('createSimilarArtistsService returns cached result on second call', async (
   assert.equal(lbCallCount, 1, 'LB client should only be called once per MBID');
 });
 
+test('createSimilarArtistsService serves a persistent cached related-artist result without provider calls', async (t) => {
+  const listenBrainzClient = createTestListenBrainzClient(t.mock.fn(async () => []));
+  const musicBrainzClient = createTestMusicBrainzClient(t.mock.fn(async () => ({ relations: [] })));
+  const getOrLoad = t.mock.fn(async () => ({
+    cache: { refresh: 'background', state: 'stale' },
+    payload: {
+      similar: [
+        { id: 'similar-1', name: 'Cached artist', score: 0.8, source: 'musicbrainz' },
+        { id: 'similar-2', name: 'Second artist', score: 0.7, source: 'listenbrainz' },
+      ],
+    },
+  }));
+  const service = createSimilarArtistsService({
+    listenBrainzClient,
+    metadataProviderCacheService: { getOrLoad },
+    musicBrainzClient,
+  });
+
+  const result = await service.getSimilarArtists({ artistMbid: 'artist-1', limit: 1 });
+
+  assert.deepEqual(result.similar, [{
+    id: 'similar-1',
+    name: 'Cached artist',
+    score: 0.8,
+    source: 'musicbrainz',
+  }]);
+  assert.deepEqual(result.cache, { refresh: 'background', state: 'stale' });
+  assert.equal(getOrLoad.mock.callCount(), 1);
+  assert.equal(getOrLoad.mock.calls[0].arguments[0].cacheNamespace, 'artist_detail.similar_artists');
+  assert.equal(getOrLoad.mock.calls[0].arguments[0].cacheKey, 'artist-1');
+  assert.equal(listenBrainzClient.getSimilarArtists.mock.callCount(), 0);
+  assert.equal(musicBrainzClient.lookupArtistRelations.mock.callCount(), 0);
+});
+
 test('createSimilarArtistsService caches separately per MBID', async (t) => {
   let lbCallCount = 0;
   const lbClient = createTestListenBrainzClient(async ({ mbid }) => {

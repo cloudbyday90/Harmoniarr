@@ -1926,6 +1926,36 @@ Columns:
 - `fetched_at timestamptz not null`
 - `created_at timestamptz not null`
 
+### `metadata_provider_response_cache`
+
+Current normalized public provider-response cache for metadata read paths. This
+is separate from the append-only `metadata_provider_snapshots` provenance
+history: it has one mutable row per application-defined response identity and
+is safe for low-latency stale-while-revalidate reads.
+
+Columns:
+
+- `id uuid primary key`
+- `cache_namespace text not null`
+- `cache_key text not null`
+- `payload jsonb not null`
+- `fetched_at timestamptz not null`
+- `created_at timestamptz not null`
+- `updated_at timestamptz not null`
+
+Unique:
+
+- `(cache_namespace, cache_key)`
+
+Constraints:
+
+- non-blank namespace and key
+- `payload` must be a JSON object
+
+Indexes:
+
+- `fetched_at` for retention pruning
+
 ### `artwork_assets`
 
 Filesystem-backed artwork asset inventory.

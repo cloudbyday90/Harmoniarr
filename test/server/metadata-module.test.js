@@ -13,6 +13,8 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     resolveDispatchReadiness: () => ({ allowed: true }),
   };
   const metadataArtistRefreshStateStore = {};
+  const metadataProviderCacheService = {};
+  const metadataProviderResponseCacheStore = {};
   const operatorArtistProjectionService = {
     getOperatorArtistProjection: () => {},
   };
@@ -76,6 +78,8 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     metadataArtistRefreshWorker,
     metadataRefreshDispatchPolicyService,
     metadataArtistRefreshStateStore,
+    metadataProviderCacheService,
+    metadataProviderResponseCacheStore,
     operatorArtistProjectionService,
     operatorMonitoredArtistProjectionService,
     operatorArtistSaveService,
@@ -98,6 +102,8 @@ test('createMetadataModule exposes shared route dependencies from injected servi
   assert.equal(metadataModule.metadataRefreshDispatchPolicyService, metadataRefreshDispatchPolicyService);
   assert.equal(metadataModule.metadataReadService, metadataReadService);
   assert.equal(metadataModule.metadataArtistRefreshStateStore, metadataArtistRefreshStateStore);
+  assert.equal(metadataModule.metadataProviderCacheService, metadataProviderCacheService);
+  assert.equal(metadataModule.metadataProviderResponseCacheStore, metadataProviderResponseCacheStore);
   assert.equal(metadataModule.operatorMonitoredArtistProjectionService, operatorMonitoredArtistProjectionService);
   assert.equal(metadataModule.operatorArtistProjectionService, operatorArtistProjectionService);
   assert.equal(metadataModule.operatorArtistSaveService, operatorArtistSaveService);

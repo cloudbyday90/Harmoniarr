@@ -24,6 +24,10 @@ import {
   normalizeSearchOffset,
 } from '../validators/metadata-search-validator.js';
 import { observeMusicBrainzProviderCall } from './musicbrainz-provider-health.js';
+import {
+  metadataProviderCacheNamespaces,
+  metadataProviderCachePolicies,
+} from './metadata-provider-cache-policy.js';
 
 function buildArtistCredit(artistCredit) {
   if (!Array.isArray(artistCredit)) {
@@ -53,7 +57,28 @@ function normalizeReleaseSummary(release) {
   };
 }
 
+/**
+ * A stable cache key for one normalized MusicBrainz artist browse request.
+ * The key contains every provider input that can alter the response.
+ */
+export function buildArtistReleaseGroupCacheKey({
+  artistId,
+  limit,
+  offset,
+  releaseGroupStatus,
+  type,
+}) {
+  return new URLSearchParams({
+    artistId: String(artistId),
+    limit: String(limit),
+    offset: String(offset),
+    releaseGroupStatus: releaseGroupStatus ?? '',
+    type: type ?? '',
+  }).toString();
+}
+
 export function createMusicBrainzCatalogService({
+  metadataProviderCacheService = null,
   musicBrainzClient = createMusicBrainzClient(),
   providerHealthRecorder = null,
 } = {}) {
@@ -63,41 +88,65 @@ export function createMusicBrainzCatalogService({
     const normalizedType = normalizeReleaseGroupType(type);
     const normalizedReleaseGroupStatus = normalizeReleaseGroupStatus(releaseGroupStatus, 'website-default');
 
-    const payload = await observeMusicBrainzProviderCall(
-      providerHealthRecorder,
-      () => musicBrainzClient.browseArtistReleaseGroups({
+    const loadBrowseResult = async () => {
+      const payload = await observeMusicBrainzProviderCall(
+        providerHealthRecorder,
+        () => musicBrainzClient.browseArtistReleaseGroups({
+          artistId,
+          limit: normalizedLimit,
+          offset: normalizedOffset,
+          type: normalizedType,
+          releaseGroupStatus: normalizedReleaseGroupStatus,
+        }),
+      );
+
+      return {
+        artistId,
+        limit: normalizedLimit,
+        offset: payload.offset ?? normalizedOffset,
+        total: payload['release-group-count'] ?? payload.count ?? 0,
+        filters: {
+          type: normalizedType,
+          releaseGroupStatus: normalizedReleaseGroupStatus,
+        },
+        results: Array.isArray(payload['release-groups'])
+          ? payload['release-groups'].map((releaseGroup) => ({
+              id: releaseGroup.id,
+              sourceProvider: 'musicbrainz',
+              musicbrainzReleaseGroupId: releaseGroup.id,
+              title: releaseGroup.title,
+              primaryType: releaseGroup['primary-type'] ?? null,
+              secondaryTypes: Array.isArray(releaseGroup['secondary-types'])
+                ? releaseGroup['secondary-types']
+                : [],
+              firstReleaseDate: releaseGroup['first-release-date'] ?? null,
+              disambiguation: releaseGroup.disambiguation ?? null,
+              artistCredit: buildArtistCredit(releaseGroup['artist-credit']),
+            }))
+          : [],
+      };
+    };
+
+    if (!metadataProviderCacheService) {
+      return loadBrowseResult();
+    }
+
+    const cached = await metadataProviderCacheService.getOrLoad({
+      cacheKey: buildArtistReleaseGroupCacheKey({
         artistId,
         limit: normalizedLimit,
         offset: normalizedOffset,
-        type: normalizedType,
         releaseGroupStatus: normalizedReleaseGroupStatus,
+        type: normalizedType,
       }),
-    );
+      cacheNamespace: metadataProviderCacheNamespaces.musicBrainzArtistReleaseGroups,
+      load: loadBrowseResult,
+      policy: metadataProviderCachePolicies.musicBrainzArtistReleaseGroups,
+    });
 
     return {
-      artistId,
-      limit: normalizedLimit,
-      offset: payload.offset ?? normalizedOffset,
-      total: payload['release-group-count'] ?? payload.count ?? 0,
-      filters: {
-        type: normalizedType,
-        releaseGroupStatus: normalizedReleaseGroupStatus,
-      },
-      results: Array.isArray(payload['release-groups'])
-        ? payload['release-groups'].map((releaseGroup) => ({
-            id: releaseGroup.id,
-            sourceProvider: 'musicbrainz',
-            musicbrainzReleaseGroupId: releaseGroup.id,
-            title: releaseGroup.title,
-            primaryType: releaseGroup['primary-type'] ?? null,
-            secondaryTypes: Array.isArray(releaseGroup['secondary-types'])
-              ? releaseGroup['secondary-types']
-              : [],
-            firstReleaseDate: releaseGroup['first-release-date'] ?? null,
-            disambiguation: releaseGroup.disambiguation ?? null,
-            artistCredit: buildArtistCredit(releaseGroup['artist-credit']),
-          }))
-        : [],
+      ...cached.payload,
+      cache: cached.cache,
     };
   }
 
