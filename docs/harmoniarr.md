@@ -1528,7 +1528,7 @@ Frontend principles:
 
 Recommended backend stack, matching Classifarr where practical:
 
-- Node.js 25.4 baseline
+- Node.js 24 LTS baseline (Node 24.19.0 target)
 - Express 5 as the HTTP server
 - Helmet, CORS, cookie-parser, JSON Web Token, and rate-limit middleware
 - Swagger UI for API documentation
@@ -5040,7 +5040,7 @@ Upgrade rules:
 
 Compatibility surfaces to track:
 
-- Node 25.4 ESM runtime behavior and package compatibility
+- Node 24 LTS ESM runtime behavior and package compatibility
 - Alpine branch support, musl-native module behavior, and packaged media tooling availability
 - PostgreSQL 18 cluster compatibility, migration expectations, and restore preflight behavior
 - `slskd` API response compatibility and adapter normalization guarantees
@@ -5207,7 +5207,7 @@ Supply-chain safeguards:
 - Run dependency vulnerability scanning in CI and treat high-severity findings as blockers unless there is documented review and justification.
 - Run secret scanning and keep credential-shaped strings out of source, tests, examples, fixtures, and generated code.
 - Prefer official or well-established packages for auth, schema validation, logging, and test infrastructure rather than obscure one-off libraries.
-- Avoid copying install commands or package recommendations from generated output without checking current maintenance status and compatibility with Node 25.4, ESM, and Alpine.
+- Avoid copying install commands or package recommendations from generated output without checking current maintenance status and compatibility with Node 24 LTS, ESM, and Alpine.
 - Review transitive-risk-heavy additions carefully, especially packages that execute install scripts, compile native code, or pull in large trees for minor convenience.
 - Keep builder-stage-only dependencies out of the runtime image whenever possible.
 
@@ -5988,7 +5988,7 @@ Know what is missing
 - Project name: Harmoniarr.
 - License: GPL-3.0-or-later, matching Classifarr.
 - Use a Classifarr-style GitHub Action to check copyright/license headers on source files.
-- Use the current ESM-native stack as the default implementation baseline: Node 25.4, npm, Express 5, Vue 3, Vite, shared native-fetch client modules, native `node:test`, ESLint flat config, Docker Alpine, and explicit PostgreSQL access through `pg`.
+- Use the current ESM-native stack as the default implementation baseline: Node 24 LTS, npm, Express 5, Vue 3, Vite, shared native-fetch client modules, native `node:test`, ESLint flat config, Docker Alpine, and explicit PostgreSQL access through `pg`.
 - Use a Classifarr-style local authentication model for v1: first-run admin setup, cookie-based browser auth, refresh-token-backed sessions, CSRF protection for cookie-authenticated writes, API keys for integrations, and explicit admin-only route protection.
 - Use ES modules for JavaScript and TypeScript code; avoid CommonJS for project scripts and application code.
 - Treat defensive coding as a baseline requirement: thin routes, schema validation at boundaries, centralized error handling, structured logging with correlation, explicit timeout and retry policy, and skeptical review of AI-generated code.
@@ -6064,7 +6064,7 @@ Harmoniarr V1 should be delivered as a staged, self-hosted music automation plat
 
 ## 3. Technical Baseline Locked For Implementation
 
-- Runtime: Node.js 25.4 baseline, ESM-only application code.
+- Runtime: Node.js 24 LTS baseline, ESM-only application code.
 - Backend: Express 5 with thin route handlers and explicit validator/service/repository boundaries.
 - Frontend: Vue 3, Vite, static ESM route and view imports by default, and shared client API/composable boundaries at the browser edge.
 - Database: PostgreSQL 18 as the canonical state store, with timestamped migrations and fail-closed startup validation.

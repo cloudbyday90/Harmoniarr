@@ -862,11 +862,40 @@ export async function markMetadataReleaseRequestLinked(page, requestKey) {
   }, requestKey);
 }
 
-export async function installMetadataBrowserFixtures(browserContext) {
-  await browserContext.addInitScript(({ fixture }) => {
+export async function installMetadataBrowserFixtures(browserContext, {
+  similarArtistsDelayMs = 0,
+} = {}) {
+  await browserContext.addInitScript(({ fixture, similarArtistsDelayMs: configuredSimilarArtistsDelayMs }) => {
     const originalFetch = globalThis.fetch.bind(globalThis);
     const fixtureStateStorageKey = 'harmoniarr:metadata-browser-fixture-state:v1';
     const state = loadFixtureState();
+
+    async function delaySimilarArtistsResponse(input, init) {
+      if (configuredSimilarArtistsDelayMs <= 0) {
+        return;
+      }
+
+      const requestSignal = init?.signal
+        ?? (input instanceof Request ? input.signal : null);
+      if (requestSignal?.aborted) {
+        throw new DOMException('The operation was aborted.', 'AbortError');
+      }
+
+      await new Promise((resolve, reject) => {
+        let timer;
+        const onAbort = () => {
+          globalThis.clearTimeout(timer);
+          reject(new DOMException('The operation was aborted.', 'AbortError'));
+        };
+        const complete = () => {
+          requestSignal?.removeEventListener('abort', onAbort);
+          resolve();
+        };
+
+        timer = globalThis.setTimeout(complete, configuredSimilarArtistsDelayMs);
+        requestSignal?.addEventListener('abort', onAbort, { once: true });
+      });
+    }
 
     function getArtistFixtureEntries() {
       return [
@@ -2821,6 +2850,7 @@ export async function installMetadataBrowserFixtures(browserContext) {
       }
 
       if (method === 'GET' && path.startsWith('/api/v1/metadata/artists/') && path.endsWith('/similar')) {
+        await delaySimilarArtistsResponse(input, init);
         const artistId = path.slice('/api/v1/metadata/artists/'.length, -'/similar'.length);
         return buildJsonResponse({
           ok: true,
@@ -2922,6 +2952,7 @@ export async function installMetadataBrowserFixtures(browserContext) {
     };
   }, {
     fixture: metadataFixture,
+    similarArtistsDelayMs,
   });
 
   await browserContext.route(/^https:\/\/coverartarchive\.org\//, async (route) => {

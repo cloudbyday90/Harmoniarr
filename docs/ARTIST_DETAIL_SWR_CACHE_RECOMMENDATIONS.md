@@ -158,6 +158,11 @@ Decision: accepted.
    catalog data must not suppress a needed provider fallback unless it is
    explicitly known to be a completed empty result.
 
+The next item is now implemented and recorded separately in
+`ARTIST_DETAIL_PROGRESSIVE_HYDRATION.md`. It keeps the persistent server-side
+SWR cache as the source of truth while separating the page's critical render
+path from the optional related-artist enhancement.
+
 ## Security Constraints
 
 - Every cache key and SQL value is parameterized; no provider or cache key is

@@ -1,11 +1,13 @@
 # syntax=docker/dockerfile:1.7
 
-ARG NODE_IMAGE=node:25.4.0-alpine
+ARG NODE_IMAGE=node:24.19.0-alpine
 ARG RUNTIME_IMAGE=alpine:3.23
 
 FROM ${NODE_IMAGE} AS node-base
 
-FROM ${NODE_IMAGE} AS client-builder
+RUN npm install --global --ignore-scripts npm@12.0.2
+
+FROM node-base AS client-builder
 WORKDIR /build
 
 COPY package.json package-lock.json vite.config.js ./
@@ -15,7 +17,7 @@ COPY src/shared ./src/shared
 RUN --mount=type=cache,target=/root/.npm npm ci \
     && npm run build:client
 
-FROM ${NODE_IMAGE} AS server-builder
+FROM node-base AS server-builder
 WORKDIR /build
 
 COPY package.json package-lock.json ./

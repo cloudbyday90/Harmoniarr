@@ -105,7 +105,7 @@ The release check also found outdated production dependencies that were not
 introduced by this work. The lockfile now resolves `sharp` 0.35.3, `postcss`
 8.5.25, and `body-parser` 2.3.0. The final `npm audit --omit=dev` result is
 zero production vulnerabilities. `sharp` 0.35.3 requires Node 20.9 or later;
-the supported local and container runtime uses Node 25.
+the supported local and container runtime uses Node 24 LTS.
 
 The full development dependency graph still has separate toolchain advisories
 for Vite and integration-test dependencies. They do not ship in the runtime

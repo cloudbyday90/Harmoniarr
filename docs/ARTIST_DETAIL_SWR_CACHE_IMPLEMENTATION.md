@@ -75,6 +75,7 @@ authenticated API response caching.
   ESM, image-tag, lint, test-hygiene, full unit/client/script/integration test,
   and production-build checks.
 
-The validation shell supplied Node 24.18.1, so npm correctly warned that it is
-below the repository's supported Node 25.4 range. The toolchain policy was not
-relaxed to hide that mismatch.
+The validation shell supplied Node 24.18.1. The prior Node 25.4 policy has
+been superseded because Node 25 reached end of life; the repository now accepts
+the supported Node 24 LTS compatibility range and directs developers and
+containers to Node 24.19.0. See `NODE_LTS_RUNTIME_POLICY_2026_08.md`.

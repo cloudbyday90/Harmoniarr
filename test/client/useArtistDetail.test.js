@@ -92,6 +92,23 @@ function createOperatorProjectionDouble({ projection = null, throws = null } = {
   };
 }
 
+function createDeferred() {
+  let reject;
+  let resolve;
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+
+  return { promise, reject, resolve };
+}
+
+async function flushAsyncWork() {
+  await new Promise((resolve) => {
+    setImmediate(resolve);
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Initial state
 // ---------------------------------------------------------------------------
@@ -202,6 +219,35 @@ test('useArtistDetail loadArtistDetail populates relatedArtists from fetchSimila
   assert.equal(relatedArtists.value[0].name, 'Portishead');
 });
 
+test('useArtistDetail resolves the critical path before related-artist enrichment finishes', async () => {
+  const relatedArtistsDeferred = createDeferred();
+  const releaseGroups = [makeReleaseGroup({ id: 'browse-rg' })];
+  const {
+    isLoading,
+    isLoadingRelatedArtists,
+    loadArtistDetail,
+    relatedArtists,
+    releaseGroups: loadedReleaseGroups,
+  } = useArtistDetail({
+    resolveLocal: createLocalDouble({ throws: Object.assign(new Error('Not Found'), { status: 404 }) }),
+    browseReleaseGroups: createBrowseDouble({ results: releaseGroups }),
+    fetchSimilar: () => relatedArtistsDeferred.promise,
+  });
+
+  await loadArtistDetail('mb-1');
+
+  assert.equal(isLoading.value, false);
+  assert.equal(isLoadingRelatedArtists.value, true);
+  assert.equal(loadedReleaseGroups.value.length, 1);
+  assert.deepEqual(relatedArtists.value, []);
+
+  relatedArtistsDeferred.resolve({ similar: [makeSimilar()] });
+  await flushAsyncWork();
+
+  assert.equal(isLoadingRelatedArtists.value, false);
+  assert.equal(relatedArtists.value[0].name, 'Portishead');
+});
+
 test('useArtistDetail loads operator projection for local artist detail', async (t) => {
   const fetchOperatorProjection = t.mock.fn(createOperatorProjectionDouble());
   const { operator, projection, loadArtistDetail } = useArtistDetail({
@@ -241,6 +287,27 @@ test('useArtistDetail uses operator projection release groups instead of browse 
   assert.equal(releaseGroups.value[0].id, 'local-rg-1');
 });
 
+test('useArtistDetail browses the cached provider catalog when an operator projection has no release groups', async (t) => {
+  const browseReleaseGroups = t.mock.fn(createBrowseDouble({ results: [makeReleaseGroup({ id: 'browse-rg' })] }));
+  const { releaseGroups, loadArtistDetail } = useArtistDetail({
+    resolveLocal: createLocalDouble({ artist: makeArtist({ id: 'local-1' }) }),
+    fetchOperatorProjection: createOperatorProjectionDouble({
+      projection: {
+        artist: makeArtist({ id: 'local-1' }),
+        operator: { monitoring: { isMonitored: true, monitoredReleaseGroupTypes: ['album'] } },
+        releaseGroups: [],
+      },
+    }),
+    browseReleaseGroups,
+    fetchSimilar: createSimilarDouble(),
+  });
+
+  await loadArtistDetail('mb-1');
+
+  assert.equal(browseReleaseGroups.mock.callCount(), 1);
+  assert.equal(releaseGroups.value[0].id, 'browse-rg');
+});
+
 test('useArtistDetail falls back to browse when operator projection is not found', async (t) => {
   const browseReleaseGroups = t.mock.fn(createBrowseDouble({ results: [makeReleaseGroup({ id: 'browse-rg' })] }));
   const { artistError, releaseGroups, loadArtistDetail } = useArtistDetail({
@@ -271,7 +338,7 @@ test('useArtistDetail loadArtistDetail sets isLoading false after resolution', a
   assert.equal(isLoading.value, false);
 });
 
-test('useArtistDetail loadArtistDetail clears isLoading after unexpected loader errors', async () => {
+test('useArtistDetail keeps provider-backed discography and related enrichment independent after a local loader error', async () => {
   const { artistError, isLoading, loadArtistDetail, releaseGroups, relatedArtists } = useArtistDetail({
     resolveLocal: () => {
       throw new Error('unexpected local resolver failure');
@@ -284,8 +351,8 @@ test('useArtistDetail loadArtistDetail clears isLoading after unexpected loader 
 
   assert.equal(isLoading.value, false);
   assert.ok(artistError.value);
-  assert.deepEqual(releaseGroups.value, []);
-  assert.deepEqual(relatedArtists.value, []);
+  assert.equal(releaseGroups.value.length, 1);
+  assert.equal(relatedArtists.value.length, 1);
 });
 
 test('useArtistDetail loadArtistDetail passes the mbid to resolveLocal', async (t) => {
@@ -451,6 +518,30 @@ test('useArtistDetail similar failure does not block discography or artist load'
 
   assert.equal(artist.value?.name, 'Radiohead');
   assert.equal(releaseGroups.value.length, 1);
+});
+
+test('useArtistDetail ignores a late related-artist response after a newer artist load begins', async () => {
+  const firstRelatedArtists = createDeferred();
+  const secondRelatedArtists = createDeferred();
+  const { relatedArtists, loadArtistDetail } = useArtistDetail({
+    resolveLocal: createLocalDouble({ throws: Object.assign(new Error('Not Found'), { status: 404 }) }),
+    browseReleaseGroups: createBrowseDouble(),
+    fetchSimilar: (artistId) => (artistId === 'first-mbid'
+      ? firstRelatedArtists.promise
+      : secondRelatedArtists.promise),
+  });
+
+  await loadArtistDetail('first-mbid');
+  await loadArtistDetail('second-mbid');
+  firstRelatedArtists.resolve({ similar: [makeSimilar({ id: 'first-related' })] });
+  await flushAsyncWork();
+
+  assert.deepEqual(relatedArtists.value, []);
+
+  secondRelatedArtists.resolve({ similar: [makeSimilar({ id: 'second-related' })] });
+  await flushAsyncWork();
+
+  assert.equal(relatedArtists.value[0].id, 'second-related');
 });
 
 // ---------------------------------------------------------------------------

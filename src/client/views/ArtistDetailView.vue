@@ -123,10 +123,12 @@ const {
   releaseGroups,
   relatedArtists,
   isLoading,
+  isLoadingRelatedArtists,
   isMonitored,
   artistError,
   discographyError,
   relatedError,
+  cancelArtistDetailLoad,
   loadArtistDetail,
   setOperatorProjection,
 } = useArtistDetail();
@@ -514,10 +516,14 @@ async function retryReconciliation() {
   }
 }
 
-watch(mbid, (nextMbid) => {
+watch(mbid, (nextMbid, _previousMbid, onCleanup) => {
   if (nextMbid) {
     void loadArtistDetail(nextMbid);
   }
+
+  onCleanup(() => {
+    cancelArtistDetailLoad();
+  });
 }, { immediate: true });
 
 watch(projection, () => {
@@ -530,7 +536,7 @@ watch(projection, () => {
     <article v-if="isLoading" class="hx-card artist-detail-loading" aria-live="polite" aria-busy="true">
       <div class="hx-card-body">
         <p class="artist-detail-loading__title">Loading artist detail...</p>
-        <p class="artist-detail-loading__body">Discography, artwork, and related artists are being prepared.</p>
+        <p class="artist-detail-loading__body">Discography and artwork are being prepared.</p>
       </div>
     </article>
 
@@ -970,7 +976,7 @@ watch(projection, () => {
       </article>
 
       <article
-        v-if="relatedArtists.length > 0"
+        v-if="isLoadingRelatedArtists || relatedArtists.length > 0 || relatedError"
         class="hx-card artist-detail-section-card"
         aria-label="Related artists"
       >
@@ -984,7 +990,11 @@ watch(projection, () => {
         </header>
 
         <div class="hx-card-body artist-detail-section-card__body">
-          <div class="artist-detail-related-strip" role="list">
+          <p v-if="isLoadingRelatedArtists" class="artist-detail-loading__body" role="status">
+            Preparing related artists…
+          </p>
+
+          <div v-else-if="relatedArtists.length > 0" class="artist-detail-related-strip" role="list">
             <ArtistDetailRelatedArtistCard
               v-for="related in relatedArtists"
               :key="related.id"

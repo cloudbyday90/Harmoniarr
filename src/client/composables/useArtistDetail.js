@@ -17,18 +17,22 @@
  */
 
 import { computed, readonly, ref } from 'vue';
+import { isAbortError } from '../lib/abort-error.js';
 import { getErrorMessage } from '../lib/error-utils.js';
+import { createLatestRequestGate } from '../lib/latest-request-gate.js';
 import {
   browseMusicBrainzArtistReleaseGroups,
   fetchOperatorArtistProjection,
-  fetchSimilarArtists,
   resolveMusicBrainzArtistLocal,
 } from '../lib/metadata-api.js';
+import { useArtistDetailRelatedArtists } from './useArtistDetailRelatedArtists.js';
 
 /**
  * Composable for the artist detail page.
  *
- * Loads three data sources in parallel for a given MusicBrainz artist MBID:
+ * Coordinates the critical artist/discography path and a separate
+ * non-critical related-artists enhancement for a given MusicBrainz artist
+ * MBID:
  *
  * 1. Local metadata (resolveMusicBrainzArtistLocal): artist object, monitoring
  *    state. A 404 is treated as "not imported yet" and falls back to
@@ -36,7 +40,8 @@ import {
  * 2. Operator projection (fetchOperatorArtistProjection): canonical policy,
  *    selection, override, and local release-group state for imported artists.
  * 3. MusicBrainz release-group browse: fallback raw discography.
- * 4. Similar artists (fetchSimilarArtists): related artist strip data.
+ * 4. Related artists: a non-critical enhancement which starts in parallel but
+ *    never keeps the critical artist/discography path in a loading state.
  *
  * Exposes cache setters so parent views can update monitoring or the operator
  * projection after successful mutations without triggering a full reload.
@@ -55,7 +60,7 @@ export function useArtistDetail({
   resolveLocal = resolveMusicBrainzArtistLocal,
   fetchOperatorProjection = fetchOperatorArtistProjection,
   browseReleaseGroups = browseMusicBrainzArtistReleaseGroups,
-  fetchSimilar = fetchSimilarArtists,
+  fetchSimilar,
   releaseGroupLimit = 100,
   similarLimit = 8,
 } = {}) {
@@ -64,11 +69,17 @@ export function useArtistDetail({
   const projection = ref(null);
   const monitoring = ref(null);
   const releaseGroups = ref([]);
-  const relatedArtists = ref([]);
   const isLoading = ref(false);
   const artistError = ref(null);
   const discographyError = ref(null);
-  const relatedError = ref(null);
+  const artistDetailRequestGate = createLatestRequestGate();
+  const {
+    invalidateRelatedArtists,
+    isLoadingRelatedArtists,
+    loadRelatedArtists,
+    relatedArtists,
+    relatedError,
+  } = useArtistDetailRelatedArtists({ fetchSimilar, similarLimit });
 
   /** True when the operator projection or legacy metadata indicates the artist is monitored. */
   const isMonitored = computed(() =>
@@ -78,47 +89,89 @@ export function useArtistDetail({
   /**
    * Loads all artist detail data for the given MBID.
    *
-   * Local artist and related-artist fetches run concurrently. The operator
-   * projection is preferred for imported artists; MusicBrainz browse remains
-   * the fallback discography source when no operator projection is available.
+   * The related-artist enhancement starts concurrently but is intentionally
+   * not awaited. The operator projection is preferred for imported artists;
+   * MusicBrainz browse remains the fallback when the projection has no release
+   * groups because an empty local catalog is not proof of a complete empty
+   * discography.
    *
    * @param {string} mbid - MusicBrainz artist MBID.
    * @param {{ signal?: AbortSignal }} [opts]
    */
   async function loadArtistDetail(mbid, { signal } = {}) {
-    if (!mbid) return;
+    if (!mbid) {
+      artistDetailRequestGate.invalidate();
+      invalidateRelatedArtists();
+      return;
+    }
+
+    const request = artistDetailRequestGate.begin();
+    const requestSignal = signal ?? request.signal;
 
     isLoading.value = true;
     artistError.value = null;
     discographyError.value = null;
-    relatedError.value = null;
+    artist.value = null;
+    monitoring.value = null;
+    operator.value = null;
+    projection.value = null;
+    releaseGroups.value = [];
+    void loadRelatedArtists(mbid, {
+      isCurrent: request.isCurrent,
+      signal: requestSignal,
+    });
+
+    let localPayload = null;
+    try {
+      localPayload = await resolveLocal(mbid, { signal: requestSignal });
+    } catch (error) {
+      if (!request.isCurrent() || isAbortError(error)) {
+        if (request.isCurrent()) {
+          isLoading.value = false;
+        }
+        return;
+      }
+
+      if (error?.status !== 404) {
+        artistError.value = getErrorMessage(error, 'Could not load artist data.');
+      }
+      artist.value = null;
+      monitoring.value = null;
+    }
 
     try {
-      const [localResult, similarResult] = await Promise.allSettled([
-        resolveLocal(mbid, { signal }),
-        fetchSimilar(mbid, { limit: similarLimit, signal }),
-      ]);
+      if (!request.isCurrent()) {
+        return;
+      }
 
       let shouldBrowseDiscography = true;
-
-      // Local artist — 404 is not an error (artist not yet imported).
-      if (localResult.status === 'fulfilled') {
-        artist.value = localResult.value?.artist ?? null;
-        monitoring.value = localResult.value?.monitoring ?? null;
-        const localArtistId = localResult.value?.artist?.id ?? null;
+      const localArtist = localPayload?.artist ?? null;
+      if (localArtist) {
+        artist.value = localArtist;
+        monitoring.value = localPayload?.monitoring ?? null;
+        const localArtistId = localArtist.id ?? null;
 
         if (localArtistId) {
           try {
-            const operatorPayload = await fetchOperatorProjection(localArtistId, { signal });
+            const operatorPayload = await fetchOperatorProjection(localArtistId, { signal: requestSignal });
+            if (!request.isCurrent()) {
+              return;
+            }
+
+            const projectedReleaseGroups = Array.isArray(operatorPayload?.releaseGroups)
+              ? operatorPayload.releaseGroups
+              : [];
             projection.value = operatorPayload;
             operator.value = operatorPayload?.operator ?? null;
             artist.value = operatorPayload?.artist ?? artist.value;
             monitoring.value = operatorPayload?.operator?.monitoring ?? monitoring.value;
-            releaseGroups.value = Array.isArray(operatorPayload?.releaseGroups)
-              ? operatorPayload.releaseGroups
-              : [];
-            shouldBrowseDiscography = false;
+            releaseGroups.value = projectedReleaseGroups;
+            shouldBrowseDiscography = projectedReleaseGroups.length === 0;
           } catch (error) {
+            if (!request.isCurrent() || isAbortError(error)) {
+              return;
+            }
+
             if (error?.status !== 404) {
               artistError.value = getErrorMessage(
                 error,
@@ -129,59 +182,47 @@ export function useArtistDetail({
             operator.value = null;
           }
         }
-      } else {
-        if (localResult.reason?.status !== 404) {
-          artistError.value = getErrorMessage(
-            localResult.reason,
-            'Could not load artist data.',
-          );
-        }
-        artist.value = null;
-        monitoring.value = null;
       }
 
-      if (shouldBrowseDiscography) {
-        try {
-          const discographyResult = await browseReleaseGroups({
-            artistId: mbid,
-            limit: releaseGroupLimit,
-            signal,
-          });
-          releaseGroups.value = Array.isArray(discographyResult?.results)
-            ? discographyResult.results
-            : [];
-        } catch (error) {
-          discographyError.value = getErrorMessage(
-            error,
-            'Could not load discography.',
-          );
-          releaseGroups.value = [];
-        }
+      if (!request.isCurrent() || !shouldBrowseDiscography) {
+        return;
       }
 
-      // Related artists.
-      if (similarResult.status === 'fulfilled') {
-        relatedArtists.value = Array.isArray(similarResult.value?.similar)
-          ? similarResult.value.similar.slice(0, similarLimit)
+      try {
+        const discographyResult = await browseReleaseGroups({
+          artistId: mbid,
+          limit: releaseGroupLimit,
+          signal: requestSignal,
+        });
+        if (!request.isCurrent()) {
+          return;
+        }
+
+        releaseGroups.value = Array.isArray(discographyResult?.results)
+          ? discographyResult.results
           : [];
-      } else {
-        relatedError.value = getErrorMessage(
-          similarResult.reason,
-          'Could not load related artists.',
+      } catch (error) {
+        if (!request.isCurrent() || isAbortError(error)) {
+          return;
+        }
+
+        discographyError.value = getErrorMessage(
+          error,
+          'Could not load discography.',
         );
-        relatedArtists.value = [];
+        releaseGroups.value = [];
       }
-    } catch (error) {
-      artistError.value = getErrorMessage(error, 'Could not load artist detail.');
-      releaseGroups.value = [];
-      relatedError.value = getErrorMessage(
-        error,
-        'Could not load related artists.',
-      );
-      relatedArtists.value = [];
     } finally {
-      isLoading.value = false;
+      if (request.isCurrent()) {
+        isLoading.value = false;
+      }
     }
+  }
+
+  function cancelArtistDetailLoad() {
+    artistDetailRequestGate.invalidate();
+    invalidateRelatedArtists();
+    isLoading.value = false;
   }
 
   /**
@@ -212,11 +253,13 @@ export function useArtistDetail({
     releaseGroups: readonly(releaseGroups),
     relatedArtists: readonly(relatedArtists),
     isLoading: readonly(isLoading),
+    isLoadingRelatedArtists,
     isMonitored,
     artistError: readonly(artistError),
     discographyError: readonly(discographyError),
     relatedError: readonly(relatedError),
     loadArtistDetail,
+    cancelArtistDetailLoad,
     setMonitoring,
     setOperatorProjection,
   };

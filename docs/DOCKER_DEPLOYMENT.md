@@ -355,7 +355,8 @@ The future standard Docker image should follow these assumptions.
 ### Base And Stages
 
 - multi-stage build
-- Node 25.4 Alpine image for builder stages
+- Node 24.19 LTS Alpine image for builder stages, with npm 12.0.2 installed
+  explicitly
 - Alpine 3.23 runtime image
 - Vite client built in a builder stage
 - production server dependencies prepared in a builder stage

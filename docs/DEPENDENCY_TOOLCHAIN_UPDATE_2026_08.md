@@ -43,9 +43,10 @@ lockfile-level security remediations found by `npm audit`.
 
 1. Pin the repository package manager to npm 12.0.2. This also pins the
    bundled `npx`; do not add a standalone `npx` dependency.
-2. Express the Node 25.4 and npm 12 compatibility windows with valid semver in
-   `engines` and `devEngines`. This preserves the Node target while allowing
-   npm to enforce the declared package-manager policy correctly.
+2. Use the supported Node 24 LTS compatibility window (`>=24.15.0 <25.0.0`)
+   with npm 12.0.2. Node 25 reached end of life in March 2026, so it is not an
+   appropriate production baseline. The current exact developer and container
+   target is Node 24.19.0.
 3. Keep direct `glob` at its current 13.0.6 release.
 4. Do not introduce a semver-violating global override for the transitive
    `glob@10`. Track it for replacement when Testcontainers updates its
@@ -58,8 +59,10 @@ lockfile-level security remediations found by `npm audit`.
 
 - `packageManager` now pins npm 12.0.2. The bundled `npx` follows the same
   version without adding a standalone dependency.
-- The package-manager and runtime policies use valid semver ranges while
-  retaining the existing Node 25.4 support boundary.
+- The package-manager and runtime policies use valid semver ranges for the
+  supported Node 24 LTS line. `.nvmrc` and the Docker builder image target
+  Node 24.19.0; the wider engine range preserves compatibility with npm 12's
+  supported Node 24 floor.
 - The direct `glob` dependency remains current at 13.0.6. The remaining
   deprecated transitive `glob@10.5.0` is documented and deliberately not
   overridden across Testcontainers' upstream major-version boundary.
