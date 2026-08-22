@@ -106,11 +106,11 @@
   },
   "dependencies": {
     "express": "^5.2.1",
-    "music-metadata": "^11.12.3",
-    "pg": "^8.20.0",
+    "music-metadata": "^11.15.0",
+    "pg": "^8.23.0",
     "sharp": "^0.35.3",
-    "vue": "^3.5.34",
-    "vue-router": "^5.0.7",
+    "vue": "^3.5.41",
+    "vue-router": "^5.2.0",
     "web-push": "^3.6.7"
   }
 }
