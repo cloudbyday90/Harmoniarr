@@ -53,6 +53,7 @@ import { createMusicBrainzImportService } from './musicbrainz-import-service.js'
 import { createMusicBrainzSearchService } from './musicbrainz-search-service.js';
 import { createSimilarArtistsService } from './similar-artists-service.js';
 import { createReleaseGroupTracklistService } from './release-group-tracklist-service.js';
+import { createMusicBrainzClient } from '../integrations/musicbrainz/musicbrainz-client.js';
 import { createMetadataProviderCacheService } from './metadata-provider-cache-service.js';
 import { createMetadataProviderCacheObservabilityService } from './metadata-provider-cache-observability-service.js';
 import { createMetadataProviderResponseCacheStore } from './metadata-provider-response-cache-store.js';
@@ -102,6 +103,7 @@ export function createMetadataModule({
   providerHealthRecorder = null,
   recordActivityEventFn = null,
   recordAuditEventFn = undefined,
+  musicBrainzClient = null,
   musicBrainzCatalogService = null,
   musicBrainzImportService = null,
   musicBrainzSearchService = null,
@@ -216,11 +218,25 @@ export function createMetadataModule({
       onRefreshStart: resolvedMetadataProviderCacheObservabilityService.recordRefreshStart,
       onRefreshSuccess: resolvedMetadataProviderCacheObservabilityService.recordRefreshSuccess,
     });
+  const usesDefaultMusicBrainzService = [
+    metadataRefreshService,
+    musicBrainzCatalogService,
+    musicBrainzImportService,
+    musicBrainzSearchService,
+    similarArtistsService,
+  ].some((service) => service == null);
+  const resolvedMusicBrainzClient = usesDefaultMusicBrainzService
+    ? musicBrainzClient ?? createMusicBrainzClient()
+    : musicBrainzClient;
   const resolvedMusicBrainzCatalogService = musicBrainzCatalogService ?? createMusicBrainzCatalogService({
     metadataProviderCacheService: resolvedMetadataProviderCacheService,
+    musicBrainzClient: resolvedMusicBrainzClient,
     providerHealthRecorder,
   });
-  const resolvedMusicBrainzImportService = musicBrainzImportService ?? createMusicBrainzImportService({ providerHealthRecorder });
+  const resolvedMusicBrainzImportService = musicBrainzImportService ?? createMusicBrainzImportService({
+    musicBrainzClient: resolvedMusicBrainzClient,
+    providerHealthRecorder,
+  });
   const resolvedMetadataReleaseMaterializationService = metadataReleaseMaterializationService
     ?? createMetadataReleaseMaterializationService({
       getMetadataArtist: resolvedMetadataReadService.getArtist,
@@ -251,6 +267,7 @@ export function createMetadataModule({
     getMetadataArtistByMusicBrainzId: resolvedMetadataReadService.getArtistByMusicBrainzId,
     listOperatorArtistMonitoringByMetadataArtist: resolvedOperatorArtistMonitoringStore.listOperatorArtistMonitoringByMetadataArtist,
     materializeMonitoredReleaseGroups: resolvedMetadataReleaseMaterializationService.materializeMonitoredReleaseGroups,
+    musicBrainzClient: resolvedMusicBrainzClient,
     providerHealthRecorder,
     metadataReleaseDetectionService: resolvedMetadataReleaseDetectionService,
     queueOperatorArtistReconciliation: resolvedOperatorArtistReconciliationService.queueOperatorArtistReconciliation,
@@ -285,9 +302,13 @@ export function createMetadataModule({
   const resolvedMetadataRefreshHeartbeatConfig = metadataRefreshHeartbeatConfig ?? resolveMetadataRefreshHeartbeatConfig();
   const resolvedMetadataRefreshHeartbeatState = metadataRefreshHeartbeatState ?? createMetadataRefreshHeartbeatState();
   const resolvedMetadataSearchService = metadataSearchService ?? createMetadataSearchService();
-  const resolvedMusicBrainzSearchService = musicBrainzSearchService ?? createMusicBrainzSearchService({ providerHealthRecorder });
+  const resolvedMusicBrainzSearchService = musicBrainzSearchService ?? createMusicBrainzSearchService({
+    musicBrainzClient: resolvedMusicBrainzClient,
+    providerHealthRecorder,
+  });
   const resolvedSimilarArtistsService = similarArtistsService ?? createSimilarArtistsService({
     metadataProviderCacheService: resolvedMetadataProviderCacheService,
+    musicBrainzClient: resolvedMusicBrainzClient,
   });
   const resolvedReleaseGroupTracklistService = releaseGroupTracklistService ?? createReleaseGroupTracklistService({
     musicBrainzCatalogService: resolvedMusicBrainzCatalogService,

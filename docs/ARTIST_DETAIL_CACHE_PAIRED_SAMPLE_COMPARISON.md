@@ -116,7 +116,12 @@ Validation completed successfully:
 
 ## Next Item
 
-Collect actual paired samples from the controlled operator workflow. Tune the
-single-instance cache only when those samples identify a concrete failure mode.
-Do not add sample persistence, a telemetry collector, or a distributed lease
-until the deployment topology and measured behavior justify it.
+The first real-provider paired sample ruled out a cache-write failure and
+identified independent MusicBrainz client limiters in the metadata module. The
+module-level shared-client correction is documented in [MusicBrainz Shared
+Client Rate Limiting](MUSICBRAINZ_SHARED_CLIENT_RATE_LIMITING.md). A rebuilt
+same-process sample then verified a successful cold fill and an immediate fresh
+read, while showing that the cold related-artists fallback remains unbounded.
+The next implementation target is the cancellable operation budget described
+in [Artist Detail Related-Artists Response
+Budget](ARTIST_DETAIL_RELATED_ARTISTS_RESPONSE_BUDGET.md).

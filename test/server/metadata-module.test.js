@@ -151,3 +151,67 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     queueOperatorArtistReconciliation: operatorArtistReconciliationService.queueOperatorArtistReconciliation,
   });
 });
+
+test('createMetadataModule shares an injected MusicBrainz client with default catalog and search services', async () => {
+  const calls = [];
+  const musicBrainzClient = {
+    async browseArtistReleaseGroups(input) {
+      calls.push({ method: 'browseArtistReleaseGroups', input });
+      return {
+        'release-groups': [],
+      };
+    },
+    async searchArtists(input) {
+      calls.push({ method: 'searchArtists', input });
+      return {
+        artists: [],
+        count: 0,
+        offset: 0,
+      };
+    },
+  };
+  const metadataProviderCacheService = {
+    async getOrLoad({ load }) {
+      return {
+        cache: { state: 'cold' },
+        payload: await load(),
+      };
+    },
+  };
+
+  const metadataModule = createMetadataModule({
+    metadataProviderCacheService,
+    musicBrainzClient,
+  });
+
+  await metadataModule.routeDependencies.browseMusicBrainzArtistReleaseGroups({
+    artistId: 'artist-1',
+    limit: 25,
+    offset: 0,
+  });
+  await metadataModule.routeDependencies.searchMusicBrainzArtists({
+    query: 'example artist',
+    limit: 10,
+  });
+
+  assert.deepEqual(calls, [
+    {
+      method: 'browseArtistReleaseGroups',
+      input: {
+        artistId: 'artist-1',
+        limit: 25,
+        offset: 0,
+        releaseGroupStatus: 'website-default',
+        type: null,
+      },
+    },
+    {
+      method: 'searchArtists',
+      input: {
+        query: 'example artist',
+        limit: 10,
+        dismax: true,
+      },
+    },
+  ]);
+});
