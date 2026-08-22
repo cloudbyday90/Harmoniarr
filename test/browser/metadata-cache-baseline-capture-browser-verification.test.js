@@ -56,7 +56,7 @@ suite('Metadata cache baseline capture browser coverage', () => {
     timeout: integrationRuntimeConfig.suiteTeardownTimeoutMs,
   });
 
-  test('an administrator explicitly copies a bounded process-local baseline', {
+  test('an administrator explicitly copies and compares bounded process-local baselines', {
     timeout: integrationRuntimeConfig.scenarioTimeoutMs,
   }, async (t) => {
     if (runtimeUnavailableReason) {
@@ -77,24 +77,42 @@ suite('Metadata cache baseline capture browser coverage', () => {
           },
         });
       });
+      const cacheSnapshots = [
+        {
+          namespaces: [{
+            cacheNamespace: 'musicbrainz.related_artists',
+            cacheStoreErrors: { read: 0, write: 0 },
+            lookups: { cold: 2, fresh: 5, stale: 3 },
+            providerPayload: 'private-id',
+            refreshes: {
+              background: { failed: 0, inFlight: 0, succeeded: 1 },
+              foreground: { failed: 0, inFlight: 0, succeeded: 1 },
+            },
+          }],
+          observedSinceAt: '2026-08-22T12:00:00.000Z',
+          providerCredential: 'private-credential',
+          updatedAt: '2026-08-22T12:04:00.000Z',
+        },
+        {
+          namespaces: [{
+            cacheNamespace: 'musicbrainz.related_artists',
+            cacheStoreErrors: { read: 1, write: 0 },
+            lookups: { cold: 2, fresh: 8, stale: 5 },
+            refreshes: {
+              background: { failed: 0, inFlight: 0, succeeded: 1 },
+              foreground: { failed: 1, inFlight: 0, succeeded: 2 },
+            },
+          }],
+          observedSinceAt: '2026-08-22T12:00:00.000Z',
+          updatedAt: '2026-08-22T12:05:00.000Z',
+        },
+      ];
+      let cacheSnapshotIndex = 0;
+
       await browserContext.route('**/api/v1/metadata/cache-observability', async (route) => {
         await route.fulfill({
           body: JSON.stringify({
-            cache: {
-              namespaces: [{
-                cacheNamespace: 'musicbrainz.related_artists',
-                cacheStoreErrors: { read: 0, write: 0 },
-                lookups: { cold: 2, fresh: 5, stale: 3 },
-                providerPayload: 'private-id',
-                refreshes: {
-                  background: { failed: 0, inFlight: 0, succeeded: 1 },
-                  foreground: { failed: 0, inFlight: 0, succeeded: 1 },
-                },
-              }],
-              observedSinceAt: '2026-08-22T12:00:00.000Z',
-              providerCredential: 'private-credential',
-              updatedAt: '2026-08-22T12:04:00.000Z',
-            },
+            cache: cacheSnapshots[Math.min(cacheSnapshotIndex++, cacheSnapshots.length - 1)],
             ok: true,
           }),
           contentType: 'application/json',
@@ -108,6 +126,12 @@ suite('Metadata cache baseline capture browser coverage', () => {
       await page.getByRole('button', { exact: true, name: 'Copy baseline summary' }).waitFor();
       await page.getByRole('button', { exact: true, name: 'Copy baseline summary' }).click();
       await page.getByRole('status').getByText('Baseline summary copied. Save it only in an approved operator record.').waitFor();
+      await page.getByRole('button', { exact: true, name: 'Mark comparison start' }).click();
+      await page.getByText('Comparison start marked. Refresh diagnostics after active use to compare this process window.').waitFor();
+      await page.getByRole('button', { exact: true, name: 'Refresh diagnostics' }).click();
+      await page.getByRole('heading', { exact: true, name: 'Paired sample comparison' }).waitFor();
+      await page.getByRole('cell', { exact: true, name: '3 / 2 / 0' }).waitFor();
+      await page.getByRole('cell', { exact: true, name: '2 completed, 1 failed' }).waitFor();
 
       const copiedBaseline = await page.evaluate(() => globalThis.__harmoniarrCopiedBaseline);
       assert.match(copiedBaseline, /Scope: process-local aggregate; not fleet telemetry\./);

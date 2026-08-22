@@ -178,6 +178,11 @@ The follow-on sample-capture workflow is recorded in
 plain-text administrator capture action so paired process-local samples can be
 collected before infrastructure is expanded.
 
+The paired-sample comparison workflow in
+`ARTIST_DETAIL_CACHE_PAIRED_SAMPLE_COMPARISON.md` then derives only
+same-process interval deltas in memory. It is the final observation aid before
+evidence-based single-instance cache tuning is considered.
+
 ## Security Constraints
 
 - Every cache key and SQL value is parameterized; no provider or cache key is

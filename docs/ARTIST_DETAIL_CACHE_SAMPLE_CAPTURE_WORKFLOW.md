@@ -193,7 +193,8 @@ Implemented on 2026-08-22.
 
 ## Next Item
 
-After actual paired operator samples are available, determine whether the
-single-instance cache configuration needs tuning. Do not introduce a collector
-or distributed lease unless the deployment topology and measured behavior meet
-the decision gate above.
+The accepted paired-sample comparison workflow is documented in
+`ARTIST_DETAIL_CACHE_PAIRED_SAMPLE_COMPARISON.md`. It supports the required
+ordinary-load then active-use comparison in live memory, without persistence or
+new telemetry infrastructure. Use actual paired samples to identify a concrete
+single-instance tuning need before considering a collector or lease.

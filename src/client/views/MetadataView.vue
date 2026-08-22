@@ -31,6 +31,7 @@ import MetadataReleaseGroupBrowser from '../components/MetadataReleaseGroupBrows
 import MetadataSelectedReleaseGroupSummary from '../components/MetadataSelectedReleaseGroupSummary.vue';
 import { useMetadataArtistWorkflow } from '../composables/useMetadataArtistWorkflow.js';
 import { useMetadataProviderCacheBaseline } from '../composables/useMetadataProviderCacheBaseline.js';
+import { useMetadataProviderCacheBaselineComparison } from '../composables/useMetadataProviderCacheBaselineComparison.js';
 import {
   buildMetadataRouteHydrationPlan,
   buildMetadataRouteQuery,
@@ -95,6 +96,12 @@ const {
   isLoading: isLoadingCacheBaseline,
   loadCacheBaseline,
 } = useMetadataProviderCacheBaseline();
+const {
+  baselineComparison,
+  clearComparisonStart,
+  hasComparisonStart,
+  markComparisonStart,
+} = useMetadataProviderCacheBaselineComparison(cacheBaseline);
 
 const metadataRouteState = computed(() => normalizeMetadataRouteState(route.query));
 const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
@@ -220,9 +227,13 @@ watch(
 
     <MetadataProviderCacheBaselinePanel
       v-if="isAdmin"
+      :baseline-comparison="baselineComparison"
       :cache-baseline="cacheBaseline"
       :error-message="cacheBaselineErrorMessage"
+      :has-comparison-start="hasComparisonStart"
       :is-loading="isLoadingCacheBaseline"
+      @clear-comparison-start="clearComparisonStart"
+      @mark-comparison-start="markComparisonStart"
       @refresh="loadCacheBaseline"
     />
 

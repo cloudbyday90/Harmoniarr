@@ -22,13 +22,17 @@ import test from 'node:test';
 
 const baselinePanelUrl = new URL('../../src/client/components/MetadataProviderCacheBaselinePanel.vue', import.meta.url);
 
-test('MetadataProviderCacheBaselinePanel keeps baseline capture explicit, write-only, and status-announced', async () => {
+test('MetadataProviderCacheBaselinePanel keeps baseline capture and paired comparison explicit, bounded, and status-announced', async () => {
   const source = await readFile(baselinePanelUrl, 'utf8');
 
   assert.match(source, /formatMetadataProviderCacheBaselineCapture/);
   assert.match(source, /writePlainTextToClipboard/);
   assert.match(source, /async function copyBaselineSummary/);
   assert.match(source, /Copy baseline summary/);
+  assert.match(source, /Mark comparison start/);
+  assert.match(source, /Clear comparison start/);
+  assert.match(source, /Paired sample comparison/);
+  assert.match(source, /comparison_process_window_changed/);
   assert.match(source, /role="status"/);
-  assert.doesNotMatch(source, /readText|clipboard\.read/);
+  assert.doesNotMatch(source, /indexedDB|localStorage|readText|sessionStorage|clipboard\.read/);
 });
