@@ -10,7 +10,7 @@ RUN npm install --global --ignore-scripts npm@12.0.2
 FROM node-base AS client-builder
 WORKDIR /build
 
-COPY package.json package-lock.json vite.config.js ./
+COPY package.json package-lock.json .npmrc vite.config.js ./
 COPY src/client ./src/client
 COPY src/shared ./src/shared
 
@@ -20,7 +20,7 @@ RUN --mount=type=cache,target=/root/.npm npm ci \
 FROM node-base AS server-builder
 WORKDIR /build
 
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json .npmrc ./
 COPY scripts/build-server.js ./scripts/build-server.js
 COPY src/server ./src/server
 COPY src/shared ./src/shared
@@ -68,7 +68,7 @@ RUN addgroup -g 1000 -S harmoniarr \
 
 WORKDIR ${APP_HOME}
 
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json .npmrc ./
 RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev
 
 COPY --from=client-builder /build/dist/client ./client-dist/
