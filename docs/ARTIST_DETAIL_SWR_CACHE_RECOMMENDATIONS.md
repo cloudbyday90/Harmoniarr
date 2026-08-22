@@ -173,6 +173,11 @@ The next accepted baseline workflow is recorded in
 window and safe aggregate interpretable before any exporter or distributed
 refresh lease is introduced.
 
+The follow-on sample-capture workflow is recorded in
+`ARTIST_DETAIL_CACHE_SAMPLE_CAPTURE_WORKFLOW.md`. It adds an explicit,
+plain-text administrator capture action so paired process-local samples can be
+collected before infrastructure is expanded.
+
 ## Security Constraints
 
 - Every cache key and SQL value is parameterized; no provider or cache key is

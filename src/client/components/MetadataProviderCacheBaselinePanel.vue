@@ -16,8 +16,10 @@
   along with this program. If not, see <https://www.gnu.org/licenses/>.
 -->
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
+import { formatMetadataProviderCacheBaselineCapture } from '../lib/metadata-provider-cache-baseline-capture.js';
 import { formatMetadataProviderCacheTimestamp } from '../lib/metadata-provider-cache-observability-presentation.js';
+import { writePlainTextToClipboard } from '../lib/plain-text-clipboard-service.js';
 
 const props = defineProps({
   cacheBaseline: {
@@ -34,8 +36,9 @@ const props = defineProps({
   },
 });
 
-defineEmits(['refresh']);
+const emit = defineEmits(['refresh']);
 
+const copyStatus = ref('');
 const observedSinceLabel = computed(() => formatMetadataProviderCacheTimestamp(props.cacheBaseline?.observedSinceAt));
 const updatedAtLabel = computed(() => formatMetadataProviderCacheTimestamp(props.cacheBaseline?.updatedAt));
 
@@ -45,6 +48,24 @@ function formatPercentage(value) {
 
 function formatDuration(value) {
   return Number.isSafeInteger(value) ? `${value} ms` : 'Not recorded';
+}
+
+function requestRefresh() {
+  copyStatus.value = '';
+  emit('refresh');
+}
+
+async function copyBaselineSummary() {
+  if (!props.cacheBaseline || props.isLoading) {
+    return;
+  }
+
+  try {
+    await writePlainTextToClipboard(formatMetadataProviderCacheBaselineCapture(props.cacheBaseline));
+    copyStatus.value = 'Baseline summary copied. Save it only in an approved operator record.';
+  } catch {
+    copyStatus.value = 'Clipboard access was unavailable. Use the displayed diagnostic values instead.';
+  }
 }
 </script>
 
@@ -56,16 +77,20 @@ function formatDuration(value) {
         <p class="hx-card-subtitle">On-demand, process-local cache evidence for administrators. It does not persist in the browser or prove cross-instance behaviour.</p>
       </div>
       <div class="hx-card-actions">
-        <button type="button" class="hx-btn" data-variant="primary" :disabled="isLoading" @click="$emit('refresh')">
+        <button type="button" class="hx-btn" data-variant="primary" :disabled="isLoading" @click="requestRefresh">
           {{ isLoading ? 'Loading…' : cacheBaseline ? 'Refresh diagnostics' : 'Load diagnostics' }}
+        </button>
+        <button v-if="cacheBaseline" type="button" class="hx-btn" :disabled="isLoading" @click="copyBaselineSummary">
+          Copy baseline summary
         </button>
       </div>
     </header>
 
     <div class="hx-card-body">
       <p v-if="errorMessage" class="hx-text-muted" role="alert">{{ errorMessage }}</p>
+      <p v-if="copyStatus" class="hx-text-muted" role="status">{{ copyStatus }}</p>
 
-      <div v-else-if="isLoading && !cacheBaseline" class="hx-skeleton-stack" aria-live="polite" aria-label="Loading cache diagnostics">
+      <div v-if="isLoading && !cacheBaseline" class="hx-skeleton-stack" aria-live="polite" aria-label="Loading cache diagnostics">
         <span class="hx-skeleton" data-size="sm"></span>
         <span class="hx-skeleton"></span>
       </div>

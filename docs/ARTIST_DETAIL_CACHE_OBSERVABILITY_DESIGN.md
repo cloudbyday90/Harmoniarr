@@ -206,6 +206,7 @@ Implemented on 2026-08-22.
 ## Next Item
 
 The accepted baseline workflow is documented in
-`ARTIST_DETAIL_CACHE_BASELINE_WORKFLOW.md`. It adds a manual fresh-admin view
-over the bounded aggregate before any durable telemetry or distributed refresh
-coordination is considered.
+`ARTIST_DETAIL_CACHE_BASELINE_WORKFLOW.md`, followed by the explicit
+sample-capture workflow in `ARTIST_DETAIL_CACHE_SAMPLE_CAPTURE_WORKFLOW.md`.
+They establish paired, process-local observations before any durable telemetry
+or distributed refresh coordination is considered.

@@ -200,6 +200,9 @@ Implemented on 2026-08-22.
 
 ## Next Item
 
-After real operator samples are available, decide whether the deployment needs
-fleet-wide telemetry. Only then evaluate a PostgreSQL refresh lease, with an
-expiry, owner-safe release, and integration coverage for concurrent instances.
+The accepted sample-capture workflow is documented in
+`ARTIST_DETAIL_CACHE_SAMPLE_CAPTURE_WORKFLOW.md`. It supports the required
+ordinary-load and active-use observations without persistence or new telemetry
+infrastructure. After actual paired samples are available, decide whether the
+single-instance cache configuration needs tuning before considering fleet-wide
+telemetry.
