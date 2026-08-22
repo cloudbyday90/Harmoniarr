@@ -66,7 +66,7 @@ export function registerMetadataRoutes(app, {
   getMetadataArtist,
   getMetadataArtistDetectionEvents,
   getMetadataArtistByMusicBrainzId,
-  getMetadataProviderCacheObservability = () => ({ namespaces: [], updatedAt: null }),
+  getMetadataProviderCacheObservability = () => ({ namespaces: [], observedSinceAt: null, updatedAt: null }),
   getOperatorArtistProjection,
   saveOperatorArtist,
   getMetadataRelease,

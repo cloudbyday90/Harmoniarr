@@ -4,6 +4,7 @@ import {
   browseMusicBrainzArtistReleaseGroups,
   fetchMetadataArtist,
   fetchMetadataArtistDetectionEvents,
+  fetchMetadataProviderCacheObservability,
   fetchMetadataRelease,
   fetchMetadataReleaseGroup,
   fetchMusicBrainzReleaseGroupReleases,
@@ -68,6 +69,16 @@ test('metadata-api fetchMetadataArtistDetectionEvents sends before and limit', a
   const url = globalThis.fetch.mock.calls[0].arguments[0];
   assert.ok(url.includes('before=cursor-x'));
   assert.ok(url.includes('limit=10'));
+});
+
+test('metadata-api fetchMetadataProviderCacheObservability requests the protected diagnostic endpoint', async (t) => {
+  globalThis.document = { cookie: '' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse());
+
+  await fetchMetadataProviderCacheObservability();
+
+  assert.equal(globalThis.fetch.mock.calls[0].arguments[0], '/api/v1/metadata/cache-observability');
+  assert.equal(globalThis.fetch.mock.calls[0].arguments[1].method, 'GET');
 });
 
 test('metadata-api search endpoints send query params', async (t) => {

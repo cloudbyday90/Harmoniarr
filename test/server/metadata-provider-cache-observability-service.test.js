@@ -20,6 +20,7 @@ test('metadata provider cache observability aggregates only fixed low-cardinalit
 
   const summary = observability.getSummary();
 
+  assert.equal(summary.observedSinceAt, '2026-08-22T12:00:00.000Z');
   assert.equal(summary.updatedAt, '2026-08-22T12:00:00.000Z');
   assert.equal(summary.namespaces.length, 1);
   assert.deepEqual(summary.namespaces[0], {
@@ -56,5 +57,9 @@ test('metadata provider cache observability ignores invalid dimensions', () => {
   observability.recordRefreshStart({ cacheNamespace: namespace, refresh: 'blocking' });
   observability.recordCacheStoreError({ cacheNamespace: namespace, operation: 'delete' });
 
-  assert.deepEqual(observability.getSummary(), { namespaces: [], updatedAt: null });
+  const summary = observability.getSummary();
+
+  assert.deepEqual(summary.namespaces, []);
+  assert.equal(summary.updatedAt, null);
+  assert.match(summary.observedSinceAt, /^\d{4}-\d{2}-\d{2}T/);
 });

@@ -24,11 +24,13 @@ import MetadataArtistSummary from '../components/MetadataArtistSummary.vue';
 import MetadataLocalSearchPanel from '../components/MetadataLocalSearchPanel.vue';
 import MetadataLocalReleaseGroupList from '../components/MetadataLocalReleaseGroupList.vue';
 import MetadataLocalReleaseList from '../components/MetadataLocalReleaseList.vue';
+import MetadataProviderCacheBaselinePanel from '../components/MetadataProviderCacheBaselinePanel.vue';
 import MetadataProviderReleaseList from '../components/MetadataProviderReleaseList.vue';
 import MetadataReleaseDetail from '../components/MetadataReleaseDetail.vue';
 import MetadataReleaseGroupBrowser from '../components/MetadataReleaseGroupBrowser.vue';
 import MetadataSelectedReleaseGroupSummary from '../components/MetadataSelectedReleaseGroupSummary.vue';
 import { useMetadataArtistWorkflow } from '../composables/useMetadataArtistWorkflow.js';
+import { useMetadataProviderCacheBaseline } from '../composables/useMetadataProviderCacheBaseline.js';
 import {
   buildMetadataRouteHydrationPlan,
   buildMetadataRouteQuery,
@@ -36,6 +38,7 @@ import {
   normalizeMetadataRouteState,
   resolveMetadataRouteReleaseGroupId,
 } from '../lib/metadata-route-state.js';
+import { sessionStore } from '../state/session.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -86,7 +89,15 @@ const {
   hasSearchedLocal,
 } = useMetadataArtistWorkflow();
 
+const {
+  cacheBaseline,
+  errorMessage: cacheBaselineErrorMessage,
+  isLoading: isLoadingCacheBaseline,
+  loadCacheBaseline,
+} = useMetadataProviderCacheBaseline();
+
 const metadataRouteState = computed(() => normalizeMetadataRouteState(route.query));
+const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
 
 async function replaceMetadataRouteState(nextState) {
   const normalizedNextState = normalizeMetadataRouteState({
@@ -206,6 +217,14 @@ watch(
         <li><strong>Already imported?</strong> Use local search to reopen their metadata workspace.</li>
       </ul>
     </article>
+
+    <MetadataProviderCacheBaselinePanel
+      v-if="isAdmin"
+      :cache-baseline="cacheBaseline"
+      :error-message="cacheBaselineErrorMessage"
+      :is-loading="isLoadingCacheBaseline"
+      @refresh="loadCacheBaseline"
+    />
 
     <MetadataArtistSearchPanel
       :is-importing-artist="isImportingArtist"

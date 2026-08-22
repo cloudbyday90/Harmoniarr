@@ -79,6 +79,7 @@ export function createMetadataProviderCacheObservabilityService({
   nowFn = () => new Date(),
 } = {}) {
   const metricsByNamespace = new Map();
+  const observedSinceAt = toIsoTimestamp(nowFn());
   let updatedAt = null;
 
   function getMetrics(cacheNamespace) {
@@ -181,6 +182,7 @@ export function createMetadataProviderCacheObservabilityService({
       namespaces: [...metricsByNamespace.values()]
         .sort((left, right) => left.cacheNamespace.localeCompare(right.cacheNamespace))
         .map((metrics) => structuredClone(metrics)),
+      observedSinceAt,
       updatedAt,
     };
   }

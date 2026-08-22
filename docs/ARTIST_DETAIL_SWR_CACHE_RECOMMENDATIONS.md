@@ -168,6 +168,11 @@ The following observability layer is implemented separately in
 refresh-failure, and refresh-duration evidence, and fixes the Artist Detail
 adapter to read the API's `browse` envelope.
 
+The next accepted baseline workflow is recorded in
+`ARTIST_DETAIL_CACHE_BASELINE_WORKFLOW.md`. It makes the process observation
+window and safe aggregate interpretable before any exporter or distributed
+refresh lease is introduced.
+
 ## Security Constraints
 
 - Every cache key and SQL value is parameterized; no provider or cache key is

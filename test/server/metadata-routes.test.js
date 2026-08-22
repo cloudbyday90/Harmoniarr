@@ -285,6 +285,7 @@ test('metadata cache observability route requires a fresh admin session and retu
       lookups: { cold: 1, fresh: 2, stale: 3 },
       refreshes: {},
     }],
+    observedSinceAt: '2026-08-22T11:00:00.000Z',
     updatedAt: '2026-08-22T12:00:00.000Z',
   }));
   const requireFreshAdminSession = t.mock.fn(async () => ({ appUserId: 'admin-1' }));
@@ -308,6 +309,7 @@ test('metadata cache observability route requires a fresh admin session and retu
           lookups: { cold: 1, fresh: 2, stale: 3 },
           refreshes: {},
         }],
+        observedSinceAt: '2026-08-22T11:00:00.000Z',
         updatedAt: '2026-08-22T12:00:00.000Z',
       },
       ok: true,

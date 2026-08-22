@@ -22,6 +22,10 @@ export function fetchMetadataArtist(artistId, { signal } = {}) {
   return apiRequest(`/api/v1/metadata/artists/${encodeURIComponent(artistId)}`, { signal });
 }
 
+export function fetchMetadataProviderCacheObservability({ signal } = {}) {
+  return apiRequest('/api/v1/metadata/cache-observability', { signal });
+}
+
 export function fetchMetadataArtistDetectionEvents(artistId, { before, limit, signal } = {}) {
   return apiRequest(
     `/api/v1/metadata/artists/${encodeURIComponent(artistId)}/detection-events${buildQueryString({ before, limit })}`,

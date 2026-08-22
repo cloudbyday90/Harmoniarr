@@ -205,8 +205,7 @@ Implemented on 2026-08-22.
 
 ## Next Item
 
-Use the diagnostic data to establish a baseline under real Artist Detail load.
-If multiple application instances are introduced and cold or stale refreshes
-duplicate upstream work, add a PostgreSQL-backed refresh lease with expiry and
-owner-safe release. Do not add a distributed lease before the measurements show
-that in-process coalescing is insufficient.
+The accepted baseline workflow is documented in
+`ARTIST_DETAIL_CACHE_BASELINE_WORKFLOW.md`. It adds a manual fresh-admin view
+over the bounded aggregate before any durable telemetry or distributed refresh
+coordination is considered.
