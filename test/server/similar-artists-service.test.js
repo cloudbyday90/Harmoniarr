@@ -328,6 +328,61 @@ test('createSimilarArtistsService serves a persistent cached related-artist resu
   assert.equal(musicBrainzClient.lookupArtistRelations.mock.callCount(), 0);
 });
 
+test('createSimilarArtistsService serves an expired-budget result without persisting or extending fallbacks', async (t) => {
+  const controller = new AbortController();
+  controller.abort(new Error('related artists response budget exhausted'));
+  const listenBrainzClient = createTestListenBrainzClient(
+    t.mock.fn(async () => []),
+    t.mock.fn(async () => []),
+  );
+  const musicBrainzClient = createTestMusicBrainzClient(
+    t.mock.fn(async () => ({ name: 'Seed Artist', relations: [] })),
+    t.mock.fn(async () => ({ artists: [] })),
+  );
+  const lastFmClient = createTestLastFmClient(t.mock.fn(async () => []));
+  let persisted = null;
+  const getOrLoad = t.mock.fn(async ({ load, shouldPersist }) => {
+    const payload = await load();
+    persisted = shouldPersist(payload);
+    return {
+      cache: { refresh: 'foreground', state: 'miss' },
+      payload,
+    };
+  });
+  const service = createSimilarArtistsService({
+    lastFmClient,
+    listenBrainzClient,
+    metadataProviderCacheService: { getOrLoad },
+    musicBrainzClient,
+    relatedArtistsResponseBudgetService: {
+      createResponseBudget: () => ({
+        fallbackLimits: {
+          maxMusicBrainzFallbackSearchQueries: 1,
+          maxRadioCandidatesToRerank: 0,
+        },
+        isExhausted: () => true,
+        signal: controller.signal,
+      }),
+    },
+  });
+
+  const result = await service.getSimilarArtists({ artistMbid: 'artist-1' });
+
+  assert.deepEqual(result.similar, []);
+  assert.equal(persisted, false);
+  assert.equal(lastFmClient.getSimilarArtists.mock.callCount(), 1);
+  assert.equal(listenBrainzClient.getRadioSimilarArtists.mock.callCount(), 0);
+  assert.equal(musicBrainzClient.searchArtists.mock.callCount(), 0);
+  assert.equal(
+    listenBrainzClient.getSimilarArtists.mock.calls[0].arguments[0].signal,
+    controller.signal,
+  );
+  assert.equal(
+    musicBrainzClient.lookupArtistRelations.mock.calls[0].arguments[0].signal,
+    controller.signal,
+  );
+});
+
 test('createSimilarArtistsService caches separately per MBID', async (t) => {
   let lbCallCount = 0;
   const lbClient = createTestListenBrainzClient(async ({ mbid }) => {

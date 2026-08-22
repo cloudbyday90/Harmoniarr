@@ -25,6 +25,62 @@ function createTestClient({ fetchImpl, sleepImpl = async () => {} } = {}) {
   });
 }
 
+function waitForNextTurn() {
+  return new Promise((resolve) => {
+    setImmediate(resolve);
+  });
+}
+
+test('MusicBrainz client does not start an expired queued request', async (t) => {
+  let resolveFirstRequest;
+  const fetchImpl = t.mock.fn(() => new Promise((resolve) => {
+    resolveFirstRequest = resolve;
+  }));
+  const client = createTestClient({ fetchImpl });
+
+  const firstRequest = client.lookupArtistRelations({ artistId: 'artist-1' });
+  await waitForNextTurn();
+  assert.equal(fetchImpl.mock.callCount(), 1);
+
+  const controller = new AbortController();
+  const abortReason = new Error('related artists response budget exhausted');
+  const expiredQueuedRequest = client.lookupArtistRelations({
+    artistId: 'artist-2',
+    signal: controller.signal,
+  });
+  controller.abort(abortReason);
+
+  await assert.rejects(expiredQueuedRequest, (error) => error === abortReason);
+  resolveFirstRequest(createJsonResponse({ relations: [] }));
+  await firstRequest;
+  await waitForNextTurn();
+
+  assert.equal(fetchImpl.mock.callCount(), 1);
+});
+
+test('MusicBrainz client does not retry a request cancelled by the response budget', async (t) => {
+  let markRequestStarted;
+  const requestStarted = new Promise((resolve) => {
+    markRequestStarted = resolve;
+  });
+  const sleepImpl = t.mock.fn(async () => {});
+  const fetchImpl = t.mock.fn((_, { signal }) => new Promise((resolve, reject) => {
+    markRequestStarted();
+    signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+  }));
+  const client = createTestClient({ fetchImpl, sleepImpl });
+  const controller = new AbortController();
+  const abortReason = new Error('related artists response budget exhausted');
+
+  const request = client.lookupArtistRelations({ artistId: 'artist-1', signal: controller.signal });
+  await requestStarted;
+  controller.abort(abortReason);
+
+  await assert.rejects(request, (error) => error === abortReason);
+  assert.equal(fetchImpl.mock.callCount(), 1);
+  assert.equal(sleepImpl.mock.callCount(), 0);
+});
+
 test('MusicBrainz client retries throttled responses using Retry-After metadata', async (t) => {
   const sleepDelays = [];
   let requestCount = 0;

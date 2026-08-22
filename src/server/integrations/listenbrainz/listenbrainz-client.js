@@ -21,6 +21,12 @@ import {
   resolveAllowedOutboundHosts,
   resolveAllowedOutboundHostSuffixes,
 } from '../../outbound-url-policy.js';
+import {
+  awaitProviderRequest,
+  createProviderRequestSignal,
+  throwIfProviderRequestAborted,
+  waitForProviderRequestDelay,
+} from '../provider-request-cancellation.js';
 
 function parsePositiveInteger(value, fallback) {
   if (value == null || value === '') {
@@ -168,22 +174,25 @@ export function createListenBrainzClient({
   // Tracks when the rate limit window resets; updated from X-RateLimit-Reset-In.
   let rateLimitResetAt = 0;
 
-  async function enqueue(operation) {
+  async function enqueue(operation, { signal = null } = {}) {
     const execute = async () => {
+      throwIfProviderRequestAborted(signal);
+
       const spacingDelay = Math.max(0, nextRequestAt - Date.now());
       const rateLimitDelay = Math.max(0, rateLimitResetAt - Date.now());
       const delayMs = Math.max(spacingDelay, rateLimitDelay);
       if (delayMs > 0) {
-        await sleepImpl(delayMs);
+        await waitForProviderRequestDelay(delayMs, { signal, sleepImpl });
       }
 
+      throwIfProviderRequestAborted(signal);
       nextRequestAt = Date.now() + effectiveMinIntervalMs;
       return operation();
     };
 
     const result = queuedRequest.then(execute, execute);
     queuedRequest = result.catch(() => {});
-    return result;
+    return awaitProviderRequest(result, { signal });
   }
 
   // Inspects rate-limit headers from any successful response and updates
@@ -200,8 +209,10 @@ export function createListenBrainzClient({
     }
   }
 
-  async function requestJson(pathname, { operation, query = null } = {}) {
+  async function requestJson(pathname, { operation, query = null, signal = null } = {}) {
     return enqueue(async () => {
+      throwIfProviderRequestAborted(signal);
+
       const url = new URL(pathname, normalizedBaseUrl);
       if (query && typeof query === 'object') {
         for (const [key, value] of Object.entries(query)) {
@@ -214,17 +225,27 @@ export function createListenBrainzClient({
       }
 
       for (let attempt = 0; attempt <= effectiveMaxRetries; attempt += 1) {
+        throwIfProviderRequestAborted(signal);
+
         let response;
         try {
           response = await fetchImpl(url, {
             method: 'GET',
             headers: { Accept: 'application/json' },
             redirect: 'error',
-            signal: AbortSignal.timeout(effectiveRequestTimeoutMs),
+            signal: createProviderRequestSignal({
+              signal,
+              timeoutMs: effectiveRequestTimeoutMs,
+            }),
           });
         } catch (error) {
+          throwIfProviderRequestAborted(signal);
+
           if (attempt < effectiveMaxRetries) {
-            await sleepImpl(computeBackoffDelay(attempt + 1, effectiveMinIntervalMs));
+            await waitForProviderRequestDelay(
+              computeBackoffDelay(attempt + 1, effectiveMinIntervalMs),
+              { signal, sleepImpl },
+            );
             continue;
           }
 
@@ -272,7 +293,10 @@ export function createListenBrainzClient({
         }
 
         if (retryable && attempt < effectiveMaxRetries) {
-          await sleepImpl(computeBackoffDelay(attempt + 1, effectiveMinIntervalMs));
+          await waitForProviderRequestDelay(
+            computeBackoffDelay(attempt + 1, effectiveMinIntervalMs),
+            { signal, sleepImpl },
+          );
           continue;
         }
 
@@ -312,11 +336,12 @@ export function createListenBrainzClient({
   // Response format normalisation: the endpoint may return items directly as
   // an array, or wrapped in a { payload: [...] } envelope. Both shapes are
   // handled transparently.
-  async function getSimilarArtists({ mbid, limit = 50 }) {
+  async function getSimilarArtists({ mbid, limit = 50, signal = null }) {
     let payload;
     try {
       payload = await requestJson(`1/popularity/similar-to-artist/${encodeURIComponent(mbid)}`, {
         operation: 'similar artists',
+        signal,
       });
     } catch (error) {
       if (error.code === 'listenbrainz_not_found') {
@@ -350,9 +375,11 @@ export function createListenBrainzClient({
     maxRecordingsPerArtist = 1,
     popBegin = 0,
     popEnd = 100,
+    signal = null,
   }) {
     const payload = await requestJson(`1/lb-radio/artist/${encodeURIComponent(mbid)}`, {
       operation: 'artist radio lookup',
+      signal,
       query: {
         max_recordings_per_artist: maxRecordingsPerArtist,
         max_similar_artists: Math.max(1, Math.min(Number(limit) || 50, 100)),

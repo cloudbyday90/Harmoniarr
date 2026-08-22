@@ -216,3 +216,61 @@ test('getOrLoad remains available when cache persistence fails after a cold fetc
   assert.equal(onCacheError.mock.callCount(), 1);
   assert.equal(onCacheError.mock.calls[0].arguments[1], persistenceError);
 });
+
+test('getOrLoad returns an incomplete foreground payload without persisting it', async (t) => {
+  const onRefreshFailure = t.mock.fn();
+  const upsertCacheEntry = t.mock.fn(async () => ({ ...identity }));
+  const service = createMetadataProviderCacheService({
+    cacheStore: {
+      getCacheEntry: async () => null,
+      upsertCacheEntry,
+    },
+    nowFn: () => new Date('2026-08-22T12:00:00.000Z'),
+    onRefreshFailure,
+  });
+
+  const result = await service.getOrLoad({
+    ...identity,
+    load: async () => ({ results: ['partial-provider-result'] }),
+    policy,
+    shouldPersist: () => false,
+  });
+
+  assert.deepEqual(result.payload, { results: ['partial-provider-result'] });
+  assert.equal(result.cache.state, 'miss');
+  assert.equal(result.cache.refresh, 'foreground');
+  assert.equal(upsertCacheEntry.mock.callCount(), 0);
+  assert.equal(onRefreshFailure.mock.callCount(), 1);
+});
+
+test('getOrLoad retains a stale payload when its background refresh is non-cacheable', async (t) => {
+  const onRefreshFailure = t.mock.fn();
+  const upsertCacheEntry = t.mock.fn(async () => ({ ...identity }));
+  const service = createMetadataProviderCacheService({
+    cacheStore: {
+      getCacheEntry: async () => ({
+        ...identity,
+        fetchedAt: '2026-08-22T11:58:30.000Z',
+        payload: { results: ['stale'] },
+      }),
+      upsertCacheEntry,
+    },
+    nowFn: () => new Date('2026-08-22T12:00:00.000Z'),
+    onRefreshFailure,
+  });
+
+  const result = await service.getOrLoad({
+    ...identity,
+    load: async () => ({ results: ['incomplete'] }),
+    policy,
+    shouldPersist: () => false,
+  });
+  await new Promise((resolve) => {
+    setImmediate(resolve);
+  });
+
+  assert.deepEqual(result.payload, { results: ['stale'] });
+  assert.equal(result.cache.state, 'stale');
+  assert.equal(upsertCacheEntry.mock.callCount(), 0);
+  assert.equal(onRefreshFailure.mock.callCount(), 1);
+});

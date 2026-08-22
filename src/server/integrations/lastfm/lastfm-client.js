@@ -21,6 +21,12 @@ import {
   resolveAllowedOutboundHosts,
   resolveAllowedOutboundHostSuffixes,
 } from '../../outbound-url-policy.js';
+import {
+  awaitProviderRequest,
+  createProviderRequestSignal,
+  throwIfProviderRequestAborted,
+  waitForProviderRequestDelay,
+} from '../provider-request-cancellation.js';
 
 const NOOP_CLIENT = Object.freeze({
   getSimilarArtists: async () => [],
@@ -132,24 +138,29 @@ export function createLastFmClient({
   let queuedRequest = Promise.resolve();
   let nextRequestAt = 0;
 
-  async function enqueue(operation) {
+  async function enqueue(operation, { signal = null } = {}) {
     const execute = async () => {
+      throwIfProviderRequestAborted(signal);
+
       const delayMs = Math.max(0, nextRequestAt - Date.now());
       if (delayMs > 0) {
-        await sleepImpl(delayMs);
+        await waitForProviderRequestDelay(delayMs, { signal, sleepImpl });
       }
 
+      throwIfProviderRequestAborted(signal);
       nextRequestAt = Date.now() + effectiveMinIntervalMs;
       return operation();
     };
 
     const result = queuedRequest.then(execute, execute);
     queuedRequest = result.catch(() => {});
-    return result;
+    return awaitProviderRequest(result, { signal });
   }
 
-  async function requestJson(queryParams, { operation }) {
+  async function requestJson(queryParams, { operation, signal = null }) {
     return enqueue(async () => {
+      throwIfProviderRequestAborted(signal);
+
       const url = new URL(normalizedBaseUrl);
       url.searchParams.set('format', 'json');
       url.searchParams.set('api_key', apiKey);
@@ -162,17 +173,27 @@ export function createLastFmClient({
       }
 
       for (let attempt = 0; attempt <= effectiveMaxRetries; attempt += 1) {
+        throwIfProviderRequestAborted(signal);
+
         let response;
         try {
           response = await fetchImpl(url, {
             method: 'GET',
             headers: { Accept: 'application/json' },
             redirect: 'error',
-            signal: AbortSignal.timeout(effectiveRequestTimeoutMs),
+            signal: createProviderRequestSignal({
+              signal,
+              timeoutMs: effectiveRequestTimeoutMs,
+            }),
           });
         } catch (error) {
+          throwIfProviderRequestAborted(signal);
+
           if (attempt < effectiveMaxRetries) {
-            await sleepImpl(computeBackoffDelay(attempt + 1, effectiveMinIntervalMs));
+            await waitForProviderRequestDelay(
+              computeBackoffDelay(attempt + 1, effectiveMinIntervalMs),
+              { signal, sleepImpl },
+            );
             continue;
           }
 
@@ -189,7 +210,10 @@ export function createLastFmClient({
 
         const retryable = response.status === 429 || response.status === 503 || response.status >= 500;
         if (retryable && attempt < effectiveMaxRetries) {
-          await sleepImpl(computeBackoffDelay(attempt + 1, effectiveMinIntervalMs));
+          await waitForProviderRequestDelay(
+            computeBackoffDelay(attempt + 1, effectiveMinIntervalMs),
+            { signal, sleepImpl },
+          );
           continue;
         }
 
@@ -205,10 +229,10 @@ export function createLastFmClient({
         `Last.fm ${operation} request exhausted retries`,
         { attempts: effectiveMaxRetries + 1, maxRetries: effectiveMaxRetries, retryable: true, url: url.toString() },
       );
-    });
+    }, { signal });
   }
 
-  async function getSimilarArtists({ mbid, artistName, limit = 50 }) {
+  async function getSimilarArtists({ mbid, artistName, limit = 50, signal = null }) {
     const query = {
       method: 'artist.getsimilar',
       limit: Math.min(limit, 100),
@@ -225,7 +249,7 @@ export function createLastFmClient({
 
     let payload;
     try {
-      payload = await requestJson(query, { operation: 'similar artists' });
+      payload = await requestJson(query, { operation: 'similar artists', signal });
     } catch (error) {
       if (error.code === 'lastfm_request_failed') {
         return [];

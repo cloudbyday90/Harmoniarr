@@ -19,6 +19,19 @@ test('classifyMetadataProviderCacheEntry returns a cache miss without a usable e
   });
 });
 
+test('classifyMetadataProviderCacheEntry treats a null fetched timestamp as a cache miss', () => {
+  const result = classifyMetadataProviderCacheEntry({
+    entry: {
+      fetchedAt: null,
+      payload: { results: ['incomplete'] },
+    },
+    now,
+    policy,
+  });
+
+  assert.equal(result.state, 'miss');
+});
+
 test('classifyMetadataProviderCacheEntry marks a recent entry fresh', () => {
   const result = classifyMetadataProviderCacheEntry({
     entry: {

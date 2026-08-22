@@ -21,6 +21,12 @@ import {
   resolveAllowedOutboundHosts,
   resolveAllowedOutboundHostSuffixes,
 } from '../../outbound-url-policy.js';
+import {
+  awaitProviderRequest,
+  createProviderRequestSignal,
+  throwIfProviderRequestAborted,
+  waitForProviderRequestDelay,
+} from '../provider-request-cancellation.js';
 
 // Last-resort contact used in the User-Agent when no HARMONIARR_CONTACT_URL or
 // HARMONIARR_CONTACT_EMAIL is configured. Operators are encouraged to override
@@ -195,24 +201,29 @@ export function createMusicBrainzClient({
   let queuedRequest = Promise.resolve();
   let nextRequestAt = 0;
 
-  async function enqueue(operation) {
+  async function enqueue(operation, { signal = null } = {}) {
     const execute = async () => {
+      throwIfProviderRequestAborted(signal);
+
       const delayMs = Math.max(0, nextRequestAt - Date.now());
       if (delayMs > 0) {
-        await sleepImpl(delayMs);
+        await waitForProviderRequestDelay(delayMs, { signal, sleepImpl });
       }
 
+      throwIfProviderRequestAborted(signal);
       nextRequestAt = Date.now() + effectiveMinIntervalMs;
       return operation();
     };
 
     const result = queuedRequest.then(execute, execute);
     queuedRequest = result.catch(() => {});
-    return result;
+    return awaitProviderRequest(result, { signal });
   }
 
-  async function requestJson(pathname, { query = {}, operation }) {
+  async function requestJson(pathname, { query = {}, operation, signal = null }) {
     return enqueue(async () => {
+      throwIfProviderRequestAborted(signal);
+
       const url = new URL(pathname, normalizedBaseUrl);
       url.searchParams.set('fmt', 'json');
       for (const [key, value] of Object.entries(query)) {
@@ -224,6 +235,8 @@ export function createMusicBrainzClient({
       }
 
       for (let attempt = 0; attempt <= effectiveMaxRetries; attempt += 1) {
+        throwIfProviderRequestAborted(signal);
+
         let response;
         try {
           response = await fetchImpl(url, {
@@ -233,11 +246,19 @@ export function createMusicBrainzClient({
               'User-Agent': userAgent,
             },
             redirect: 'error',
-            signal: AbortSignal.timeout(effectiveRequestTimeoutMs),
+            signal: createProviderRequestSignal({
+              signal,
+              timeoutMs: effectiveRequestTimeoutMs,
+            }),
           });
         } catch (error) {
+          throwIfProviderRequestAborted(signal);
+
           if (attempt < effectiveMaxRetries) {
-            await sleepImpl(computeBackoffDelay(attempt + 1, effectiveMinIntervalMs));
+            await waitForProviderRequestDelay(
+              computeBackoffDelay(attempt + 1, effectiveMinIntervalMs),
+              { signal, sleepImpl },
+            );
             continue;
           }
 
@@ -277,7 +298,10 @@ export function createMusicBrainzClient({
         const throttled = response.status === 429 || response.status === 503;
         if (retryable && attempt < effectiveMaxRetries) {
           const backoffDelayMs = computeBackoffDelay(attempt + 1, effectiveMinIntervalMs);
-          await sleepImpl(retryAfterMs == null ? backoffDelayMs : Math.max(backoffDelayMs, retryAfterMs));
+          await waitForProviderRequestDelay(
+            retryAfterMs == null ? backoffDelayMs : Math.max(backoffDelayMs, retryAfterMs),
+            { signal, sleepImpl },
+          );
           continue;
         }
 
@@ -306,48 +330,53 @@ export function createMusicBrainzClient({
           url: url.toString(),
         }),
       );
-    });
+    }, { signal });
   }
 
-  async function lookupArtist({ artistId, includeAliases = true }) {
+  async function lookupArtist({ artistId, includeAliases = true, signal = null }) {
     return requestJson(`artist/${artistId}`, {
       operation: 'artist lookup',
+      signal,
       query: {
         inc: includeAliases ? 'aliases' : null,
       },
     });
   }
 
-  async function lookupArtistRelations({ artistId }) {
+  async function lookupArtistRelations({ artistId, signal = null }) {
     return requestJson(`artist/${artistId}`, {
       operation: 'artist relations lookup',
+      signal,
       query: {
         inc: 'artist-rels+genres+tags',
       },
     });
   }
 
-  async function lookupRelease({ releaseId }) {
+  async function lookupRelease({ releaseId, signal = null }) {
     return requestJson(`release/${releaseId}`, {
       operation: 'release lookup',
+      signal,
       query: {
         inc: 'artist-credits+recordings+release-groups+media',
       },
     });
   }
 
-  async function lookupReleaseGroup({ releaseGroupId }) {
+  async function lookupReleaseGroup({ releaseGroupId, signal = null }) {
     return requestJson(`release-group/${releaseGroupId}`, {
       operation: 'release-group lookup',
+      signal,
       query: {
         inc: 'artist-credits+releases',
       },
     });
   }
 
-  async function searchArtists({ query, limit = 10, offset = 0, dismax = false }) {
+  async function searchArtists({ query, limit = 10, offset = 0, dismax = false, signal = null }) {
     return requestJson('artist', {
       operation: 'artist search',
+      signal,
       query: {
         query,
         limit,
@@ -357,9 +386,10 @@ export function createMusicBrainzClient({
     });
   }
 
-  async function searchReleases({ query, limit = 10, offset = 0, dismax = false }) {
+  async function searchReleases({ query, limit = 10, offset = 0, dismax = false, signal = null }) {
     return requestJson('release', {
       operation: 'release search',
+      signal,
       query: {
         query,
         limit,
@@ -375,9 +405,11 @@ export function createMusicBrainzClient({
     offset = 0,
     type = null,
     releaseGroupStatus = 'website-default',
+    signal = null,
   }) {
     return requestJson('release-group', {
       operation: 'artist release-group browse',
+      signal,
       query: {
         artist: artistId,
         limit,
@@ -393,9 +425,11 @@ export function createMusicBrainzClient({
     releaseGroupId,
     limit = 25,
     offset = 0,
+    signal = null,
   }) {
     return requestJson('release', {
       operation: 'release-group release browse',
+      signal,
       query: {
         'release-group': releaseGroupId,
         limit,

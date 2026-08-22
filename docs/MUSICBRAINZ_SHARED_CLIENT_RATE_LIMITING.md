@@ -109,10 +109,11 @@ fallback still needs a bounded response design.
 
 ## Next Item
 
-The next recommended item is the interactive related-artists response budget
-described in [Artist Detail Related-Artists Response
-Budget](ARTIST_DETAIL_RELATED_ARTISTS_RESPONSE_BUDGET.md). Establish a bounded,
-cancellable best-effort fallback policy before considering multi-replica rate
-coordination. Once cold interactive work is bounded, establish whether
-production runs more than one Harmoniarr process behind a shared egress IP; a
-centralized limiter is needed only for that topology.
+The interactive related-artists response budget is now implemented as described
+in [Artist Detail Related-Artists Response
+Budget](ARTIST_DETAIL_RELATED_ARTISTS_RESPONSE_BUDGET.md). The next recommended
+item is to establish the production topology: determine whether more than one
+Harmoniarr process shares the same egress IP while performing metadata work. A
+centrally coordinated limiter is needed only for that topology; a single
+process continues to use the implemented shared client queue and bounded
+interactive response policy.

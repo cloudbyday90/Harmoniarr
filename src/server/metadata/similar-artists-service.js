@@ -20,6 +20,7 @@ import { createLastFmClient } from '../integrations/lastfm/lastfm-client.js';
 import { createListenBrainzClient } from '../integrations/listenbrainz/listenbrainz-client.js';
 import { createMusicBrainzClient } from '../integrations/musicbrainz/musicbrainz-client.js';
 import { createSimilarArtistsFallbackService } from './similar-artists-fallback-service.js';
+import { createRelatedArtistsResponseBudgetService } from './related-artists-response-budget-service.js';
 import {
   metadataProviderCacheNamespaces,
   metadataProviderCachePolicies,
@@ -254,6 +255,7 @@ export function createSimilarArtistsService({
   listenBrainzClient = createListenBrainzClient(),
   metadataProviderCacheService = null,
   musicBrainzClient = createMusicBrainzClient(),
+  relatedArtistsResponseBudgetService = createRelatedArtistsResponseBudgetService(),
   cacheTtlMs = 24 * 60 * 60 * 1000,
   cache = null,
 } = {}) {
@@ -302,10 +304,12 @@ export function createSimilarArtistsService({
   }
 
   async function loadSimilarArtistsFromProviders({ artistMbid, discoveryLimit = 100 }) {
+    const responseBudget = relatedArtistsResponseBudgetService.createResponseBudget();
+    const { fallbackLimits, signal } = responseBudget;
     const [lbResult, mbResult, lastfmResult] = await Promise.allSettled([
-      listenBrainzClient.getSimilarArtists({ mbid: artistMbid, limit: 100 }),
-      musicBrainzClient.lookupArtistRelations({ artistId: artistMbid }),
-      lastFmClient.getSimilarArtists({ mbid: artistMbid, limit: 100 }),
+      listenBrainzClient.getSimilarArtists({ mbid: artistMbid, limit: 100, signal }),
+      musicBrainzClient.lookupArtistRelations({ artistId: artistMbid, signal }),
+      lastFmClient.getSimilarArtists({ mbid: artistMbid, limit: 100, signal }),
     ]);
 
     let lbArtists = lbResult.status === 'fulfilled' ? lbResult.value : [];
@@ -352,33 +356,44 @@ export function createSimilarArtistsService({
 
     let lastfmArtists = lastfmResult.status === 'fulfilled' ? lastfmResult.value : [];
 
-    if (lastfmArtists.length === 0 && mbResult.status === 'fulfilled') {
+    if (
+      !responseBudget.isExhausted()
+      && lastfmArtists.length === 0
+      && mbResult.status === 'fulfilled'
+    ) {
       const artistName = mbResult.value?.name;
       if (typeof artistName === 'string' && artistName.length > 0) {
         try {
-          lastfmArtists = await lastFmClient.getSimilarArtists({ artistName, limit: 100 });
+          lastfmArtists = await lastFmClient.getSimilarArtists({ artistName, limit: 100, signal });
         } catch {
           // Fallback failure is non-fatal; proceed with empty Last.fm results.
         }
       }
     }
 
-    if (shouldUseSimilarityFallback({
-      lbArtists,
-      mbArtists,
-      lastfmArtists,
-      safeLimit: discoveryLimit,
-    })) {
+    if (
+      !responseBudget.isExhausted()
+      && shouldUseSimilarityFallback({
+        lbArtists,
+        mbArtists,
+        lastfmArtists,
+        safeLimit: discoveryLimit,
+      })
+    ) {
       const [lbRadioArtists, mbSearchArtists] = await Promise.all([
         fallbackService.getListenBrainzRadioFallback({
           artistMbid,
           limit: 24,
+          maxCandidatesToRerank: fallbackLimits.maxRadioCandidatesToRerank,
           seedArtist: mbResult.status === 'fulfilled' ? mbResult.value : null,
+          signal,
         }),
         fallbackService.searchMusicBrainzFallbackArtists({
           artistMbid,
           limit: 24,
+          maxSearchQueries: fallbackLimits.maxMusicBrainzFallbackSearchQueries,
           seedArtist: mbResult.status === 'fulfilled' ? mbResult.value : null,
+          signal,
         }),
       ]);
 
@@ -386,26 +401,33 @@ export function createSimilarArtistsService({
       mbArtists = mergeSourceCandidates(mbArtists, mbSearchArtists);
     }
 
-    return mergeSimilarArtists(
-      lbArtists,
-      mbArtists,
-      { limit: 100 },
-      lastfmArtists,
-      { seedGenres, seedTags, genreOverrides },
-    );
+    return {
+      cacheable: !responseBudget.isExhausted(),
+      similar: mergeSimilarArtists(
+        lbArtists,
+        mbArtists,
+        { limit: 100 },
+        lastfmArtists,
+        { seedGenres, seedTags, genreOverrides },
+      ),
+    };
   }
 
   async function getSimilarArtists({ artistMbid, limit = 20 }) {
     const safeLimit = Math.max(1, Math.min(Number(limit) || 20, 100));
 
     if (metadataProviderCacheService) {
+      let cacheable = true;
       const cached = await metadataProviderCacheService.getOrLoad({
         cacheKey: String(artistMbid),
         cacheNamespace: metadataProviderCacheNamespaces.similarArtists,
-        load: async () => ({
-          similar: await loadSimilarArtistsFromProviders({ artistMbid }),
-        }),
+        load: async () => {
+          const result = await loadSimilarArtistsFromProviders({ artistMbid });
+          cacheable = result.cacheable;
+          return { similar: result.similar };
+        },
         policy: metadataProviderCachePolicies.similarArtists,
+        shouldPersist: () => cacheable,
       });
 
       return {
@@ -421,10 +443,12 @@ export function createSimilarArtistsService({
       return { similar: cached.slice(0, safeLimit) };
     }
 
-    const merged = await loadSimilarArtistsFromProviders({ artistMbid });
-    ttlCache.set(artistMbid, merged);
+    const result = await loadSimilarArtistsFromProviders({ artistMbid });
+    if (result.cacheable) {
+      ttlCache.set(artistMbid, result.similar);
+    }
 
-    return { similar: merged.slice(0, safeLimit) };
+    return { similar: result.similar.slice(0, safeLimit) };
   }
 
   return { getSimilarArtists };

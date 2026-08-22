@@ -250,19 +250,29 @@ export function createSimilarArtistsFallbackService({
   listenBrainzClient,
   musicBrainzClient,
 } = {}) {
-  async function getListenBrainzRadioFallback({ artistMbid, limit = 20, seedArtist = null }) {
+  async function getListenBrainzRadioFallback({
+    artistMbid,
+    limit = 20,
+    maxCandidatesToRerank = 10,
+    seedArtist = null,
+    signal = null,
+  }) {
     if (typeof listenBrainzClient?.getRadioSimilarArtists !== 'function') {
       return [];
     }
 
     let candidates;
     try {
-      candidates = await listenBrainzClient.getRadioSimilarArtists({ mbid: artistMbid, limit });
+      candidates = await listenBrainzClient.getRadioSimilarArtists({ mbid: artistMbid, limit, signal });
     } catch {
       return [];
     }
 
-    if (!seedArtist || typeof musicBrainzClient?.lookupArtistRelations !== 'function') {
+    if (
+      !seedArtist
+      || maxCandidatesToRerank <= 0
+      || typeof musicBrainzClient?.lookupArtistRelations !== 'function'
+    ) {
       return candidates;
     }
 
@@ -272,9 +282,12 @@ export function createSimilarArtistsFallbackService({
     }
 
     const reranked = [];
-    for (const candidate of candidates.slice(0, Math.min(limit, 10))) {
+    for (const candidate of candidates.slice(0, Math.min(limit, maxCandidatesToRerank))) {
       try {
-        const metadata = await musicBrainzClient.lookupArtistRelations({ artistId: candidate.mbid });
+        const metadata = await musicBrainzClient.lookupArtistRelations({
+          artistId: candidate.mbid,
+          signal,
+        });
         const overlap = computeSignalOverlap(seedProfile, metadata);
         reranked.push({
           ...candidate,
@@ -294,25 +307,29 @@ export function createSimilarArtistsFallbackService({
     artistMbid,
     seedArtist,
     limit = 20,
+    maxSearchQueries = 4,
+    signal = null,
   }) {
     if (typeof musicBrainzClient?.searchArtists !== 'function' || !seedArtist) {
       return [];
     }
 
     const seedProfile = createSeedSignalProfile(seedArtist);
-    const queries = buildMusicBrainzFallbackQueries(seedArtist);
+    const queries = buildMusicBrainzFallbackQueries(seedArtist)
+      .slice(0, Math.max(0, maxSearchQueries));
     if (queries.length === 0) {
       return [];
     }
 
     const candidateMap = new Map();
-    for (const { query, signal } of queries) {
+    for (const { query, signal: signalDescriptor } of queries) {
       let payload;
       try {
         payload = await musicBrainzClient.searchArtists({
           dismax: false,
           limit: Math.min(Math.max(limit * 2, 10), 25),
           query,
+          signal,
         });
       } catch {
         continue;
@@ -324,7 +341,7 @@ export function createSimilarArtistsFallbackService({
         }
 
         const candidate = createMusicBrainzSearchCandidate(artist, {
-          score: scoreMusicBrainzFallbackCandidate(artist, signal, seedProfile),
+          score: scoreMusicBrainzFallbackCandidate(artist, signalDescriptor, seedProfile),
         });
         const existing = candidateMap.get(candidate.mbid);
         candidateMap.set(candidate.mbid, mergeCandidates(existing, candidate));

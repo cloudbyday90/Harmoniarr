@@ -176,3 +176,43 @@ test('createSimilarArtistsFallbackService downranks ListenBrainz radio candidate
     { mbid: 'artist-1', name: 'P!nk', score: 0.34 },
   ]);
 });
+
+test('createSimilarArtistsFallbackService skips MusicBrainz radio reranking when the response budget sets a zero cap', async (t) => {
+  const lookupArtistRelations = t.mock.fn(async () => ({ tags: [{ name: 'christian' }] }));
+  const service = createSimilarArtistsFallbackService({
+    listenBrainzClient: {
+      getRadioSimilarArtists: async () => [
+        { mbid: 'artist-1', name: 'Candidate', score: 0.66 },
+      ],
+    },
+    musicBrainzClient: { lookupArtistRelations },
+  });
+
+  const results = await service.getListenBrainzRadioFallback({
+    artistMbid: 'seed-mbid',
+    maxCandidatesToRerank: 0,
+    seedArtist: { tags: [{ name: 'christian' }] },
+  });
+
+  assert.deepEqual(results, [{ mbid: 'artist-1', name: 'Candidate', score: 0.66 }]);
+  assert.equal(lookupArtistRelations.mock.callCount(), 0);
+});
+
+test('createSimilarArtistsFallbackService bounds MusicBrainz fallback searches to the response-budget cap', async (t) => {
+  const searchArtists = t.mock.fn(async () => ({ artists: [] }));
+  const service = createSimilarArtistsFallbackService({
+    musicBrainzClient: { searchArtists },
+  });
+
+  await service.searchMusicBrainzFallbackArtists({
+    artistMbid: 'seed-mbid',
+    maxSearchQueries: 1,
+    seedArtist: {
+      country: 'US',
+      tags: [{ name: 'christian' }, { name: 'gospel' }, { name: 'worship' }],
+      type: 'Person',
+    },
+  });
+
+  assert.equal(searchArtists.mock.callCount(), 1);
+});

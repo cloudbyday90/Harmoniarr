@@ -36,6 +36,10 @@ export const metadataProviderCachePolicies = Object.freeze({
 });
 
 function asDate(value) {
+  if (value == null || value === '') {
+    return null;
+  }
+
   if (value instanceof Date) {
     return Number.isNaN(value.getTime()) ? null : value;
   }

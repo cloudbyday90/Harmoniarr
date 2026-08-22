@@ -90,7 +90,7 @@ export function createMetadataProviderCacheService({
     }
   }
 
-  function refreshEntry({ cacheNamespace, cacheKey, load, refresh }) {
+  function refreshEntry({ cacheNamespace, cacheKey, load, refresh, shouldPersist }) {
     const identity = { cacheNamespace, cacheKey };
     const inFlightKey = buildInFlightKey(identity);
     const existing = inFlightRefreshes.get(inFlightKey);
@@ -103,6 +103,15 @@ export function createMetadataProviderCacheService({
     const refreshPromise = Promise.resolve()
       .then(async () => {
         const payload = await load();
+        if (!shouldPersist(payload)) {
+          return {
+            cacheable: false,
+            fetchedAt: null,
+            payload,
+            persisted: false,
+          };
+        }
+
         const fetchedAt = nowFn();
         try {
           const stored = await cacheStore.upsertCacheEntry({
@@ -111,6 +120,7 @@ export function createMetadataProviderCacheService({
             payload,
           });
           return {
+            cacheable: true,
             fetchedAt: stored.fetchedAt,
             payload: stored.payload,
             persisted: true,
@@ -118,6 +128,7 @@ export function createMetadataProviderCacheService({
         } catch (error) {
           notify(onCacheError, { ...identity, operation: 'write' }, error);
           return {
+            cacheable: true,
             fetchedAt: toIsoTimestamp(fetchedAt),
             payload,
             persisted: false,
@@ -127,7 +138,11 @@ export function createMetadataProviderCacheService({
       .then(
         (result) => {
           const durationMs = normalizeRefreshDurationMs(nowMsFn() - refreshStartedAt);
-          notify(onRefreshSuccess, { cacheNamespace, durationMs, refresh });
+          if (result.cacheable) {
+            notify(onRefreshSuccess, { cacheNamespace, durationMs, refresh });
+          } else {
+            notify(onRefreshFailure, { cacheNamespace, durationMs, refresh });
+          }
           return { ...result, durationMs };
         },
         (error) => {
@@ -144,9 +159,18 @@ export function createMetadataProviderCacheService({
     return refreshPromise;
   }
 
-  async function getOrLoad({ cacheNamespace, cacheKey, load, policy }) {
+  async function getOrLoad({
+    cacheNamespace,
+    cacheKey,
+    load,
+    policy,
+    shouldPersist = () => true,
+  }) {
     if (typeof load !== 'function') {
       throw new Error('metadata provider cache load function is required');
+    }
+    if (typeof shouldPersist !== 'function') {
+      throw new Error('metadata provider cache shouldPersist function must be a function');
     }
 
     const identity = { cacheNamespace, cacheKey };
@@ -168,7 +192,12 @@ export function createMetadataProviderCacheService({
 
     if (classification.state === 'stale') {
       notify(onCacheLookup, { cacheNamespace, lookup });
-      void refreshEntry({ ...identity, load, refresh: 'background' }).catch((error) => {
+      void refreshEntry({
+        ...identity,
+        load,
+        refresh: 'background',
+        shouldPersist,
+      }).catch((error) => {
         notify(onRefreshError, identity, error);
       });
 
@@ -179,7 +208,12 @@ export function createMetadataProviderCacheService({
     }
 
     notify(onCacheLookup, { cacheNamespace, lookup });
-    const loaded = await refreshEntry({ ...identity, load, refresh: 'foreground' });
+    const loaded = await refreshEntry({
+      ...identity,
+      load,
+      refresh: 'foreground',
+      shouldPersist,
+    });
     const refreshedClassification = classifyMetadataProviderCacheEntry({
       entry: {
         fetchedAt: loaded.fetchedAt,
