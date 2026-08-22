@@ -20,45 +20,86 @@ the production runtime image because production installation uses
 development dependencies to build the server. The same local build completed
 with zero audit vulnerabilities.
 
-## Decision
+## Research and Compatibility Assessment
 
-Do not add an incompatible forced `glob@13` override solely to suppress this
-warning. `archiver-utils@5.0.2` explicitly depends on the 10.x line, so a
-major-version override would replace a tested transitive contract without an
-upstream compatibility guarantee. The latest published
-`@testcontainers/postgresql@12.1.0` currently resolves the same dependency
-chain; there is no compatible direct upgrade to apply.
+Research was refreshed on 2026-08-22 using the official npm documentation and
+registry package pages. `glob@13.0.6` is the current stable release. Its
+documented CommonJS interface retains the `glob.sync()` alias used by
+`archiver-utils@5.0.2`, so this consumer is compatible with the resolved API.
 
-Continue to retain the root `glob@13.0.6`, lock dependencies with `npm ci`,
-and monitor the Testcontainers/Archiver release chain for an upstream fix.
-Reassess when the upstream package changes its declared dependency or when an
-advisory affects the transitive version. The current warning is technical-debt
-noise, not a reported vulnerability or runtime inclusion.
+The preferred upstream upgrade path is not currently safe to force. The
+current Testcontainers package continues to declare `archiver@^7.0.1`, and its
+published JavaScript imports Archiver through CommonJS. Archiver 8 is ESM-only,
+so overriding that intermediate major would risk breaking the test container
+archive path. We must not replace it merely to remove a warning.
+
+## Implemented Decision
+
+Add a root-level, nested npm override that applies only to the affected edge:
+
+```json
+"overrides": {
+  "archiver-utils": {
+    "glob": "13.0.6"
+  }
+}
+```
+
+The exact version prevents an accidental downgrade within the override. npm
+supports root-level overrides for transitive dependencies; keeping this rule at
+the root lets `npm ci` create a deterministic, reviewed lockfile. A clean
+lockfile regeneration resolves the graph as:
+
+```text
+@testcontainers/postgresql@12.1.0
+  -> testcontainers@12.1.0
+  -> archiver@7.0.1
+  -> archiver-utils@5.0.2
+  -> glob@13.0.6 (deduplicated)
+```
+
+This repository is ESM (`"type": "module"`). No application module is
+converted to CommonJS; the compatibility check deliberately verifies the one
+CommonJS third-party consumer retained by Testcontainers.
 
 ## Options
 
 | Option | Benefits | Risks | Decision |
 | --- | --- | --- | --- |
-| Force `glob@13` with `overrides` | Removes the warning now | Crosses a declared major-version boundary and can break Testcontainers archive behavior | Reject |
+| Scoped `archiver-utils > glob@13.0.6` override | Removes the deprecated dependency and preserves the known `glob.sync()` interface | A temporary major-version exception needs revalidation when Testcontainers changes | Implemented |
+| Force Archiver 8 | Uses the newest Archiver release | Current Testcontainers requires Archiver through CommonJS; Archiver 8 is ESM-only | Reject |
 | Remove Testcontainers | Removes the dependency chain | Loses container-backed integration coverage | Reject |
-| Update Testcontainers | Preferred upstream remediation | Current latest release retains the chain | No change available |
-| Keep root Glob current and monitor upstream | Preserves verified integration behavior and production dependency boundary | Build-time warning remains visible | Implemented |
+| Update Testcontainers | Preferred upstream remediation when it removes the old Archiver chain | Current latest release retains the chain | Monitor |
+
+## Recommendation Stack
+
+1. Keep the scoped override and the reviewed lockfile.
+2. Run `npm ci` in CI and retain dependency signature/audit validation.
+3. Reassess on each Testcontainers update; remove the override when its
+   supported Archiver line no longer needs it.
+4. Do not force Archiver 8 until Testcontainers publishes an ESM-compatible
+   release and its archive path passes integration testing.
 
 ## Security Outcome
 
-`npm run validate:security` reports zero vulnerabilities. `npm audit
-signatures` verifies 468 registry signatures and 87 provenance attestations in
-the locked dependency tree. These checks are stronger evidence than treating a
-deprecation message as an automatic reason to force an unverified semver-major
-override.
+`npm ci --ignore-scripts` completes with no Glob 10 deprecation warning and
+`npm ls glob` resolves the Testcontainers path to `glob@13.0.6`. An ESM import
+check confirms both the Archiver Utils file-expansion API and Testcontainers'
+`GenericContainer` remain available. `npm run validate` completes successfully,
+including the ESM guard, lint, test, integration, and production-build stages.
+`npm run validate:security` reports zero vulnerabilities, while `npm audit
+signatures` verifies 453 registry signatures and 88 provenance attestations.
+The rebuilt walkthrough Compose image is healthy and its bootstrap check
+completes successfully.
 
 ## Official Sources
 
 Sources accessed on 2026-08-22:
 
-- [npm package.json: overrides](https://docs.npmjs.com/files/package.json/)
+- [npm package.json: overrides](https://docs.npmjs.com/cli/v11/configuring-npm/package-json/#overrides)
 - [npm audit documentation](https://docs.npmjs.com/cli/audit/)
 - [@testcontainers/postgresql package](https://www.npmjs.com/package/@testcontainers/postgresql)
 - [Testcontainers package versions](https://www.npmjs.com/package/testcontainers?activeTab=versions)
 - [Archiver package versions](https://www.npmjs.com/package/archiver?activeTab=versions)
 - [archiver-utils package](https://www.npmjs.com/package/archiver-utils)
+- [Glob package](https://www.npmjs.com/package/glob)
