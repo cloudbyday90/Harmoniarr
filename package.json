@@ -2,23 +2,23 @@
   "name": "harmoniarr",
   "version": "0.1.0-beta",
   "private": true,
-  "packageManager": "npm@11.12.1",
+  "packageManager": "npm@12.0.2",
   "type": "module",
   "description": "Soulseek-native music library manager inspired by Lidarr",
   "license": "GPL-3.0-or-later",
   "engines": {
-    "node": "25.4.x",
-    "npm": "11.x"
+    "node": ">=25.4.0 <26.0.0",
+    "npm": ">=12.0.2 <13.0.0"
   },
   "devEngines": {
     "runtime": {
       "name": "node",
-      "version": "25.4.x",
+      "version": ">=25.4.0 <26.0.0",
       "onFail": "warn"
     },
     "packageManager": {
       "name": "npm",
-      "version": "11.x",
+      "version": ">=12.0.2 <13.0.0",
       "onFail": "warn"
     }
   },
@@ -87,21 +87,21 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@testcontainers/postgresql": "^12.0.4",
+    "@testcontainers/postgresql": "^12.1.0",
     "@vitejs/plugin-vue": "^6.0.8",
-    "@vue/language-server": "^3.3.1",
+    "@vue/language-server": "^3.3.9",
     "@vue/typescript-plugin": "^3.3.1",
-    "eslint": "^10.4.0",
-    "eslint-plugin-vue": "^10.9.1",
+    "eslint": "^10.8.0",
+    "eslint-plugin-vue": "^10.10.0",
     "glob": "^13.0.6",
-    "globals": "^17.6.0",
-    "playwright": "^1.60.0",
+    "globals": "^17.9.0",
+    "playwright": "^1.62.1",
     "typescript": "^6.0.3",
     "typescript-language-server": "^5.3.0",
-    "vite": "^8.1.5"
+    "vite": "^8.2.1"
   },
   "overrides": {
-    "brace-expansion": "5.0.8",
+    "brace-expansion": "5.0.9",
     "uuid": "^11.1.1"
   },
   "dependencies": {
