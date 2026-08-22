@@ -54,6 +54,7 @@ import { createMusicBrainzSearchService } from './musicbrainz-search-service.js'
 import { createSimilarArtistsService } from './similar-artists-service.js';
 import { createReleaseGroupTracklistService } from './release-group-tracklist-service.js';
 import { createMetadataProviderCacheService } from './metadata-provider-cache-service.js';
+import { createMetadataProviderCacheObservabilityService } from './metadata-provider-cache-observability-service.js';
 import { createMetadataProviderResponseCacheStore } from './metadata-provider-response-cache-store.js';
 import { forceCanonicalRelease } from './canonical-release-service.js';
 import { createOperationRunInterruptionGate } from '../operation-run-cancellation.js';
@@ -95,6 +96,7 @@ export function createMetadataModule({
   metadataRefreshService = null,
   metadataReleaseMaterializationService = null,
   metadataProviderCacheService = null,
+  metadataProviderCacheObservabilityService = null,
   metadataProviderResponseCacheStore = null,
   metadataSearchService = null,
   providerHealthRecorder = null,
@@ -203,9 +205,16 @@ export function createMetadataModule({
     });
   const resolvedMetadataProviderResponseCacheStore = metadataProviderResponseCacheStore
     ?? createMetadataProviderResponseCacheStore();
+  const resolvedMetadataProviderCacheObservabilityService = metadataProviderCacheObservabilityService
+    ?? createMetadataProviderCacheObservabilityService();
   const resolvedMetadataProviderCacheService = metadataProviderCacheService
     ?? createMetadataProviderCacheService({
       cacheStore: resolvedMetadataProviderResponseCacheStore,
+      onCacheError: resolvedMetadataProviderCacheObservabilityService.recordCacheStoreError,
+      onCacheLookup: resolvedMetadataProviderCacheObservabilityService.recordCacheLookup,
+      onRefreshFailure: resolvedMetadataProviderCacheObservabilityService.recordRefreshFailure,
+      onRefreshStart: resolvedMetadataProviderCacheObservabilityService.recordRefreshStart,
+      onRefreshSuccess: resolvedMetadataProviderCacheObservabilityService.recordRefreshSuccess,
     });
   const resolvedMusicBrainzCatalogService = musicBrainzCatalogService ?? createMusicBrainzCatalogService({
     metadataProviderCacheService: resolvedMetadataProviderCacheService,
@@ -298,6 +307,7 @@ export function createMetadataModule({
     metadataReadService: resolvedMetadataReadService,
     metadataMonitoredArtistStore: resolvedMetadataMonitoredArtistStore,
     metadataProviderCacheService: resolvedMetadataProviderCacheService,
+    metadataProviderCacheObservabilityService: resolvedMetadataProviderCacheObservabilityService,
     metadataProviderResponseCacheStore: resolvedMetadataProviderResponseCacheStore,
     operatorArtistMonitoringService: resolvedOperatorArtistMonitoringService,
     operatorArtistMonitoringStore: resolvedOperatorArtistMonitoringStore,
@@ -327,6 +337,7 @@ export function createMetadataModule({
     routeDependencies: {
       browseMusicBrainzArtistReleaseGroups: resolvedMusicBrainzCatalogService.browseArtistReleaseGroups,
       getMetadataArtistDetectionEvents: resolvedMetadataReadService.getArtistDetectionEvents,
+      getMetadataProviderCacheObservability: resolvedMetadataProviderCacheObservabilityService.getSummary,
       listOperatorMonitoredArtistProjections: resolvedOperatorMonitoredArtistProjectionService.listOperatorMonitoredArtistProjections,
       getOperatorArtistProjection: resolvedOperatorArtistProjectionService.getOperatorArtistProjection,
       getMusicBrainzReleaseGroupReleases: resolvedMusicBrainzCatalogService.getReleaseGroupReleases,

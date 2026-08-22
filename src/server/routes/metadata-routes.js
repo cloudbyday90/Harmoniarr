@@ -66,6 +66,7 @@ export function registerMetadataRoutes(app, {
   getMetadataArtist,
   getMetadataArtistDetectionEvents,
   getMetadataArtistByMusicBrainzId,
+  getMetadataProviderCacheObservability = () => ({ namespaces: [], updatedAt: null }),
   getOperatorArtistProjection,
   saveOperatorArtist,
   getMetadataRelease,
@@ -185,6 +186,14 @@ export function registerMetadataRoutes(app, {
       offset: sanitizePageOffset(request.query.offset),
     });
     response.json({ ok: true, ...result });
+  }));
+
+  app.get('/api/v1/metadata/cache-observability', metadataRoute(async (request, response) => {
+    await requireFreshAdminSessionFn(request);
+    response.json({
+      cache: await getMetadataProviderCacheObservability(),
+      ok: true,
+    });
   }));
 
   registerSessionGetJsonRoute('/api/v1/metadata/release-groups/search', async (request) => ({
@@ -311,7 +320,10 @@ export function registerMetadataRoutes(app, {
       limit: sanitizePageLimit(request.query.limit, { default: 20, max: 100 }),
     });
 
-    return { similar: result.similar };
+    return {
+      cache: result.cache ?? null,
+      similar: result.similar,
+    };
   });
 
   registerSessionGetJsonRoute('/api/v1/metadata/musicbrainz/artists/:artistId/local', async (request) => {

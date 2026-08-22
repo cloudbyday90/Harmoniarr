@@ -14,6 +14,9 @@ test('createMetadataModule exposes shared route dependencies from injected servi
   };
   const metadataArtistRefreshStateStore = {};
   const metadataProviderCacheService = {};
+  const metadataProviderCacheObservabilityService = {
+    getSummary: () => {},
+  };
   const metadataProviderResponseCacheStore = {};
   const operatorArtistProjectionService = {
     getOperatorArtistProjection: () => {},
@@ -79,6 +82,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     metadataRefreshDispatchPolicyService,
     metadataArtistRefreshStateStore,
     metadataProviderCacheService,
+    metadataProviderCacheObservabilityService,
     metadataProviderResponseCacheStore,
     operatorArtistProjectionService,
     operatorMonitoredArtistProjectionService,
@@ -103,6 +107,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
   assert.equal(metadataModule.metadataReadService, metadataReadService);
   assert.equal(metadataModule.metadataArtistRefreshStateStore, metadataArtistRefreshStateStore);
   assert.equal(metadataModule.metadataProviderCacheService, metadataProviderCacheService);
+  assert.equal(metadataModule.metadataProviderCacheObservabilityService, metadataProviderCacheObservabilityService);
   assert.equal(metadataModule.metadataProviderResponseCacheStore, metadataProviderResponseCacheStore);
   assert.equal(metadataModule.operatorMonitoredArtistProjectionService, operatorMonitoredArtistProjectionService);
   assert.equal(metadataModule.operatorArtistProjectionService, operatorArtistProjectionService);
@@ -121,6 +126,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     getMetadataArtist: metadataReadService.getArtist,
     getMetadataArtistByMusicBrainzId: metadataReadService.getArtistByMusicBrainzId,
     getMetadataArtistDetectionEvents: metadataReadService.getArtistDetectionEvents,
+    getMetadataProviderCacheObservability: metadataProviderCacheObservabilityService.getSummary,
     listOperatorMonitoredArtistProjections: operatorMonitoredArtistProjectionService.listOperatorMonitoredArtistProjections,
     getOperatorArtistProjection: operatorArtistProjectionService.getOperatorArtistProjection,
     getMetadataRelease: metadataReadService.getRelease,

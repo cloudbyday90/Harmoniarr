@@ -38,6 +38,7 @@ export function useArtistDetailRelatedArtists({
   similarLimit = 8,
 } = {}) {
   const relatedArtists = ref([]);
+  const relatedArtistsCache = ref(null);
   const relatedError = ref(null);
   const isLoadingRelatedArtists = ref(false);
   let latestRequestId = 0;
@@ -45,6 +46,7 @@ export function useArtistDetailRelatedArtists({
   function invalidateRelatedArtists() {
     latestRequestId += 1;
     relatedArtists.value = [];
+    relatedArtistsCache.value = null;
     relatedError.value = null;
     isLoadingRelatedArtists.value = false;
   }
@@ -55,6 +57,7 @@ export function useArtistDetailRelatedArtists({
   } = {}) {
     const requestId = ++latestRequestId;
     relatedArtists.value = [];
+    relatedArtistsCache.value = null;
     relatedError.value = null;
 
     if (!mbid) {
@@ -78,6 +81,7 @@ export function useArtistDetailRelatedArtists({
       relatedArtists.value = Array.isArray(payload?.similar)
         ? payload.similar.slice(0, similarLimit)
         : [];
+      relatedArtistsCache.value = payload?.cache ?? null;
       return true;
     } catch (error) {
       if (!canApply() || isAbortError(error)) {
@@ -102,6 +106,7 @@ export function useArtistDetailRelatedArtists({
     isLoadingRelatedArtists: readonly(isLoadingRelatedArtists),
     loadRelatedArtists,
     relatedArtists: readonly(relatedArtists),
+    relatedArtistsCache: readonly(relatedArtistsCache),
     relatedError: readonly(relatedError),
   };
 }

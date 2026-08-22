@@ -1,6 +1,21 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
+async function waitFor(predicate, {
+  intervalMs = 10,
+  timeoutMs = 1_000,
+} = {}) {
+  const deadline = Date.now() + timeoutMs;
+
+  while (!predicate()) {
+    if (Date.now() >= deadline) {
+      throw new Error('Timed out waiting for the expected polling state');
+    }
+
+    await new Promise((resolve) => { setTimeout(resolve, intervalMs); });
+  }
+}
+
 function makeOnboardingPayload(issueCount = 0, overrides = {}) {
   return {
     summary: {
@@ -117,11 +132,11 @@ describe('useOnboardingSummary SWR', () => {
 
     await workflow.loadOnboardingSummary();
 
-    await new Promise((resolve) => { setTimeout(resolve, 150); });
-    const countAfterPoll = callCount;
+    await waitFor(() => callCount === 3 && workflow.summary.value?.issueCount === 0);
+    const countAfterResolution = callCount;
 
     await new Promise((resolve) => { setTimeout(resolve, 120); });
-    assert.equal(callCount, countAfterPoll, 'polling stopped after issues resolved');
+    assert.equal(callCount, countAfterResolution, 'polling stopped after issues resolved');
 
     workflow.destroy();
   });

@@ -163,6 +163,11 @@ The next item is now implemented and recorded separately in
 SWR cache as the source of truth while separating the page's critical render
 path from the optional related-artist enhancement.
 
+The following observability layer is implemented separately in
+`ARTIST_DETAIL_CACHE_OBSERVABILITY_DESIGN.md`. It adds safe cold, fresh, stale,
+refresh-failure, and refresh-duration evidence, and fixes the Artist Detail
+adapter to read the API's `browse` envelope.
+
 ## Security Constraints
 
 - Every cache key and SQL value is parameterized; no provider or cache key is

@@ -26,6 +26,7 @@ test('getOrLoad returns a fresh cached payload without calling the provider', as
   const result = await service.getOrLoad({ ...identity, load, policy });
 
   assert.deepEqual(result.payload, { results: ['cached'] });
+  assert.equal(result.cache.lookup, 'fresh');
   assert.equal(result.cache.state, 'fresh');
   assert.equal(result.cache.refresh, 'none');
   assert.equal(load.mock.callCount(), 0);
@@ -57,6 +58,7 @@ test('getOrLoad serves a stale payload and refreshes it in the background', asyn
   const result = await service.getOrLoad({ ...identity, load, policy });
 
   assert.deepEqual(result.payload, { results: ['stale'] });
+  assert.equal(result.cache.lookup, 'stale');
   assert.equal(result.cache.state, 'stale');
   assert.equal(result.cache.refresh, 'background');
   assert.equal(load.mock.callCount(), 1);
@@ -100,11 +102,57 @@ test('getOrLoad coalesces concurrent cold cache misses', async (t) => {
   assert.deepEqual(firstResult.payload, { results: ['loaded'] });
   assert.deepEqual(secondResult.payload, { results: ['loaded'] });
   assert.equal(firstResult.cache.refresh, 'foreground');
+  assert.equal(firstResult.cache.lookup, 'cold');
+});
+
+test('getOrLoad reports a cold lookup and foreground refresh duration without exposing the cache key', async (t) => {
+  const onCacheLookup = t.mock.fn();
+  const onRefreshStart = t.mock.fn();
+  const onRefreshSuccess = t.mock.fn();
+  const service = createMetadataProviderCacheService({
+    cacheStore: {
+      getCacheEntry: async () => null,
+      upsertCacheEntry: async ({ fetchedAt, payload }) => ({ ...identity, fetchedAt, payload }),
+    },
+    nowFn: () => new Date('2026-08-22T12:00:00.000Z'),
+    nowMsFn: (() => {
+      const values = [100, 145];
+      return () => values.shift();
+    })(),
+    onCacheLookup,
+    onRefreshStart,
+    onRefreshSuccess,
+  });
+
+  const result = await service.getOrLoad({
+    ...identity,
+    load: async () => ({ results: ['provider'] }),
+    policy,
+  });
+
+  assert.equal(result.cache.lookup, 'cold');
+  assert.equal(result.cache.refresh, 'foreground');
+  assert.equal(result.cache.refreshDurationMs, 45);
+  assert.deepEqual(onCacheLookup.mock.calls[0].arguments[0], {
+    cacheNamespace: identity.cacheNamespace,
+    lookup: 'cold',
+  });
+  assert.deepEqual(onRefreshStart.mock.calls[0].arguments[0], {
+    cacheNamespace: identity.cacheNamespace,
+    refresh: 'foreground',
+  });
+  assert.deepEqual(onRefreshSuccess.mock.calls[0].arguments[0], {
+    cacheNamespace: identity.cacheNamespace,
+    durationMs: 45,
+    refresh: 'foreground',
+  });
+  assert.equal(JSON.stringify(onRefreshSuccess.mock.calls[0].arguments[0]).includes(identity.cacheKey), false);
 });
 
 test('getOrLoad reports background refresh failures while retaining the stale response', async (t) => {
   const refreshError = new Error('provider unavailable');
   const onRefreshError = t.mock.fn();
+  const onRefreshFailure = t.mock.fn();
   const service = createMetadataProviderCacheService({
     cacheStore: {
       getCacheEntry: async () => ({
@@ -118,6 +166,7 @@ test('getOrLoad reports background refresh failures while retaining the stale re
     },
     nowFn: () => new Date('2026-08-22T12:00:00.000Z'),
     onRefreshError,
+    onRefreshFailure,
   });
 
   const result = await service.getOrLoad({
@@ -134,6 +183,12 @@ test('getOrLoad reports background refresh failures while retaining the stale re
   assert.deepEqual(result.payload, { results: ['stale'] });
   assert.equal(onRefreshError.mock.callCount(), 1);
   assert.equal(onRefreshError.mock.calls[0].arguments[1], refreshError);
+  assert.equal(onRefreshFailure.mock.callCount(), 1);
+  assert.deepEqual(onRefreshFailure.mock.calls[0].arguments[0], {
+    cacheNamespace: identity.cacheNamespace,
+    durationMs: onRefreshFailure.mock.calls[0].arguments[0].durationMs,
+    refresh: 'background',
+  });
 });
 
 test('getOrLoad remains available when cache persistence fails after a cold fetch', async (t) => {

@@ -277,6 +277,44 @@ test('metadata operator monitored artists route returns the operator-scoped proj
   });
 });
 
+test('metadata cache observability route requires a fresh admin session and returns aggregate metrics', async (t) => {
+  const getMetadataProviderCacheObservability = t.mock.fn(async () => ({
+    namespaces: [{
+      cacheNamespace: 'musicbrainz.artist_release_groups',
+      cacheStoreErrors: { read: 0, write: 0 },
+      lookups: { cold: 1, fresh: 2, stale: 3 },
+      refreshes: {},
+    }],
+    updatedAt: '2026-08-22T12:00:00.000Z',
+  }));
+  const requireFreshAdminSession = t.mock.fn(async () => ({ appUserId: 'admin-1' }));
+  const app = createMetadataRouteTestApp({
+    getMetadataProviderCacheObservability,
+    requireFreshAdminSession,
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/metadata/cache-observability`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireFreshAdminSession.mock.callCount(), 1);
+    assert.equal(getMetadataProviderCacheObservability.mock.callCount(), 1);
+    assert.deepEqual(payload, {
+      cache: {
+        namespaces: [{
+          cacheNamespace: 'musicbrainz.artist_release_groups',
+          cacheStoreErrors: { read: 0, write: 0 },
+          lookups: { cold: 1, fresh: 2, stale: 3 },
+          refreshes: {},
+        }],
+        updatedAt: '2026-08-22T12:00:00.000Z',
+      },
+      ok: true,
+    });
+  });
+});
+
 test('metadata local artist search route returns the shared search payload', async () => {
   const app = createMetadataRouteTestApp();
 
@@ -293,6 +331,42 @@ test('metadata local artist search route returns the shared search payload', asy
         limit: 6,
         results: [{ id: 'artist-1', name: 'Autechre' }],
       },
+    });
+  });
+});
+
+test('metadata provider artist browse route preserves the SWR cache metadata inside its browse envelope', async (t) => {
+  const browseMusicBrainzArtistReleaseGroups = t.mock.fn(async ({ artistId, limit, offset }) => ({
+    cache: { lookup: 'stale', refresh: 'background', refreshDurationMs: null, state: 'stale' },
+    limit,
+    offset,
+    results: [{ id: 'release-group-1', title: 'Amber' }],
+    total: 1,
+  }));
+  const app = createMetadataRouteTestApp({ browseMusicBrainzArtistReleaseGroups });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/metadata/musicbrainz/artists/artist-1/release-groups?limit=10&offset=5`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(browseMusicBrainzArtistReleaseGroups.mock.calls[0].arguments[0], {
+      artistId: 'artist-1',
+      limit: 10,
+      offset: 5,
+      releaseGroupStatus: undefined,
+      type: undefined,
+    });
+    assert.deepEqual(payload, {
+      browse: {
+        cache: { lookup: 'stale', refresh: 'background', refreshDurationMs: null, state: 'stale' },
+        limit: 10,
+        offset: 5,
+        results: [{ id: 'release-group-1', title: 'Amber' }],
+        total: 1,
+      },
+      ok: true,
+      provider: 'musicbrainz',
     });
   });
 });
@@ -1186,6 +1260,7 @@ test('metadata canonical release patch route returns 404 when markCanonicalRelea
 
 test('metadata similar artists route returns shared similar payload with sanitized limit', async (t) => {
   const getSimilarArtists = t.mock.fn(async ({ artistMbid, limit }) => ({
+    cache: { lookup: 'fresh', refresh: 'none', refreshDurationMs: null, state: 'fresh' },
     similar: [{ mbid: 'mb-1', name: 'Similar Artist', score: 0.9 }],
   }));
   const app = createMetadataRouteTestApp({ getSimilarArtists });
@@ -1196,6 +1271,7 @@ test('metadata similar artists route returns shared similar payload with sanitiz
 
     assert.equal(response.status, 200);
     assert.equal(payload.ok, true);
+    assert.deepEqual(payload.cache, { lookup: 'fresh', refresh: 'none', refreshDurationMs: null, state: 'fresh' });
     assert.equal(payload.similar.length, 1);
     const callArgs = getSimilarArtists.mock.calls[0].arguments[0];
     assert.equal(callArgs.artistMbid, 'test-mbid');

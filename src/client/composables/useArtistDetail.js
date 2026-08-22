@@ -69,6 +69,7 @@ export function useArtistDetail({
   const projection = ref(null);
   const monitoring = ref(null);
   const releaseGroups = ref([]);
+  const discographyCache = ref(null);
   const isLoading = ref(false);
   const artistError = ref(null);
   const discographyError = ref(null);
@@ -78,6 +79,7 @@ export function useArtistDetail({
     isLoadingRelatedArtists,
     loadRelatedArtists,
     relatedArtists,
+    relatedArtistsCache,
     relatedError,
   } = useArtistDetailRelatedArtists({ fetchSimilar, similarLimit });
 
@@ -116,6 +118,7 @@ export function useArtistDetail({
     operator.value = null;
     projection.value = null;
     releaseGroups.value = [];
+    discographyCache.value = null;
     void loadRelatedArtists(mbid, {
       isCurrent: request.isCurrent,
       signal: requestSignal,
@@ -198,9 +201,11 @@ export function useArtistDetail({
           return;
         }
 
-        releaseGroups.value = Array.isArray(discographyResult?.results)
-          ? discographyResult.results
+        const browsePayload = discographyResult?.browse ?? discographyResult;
+        releaseGroups.value = Array.isArray(browsePayload?.results)
+          ? browsePayload.results
           : [];
+        discographyCache.value = browsePayload?.cache ?? null;
       } catch (error) {
         if (!request.isCurrent() || isAbortError(error)) {
           return;
@@ -251,7 +256,9 @@ export function useArtistDetail({
     projection: readonly(projection),
     monitoring: readonly(monitoring),
     releaseGroups: readonly(releaseGroups),
+    discographyCache: readonly(discographyCache),
     relatedArtists: readonly(relatedArtists),
+    relatedArtistsCache,
     isLoading: readonly(isLoading),
     isLoadingRelatedArtists,
     isMonitored,

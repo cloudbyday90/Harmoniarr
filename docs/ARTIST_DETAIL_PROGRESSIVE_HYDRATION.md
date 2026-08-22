@@ -134,6 +134,12 @@ At the start of each new critical request, artist, operator, policy, and
 release-group refs are cleared. This prevents a previous artist's monitoring
 or policy information from appearing during or after a route transition.
 
+The subsequent observability slice also corrects the provider-discography
+adapter: the API returns a `browse` envelope, so Artist Detail must read
+`browse.results` rather than a top-level `results`. The modular cache state and
+safe diagnostics contract are recorded in
+`ARTIST_DETAIL_CACHE_OBSERVABILITY_DESIGN.md`.
+
 ## Security Constraints
 
 - This change does not add browser persistence, service-worker API caching,

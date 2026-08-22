@@ -205,6 +205,32 @@ test('useArtistDetail loadArtistDetail populates releaseGroups from browse', asy
   assert.equal(releaseGroups.value.length, 2);
 });
 
+test('useArtistDetail unwraps the metadata route browse envelope and retains safe cache diagnostics', async () => {
+  const cache = {
+    lookup: 'stale',
+    refresh: 'background',
+    refreshDurationMs: null,
+    state: 'stale',
+  };
+  const { discographyCache, loadArtistDetail, releaseGroups } = useArtistDetail({
+    resolveLocal: createLocalDouble({ throws: Object.assign(new Error('Not Found'), { status: 404 }) }),
+    browseReleaseGroups: async () => ({
+      browse: {
+        cache,
+        results: [makeReleaseGroup({ id: 'route-enveloped-rg' })],
+      },
+      ok: true,
+      provider: 'musicbrainz',
+    }),
+    fetchSimilar: createSimilarDouble(),
+  });
+
+  await loadArtistDetail('mb-1');
+
+  assert.equal(releaseGroups.value[0].id, 'route-enveloped-rg');
+  assert.deepEqual(discographyCache.value, cache);
+});
+
 test('useArtistDetail loadArtistDetail populates relatedArtists from fetchSimilar', async () => {
   const similar = [makeSimilar({ id: 'sim-1', name: 'Portishead' })];
   const { relatedArtists, loadArtistDetail } = useArtistDetail({
@@ -217,6 +243,19 @@ test('useArtistDetail loadArtistDetail populates relatedArtists from fetchSimila
 
   assert.equal(relatedArtists.value.length, 1);
   assert.equal(relatedArtists.value[0].name, 'Portishead');
+});
+
+test('useArtistDetail retains related-artist cache diagnostics independently', async () => {
+  const cache = { lookup: 'fresh', refresh: 'none', refreshDurationMs: null, state: 'fresh' };
+  const { loadArtistDetail, relatedArtistsCache } = useArtistDetail({
+    resolveLocal: createLocalDouble(),
+    browseReleaseGroups: createBrowseDouble(),
+    fetchSimilar: async () => ({ cache, similar: [makeSimilar()] }),
+  });
+
+  await loadArtistDetail('mb-1');
+
+  assert.deepEqual(relatedArtistsCache.value, cache);
 });
 
 test('useArtistDetail resolves the critical path before related-artist enrichment finishes', async () => {

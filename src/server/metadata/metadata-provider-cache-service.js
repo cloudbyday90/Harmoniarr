@@ -28,14 +28,39 @@ function toIsoTimestamp(value) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-function buildCacheMetadata(classification, refresh) {
+function buildCacheMetadata(classification, refresh, {
+  lookup,
+  refreshDurationMs = null,
+} = {}) {
   return {
     expiresAt: classification.expiresAt,
     fetchedAt: classification.fetchedAt,
     freshUntil: classification.freshUntil,
+    lookup,
     refresh,
+    refreshDurationMs,
     state: classification.state,
   };
+}
+
+function normalizeLookupState(state) {
+  return state === 'fresh' || state === 'stale' ? state : 'cold';
+}
+
+function normalizeRefreshDurationMs(value) {
+  if (!Number.isFinite(value) || value < 0) {
+    return null;
+  }
+
+  return Math.round(value);
+}
+
+function notify(observer, details, error) {
+  try {
+    observer(details, error);
+  } catch {
+    // Cache observability must never affect a metadata response.
+  }
 }
 
 /**
@@ -46,8 +71,13 @@ function buildCacheMetadata(classification, refresh) {
 export function createMetadataProviderCacheService({
   cacheStore = createMetadataProviderResponseCacheStore(),
   nowFn = () => new Date(),
+  nowMsFn = () => performance.now(),
   onCacheError = () => {},
+  onCacheLookup = () => {},
+  onRefreshFailure = () => {},
   onRefreshError = () => {},
+  onRefreshStart = () => {},
+  onRefreshSuccess = () => {},
 } = {}) {
   const inFlightRefreshes = new Map();
 
@@ -55,12 +85,12 @@ export function createMetadataProviderCacheService({
     try {
       return await cacheStore.getCacheEntry(identity);
     } catch (error) {
-      onCacheError({ ...identity, operation: 'read' }, error);
+      notify(onCacheError, { ...identity, operation: 'read' }, error);
       return null;
     }
   }
 
-  function refreshEntry({ cacheNamespace, cacheKey, load }) {
+  function refreshEntry({ cacheNamespace, cacheKey, load, refresh }) {
     const identity = { cacheNamespace, cacheKey };
     const inFlightKey = buildInFlightKey(identity);
     const existing = inFlightRefreshes.get(inFlightKey);
@@ -68,7 +98,9 @@ export function createMetadataProviderCacheService({
       return existing;
     }
 
-    const refresh = Promise.resolve()
+    const refreshStartedAt = nowMsFn();
+    notify(onRefreshStart, { cacheNamespace, refresh });
+    const refreshPromise = Promise.resolve()
       .then(async () => {
         const payload = await load();
         const fetchedAt = nowFn();
@@ -84,7 +116,7 @@ export function createMetadataProviderCacheService({
             persisted: true,
           };
         } catch (error) {
-          onCacheError({ ...identity, operation: 'write' }, error);
+          notify(onCacheError, { ...identity, operation: 'write' }, error);
           return {
             fetchedAt: toIsoTimestamp(fetchedAt),
             payload,
@@ -92,12 +124,24 @@ export function createMetadataProviderCacheService({
           };
         }
       })
+      .then(
+        (result) => {
+          const durationMs = normalizeRefreshDurationMs(nowMsFn() - refreshStartedAt);
+          notify(onRefreshSuccess, { cacheNamespace, durationMs, refresh });
+          return { ...result, durationMs };
+        },
+        (error) => {
+          const durationMs = normalizeRefreshDurationMs(nowMsFn() - refreshStartedAt);
+          notify(onRefreshFailure, { cacheNamespace, durationMs, refresh }, error);
+          throw error;
+        },
+      )
       .finally(() => {
         inFlightRefreshes.delete(inFlightKey);
       });
 
-    inFlightRefreshes.set(inFlightKey, refresh);
-    return refresh;
+    inFlightRefreshes.set(inFlightKey, refreshPromise);
+    return refreshPromise;
   }
 
   async function getOrLoad({ cacheNamespace, cacheKey, load, policy }) {
@@ -112,26 +156,30 @@ export function createMetadataProviderCacheService({
       now: nowFn(),
       policy,
     });
+    const lookup = normalizeLookupState(classification.state);
 
     if (classification.state === 'fresh') {
+      notify(onCacheLookup, { cacheNamespace, lookup });
       return {
-        cache: buildCacheMetadata(classification, 'none'),
+        cache: buildCacheMetadata(classification, 'none', { lookup }),
         payload: entry.payload,
       };
     }
 
     if (classification.state === 'stale') {
-      void refreshEntry({ ...identity, load }).catch((error) => {
-        onRefreshError(identity, error);
+      notify(onCacheLookup, { cacheNamespace, lookup });
+      void refreshEntry({ ...identity, load, refresh: 'background' }).catch((error) => {
+        notify(onRefreshError, identity, error);
       });
 
       return {
-        cache: buildCacheMetadata(classification, 'background'),
+        cache: buildCacheMetadata(classification, 'background', { lookup }),
         payload: entry.payload,
       };
     }
 
-    const loaded = await refreshEntry({ ...identity, load });
+    notify(onCacheLookup, { cacheNamespace, lookup });
+    const loaded = await refreshEntry({ ...identity, load, refresh: 'foreground' });
     const refreshedClassification = classifyMetadataProviderCacheEntry({
       entry: {
         fetchedAt: loaded.fetchedAt,
@@ -142,7 +190,10 @@ export function createMetadataProviderCacheService({
     });
 
     return {
-      cache: buildCacheMetadata(refreshedClassification, 'foreground'),
+      cache: buildCacheMetadata(refreshedClassification, 'foreground', {
+        lookup,
+        refreshDurationMs: loaded.durationMs,
+      }),
       payload: loaded.payload,
     };
   }

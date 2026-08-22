@@ -48,11 +48,13 @@ test('useArtistDetailRelatedArtists exposes a dedicated loading state while enri
   assert.equal(related.isLoadingRelatedArtists.value, true);
   assert.deepEqual(related.relatedArtists.value, []);
 
-  deferred.resolve({ similar: [{ id: 'artist-2', name: 'Related artist' }] });
+  const cache = { lookup: 'fresh', refresh: 'none', state: 'fresh' };
+  deferred.resolve({ cache, similar: [{ id: 'artist-2', name: 'Related artist' }] });
   await loading;
 
   assert.equal(related.isLoadingRelatedArtists.value, false);
   assert.equal(related.relatedArtists.value[0].id, 'artist-2');
+  assert.deepEqual(related.relatedArtistsCache.value, cache);
 });
 
 test('useArtistDetailRelatedArtists ignores stale responses after invalidation', async () => {

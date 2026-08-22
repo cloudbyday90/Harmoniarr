@@ -1,6 +1,21 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
+async function waitFor(predicate, {
+  intervalMs = 10,
+  timeoutMs = 1_000,
+} = {}) {
+  const deadline = Date.now() + timeoutMs;
+
+  while (!predicate()) {
+    if (Date.now() >= deadline) {
+      throw new Error('Timed out waiting for the expected polling state');
+    }
+
+    await new Promise((resolve) => { setTimeout(resolve, intervalMs); });
+  }
+}
+
 function makeSummaryPayload(overrides = {}) {
   return {
     testRun: {
@@ -143,11 +158,11 @@ describe('useImportCandidateRunSummary SWR', () => {
 
     await workflow.loadRunSummary();
 
-    await new Promise((resolve) => { setTimeout(resolve, 150); });
-    const countAfterPoll = callCount;
+    await waitFor(() => callCount === 3 && workflow.activeRun.value === null);
+    const countAfterCompletedRun = callCount;
 
     await new Promise((resolve) => { setTimeout(resolve, 120); });
-    assert.equal(callCount, countAfterPoll, 'polling stopped after active run completed');
+    assert.equal(callCount, countAfterCompletedRun, 'polling stopped after active run completed');
 
     workflow.destroy();
   });
