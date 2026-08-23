@@ -8,6 +8,7 @@ import {
   extractMbRelatedArtists,
   mergeSimilarArtists,
 } from '../../src/server/metadata/similar-artists-service.js';
+import { createRelatedArtistsResponseBudgetService } from '../../src/server/metadata/related-artists-response-budget-service.js';
 
 // ---------------------------------------------------------------------------
 // extractMbRelatedArtists
@@ -381,6 +382,106 @@ test('createSimilarArtistsService serves an expired-budget result without persis
     musicBrainzClient.lookupArtistRelations.mock.calls[0].arguments[0].signal,
     controller.signal,
   );
+});
+
+test('createSimilarArtistsService persists completed direct candidates after response budget exhaustion', async (t) => {
+  const controller = new AbortController();
+  controller.abort(new Error('related artists response budget exhausted'));
+  const listenBrainzClient = createTestListenBrainzClient(
+    t.mock.fn(async () => [{
+      mbid: 'similar-artist-1',
+      name: 'Related Artist',
+      score: 0.8,
+    }]),
+    t.mock.fn(async () => []),
+  );
+  const musicBrainzClient = createTestMusicBrainzClient(
+    t.mock.fn(async () => ({ relations: [] })),
+    t.mock.fn(async () => ({ artists: [] })),
+  );
+  const lastFmClient = createTestLastFmClient(t.mock.fn(async () => []));
+  let persisted = null;
+  const getOrLoad = t.mock.fn(async ({ load, shouldPersist }) => {
+    const payload = await load();
+    persisted = shouldPersist(payload);
+    return {
+      cache: { refresh: 'foreground', state: 'fresh' },
+      payload,
+    };
+  });
+  const service = createSimilarArtistsService({
+    lastFmClient,
+    listenBrainzClient,
+    metadataProviderCacheService: { getOrLoad },
+    musicBrainzClient,
+    relatedArtistsResponseBudgetService: {
+      createResponseBudget: () => ({
+        fallbackLimits: {
+          maxMusicBrainzFallbackSearchQueries: 1,
+          maxRadioCandidatesToRerank: 0,
+        },
+        isExhausted: () => true,
+        signal: controller.signal,
+      }),
+    },
+  });
+
+  const result = await service.getSimilarArtists({ artistMbid: 'artist-1' });
+
+  assert.equal(persisted, true);
+  assert.deepEqual(result.similar, [{
+    id: 'similar-artist-1',
+    name: 'Related Artist',
+    score: 0.8,
+    source: 'listenbrainz',
+  }]);
+  assert.equal(listenBrainzClient.getRadioSimilarArtists.mock.callCount(), 0);
+  assert.equal(musicBrainzClient.searchArtists.mock.callCount(), 0);
+});
+
+test('createSimilarArtistsService persists direct provider results within the aligned response budget', async (t) => {
+  const controller = new AbortController();
+  let receivedTimeoutMs = null;
+  const listenBrainzClient = createTestListenBrainzClient(t.mock.fn(async () => []));
+  const musicBrainzClient = createTestMusicBrainzClient(t.mock.fn(async () => ({
+    relations: [{
+      artist: { id: 'similar-artist-1', name: 'Related Artist' },
+      type: 'similar artist',
+    }],
+  })));
+  const lastFmClient = createTestLastFmClient(t.mock.fn(async () => []));
+  let persisted = null;
+  const getOrLoad = t.mock.fn(async ({ load, shouldPersist }) => {
+    const payload = await load();
+    persisted = shouldPersist(payload);
+    return {
+      cache: { refresh: 'foreground', state: 'fresh' },
+      payload,
+    };
+  });
+  const service = createSimilarArtistsService({
+    lastFmClient,
+    listenBrainzClient,
+    metadataProviderCacheService: { getOrLoad },
+    musicBrainzClient,
+    relatedArtistsResponseBudgetService: createRelatedArtistsResponseBudgetService({
+      createTimeoutSignal: (timeoutMs) => {
+        receivedTimeoutMs = timeoutMs;
+        return controller.signal;
+      },
+    }),
+  });
+
+  const result = await service.getSimilarArtists({ artistMbid: 'artist-1' });
+
+  assert.equal(receivedTimeoutMs, 15_000);
+  assert.equal(persisted, true);
+  assert.deepEqual(result.similar, [{
+    id: 'similar-artist-1',
+    name: 'Related Artist',
+    score: 0.7,
+    source: 'musicbrainz',
+  }]);
 });
 
 test('createSimilarArtistsService caches separately per MBID', async (t) => {

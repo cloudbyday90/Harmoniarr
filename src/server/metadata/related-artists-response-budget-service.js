@@ -16,10 +16,27 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { resolveMusicBrainzRequestPolicy } from '../integrations/musicbrainz/musicbrainz-request-policy.js';
+
+const minimumInteractiveResponseBudgetMs = 15_000;
+const responseBudgetSettlementMarginMs = 1_000;
+
+export function getMinimumRelatedArtistsResponseBudgetMs(musicBrainzRequestPolicy) {
+  const normalizedMusicBrainzRequestPolicy = resolveMusicBrainzRequestPolicy(musicBrainzRequestPolicy);
+  return Math.max(
+    minimumInteractiveResponseBudgetMs,
+    normalizedMusicBrainzRequestPolicy.requestTimeoutMs
+      + normalizedMusicBrainzRequestPolicy.minIntervalMs
+      + responseBudgetSettlementMarginMs,
+  );
+}
+
 export const relatedArtistsResponseBudgetDefaults = Object.freeze({
   maxMusicBrainzFallbackSearchQueries: 1,
   maxRadioCandidatesToRerank: 0,
-  responseBudgetMs: 6_000,
+  responseBudgetMs: getMinimumRelatedArtistsResponseBudgetMs(
+    resolveMusicBrainzRequestPolicy(),
+  ),
 });
 
 function normalizePositiveInteger(value, label) {
@@ -60,9 +77,17 @@ export function createRelatedArtistsResponseBudgetService({
   createTimeoutSignal = AbortSignal.timeout,
   maxMusicBrainzFallbackSearchQueries = relatedArtistsResponseBudgetDefaults.maxMusicBrainzFallbackSearchQueries,
   maxRadioCandidatesToRerank = relatedArtistsResponseBudgetDefaults.maxRadioCandidatesToRerank,
-  responseBudgetMs = relatedArtistsResponseBudgetDefaults.responseBudgetMs,
+  musicBrainzRequestPolicy = resolveMusicBrainzRequestPolicy(),
+  responseBudgetMs = null,
 } = {}) {
-  const normalizedResponseBudgetMs = normalizePositiveInteger(responseBudgetMs, 'responseBudgetMs');
+  const minimumResponseBudgetMs = getMinimumRelatedArtistsResponseBudgetMs(musicBrainzRequestPolicy);
+  const normalizedResponseBudgetMs = normalizePositiveInteger(
+    responseBudgetMs ?? minimumResponseBudgetMs,
+    'responseBudgetMs',
+  );
+  if (normalizedResponseBudgetMs < minimumResponseBudgetMs) {
+    throw new Error(`responseBudgetMs must be at least ${minimumResponseBudgetMs}ms for the configured MusicBrainz request policy`);
+  }
   const normalizedMaxMusicBrainzFallbackSearchQueries = normalizePositiveInteger(
     maxMusicBrainzFallbackSearchQueries,
     'maxMusicBrainzFallbackSearchQueries',

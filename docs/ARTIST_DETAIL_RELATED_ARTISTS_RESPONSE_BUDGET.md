@@ -120,3 +120,11 @@ returned without a cache write. On 2026-08-22, `npm run validate` and the
 controlled Artist Detail cache workload passed. The local walkthrough Compose
 image rebuilt, the recreated service became healthy, and its one-shot bootstrap
 confirmed the existing disposable local admin.
+
+## Follow-up
+
+The response budget was subsequently found to be shorter than one configured
+MusicBrainz request attempt. The resulting deadline alignment design and its
+implementation outcome are documented separately in [Artist Detail
+Related-Artists Deadline
+Alignment](ARTIST_DETAIL_RELATED_ARTISTS_DEADLINE_ALIGNMENT_DESIGN.md).

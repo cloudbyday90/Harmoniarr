@@ -20,6 +20,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   createRelatedArtistsResponseBudgetService,
+  getMinimumRelatedArtistsResponseBudgetMs,
   relatedArtistsResponseBudgetDefaults,
 } from '../../src/server/metadata/related-artists-response-budget-service.js';
 
@@ -47,10 +48,40 @@ test('related artists response budget owns its timeout and fallback limits', () 
   assert.equal(budget.isExhausted(), true);
 });
 
+test('related artists response budget accommodates the configured MusicBrainz request policy', () => {
+  const controller = new AbortController();
+  let receivedTimeoutMs = null;
+  const musicBrainzRequestPolicy = {
+    maxRetries: 2,
+    minIntervalMs: 1_100,
+    requestTimeoutMs: 30_000,
+  };
+  const service = createRelatedArtistsResponseBudgetService({
+    createTimeoutSignal: (timeoutMs) => {
+      receivedTimeoutMs = timeoutMs;
+      return controller.signal;
+    },
+    musicBrainzRequestPolicy,
+  });
+
+  service.createResponseBudget();
+
+  assert.equal(receivedTimeoutMs, getMinimumRelatedArtistsResponseBudgetMs(musicBrainzRequestPolicy));
+  assert.equal(receivedTimeoutMs, 32_100);
+  assert.ok(
+    relatedArtistsResponseBudgetDefaults.responseBudgetMs >= 15_000,
+    'the default permits one normal MusicBrainz request attempt',
+  );
+});
+
 test('related artists response budget rejects invalid server policy values', () => {
   assert.throws(
     () => createRelatedArtistsResponseBudgetService({ responseBudgetMs: 0 }),
     /responseBudgetMs must be a positive safe integer/,
+  );
+  assert.throws(
+    () => createRelatedArtistsResponseBudgetService({ responseBudgetMs: 6_000 }),
+    /responseBudgetMs must be at least 15000ms for the configured MusicBrainz request policy/,
   );
   assert.throws(
     () => createRelatedArtistsResponseBudgetService({ maxRadioCandidatesToRerank: -1 }),

@@ -27,43 +27,12 @@ import {
   throwIfProviderRequestAborted,
   waitForProviderRequestDelay,
 } from '../provider-request-cancellation.js';
+import { resolveMusicBrainzRequestPolicy } from './musicbrainz-request-policy.js';
 
 // Last-resort contact used in the User-Agent when no HARMONIARR_CONTACT_URL or
 // HARMONIARR_CONTACT_EMAIL is configured. Operators are encouraged to override
 // this with their own contact, but this keeps the provider usable out of the box.
 const DEFAULT_CONTACT_URL = 'https://github.com/cloudbyday90/harmoniarr';
-
-function parsePositiveInteger(value, fallback) {
-  if (value == null || value === '') {
-    return fallback;
-  }
-
-  const parsed = Number.parseInt(String(value), 10);
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw createMusicBrainzError(
-      'musicbrainz_misconfigured',
-      `Expected a positive integer but received ${value}`,
-    );
-  }
-
-  return parsed;
-}
-
-function parseNonNegativeInteger(value, fallback) {
-  if (value == null || value === '') {
-    return fallback;
-  }
-
-  const parsed = Number.parseInt(String(value), 10);
-  if (!Number.isInteger(parsed) || parsed < 0) {
-    throw createMusicBrainzError(
-      'musicbrainz_misconfigured',
-      `Expected a non-negative integer but received ${value}`,
-    );
-  }
-
-  return parsed;
-}
 
 function defaultSleep(delayMs) {
   return new Promise((resolve) => {
@@ -188,9 +157,21 @@ export function createMusicBrainzClient({
   sleepImpl = defaultSleep,
 } = {}) {
   const normalizedBaseUrl = normalizeBaseUrl(baseUrl, { allowedHosts, allowedHostSuffixes });
-  const effectiveMinIntervalMs = Math.max(parsePositiveInteger(minIntervalMs, 1100), 1000);
-  const effectiveRequestTimeoutMs = parsePositiveInteger(requestTimeoutMs, 10000);
-  const effectiveMaxRetries = parseNonNegativeInteger(maxRetries, 2);
+  let requestPolicy;
+  try {
+    requestPolicy = resolveMusicBrainzRequestPolicy({
+      maxRetries,
+      minIntervalMs,
+      requestTimeoutMs,
+    });
+  } catch (error) {
+    throw createMusicBrainzError('musicbrainz_misconfigured', error.message);
+  }
+  const {
+    maxRetries: effectiveMaxRetries,
+    minIntervalMs: effectiveMinIntervalMs,
+    requestTimeoutMs: effectiveRequestTimeoutMs,
+  } = requestPolicy;
   const userAgent = resolveUserAgent({
     applicationName,
     applicationVersion,

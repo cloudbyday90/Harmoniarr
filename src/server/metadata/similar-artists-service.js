@@ -19,6 +19,7 @@
 import { createLastFmClient } from '../integrations/lastfm/lastfm-client.js';
 import { createListenBrainzClient } from '../integrations/listenbrainz/listenbrainz-client.js';
 import { createMusicBrainzClient } from '../integrations/musicbrainz/musicbrainz-client.js';
+import { shouldPersistSimilarArtists } from './similar-artists-cacheability-policy.js';
 import { createSimilarArtistsFallbackService } from './similar-artists-fallback-service.js';
 import { createRelatedArtistsResponseBudgetService } from './related-artists-response-budget-service.js';
 import {
@@ -371,6 +372,8 @@ export function createSimilarArtistsService({
       }
     }
 
+    const directSourceArtists = [lbArtists, mbArtists, lastfmArtists];
+
     if (
       !responseBudget.isExhausted()
       && shouldUseSimilarityFallback({
@@ -402,7 +405,10 @@ export function createSimilarArtistsService({
     }
 
     return {
-      cacheable: !responseBudget.isExhausted(),
+      cacheable: shouldPersistSimilarArtists({
+        directSourceArtists,
+        responseBudgetExhausted: responseBudget.isExhausted(),
+      }),
       similar: mergeSimilarArtists(
         lbArtists,
         mbArtists,
