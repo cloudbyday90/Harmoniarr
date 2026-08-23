@@ -28,6 +28,10 @@ function normalizeReleaseId(value) {
   return normalizedValue || null;
 }
 
+function buildFocusCandidates(...targets) {
+  return targets.filter((target, index) => target && targets.indexOf(target) === index);
+}
+
 /**
  * Records how a selected Music Queue release was opened so the non-modal
  * inspector can preserve or restore an intentional focus location. Route
@@ -99,13 +103,13 @@ export function createMusicQueueReleaseFocusController() {
     return true;
   }
 
-  function takeCloseFocusTarget(fallbackTarget = null) {
+  function takeCloseFocusTargets(...fallbackTargets) {
     const trigger = selectedRelease?.origin === MUSIC_QUEUE_RELEASE_FOCUS_ORIGIN.ROW
       ? selectedRelease.trigger
       : null;
     selectedRelease = null;
     focusedDirectReleaseId = null;
-    return trigger ?? fallbackTarget;
+    return buildFocusCandidates(trigger, ...fallbackTargets);
   }
 
   function getSelection() {
@@ -117,6 +121,6 @@ export function createMusicQueueReleaseFocusController() {
     selectFromRow,
     shouldFocusDirectInspectorHeading,
     synchronizeRouteSelection,
-    takeCloseFocusTarget,
+    takeCloseFocusTargets,
   };
 }

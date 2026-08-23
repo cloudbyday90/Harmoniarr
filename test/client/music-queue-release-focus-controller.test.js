@@ -23,9 +23,11 @@ import {
   MUSIC_QUEUE_RELEASE_FOCUS_ORIGIN,
 } from '../../src/client/lib/music-queue-release-focus-controller.js';
 
-test('Music Queue preserves a row origin when the matching release route resolves', () => {
+test('Music Queue preserves the row origin before the queue-heading Close fallback', () => {
   const controller = createMusicQueueReleaseFocusController();
   const trigger = { focus() {} };
+  const queueHeading = { focus() {} };
+  const pageHeading = { focus() {} };
 
   controller.selectFromRow({ releaseId: ' wanted-quality ', trigger });
   assert.deepEqual(controller.synchronizeRouteSelection('wanted-quality'), {
@@ -38,8 +40,29 @@ test('Music Queue preserves a row origin when the matching release route resolve
     releaseId: 'wanted-quality',
   }), false);
 
-  assert.equal(controller.takeCloseFocusTarget({ focus() {} }), trigger);
+  assert.deepEqual(controller.takeCloseFocusTargets(queueHeading, pageHeading), [
+    trigger,
+    queueHeading,
+    pageHeading,
+  ]);
   assert.equal(controller.getSelection(), null);
+});
+
+test('Music Queue uses only the queue-heading Close fallback for a direct release URL', () => {
+  const controller = createMusicQueueReleaseFocusController();
+  const queueHeading = { focus() {} };
+  const pageHeading = { focus() {} };
+
+  controller.synchronizeRouteSelection('wanted-quality');
+  assert.deepEqual(controller.takeCloseFocusTargets(queueHeading, pageHeading), [queueHeading, pageHeading]);
+});
+
+test('Music Queue de-duplicates a repeated row-origin and Close fallback target', () => {
+  const controller = createMusicQueueReleaseFocusController();
+  const target = { focus() {} };
+
+  controller.selectFromRow({ releaseId: 'wanted-quality', trigger: target });
+  assert.deepEqual(controller.takeCloseFocusTargets(target, target), [target]);
 });
 
 test('Music Queue focuses a direct release inspector only once after it is ready', () => {

@@ -118,6 +118,7 @@ const selectedReleaseType = ref('all');
 const selectedReleaseId = ref(requestedReleaseId.value);
 const providerRecoveryVisibility = ref(null);
 const scopeStatusAnnouncement = ref('');
+const musicQueueHeadingElement = ref(null);
 const queueListHeadingElement = ref(null);
 const reviewPanelElement = ref(null);
 const musicQueueReleaseFocus = useMusicQueueReleaseFocus();
@@ -194,9 +195,12 @@ function openReview(release, trigger) {
 }
 
 function closeReview() {
-  const focusTarget = musicQueueReleaseFocus.takeCloseFocusTarget(queueListHeadingElement.value);
+  const focusCandidates = musicQueueReleaseFocus.takeCloseFocusTargets(
+    queueListHeadingElement.value,
+    musicQueueHeadingElement.value,
+  );
   selectedReleaseId.value = null;
-  void musicQueueReleaseFocus.focusAfterRender(focusTarget);
+  void musicQueueReleaseFocus.focusFirstAvailableAfterRender(focusCandidates);
   if (route.name === 'music-queue-release') {
     void router.replace({ name: 'music-queue' });
   }
@@ -363,7 +367,7 @@ watch(releases, (updatedReleases) => {
     <header class="music-queue-header">
       <div>
         <p class="hx-eyebrow">Music Queue</p>
-        <h1>Music Queue</h1>
+        <h1 ref="musicQueueHeadingElement" tabindex="-1">Music Queue</h1>
         <p class="music-queue-copy">
           Review releases that need a decision. Harmoniarr continues eligible work automatically.
         </p>
@@ -531,6 +535,11 @@ watch(releases, (updatedReleases) => {
 
 .music-queue-header h1 {
   margin: 0;
+}
+
+.music-queue-header h1:focus {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 4px;
 }
 
 .music-queue-copy,

@@ -90,6 +90,17 @@ function buildMusicQueuePayload() {
   };
 }
 
+function buildEmptyMusicQueuePayload() {
+  const payload = buildMusicQueuePayload();
+
+  return {
+    ...payload,
+    pagination: { ...payload.pagination, total: 0 },
+    releases: [],
+    summary: { counts: {}, total: 0 },
+  };
+}
+
 function buildRecoveryPayload() {
   const releases = [{
     artistName: 'Forest Frank',
@@ -485,6 +496,23 @@ suite('Music Queue release row hierarchy browser verification', () => {
         'Closing a row-opened release inspector should return focus to its row action.',
       );
 
+      await reviewButton.focus();
+      await reviewButton.press('Enter');
+      await reviewPanel.getByRole('heading', { name: /Geogaddi by Boards of Canada/ }).waitFor();
+      await page.getByLabel('Search this queue').fill('Child of God');
+      await reviewButton.waitFor({ state: 'detached' });
+      await reviewPanel.getByRole('button', { name: 'Close' }).click();
+      await reviewPanel.waitFor({ state: 'detached' });
+      const filteredQueueHeading = page.getByRole('heading', { exact: true, name: 'All releases' });
+      await assertLocatorFocused(
+        filteredQueueHeading,
+        'Closing after a filter removes the opening row should focus the Music Queue heading.',
+      );
+      await assertVisibleFocusOutline(
+        filteredQueueHeading,
+        'The queue heading fallback should expose a visible focus outline after its originating row is removed.',
+      );
+
       await page.goto(`${baseUrl}/app/music-queue/wanted-quality-stop`, { waitUntil: 'domcontentloaded' });
       const directReleaseHeading = reviewPanel.getByRole('heading', { name: /Geogaddi by Boards of Canada/ });
       await directReleaseHeading.waitFor();
@@ -511,6 +539,78 @@ suite('Music Queue release row hierarchy browser verification', () => {
       const manifest = await evidence.writeManifest();
       assert.equal(manifest.captureCount, 6);
     }, { scenarioName: 'music_queue_release_row_hierarchy' });
+  });
+
+  test('uses the persistent Music Queue heading when refresh removes every row before Close', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) {
+      t.skip(runtimeUnavailableReason);
+      return;
+    }
+
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      const pageErrors = [];
+      let includesQueuedRows = true;
+      page.on('pageerror', (error) => pageErrors.push(error.message));
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      await browserContext.route(/\/api\/v1\/acquisition\/releases(?:\?.*)?$/, async (route) => {
+        await route.fulfill({
+          body: JSON.stringify(includesQueuedRows ? buildMusicQueuePayload() : buildEmptyMusicQueuePayload()),
+          contentType: 'application/json',
+        });
+      });
+      await installMusicQueueReleaseDetailFixture(browserContext, buildMusicQueuePayload);
+      await browserContext.route('**/api/v1/system/overview', async (route) => {
+        await route.fulfill({
+          body: JSON.stringify({ dependencies: [{ provider: 'slskd', status: 'healthy' }] }),
+          contentType: 'application/json',
+        });
+      });
+      await browserContext.route('**/api/v1/settings', async (route) => {
+        const response = await route.fetch();
+        const payload = await response.json();
+        payload.secretStatus ??= {};
+        payload.secretStatus.slskd = {
+          ...(payload.secretStatus.slskd ?? {}),
+          providerMode: 'external',
+          providerModeState: 'configured',
+        };
+        await route.fulfill({
+          body: JSON.stringify(payload),
+          contentType: 'application/json',
+          response,
+        });
+      });
+
+      await page.goto(`${baseUrl}/app/music-queue`, { waitUntil: 'domcontentloaded' });
+      const reviewPanel = page.locator('.music-queue-review');
+      const queueRow = page.locator('.music-queue-release-row').filter({ hasText: 'Geogaddi' });
+      const reviewButton = queueRow.getByRole('button', { name: 'Review quality choice' });
+      await reviewButton.click();
+      await reviewPanel.getByRole('heading', { name: /Geogaddi by Boards of Canada/ }).waitFor();
+
+      includesQueuedRows = false;
+      await page.getByRole('button', { exact: true, name: 'Refresh' }).click();
+      await reviewButton.waitFor({ state: 'detached' });
+      await reviewPanel.getByRole('heading', { name: /Geogaddi by Boards of Canada/ }).waitFor();
+      await reviewPanel.getByRole('button', { exact: true, name: 'Close' }).click();
+      await reviewPanel.waitFor({ state: 'detached' });
+
+      const pageHeading = page.locator('.music-queue-header').getByRole('heading', {
+        exact: true,
+        name: 'Music Queue',
+      });
+      await assertLocatorFocused(
+        pageHeading,
+        'Closing after a refresh removes every row should focus the persistent Music Queue heading.',
+      );
+      await assertVisibleFocusOutline(
+        pageHeading,
+        'The persistent Music Queue heading should expose a visible focus outline after the queue becomes empty.',
+      );
+      assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
+    }, { scenarioName: 'music_queue_release_close_empty_fallback' });
   });
 
   test('keeps direct release recovery local, actionable, and free of raw request details', {

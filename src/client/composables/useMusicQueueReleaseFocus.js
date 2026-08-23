@@ -28,6 +28,12 @@ function focusElement(element) {
   return true;
 }
 
+function resolveFocusTarget(targetOrResolver) {
+  return typeof targetOrResolver === 'function'
+    ? targetOrResolver()
+    : targetOrResolver;
+}
+
 /**
  * Coordinates focus around Music Queue's conditional, non-modal release
  * inspector. It deliberately waits for Vue's next render before focusing a
@@ -39,12 +45,20 @@ export function useMusicQueueReleaseFocus({
 } = {}) {
   const controller = createMusicQueueReleaseFocusController();
 
-  async function focusAfterRender(targetOrResolver) {
+  async function focusFirstAvailableAfterRender(candidates = []) {
     await nextTickFn();
-    const target = typeof targetOrResolver === 'function'
-      ? targetOrResolver()
-      : targetOrResolver;
-    return focusElementFn(target);
+
+    for (const candidate of candidates) {
+      if (focusElementFn(resolveFocusTarget(candidate))) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  async function focusAfterRender(targetOrResolver) {
+    return focusFirstAvailableAfterRender([targetOrResolver]);
   }
 
   async function focusDirectInspectorHeading({
@@ -79,10 +93,11 @@ export function useMusicQueueReleaseFocus({
   return {
     focusAfterRender,
     focusDirectInspectorHeading,
+    focusFirstAvailableAfterRender,
     getSelection: controller.getSelection,
     selectFromRow: controller.selectFromRow,
     shouldFocusDirectInspectorHeading: controller.shouldFocusDirectInspectorHeading,
     synchronizeRouteSelection: controller.synchronizeRouteSelection,
-    takeCloseFocusTarget: controller.takeCloseFocusTarget,
+    takeCloseFocusTargets: controller.takeCloseFocusTargets,
   };
 }

@@ -45,6 +45,20 @@ test('useMusicQueueReleaseFocus does not focus a disconnected close target', asy
   assert.equal(targetFocus.mock.callCount(), 0);
 });
 
+test('useMusicQueueReleaseFocus tries the queue heading when a row-close target is disconnected', async (t) => {
+  const disconnectedFocus = t.mock.fn();
+  const fallbackFocus = t.mock.fn();
+  const focus = useMusicQueueReleaseFocus({
+    nextTickFn: async () => {},
+  });
+  const disconnectedTarget = { focus: disconnectedFocus, isConnected: false };
+  const fallbackTarget = { focus: fallbackFocus };
+
+  assert.equal(await focus.focusFirstAvailableAfterRender([disconnectedTarget, fallbackTarget]), true);
+  assert.equal(disconnectedFocus.mock.callCount(), 0);
+  assert.equal(fallbackFocus.mock.callCount(), 1);
+});
+
 test('useMusicQueueReleaseFocus waits for a ready direct-route heading before recording focus', async (t) => {
   const focusElementFn = t.mock.fn(() => true);
   const focus = useMusicQueueReleaseFocus({
