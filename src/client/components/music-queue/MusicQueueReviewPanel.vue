@@ -65,6 +65,7 @@ const emit = defineEmits([
 ]);
 
 const detailsExpanded = ref(false);
+const headingElement = ref(null);
 const presentation = computed(() => buildMusicQueueReviewPresentation(props.review));
 const releaseActionFeedback = computed(() => buildMusicQueueReleaseActionFeedback(
   props.actionFeedback,
@@ -92,6 +93,12 @@ function getMatchActionState(match) {
 function isReleaseActionRunning(action) {
   return props.activeReleaseActionKey === `${props.review?.releaseId}:${action}`;
 }
+
+function getHeadingElement() {
+  return headingElement.value;
+}
+
+defineExpose({ getHeadingElement });
 </script>
 
 <template>
@@ -102,13 +109,13 @@ function isReleaseActionRunning(action) {
     :aria-busy="isLoading ? 'true' : undefined"
   >
     <div v-if="isLoading" class="music-queue-review__state" role="status" aria-atomic="true">
-      <h2>Loading release details</h2>
+      <h2 ref="headingElement" class="music-queue-review__heading" tabindex="-1">Loading release details</h2>
       <p>Getting the latest release status and available actions.</p>
       <button type="button" class="hx-btn" data-variant="ghost" @click="emit('close')">Close</button>
     </div>
 
     <div v-else-if="!review" class="music-queue-review__state">
-      <h2>Release details are unavailable</h2>
+      <h2 ref="headingElement" class="music-queue-review__heading" tabindex="-1">Release details are unavailable</h2>
       <p>Refresh the queue, then try opening this release again.</p>
       <button type="button" class="hx-btn" data-variant="ghost" @click="emit('close')">Close</button>
     </div>
@@ -117,7 +124,7 @@ function isReleaseActionRunning(action) {
       <div class="music-queue-review__header">
         <div>
           <p class="hx-eyebrow">Release details</p>
-          <h2>{{ review.heading }}</h2>
+          <h2 ref="headingElement" class="music-queue-review__heading" tabindex="-1">{{ review.heading }}</h2>
         </div>
         <button type="button" class="hx-btn" data-variant="ghost" @click="emit('close')">Close</button>
       </div>
@@ -357,6 +364,11 @@ function isReleaseActionRunning(action) {
 
 .music-queue-review__header h2 {
   margin: 0;
+}
+
+.music-queue-review__heading:focus {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 4px;
 }
 
 .music-queue-review__section {

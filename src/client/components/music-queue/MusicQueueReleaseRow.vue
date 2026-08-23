@@ -59,8 +59,8 @@ const routeActionLocation = computed(() => {
   });
 });
 
-function openReview() {
-  emit('open-review', props.release);
+function openReview(event) {
+  emit('open-review', props.release, event.currentTarget);
 }
 </script>
 

@@ -1,0 +1,78 @@
+/*
+ * Harmoniarr - Soulseek-native music library management
+ * Copyright (C) 2026 Harmoniarr Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+import { nextTick } from 'vue';
+import { createMusicQueueReleaseFocusController } from '../lib/music-queue-release-focus-controller.js';
+
+function focusElement(element) {
+  if (!element || typeof element.focus !== 'function' || element.isConnected === false) {
+    return false;
+  }
+
+  element.focus();
+  return true;
+}
+
+/**
+ * Coordinates focus around Music Queue's conditional, non-modal release
+ * inspector. It deliberately waits for Vue's next render before focusing a
+ * target, so removed controls never retain the browser's focus.
+ */
+export function useMusicQueueReleaseFocus({
+  focusElementFn = focusElement,
+  nextTickFn = nextTick,
+} = {}) {
+  const controller = createMusicQueueReleaseFocusController();
+
+  async function focusAfterRender(targetOrResolver) {
+    await nextTickFn();
+    const target = typeof targetOrResolver === 'function'
+      ? targetOrResolver()
+      : targetOrResolver;
+    return focusElementFn(target);
+  }
+
+  async function focusDirectInspectorHeading({
+    headingResolver,
+    isLoading = false,
+    isReady = false,
+    releaseId,
+  } = {}) {
+    await nextTickFn();
+    const heading = headingResolver?.();
+    if (!heading || !controller.shouldFocusDirectInspectorHeading({
+      isLoading,
+      isReady,
+      releaseId,
+    })) {
+      return false;
+    }
+
+    return focusElementFn(heading);
+  }
+
+  return {
+    focusAfterRender,
+    focusDirectInspectorHeading,
+    getSelection: controller.getSelection,
+    selectFromRow: controller.selectFromRow,
+    shouldFocusDirectInspectorHeading: controller.shouldFocusDirectInspectorHeading,
+    synchronizeRouteSelection: controller.synchronizeRouteSelection,
+    takeCloseFocusTarget: controller.takeCloseFocusTarget,
+  };
+}

@@ -29,6 +29,10 @@ import {
   stabilizeVisualEvidencePage,
 } from '../../testing/browser/visual-evidence.js';
 import { installConfiguredMusicQueueProviderFixtures } from '../../testing/browser/music-queue-browser-fixtures.js';
+import {
+  assertLocatorFocused,
+  assertVisibleFocusOutline,
+} from '../../testing/browser/keyboard-accessibility-helpers.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 
 const integrationRuntimeConfig = resolveIntegrationTestRuntimeConfig();
@@ -474,6 +478,35 @@ suite('Music Queue release row hierarchy browser verification', () => {
         name: 'mobile-review-evidence',
         surface: 'music-queue-review',
       });
+      await reviewPanel.getByRole('button', { name: 'Close' }).click();
+      await reviewPanel.waitFor({ state: 'detached' });
+      await assertLocatorFocused(
+        reviewButton,
+        'Closing a row-opened release inspector should return focus to its row action.',
+      );
+
+      await page.goto(`${baseUrl}/app/music-queue/wanted-quality-stop`, { waitUntil: 'domcontentloaded' });
+      const directReleaseHeading = reviewPanel.getByRole('heading', { name: /Geogaddi by Boards of Canada/ });
+      await directReleaseHeading.waitFor();
+      await assertLocatorFocused(
+        directReleaseHeading,
+        'A direct Music Queue release URL should focus its loaded inspector heading.',
+      );
+      await assertVisibleFocusOutline(
+        directReleaseHeading,
+        'The direct Music Queue inspector heading should expose a visible focus outline.',
+      );
+      await reviewPanel.getByRole('button', { name: 'Close' }).click();
+      await reviewPanel.waitFor({ state: 'detached' });
+      const queueListHeading = page.getByRole('heading', { exact: true, name: 'Actions' });
+      await assertLocatorFocused(
+        queueListHeading,
+        'Closing a direct Music Queue release URL should focus the queue heading.',
+      );
+      await assertVisibleFocusOutline(
+        queueListHeading,
+        'The returned Music Queue heading should expose a visible focus outline.',
+      );
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
       const manifest = await evidence.writeManifest();
       assert.equal(manifest.captureCount, 6);

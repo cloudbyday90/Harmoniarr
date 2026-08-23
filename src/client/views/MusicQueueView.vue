@@ -34,6 +34,7 @@ import {
   MUSIC_QUEUE_STATE_FILTERS,
 } from '../lib/music-queue-filter-presentation.js';
 import { useMusicQueue } from '../composables/useMusicQueue.js';
+import { useMusicQueueReleaseFocus } from '../composables/useMusicQueueReleaseFocus.js';
 import { useMusicQueueReleaseDetail } from '../composables/useMusicQueueReleaseDetail.js';
 import { useMusicQueueProviderRepairContext } from '../composables/useMusicQueueProviderRepairContext.js';
 import { useConfirm } from '../composables/useConfirm.js';
@@ -116,6 +117,9 @@ const selectedReleaseType = ref('all');
 const selectedReleaseId = ref(requestedReleaseId.value);
 const providerRecoveryVisibility = ref(null);
 const scopeStatusAnnouncement = ref('');
+const queueListHeadingElement = ref(null);
+const reviewPanelElement = ref(null);
+const musicQueueReleaseFocus = useMusicQueueReleaseFocus();
 
 const releaseTypeFilters = computed(() => buildMusicQueueReleaseTypeFilters(releases.value));
 const scopeFilters = computed(() => buildMusicQueueScopeFilters(releases.value));
@@ -167,7 +171,8 @@ const matchReview = computed(() => buildMusicQueueMatchReview(selectedRelease.va
 const musicQueueWorkspace = computed(() => buildMusicQueueWorkspacePresentation(selectedReleaseId.value));
 const musicQueueErrorMessage = computed(() => errorMessage.value || releaseDetailErrorMessage.value);
 
-function openReview(release) {
+function openReview(release, trigger) {
+  musicQueueReleaseFocus.selectFromRow({ releaseId: release.id, trigger });
   selectedReleaseId.value = release.id;
   if (route.name !== 'music-queue-release' || route.params.wantedReleaseId !== release.id) {
     void router.replace({ name: 'music-queue-release', params: { wantedReleaseId: release.id } });
@@ -175,7 +180,9 @@ function openReview(release) {
 }
 
 function closeReview() {
+  const focusTarget = musicQueueReleaseFocus.takeCloseFocusTarget(queueListHeadingElement.value);
   selectedReleaseId.value = null;
+  void musicQueueReleaseFocus.focusAfterRender(focusTarget);
   if (route.name === 'music-queue-release') {
     void router.replace({ name: 'music-queue' });
   }
@@ -306,7 +313,22 @@ watch(
   requestedReleaseId,
   (wantedReleaseId) => {
     selectedReleaseId.value = wantedReleaseId;
+    musicQueueReleaseFocus.synchronizeRouteSelection(wantedReleaseId);
   },
+  { immediate: true },
+);
+
+watch(
+  [requestedReleaseId, isReleaseDetailLoading, matchReview],
+  ([wantedReleaseId, detailIsLoading, review]) => {
+    void musicQueueReleaseFocus.focusDirectInspectorHeading({
+      headingResolver: () => reviewPanelElement.value?.getHeadingElement(),
+      isLoading: detailIsLoading,
+      isReady: Boolean(review) || !detailIsLoading,
+      releaseId: wantedReleaseId,
+    });
+  },
+  { flush: 'post' },
 );
 
 watch(releases, (updatedReleases) => {
@@ -365,7 +387,7 @@ watch(releases, (updatedReleases) => {
       <div class="music-queue-panel">
         <div class="music-queue-panel-header">
           <div>
-            <h2>{{ queueListHeading }}</h2>
+            <h2 ref="queueListHeadingElement" class="music-queue-panel-title" tabindex="-1">{{ queueListHeading }}</h2>
             <p class="music-queue-panel-status">{{ queueListStatus }}</p>
             <p v-if="queueListDetail" class="music-queue-panel-detail">{{ queueListDetail }}</p>
           </div>
@@ -459,6 +481,7 @@ watch(releases, (updatedReleases) => {
 
       <MusicQueueReviewPanel
         v-if="musicQueueWorkspace.hasReleaseInspector"
+        ref="reviewPanelElement"
         :action-feedback="actionFeedback"
         :active-match-action-key="activeMatchActionKey"
         :active-release-action-key="activeReleaseActionKey"
@@ -531,6 +554,11 @@ watch(releases, (updatedReleases) => {
 
 .music-queue-panel-header h2 {
   margin: 0;
+}
+
+.music-queue-panel-title:focus {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 4px;
 }
 
 .music-queue-panel-status,
