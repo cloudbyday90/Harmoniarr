@@ -26,6 +26,10 @@ import {
 } from '../../lib/settings-recovery-handoff.js';
 
 const props = defineProps({
+  inspectorId: {
+    default: null,
+    type: String,
+  },
   release: {
     required: true,
     type: Object,
@@ -110,7 +114,8 @@ function openReview() {
         type="button"
         class="hx-btn"
         data-variant="primary"
-        :aria-expanded="selected"
+        :aria-controls="selected ? inspectorId : undefined"
+        :aria-expanded="selected ? 'true' : undefined"
         @click="openReview"
       >
         {{ release.action.label }}
@@ -128,7 +133,8 @@ function openReview() {
         type="button"
         class="hx-btn"
         data-variant="ghost"
-        :aria-expanded="selected"
+        :aria-controls="selected ? inspectorId : undefined"
+        :aria-expanded="selected ? 'true' : undefined"
         @click="openReview"
       >
         Details

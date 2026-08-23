@@ -40,6 +40,14 @@ const props = defineProps({
     default: '',
     type: String,
   },
+  inspectorId: {
+    required: true,
+    type: String,
+  },
+  isLoading: {
+    default: false,
+    type: Boolean,
+  },
   review: {
     default: null,
     type: Object,
@@ -87,10 +95,22 @@ function isReleaseActionRunning(action) {
 </script>
 
 <template>
-  <aside class="music-queue-review" aria-label="Music Queue details">
-    <div v-if="!review" class="music-queue-review__empty">
-      <h2>Select a release</h2>
-      <p>Open details to see what Harmoniarr is doing or the next step it needs from you.</p>
+  <aside
+    :id="inspectorId"
+    class="music-queue-review"
+    aria-label="Music Queue release details"
+    :aria-busy="isLoading ? 'true' : undefined"
+  >
+    <div v-if="isLoading" class="music-queue-review__state" role="status" aria-atomic="true">
+      <h2>Loading release details</h2>
+      <p>Getting the latest release status and available actions.</p>
+      <button type="button" class="hx-btn" data-variant="ghost" @click="emit('close')">Close</button>
+    </div>
+
+    <div v-else-if="!review" class="music-queue-review__state">
+      <h2>Release details are unavailable</h2>
+      <p>Refresh the queue, then try opening this release again.</p>
+      <button type="button" class="hx-btn" data-variant="ghost" @click="emit('close')">Close</button>
     </div>
 
     <div v-else>
@@ -308,13 +328,24 @@ function isReleaseActionRunning(action) {
   background: var(--hx-bg-surface);
 }
 
-.music-queue-review__empty {
+.music-queue-review__state {
+  display: grid;
+  gap: var(--hx-space-2);
   padding: var(--hx-space-7) var(--hx-space-3);
   text-align: center;
 }
 
-.music-queue-review__empty p {
+.music-queue-review__state h2,
+.music-queue-review__state p {
+  margin: 0;
+}
+
+.music-queue-review__state p {
   color: var(--hx-text-muted);
+}
+
+.music-queue-review__state .hx-btn {
+  justify-self: center;
 }
 
 .music-queue-review__header {

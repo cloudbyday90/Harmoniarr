@@ -43,6 +43,7 @@ import {
   buildMusicQueueScopePresentation,
   MUSIC_QUEUE_DEFAULT_SCOPE,
 } from '../lib/music-queue-scope-presentation.js';
+import { buildMusicQueueWorkspacePresentation } from '../lib/music-queue-workspace-presentation.js';
 import {
   buildMusicQueueProviderRecoveryVisibility,
   isMusicQueueProviderReadyRecoveryContext,
@@ -163,6 +164,7 @@ const selectedRelease = computed(() => (
   ?? null
 ));
 const matchReview = computed(() => buildMusicQueueMatchReview(selectedRelease.value));
+const musicQueueWorkspace = computed(() => buildMusicQueueWorkspacePresentation(selectedReleaseId.value));
 const musicQueueErrorMessage = computed(() => errorMessage.value || releaseDetailErrorMessage.value);
 
 function openReview(release) {
@@ -347,7 +349,7 @@ watch(releases, (updatedReleases) => {
       {{ musicQueueErrorMessage }}
     </div>
 
-    <div v-if="isLoading || isReleaseDetailLoading" class="music-queue-panel">
+    <div v-if="isLoading" class="music-queue-panel">
       Loading Music Queue...
     </div>
 
@@ -355,7 +357,11 @@ watch(releases, (updatedReleases) => {
 
     <MusicQueueEmptyState v-else-if="!releases.length" />
 
-    <div v-else class="music-queue-layout">
+    <div
+      v-else
+      class="music-queue-layout"
+      :class="{ 'music-queue-layout--with-inspector': musicQueueWorkspace.hasReleaseInspector }"
+    >
       <div class="music-queue-panel">
         <div class="music-queue-panel-header">
           <div>
@@ -441,6 +447,7 @@ watch(releases, (updatedReleases) => {
           <MusicQueueReleaseRow
             v-for="release in filteredReleases"
             :key="release.id"
+            :inspector-id="musicQueueWorkspace.inspectorId"
             :release="release"
             :selected="selectedReleaseId === release.id"
             @open-review="openReview"
@@ -451,9 +458,12 @@ watch(releases, (updatedReleases) => {
       <p class="music-queue-status-announcement" role="status" aria-atomic="true">{{ scopeStatusAnnouncement }}</p>
 
       <MusicQueueReviewPanel
+        v-if="musicQueueWorkspace.hasReleaseInspector"
         :action-feedback="actionFeedback"
         :active-match-action-key="activeMatchActionKey"
         :active-release-action-key="activeReleaseActionKey"
+        :inspector-id="musicQueueWorkspace.inspectorId"
+        :is-loading="isReleaseDetailLoading"
         :review="matchReview"
         @add-to-library="handleAddToLibrary"
         @allow-fallback-quality="handleAllowFallbackQuality"
@@ -501,6 +511,10 @@ watch(releases, (updatedReleases) => {
   align-items: start;
   display: grid;
   gap: 20px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.music-queue-layout--with-inspector {
   grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
 }
 

@@ -360,6 +360,17 @@ suite('Music Queue release row hierarchy browser verification', () => {
       assert.equal(await secondaryFilters.isHidden(), true);
       await page.getByLabel('Show releases').selectOption('all');
 
+      const workspace = page.locator('.music-queue-layout');
+      const queuePanel = workspace.locator(':scope > .music-queue-panel');
+      const reviewPanel = page.locator('.music-queue-review');
+      assert.equal(await reviewPanel.count(), 0, 'The release list should not reserve an empty details inspector.');
+      assert.equal(
+        await workspace.evaluate((element) => globalThis.getComputedStyle(element).gridTemplateColumns.split(/\s+/u).length),
+        1,
+        'The unselected Music Queue should use one full-width list column.',
+      );
+      const fullWidthListPanel = await queuePanel.evaluate((element) => element.getBoundingClientRect().width);
+
       const rows = page.locator('.music-queue-release-row');
       const downloadingRow = rows.filter({ hasText: 'Child of God' });
       const qualityRow = rows.filter({ hasText: 'Geogaddi' });
@@ -405,9 +416,22 @@ suite('Music Queue release row hierarchy browser verification', () => {
       });
 
       await page.setViewportSize({ height: 1000, width: 1440 });
-      await qualityRow.getByRole('button', { name: 'Review quality choice' }).click();
-      const reviewPanel = page.locator('.music-queue-review');
+      const reviewButton = qualityRow.getByRole('button', { name: 'Review quality choice' });
+      await reviewButton.focus();
+      await reviewButton.press('Enter');
       await reviewPanel.getByRole('heading', { name: /Geogaddi by Boards of Canada/ }).waitFor();
+      assert.equal(
+        await reviewButton.evaluate((element) => globalThis.document.activeElement === element),
+        true,
+        'Opening release details should preserve focus on the action that opened them.',
+      );
+      assert.equal(await reviewButton.getAttribute('aria-controls'), 'music-queue-release-details');
+      assert.equal(await reviewButton.getAttribute('aria-expanded'), 'true');
+      assert.equal(await reviewPanel.getAttribute('id'), 'music-queue-release-details');
+      assert.ok(
+        await queuePanel.evaluate((element) => element.getBoundingClientRect().width) < fullWidthListPanel,
+        'The selected release inspector should use the second column only after a release is selected.',
+      );
       await reviewPanel.getByText('Current status', { exact: true }).waitFor();
       await reviewPanel.getByRole('heading', { name: 'Quality choice needed' }).waitFor();
       await reviewPanel.getByText('Next step:', { exact: false }).waitFor();
@@ -798,7 +822,7 @@ suite('Music Queue release row hierarchy browser verification', () => {
         { exact: true },
       ).waitFor();
       await reviewPanel.getByRole('button', { name: 'Close' }).click();
-      await reviewPanel.getByRole('heading', { name: 'Select a release' }).waitFor();
+      await reviewPanel.waitFor({ state: 'detached' });
       await releaseRow.getByText('Checking matches', { exact: true }).waitFor();
       await releaseRow.getByText('Up next', { exact: true }).waitFor();
       await stabilizeVisualEvidencePage(page);

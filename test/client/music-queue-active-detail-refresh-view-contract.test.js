@@ -30,3 +30,11 @@ test('Music Queue refreshes an already authorized selected detail from the queue
   assert.match(source, /updatedReleases\.find\(\(release\) => release\.id === wantedReleaseId\)/);
   assert.match(source, /applyReleaseDetail\(refreshedRelease\)/);
 });
+
+test('Music Queue keeps the release list visible while selected details load', async () => {
+  const source = await readFile(VIEW_PATH, 'utf8');
+
+  assert.doesNotMatch(source, /v-if="isLoading \|\| isReleaseDetailLoading"/);
+  assert.match(source, /v-if="musicQueueWorkspace\.hasReleaseInspector"/);
+  assert.match(source, /:is-loading="isReleaseDetailLoading"/);
+});
