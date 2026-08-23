@@ -42,12 +42,35 @@ function createDeterministicSimilarArtists(artistMbid) {
   }));
 }
 
-export function createCacheBackedArtistDetailSampleServices({ cacheService, providerCalls }) {
+function normalizeBeforeProviderCall(beforeProviderCall) {
+  if (beforeProviderCall == null) {
+    return async () => {};
+  }
+
+  if (typeof beforeProviderCall !== 'function') {
+    throw new TypeError('beforeProviderCall must be a function when provided');
+  }
+
+  return beforeProviderCall;
+}
+
+/**
+ * Creates deterministic cache-backed providers for Artist Detail integration
+ * tests. `beforeProviderCall` provides a test-only synchronization boundary
+ * for exercising concurrent requests without contacting a live provider.
+ */
+export function createCacheBackedArtistDetailSampleServices({
+  beforeProviderCall,
+  cacheService,
+  providerCalls,
+}) {
+  const waitBeforeProviderCall = normalizeBeforeProviderCall(beforeProviderCall);
   const musicBrainzCatalogService = createMusicBrainzCatalogService({
     metadataProviderCacheService: cacheService,
     musicBrainzClient: {
       async browseArtistReleaseGroups({ artistId, offset }) {
         providerCalls.discography += 1;
+        await waitBeforeProviderCall('discography');
         return {
           'release-group-count': 1,
           'release-groups': [{
@@ -65,6 +88,7 @@ export function createCacheBackedArtistDetailSampleServices({ cacheService, prov
     lastFmClient: {
       async getSimilarArtists() {
         providerCalls.lastFm += 1;
+        await waitBeforeProviderCall('lastFm');
         return [];
       },
     },
@@ -74,6 +98,7 @@ export function createCacheBackedArtistDetailSampleServices({ cacheService, prov
       },
       async getSimilarArtists({ mbid }) {
         providerCalls.listenBrainz += 1;
+        await waitBeforeProviderCall('listenBrainz');
         return createDeterministicSimilarArtists(mbid);
       },
     },
@@ -81,6 +106,7 @@ export function createCacheBackedArtistDetailSampleServices({ cacheService, prov
     musicBrainzClient: {
       async lookupArtistRelations() {
         providerCalls.musicBrainzRelations += 1;
+        await waitBeforeProviderCall('musicBrainzRelations');
         return { relations: [] };
       },
       async searchArtists() {

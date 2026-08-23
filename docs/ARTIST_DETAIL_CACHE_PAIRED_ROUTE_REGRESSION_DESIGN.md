@@ -106,7 +106,10 @@ requests for one deterministic Artist Detail sample twice:
    deterministic provider call count remains unchanged at one.
 
 The new `npm run validate:artist-detail-cache-pair` command runs that focused
-proof serially. It passed with one test. `npm run validate` also passed,
+proof serially. Its sequential contract passed before the concurrent companion
+was added in
+[Artist Detail Cache Concurrent Route Regression](ARTIST_DETAIL_CACHE_CONCURRENT_ROUTE_REGRESSION_DESIGN.md).
+`npm run validate` also passed,
 including copyright, migration, schema, ESM, image, Compose-topology, lint,
 test-hygiene, the server/client/script/integration suites, and production
 builds.
@@ -117,7 +120,10 @@ changed. A Compose rebuild is not required for this test-only increment.
 
 ## Next Item
 
-No additional cache feature is recommended. Retain this paired-route command
-with the existing workload and lifecycle checks. If a future local paired
-sample fails, first add that measured cache namespace and phase to a focused
-regression before changing a TTL, stale window, retry policy, or UI behavior.
+The concurrent cold-request companion is now implemented in
+[Artist Detail Cache Concurrent Route Regression](ARTIST_DETAIL_CACHE_CONCURRENT_ROUTE_REGRESSION_DESIGN.md).
+No additional cache runtime feature is recommended. Retain the paired-route
+command with the existing workload and lifecycle checks. If a future local
+paired sample fails, first add that measured cache namespace and phase to a
+focused regression before changing a TTL, stale window, retry policy, or UI
+behavior.
