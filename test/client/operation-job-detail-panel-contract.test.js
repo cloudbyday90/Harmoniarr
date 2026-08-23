@@ -64,3 +64,13 @@ test('Operator Home add-artists tile is a neutral action, not a fake artist avat
   assert.match(source, /operator-home__discover-art svg/);
   assert.match(source, /Add more artists/);
 });
+
+test('Operator Home uses a bounded wide workspace and preserves a stacked fallback', async () => {
+  const source = await readFile(OPERATOR_HOME_PATH, 'utf8');
+
+  assert.match(source, /class="operator-home__workspace"/);
+  assert.match(source, /max-width:\s*2200px/);
+  assert.match(source, /@media \(min-width: 1400px\)/);
+  assert.match(source, /grid-template-columns:\s*minmax\(0, 7fr\) minmax\(22rem, 5fr\)/);
+  assert.match(source, /operator-home__artists-card:only-child/);
+});

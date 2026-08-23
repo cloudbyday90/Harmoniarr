@@ -312,6 +312,21 @@ npm run validate:release-contract
 
 The default Compose template should expose only the Harmoniarr HTTP port and should not publish embedded Postgres `5432`.
 
+### Supported topology
+
+The checked-in deployment and walkthrough are explicitly single-node:
+`harmoniarr` uses `deploy.mode: replicated` with `deploy.replicas: 1`. The
+container owns embedded PostgreSQL and host-backed writable state, so it is not
+safe to horizontally scale this service or point multiple containers at the
+same mounted paths. The repository validation and security gate reject a
+supported Compose file that drops or changes this contract.
+
+Do not use `docker compose up --scale harmoniarr=...` with this deployment.
+Before any multi-replica design, move the database and application state to an
+approved shared topology, establish the shared outbound network identity, and
+add a centrally coordinated MusicBrainz rate limiter. The current one-process
+metadata client queue is correct only for this supported single-node shape.
+
 Planned baseline shape:
 
 ```yaml
@@ -321,6 +336,9 @@ services:
       context: .
       dockerfile: Dockerfile
     image: ghcr.io/cloudbyday90/harmoniarr:0.1.0-beta
+    deploy:
+      mode: replicated
+      replicas: 1
     user: "${PUID:-1000}:${PGID:-1000}"
     read_only: true
     environment:

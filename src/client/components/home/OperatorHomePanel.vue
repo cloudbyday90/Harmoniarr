@@ -245,95 +245,105 @@ onBeforeUnmount(() => {
         :return-context="dashboardRecoveryContext"
       />
 
-      <MusicQueueProgressStrip
-        v-if="shouldShowMusicQueueProgress"
-        active-or-attention-only
-        :error-message="musicQueueErrorMessage"
-        :is-loading="isMusicQueueLoading"
-        :releases="musicQueueReleases"
-        release-details-only
-      />
+      <div class="operator-home__workspace">
+        <MusicQueueProgressStrip
+          v-if="shouldShowMusicQueueProgress"
+          active-or-attention-only
+          :error-message="musicQueueErrorMessage"
+          :is-loading="isMusicQueueLoading"
+          :releases="musicQueueReleases"
+          release-details-only
+        />
 
-      <article class="hx-card operator-home__artists-card">
-        <header class="hx-card-header">
-          <div>
-            <h2 class="hx-card-title">Monitored Artists</h2>
-            <p class="hx-card-subtitle">
-              Compact policy, coverage, and reconciliation state for the artists you manage.
-            </p>
+        <article class="hx-card operator-home__artists-card">
+          <header class="hx-card-header">
+            <div>
+              <h2 class="hx-card-title">Monitored Artists</h2>
+              <p class="hx-card-subtitle">
+                Compact policy, coverage, and reconciliation state for the artists you manage.
+              </p>
+            </div>
+          </header>
+
+          <div class="hx-card-body operator-home__controls">
+            <GridControls
+              :model-value="filterState"
+              :sort-options="SORT_OPTIONS"
+              :filter-groups="[]"
+              :is-default="isDefault"
+              :is-loading="isRevalidating || isResolvingArtistArtwork"
+              @clear-all="clearAll"
+              @update:model-value="updateState"
+            />
           </div>
-        </header>
 
-        <div class="hx-card-body operator-home__controls">
-          <GridControls
-            :model-value="filterState"
-            :sort-options="SORT_OPTIONS"
-            :filter-groups="[]"
-            :is-default="isDefault"
-            :is-loading="isRevalidating || isResolvingArtistArtwork"
-            @clear-all="clearAll"
-            @update:model-value="updateState"
-          />
-        </div>
-
-        <div
-          class="hx-card-body hx-card-body--flush"
-          :class="{ 'operator-home__grid--stale': isRevalidating }"
-        >
-          <ul
-            ref="artistsGrid"
-            class="hx-artwork-grid operator-home__grid"
-            role="list"
-            aria-label="Monitored artists"
+          <div
+            class="hx-card-body hx-card-body--flush"
+            :class="{ 'operator-home__grid--stale': isRevalidating }"
           >
-            <li v-for="projection in sortedArtists" :key="projection.artist?.id">
-              <OperatorArtistCard
-                :projection="projection"
-                :artwork="getArtistArtwork(projection.artist?.musicBrainzArtistId)"
-              />
-            </li>
+            <ul
+              ref="artistsGrid"
+              class="hx-artwork-grid operator-home__grid"
+              role="list"
+              aria-label="Monitored artists"
+            >
+              <li v-for="projection in sortedArtists" :key="projection.artist?.id">
+                <OperatorArtistCard
+                  :projection="projection"
+                  :artwork="getArtistArtwork(projection.artist?.musicBrainzArtistId)"
+                />
+              </li>
 
-            <li>
-              <RouterLink
-                :to="{ name: 'discover' }"
-                class="hx-media-card operator-home__discover-card"
-                aria-label="Add more artists from Discover"
-              >
-                <div
-                  class="hx-artwork hx-artwork--dashed operator-home__discover-art"
-                  aria-hidden="true"
+              <li>
+                <RouterLink
+                  :to="{ name: 'discover' }"
+                  class="hx-media-card operator-home__discover-card"
+                  aria-label="Add more artists from Discover"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.6"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
+                  <div
+                    class="hx-artwork hx-artwork--dashed operator-home__discover-art"
+                    aria-hidden="true"
                   >
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                </div>
-                <div class="hx-media-card__body">
-                  <p class="hx-media-card__title">Add more artists</p>
-                  <p class="hx-media-card__meta">Search Discover</p>
-                </div>
-              </RouterLink>
-            </li>
-          </ul>
-        </div>
-      </article>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.6"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                  </div>
+                  <div class="hx-media-card__body">
+                    <p class="hx-media-card__title">Add more artists</p>
+                    <p class="hx-media-card__meta">Search Discover</p>
+                  </div>
+                </RouterLink>
+              </li>
+            </ul>
+          </div>
+        </article>
+      </div>
     </template>
   </section>
 </template>
 
 <style scoped>
 .operator-home {
+  max-width: 2200px;
   display: grid;
   gap: var(--hx-space-5);
   align-content: start;
+}
+
+.operator-home__workspace {
+  display: grid;
+  gap: var(--hx-space-5);
+  align-items: start;
+  min-width: 0;
 }
 
 .operator-home__loading {
@@ -391,6 +401,20 @@ onBeforeUnmount(() => {
 .operator-home__discover-art svg {
   width: 40%;
   height: 40%;
+}
+
+/* Keep queue rows within a scan-friendly measure while allocating the
+   remaining wide-screen workspace to the artist management surface. */
+@media (min-width: 1400px) {
+  .operator-home__workspace {
+    grid-template-columns: minmax(0, 7fr) minmax(22rem, 5fr);
+  }
+
+  /* A dashboard with no active queue should let artist management use the
+     complete workspace instead of reserving an empty queue column. */
+  .operator-home__artists-card:only-child {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 640px) {

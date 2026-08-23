@@ -112,8 +112,11 @@ fallback still needs a bounded response design.
 The interactive related-artists response budget is now implemented as described
 in [Artist Detail Related-Artists Response
 Budget](ARTIST_DETAIL_RELATED_ARTISTS_RESPONSE_BUDGET.md). The next recommended
-item is to establish the production topology: determine whether more than one
-Harmoniarr process shares the same egress IP while performing metadata work. A
-centrally coordinated limiter is needed only for that topology; a single
-process continues to use the implemented shared client queue and bounded
-interactive response policy.
+item was to establish the production topology. The supported Compose shape is
+now explicitly one replica because it embeds PostgreSQL and owns host-backed
+mutable state; its validation gate is documented in [Single-Node Deployment
+Topology Gate](SINGLE_NODE_DEPLOYMENT_TOPOLOGY_DESIGN.md). A centrally
+coordinated limiter remains deferred until a deliberate shared-database,
+multi-replica deployment establishes a shared egress identity. The current
+single process continues to use the implemented shared client queue and
+bounded interactive response policy.
