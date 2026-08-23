@@ -82,6 +82,29 @@ export async function bootstrapAdminThroughUi(page, {
   await assertAuthenticatedLanding(page, username);
 }
 
+/**
+ * Dismisses the optional first-run setup view when a browser scenario needs
+ * the regular operator workspace. Tests that exercise onboarding leave it
+ * visible by simply not calling this helper.
+ *
+ * @returns {Promise<boolean>} Whether setup mode was visible and dismissed.
+ */
+export async function dismissSetupModeIfPresent(page) {
+  const dismissSetupModeButton = page.getByRole('button', { name: 'Hide setup mode' });
+
+  if (!await dismissSetupModeButton.isVisible()) {
+    return false;
+  }
+
+  await Promise.all([
+    waitForUrlMatch(page, /\/app(?:\?.*)?(?:#.*)?$/),
+    dismissSetupModeButton.click(),
+  ]);
+  await waitForHeading(page, 'Home');
+
+  return true;
+}
+
 export async function loginThroughUi(page, {
   baseUrl,
   password = 'BrowserPass123!',
