@@ -762,8 +762,23 @@ suite('Music Queue release row hierarchy browser verification', () => {
         0,
         'Raw provider failures must not be rendered in Music Queue.',
       );
-      await reviewPanel.getByRole('button', { exact: true, name: 'Try again' }).click();
+      const retryButton = reviewPanel.getByRole('button', { exact: true, name: 'Try again' });
+      await retryButton.focus();
+      await retryButton.press('Enter');
       await reviewPanel.getByRole('heading', { name: /Tomorrow's Harvest by Boards of Canada/ }).waitFor();
+      const retryOutcomeHeading = reviewPanel.locator('#music-queue-review-status');
+      await retryOutcomeHeading.waitFor();
+      await page.waitForFunction(() => (
+        globalThis.document.activeElement?.id === 'music-queue-review-status'
+      ));
+      await assertLocatorFocused(
+        retryOutcomeHeading,
+        'Retrying release details should focus the updated outcome when Try again is replaced.',
+      );
+      await assertVisibleFocusOutline(
+        retryOutcomeHeading,
+        'The retry outcome should show a visible focus outline after Try again is replaced.',
+      );
       assert.equal(retryRequestCount, 2, 'Try again should repeat only the selected release-detail request.');
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
     }, { scenarioName: 'music_queue_direct_release_recovery' });
@@ -1030,6 +1045,11 @@ suite('Music Queue release row hierarchy browser verification', () => {
       useMatchResponse.resolve();
       await statusFeedback.getByText('Updated', { exact: true }).waitFor();
       await statusFeedback.getByText('Match selected. Harmoniarr will use it for the next download step.', { exact: true }).waitFor();
+      assert.equal(
+        await useButtonFocusTarget.evaluate((element) => globalThis.document.activeElement === element),
+        true,
+        'A completed action that remains available should retain keyboard focus.',
+      );
       await stabilizeVisualEvidencePage(page);
       await evidence.capture(page, {
         description: 'A successful match action is announced inside the selected release review, not above the queue.',
@@ -1102,7 +1122,22 @@ suite('Music Queue release row hierarchy browser verification', () => {
 
       const reviewPanel = page.locator('.music-queue-review');
       const selectedMatchCard = reviewPanel.locator('.music-queue-review-match').filter({ hasText: 'Match 1' });
-      await selectedMatchCard.getByRole('button', { name: 'Use this match' }).click();
+      const useMatchButton = selectedMatchCard.getByRole('button', { name: 'Use this match' });
+      await useMatchButton.focus();
+      await useMatchButton.press('Enter');
+      const updatedOutcomeHeading = reviewPanel.getByRole('heading', { exact: true, name: 'Checking matches' });
+      await updatedOutcomeHeading.waitFor();
+      await page.waitForFunction(() => (
+        globalThis.document.activeElement?.id === 'music-queue-review-status'
+      ));
+      await assertLocatorFocused(
+        updatedOutcomeHeading,
+        'Selecting a match should focus the updated outcome when the invoked action is removed.',
+      );
+      await assertVisibleFocusOutline(
+        updatedOutcomeHeading,
+        'The updated outcome should show a visible focus outline after the match action is removed.',
+      );
       await page.getByLabel('Show releases').selectOption('in-progress');
       await releaseRow.getByText('Checking matches', { exact: true }).waitFor();
       await releaseRow.getByText('Up next', { exact: true }).waitFor();

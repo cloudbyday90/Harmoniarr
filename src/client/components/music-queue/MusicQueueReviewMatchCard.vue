@@ -49,14 +49,24 @@ watch(
   },
 );
 
-function useMatch() {
+function useMatch(event) {
   if (props.actionRunning) return;
-  emit('use-match', props.match);
+  emit('use-match', {
+    actionId: `use-match:${props.match.id}`,
+    match: props.match,
+    trigger: event.currentTarget,
+    wasFocused: globalThis.document?.activeElement === event.currentTarget,
+  });
 }
 
-function rejectMatch() {
+function rejectMatch(event) {
   if (props.actionRunning) return;
-  emit('reject-match', props.match);
+  emit('reject-match', {
+    actionId: `reject-match:${props.match.id}`,
+    match: props.match,
+    trigger: event.currentTarget,
+    wasFocused: globalThis.document?.activeElement === event.currentTarget,
+  });
 }
 </script>
 
@@ -88,6 +98,7 @@ function rejectMatch() {
         type="button"
         class="hx-btn"
         data-variant="primary"
+        :data-music-queue-action="`use-match:${match.id}`"
         :aria-disabled="Boolean(actionRunning)"
         @click="useMatch"
       >
@@ -98,6 +109,7 @@ function rejectMatch() {
         type="button"
         class="hx-btn"
         data-variant="ghost"
+        :data-music-queue-action="`reject-match:${match.id}`"
         :aria-disabled="Boolean(actionRunning)"
         @click="rejectMatch"
       >

@@ -72,6 +72,8 @@ const emit = defineEmits([
 
 const detailsExpanded = ref(false);
 const headingElement = ref(null);
+const outcomeHeadingElement = ref(null);
+const reviewPanelElement = ref(null);
 const presentation = computed(() => buildMusicQueueReviewPresentation(props.review));
 const releaseActionFeedback = computed(() => buildMusicQueueReleaseActionFeedback(
   props.actionFeedback,
@@ -115,11 +117,34 @@ function getHeadingElement() {
   return headingElement.value;
 }
 
-defineExpose({ getHeadingElement });
+function getOutcomeHeadingElement() {
+  return outcomeHeadingElement.value ?? headingElement.value;
+}
+
+function getActionElement(actionId) {
+  const normalizedActionId = typeof actionId === 'string' ? actionId.trim() : '';
+  if (!normalizedActionId) return null;
+
+  return [...(reviewPanelElement.value?.querySelectorAll('[data-music-queue-action]') ?? [])]
+    .find((element) => element.dataset.musicQueueAction === normalizedActionId)
+    ?? null;
+}
+
+function buildActionPayload(event, actionId) {
+  const trigger = event.currentTarget;
+  return {
+    actionId,
+    trigger,
+    wasFocused: globalThis.document?.activeElement === trigger,
+  };
+}
+
+defineExpose({ getActionElement, getHeadingElement, getOutcomeHeadingElement });
 </script>
 
 <template>
   <aside
+    ref="reviewPanelElement"
     :id="inspectorId"
     class="music-queue-review"
     aria-label="Music Queue release details"
@@ -143,7 +168,8 @@ defineExpose({ getHeadingElement });
           type="button"
           class="hx-btn"
           data-variant="primary"
-          @click="emit('retry')"
+          data-music-queue-action="retry-release-detail"
+          @click="emit('retry', buildActionPayload($event, 'retry-release-detail'))"
         >
           Try again
         </button>
@@ -168,7 +194,15 @@ defineExpose({ getHeadingElement });
 
       <section class="music-queue-review__section music-queue-review__outcome" aria-labelledby="music-queue-review-status">
         <p class="music-queue-review__label">Current status</p>
-        <h3 id="music-queue-review-status" :data-tone="review.statusTone">{{ review.statusLabel }}</h3>
+        <h3
+          id="music-queue-review-status"
+          ref="outcomeHeadingElement"
+          class="music-queue-review__outcome-heading"
+          :data-tone="review.statusTone"
+          tabindex="-1"
+        >
+          {{ review.statusLabel }}
+        </h3>
         <p v-if="!review.repair">{{ review.reason }}</p>
         <p v-if="!review.repair" class="music-queue-review__next-step"><strong>Next step:</strong> {{ presentation.decisionCopy }}</p>
         <div class="music-queue-review__feedback-live-region" aria-atomic="true" aria-live="polite">
@@ -225,8 +259,9 @@ defineExpose({ getHeadingElement });
             type="button"
             class="hx-btn"
             data-variant="primary"
+            data-music-queue-action="recheck-library-add"
             :disabled="Boolean(activeReleaseActionKey)"
-            @click="emit('recheck-library-add')"
+            @click="emit('recheck-library-add', buildActionPayload($event, 'recheck-library-add'))"
           >
             {{ isReleaseActionRunning('recheck-library-add') ? 'Checking...' : review.repair.actionLabel }}
           </button>
@@ -261,8 +296,9 @@ defineExpose({ getHeadingElement });
             type="button"
             class="hx-btn"
             data-variant="primary"
+            data-music-queue-action="add-to-library"
             :disabled="Boolean(activeReleaseActionKey)"
-            @click="emit('add-to-library')"
+            @click="emit('add-to-library', buildActionPayload($event, 'add-to-library'))"
           >
             {{ isReleaseActionRunning('add-to-library') ? 'Checking...' : 'Add to library' }}
           </button>
@@ -286,8 +322,9 @@ defineExpose({ getHeadingElement });
             type="button"
             class="hx-btn"
             data-variant="primary"
+            data-music-queue-action="allow-fallback-quality"
             :disabled="Boolean(activeReleaseActionKey)"
-            @click="emit('allow-fallback-quality')"
+            @click="emit('allow-fallback-quality', buildActionPayload($event, 'allow-fallback-quality'))"
           >
             {{ isReleaseActionRunning('allow-fallback-quality') ? 'Saving...' : review.fallbackQualityLabel }}
           </button>
@@ -296,8 +333,9 @@ defineExpose({ getHeadingElement });
             type="button"
             class="hx-btn"
             :data-variant="review.canAllowFallbackQuality ? 'ghost' : 'primary'"
+            data-music-queue-action="search-again"
             :disabled="Boolean(activeReleaseActionKey)"
-            @click="emit('search-again')"
+            @click="emit('search-again', buildActionPayload($event, 'search-again'))"
           >
             {{ isReleaseActionRunning('search-again') ? 'Queuing...' : review.searchAgainLabel }}
           </button>
@@ -426,6 +464,11 @@ defineExpose({ getHeadingElement });
 }
 
 .music-queue-review__heading:focus {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 4px;
+}
+
+.music-queue-review__outcome-heading:focus {
   outline: 2px solid var(--hx-accent);
   outline-offset: 4px;
 }

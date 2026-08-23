@@ -34,6 +34,7 @@ import {
 } from '../lib/music-queue-filter-presentation.js';
 import { useMusicQueue } from '../composables/useMusicQueue.js';
 import { useMusicQueueReleaseFocus } from '../composables/useMusicQueueReleaseFocus.js';
+import { useMusicQueueReleaseMutationFocus } from '../composables/useMusicQueueReleaseMutationFocus.js';
 import { useMusicQueueReleaseDetail } from '../composables/useMusicQueueReleaseDetail.js';
 import { useMusicQueueProviderRepairContext } from '../composables/useMusicQueueProviderRepairContext.js';
 import { useConfirm } from '../composables/useConfirm.js';
@@ -122,6 +123,7 @@ const musicQueueHeadingElement = ref(null);
 const queueListHeadingElement = ref(null);
 const reviewPanelElement = ref(null);
 const musicQueueReleaseFocus = useMusicQueueReleaseFocus();
+const musicQueueReleaseMutationFocus = useMusicQueueReleaseMutationFocus();
 
 const releaseTypeFilters = computed(() => buildMusicQueueReleaseTypeFilters(releases.value));
 const scopeFilters = computed(() => buildMusicQueueScopeFilters(releases.value));
@@ -206,8 +208,27 @@ function closeReview() {
   }
 }
 
-async function retryReleaseDetail() {
-  await loadReleaseDetail();
+async function runReleaseMutation({ actionId, trigger, wasFocused, mutation } = {}) {
+  const mutationId = musicQueueReleaseMutationFocus.startMutation({ trigger, wasFocused });
+
+  try {
+    await mutation?.();
+  } finally {
+    await musicQueueReleaseMutationFocus.focusAfterMutation({
+      actionResolver: () => reviewPanelElement.value?.getActionElement(actionId),
+      mutationId,
+      outcomeHeadingResolver: () => reviewPanelElement.value?.getOutcomeHeadingElement(),
+    });
+  }
+}
+
+async function retryReleaseDetail({ actionId, trigger, wasFocused } = {}) {
+  await runReleaseMutation({
+    actionId,
+    trigger,
+    wasFocused,
+    mutation: loadReleaseDetail,
+  });
 }
 
 function focusDirectInspectorHeading() {
@@ -243,54 +264,89 @@ async function refreshSelectedReleaseDetail(result) {
   await loadReleaseDetail();
 }
 
-async function handleUseMatch(match) {
-  const result = await useMatch({
-    matchId: match.matchId,
-    wantedReleaseId: selectedRelease.value?.id,
+async function handleUseMatch({ actionId, match, trigger, wasFocused } = {}) {
+  await runReleaseMutation({
+    actionId,
+    trigger,
+    wasFocused,
+    mutation: async () => {
+      const result = await useMatch({
+        matchId: match?.matchId,
+        wantedReleaseId: selectedRelease.value?.id,
+      });
+      if (result) {
+        await refreshSelectedReleaseDetail(result);
+      }
+    },
   });
-  if (result) {
-    await refreshSelectedReleaseDetail(result);
-  }
 }
 
-async function handleRejectMatch(match) {
-  const result = await rejectMatch({
-    matchId: match.matchId,
-    wantedReleaseId: selectedRelease.value?.id,
+async function handleRejectMatch({ actionId, match, trigger, wasFocused } = {}) {
+  await runReleaseMutation({
+    actionId,
+    trigger,
+    wasFocused,
+    mutation: async () => {
+      const result = await rejectMatch({
+        matchId: match?.matchId,
+        wantedReleaseId: selectedRelease.value?.id,
+      });
+      if (result) {
+        await refreshSelectedReleaseDetail(result);
+      }
+    },
   });
-  if (result) {
-    await refreshSelectedReleaseDetail(result);
-  }
 }
 
-async function handleSearchAgain() {
-  const result = await searchAgain({
-    wantedReleaseId: selectedRelease.value?.id,
+async function handleSearchAgain({ actionId, trigger, wasFocused } = {}) {
+  await runReleaseMutation({
+    actionId,
+    trigger,
+    wasFocused,
+    mutation: async () => {
+      const result = await searchAgain({
+        wantedReleaseId: selectedRelease.value?.id,
+      });
+      if (result) {
+        await refreshSelectedReleaseDetail(result);
+      }
+    },
   });
-  if (result) {
-    await refreshSelectedReleaseDetail(result);
-  }
 }
 
-async function handleAllowFallbackQuality() {
-  const result = await allowFallbackQuality({
-    wantedReleaseId: selectedRelease.value?.id,
+async function handleAllowFallbackQuality({ actionId, trigger, wasFocused } = {}) {
+  await runReleaseMutation({
+    actionId,
+    trigger,
+    wasFocused,
+    mutation: async () => {
+      const result = await allowFallbackQuality({
+        wantedReleaseId: selectedRelease.value?.id,
+      });
+      if (result) {
+        await refreshSelectedReleaseDetail(result);
+      }
+    },
   });
-  if (result) {
-    await refreshSelectedReleaseDetail(result);
-  }
 }
 
-async function handleRecheckLibraryAdd() {
-  const result = await recheckLibraryAdd({
-    wantedReleaseId: selectedRelease.value?.id,
+async function handleRecheckLibraryAdd({ actionId, trigger, wasFocused } = {}) {
+  await runReleaseMutation({
+    actionId,
+    trigger,
+    wasFocused,
+    mutation: async () => {
+      const result = await recheckLibraryAdd({
+        wantedReleaseId: selectedRelease.value?.id,
+      });
+      if (result) {
+        await refreshSelectedReleaseDetail(result);
+      }
+    },
   });
-  if (result) {
-    await refreshSelectedReleaseDetail(result);
-  }
 }
 
-async function handleAddToLibrary() {
+async function handleAddToLibrary({ actionId, trigger, wasFocused } = {}) {
   const release = selectedRelease.value;
   if (!release?.id) {
     return;
@@ -309,10 +365,17 @@ async function handleAddToLibrary() {
     return;
   }
 
-  const result = await addToLibrary({ wantedReleaseId: release.id });
-  if (result) {
-    await refreshSelectedReleaseDetail(result);
-  }
+  await runReleaseMutation({
+    actionId,
+    trigger,
+    wasFocused,
+    mutation: async () => {
+      const result = await addToLibrary({ wantedReleaseId: release.id });
+      if (result) {
+        await refreshSelectedReleaseDetail(result);
+      }
+    },
+  });
 }
 
 async function refreshMusicQueue() {
