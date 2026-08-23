@@ -163,6 +163,53 @@ test('Music Queue keeps working, success, and failure feedback scoped to the rel
   failingApp.unmount();
 });
 
+test('Music Queue ignores competing release mutations until the active action finishes', async (t) => {
+  const originalDocument = globalThis.document;
+  globalThis.document = {
+    addEventListener() {},
+    hidden: false,
+    removeEventListener() {},
+  };
+  t.after(() => {
+    globalThis.document = originalDocument;
+  });
+
+  const useMatchResponse = createDeferred();
+  const fetchMusicQueueReleases = t.mock.fn(async () => ({
+    pagination: { total: 0 },
+    releases: [],
+    summary: { counts: {}, total: 0 },
+  }));
+  const useMusicQueueMatch = t.mock.fn(() => useMatchResponse.promise);
+  const rejectMusicQueueMatch = t.mock.fn(async () => ({ ok: true }));
+  const { app, musicQueue } = mountMusicQueue({
+    fetchMusicQueueReleases,
+    rejectMusicQueueMatch,
+    useMusicQueueMatch,
+  });
+
+  const activeAction = musicQueue.useMatch({ matchId: 'match-1', wantedReleaseId: 'wanted-1' });
+  assert.equal(musicQueue.activeMutationWantedReleaseId.value, 'wanted-1');
+  assert.equal(await musicQueue.rejectMatch({ matchId: 'match-2', wantedReleaseId: 'wanted-1' }), null);
+  assert.equal(await musicQueue.searchAgain({ wantedReleaseId: 'wanted-1' }), null);
+  assert.equal(rejectMusicQueueMatch.mock.callCount(), 0);
+  assert.equal(useMusicQueueMatch.mock.callCount(), 1);
+  assert.deepEqual(musicQueue.actionFeedback.value, {
+    actionKey: 'wanted-1:match-1:use',
+    message: 'Using this match...',
+    phase: 'working',
+    wantedReleaseId: 'wanted-1',
+  });
+
+  useMatchResponse.resolve({ ok: true });
+  await activeAction;
+  assert.equal(musicQueue.activeMutationWantedReleaseId.value, '');
+
+  await musicQueue.rejectMatch({ matchId: 'match-2', wantedReleaseId: 'wanted-1' });
+  assert.equal(rejectMusicQueueMatch.mock.callCount(), 1);
+  app.unmount();
+});
+
 test('Music Queue applies an authoritative mutation release before its list revalidation finishes', async (t) => {
   const originalDocument = globalThis.document;
   globalThis.document = {

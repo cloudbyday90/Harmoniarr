@@ -988,6 +988,7 @@ suite('Music Queue release row hierarchy browser verification', () => {
       });
       const pageErrors = [];
       const useMatchResponse = createDeferred();
+      let alternateUseRequestCount = 0;
       page.on('pageerror', (error) => pageErrors.push(error.message));
       await bootstrapAdminThroughUi(page, { baseUrl });
       await browserContext.route(/\/api\/v1\/acquisition\/releases(?:\?.*)?$/, async (route) => {
@@ -999,6 +1000,13 @@ suite('Music Queue release row hierarchy browser verification', () => {
       await installMusicQueueReleaseDetailFixture(browserContext, buildMatchChoicePayload);
       await browserContext.route(/\/api\/v1\/acquisition\/releases\/wanted-match-choice\/matches\/match-choice-best\/use$/, async (route) => {
         await useMatchResponse.promise;
+        await route.fulfill({
+          body: JSON.stringify({ ok: true }),
+          contentType: 'application/json',
+        });
+      });
+      await browserContext.route(/\/api\/v1\/acquisition\/releases\/wanted-match-choice\/matches\/match-choice-alternate\/use$/, async (route) => {
+        alternateUseRequestCount += 1;
         await route.fulfill({
           body: JSON.stringify({ ok: true }),
           contentType: 'application/json',
@@ -1025,9 +1033,11 @@ suite('Music Queue release row hierarchy browser verification', () => {
 
       const reviewPanel = page.locator('.music-queue-review');
       const decisionCard = reviewPanel.locator('.music-queue-review-match').filter({ hasText: 'Match 1' });
+      const alternateDecisionCard = reviewPanel.locator('.music-queue-review-match').filter({ hasText: 'Match 2' });
       const useButton = decisionCard.getByRole('button', { name: 'Use this match' });
       const useButtonFocusTarget = decisionCard.locator('.music-queue-review-match__actions button').first();
       const rejectButton = decisionCard.getByRole('button', { name: 'Reject match' });
+      const alternateUseButton = alternateDecisionCard.getByRole('button', { name: 'Use this match' });
       const statusFeedback = reviewPanel.locator('.music-queue-review__action-feedback[role="status"]');
       const errorFeedback = reviewPanel.locator('.music-queue-review__action-feedback[role="alert"]');
       const useMatchRequest = page.waitForRequest((request) => request.url().endsWith(
@@ -1040,11 +1050,19 @@ suite('Music Queue release row hierarchy browser verification', () => {
       await statusFeedback.getByText('Working', { exact: true }).waitFor();
       await statusFeedback.getByText('Using this match...', { exact: true }).waitFor();
       assert.equal(await useButtonFocusTarget.evaluate((element) => globalThis.document.activeElement === element), true);
+      assert.equal(await useButtonFocusTarget.getAttribute('aria-disabled'), 'true');
+      assert.equal(await useButtonFocusTarget.getAttribute('aria-describedby'), 'music-queue-review-action-feedback');
+      assert.equal(await alternateUseButton.isDisabled(), true);
+      assert.equal(alternateUseRequestCount, 0);
       assert.equal(await page.locator('.music-queue-view > .hx-alert').filter({ hasText: 'Using this match...' }).count(), 0);
 
       useMatchResponse.resolve();
       await statusFeedback.getByText('Updated', { exact: true }).waitFor();
       await statusFeedback.getByText('Match selected. Harmoniarr will use it for the next download step.', { exact: true }).waitFor();
+      await page.waitForFunction(() => (
+        globalThis.document.querySelector('[data-music-queue-action="use-match:match-choice-alternate"]')
+          ?.disabled === false
+      ));
       assert.equal(
         await useButtonFocusTarget.evaluate((element) => globalThis.document.activeElement === element),
         true,

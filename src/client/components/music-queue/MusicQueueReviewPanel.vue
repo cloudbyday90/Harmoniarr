@@ -36,6 +36,10 @@ const props = defineProps({
     default: '',
     type: String,
   },
+  activeMutationWantedReleaseId: {
+    default: '',
+    type: String,
+  },
   activeReleaseActionKey: {
     default: '',
     type: String,
@@ -78,6 +82,9 @@ const presentation = computed(() => buildMusicQueueReviewPresentation(props.revi
 const releaseActionFeedback = computed(() => buildMusicQueueReleaseActionFeedback(
   props.actionFeedback,
   props.review?.releaseId,
+));
+const isReleaseMutationRunning = computed(() => (
+  props.activeMutationWantedReleaseId === props.review?.releaseId
 ));
 const repairSettingsLocation = computed(() => {
   const routeName = props.review?.repair?.settingsRouteName;
@@ -208,6 +215,7 @@ defineExpose({ getActionElement, getHeadingElement, getOutcomeHeadingElement });
         <div class="music-queue-review__feedback-live-region" aria-atomic="true" aria-live="polite">
           <p
             v-if="releaseActionFeedback && releaseActionFeedback.role === 'status'"
+            id="music-queue-review-action-feedback"
             class="music-queue-review__action-feedback"
             :data-tone="releaseActionFeedback.tone"
             role="status"
@@ -219,6 +227,7 @@ defineExpose({ getActionElement, getHeadingElement, getOutcomeHeadingElement });
         <div class="music-queue-review__feedback-live-region" aria-atomic="true" aria-live="assertive">
           <p
             v-if="releaseActionFeedback && releaseActionFeedback.role === 'alert'"
+            id="music-queue-review-action-feedback"
             class="music-queue-review__action-feedback"
             :data-tone="releaseActionFeedback.tone"
             role="alert"
@@ -239,8 +248,10 @@ defineExpose({ getActionElement, getHeadingElement, getOutcomeHeadingElement });
             v-for="match in presentation.decisionMatchCards"
             :key="match.id"
             :action-running="getMatchActionState(match)"
+            :actions-blocked="isReleaseMutationRunning"
             :match="match"
             show-actions
+            unavailable-description-id="music-queue-review-action-feedback"
             @reject-match="emit('reject-match', $event)"
             @use-match="emit('use-match', $event)"
           />
@@ -260,7 +271,7 @@ defineExpose({ getActionElement, getHeadingElement, getOutcomeHeadingElement });
             class="hx-btn"
             data-variant="primary"
             data-music-queue-action="recheck-library-add"
-            :disabled="Boolean(activeReleaseActionKey)"
+            :disabled="isReleaseMutationRunning"
             @click="emit('recheck-library-add', buildActionPayload($event, 'recheck-library-add'))"
           >
             {{ isReleaseActionRunning('recheck-library-add') ? 'Checking...' : review.repair.actionLabel }}
@@ -297,7 +308,7 @@ defineExpose({ getActionElement, getHeadingElement, getOutcomeHeadingElement });
             class="hx-btn"
             data-variant="primary"
             data-music-queue-action="add-to-library"
-            :disabled="Boolean(activeReleaseActionKey)"
+            :disabled="isReleaseMutationRunning"
             @click="emit('add-to-library', buildActionPayload($event, 'add-to-library'))"
           >
             {{ isReleaseActionRunning('add-to-library') ? 'Checking...' : 'Add to library' }}
@@ -323,7 +334,7 @@ defineExpose({ getActionElement, getHeadingElement, getOutcomeHeadingElement });
             class="hx-btn"
             data-variant="primary"
             data-music-queue-action="allow-fallback-quality"
-            :disabled="Boolean(activeReleaseActionKey)"
+            :disabled="isReleaseMutationRunning"
             @click="emit('allow-fallback-quality', buildActionPayload($event, 'allow-fallback-quality'))"
           >
             {{ isReleaseActionRunning('allow-fallback-quality') ? 'Saving...' : review.fallbackQualityLabel }}
@@ -334,7 +345,7 @@ defineExpose({ getActionElement, getHeadingElement, getOutcomeHeadingElement });
             class="hx-btn"
             :data-variant="review.canAllowFallbackQuality ? 'ghost' : 'primary'"
             data-music-queue-action="search-again"
-            :disabled="Boolean(activeReleaseActionKey)"
+            :disabled="isReleaseMutationRunning"
             @click="emit('search-again', buildActionPayload($event, 'search-again'))"
           >
             {{ isReleaseActionRunning('search-again') ? 'Queuing...' : review.searchAgainLabel }}

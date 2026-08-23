@@ -74,6 +74,7 @@ const musicQueueRecoveryContext = computed(() => createSettingsRecoveryContext({
 const {
   actionFeedback,
   activeMatchActionKey,
+  activeMutationWantedReleaseId,
   activeReleaseActionKey,
   addToLibrary,
   allowFallbackQuality,
@@ -563,6 +564,7 @@ watch(releases, (updatedReleases) => {
         ref="reviewPanelElement"
         :action-feedback="actionFeedback"
         :active-match-action-key="activeMatchActionKey"
+        :active-mutation-wanted-release-id="activeMutationWantedReleaseId"
         :active-release-action-key="activeReleaseActionKey"
         :inspector-id="musicQueueWorkspace.inspectorId"
         :is-loading="isReleaseDetailLoading"

@@ -30,6 +30,7 @@ import {
 import { buildMusicQueueSummaryCards, normalizeMusicQueueRelease } from '../lib/acquisition-pipeline-presentation.js';
 import { getErrorMessage } from '../lib/error-utils.js';
 import { createMusicQueueActionFeedback } from '../lib/music-queue-action-feedback-presentation.js';
+import { createMusicQueueReleaseMutationGate } from '../lib/music-queue-release-mutation-gate.js';
 import {
   isMusicQueueActiveProgressRelease,
   MUSIC_QUEUE_ACTIVE_PROGRESS_STATUSES,
@@ -64,8 +65,10 @@ export function useMusicQueue({
 } = {}) {
   const actionFeedback = ref(null);
   const activeMatchActionKey = ref('');
+  const activeMutationWantedReleaseId = ref('');
   const activeReleaseActionKey = ref('');
   const hasArtistScope = metadataArtistId !== null;
+  const releaseMutationGate = createMusicQueueReleaseMutationGate();
 
   function getMetadataArtistId() {
     const value = toValue(metadataArtistId);
@@ -141,6 +144,20 @@ export function useMusicQueue({
     });
   }
 
+  function acquireReleaseMutation(wantedReleaseId) {
+    if (!releaseMutationGate.acquire(wantedReleaseId)) {
+      return false;
+    }
+
+    activeMutationWantedReleaseId.value = releaseMutationGate.getActiveWantedReleaseId();
+    return true;
+  }
+
+  function releaseReleaseMutation(wantedReleaseId) {
+    releaseMutationGate.release(wantedReleaseId);
+    activeMutationWantedReleaseId.value = releaseMutationGate.getActiveWantedReleaseId();
+  }
+
   async function runMatchAction({
     actionKey,
     apiFn,
@@ -150,6 +167,10 @@ export function useMusicQueue({
     wantedReleaseId,
   }) {
     if (!wantedReleaseId || !matchId) {
+      return null;
+    }
+
+    if (!acquireReleaseMutation(wantedReleaseId)) {
       return null;
     }
 
@@ -172,6 +193,7 @@ export function useMusicQueue({
       return null;
     } finally {
       activeMatchActionKey.value = '';
+      releaseReleaseMutation(wantedReleaseId);
     }
   }
 
@@ -199,6 +221,10 @@ export function useMusicQueue({
 
   async function searchAgain({ wantedReleaseId } = {}) {
     if (!wantedReleaseId) {
+      return null;
+    }
+
+    if (!acquireReleaseMutation(wantedReleaseId)) {
       return null;
     }
 
@@ -236,11 +262,16 @@ export function useMusicQueue({
       return null;
     } finally {
       activeReleaseActionKey.value = '';
+      releaseReleaseMutation(wantedReleaseId);
     }
   }
 
   async function allowFallbackQuality({ wantedReleaseId } = {}) {
     if (!wantedReleaseId) {
+      return null;
+    }
+
+    if (!acquireReleaseMutation(wantedReleaseId)) {
       return null;
     }
 
@@ -276,11 +307,16 @@ export function useMusicQueue({
       return null;
     } finally {
       activeReleaseActionKey.value = '';
+      releaseReleaseMutation(wantedReleaseId);
     }
   }
 
   async function recheckLibraryAdd({ wantedReleaseId } = {}) {
     if (!wantedReleaseId) {
+      return null;
+    }
+
+    if (!acquireReleaseMutation(wantedReleaseId)) {
       return null;
     }
 
@@ -324,11 +360,16 @@ export function useMusicQueue({
       return null;
     } finally {
       activeReleaseActionKey.value = '';
+      releaseReleaseMutation(wantedReleaseId);
     }
   }
 
   async function addToLibrary({ wantedReleaseId } = {}) {
     if (!wantedReleaseId) {
+      return null;
+    }
+
+    if (!acquireReleaseMutation(wantedReleaseId)) {
       return null;
     }
 
@@ -370,6 +411,7 @@ export function useMusicQueue({
       return null;
     } finally {
       activeReleaseActionKey.value = '';
+      releaseReleaseMutation(wantedReleaseId);
     }
   }
 
@@ -377,6 +419,7 @@ export function useMusicQueue({
     ...resource,
     actionFeedback: readonly(actionFeedback),
     activeMatchActionKey: readonly(activeMatchActionKey),
+    activeMutationWantedReleaseId: readonly(activeMutationWantedReleaseId),
     activeReleaseActionKey: readonly(activeReleaseActionKey),
     addToLibrary,
     allowFallbackQuality,

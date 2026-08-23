@@ -25,6 +25,10 @@ const props = defineProps({
     default: '',
     type: String,
   },
+  actionsBlocked: {
+    default: false,
+    type: Boolean,
+  },
   match: {
     required: true,
     type: Object,
@@ -32,6 +36,10 @@ const props = defineProps({
   showActions: {
     default: false,
     type: Boolean,
+  },
+  unavailableDescriptionId: {
+    default: '',
+    type: String,
   },
 });
 
@@ -41,6 +49,7 @@ const detailsExpanded = ref(false);
 const presentation = computed(() => buildMusicQueueMatchCardPresentation(props.match, {
   isDecision: props.showActions,
 }));
+const areActionsUnavailable = computed(() => props.actionsBlocked || Boolean(props.actionRunning));
 
 watch(
   () => [props.match?.id, props.showActions],
@@ -50,7 +59,7 @@ watch(
 );
 
 function useMatch(event) {
-  if (props.actionRunning) return;
+  if (areActionsUnavailable.value) return;
   emit('use-match', {
     actionId: `use-match:${props.match.id}`,
     match: props.match,
@@ -60,13 +69,21 @@ function useMatch(event) {
 }
 
 function rejectMatch(event) {
-  if (props.actionRunning) return;
+  if (areActionsUnavailable.value) return;
   emit('reject-match', {
     actionId: `reject-match:${props.match.id}`,
     match: props.match,
     trigger: event.currentTarget,
     wasFocused: globalThis.document?.activeElement === event.currentTarget,
   });
+}
+
+function isActionRunning(action) {
+  return props.actionRunning === action;
+}
+
+function isActionNativelyDisabled(action) {
+  return areActionsUnavailable.value && !isActionRunning(action);
 }
 </script>
 
@@ -99,7 +116,9 @@ function rejectMatch(event) {
         class="hx-btn"
         data-variant="primary"
         :data-music-queue-action="`use-match:${match.id}`"
-        :aria-disabled="Boolean(actionRunning)"
+        :aria-describedby="isActionRunning('use') ? unavailableDescriptionId || undefined : undefined"
+        :aria-disabled="isActionRunning('use') || undefined"
+        :disabled="isActionNativelyDisabled('use')"
         @click="useMatch"
       >
         {{ actionRunning === 'use' ? 'Selecting...' : 'Use this match' }}
@@ -110,7 +129,9 @@ function rejectMatch(event) {
         class="hx-btn"
         data-variant="ghost"
         :data-music-queue-action="`reject-match:${match.id}`"
-        :aria-disabled="Boolean(actionRunning)"
+        :aria-describedby="isActionRunning('reject') ? unavailableDescriptionId || undefined : undefined"
+        :aria-disabled="isActionRunning('reject') || undefined"
+        :disabled="isActionNativelyDisabled('reject')"
         @click="rejectMatch"
       >
         {{ actionRunning === 'reject' ? 'Rejecting...' : 'Reject match' }}
@@ -230,6 +251,11 @@ function rejectMatch(event) {
 
 .music-queue-review-match__actions button[aria-disabled='true'] {
   cursor: wait;
+  opacity: 0.65;
+}
+
+.music-queue-review-match__actions button:disabled {
+  cursor: not-allowed;
   opacity: 0.65;
 }
 
