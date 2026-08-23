@@ -287,6 +287,38 @@ test('useArtistDetail resolves the critical path before related-artist enrichmen
   assert.equal(relatedArtists.value[0].name, 'Portishead');
 });
 
+test('useArtistDetail defers related-provider work until a cold Discography load settles', async () => {
+  const discographyDeferred = createDeferred();
+  const callOrder = [];
+  const { loadArtistDetail } = useArtistDetail({
+    resolveLocal: createLocalDouble({ throws: Object.assign(new Error('Not Found'), { status: 404 }) }),
+    browseReleaseGroups: async () => {
+      callOrder.push('discography');
+      return discographyDeferred.promise;
+    },
+    fetchSimilar: async () => {
+      callOrder.push('related');
+      return { similar: [makeSimilar()] };
+    },
+  });
+
+  const loading = loadArtistDetail('mb-1');
+  await flushAsyncWork();
+
+  assert.deepEqual(callOrder, ['discography']);
+
+  discographyDeferred.resolve({
+    limit: 100,
+    offset: 0,
+    results: [makeReleaseGroup({ id: 'cold-discography-rg' })],
+    total: 1,
+  });
+  await loading;
+  await flushAsyncWork();
+
+  assert.deepEqual(callOrder, ['discography', 'related']);
+});
+
 test('useArtistDetail loads operator projection for local artist detail', async (t) => {
   const fetchOperatorProjection = t.mock.fn(createOperatorProjectionDouble());
   const { operator, projection, loadArtistDetail } = useArtistDetail({

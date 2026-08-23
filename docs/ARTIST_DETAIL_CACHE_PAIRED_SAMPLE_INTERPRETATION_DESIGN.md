@@ -151,13 +151,15 @@ Validation completed successfully on 2026-08-22:
 
 ## Next Item
 
-Run one fresh-administrator, same-process real-provider pair in Metadata:
+The fresh-administrator real-provider pair is complete. It proved the
+Discography namespace progresses from a cold fill to a fresh cache read, and
+identified a distinct priority inversion that has now been corrected without
+altering SWR lifetimes. The remaining observed work is scoped to
+`artist_detail.similar_artists`: its cold refresh can exhaust the related-
+artists response budget and therefore is not persisted.
 
-1. Load diagnostics and mark the comparison start.
-2. Open one ordinary Artist Detail Discography or related-artists flow through
-   the existing shared provider client.
-3. Refresh diagnostics, act on the bounded reading, and copy only the
-   sanitized aggregate if an approved incident record needs it.
-4. Add a focused regression for the observed namespace and phase before
-   changing cache TTLs, stale windows, provider retries, or deployment
-   topology.
+Add a focused related-artists service regression for this response-budget
+outcome before changing its timeout, cacheability decision, retry count, or
+the shared MusicBrainz client policy. See [Artist Detail Provider-Priority
+Hydration](ARTIST_DETAIL_PROVIDER_PRIORITY_HYDRATION_DESIGN.md) for the
+validated design and aggregate evidence.

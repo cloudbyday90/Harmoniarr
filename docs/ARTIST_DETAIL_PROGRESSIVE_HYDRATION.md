@@ -42,8 +42,9 @@ The critical path is:
    groups are absent or the artist is not local.
 4. Let the existing artwork composable hydrate from the released groups.
 
-Related artists are an optional fifth step. They should start promptly, but
-must not control the page-level loader.
+Related artists are an optional fifth step. They must start only after the
+critical path settles, so their provider fanout cannot control the page-level
+loader or pre-empt the shared provider client that serves Discography.
 
 An empty `operator.releaseGroups` list is not treated as proof that the
 artist's real discography is empty. It can simply mean the local catalog has
@@ -120,6 +121,9 @@ metadata cache.
   resolve, operator projection, catalog fallback, and request lifecycle.
 - `useArtistDetailRelatedArtists.js` owns the optional related-artist request,
   result, error, dedicated loading state, and local response token.
+- Related-artists hydration begins after the critical path clears its loading
+  state. This preserves progressive rendering while giving the server-side
+  MusicBrainz client queue to the SWR-backed Discography browse first.
 - `latest-request-gate.js` continues to provide `AbortController`-backed
   cancellation for the route's active request.
 - `ArtistDetailView.vue` renders the full-page loader for critical data only,
@@ -189,3 +193,19 @@ Implemented and validated on 2026-08-22.
 - The complete `npm run validate` contract passed with the locally applied
   Dependabot PR #36 dependency updates and the Node 24 LTS policy.
 - `npm run validate:security` reported zero npm audit vulnerabilities.
+
+## Priority-Hydration Follow-up
+
+The subsequent live fresh-admin cache pair exposed a provider-priority
+inversion: the optional related-artists fanout started before an unimported
+artist's cold Discography browse. Both paths share the server-side MusicBrainz
+client, so the response-budgeted related request could consume the queue and
+record a scoped refresh failure while the critical view remained on its full
+page loader.
+
+The follow-up keeps the same modular boundaries but starts related-artists
+hydration only after the local/projection/Discography path has settled. The
+focused regression proves a cold provider-backed Discography request begins
+before the optional related call. See
+[Artist Detail Provider-Priority Hydration](ARTIST_DETAIL_PROVIDER_PRIORITY_HYDRATION_DESIGN.md)
+for the current evidence, source review, and outcome.

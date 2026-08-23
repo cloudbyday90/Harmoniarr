@@ -40,8 +40,9 @@ import { useArtistDetailRelatedArtists } from './useArtistDetailRelatedArtists.j
  * 2. Operator projection (fetchOperatorArtistProjection): canonical policy,
  *    selection, override, and local release-group state for imported artists.
  * 3. MusicBrainz release-group browse: fallback raw discography.
- * 4. Related artists: a non-critical enhancement which starts in parallel but
- *    never keeps the critical artist/discography path in a loading state.
+ * 4. Related artists: a non-critical enhancement which begins after the
+ *    critical path settles, so it cannot pre-empt a provider-backed
+ *    Discography request in the shared server-side client queue.
  *
  * Exposes cache setters so parent views can update monitoring or the operator
  * projection after successful mutations without triggering a full reload.
@@ -119,11 +120,6 @@ export function useArtistDetail({
     projection.value = null;
     releaseGroups.value = [];
     discographyCache.value = null;
-    void loadRelatedArtists(mbid, {
-      isCurrent: request.isCurrent,
-      signal: requestSignal,
-    });
-
     let localPayload = null;
     try {
       localPayload = await resolveLocal(mbid, { signal: requestSignal });
@@ -218,8 +214,17 @@ export function useArtistDetail({
         releaseGroups.value = [];
       }
     } finally {
-      if (request.isCurrent()) {
+      if (request.isCurrent() && !requestSignal?.aborted) {
         isLoading.value = false;
+        // Related artists are intentionally lower priority than the critical
+        // local/projection/discography path. Starting this expensive provider
+        // fanout afterwards avoids consuming the shared MusicBrainz request
+        // queue and response budget before Discography has a chance to read
+        // its SWR cache or complete a cold fill.
+        void loadRelatedArtists(mbid, {
+          isCurrent: request.isCurrent,
+          signal: requestSignal,
+        });
       }
     }
   }
