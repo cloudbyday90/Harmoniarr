@@ -19,106 +19,20 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { applyPendingMigrations } from '../../src/server/migrations.js';
-import { createMetadataProviderCacheObservabilityService } from '../../src/server/metadata/metadata-provider-cache-observability-service.js';
-import { createMetadataProviderCacheService } from '../../src/server/metadata/metadata-provider-cache-service.js';
 import {
   metadataProviderCacheNamespaces,
 } from '../../src/server/metadata/metadata-provider-cache-policy.js';
 import { createMetadataProviderResponseCacheStore } from '../../src/server/metadata/metadata-provider-response-cache-store.js';
-import { createMusicBrainzCatalogService } from '../../src/server/metadata/musicbrainz-catalog-service.js';
-import { createSimilarArtistsService } from '../../src/server/metadata/similar-artists-service.js';
 import { artistDetailCacheSampleCatalog } from '../../testing/metadata/artist-detail-cache-sample-catalog.js';
 import { runArtistDetailCacheSampleWorkload } from '../../testing/metadata/artist-detail-cache-sample-workload.js';
+import {
+  createArtistDetailCacheSampleProviderCalls,
+  createCacheBackedArtistDetailSampleServices,
+  createObservedArtistDetailCacheService,
+} from '../../testing/metadata/artist-detail-cache-sample-workload-fixtures.js';
 import { withDockerizedPostgresDatabase } from '../../testing/postgres-docker-database.js';
 
 const expectedSampleCount = artistDetailCacheSampleCatalog.length;
-
-function createProviderCalls() {
-  return {
-    discography: 0,
-    lastFm: 0,
-    listenBrainz: 0,
-    musicBrainzRelations: 0,
-  };
-}
-
-function createDeterministicSimilarArtists(artistMbid) {
-  return Array.from({ length: 12 }, (_, index) => ({
-    mbid: `fixture-related-${artistMbid}-${index + 1}`,
-    name: `Fixture related artist ${index + 1}`,
-    score: 1 - (index * 0.02),
-  }));
-}
-
-function createCacheBackedArtistDetailServices({ cacheService, providerCalls }) {
-  const musicBrainzCatalogService = createMusicBrainzCatalogService({
-    metadataProviderCacheService: cacheService,
-    musicBrainzClient: {
-      async browseArtistReleaseGroups({ artistId, offset }) {
-        providerCalls.discography += 1;
-        return {
-          'release-group-count': 1,
-          'release-groups': [{
-            'first-release-date': '2026-01-01',
-            'primary-type': 'Album',
-            id: `fixture-release-group-${artistId}`,
-            title: 'Fixture discography result',
-          }],
-          offset,
-        };
-      },
-    },
-  });
-  const similarArtistsService = createSimilarArtistsService({
-    lastFmClient: {
-      async getSimilarArtists() {
-        providerCalls.lastFm += 1;
-        return [];
-      },
-    },
-    listenBrainzClient: {
-      async getRadioSimilarArtists() {
-        throw new Error('similarity fallback must not run for the controlled workload');
-      },
-      async getSimilarArtists({ mbid }) {
-        providerCalls.listenBrainz += 1;
-        return createDeterministicSimilarArtists(mbid);
-      },
-    },
-    metadataProviderCacheService: cacheService,
-    musicBrainzClient: {
-      async lookupArtistRelations() {
-        providerCalls.musicBrainzRelations += 1;
-        return { relations: [] };
-      },
-      async searchArtists() {
-        throw new Error('similarity fallback must not run for the controlled workload');
-      },
-    },
-  });
-
-  return {
-    browseArtistReleaseGroups: musicBrainzCatalogService.browseArtistReleaseGroups,
-    getSimilarArtists: similarArtistsService.getSimilarArtists,
-  };
-}
-
-function createObservedCacheService({ cacheStore }) {
-  const observability = createMetadataProviderCacheObservabilityService({
-    nowFn: () => new Date('2026-08-22T12:00:00.000Z'),
-  });
-  const cacheService = createMetadataProviderCacheService({
-    cacheStore,
-    nowFn: () => new Date('2026-08-22T12:00:00.000Z'),
-    onCacheError: observability.recordCacheStoreError,
-    onCacheLookup: observability.recordCacheLookup,
-    onRefreshFailure: observability.recordRefreshFailure,
-    onRefreshStart: observability.recordRefreshStart,
-    onRefreshSuccess: observability.recordRefreshSuccess,
-  });
-
-  return { cacheService, observability };
-}
 
 function getNamespaceMetrics(summary, cacheNamespace) {
   const metrics = summary.namespaces.find((candidate) => candidate.cacheNamespace === cacheNamespace);
@@ -153,9 +67,12 @@ test('Artist Detail samples progress from cold to fresh and remain fresh after s
     run: async ({ getPoolFn }) => {
       await applyPendingMigrations({ getPoolFn });
       const cacheStore = createMetadataProviderResponseCacheStore({ getPoolFn });
-      const firstProcess = createObservedCacheService({ cacheStore });
-      const firstProviderCalls = createProviderCalls();
-      const firstServices = createCacheBackedArtistDetailServices({
+      const firstProcess = createObservedArtistDetailCacheService({
+        cacheStore,
+        nowFn: () => new Date('2026-08-22T12:00:00.000Z'),
+      });
+      const firstProviderCalls = createArtistDetailCacheSampleProviderCalls();
+      const firstServices = createCacheBackedArtistDetailSampleServices({
         cacheService: firstProcess.cacheService,
         providerCalls: firstProviderCalls,
       });
@@ -203,9 +120,12 @@ test('Artist Detail samples progress from cold to fresh and remain fresh after s
         },
       ]);
 
-      const recreatedProcess = createObservedCacheService({ cacheStore });
-      const recreatedProviderCalls = createProviderCalls();
-      const recreatedServices = createCacheBackedArtistDetailServices({
+      const recreatedProcess = createObservedArtistDetailCacheService({
+        cacheStore,
+        nowFn: () => new Date('2026-08-22T12:00:00.000Z'),
+      });
+      const recreatedProviderCalls = createArtistDetailCacheSampleProviderCalls();
+      const recreatedServices = createCacheBackedArtistDetailSampleServices({
         cacheService: recreatedProcess.cacheService,
         providerCalls: recreatedProviderCalls,
       });
@@ -221,7 +141,7 @@ test('Artist Detail samples progress from cold to fresh and remain fresh after s
         metadataProviderCacheNamespaces.similarArtists,
         { cold: 0, foregroundSucceeded: 0, fresh: expectedSampleCount },
       );
-      assert.deepEqual(recreatedProviderCalls, createProviderCalls());
+      assert.deepEqual(recreatedProviderCalls, createArtistDetailCacheSampleProviderCalls());
     },
   });
 });

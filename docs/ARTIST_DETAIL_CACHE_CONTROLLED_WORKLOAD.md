@@ -123,7 +123,9 @@ applicable PR to apply locally, and no remote branch was merged.
 
 ## Next Item
 
-Run a controlled real-provider paired sample through the existing
+Run `npm run validate:artist-detail-cache-lifecycle` to prove the stale-
+while-revalidate and expiry phases against the same durable cache contract.
+Then run a controlled real-provider paired sample through the existing
 administrator-only cache baseline view. If its per-namespace delta shows a
 specific failure, add a focused regression test for that measured condition
 before altering an SWR lifetime, stale window, or refresh mechanism.

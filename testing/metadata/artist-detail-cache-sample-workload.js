@@ -17,45 +17,14 @@
  */
 
 import { artistDetailCacheSampleCatalog } from './artist-detail-cache-sample-catalog.js';
+import {
+  assertArtistDetailCacheSampleRead,
+  normalizeArtistDetailCacheSampleCatalog,
+  normalizeArtistDetailCacheSampleLimit,
+} from './artist-detail-cache-sample-workload-contract.js';
 
 const defaultReleaseGroupLimit = 25;
 const defaultSimilarArtistLimit = 8;
-
-function assertCallable(value, label) {
-  if (typeof value !== 'function') {
-    throw new Error(`${label} must be a function`);
-  }
-}
-
-function normalizePositiveInteger(value, label) {
-  if (!Number.isInteger(value) || value < 1) {
-    throw new Error(`${label} must be a positive integer`);
-  }
-
-  return value;
-}
-
-function normalizeCatalog(catalog) {
-  if (!Array.isArray(catalog) || catalog.length === 0) {
-    throw new Error('catalog must contain at least one Artist Detail sample');
-  }
-
-  const artistIds = new Set();
-  for (const sample of catalog) {
-    const artistId = typeof sample?.musicBrainzArtistId === 'string'
-      ? sample.musicBrainzArtistId.trim()
-      : '';
-    if (!artistId) {
-      throw new Error('each Artist Detail cache sample requires musicBrainzArtistId');
-    }
-    if (artistIds.has(artistId)) {
-      throw new Error('Artist Detail cache sample IDs must be unique');
-    }
-    artistIds.add(artistId);
-  }
-
-  return catalog;
-}
 
 /**
  * Executes the two provider-backed Artist Detail reads for every deterministic
@@ -69,11 +38,17 @@ export async function runArtistDetailCacheSampleWorkload({
   releaseGroupLimit = defaultReleaseGroupLimit,
   similarArtistLimit = defaultSimilarArtistLimit,
 } = {}) {
-  assertCallable(browseArtistReleaseGroups, 'browseArtistReleaseGroups');
-  assertCallable(getSimilarArtists, 'getSimilarArtists');
-  const samples = normalizeCatalog(catalog);
-  const normalizedReleaseGroupLimit = normalizePositiveInteger(releaseGroupLimit, 'releaseGroupLimit');
-  const normalizedSimilarArtistLimit = normalizePositiveInteger(similarArtistLimit, 'similarArtistLimit');
+  assertArtistDetailCacheSampleRead(browseArtistReleaseGroups, 'browseArtistReleaseGroups');
+  assertArtistDetailCacheSampleRead(getSimilarArtists, 'getSimilarArtists');
+  const samples = normalizeArtistDetailCacheSampleCatalog(catalog);
+  const normalizedReleaseGroupLimit = normalizeArtistDetailCacheSampleLimit(
+    releaseGroupLimit,
+    'releaseGroupLimit',
+  );
+  const normalizedSimilarArtistLimit = normalizeArtistDetailCacheSampleLimit(
+    similarArtistLimit,
+    'similarArtistLimit',
+  );
 
   for (const { musicBrainzArtistId } of samples) {
     await Promise.all([
