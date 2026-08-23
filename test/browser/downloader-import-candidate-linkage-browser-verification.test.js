@@ -70,8 +70,12 @@ async function assertCandidateRouteSelected(page) {
       && url.searchParams.get('status') === 'all';
   });
   await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
-  await page.getByText('/private/staging/Autechre/Amber', { exact: true }).first().waitFor();
-  await page.getByText('healthy-slskd-peer', { exact: true }).first().waitFor();
+  const recoveryPanel = page.locator('.import-candidate-recovery');
+  await recoveryPanel.getByRole('heading', { exact: true, name: 'Download in progress' }).waitFor();
+  await recoveryPanel.getByText(
+    'The download client is handling this match. Follow live transfer progress in Downloader.',
+    { exact: true },
+  ).waitFor();
 }
 
 suite('Downloader import-candidate linkage browser verification', () => {

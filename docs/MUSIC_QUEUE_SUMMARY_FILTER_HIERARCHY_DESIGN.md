@@ -1,10 +1,14 @@
 # Music Queue Summary And Filter Hierarchy Design
 
-Status: **Implemented 2026-07-26; superseded by the header-based status hierarchy on 2026-07-28.**
+Status: **Implemented 2026-07-26; superseded by the header-based status hierarchy on 2026-07-28 and the decision-first scope model on 2026-08-23.**
 
 The compact standalone overview described below was a transitional improvement.
 `MUSIC_QUEUE_STATUS_HIERARCHY_DESIGN.md` replaces it with one status line in the
 queue header and a secondary scheduled-search handoff.
+
+`MUSIC_QUEUE_DECISION_FIRST_WORKSPACE_DESIGN.md` now supersedes the mixed
+current-work scope with explicit operator-input, automatic-progress, scheduled,
+and all-release scopes.
 
 ## Purpose
 

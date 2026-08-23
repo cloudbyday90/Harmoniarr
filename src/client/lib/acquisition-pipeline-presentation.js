@@ -28,7 +28,6 @@ import {
 } from './acquisition-quality-presentation.js';
 import { formatBytes } from './import-candidate-presentation.js';
 import { buildMusicQueueRecoveryPresentation } from './music-queue-recovery-presentation.js';
-import { isMusicQueueHomeProgressRelease } from './music-queue-progress-state.js';
 
 const DEFAULT_STATUS = Object.freeze({
   code: 'queued_for_search',
@@ -640,73 +639,6 @@ export function buildMusicQueueSummaryCards(summary = {}) {
       label: 'Needs setup',
       value: getCount(counts.needs_setup),
     },
-  ];
-}
-
-export const MUSIC_QUEUE_STATE_FILTERS = Object.freeze([
-  Object.freeze({ label: 'All', value: 'all' }),
-  Object.freeze({ label: 'Waiting', value: 'waiting' }),
-  Object.freeze({ label: 'Searching', value: 'searching' }),
-  Object.freeze({ label: 'Downloading', value: 'downloading' }),
-  Object.freeze({ label: 'Ready to add', value: 'ready_to_add' }),
-  Object.freeze({ label: 'Needs help', value: 'needs_help' }),
-  Object.freeze({ label: 'Needs setup', value: 'needs_setup' }),
-  Object.freeze({ label: 'In library', value: 'in_library' }),
-]);
-
-export const MUSIC_QUEUE_SCOPE_FILTERS = Object.freeze([
-  Object.freeze({ label: 'Current work', value: 'current' }),
-  Object.freeze({ label: 'All releases', value: 'all' }),
-]);
-
-export function getMusicQueueFilterState(statusCode) {
-  if (['queued_for_search', 'retrying_search'].includes(statusCode)) return 'waiting';
-  if (['searching', 'checking_matches', 'pick_match'].includes(statusCode)) return 'searching';
-  if (['downloading', 'trying_next_match'].includes(statusCode)) return 'downloading';
-  if (['ready_to_add', 'adding_to_library'].includes(statusCode)) return 'ready_to_add';
-  if (statusCode === 'needs_setup') return 'needs_setup';
-  if (statusCode === 'in_library') return 'in_library';
-  if (['quality_choice_needed', 'needs_help_adding', 'no_matches_left', 'failed'].includes(statusCode)) return 'needs_help';
-  return 'all';
-}
-
-export function filterMusicQueueReleases(releases, {
-  query = '',
-  releaseType = 'all',
-  scope = 'all',
-  state = 'all',
-} = {}) {
-  const normalizedQuery = normalizeToken(query);
-  const normalizedReleaseType = normalizeToken(releaseType);
-  const normalizedScope = normalizeToken(scope);
-  const normalizedState = normalizeToken(state);
-
-  return releases.filter((release) => {
-    if (normalizedScope === 'current' && !isMusicQueueHomeProgressRelease(release)) {
-      return false;
-    }
-
-    if (normalizedQuery && !release.searchableText.includes(normalizedQuery)) {
-      return false;
-    }
-
-    if (normalizedReleaseType && normalizedReleaseType !== 'all') {
-      if (normalizeToken(release.releaseTypeLabel) !== normalizedReleaseType) return false;
-    }
-
-    if (normalizedState && normalizedState !== 'all') {
-      if (getMusicQueueFilterState(release.statusCode) !== normalizedState) return false;
-    }
-
-    return true;
-  });
-}
-
-export function buildMusicQueueReleaseTypeFilters(releases) {
-  const types = [...new Set(releases.map((release) => release.releaseTypeLabel).filter(Boolean))].sort();
-  return [
-    { label: 'All types', value: 'all' },
-    ...types.map((type) => ({ label: type, value: type.toLowerCase() })),
   ];
 }
 

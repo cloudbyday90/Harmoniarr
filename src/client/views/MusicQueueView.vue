@@ -27,17 +27,22 @@ import MusicQueueReviewPanel from '../components/music-queue/MusicQueueReviewPan
 import MusicQueueReleaseRow from '../components/music-queue/MusicQueueReleaseRow.vue';
 import {
   buildMusicQueueMatchReview,
+} from '../lib/acquisition-pipeline-presentation.js';
+import {
   buildMusicQueueReleaseTypeFilters,
   filterMusicQueueReleases,
-  MUSIC_QUEUE_SCOPE_FILTERS,
   MUSIC_QUEUE_STATE_FILTERS,
-} from '../lib/acquisition-pipeline-presentation.js';
+} from '../lib/music-queue-filter-presentation.js';
 import { useMusicQueue } from '../composables/useMusicQueue.js';
 import { useMusicQueueReleaseDetail } from '../composables/useMusicQueueReleaseDetail.js';
 import { useMusicQueueProviderRepairContext } from '../composables/useMusicQueueProviderRepairContext.js';
 import { useConfirm } from '../composables/useConfirm.js';
 import { hasMusicQueueProviderDependentWork } from '../lib/music-queue-provider-repair-presentation.js';
-import { buildMusicQueueStatusPresentation } from '../lib/music-queue-status-presentation.js';
+import {
+  buildMusicQueueScopeFilters,
+  buildMusicQueueScopePresentation,
+  MUSIC_QUEUE_DEFAULT_SCOPE,
+} from '../lib/music-queue-scope-presentation.js';
 import {
   buildMusicQueueProviderRecoveryVisibility,
   isMusicQueueProviderReadyRecoveryContext,
@@ -77,7 +82,6 @@ const {
   recheckLibraryAdd,
   releases,
   searchAgain,
-  summaryCards,
   useMatch,
 } = useMusicQueue({ immediate: !isProviderReadyRecoveryReturn });
 const {
@@ -105,13 +109,15 @@ const {
 
 const query = ref('');
 const filtersExpanded = ref(false);
-const selectedScope = ref('current');
+const selectedScope = ref(MUSIC_QUEUE_DEFAULT_SCOPE);
 const selectedState = ref('all');
 const selectedReleaseType = ref('all');
 const selectedReleaseId = ref(requestedReleaseId.value);
 const providerRecoveryVisibility = ref(null);
+const scopeStatusAnnouncement = ref('');
 
 const releaseTypeFilters = computed(() => buildMusicQueueReleaseTypeFilters(releases.value));
+const scopeFilters = computed(() => buildMusicQueueScopeFilters(releases.value));
 const filteredReleases = computed(() => filterMusicQueueReleases(releases.value, {
   query: query.value,
   releaseType: selectedReleaseType.value,
@@ -121,38 +127,32 @@ const filteredReleases = computed(() => filterMusicQueueReleases(releases.value,
 const scopedReleaseCount = computed(() => filterMusicQueueReleases(releases.value, {
   scope: selectedScope.value,
 }).length);
-const musicQueueStatus = computed(() => buildMusicQueueStatusPresentation(summaryCards.value));
-const isCurrentWorkScope = computed(() => selectedScope.value === 'current');
-const queueListHeading = computed(() => (
-  isCurrentWorkScope.value ? 'Current work' : 'All releases'
+const queueScopePresentation = computed(() => buildMusicQueueScopePresentation(
+  releases.value,
+  selectedScope.value,
 ));
+const queueListHeading = computed(() => queueScopePresentation.value.heading);
 const hasNarrowingFilters = computed(() => (
   query.value.trim().length > 0
   || selectedState.value !== 'all'
   || selectedReleaseType.value !== 'all'
 ));
 const queueListStatus = computed(() => {
-  if (!isCurrentWorkScope.value || hasNarrowingFilters.value) {
+  if (hasNarrowingFilters.value) {
     return `${filteredReleases.value.length} of ${scopedReleaseCount.value} release${scopedReleaseCount.value === 1 ? '' : 's'} ${
-      isCurrentWorkScope.value ? 'matching the current filters' : 'being tracked'
+      'matching the current filters'
     }`;
   }
 
-  return musicQueueStatus.value.primaryHeadline;
+  return queueScopePresentation.value.status;
 });
 const queueListDetail = computed(() => (
-  isCurrentWorkScope.value && !hasNarrowingFilters.value && filteredReleases.value.length > 0
-    ? musicQueueStatus.value.primaryDetail
-    : ''
-));
-const scheduledSearchDetail = computed(() => (
-  isCurrentWorkScope.value && !hasNarrowingFilters.value && filteredReleases.value.length > 0
-    ? musicQueueStatus.value.scheduledSearchDetail
+  !hasNarrowingFilters.value && filteredReleases.value.length > 0
+    ? queueScopePresentation.value.detail
     : ''
 ));
 const hasActiveFilters = computed(() => (
   query.value.trim().length > 0
-  || selectedScope.value !== 'current'
   || selectedState.value !== 'all'
   || selectedReleaseType.value !== 'all'
 ));
@@ -181,16 +181,13 @@ function closeReview() {
 
 function clearFilters() {
   query.value = '';
-  selectedScope.value = 'current';
   selectedState.value = 'all';
   selectedReleaseType.value = 'all';
   filtersExpanded.value = false;
 }
 
-function showScheduledReleases() {
-  selectedScope.value = 'all';
-  selectedState.value = 'waiting';
-  filtersExpanded.value = true;
+function announceScopeChange() {
+  scopeStatusAnnouncement.value = queueScopePresentation.value.status;
 }
 
 function showAllReleases() {
@@ -330,7 +327,7 @@ watch(releases, (updatedReleases) => {
         <p class="hx-eyebrow">Music Queue</p>
         <h1>Music Queue</h1>
         <p class="music-queue-copy">
-          Releases Harmoniarr is searching, downloading, checking, and adding to your library. If automation stops, the row explains why and shows the next action.
+          Review releases that need a decision. Harmoniarr continues eligible work automatically.
         </p>
       </div>
       <button type="button" class="hx-btn" :disabled="isRevalidating" @click="refreshMusicQueue">
@@ -363,32 +360,23 @@ watch(releases, (updatedReleases) => {
         <div class="music-queue-panel-header">
           <div>
             <h2>{{ queueListHeading }}</h2>
-            <p class="music-queue-panel-status" role="status" aria-atomic="true">{{ queueListStatus }}</p>
+            <p class="music-queue-panel-status">{{ queueListStatus }}</p>
             <p v-if="queueListDetail" class="music-queue-panel-detail">{{ queueListDetail }}</p>
-            <p v-if="scheduledSearchDetail" class="music-queue-scheduled-search">
-              <span>{{ scheduledSearchDetail }}</span>
-              <button type="button" class="hx-btn" data-variant="ghost" @click="showScheduledReleases">
-                View scheduled releases
-              </button>
-            </p>
           </div>
-          <div class="music-queue-filters" aria-label="Music Queue filters">
+          <form class="music-queue-filters" aria-label="Music Queue filters" @submit.prevent>
             <label class="music-queue-filter">
-              <span>Show</span>
-              <select v-model="selectedScope" class="hx-select">
-                <option v-for="filter in MUSIC_QUEUE_SCOPE_FILTERS" :key="filter.value" :value="filter.value">
-                  {{ filter.label }}
+              <span>Show releases</span>
+              <select v-model="selectedScope" class="hx-select" @change="announceScopeChange">
+                <option v-for="filter in scopeFilters" :key="filter.value" :value="filter.value">
+                  {{ filter.label }} ({{ filter.count }})
                 </option>
               </select>
             </label>
             <label class="music-queue-filter music-queue-filter--search">
-              <span>Search</span>
+              <span>Search this queue</span>
               <input v-model="query" class="hx-input" type="search" placeholder="Artist or release" />
             </label>
             <div class="music-queue-filter-actions">
-              <RouterLink class="hx-btn" data-variant="ghost" :to="{ name: 'activity-feed' }">
-                Activity
-              </RouterLink>
               <button
                 type="button"
                 class="hx-btn"
@@ -397,7 +385,7 @@ watch(releases, (updatedReleases) => {
                 :aria-expanded="filtersExpanded"
                 @click="filtersExpanded = !filtersExpanded"
               >
-                {{ hasActiveFilters ? 'Filters active' : 'Filters' }}
+                {{ filtersExpanded ? 'Hide filters' : 'More filters' }}
               </button>
               <button
                 v-if="hasActiveFilters"
@@ -406,10 +394,10 @@ watch(releases, (updatedReleases) => {
                 data-variant="ghost"
                 @click="clearFilters"
               >
-                Clear
+                Clear filters
               </button>
             </div>
-          </div>
+          </form>
         </div>
 
         <div v-show="filtersExpanded" id="music-queue-secondary-filters" class="music-queue-secondary-filters">
@@ -432,17 +420,16 @@ watch(releases, (updatedReleases) => {
         </div>
 
         <div v-if="!filteredReleases.length" class="music-queue-empty-inline">
-          <template v-if="isCurrentWorkScope && !hasActiveFilters">
-            <p>No current action is needed.</p>
-            <p v-if="musicQueueStatus.scheduledSearchDetail">{{ musicQueueStatus.scheduledSearchDetail }}</p>
-            <p v-else>Completed and waiting releases are still available when you need them.</p>
+          <template v-if="!hasNarrowingFilters">
+            <p>{{ queueScopePresentation.emptyMessage }}</p>
+            <p v-if="selectedScope === MUSIC_QUEUE_DEFAULT_SCOPE">Completed and scheduled releases remain available when you need them.</p>
             <button
               type="button"
               class="hx-btn"
               data-variant="ghost"
-              @click="musicQueueStatus.scheduledSearchCount ? showScheduledReleases() : showAllReleases()"
+              @click="showAllReleases"
             >
-              {{ musicQueueStatus.scheduledSearchCount ? 'View scheduled releases' : 'View all releases' }}
+              View all releases
             </button>
           </template>
           <template v-else>
@@ -460,6 +447,8 @@ watch(releases, (updatedReleases) => {
           />
         </div>
       </div>
+
+      <p class="music-queue-status-announcement" role="status" aria-atomic="true">{{ scopeStatusAnnouncement }}</p>
 
       <MusicQueueReviewPanel
         :action-feedback="actionFeedback"
@@ -498,8 +487,7 @@ watch(releases, (updatedReleases) => {
 
 .music-queue-copy,
 .music-queue-panel-status,
-.music-queue-panel-detail,
-.music-queue-scheduled-search {
+.music-queue-panel-detail {
   color: var(--hx-text-muted);
 }
 
@@ -532,8 +520,7 @@ watch(releases, (updatedReleases) => {
 }
 
 .music-queue-panel-status,
-.music-queue-panel-detail,
-.music-queue-scheduled-search {
+.music-queue-panel-detail {
   font-size: var(--hx-text-sm);
   margin: var(--hx-space-1) 0 0;
 }
@@ -543,23 +530,15 @@ watch(releases, (updatedReleases) => {
   font-weight: 700;
 }
 
-.music-queue-scheduled-search {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--hx-space-1);
-}
-
-.music-queue-scheduled-search .hx-btn {
-  margin: calc(var(--hx-space-1) * -1) 0;
-}
-
 .music-queue-filters {
   align-items: end;
+  border: 0;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
   justify-content: flex-end;
+  margin: 0;
+  padding: 0;
 }
 
 .music-queue-filter-actions,
@@ -611,6 +590,16 @@ watch(releases, (updatedReleases) => {
 
 .music-queue-empty-inline p + p {
   color: var(--hx-text-muted);
+}
+
+.music-queue-status-announcement {
+  block-size: 1px;
+  clip-path: inset(50%);
+  inline-size: 1px;
+  margin: -1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
 }
 
 @media (max-width: 720px) {

@@ -271,6 +271,7 @@ suite('Music Queue post-transfer library add browser verification', () => {
       });
 
       await page.goto(`${baseUrl}/app/music-queue`, { waitUntil: 'domcontentloaded' });
+      await page.getByLabel('Show releases').selectOption('in-progress');
       const releaseRow = page.locator('.music-queue-release-row').filter({ hasText: 'Child of God' });
       await releaseRow.getByText('Ready to add', { exact: true }).waitFor();
       await releaseRow.getByText('Downloaded files passed the audio check and will be added automatically.').waitFor();
@@ -281,7 +282,7 @@ suite('Music Queue post-transfer library add browser verification', () => {
       await releaseRow.getByText('Adding to library', { exact: true }).waitFor();
       await releaseRow.getByText('Harmoniarr is adding verified files to your library.').waitFor();
 
-      await page.getByLabel('Show').selectOption('all');
+      await page.getByLabel('Show releases').selectOption('all');
       await page.getByRole('button', { name: 'Refresh' }).click();
       await releaseRow.getByText('In library', { exact: true }).waitFor();
       await releaseRow.getByRole('link', { name: 'Open Library' }).waitFor();

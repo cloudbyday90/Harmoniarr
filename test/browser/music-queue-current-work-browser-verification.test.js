@@ -92,7 +92,7 @@ function buildMusicQueuePayload() {
 let browserRuntime;
 let runtimeUnavailableReason = null;
 
-suite('Music Queue current-work browser verification', () => {
+suite('Music Queue action-scope browser verification', () => {
   before(async () => {
     try {
       browserRuntime = await createBrowserSmokeRuntime({ config: integrationRuntimeConfig });
@@ -107,7 +107,7 @@ suite('Music Queue current-work browser verification', () => {
     await browserRuntime?.cleanup();
   }, { timeout: integrationRuntimeConfig.suiteTeardownTimeoutMs });
 
-  test('defaults to current work and reveals stable releases only on request', {
+  test('defaults to actions and keeps automatic and stable releases in explicit scopes', {
     timeout: integrationRuntimeConfig.scenarioTimeoutMs,
   }, async (t) => {
     if (runtimeUnavailableReason) {
@@ -148,48 +148,44 @@ suite('Music Queue current-work browser verification', () => {
 
       await page.setViewportSize({ height: 1000, width: 1440 });
       await page.goto(`${baseUrl}/app/music-queue`, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('heading', { exact: true, name: 'Current work' }).waitFor();
-      await page.getByText('Child of God', { exact: true }).waitFor();
+      await page.getByRole('heading', { exact: true, name: 'Actions' }).waitFor();
       await page.getByText('Golden Hour', { exact: true }).waitFor();
+      assert.equal(await page.getByText('Child of God', { exact: true }).count(), 0);
       assert.equal(await page.getByText('Geogaddi', { exact: true }).count(), 0);
       assert.equal(await page.getByText('Look Up Child', { exact: true }).count(), 0);
-      await page.getByText('1 release needs attention', { exact: true }).waitFor();
-      await page.getByText('Harmoniarr is also working on 1 release.', { exact: true }).waitFor();
-      await page.getByText('1 release is scheduled for automatic search.', { exact: true }).waitFor();
-        assert.equal(await page.getByLabel('Show').inputValue(), 'current');
-        assert.equal(
-        await page.getByLabel('Music Queue filters').getByRole('link', { name: 'Activity' }).getAttribute('href'),
-        '/app/activity/feed',
-      );
+      await page.getByText('1 release has an action available', { exact: true }).waitFor();
+      await page.getByText('Harmoniarr is working automatically on 1 release.', { exact: true }).waitFor();
+      assert.equal(await page.getByLabel('Show releases').inputValue(), 'actions');
       await stabilizeVisualEvidencePage(page);
       await evidence.capture(page, {
-        description: 'Current work keeps the decision, active progress, and a compact scheduled-search handoff in one scan path.',
-        name: 'desktop-current-work',
+        description: 'Actions keeps releases with an available next action separate from automatic progress and scheduled work.',
+        name: 'desktop-actions',
         surface: 'music-queue',
       });
 
-      await page.getByRole('button', { name: 'View scheduled releases' }).click();
-      assert.equal(await page.getByLabel('Show').inputValue(), 'all');
-      assert.equal(await page.getByLabel('State').inputValue(), 'waiting');
+      await page.getByLabel('Show releases').selectOption('in-progress');
+      await page.getByRole('heading', { exact: true, name: 'In progress' }).waitFor();
+      await page.getByText('Child of God', { exact: true }).waitFor();
+      await page.getByLabel('Show releases').selectOption('scheduled');
+      await page.getByRole('heading', { exact: true, name: 'Scheduled' }).waitFor();
       await page.getByText('Look Up Child', { exact: true }).waitFor();
-      await page.getByRole('button', { exact: true, name: 'Clear' }).click();
 
-      await page.getByLabel('Show').selectOption('all');
+      await page.getByLabel('Show releases').selectOption('all');
       await page.getByRole('heading', { exact: true, name: 'All releases' }).waitFor();
       await page.getByText('Geogaddi', { exact: true }).waitFor();
       await page.getByText('Look Up Child', { exact: true }).waitFor();
-      await page.getByLabel('Show').selectOption('current');
+      await page.getByLabel('Show releases').selectOption('actions');
       await page.setViewportSize({ height: 844, width: 390 });
-      await page.getByText('Child of God', { exact: true }).waitFor();
+      await page.getByText('Golden Hour', { exact: true }).waitFor();
       assert.equal(
         await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth),
         true,
-        'The compact current-work hierarchy should not create horizontal overflow on mobile.',
+        'The compact action scope should not create horizontal overflow on mobile.',
       );
       await stabilizeVisualEvidencePage(page);
       await evidence.capture(page, {
-        description: 'Current work preserves its priority and compact scheduled-search handoff on mobile.',
-        name: 'mobile-current-work',
+        description: 'Actions preserves clear release actions on mobile without exposing automatic work as a manual task.',
+        name: 'mobile-actions',
         surface: 'music-queue',
       });
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);

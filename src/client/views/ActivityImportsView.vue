@@ -35,6 +35,7 @@ import {
   fetchImportPendingCandidateSummary,
   fetchReleaseAddDiagnostics,
 } from '../lib/import-candidate-api.js';
+import { buildImportReviewRouteQuery } from '../lib/import-review-route-state.js';
 import MusicQueueReleaseUnavailable from '../components/music-queue/MusicQueueReleaseUnavailable.vue';
 import { useAsyncResource } from '../composables/useAsyncResource.js';
 import {
@@ -207,9 +208,7 @@ function buildImportReviewLocation(candidateId) {
   return {
     hash: '#import-review-selection-stage',
     name: 'activity-diagnostics-matches',
-    query: {
-      candidate: candidateId,
-    },
+    query: buildImportReviewRouteQuery({ candidateId, status: 'import_pending' }),
   };
 }
 

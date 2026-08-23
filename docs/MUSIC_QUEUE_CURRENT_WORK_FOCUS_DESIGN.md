@@ -1,10 +1,15 @@
 # Music Queue Current Work Focus Design
 
-Status: Implemented on 2026-07-28
+Status: Implemented on 2026-07-28; superseded for normal queue navigation by
+`MUSIC_QUEUE_DECISION_FIRST_WORKSPACE_DESIGN.md` on 2026-08-23.
 
 Follow-up: the standalone summary was consolidated into the Music Queue header
 and scheduled search became secondary context on 2026-07-28. See
 `MUSIC_QUEUE_STATUS_HIERARCHY_DESIGN.md`.
+
+The successor scope model now separates releases that need operator input from
+automatic progress and scheduled work. This document remains the historical
+record for the former mixed `Current work` view.
 
 ## Purpose
 

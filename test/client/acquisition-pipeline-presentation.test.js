@@ -3,13 +3,18 @@ import test from 'node:test';
 import {
   buildMusicQueueAction,
   buildMusicQueueMatchReview,
-  buildMusicQueueReleaseTypeFilters,
   buildMusicQueueSummaryCards,
-  filterMusicQueueReleases,
   getMusicQueueStatusClass,
-  MUSIC_QUEUE_SCOPE_FILTERS,
   normalizeMusicQueueRelease,
 } from '../../src/client/lib/acquisition-pipeline-presentation.js';
+import {
+  buildMusicQueueReleaseTypeFilters,
+  filterMusicQueueReleases,
+} from '../../src/client/lib/music-queue-filter-presentation.js';
+import {
+  buildMusicQueueScopeFilters,
+  MUSIC_QUEUE_SCOPE_FILTERS,
+} from '../../src/client/lib/music-queue-scope-presentation.js';
 
 test('normalizeMusicQueueRelease maps release and quality copy for the view', () => {
   const release = normalizeMusicQueueRelease({
@@ -103,7 +108,7 @@ test('filterMusicQueueReleases filters by state, release type, and search text',
   );
 });
 
-test('filterMusicQueueReleases keeps the default current scope focused on active and attention work', () => {
+test('filterMusicQueueReleases separates decision, automatic, scheduled, and stable release scopes', () => {
   const releases = [
     normalizeMusicQueueRelease({
       artistName: 'Boards of Canada',
@@ -128,12 +133,31 @@ test('filterMusicQueueReleases keeps the default current scope focused on active
   ];
 
   assert.deepEqual(MUSIC_QUEUE_SCOPE_FILTERS, [
-    { label: 'Current work', value: 'current' },
+    { label: 'Actions', value: 'actions' },
+    { label: 'In progress', value: 'in-progress' },
+    { label: 'Scheduled', value: 'scheduled' },
     { label: 'All releases', value: 'all' },
   ]);
   assert.deepEqual(
-    filterMusicQueueReleases(releases, { scope: 'current' }).map((release) => release.releaseTitle),
-    ['Child of God', 'Golden Hour'],
+    filterMusicQueueReleases(releases, { scope: 'actions' }).map((release) => release.releaseTitle),
+    ['Golden Hour'],
+  );
+  assert.deepEqual(
+    filterMusicQueueReleases(releases, { scope: 'in-progress' }).map((release) => release.releaseTitle),
+    ['Child of God'],
+  );
+  assert.deepEqual(
+    filterMusicQueueReleases(releases, { scope: 'scheduled' }).map((release) => release.releaseTitle),
+    ['Look Up Child'],
+  );
+  assert.deepEqual(
+    buildMusicQueueScopeFilters(releases),
+    [
+      { count: 1, label: 'Actions', value: 'actions' },
+      { count: 1, label: 'In progress', value: 'in-progress' },
+      { count: 1, label: 'Scheduled', value: 'scheduled' },
+      { count: 4, label: 'All releases', value: 'all' },
+    ],
   );
   assert.equal(filterMusicQueueReleases(releases, { scope: 'all' }).length, 4);
 });

@@ -98,8 +98,8 @@ function getFilterLabel(filter) {
   return ACTIVITY_TIMELINE_FILTERS.find((item) => item.value === filter)?.label ?? 'Activity';
 }
 
-function getAttentionEventLinkTarget(event, sectionId) {
-  return sectionId === 'attention'
+function getActivityEventLinkTarget(event, sectionId) {
+  return sectionId === 'attention' || event?.eventType === 'artist_policy_saved'
     ? buildActivityEventLinkTarget(event)
     : null;
 }
@@ -232,11 +232,11 @@ onBeforeUnmount(() => {
                     </ol>
                   </details>
                   <RouterLink
-                    v-if="getAttentionEventLinkTarget(entry.event, section.id)"
+                    v-if="getActivityEventLinkTarget(entry.event, section.id)"
                     class="activity-timeline-link"
-                    :to="getAttentionEventLinkTarget(entry.event, section.id).to"
+                    :to="getActivityEventLinkTarget(entry.event, section.id).to"
                   >
-                    {{ getAttentionEventLinkTarget(entry.event, section.id).label }}
+                    {{ getActivityEventLinkTarget(entry.event, section.id).label }}
                   </RouterLink>
                 </div>
               </article>

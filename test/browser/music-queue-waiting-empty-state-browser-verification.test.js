@@ -141,19 +141,17 @@ suite('Music Queue waiting and empty-state browser verification', () => {
 
       await page.setViewportSize({ height: 900, width: 1440 });
       await page.goto(`${baseUrl}/app/music-queue`, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('heading', { exact: true, name: 'Current work' }).waitFor();
-      await page.getByText('No current action is needed.', { exact: true }).waitFor();
-      await page.getByText('2 releases are scheduled for automatic search.', { exact: true }).waitFor();
+      await page.getByRole('heading', { exact: true, name: 'Actions' }).waitFor();
+      await page.getByText('No release actions are available right now.', { exact: true }).waitFor();
       assert.equal(await page.getByRole('heading', { name: 'Nothing needs your attention' }).count(), 0);
       await stabilizeVisualEvidencePage(page);
       await evidence.capture(page, {
-        description: 'Scheduled releases remain a compact secondary status rather than crowding the current-work list.',
+        description: 'Actions stays clear when automatic searches are scheduled but no release has a manual next step.',
         name: 'desktop-automatic-waiting',
         surface: 'music-queue',
       });
-      await page.getByRole('button', { name: 'View scheduled releases' }).click();
-      assert.equal(await page.getByLabel('Show').inputValue(), 'all');
-      assert.equal(await page.getByLabel('State').inputValue(), 'waiting');
+      await page.getByLabel('Show releases').selectOption('scheduled');
+      assert.equal(await page.getByLabel('Show releases').inputValue(), 'scheduled');
       await page.getByText('Golden Hour', { exact: true }).waitFor();
 
       queuePayload = buildEmptyPayload();

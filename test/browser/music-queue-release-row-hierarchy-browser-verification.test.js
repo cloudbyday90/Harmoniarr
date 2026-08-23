@@ -248,6 +248,28 @@ function buildSelectedMatchPayload() {
   return payload;
 }
 
+async function installMusicQueueReleaseDetailFixture(browserContext, getPayload) {
+  await browserContext.route(/\/api\/v1\/acquisition\/releases\/[^/?]+(?:\?.*)?$/, async (route) => {
+    const url = new URL(route.request().url());
+    const wantedReleaseId = decodeURIComponent(url.pathname.split('/').at(-1));
+    const release = getPayload().releases.find((candidate) => candidate.id === wantedReleaseId);
+
+    if (!release) {
+      await route.fulfill({
+        body: JSON.stringify({ error: { code: 'music_queue_release_not_found' } }),
+        contentType: 'application/json',
+        status: 404,
+      });
+      return;
+    }
+
+    await route.fulfill({
+      body: JSON.stringify({ release }),
+      contentType: 'application/json',
+    });
+  });
+}
+
 function createDeferred() {
   let resolve;
   const promise = new Promise((resolvePromise) => {
@@ -298,6 +320,7 @@ suite('Music Queue release row hierarchy browser verification', () => {
           contentType: 'application/json',
         });
       });
+      await installMusicQueueReleaseDetailFixture(browserContext, buildMusicQueuePayload);
       await browserContext.route('**/api/v1/system/overview', async (route) => {
         await route.fulfill({
           body: JSON.stringify({
@@ -324,17 +347,18 @@ suite('Music Queue release row hierarchy browser verification', () => {
 
       await page.setViewportSize({ height: 1000, width: 1440 });
       await page.goto(`${baseUrl}/app/music-queue`, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('heading', { exact: true, name: 'Current work' }).waitFor();
-      await page.locator('.music-queue-panel-status').filter({ hasText: '1 release needs attention' }).waitFor();
+      await page.getByRole('heading', { exact: true, name: 'Actions' }).waitFor();
+      await page.locator('.music-queue-panel-status').filter({ hasText: '1 release has an action available' }).waitFor();
       assert.equal(await page.locator('.music-queue-summary-card').count(), 0);
       const secondaryFilters = page.locator('#music-queue-secondary-filters');
       assert.equal(await secondaryFilters.isHidden(), true);
-      await page.getByRole('button', { exact: true, name: 'Filters' }).click();
+      await page.getByRole('button', { exact: true, name: 'More filters' }).click();
       assert.equal(await secondaryFilters.isVisible(), true);
       await secondaryFilters.getByLabel('State').selectOption('needs_help');
-      await page.getByRole('button', { exact: true, name: 'Filters active' }).waitFor();
-      await page.getByRole('button', { exact: true, name: 'Clear' }).click();
+      await page.getByRole('button', { exact: true, name: 'Hide filters' }).waitFor();
+      await page.getByRole('button', { exact: true, name: 'Clear filters' }).click();
       assert.equal(await secondaryFilters.isHidden(), true);
+      await page.getByLabel('Show releases').selectOption('all');
 
       const rows = page.locator('.music-queue-release-row');
       const downloadingRow = rows.filter({ hasText: 'Child of God' });
@@ -453,6 +477,7 @@ suite('Music Queue release row hierarchy browser verification', () => {
           contentType: 'application/json',
         });
       });
+      await installMusicQueueReleaseDetailFixture(browserContext, buildRecoveryPayload);
       await browserContext.route('**/api/v1/system/overview', async (route) => {
         await route.fulfill({
           body: JSON.stringify({ dependencies: [{ provider: 'slskd', status: 'healthy' }] }),
@@ -475,8 +500,8 @@ suite('Music Queue release row hierarchy browser verification', () => {
       const settingsResponse = page.waitForResponse((response) => response.url().includes('/api/v1/settings'));
       await page.goto(`${baseUrl}/app/music-queue`, { waitUntil: 'domcontentloaded' });
       await settingsResponse;
-      await page.getByRole('heading', { exact: true, name: 'Current work' }).waitFor();
-      await page.getByLabel('Show').selectOption('all');
+      await page.getByRole('heading', { exact: true, name: 'Actions' }).waitFor();
+      await page.getByLabel('Show releases').selectOption('all');
       await page.getByRole('heading', { exact: true, name: 'All releases' }).waitFor();
 
       const rows = page.locator('.music-queue-release-row');
@@ -558,6 +583,7 @@ suite('Music Queue release row hierarchy browser verification', () => {
           contentType: 'application/json',
         });
       });
+      await installMusicQueueReleaseDetailFixture(browserContext, buildMatchChoicePayload);
       await installConfiguredMusicQueueProviderFixtures(browserContext);
 
       await page.setViewportSize({ height: 1000, width: 1440 });
@@ -642,6 +668,7 @@ suite('Music Queue release row hierarchy browser verification', () => {
           contentType: 'application/json',
         });
       });
+      await installMusicQueueReleaseDetailFixture(browserContext, buildMatchChoicePayload);
       await browserContext.route(/\/api\/v1\/acquisition\/releases\/wanted-match-choice\/matches\/match-choice-best\/use$/, async (route) => {
         await useMatchResponse.promise;
         await route.fulfill({
@@ -745,6 +772,7 @@ suite('Music Queue release row hierarchy browser verification', () => {
           contentType: 'application/json',
         });
       });
+      await installMusicQueueReleaseDetailFixture(browserContext, () => payload);
       await browserContext.route('**/api/v1/acquisition/releases/wanted-match-choice/matches/match-choice-best/use', async (route) => {
         payload = buildSelectedMatchPayload();
         await route.fulfill({
@@ -762,6 +790,7 @@ suite('Music Queue release row hierarchy browser verification', () => {
       const reviewPanel = page.locator('.music-queue-review');
       const selectedMatchCard = reviewPanel.locator('.music-queue-review-match').filter({ hasText: 'Match 1' });
       await selectedMatchCard.getByRole('button', { name: 'Use this match' }).click();
+      await page.getByLabel('Show releases').selectOption('in-progress');
       await releaseRow.getByText('Checking matches', { exact: true }).waitFor();
       await releaseRow.getByText('Up next', { exact: true }).waitFor();
       await releaseRow.getByText(
