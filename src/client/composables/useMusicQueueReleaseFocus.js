@@ -54,8 +54,18 @@ export function useMusicQueueReleaseFocus({
     releaseId,
   } = {}) {
     await nextTickFn();
-    const heading = headingResolver?.();
-    if (!heading || !controller.shouldFocusDirectInspectorHeading({
+    let heading = headingResolver?.();
+
+    // A conditional panel heading may still refer to the element Vue is
+    // replacing during the first render tick. Resolve once more before
+    // recording direct-route focus so a disconnected heading cannot consume
+    // the one intentional focus move for this route.
+    if (heading?.isConnected === false) {
+      await nextTickFn();
+      heading = headingResolver?.();
+    }
+
+    if (!heading || heading.isConnected === false || !controller.shouldFocusDirectInspectorHeading({
       isLoading,
       isReady,
       releaseId,

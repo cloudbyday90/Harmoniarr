@@ -22,7 +22,6 @@ import { useRoute, useRouter } from 'vue-router';
 import MusicQueueEmptyState from '../components/music-queue/MusicQueueEmptyState.vue';
 import MusicQueueProviderRepairNotice from '../components/music-queue/MusicQueueProviderRepairNotice.vue';
 import MusicQueueProviderRecoveryVisibility from '../components/music-queue/MusicQueueProviderRecoveryVisibility.vue';
-import MusicQueueReleaseUnavailable from '../components/music-queue/MusicQueueReleaseUnavailable.vue';
 import MusicQueueReviewPanel from '../components/music-queue/MusicQueueReviewPanel.vue';
 import MusicQueueReleaseRow from '../components/music-queue/MusicQueueReleaseRow.vue';
 import {
@@ -45,6 +44,7 @@ import {
   MUSIC_QUEUE_DEFAULT_SCOPE,
 } from '../lib/music-queue-scope-presentation.js';
 import { buildMusicQueueWorkspacePresentation } from '../lib/music-queue-workspace-presentation.js';
+import { buildMusicQueueReleaseRecoveryPresentation } from '../lib/music-queue-release-recovery-presentation.js';
 import {
   buildMusicQueueProviderRecoveryVisibility,
   isMusicQueueProviderReadyRecoveryContext,
@@ -88,6 +88,7 @@ const {
 } = useMusicQueue({ immediate: !isProviderReadyRecoveryReturn });
 const {
   applyRelease: applyReleaseDetail,
+  detailWantedReleaseId,
   errorMessage: releaseDetailErrorMessage,
   isLoading: isReleaseDetailLoading,
   isNotFound: isReleaseDetailNotFound,
@@ -161,15 +162,28 @@ const hasActiveFilters = computed(() => (
   || selectedState.value !== 'all'
   || selectedReleaseType.value !== 'all'
 ));
-const selectedRelease = computed(() => (
-  releaseDetail.value
-  ?? filteredReleases.value.find((release) => release.id === selectedReleaseId.value)
-  ?? releases.value.find((release) => release.id === selectedReleaseId.value)
-  ?? null
-));
+const selectedRelease = computed(() => {
+  if (releaseDetail.value?.id === selectedReleaseId.value) {
+    return releaseDetail.value;
+  }
+
+  return filteredReleases.value.find((release) => release.id === selectedReleaseId.value)
+    ?? releases.value.find((release) => release.id === selectedReleaseId.value)
+    ?? null;
+});
 const matchReview = computed(() => buildMusicQueueMatchReview(selectedRelease.value));
 const musicQueueWorkspace = computed(() => buildMusicQueueWorkspacePresentation(selectedReleaseId.value));
-const musicQueueErrorMessage = computed(() => errorMessage.value || releaseDetailErrorMessage.value);
+const releaseDetailRecovery = computed(() => buildMusicQueueReleaseRecoveryPresentation({
+  errorMessage: detailWantedReleaseId.value === requestedReleaseId.value
+    ? releaseDetailErrorMessage.value
+    : '',
+  isNotFound: detailWantedReleaseId.value === requestedReleaseId.value
+    && isReleaseDetailNotFound.value,
+}));
+const hasResolvedReleaseDetail = computed(() => (
+  releaseDetail.value?.id === requestedReleaseId.value && Boolean(matchReview.value)
+));
+const musicQueueErrorMessage = computed(() => errorMessage.value);
 
 function openReview(release, trigger) {
   musicQueueReleaseFocus.selectFromRow({ releaseId: release.id, trigger });
@@ -186,6 +200,19 @@ function closeReview() {
   if (route.name === 'music-queue-release') {
     void router.replace({ name: 'music-queue' });
   }
+}
+
+async function retryReleaseDetail() {
+  await loadReleaseDetail();
+}
+
+function focusDirectInspectorHeading() {
+  void musicQueueReleaseFocus.focusDirectInspectorHeading({
+    headingResolver: () => reviewPanelElement.value?.getHeadingElement(),
+    isLoading: isReleaseDetailLoading.value,
+    isReady: Boolean(hasResolvedReleaseDetail.value || releaseDetailRecovery.value),
+    releaseId: requestedReleaseId.value,
+  });
 }
 
 function clearFilters() {
@@ -318,19 +345,6 @@ watch(
   { immediate: true },
 );
 
-watch(
-  [requestedReleaseId, isReleaseDetailLoading, matchReview],
-  ([wantedReleaseId, detailIsLoading, review]) => {
-    void musicQueueReleaseFocus.focusDirectInspectorHeading({
-      headingResolver: () => reviewPanelElement.value?.getHeadingElement(),
-      isLoading: detailIsLoading,
-      isReady: Boolean(review) || !detailIsLoading,
-      releaseId: wantedReleaseId,
-    });
-  },
-  { flush: 'post' },
-);
-
 watch(releases, (updatedReleases) => {
   const wantedReleaseId = requestedReleaseId.value;
   if (!wantedReleaseId || releaseDetail.value?.id !== wantedReleaseId) {
@@ -375,9 +389,7 @@ watch(releases, (updatedReleases) => {
       Loading Music Queue...
     </div>
 
-    <MusicQueueReleaseUnavailable v-else-if="isReleaseDetailNotFound" />
-
-    <MusicQueueEmptyState v-else-if="!releases.length" />
+    <MusicQueueEmptyState v-else-if="!releases.length && !musicQueueWorkspace.hasReleaseInspector" />
 
     <div
       v-else
@@ -487,12 +499,15 @@ watch(releases, (updatedReleases) => {
         :active-release-action-key="activeReleaseActionKey"
         :inspector-id="musicQueueWorkspace.inspectorId"
         :is-loading="isReleaseDetailLoading"
+        :recovery="releaseDetailRecovery"
         :review="matchReview"
         @add-to-library="handleAddToLibrary"
         @allow-fallback-quality="handleAllowFallbackQuality"
         @close="closeReview"
+        @heading-ready="focusDirectInspectorHeading"
         @recheck-library-add="handleRecheckLibraryAdd"
         @reject-match="handleRejectMatch"
+        @retry="retryReleaseDetail"
         @search-again="handleSearchAgain"
         @use-match="handleUseMatch"
       />

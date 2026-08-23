@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { buildMusicQueueReleaseActionFeedback } from '../../lib/music-queue-action-feedback-presentation.js';
 import { buildMusicQueueReviewPresentation } from '../../lib/music-queue-review-presentation.js';
 import {
@@ -52,14 +52,20 @@ const props = defineProps({
     default: null,
     type: Object,
   },
+  recovery: {
+    default: null,
+    type: Object,
+  },
 });
 
 const emit = defineEmits([
   'add-to-library',
   'allow-fallback-quality',
   'close',
+  'heading-ready',
   'recheck-library-add',
   'reject-match',
+  'retry',
   'search-again',
   'use-match',
 ]);
@@ -83,6 +89,17 @@ const repairSettingsLocation = computed(() => {
     routeName,
   });
 });
+
+watch(
+  [() => props.isLoading, () => props.recovery, () => props.review],
+  async () => {
+    await nextTick();
+    if (headingElement.value?.isConnected !== false) {
+      emit('heading-ready');
+    }
+  },
+  { flush: 'post', immediate: true },
+);
 
 function getMatchActionState(match) {
   const activeAction = props.activeMatchActionKey;
@@ -112,6 +129,26 @@ defineExpose({ getHeadingElement });
       <h2 ref="headingElement" class="music-queue-review__heading" tabindex="-1">Loading release details</h2>
       <p>Getting the latest release status and available actions.</p>
       <button type="button" class="hx-btn" data-variant="ghost" @click="emit('close')">Close</button>
+    </div>
+
+    <div v-else-if="recovery" class="music-queue-review__state" :data-tone="recovery.tone">
+      <p class="music-queue-review__recovery-announcement" :role="recovery.role" aria-atomic="true">
+        {{ recovery.announcement }}
+      </p>
+      <h2 ref="headingElement" class="music-queue-review__heading" tabindex="-1">{{ recovery.heading }}</h2>
+      <p>{{ recovery.message }}</p>
+      <div class="music-queue-review__actions music-queue-review__recovery-actions">
+        <button
+          v-if="recovery.canRetry"
+          type="button"
+          class="hx-btn"
+          data-variant="primary"
+          @click="emit('retry')"
+        >
+          Try again
+        </button>
+        <button type="button" class="hx-btn" data-variant="ghost" @click="emit('close')">Return to Music Queue</button>
+      </div>
     </div>
 
     <div v-else-if="!review" class="music-queue-review__state">
@@ -353,6 +390,28 @@ defineExpose({ getHeadingElement });
 
 .music-queue-review__state .hx-btn {
   justify-self: center;
+}
+
+.music-queue-review__state[data-tone='warning'] {
+  box-shadow: inset 3px 0 0 var(--hx-warning);
+}
+
+.music-queue-review__state[data-tone='danger'] {
+  box-shadow: inset 3px 0 0 var(--hx-danger);
+}
+
+.music-queue-review__recovery-announcement {
+  block-size: 1px;
+  clip-path: inset(50%);
+  inline-size: 1px;
+  margin: -1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+}
+
+.music-queue-review__recovery-actions {
+  justify-content: center;
 }
 
 .music-queue-review__header {

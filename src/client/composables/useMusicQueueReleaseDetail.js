@@ -41,6 +41,7 @@ export function useMusicQueueReleaseDetail({
 } = {}) {
   const release = ref(null);
   const errorMessage = ref('');
+  const detailWantedReleaseId = ref(null);
   const isLoading = ref(false);
   const isNotFound = ref(false);
   const resolvedWantedReleaseId = computed(() => normalizeWantedReleaseId(toValue(wantedReleaseId)));
@@ -59,6 +60,7 @@ export function useMusicQueueReleaseDetail({
     }
 
     release.value = normalizedRelease;
+    detailWantedReleaseId.value = normalizedRelease.id;
     errorMessage.value = '';
     isNotFound.value = false;
     return normalizedRelease;
@@ -73,10 +75,12 @@ export function useMusicQueueReleaseDetail({
     isNotFound.value = false;
 
     if (!currentWantedReleaseId) {
+      detailWantedReleaseId.value = null;
       isLoading.value = false;
       return null;
     }
 
+    detailWantedReleaseId.value = currentWantedReleaseId;
     isLoading.value = true;
 
     try {
@@ -115,6 +119,7 @@ export function useMusicQueueReleaseDetail({
   });
 
   return {
+    detailWantedReleaseId,
     errorMessage,
     isLoading,
     isNotFound,

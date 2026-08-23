@@ -92,6 +92,7 @@ test('Music Queue release detail keeps a scoped direct read separate from the qu
 
   assert.equal(fetchMusicQueueRelease.mock.callCount(), 1);
   assert.equal(releaseDetail.release.value.id, 'wanted-1');
+  assert.equal(releaseDetail.detailWantedReleaseId.value, 'wanted-1');
   assert.equal(releaseDetail.release.value.statusCode, 'downloading');
   assert.equal(releaseDetail.isNotFound.value, false);
   assert.equal(releaseDetail.errorMessage.value, '');
@@ -111,6 +112,7 @@ test('Music Queue release detail turns scoped 404s into a generic unavailable st
   await releaseDetail.load();
 
   assert.equal(releaseDetail.release.value, null);
+  assert.equal(releaseDetail.detailWantedReleaseId.value, 'wanted-other-operator');
   assert.equal(releaseDetail.isNotFound.value, true);
   assert.equal(releaseDetail.errorMessage.value, '');
   assert.equal(isMusicQueueReleaseNotFoundError({ code: 'music_queue_release_not_found', status: 404 }), true);
@@ -128,6 +130,7 @@ test('Music Queue release detail preserves non-authorization failures for the no
   await releaseDetail.load();
 
   assert.equal(releaseDetail.release.value, null);
+  assert.equal(releaseDetail.detailWantedReleaseId.value, 'wanted-1');
   assert.equal(releaseDetail.isNotFound.value, false);
   assert.equal(releaseDetail.errorMessage.value, 'Music Queue release failed to load');
   app.unmount();

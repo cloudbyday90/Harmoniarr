@@ -66,3 +66,25 @@ test('useMusicQueueReleaseFocus waits for a ready direct-route heading before re
   }), true);
   assert.equal(focusElementFn.mock.callCount(), 1);
 });
+
+test('useMusicQueueReleaseFocus re-resolves a replaced direct-route heading before recording focus', async (t) => {
+  const nextTickFn = t.mock.fn(async () => {});
+  const focusElementFn = t.mock.fn(() => true);
+  const focus = useMusicQueueReleaseFocus({ focusElementFn, nextTickFn });
+  const replacedHeading = { focus() {}, isConnected: false };
+  const renderedHeading = { focus() {} };
+  let headingLookupCount = 0;
+
+  focus.synchronizeRouteSelection('wanted-unavailable');
+  assert.equal(await focus.focusDirectInspectorHeading({
+    headingResolver: () => {
+      headingLookupCount += 1;
+      return headingLookupCount === 1 ? replacedHeading : renderedHeading;
+    },
+    isReady: true,
+    releaseId: 'wanted-unavailable',
+  }), true);
+  assert.equal(nextTickFn.mock.callCount(), 2);
+  assert.equal(focusElementFn.mock.callCount(), 1);
+  assert.equal(focusElementFn.mock.calls[0].arguments[0], renderedHeading);
+});

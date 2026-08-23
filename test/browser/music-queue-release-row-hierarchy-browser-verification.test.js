@@ -513,6 +513,162 @@ suite('Music Queue release row hierarchy browser verification', () => {
     }, { scenarioName: 'music_queue_release_row_hierarchy' });
   });
 
+  test('keeps direct release recovery local, actionable, and free of raw request details', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) {
+      t.skip(runtimeUnavailableReason);
+      return;
+    }
+
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      const pageErrors = [];
+      const slowDetailResponse = createDeferred();
+      const retryRelease = {
+        ...buildMusicQueuePayload().releases[1],
+        id: 'wanted-retryable-detail',
+        releaseTitle: 'Tomorrow\'s Harvest',
+      };
+      let retryRequestCount = 0;
+      page.on('pageerror', (error) => pageErrors.push(error.message));
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      await browserContext.route(/\/api\/v1\/acquisition\/releases(?:\?.*)?$/, async (route) => {
+        await route.fulfill({
+          body: JSON.stringify(buildMusicQueuePayload()),
+          contentType: 'application/json',
+        });
+      });
+      await browserContext.route(/\/api\/v1\/acquisition\/releases\/[^/?]+(?:\?.*)?$/, async (route) => {
+        const url = new URL(route.request().url());
+        const wantedReleaseId = decodeURIComponent(url.pathname.split('/').at(-1));
+
+        if (wantedReleaseId === 'wanted-quality-stop') {
+          await slowDetailResponse.promise;
+          await route.fulfill({
+            body: JSON.stringify({ release: buildMusicQueuePayload().releases[1] }),
+            contentType: 'application/json',
+          });
+          return;
+        }
+
+        if (wantedReleaseId === 'wanted-not-available') {
+          await route.fulfill({
+            body: JSON.stringify({ error: { code: 'music_queue_release_not_found' } }),
+            contentType: 'application/json',
+            status: 404,
+          });
+          return;
+        }
+
+        if (wantedReleaseId === 'wanted-retryable-detail') {
+          retryRequestCount += 1;
+          if (retryRequestCount === 1) {
+            await route.fulfill({
+              body: JSON.stringify({
+                error: {
+                  code: 'upstream_unavailable',
+                  message: 'Provider https://provider.example/internal-release is unavailable.',
+                },
+              }),
+              contentType: 'application/json',
+              status: 503,
+            });
+            return;
+          }
+
+          await route.fulfill({
+            body: JSON.stringify({ release: retryRelease }),
+            contentType: 'application/json',
+          });
+          return;
+        }
+
+        await route.fulfill({
+          body: JSON.stringify({ error: { code: 'music_queue_release_not_found' } }),
+          contentType: 'application/json',
+          status: 404,
+        });
+      });
+      await browserContext.route('**/api/v1/system/overview', async (route) => {
+        await route.fulfill({
+          body: JSON.stringify({ dependencies: [{ provider: 'slskd', status: 'healthy' }] }),
+          contentType: 'application/json',
+        });
+      });
+      await browserContext.route('**/api/v1/settings', async (route) => {
+        const response = await route.fetch();
+        const payload = await response.json();
+        payload.secretStatus ??= {};
+        payload.secretStatus.slskd = {
+          ...(payload.secretStatus.slskd ?? {}),
+          providerMode: 'external',
+          providerModeState: 'configured',
+        };
+        await route.fulfill({
+          body: JSON.stringify(payload),
+          contentType: 'application/json',
+          response,
+        });
+      });
+
+      const reviewPanel = page.locator('.music-queue-review');
+      await page.goto(`${baseUrl}/app/music-queue/wanted-quality-stop`, { waitUntil: 'domcontentloaded' });
+      const loadingHeading = reviewPanel.getByRole('heading', { exact: true, name: 'Loading release details' });
+      await loadingHeading.waitFor();
+      assert.equal(await reviewPanel.getAttribute('aria-busy'), 'true');
+      await reviewPanel.getByRole('button', { exact: true, name: 'Close' }).waitFor();
+
+      slowDetailResponse.resolve();
+      const loadedHeading = reviewPanel.getByRole('heading', { name: /Geogaddi by Boards of Canada/ });
+      await loadedHeading.waitFor();
+      await assertLocatorFocused(
+        loadedHeading,
+        'A direct release URL should focus the loaded inspector only after its slow detail request resolves.',
+      );
+
+      await page.goto(`${baseUrl}/app/music-queue/wanted-not-available`, { waitUntil: 'domcontentloaded' });
+      const unavailableHeading = reviewPanel.getByRole('heading', { exact: true, name: 'Release not available' });
+      await unavailableHeading.waitFor();
+      await assertLocatorFocused(
+        unavailableHeading,
+        'An unavailable direct release should focus the recovery heading after it renders.',
+      );
+      await assertVisibleFocusOutline(
+        unavailableHeading,
+        'The unavailable recovery heading should expose a visible focus outline.',
+      );
+      await reviewPanel.getByRole('status').getByText('Release not available.', { exact: true }).waitFor();
+      await reviewPanel.getByRole('button', { exact: true, name: 'Return to Music Queue' }).click();
+      await reviewPanel.waitFor({ state: 'detached' });
+      await assertLocatorFocused(
+        page.getByRole('heading', { exact: true, name: 'Actions' }),
+        'Returning from an unavailable direct release should focus the queue heading.',
+      );
+
+      await page.goto(`${baseUrl}/app/music-queue/wanted-retryable-detail`, { waitUntil: 'domcontentloaded' });
+      const retryHeading = reviewPanel.getByRole('heading', { exact: true, name: 'Release details unavailable' });
+      await retryHeading.waitFor();
+      await assertLocatorFocused(
+        retryHeading,
+        'A temporary direct release failure should focus its recovery heading.',
+      );
+      await assertVisibleFocusOutline(
+        retryHeading,
+        'The temporary failure recovery heading should expose a visible focus outline.',
+      );
+      await reviewPanel.getByRole('alert').getByText('Release details could not be loaded.', { exact: true }).waitFor();
+      assert.equal(
+        await page.getByText('Provider https://provider.example/internal-release is unavailable.').count(),
+        0,
+        'Raw provider failures must not be rendered in Music Queue.',
+      );
+      await reviewPanel.getByRole('button', { exact: true, name: 'Try again' }).click();
+      await reviewPanel.getByRole('heading', { name: /Tomorrow's Harvest by Boards of Canada/ }).waitFor();
+      assert.equal(retryRequestCount, 2, 'Try again should repeat only the selected release-detail request.');
+      assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
+    }, { scenarioName: 'music_queue_direct_release_recovery' });
+  });
+
   test('separates automatic recovery from stopped-release decisions without duplicate actions', {
     timeout: integrationRuntimeConfig.scenarioTimeoutMs,
   }, async (t) => {
