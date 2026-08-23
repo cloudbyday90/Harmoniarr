@@ -138,6 +138,9 @@ Validation completed successfully on 2026-08-22:
 ## Next Item
 
 Run one administrator-only, rate-respectful paired real-provider sample after
-the local lifecycle proof is healthy. If its aggregate result differs from the
-contract, isolate the measured namespace and phase in a focused regression
-before modifying TTLs, stale windows, provider retries, or topology.
+the local lifecycle proof is healthy. Use the bounded reading documented in
+[Artist Detail Cache Paired-Sample Interpretation](ARTIST_DETAIL_CACHE_PAIRED_SAMPLE_INTERPRETATION_DESIGN.md)
+to distinguish an ordinary cold fill, fresh reuse, SWR reuse, and investigation
+signals. If its aggregate result differs from the contract, isolate the
+measured namespace and phase in a focused regression before modifying TTLs,
+stale windows, provider retries, or topology.

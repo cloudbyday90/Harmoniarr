@@ -118,10 +118,8 @@ Validation completed successfully:
 
 The first real-provider paired sample ruled out a cache-write failure and
 identified independent MusicBrainz client limiters in the metadata module. The
-module-level shared-client correction is documented in [MusicBrainz Shared
-Client Rate Limiting](MUSICBRAINZ_SHARED_CLIENT_RATE_LIMITING.md). A rebuilt
-same-process sample then verified a successful cold fill and an immediate fresh
-read, while showing that the cold related-artists fallback remains unbounded.
-The next implementation target is the cancellable operation budget described
-in [Artist Detail Related-Artists Response
-Budget](ARTIST_DETAIL_RELATED_ARTISTS_RESPONSE_BUDGET.md).
+module-level shared-client correction and bounded related-artists response work
+are now implemented. Use [Artist Detail Cache Paired-Sample
+Interpretation](ARTIST_DETAIL_CACHE_PAIRED_SAMPLE_INTERPRETATION_DESIGN.md) for
+the next fresh-admin sample: it turns the same safe aggregate into a bounded
+reading and action without adding provider probes, persistence, or telemetry.

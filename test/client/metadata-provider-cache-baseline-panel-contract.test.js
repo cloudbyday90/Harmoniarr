@@ -32,6 +32,9 @@ test('MetadataProviderCacheBaselinePanel keeps baseline capture and paired compa
   assert.match(source, /Mark comparison start/);
   assert.match(source, /Clear comparison start/);
   assert.match(source, /Paired sample comparison/);
+  assert.match(source, /assessMetadataProviderCachePairedSample/);
+  assert.match(source, /Paired-sample reading/);
+  assert.match(source, /aria-atomic="true"/);
   assert.match(source, /comparison_process_window_changed/);
   assert.match(source, /role="status"/);
   assert.doesNotMatch(source, /indexedDB|localStorage|readText|sessionStorage|clipboard\.read/);

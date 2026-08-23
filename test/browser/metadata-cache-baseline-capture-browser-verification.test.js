@@ -56,7 +56,7 @@ suite('Metadata cache baseline capture browser coverage', () => {
     timeout: integrationRuntimeConfig.suiteTeardownTimeoutMs,
   });
 
-  test('an administrator explicitly copies and compares bounded process-local baselines', {
+  test('an administrator explicitly copies, compares, and receives a bounded paired-sample reading', {
     timeout: integrationRuntimeConfig.scenarioTimeoutMs,
   }, async (t) => {
     if (runtimeUnavailableReason) {
@@ -130,6 +130,8 @@ suite('Metadata cache baseline capture browser coverage', () => {
       await page.getByText('Comparison start marked. Refresh diagnostics after active use to compare this process window.').waitFor();
       await page.getByRole('button', { exact: true, name: 'Refresh diagnostics' }).click();
       await page.getByRole('heading', { exact: true, name: 'Paired sample comparison' }).waitFor();
+      await page.getByRole('status').getByText('Cache-store errors observed').waitFor();
+      await page.getByRole('status').getByText('Inspect the affected cache namespace and database configuration before changing cache policy.').waitFor();
       await page.getByRole('cell', { exact: true, name: '3 / 2 / 0' }).waitFor();
       await page.getByRole('cell', { exact: true, name: '2 completed, 1 failed' }).waitFor();
 

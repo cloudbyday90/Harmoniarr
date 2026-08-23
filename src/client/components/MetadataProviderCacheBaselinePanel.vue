@@ -18,6 +18,7 @@
 <script setup>
 import { computed, ref } from 'vue';
 import { formatMetadataProviderCacheBaselineCapture } from '../lib/metadata-provider-cache-baseline-capture.js';
+import { assessMetadataProviderCachePairedSample } from '../lib/metadata-provider-cache-paired-sample-assessment.js';
 import { formatMetadataProviderCacheTimestamp } from '../lib/metadata-provider-cache-observability-presentation.js';
 import { writePlainTextToClipboard } from '../lib/plain-text-clipboard-service.js';
 
@@ -50,6 +51,7 @@ const copyStatus = ref('');
 const comparisonStatus = ref('');
 const canMarkComparisonStart = computed(() => Boolean(props.cacheBaseline?.observedSinceAt));
 const observedSinceLabel = computed(() => formatMetadataProviderCacheTimestamp(props.cacheBaseline?.observedSinceAt));
+const pairedSampleAssessment = computed(() => assessMetadataProviderCachePairedSample(props.baselineComparison));
 const updatedAtLabel = computed(() => formatMetadataProviderCacheTimestamp(props.cacheBaseline?.updatedAt));
 
 function formatPercentage(value) {
@@ -183,6 +185,19 @@ async function copyBaselineSummary() {
             Interval changes since the marked baseline in this process window ({{ formatMetadataProviderCacheTimestamp(baselineComparison.observedSinceAt) }}).
           </p>
 
+          <div
+            class="metadata-provider-cache-baseline-panel__assessment"
+            role="status"
+            aria-atomic="true"
+          >
+            <div>
+              <h5>Paired-sample reading</h5>
+              <p>{{ pairedSampleAssessment.summary }}</p>
+              <p class="hx-text-muted">{{ pairedSampleAssessment.nextAction }}</p>
+            </div>
+            <span class="hx-pill" :data-tone="pairedSampleAssessment.tone">{{ pairedSampleAssessment.title }}</span>
+          </div>
+
           <div class="hx-stat-grid" aria-label="Artist Detail cache paired-sample comparison summary">
             <div class="hx-stat">
               <span class="hx-stat-label">LOOKUPS ADDED</span>
@@ -283,6 +298,34 @@ async function copyBaselineSummary() {
   justify-content: flex-end;
 }
 
+.metadata-provider-cache-baseline-panel__assessment {
+  align-items: flex-start;
+  background: var(--hx-bg-surface-muted);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-sm);
+  display: flex;
+  gap: var(--hx-space-3);
+  justify-content: space-between;
+  margin: var(--hx-space-3) 0;
+  padding: var(--hx-space-3);
+}
+
+.metadata-provider-cache-baseline-panel__assessment h5,
+.metadata-provider-cache-baseline-panel__assessment p {
+  margin: 0;
+}
+
+.metadata-provider-cache-baseline-panel__assessment h5 {
+  color: var(--hx-text-strong);
+  font-size: var(--hx-text-sm);
+}
+
+.metadata-provider-cache-baseline-panel__assessment p {
+  color: var(--hx-text);
+  font-size: var(--hx-text-sm);
+  margin-top: var(--hx-space-1);
+}
+
 @media (max-width: 760px) {
   .metadata-provider-cache-baseline-panel__header {
     flex-direction: column;
@@ -290,6 +333,10 @@ async function copyBaselineSummary() {
 
   .metadata-provider-cache-baseline-panel__actions {
     justify-content: flex-start;
+  }
+
+  .metadata-provider-cache-baseline-panel__assessment {
+    flex-direction: column;
   }
 }
 </style>
