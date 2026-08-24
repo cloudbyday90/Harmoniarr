@@ -163,6 +163,50 @@ test('Music Queue keeps working, success, and failure feedback scoped to the rel
   failingApp.unmount();
 });
 
+test('Music Queue revalidates after another operator already selected a shared-release match', async (t) => {
+  const originalDocument = globalThis.document;
+  globalThis.document = {
+    addEventListener() {},
+    hidden: false,
+    removeEventListener() {},
+  };
+  t.after(() => {
+    globalThis.document = originalDocument;
+  });
+
+  const refreshedRelease = createMusicQueueRelease({
+    status: {
+      code: 'downloading',
+      label: 'Downloading',
+      nextAction: 'none',
+      tone: 'info',
+    },
+  });
+  const fetchMusicQueueReleases = t.mock.fn(async () => ({
+    pagination: { total: 1 },
+    releases: [refreshedRelease],
+    summary: { counts: { downloading: 1 }, total: 1 },
+  }));
+  const useMusicQueueMatch = t.mock.fn(async () => {
+    const error = new Error('A candidate for this release is already moving through the download process. Refresh Music Queue before choosing another match.');
+    error.code = 'music_queue_candidate_already_active';
+    throw error;
+  });
+  const { app, musicQueue } = mountMusicQueue({ fetchMusicQueueReleases, useMusicQueueMatch });
+
+  await musicQueue.useMatch({ matchId: 'match-1', wantedReleaseId: 'wanted-1' });
+
+  assert.equal(fetchMusicQueueReleases.mock.callCount(), 1);
+  assert.equal(musicQueue.releases.value[0].statusCode, 'downloading');
+  assert.deepEqual(musicQueue.actionFeedback.value, {
+    actionKey: 'wanted-1:match-1:use',
+    message: 'A candidate for this release is already moving through the download process. Refresh Music Queue before choosing another match.',
+    phase: 'error',
+    wantedReleaseId: 'wanted-1',
+  });
+  app.unmount();
+});
+
 test('Music Queue ignores competing release mutations until the active action finishes', async (t) => {
   const originalDocument = globalThis.document;
   globalThis.document = {

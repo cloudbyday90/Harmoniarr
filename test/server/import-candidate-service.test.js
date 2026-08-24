@@ -808,6 +808,44 @@ test('createImportCandidateService selects candidates with the expected status g
   });
 });
 
+test('createImportCandidateService rolls back a selection when its Music Queue search already has an active candidate', async (t) => {
+  const { client, pool } = createPool(t);
+  const musicQueueSelectionGuard = {
+    findActiveSelection: t.mock.fn(async () => ({
+      id: 'candidate-already-active',
+      status: 'downloading',
+    })),
+  };
+  const transitionImportCandidateStatusFn = t.mock.fn(async ({ toStatus }) => createStoredCandidate({ status: toStatus }));
+  const service = createImportCandidateService({
+    getImportCandidateByIdFn: t.mock.fn(async () => createStoredCandidate({ status: 'pending' })),
+    insertImportCandidateEventFn: t.mock.fn(),
+    musicQueueSelectionGuard,
+    pool,
+    recordAuditEventFn: t.mock.fn(),
+    slskdService: {
+      getSearchResponses: async () => ({ searchId: 'unused', responses: [] }),
+    },
+    transitionImportCandidateStatusFn,
+  });
+
+  await assert.rejects(
+    () => service.selectImportCandidate({ importCandidateId: 'candidate-1' }),
+    (error) => {
+      assert.equal(error.status, 409);
+      assert.equal(error.code, 'music_queue_candidate_already_active');
+      return true;
+    },
+  );
+
+  assert.deepEqual(musicQueueSelectionGuard.findActiveSelection.mock.calls[0].arguments, [{
+    candidate: createStoredCandidate({ status: 'pending' }),
+    client,
+  }]);
+  assert.equal(transitionImportCandidateStatusFn.mock.callCount(), 0);
+  assert.deepEqual(client.query.mock.calls.map((call) => call.arguments[0]), ['BEGIN', 'ROLLBACK']);
+});
+
 test('createImportCandidateService rejects and reopens selected candidates with the expected status guards', async (t) => {
   const { client, pool } = createPool(t);
   const getImportCandidateByIdFn = t.mock.fn(async () => createStoredCandidate({ status: 'selected' }));

@@ -42,6 +42,7 @@ import {
   deriveImportCandidateAddRecoveryReasonCode,
   normalizeImportCandidateAddBlockerCode,
 } from './import-candidate-add-blocker.js';
+import { createImportCandidateMusicQueueSelectionGuard } from './import-candidate-music-queue-selection-guard.js';
 
 const candidateStatuses = new Set(['pending', 'held', 'rejected', 'selected', 'downloading', 'import_pending', 'applied', 'failed']);
 const DEFAULT_SLSKD_RESPONSE_POLL_ATTEMPTS = 15;
@@ -485,6 +486,7 @@ export function createImportCandidateService({
   listImportCandidatesBySourceMediaRequestIdsFn = listImportCandidatesBySourceMediaRequestIdsFromRepository,
   listIgnoredUsernamesFn = async () => [],
   listSourceUserReputationIndexFn = async () => new Map(),
+  musicQueueSelectionGuard = createImportCandidateMusicQueueSelectionGuard(),
   normalizeSlskdResponsesFn = normalizeSlskdResponsesToImportCandidatesWithDiagnostics,
   pool = getPool(),
   recordAuditEventFn = recordAuditEvent,
@@ -685,6 +687,21 @@ export function createImportCandidateService({
       const currentCandidate = await getImportCandidateByIdFn(normalizedImportCandidateId, client);
       if (!currentCandidate) {
         throw createApiError(404, 'import_candidate_not_found', 'Import candidate not found');
+      }
+
+      if (toStatus === 'selected'
+        && typeof musicQueueSelectionGuard?.findActiveSelection === 'function') {
+        const activeSelection = await musicQueueSelectionGuard.findActiveSelection({
+          candidate: currentCandidate,
+          client,
+        });
+        if (activeSelection) {
+          throw createApiError(
+            409,
+            'music_queue_candidate_already_active',
+            'A candidate for this release is already moving through the download process. Refresh Music Queue before choosing another match.',
+          );
+        }
       }
 
       const transitionedCandidate = await transitionImportCandidateStatusFn({

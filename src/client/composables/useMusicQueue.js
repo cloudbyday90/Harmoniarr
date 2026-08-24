@@ -184,6 +184,9 @@ export function useMusicQueue({
       await resource.load();
       return payload;
     } catch (error) {
+      if (error?.code === 'music_queue_candidate_already_active') {
+        await resource.load();
+      }
       setActionFeedback({
         actionKey,
         message: getErrorMessage(error, 'Music Queue match action failed.') || 'Music Queue match action failed.',
