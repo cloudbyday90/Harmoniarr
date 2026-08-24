@@ -28,6 +28,7 @@ export function createAcquisitionModule({
   createPipelineStatusService = createAcquisitionPipelineStatusService,
   createPipelineStore = createAcquisitionPipelineStore,
   createQualityPolicyService = createAcquisitionQualityPolicyService,
+  executeIdempotentMutation = async ({ executeMutation }) => executeMutation(),
   recheckReleaseSafeAdd = null,
   rejectImportCandidate = null,
   recordActivityEventFn = null,
@@ -59,6 +60,7 @@ export function createAcquisitionModule({
     qualityPolicyService,
     routeDependencies: {
       addMusicQueueReleaseToLibrary: acquisitionPipelineService.addMusicQueueReleaseToLibrary,
+      executeIdempotentMutation,
       getMusicQueueRelease: acquisitionPipelineService.getMusicQueueRelease,
       allowMusicQueueReleaseFallbackQuality: acquisitionPipelineService.allowMusicQueueReleaseFallbackQuality,
       listMusicQueueReleases: acquisitionPipelineService.listMusicQueueReleases,

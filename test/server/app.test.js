@@ -395,6 +395,7 @@ suite('createApp', () => {
     appleMusicStatusService: providerModule.appleMusicStatusService,
     artworkPolicyService: artworkModule.artworkPolicyService,
     artworkSummaryService: artworkModule.artworkSummaryService,
+    controlPlaneIdempotencyService: systemModuleArgs.controlPlaneIdempotencyService,
     dependencyHealthService: systemModuleArgs.dependencyHealthService,
     importCandidateExecutionHeartbeatConfig: undefined,
     importCandidateExecutionHeartbeatState: undefined,

@@ -25,6 +25,7 @@ const defaultRequestAuthDependencies = createRequestAuthDependencies();
 export function registerAcquisitionRoutes(app, {
   addMusicQueueReleaseToLibrary,
   allowMusicQueueReleaseFallbackQuality,
+  executeIdempotentMutation = async ({ executeMutation }) => executeMutation(),
   getRequestMetadata = defaultRequestAuthDependencies.getRequestMetadata,
   getMusicQueueRelease,
   limitMusicQueueMutation = skipRateLimitMiddleware,
@@ -63,18 +64,32 @@ export function registerAcquisitionRoutes(app, {
   app.post('/api/v1/acquisition/releases/:wantedReleaseId/matches/:matchId/use', limitMusicQueueMutation, asyncRoute(async (request, response) => {
     const session = await requireFreshSession(request);
     requireCsrf(request, session);
-    const payload = await useMusicQueueMatch({
-      actorUserId: session.user?.id ?? session.appUserId,
-      appUserId: session.user?.id ?? session.appUserId,
-      matchId: request.params.matchId,
-      reason: request.body?.reason,
-      requestMetadata: getRequestMetadata(request),
-      wantedReleaseId: request.params.wantedReleaseId,
+    const actorUserId = session.user?.id ?? session.appUserId;
+    const result = await executeIdempotentMutation({
+      actorUserId,
+      executeMutation: async () => ({
+        body: await useMusicQueueMatch({
+          actorUserId,
+          appUserId: actorUserId,
+          matchId: request.params.matchId,
+          reason: request.body?.reason,
+          requestMetadata: getRequestMetadata(request),
+          wantedReleaseId: request.params.wantedReleaseId,
+        }),
+        statusCode: 200,
+      }),
+      idempotencyKey: request.headers['idempotency-key'],
+      operationScope: 'acquisition.musicQueue.matches.use',
+      requestPayload: {
+        matchId: request.params.matchId,
+        reason: request.body?.reason ?? null,
+        wantedReleaseId: request.params.wantedReleaseId,
+      },
     });
 
-    response.json({
+    response.status(result?.statusCode ?? 200).json({
       ok: true,
-      ...payload,
+      ...(result?.body ?? {}),
     });
   }));
 

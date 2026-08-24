@@ -66,7 +66,22 @@ test('acquisition-api useMusicQueueMatch sends CSRF-backed scoped POST', async (
   assert.equal(url, '/api/v1/acquisition/releases/wanted%2F1/matches/candidate%2F1/use');
   assert.equal(options.method, 'POST');
   assert.equal(options.headers.get('X-CSRF-Token'), 'csrf-mq');
+  assert.match(options.headers.get('Idempotency-Key'), /^acquisition-music-queue-matches-use-/);
   assert.deepEqual(JSON.parse(options.body), { reason: 'Looks right' });
+});
+
+test('acquisition-api useMusicQueueMatch reuses a caller-held idempotency key', async (t) => {
+  globalThis.document = { cookie: 'harmoniarr_csrf=csrf-mq' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse());
+
+  await useMusicQueueMatch({
+    idempotencyKey: 'acquisition-music-queue-matches-use-retry-1',
+    matchId: 'candidate-1',
+    wantedReleaseId: 'wanted-1',
+  });
+
+  const [, options] = globalThis.fetch.mock.calls[0].arguments;
+  assert.equal(options.headers.get('Idempotency-Key'), 'acquisition-music-queue-matches-use-retry-1');
 });
 
 test('acquisition-api rejectMusicQueueMatch sends CSRF-backed scoped POST', async (t) => {

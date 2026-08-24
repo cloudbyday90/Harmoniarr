@@ -163,6 +163,45 @@ test('Music Queue keeps working, success, and failure feedback scoped to the rel
   failingApp.unmount();
 });
 
+test('Music Queue retries an unconfirmed match selection with its original idempotency key', async (t) => {
+  const originalDocument = globalThis.document;
+  globalThis.document = {
+    addEventListener() {},
+    hidden: false,
+    removeEventListener() {},
+  };
+  t.after(() => {
+    globalThis.document = originalDocument;
+  });
+
+  const fetchMusicQueueReleases = t.mock.fn(async () => ({
+    pagination: { total: 0 },
+    releases: [],
+    summary: { counts: {}, total: 0 },
+  }));
+  let attemptCount = 0;
+  const useMusicQueueMatch = t.mock.fn(async () => {
+    attemptCount += 1;
+    if (attemptCount === 1) {
+      throw new Error('Network connection closed before the response arrived.');
+    }
+
+    return { ok: true };
+  });
+  const { app, musicQueue } = mountMusicQueue({ fetchMusicQueueReleases, useMusicQueueMatch });
+
+  await musicQueue.useMatch({ matchId: 'match-1', wantedReleaseId: 'wanted-1' });
+  await musicQueue.useMatch({ matchId: 'match-1', wantedReleaseId: 'wanted-1' });
+
+  assert.equal(useMusicQueueMatch.mock.callCount(), 2);
+  const firstRequest = useMusicQueueMatch.mock.calls[0].arguments[0];
+  const secondRequest = useMusicQueueMatch.mock.calls[1].arguments[0];
+  assert.match(firstRequest.idempotencyKey, /^acquisition-music-queue-matches-use-/);
+  assert.equal(secondRequest.idempotencyKey, firstRequest.idempotencyKey);
+  assert.equal(fetchMusicQueueReleases.mock.callCount(), 1);
+  app.unmount();
+});
+
 test('Music Queue revalidates after another operator already selected a shared-release match', async (t) => {
   const originalDocument = globalThis.document;
   globalThis.document = {

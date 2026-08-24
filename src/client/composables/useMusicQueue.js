@@ -31,6 +31,7 @@ import { buildMusicQueueSummaryCards, normalizeMusicQueueRelease } from '../lib/
 import { getErrorMessage } from '../lib/error-utils.js';
 import { createMusicQueueActionFeedback } from '../lib/music-queue-action-feedback-presentation.js';
 import { createMusicQueueReleaseMutationGate } from '../lib/music-queue-release-mutation-gate.js';
+import { createRetryIdempotencyKeyStore } from '../lib/retry-idempotency-key-store.js';
 import {
   isMusicQueueActiveProgressRelease,
   MUSIC_QUEUE_ACTIVE_PROGRESS_STATUSES,
@@ -69,6 +70,7 @@ export function useMusicQueue({
   const activeReleaseActionKey = ref('');
   const hasArtistScope = metadataArtistId !== null;
   const releaseMutationGate = createMusicQueueReleaseMutationGate();
+  const retryIdempotencyKeyStore = createRetryIdempotencyKeyStore();
 
   function getMetadataArtistId() {
     const value = toValue(metadataArtistId);
@@ -162,6 +164,7 @@ export function useMusicQueue({
     actionKey,
     apiFn,
     matchId,
+    idempotencyScope = null,
     pendingMessage,
     successMessage,
     wantedReleaseId,
@@ -178,12 +181,21 @@ export function useMusicQueue({
     setActionFeedback({ actionKey, message: pendingMessage, phase: 'working', wantedReleaseId });
 
     try {
-      const payload = await apiFn({ matchId, wantedReleaseId });
+      const idempotencyKey = idempotencyScope
+        ? retryIdempotencyKeyStore.getOrCreate({ actionKey, scope: idempotencyScope })
+        : null;
+      const payload = await apiFn({ idempotencyKey, matchId, wantedReleaseId });
       applyMutationRelease(payload);
+      if (idempotencyScope) {
+        retryIdempotencyKeyStore.clear(actionKey);
+      }
       setActionFeedback({ actionKey, message: successMessage, phase: 'success', wantedReleaseId });
       await resource.load();
       return payload;
     } catch (error) {
+      if (idempotencyScope && Number.isInteger(error?.status)) {
+        retryIdempotencyKeyStore.clear(actionKey);
+      }
       if (error?.code === 'music_queue_candidate_already_active') {
         await resource.load();
       }
@@ -201,9 +213,11 @@ export function useMusicQueue({
   }
 
   function useMatch({ matchId, wantedReleaseId } = {}) {
+    const actionKey = `${wantedReleaseId}:${matchId}:use`;
     return runMatchAction({
-      actionKey: `${wantedReleaseId}:${matchId}:use`,
+      actionKey,
       apiFn: useMusicQueueMatch,
+      idempotencyScope: 'acquisition.music-queue.matches.use',
       matchId,
       pendingMessage: 'Using this match...',
       successMessage: 'Match selected. Harmoniarr will use it for the next download step.',

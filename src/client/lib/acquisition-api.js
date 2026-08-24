@@ -17,6 +17,7 @@
  */
 
 import { apiRequest, buildQueryString } from './api.js';
+import { createControlPlaneIdempotencyHeaders } from './control-plane-idempotency.js';
 
 export function fetchMusicQueueReleases({ limit = 100, metadataArtistId = null, offset = 0 } = {}) {
   return apiRequest(`/api/v1/acquisition/releases${buildQueryString({ limit, metadataArtistId, offset })}`);
@@ -26,11 +27,14 @@ export function fetchMusicQueueRelease(wantedReleaseId) {
   return apiRequest(`/api/v1/acquisition/releases/${encodeURIComponent(wantedReleaseId)}`);
 }
 
-export function useMusicQueueMatch({ wantedReleaseId, matchId, reason } = {}) {
+export function useMusicQueueMatch({ idempotencyKey = null, wantedReleaseId, matchId, reason } = {}) {
   return apiRequest(
     `/api/v1/acquisition/releases/${encodeURIComponent(wantedReleaseId)}/matches/${encodeURIComponent(matchId)}/use`,
     {
       body: { reason },
+      headers: idempotencyKey
+        ? { 'Idempotency-Key': idempotencyKey }
+        : createControlPlaneIdempotencyHeaders('acquisition.music-queue.matches.use'),
       includeCsrf: true,
       method: 'POST',
     },

@@ -137,6 +137,23 @@ test('music queue routes return auth errors from requireSession', async () => {
 });
 
 test('music queue use-match route requires fresh session and CSRF before scoped mutation', async (t) => {
+  const executeIdempotentMutation = t.mock.fn(async ({
+    actorUserId,
+    executeMutation,
+    idempotencyKey,
+    operationScope,
+    requestPayload,
+  }) => {
+    assert.equal(actorUserId, 'user-1');
+    assert.equal(idempotencyKey, 'music-queue-use-1');
+    assert.equal(operationScope, 'acquisition.musicQueue.matches.use');
+    assert.deepEqual(requestPayload, {
+      matchId: 'candidate-1',
+      reason: 'Use this one',
+      wantedReleaseId: 'wanted-1',
+    });
+    return executeMutation();
+  });
   const requireFreshSession = t.mock.fn(async () => ({ appUserId: 'user-1' }));
   const requireCsrf = t.mock.fn(() => {});
   const useMusicQueueMatch = t.mock.fn(async ({ matchId, wantedReleaseId }) => ({
@@ -144,6 +161,7 @@ test('music queue use-match route requires fresh session and CSRF before scoped 
     release: { id: wantedReleaseId },
   }));
   const app = createAcquisitionRouteTestApp({
+    executeIdempotentMutation,
     getRequestMetadata: () => ({ ipAddress: '127.0.0.1' }),
     requireCsrf,
     requireFreshSession,
@@ -153,7 +171,10 @@ test('music queue use-match route requires fresh session and CSRF before scoped 
   await withServer(app, async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/v1/acquisition/releases/wanted-1/matches/candidate-1/use`, {
       body: JSON.stringify({ reason: 'Use this one' }),
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'content-type': 'application/json',
+        'idempotency-key': 'music-queue-use-1',
+      },
       method: 'POST',
     });
     const payload = await response.json();
@@ -162,6 +183,7 @@ test('music queue use-match route requires fresh session and CSRF before scoped 
     assert.equal(payload.ok, true);
     assert.equal(requireFreshSession.mock.callCount(), 1);
     assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.equal(executeIdempotentMutation.mock.callCount(), 1);
     assert.deepEqual(useMusicQueueMatch.mock.calls[0].arguments, [{
       actorUserId: 'user-1',
       appUserId: 'user-1',
@@ -170,6 +192,51 @@ test('music queue use-match route requires fresh session and CSRF before scoped 
       requestMetadata: { ipAddress: '127.0.0.1' },
       wantedReleaseId: 'wanted-1',
     }]);
+  });
+});
+
+test('music queue use-match route replays its stored result without selecting again', async (t) => {
+  const executeIdempotentMutation = t.mock.fn(async ({
+    actorUserId,
+    idempotencyKey,
+    operationScope,
+    requestPayload,
+  }) => {
+    assert.equal(actorUserId, 'user-1');
+    assert.equal(idempotencyKey, 'music-queue-use-replay-1');
+    assert.equal(operationScope, 'acquisition.musicQueue.matches.use');
+    assert.deepEqual(requestPayload, {
+      matchId: 'candidate-1',
+      reason: null,
+      wantedReleaseId: 'wanted-1',
+    });
+    return {
+      body: {
+        action: { code: 'use_match', matchId: 'candidate-1' },
+        release: { id: 'wanted-1' },
+      },
+      replayed: true,
+      statusCode: 200,
+    };
+  });
+  const useMusicQueueMatch = t.mock.fn(async () => {
+    throw new Error('a completed idempotency record must replay before selection runs');
+  });
+  const app = createAcquisitionRouteTestApp({ executeIdempotentMutation, useMusicQueueMatch });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/acquisition/releases/wanted-1/matches/candidate-1/use`, {
+      headers: { 'idempotency-key': 'music-queue-use-replay-1' },
+      method: 'POST',
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.action.code, 'use_match');
+    assert.equal(payload.release.id, 'wanted-1');
+    assert.equal(executeIdempotentMutation.mock.callCount(), 1);
+    assert.equal(useMusicQueueMatch.mock.callCount(), 0);
   });
 });
 

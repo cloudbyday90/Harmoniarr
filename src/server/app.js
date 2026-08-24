@@ -584,9 +584,11 @@ export function createApp({
     settingsService,
     slskdService: slskdModule.slskdService,
   });
+  const controlPlaneIdempotencyService = createControlPlaneIdempotencyService();
   const acquisitionModule = buildAcquisitionModule({
     allowMusicQueueFallbackQuality: libraryModule.libraryDiscoveryRequestStore?.allowMusicQueueFallbackQuality,
     buildLibraryWantedReleases: libraryModule.routeDependencies.buildLibraryWantedReleases,
+    executeIdempotentMutation: controlPlaneIdempotencyService.executeIdempotentMutation,
     recheckReleaseSafeAdd: importCandidateModule.importCandidateReleaseSafeAddRecheckService?.recheckReleaseSafeAdd
       ?? null,
     startReleaseManualSafeAdd: importCandidateModule.importCandidateReleaseManualSafeAddService?.startReleaseManualSafeAdd
@@ -650,6 +652,7 @@ export function createApp({
     appPort,
     artworkPolicyService: artworkModule.artworkPolicyService,
     artworkSummaryService: artworkModule.artworkSummaryService,
+    controlPlaneIdempotencyService,
     dependencyHealthService,
     importCandidateExecutionHeartbeatConfig: importCandidateModule.importCandidateExecutionHeartbeatConfig,
     importCandidateExecutionHeartbeatState: importCandidateModule.importCandidateExecutionHeartbeatState,
