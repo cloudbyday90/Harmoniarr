@@ -50,8 +50,8 @@ the checked-out PR branch.
 
 ## Next recommended work
 
-Add a narrow idempotency-response store for externally retried mutation
-requests, beginning with Music Queue match selection. The new selection guard
-prevents competing choices; idempotency would additionally let a repeated
-request return its original successful result without redoing audit work or
-forcing the client to infer whether the first response was lost.
+Apply the existing control-plane idempotency service to Music Queue match
+selection. The new selection guard prevents competing choices; a replay key
+would additionally let a repeated request return its original successful
+result without redoing audit work or forcing the client to infer whether the
+first response was lost.
