@@ -42,22 +42,74 @@ function normalizeIdempotencyKey(idempotencyKey) {
   return trimmed;
 }
 
-function computeExpiry({ getNow, ttlHours }) {
-  const expiresAt = new Date(getNow().getTime() + (ttlHours * 60 * 60 * 1000));
+function computeExpiry({ getNow, ttlMilliseconds }) {
+  const expiresAt = new Date(getNow().getTime() + ttlMilliseconds);
   return expiresAt.toISOString();
 }
 
+function isExpired(record, now) {
+  return record.expiresAt && new Date(record.expiresAt).getTime() <= now.getTime();
+}
+
 export function createControlPlaneIdempotencyService({
-  createRecord = null,
-  deleteRecordById = null,
+  completeRecord = null,
+  createInProgressRecord = null,
+  deleteExpiredRecordById = null,
+  deleteInProgressRecordById = null,
   getNow = () => new Date(),
   getRecordByScopeActorAndKey = null,
+  inProgressTtlMinutes = 60,
   idempotencyStore = createControlPlaneIdempotencyStore(),
   ttlHours = 48,
 } = {}) {
-  const createRecordFn = createRecord ?? idempotencyStore.createRecord;
-  const deleteRecordByIdFn = deleteRecordById ?? idempotencyStore.deleteRecordById;
+  const completeRecordFn = completeRecord ?? idempotencyStore.completeRecord;
+  const createInProgressRecordFn = createInProgressRecord ?? idempotencyStore.createInProgressRecord;
+  const deleteExpiredRecordByIdFn = deleteExpiredRecordById ?? idempotencyStore.deleteExpiredRecordById;
+  const deleteInProgressRecordByIdFn = deleteInProgressRecordById ?? idempotencyStore.deleteInProgressRecordById;
   const getRecordFn = getRecordByScopeActorAndKey ?? idempotencyStore.getRecordByScopeActorAndKey;
+
+  function createPayloadMismatchError() {
+    return createApiError(409, 'idempotency_key_payload_mismatch', 'Idempotency key was already used with a different request payload');
+  }
+
+  function createInProgressError() {
+    return createApiError(409, 'idempotency_key_in_progress', 'This action is already being processed. Try again shortly.');
+  }
+
+  async function findExistingOutcome({ actorUserId, idempotencyKey, operationScope, requestHash }) {
+    const existingRecord = await getRecordFn({
+      actorUserId,
+      idempotencyKey,
+      operationScope,
+    });
+
+    if (!existingRecord) {
+      return null;
+    }
+
+    const now = getNow();
+    if (isExpired(existingRecord, now)) {
+      await deleteExpiredRecordByIdFn({
+        id: existingRecord.id,
+        now: now.toISOString(),
+      });
+      return null;
+    }
+
+    if (existingRecord.requestHash !== requestHash) {
+      throw createPayloadMismatchError();
+    }
+
+    if (existingRecord.state === 'in_progress') {
+      throw createInProgressError();
+    }
+
+    return {
+      body: existingRecord.response,
+      replayed: true,
+      statusCode: existingRecord.statusCode,
+    };
+  }
 
   async function executeIdempotentMutation({
     actorUserId = null,
@@ -78,71 +130,65 @@ export function createControlPlaneIdempotencyService({
 
     const requestHash = hashRequestPayload(requestPayload);
 
-    const existingRecord = await getRecordFn({
-      actorUserId,
-      idempotencyKey: normalizedIdempotencyKey,
-      operationScope,
-    });
-
-    if (existingRecord) {
-      if (existingRecord.expiresAt && new Date(existingRecord.expiresAt).getTime() <= getNow().getTime()) {
-        await deleteRecordByIdFn({ id: existingRecord.id });
-      } else {
-        if (existingRecord.requestHash !== requestHash) {
-          throw createApiError(409, 'idempotency_key_payload_mismatch', 'Idempotency key was already used with a different request payload');
-        }
-
-        return {
-          body: existingRecord.response,
-          replayed: true,
-          statusCode: existingRecord.statusCode,
-        };
-      }
-    }
-
-    const result = await executeMutation();
-
-    try {
-      await createRecordFn({
+    for (;;) {
+      const existingOutcome = await findExistingOutcome({
         actorUserId,
-        expiresAt: computeExpiry({ getNow, ttlHours }),
         idempotencyKey: normalizedIdempotencyKey,
         operationScope,
         requestHash,
-        response: result?.body ?? {},
-        statusCode: result?.statusCode ?? 200,
       });
-    } catch (error) {
-      if (error?.code === '23505') {
-        const replayRecord = await getRecordFn({
-          actorUserId,
-          idempotencyKey: normalizedIdempotencyKey,
-          operationScope,
+
+      if (existingOutcome) {
+        return existingOutcome;
+      }
+
+      const reservation = await createInProgressRecordFn({
+        actorUserId,
+        expiresAt: computeExpiry({
+          getNow,
+          ttlMilliseconds: inProgressTtlMinutes * 60 * 1000,
+        }),
+        idempotencyKey: normalizedIdempotencyKey,
+        operationScope,
+        requestHash,
+      });
+
+      if (!reservation) {
+        continue;
+      }
+
+      let mutationCompleted = false;
+
+      try {
+        const result = await executeMutation();
+        mutationCompleted = true;
+        const completedRecord = await completeRecordFn({
+          expiresAt: computeExpiry({
+            getNow,
+            ttlMilliseconds: ttlHours * 60 * 60 * 1000,
+          }),
+          id: reservation.id,
+          response: result?.body ?? {},
+          statusCode: result?.statusCode ?? 200,
         });
 
-        if (!replayRecord) {
-          throw error;
-        }
-
-        if (replayRecord.requestHash !== requestHash) {
-          throw createApiError(409, 'idempotency_key_payload_mismatch', 'Idempotency key was already used with a different request payload');
+        if (!completedRecord) {
+          throw new Error('Idempotency reservation was not available to complete');
         }
 
         return {
-          body: replayRecord.response,
-          replayed: true,
-          statusCode: replayRecord.statusCode,
+          body: result?.body ?? {},
+          replayed: false,
+          statusCode: result?.statusCode ?? 200,
         };
+      } catch (error) {
+        if (!mutationCompleted) {
+          await deleteInProgressRecordByIdFn({ id: reservation.id });
+        }
+
+        throw error;
       }
-
-      throw error;
     }
-
-    return {
-      body: result?.body ?? {},
-      replayed: false,
-      statusCode: result?.statusCode ?? 200,
-    };
   }
 
   return {

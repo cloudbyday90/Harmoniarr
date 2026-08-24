@@ -32,6 +32,7 @@ function normalizeRecord(row) {
     operationScope: row.operation_scope,
     requestHash: row.request_hash,
     response: row.response_json ?? {},
+    state: row.state ?? 'completed',
     statusCode: row.status_code,
   };
 }
@@ -42,7 +43,7 @@ export function createControlPlaneIdempotencyStore({
   async function getRecordByScopeActorAndKey({ actorUserId = null, idempotencyKey, operationScope }) {
     const result = await getPoolFn().query(
       `
-        SELECT id, operation_scope, actor_user_id, idempotency_key, request_hash, status_code, response_json, created_at, expires_at
+        SELECT id, operation_scope, actor_user_id, idempotency_key, request_hash, state, status_code, response_json, created_at, expires_at
         FROM control_plane_idempotency_records
         WHERE operation_scope = $1
           AND actor_user_id IS NOT DISTINCT FROM $2
@@ -55,14 +56,12 @@ export function createControlPlaneIdempotencyStore({
     return normalizeRecord(result.rows[0]);
   }
 
-  async function createRecord({
+  async function createInProgressRecord({
     actorUserId = null,
     expiresAt = null,
     idempotencyKey,
     operationScope,
     requestHash,
-    response,
-    statusCode,
   }) {
     const result = await getPoolFn().query(
       `
@@ -71,20 +70,20 @@ export function createControlPlaneIdempotencyStore({
           actor_user_id,
           idempotency_key,
           request_hash,
+          state,
           status_code,
           response_json,
           expires_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::timestamptz)
-        RETURNING id, operation_scope, actor_user_id, idempotency_key, request_hash, status_code, response_json, created_at, expires_at
+        VALUES ($1, $2, $3, $4, 'in_progress', 202, '{}'::jsonb, $5::timestamptz)
+        ON CONFLICT DO NOTHING
+        RETURNING id, operation_scope, actor_user_id, idempotency_key, request_hash, state, status_code, response_json, created_at, expires_at
       `,
       [
         operationScope,
         actorUserId,
         idempotencyKey,
         requestHash,
-        statusCode,
-        JSON.stringify(response ?? {}),
         expiresAt,
       ],
     );
@@ -92,11 +91,45 @@ export function createControlPlaneIdempotencyStore({
     return normalizeRecord(result.rows[0]);
   }
 
-  async function deleteRecordById({ id }) {
+  async function completeRecord({ expiresAt = null, id, response, statusCode }) {
+    const result = await getPoolFn().query(
+      `
+        UPDATE control_plane_idempotency_records
+        SET state = 'completed',
+            status_code = $2,
+            response_json = $3::jsonb,
+            expires_at = $4::timestamptz
+        WHERE id = $1
+          AND state = 'in_progress'
+        RETURNING id, operation_scope, actor_user_id, idempotency_key, request_hash, state, status_code, response_json, created_at, expires_at
+      `,
+      [id, statusCode, JSON.stringify(response ?? {}), expiresAt],
+    );
+
+    return normalizeRecord(result.rows[0]);
+  }
+
+  async function deleteExpiredRecordById({ id, now }) {
+    const result = await getPoolFn().query(
+      `
+        DELETE FROM control_plane_idempotency_records
+        WHERE id = $1
+          AND expires_at IS NOT NULL
+          AND expires_at <= $2::timestamptz
+        RETURNING id
+      `,
+      [id, now],
+    );
+
+    return result.rowCount > 0;
+  }
+
+  async function deleteInProgressRecordById({ id }) {
     await getPoolFn().query(
       `
         DELETE FROM control_plane_idempotency_records
         WHERE id = $1
+          AND state = 'in_progress'
       `,
       [id],
     );
@@ -118,9 +151,11 @@ export function createControlPlaneIdempotencyStore({
   }
 
   return {
-    createRecord,
+    completeRecord,
+    createInProgressRecord,
     deleteExpiredRecords,
-    deleteRecordById,
+    deleteExpiredRecordById,
+    deleteInProgressRecordById,
     getRecordByScopeActorAndKey,
   };
 }
