@@ -10,6 +10,10 @@ import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { chromium } from 'playwright';
 
+import {
+  assertMusicQueueTransferLinkagePreserved,
+  summarizeMusicQueueTransferLinkage,
+} from './downloader-music-queue-evidence.js';
 import { writeDockerSmokeEvidence } from './docker-smoke-evidence.js';
 
 export const defaultDockerProviderAcceptanceBaseUrl = 'http://127.0.0.1:47956';
@@ -84,6 +88,10 @@ function getDownloadAcceptanceDiagnostic(item) {
 
 function normalizeCount(value) {
   return Number.isFinite(Number(value)) ? Number(value) : 0;
+}
+
+function assertExactRowCount(actual, expected, label) {
+  assertCondition(actual === expected, `${label} expected ${expected} row${expected === 1 ? '' : 's'}, received ${actual}`);
 }
 
 function summarizeProviderState(downloaderQueue) {
@@ -179,6 +187,7 @@ export function buildProviderAcceptanceEvidenceResult({
     baseUrl,
     checkedAt,
     importReview,
+    musicQueue: summarizeMusicQueueTransferLinkage(downloaderQueue),
     paths,
     provider,
     username,
@@ -189,6 +198,7 @@ export function assertProviderAcceptanceEvidenceResult(result, {
   requireAcceptedTransfer = false,
   requireConfiguredProvider = true,
   requireDiagnostic = true,
+  requireMusicQueueLink = false,
   requirePathMapping = true,
 } = {}) {
   assertCondition(result && typeof result === 'object', 'provider acceptance evidence result must be an object');
@@ -223,7 +233,64 @@ export function assertProviderAcceptanceEvidenceResult(result, {
     );
   }
 
+  if (requireMusicQueueLink) {
+    assertCondition(
+      result.musicQueue?.linkedTransferCount > 0,
+      'Expected at least one Downloader transfer linked to Music Queue',
+    );
+  }
+
   return result;
+}
+
+async function verifyMusicQueueLinkageInDownloader({
+  baseUrl,
+  downloaderQueue,
+  page,
+  timeoutMs,
+} = {}) {
+  const beforeRefresh = summarizeMusicQueueTransferLinkage(downloaderQueue);
+  assertCondition(
+    beforeRefresh.linkedTransferCount > 0,
+    'Expected at least one Downloader transfer linked to Music Queue',
+  );
+
+  await page.goto(`${baseUrl}/app/downloader`, { waitUntil: 'domcontentloaded' });
+  await waitForHeading(page, 'Downloader');
+
+  const musicQueueFilter = page.getByRole('checkbox', {
+    name: 'Only transfers linked to Music Queue',
+  });
+  await musicQueueFilter.check();
+  await page.getByRole('status').filter({
+    hasText: `Showing ${beforeRefresh.linkedTransferCount} of ${beforeRefresh.totalTransferCount} transfers.`,
+  }).waitFor({ timeout: timeoutMs });
+  assertExactRowCount(
+    await page.getByRole('row').count() - 1,
+    beforeRefresh.linkedTransferCount,
+    'Music Queue filter',
+  );
+
+  const refreshResponsePromise = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return response.request().method() === 'GET' && url.pathname === '/api/v1/downloader/queue';
+  });
+  await page.getByRole('button', { exact: true, name: 'Refresh' }).click();
+  const refreshResponse = await refreshResponsePromise;
+  assertCondition(refreshResponse.ok(), `Downloader refresh returned HTTP ${refreshResponse.status()}`);
+  const refreshedQueue = await refreshResponse.json();
+  const linkage = assertMusicQueueTransferLinkagePreserved({
+    afterRefresh: refreshedQueue,
+    beforeRefresh: downloaderQueue,
+  });
+  assertCondition(await musicQueueFilter.isChecked(), 'Music Queue filter must remain selected after refresh');
+  assertExactRowCount(
+    await page.getByRole('row').count() - 1,
+    linkage.afterRefresh.linkedTransferCount,
+    'Refreshed Music Queue filter',
+  );
+
+  return linkage;
 }
 
 function createNoopCheckpointRecorder() {
@@ -276,6 +343,7 @@ export async function runProviderAcceptanceBrowserScenario({
   requireAcceptedTransfer = false,
   requireConfiguredProvider = true,
   requireDiagnostic = true,
+  requireMusicQueueLink = false,
   requirePathMapping = true,
   timeoutMs = 15_000,
   username,
@@ -313,22 +381,40 @@ export async function runProviderAcceptanceBrowserScenario({
     requireAcceptedTransfer,
     requireConfiguredProvider,
     requireDiagnostic,
+    requireMusicQueueLink,
     requirePathMapping,
   });
   await record('provider_acceptance_api_verified');
 
-  await page.goto(`${baseUrl}/app/activity/candidates`, { waitUntil: 'domcontentloaded' });
-  await waitForHeading(page, 'Download candidates');
-
-  const firstDiagnostic = result.importReview.diagnostics[0] ?? null;
-  if (firstDiagnostic) {
+  if (requireDiagnostic) {
+    await page.goto(`${baseUrl}/app/activity/diagnostics/matches`, { waitUntil: 'domcontentloaded' });
+    await waitForHeading(page, 'Match diagnostics');
+    const firstDiagnostic = result.importReview.diagnostics[0] ?? null;
     await page.getByText('Download acceptance diagnostic', { exact: true }).first().waitFor({ timeout: timeoutMs });
     await page.getByText(firstDiagnostic.title, { exact: true }).first().waitFor({ timeout: timeoutMs });
+    await record('provider_acceptance_ui_verified');
   }
-  await record('provider_acceptance_ui_verified');
+
+  const musicQueueLinkage = requireMusicQueueLink
+    ? await verifyMusicQueueLinkageInDownloader({
+      baseUrl,
+      downloaderQueue,
+      page,
+      timeoutMs,
+    })
+    : null;
+  if (musicQueueLinkage) {
+    await record('music_queue_linkage_ui_verified');
+  }
 
   return {
     ...result,
+    musicQueue: musicQueueLinkage
+      ? {
+        ...result.musicQueue,
+        afterRefresh: musicQueueLinkage.afterRefresh,
+      }
+      : result.musicQueue,
     browser: {
       checkpoints,
     },
@@ -357,6 +443,7 @@ export async function runDockerProviderAcceptanceEvidence({
   requireAcceptedTransfer = false,
   requireConfiguredProvider = true,
   requireDiagnostic = true,
+  requireMusicQueueLink = false,
   requirePathMapping = true,
   runProviderAcceptanceBrowserScenarioFn = runProviderAcceptanceBrowserScenario,
   screenshotDir = null,
@@ -396,6 +483,7 @@ export async function runDockerProviderAcceptanceEvidence({
       requireAcceptedTransfer,
       requireConfiguredProvider,
       requireDiagnostic,
+      requireMusicQueueLink,
       requirePathMapping,
       timeoutMs,
       username,

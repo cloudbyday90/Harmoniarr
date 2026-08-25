@@ -277,7 +277,7 @@ export async function runOperatorBrowserScenario({
 
   await page.getByRole('link', { name: 'Candidates' }).click();
   await page.waitForURL(/\/app\/activity\/candidates(?:\?.*)?(?:#.*)?$/);
-  await waitForHeading(page, 'Download candidates');
+  await waitForHeading(page, 'Match diagnostics');
   await record('candidates_loaded');
 
   await page.getByRole('link', { name: 'Settings' }).click();

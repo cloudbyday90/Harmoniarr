@@ -36,6 +36,8 @@ const expectedProviderCalls = Object.freeze({
   listenBrainz: 1,
   musicBrainzRelations: 1,
 });
+const cacheCoalescingWaitTimeoutMs = 15_000;
+const cacheCoalescingPollIntervalMs = 25;
 
 function assertCacheMetadata(cache, { lookup, refresh }) {
   assert.equal(cache.lookup, lookup);
@@ -87,16 +89,18 @@ function createReadObservedCacheStore(cacheStore) {
 }
 
 async function waitForCondition(condition, message) {
-  for (let attempt = 0; attempt < 1_000; attempt += 1) {
+  const deadline = Date.now() + cacheCoalescingWaitTimeoutMs;
+
+  while (Date.now() <= deadline) {
     if (condition()) {
       return;
     }
     await new Promise((resolve) => {
-      setImmediate(resolve);
+      setTimeout(resolve, cacheCoalescingPollIntervalMs);
     });
   }
 
-  throw new Error(message);
+  throw new Error(`${message} within ${cacheCoalescingWaitTimeoutMs}ms`);
 }
 
 function assertArtistDetailProviderPayloads({ discography, relatedArtists }, cacheExpectation) {

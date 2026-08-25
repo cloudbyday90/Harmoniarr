@@ -25,6 +25,7 @@ export const validateDockerProviderAcceptanceCliOptions = Object.freeze({
   'require-accepted-transfer': { type: 'boolean' },
   'require-configured-provider': { type: 'boolean' },
   'require-diagnostic': { type: 'boolean' },
+  'require-music-queue-link': { type: 'boolean' },
   'require-path-mapping': { type: 'boolean' },
   'screenshot-dir': { type: 'string' },
   'timeout-ms': { type: 'string' },
@@ -91,6 +92,13 @@ export function resolveDockerProviderAcceptanceInputs({
       'HARMONIARR_DOCKER_PROVIDER_ACCEPTANCE_REQUIRE_DIAGNOSTIC',
       env,
       true,
+    ),
+    requireMusicQueueLink: getBooleanInput(
+      values,
+      'require-music-queue-link',
+      'HARMONIARR_DOCKER_PROVIDER_ACCEPTANCE_REQUIRE_MUSIC_QUEUE_LINK',
+      env,
+      false,
     ),
     requirePathMapping: getBooleanInput(
       values,

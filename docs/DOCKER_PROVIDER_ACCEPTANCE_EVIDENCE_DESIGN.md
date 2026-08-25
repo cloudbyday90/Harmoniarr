@@ -22,7 +22,7 @@ that:
 - the emitted JSON evidence contains no provider API key or raw secret value.
 
 The validator supports stricter proof with
-`--require-accepted-transfer true` when the local slskd run is expected to have
+`--require-accepted-transfer` when the local slskd run is expected to have
 accepted at least one transfer.
 
 ## Official Sources Reviewed
@@ -124,7 +124,7 @@ npm run validate:docker-provider-acceptance
 For a stricter acceptance proof:
 
 ```powershell
-npm run validate:docker-provider-acceptance -- --require-accepted-transfer true
+npm run validate:docker-provider-acceptance -- -- --require-accepted-transfer
 ```
 
 Use the non-strict diagnostic mode only when intentionally capturing a

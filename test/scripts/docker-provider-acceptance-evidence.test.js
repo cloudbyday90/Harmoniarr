@@ -28,6 +28,7 @@ function createDownloaderQueue(overrides = {}) {
         },
         status: 'busy',
       },
+      transfers: [],
       ...overrides,
     },
   };
@@ -137,6 +138,10 @@ test('buildProviderAcceptanceEvidenceResult redacts provider secrets and include
   });
 
   assert.equal(result.provider.enabled, true);
+  assert.deepEqual(result.musicQueue, {
+    linkedTransferCount: 0,
+    totalTransferCount: 0,
+  });
   assert.equal(result.paths.slskdSecretConfigured, true);
   assert.deepEqual(result.paths.downloadMappings, [{
     downloadClientPrefix: '/downloads/complete/Music',
@@ -196,9 +201,38 @@ test('assertProviderAcceptanceEvidenceResult can require accepted provider evide
   );
 });
 
+test('assertProviderAcceptanceEvidenceResult can require a Music Queue-linked transfer', () => {
+  const result = buildProviderAcceptanceEvidenceResult({
+    baseUrl: 'http://127.0.0.1:47956',
+    downloaderQueue: createDownloaderQueue({
+      transfers: [{
+        diagnostics: {
+          importLinkage: {
+            musicQueueRelease: {
+              wantedReleaseId: 'wanted-release-1',
+            },
+          },
+        },
+        id: 'transfer-1',
+        sourceUser: 'source-one',
+        transferKey: 'source-one::transfer-1',
+      }],
+    }),
+    executionSummary: createExecutionSummary(),
+    settings: createSettingsPayload(),
+    username: 'walkthrough-admin',
+  });
+
+  assert.equal(
+    assertProviderAcceptanceEvidenceResult(result, { requireMusicQueueLink: true })
+      .musicQueue.linkedTransferCount,
+    1,
+  );
+});
+
 test('resolveDockerProviderAcceptanceInputs reads walkthrough defaults and strict evidence options', () => {
   const inputs = resolveDockerProviderAcceptanceInputs({
-    args: ['--require-accepted-transfer', 'true', '--timeout-ms', '25000'],
+    args: ['--require-accepted-transfer', '--require-music-queue-link', '--timeout-ms', '25000'],
     env: {
       [dockerProviderAcceptanceEvidencePathEnvVar]: 'artifacts/provider-acceptance.json',
       HARMONIARR_DOCKER_PROVIDER_ACCEPTANCE_HEADLESS: 'false',
@@ -216,6 +250,7 @@ test('resolveDockerProviderAcceptanceInputs reads walkthrough defaults and stric
     requireAcceptedTransfer: true,
     requireConfiguredProvider: true,
     requireDiagnostic: true,
+    requireMusicQueueLink: true,
     requirePathMapping: true,
     screenshotDir: 'artifacts/screens',
     timeoutMs: 25_000,

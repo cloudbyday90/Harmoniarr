@@ -73,7 +73,7 @@ paths alongside the existing checkpoint list.
 The login checkpoint now waits for the visible account-menu button containing
 the username instead of the removed `.session-username` implementation class.
 The Activity and Import Review checkpoints were also updated to current
-user-facing headings: `Activity`, `Background Jobs`, and `Download candidates`.
+user-facing headings: `Activity`, `Background Jobs`, and `Match diagnostics`.
 
 `scripts/validate-docker-browser-smoke.js` accepts:
 

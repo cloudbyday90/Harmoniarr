@@ -185,7 +185,25 @@ browser-visible diagnostic panel. To require that slskd accepted at least one
 transfer, run:
 
 ```powershell
-npm run validate:docker-provider-acceptance -- --require-accepted-transfer true
+npm run validate:docker-provider-acceptance -- -- --require-accepted-transfer
+```
+
+For a Music Queue-origin transfer, add the strict linkage check. It verifies
+that at least one current Downloader transfer is linked to Music Queue, then
+uses the visible native filter and a Downloader refresh to confirm that the
+same linkage remains available:
+
+```powershell
+npm run validate:docker-provider-acceptance -- -- --require-accepted-transfer --require-music-queue-link
+```
+
+The extra `--` is required by the repository's npm 12 script invocation before
+forwarding flags to the Node validator. Boolean options are presence flags;
+do not append `true` or `false`. For an intentionally unconfigured walkthrough
+diagnostic, use the corresponding `--no-require-*` flags instead:
+
+```powershell
+npm run validate:docker-provider-acceptance -- -- --no-require-configured-provider --no-require-path-mapping --no-require-diagnostic
 ```
 
 If you need a fully clean rebuild while testing Docker changes, use:
@@ -240,6 +258,13 @@ npm run validate:docker-deployment-path
 ```
 
 To capture packaged-runtime browser evidence from the walkthrough stack:
+
+> The browser smoke is a fresh, unconfigured-provider check. It specifically
+> expects the Discovery heartbeat to be `setup_required`, Downloader to be
+> disabled, and no operator notifications. Run it before configuring a
+> provider or starting discovery, or after the documented **Reset** steps.
+> Do not delete a walkthrough you want to keep merely to run this smoke; use
+> the isolated deployment-path validator for release evidence instead.
 
 ```powershell
 $env:HARMONIARR_DOCKER_BROWSER_SMOKE_EVIDENCE_PATH = ".tmp\docker-browser-smoke-evidence\harmoniarr-docker-smoke-browser-operator.json"

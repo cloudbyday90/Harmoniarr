@@ -51,10 +51,19 @@ function assertUpgradeValidationResult(validationResult, validationKind) {
   assertObjectSection(validationResult.upgradedRuntime, `${validationKind}.upgradedRuntime`);
 }
 
+function assertNonNegativeInteger(value, label) {
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`${label} must be a non-negative integer`);
+  }
+}
+
 function assertDockerProviderAcceptanceValidationResult(validationResult, validationKind) {
   assertObjectSection(validationResult.provider, `${validationKind}.provider`);
   assertObjectSection(validationResult.paths, `${validationKind}.paths`);
   assertObjectSection(validationResult.importReview, `${validationKind}.importReview`);
+  assertObjectSection(validationResult.musicQueue, `${validationKind}.musicQueue`);
+  assertNonNegativeInteger(validationResult.musicQueue.linkedTransferCount, `${validationKind}.musicQueue.linkedTransferCount`);
+  assertNonNegativeInteger(validationResult.musicQueue.totalTransferCount, `${validationKind}.musicQueue.totalTransferCount`);
 
   if (!Array.isArray(validationResult.importReview.diagnostics)) {
     throw new Error(`${validationKind}.importReview.diagnostics must be an array`);

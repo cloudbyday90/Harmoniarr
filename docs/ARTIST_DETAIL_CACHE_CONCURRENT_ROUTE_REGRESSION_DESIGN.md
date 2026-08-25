@@ -117,6 +117,22 @@ copyright, migration, schema, ESM, image-tag, Compose-topology, lint,
 test-hygiene, server, client, script, real-PostgreSQL integration, and
 production client/server build validation.
 
+### Stability update: 2026-08-25
+
+The concurrent route assertion initially used a fixed number of immediate-task
+turns to wait for all eight HTTP reads to reach the cache. Under the full
+real-PostgreSQL integration suite, host scheduling can consume that attempt
+budget before every in-process HTTP request starts, even though the same
+single-flight behavior passes in isolation. The test now uses a 15-second
+wall-clock deadline with a small timer yield between checks. It preserves the
+same proof conditions and timeout failure, while allowing network and database
+I/O to make progress under load.
+
+This is test-only synchronization: no cache runtime, route, policy, database,
+or browser behavior changed. Node's test runner treats rejected asynchronous
+test work as a failure, so the bounded wait continues to fail the build if the
+coalescing condition genuinely does not occur.
+
 ## Next Item
 
 No additional cache runtime feature is recommended for the home-hosted

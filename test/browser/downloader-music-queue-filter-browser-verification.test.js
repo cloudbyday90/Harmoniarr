@@ -181,6 +181,45 @@ suite('Downloader Music Queue filter browser verification', () => {
         name: 'Open Music Queue release: Autechre — Amber',
       }).waitFor();
 
+      await page.evaluate(() => {
+        const fetchBeforeRefresh = globalThis.fetch;
+        let queueRefreshCount = 0;
+
+        globalThis.fetch = async (...args) => {
+          const [input, init] = args;
+          const requestUrl = typeof input === 'string'
+            ? input
+            : input instanceof URL
+              ? input.toString()
+              : input.url;
+          const url = new URL(requestUrl, globalThis.location.origin);
+          const method = String(init?.method ?? input?.method ?? 'GET').toUpperCase();
+
+          if (method === 'GET' && url.pathname === '/api/v1/downloader/queue') {
+            queueRefreshCount += 1;
+          }
+
+          return fetchBeforeRefresh(...args);
+        };
+
+        globalThis.__harmoniarrDownloaderFixture = {
+          getQueueRefreshCount: () => queueRefreshCount,
+        };
+      });
+      await page.getByRole('button', { exact: true, name: 'Refresh' }).click();
+      await page.waitForFunction(() => (
+        globalThis.__harmoniarrDownloaderFixture.getQueueRefreshCount() === 1
+      ));
+      const refreshedTransferCount = await page.evaluate(() => (
+        globalThis.__harmoniarrDownloaderFixture.getQueueRefreshCount()
+      ));
+      assert.equal(
+        refreshedTransferCount,
+        1,
+      );
+      assert.equal(await musicQueueLinkedOnly.isChecked(), true);
+      assert.equal(await transferQueueCard.getByRole('row').count(), 3);
+
       await page.setViewportSize({ width: 375, height: 812 });
       const narrowLayout = await page.evaluate(() => {
         const viewportWidth = globalThis.innerWidth;

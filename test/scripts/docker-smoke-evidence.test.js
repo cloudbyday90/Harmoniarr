@@ -143,6 +143,10 @@ test('assertDockerSmokeEvidenceContract validates docker provider acceptance evi
           title: 'Provider accepted transfer',
         }],
       },
+      musicQueue: {
+        linkedTransferCount: 1,
+        totalTransferCount: 2,
+      },
       paths: {
         downloadMappingCount: 1,
       },
@@ -166,6 +170,10 @@ test('assertDockerSmokeEvidenceContract rejects provider acceptance evidence wit
     validationResult: {
       importReview: {
         diagnostics: [],
+      },
+      musicQueue: {
+        linkedTransferCount: 0,
+        totalTransferCount: 0,
       },
       paths: {},
       provider: {},
