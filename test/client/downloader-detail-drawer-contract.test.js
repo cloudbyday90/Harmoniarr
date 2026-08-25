@@ -39,6 +39,15 @@ test('DownloaderTransferDetailDrawer exposes import candidate drill-through when
   assert.match(source, /diagnostics\.importLinkage\?\.summary/);
 });
 
+test('DownloaderTransferDetailDrawer exposes a descriptive Music Queue release handoff only when available', async () => {
+  const source = await readFile(drawerPath, 'utf8');
+
+  assert.match(source, /buildDownloaderMusicQueueReleaseLocation/);
+  assert.match(source, /Music Queue release/);
+  assert.match(source, /musicQueueReleaseLocation/);
+  assert.match(source, /musicQueueReleaseLinkLabel/);
+});
+
 test('DownloaderView opens diagnostics from an explicit Details action', async () => {
   const source = await readFile(viewPath, 'utf8');
 

@@ -334,7 +334,10 @@ export function createDownloaderQueueReadModelService({
     throw new TypeError('createDownloaderQueueReadModelService requires getDownloads');
   }
 
-  async function buildDownloaderQueue({ includeRemoved = false } = {}) {
+  async function buildDownloaderQueue({
+    appUserId = null,
+    includeRemoved = false,
+  } = {}) {
     const normalizedIncludeRemoved = normalizeBoolean(includeRemoved, false);
     const providerStatus = typeof getDownloaderProviderStatus === 'function'
       ? await getDownloaderProviderStatus()
@@ -352,6 +355,7 @@ export function createDownloaderQueueReadModelService({
     const allTransfers = flattenDownloadGroups(downloads).slice(0, normalizeMaxTransferRows(maxTransferRows));
     const importCandidateLinkageByTransferKey = typeof buildTransferImportCandidateLinkage === 'function'
       ? await buildTransferImportCandidateLinkage({
+          appUserId: normalizeString(appUserId),
           transfers: allTransfers.map((transfer, index) => ({
             id: normalizeString(transfer?.id),
             sourceUser: normalizeString(transfer?.username),

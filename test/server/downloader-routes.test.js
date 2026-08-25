@@ -91,7 +91,10 @@ test('downloader queue route requires admin session and returns the read model',
 
     assert.equal(response.status, 200);
     assert.equal(requireAdminSession.mock.callCount(), 1);
-    assert.deepEqual(buildDownloaderQueue.mock.calls[0].arguments, [{ includeRemoved: 'true' }]);
+    assert.deepEqual(buildDownloaderQueue.mock.calls[0].arguments, [{
+      appUserId: 'admin-1',
+      includeRemoved: 'true',
+    }]);
     assert.deepEqual(payload, {
       ok: true,
       downloader: {

@@ -17,6 +17,7 @@
  */
 
 import { getPool } from '../database.js';
+import { createDownloaderMusicQueueLinkageService } from './downloader-music-queue-linkage-service.js';
 
 function normalizeString(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
@@ -44,12 +45,13 @@ function normalizeTransferForLookup(transfer) {
   };
 }
 
-function buildImportCandidateLinkage(row) {
+function buildImportCandidateLinkage(row, musicQueueRelease = null) {
   return {
     candidateId: row.import_candidate_id,
     candidateStatus: row.candidate_status ?? null,
     executionItemStatus: row.execution_item_status ?? null,
     linkedAt: normalizeTimestamp(row.linked_at),
+    musicQueueRelease,
     operationRunId: row.operation_run_id ?? null,
     sourceSearchId: row.source_search_id ?? null,
     status: 'linked',
@@ -58,9 +60,13 @@ function buildImportCandidateLinkage(row) {
 }
 
 export function createDownloaderImportCandidateLinkageService({
+  buildCandidateMusicQueueReleaseLinkage = createDownloaderMusicQueueLinkageService().buildCandidateMusicQueueReleaseLinkage,
   getPoolFn = getPool,
 } = {}) {
-  async function buildTransferImportCandidateLinkage({ transfers = [] } = {}) {
+  async function buildTransferImportCandidateLinkage({
+    appUserId = null,
+    transfers = [],
+  } = {}) {
     const lookupTransfers = Array.isArray(transfers)
       ? transfers.map(normalizeTransferForLookup).filter(Boolean)
       : [];
@@ -107,10 +113,20 @@ export function createDownloaderImportCandidateLinkageService({
       [JSON.stringify(lookupTransfers)],
     );
 
+    const musicQueueReleaseByCandidateId = typeof buildCandidateMusicQueueReleaseLinkage === 'function'
+      ? await buildCandidateMusicQueueReleaseLinkage({
+          appUserId,
+          candidateIds: result.rows.map((row) => row.import_candidate_id),
+        })
+      : new Map();
+
     return new Map(
       result.rows.map((row) => [
         row.transfer_key,
-        buildImportCandidateLinkage(row),
+        buildImportCandidateLinkage(
+          row,
+          musicQueueReleaseByCandidateId.get(row.import_candidate_id) ?? null,
+        ),
       ]),
     );
   }

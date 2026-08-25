@@ -140,7 +140,19 @@ suite('Downloader import-candidate linkage browser verification', () => {
       const dialog = page.locator('.downloader-detail-drawer');
       await dialog.waitFor();
       await dialog.getByText('Linked to Import Review candidate.', { exact: true }).waitFor();
-      const drawerLink = dialog.getByRole('link', { name: 'Open advanced diagnostics' });
+      const musicQueueLink = dialog.getByRole('link', {
+        name: 'Open Music Queue release: Autechre — Amber',
+      });
+      await musicQueueLink.waitFor();
+      await musicQueueLink.click();
+      await page.waitForFunction(() => globalThis.location.pathname === '/app/music-queue/wanted-release-downloader-linked');
+
+      await page.goto(`${baseUrl}/app/downloader`, { waitUntil: 'domcontentloaded' });
+      const restoredLinkedTransferRow = page.getByRole('row').filter({ hasText: '01 Foil.flac' });
+      await restoredLinkedTransferRow.getByRole('button', { name: 'Details' }).click();
+      const restoredDialog = page.locator('.downloader-detail-drawer');
+      await restoredDialog.waitFor();
+      const drawerLink = restoredDialog.getByRole('link', { name: 'Open advanced diagnostics' });
       await drawerLink.waitFor();
       await drawerLink.click();
       await assertCandidateRouteSelected(page);

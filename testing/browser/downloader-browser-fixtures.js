@@ -94,6 +94,12 @@ const linkedDownloaderQueue = Object.freeze({
           candidateStatus: 'downloading',
           executionItemStatus: 'queued',
           linkedAt: '2026-06-27T21:12:00.000Z',
+          musicQueueRelease: Object.freeze({
+            artistName: 'Autechre',
+            releaseTitle: 'Amber',
+            wantedReleaseId: 'wanted-release-downloader-linked',
+            wantedStatus: 'missing',
+          }),
           operationRunId: 'import-execution-run-downloader-linked',
           requestId: null,
           sourceSearchId: 'search-discovery-dispatch-amber',

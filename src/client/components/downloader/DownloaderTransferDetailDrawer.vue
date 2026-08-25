@@ -20,6 +20,11 @@
 import { computed, nextTick, onBeforeUnmount, watch } from 'vue';
 import { formatTransferFilename } from '../../lib/activity-downloads-presentation.js';
 import { buildDownloaderImportCandidateLocation } from '../../lib/downloader-import-review-link.js';
+import {
+  buildDownloaderMusicQueueReleaseLinkLabel,
+  buildDownloaderMusicQueueReleaseLocation,
+  getDownloaderMusicQueueRelease,
+} from '../../lib/downloader-music-queue-link.js';
 import { formatOperationTimestampShort } from '../../lib/operation-run-presentation.js';
 import { formatBytes, formatSpeed } from '../../lib/search-presentation.js';
 
@@ -43,6 +48,9 @@ const title = computed(() => (
 
 const diagnostics = computed(() => props.transfer?.diagnostics ?? {});
 const importCandidateLocation = computed(() => buildDownloaderImportCandidateLocation(props.transfer));
+const musicQueueRelease = computed(() => getDownloaderMusicQueueRelease(props.transfer));
+const musicQueueReleaseLocation = computed(() => buildDownloaderMusicQueueReleaseLocation(props.transfer));
+const musicQueueReleaseLinkLabel = computed(() => buildDownloaderMusicQueueReleaseLinkLabel(props.transfer));
 const recommendedAction = computed(() => diagnostics.value.recommendedNextAction ?? null);
 const timestamps = computed(() => props.transfer?.timestamps ?? {});
 const transferActions = computed(() => (
@@ -218,6 +226,19 @@ onBeforeUnmount(() => {
                 @click="closeDrawer"
               >
                 Open advanced diagnostics
+              </RouterLink>
+            </dd>
+          </div>
+          <div v-if="musicQueueReleaseLocation">
+            <dt>Music Queue release</dt>
+            <dd>
+              <span>{{ musicQueueRelease?.artistName ? `${musicQueueRelease.artistName} — ` : '' }}{{ musicQueueRelease?.releaseTitle ?? 'Linked release' }}</span>
+              <RouterLink
+                class="downloader-detail-import-link"
+                :to="musicQueueReleaseLocation"
+                @click="closeDrawer"
+              >
+                {{ musicQueueReleaseLinkLabel }}
               </RouterLink>
             </dd>
           </div>

@@ -324,6 +324,12 @@ test('createDownloaderQueueReadModelService enriches downloads with import-candi
         candidateId: 'candidate-queued',
         candidateStatus: 'downloading',
         executionItemStatus: 'queued',
+        musicQueueRelease: {
+          artistName: 'Autechre',
+          releaseTitle: 'Amber',
+          wantedReleaseId: 'wanted-release-queued',
+          wantedStatus: 'missing',
+        },
         status: 'linked',
       },
     ]]);
@@ -335,11 +341,18 @@ test('createDownloaderQueueReadModelService enriches downloads with import-candi
     now: () => observedAt,
   });
 
-  const result = await service.buildDownloaderQueue();
+  const result = await service.buildDownloaderQueue({ appUserId: 'admin-1' });
 
   assert.equal(buildTransferImportCandidateLinkage.mock.callCount(), 1);
+  assert.equal(buildTransferImportCandidateLinkage.mock.calls[0].arguments[0].appUserId, 'admin-1');
   assert.equal(result.transfers[2].diagnostics.importLinkage.candidateId, 'candidate-queued');
   assert.equal(result.transfers[2].diagnostics.importLinkage.status, 'linked');
+  assert.deepEqual(result.transfers[2].diagnostics.importLinkage.musicQueueRelease, {
+    artistName: 'Autechre',
+    releaseTitle: 'Amber',
+    wantedReleaseId: 'wanted-release-queued',
+    wantedStatus: 'missing',
+  });
 });
 
 test('createDownloaderQueueReadModelService does not call slskd when provider is unconfigured', async (t) => {

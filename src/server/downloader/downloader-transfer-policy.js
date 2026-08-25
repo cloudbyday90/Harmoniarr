@@ -89,6 +89,10 @@ function normalizeState(value) {
     : 'Unknown';
 }
 
+function normalizeOptionalString(value) {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
 function normalizeStateKey(value) {
   return normalizeState(value).toLowerCase();
 }
@@ -372,11 +376,13 @@ export function buildDownloaderTransferDiagnostics(transfer, {
 
 function buildImportLinkage(importCandidateLinkage) {
   if (importCandidateLinkage?.candidateId) {
+    const musicQueueRelease = buildMusicQueueReleaseLinkage(importCandidateLinkage.musicQueueRelease);
     return {
       candidateId: importCandidateLinkage.candidateId,
       candidateStatus: importCandidateLinkage.candidateStatus ?? null,
       executionItemStatus: importCandidateLinkage.executionItemStatus ?? null,
       linkedAt: importCandidateLinkage.linkedAt ?? null,
+      ...(musicQueueRelease ? { musicQueueRelease } : {}),
       operationRunId: importCandidateLinkage.operationRunId ?? null,
       requestId: null,
       sourceSearchId: importCandidateLinkage.sourceSearchId ?? null,
@@ -390,5 +396,19 @@ function buildImportLinkage(importCandidateLinkage) {
     requestId: null,
     status: 'not_linked',
     summary: 'No request or import-candidate linkage is exposed for this live provider row yet.',
+  };
+}
+
+function buildMusicQueueReleaseLinkage(release) {
+  const wantedReleaseId = normalizeOptionalString(release?.wantedReleaseId);
+  if (!wantedReleaseId) {
+    return null;
+  }
+
+  return {
+    artistName: normalizeOptionalString(release.artistName),
+    releaseTitle: normalizeOptionalString(release.releaseTitle),
+    wantedReleaseId,
+    wantedStatus: normalizeOptionalString(release.wantedStatus),
   };
 }

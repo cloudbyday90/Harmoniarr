@@ -59,10 +59,11 @@ export function registerDownloaderRoutes(app, {
   requireFreshAdminSession = defaultRequestAuthDependencies.requireFreshAdminSession,
 }) {
   app.get('/api/v1/downloader/queue', limitDownloaderQueueRead, downloaderRoute(async (request, response) => {
-    await requireAdminSession(request);
+    const session = await requireAdminSession(request);
     response.json({
       ok: true,
       downloader: await buildDownloaderQueue({
+        appUserId: session.appUserId,
         includeRemoved: request.query.includeRemoved,
       }),
     });
