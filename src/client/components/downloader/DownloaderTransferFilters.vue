@@ -115,6 +115,7 @@ function updateMusicQueueLinkedOnly(event) {
 @media (max-width: 640px) {
   .downloader-transfer-filters {
     align-items: stretch;
+    width: 100%;
   }
 
   .downloader-transfer-filter-state {
@@ -123,6 +124,7 @@ function updateMusicQueueLinkedOnly(event) {
 
   .downloader-transfer-filter-linkage {
     min-height: 44px;
+    width: 100%;
   }
 }
 </style>

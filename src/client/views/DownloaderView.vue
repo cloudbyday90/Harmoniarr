@@ -313,7 +313,7 @@ async function clearCompletedTransfers() {
       </div>
     </article>
 
-    <article class="hx-card">
+    <article class="hx-card downloader-transfer-queue">
       <div class="hx-card-header">
         <div>
           <h2 class="hx-card-title">Transfer Queue</h2>
@@ -515,6 +515,16 @@ async function clearCompletedTransfers() {
   display: inline-grid;
   gap: var(--hx-space-1);
   justify-items: end;
+}
+
+@media (max-width: 640px) {
+  .downloader-transfer-queue .hx-card-header {
+    flex-direction: column;
+  }
+
+  .downloader-transfer-queue .hx-card-actions {
+    align-self: stretch;
+  }
 }
 
 </style>

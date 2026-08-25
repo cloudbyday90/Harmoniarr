@@ -14,6 +14,8 @@ test('DownloaderTransferFilters uses grouped native controls with visible labels
   assert.match(source, /<input\s+type="checkbox"/);
   assert.match(source, /Only transfers linked to Music Queue/);
   assert.match(source, /min-height: 44px/);
+  assert.match(source, /\.downloader-transfer-filters\s*\{[\s\S]*?width: 100%;/);
+  assert.match(source, /\.downloader-transfer-filter-linkage\s*\{[\s\S]*?width: 100%;/);
   assert.match(source, /:focus-within/);
 });
 
@@ -27,4 +29,6 @@ test('DownloaderView announces only user-initiated filter result changes', async
   assert.match(source, /@update:music-queue-linked-only="updateMusicQueueLinkedOnly"/);
   assert.match(source, /@update:state-filter="updateStateFilter"/);
   assert.match(source, /No transfers match these filters/);
+  assert.match(source, /class="hx-card downloader-transfer-queue"/);
+  assert.match(source, /\.downloader-transfer-queue \.hx-card-header\s*\{\s*flex-direction: column;/);
 });

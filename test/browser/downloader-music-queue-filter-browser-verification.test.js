@@ -23,33 +23,71 @@ import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/r
 
 const integrationRuntimeConfig = resolveIntegrationTestRuntimeConfig();
 const defaultQueue = buildLinkedDownloaderQueueFixture();
-const twoTransferQueue = buildLinkedDownloaderQueueFixture({
+const additionalLinkedTransfer = {
+  ...defaultQueue.transfers[0],
+  diagnostics: {
+    ...defaultQueue.transfers[0].diagnostics,
+    importLinkage: {
+      ...defaultQueue.transfers[0].diagnostics.importLinkage,
+      musicQueueRelease: {
+        ...defaultQueue.transfers[0].diagnostics.importLinkage.musicQueueRelease,
+        releaseTitle: 'Tri Repetae',
+        wantedReleaseId: 'wanted-release-downloader-linked-second',
+      },
+    },
+  },
+  directory: 'Autechre\\Tri Repetae',
+  filename: 'Autechre\\Tri Repetae\\02 Eutow.flac',
+  id: 'transfer-downloader-linked-second',
+  sourceUser: 'second-healthy-slskd-peer',
+  transferKey: 'second-healthy-slskd-peer::transfer-downloader-linked-second',
+};
+const fourTransferQueue = buildLinkedDownloaderQueueFixture({
   queueHealth: {
     ...defaultQueue.queueHealth,
     counts: {
       ...defaultQueue.queueHealth.counts,
-      queued: 1,
-      total: 2,
+      active: 2,
+      queued: 2,
+      total: 4,
     },
-    message: '1 active and 1 queued transfer are in the queue.',
+    message: '2 active and 2 queued transfers are in the queue.',
   },
   sourceGroups: [
-    ...defaultQueue.sourceGroups,
+    {
+      counts: {
+        active: 2,
+        completed: 0,
+        failed: 0,
+        other: 0,
+        queued: 0,
+        total: 2,
+      },
+      sourceUser: 'healthy-slskd-peer',
+    },
     {
       counts: {
         active: 0,
         completed: 0,
         failed: 0,
         other: 0,
-        queued: 1,
-        total: 1,
+        queued: 2,
+        total: 2,
       },
       sourceUser: 'queued-slskd-peer',
     },
   ],
   transfers: [
     ...defaultQueue.transfers,
+    additionalLinkedTransfer,
     buildUnlinkedDownloaderTransferFixture(),
+    buildUnlinkedDownloaderTransferFixture({
+      directory: 'Biosphere\\Substrata',
+      filename: 'Biosphere\\Substrata\\04 Hyperborea.flac',
+      id: 'transfer-downloader-unlinked-second',
+      placeInQueue: 2,
+      transferKey: 'queued-slskd-peer::transfer-downloader-unlinked-second',
+    }),
   ],
 });
 
@@ -94,7 +132,7 @@ suite('Downloader Music Queue filter browser verification', () => {
         pageErrors.push(error.message);
       });
 
-      await installDownloaderBrowserFixtures(browserContext, { queue: twoTransferQueue });
+      await installDownloaderBrowserFixtures(browserContext, { queue: fourTransferQueue });
       await bootstrapAdminThroughUi(page, { baseUrl });
 
       await page.goto(`${baseUrl}/app/downloader`, { waitUntil: 'domcontentloaded' });
@@ -103,10 +141,12 @@ suite('Downloader Music Queue filter browser verification', () => {
       });
       await transferQueueCard.waitFor();
       await transferQueueCard.locator('.hx-card-subtitle').filter({
-        hasText: 'Showing 2 of 2 transfers.',
+        hasText: 'Showing 4 of 4 transfers.',
       }).waitFor();
       await page.getByText('01 Foil.flac', { exact: true }).waitFor();
+      await page.getByText('02 Eutow.flac', { exact: true }).waitFor();
       await page.getByText('02 Antarctica Starts Here.flac', { exact: true }).waitFor();
+      await page.getByText('04 Hyperborea.flac', { exact: true }).waitFor();
 
       const stateFilter = page.getByLabel('State');
       const musicQueueLinkedOnly = page.getByRole('checkbox', {
@@ -114,32 +154,67 @@ suite('Downloader Music Queue filter browser verification', () => {
       });
       await stateFilter.selectOption('queued');
       await transferQueueCard.locator('.hx-card-subtitle').filter({
-        hasText: 'Showing 1 of 2 transfers.',
+        hasText: 'Showing 2 of 4 transfers.',
       }).waitFor();
       await page.getByRole('status').filter({
-        hasText: 'Showing 1 of 2 transfers.',
+        hasText: 'Showing 2 of 4 transfers.',
       }).waitFor();
       await page.getByText('02 Antarctica Starts Here.flac', { exact: true }).waitFor();
 
       await musicQueueLinkedOnly.check();
       assert.equal(await musicQueueLinkedOnly.isChecked(), true);
       await transferQueueCard.locator('.hx-card-subtitle').filter({
-        hasText: 'Showing 0 of 2 transfers.',
+        hasText: 'Showing 0 of 4 transfers.',
       }).waitFor();
       await page.getByRole('status').filter({
-        hasText: 'Showing 0 of 2 transfers.',
+        hasText: 'Showing 0 of 4 transfers.',
       }).waitFor();
       await page.getByText('No transfers match these filters', { exact: true }).waitFor();
 
       await stateFilter.selectOption('active');
       await transferQueueCard.locator('.hx-card-subtitle').filter({
-        hasText: 'Showing 1 of 2 transfers.',
+        hasText: 'Showing 2 of 4 transfers.',
       }).waitFor();
       const linkedTransferRow = page.getByRole('row').filter({ hasText: '01 Foil.flac' });
       await linkedTransferRow.waitFor();
       await linkedTransferRow.getByRole('link', {
         name: 'Open Music Queue release: Autechre — Amber',
       }).waitFor();
+
+      await page.setViewportSize({ width: 375, height: 812 });
+      const narrowLayout = await page.evaluate(() => {
+        const viewportWidth = globalThis.innerWidth;
+        const toBox = (element) => {
+          const { height, left, right, width } = element.getBoundingClientRect();
+          return { height, left, right, width };
+        };
+        const transferQueue = globalThis.document.querySelector('.downloader-transfer-queue');
+
+        return {
+          actionButtons: Array.from(globalThis.document.querySelectorAll('.hx-page-actions > *')).map(toBox),
+          filterControls: Array.from(globalThis.document.querySelectorAll(
+            '.downloader-transfer-filters select, .downloader-transfer-filter-linkage',
+          )).map(toBox),
+          headerFlexDirection: globalThis.getComputedStyle(
+            transferQueue.querySelector('.hx-card-header'),
+          ).flexDirection,
+          statCards: Array.from(globalThis.document.querySelectorAll('.hx-stat-grid > *')).map(toBox),
+          tableElement: transferQueue.querySelector('.hx-table')?.tagName,
+          viewportWidth,
+        };
+      });
+      assert.equal(narrowLayout.headerFlexDirection, 'column');
+      assert.equal(narrowLayout.tableElement, 'TABLE');
+      assert.ok(narrowLayout.actionButtons.every((box) => (
+        box.height >= 44 && box.left >= 0 && box.right <= narrowLayout.viewportWidth
+      )));
+      assert.ok(narrowLayout.statCards.every((box) => (
+        box.left >= 0 && box.right <= narrowLayout.viewportWidth
+      )));
+      assert.ok(narrowLayout.filterControls.every((box) => (
+        box.left >= 0 && box.right <= narrowLayout.viewportWidth
+      )));
+      assert.equal(narrowLayout.filterControls[0].width, narrowLayout.filterControls[1].width);
 
       assert.deepEqual(pageErrors, []);
       await page.goto('about:blank', { waitUntil: 'load' });
