@@ -193,6 +193,7 @@ const accentStyle = computed(() => {
         <p v-if="meta" class="hx-media-card__meta">{{ meta }}</p>
       </div>
     </div>
+    <slot name="details" />
     <div class="hx-media-card__actions">
       <slot name="actions">
         <RequestButton

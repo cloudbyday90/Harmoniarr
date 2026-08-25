@@ -17,6 +17,7 @@
  */
 
 import { buildMusicQueueReleaseTransitionPresentation } from './music-queue-release-transition-presentation.js';
+import { buildOperatorReleaseSelectionPresentation } from './operator-release-selection-presentation.js';
 
 const QUALITY_ATTENTION_CODES = new Set([
   'below_minimum',
@@ -64,6 +65,7 @@ export function buildMusicQueueReleaseRowPresentation(release = {}) {
   const qualityLabel = qualityNeedsAttention
     ? `Quality: ${release.qualityDecisionLabel ?? 'Quality choice needed'}`
     : `Quality profile: ${release.qualityProfileLabel ?? 'Not set'}`;
+  const selection = buildOperatorReleaseSelectionPresentation(release.operatorSelection);
 
   return {
     attentionLabel: statusCode === 'needs_help_adding'
@@ -76,6 +78,7 @@ export function buildMusicQueueReleaseRowPresentation(release = {}) {
         label: qualityLabel,
         tone: qualityNeedsAttention ? (quality.tone ?? 'warning') : 'neutral',
       },
+      ...(selection ? [{ key: 'selection', label: selection.label, tone: selection.tone }] : []),
     ],
     qualityNeedsAttention,
     statusTone: release.status?.tone ?? 'neutral',

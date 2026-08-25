@@ -110,6 +110,11 @@ import {
   formatOperatorArtistActivityLine,
   formatOperatorArtistCoverageLine,
 } from '../lib/operator-artist-card-presentation.js';
+import {
+  buildOperatorReleaseReconciliationPresentation,
+  buildOperatorReleaseSelectionPresentation,
+  findMusicQueueReleaseForReleaseGroup,
+} from '../lib/operator-release-selection-presentation.js';
 import { sessionStore } from '../state/session.js';
 
 const route = useRoute();
@@ -292,6 +297,7 @@ const manualEditionSelectionDisabledReason = computed(() => {
 const {
   errorMessage: musicQueueErrorMessage,
   isLoading: isMusicQueueLoading,
+  load: loadMusicQueue,
   releases: musicQueueReleases,
 } = useMusicQueue({
   limit: 100,
@@ -307,6 +313,15 @@ const discographySections = computed(() =>
     type: section.type,
     releases: section.items.map((releaseGroup) => ({
       ...normalizeReleaseGroupForCard(releaseGroup),
+      manualSelectionPresentation: buildOperatorReleaseSelectionPresentation(releaseGroup.operatorState),
+      musicQueueRelease: findMusicQueueReleaseForReleaseGroup(
+        musicQueueReleases.value,
+        releaseGroup.id,
+      ),
+      reconciliationPresentation: buildOperatorReleaseReconciliationPresentation({
+        operatorState: releaseGroup.operatorState,
+        reconciliation: operatorReconciliation.value,
+      }),
       sourceReleaseGroup: releaseGroup,
     })),
   })),
@@ -571,6 +586,7 @@ async function selectManualEdition({ release }) {
 
   if (result.ok && result.projection) {
     setOperatorProjection(result.projection);
+    void loadMusicQueue();
   } else if (!result.ok && !result.skipped) {
     manualEditionSelectionError.value = getErrorMessage(
       result.error,
@@ -1016,8 +1032,30 @@ watch(projection, () => {
                   @request="openConfirmModal"
                   @detail="openDetailModal"
                 >
-                  <template v-if="canEditOperatorPolicy" #actions>
-                    <div class="artist-detail-selection">
+                  <template v-if="release.manualSelectionPresentation || release.reconciliationPresentation" #details>
+                    <div class="artist-detail-release-state">
+                      <div v-if="release.manualSelectionPresentation" class="artist-detail-release-state__origin">
+                        <span class="hx-pill" :data-tone="release.manualSelectionPresentation.tone">
+                          {{ release.manualSelectionPresentation.label }}
+                        </span>
+                        <span class="artist-detail-release-state__copy">
+                          {{ release.manualSelectionPresentation.detail }}
+                        </span>
+                      </div>
+                      <p
+                        v-if="release.reconciliationPresentation"
+                        class="artist-detail-release-state__reconciliation"
+                        role="status"
+                        aria-atomic="true"
+                      >
+                        <strong>{{ release.reconciliationPresentation.label }}</strong>
+                        <span>{{ release.reconciliationPresentation.detail }}</span>
+                      </p>
+                    </div>
+                  </template>
+
+                  <template v-if="canEditOperatorPolicy || release.musicQueueRelease" #actions>
+                    <div v-if="canEditOperatorPolicy" class="artist-detail-selection">
                       <select
                         class="hx-select artist-detail-selection__select"
                         :value="getDraftReleaseGroupSelectionState(policyDraft, release.sourceReleaseGroup)"
@@ -1047,6 +1085,18 @@ watch(projection, () => {
                         </span>
                       </span>
                     </div>
+                    <RouterLink
+                      v-if="release.musicQueueRelease"
+                      class="hx-btn artist-detail-selection__queue-link"
+                      data-variant="ghost"
+                      :to="{
+                        name: 'music-queue-release',
+                        params: { wantedReleaseId: release.musicQueueRelease.id },
+                      }"
+                      :aria-label="`Open ${release.title ?? 'this release'} in Music Queue`"
+                    >
+                      Open in Music Queue
+                    </RouterLink>
                   </template>
                 </ReleaseCard>
                 </template>
@@ -1483,6 +1533,10 @@ watch(projection, () => {
   font-size: var(--hx-text-xs);
 }
 
+.artist-detail-selection__queue-link {
+  width: 100%;
+}
+
 .artist-detail-selection__note {
   color: var(--hx-text-muted);
   font-size: var(--hx-text-xs);
@@ -1502,6 +1556,39 @@ watch(projection, () => {
   color: var(--hx-text-muted);
   font-size: var(--hx-text-xs);
   line-height: 1.35;
+}
+
+.artist-detail-release-state,
+.artist-detail-release-state__origin,
+.artist-detail-release-state__reconciliation {
+  display: grid;
+  gap: var(--hx-space-1);
+}
+
+.artist-detail-release-state {
+  margin-top: calc(var(--hx-space-1) * -1);
+  padding: 0 var(--hx-space-3);
+}
+
+.artist-detail-release-state__origin .hx-pill {
+  justify-self: start;
+}
+
+.artist-detail-release-state__copy,
+.artist-detail-release-state__reconciliation {
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-xs);
+  line-height: 1.35;
+}
+
+.artist-detail-release-state__reconciliation {
+  margin: 0;
+  padding-left: var(--hx-space-2);
+  border-left: 2px solid var(--hx-accent);
+}
+
+.artist-detail-release-state__reconciliation strong {
+  color: var(--hx-text);
 }
 
 .artist-detail-related-strip {

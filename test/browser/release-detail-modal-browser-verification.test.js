@@ -29,6 +29,44 @@ import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/r
 
 const integrationRuntimeConfig = resolveIntegrationTestRuntimeConfig();
 
+function buildManualSelectionMusicQueuePayload({ includeRelease = false } = {}) {
+  const releases = includeRelease ? [{
+    artistName: 'Boards of Canada',
+    evidence: {
+      selectionSource: 'manual',
+      selectionState: 'selected',
+    },
+    expectedTrackCount: 4,
+    id: 'wanted-mhtrtc',
+    matchedTrackCount: 0,
+    metadataArtistId: 'metadata-artist-boards',
+    metadataReleaseGroupId: 'metadata-rg-mhtrtc',
+    missingTrackCount: 4,
+    quality: {
+      code: 'accepted',
+      profile: { code: 'lossless_archive' },
+    },
+    releaseGroupType: 'Album',
+    releaseTitle: 'Music Has the Right to Children',
+    status: {
+      code: 'queued_for_search',
+      detail: 'Harmoniarr will search when this release is due.',
+      label: 'Waiting to search',
+      tone: 'neutral',
+    },
+  }] : [];
+
+  return {
+    checkedAt: '2026-08-25T12:00:00.000Z',
+    pagination: { limit: 100, offset: 0, total: releases.length },
+    releases,
+    summary: {
+      counts: includeRelease ? { queued_for_search: 1 } : {},
+      total: releases.length,
+    },
+  };
+}
+
 let browserRuntime;
 let runtimeUnavailableReason = null;
 
@@ -180,6 +218,22 @@ suite('Release Detail modal browser verification', () => {
     }
 
     await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      let manualEditionSaved = false;
+      const queuePayload = () => buildManualSelectionMusicQueuePayload({
+        includeRelease: manualEditionSaved,
+      });
+      await browserContext.route(/\/api\/v1\/acquisition\/releases(?:\/wanted-mhtrtc)?(?:\?.*)?$/, async (route) => {
+        const requestUrl = new URL(route.request().url());
+        const payload = queuePayload();
+        const wantedReleaseId = requestUrl.pathname.endsWith('/wanted-mhtrtc')
+          ? payload.releases[0] ?? null
+          : null;
+        await route.fulfill({
+          body: JSON.stringify(wantedReleaseId ? { checkedAt: payload.checkedAt, release: wantedReleaseId } : payload),
+          contentType: 'application/json',
+          status: 200,
+        });
+      });
       await installMetadataBrowserFixtures(browserContext);
       await bootstrapAdminThroughUi(page, { baseUrl });
       await markBoardsOfCanadaAddedInMetadataBrowserFixture(page);
@@ -197,6 +251,21 @@ suite('Release Detail modal browser verification', () => {
       await saveEdition.click();
       await dialog.getByText('Your selected edition', { exact: true }).waitFor();
       await dialog.getByRole('button', { name: 'Edition selected' }).waitFor();
+      manualEditionSaved = true;
+      await dialog.getByRole('button', { name: 'Close' }).click();
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await page.getByRole('heading', { exact: true, name: 'Boards of Canada' }).waitFor();
+      await page.getByText('Manual selection', { exact: true }).waitFor();
+
+      const musicQueueLink = page.getByRole('link', {
+        name: 'Open Music Has the Right to Children in Music Queue',
+      });
+      await musicQueueLink.waitFor();
+      await musicQueueLink.click();
+      await page.waitForURL(/\/app\/music-queue\/wanted-mhtrtc$/u);
+      await page.getByLabel('Show releases').selectOption('scheduled');
+      const queueRow = page.getByRole('listitem').filter({ hasText: 'Music Has the Right to Children' });
+      await queueRow.getByText('Manual selection', { exact: true }).waitFor();
 
       await page.goto('about:blank', { waitUntil: 'load' });
     }, {

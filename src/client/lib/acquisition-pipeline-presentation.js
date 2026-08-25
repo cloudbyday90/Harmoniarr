@@ -567,6 +567,7 @@ export function normalizeMusicQueueRelease(release) {
     lastActivityLabel: lastActivityAt ? formatOperationTimestampShort(lastActivityAt) : 'No activity yet',
     matchSummary,
     matchedTrackCount: getCount(release?.matchedTrackCount),
+    metadataReleaseGroupId: release?.metadataReleaseGroupId ?? null,
     missingTrackCount: getCount(release?.missingTrackCount),
     nextAction: status.nextAction ?? null,
     progressChips: [
@@ -600,6 +601,10 @@ export function normalizeMusicQueueRelease(release) {
     status,
     statusClass: getMusicQueueStatusClass(status),
     statusCode: status.code,
+    operatorSelection: {
+      selectionSource: release?.evidence?.selectionSource ?? null,
+      selectionState: release?.evidence?.selectionState ?? null,
+    },
   };
 }
 

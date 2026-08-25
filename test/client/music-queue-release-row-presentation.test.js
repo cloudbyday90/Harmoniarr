@@ -132,3 +132,27 @@ test('Music Queue release rows describe only recognized automatic handoffs', () 
   });
   assert.equal(buildMusicQueueReleaseRowPresentation({ statusCode: 'unknown_future_status' }).transition, null);
 });
+
+test('Music Queue release rows retain manual selection provenance as a compact fact', () => {
+  const release = normalizeMusicQueueRelease({
+    evidence: {
+      selectionSource: 'manual',
+      selectionState: 'selected',
+    },
+    expectedTrackCount: 12,
+    missingTrackCount: 12,
+    quality: { code: 'accepted', profile: { code: 'lossless_archive' } },
+    releaseTitle: 'Child of God',
+    status: {
+      code: 'queued_for_search',
+      label: 'Waiting to search',
+      tone: 'neutral',
+    },
+  });
+
+  assert.deepEqual(buildMusicQueueReleaseRowPresentation(release).facts, [
+    { key: 'progress', label: '12 tracks still missing', tone: 'neutral' },
+    { key: 'quality', label: 'Quality profile: Lossless archive', tone: 'neutral' },
+    { key: 'selection', label: 'Manual selection', tone: 'info' },
+  ]);
+});

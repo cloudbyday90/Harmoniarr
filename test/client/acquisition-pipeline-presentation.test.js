@@ -36,7 +36,10 @@ test('normalizeMusicQueueRelease maps release and quality copy for the view', ()
         totalCount: 2,
       },
       search: { lastSearchAt: '2026-06-28T12:00:00.000Z' },
+      selectionSource: 'manual',
+      selectionState: 'selected',
     },
+    metadataReleaseGroupId: 'release-group-1',
     releaseTitle: 'Child of God',
     releaseGroupType: 'album',
     status: {
@@ -54,6 +57,11 @@ test('normalizeMusicQueueRelease maps release and quality copy for the view', ()
   assert.equal(release.releaseTypeLabel, 'Album');
   assert.equal(release.matchSummary.totalCount, 2);
   assert.equal(release.detailText, 'The best match is below the automatic threshold.');
+  assert.equal(release.metadataReleaseGroupId, 'release-group-1');
+  assert.deepEqual(release.operatorSelection, {
+    selectionSource: 'manual',
+    selectionState: 'selected',
+  });
   assert.equal(release.statusClass, 'review-status-pending');
 });
 
