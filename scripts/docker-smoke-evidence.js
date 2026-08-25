@@ -57,6 +57,36 @@ function assertNonNegativeInteger(value, label) {
   }
 }
 
+function assertBoolean(value, label) {
+  if (typeof value !== 'boolean') {
+    throw new Error(`${label} must be a boolean`);
+  }
+}
+
+function assertProviderAcceptanceReadiness(readiness, validationKind) {
+  assertObjectSection(readiness, `${validationKind}.readiness`);
+  assertBoolean(readiness.ready, `${validationKind}.readiness.ready`);
+  assertStringField(readiness.code, `${validationKind}.readiness.code`);
+  assertStringField(readiness.label, `${validationKind}.readiness.label`);
+  assertStringField(readiness.nextAction, `${validationKind}.readiness.nextAction`);
+  assertStringField(readiness.status, `${validationKind}.readiness.status`);
+  assertStringField(readiness.summary, `${validationKind}.readiness.summary`);
+}
+
+function assertProviderAcceptanceRequirements(requirements, validationKind) {
+  assertObjectSection(requirements, `${validationKind}.requirements`);
+
+  for (const key of [
+    'requireAcceptedTransfer',
+    'requireConfiguredProvider',
+    'requireDiagnostic',
+    'requireMusicQueueLink',
+    'requirePathMapping',
+  ]) {
+    assertBoolean(requirements[key], `${validationKind}.requirements.${key}`);
+  }
+}
+
 function assertDockerProviderAcceptanceValidationResult(validationResult, validationKind) {
   assertObjectSection(validationResult.provider, `${validationKind}.provider`);
   assertObjectSection(validationResult.paths, `${validationKind}.paths`);
@@ -69,7 +99,18 @@ function assertDockerProviderAcceptanceValidationResult(validationResult, valida
     throw new Error(`${validationKind}.importReview.diagnostics must be an array`);
   }
 
-  if (validationResult.importReview.diagnostics.length === 0) {
+  if (!validationResult.readiness) {
+    if (validationResult.importReview.diagnostics.length === 0) {
+      throw new Error(`${validationKind}.importReview.diagnostics must include at least one diagnostic`);
+    }
+    return;
+  }
+
+  assertProviderAcceptanceReadiness(validationResult.readiness, validationKind);
+  assertProviderAcceptanceRequirements(validationResult.requirements, validationKind);
+
+  if (validationResult.readiness.ready && validationResult.requirements.requireDiagnostic
+    && validationResult.importReview.diagnostics.length === 0) {
     throw new Error(`${validationKind}.importReview.diagnostics must include at least one diagnostic`);
   }
 }

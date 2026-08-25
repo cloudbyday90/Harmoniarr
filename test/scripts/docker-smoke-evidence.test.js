@@ -154,12 +154,67 @@ test('assertDockerSmokeEvidenceContract validates docker provider acceptance evi
         enabled: true,
         queueHealthStatus: 'busy',
       },
+      readiness: {
+        code: 'ready',
+        label: 'Provider acceptance evidence is ready',
+        nextAction: 'Save this result with your local validation evidence.',
+        ready: true,
+        status: 'ready',
+        summary: 'All selected provider acceptance requirements are met.',
+      },
+      requirements: {
+        requireAcceptedTransfer: false,
+        requireConfiguredProvider: true,
+        requireDiagnostic: true,
+        requireMusicQueueLink: false,
+        requirePathMapping: true,
+      },
       username: 'walkthrough-admin',
     },
   });
 
   assert.equal(evidence.validationKind, 'docker-provider-acceptance');
   assert.equal(evidence.validationResult.importReview.diagnostics[0].code, 'provider_accepted');
+});
+
+test('assertDockerSmokeEvidenceContract permits a bounded action-required provider readiness artifact', () => {
+  const evidence = assertDockerSmokeEvidenceContract({
+    generatedAt: '2026-08-25T00:00:00.000Z',
+    schemaVersion: 1,
+    validationKind: 'docker-provider-acceptance',
+    validationResult: {
+      importReview: {
+        diagnostics: [],
+      },
+      musicQueue: {
+        linkedTransferCount: 0,
+        totalTransferCount: 0,
+      },
+      paths: {
+        downloadMappingCount: 0,
+      },
+      provider: {
+        enabled: false,
+      },
+      readiness: {
+        code: 'provider_configuration_required',
+        label: 'Connect the download provider',
+        nextAction: 'Open Settings > Connections, complete the download provider connection, then run this check again.',
+        ready: false,
+        status: 'action_required',
+        summary: 'The Downloader connection is not fully configured.',
+      },
+      requirements: {
+        requireAcceptedTransfer: true,
+        requireConfiguredProvider: true,
+        requireDiagnostic: true,
+        requireMusicQueueLink: true,
+        requirePathMapping: true,
+      },
+    },
+  });
+
+  assert.equal(evidence.validationResult.readiness.code, 'provider_configuration_required');
 });
 
 test('assertDockerSmokeEvidenceContract rejects provider acceptance evidence without diagnostics', () => {

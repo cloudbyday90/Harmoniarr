@@ -70,6 +70,11 @@ No open pull request was applied locally:
 
 ## Next recommended item
 
+The strict probe now reports a bounded readiness result before it fails, so it
+can distinguish provider setup, path mapping, provider acceptance, and Music
+Queue linkage prerequisites without exposing paths or provider payloads. See
+[Docker Provider Acceptance Readiness Outcome](DOCKER_PROVIDER_ACCEPTANCE_READINESS_OUTCOME.md).
+
 Run the strict command once slskd has accepted a transfer selected from Music
 Queue and a download path mapping is present. If that evidence is clean, the
 next product work should be observed operator recovery friction, not another

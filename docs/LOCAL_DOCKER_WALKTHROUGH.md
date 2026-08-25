@@ -206,6 +206,13 @@ diagnostic, use the corresponding `--no-require-*` flags instead:
 npm run validate:docker-provider-acceptance -- -- --no-require-configured-provider --no-require-path-mapping --no-require-diagnostic
 ```
 
+When a selected strict check cannot pass yet, the command keeps its failing exit
+code but reports one label, the missing condition, and the next action. If an
+evidence path is configured, it saves that bounded readiness result first. The
+artifact contains counts and configuration booleans only; it does not contain
+API keys, provider endpoint values, download paths, transfer IDs, or raw
+provider responses.
+
 If you need a fully clean rebuild while testing Docker changes, use:
 
 ```powershell

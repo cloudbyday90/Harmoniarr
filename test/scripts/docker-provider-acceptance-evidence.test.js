@@ -128,7 +128,7 @@ test('summarizeExecutionDiagnostics extracts bounded download acceptance details
   });
 });
 
-test('buildProviderAcceptanceEvidenceResult redacts provider secrets and includes path mapping evidence', () => {
+test('buildProviderAcceptanceEvidenceResult redacts provider secrets and path prefixes', () => {
   const result = buildProviderAcceptanceEvidenceResult({
     baseUrl: 'http://127.0.0.1:47956',
     downloaderQueue: createDownloaderQueue(),
@@ -143,11 +143,10 @@ test('buildProviderAcceptanceEvidenceResult redacts provider secrets and include
     totalTransferCount: 0,
   });
   assert.equal(result.paths.slskdSecretConfigured, true);
-  assert.deepEqual(result.paths.downloadMappings, [{
-    downloadClientPrefix: '/downloads/complete/Music',
-    harmoniarrPrefix: '/data/downloads/complete',
-  }]);
+  assert.equal(result.paths.downloadMappingCount, 1);
+  assert.equal(result.readiness.ready, true);
   assert.doesNotMatch(JSON.stringify(result), /should-not-appear/u);
+  assert.doesNotMatch(JSON.stringify(result), /\/downloads\/complete\/Music|\/data\/downloads/u);
 });
 
 test('assertProviderAcceptanceEvidenceResult rejects missing diagnostics by default', () => {
@@ -169,7 +168,7 @@ test('assertProviderAcceptanceEvidenceResult rejects missing diagnostics by defa
 
   assert.throws(
     () => assertProviderAcceptanceEvidenceResult(result),
-    /Expected at least one Import Review download acceptance diagnostic/u,
+    /Record a download outcome: No Import Review download outcome has been recorded yet\./u,
   );
 });
 
@@ -184,7 +183,7 @@ test('assertProviderAcceptanceEvidenceResult can require accepted provider evide
 
   assert.throws(
     () => assertProviderAcceptanceEvidenceResult(rejectedResult, { requireAcceptedTransfer: true }),
-    /Expected at least one provider-accepted download acceptance diagnostic/u,
+    /Get a provider-accepted transfer: The provider has not accepted a transfer yet\./u,
   );
 
   const acceptedResult = buildProviderAcceptanceEvidenceResult({
@@ -323,6 +322,67 @@ test('runDockerProviderAcceptanceEvidence writes evidence and closes browser res
   assert.equal(calls.writeEvidence[0].validationKind, 'docker-provider-acceptance');
   assert.equal(calls.writeEvidence[0].validationResult.provider.enabled, true);
   assert.equal(result.evidencePath, 'C:/repo/artifacts/provider-acceptance.json');
+  assert.equal(calls.closeContext, 1);
+  assert.equal(calls.closeBrowser, 1);
+});
+
+test('runDockerProviderAcceptanceEvidence writes bounded readiness evidence before a strict failure', async () => {
+  const calls = {
+    closeBrowser: 0,
+    closeContext: 0,
+    writeEvidence: [],
+  };
+  const browserContext = {
+    close: async () => {
+      calls.closeContext += 1;
+    },
+    newPage: async () => ({
+      setDefaultTimeout() {},
+    }),
+  };
+  const browser = {
+    close: async () => {
+      calls.closeBrowser += 1;
+    },
+    newContext: async () => browserContext,
+  };
+
+  await assert.rejects(
+    () => runDockerProviderAcceptanceEvidence({
+      baseUrl: 'http://127.0.0.1:49100',
+      evidencePath: 'artifacts/provider-acceptance.json',
+      launchBrowserFn: async () => browser,
+      password: 'BrowserPass123!',
+      runProviderAcceptanceBrowserScenarioFn: async ({ baseUrl, username }) => buildProviderAcceptanceEvidenceResult({
+        baseUrl,
+        downloaderQueue: createDownloaderQueue(),
+        executionSummary: createExecutionSummary(),
+        settings: createSettingsPayload({
+          settings: {
+            paths: {
+              downloadMappings: [],
+              downloads: '/data/downloads',
+            },
+            slskd: {
+              apiKey: 'should-not-appear',
+              baseUrl: 'http://slskd:5030',
+            },
+          },
+        }),
+        username,
+      }),
+      username: 'admin',
+      writeDockerSmokeEvidenceFn: async (options) => {
+        calls.writeEvidence.push(options);
+        return { evidencePath: 'C:/repo/artifacts/provider-acceptance.json' };
+      },
+    }),
+    /Set the download path mapping: No download path mapping is configured\..*A local evidence artifact was written\./u,
+  );
+
+  assert.equal(calls.writeEvidence.length, 1);
+  assert.equal(calls.writeEvidence[0].validationResult.readiness.code, 'download_path_mapping_required');
+  assert.doesNotMatch(JSON.stringify(calls.writeEvidence[0]), /should-not-appear|\/data\/downloads/u);
   assert.equal(calls.closeContext, 1);
   assert.equal(calls.closeBrowser, 1);
 });

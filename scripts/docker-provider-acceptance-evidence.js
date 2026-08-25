@@ -14,14 +14,14 @@ import {
   assertMusicQueueTransferLinkagePreserved,
   summarizeMusicQueueTransferLinkage,
 } from './downloader-music-queue-evidence.js';
+import {
+  buildProviderAcceptanceReadiness,
+  formatProviderAcceptanceReadinessError,
+  resolveProviderAcceptanceRequirements,
+} from './docker-provider-acceptance-readiness.js';
 import { writeDockerSmokeEvidence } from './docker-smoke-evidence.js';
 
 export const defaultDockerProviderAcceptanceBaseUrl = 'http://127.0.0.1:47956';
-
-const acceptedDiagnosticCodes = new Set([
-  'provider_accepted',
-  'provider_accepted_with_rejections',
-]);
 
 function assertCondition(condition, message) {
   if (!condition) {
@@ -120,10 +120,6 @@ function summarizePathMappings(settingsPayload) {
 
   return {
     downloadMappingCount: mappings.length,
-    downloadMappings: mappings.map((mapping) => ({
-      downloadClientPrefix: mapping.slskdPrefix ?? '',
-      harmoniarrPrefix: mapping.harmoniarrPrefix ?? '',
-    })),
     downloadsRootConfigured: typeof settings.paths?.downloads === 'string' && settings.paths.downloads.trim().length > 0,
     slskdBaseUrlConfigured: typeof settings.slskd?.baseUrl === 'string' && settings.slskd.baseUrl.trim().length > 0,
     slskdSecretConfigured: Boolean(settingsPayload?.secretStatus?.slskd?.apiKeyConfigured),
@@ -176,21 +172,28 @@ export function buildProviderAcceptanceEvidenceResult({
   checkedAt = new Date().toISOString(),
   downloaderQueue,
   executionSummary,
+  requirements,
   settings,
   username,
 } = {}) {
   const provider = summarizeProviderState(downloaderQueue);
   const importReview = summarizeExecutionDiagnostics(executionSummary);
   const paths = summarizePathMappings(settings);
-
-  return {
+  const normalizedRequirements = resolveProviderAcceptanceRequirements(requirements);
+  const evidence = {
     baseUrl,
     checkedAt,
     importReview,
     musicQueue: summarizeMusicQueueTransferLinkage(downloaderQueue),
     paths,
     provider,
+    requirements: normalizedRequirements,
     username,
+  };
+
+  return {
+    ...evidence,
+    readiness: buildProviderAcceptanceReadiness(evidence, normalizedRequirements),
   };
 }
 
@@ -205,39 +208,16 @@ export function assertProviderAcceptanceEvidenceResult(result, {
   assertCondition(typeof result.baseUrl === 'string' && result.baseUrl.length > 0, 'provider acceptance evidence baseUrl is required');
   assertCondition(typeof result.username === 'string' && result.username.length > 0, 'provider acceptance evidence username is required');
 
-  if (requireConfiguredProvider) {
-    assertCondition(result.provider?.enabled === true, 'Expected configured downloader provider to be enabled');
-    assertCondition(result.paths?.slskdBaseUrlConfigured === true, 'Expected slskd base URL to be configured');
-    assertCondition(result.paths?.slskdSecretConfigured === true, 'Expected slskd API key secret to be configured');
-  }
+  const readiness = buildProviderAcceptanceReadiness(result, {
+    requireAcceptedTransfer,
+    requireConfiguredProvider,
+    requireDiagnostic,
+    requireMusicQueueLink,
+    requirePathMapping,
+  });
 
-  if (requirePathMapping) {
-    assertCondition(
-      result.paths?.downloadMappingCount > 0,
-      'Expected at least one download path mapping for provider acceptance evidence',
-    );
-  }
-
-  if (requireDiagnostic) {
-    assertCondition(result.importReview?.currentRun, 'Expected an Import Review download run to exist');
-    assertCondition(
-      result.importReview?.diagnosticCount > 0,
-      'Expected at least one Import Review download acceptance diagnostic',
-    );
-  }
-
-  if (requireAcceptedTransfer) {
-    assertCondition(
-      result.importReview?.diagnostics?.some((diagnostic) => acceptedDiagnosticCodes.has(diagnostic.code)),
-      'Expected at least one provider-accepted download acceptance diagnostic',
-    );
-  }
-
-  if (requireMusicQueueLink) {
-    assertCondition(
-      result.musicQueue?.linkedTransferCount > 0,
-      'Expected at least one Downloader transfer linked to Music Queue',
-    );
+  if (!readiness.ready) {
+    throw new Error(formatProviderAcceptanceReadinessError(readiness));
   }
 
   return result;
@@ -371,22 +351,23 @@ export async function runProviderAcceptanceBrowserScenario({
     fetchJsonFromApp(page, '/api/v1/import-candidates/execution-summary'),
     fetchJsonFromApp(page, '/api/v1/settings'),
   ]);
-  const result = assertProviderAcceptanceEvidenceResult(buildProviderAcceptanceEvidenceResult({
+  const result = buildProviderAcceptanceEvidenceResult({
     baseUrl,
     downloaderQueue,
     executionSummary,
+    requirements: {
+      requireAcceptedTransfer,
+      requireConfiguredProvider,
+      requireDiagnostic,
+      requireMusicQueueLink,
+      requirePathMapping,
+    },
     settings,
     username,
-  }), {
-    requireAcceptedTransfer,
-    requireConfiguredProvider,
-    requireDiagnostic,
-    requireMusicQueueLink,
-    requirePathMapping,
   });
   await record('provider_acceptance_api_verified');
 
-  if (requireDiagnostic) {
+  if (result.readiness.ready && requireDiagnostic) {
     await page.goto(`${baseUrl}/app/activity/diagnostics/matches`, { waitUntil: 'domcontentloaded' });
     await waitForHeading(page, 'Match diagnostics');
     const firstDiagnostic = result.importReview.diagnostics[0] ?? null;
@@ -395,7 +376,7 @@ export async function runProviderAcceptanceBrowserScenario({
     await record('provider_acceptance_ui_verified');
   }
 
-  const musicQueueLinkage = requireMusicQueueLink
+  const musicQueueLinkage = result.readiness.ready && requireMusicQueueLink
     ? await verifyMusicQueueLinkageInDownloader({
       baseUrl,
       downloaderQueue,
@@ -502,6 +483,28 @@ export async function runDockerProviderAcceptanceEvidence({
       validationKind: 'docker-provider-acceptance',
       validationResult: resultWithScreenshots,
     });
+
+    try {
+      assertProviderAcceptanceEvidenceResult(resultWithScreenshots, {
+        requireAcceptedTransfer,
+        requireConfiguredProvider,
+        requireDiagnostic,
+        requireMusicQueueLink,
+        requirePathMapping,
+      });
+    } catch (error) {
+      const readiness = resultWithScreenshots.readiness
+        ?? buildProviderAcceptanceReadiness(resultWithScreenshots, {
+          requireAcceptedTransfer,
+          requireConfiguredProvider,
+          requireDiagnostic,
+          requireMusicQueueLink,
+          requirePathMapping,
+        });
+      throw new Error(formatProviderAcceptanceReadinessError(readiness, {
+        evidencePath: evidence?.evidencePath ?? null,
+      }), { cause: error });
+    }
 
     return {
       ...resultWithScreenshots,

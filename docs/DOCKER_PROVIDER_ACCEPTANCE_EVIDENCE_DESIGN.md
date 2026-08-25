@@ -19,7 +19,8 @@ that:
 - at least one download path mapping exists,
 - an Import Review download run has a bounded download acceptance diagnostic,
 - the diagnostic is visible in the browser Import Review surface, and
-- the emitted JSON evidence contains no provider API key or raw secret value.
+- the emitted JSON evidence contains no provider API key, raw secret value, or
+  machine-specific path prefix.
 
 The validator supports stricter proof with
 `--require-accepted-transfer` when the local slskd run is expected to have
@@ -46,7 +47,7 @@ accepted at least one transfer.
   user-facing text and headings instead of implementation selectors.
 - OWASP Logging Cheat Sheet:
   <https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html>.
-  Evidence is bounded to operational status, counts, and path prefixes.
+  Evidence is bounded to operational status and counts.
 - OWASP REST Security Cheat Sheet:
   <https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html>.
   The validator reads authenticated API state without placing secrets in URLs.
@@ -62,8 +63,8 @@ Pros:
   Soulseek peers in CI.
 - Proves the operator-visible diagnostic and the durable Import Review read
   model in one run.
-- Records path mapping evidence needed to explain why downloads can or cannot
-  be imported later.
+- Records whether path mapping evidence is present without serializing the
+  machine-specific mapping itself.
 - Redacts provider secrets by construction.
 - Reuses the existing Playwright and Docker smoke evidence conventions.
 
@@ -73,8 +74,8 @@ Cons:
   run before strict evidence can pass.
 - Does not force a remote peer to finish a transfer; it proves provider
   acceptance or bounded rejection.
-- Local path mappings remain environment-specific, so evidence is useful for
-  replay and troubleshooting but not portable production configuration.
+- A mapping count proves only that a mapping is saved; it does not prove a
+  particular completed provider path resolves inside the container.
 
 ## Final Stack
 
@@ -95,9 +96,9 @@ Cons:
 - The evidence payload stores whether the slskd secret is configured, not the
   key value or source secret metadata beyond the existing safe status.
 - The script does not accept API keys through CLI arguments.
-- Evidence includes download-client and Harmoniarr path prefixes because those
-  are required for operator troubleshooting. It does not include file contents
-  or raw provider API responses.
+- Evidence includes a path-mapping count rather than download-client or
+  Harmoniarr path prefixes. It does not include file contents or raw provider
+  API responses.
 - The script performs authenticated GET requests after browser login; it does
   not mutate Import Review state.
 
@@ -129,6 +130,10 @@ npm run validate:docker-provider-acceptance -- -- --require-accepted-transfer
 
 Use the non-strict diagnostic mode only when intentionally capturing a
 provider-rejected or blocked run for troubleshooting.
+
+If a strict prerequisite is missing, the command writes the configured evidence
+artifact first, then exits unsuccessfully with one labelled next action. See
+[Docker Provider Acceptance Readiness Design](DOCKER_PROVIDER_ACCEPTANCE_READINESS_DESIGN.md).
 
 ## Follow-Up
 
