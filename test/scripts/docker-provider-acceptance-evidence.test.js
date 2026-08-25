@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   assertProviderAcceptanceEvidenceResult,
   buildProviderAcceptanceEvidenceResult,
+  openImportReviewRunHistoryDisclosure,
   runDockerProviderAcceptanceEvidence,
   summarizeExecutionDiagnostics,
 } from '../../scripts/docker-provider-acceptance-evidence.js';
@@ -101,6 +102,94 @@ function createExecutionSummary({ diagnosticCode = 'provider_accepted' } = {}) {
     },
   };
 }
+
+function createImportReviewRunHistoryPage({ isOpen = false } = {}) {
+  const calls = {
+    disclosureHeadingWaits: 0,
+    disclosureWaits: 0,
+    openDisclosureWaits: 0,
+    summaryClicks: 0,
+  };
+  const state = { isOpen };
+  const heading = {
+    waitFor: async () => {
+      calls.disclosureHeadingWaits += 1;
+    },
+  };
+  const summary = {
+    click: async () => {
+      calls.summaryClicks += 1;
+      state.isOpen = true;
+    },
+  };
+  const disclosure = {
+    evaluate: async (callback) => callback({ open: state.isOpen }),
+    getByRole: (role, options) => {
+      assert.equal(role, 'heading');
+      assert.deepEqual(options, {
+        exact: true,
+        name: 'Run history and controls',
+      });
+      return heading;
+    },
+    locator: (selector) => {
+      assert.equal(selector, ':scope > summary');
+      return summary;
+    },
+    waitFor: async () => {
+      calls.disclosureWaits += 1;
+    },
+  };
+  const openDisclosure = {
+    waitFor: async () => {
+      assert.equal(state.isOpen, true);
+      calls.openDisclosureWaits += 1;
+    },
+  };
+  const page = {
+    locator: (selector) => {
+      if (selector === 'details.import-review-runway') {
+        return disclosure;
+      }
+
+      assert.equal(selector, 'details.import-review-runway[open]');
+      return openDisclosure;
+    },
+  };
+
+  return {
+    calls,
+    disclosure,
+    page,
+  };
+}
+
+test('openImportReviewRunHistoryDisclosure opens the native advanced diagnostics disclosure', async () => {
+  const { calls, disclosure, page } = createImportReviewRunHistoryPage();
+
+  const result = await openImportReviewRunHistoryDisclosure(page);
+
+  assert.equal(result, disclosure);
+  assert.deepEqual(calls, {
+    disclosureHeadingWaits: 1,
+    disclosureWaits: 1,
+    openDisclosureWaits: 1,
+    summaryClicks: 1,
+  });
+});
+
+test('openImportReviewRunHistoryDisclosure preserves an already open disclosure', async () => {
+  const { calls, page } = createImportReviewRunHistoryPage({ isOpen: true });
+
+  await openImportReviewRunHistoryDisclosure(page);
+
+  assert.deepEqual(calls, {
+    disclosureHeadingWaits: 1,
+    disclosureWaits: 1,
+    openDisclosureWaits: 1,
+    summaryClicks: 0,
+  });
+});
 
 test('summarizeExecutionDiagnostics extracts bounded download acceptance details', () => {
   const result = summarizeExecutionDiagnostics(createExecutionSummary());

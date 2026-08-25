@@ -43,8 +43,9 @@ accepted at least one transfer.
   sensitive values should not be logged.
 - Playwright locators and assertions:
   <https://playwright.dev/docs/locators> and
-  <https://playwright.dev/docs/test-assertions>. The browser proof uses
-  user-facing text and headings instead of implementation selectors.
+  <https://playwright.dev/docs/test-assertions>. The browser proof uses an
+  accessible heading and visible diagnostic text; it opens only the known
+  native disclosure that contains the advanced diagnostic before asserting it.
 - OWASP Logging Cheat Sheet:
   <https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html>.
   Evidence is bounded to operational status and counts.
@@ -137,7 +138,8 @@ artifact first, then exits unsuccessfully with one labelled next action. See
 
 ## Follow-Up
 
-The next high-value item is **Import execution selected-candidate readiness
-guidance**: when a wanted request produces candidates but no download run is
-ready, show the operator the exact missing step from Wanted, Import Review, and
-Downloader instead of requiring them to infer it from separate screens.
+The next high-value item is a strict local Music Queue-to-Downloader proof:
+create a Music Queue-origin transfer, then rerun the strict evidence command.
+Keep the resulting recovery guidance in the existing Music Queue, Import
+Review, and Downloader surfaces; do not add another queue view unless observed
+operator friction requires it.

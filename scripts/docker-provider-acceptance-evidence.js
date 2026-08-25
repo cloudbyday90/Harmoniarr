@@ -41,6 +41,23 @@ async function waitForHeading(page, name) {
   await page.getByRole('heading', { name }).waitFor();
 }
 
+export async function openImportReviewRunHistoryDisclosure(page) {
+  const disclosure = page.locator('details.import-review-runway');
+  await disclosure.waitFor();
+  await disclosure.getByRole('heading', {
+    exact: true,
+    name: 'Run history and controls',
+  }).waitFor();
+
+  const isOpen = await disclosure.evaluate((element) => element.open);
+  if (!isOpen) {
+    await disclosure.locator(':scope > summary').click();
+  }
+
+  await page.locator('details.import-review-runway[open]').waitFor();
+  return disclosure;
+}
+
 async function fetchJsonFromApp(page, path) {
   const result = await page.evaluate(async (requestPath) => {
     const response = await fetch(requestPath, {
@@ -371,8 +388,10 @@ export async function runProviderAcceptanceBrowserScenario({
     await page.goto(`${baseUrl}/app/activity/diagnostics/matches`, { waitUntil: 'domcontentloaded' });
     await waitForHeading(page, 'Match diagnostics');
     const firstDiagnostic = result.importReview.diagnostics[0] ?? null;
-    await page.getByText('Download acceptance diagnostic', { exact: true }).first().waitFor({ timeout: timeoutMs });
-    await page.getByText(firstDiagnostic.title, { exact: true }).first().waitFor({ timeout: timeoutMs });
+    assertCondition(firstDiagnostic, 'Expected one download acceptance diagnostic after readiness passed');
+    const runHistoryDisclosure = await openImportReviewRunHistoryDisclosure(page);
+    await runHistoryDisclosure.getByText('Download acceptance diagnostic', { exact: true }).waitFor({ timeout: timeoutMs });
+    await runHistoryDisclosure.getByText(firstDiagnostic.title, { exact: true }).waitFor({ timeout: timeoutMs });
     await record('provider_acceptance_ui_verified');
   }
 

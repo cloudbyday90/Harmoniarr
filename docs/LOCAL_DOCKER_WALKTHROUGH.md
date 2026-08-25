@@ -120,7 +120,8 @@ same folder; it does not mount a host folder by itself.
 ## Verifying Provider Download Acceptance
 
 After Soulseek is configured and at least one Import Review candidate is
-selected, use Import Review's download runway:
+selected, open `Advanced diagnostics > Run history and controls` in Import
+Review, then use its download runway:
 
 1. Click `Start download run`.
 2. Click `Sync transfer state`.
