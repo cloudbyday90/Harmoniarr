@@ -27,6 +27,9 @@ test('createMetadataModule exposes shared route dependencies from injected servi
   const operatorArtistSaveService = {
     saveOperatorArtist: () => {},
   };
+  const operatorArtistManualInclusionService = {
+    includeOperatorArtistReleaseManually: () => {},
+  };
   const operatorArtistReconciliationService = {
     queueOperatorArtistReconciliation: async () => {},
   };
@@ -87,6 +90,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     operatorArtistProjectionService,
     operatorMonitoredArtistProjectionService,
     operatorArtistSaveService,
+    operatorArtistManualInclusionService,
     operatorArtistReconciliationService,
     metadataReadService,
     metadataRefreshService,
@@ -112,6 +116,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
   assert.equal(metadataModule.operatorMonitoredArtistProjectionService, operatorMonitoredArtistProjectionService);
   assert.equal(metadataModule.operatorArtistProjectionService, operatorArtistProjectionService);
   assert.equal(metadataModule.operatorArtistSaveService, operatorArtistSaveService);
+  assert.equal(metadataModule.operatorArtistManualInclusionService, operatorArtistManualInclusionService);
   assert.equal(metadataModule.metadataRefreshService, metadataRefreshService);
   assert.equal(metadataModule.metadataReleaseMaterializationService, metadataReleaseMaterializationService);
   assert.equal(metadataModule.metadataSearchService, metadataSearchService);
@@ -129,6 +134,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     getMetadataProviderCacheObservability: metadataProviderCacheObservabilityService.getSummary,
     listOperatorMonitoredArtistProjections: operatorMonitoredArtistProjectionService.listOperatorMonitoredArtistProjections,
     getOperatorArtistProjection: operatorArtistProjectionService.getOperatorArtistProjection,
+    includeOperatorArtistReleaseManually: operatorArtistManualInclusionService.includeOperatorArtistReleaseManually,
     getMetadataRelease: metadataReadService.getRelease,
     getMetadataReleaseByMusicBrainzId: metadataReadService.getReleaseByMusicBrainzId,
     getMetadataReleaseGroup: metadataReadService.getReleaseGroup,

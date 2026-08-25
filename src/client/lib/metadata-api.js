@@ -123,6 +123,21 @@ export function saveOperatorArtistDraft(artistId, draft) {
   });
 }
 
+export function includeOperatorArtistReleaseManually({
+  metadataArtistId,
+  metadataReleaseGroupId,
+  metadataReleaseId,
+}) {
+  return apiRequest(
+    `/api/v1/metadata/artists/${encodeURIComponent(metadataArtistId)}/operator/release-groups/${encodeURIComponent(metadataReleaseGroupId)}/manual-inclusion`,
+    {
+      method: 'POST',
+      includeCsrf: true,
+      body: { metadataReleaseId },
+    },
+  );
+}
+
 export function startMetadataArtistRefresh(artistId) {
   return apiRequest(`/api/v1/metadata/artists/${encodeURIComponent(artistId)}/refresh`, {
     method: 'POST',

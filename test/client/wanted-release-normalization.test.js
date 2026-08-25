@@ -137,6 +137,19 @@ test('normalizeWantedReleaseForCard forwards metadataArtistId', () => {
   assert.equal(result.metadataArtistId, 'local-artist-uuid');
 });
 
+test('normalizeWantedReleaseForCard preserves manual-selection state needed by Missing Music actions', () => {
+  const result = normalizeWantedReleaseForCard({
+    evidence: { selectionSource: 'manual', selectionState: 'selected' },
+    metadataReleaseGroupId: 'release-group-1',
+    metadataReleaseId: 'release-1',
+  });
+
+  assert.equal(result.metadataReleaseGroupId, 'release-group-1');
+  assert.equal(result.metadataReleaseId, 'release-1');
+  assert.equal(result.selectionSource, 'manual');
+  assert.equal(result.selectionState, 'selected');
+});
+
 test('normalizeWantedReleaseForCard forwards metadataReleaseId for recovery actions', () => {
   const result = normalizeWantedReleaseForCard({ metadataReleaseId: 'local-release-uuid' });
   assert.equal(result.metadataReleaseId, 'local-release-uuid');

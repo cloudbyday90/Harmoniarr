@@ -27,6 +27,7 @@ import { createMetadataMonitoredArtistStore } from './metadata-monitored-artist-
 import { createMetadataArtistRefreshStateStore } from './metadata-artist-refresh-state-store.js';
 import { createOperatorArtistMonitoringService } from './operator-artist-monitoring-service.js';
 import { createOperatorMonitoredArtistProjectionService } from './operator-monitored-artist-projection-service.js';
+import { createOperatorArtistManualInclusionService } from './operator-artist-manual-inclusion-service.js';
 import { createOperatorArtistProjectionService } from './operator-artist-projection-service.js';
 import { createOperatorArtistSaveService } from './operator-artist-save-service.js';
 import { createOperatorArtistMonitoringStore } from './operator-artist-monitoring-store.js';
@@ -79,6 +80,7 @@ export function createMetadataModule({
   metadataMonitoredArtistStore = null,
   operatorArtistMonitoringStore = null,
   operatorArtistMonitoringService = null,
+  operatorArtistManualInclusionService = null,
   operatorMonitoredArtistProjectionService = null,
   operatorArtistProjectionService = null,
   operatorArtistSaveService = null,
@@ -190,6 +192,11 @@ export function createMetadataModule({
       // below. Adding/monitoring an artist queues a per-artist discography
       // refresh so their releases populate without waiting on the heartbeat.
       startMetadataArtistRefresh: (input) => resolvedMetadataArtistRefreshService.startMetadataArtistRefresh(input),
+    });
+  const resolvedOperatorArtistManualInclusionService = operatorArtistManualInclusionService
+    ?? createOperatorArtistManualInclusionService({
+      getOperatorArtistProjection: resolvedOperatorArtistProjectionService.getOperatorArtistProjection,
+      saveOperatorArtist: resolvedOperatorArtistSaveService.saveOperatorArtist,
     });
   const resolvedOperatorArtistReconciliationRequestService = operatorArtistReconciliationRequestService
     ?? createOperatorArtistReconciliationRequestService({
@@ -332,6 +339,7 @@ export function createMetadataModule({
     metadataProviderResponseCacheStore: resolvedMetadataProviderResponseCacheStore,
     operatorArtistMonitoringService: resolvedOperatorArtistMonitoringService,
     operatorArtistMonitoringStore: resolvedOperatorArtistMonitoringStore,
+    operatorArtistManualInclusionService: resolvedOperatorArtistManualInclusionService,
     operatorMonitoredArtistProjectionService: resolvedOperatorMonitoredArtistProjectionService,
     operatorArtistProjectionService: resolvedOperatorArtistProjectionService,
     operatorArtistSaveService: resolvedOperatorArtistSaveService,
@@ -361,6 +369,7 @@ export function createMetadataModule({
       getMetadataProviderCacheObservability: resolvedMetadataProviderCacheObservabilityService.getSummary,
       listOperatorMonitoredArtistProjections: resolvedOperatorMonitoredArtistProjectionService.listOperatorMonitoredArtistProjections,
       getOperatorArtistProjection: resolvedOperatorArtistProjectionService.getOperatorArtistProjection,
+      includeOperatorArtistReleaseManually: resolvedOperatorArtistManualInclusionService.includeOperatorArtistReleaseManually,
       getMusicBrainzReleaseGroupReleases: resolvedMusicBrainzCatalogService.getReleaseGroupReleases,
       getMetadataArtist: resolvedMetadataReadService.getArtist,
       getMetadataArtistByMusicBrainzId: resolvedMetadataReadService.getArtistByMusicBrainzId,

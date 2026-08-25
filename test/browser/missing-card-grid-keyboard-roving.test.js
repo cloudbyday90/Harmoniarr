@@ -98,10 +98,10 @@ suite('Missing release-card browser keyboard roving coverage', () => {
         controlSelector: cardActionSelector,
       });
 
-      assert.deepEqual(controlTabindexes[0], ['-1']);
+      assert.deepEqual(controlTabindexes[0], ['-1', '-1']);
       assert.ok(
-        controlTabindexes[2].length >= 2,
-        'the active recovery card should expose both Search again and Search controls',
+        controlTabindexes[2].length >= 3,
+        'the active recovery card should expose Search again, Search, and manual-selection controls',
       );
       assert.deepEqual(
         controlTabindexes[2].map((value) => value ?? null),
@@ -109,6 +109,68 @@ suite('Missing release-card browser keyboard roving coverage', () => {
       );
     }, {
       scenarioName: 'missing_release_card_grid_keyboard_roving',
+    });
+  });
+
+  test('Missing Music confirms and submits manual inclusion without implying a search', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) {
+      t.skip(runtimeUnavailableReason);
+      return;
+    }
+
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      await installWantedBrowserFixtures(browserContext);
+      let manualInclusionRequest = null;
+      await browserContext.route(
+        '**/api/v1/metadata/artists/metadata-artist-autechre/operator/release-groups/metadata-rg-amber/manual-inclusion',
+        async (route) => {
+          manualInclusionRequest = {
+            body: route.request().postDataJSON(),
+            method: route.request().method(),
+          };
+          await route.fulfill({
+            body: JSON.stringify({
+              alreadyIncluded: false,
+              manualInclusion: {
+                metadataArtistId: 'metadata-artist-autechre',
+                metadataReleaseGroupId: 'metadata-rg-amber',
+                metadataReleaseId: 'metadata-release-amber',
+                selectionState: 'selected',
+              },
+              ok: true,
+              reconciliation: { run: { id: 'run-manual-inclusion', status: 'pending' } },
+              snapshot: { id: 'snapshot-manual-inclusion', snapshotRevision: 1 },
+            }),
+            contentType: 'application/json',
+            status: 202,
+          });
+        },
+      );
+      await bootstrapAdminThroughUi(page, { baseUrl });
+
+      await page.goto(`${baseUrl}/app/missing`, { waitUntil: 'domcontentloaded' });
+      const action = page.getByRole('button', { name: 'Keep Amber selected manually' });
+      await action.waitFor();
+      await action.click();
+
+      const dialog = page.getByRole('dialog', { name: 'Keep this release selected manually?' });
+      await dialog.waitFor();
+      await assertLocatorFocused(
+        dialog.getByRole('button', { name: 'Close' }),
+        'the manual inclusion dialog should move focus inside the modal',
+      );
+      await dialog.getByText('Harmoniarr will queue reconciliation; it will not start a search.').waitFor();
+      await dialog.getByRole('button', { name: 'Keep selected manually' }).click();
+
+      await page.getByText('Manual inclusion').first().waitFor();
+      assert.deepEqual(manualInclusionRequest, {
+        body: { metadataReleaseId: 'metadata-release-amber' },
+        method: 'POST',
+      });
+    }, {
+      scenarioName: 'missing_music_manual_inclusion',
     });
   });
 });

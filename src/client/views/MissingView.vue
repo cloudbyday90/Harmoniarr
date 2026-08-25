@@ -29,6 +29,7 @@ import { useDownloadRecoveryRetry } from '../composables/useDownloadRecoveryRetr
 import { useLibraryWantedSummary } from '../composables/useLibraryWantedSummary.js';
 import { useLibraryWantedReleases } from '../composables/useLibraryWantedReleases.js';
 import { useLibraryReconciliationSummary } from '../composables/useLibraryReconciliationSummary.js';
+import { getManualSelectionLabel, useManualReleaseInclusion } from '../composables/useManualReleaseInclusion.js';
 import { useReleaseRequest } from '../composables/useReleaseRequest.js';
 import { useRequestUsers } from '../composables/useRequestUsers.js';
 import { getErrorMessage } from '../lib/error-utils.js';
@@ -59,6 +60,7 @@ const {
   requestRelease,
 } = useReleaseRequest();
 const recoveryRetry = useDownloadRecoveryRetry();
+const manualInclusion = useManualReleaseInclusion();
 
 const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
 const { users: requestForUsers, loadUsers: loadRequestForUsers } = useRequestUsers();
@@ -186,6 +188,47 @@ function refreshAll() {
   wanted.loadLibraryWantedSummary();
   releases.loadWantedReleases();
   reconciliation.loadLibraryReconciliationSummary();
+}
+
+const manualInclusionModalOpen = ref(false);
+const manualInclusionRelease = ref(null);
+const manualInclusionError = ref(null);
+
+function openManualInclusionModal(release) {
+  manualInclusionRelease.value = release;
+  manualInclusionError.value = null;
+  manualInclusionModalOpen.value = true;
+}
+
+function closeManualInclusionModal() {
+  if (!manualInclusion.isIncluding(manualInclusionRelease.value)) {
+    manualInclusionModalOpen.value = false;
+    manualInclusionRelease.value = null;
+    manualInclusionError.value = null;
+  }
+}
+
+const manualInclusionIsSaving = computed(() => (
+  manualInclusion.isIncluding(manualInclusionRelease.value)
+));
+
+const manualInclusionIsSaved = computed(() => (
+  manualInclusion.isManualSelection(manualInclusionRelease.value)
+));
+
+async function handleConfirmManualInclusion() {
+  if (!manualInclusionRelease.value) return;
+  manualInclusionError.value = null;
+  const result = await manualInclusion.includeManually(manualInclusionRelease.value);
+  if (result.ok) {
+    closeManualInclusionModal();
+    refreshAll();
+  } else if (!result.skipped) {
+    manualInclusionError.value = getErrorMessage(
+      result.error,
+      'Could not save the manual inclusion. Please try again.',
+    );
+  }
 }
 
 async function retryDownloadRecovery(release) {
@@ -374,6 +417,24 @@ onBeforeUnmount(() => {
                     : `Start a search for ${release.title ?? 'this release'}`"
                   @request="openConfirmModal(release)"
                 />
+                <span
+                  v-if="manualInclusion.isManualSelection(release)"
+                  class="hx-pill"
+                  data-tone="info"
+                >
+                  {{ getManualSelectionLabel(release) }}
+                </span>
+                <button
+                  v-else-if="manualInclusion.canIncludeManually(release)"
+                  type="button"
+                  class="hx-btn"
+                  data-variant="ghost"
+                  :disabled="manualInclusion.isIncluding(release)"
+                  :aria-label="`Keep ${release.title ?? 'this release'} selected manually`"
+                  @click="openManualInclusionModal(release)"
+                >
+                  {{ manualInclusion.isIncluding(release) ? 'Saving selection…' : 'Keep selected manually' }}
+                </button>
               </div>
             </template>
           </ReleaseCard>
@@ -466,8 +527,21 @@ onBeforeUnmount(() => {
     :error-message="confirmError"
     :users="isAdmin ? requestForUsers : []"
     action-context="music_queue_search"
+    dialog-id="missing-music-search-confirmation"
     @confirm="handleConfirmRequest"
     @close="closeConfirmModal"
+  />
+
+  <ConfirmRequestModal
+    :open="manualInclusionModalOpen"
+    :release="manualInclusionRelease"
+    :loading="manualInclusionIsSaving"
+    :requested="manualInclusionIsSaved"
+    :error-message="manualInclusionError"
+    action-context="manual_inclusion"
+    dialog-id="missing-music-manual-inclusion-confirmation"
+    @confirm="handleConfirmManualInclusion"
+    @close="closeManualInclusionModal"
   />
 </template>
 

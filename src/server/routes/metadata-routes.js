@@ -68,6 +68,7 @@ export function registerMetadataRoutes(app, {
   getMetadataArtistByMusicBrainzId,
   getMetadataProviderCacheObservability = () => ({ namespaces: [], observedSinceAt: null, updatedAt: null }),
   getOperatorArtistProjection,
+  includeOperatorArtistReleaseManually,
   saveOperatorArtist,
   getMetadataRelease,
   getMetadataReleaseByMusicBrainzId,
@@ -275,6 +276,27 @@ export function registerMetadataRoutes(app, {
       reconciliation: result.reconciliation,
       releaseGroups: result.projection?.releaseGroups ?? [],
       releases: result.projection?.releases ?? [],
+      snapshot: result.snapshot,
+    });
+  }));
+
+  app.post('/api/v1/metadata/artists/:artistId/operator/release-groups/:releaseGroupId/manual-inclusion', limitMetadataMutation, metadataRoute(async (request, response) => {
+    const session = await requireFreshSessionFn(request);
+    requireCsrfFn(request, session);
+
+    const result = await includeOperatorArtistReleaseManually({
+      appUserId: session.appUserId,
+      metadataArtistId: request.params.artistId,
+      metadataReleaseGroupId: request.params.releaseGroupId,
+      metadataReleaseId: request.body?.metadataReleaseId,
+      triggeredByUserId: session.appUserId,
+    });
+
+    response.status(result.alreadyIncluded ? 200 : 202).json({
+      ok: true,
+      alreadyIncluded: result.alreadyIncluded,
+      manualInclusion: result.manualInclusion,
+      reconciliation: result.reconciliation,
       snapshot: result.snapshot,
     });
   }));

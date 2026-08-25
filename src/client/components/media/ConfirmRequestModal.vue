@@ -23,7 +23,7 @@ import { containDialogTabFocus } from '../../lib/dialog-focus-trap.js';
 import { getReleaseArtistName, getReleaseTitle, getReleaseYear } from '../../lib/release-normalization.js';
 
 /**
- * ConfirmRequestModal — lightweight release request confirmation dialog.
+ * ConfirmRequestModal — lightweight release-action confirmation dialog.
  *
  * Presents a single release for the user to confirm or cancel before submitting
  * a media request. Intentionally not a full release detail modal — it shows
@@ -80,6 +80,11 @@ const props = defineProps({
     type: String,
     default: 'request',
   },
+  /** Unique DOM ID prefix when more than one confirmation dialog is rendered. */
+  dialogId: {
+    type: String,
+    default: 'confirm-request',
+  },
 });
 
 const emit = defineEmits(['confirm', 'close']);
@@ -94,6 +99,7 @@ let previouslyFocusedElement = null;
  * null means "myself" (the session user). Reset whenever the modal opens.
  */
 const selectedForUserId = ref(null);
+const dialogHeadingId = computed(() => `${props.dialogId}-heading`);
 
 function openDialogSession() {
   if (!dialogRef.value) return;
@@ -172,6 +178,16 @@ const metaLine = computed(() => {
 });
 
 const actionCopy = computed(() => {
+  if (props.actionContext === 'manual_inclusion') {
+    return {
+      confirmLabel: 'Keep selected manually',
+      explanation: 'This saves a manual inclusion for this release. Harmoniarr will queue reconciliation; it will not start a search.',
+      heading: 'Keep this release selected manually?',
+      loadingLabel: 'Saving selection…',
+      requestedLabel: 'Manual inclusion saved',
+    };
+  }
+
   if (props.actionContext === 'music_queue_search') {
     return {
       confirmLabel: 'Start search',
@@ -231,14 +247,14 @@ function handleConfirm() {
     class="crm-dialog"
     role="dialog"
     aria-modal="true"
-    aria-labelledby="crm-heading"
+    :aria-labelledby="dialogHeadingId"
     @cancel="handleCancel"
     @click="handleBackdropClick"
     @keydown="handleKeydown"
   >
     <div class="crm-shell">
       <header class="crm-header">
-        <h2 id="crm-heading" class="crm-title">{{ actionCopy.heading }}</h2>
+        <h2 :id="dialogHeadingId" class="crm-title">{{ actionCopy.heading }}</h2>
         <button
           ref="closeButtonRef"
           type="button"

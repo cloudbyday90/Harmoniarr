@@ -59,6 +59,29 @@ function createMetadataRouteTestApp(overrides = {}) {
         releaseGroups: [],
         releases: [],
       }),
+      includeOperatorArtistReleaseManually: async ({
+        appUserId,
+        metadataArtistId,
+        metadataReleaseGroupId,
+        metadataReleaseId,
+        triggeredByUserId,
+      }) => ({
+        alreadyIncluded: false,
+        manualInclusion: {
+          metadataArtistId,
+          metadataReleaseGroupId,
+          metadataReleaseId,
+          selectionState: 'selected',
+        },
+        reconciliation: {
+          run: {
+            appUserId,
+            id: 'run-manual-inclusion',
+            triggeredByUserId,
+          },
+        },
+        snapshot: { id: 'snapshot-manual-inclusion', snapshotRevision: 1 },
+      }),
       listOperatorMonitoredArtistProjections: async ({ appUserId, limit }) => ({
         limit,
         results: [{
@@ -636,6 +659,68 @@ test('metadata operator artist save route persists the operator draft payload', 
         id: 'snapshot-1',
         snapshotRevision: 1,
       },
+    });
+  });
+});
+
+test('metadata manual inclusion route uses a fresh session, CSRF protection, and a narrow server command', async (t) => {
+  const includeOperatorArtistReleaseManually = t.mock.fn(async ({
+    appUserId,
+    metadataArtistId,
+    metadataReleaseGroupId,
+    metadataReleaseId,
+    triggeredByUserId,
+  }) => ({
+    alreadyIncluded: false,
+    manualInclusion: {
+      metadataArtistId,
+      metadataReleaseGroupId,
+      metadataReleaseId,
+      selectionState: 'selected',
+    },
+    reconciliation: { run: { id: 'run-7', status: 'pending' } },
+    snapshot: { id: 'snapshot-7', snapshotRevision: 7 },
+    received: { appUserId, triggeredByUserId },
+  }));
+  const requireCsrf = t.mock.fn();
+  const requireFreshSession = t.mock.fn(async () => ({ appUserId: 'user-7' }));
+  const app = createMetadataRouteTestApp({
+    includeOperatorArtistReleaseManually,
+    requireCsrf,
+    requireFreshSession,
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/metadata/artists/artist-7/operator/release-groups/release-group-7/manual-inclusion`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-csrf-token': 'csrf-token',
+      },
+      body: JSON.stringify({ metadataReleaseId: 'release-7' }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 202);
+    assert.deepEqual(includeOperatorArtistReleaseManually.mock.calls[0].arguments[0], {
+      appUserId: 'user-7',
+      metadataArtistId: 'artist-7',
+      metadataReleaseGroupId: 'release-group-7',
+      metadataReleaseId: 'release-7',
+      triggeredByUserId: 'user-7',
+    });
+    assert.deepEqual(requireCsrf.mock.calls[0].arguments[1], { appUserId: 'user-7' });
+    assert.deepEqual(payload, {
+      ok: true,
+      alreadyIncluded: false,
+      manualInclusion: {
+        metadataArtistId: 'artist-7',
+        metadataReleaseGroupId: 'release-group-7',
+        metadataReleaseId: 'release-7',
+        selectionState: 'selected',
+      },
+      reconciliation: { run: { id: 'run-7', status: 'pending' } },
+      snapshot: { id: 'snapshot-7', snapshotRevision: 7 },
     });
   });
 });

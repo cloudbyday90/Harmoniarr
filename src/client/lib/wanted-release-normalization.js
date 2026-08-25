@@ -74,6 +74,9 @@ export function normalizeWantedReleaseForCard(release) {
     missingTrackCount: release.missingTrackCount ?? 0,
     discoveryRequest: release.discoveryRequest ?? null,
     metadataReleaseId: release.metadataReleaseId ?? null,
+    metadataReleaseGroupId: release.metadataReleaseGroupId ?? null,
+    selectionSource: release.evidence?.selectionSource ?? null,
+    selectionState: release.evidence?.selectionState ?? null,
 
     // Forwarded for potential artist-detail navigation.
     metadataArtistId: release.metadataArtistId ?? null,
