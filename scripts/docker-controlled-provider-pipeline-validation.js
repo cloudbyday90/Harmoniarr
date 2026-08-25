@@ -185,7 +185,12 @@ async function copyAndRunVerifier({ composeArgs, env }) {
     && parsed.sharedRecovery.fallbackRunId.length > 0
     && parsed.sharedRecovery.crossOperatorReadDenied === true
     && parsed.sharedRecovery.candidatePolicyRedacted === true
-    && parsed.sharedRecovery.activityPolicyRedacted === true;
+    && parsed.sharedRecovery.activityPolicyRedacted === true
+    && parsed.sharedRecovery.downloaderMusicQueueLinkage?.operatorCount === 2
+    && parsed.sharedRecovery.downloaderMusicQueueLinkage.linkedTransferCount === 2
+    && parsed.sharedRecovery.downloaderMusicQueueLinkage.siblingReleaseRedacted === true
+    && parsed.sharedRecovery.downloaderMusicQueueLinkage.operatorIdentityRedacted === true
+    && parsed.sharedRecovery.downloaderMusicQueueLinkage.privatePolicyRedacted === true;
   const sharedBoundedStopVerified = parsed?.sharedBoundedStop?.providerSearchCount === 1
     && parsed?.sharedBoundedStop?.providerTransferCount === 1
     && parsed.sharedBoundedStop.operatorCount === 2

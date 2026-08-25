@@ -18,9 +18,11 @@ import {
   buildControlledProviderFixtureFilename,
   controlledProviderFixtureCatalog,
 } from './controlled-provider-fixture-catalog.mjs';
+import { assertSharedRecoveryDownloaderMusicQueueLinkage } from './controlled-provider-music-queue-linkage-verifier.mjs';
 import { createAcquisitionModule } from '/app/server-dist/acquisition/acquisition-module.js';
 import { createActivityModule } from '/app/server-dist/activity/activity-module.js';
 import { closePool, getPool } from '/app/server-dist/database.js';
+import { createDownloaderModule } from '/app/server-dist/downloader/downloader-module.js';
 import { createImportCandidateModule } from '/app/server-dist/import-candidates/import-candidate-module.js';
 import { createLibraryModule } from '/app/server-dist/library/library-module.js';
 import { createSlskdService } from '/app/server-dist/slskd/slskd-service.js';
@@ -475,6 +477,7 @@ async function runVerification() {
     requestMusicQueueRediscovery: libraryModule.libraryDiscoveryRequestStore.requestMusicQueueRediscovery,
     startLibraryDiscoveryRun: libraryModule.routeDependencies.startLibraryDiscoveryRun,
   });
+  const downloaderModule = createDownloaderModule({ slskdService });
 
   await persistSettings([
     { namespace: 'paths', settingKey: 'downloads', value: downloadsRoot },
@@ -1021,6 +1024,11 @@ async function runVerification() {
     importCandidateId: sharedRecoveryFallbackCandidateId,
   });
   assert.equal(sharedRecoveryFallbackCandidate.status, 'downloading', 'the shared fallback must become the only active download');
+  const sharedRecoveryDownloaderMusicQueueLinkage = await assertSharedRecoveryDownloaderMusicQueueLinkage({
+    buildDownloaderQueue: downloaderModule.routeDependencies.buildDownloaderQueue,
+    fallbackCandidateId: sharedRecoveryFallbackCandidateId,
+    sharedSeed: sharedRecoverySeed,
+  });
 
   const sharedDownloadingOutcomes = await Promise.all(sharedRecoverySeed.wantedReleases.map(async ({
     appUserId,
@@ -1491,6 +1499,7 @@ async function runVerification() {
       recoveryActivityCount: sharedRecoveryActivities.length,
       recoveryChainCount: sharedRecoveryReconciliation.recoveries.length,
       fallbackActivityCount: sharedFallbackActivities.length,
+      downloaderMusicQueueLinkage: sharedRecoveryDownloaderMusicQueueLinkage,
     },
     sharedBoundedStop: {
       activityCount: sharedBoundedStopActivities.length,

@@ -5,6 +5,7 @@ services:
       HARMONIARR_TEST_DISABLE_BACKGROUND_SERVICES: 'true'
     volumes:
       - "./testing/docker/controlled-provider-fixture-catalog.mjs:/validation/controlled-provider-fixture-catalog.mjs:ro"
+      - "./testing/docker/controlled-provider-music-queue-linkage-verifier.mjs:/validation/controlled-provider-music-queue-linkage-verifier.mjs:ro"
       - "./testing/docker/controlled-provider-pipeline-verifier.mjs:/validation/controlled-provider-pipeline-verifier.mjs:ro"
 
   controlled-provider:

@@ -136,3 +136,15 @@ then proves a separately generated full-spectrum FLAC fallback is selected,
 downloaded, and added. Fixture 14 proves the exhausted branch creates no
 follow-up download run and makes no library write. The verifier also confirms
 the quality counters survive the apply-run store read boundary.
+
+### Downloader Music Queue Linkage
+
+Implemented on 2026-08-25 in
+[CONTROLLED_PROVIDER_DOWNLOADER_MUSIC_QUEUE_LINKAGE_DESIGN.md](CONTROLLED_PROVIDER_DOWNLOADER_MUSIC_QUEUE_LINKAGE_DESIGN.md).
+The shared recovery fixture now builds the packaged Downloader projection for
+each operator after the fallback starts. It requires one linked fallback
+transfer per operator, resolves only that operator's wanted release, and rejects
+sibling release IDs, operator IDs, and policy markers from the linkage payload.
+The packaged run also found and repaired the missing
+`awaiting_confirmation` execution-item constraint value that protects the
+durable no-duplicate-enqueue handoff checkpoint.

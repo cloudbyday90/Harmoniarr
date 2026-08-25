@@ -120,6 +120,12 @@ function listTransfers(username) {
   }];
 }
 
+function listAllTransfers() {
+  return [...transfersByUsername.keys()]
+    .sort((left, right) => left.localeCompare(right))
+    .flatMap((username) => listTransfers(username));
+}
+
 function buildFixtureEvidence(fixtureId) {
   const fixture = controlledProviderFixtureCatalog.find((entry) => entry.id === fixtureId);
   if (!fixture) {
@@ -218,6 +224,9 @@ const server = createServer(async (request, response) => {
       return writeJson(response, 200, { server: { isConnected: true, isLoggedIn: true }, version: { current: 'controlled-fixture' } });
     }
     if (request.method === 'GET' && pathname === '/api/v0/session') return writeJson(response, 200, true);
+    if (request.method === 'GET' && pathname === '/api/v0/transfers/downloads') {
+      return writeJson(response, 200, listAllTransfers());
+    }
     if (request.method === 'POST' && pathname === '/api/v0/searches') {
       const body = await readJson(request);
       const id = randomUUID();
