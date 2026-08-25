@@ -28,6 +28,7 @@ import {
 } from './acquisition-quality-presentation.js';
 import { formatBytes } from './import-candidate-presentation.js';
 import { buildMusicQueueRecoveryPresentation } from './music-queue-recovery-presentation.js';
+import { buildMusicQueueReleaseProgressPresentation } from './music-queue-release-progress-presentation.js';
 
 const DEFAULT_STATUS = Object.freeze({
   code: 'queued_for_search',
@@ -83,9 +84,12 @@ function buildMatchSummary(release) {
   return {
     bestCompositeScore: match.bestCompositeScore ?? readiness?.bestCompositeScore ?? null,
     blockedCount: getCount(match.statusCounts?.failed) + getCount(match.statusCounts?.rejected),
+    confirmedTransferCount: getCount(match.confirmedTransferCount),
+    confirmedTransferCandidateCount: getCount(match.confirmedTransferCandidateCount),
     completedTransferCount: getCount(executionCounts.completed) + getCount(executionCounts.complete),
     label: totalCount === 1 ? '1 match found' : `${totalCount} matches found`,
     matches: Array.isArray(match.matches) ? match.matches : [],
+    latestConfirmedTransferAt: match.latestConfirmedTransferAt ?? null,
     message: readiness?.message ?? (totalCount > 0 ? 'Harmoniarr is evaluating the available matches.' : 'No matches have been found yet.'),
     pendingCount: match.pendingCount == null ? derivedPendingCount : getCount(match.pendingCount),
     readiness,
@@ -698,6 +702,7 @@ export function buildMusicQueueMatchReview(release) {
       { label: 'Library gate', value: qualitySummary.autoAddLabel },
     ],
     qualityGuidance: qualitySummary.reviewGuidance,
+    progress: buildMusicQueueReleaseProgressPresentation(release),
     recovery,
     repair: release.repair,
     searchAgainLabel: recovery?.retryLabel ?? (release.statusCode === 'quality_choice_needed' ? 'Search again' : 'Try again'),

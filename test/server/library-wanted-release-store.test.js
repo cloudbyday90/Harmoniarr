@@ -74,6 +74,9 @@ test('listWantedReleasesWithMetadata maps discovery request recovery evidence', 
             import_execution_item_total_count: 2,
             import_execution_latest_item_status: 'queued',
             import_execution_latest_updated_at: '2026-06-27T21:12:00.000Z',
+            confirmed_transfer_candidate_count: 1,
+            confirmed_transfer_count: 2,
+            confirmed_transfer_latest_linked_at: '2026-06-27T21:13:00.000Z',
             import_apply_item_status_counts: {
               blocked: 1,
             },
@@ -138,6 +141,9 @@ test('listWantedReleasesWithMetadata maps discovery request recovery evidence', 
   assert.match(observedSql, /import_match_drilldown\.matches AS import_candidate_matches/);
   assert.match(observedSql, /LIMIT 5/);
   assert.match(observedSql, /FROM import_execution_run_items iei/);
+  assert.match(observedSql, /FROM import_execution_transfer_links AS transfer_links/);
+  assert.match(observedSql, /COUNT\(DISTINCT transfer_links\.import_candidate_id\)/);
+  assert.match(observedSql, /import_candidates\.source_search_id = NULLIF\(ldr\.evidence->>'lastSearchId', ''\)/);
   assert.match(observedSql, /FROM import_apply_run_items iai/);
   assert.match(observedSql, /jsonb_array_length\(latest_item\.planning_snapshot #> '\{execution,enqueuedTransfers\}'\)/);
   assert.match(observedSql, /latest_items\.apply_snapshot #>> '\{apply,outcome\}' = 'quality_blocked'/);
@@ -218,6 +224,11 @@ test('listWantedReleasesWithMetadata maps discovery request recovery evidence', 
         latestItemStatus: 'queued',
         latestUpdatedAt: '2026-06-27T21:12:00.000Z',
         totalItemCount: 2,
+      },
+      confirmedTransferSummary: {
+        candidateCount: 1,
+        latestConfirmedAt: '2026-06-27T21:13:00.000Z',
+        transferCount: 2,
       },
       libraryAddSummary: {
         itemStatusCounts: {

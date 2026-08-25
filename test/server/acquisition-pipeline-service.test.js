@@ -394,6 +394,55 @@ test('listMusicQueueReleases maps quality-blocked add evidence to a release-cent
   assert.equal(result.summary.counts.needs_help_adding, 1);
 });
 
+test('listMusicQueueReleases projects durable confirmed transfers without provider identity details', async () => {
+  const release = createRelease({ status: 'downloading' });
+  release.discoveryRequest.importReviewSummary.confirmedTransferSummary = {
+    candidateCount: 1,
+    latestConfirmedAt: '2026-08-25T19:12:00.000Z',
+    transferCount: 2,
+  };
+
+  const service = createService({
+    release,
+    statusService: {
+      deriveMusicQueueStatus: () => ({
+        code: 'downloading',
+        label: 'Downloading',
+        progressStep: 'download',
+        tone: 'info',
+      }),
+    },
+  });
+
+  const result = await service.listMusicQueueReleases({ appUserId: 'user-1' });
+
+  assert.deepEqual(result.releases[0].evidence.match, {
+    addBlockerCode: null,
+    bestCompositeScore: null,
+    confirmedTransferCandidateCount: 1,
+    confirmedTransferCount: 2,
+    executionStatusCounts: {},
+    latestConfirmedTransferAt: '2026-08-25T19:12:00.000Z',
+    latestEventType: null,
+    latestStatus: null,
+    latestUpdatedAt: null,
+    matches: [{
+      fileCount: 12,
+      matchId: 'candidate-1',
+      score: 92,
+      status: 'downloading',
+    }],
+    pendingCount: 0,
+    readiness: null,
+    recoverySelectedCount: 0,
+    scoredCount: 0,
+    secondBestCompositeScore: null,
+    statusCounts: { downloading: 1 },
+    totalCount: 1,
+  });
+  assert.doesNotMatch(JSON.stringify(result.releases[0].evidence.match), /sourceUsername|providerTransferId|provider/i);
+});
+
 test('listMusicQueueReleases exposes allowlisted selection origin from scoped wanted evidence', async () => {
   const release = createRelease();
   release.evidence = {

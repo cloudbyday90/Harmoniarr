@@ -168,6 +168,15 @@ function buildImportReviewSummary(row) {
     };
   }
 
+  const confirmedTransferCount = toInteger(row.confirmed_transfer_count);
+  if (confirmedTransferCount > 0) {
+    summary.confirmedTransferSummary = {
+      candidateCount: toInteger(row.confirmed_transfer_candidate_count),
+      latestConfirmedAt: row.confirmed_transfer_latest_linked_at ?? null,
+      transferCount: confirmedTransferCount,
+    };
+  }
+
   const libraryAddSummary = buildLibraryAddSummary(row);
   if (libraryAddSummary) {
     summary.libraryAddSummary = libraryAddSummary;
@@ -451,6 +460,9 @@ export function createLibraryWantedReleaseStore({
           import_execution_summary.latest_updated_at AS import_execution_latest_updated_at,
           import_execution_summary.enqueued_transfer_count AS import_execution_enqueued_transfer_count,
           import_execution_summary.failed_filename_count AS import_execution_failed_filename_count,
+          confirmed_transfer_summary.transfer_count AS confirmed_transfer_count,
+          confirmed_transfer_summary.candidate_count AS confirmed_transfer_candidate_count,
+          confirmed_transfer_summary.latest_linked_at AS confirmed_transfer_latest_linked_at,
           import_apply_summary.total_item_count AS import_apply_item_total_count,
           import_apply_summary.item_status_counts AS import_apply_item_status_counts,
           import_apply_summary.latest_item_status AS import_apply_latest_item_status,
@@ -684,6 +696,16 @@ export function createLibraryWantedReleaseStore({
             GROUP BY latest_item.item_status
           ) item_summary
         ) import_execution_summary ON TRUE
+        LEFT JOIN LATERAL (
+          SELECT
+            COUNT(*)::integer AS transfer_count,
+            COUNT(DISTINCT transfer_links.import_candidate_id)::integer AS candidate_count,
+            MAX(transfer_links.linked_at) AS latest_linked_at
+          FROM import_execution_transfer_links AS transfer_links
+          JOIN import_candidates AS import_candidates
+            ON import_candidates.id = transfer_links.import_candidate_id
+          WHERE import_candidates.source_search_id = NULLIF(ldr.evidence->>'lastSearchId', '')
+        ) confirmed_transfer_summary ON TRUE
         LEFT JOIN LATERAL (
           WITH latest_items AS (
             SELECT DISTINCT ON (iai.import_candidate_id)

@@ -25,6 +25,7 @@ import {
   buildSettingsRecoveryHandoffLocation,
   createSettingsRecoveryContext,
 } from '../../lib/settings-recovery-handoff.js';
+import MusicQueueReleaseProgress from './MusicQueueReleaseProgress.vue';
 import MusicQueueReviewMatchCard from './MusicQueueReviewMatchCard.vue';
 
 const props = defineProps({
@@ -237,6 +238,8 @@ defineExpose({ getActionElement, getHeadingElement, getOutcomeHeadingElement });
           </p>
         </div>
       </section>
+
+      <MusicQueueReleaseProgress v-if="review.progress" :progress="review.progress" />
 
       <section v-if="presentation.hasMatchChoices" class="music-queue-review__section" aria-labelledby="music-queue-review-match-choice">
         <div>

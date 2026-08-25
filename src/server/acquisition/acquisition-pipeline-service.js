@@ -106,13 +106,17 @@ function buildSetupEvidence(release) {
 
 function buildMatchEvidence(release) {
   const importReviewSummary = release.discoveryRequest?.importReviewSummary ?? {};
+  const confirmedTransferSummary = importReviewSummary.confirmedTransferSummary ?? {};
   const executionSummary = importReviewSummary.downloadExecutionSummary ?? {};
   const statusCounts = importReviewSummary.statusCounts ?? {};
   return {
     bestCompositeScore: importReviewSummary.bestCompositeScore ?? null,
     addBlockerCode: importReviewSummary.latestAddBlockerCode ?? null,
+    confirmedTransferCandidateCount: getCount(confirmedTransferSummary.candidateCount),
+    confirmedTransferCount: getCount(confirmedTransferSummary.transferCount),
     executionStatusCounts: executionSummary.itemStatusCounts ?? {},
     latestEventType: importReviewSummary.latestEventType ?? null,
+    latestConfirmedTransferAt: confirmedTransferSummary.latestConfirmedAt ?? null,
     latestStatus: importReviewSummary.latestStatus ?? null,
     latestUpdatedAt: importReviewSummary.latestUpdatedAt ?? executionSummary.latestUpdatedAt ?? null,
     matches: Array.isArray(importReviewSummary.matches) ? importReviewSummary.matches : [],

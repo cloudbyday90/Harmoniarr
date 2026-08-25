@@ -80,7 +80,6 @@ const {
   allowFallbackQuality,
   errorMessage,
   isLoading,
-  isRevalidating,
   load,
   rejectMatch,
   recheckLibraryAdd,
@@ -120,6 +119,8 @@ const selectedState = ref('all');
 const selectedReleaseType = ref('all');
 const selectedReleaseId = ref(requestedReleaseId.value);
 const providerRecoveryVisibility = ref(null);
+const isQueueRefreshRunning = ref(false);
+const refreshStatusAnnouncement = ref('');
 const scopeStatusAnnouncement = ref('');
 const musicQueueHeadingElement = ref(null);
 const queueListHeadingElement = ref(null);
@@ -381,8 +382,26 @@ async function handleAddToLibrary({ actionId, trigger, wasFocused } = {}) {
 }
 
 async function refreshMusicQueue() {
-  await Promise.all([load(), loadReleaseDetail()]);
-  await refreshProviderRepairContext();
+  if (isQueueRefreshRunning.value) return;
+
+  isQueueRefreshRunning.value = true;
+  refreshStatusAnnouncement.value = 'Refreshing Music Queue.';
+  try {
+    await Promise.all([load(), loadReleaseDetail()]);
+    await refreshProviderRepairContext();
+
+    if (errorMessage.value) {
+      refreshStatusAnnouncement.value = 'Music Queue could not refresh. See the message above.';
+      return;
+    }
+
+    const release = selectedRelease.value;
+    refreshStatusAnnouncement.value = release
+      ? `Music Queue refreshed. ${release.releaseTitle} is ${release.status?.label ?? 'updated'}.`
+      : `Music Queue refreshed. ${queueScopePresentation.value.status}`;
+  } finally {
+    isQueueRefreshRunning.value = false;
+  }
 }
 
 async function consumeProviderReadyRecoveryReturn() {
@@ -441,11 +460,19 @@ watch(releases, (updatedReleases) => {
         <RouterLink v-if="isAdmin" class="hx-btn" data-variant="ghost" :to="{ name: 'acquisition' }">
           Acquisition overview
         </RouterLink>
-        <button type="button" class="hx-btn" :disabled="isRevalidating" @click="refreshMusicQueue">
-          {{ isRevalidating ? 'Refreshing...' : 'Refresh' }}
+        <button
+          type="button"
+          class="hx-btn"
+          :aria-busy="isQueueRefreshRunning ? 'true' : undefined"
+          :aria-disabled="isQueueRefreshRunning ? 'true' : undefined"
+          @click="refreshMusicQueue"
+        >
+          {{ isQueueRefreshRunning ? 'Refreshing...' : 'Refresh' }}
         </button>
       </div>
     </header>
+
+    <p class="music-queue-status-announcement" role="status" aria-atomic="true">{{ refreshStatusAnnouncement }}</p>
 
     <MusicQueueProviderRepairNotice
       v-if="!isRequester"

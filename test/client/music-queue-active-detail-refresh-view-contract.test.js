@@ -38,3 +38,19 @@ test('Music Queue keeps the release list visible while selected details load', a
   assert.match(source, /v-if="musicQueueWorkspace\.hasReleaseInspector"/);
   assert.match(source, /:is-loading="isReleaseDetailLoading"/);
 });
+
+test('Music Queue announces an explicit refresh result without moving keyboard focus', async () => {
+  const source = await readFile(VIEW_PATH, 'utf8');
+
+  assert.match(source, /const refreshStatusAnnouncement = ref\(''\)/);
+  assert.match(source, /const isQueueRefreshRunning = ref\(false\)/);
+  assert.match(source, /refreshStatusAnnouncement\.value = 'Refreshing Music Queue\.'/);
+  assert.match(source, /Music Queue refreshed\./);
+  assert.match(source, /role="status" aria-atomic="true">\{\{ refreshStatusAnnouncement \}\}/);
+  assert.match(source, /:aria-disabled="isQueueRefreshRunning \? 'true' : undefined"/);
+  assert.doesNotMatch(source, /:disabled="isRevalidating"/);
+  assert.doesNotMatch(
+    source.match(/async function refreshMusicQueue\(\) \{[\s\S]*?\n\}/)?.[0] ?? '',
+    /\.focus\(/,
+  );
+});

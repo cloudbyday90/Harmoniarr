@@ -70,12 +70,19 @@ const RELEASE_STAGES = Object.freeze([
 
 function buildMusicQueuePayload(stage) {
   const inLibrary = stage.code === 'in_library';
+  const downloading = stage.code === 'downloading';
 
   return {
     checkedAt: '2026-07-26T20:00:00.000Z',
     pagination: { limit: 100, offset: 0, total: 1 },
     releases: [{
       artistName: 'Forest Frank',
+      evidence: downloading ? {
+        match: {
+          confirmedTransferCount: 2,
+          latestConfirmedTransferAt: '2026-07-26T19:58:00.000Z',
+        },
+      } : {},
       expectedTrackCount: 12,
       id: wantedReleaseId,
       matchedTrackCount: inLibrary ? 12 : 0,
@@ -125,6 +132,7 @@ suite('Music Queue release progress browser acceptance', () => {
     await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
       const pageErrors = [];
       let stageIndex = 0;
+      let detailStageIndex = 0;
       page.on('pageerror', (error) => pageErrors.push(error.message));
 
       await bootstrapAdminThroughUi(page, { baseUrl });
@@ -137,17 +145,36 @@ suite('Music Queue release progress browser acceptance', () => {
           contentType: 'application/json',
         });
       });
+      await browserContext.route(
+        new RegExp(`/api/v1/acquisition/releases/${wantedReleaseId}$`),
+        async (route) => {
+          const stage = RELEASE_STAGES[Math.min(detailStageIndex, RELEASE_STAGES.length - 1)];
+          detailStageIndex += 1;
+          await route.fulfill({
+            body: JSON.stringify({
+              checkedAt: '2026-07-26T20:00:00.000Z',
+              release: buildMusicQueuePayload(stage).releases[0],
+            }),
+            contentType: 'application/json',
+          });
+        },
+      );
 
       await page.goto(`${baseUrl}/app/music-queue`, { waitUntil: 'domcontentloaded' });
+      await page.getByLabel('Show releases').selectOption('all');
       const releaseRow = page.getByRole('listitem').filter({ hasText: 'Child of God' });
-      const details = page.getByRole('complementary', { name: 'Music Queue details' });
+      const details = page.getByRole('complementary', { name: 'Music Queue release details' });
 
       await releaseRow.getByText('Searching', { exact: true }).waitFor();
       await releaseRow.getByText('Harmoniarr is looking for an acceptable lossless match.').waitFor();
       await releaseRow.getByRole('button', { name: 'Review matches' }).click();
       await details.getByRole('heading', { name: 'Child of God by Forest Frank' }).waitFor();
 
-      const evidenceToggle = details.locator('button[aria-controls="music-queue-review-evidence"]');
+      const progress = details.getByRole('region', { name: 'Progress' });
+      await progress.getByText('Search', { exact: true }).waitFor();
+      assert.match(await progress.innerText(), /looking for an acceptable lossless match/i);
+
+      const evidenceToggle = details.getByRole('button', { name: /matching and quality details/ });
       assert.equal(await evidenceToggle.count(), 1, await details.innerText());
       assert.equal(await evidenceToggle.getAttribute('aria-expanded'), 'false');
       assert.equal(await details.getByRole('link', { name: 'Advanced diagnostics' }).count(), 0);
@@ -157,22 +184,29 @@ suite('Music Queue release progress browser acceptance', () => {
       assert.equal(await evidenceToggle.getAttribute('aria-expanded'), 'true');
       await details.getByRole('link', { name: 'Advanced diagnostics' }).waitFor();
 
-      await page.getByRole('button', { name: 'Refresh' }).click();
+      const refreshButton = page.getByRole('button', { name: 'Refresh' });
+      await refreshButton.focus();
+      await refreshButton.click();
       await releaseRow.getByText('Downloading', { exact: true }).waitFor();
       await releaseRow.getByRole('link', { name: 'Open Downloader' }).waitFor();
+      assert.match(await progress.innerText(), /2 transfers confirmed by Harmoniarr\./);
+      assert.equal(await refreshButton.evaluate((element) => globalThis.document.activeElement === element), true);
+      await page.locator('.music-queue-status-announcement')
+        .filter({ hasText: 'Music Queue refreshed. Child of God is Downloading.' })
+        .waitFor({ state: 'attached' });
       assert.equal(await releaseRow.getByRole('button', { name: 'Review matches' }).count(), 0);
 
-      await page.getByRole('button', { name: 'Refresh' }).click();
+      await refreshButton.click();
       await releaseRow.getByText('Ready to add', { exact: true }).waitFor();
       await releaseRow.getByText('Downloaded files passed the audio check and will be added automatically.').waitFor();
       await releaseRow.getByRole('button', { name: 'View details' }).waitFor();
       assert.equal(await releaseRow.getByRole('link', { name: 'Review add plan' }).count(), 0);
 
-      await page.getByRole('button', { name: 'Refresh' }).click();
+      await refreshButton.click();
       await releaseRow.getByText('Adding to library', { exact: true }).waitFor();
       await releaseRow.getByText('Harmoniarr is adding verified files to your library.').waitFor();
 
-      await page.getByRole('button', { name: 'Refresh' }).click();
+      await refreshButton.click();
       await releaseRow.getByText('In library', { exact: true }).waitFor();
       await releaseRow.getByText('All 12 tracks matched').waitFor();
       await releaseRow.getByRole('link', { name: 'Open Library' }).waitFor();
