@@ -75,6 +75,7 @@ test('manual edition selection derives a complete narrow draft and saves it with
       releaseGroupSelections: [{
         metadataReleaseGroupId: 'release-group-1',
         resolvedMetadataReleaseId: 'release-2',
+        selectionOrigin: 'manual_edition',
         selectionSource: 'manual',
         selectionState: 'selected',
       }],
@@ -90,6 +91,7 @@ test('manual edition selection derives a complete narrow draft and saves it with
     metadataArtistId: 'artist-1',
     metadataReleaseGroupId: 'release-group-1',
     metadataReleaseId: 'release-2',
+    selectionOrigin: 'manual_edition',
     selectionSource: 'manual',
     selectionState: 'selected',
   });

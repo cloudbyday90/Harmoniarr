@@ -2126,6 +2126,7 @@ export async function installMetadataBrowserFixtures(browserContext, {
             isExplicitSelection: Boolean(explicitSelection),
             resolvedMetadataReleaseId: explicitSelection?.resolvedMetadataReleaseId ?? null,
             resolvedRelease: null,
+            selectionOrigin: explicitSelection?.selectionOrigin ?? null,
             selectionSource: explicitSelection?.selectionSource ?? 'policy',
             selectionState: explicitSelection?.selectionState ?? (selectedByPolicy ? 'selected' : 'unselected'),
             trackOverrideSummary: {
@@ -2865,6 +2866,7 @@ export async function installMetadataBrowserFixtures(browserContext, {
         const selection = {
           metadataReleaseGroupId,
           resolvedMetadataReleaseId: payload.metadataReleaseId,
+          selectionOrigin: 'manual_edition',
           selectionSource: 'manual',
           selectionState: 'selected',
         };

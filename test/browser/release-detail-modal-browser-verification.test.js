@@ -33,8 +33,11 @@ function buildManualSelectionMusicQueuePayload({ includeRelease = false } = {}) 
   const releases = includeRelease ? [{
     artistName: 'Boards of Canada',
     evidence: {
-      selectionSource: 'manual',
-      selectionState: 'selected',
+      operatorSelection: {
+        selectionOrigin: 'manual_edition',
+        selectionSource: 'manual',
+        selectionState: 'selected',
+      },
     },
     expectedTrackCount: 4,
     id: 'wanted-mhtrtc',
@@ -255,7 +258,7 @@ suite('Release Detail modal browser verification', () => {
       await dialog.getByRole('button', { name: 'Close' }).click();
       await page.reload({ waitUntil: 'domcontentloaded' });
       await page.getByRole('heading', { exact: true, name: 'Boards of Canada' }).waitFor();
-      await page.getByText('Manual selection', { exact: true }).waitFor();
+      await page.getByText('Edition selected', { exact: true }).waitFor();
 
       const musicQueueLink = page.getByRole('link', {
         name: 'Open Music Has the Right to Children in Music Queue',
@@ -265,7 +268,7 @@ suite('Release Detail modal browser verification', () => {
       await page.waitForURL(/\/app\/music-queue\/wanted-mhtrtc$/u);
       await page.getByLabel('Show releases').selectOption('scheduled');
       const queueRow = page.getByRole('listitem').filter({ hasText: 'Music Has the Right to Children' });
-      await queueRow.getByText('Manual selection', { exact: true }).waitFor();
+      await queueRow.getByText('Edition selected', { exact: true }).waitFor();
 
       await page.goto('about:blank', { waitUntil: 'load' });
     }, {

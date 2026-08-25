@@ -19,6 +19,7 @@
 import { getPool } from '../database.js';
 import {
   defaultOperatorReleaseGroupSelectionPolicy,
+  operatorReleaseGroupSelectionOrigins,
   operatorReleaseGroupSelectionSources,
   operatorReleaseGroupSelectionStates,
 } from './operator-release-group-selection-policy.js';
@@ -57,21 +58,47 @@ function normalizeEnumValue({ allowedValues, fallback, field, value }) {
   return resolved;
 }
 
+function normalizeSelectionOrigin(value) {
+  if (value == null || (typeof value === 'string' && value.trim().length === 0)) {
+    return null;
+  }
+
+  if (typeof value !== 'string') {
+    throw createValidationError('Selection origin must be a string');
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (!operatorReleaseGroupSelectionOrigins.includes(normalized)) {
+    throw createValidationError(`Unsupported selection origin: ${normalized}`);
+  }
+
+  return normalized;
+}
+
 export function normalizeOperatorReleaseGroupSelectionPatch(patch = {}) {
   const {
     resolvedMetadataReleaseId = defaultOperatorReleaseGroupSelectionPolicy.resolvedMetadataReleaseId,
+    selectionOrigin = defaultOperatorReleaseGroupSelectionPolicy.selectionOrigin,
     selectionSource = defaultOperatorReleaseGroupSelectionPolicy.selectionSource,
     selectionState = defaultOperatorReleaseGroupSelectionPolicy.selectionState,
   } = patch;
 
+  const normalizedSelectionSource = normalizeEnumValue({
+    allowedValues: operatorReleaseGroupSelectionSources,
+    fallback: defaultOperatorReleaseGroupSelectionPolicy.selectionSource,
+    field: 'selection source',
+    value: selectionSource,
+  });
+  const normalizedSelectionOrigin = normalizeSelectionOrigin(selectionOrigin);
+
+  if (normalizedSelectionOrigin && normalizedSelectionSource !== 'manual') {
+    throw createValidationError('Selection origin requires manual selection source');
+  }
+
   return {
     resolvedMetadataReleaseId: resolvedMetadataReleaseId ?? null,
-    selectionSource: normalizeEnumValue({
-      allowedValues: operatorReleaseGroupSelectionSources,
-      fallback: defaultOperatorReleaseGroupSelectionPolicy.selectionSource,
-      field: 'selection source',
-      value: selectionSource,
-    }),
+    selectionOrigin: normalizedSelectionOrigin,
+    selectionSource: normalizedSelectionSource,
     selectionState: normalizeEnumValue({
       allowedValues: operatorReleaseGroupSelectionStates,
       fallback: defaultOperatorReleaseGroupSelectionPolicy.selectionState,

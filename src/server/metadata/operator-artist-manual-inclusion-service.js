@@ -89,6 +89,7 @@ export function createOperatorArtistManualInclusionService({
       metadataArtistId: normalizedMetadataArtistId,
       metadataReleaseGroupId: normalizedMetadataReleaseGroupId,
       metadataReleaseId: normalizedMetadataReleaseId,
+      selectionOrigin: 'manual_inclusion',
       selectionState: 'selected',
     };
 

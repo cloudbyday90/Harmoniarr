@@ -27,8 +27,14 @@ export const operatorReleaseGroupSelectionSources = Object.freeze([
   'policy',
 ]);
 
+export const operatorReleaseGroupSelectionOrigins = Object.freeze([
+  'manual_edition',
+  'manual_inclusion',
+]);
+
 export const defaultOperatorReleaseGroupSelectionPolicy = Object.freeze({
   resolvedMetadataReleaseId: null,
+  selectionOrigin: null,
   selectionSource: 'manual',
   selectionState: 'selected',
 });
@@ -40,6 +46,7 @@ export function normalizeOperatorReleaseGroupSelectionRow(row = {}) {
     metadataArtistId: row.metadata_artist_id ?? row.metadataArtistId ?? null,
     metadataReleaseGroupId: row.metadata_release_group_id ?? row.metadataReleaseGroupId ?? null,
     resolvedMetadataReleaseId: row.resolved_metadata_release_id ?? row.resolvedMetadataReleaseId ?? null,
+    selectionOrigin: row.selection_origin ?? row.selectionOrigin ?? null,
     selectionSource: typeof row.selection_source === 'string'
       ? row.selection_source
       : (row.selectionSource ?? defaultOperatorReleaseGroupSelectionPolicy.selectionSource),

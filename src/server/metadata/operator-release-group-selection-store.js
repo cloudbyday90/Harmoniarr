@@ -83,6 +83,7 @@ export function createOperatorReleaseGroupSelectionStore({
     metadataReleaseGroupId,
     queryable = null,
     resolvedMetadataReleaseId = null,
+    selectionOrigin = null,
     selectionSource,
     selectionState,
   }) {
@@ -96,14 +97,16 @@ export function createOperatorReleaseGroupSelectionStore({
           selection_state,
           resolved_metadata_release_id,
           selection_source,
+          selection_origin,
           updated_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, NOW())
+        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
         ON CONFLICT (app_user_id, metadata_release_group_id) DO UPDATE
         SET metadata_artist_id = EXCLUDED.metadata_artist_id,
             selection_state = EXCLUDED.selection_state,
             resolved_metadata_release_id = EXCLUDED.resolved_metadata_release_id,
             selection_source = EXCLUDED.selection_source,
+            selection_origin = EXCLUDED.selection_origin,
             updated_at = NOW()
       `,
       [
@@ -113,6 +116,7 @@ export function createOperatorReleaseGroupSelectionStore({
         selectionState,
         resolvedMetadataReleaseId,
         selectionSource,
+        selectionOrigin,
       ],
     );
   }
@@ -140,6 +144,7 @@ export function createOperatorReleaseGroupSelectionStore({
         metadataReleaseGroupId: selection.metadataReleaseGroupId,
         queryable: queryTarget,
         resolvedMetadataReleaseId: selection.resolvedMetadataReleaseId ?? null,
+        selectionOrigin: selection.selectionOrigin ?? null,
         selectionSource: selection.selectionSource,
         selectionState: selection.selectionState,
       });
@@ -179,9 +184,10 @@ export function createOperatorReleaseGroupSelectionStore({
               selection_state,
               resolved_metadata_release_id,
               selection_source,
+              selection_origin,
               updated_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, NOW())
+            VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
           `,
           [
             row.appUserId,
@@ -190,6 +196,7 @@ export function createOperatorReleaseGroupSelectionStore({
             row.selectionState,
             row.resolvedMetadataReleaseId ?? null,
             row.selectionSource,
+            row.selectionOrigin ?? null,
           ],
         );
       }

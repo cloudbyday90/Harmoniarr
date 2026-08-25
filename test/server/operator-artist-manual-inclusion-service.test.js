@@ -24,6 +24,7 @@ function createProjection(overrides = {}) {
       releaseGroupSelections: [{
         metadataReleaseGroupId: 'release-group-other',
         resolvedMetadataReleaseId: 'release-other',
+        selectionOrigin: null,
         selectionSource: 'manual',
         selectionState: 'partial',
       }],
@@ -92,11 +93,13 @@ test('includeOperatorArtistReleaseManually builds a complete manual inclusion dr
       releaseGroupSelections: [{
         metadataReleaseGroupId: 'release-group-other',
         resolvedMetadataReleaseId: 'release-other',
+        selectionOrigin: null,
         selectionSource: 'manual',
         selectionState: 'partial',
       }, {
         metadataReleaseGroupId: 'release-group-current',
         resolvedMetadataReleaseId: 'release-current',
+        selectionOrigin: 'manual_inclusion',
         selectionSource: 'manual',
         selectionState: 'selected',
       }],
@@ -124,6 +127,7 @@ test('includeOperatorArtistReleaseManually builds a complete manual inclusion dr
       metadataArtistId: 'artist-1',
       metadataReleaseGroupId: 'release-group-current',
       metadataReleaseId: 'release-current',
+      selectionOrigin: 'manual_inclusion',
       selectionState: 'selected',
     },
     reconciliation: { run: { id: 'run-1', status: 'pending' } },

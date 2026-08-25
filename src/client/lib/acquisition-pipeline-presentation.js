@@ -546,6 +546,7 @@ export function getMusicQueueStatusClass(status) {
 
 export function normalizeMusicQueueRelease(release) {
   const status = release?.status ?? DEFAULT_STATUS;
+  const operatorSelectionEvidence = release?.evidence?.operatorSelection ?? release?.evidence ?? {};
   const quality = release?.quality ?? {};
   const qualityProfile = quality.profile ?? {};
   const lastActivityAt = getLastActivityAt(release);
@@ -602,8 +603,9 @@ export function normalizeMusicQueueRelease(release) {
     statusClass: getMusicQueueStatusClass(status),
     statusCode: status.code,
     operatorSelection: {
-      selectionSource: release?.evidence?.selectionSource ?? null,
-      selectionState: release?.evidence?.selectionState ?? null,
+      selectionOrigin: operatorSelectionEvidence.selectionOrigin ?? null,
+      selectionSource: operatorSelectionEvidence.selectionSource ?? null,
+      selectionState: operatorSelectionEvidence.selectionState ?? null,
     },
   };
 }

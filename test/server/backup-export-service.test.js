@@ -152,6 +152,7 @@ test('createBackupExport includes monitoring and wanted snapshots when provided'
         metadataArtistId: 'artist-1',
         metadataReleaseGroupId: 'release-group-1',
         resolvedMetadataReleaseId: 'release-1',
+        selectionOrigin: 'manual_inclusion',
         selectionSource: 'manual',
         selectionState: 'partial',
       },
@@ -216,6 +217,10 @@ test('createBackupExport includes monitoring and wanted snapshots when provided'
   assert.equal(
     payload.data.scopeSettings.monitoring.operatorReleaseGroupSelections[0].metadataReleaseGroupId,
     'release-group-1',
+  );
+  assert.equal(
+    payload.data.scopeSettings.monitoring.operatorReleaseGroupSelections[0].selectionOrigin,
+    'manual_inclusion',
   );
   assert.equal(payload.data.scopeSettings.monitoring.operatorTrackOverrides.length, 1);
   assert.equal(

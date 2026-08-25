@@ -10,6 +10,7 @@ test('getOperatorReleaseGroupSelection returns stored selection state', async (t
       metadata_artist_id: 'artist-1',
       metadata_release_group_id: 'release-group-1',
       resolved_metadata_release_id: 'release-1',
+      selection_origin: 'manual_edition',
       selection_source: 'manual',
       selection_state: 'partial',
     }],
@@ -27,6 +28,7 @@ test('getOperatorReleaseGroupSelection returns stored selection state', async (t
     metadataArtistId: 'artist-1',
     metadataReleaseGroupId: 'release-group-1',
     resolvedMetadataReleaseId: 'release-1',
+    selectionOrigin: 'manual_edition',
     selectionSource: 'manual',
     selectionState: 'partial',
   });
@@ -56,6 +58,7 @@ test('upsertOperatorReleaseGroupSelection stores the selection policy', async (t
     metadataArtistId: 'artist-1',
     metadataReleaseGroupId: 'release-group-1',
     resolvedMetadataReleaseId: 'release-1',
+    selectionOrigin: null,
     selectionSource: 'policy',
     selectionState: 'selected',
   });
@@ -68,6 +71,7 @@ test('upsertOperatorReleaseGroupSelection stores the selection policy', async (t
     'selected',
     'release-1',
     'policy',
+    null,
   ]);
 });
 
@@ -110,6 +114,7 @@ test('replaceOperatorReleaseGroupSelectionsSnapshot replaces the backup snapshot
       metadataArtistId: 'artist-1',
       metadataReleaseGroupId: 'release-group-1',
       resolvedMetadataReleaseId: 'release-1',
+      selectionOrigin: 'manual_edition',
       selectionSource: 'manual',
       selectionState: 'partial',
     }],
@@ -126,6 +131,7 @@ test('replaceOperatorReleaseGroupSelectionsSnapshot replaces the backup snapshot
     'partial',
     'release-1',
     'manual',
+    'manual_edition',
   ]);
   assert.equal(release.mock.callCount(), 1);
 });
@@ -142,6 +148,7 @@ test('replaceOperatorArtistReleaseGroupSelections replaces only one operator art
     operatorReleaseGroupSelections: [{
       metadataReleaseGroupId: 'release-group-1',
       resolvedMetadataReleaseId: 'release-1',
+      selectionOrigin: 'manual_inclusion',
       selectionSource: 'manual',
       selectionState: 'selected',
     }],
@@ -157,5 +164,6 @@ test('replaceOperatorArtistReleaseGroupSelections replaces only one operator art
     'selected',
     'release-1',
     'manual',
+    'manual_inclusion',
   ]);
 });

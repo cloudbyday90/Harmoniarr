@@ -101,6 +101,7 @@ export function createOperatorArtistDesiredStateService({
           releaseDate: null,
           releaseGroupTitle: releaseGroup.title ?? null,
           releaseTitle: resolvedRelease?.title ?? null,
+          selectionOrigin: operatorState.selectionOrigin ?? null,
           selectionState,
         });
         continue;
@@ -169,6 +170,7 @@ export function createOperatorArtistDesiredStateService({
         releaseDate,
         releaseGroupTitle: releaseGroup.title ?? null,
         releaseTitle: resolvedRelease.title ?? null,
+        selectionOrigin: operatorState.selectionOrigin ?? null,
         selectionState,
       });
     }

@@ -60,6 +60,7 @@ function buildWantedReleaseEvidence({
       : [],
     reconciliationStatus,
     releaseScope: monitoring.releaseScope ?? defaultOperatorArtistMonitoringPolicy.releaseScope,
+    selectionOrigin: isExplicitSelection ? (desiredRelease.selectionOrigin ?? null) : null,
     selectionSource: isExplicitSelection ? 'manual' : 'policy',
     selectionState: desiredRelease.selectionState,
     strategy: isExplicitSelection

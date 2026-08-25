@@ -94,6 +94,7 @@ function normalizeOperatorReleaseGroupSelectionRows(operatorReleaseGroupSelectio
       metadataArtistId: row.metadataArtistId,
       metadataReleaseGroupId: row.metadataReleaseGroupId,
       resolvedMetadataReleaseId: row.resolvedMetadataReleaseId ?? null,
+      selectionOrigin: row.selectionOrigin ?? null,
       selectionSource: row.selectionSource ?? 'manual',
       selectionState: row.selectionState ?? 'selected',
     }))

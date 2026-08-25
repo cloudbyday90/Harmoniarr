@@ -9,11 +9,35 @@ import {
 test('manual release selection presentation uses durable state rather than an action name', () => {
   assert.deepEqual(
     buildOperatorReleaseSelectionPresentation({
+      selectionOrigin: 'manual_edition',
       selectionSource: 'manual',
       selectionState: 'selected',
     }),
     {
-      detail: 'A saved edition will be used in Music Queue.',
+      detail: 'This edition was selected in Artist Detail.',
+      label: 'Edition selected',
+      tone: 'info',
+    },
+  );
+  assert.deepEqual(
+    buildOperatorReleaseSelectionPresentation({
+      selectionOrigin: 'manual_inclusion',
+      selectionSource: 'manual',
+      selectionState: 'selected',
+    }),
+    {
+      detail: 'This release was included from Missing Music.',
+      label: 'Manual inclusion',
+      tone: 'info',
+    },
+  );
+  assert.deepEqual(
+    buildOperatorReleaseSelectionPresentation({
+      selectionSource: 'manual',
+      selectionState: 'selected',
+    }),
+    {
+      detail: 'This release was manually selected.',
       label: 'Manual selection',
       tone: 'info',
     },

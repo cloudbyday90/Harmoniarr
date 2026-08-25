@@ -14,9 +14,45 @@ test('normalizeOperatorReleaseGroupSelectionPatch validates and normalizes selec
 
   assert.deepEqual(result, {
     resolvedMetadataReleaseId: 'release-1',
+    selectionOrigin: null,
     selectionSource: 'policy',
     selectionState: 'partial',
   });
+});
+
+test('normalizeOperatorReleaseGroupSelectionPatch allowlists an origin and requires a manual source', () => {
+  assert.deepEqual(
+    normalizeOperatorReleaseGroupSelectionPatch({
+      selectionOrigin: 'MANUAL_EDITION',
+      selectionSource: 'manual',
+    }),
+    {
+      resolvedMetadataReleaseId: null,
+      selectionOrigin: 'manual_edition',
+      selectionSource: 'manual',
+      selectionState: 'selected',
+    },
+  );
+
+  assert.throws(
+    () => normalizeOperatorReleaseGroupSelectionPatch({
+      selectionOrigin: 'manual_edition',
+      selectionSource: 'policy',
+    }),
+    {
+      code: 'validation_error',
+      message: 'Selection origin requires manual selection source',
+      status: 400,
+    },
+  );
+  assert.throws(
+    () => normalizeOperatorReleaseGroupSelectionPatch({ selectionOrigin: 'untrusted_value' }),
+    {
+      code: 'validation_error',
+      message: 'Unsupported selection origin: untrusted_value',
+      status: 400,
+    },
+  );
 });
 
 test('normalizeOperatorReleaseGroupSelectionPatch rejects unsupported selection states', () => {
@@ -69,6 +105,7 @@ test('updateOperatorReleaseGroupSelection validates artist and release membershi
     metadataReleaseGroupId: 'release-group-1',
     patch: {
       resolvedMetadataReleaseId: 'release-1',
+      selectionOrigin: null,
       selectionSource: 'manual',
       selectionState: 'partial',
     },
@@ -79,6 +116,7 @@ test('updateOperatorReleaseGroupSelection validates artist and release membershi
     metadataArtistId: 'artist-1',
     metadataReleaseGroupId: 'release-group-1',
     resolvedMetadataReleaseId: 'release-1',
+    selectionOrigin: null,
     selectionSource: 'manual',
     selectionState: 'partial',
   });
@@ -88,6 +126,7 @@ test('updateOperatorReleaseGroupSelection validates artist and release membershi
     metadataReleaseGroupId: 'release-group-1',
     selection: {
       resolvedMetadataReleaseId: 'release-1',
+      selectionOrigin: null,
       selectionSource: 'manual',
       selectionState: 'partial',
     },

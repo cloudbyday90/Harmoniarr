@@ -426,6 +426,7 @@ export function createLibraryWantedReleaseStore({
           mr.disambiguation AS release_disambiguation,
           mr.country AS release_country,
           mr.musicbrainz_release_id AS musicbrainz_release_id,
+          lwr.evidence AS wanted_evidence,
           ldr.request_status AS discovery_request_status,
           ldr.blocked_reason AS discovery_blocked_reason,
           ldr.last_search_at AS discovery_last_search_at,
@@ -778,6 +779,7 @@ export function createLibraryWantedReleaseStore({
       appUserId: row.app_user_id,
       artistName: row.artist_name,
       artistSortName: row.artist_sort_name ?? row.artist_name,
+      evidence: row.wanted_evidence ?? {},
       discoveryRequest: row.discovery_request_status
         ? {
             blockedReason: row.discovery_blocked_reason ?? null,

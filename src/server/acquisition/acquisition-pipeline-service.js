@@ -17,6 +17,7 @@
  */
 
 import { createApiError } from '../auth.js';
+import { buildMusicQueueOperatorSelectionEvidence } from './acquisition-operator-selection-evidence.js';
 import {
   createAcquisitionQualityPolicyService,
   QUALITY_DECISION_CODES,
@@ -185,6 +186,7 @@ function projectRelease(release, { qualityPolicyService, statusService }) {
   const evidence = {
     add: buildAddEvidence(release),
     match: buildMatchEvidence(release),
+    operatorSelection: buildMusicQueueOperatorSelectionEvidence(release),
     quality,
     release: buildReleaseEvidence(release),
     search: buildSearchEvidence(release),

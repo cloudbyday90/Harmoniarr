@@ -77,6 +77,7 @@ function deriveSelectionState({
     return {
       isExplicit: true,
       resolvedMetadataReleaseId: explicitSelection.resolvedMetadataReleaseId ?? canonicalRelease?.id ?? null,
+      selectionOrigin: explicitSelection.selectionOrigin ?? null,
       selectionSource: explicitSelection.selectionSource ?? 'manual',
       selectionState: explicitSelection.selectionState ?? 'selected',
     };
@@ -88,6 +89,7 @@ function deriveSelectionState({
   return {
     isExplicit: false,
     resolvedMetadataReleaseId: canonicalRelease?.id ?? null,
+    selectionOrigin: null,
     selectionSource: 'policy',
     selectionState: isSelectedByPolicy ? 'selected' : 'unselected',
   };
@@ -128,6 +130,7 @@ export function buildOperatorArtistEffectiveReleaseGroups({
         isExplicitSelection: selectionState.isExplicit,
         resolvedMetadataReleaseId: selectionState.resolvedMetadataReleaseId,
         resolvedRelease,
+        selectionOrigin: selectionState.selectionOrigin,
         selectionSource: selectionState.selectionSource,
         selectionState: selectionState.selectionState,
         trackOverrideSummary: summarizeTrackOverrides(releaseGroupTrackOverrides),

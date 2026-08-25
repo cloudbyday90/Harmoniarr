@@ -50,6 +50,7 @@ test('applyRestoreScopes applies settings-backed scopes, wanted, and monitoring 
                 metadataArtistId: 'artist-1',
                 metadataReleaseGroupId: 'release-group-1',
                 resolvedMetadataReleaseId: 'release-1',
+                selectionOrigin: 'manual_inclusion',
                 selectionSource: 'manual',
                 selectionState: 'partial',
               },
@@ -126,6 +127,11 @@ test('applyRestoreScopes applies settings-backed scopes, wanted, and monitoring 
   );
   assert.equal(replaceOperatorArtistMonitoring.mock.callCount(), 1);
   assert.equal(replaceOperatorReleaseGroupSelections.mock.callCount(), 1);
+  assert.equal(
+    replaceOperatorReleaseGroupSelections.mock.calls[0].arguments[0]
+      .operatorReleaseGroupSelections[0].selectionOrigin,
+    'manual_inclusion',
+  );
   assert.equal(replaceOperatorTrackOverrides.mock.callCount(), 1);
   assert.equal(replaceTrustSnapshot.mock.callCount(), 1);
   assert.deepEqual(result, {

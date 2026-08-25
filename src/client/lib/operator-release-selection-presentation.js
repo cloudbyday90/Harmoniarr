@@ -25,13 +25,17 @@ function isManualSelection(selection = {}) {
     && normalizeToken(selection.selectionState) !== 'unselected';
 }
 
+function getSelectionOrigin(selection = {}) {
+  return normalizeToken(selection.selectionOrigin);
+}
+
 /**
  * Builds the concise, durable provenance status shared by Artist Detail and
  * Music Queue. A manual selection can originate from more than one command,
  * so the copy deliberately describes the saved state rather than guessing the
  * command that produced it.
  *
- * @param {{ selectionSource?: string, selectionState?: string } | null | undefined} selection
+ * @param {{ selectionOrigin?: string, selectionSource?: string, selectionState?: string } | null | undefined} selection
  * @returns {{ detail: string, label: string, tone: string } | null}
  */
 export function buildOperatorReleaseSelectionPresentation(selection = {}) {
@@ -47,8 +51,25 @@ export function buildOperatorReleaseSelectionPresentation(selection = {}) {
     };
   }
 
+  switch (getSelectionOrigin(selection)) {
+    case 'manual_edition':
+      return {
+        detail: 'This edition was selected in Artist Detail.',
+        label: 'Edition selected',
+        tone: 'info',
+      };
+    case 'manual_inclusion':
+      return {
+        detail: 'This release was included from Missing Music.',
+        label: 'Manual inclusion',
+        tone: 'info',
+      };
+    default:
+      break;
+  }
+
   return {
-    detail: 'A saved edition will be used in Music Queue.',
+    detail: 'This release was manually selected.',
     label: 'Manual selection',
     tone: 'info',
   };

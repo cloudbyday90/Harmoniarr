@@ -113,6 +113,7 @@ export function createOperatorArtistManualEditionSelectionService({
       metadataArtistId: normalizedMetadataArtistId,
       metadataReleaseGroupId: normalizedMetadataReleaseGroupId,
       metadataReleaseId: normalizedMetadataReleaseId,
+      selectionOrigin: 'manual_edition',
       selectionSource: 'manual',
       selectionState: 'selected',
     };

@@ -394,6 +394,33 @@ test('listMusicQueueReleases maps quality-blocked add evidence to a release-cent
   assert.equal(result.summary.counts.needs_help_adding, 1);
 });
 
+test('listMusicQueueReleases exposes allowlisted selection origin from scoped wanted evidence', async () => {
+  const release = createRelease();
+  release.evidence = {
+    selectionOrigin: 'manual_edition',
+    selectionSource: 'manual',
+    selectionState: 'selected',
+  };
+  const service = createAcquisitionPipelineService({
+    acquisitionPipelineStore: {
+      listWantedReleaseEvidence: async () => ({
+        checkedAt: '2026-08-25T12:00:00.000Z',
+        pagination: { limit: 100, offset: 0, total: 1 },
+        releases: [release],
+      }),
+    },
+    qualityPolicyService,
+  });
+
+  const result = await service.listMusicQueueReleases({ appUserId: 'user-1' });
+
+  assert.deepEqual(result.releases[0].evidence.operatorSelection, {
+    selectionOrigin: 'manual_edition',
+    selectionSource: 'manual',
+    selectionState: 'selected',
+  });
+});
+
 test('listMusicQueueReleases renders automatic folder readiness as a safe setup stop', async () => {
   const release = createRelease();
   release.discoveryRequest.evidence = {

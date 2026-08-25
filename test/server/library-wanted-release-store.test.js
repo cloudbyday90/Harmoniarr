@@ -104,6 +104,11 @@ test('listWantedReleasesWithMetadata maps discovery request recovery evidence', 
             missing_track_count: 10,
             musicbrainz_release_group_id: 'rg-mbid-1',
             musicbrainz_release_id: 'release-mbid-1',
+            wanted_evidence: {
+              selectionOrigin: 'manual_edition',
+              selectionSource: 'manual',
+              selectionState: 'selected',
+            },
             release_country: 'GB',
             release_date: '2000-10-02',
             release_disambiguation: null,
@@ -121,6 +126,7 @@ test('listWantedReleasesWithMetadata maps discovery request recovery evidence', 
   const releases = await store.listWantedReleasesWithMetadata({ appUserId: 'user-1', limit: 25 });
 
   assert.match(observedSql, /LEFT JOIN library_discovery_requests ldr/);
+  assert.match(observedSql, /lwr\.evidence AS wanted_evidence/);
   assert.match(observedSql, /LEFT JOIN LATERAL/);
   assert.match(observedSql, /FROM import_candidates ic/);
   assert.match(observedSql, /ic\.source_search_id = NULLIF\(ldr\.evidence->>'lastSearchId', ''\)/);
@@ -139,6 +145,11 @@ test('listWantedReleasesWithMetadata maps discovery request recovery evidence', 
   assert.match(observedSql, /lwr\.app_user_id = \$1/);
   assert.deepEqual(observedParams, ['user-1', 25]);
   assert.equal(releases[0].appUserId, 'user-1');
+  assert.deepEqual(releases[0].evidence, {
+    selectionOrigin: 'manual_edition',
+    selectionSource: 'manual',
+    selectionState: 'selected',
+  });
   assert.deepEqual(releases[0].discoveryRequest, {
     blockedReason: 'download_recovery_exhausted',
     evidence: {

@@ -34,6 +34,7 @@ function copyReleaseGroupSelections(selections = []) {
   return selections.map((selection) => ({
     metadataReleaseGroupId: selection.metadataReleaseGroupId,
     resolvedMetadataReleaseId: selection.resolvedMetadataReleaseId ?? null,
+    selectionOrigin: selection.selectionOrigin ?? null,
     selectionSource: selection.selectionSource ?? 'manual',
     selectionState: selection.selectionState ?? 'selected',
   }));
@@ -96,6 +97,7 @@ function buildManualSelectedDraft({
   metadataReleaseId,
   monitoring,
   projection,
+  selectionOrigin,
 }) {
   const existingSelections = copyReleaseGroupSelections(
     Array.isArray(projection?.operator?.releaseGroupSelections)
@@ -106,6 +108,7 @@ function buildManualSelectedDraft({
   existingSelections.push({
     metadataReleaseGroupId,
     resolvedMetadataReleaseId: metadataReleaseId,
+    selectionOrigin,
     selectionSource: 'manual',
     selectionState: 'selected',
   });
@@ -196,6 +199,7 @@ export function buildOperatorArtistManualInclusionDraft({
       metadataReleaseId,
       monitoring,
       projection,
+      selectionOrigin: 'manual_inclusion',
     }),
   };
 }
@@ -246,6 +250,7 @@ export function buildOperatorArtistManualEditionSelectionDraft({
       metadataReleaseId,
       monitoring,
       projection,
+      selectionOrigin: 'manual_edition',
     }),
   };
 }

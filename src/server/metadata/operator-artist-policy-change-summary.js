@@ -77,6 +77,7 @@ function indexByKey(items, buildKey) {
 
 function releaseSelectionChanged(previous = {}, next = {}) {
   return previous.selectionState !== next.selectionState
+    || (previous.selectionOrigin ?? null) !== (next.selectionOrigin ?? null)
     || previous.selectionSource !== next.selectionSource
     || (previous.resolvedMetadataReleaseId ?? null) !== (next.resolvedMetadataReleaseId ?? null);
 }
@@ -234,4 +235,3 @@ export function buildOperatorArtistPolicyChangeSummary({
     },
   };
 }
-

@@ -96,6 +96,7 @@ test('buildDesiredStatePlan distinguishes eligible releases from duplicate-aware
           releaseDate: '2026-04-01',
           title: 'Manual Historical Album',
         },
+        selectionOrigin: 'manual_inclusion',
         selectionState: 'partial',
         trackOverrideSummary: { totalCount: 2 },
       },
@@ -119,5 +120,9 @@ test('buildDesiredStatePlan distinguishes eligible releases from duplicate-aware
   assert.equal(
     plan.desiredReleases.find((release) => release.metadataReleaseId === 'release-manual')?.eligibleForDownstreamWork,
     true,
+  );
+  assert.equal(
+    plan.desiredReleases.find((release) => release.metadataReleaseId === 'release-manual')?.selectionOrigin,
+    'manual_inclusion',
   );
 });
