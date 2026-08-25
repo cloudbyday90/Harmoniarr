@@ -197,6 +197,7 @@ test('saveOperatorArtist persists normalized state, snapshots it, and queues rec
     operatorReleaseGroupSelections: [{
       metadataReleaseGroupId: 'release-group-1',
       resolvedMetadataReleaseId: 'release-1',
+      selectionOrigin: null,
       selectionSource: 'manual',
       selectionState: 'partial',
     }],
@@ -240,6 +241,7 @@ test('saveOperatorArtist persists normalized state, snapshots it, and queues rec
         releaseGroupSelections: [{
           metadataReleaseGroupId: 'release-group-1',
           resolvedMetadataReleaseId: 'release-1',
+          selectionOrigin: null,
           selectionSource: 'manual',
           selectionState: 'partial',
         }],

@@ -265,6 +265,9 @@ async function clearCompletedTransfers() {
         </p>
       </div>
       <div class="hx-page-actions">
+        <RouterLink class="hx-btn" data-variant="ghost" :to="{ name: 'acquisition' }">
+          Acquisition overview
+        </RouterLink>
         <button
           type="button"
           class="hx-btn"

@@ -32,6 +32,7 @@ const ActivityReleasesView = () => import('./views/ActivityReleasesView.vue');
 const ActivityUsersView = () => import('./views/ActivityUsersView.vue');
 const ActivityWantedView = () => import('./views/ActivityWantedView.vue');
 const ActivityWorkspaceView = () => import('./views/ActivityWorkspaceView.vue');
+const AcquisitionView = () => import('./views/AcquisitionView.vue');
 const ArtistDetailView = () => import('./views/ArtistDetailView.vue');
 const BootstrapSetupView = () => import('./views/BootstrapSetupView.vue');
 const ClaimAccountView = () => import('./views/ClaimAccountView.vue');
@@ -82,6 +83,7 @@ const requesterRestrictedRouteNames = new Set([
   'activity-ignored',
   'activity-failed',
   'activity-monitored-artists',
+  'acquisition',
   'downloader',
   'settings',
   'settings-connections',
@@ -117,6 +119,7 @@ const router = createRouter({
         { path: 'onboarding', name: 'onboarding', component: OnboardingView },
         { path: 'discover', name: 'discover', component: DiscoverView },
         { path: 'library', name: 'library', component: LibraryView },
+        { path: 'acquisition', name: 'acquisition', component: AcquisitionView },
         { path: 'music-queue', name: 'music-queue', component: MusicQueueView },
         { path: 'music-queue/:wantedReleaseId', name: 'music-queue-release', component: MusicQueueView },
         { path: 'missing', name: 'missing', component: MissingView },

@@ -99,6 +99,7 @@ const {
 } = useMusicQueueReleaseDetail({ wantedReleaseId: requestedReleaseId });
 
 const isRequester = computed(() => sessionStore.state.user?.role === 'requester');
+const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
 const hasProviderDependentMusicQueueWork = computed(() =>
   hasMusicQueueProviderDependentWork(releases.value),
 );
@@ -436,9 +437,14 @@ watch(releases, (updatedReleases) => {
           Review releases that need a decision. Harmoniarr continues eligible work automatically.
         </p>
       </div>
-      <button type="button" class="hx-btn" :disabled="isRevalidating" @click="refreshMusicQueue">
-        {{ isRevalidating ? 'Refreshing...' : 'Refresh' }}
-      </button>
+      <div class="hx-page-actions">
+        <RouterLink v-if="isAdmin" class="hx-btn" data-variant="ghost" :to="{ name: 'acquisition' }">
+          Acquisition overview
+        </RouterLink>
+        <button type="button" class="hx-btn" :disabled="isRevalidating" @click="refreshMusicQueue">
+          {{ isRevalidating ? 'Refreshing...' : 'Refresh' }}
+        </button>
+      </div>
     </header>
 
     <MusicQueueProviderRepairNotice
