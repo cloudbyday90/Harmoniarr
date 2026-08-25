@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 const drawerPath = new URL('../../src/client/components/downloader/DownloaderTransferDetailDrawer.vue', import.meta.url);
+const rowHandoffsPath = new URL('../../src/client/components/downloader/DownloaderTransferRowHandoffs.vue', import.meta.url);
 const viewPath = new URL('../../src/client/views/DownloaderView.vue', import.meta.url);
 
 test('DownloaderTransferDetailDrawer follows the modal dialog accessibility contract', async () => {
@@ -57,12 +58,26 @@ test('DownloaderView opens diagnostics from an explicit Details action', async (
   assert.match(source, />\s*Details\s*<\/button>/);
 });
 
-test('DownloaderView exposes import candidate drill-through links for linked transfers', async () => {
-  const source = await readFile(viewPath, 'utf8');
+test('DownloaderTransferRowHandoffs renders only its durable transfer destinations as native links', async () => {
+  const source = await readFile(rowHandoffsPath, 'utf8');
 
   assert.match(source, /buildDownloaderImportCandidateLocation/);
-  assert.match(source, /importCandidateLocation\(file\)/);
+  assert.match(source, /buildDownloaderMusicQueueReleaseLocation/);
+  assert.match(source, /buildDownloaderMusicQueueReleaseLinkLabel/);
+  assert.match(source, /v-if="musicQueueReleaseLocation"/);
+  assert.match(source, /<RouterLink/);
   assert.match(source, /Open advanced diagnostics/);
+  assert.match(source, /min-height: 24px/);
+  assert.match(source, /min-height: 44px/);
+  assert.match(source, /:focus-visible/);
+});
+
+test('DownloaderView keeps Details primary and delegates compact transfer destinations', async () => {
+  const source = await readFile(viewPath, 'utf8');
+
+  assert.match(source, /DownloaderTransferRowHandoffs/);
+  assert.match(source, /<DownloaderTransferRowHandoffs :transfer="file" \/>/);
+  assert.ok(source.indexOf('>\n                      Details\n                    </button>') < source.indexOf('<DownloaderTransferRowHandoffs'));
 });
 
 test('DownloaderView wires operator controls to downloader mutation APIs', async () => {

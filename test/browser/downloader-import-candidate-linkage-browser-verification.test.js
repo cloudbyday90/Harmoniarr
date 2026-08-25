@@ -128,8 +128,26 @@ suite('Downloader import-candidate linkage browser verification', () => {
       await page.getByText('healthy-slskd-peer', { exact: true }).waitFor();
       await page.getByRole('progressbar').waitFor();
       const linkedTransferRow = page.getByRole('row').filter({ hasText: '01 Foil.flac' });
+      assert.deepEqual(
+        await linkedTransferRow.locator('button, a').evaluateAll((controls) => controls.map((control) => control.textContent?.trim() ?? '')),
+        [
+          'Details',
+          'Open Music Queue release: Autechre — Amber',
+          'Open advanced diagnostics',
+        ],
+      );
 
-      const rowLink = linkedTransferRow.getByRole('link', { name: 'Open advanced diagnostics' });
+      const musicQueueRowLink = linkedTransferRow.getByRole('link', {
+        name: 'Open Music Queue release: Autechre — Amber',
+      });
+      await musicQueueRowLink.waitFor();
+      await musicQueueRowLink.click();
+      await page.waitForFunction(() => globalThis.location.pathname === '/app/music-queue/wanted-release-downloader-linked');
+
+      await page.goto(`${baseUrl}/app/downloader`, { waitUntil: 'domcontentloaded' });
+      const restoredLinkedTransferRow = page.getByRole('row').filter({ hasText: '01 Foil.flac' });
+
+      const rowLink = restoredLinkedTransferRow.getByRole('link', { name: 'Open advanced diagnostics' });
       await rowLink.waitFor();
       await rowLink.click();
       await assertCandidateRouteSelected(page);
@@ -148,8 +166,8 @@ suite('Downloader import-candidate linkage browser verification', () => {
       await page.waitForFunction(() => globalThis.location.pathname === '/app/music-queue/wanted-release-downloader-linked');
 
       await page.goto(`${baseUrl}/app/downloader`, { waitUntil: 'domcontentloaded' });
-      const restoredLinkedTransferRow = page.getByRole('row').filter({ hasText: '01 Foil.flac' });
-      await restoredLinkedTransferRow.getByRole('button', { name: 'Details' }).click();
+      const restoredDialogTransferRow = page.getByRole('row').filter({ hasText: '01 Foil.flac' });
+      await restoredDialogTransferRow.getByRole('button', { name: 'Details' }).click();
       const restoredDialog = page.locator('.downloader-detail-drawer');
       await restoredDialog.waitFor();
       const drawerLink = restoredDialog.getByRole('link', { name: 'Open advanced diagnostics' });

@@ -20,6 +20,7 @@
 import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import DownloaderTransferDetailDrawer from '../components/downloader/DownloaderTransferDetailDrawer.vue';
+import DownloaderTransferRowHandoffs from '../components/downloader/DownloaderTransferRowHandoffs.vue';
 import {
   formatTransferFilename,
 } from '../lib/activity-downloads-presentation.js';
@@ -35,7 +36,6 @@ import {
   buildDownloaderEmptyState,
   isDownloaderProviderDisabled,
 } from '../lib/downloader-presentation.js';
-import { buildDownloaderImportCandidateLocation } from '../lib/downloader-import-review-link.js';
 import {
   normalizeDownloaderTransferRouteQuery,
   omitDownloaderTransferRouteQuery,
@@ -189,10 +189,6 @@ function progressLabel(file) {
 
 function shouldShowIndeterminateProgress(file) {
   return file?.state?.code === 'active' || file?.state?.code === 'queued';
-}
-
-function importCandidateLocation(file) {
-  return buildDownloaderImportCandidateLocation(file);
 }
 
 function openTransferDetail(file) {
@@ -420,13 +416,7 @@ async function clearCompletedTransfers() {
                     >
                       Details
                     </button>
-                    <RouterLink
-                      v-if="importCandidateLocation(file)"
-                      class="downloader-import-review-link"
-                      :to="importCandidateLocation(file)"
-                    >
-                      Open advanced diagnostics
-                    </RouterLink>
+                    <DownloaderTransferRowHandoffs :transfer="file" />
                   </div>
                 </td>
               </tr>
@@ -531,15 +521,4 @@ async function clearCompletedTransfers() {
   justify-items: end;
 }
 
-.downloader-import-review-link {
-  color: var(--hx-accent);
-  font-size: var(--hx-text-xs);
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.downloader-import-review-link:hover,
-.downloader-import-review-link:focus-visible {
-  text-decoration: underline;
-}
 </style>
