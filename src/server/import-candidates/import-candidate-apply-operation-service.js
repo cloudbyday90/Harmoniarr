@@ -150,12 +150,65 @@ function collectReusableCandidatePaths({
     .filter((candidatePath) => !ignoredPaths.has(candidatePath));
 }
 
+function normalizeExpectedSize(value) {
+  const size = Number(value);
+  return Number.isFinite(size) && size >= 0 ? size : null;
+}
+
+function buildMutationIntent({
+  destinationPath,
+  expectedSizeBytes,
+  file,
+  operationPosition,
+  removeSourceAfterSuccess,
+  requestedMode,
+  sourcePath,
+  startedAt,
+  stepType,
+}) {
+  return {
+    destinationPath,
+    expectedSizeBytes: normalizeExpectedSize(expectedSizeBytes),
+    fileId: file.fileId,
+    filename: file.filename,
+    operationPosition,
+    removeSourceAfterSuccess: Boolean(removeSourceAfterSuccess),
+    requestedMode,
+    sourcePath,
+    startedAt,
+    stepType,
+  };
+}
+
+function buildRecoveredMutationStep(intent) {
+  return {
+    appliedMode: intent.requestedMode,
+    destinationPath: intent.destinationPath,
+    fallbackFromMode: null,
+    fallbackReason: null,
+    requestedMode: intent.requestedMode,
+    sourcePath: intent.sourcePath,
+    status: 'applied',
+    stepType: intent.stepType,
+    transport: 'confirmed_after_restart',
+    verification: {
+      destinationExists: true,
+      destinationSizeBytes: intent.expectedSizeBytes,
+      hardlinkSharedInode: null,
+      sourceExistsAfterSuccess: !intent.removeSourceAfterSuccess,
+      sourceRemoved: intent.removeSourceAfterSuccess,
+      sourceSizeBytes: intent.expectedSizeBytes,
+    },
+  };
+}
+
 export function createImportCandidateApplyOperationService({
   copyFileFn = copyFile,
   linkFn = link,
   mkdirFn = mkdir,
   mediaFilesystemService = null,
   mediaTranscodeExecutionService = null,
+  onMutationIntent = async () => {},
   recordImportOperationFn = recordImportOperation,
   removeFileFn = rm,
   statFn = stat,
@@ -172,6 +225,8 @@ export function createImportCandidateApplyOperationService({
     applyPreview,
     executionMode = 'move',
     importCandidateId = null,
+    onMutationIntent: onMutationIntentFn = onMutationIntent,
+    operationPositionStart = 0,
     operationRunId = null,
   }) {
     if (!Array.isArray(applyPreview?.files)) {
@@ -196,10 +251,63 @@ export function createImportCandidateApplyOperationService({
       transcodePreflightPassedCount: 0,
       transcodePreflightUnavailableCount: 0,
     };
-    let operationPosition = 0;
+    let operationPosition = Number.isInteger(operationPositionStart) && operationPositionStart >= 0
+      ? operationPositionStart
+      : 0;
     const preferHardlink = applyPreview?.preview?.library?.reusePolicy?.sameVolumeLinkMode === 'prefer_hardlink';
     const duplicateLosslessPolicy = applyPreview?.preview?.library?.reusePolicy?.duplicateLosslessPolicy;
     const canReuseExistingLossless = duplicateLosslessPolicy === 'reuse_existing_lossless_by_default';
+
+    function reserveOperationPosition() {
+      operationPosition += 1;
+      return operationPosition;
+    }
+
+    async function applyFilesystemMutation({
+      destinationPath,
+      destinationRoot,
+      expectedSizeBytes,
+      fallbackMode = null,
+      file,
+      removeSourceAfterSuccess,
+      requestedMode,
+      sourcePath,
+      sourceRoot,
+      startedAt,
+      stepType,
+    }) {
+      const operationPositionForMutation = reserveOperationPosition();
+      const intent = buildMutationIntent({
+        destinationPath,
+        expectedSizeBytes,
+        file,
+        operationPosition: operationPositionForMutation,
+        removeSourceAfterSuccess,
+        requestedMode,
+        sourcePath,
+        startedAt,
+        stepType,
+      });
+
+      await onMutationIntentFn(intent);
+
+      const result = await resolvedMediaFilesystemService.applyExclusiveFileMutationPlan(
+        resolvedMediaFilesystemService.createExclusiveFileMutationPlan({
+          destinationPath,
+          destinationRoot,
+          fallbackMode,
+          removeSourceAfterSuccess,
+          requestedMode,
+          sourcePath,
+          sourceRoot,
+        }),
+      );
+
+      return {
+        intent,
+        result,
+      };
+    }
 
     async function resolveReusableSourcePath(file) {
       if (!canReuseExistingLossless) {
@@ -238,6 +346,7 @@ export function createImportCandidateApplyOperationService({
       finishedAt = null,
       sourcePath,
       startedAt = null,
+      position = null,
       status,
       stepType,
       transport = null,
@@ -246,7 +355,10 @@ export function createImportCandidateApplyOperationService({
         return null;
       }
 
-      operationPosition += 1;
+      const resolvedPosition = Number.isInteger(position) && position > 0
+        ? position
+        : operationPosition + 1;
+      operationPosition = Math.max(operationPosition, resolvedPosition);
 
       return recordImportOperationFn({
         destinationPath,
@@ -256,7 +368,7 @@ export function createImportCandidateApplyOperationService({
         importCandidateId,
         operationRunId,
         operationType: executionMode,
-        position: operationPosition,
+        position: resolvedPosition,
         sourcePath,
         startedAt,
         status,
@@ -306,6 +418,48 @@ export function createImportCandidateApplyOperationService({
         },
       };
       let currentStep = null;
+
+      if (file.recovery?.confirmedStageIntent) {
+        const intent = file.recovery.confirmedStageIntent;
+        const finishedAt = new Date().toISOString();
+        const recoveredStep = buildRecoveredMutationStep(intent);
+        operation.steps.push(recoveredStep);
+        summary.stagedFromSourceCount += 1;
+        await persistOperation({
+          destinationPath: intent.destinationPath,
+          file,
+          finishedAt,
+          position: intent.operationPosition,
+          sourcePath: intent.sourcePath,
+          startedAt: intent.startedAt,
+          status: 'applied',
+          stepType: 'stage',
+          transport: recoveredStep.transport,
+        });
+      }
+
+      if (file.recovery?.confirmedFinalizeIntent) {
+        const intent = file.recovery.confirmedFinalizeIntent;
+        const finishedAt = new Date().toISOString();
+        const recoveredStep = buildRecoveredMutationStep(intent);
+        operation.steps.push(recoveredStep);
+        operation.status = 'applied';
+        operation.transport = recoveredStep.transport;
+        summary.appliedFileCount += 1;
+        await persistOperation({
+          destinationPath: intent.destinationPath,
+          file,
+          finishedAt,
+          position: intent.operationPosition,
+          sourcePath: intent.sourcePath,
+          startedAt: intent.startedAt,
+          status: 'applied',
+          stepType: 'finalize',
+          transport: recoveredStep.transport,
+        });
+        fileOperations.push(operation);
+        continue;
+      }
 
       try {
         if (typeof mediaTranscodeExecutionService?.executeCandidate === 'function') {
@@ -377,20 +531,26 @@ export function createImportCandidateApplyOperationService({
           } else {
             currentStep = {
               destinationPath: file.stagingTarget?.path ?? null,
+              expectedSizeBytes: file.sourceFile?.sizeBytes ?? null,
+              operationPosition: operationPosition + 1,
+              removeSourceAfterSuccess: true,
+              requestedMode: 'move',
               sourcePath: file.sourceFile?.path ?? null,
               startedAt: new Date().toISOString(),
               stepType: 'stage',
             };
-            const stageMove = await resolvedMediaFilesystemService.applyExclusiveFileMutationPlan(
-              resolvedMediaFilesystemService.createExclusiveFileMutationPlan({
-                destinationPath: file.stagingTarget.path,
-                destinationRoot: applyPreview?.preview?.staging?.root,
-                removeSourceAfterSuccess: true,
-                requestedMode: 'move',
-                sourcePath: file.sourceFile.path,
-                sourceRoot: applyPreview?.preview?.source?.resolvedFolderPath,
-              }),
-            );
+            const { intent: stageIntent, result: stageMove } = await applyFilesystemMutation({
+              destinationPath: file.stagingTarget.path,
+              destinationRoot: applyPreview?.preview?.staging?.root,
+              expectedSizeBytes: currentStep.expectedSizeBytes,
+              file,
+              removeSourceAfterSuccess: currentStep.removeSourceAfterSuccess,
+              requestedMode: currentStep.requestedMode,
+              sourcePath: file.sourceFile.path,
+              sourceRoot: applyPreview?.preview?.source?.resolvedFolderPath,
+              startedAt: currentStep.startedAt,
+              stepType: currentStep.stepType,
+            });
             const finishedAt = new Date().toISOString();
             summary.stagedFromSourceCount += 1;
             operation.steps.push({
@@ -409,6 +569,7 @@ export function createImportCandidateApplyOperationService({
               destinationPath: file.stagingTarget.path,
               file,
               finishedAt,
+              position: stageIntent.operationPosition,
               sourcePath: file.sourceFile.path,
               startedAt: currentStep.startedAt,
               status: 'applied',
@@ -418,23 +579,31 @@ export function createImportCandidateApplyOperationService({
           }
         }
 
+        const finalizeRequestedMode = preferHardlink ? 'hardlink' : (finalizeRemovesSource ? 'move' : 'copy');
+        const finalizeFallbackMode = preferHardlink ? (finalizeRemovesSource ? 'move' : 'copy') : null;
         currentStep = {
           destinationPath: file.libraryTarget?.path ?? null,
+          expectedSizeBytes: file.sourceFile?.sizeBytes ?? null,
+          operationPosition: operationPosition + 1,
+          removeSourceAfterSuccess: finalizeRemovesSource,
+          requestedMode: finalizeRequestedMode,
           sourcePath: finalizeSourcePath,
           startedAt: new Date().toISOString(),
           stepType: 'finalize',
         };
-        const finalizeMove = await resolvedMediaFilesystemService.applyExclusiveFileMutationPlan(
-          resolvedMediaFilesystemService.createExclusiveFileMutationPlan({
-            destinationPath: file.libraryTarget.path,
-            destinationRoot: applyPreview?.preview?.library?.root,
-            fallbackMode: preferHardlink ? (finalizeRemovesSource ? 'move' : 'copy') : null,
-            removeSourceAfterSuccess: finalizeRemovesSource,
-            requestedMode: preferHardlink ? 'hardlink' : (finalizeRemovesSource ? 'move' : 'copy'),
-            sourcePath: finalizeSourcePath,
-            sourceRoot: finalizeSourceRoot,
-          }),
-        );
+        const { intent: finalizeIntent, result: finalizeMove } = await applyFilesystemMutation({
+          destinationPath: file.libraryTarget.path,
+          destinationRoot: applyPreview?.preview?.library?.root,
+          expectedSizeBytes: currentStep.expectedSizeBytes,
+          fallbackMode: finalizeFallbackMode,
+          file,
+          removeSourceAfterSuccess: currentStep.removeSourceAfterSuccess,
+          requestedMode: currentStep.requestedMode,
+          sourcePath: finalizeSourcePath,
+          sourceRoot: finalizeSourceRoot,
+          startedAt: currentStep.startedAt,
+          stepType: currentStep.stepType,
+        });
         const finishedAt = new Date().toISOString();
         operation.steps.push({
           appliedMode: finalizeMove.appliedMode,
@@ -455,6 +624,7 @@ export function createImportCandidateApplyOperationService({
           destinationPath: file.libraryTarget.path,
           file,
           finishedAt,
+          position: finalizeIntent.operationPosition,
           sourcePath: finalizeSourcePath,
           startedAt: currentStep.startedAt,
           status: 'applied',
@@ -472,6 +642,7 @@ export function createImportCandidateApplyOperationService({
             errorMessage: operation.errorMessage,
             file,
             finishedAt: new Date().toISOString(),
+            position: currentStep.operationPosition,
             sourcePath: currentStep.sourcePath,
             startedAt: currentStep.startedAt,
             status: 'failed',

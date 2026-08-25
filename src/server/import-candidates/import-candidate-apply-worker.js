@@ -120,6 +120,90 @@ function createBaseSnapshot(summaryCandidate) {
   };
 }
 
+function buildMutationCheckpointSnapshot({
+  applyPreview,
+  baseSnapshot,
+  mutationIntent,
+}) {
+  return {
+    ...baseSnapshot,
+    apply: {
+      ...baseSnapshot.apply,
+      pendingMutation: mutationIntent,
+    },
+    fullPreview: applyPreview,
+  };
+}
+
+function buildFilesystemConfirmationSnapshot({
+  baseSnapshot,
+  confirmation,
+  outcome,
+}) {
+  return {
+    ...baseSnapshot,
+    apply: {
+      ...baseSnapshot.apply,
+      filesystemConfirmation: confirmation,
+      outcome,
+    },
+  };
+}
+
+function buildRecoveryApplyPreview({ applySnapshot, mutationIntent }) {
+  const persistedPreview = applySnapshot?.fullPreview;
+  if (!Array.isArray(persistedPreview?.files)) {
+    return null;
+  }
+
+  let matchingFileFound = false;
+  const files = persistedPreview.files.map((file) => {
+    if (file?.fileId !== mutationIntent.fileId) {
+      return file;
+    }
+
+    matchingFileFound = true;
+    if (mutationIntent.stepType === 'stage') {
+      return {
+        ...file,
+        stagingTarget: {
+          ...file.stagingTarget,
+          exists: true,
+        },
+        recovery: {
+          confirmedStageIntent: mutationIntent,
+        },
+      };
+    }
+
+    if (mutationIntent.stepType === 'finalize') {
+      return {
+        ...file,
+        recovery: {
+          confirmedFinalizeIntent: mutationIntent,
+        },
+      };
+    }
+
+    return file;
+  });
+
+  return matchingFileFound
+    ? { ...persistedPreview, files }
+    : null;
+}
+
+function buildFilesystemConfirmationStatusMessage(confirmation) {
+  return `Confirm filesystem change: inspect the source and destination paths below, correct the local file state if needed, then start Add downloads again. ${confirmation.message}`;
+}
+
+function getMaximumOperationPosition(importOperations) {
+  return importOperations.reduce((maximum, operation) => {
+    const position = Number(operation?.position);
+    return Number.isInteger(position) && position > maximum ? position : maximum;
+  }, 0);
+}
+
 function buildApplyStatusMessage({ applyResult, importStatusCode }) {
   const summary = applyResult.summary;
   if ((summary.failedFileCount ?? 0) > 0) {
@@ -209,7 +293,10 @@ export function createImportCandidateApplyWorker({
   }),
   buildPostApplyReleaseHints = async () => [],
   createOperationRunLeaseHeartbeatFn = createOperationRunLeaseHeartbeat,
+  confirmPendingMutation = async () => ({ status: 'safe_to_retry' }),
   isCancellationRequested,
+  listImportApplyRunItems = async () => [],
+  listImportOperations = async () => [],
   markImportCandidateApplied = async () => null,
   markRunCompleted,
   markRunPaused,
@@ -293,22 +380,37 @@ export function createImportCandidateApplyWorker({
         importPendingSummary.importPendingCandidates ?? [],
         applySafetyMode,
       );
-      const runItems = buildRunItems(runnableCandidates);
-      await replaceImportApplyRunItems(runId, runItems);
+      const persistedRunItems = await listImportApplyRunItems(runId);
+      const persistedItemsByCandidateId = new Map(
+        persistedRunItems.map((item) => [item.importCandidateId, item]),
+      );
+      const candidatesForRun = persistedRunItems.length > 0
+        ? runnableCandidates.filter((candidate) => persistedItemsByCandidateId.has(candidate.id))
+        : runnableCandidates;
+      const runItems = persistedRunItems.length > 0
+        ? persistedRunItems
+        : buildRunItems(candidatesForRun);
+      if (persistedRunItems.length === 0) {
+        await replaceImportApplyRunItems(runId, runItems);
+      }
+      const existingImportOperations = await listImportOperations({ operationRunId: runId });
+      let operationPositionCursor = getMaximumOperationPosition(existingImportOperations);
 
       const counts = {
         applied: 0,
         appliedWithWarnings: 0,
         applyFailed: 0,
+        awaitingConfirmation: 0,
         blocked: 0,
         qualityBlocked: 0,
       };
       const postApplyReleaseHints = [];
       const qualityRecoveries = [];
 
-      for (const summaryCandidate of runnableCandidates) {
+      for (const summaryCandidate of candidatesForRun) {
         await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
-        const baseSnapshot = createBaseSnapshot(summaryCandidate);
+        const persistedItem = persistedItemsByCandidateId.get(summaryCandidate.id);
+        const baseSnapshot = persistedItem?.applySnapshot ?? createBaseSnapshot(summaryCandidate);
 
         if (summaryCandidate.importStatus.code === 'blocked') {
           counts.blocked += 1;
@@ -334,7 +436,57 @@ export function createImportCandidateApplyWorker({
         }
 
         try {
-          const applyPreview = await previewImportCandidateApply({ importCandidateId: summaryCandidate.id });
+          const pendingMutation = baseSnapshot.apply?.pendingMutation;
+          let applyPreview = null;
+          if (pendingMutation) {
+            const confirmation = await confirmPendingMutation(pendingMutation);
+            if (confirmation?.status === 'ambiguous') {
+              counts.awaitingConfirmation += 1;
+              await updateImportApplyRunItem({
+                applySnapshot: buildFilesystemConfirmationSnapshot({
+                  baseSnapshot,
+                  confirmation,
+                  outcome: 'awaiting_confirmation',
+                }),
+                importCandidateId: summaryCandidate.id,
+                itemStatus: 'awaiting_confirmation',
+                operationRunId: runId,
+                statusMessage: buildFilesystemConfirmationStatusMessage(confirmation),
+              });
+              continue;
+            }
+
+            if (confirmation?.status === 'confirmed') {
+              applyPreview = buildRecoveryApplyPreview({
+                applySnapshot: baseSnapshot,
+                mutationIntent: pendingMutation,
+              });
+              if (!applyPreview) {
+                counts.awaitingConfirmation += 1;
+                const incompleteCheckpointConfirmation = {
+                  ...confirmation,
+                  message: 'The earlier filesystem change is confirmed, but the saved import plan is incomplete. No further file changes will be made automatically.',
+                  status: 'ambiguous',
+                };
+                await updateImportApplyRunItem({
+                  applySnapshot: buildFilesystemConfirmationSnapshot({
+                    baseSnapshot,
+                    confirmation: incompleteCheckpointConfirmation,
+                    outcome: 'awaiting_confirmation',
+                  }),
+                  importCandidateId: summaryCandidate.id,
+                  itemStatus: 'awaiting_confirmation',
+                  operationRunId: runId,
+                  statusMessage: buildFilesystemConfirmationStatusMessage(incompleteCheckpointConfirmation),
+                });
+                continue;
+              }
+            }
+          }
+
+          if (!applyPreview) {
+            applyPreview = await previewImportCandidateApply({ importCandidateId: summaryCandidate.id });
+          }
           if (applySafetyMode === 'safe_auto') {
             const qualityGate = await safeAutoAddQualityGateService.evaluateSafeAutoAddQuality({
               applyPreview,
@@ -397,10 +549,33 @@ export function createImportCandidateApplyWorker({
               continue;
             }
           }
+          const persistedOperationPosition = Number(pendingMutation?.operationPosition);
+          const operationPositionStart = Math.max(
+            operationPositionCursor,
+            Number.isInteger(persistedOperationPosition) && persistedOperationPosition > 0
+              ? persistedOperationPosition
+              : 0,
+          );
+          operationPositionCursor = operationPositionStart + Math.max(
+            (applyPreview.files?.length ?? 0) * 2,
+            1,
+          );
           const applyResult = await applyImportCandidatePreview({
             applyPreview,
             executionMode: 'move',
             importCandidateId: summaryCandidate.id,
+            onMutationIntent: async (mutationIntent) => updateImportApplyRunItem({
+              applySnapshot: buildMutationCheckpointSnapshot({
+                applyPreview,
+                baseSnapshot,
+                mutationIntent,
+              }),
+              importCandidateId: summaryCandidate.id,
+              itemStatus: 'applying',
+              operationRunId: runId,
+              statusMessage: 'Applying files to the library.',
+            }),
+            operationPositionStart,
             operationRunId: runId,
           });
           const itemStatus = (applyResult.summary.failedFileCount ?? 0) > 0
@@ -429,7 +604,9 @@ export function createImportCandidateApplyWorker({
               ...baseSnapshot,
               apply: {
                 ...baseSnapshot.apply,
+                filesystemConfirmation: null,
                 outcome: itemStatus,
+                pendingMutation: null,
                 result: applyResult.summary,
               },
               fileOperations: applyResult.fileOperations,
@@ -556,6 +733,7 @@ export function createImportCandidateApplyWorker({
           readyCount: importPendingSummary.counts?.ready ?? 0,
           readyWithWarningsCount: importPendingSummary.counts?.readyWithWarnings ?? 0,
           requestedCandidateCount,
+          ...(counts.awaitingConfirmation > 0 ? { awaitingConfirmationCount: counts.awaitingConfirmation } : {}),
           ...(counts.qualityBlocked > 0 ? { qualityBlockedCount: counts.qualityBlocked } : {}),
           ...buildQualityRecoverySummary(qualityRecoveries),
           ...buildApplyTriggerSummary({ applySafetyMode, importCandidateIds: scopedCandidateIds, triggerSource }),

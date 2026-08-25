@@ -283,6 +283,10 @@ function onApplyConfirm() {
           <dd>{{ currentRun.applyFailedCount ?? 0 }}</dd>
         </div>
         <div>
+          <dt>Confirm filesystem change</dt>
+          <dd>{{ currentRun.awaitingConfirmationCount ?? 0 }}</dd>
+        </div>
+        <div>
           <dt>Blocked</dt>
           <dd>{{ currentRun.blockedCount ?? 0 }}</dd>
         </div>

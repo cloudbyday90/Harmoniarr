@@ -34,6 +34,7 @@ function normalizeRun(run) {
     appliedWithWarningsCount: toNumberOrNull(run.summary.appliedWithWarningsCount),
     applyFailedCount: toNumberOrNull(run.summary.applyFailedCount),
     applySafetyMode: run.summary.applySafetyMode ?? 'manual',
+    awaitingConfirmationCount: toNumberOrNull(run.summary.awaitingConfirmationCount),
     blockedCount: toNumberOrNull(run.summary.blockedCount),
     currentStep: run.summary.currentStep ?? null,
     errorMessage: run.errorMessage,

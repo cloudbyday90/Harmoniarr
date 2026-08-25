@@ -95,3 +95,29 @@ test('buildImportCandidateApplySummary reports no run when none exist', async ()
   assert.deepEqual(summary.recentRuns, []);
   assert.equal(summary.summary.status, 'not_started');
 });
+
+test('buildImportCandidateApplySummary surfaces an explicit filesystem confirmation state', async () => {
+  const service = createImportCandidateApplySummaryService({
+    importCandidateApplyRunStore: {
+      getActiveRun: async () => null,
+      getLatestRun: async () => ({
+        appliedCount: 0,
+        appliedWithWarningsCount: 0,
+        applyFailedCount: 0,
+        awaitingConfirmationCount: 1,
+        blockedCount: 0,
+        id: 'run-confirmation-1',
+        status: 'completed',
+      }),
+      listRecentRuns: async () => [],
+    },
+    listImportApplyRunItemsFn: async () => [],
+    listImportOperationsFn: async () => [],
+  });
+
+  const summary = await service.buildImportCandidateApplySummary();
+
+  assert.equal(summary.summary.status, 'attention');
+  assert.match(summary.summary.message, /filesystem change/);
+  assert.match(summary.summary.message, /will not make another file change automatically/);
+});

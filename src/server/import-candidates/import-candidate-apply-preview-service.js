@@ -41,6 +41,7 @@ async function inspectPath(pathValue, statFn) {
     return {
       exists: true,
       path: pathValue,
+      sizeBytes: stats.isDirectory() ? null : Number(stats.size),
       type: stats.isDirectory() ? 'directory' : 'file',
     };
   } catch {

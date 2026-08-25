@@ -59,6 +59,13 @@ function buildDisplayRunSummary(run) {
     };
   }
 
+  if ((run.awaitingConfirmationCount ?? 0) > 0) {
+    return {
+      message: `${run.awaitingConfirmationCount} filesystem change${run.awaitingConfirmationCount === 1 ? ' needs' : 's need'} confirmation. Harmoniarr will not make another file change automatically.`,
+      status: 'attention',
+    };
+  }
+
   if ((run.applyFailedCount ?? 0) > 0) {
     return {
       message: `${run.applyFailedCount} candidate${run.applyFailedCount === 1 ? '' : 's'} encountered an import apply failure and need operator attention.`,

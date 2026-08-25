@@ -20,7 +20,12 @@ import { createImportCandidateApplyPreviewService } from './import-candidate-app
 import { createImportCandidateApplyOperationService } from './import-candidate-apply-operation-service.js';
 import { createImportCandidatePostApplyScanService } from './import-candidate-post-apply-scan-service.js';
 import { createImportCandidateBulkReviewService } from './import-candidate-bulk-review-service.js';
-import { replaceImportApplyRunItems, updateImportApplyRunItem } from './import-candidate-apply-repository.js';
+import {
+  listImportApplyRunItems,
+  replaceImportApplyRunItems,
+  updateImportApplyRunItem,
+} from './import-candidate-apply-repository.js';
+import { listImportOperations } from './import-candidate-operation-repository.js';
 import { createImportCandidateApplyRunStore } from './import-candidate-apply-run-store.js';
 import { createImportCandidateApplyService } from './import-candidate-apply-service.js';
 import { createImportCandidateApplySummaryService } from './import-candidate-apply-summary-service.js';
@@ -65,6 +70,7 @@ import { createImportCandidateSelectionSummaryService } from './import-candidate
 import { createCandidateBrowseEnrichmentService } from '../library/candidate-browse-enrichment-service.js';
 import { createSlskdBrowseCacheStore } from '../slskd/slskd-browse-cache-store.js';
 import { createMediaInspectionService } from '../media/media-inspection-service.js';
+import { createMediaFileMutationConfirmationService } from '../media/media-file-mutation-confirmation-service.js';
 import { createMediaLosslessRetentionPolicyService } from '../media/media-lossless-retention-policy-service.js';
 import { createMediaTranscodeExecutionService } from '../media/media-transcode-execution-service.js';
 import { createMediaTranscodePlanningService } from '../media/media-transcode-planning-service.js';
@@ -113,6 +119,7 @@ export function createImportCandidateModule({
     getMediaToolingStatus,
   }),
   mediaLosslessRetentionPolicyService = createMediaLosslessRetentionPolicyService(),
+  mediaFileMutationConfirmationService = createMediaFileMutationConfirmationService(),
   mediaTranscodePlanningService = createMediaTranscodePlanningService(),
   analyzeSpectralCutoffFn = createFfmpegSpectralAnalyzer().analyzeSpectralCutoff,
   spectralCacheStore = createSourceUserSpectralCacheStore(),
@@ -240,6 +247,7 @@ export function createImportCandidateModule({
     applyImportCandidatePreview: importCandidateApplyOperationService.applyImportCandidatePreview,
     buildImportPendingCandidateSummary: importCandidateImportPendingSummaryService.buildImportPendingCandidateSummary,
     buildPostApplyReleaseHints: importCandidateReleaseHintService.buildPostApplyReleaseHints,
+    confirmPendingMutation: mediaFileMutationConfirmationService.confirmMutation,
     isCancellationRequested: maintenanceLockOperationPauseService
       ? createOperationRunInterruptionGate({
         isCancellationRequested: importCandidateApplyRunStore.isCancellationRequested,
@@ -254,6 +262,8 @@ export function createImportCandidateModule({
     markRunPaused: importCandidateApplyRunStore.markRunPaused,
     markRunStarted: importCandidateApplyRunStore.markRunStarted,
     handleImportCandidateQualityFailure: importCandidateRecoveryService.handleImportCandidateQualityFailure,
+    listImportApplyRunItems,
+    listImportOperations,
     previewImportCandidateApply: importCandidateApplyPreviewService.previewImportCandidateApply,
     safeAutoAddQualityGateService: importCandidateSafeAutoAddQualityGateService,
     releaseLease: importCandidateApplyRunStore.releaseLease,

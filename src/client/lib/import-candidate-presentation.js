@@ -242,6 +242,7 @@ export function getApplyItemStatusClass(status) {
       return 'review-status-failed';
     case 'applied_with_warnings':
     case 'ready_with_warnings':
+    case 'awaiting_confirmation':
       return 'review-status-held';
     case 'applied':
     default:
@@ -265,6 +266,8 @@ export function getApplyItemStatusLabel(status) {
       return 'Applied with warnings';
     case 'applied':
       return 'Applied';
+    case 'awaiting_confirmation':
+      return 'Confirm filesystem change';
     case 'ready_with_warnings':
       return 'Ready with warnings';
     default:

@@ -97,6 +97,18 @@ export async function recordImportOperation({
         COALESCE($13::timestamptz, COALESCE($12::timestamptz, NOW())),
         NOW()
       )
+      ON CONFLICT (operation_run_id, import_candidate_file_id, step_type)
+      DO UPDATE SET
+        position = EXCLUDED.position,
+        operation_type = EXCLUDED.operation_type,
+        transport = EXCLUDED.transport,
+        source_path = EXCLUDED.source_path,
+        destination_path = EXCLUDED.destination_path,
+        status = EXCLUDED.status,
+        error_message = EXCLUDED.error_message,
+        started_at = LEAST(import_operations.started_at, EXCLUDED.started_at),
+        finished_at = EXCLUDED.finished_at,
+        updated_at = NOW()
       RETURNING *
     `,
     [

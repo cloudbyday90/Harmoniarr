@@ -14,6 +14,7 @@ function createReadyApplyPreview(overrides = {}) {
       sourceFile: {
         exists: true,
         path: '/downloads/Autechre/Amber/01 Foil.flac',
+        sizeBytes: 42,
       },
       stagingTarget: {
         exists: false,
@@ -233,6 +234,100 @@ test('applyImportCandidatePreview stages and finalizes ready files with exclusiv
   assert.match(recordImportOperationFn.mock.calls[1].arguments[0].startedAt, /^\d{4}-\d{2}-\d{2}T/);
   assert.match(recordImportOperationFn.mock.calls[1].arguments[0].finishedAt, /^\d{4}-\d{2}-\d{2}T/);
   assert.ok(statFn.mock.callCount() >= 4);
+});
+
+test('applyImportCandidatePreview checkpoints each mutation before changing the filesystem', async (t) => {
+  const {
+    copyFileFn,
+    linkFn,
+    mkdirFn,
+    removeFileFn,
+    statFn,
+  } = createSimulatedFilesystemDeps(t);
+  const intents = [];
+  const service = createImportCandidateApplyOperationService({
+    copyFileFn,
+    linkFn,
+    mkdirFn,
+    recordImportOperationFn: t.mock.fn(async () => {}),
+    removeFileFn,
+    statFn,
+  });
+
+  await service.applyImportCandidatePreview({
+    applyPreview: createReadyApplyPreview(),
+    onMutationIntent: async (intent) => {
+      intents.push(intent);
+      if (intent.stepType === 'stage') {
+        assert.equal(copyFileFn.mock.callCount(), 0);
+      } else {
+        assert.equal(linkFn.mock.callCount(), 0);
+      }
+    },
+  });
+
+  assert.deepEqual(intents.map((intent) => ({
+    expectedSizeBytes: intent.expectedSizeBytes,
+    operationPosition: intent.operationPosition,
+    stepType: intent.stepType,
+  })), [
+    { expectedSizeBytes: 42, operationPosition: 1, stepType: 'stage' },
+    { expectedSizeBytes: 42, operationPosition: 2, stepType: 'finalize' },
+  ]);
+});
+
+test('applyImportCandidatePreview records a confirmed final mutation without repeating it after restart', async (t) => {
+  const {
+    copyFileFn,
+    linkFn,
+    mkdirFn,
+    removeFileFn,
+    statFn,
+  } = createSimulatedFilesystemDeps(t);
+  const recordImportOperationFn = t.mock.fn(async () => {});
+  const service = createImportCandidateApplyOperationService({
+    copyFileFn,
+    linkFn,
+    mkdirFn,
+    recordImportOperationFn,
+    removeFileFn,
+    statFn,
+  });
+  const originalFile = createReadyApplyPreview().files[0];
+
+  const result = await service.applyImportCandidatePreview({
+    applyPreview: createReadyApplyPreview({
+      files: [{
+        ...originalFile,
+        recovery: {
+          confirmedFinalizeIntent: {
+            destinationPath: originalFile.libraryTarget.path,
+            expectedSizeBytes: 42,
+            fileId: originalFile.fileId,
+            filename: originalFile.filename,
+            operationPosition: 2,
+            removeSourceAfterSuccess: true,
+            requestedMode: 'hardlink',
+            sourcePath: originalFile.stagingTarget.path,
+            startedAt: '2026-08-25T12:00:00.000Z',
+            stepType: 'finalize',
+          },
+        },
+        stagingTarget: {
+          ...originalFile.stagingTarget,
+          exists: true,
+        },
+      }],
+    }),
+    importCandidateId: 'candidate-1',
+    operationRunId: 'run-1',
+  });
+
+  assert.equal(copyFileFn.mock.callCount(), 0);
+  assert.equal(linkFn.mock.callCount(), 0);
+  assert.equal(removeFileFn.mock.callCount(), 0);
+  assert.equal(result.fileOperations[0].transport, 'confirmed_after_restart');
+  assert.equal(recordImportOperationFn.mock.calls[0].arguments[0].position, 2);
 });
 
 test('applyImportCandidatePreview falls back to copy when hardlink finalize is rejected by the filesystem', async (t) => {

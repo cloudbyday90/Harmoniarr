@@ -402,6 +402,10 @@ describe('getApplyItemStatusClass', () => {
     assert.equal(getApplyItemStatusClass('ready_with_warnings'), 'review-status-held');
   });
 
+  it('returns review-status-held for an unconfirmed filesystem change', () => {
+    assert.equal(getApplyItemStatusClass('awaiting_confirmation'), 'review-status-held');
+  });
+
   it('returns review-status-selected for applied', () => {
     assert.equal(getApplyItemStatusClass('applied'), 'review-status-selected');
   });
@@ -434,6 +438,10 @@ describe('getApplyItemStatusLabel', () => {
 
   it('returns Ready with warnings for ready_with_warnings', () => {
     assert.equal(getApplyItemStatusLabel('ready_with_warnings'), 'Ready with warnings');
+  });
+
+  it('uses a concrete label for an unconfirmed filesystem change', () => {
+    assert.equal(getApplyItemStatusLabel('awaiting_confirmation'), 'Confirm filesystem change');
   });
 
   it('returns Ready for unknown status', () => {

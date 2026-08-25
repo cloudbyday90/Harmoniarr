@@ -1003,3 +1003,87 @@ test('import apply worker does not call sendFulfillmentNotificationFn when candi
 
   assert.equal(notifyCallCount, 0, 'should not call sendFulfillmentNotificationFn when no requestOwnership');
 });
+
+test('import apply worker holds an ambiguous filesystem checkpoint without invoking another file mutation', async (t) => {
+  const updateImportApplyRunItem = t.mock.fn(async () => null);
+  const applyImportCandidatePreview = t.mock.fn(async () => {
+    throw new Error('The filesystem mutator must not run for an ambiguous checkpoint.');
+  });
+  let completedSummary = null;
+  let resolveCompleted;
+  const completed = new Promise((resolve) => {
+    resolveCompleted = resolve;
+  });
+  const candidate = createReadyImportCandidate({ id: 'candidate-awaiting-confirmation' });
+  const pendingMutation = {
+    destinationPath: '/library/Artist/Album/01 Track.flac',
+    expectedSizeBytes: 42,
+    fileId: 'file-ready-1',
+    filename: '01 Track.flac',
+    operationPosition: 1,
+    removeSourceAfterSuccess: true,
+    requestedMode: 'move',
+    sourcePath: '/downloads/Artist/Album/01 Track.flac',
+    startedAt: '2026-08-25T12:00:00.000Z',
+    stepType: 'stage',
+  };
+  const worker = createImportCandidateApplyWorker({
+    acquireLease: async () => {},
+    applyImportCandidatePreview,
+    buildImportPendingCandidateSummary: async () => ({
+      counts: { blocked: 0, ready: 1, readyWithWarnings: 0, totalImportPending: 1 },
+      importPendingCandidates: [candidate],
+    }),
+    confirmPendingMutation: async () => ({
+      destination: { exists: true, sizeBytes: 42 },
+      expectedSizeBytes: 42,
+      message: 'The filesystem does not prove whether the earlier change completed. No further file changes will be made automatically.',
+      source: { exists: true, sizeBytes: 42 },
+      status: 'ambiguous',
+    }),
+    listImportApplyRunItems: async () => [{
+      applySnapshot: {
+        apply: {
+          executionMode: 'move',
+          pendingMutation,
+          requestedAt: '2026-08-25T12:00:00.000Z',
+        },
+        candidate: { id: candidate.id },
+      },
+      importCandidateId: candidate.id,
+      itemStatus: 'applying',
+      position: 1,
+      statusMessage: 'Applying files to the library.',
+    }],
+    listImportOperations: async () => [],
+    markImportCandidateApplied: async () => ({}),
+    markRunCompleted: async ({ summary }) => {
+      completedSummary = summary;
+      resolveCompleted();
+    },
+    markRunFailed: async () => {},
+    markRunStarted: async () => {},
+    previewImportCandidateApply: async () => {
+      throw new Error('The preview must not run for an ambiguous checkpoint.');
+    },
+    releaseLease: async () => {},
+    replaceImportApplyRunItems: async () => {
+      throw new Error('Existing run items must be preserved during recovery.');
+    },
+    updateImportApplyRunItem,
+  });
+
+  await worker.startWorkerRun({
+    executableCandidateCount: 1,
+    requestedCandidateCount: 1,
+    runId: 'run-awaiting-confirmation',
+  });
+
+  await completed;
+
+  assert.equal(applyImportCandidatePreview.mock.callCount(), 0);
+  assert.equal(updateImportApplyRunItem.mock.callCount(), 1);
+  assert.equal(updateImportApplyRunItem.mock.calls[0].arguments[0].itemStatus, 'awaiting_confirmation');
+  assert.equal(completedSummary.awaitingConfirmationCount, 1);
+  assert.equal(completedSummary.appliedCount, 0);
+});
