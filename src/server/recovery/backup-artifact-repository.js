@@ -32,6 +32,8 @@ function normalizeArtifact(row) {
     return null;
   }
 
+  const fileSizeBytes = Number(row.file_size_bytes);
+
   return {
     appVersion: row.app_version ?? null,
     backupType: row.backup_type,
@@ -39,7 +41,7 @@ function normalizeArtifact(row) {
     createdByUserId: row.created_by_user_id ?? null,
     encrypted: row.encrypted,
     encryptionKeyFingerprint: row.encryption_key_fingerprint ?? null,
-    fileSizeBytes: Number.isFinite(row.file_size_bytes) ? row.file_size_bytes : null,
+    fileSizeBytes: Number.isSafeInteger(fileSizeBytes) && fileSizeBytes >= 0 ? fileSizeBytes : null,
     filename: row.filename,
     formatVersion: row.format_version,
     id: row.id,
@@ -140,6 +142,21 @@ export function createBackupArtifactRepository({
     return normalizeArtifact(result.rows[0]);
   }
 
+  async function getBackupArtifactByFilename({ filename }) {
+    const pool = getPoolFn();
+    const result = await pool.query(
+      `
+        SELECT id, filename, backup_type, encrypted, encryption_key_fingerprint, format_version, app_version, migration_level, scope_json, payload_sha256, file_size_bytes, created_by_user_id, storage_path, manifest_json, created_at
+        FROM backup_artifacts
+        WHERE filename = $1
+        LIMIT 1
+      `,
+      [filename],
+    );
+
+    return normalizeArtifact(result.rows[0]);
+  }
+
   async function deleteBackupArtifactById({ backupArtifactId }) {
     const pool = getPoolFn();
     const result = await pool.query(
@@ -158,6 +175,7 @@ export function createBackupArtifactRepository({
     createBackupArtifact,
     deleteBackupArtifactById,
     getBackupArtifactById,
+    getBackupArtifactByFilename,
     listBackupArtifacts,
   };
 }

@@ -82,6 +82,28 @@ test('detectAndDecrypt decrypts encrypted envelope and returns fingerprint', () 
   assert.equal(result.decrypted, plaintext);
 });
 
+test('detectAndDecrypt does not reclassify an encrypted envelope as plaintext when the key is unavailable', () => {
+  const encryptService = createBackupEncryptionService({ encryptionKey: generateTestKey() });
+  const decryptService = createBackupEncryptionService({ encryptionKey: null });
+  const encrypted = encryptService.encryptBackupPayload('{"formatVersion":"1"}');
+
+  assert.throws(
+    () => decryptService.detectAndDecrypt(encrypted),
+    { message: /requires a configured encryption key/ },
+  );
+});
+
+test('inspectBackupEnvelope identifies encryption without requiring a decryption key', () => {
+  const encryptService = createBackupEncryptionService({ encryptionKey: generateTestKey() });
+  const inspectService = createBackupEncryptionService({ encryptionKey: null });
+  const encrypted = encryptService.encryptBackupPayload('{"formatVersion":"1"}');
+
+  assert.deepEqual(inspectService.inspectBackupEnvelope(encrypted), {
+    encrypted: true,
+    keyFingerprint: encryptService.getKeyFingerprint(),
+  });
+});
+
 test('decryptBackupPayload throws when key is not configured', () => {
   const key = generateTestKey();
   const encryptService = createBackupEncryptionService({ encryptionKey: key });

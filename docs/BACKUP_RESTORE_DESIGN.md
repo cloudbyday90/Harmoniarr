@@ -517,11 +517,24 @@ Recommended default:
 Recommended filename shape:
 
 ```text
-harmoniarr_backup_YYYY-MM-DDTHH-mm-ssZ.enc.json
-harmoniarr_backup_YYYY-MM-DDTHH-mm-ssZ.json
+harmoniarr_backup_YYYY-MM-DDTHH-mm-ssZ_<uuid>.enc.json
+harmoniarr_backup_YYYY-MM-DDTHH-mm-ssZ_<uuid>.json
 ```
 
 Use `.enc.json` for encrypted payloads and `.json` only when plaintext export is explicitly chosen.
+
+### Local Publication And Delete Recovery
+
+Logical backup files are published and removed through the durable lifecycle
+described in `docs/BACKUP_ARTIFACT_FILE_LIFECYCLE_DESIGN.md`. Harmoniarr records
+the intended local file operation before it mutates the backup directory, writes
+new artifacts to private same-directory temporary files, verifies the file and
+manifest, then promotes with a same-filesystem rename. A later backup mutation
+reconciles an interrupted intent only when the current paths prove a safe action.
+
+The lifecycle does not perform automatic artifact-retention deletion. Deletion
+remains an explicit, fresh-admin operation until a reviewed retention policy can
+provide a minimum-survivor guarantee and an operator-visible preview.
 
 ### Artifact Structure
 

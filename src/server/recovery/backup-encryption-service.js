@@ -35,6 +35,15 @@ function isEnvelopeFormat(parsed) {
     && typeof parsed.encryption.tag === 'string';
 }
 
+function parseBackupEnvelope(serialized) {
+  try {
+    const parsed = JSON.parse(serialized);
+    return isEnvelopeFormat(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 export function createBackupEncryptionService({
   env = process.env,
   encryptionKey = resolveSecretEncryptionKey(env[secretEncryptionKeyEnvVar]),
@@ -80,8 +89,8 @@ export function createBackupEncryptionService({
       throw new Error('Backup decryption requires a configured encryption key');
     }
 
-    const parsed = JSON.parse(serialized);
-    if (!isEnvelopeFormat(parsed)) {
+    const parsed = parseBackupEnvelope(serialized);
+    if (!parsed) {
       throw new Error('Backup payload is not in encrypted envelope format');
     }
 
@@ -99,18 +108,29 @@ export function createBackupEncryptionService({
     ]).toString('utf8');
   }
 
+  function inspectBackupEnvelope(serialized) {
+    const parsed = parseBackupEnvelope(serialized);
+    if (!parsed) {
+      return {
+        encrypted: false,
+        keyFingerprint: null,
+      };
+    }
+
+    return {
+      encrypted: true,
+      keyFingerprint: parsed.encryption.keyFingerprint ?? null,
+    };
+  }
+
   function detectAndDecrypt(serialized) {
-    try {
-      const parsed = JSON.parse(serialized);
-      if (isEnvelopeFormat(parsed)) {
-        return {
-          decrypted: decryptBackupPayload(serialized),
-          encrypted: true,
-          keyFingerprint: parsed.encryption.keyFingerprint ?? null,
-        };
-      }
-    } catch {
-      // Not JSON or not envelope - treat as plaintext
+    const envelope = inspectBackupEnvelope(serialized);
+    if (envelope.encrypted) {
+      return {
+        decrypted: decryptBackupPayload(serialized),
+        encrypted: true,
+        keyFingerprint: envelope.keyFingerprint,
+      };
     }
 
     return {
@@ -125,6 +145,7 @@ export function createBackupEncryptionService({
     detectAndDecrypt,
     encryptBackupPayload,
     getKeyFingerprint,
+    inspectBackupEnvelope,
     isEncryptionAvailable,
   };
 }

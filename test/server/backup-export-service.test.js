@@ -1,9 +1,40 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { createBackupExportService } from '../../src/server/recovery/backup-export-service.js';
+
+function createBackupArtifactFileOperationServiceFixture({
+  createBackupArtifact = async (artifact) => artifact,
+  deleteBackupArtifactById = async () => null,
+} = {}) {
+  return {
+    async deleteBackupArtifact({ artifact }) {
+      let fileDeleted = true;
+      try {
+        await unlink(artifact.storagePath);
+      } catch (error) {
+        if (error?.code === 'ENOENT') {
+          fileDeleted = false;
+        } else {
+          throw error;
+        }
+      }
+
+      return {
+        backupArtifact: (await deleteBackupArtifactById({ backupArtifactId: artifact.id })) ?? artifact,
+        fileDeleted,
+      };
+    },
+    async publishBackupArtifact({ artifact, content }) {
+      await mkdir(dirname(artifact.storagePath), { recursive: true });
+      await writeFile(artifact.storagePath, content, 'utf8');
+      return createBackupArtifact(artifact);
+    },
+    async recoverIncompleteFileOperations() {},
+  };
+}
 
 test('createBackupExport writes backup artifact and persists metadata', async (t) => {
   const backupsDirectory = await mkdtemp(join(tmpdir(), 'harmoniarr-backups-'));
@@ -19,6 +50,7 @@ test('createBackupExport writes backup artifact and persists metadata', async (t
   });
   const recordAuditEventFn = t.mock.fn(async () => {});
   const service = createBackupExportService({
+    backupArtifactFileOperationService: createBackupArtifactFileOperationServiceFixture({ createBackupArtifact }),
     backupsDirectory,
     createBackupArtifact,
     getMigrationStatusFn: async () => ({
@@ -78,14 +110,16 @@ test('createBackupExport includes monitoring and wanted snapshots when provided'
   const backupsDirectory = await mkdtemp(join(tmpdir(), 'harmoniarr-backups-scope-snapshots-'));
   let capturedArtifact = null;
   const service = createBackupExportService({
+    backupArtifactFileOperationService: createBackupArtifactFileOperationServiceFixture({
+      createBackupArtifact: async (artifact) => {
+        capturedArtifact = artifact;
+        return {
+          ...artifact,
+          id: 'backup-artifact-scoped',
+        };
+      },
+    }),
     backupsDirectory,
-    createBackupArtifact: async (artifact) => {
-      capturedArtifact = artifact;
-      return {
-        ...artifact,
-        id: 'backup-artifact-scoped',
-      };
-    },
     getMigrationStatusFn: async () => ({
       applied: 42,
       pending: [],
@@ -199,6 +233,7 @@ test('createBackupExport includes monitoring and wanted snapshots when provided'
 
 test('getBackupExportById throws when backup artifact does not exist', async () => {
   const service = createBackupExportService({
+    backupArtifactFileOperationService: createBackupArtifactFileOperationServiceFixture(),
     getBackupArtifactById: async () => null,
     packageJsonPath: '/ignored/package.json',
     readPackageMetadataFn: async () => ({ version: '0.1.0-beta' }),
@@ -215,6 +250,7 @@ test('getBackupExportDownloadById returns payload for managed backup artifact', 
   const storagePath = join(backupsDirectory, 'harmoniarr_backup_2026-05-02T14-00-00-000Z.json');
 
   const service = createBackupExportService({
+    backupArtifactFileOperationService: createBackupArtifactFileOperationServiceFixture(),
     backupsDirectory,
     getBackupArtifactById: async () => ({
       id: 'backup-artifact-77',
@@ -250,8 +286,8 @@ test('deleteBackupExportById removes metadata when payload file is already missi
   const recordAuditEventFn = t.mock.fn(async () => {});
 
   const service = createBackupExportService({
+    backupArtifactFileOperationService: createBackupArtifactFileOperationServiceFixture({ deleteBackupArtifactById }),
     backupsDirectory,
-    deleteBackupArtifactById,
     getBackupArtifactById: async () => ({
       id: 'backup-artifact-88',
       filename: 'harmoniarr_backup_2026-05-02T15-00-00-000Z.json',

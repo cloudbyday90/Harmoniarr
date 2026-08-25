@@ -31,6 +31,8 @@ import { createOperatorNotificationFanoutHeartbeat } from './operator-notificati
 import { createOperatorNotificationAcknowledgementService } from './operator-notification-acknowledgement-service.js';
 import { createOperatorNotificationFanoutWorker } from './operator-notification-fanout-worker.js';
 import { createBackupArtifactRepository } from './recovery/backup-artifact-repository.js';
+import { createBackupArtifactFileOperationService } from './recovery/backup-artifact-file-operation-service.js';
+import { createBackupArtifactFileOperationStore } from './recovery/backup-artifact-file-operation-store.js';
 import { createBackupExportService } from './recovery/backup-export-service.js';
 import { createBackupRestoreApplyService } from './recovery/backup-restore-apply-service.js';
 import { createBackupRestorePreviewService } from './recovery/backup-restore-preview-service.js';
@@ -65,6 +67,8 @@ export function createSystemModule({
   metadataRefreshHeartbeatState = null,
   musicBrainzSearchService,
   backupArtifactRepository = createBackupArtifactRepository(),
+  backupArtifactFileOperationService = null,
+  backupArtifactFileOperationStore = createBackupArtifactFileOperationStore(),
   backupExportService = null,
   backupRestoreApplyService = null,
   backupRestorePreviewService = null,
@@ -112,9 +116,17 @@ export function createSystemModule({
     operationHistoryService,
   }),
   systemOperatorNotificationService = operatorNotificationService ?? createOperatorNotificationService(),
-  systemBackupExportService = backupExportService ?? createBackupExportService({
+  systemBackupArtifactFileOperationService = backupArtifactFileOperationService ?? createBackupArtifactFileOperationService({
     createBackupArtifact: backupArtifactRepository.createBackupArtifact,
+    createFileOperation: backupArtifactFileOperationStore.createFileOperation,
     deleteBackupArtifactById: backupArtifactRepository.deleteBackupArtifactById,
+    getBackupArtifactByFilename: backupArtifactRepository.getBackupArtifactByFilename,
+    getBackupArtifactById: backupArtifactRepository.getBackupArtifactById,
+    listIncompleteFileOperations: backupArtifactFileOperationStore.listIncompleteFileOperations,
+    updateFileOperation: backupArtifactFileOperationStore.updateFileOperation,
+  }),
+  systemBackupExportService = backupExportService ?? createBackupExportService({
+    backupArtifactFileOperationService: systemBackupArtifactFileOperationService,
     getBackupArtifactById: backupArtifactRepository.getBackupArtifactById,
     listBackupArtifacts: backupArtifactRepository.listBackupArtifacts,
     listOverridesSnapshotForBackup: restoreScopeRuntimeSnapshotStore.listOverridesSnapshot,
@@ -260,6 +272,8 @@ export function createSystemModule({
     activityFeedService: systemActivityFeedService,
     operatorNotificationService: systemOperatorNotificationService,
     backupArtifactRepository,
+    backupArtifactFileOperationService: systemBackupArtifactFileOperationService,
+    backupArtifactFileOperationStore,
     backupExportService: systemBackupExportService,
     backupRestoreApplyService: systemBackupRestoreApplyService,
     backupRestorePreviewService: systemBackupRestorePreviewService,

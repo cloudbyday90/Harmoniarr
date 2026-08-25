@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
 import test from 'node:test';
+import { createBackupEncryptionService } from '../../src/server/recovery/backup-encryption-service.js';
 import { createBackupRestorePreviewService } from '../../src/server/recovery/backup-restore-preview-service.js';
 
 test('getBackupRestorePreview returns compatible preview when checks pass and no lock blocks apply', async () => {
@@ -158,5 +160,80 @@ test('getBackupRestorePreview throws when artifact is missing', async () => {
   await assert.rejects(
     () => service.getBackupRestorePreview({ backupArtifactId: 'missing' }),
     (error) => error.code === 'backup_artifact_not_found',
+  );
+});
+
+test('getBackupRestorePreview reports an encrypted backup without its configured key without treating it as plaintext', async () => {
+  const encryptingService = createBackupEncryptionService({ encryptionKey: randomBytes(32) });
+  const serializedBackup = encryptingService.encryptBackupPayload(JSON.stringify({
+    backup: {
+      encrypted: true,
+      scope: ['settings'],
+      type: 'logical',
+    },
+    formatVersion: '1',
+  }));
+  const service = createBackupRestorePreviewService({
+    backupEncryptionService: createBackupEncryptionService({ encryptionKey: null }),
+    getBackupArtifactById: async () => ({
+      backupType: 'logical',
+      encrypted: true,
+      fileSizeBytes: Buffer.byteLength(serializedBackup),
+      filename: 'encrypted-backup.enc.json',
+      formatVersion: '1',
+      id: 'backup-encrypted-no-key',
+      migrationLevel: 'applied:42',
+      payloadSha256: 'a'.repeat(64),
+      scope: ['settings'],
+      storagePath: '/backups/encrypted-backup.enc.json',
+    }),
+    listRestoreApplyBlockingLocks: async () => [],
+    readBackupPayloadFn: async () => serializedBackup,
+  });
+
+  const preview = await service.getBackupRestorePreview({ backupArtifactId: 'backup-encrypted-no-key' });
+
+  assert.equal(preview.integrity.status, 'failed');
+  assert.equal(preview.canApplyRestore, false);
+  assert.equal(
+    preview.compatibility.checks.some((check) => check.code === 'payload_encrypted_no_key'),
+    true,
+  );
+});
+
+test('getBackupRestorePreview reports decryption failure for an encrypted backup with the wrong key', async () => {
+  const encryptingService = createBackupEncryptionService({ encryptionKey: randomBytes(32) });
+  const serializedBackup = encryptingService.encryptBackupPayload(JSON.stringify({
+    backup: {
+      encrypted: true,
+      scope: ['settings'],
+      type: 'logical',
+    },
+    formatVersion: '1',
+  }));
+  const service = createBackupRestorePreviewService({
+    backupEncryptionService: createBackupEncryptionService({ encryptionKey: randomBytes(32) }),
+    getBackupArtifactById: async () => ({
+      backupType: 'logical',
+      encrypted: true,
+      fileSizeBytes: Buffer.byteLength(serializedBackup),
+      filename: 'encrypted-backup.enc.json',
+      formatVersion: '1',
+      id: 'backup-encrypted-wrong-key',
+      migrationLevel: 'applied:42',
+      payloadSha256: 'a'.repeat(64),
+      scope: ['settings'],
+      storagePath: '/backups/encrypted-backup.enc.json',
+    }),
+    listRestoreApplyBlockingLocks: async () => [],
+    readBackupPayloadFn: async () => serializedBackup,
+  });
+
+  const preview = await service.getBackupRestorePreview({ backupArtifactId: 'backup-encrypted-wrong-key' });
+
+  assert.equal(preview.integrity.status, 'failed');
+  assert.equal(
+    preview.compatibility.checks.some((check) => check.code === 'payload_decryption_failed'),
+    true,
   );
 });

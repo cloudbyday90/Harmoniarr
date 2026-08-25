@@ -182,10 +182,17 @@ export function createBackupRestoreApplyService({
       }
 
       const serializedPayload = await readBackupPayloadFn(artifact.storagePath);
-      const decryptionResult = backupEncryptionService.detectAndDecrypt(serializedPayload);
+      const envelope = backupEncryptionService.inspectBackupEnvelope(serializedPayload);
 
-      if (decryptionResult.encrypted && !backupEncryptionService.isEncryptionAvailable()) {
+      if (envelope.encrypted && !backupEncryptionService.isEncryptionAvailable()) {
         throw createApiError(409, 'backup_restore_encrypted_no_key', 'Backup artifact is encrypted but no decryption key is configured');
+      }
+
+      let decryptionResult;
+      try {
+        decryptionResult = backupEncryptionService.detectAndDecrypt(serializedPayload);
+      } catch {
+        throw createApiError(422, 'backup_restore_decryption_failed', 'Backup artifact could not be decrypted with the configured key');
       }
 
       let parsedPayload = null;

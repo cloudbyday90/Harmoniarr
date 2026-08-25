@@ -141,6 +141,31 @@ export function createBackupRestorePreviewService({
   sha256Fn = createPayloadSha256,
   backupEncryptionService = createBackupEncryptionService(),
 } = {}) {
+  async function buildEncryptedPayloadFailurePreview({ artifact, checks }) {
+    const blockingLocks = await listRestoreApplyBlockingLocks();
+
+    return {
+      checkedAt: toIsoDate(nowFn()),
+      backupArtifact: toSafeBackupArtifact(artifact),
+      integrity: {
+        status: 'failed',
+        expectedPayloadSha256: artifact.payloadSha256 ?? null,
+        actualPayloadSha256: null,
+      },
+      compatibility: {
+        compatible: false,
+        backupMigrationLevel: artifact.migrationLevel,
+        currentMigrationLevel: null,
+        checks,
+      },
+      restoreReadiness: {
+        blockedByLock: blockingLocks.length > 0,
+        blockingLocks: blockingLocks.map((lock) => controlPlaneRedactionService.redactMaintenanceLock(lock)),
+      },
+      canApplyRestore: false,
+    };
+  }
+
   async function getBackupRestorePreview({ backupArtifactId }) {
     const artifact = await getBackupArtifactById({ backupArtifactId });
     if (!artifact) {
@@ -159,37 +184,29 @@ export function createBackupRestorePreviewService({
       throw createApiError(500, 'backup_artifact_unreadable', 'Backup artifact could not be read');
     }
 
-    const decryptionResult = backupEncryptionService.detectAndDecrypt(serializedPayload);
+    const envelope = backupEncryptionService.inspectBackupEnvelope(serializedPayload);
 
-    if (decryptionResult.encrypted && !backupEncryptionService.isEncryptionAvailable()) {
+    if (envelope.encrypted && !backupEncryptionService.isEncryptionAvailable()) {
       checks.push({
         code: 'payload_encrypted_no_key',
         status: 'failed',
         message: 'Backup artifact is encrypted but no decryption key is configured.',
       });
 
-      const blockingLocks = await listRestoreApplyBlockingLocks();
+      return buildEncryptedPayloadFailurePreview({ artifact, checks });
+    }
 
-      return {
-        checkedAt: toIsoDate(nowFn()),
-        backupArtifact: toSafeBackupArtifact(artifact),
-        integrity: {
-          status: 'failed',
-          expectedPayloadSha256: artifact.payloadSha256 ?? null,
-          actualPayloadSha256: null,
-        },
-        compatibility: {
-          compatible: false,
-          backupMigrationLevel: artifact.migrationLevel,
-          currentMigrationLevel: null,
-          checks,
-        },
-        restoreReadiness: {
-          blockedByLock: blockingLocks.length > 0,
-          blockingLocks: blockingLocks.map((lock) => controlPlaneRedactionService.redactMaintenanceLock(lock)),
-        },
-        canApplyRestore: false,
-      };
+    let decryptionResult;
+    try {
+      decryptionResult = backupEncryptionService.detectAndDecrypt(serializedPayload);
+    } catch {
+      checks.push({
+        code: 'payload_decryption_failed',
+        status: 'failed',
+        message: 'Backup artifact could not be decrypted with the configured key.',
+      });
+
+      return buildEncryptedPayloadFailurePreview({ artifact, checks });
     }
 
     const plaintextPayload = decryptionResult.decrypted;
