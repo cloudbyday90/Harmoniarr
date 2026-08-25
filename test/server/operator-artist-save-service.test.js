@@ -2,6 +2,49 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createOperatorArtistSaveService } from '../../src/server/metadata/operator-artist-save-service.js';
 
+test('saveOperatorArtist rejects a stale snapshot revision before replacing user selections', async (t) => {
+  const query = t.mock.fn(async (sql) => {
+    if (sql === 'BEGIN' || sql === 'ROLLBACK') return { rows: [] };
+    if (sql.includes('FROM app_users')) return { rows: [{ id: 'user-1' }] };
+    if (sql.includes('FROM metadata_artists')) return { rows: [{ id: 'artist-1', name: 'Autechre' }] };
+    if (sql.includes('FROM operator_artist_monitoring')) return { rows: [] };
+    if (sql.includes('FROM operator_artist_reconciliation_snapshot')) {
+      return { rows: [{ snapshot_revision: 4 }] };
+    }
+    throw new Error(`Unexpected SQL: ${sql}`);
+  });
+  const replaceOperatorArtistReleaseGroupSelections = t.mock.fn();
+  const service = createOperatorArtistSaveService({
+    getPoolFn: () => ({
+      connect: async () => ({ query, release: () => {} }),
+    }),
+    operatorReleaseGroupSelectionStore: { replaceOperatorArtistReleaseGroupSelections },
+  });
+
+  await assert.rejects(
+    service.saveOperatorArtist({
+      appUserId: 'user-1',
+      draft: {
+        monitoring: {
+          acquisitionProfileKey: 'lossless_archive',
+          isMonitored: true,
+          monitoredReleaseGroupTypes: ['album'],
+          releaseScope: 'current_and_future',
+          searchOnAddMode: 'none',
+          selectionSourceMode: 'policy_only',
+          wantedAutomationMode: 'current_and_future_matching',
+        },
+        releaseGroupSelections: [],
+        trackOverrides: [],
+      },
+      expectedSnapshotRevision: 3,
+      metadataArtistId: 'artist-1',
+    }),
+    { code: 'operator_artist_snapshot_conflict', status: 409 },
+  );
+  assert.equal(replaceOperatorArtistReleaseGroupSelections.mock.callCount(), 0);
+});
+
 test('saveOperatorArtist persists normalized state, snapshots it, and queues reconciliation atomically', async (t) => {
   const query = t.mock.fn(async (sql, params = []) => {
     if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') {
@@ -25,6 +68,11 @@ test('saveOperatorArtist persists normalized state, snapshots it, and queues rec
           last_saved_snapshot_at: new Date('2026-05-25T11:15:00.000Z'),
         }],
       };
+    }
+
+    if (sql.includes('FROM operator_artist_reconciliation_snapshot')) {
+      assert.deepEqual(params, ['user-1', 'artist-1']);
+      return { rows: [{ snapshot_revision: 1 }] };
     }
 
     if (sql.includes('FROM metadata_release_groups')) {
@@ -123,6 +171,7 @@ test('saveOperatorArtist persists normalized state, snapshots it, and queues rec
         trackTitleSnapshot: ' Example Song ',
       }],
     },
+    expectedSnapshotRevision: 1,
     metadataArtistId: 'artist-1',
     triggeredByUserId: 'operator-1',
   });

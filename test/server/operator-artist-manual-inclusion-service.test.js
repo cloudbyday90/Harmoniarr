@@ -113,6 +113,7 @@ test('includeOperatorArtistReleaseManually builds a complete manual inclusion dr
         trackTitleSnapshot: 'Other track',
       }],
     },
+    expectedSnapshotRevision: 3,
     metadataArtistId: 'artist-1',
     triggerSource: 'manual_inclusion',
     triggeredByUserId: 'user-9',
@@ -126,6 +127,7 @@ test('includeOperatorArtistReleaseManually builds a complete manual inclusion dr
       selectionState: 'selected',
     },
     reconciliation: { run: { id: 'run-1', status: 'pending' } },
+    projection: null,
     snapshot: { id: 'snapshot-4', snapshotRevision: 4 },
   });
 });

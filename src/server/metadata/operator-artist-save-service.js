@@ -49,6 +49,15 @@ function createValidationError(message) {
   return error;
 }
 
+function createSnapshotConflictError({ expectedSnapshotRevision, snapshotRevision }) {
+  const error = new Error(
+    `Artist Policy changed since it was loaded: expected snapshot revision ${expectedSnapshotRevision}, received ${snapshotRevision}`,
+  );
+  error.status = 409;
+  error.code = 'operator_artist_snapshot_conflict';
+  return error;
+}
+
 function isUniqueViolation(error) {
   return error?.code === '23505';
 }
@@ -231,6 +240,7 @@ async function fetchExistingMonitoringTimestamps({ appUserId, client, metadataAr
       WHERE app_user_id = $1
         AND metadata_artist_id = $2
       LIMIT 1
+      FOR UPDATE
     `,
     [appUserId, metadataArtistId],
   );
@@ -240,6 +250,49 @@ async function fetchExistingMonitoringTimestamps({ appUserId, client, metadataAr
     lastSavedSnapshotAt: result.rows[0]?.last_saved_snapshot_at?.toISOString?.() ?? null,
     wasMonitored: result.rows[0]?.is_monitored === true,
   };
+}
+
+function normalizeExpectedSnapshotRevision(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw createValidationError('expectedSnapshotRevision must be a non-negative integer');
+  }
+
+  return value;
+}
+
+async function assertExpectedSnapshotRevision({
+  appUserId,
+  client,
+  expectedSnapshotRevision,
+  metadataArtistId,
+}) {
+  if (expectedSnapshotRevision === null) {
+    return;
+  }
+
+  const result = await client.query(
+    `
+      SELECT snapshot_revision
+      FROM operator_artist_reconciliation_snapshot
+      WHERE app_user_id = $1
+        AND metadata_artist_id = $2
+      ORDER BY snapshot_revision DESC
+      LIMIT 1
+      FOR UPDATE
+    `,
+    [appUserId, metadataArtistId],
+  );
+  const snapshotRevision = Number.isSafeInteger(result.rows[0]?.snapshot_revision)
+    ? result.rows[0].snapshot_revision
+    : 0;
+
+  if (snapshotRevision !== expectedSnapshotRevision) {
+    throw createSnapshotConflictError({ expectedSnapshotRevision, snapshotRevision });
+  }
 }
 
 async function getPreviousMonitoringPolicy({
@@ -383,12 +436,17 @@ export function createOperatorArtistSaveService({
   async function saveOperatorArtist({
     appUserId,
     draft,
+    expectedSnapshotRevision = null,
     metadataArtistId,
     triggerSource = 'save',
     triggeredByUserId = null,
   }) {
     assertPlainObject(draft, 'draft');
     assertPlainObject(draft.monitoring, 'draft.monitoring');
+
+    const normalizedExpectedSnapshotRevision = normalizeExpectedSnapshotRevision(
+      expectedSnapshotRevision,
+    );
 
     const normalizedMonitoringPatch = normalizeOperatorArtistMonitoringPatch(draft.monitoring);
     const normalizedReleaseGroupSelections = normalizeReleaseGroupSelections(
@@ -445,6 +503,12 @@ export function createOperatorArtistSaveService({
         const existingMonitoring = await fetchExistingMonitoringTimestamps({
           appUserId,
           client,
+          metadataArtistId,
+        });
+        await assertExpectedSnapshotRevision({
+          appUserId,
+          client,
+          expectedSnapshotRevision: normalizedExpectedSnapshotRevision,
           metadataArtistId,
         });
         const [

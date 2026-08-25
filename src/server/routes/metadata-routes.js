@@ -69,6 +69,7 @@ export function registerMetadataRoutes(app, {
   getMetadataProviderCacheObservability = () => ({ namespaces: [], observedSinceAt: null, updatedAt: null }),
   getOperatorArtistProjection,
   includeOperatorArtistReleaseManually,
+  selectOperatorArtistReleaseEditionManually,
   saveOperatorArtist,
   getMetadataRelease,
   getMetadataReleaseByMusicBrainzId,
@@ -258,6 +259,7 @@ export function registerMetadataRoutes(app, {
     const result = await saveOperatorArtist({
       appUserId: session.appUserId,
       draft: request.body,
+      expectedSnapshotRevision: request.body?.expectedSnapshotRevision ?? null,
       metadataArtistId: request.params.artistId,
       triggeredByUserId: session.appUserId,
     });
@@ -296,6 +298,29 @@ export function registerMetadataRoutes(app, {
       ok: true,
       alreadyIncluded: result.alreadyIncluded,
       manualInclusion: result.manualInclusion,
+      reconciliation: result.reconciliation,
+      snapshot: result.snapshot,
+    });
+  }));
+
+  app.post('/api/v1/metadata/artists/:artistId/operator/release-groups/:releaseGroupId/manual-edition-selection', limitMetadataMutation, metadataRoute(async (request, response) => {
+    const session = await requireFreshSessionFn(request);
+    requireCsrfFn(request, session);
+
+    const result = await selectOperatorArtistReleaseEditionManually({
+      appUserId: session.appUserId,
+      expectedSnapshotRevision: request.body?.expectedSnapshotRevision,
+      metadataArtistId: request.params.artistId,
+      metadataReleaseGroupId: request.params.releaseGroupId,
+      metadataReleaseId: request.body?.metadataReleaseId,
+      triggeredByUserId: session.appUserId,
+    });
+
+    response.status(result.alreadySelected ? 200 : 202).json({
+      ok: true,
+      alreadySelected: result.alreadySelected,
+      manualEditionSelection: result.manualEditionSelection,
+      projection: result.projection ?? null,
       reconciliation: result.reconciliation,
       snapshot: result.snapshot,
     });

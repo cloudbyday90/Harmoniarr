@@ -172,6 +172,7 @@ function collectRegisteredRoutes() {
     importMusicBrainzArtist: asyncNoopResult({ artist: {}, source: 'musicbrainz' }),
     importMusicBrainzRelease: asyncNoopResult({ artist: {}, releaseGroup: {}, release: {}, source: 'musicbrainz' }),
     importMusicBrainzReleaseGroup: asyncNoopResult({ artist: {}, releaseGroup: {}, source: 'musicbrainz' }),
+    includeOperatorArtistReleaseManually: asyncNoopResult({}),
     requireCsrf: () => {},
     requireFreshAdminSession: asyncNoopResult({ appUserId: 'user-1' }),
     requireFreshSession: asyncNoopResult({ appUserId: 'user-1' }),
@@ -185,6 +186,7 @@ function collectRegisteredRoutes() {
     getSimilarArtists: asyncNoopResult({ similar: [] }),
     getReleaseGroupTracklist: asyncNoopResult({}),
     markCanonicalRelease: asyncNoopResult({}),
+    selectOperatorArtistReleaseEditionManually: asyncNoopResult({}),
     startMetadataArtistRefresh: asyncNoopResult({}),
     updateMetadataArtistMonitoring: asyncNoopResult({}),
   });

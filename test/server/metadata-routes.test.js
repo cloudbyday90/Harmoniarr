@@ -82,6 +82,33 @@ function createMetadataRouteTestApp(overrides = {}) {
         },
         snapshot: { id: 'snapshot-manual-inclusion', snapshotRevision: 1 },
       }),
+      selectOperatorArtistReleaseEditionManually: async ({
+        appUserId,
+        expectedSnapshotRevision,
+        metadataArtistId,
+        metadataReleaseGroupId,
+        metadataReleaseId,
+        triggeredByUserId,
+      }) => ({
+        alreadySelected: false,
+        manualEditionSelection: {
+          metadataArtistId,
+          metadataReleaseGroupId,
+          metadataReleaseId,
+          selectionSource: 'manual',
+          selectionState: 'selected',
+        },
+        projection: null,
+        reconciliation: {
+          run: {
+            appUserId,
+            expectedSnapshotRevision,
+            id: 'run-manual-edition-selection',
+            triggeredByUserId,
+          },
+        },
+        snapshot: { id: 'snapshot-manual-edition-selection', snapshotRevision: 2 },
+      }),
       listOperatorMonitoredArtistProjections: async ({ appUserId, limit }) => ({
         limit,
         results: [{
@@ -626,6 +653,7 @@ test('metadata operator artist save route persists the operator draft payload', 
         }],
         trackOverrides: [],
       },
+      expectedSnapshotRevision: null,
       metadataArtistId: 'local-artist-1',
       triggeredByUserId: 'user-1',
     });
@@ -721,6 +749,84 @@ test('metadata manual inclusion route uses a fresh session, CSRF protection, and
       },
       reconciliation: { run: { id: 'run-7', status: 'pending' } },
       snapshot: { id: 'snapshot-7', snapshotRevision: 7 },
+    });
+  });
+});
+
+test('metadata manual edition selection route uses a fresh session, CSRF protection, and a narrow versioned command', async (t) => {
+  const selectOperatorArtistReleaseEditionManually = t.mock.fn(async ({
+    appUserId,
+    expectedSnapshotRevision,
+    metadataArtistId,
+    metadataReleaseGroupId,
+    metadataReleaseId,
+    triggeredByUserId,
+  }) => ({
+    alreadySelected: false,
+    manualEditionSelection: {
+      metadataArtistId,
+      metadataReleaseGroupId,
+      metadataReleaseId,
+      selectionSource: 'manual',
+      selectionState: 'selected',
+    },
+    projection: {
+      artist: { id: metadataArtistId, name: 'Autechre' },
+      operator: { monitoring: { isMonitored: true } },
+      releaseGroups: [],
+      releases: [],
+    },
+    reconciliation: { run: { id: 'run-8', status: 'pending' } },
+    snapshot: { id: 'snapshot-8', snapshotRevision: expectedSnapshotRevision + 1 },
+    received: { appUserId, triggeredByUserId },
+  }));
+  const requireCsrf = t.mock.fn();
+  const requireFreshSession = t.mock.fn(async () => ({ appUserId: 'user-8' }));
+  const app = createMetadataRouteTestApp({
+    requireCsrf,
+    requireFreshSession,
+    selectOperatorArtistReleaseEditionManually,
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/metadata/artists/artist-8/operator/release-groups/release-group-8/manual-edition-selection`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-csrf-token': 'csrf-token',
+      },
+      body: JSON.stringify({ expectedSnapshotRevision: 8, metadataReleaseId: 'release-8' }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 202);
+    assert.deepEqual(selectOperatorArtistReleaseEditionManually.mock.calls[0].arguments[0], {
+      appUserId: 'user-8',
+      expectedSnapshotRevision: 8,
+      metadataArtistId: 'artist-8',
+      metadataReleaseGroupId: 'release-group-8',
+      metadataReleaseId: 'release-8',
+      triggeredByUserId: 'user-8',
+    });
+    assert.deepEqual(requireCsrf.mock.calls[0].arguments[1], { appUserId: 'user-8' });
+    assert.deepEqual(payload, {
+      ok: true,
+      alreadySelected: false,
+      manualEditionSelection: {
+        metadataArtistId: 'artist-8',
+        metadataReleaseGroupId: 'release-group-8',
+        metadataReleaseId: 'release-8',
+        selectionSource: 'manual',
+        selectionState: 'selected',
+      },
+      projection: {
+        artist: { id: 'artist-8', name: 'Autechre' },
+        operator: { monitoring: { isMonitored: true } },
+        releaseGroups: [],
+        releases: [],
+      },
+      reconciliation: { run: { id: 'run-8', status: 'pending' } },
+      snapshot: { id: 'snapshot-8', snapshotRevision: 9 },
     });
   });
 });

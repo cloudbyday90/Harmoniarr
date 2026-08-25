@@ -112,9 +112,40 @@ const props = defineProps({
     type: Object,
     default: null,
   },
+  /** Whether the operator can persist the edition shown in this dialog. */
+  operatorEditionSelectionEnabled: {
+    type: Boolean,
+    default: false,
+  },
+  /** Explains why the edition-selection action is currently unavailable. */
+  operatorEditionSelectionDisabledReason: {
+    type: String,
+    default: '',
+  },
+  /** Parent-owned error for the edition-selection command. */
+  operatorEditionSelectionError: {
+    type: String,
+    default: '',
+  },
+  /** Whether the operator edition-selection command is in flight. */
+  operatorEditionSelectionSaving: {
+    type: Boolean,
+    default: false,
+  },
+  /** Local release ID explicitly selected by this operator, when present. */
+  operatorSelectedReleaseId: {
+    type: String,
+    default: null,
+  },
 });
 
-const emit = defineEmits(['close', 'requested', 'track-override-change', 'track-override-repair']);
+const emit = defineEmits([
+  'close',
+  'manual-edition-selection',
+  'requested',
+  'track-override-change',
+  'track-override-repair',
+]);
 
 const dialogRef = ref(null);
 const closeButtonRef = ref(null);
@@ -172,6 +203,7 @@ const artworkMbidType = computed(() => {
 const totalRuntime = computed(() => formatAlbumRuntime(computeMediaTotalMs(media.value)));
 
 const hasMultipleEditions = computed(() => allReleases.value.length > 1);
+const editionInputName = computed(() => `rdm-edition-${props.releaseGroupMbid}`);
 
 const showOwnershipCallout = computed(() => {
   const o = ownership.value;
@@ -179,6 +211,29 @@ const showOwnershipCallout = computed(() => {
 });
 
 const currentRelease = computed(() => release.value);
+const isCurrentEditionManuallySelected = computed(() =>
+  props.operatorReleaseGroup?.operatorState?.selectionSource === 'manual'
+  && props.operatorReleaseGroup?.operatorState?.selectionState === 'selected'
+  && props.operatorSelectedReleaseId === currentRelease.value?.id,
+);
+const canSaveCurrentEdition = computed(() =>
+  props.operatorEditionSelectionEnabled
+  && Boolean(currentRelease.value?.id)
+  && !props.operatorEditionSelectionSaving
+  && !isCurrentEditionManuallySelected.value,
+);
+const currentEditionFacts = computed(() => {
+  if (!currentRelease.value) return [];
+
+  return [
+    { label: 'Country', value: currentRelease.value.country ?? 'Not specified' },
+    { label: 'Release date', value: currentRelease.value.releaseDate ?? 'Not specified' },
+    { label: 'Tracks', value: currentRelease.value.trackCount ? String(currentRelease.value.trackCount) : 'Not specified' },
+    { label: 'Media', value: currentRelease.value.mediumCount ? String(currentRelease.value.mediumCount) : 'Not specified' },
+    { label: 'Status', value: currentRelease.value.status ?? 'Not specified' },
+    { label: 'Global default', value: currentRelease.value.isCanonical ? 'Yes' : 'No' },
+  ];
+});
 
 const releaseForRequest = computed(() => {
   if (!release.value) return null;
@@ -425,11 +480,16 @@ function getTrackOverrideLabel(track) {
 }
 
 function buildEditionButtonLabel(edition) {
-  const parts = ['Switch to edition'];
+  const parts = ['Preview edition'];
   if (edition?.country) parts.push(edition.country);
   if (edition?.releaseDate) parts.push(edition.releaseDate.slice(0, 4));
   if (edition?.trackCount) parts.push(`${edition.trackCount} tracks`);
   return parts.join(', ');
+}
+
+function handleManualEditionSelection() {
+  if (!canSaveCurrentEdition.value) return;
+  emit('manual-edition-selection', { release: currentRelease.value });
 }
 
 function handleTrackOverrideChange(medium, track, event) {
@@ -555,24 +615,31 @@ function handleTrackOverrideRepair(action, trackOverride) {
 
           <!-- ── Edition switcher ────────────────────────────────────── -->
           <div v-if="hasMultipleEditions" class="rdm-editions">
-            <div class="rdm-edition-pills">
-              <button
-                v-for="ed in allReleases.slice(0, 6)"
-                :key="ed.musicbrainzReleaseId ?? ed.id"
-                type="button"
-                class="rdm-edition-pill"
-                :class="{ 'is-active': ed.id === currentRelease?.id }"
-                :aria-label="buildEditionButtonLabel(ed)"
-                :aria-pressed="ed.id === currentRelease?.id"
-                @click="handleSwitchEdition(ed)"
-              >
-                {{ ed.country ?? '??' }}
-                <span v-if="ed.releaseDate"> · {{ ed.releaseDate.slice(0, 4) }}</span>
-                <span v-if="ed.trackCount"> · {{ ed.trackCount }}tr</span>
-              </button>
-            </div>
+            <fieldset class="rdm-edition-picker">
+              <legend class="rdm-edition-picker__legend">Preview an edition</legend>
+              <div class="rdm-edition-options">
+                <label
+                  v-for="ed in allReleases.slice(0, 6)"
+                  :key="ed.musicbrainzReleaseId ?? ed.id"
+                  class="rdm-edition-option"
+                  :class="{ 'is-active': ed.id === currentRelease?.id }"
+                >
+                  <input
+                    type="radio"
+                    :name="editionInputName"
+                    :value="ed.id"
+                    :checked="ed.id === currentRelease?.id"
+                    :aria-label="buildEditionButtonLabel(ed)"
+                    @change="handleSwitchEdition(ed)"
+                  >
+                  <span>{{ ed.country ?? 'Country not specified' }}</span>
+                  <span v-if="ed.releaseDate"> · {{ ed.releaseDate.slice(0, 4) }}</span>
+                  <span v-if="ed.trackCount"> · {{ ed.trackCount }} tracks</span>
+                </label>
+              </div>
+            </fieldset>
 
-            <!-- ··· overflow menu with "Set as Default Edition" -->
+            <!-- Global metadata default; separate from the operator's choice below. -->
             <div v-if="isAdmin && currentRelease?.id" class="rdm-edition-overflow">
               <button
                 type="button"
@@ -596,6 +663,48 @@ function handleTrackOverrideRepair(action, trackOverride) {
               </ul>
             </div>
           </div>
+
+          <section
+            v-if="operatorEditingEnabled && currentRelease"
+            class="rdm-operator-edition"
+            aria-labelledby="rdm-operator-edition-heading"
+          >
+            <div class="rdm-operator-edition__heading">
+              <div>
+                <h3 id="rdm-operator-edition-heading">Edition for this artist</h3>
+                <p>Review the previewed edition, then save it for this artist. This does not change the default edition or start a download.</p>
+              </div>
+              <span v-if="isCurrentEditionManuallySelected" class="hx-pill" data-tone="info">
+                Your selected edition
+              </span>
+            </div>
+
+            <dl class="rdm-edition-facts">
+              <div v-for="fact in currentEditionFacts" :key="fact.label">
+                <dt>{{ fact.label }}</dt>
+                <dd>{{ fact.value }}</dd>
+              </div>
+            </dl>
+
+            <p v-if="operatorEditionSelectionDisabledReason" class="rdm-operator-edition__help" role="note">
+              {{ operatorEditionSelectionDisabledReason }}
+            </p>
+
+            <button
+              type="button"
+              class="hx-btn"
+              data-variant="primary"
+              :disabled="!canSaveCurrentEdition"
+              :aria-busy="operatorEditionSelectionSaving || undefined"
+              @click="handleManualEditionSelection"
+            >
+              {{ operatorEditionSelectionSaving ? 'Saving edition…' : (isCurrentEditionManuallySelected ? 'Edition selected' : 'Save this edition') }}
+            </button>
+
+            <p v-if="operatorEditionSelectionError" class="rdm-error" role="alert">
+              {{ operatorEditionSelectionError }}
+            </p>
+          </section>
 
           <p v-if="canonicalError" class="rdm-error" role="alert">{{ canonicalError }}</p>
 
@@ -950,22 +1059,39 @@ function handleTrackOverrideRepair(action, trackOverride) {
 
 .rdm-editions {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--hx-space-2);
   flex-wrap: wrap;
 }
 
-.rdm-edition-pills {
-  display: flex;
-  gap: var(--hx-space-2);
-  flex-wrap: wrap;
+.rdm-edition-picker {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
   flex: 1;
 }
 
-.rdm-edition-pill {
+.rdm-edition-picker__legend {
+  margin-bottom: var(--hx-space-2);
+  padding: 0;
+  color: var(--hx-text);
+  font-size: var(--hx-text-xs);
+  font-weight: 700;
+}
+
+.rdm-edition-options {
+  display: flex;
+  gap: var(--hx-space-2);
+  flex-wrap: wrap;
+}
+
+.rdm-edition-option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hx-space-1);
   border: 1px solid var(--hx-border);
   border-radius: var(--hx-radius-full);
-  background: none;
   color: var(--hx-text-muted);
   font-size: var(--hx-text-xs);
   padding: var(--hx-space-1) var(--hx-space-3);
@@ -973,22 +1099,26 @@ function handleTrackOverrideRepair(action, trackOverride) {
   transition: background 0.1s, color 0.1s;
 }
 
-.rdm-edition-pill:hover {
+.rdm-edition-option:hover {
   background: var(--hx-bg-muted);
   color: var(--hx-text);
 }
 
-.rdm-edition-pill:focus-visible,
+.rdm-edition-option:has(input:focus-visible),
 .rdm-edition-menu__item:focus-visible {
   outline: 2px solid var(--hx-accent);
   outline-offset: 2px;
 }
 
-.rdm-edition-pill.is-active {
+.rdm-edition-option.is-active {
   background: var(--hx-color-accent-muted, var(--hx-bg-muted));
   border-color: var(--hx-color-accent, var(--hx-border));
   color: var(--hx-text-strong);
   font-weight: 600;
+}
+
+.rdm-edition-option input {
+  accent-color: var(--hx-color-accent, var(--hx-accent));
 }
 
 .rdm-edition-overflow {
@@ -1064,6 +1194,70 @@ function handleTrackOverrideRepair(action, trackOverride) {
   align-items: center;
   padding: var(--hx-space-1) var(--hx-space-2);
   border-radius: var(--hx-radius-sm);
+  font-size: var(--hx-text-sm);
+}
+
+.rdm-operator-edition {
+  display: grid;
+  gap: var(--hx-space-3);
+  padding: var(--hx-space-3);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-surface-muted);
+}
+
+.rdm-operator-edition__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--hx-space-3);
+}
+
+.rdm-operator-edition__heading h3,
+.rdm-operator-edition__heading p {
+  margin: 0;
+}
+
+.rdm-operator-edition__heading h3 {
+  color: var(--hx-text-strong);
+  font-size: var(--hx-text-sm);
+}
+
+.rdm-operator-edition__heading p,
+.rdm-operator-edition__help {
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-xs);
+  line-height: 1.45;
+}
+
+.rdm-operator-edition__heading p {
+  margin-top: var(--hx-space-1);
+}
+
+.rdm-operator-edition__help {
+  margin: 0;
+}
+
+.rdm-edition-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: var(--hx-space-2);
+  margin: 0;
+}
+
+.rdm-edition-facts div {
+  min-width: 0;
+}
+
+.rdm-edition-facts dt {
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-xs);
+}
+
+.rdm-edition-facts dd {
+  margin: var(--hx-space-1) 0 0;
+  overflow-wrap: anywhere;
+  color: var(--hx-text);
   font-size: var(--hx-text-sm);
 }
 

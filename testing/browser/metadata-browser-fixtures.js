@@ -2848,6 +2848,53 @@ export async function installMetadataBrowserFixtures(browserContext, {
         });
       }
 
+      const manualEditionSelectionMatch = path.match(/^\/api\/v1\/metadata\/artists\/([^/]+)\/operator\/release-groups\/([^/]+)\/manual-edition-selection$/u);
+      if (method === 'POST' && manualEditionSelectionMatch) {
+        Object.assign(state, loadFixtureState());
+        const localArtistId = decodeURIComponent(manualEditionSelectionMatch[1]);
+        const metadataReleaseGroupId = decodeURIComponent(manualEditionSelectionMatch[2]);
+        const payload = parseJsonBody(input, init);
+        const artistFixture = getArtistFixtureByLocalId(localArtistId);
+        const previousProjection = artistFixture
+          ? state.operatorProjectionsByMusicBrainzId[artistFixture.musicBrainzArtistId]
+          : null;
+        if (!artistFixture || !previousProjection || typeof payload.metadataReleaseId !== 'string') {
+          return buildJsonResponse({ error: { message: 'Not found' }, ok: false }, 404);
+        }
+
+        const selection = {
+          metadataReleaseGroupId,
+          resolvedMetadataReleaseId: payload.metadataReleaseId,
+          selectionSource: 'manual',
+          selectionState: 'selected',
+        };
+        const projection = updateOperatorProjectionFromDraft(localArtistId, {
+          monitoring: previousProjection.operator.monitoring,
+          releaseGroupSelections: [
+            ...(previousProjection.operator.releaseGroupSelections ?? [])
+              .filter((entry) => entry.metadataReleaseGroupId !== metadataReleaseGroupId),
+            selection,
+          ],
+          trackOverrides: previousProjection.operator.trackOverrides ?? [],
+        });
+
+        return buildJsonResponse({
+          alreadySelected: false,
+          manualEditionSelection: {
+            ...selection,
+            metadataArtistId: localArtistId,
+            metadataReleaseId: payload.metadataReleaseId,
+          },
+          ok: true,
+          projection: clone(projection),
+          reconciliation: projection.operator.reconciliation,
+          snapshot: {
+            id: `operator-snapshot-${state.operatorSaveCount}`,
+            snapshotRevision: state.operatorSaveCount,
+          },
+        }, 202);
+      }
+
       if (method === 'PUT' && path.startsWith('/api/v1/metadata/artists/') && path.endsWith('/monitoring')) {
         const localArtistId = decodeURIComponent(
           path.slice('/api/v1/metadata/artists/'.length, -'/monitoring'.length),

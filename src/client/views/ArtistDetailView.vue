@@ -29,6 +29,7 @@ import MusicQueueProgressStrip from '../components/music-queue/MusicQueueProgres
 import ReleaseCard from '../components/media/ReleaseCard.vue';
 import { useArtistDetail } from '../composables/useArtistDetail.js';
 import { useArtistDetailArtwork } from '../composables/useArtistDetailArtwork.js';
+import { useManualEditionSelection } from '../composables/useManualEditionSelection.js';
 import { useMusicQueue } from '../composables/useMusicQueue.js';
 import { useReleaseRequest } from '../composables/useReleaseRequest.js';
 import { useRequestUsers } from '../composables/useRequestUsers.js';
@@ -188,6 +189,7 @@ async function handleConfirmRequest({ requestedForUserId = null } = {}) {
 
 const detailModalOpen = ref(false);
 const detailRelease = ref(null);
+const manualEditionSelectionError = ref('');
 const policyDraft = ref(createOperatorArtistDetailDraft());
 const savedDraftFingerprint = ref(fingerprintOperatorArtistDraft(policyDraft.value));
 const isSavingPolicy = ref(false);
@@ -206,6 +208,7 @@ function openDetailModal(release) {
 function closeDetailModal() {
   detailModalOpen.value = false;
   detailRelease.value = null;
+  manualEditionSelectionError.value = '';
 }
 
 const artistName = computed(() => (artist.value?.name ?? nameHint.value) || 'Artist');
@@ -225,6 +228,31 @@ const operatorCoverage = computed(() => operator.value?.coverage ?? {});
 const operatorOverview = computed(() => operator.value?.overview ?? {});
 const operatorReconciliation = computed(() => operator.value?.reconciliation ?? {});
 const musicQueueMetadataArtistId = computed(() => projection.value?.artist?.id ?? null);
+const latestSnapshotRevision = computed(() => {
+  const snapshotRevision = operatorReconciliation.value?.latestSnapshot?.snapshotRevision;
+  return Number.isSafeInteger(snapshotRevision) && snapshotRevision >= 0 ? snapshotRevision : 0;
+});
+const detailOperatorReleaseGroup = computed(() => {
+  const releaseGroupId = detailRelease.value?.sourceReleaseGroup?.id;
+  if (!releaseGroupId) return null;
+
+  return releaseGroups.value.find((releaseGroup) => releaseGroup.id === releaseGroupId)
+    ?? detailRelease.value?.sourceReleaseGroup
+    ?? null;
+});
+const detailReleaseGroupHasTrackOverrides = computed(() => {
+  const releaseGroupId = detailOperatorReleaseGroup.value?.id;
+  return Boolean(
+    releaseGroupId
+    && operator.value?.trackOverrides?.some(
+      (trackOverride) => trackOverride.metadataReleaseGroupId === releaseGroupId,
+    ),
+  );
+});
+const detailReleaseGroupRequiresTrackReview = computed(() =>
+  detailOperatorReleaseGroup.value?.operatorState?.selectionState === 'partial'
+  || detailReleaseGroupHasTrackOverrides.value,
+);
 const coveragePercent = computed(() => calculateOperatorArtistCoveragePercent(operatorCoverage.value));
 const bulkSelectionConfirmationOpen = computed(() => pendingBulkSelectionOperation.value !== null);
 const canRetryOperatorReconciliation = computed(() =>
@@ -235,6 +263,31 @@ const canRetryOperatorReconciliation = computed(() =>
   && !operatorReconciliation.value?.runningRun
   && !isRetryingReconciliation.value,
 );
+const canSelectManualEdition = computed(() =>
+  canEditOperatorPolicy.value
+  && policyDraft.value.monitoring.isMonitored
+  && !detailReleaseGroupRequiresTrackReview.value
+  && !isPolicyDirty.value
+  && !isSavingPolicy.value,
+);
+const manualEditionSelectionDisabledReason = computed(() => {
+  if (!canEditOperatorPolicy.value) {
+    return 'Only operators can choose an edition.';
+  }
+  if (!policyDraft.value.monitoring.isMonitored) {
+    return 'Monitor this artist before choosing an edition.';
+  }
+  if (detailReleaseGroupRequiresTrackReview.value) {
+    return 'Review this release group\'s track overrides in Artist Policy before choosing an edition.';
+  }
+  if (isSavingPolicy.value) {
+    return 'Artist Policy is saving.';
+  }
+  if (isPolicyDirty.value) {
+    return 'Save or cancel Artist Policy changes before choosing an edition.';
+  }
+  return '';
+});
 
 const {
   errorMessage: musicQueueErrorMessage,
@@ -245,6 +298,8 @@ const {
   metadataArtistId: musicQueueMetadataArtistId,
   pollIntervalMs: 30000,
 });
+
+const manualEditionSelection = useManualEditionSelection();
 
 const discographySections = computed(() =>
   groupReleaseGroupsByType(releaseGroups.value).map((section) => ({
@@ -483,6 +538,7 @@ async function savePolicyDraft() {
     const payload = await saveOperatorArtistDraft(
       projection.value.artist.id,
       buildOperatorArtistSaveDraft(policyDraft.value),
+      { expectedSnapshotRevision: latestSnapshotRevision.value },
     );
     if (payload?.projection) {
       setOperatorProjection(payload.projection);
@@ -495,6 +551,31 @@ async function savePolicyDraft() {
     policySaveError.value = getErrorMessage(error, 'Saving artist policy failed.');
   } finally {
     isSavingPolicy.value = false;
+  }
+}
+
+async function selectManualEdition({ release }) {
+  const releaseGroup = detailOperatorReleaseGroup.value;
+  if (!canSelectManualEdition.value || !releaseGroup?.id || !release?.id) {
+    return;
+  }
+
+  manualEditionSelectionError.value = '';
+  const result = await manualEditionSelection.selectEdition({
+    expectedSnapshotRevision: latestSnapshotRevision.value,
+    metadataArtistId: projection.value.artist.id,
+    metadataReleaseGroupId: releaseGroup.id,
+    metadataReleaseId: release.id,
+    title: release.title,
+  });
+
+  if (result.ok && result.projection) {
+    setOperatorProjection(result.projection);
+  } else if (!result.ok && !result.skipped) {
+    manualEditionSelectionError.value = getErrorMessage(
+      result.error,
+      'Saving the selected edition failed.',
+    );
   }
 }
 
@@ -1032,7 +1113,12 @@ watch(projection, () => {
       :operator-draft="policyDraft"
       :operator-editing-disabled="isSavingPolicy || !policyDraft.monitoring.isMonitored"
       :operator-editing-enabled="canEditOperatorPolicy"
-      :operator-release-group="detailRelease?.sourceReleaseGroup ?? null"
+      :operator-release-group="detailOperatorReleaseGroup"
+      :operator-edition-selection-enabled="canSelectManualEdition"
+      :operator-edition-selection-disabled-reason="manualEditionSelectionDisabledReason"
+      :operator-edition-selection-error="manualEditionSelectionError"
+      :operator-edition-selection-saving="manualEditionSelection.selectingKeys.size > 0"
+      :operator-selected-release-id="detailOperatorReleaseGroup?.operatorState?.resolvedMetadataReleaseId ?? null"
       :release-title="detailRelease?.title ?? null"
       :artist-name="artist?.name ?? null"
       :release-year="detailRelease?.date ? String(detailRelease.date).slice(0, 4) : null"
@@ -1040,6 +1126,7 @@ watch(projection, () => {
       @requested="closeDetailModal"
       @track-override-change="updateDraftTrackOverride"
       @track-override-repair="repairDraftTrackOverride"
+      @manual-edition-selection="selectManualEdition"
     />
 
     <ConfirmDialog

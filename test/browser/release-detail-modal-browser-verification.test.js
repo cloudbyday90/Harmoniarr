@@ -133,23 +133,23 @@ suite('Release Detail modal browser verification', () => {
       await page.keyboard.press('Tab');
       await assertFocusWithin(dialog, 'Tab after repair should re-enter the modal dialog');
 
-      const gbEdition = dialog.getByRole('button', {
-        name: 'Switch to edition, GB, 1998, 3 tracks',
+      const gbEdition = dialog.getByRole('radio', {
+        name: 'Preview edition, GB, 1998, 3 tracks',
       });
-      const usEdition = dialog.getByRole('button', {
-        name: 'Switch to edition, US, 1998, 4 tracks',
+      const usEdition = dialog.getByRole('radio', {
+        name: 'Preview edition, US, 1998, 4 tracks',
       });
       await gbEdition.waitFor();
       await usEdition.waitFor();
-      assert.equal(await gbEdition.getAttribute('aria-pressed'), 'true');
-      assert.equal(await usEdition.getAttribute('aria-pressed'), 'false');
+      assert.equal(await gbEdition.isChecked(), true);
+      assert.equal(await usEdition.isChecked(), false);
 
       await usEdition.focus();
-      await assertVisibleFocusOutline(usEdition, 'Edition switch buttons should have a visible focus ring');
-      await usEdition.press('Enter');
+      await assertVisibleFocusOutline(usEdition, 'Edition preview radio should have a visible focus ring');
+      await usEdition.check();
       await dialog.getByText('Left Side Drive').waitFor();
-      await dialog.getByText('4 tracks').waitFor();
-      assert.equal(await usEdition.getAttribute('aria-pressed'), 'true');
+      await dialog.locator('.rdm-hero .rdm-meta-line').getByText('4 tracks', { exact: true }).waitFor();
+      assert.equal(await usEdition.isChecked(), true);
 
       const editionActions = dialog.getByRole('button', { name: 'Edition actions' });
       await editionActions.click();
@@ -168,6 +168,39 @@ suite('Release Detail modal browser verification', () => {
       await page.goto('about:blank', { waitUntil: 'load' });
     }, {
       scenarioName: 'release_detail_modal_browser_verification',
+    });
+  });
+
+  test('Release Detail saves a manually selected edition without changing the global default', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) {
+      t.skip(runtimeUnavailableReason);
+      return;
+    }
+
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      await installMetadataBrowserFixtures(browserContext);
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      await markBoardsOfCanadaAddedInMetadataBrowserFixture(page);
+
+      const { dialog } = await openMusicHasTheRightToChildrenDialog({ baseUrl, page });
+      const usEdition = dialog.getByRole('radio', {
+        name: 'Preview edition, US, 1998, 4 tracks',
+      });
+      await usEdition.check();
+      await dialog.getByText('Edition for this artist', { exact: true }).waitFor();
+      await dialog.getByText('Country').waitFor();
+      await dialog.locator('.rdm-edition-facts').getByText('US', { exact: true }).waitFor();
+
+      const saveEdition = dialog.getByRole('button', { name: 'Save this edition' });
+      await saveEdition.click();
+      await dialog.getByText('Your selected edition', { exact: true }).waitFor();
+      await dialog.getByRole('button', { name: 'Edition selected' }).waitFor();
+
+      await page.goto('about:blank', { waitUntil: 'load' });
+    }, {
+      scenarioName: 'release_detail_manual_edition_selection_browser_verification',
     });
   });
 });

@@ -115,11 +115,17 @@ export function importMusicBrainzArtist(artistId) {
   });
 }
 
-export function saveOperatorArtistDraft(artistId, draft) {
+export function saveOperatorArtistDraft(
+  artistId,
+  draft,
+  { expectedSnapshotRevision = null } = {},
+) {
   return apiRequest(`/api/v1/metadata/artists/${encodeURIComponent(artistId)}/operator`, {
     method: 'PUT',
     includeCsrf: true,
-    body: draft,
+    body: expectedSnapshotRevision === null
+      ? draft
+      : { ...draft, expectedSnapshotRevision },
   });
 }
 
@@ -134,6 +140,22 @@ export function includeOperatorArtistReleaseManually({
       method: 'POST',
       includeCsrf: true,
       body: { metadataReleaseId },
+    },
+  );
+}
+
+export function selectOperatorArtistReleaseEditionManually({
+  expectedSnapshotRevision,
+  metadataArtistId,
+  metadataReleaseGroupId,
+  metadataReleaseId,
+}) {
+  return apiRequest(
+    `/api/v1/metadata/artists/${encodeURIComponent(metadataArtistId)}/operator/release-groups/${encodeURIComponent(metadataReleaseGroupId)}/manual-edition-selection`,
+    {
+      method: 'POST',
+      includeCsrf: true,
+      body: { expectedSnapshotRevision, metadataReleaseId },
     },
   );
 }

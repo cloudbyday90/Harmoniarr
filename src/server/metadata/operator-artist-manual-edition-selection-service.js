@@ -19,9 +19,16 @@
 import { createOperatorArtistProjectionService } from './operator-artist-projection-service.js';
 import { createOperatorArtistSaveService } from './operator-artist-save-service.js';
 import {
-  buildOperatorArtistManualInclusionDraft,
+  buildOperatorArtistManualEditionSelectionDraft,
   getOperatorArtistProjectionSnapshotRevision,
 } from './operator-artist-manual-selection-draft.js';
+
+function createSelectionConflictError(message) {
+  const error = new Error(message);
+  error.status = 409;
+  error.code = 'manual_edition_selection_stale';
+  return error;
+}
 
 function createValidationError(message) {
   const error = new Error(message);
@@ -38,14 +45,20 @@ function normalizeRequiredIdentifier(value, field) {
   return value.trim();
 }
 
-export { buildOperatorArtistManualInclusionDraft };
+function normalizeExpectedSnapshotRevision(value) {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw createValidationError('expectedSnapshotRevision must be a non-negative integer');
+  }
+
+  return value;
+}
 
 /**
- * Saves a narrow manual-inclusion command through the canonical artist save
- * workflow. This ensures the change is snapshot-backed and reconciliation is
- * queued alongside the durable selection update.
+ * Saves one operator-specific edition choice through the canonical artist save
+ * workflow. The browser identifies an edition; this command derives the full
+ * draft from the authoritative projection and compares its snapshot revision.
  */
-export function createOperatorArtistManualInclusionService({
+export function createOperatorArtistManualEditionSelectionService({
   getOperatorArtistProjection = null,
   operatorArtistProjectionService = null,
   operatorArtistSaveService = null,
@@ -58,8 +71,9 @@ export function createOperatorArtistManualInclusionService({
   const resolvedSaveService = operatorArtistSaveService ?? createOperatorArtistSaveService();
   const saveArtist = saveOperatorArtist ?? resolvedSaveService.saveOperatorArtist;
 
-  async function includeOperatorArtistReleaseManually({
+  async function selectOperatorArtistReleaseEditionManually({
     appUserId,
+    expectedSnapshotRevision,
     metadataArtistId,
     metadataReleaseGroupId,
     metadataReleaseId,
@@ -75,52 +89,65 @@ export function createOperatorArtistManualInclusionService({
       metadataReleaseId,
       'metadataReleaseId',
     );
+    const normalizedExpectedSnapshotRevision = normalizeExpectedSnapshotRevision(
+      expectedSnapshotRevision,
+    );
     const projection = await readOperatorArtistProjection({
       appUserId: normalizedAppUserId,
       metadataArtistId: normalizedMetadataArtistId,
     });
-    const { alreadyIncluded, draft } = buildOperatorArtistManualInclusionDraft({
+    const currentSnapshotRevision = getOperatorArtistProjectionSnapshotRevision(projection);
+
+    if (normalizedExpectedSnapshotRevision !== currentSnapshotRevision) {
+      throw createSelectionConflictError(
+        'Artist Policy changed since this edition was loaded. Refresh Artist Detail and review the current selection.',
+      );
+    }
+
+    const { alreadySelected, draft } = buildOperatorArtistManualEditionSelectionDraft({
       metadataReleaseGroupId: normalizedMetadataReleaseGroupId,
       metadataReleaseId: normalizedMetadataReleaseId,
       projection,
     });
-    const expectedSnapshotRevision = getOperatorArtistProjectionSnapshotRevision(projection);
-    const manualInclusion = {
+    const manualEditionSelection = {
       metadataArtistId: normalizedMetadataArtistId,
       metadataReleaseGroupId: normalizedMetadataReleaseGroupId,
       metadataReleaseId: normalizedMetadataReleaseId,
+      selectionSource: 'manual',
       selectionState: 'selected',
     };
 
-    if (alreadyIncluded) {
+    if (alreadySelected) {
       return {
-        alreadyIncluded: true,
-        manualInclusion,
+        alreadySelected: true,
+        manualEditionSelection,
+        projection,
         reconciliation: projection?.operator?.reconciliation ?? null,
         snapshot: projection?.operator?.reconciliation?.latestSnapshot ?? null,
-        projection,
       };
     }
 
     const result = await saveArtist({
       appUserId: normalizedAppUserId,
       draft,
-      expectedSnapshotRevision,
+      expectedSnapshotRevision: normalizedExpectedSnapshotRevision,
       metadataArtistId: normalizedMetadataArtistId,
-      triggerSource: 'manual_inclusion',
+      triggerSource: 'manual_edition_selection',
       triggeredByUserId: triggeredByUserId ?? normalizedAppUserId,
     });
 
     return {
-      alreadyIncluded: false,
-      manualInclusion,
+      alreadySelected: false,
+      manualEditionSelection,
+      projection: result.projection ?? null,
       reconciliation: result.reconciliation,
       snapshot: result.snapshot,
-      projection: result.projection ?? null,
     };
   }
 
   return {
-    includeOperatorArtistReleaseManually,
+    selectOperatorArtistReleaseEditionManually,
   };
 }
+
+export { buildOperatorArtistManualEditionSelectionDraft };

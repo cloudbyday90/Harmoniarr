@@ -26,6 +26,7 @@ import {
   searchMusicBrainzArtists,
   searchMusicBrainzReleases,
   saveOperatorArtistDraft,
+  selectOperatorArtistReleaseEditionManually,
   startMetadataArtistRefresh,
 } from '../../src/client/lib/metadata-api.js';
 
@@ -213,6 +214,44 @@ test('metadata-api saveOperatorArtistDraft sends PUT with CSRF and body', async 
   const body = JSON.parse(globalThis.fetch.mock.calls[0].arguments[1].body);
   assert.deepEqual(body.releaseGroupSelections, []);
   assert.equal(body.monitoring.isMonitored, true);
+});
+
+test('metadata-api saveOperatorArtistDraft includes an expected snapshot revision when provided', async (t) => {
+  globalThis.document = { cookie: 'harmoniarr_csrf=csrf-meta' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse());
+
+  await saveOperatorArtistDraft(
+    'artist-1',
+    { monitoring: { isMonitored: true }, releaseGroupSelections: [], trackOverrides: [] },
+    { expectedSnapshotRevision: 4 },
+  );
+
+  const body = JSON.parse(globalThis.fetch.mock.calls[0].arguments[1].body);
+  assert.equal(body.expectedSnapshotRevision, 4);
+});
+
+test('metadata-api manual edition selection sends a scoped, CSRF-protected command', async (t) => {
+  globalThis.document = { cookie: 'harmoniarr_csrf=csrf-meta' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse());
+
+  await selectOperatorArtistReleaseEditionManually({
+    expectedSnapshotRevision: 4,
+    metadataArtistId: 'artist/operator',
+    metadataReleaseGroupId: 'release-group/1',
+    metadataReleaseId: 'release-1',
+  });
+
+  assert.equal(
+    globalThis.fetch.mock.calls[0].arguments[0],
+    '/api/v1/metadata/artists/artist%2Foperator/operator/release-groups/release-group%2F1/manual-edition-selection',
+  );
+  const options = globalThis.fetch.mock.calls[0].arguments[1];
+  assert.equal(options.method, 'POST');
+  assert.equal(options.headers.get('X-CSRF-Token'), 'csrf-meta');
+  assert.deepEqual(JSON.parse(options.body), {
+    expectedSnapshotRevision: 4,
+    metadataReleaseId: 'release-1',
+  });
 });
 
 test('metadata-api startMetadataArtistRefresh sends POST', async (t) => {
