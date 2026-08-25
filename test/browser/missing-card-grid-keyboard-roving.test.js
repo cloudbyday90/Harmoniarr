@@ -66,17 +66,17 @@ suite('Missing release-card browser keyboard roving coverage', () => {
       await bootstrapAdminThroughUi(page, { baseUrl });
 
       await page.goto(`${baseUrl}/app/missing`, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('heading', { exact: true, name: 'Missing' }).waitFor();
-      await page.getByRole('heading', { name: 'Wanted releases' }).waitFor();
-      await page.getByText('Download recovery needs review').waitFor();
+      await page.getByRole('heading', { exact: true, name: 'Missing music' }).waitFor();
+      await page.getByRole('heading', { name: 'Selected releases' }).waitFor();
+      await page.getByText('Search stopped').waitFor();
 
-      const missingList = page.getByRole('list', { name: 'Missing releases' });
+      const missingList = page.getByRole('list', { name: 'Selected releases not in library' });
       const cells = missingList.locator(cardCellSelector);
       const actionControls = missingList.locator(cardActionSelector);
 
       await assertRovingGridMovement({
         cellSelector: cardCellSelector,
-        expectedCount: 3,
+        expectedCount: 4,
         list: missingList,
         page,
       });
@@ -84,12 +84,14 @@ suite('Missing release-card browser keyboard roving coverage', () => {
       await page.keyboard.press('Tab');
       await assertLocatorFocused(
         actionControls.first(),
-        'Tab should move from the active Missing release card to its Request action',
+        'Tab should move from the active Missing release card to its Search action',
       );
 
       await cells.nth(0).focus();
       await cells.nth(0).press('ArrowRight');
       await assertLocatorFocused(cells.nth(1), 'ArrowRight should focus the next Missing release card');
+
+      await cells.nth(2).focus();
 
       const controlTabindexes = await getItemControlTabindexes(missingList, {
         cellSelector: cardCellSelector,
@@ -98,12 +100,12 @@ suite('Missing release-card browser keyboard roving coverage', () => {
 
       assert.deepEqual(controlTabindexes[0], ['-1']);
       assert.ok(
-        controlTabindexes[1].length >= 2,
-        'the active recovery card should expose both Retry discovery and Request controls',
+        controlTabindexes[2].length >= 2,
+        'the active recovery card should expose both Search again and Search controls',
       );
       assert.deepEqual(
-        controlTabindexes[1].map((value) => value ?? null),
-        Array.from({ length: controlTabindexes[1].length }, () => null),
+        controlTabindexes[2].map((value) => value ?? null),
+        Array.from({ length: controlTabindexes[2].length }, () => null),
       );
     }, {
       scenarioName: 'missing_release_card_grid_keyboard_roving',

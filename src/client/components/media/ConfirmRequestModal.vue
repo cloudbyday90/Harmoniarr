@@ -75,6 +75,11 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  /** The surrounding workflow that initiated the request. */
+  actionContext: {
+    type: String,
+    default: 'request',
+  },
 });
 
 const emit = defineEmits(['confirm', 'close']);
@@ -166,6 +171,26 @@ const metaLine = computed(() => {
   return parts.length ? parts.join(' · ') : null;
 });
 
+const actionCopy = computed(() => {
+  if (props.actionContext === 'music_queue_search') {
+    return {
+      confirmLabel: 'Start search',
+      explanation: 'Harmoniarr will add this release to Music Queue, where it will be searched using your active settings.',
+      heading: 'Search for this release?',
+      loadingLabel: 'Starting search…',
+      requestedLabel: 'Search started',
+    };
+  }
+
+  return {
+    confirmLabel: 'Confirm request',
+    explanation: 'Harmoniarr will add this release to your requests so it can be searched and fulfilled.',
+    heading: 'Request this release?',
+    loadingLabel: 'Requesting…',
+    requestedLabel: 'Requested',
+  };
+});
+
 /** Block Escape key close while loading. */
 function handleCancel(event) {
   event.preventDefault();
@@ -213,7 +238,7 @@ function handleConfirm() {
   >
     <div class="crm-shell">
       <header class="crm-header">
-        <h2 id="crm-heading" class="crm-title">Request this release?</h2>
+        <h2 id="crm-heading" class="crm-title">{{ actionCopy.heading }}</h2>
         <button
           ref="closeButtonRef"
           type="button"
@@ -241,9 +266,7 @@ function handleConfirm() {
           </div>
         </div>
 
-        <p class="crm-explanation">
-          Harmoniarr will add this release to your requests so it can be searched and fulfilled.
-        </p>
+        <p class="crm-explanation">{{ actionCopy.explanation }}</p>
 
         <div v-if="users.length >= 2" class="crm-for-user">
           <label class="crm-for-user__label" for="crm-for-user-select">Request for</label>
@@ -280,9 +303,9 @@ function handleConfirm() {
           :aria-busy="loading || undefined"
           @click="handleConfirm"
         >
-          <template v-if="loading">Requesting…</template>
-          <template v-else-if="requested">Requested</template>
-          <template v-else>Confirm request</template>
+          <template v-if="loading">{{ actionCopy.loadingLabel }}</template>
+          <template v-else-if="requested">{{ actionCopy.requestedLabel }}</template>
+          <template v-else>{{ actionCopy.confirmLabel }}</template>
         </button>
       </footer>
     </div>

@@ -313,10 +313,10 @@ onBeforeUnmount(() => {
                         class="hx-btn"
                         data-variant="primary"
                         :disabled="recoveryRetry.isRetrying(item.release)"
-                        :aria-label="`Retry discovery for ${item.release.releaseTitle ?? 'this release'}`"
+                        :aria-label="`Search again for ${item.release.releaseTitle ?? 'this release'}`"
                         @click="retryDownloadRecovery(item.release)"
                       >
-                        {{ recoveryRetry.isRetrying(item.release) ? 'Retrying…' : 'Retry discovery' }}
+                        {{ recoveryRetry.isRetrying(item.release) ? 'Starting search…' : 'Search again' }}
                       </button>
                     </div>
                   </div>

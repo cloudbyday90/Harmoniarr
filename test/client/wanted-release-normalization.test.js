@@ -204,12 +204,12 @@ test('normalizeWantedReleaseForCard maps a full realistic wanted release', () =>
 
 // ── getWantedStatusLabel ───────────────────────────────────────────────────────
 
-test('getWantedStatusLabel returns "Missing" for missing status', () => {
-  assert.equal(getWantedStatusLabel('missing'), 'Missing');
+test('getWantedStatusLabel returns a descriptive library state for missing status', () => {
+  assert.equal(getWantedStatusLabel('missing'), 'Not in library');
 });
 
-test('getWantedStatusLabel returns "Partial" for partial status', () => {
-  assert.equal(getWantedStatusLabel('partial'), 'Partial');
+test('getWantedStatusLabel returns a descriptive library state for partial status', () => {
+  assert.equal(getWantedStatusLabel('partial'), 'Some tracks missing');
 });
 
 test('getWantedStatusLabel returns the status string for unknown values', () => {
@@ -338,21 +338,21 @@ test('buildMissingStatCards first card is Monitored artists with given count', (
   assert.equal(cards[0].value, 2);
 });
 
-test('buildMissingStatCards second card is Wanted releases with totalWanted', () => {
+test('buildMissingStatCards second card is Selected releases with totalWanted', () => {
   const cards = buildMissingStatCards(2, 5, 3, 2);
-  assert.equal(cards[1].label, 'Wanted releases');
+  assert.equal(cards[1].label, 'Selected releases');
   assert.equal(cards[1].value, 5);
 });
 
-test('buildMissingStatCards third card is Missing with missingCount', () => {
+test('buildMissingStatCards third card is Not in library with missingCount', () => {
   const cards = buildMissingStatCards(2, 5, 3, 2);
-  assert.equal(cards[2].label, 'Missing');
+  assert.equal(cards[2].label, 'Not in library');
   assert.equal(cards[2].value, 3);
 });
 
-test('buildMissingStatCards fourth card is Partial with partialCount', () => {
+test('buildMissingStatCards fourth card is Some tracks missing with partialCount', () => {
   const cards = buildMissingStatCards(2, 5, 3, 2);
-  assert.equal(cards[3].label, 'Partial');
+  assert.equal(cards[3].label, 'Some tracks missing');
   assert.equal(cards[3].value, 2);
 });
 
@@ -400,12 +400,12 @@ test('buildWantedReleasesCardSubtitle returns null for undefined', () => {
   assert.equal(buildWantedReleasesCardSubtitle(undefined), null);
 });
 
-test('buildWantedReleasesCardSubtitle returns "1 release pending acquisition" for 1', () => {
-  assert.equal(buildWantedReleasesCardSubtitle(1), '1 release pending acquisition');
+test('buildWantedReleasesCardSubtitle returns a singular selection state for 1', () => {
+  assert.equal(buildWantedReleasesCardSubtitle(1), '1 selected release is not yet fully in your library');
 });
 
-test('buildWantedReleasesCardSubtitle returns "N releases pending acquisition" for N > 1', () => {
-  assert.equal(buildWantedReleasesCardSubtitle(7), '7 releases pending acquisition');
+test('buildWantedReleasesCardSubtitle returns a plural selection state for N > 1', () => {
+  assert.equal(buildWantedReleasesCardSubtitle(7), '7 selected releases are not yet fully in your library');
 });
 
 test('buildWantedReleasesCardSubtitle does not pluralise 1 as "1 releases"', () => {
@@ -598,8 +598,8 @@ test('buildDownloadRecoveryNotice summarizes exhausted recovery evidence', () =>
     },
   });
 
-  assert.equal(notice.title, 'Download recovery needs review');
-  assert.match(notice.message, /Automatic download recovery has stopped/);
+  assert.equal(notice.title, 'Search stopped');
+  assert.match(notice.message, /Automatic search attempts have stopped/);
   assert.deepEqual(notice.details.slice(0, 2), [
     { label: 'Research attempts', value: '3/3' },
     { label: 'Search attempts', value: '2' },

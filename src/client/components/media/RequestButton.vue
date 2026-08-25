@@ -20,11 +20,8 @@
 /**
  * RequestButton — presentational release request action button.
  *
- * Renders four visual states:
- *   - idle:       "Request"
- *   - loading:    "Requesting…"
- *   - requested:  "Requested"
- *   - unavailable: "Unavailable"
+ * Labels are configurable so the button can accurately describe the action in
+ * its surrounding workflow (for example, starting a Music Queue search).
  *
  * Does not call any APIs. Emits `request` when clicked in the idle state.
  * Loading and requested states are disabled to prevent duplicate submissions.
@@ -53,6 +50,26 @@ defineProps({
     type: Boolean,
     default: false,
   },
+  /** Visible label while the action is available. */
+  idleLabel: {
+    type: String,
+    default: 'Request',
+  },
+  /** Visible label while the request is being submitted. */
+  loadingLabel: {
+    type: String,
+    default: 'Requesting…',
+  },
+  /** Visible label after the request succeeds. */
+  requestedLabel: {
+    type: String,
+    default: 'Requested',
+  },
+  /** Visible label when the request cannot be made. */
+  unavailableLabel: {
+    type: String,
+    default: 'Unavailable',
+  },
 });
 
 const emit = defineEmits(['request']);
@@ -71,9 +88,9 @@ function handleClick() {
     :aria-busy="loading || undefined"
     @click="handleClick"
   >
-    <template v-if="loading">Requesting…</template>
-    <template v-else-if="requested">Requested</template>
-    <template v-else-if="unavailable">Unavailable</template>
-    <template v-else>Request</template>
+    <template v-if="loading">{{ loadingLabel }}</template>
+    <template v-else-if="requested">{{ requestedLabel }}</template>
+    <template v-else-if="unavailable">{{ unavailableLabel }}</template>
+    <template v-else>{{ idleLabel }}</template>
   </button>
 </template>

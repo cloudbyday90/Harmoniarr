@@ -146,10 +146,10 @@ suite('Activity releases/wanted browser verification', () => {
       await wantedTable.getByText('Last search returned no candidates; Harmoniarr will retry after cooldown.', {
         exact: true,
       }).waitFor();
-      await page.getByText('Download recovery needs review').waitFor();
+      await page.getByText('Search stopped').waitFor();
 
       const retryButton = page.getByRole('button', {
-        name: 'Retry discovery for Music Has the Right to Children',
+        name: 'Search again for Music Has the Right to Children',
       });
       await retryButton.focus();
       await assertLocatorFocused(retryButton, 'Activity Wanted recovery retry button should be keyboard-focusable');

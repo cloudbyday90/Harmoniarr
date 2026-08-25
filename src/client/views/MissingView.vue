@@ -72,8 +72,8 @@ const SORT_OPTIONS = [
 ];
 
 const STATUS_FILTER_OPTIONS = [
-  { value: 'missing', label: 'Missing' },
-  { value: 'partial', label: 'Partial' },
+  { value: 'missing', label: 'Not in library' },
+  { value: 'partial', label: 'Some tracks missing' },
 ];
 
 const MISSING_DEFAULTS = {
@@ -215,7 +215,7 @@ onBeforeUnmount(() => {
   <section class="hx-page">
     <header class="hx-page-header">
       <div>
-        <h1 class="hx-page-title">Missing</h1>
+        <h1 class="hx-page-title">Missing music</h1>
         <p class="hx-page-subtitle">{{ buildMissingPageSubtitle() }}</p>
       </div>
       <div class="hx-page-actions">
@@ -273,7 +273,7 @@ onBeforeUnmount(() => {
     <article class="hx-card" v-if="releases.wantedReleases.value.length > 0 || releases.isLoading.value || !isDefault">
       <header class="hx-card-header">
         <div>
-          <h2 class="hx-card-title">Wanted releases</h2>
+          <h2 class="hx-card-title">Selected releases</h2>
           <p v-if="buildWantedReleasesCardSubtitle(releases.totalCount.value)" class="hx-card-subtitle">{{ buildWantedReleasesCardSubtitle(releases.totalCount.value) }}</p>
         </div>
       </header>
@@ -300,8 +300,8 @@ onBeforeUnmount(() => {
       <div class="hx-card-body" v-else-if="normalizedReleases.length === 0 && !releases.isLoading.value">
         <EmptyState
           v-if="isDefault"
-          title="No wanted releases"
-          body="Releases appear here when monitored releases are missing or only partially acquired."
+          title="No selected releases are missing"
+          body="Selected releases appear here when they are not yet fully in your library."
           variant="default"
         />
         <EmptyState
@@ -315,7 +315,7 @@ onBeforeUnmount(() => {
       </div>
 
       <div v-else class="hx-card-body hx-card-body--flush">
-        <ul ref="missingGrid" class="hx-artwork-grid" role="list" aria-label="Missing releases">
+        <ul ref="missingGrid" class="hx-artwork-grid" role="list" aria-label="Selected releases not in library">
           <li v-for="(release, index) in normalizedReleases" :key="filteredReleases[index]?.id ?? index">
           <ReleaseCard
             :release="release"
@@ -357,18 +357,21 @@ onBeforeUnmount(() => {
                     class="hx-btn"
                     data-variant="primary"
                     :disabled="recoveryRetry.isRetrying(release)"
-                    :aria-label="`Retry discovery for ${release.title ?? 'this release'}`"
+                    :aria-label="`Search again for ${release.title ?? 'this release'}`"
                     @click="retryDownloadRecovery(release)"
                   >
-                    {{ recoveryRetry.isRetrying(release) ? 'Retrying…' : 'Retry discovery' }}
+                    {{ recoveryRetry.isRetrying(release) ? 'Starting search…' : 'Search again' }}
                   </button>
                 </div>
                 <RequestButton
                   :requested="isRequested(release)"
                   :loading="isRequesting(release)"
+                  idle-label="Start search"
+                  loading-label="Starting search…"
+                  requested-label="Search started"
                   :aria-label="isRequested(release)
-                    ? `${release.title ?? 'Release'} — already requested`
-                    : `Request ${release.title ?? 'this release'}`"
+                    ? `${release.title ?? 'Release'} — search started`
+                    : `Start a search for ${release.title ?? 'this release'}`"
                   @request="openConfirmModal(release)"
                 />
               </div>
@@ -458,10 +461,11 @@ onBeforeUnmount(() => {
   <ConfirmRequestModal
     :open="confirmModalOpen"
     :release="confirmRelease"
-    :is-requesting="confirmIsRequesting"
-    :is-requested="confirmIsRequested"
-    :error="confirmError"
+    :loading="confirmIsRequesting"
+    :requested="confirmIsRequested"
+    :error-message="confirmError"
     :users="isAdmin ? requestForUsers : []"
+    action-context="music_queue_search"
     @confirm="handleConfirmRequest"
     @close="closeConfirmModal"
   />

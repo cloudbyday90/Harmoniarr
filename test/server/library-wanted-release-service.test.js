@@ -1,184 +1,237 @@
+/*
+ * Harmoniarr - Soulseek-native music library management
+ * Copyright (C) 2026 Harmoniarr Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { buildLibraryWantedReleaseProjection } from '../../src/server/library/library-wanted-release-projection-service.js';
 import { createLibraryWantedReleaseService } from '../../src/server/library/library-wanted-release-service.js';
 
-test('reconcileWantedReleases records missing and partial monitored releases from current coverage gaps', async (t) => {
-  const replaceLibraryWantedReleases = t.mock.fn(async () => {});
-  const query = t.mock.fn(async () => ({
-    rows: [
+function buildArtistPayload() {
+  return {
+    artist: { id: 'artist-1' },
+    releaseGroups: [
+      { id: 'group-policy', primaryType: 'album', title: 'Policy album' },
+      { id: 'group-manual', primaryType: 'single', title: 'Manual single' },
+      { id: 'group-complete', primaryType: 'album', title: 'Complete album' },
+    ],
+    releases: [
       {
-        app_user_id: 'user-1',
-        expected_track_count: 10,
-        matched_track_count: 0,
-        metadata_artist_id: 'artist-1',
-        metadata_release_group_id: 'release-group-1',
-        metadata_release_id: 'release-1',
-        monitored_release_group_types: ['album', 'ep'],
-        reconciliation_status: null,
-        release_scope: 'future_only',
-        release_date: '2024-04-01',
-        release_status: 'Official',
-        wanted_automation_mode: 'future_matching',
+        id: 'release-policy',
+        isCanonical: true,
+        releaseDate: '2028-06-01',
+        releaseGroupId: 'group-policy',
+        status: 'Official',
+        title: 'Policy album',
+        trackCount: 10,
       },
       {
-        app_user_id: 'user-1',
-        expected_track_count: 8,
-        matched_track_count: 6,
-        metadata_artist_id: 'artist-1',
-        metadata_release_group_id: 'release-group-2',
-        metadata_release_id: 'release-2',
-        monitored_release_group_types: ['album', 'ep'],
-        reconciliation_status: 'partial',
-        release_scope: 'current_and_future',
-        release_date: '2025-05-01',
-        release_status: 'Official',
-        wanted_automation_mode: 'current_and_future_matching',
+        id: 'release-manual',
+        isCanonical: true,
+        releaseDate: '2016',
+        releaseGroupId: 'group-manual',
+        status: 'Official',
+        title: 'Manual single',
+        trackCount: 4,
       },
       {
-        app_user_id: 'user-1',
-        expected_track_count: 5,
-        matched_track_count: 0,
-        metadata_artist_id: 'artist-1',
-        metadata_release_group_id: 'release-group-3',
-        metadata_release_id: 'release-3',
-        monitored_release_group_types: ['album', 'ep'],
-        reconciliation_status: null,
-        release_scope: 'current_and_future',
-        release_date: '2016',
-        release_status: 'Official',
-        wanted_automation_mode: 'current_and_future_matching',
-      },
-      {
-        app_user_id: 'user-1',
-        expected_track_count: 6,
-        matched_track_count: 0,
-        metadata_artist_id: 'artist-1',
-        metadata_release_group_id: 'release-group-4',
-        metadata_release_id: 'release-4',
-        monitored_release_group_types: ['album', 'ep'],
-        reconciliation_status: null,
-        release_scope: 'current_and_future',
-        release_date: '2017-03',
-        release_status: 'Official',
-        wanted_automation_mode: 'current_and_future_matching',
+        id: 'release-complete',
+        isCanonical: true,
+        releaseDate: '2028-09-01',
+        releaseGroupId: 'group-complete',
+        status: 'Official',
+        title: 'Complete album',
+        trackCount: 12,
       },
     ],
-  }));
+  };
+}
+
+test('wanted-release projection uses effective desired state and retains explicit selections under manual-only automation', () => {
+  const wantedReleases = buildLibraryWantedReleaseProjection({
+    appUserId: 'user-1',
+    artistPayload: buildArtistPayload(),
+    libraryReleaseReconciliations: [
+      {
+        expectedTrackCount: 12,
+        matchedTrackCount: 12,
+        metadataReleaseId: 'release-complete',
+        reconciliationStatus: 'complete',
+      },
+    ],
+    monitoring: {
+      isMonitored: true,
+      monitoredReleaseGroupTypes: ['album'],
+      releaseScope: 'track_only',
+      wantedAutomationMode: 'manual_only',
+    },
+    releaseGroupSelections: [{
+      metadataReleaseGroupId: 'group-manual',
+      resolvedMetadataReleaseId: 'release-manual',
+      selectionSource: 'manual',
+      selectionState: 'selected',
+    }],
+  });
+
+  assert.deepEqual(wantedReleases, [{
+    appUserId: 'user-1',
+    evidence: {
+      monitoredReleaseGroupTypes: ['album'],
+      reconciliationStatus: 'missing',
+      releaseScope: 'track_only',
+      selectionSource: 'manual',
+      selectionState: 'selected',
+      strategy: 'explicit_release_gap',
+      wantedAutomationMode: 'manual_only',
+    },
+    expectedTrackCount: 4,
+    matchedTrackCount: 0,
+    metadataArtistId: 'artist-1',
+    metadataReleaseGroupId: 'group-manual',
+    metadataReleaseId: 'release-manual',
+    missingTrackCount: 4,
+    releaseDate: '2016-01-01',
+    releaseStatus: 'Official',
+    wantedStatus: 'missing',
+  }]);
+});
+
+test('wanted-release projection retains eligible policy selections and reports partial coverage from reconciliation', () => {
+  const wantedReleases = buildLibraryWantedReleaseProjection({
+    appUserId: 'user-1',
+    artistPayload: buildArtistPayload(),
+    libraryReleaseReconciliations: [{
+      expectedTrackCount: 10,
+      matchedTrackCount: 7,
+      metadataReleaseId: 'release-policy',
+      reconciliationStatus: 'partial',
+    }, {
+      expectedTrackCount: 12,
+      matchedTrackCount: 12,
+      metadataReleaseId: 'release-complete',
+      reconciliationStatus: 'complete',
+    }],
+    monitoring: {
+      isMonitored: true,
+      monitoredReleaseGroupTypes: ['album'],
+      releaseScope: 'current_and_future',
+      wantedAutomationMode: 'current_and_future_matching',
+    },
+  });
+
+  assert.equal(wantedReleases.length, 1);
+  assert.deepEqual(wantedReleases[0], {
+    appUserId: 'user-1',
+    evidence: {
+      monitoredReleaseGroupTypes: ['album'],
+      reconciliationStatus: 'partial',
+      releaseScope: 'current_and_future',
+      selectionSource: 'policy',
+      selectionState: 'selected',
+      strategy: 'monitored_release_gap',
+      wantedAutomationMode: 'current_and_future_matching',
+    },
+    expectedTrackCount: 10,
+    matchedTrackCount: 7,
+    metadataArtistId: 'artist-1',
+    metadataReleaseGroupId: 'group-policy',
+    metadataReleaseId: 'release-policy',
+    missingTrackCount: 3,
+    releaseDate: '2028-06-01',
+    releaseStatus: 'Official',
+    wantedStatus: 'partial',
+  });
+});
+
+test('reconcileWantedReleases reads each monitored artist through injected read boundaries', async (t) => {
+  const replaceLibraryWantedReleases = t.mock.fn(async () => {});
+  const listReconciliations = t.mock.fn(async ({ metadataReleaseIds }) => {
+    assert.deepEqual(metadataReleaseIds.sort(), [
+      'release-complete',
+      'release-manual',
+      'release-policy',
+    ]);
+    return [{
+      expectedTrackCount: 12,
+      matchedTrackCount: 12,
+      metadataReleaseId: 'release-complete',
+      reconciliationStatus: 'complete',
+    }];
+  });
   const service = createLibraryWantedReleaseService({
-    getPoolFn: () => ({
-      query,
-    }),
-    libraryWantedReleaseStore: {
-      replaceLibraryWantedReleases,
+    getMetadataArtist: async ({ artistId }) => {
+      assert.equal(artistId, 'artist-1');
+      return buildArtistPayload();
+    },
+    libraryWantedReleaseStore: { replaceLibraryWantedReleases },
+    listLibraryReleaseReconciliationsByMetadataReleaseIds: listReconciliations,
+    listOperatorArtistMonitoringSnapshot: async () => [{
+      appUserId: 'user-1',
+      isMonitored: true,
+      metadataArtistId: 'artist-1',
+      monitoredReleaseGroupTypes: ['album'],
+      releaseScope: 'current_and_future',
+      wantedAutomationMode: 'current_and_future_matching',
+    }],
+    listOperatorReleaseGroupSelections: async ({ appUserId, metadataArtistId }) => {
+      assert.equal(appUserId, 'user-1');
+      assert.equal(metadataArtistId, 'artist-1');
+      return [];
+    },
+    listOperatorTrackOverrides: async ({ appUserId, metadataArtistId }) => {
+      assert.equal(appUserId, 'user-1');
+      assert.equal(metadataArtistId, 'artist-1');
+      return [];
     },
   });
 
   await service.reconcileWantedReleases();
 
+  assert.equal(listReconciliations.mock.calls.length, 1);
   assert.deepEqual(replaceLibraryWantedReleases.mock.calls[0].arguments[0], {
-    wantedReleases: [
-      {
-        appUserId: 'user-1',
-        evidence: {
-          monitoredReleaseGroupTypes: ['album', 'ep'],
-          releaseScope: 'future_only',
-          reconciliationStatus: 'missing',
-          strategy: 'monitored_release_absent',
-          wantedAutomationMode: 'future_matching',
-        },
-        expectedTrackCount: 10,
-        matchedTrackCount: 0,
-        metadataArtistId: 'artist-1',
-        metadataReleaseGroupId: 'release-group-1',
-        metadataReleaseId: 'release-1',
-        missingTrackCount: 10,
-        releaseDate: '2024-04-01',
-        releaseStatus: 'Official',
-        wantedStatus: 'missing',
+    wantedReleases: [{
+      appUserId: 'user-1',
+      evidence: {
+        monitoredReleaseGroupTypes: ['album'],
+        reconciliationStatus: 'missing',
+        releaseScope: 'current_and_future',
+        selectionSource: 'policy',
+        selectionState: 'selected',
+        strategy: 'monitored_release_absent',
+        wantedAutomationMode: 'current_and_future_matching',
       },
-      {
-        appUserId: 'user-1',
-        evidence: {
-          monitoredReleaseGroupTypes: ['album', 'ep'],
-          releaseScope: 'current_and_future',
-          reconciliationStatus: 'partial',
-          strategy: 'monitored_release_gap',
-          wantedAutomationMode: 'current_and_future_matching',
-        },
-        expectedTrackCount: 8,
-        matchedTrackCount: 6,
-        metadataArtistId: 'artist-1',
-        metadataReleaseGroupId: 'release-group-2',
-        metadataReleaseId: 'release-2',
-        missingTrackCount: 2,
-        releaseDate: '2025-05-01',
-        releaseStatus: 'Official',
-        wantedStatus: 'partial',
-      },
-      {
-        appUserId: 'user-1',
-        evidence: {
-          monitoredReleaseGroupTypes: ['album', 'ep'],
-          releaseScope: 'current_and_future',
-          reconciliationStatus: 'missing',
-          strategy: 'monitored_release_absent',
-          wantedAutomationMode: 'current_and_future_matching',
-        },
-        expectedTrackCount: 5,
-        matchedTrackCount: 0,
-        metadataArtistId: 'artist-1',
-        metadataReleaseGroupId: 'release-group-3',
-        metadataReleaseId: 'release-3',
-        missingTrackCount: 5,
-        releaseDate: '2016-01-01',
-        releaseStatus: 'Official',
-        wantedStatus: 'missing',
-      },
-      {
-        appUserId: 'user-1',
-        evidence: {
-          monitoredReleaseGroupTypes: ['album', 'ep'],
-          releaseScope: 'current_and_future',
-          reconciliationStatus: 'missing',
-          strategy: 'monitored_release_absent',
-          wantedAutomationMode: 'current_and_future_matching',
-        },
-        expectedTrackCount: 6,
-        matchedTrackCount: 0,
-        metadataArtistId: 'artist-1',
-        metadataReleaseGroupId: 'release-group-4',
-        metadataReleaseId: 'release-4',
-        missingTrackCount: 6,
-        releaseDate: '2017-03-01',
-        releaseStatus: 'Official',
-        wantedStatus: 'missing',
-      },
-    ],
+      expectedTrackCount: 10,
+      matchedTrackCount: 0,
+      metadataArtistId: 'artist-1',
+      metadataReleaseGroupId: 'group-policy',
+      metadataReleaseId: 'release-policy',
+      missingTrackCount: 10,
+      releaseDate: '2028-06-01',
+      releaseStatus: 'Official',
+      wantedStatus: 'missing',
+    }],
   });
-
-  const sql = query.mock.calls[0].arguments[0];
-  assert.match(sql, /operator_artist_monitoring/);
-  assert.match(sql, /operator_artist_monitoring\.app_user_id/);
-  assert.match(sql, /operator_artist_monitoring\.release_scope <> 'track_only'/);
-  assert.match(sql, /operator_artist_monitoring\.wanted_automation_mode <> 'manual_only'/);
-  assert.match(sql, /operator_artist_monitoring\.release_scope = 'current_and_future'/);
-  assert.match(sql, /metadata_releases\.release_date ~ '\^\\d\{4\}-\\d\{2\}-\\d\{2\}\$'/);
-  assert.match(sql, /\(metadata_releases\.release_date \|\| '-01'\)::date/);
-  assert.match(sql, /\(metadata_releases\.release_date \|\| '-01-01'\)::date/);
-  assert.match(sql, /operator_artist_monitoring\.created_at::date/);
-  assert.doesNotMatch(sql, /metadata_releases\.release_date >= operator_artist_monitoring\.created_at::date/);
-  assert.doesNotMatch(sql, /metadata_artist_monitoring/);
 });
 
-test('reconcileWantedReleases clears stale wanted releases when no monitored gaps remain', async (t) => {
+test('reconcileWantedReleases clears stale wanted releases when no monitored artists remain', async (t) => {
   const replaceLibraryWantedReleases = t.mock.fn(async () => {});
   const service = createLibraryWantedReleaseService({
-    getPoolFn: () => ({
-      query: async () => ({ rows: [] }),
-    }),
-    libraryWantedReleaseStore: {
-      replaceLibraryWantedReleases,
-    },
+    libraryWantedReleaseStore: { replaceLibraryWantedReleases },
+    listOperatorArtistMonitoringSnapshot: async () => [],
   });
 
   await service.reconcileWantedReleases();
@@ -188,23 +241,29 @@ test('reconcileWantedReleases clears stale wanted releases when no monitored gap
   });
 });
 
-test('reconcileWantedReleases reads per-operator monitoring policy directly', async (t) => {
+test('reconcileWantedReleases tolerates a metadata artist removed during the projection run', async (t) => {
   const replaceLibraryWantedReleases = t.mock.fn(async () => {});
-  const query = t.mock.fn(async () => ({ rows: [] }));
+  const missingArtistError = Object.assign(new Error('Metadata artist was not found: artist-1'), {
+    code: 'metadata_not_found',
+    status: 404,
+  });
   const service = createLibraryWantedReleaseService({
-    getPoolFn: () => ({
-      query,
-    }),
-    libraryWantedReleaseStore: {
-      replaceLibraryWantedReleases,
+    getMetadataArtist: async () => {
+      throw missingArtistError;
     },
+    libraryWantedReleaseStore: { replaceLibraryWantedReleases },
+    listOperatorArtistMonitoringSnapshot: async () => [{
+      appUserId: 'user-1',
+      isMonitored: true,
+      metadataArtistId: 'artist-1',
+    }],
+    listOperatorReleaseGroupSelections: async () => [],
+    listOperatorTrackOverrides: async () => [],
   });
 
   await service.reconcileWantedReleases();
 
-  const sql = query.mock.calls[0].arguments[0];
-  assert.match(sql, /FROM operator_artist_monitoring/);
-  assert.match(sql, /unnest\(operator_artist_monitoring\.monitored_release_group_types\)/);
-  assert.match(sql, /GROUP BY\s+operator_artist_monitoring\.app_user_id/);
-  assert.doesNotMatch(sql, /operator_monitored_artist_scope/);
+  assert.deepEqual(replaceLibraryWantedReleases.mock.calls[0].arguments[0], {
+    wantedReleases: [],
+  });
 });

@@ -16,123 +16,124 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { getPool } from '../database.js';
-import { normalizeMetadataReleaseDateForDateColumn } from '../metadata/metadata-release-date-normalization.js';
+import { createMetadataReadService } from '../metadata/metadata-read-service.js';
+import { createOperatorArtistMonitoringStore } from '../metadata/operator-artist-monitoring-store.js';
+import { createOperatorReleaseGroupSelectionStore } from '../metadata/operator-release-group-selection-store.js';
+import { createOperatorTrackOverrideStore } from '../metadata/operator-track-override-store.js';
+import { createLibraryReleaseReconciliationStore } from './library-release-reconciliation-store.js';
+import { createLibraryWantedReleaseProjectionService } from './library-wanted-release-projection-service.js';
 import { createLibraryWantedReleaseStore } from './library-wanted-release-store.js';
 
-function toInteger(value) {
-  return Number.parseInt(String(value ?? 0), 10) || 0;
+const MAX_ARTIST_PROJECTION_CONCURRENCY = 6;
+
+function isMissingMetadataArtist(error) {
+  return error?.code === 'metadata_not_found' && error?.status === 404;
 }
 
-function mapWantedRow(row) {
-  const expectedTrackCount = toInteger(row.expected_track_count);
-  const matchedTrackCount = toInteger(row.matched_track_count);
-  const missingTrackCount = Math.max(expectedTrackCount - matchedTrackCount, 0);
-
-  return {
-    appUserId: row.app_user_id,
-    evidence: {
-      monitoredReleaseGroupTypes: row.monitored_release_group_types ?? ['album', 'ep'],
-      releaseScope: row.release_scope ?? 'future_only',
-      reconciliationStatus: row.reconciliation_status ?? 'missing',
-      strategy: row.reconciliation_status ? 'monitored_release_gap' : 'monitored_release_absent',
-      wantedAutomationMode: row.wanted_automation_mode ?? 'future_matching',
-    },
-    expectedTrackCount,
-    matchedTrackCount,
-    metadataArtistId: row.metadata_artist_id,
-    metadataReleaseGroupId: row.metadata_release_group_id,
-    metadataReleaseId: row.metadata_release_id,
-    missingTrackCount,
-    releaseDate: normalizeMetadataReleaseDateForDateColumn(row.release_date),
-    releaseStatus: row.release_status ?? null,
-    wantedStatus: matchedTrackCount > 0 ? 'partial' : 'missing',
-  };
+function listMetadataReleaseIds(artistPayload = {}) {
+  return [
+    ...new Set(
+      (Array.isArray(artistPayload.releases) ? artistPayload.releases : [])
+        .map((release) => release?.id)
+        .filter((metadataReleaseId) => typeof metadataReleaseId === 'string' && metadataReleaseId.length > 0),
+    ),
+  ];
 }
 
-const metadataReleaseComparableDateSql = `
-  CASE
-    WHEN metadata_releases.release_date ~ '^\\d{4}-\\d{2}-\\d{2}$'
-      THEN metadata_releases.release_date::date
-    WHEN metadata_releases.release_date ~ '^\\d{4}-\\d{2}$'
-      THEN (metadata_releases.release_date || '-01')::date
-    WHEN metadata_releases.release_date ~ '^\\d{4}$'
-      THEN (metadata_releases.release_date || '-01-01')::date
-    ELSE NULL
-  END
-`;
+async function mapWithConcurrency(values, mapper, concurrency = MAX_ARTIST_PROJECTION_CONCURRENCY) {
+  const results = new Array(values.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(Math.max(1, concurrency), values.length);
+
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (nextIndex < values.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(values[index]);
+    }
+  }));
+
+  return results;
+}
 
 export function createLibraryWantedReleaseService({
-  getPoolFn = getPool,
+  getMetadataArtist = null,
+  libraryReleaseReconciliationStore = createLibraryReleaseReconciliationStore(),
+  libraryWantedReleaseProjectionService = createLibraryWantedReleaseProjectionService(),
   libraryWantedReleaseStore = createLibraryWantedReleaseStore(),
+  listLibraryReleaseReconciliationsByMetadataReleaseIds = null,
+  listOperatorArtistMonitoringSnapshot = null,
+  listOperatorReleaseGroupSelections = null,
+  listOperatorTrackOverrides = null,
+  metadataReadService = null,
+  operatorArtistMonitoringStore = null,
+  operatorReleaseGroupSelectionStore = null,
+  operatorTrackOverrideStore = null,
 } = {}) {
-  async function loadWantedReleases() {
-    const pool = getPoolFn();
-    const result = await pool.query(
-      `
-        SELECT
-          operator_artist_monitoring.app_user_id,
-          metadata_release_groups.metadata_artist_id,
-          metadata_release_groups.id AS metadata_release_group_id,
-          metadata_releases.id AS metadata_release_id,
-          metadata_releases.release_date,
-          metadata_releases.status AS release_status,
-          operator_artist_monitoring.monitored_release_group_types,
-          operator_artist_monitoring.release_scope,
-          operator_artist_monitoring.wanted_automation_mode,
-          COUNT(metadata_tracks.id)::integer AS expected_track_count,
-          COALESCE(library_release_reconciliations.matched_track_count, 0)::integer AS matched_track_count,
-          library_release_reconciliations.reconciliation_status
-        FROM operator_artist_monitoring
-        JOIN metadata_release_groups
-          ON metadata_release_groups.metadata_artist_id = operator_artist_monitoring.metadata_artist_id
-        JOIN metadata_releases
-          ON metadata_releases.metadata_release_group_id = metadata_release_groups.id
-        JOIN metadata_media
-          ON metadata_media.metadata_release_id = metadata_releases.id
-        JOIN metadata_tracks
-          ON metadata_tracks.metadata_medium_id = metadata_media.id
-        LEFT JOIN library_release_reconciliations
-          ON library_release_reconciliations.metadata_release_id = metadata_releases.id
-        WHERE operator_artist_monitoring.is_monitored = TRUE
-          AND operator_artist_monitoring.release_scope <> 'track_only'
-          AND operator_artist_monitoring.wanted_automation_mode <> 'manual_only'
-          AND LOWER(TRIM(COALESCE(metadata_release_groups.primary_type, ''))) = ANY (
-            ARRAY(
-              SELECT LOWER(type_entry)
-              FROM unnest(operator_artist_monitoring.monitored_release_group_types) AS type_entry
-            )
-          )
-          AND COALESCE(metadata_releases.status, 'Official') = 'Official'
-          AND COALESCE(library_release_reconciliations.reconciliation_status, 'missing') <> 'complete'
-          AND COALESCE(library_release_reconciliations.reconciliation_status, 'missing') <> 'duplicate'
-          AND (
-            operator_artist_monitoring.release_scope = 'current_and_future'
-            OR metadata_releases.release_date IS NULL
-            OR (${metadataReleaseComparableDateSql}) >= operator_artist_monitoring.created_at::date
-          )
-          AND (
-            operator_artist_monitoring.wanted_automation_mode = 'current_and_future_matching'
-            OR metadata_releases.release_date IS NULL
-            OR (${metadataReleaseComparableDateSql}) >= operator_artist_monitoring.created_at::date
-          )
-        GROUP BY
-          operator_artist_monitoring.app_user_id,
-          metadata_release_groups.metadata_artist_id,
-          metadata_release_groups.id,
-          metadata_releases.id,
-          metadata_releases.release_date,
-          metadata_releases.status,
-          operator_artist_monitoring.monitored_release_group_types,
-          operator_artist_monitoring.release_scope,
-          operator_artist_monitoring.wanted_automation_mode,
-          library_release_reconciliations.matched_track_count,
-          library_release_reconciliations.reconciliation_status
-        ORDER BY metadata_releases.release_date NULLS LAST, metadata_releases.id ASC
-      `,
-    );
+  const resolvedMetadataReadService = metadataReadService ?? createMetadataReadService();
+  const resolvedOperatorArtistMonitoringStore = operatorArtistMonitoringStore
+    ?? createOperatorArtistMonitoringStore();
+  const resolvedOperatorReleaseGroupSelectionStore = operatorReleaseGroupSelectionStore
+    ?? createOperatorReleaseGroupSelectionStore();
+  const resolvedOperatorTrackOverrideStore = operatorTrackOverrideStore
+    ?? createOperatorTrackOverrideStore();
+  const readMetadataArtist = getMetadataArtist ?? resolvedMetadataReadService.getArtist;
+  const readMonitoringSnapshot = listOperatorArtistMonitoringSnapshot
+    ?? resolvedOperatorArtistMonitoringStore.listOperatorArtistMonitoringSnapshot;
+  const readReleaseSelections = listOperatorReleaseGroupSelections
+    ?? resolvedOperatorReleaseGroupSelectionStore.listOperatorReleaseGroupSelections;
+  const readTrackOverrides = listOperatorTrackOverrides
+    ?? resolvedOperatorTrackOverrideStore.listOperatorTrackOverrides;
+  const readReconciliations = listLibraryReleaseReconciliationsByMetadataReleaseIds
+    ?? libraryReleaseReconciliationStore.listReconciliationsByMetadataReleaseIds;
 
-    return result.rows.map(mapWantedRow);
+  async function projectWantedReleasesForArtist(monitoring) {
+    const { appUserId, metadataArtistId } = monitoring;
+
+    try {
+      const [artistPayload, releaseGroupSelections, trackOverrides] = await Promise.all([
+        readMetadataArtist({ artistId: metadataArtistId }),
+        readReleaseSelections({ appUserId, metadataArtistId }),
+        readTrackOverrides({ appUserId, metadataArtistId }),
+      ]);
+      const metadataReleaseIds = listMetadataReleaseIds(artistPayload);
+      const libraryReleaseReconciliations = metadataReleaseIds.length > 0
+        ? await readReconciliations({ metadataReleaseIds })
+        : [];
+
+      return libraryWantedReleaseProjectionService.projectWantedReleases({
+        appUserId,
+        artistPayload,
+        libraryReleaseReconciliations,
+        monitoring,
+        releaseGroupSelections,
+        trackOverrides,
+      });
+    } catch (error) {
+      // A metadata refresh can remove an artist after monitoring is read. The
+      // projection is rebuilt on the next discovery run, so this race should
+      // not fail or leave the complete wanted-releases replacement incomplete.
+      if (isMissingMetadataArtist(error)) {
+        return [];
+      }
+
+      throw error;
+    }
+  }
+
+  async function loadWantedReleases() {
+    const monitoringRows = await readMonitoringSnapshot();
+    const monitoredArtists = (Array.isArray(monitoringRows) ? monitoringRows : [])
+      .filter((monitoring) => (
+        monitoring?.isMonitored === true
+        && typeof monitoring.appUserId === 'string'
+        && monitoring.appUserId.length > 0
+        && typeof monitoring.metadataArtistId === 'string'
+        && monitoring.metadataArtistId.length > 0
+      ));
+    const wantedByArtist = await mapWithConcurrency(monitoredArtists, projectWantedReleasesForArtist);
+
+    return wantedByArtist.flat();
   }
 
   async function reconcileWantedReleases() {

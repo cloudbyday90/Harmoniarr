@@ -150,8 +150,8 @@ export function buildDownloadRecoveryNotice(release) {
 
   return {
     details,
-    message: 'Automatic download recovery has stopped for this release. Review advanced diagnostics or search again before retrying.',
-    title: 'Download recovery needs review',
+    message: 'Automatic search attempts have stopped. Select Search again to look for new matches.',
+    title: 'Search stopped',
   };
 }
 
@@ -785,8 +785,8 @@ export function buildDiscoveryDispatchResult(release) {
  * @returns {string}
  */
 export function getWantedStatusLabel(status) {
-  if (status === 'missing') return 'Missing';
-  if (status === 'partial') return 'Partial';
+  if (status === 'missing') return 'Not in library';
+  if (status === 'partial') return 'Some tracks missing';
   return status ?? 'Unknown';
 }
 
@@ -856,7 +856,7 @@ export function sortWantedReleases(releases, field, order) {
  * @returns {string}
  */
 export function buildMissingPageSubtitle() {
-  return 'Monitored releases not yet fully acquired. Request any release to start filling the gaps.';
+  return 'Selected releases that are not yet fully in your library. Start a search to add one to Music Queue.';
 }
 
 /**
@@ -871,9 +871,9 @@ export function buildMissingPageSubtitle() {
 export function buildMissingStatCards(monitoredCount, totalWanted, missingCount, partialCount) {
   return Object.freeze([
     Object.freeze({ label: 'Monitored artists', value: monitoredCount, meta: 'Tracked for new releases' }),
-    Object.freeze({ label: 'Wanted releases', value: totalWanted, meta: 'Missing + partial' }),
-    Object.freeze({ label: 'Missing', value: missingCount, meta: 'Zero files acquired' }),
-    Object.freeze({ label: 'Partial', value: partialCount, meta: 'Some tracks acquired' }),
+    Object.freeze({ label: 'Selected releases', value: totalWanted, meta: 'Not in library + partial' }),
+    Object.freeze({ label: 'Not in library', value: missingCount, meta: 'No tracks acquired' }),
+    Object.freeze({ label: 'Some tracks missing', value: partialCount, meta: 'Partly acquired' }),
   ]);
 }
 
@@ -886,8 +886,8 @@ export function buildMissingStatCards(monitoredCount, totalWanted, missingCount,
  */
 export function buildWantedReleasesCardSubtitle(count) {
   if (!count || count <= 0) return null;
-  if (count === 1) return '1 release pending acquisition';
-  return `${count} releases pending acquisition`;
+  if (count === 1) return '1 selected release is not yet fully in your library';
+  return `${count} selected releases are not yet fully in your library`;
 }
 
 /**
