@@ -307,6 +307,10 @@ function getDownloadAcceptanceDiagnostic(item) {
           <dd>{{ currentRun.processedCandidateCount ?? 0 }}</dd>
         </div>
         <div>
+          <dt>Confirming</dt>
+          <dd>{{ currentRun.awaitingConfirmationCount ?? 0 }}</dd>
+        </div>
+        <div>
           <dt>Queued</dt>
           <dd>{{ currentRun.queuedCount ?? currentRun.readyCount ?? 0 }}</dd>
         </div>

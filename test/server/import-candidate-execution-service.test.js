@@ -80,3 +80,24 @@ test('startImportCandidateExecutionRun rejects when maintenance lock blocks unsa
     (error) => error.code === 'recovery_lock_conflict',
   );
 });
+
+test('startImportCandidateExecutionRun blocks a new run while a prior provider request is unconfirmed', async () => {
+  const createOperationRun = async () => {
+    throw new Error('a new run must not be created');
+  };
+  const service = createImportCandidateExecutionService({
+    createOperationRun,
+    findUnconfirmedImportExecutionHandoff: async () => ({
+      importCandidateId: 'candidate-1',
+      operationRunId: 'run-1',
+    }),
+    listImportCandidates: async () => ({
+      pagination: { total: 1 },
+    }),
+  });
+
+  await assert.rejects(
+    () => service.startImportCandidateExecutionRun(),
+    (error) => error.code === 'import_candidate_execution_confirmation_pending',
+  );
+});

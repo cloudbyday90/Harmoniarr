@@ -99,17 +99,17 @@ test('import execution worker enqueues ready candidates and persists per-item ou
   await completed;
 
   assert.equal(replaceImportExecutionRunItems.mock.callCount(), 1);
-  assert.equal(updateImportExecutionRunItem.mock.callCount(), 2);
+  assert.equal(updateImportExecutionRunItem.mock.callCount(), 3);
   assert.equal(markImportCandidateDownloading.mock.callCount(), 1);
   assert.equal(markRunStarted.mock.callCount(), 1);
   assert.equal(markRunCompleted.mock.callCount(), 1);
   assert.equal(
-    updateImportExecutionRunItem.mock.calls[0].arguments[0]
+    updateImportExecutionRunItem.mock.calls[1].arguments[0]
       .planningSnapshot.execution.diagnostics.downloadAcceptance.code,
     'provider_accepted',
   );
   assert.equal(
-    updateImportExecutionRunItem.mock.calls[1].arguments[0]
+    updateImportExecutionRunItem.mock.calls[2].arguments[0]
       .planningSnapshot.execution.diagnostics.downloadAcceptance.code,
     'planning_blocked',
   );
@@ -117,6 +117,7 @@ test('import execution worker enqueues ready candidates and persists per-item ou
     runId: 'run-1',
     summary: {
       blockedCount: 1,
+      awaitingConfirmationCount: 0,
       currentStep: 'Download enqueue complete',
       executionMode: 'download_enqueue',
       processedCandidateCount: 2,
@@ -373,9 +374,15 @@ test('import execution worker cascades all-failed enqueue results to the next re
   assert.equal(markImportCandidateDownloading.mock.calls[0].arguments[0].importCandidateId, 'candidate-2');
   assert.equal(upsertImportExecutionRunItem.mock.callCount(), 1);
   assert.equal(upsertImportExecutionRunItem.mock.calls[0].arguments[0].importCandidateId, 'candidate-2');
-  assert.equal(updateImportExecutionRunItem.mock.calls[1].arguments[0].planningSnapshot.execution.recovery.nextCandidateId, 'candidate-2');
+  const recoveryUpdate = updateImportExecutionRunItem.mock.calls
+    .map((call) => call.arguments[0])
+    .find((item) => item.planningSnapshot.execution.recovery?.nextCandidateId === 'candidate-2');
+  assert.equal(recoveryUpdate.planningSnapshot.execution.recovery.nextCandidateId, 'candidate-2');
+  const rejectedUpdate = updateImportExecutionRunItem.mock.calls
+    .map((call) => call.arguments[0])
+    .find((item) => item.planningSnapshot.execution.diagnostics.downloadAcceptance.code === 'provider_rejected_all_files');
   assert.equal(
-    updateImportExecutionRunItem.mock.calls[0].arguments[0]
+    rejectedUpdate
       .planningSnapshot.execution.diagnostics.downloadAcceptance.code,
     'provider_rejected_all_files',
   );
@@ -458,4 +465,160 @@ test('import execution worker persists no-file diagnostics before provider enque
   assert.equal(itemUpdate.statusMessage, 'No unlocked files are available to enqueue from this candidate.');
   assert.equal(itemUpdate.planningSnapshot.execution.diagnostics.downloadAcceptance.code, 'no_unlocked_files');
   assert.equal(completedArgs.summary.blockedCount, 1);
+});
+
+test('import execution worker confirms an interrupted handoff without sending a second provider request', async (t) => {
+  const candidate = {
+    executionStatus: { code: 'ready', message: 'Ready for download enqueue.' },
+    fileCount: 1,
+    folderPath: 'Autechre/Amber',
+    id: 'candidate-confirmed-handoff',
+    lockedFileCount: 0,
+    planning: {},
+    selectedAt: '2026-08-25T12:00:00.000Z',
+    sourceProvider: 'slskd',
+    sourceSearchId: 'search-confirmed-handoff',
+    totalSizeBytes: 123,
+    username: 'source-user',
+  };
+  const enqueueDownloads = t.mock.fn(async () => ({ enqueued: [], failed: [] }));
+  const markImportCandidateDownloading = t.mock.fn(async () => ({}));
+  const updateImportExecutionRunItem = t.mock.fn(async () => null);
+  let resolveCompleted;
+  const completed = new Promise((resolve) => {
+    resolveCompleted = resolve;
+  });
+  const worker = createImportCandidateExecutionWorker({
+    acquireLease: async () => {},
+    buildSelectedImportCandidateSummary: async () => ({
+      counts: { blocked: 0, ready: 1, readyWithWarnings: 0, totalSelected: 1 },
+      selectedCandidates: [candidate],
+    }),
+    enqueueDownloads,
+    findMatchingTransfers: async () => ({
+      allRequestedFilesMatched: true,
+      matchedTransfers: [{
+        filename: 'Autechre\\Amber\\01 Foil.flac',
+        id: 'transfer-confirmed',
+        size: 123,
+        username: 'source-user',
+      }],
+      requestedFileCount: 1,
+    }),
+    getImportCandidate: async () => ({
+      files: [{
+        filename: '01 Foil.flac',
+        folderPath: 'Autechre/Amber',
+        isLocked: false,
+        sizeBytes: 123,
+      }],
+    }),
+    listImportExecutionRunItems: async () => [{
+      id: 'run-item-confirmed-handoff',
+      importCandidateId: candidate.id,
+      itemStatus: 'awaiting_confirmation',
+      operationRunId: 'run-confirmed-handoff',
+      planningSnapshot: {
+        candidate,
+        execution: {
+          handoff: { state: 'dispatching' },
+          requestedFiles: [{ filename: 'Autechre\\Amber\\01 Foil.flac', size: 123 }],
+        },
+      },
+      position: 1,
+      statusMessage: 'Confirming earlier request.',
+    }],
+    markImportCandidateDownloading,
+    markRunCompleted: async (args) => resolveCompleted(args),
+    markRunFailed: async () => {},
+    markRunStarted: async () => {},
+    releaseLease: async () => {},
+    updateImportExecutionRunItem,
+    upsertImportExecutionRunItem: async () => null,
+  });
+
+  await worker.startWorkerRun({ requestedCandidateCount: 1, runId: 'run-confirmed-handoff' });
+  const completedArgs = await completed;
+
+  assert.equal(enqueueDownloads.mock.callCount(), 0);
+  assert.equal(markImportCandidateDownloading.mock.callCount(), 1);
+  assert.equal(updateImportExecutionRunItem.mock.calls[0].arguments[0].itemStatus, 'queued');
+  assert.equal(updateImportExecutionRunItem.mock.calls[0].arguments[0].planningSnapshot.execution.handoff.state, 'confirmed');
+  assert.equal(completedArgs.summary.awaitingConfirmationCount, 0);
+});
+
+test('import execution worker retains an unconfirmed handoff instead of retrying the provider request', async (t) => {
+  const candidate = {
+    executionStatus: { code: 'ready', message: 'Ready for download enqueue.' },
+    fileCount: 1,
+    folderPath: 'Autechre/Amber',
+    id: 'candidate-pending-handoff',
+    lockedFileCount: 0,
+    planning: {},
+    selectedAt: '2026-08-25T12:00:00.000Z',
+    sourceProvider: 'slskd',
+    sourceSearchId: 'search-pending-handoff',
+    totalSizeBytes: 123,
+    username: 'source-user',
+  };
+  const enqueueDownloads = t.mock.fn(async () => ({ enqueued: [], failed: [] }));
+  const updateImportExecutionRunItem = t.mock.fn(async () => null);
+  let resolveCompleted;
+  const completed = new Promise((resolve) => {
+    resolveCompleted = resolve;
+  });
+  const worker = createImportCandidateExecutionWorker({
+    acquireLease: async () => {},
+    buildSelectedImportCandidateSummary: async () => ({
+      counts: { blocked: 0, ready: 1, readyWithWarnings: 0, totalSelected: 1 },
+      selectedCandidates: [candidate],
+    }),
+    enqueueDownloads,
+    findMatchingTransfers: async () => ({
+      allRequestedFilesMatched: false,
+      matchedTransfers: [],
+      requestedFileCount: 1,
+    }),
+    getImportCandidate: async () => ({
+      files: [{
+        filename: '01 Foil.flac',
+        folderPath: 'Autechre/Amber',
+        isLocked: false,
+        sizeBytes: 123,
+      }],
+    }),
+    listImportExecutionRunItems: async () => [{
+      id: 'run-item-pending-handoff',
+      importCandidateId: candidate.id,
+      itemStatus: 'awaiting_confirmation',
+      operationRunId: 'run-pending-handoff',
+      planningSnapshot: {
+        candidate,
+        execution: {
+          handoff: { state: 'dispatching' },
+          requestedFiles: [{ filename: 'Autechre\\Amber\\01 Foil.flac', size: 123 }],
+        },
+      },
+      position: 1,
+      statusMessage: 'Confirming earlier request.',
+    }],
+    markRunCompleted: async (args) => resolveCompleted(args),
+    markRunFailed: async () => {},
+    markRunStarted: async () => {},
+    releaseLease: async () => {},
+    updateImportExecutionRunItem,
+    upsertImportExecutionRunItem: async () => null,
+  });
+
+  await worker.startWorkerRun({ requestedCandidateCount: 1, runId: 'run-pending-handoff' });
+  const completedArgs = await completed;
+
+  assert.equal(enqueueDownloads.mock.callCount(), 0);
+  assert.equal(updateImportExecutionRunItem.mock.calls[0].arguments[0].itemStatus, 'awaiting_confirmation');
+  assert.equal(
+    updateImportExecutionRunItem.mock.calls[0].arguments[0]
+      .planningSnapshot.execution.diagnostics.downloadAcceptance.code,
+    'provider_confirmation_pending',
+  );
+  assert.equal(completedArgs.summary.awaitingConfirmationCount, 1);
 });

@@ -30,6 +30,7 @@ function normalizeRun(run) {
   }
 
   return {
+    awaitingConfirmationCount: toNumberOrNull(run.summary.awaitingConfirmationCount),
     blockedCount: toNumberOrNull(run.summary.blockedCount),
     currentStep: run.summary.currentStep ?? null,
     errorMessage: run.errorMessage,

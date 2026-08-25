@@ -23,6 +23,10 @@ const defaultHeartbeatIntervalMs = 60 * 1000;
 
 function hasActionableTransfers(items) {
   return items.some((item) => {
+    if (item?.itemStatus === 'awaiting_confirmation') {
+      return true;
+    }
+
     const liveStatus = item?.liveTransferSummary?.status ?? null;
     return liveStatus === 'queued'
       || liveStatus === 'active'

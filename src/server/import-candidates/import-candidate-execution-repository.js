@@ -17,6 +17,7 @@
  */
 
 import { createImportCandidateRunItemRepository } from './import-candidate-run-item-repository.js';
+import { getPool } from '../database.js';
 
 const importExecutionRunItemRepository = createImportCandidateRunItemRepository({
   snapshotColumn: 'planning_snapshot',
@@ -60,6 +61,38 @@ export async function updateImportExecutionRunItem({
   return item ? {
     ...item,
     planningSnapshot: item.snapshot,
+  } : null;
+}
+
+/**
+ * Finds the latest selected candidate whose prior slskd enqueue POST reached
+ * the durable handoff checkpoint but never reached a durable confirmation.
+ * A new run must not send that POST again because the provider does not offer
+ * an idempotency key contract.
+ */
+export async function findUnconfirmedImportExecutionHandoff(queryable) {
+  const db = queryable ?? getPool();
+  const result = await db.query(
+    `
+      SELECT
+        items.import_candidate_id,
+        items.operation_run_id,
+        items.updated_at
+      FROM import_execution_run_items AS items
+      INNER JOIN import_candidates AS candidates
+        ON candidates.id = items.import_candidate_id
+      WHERE candidates.status = 'selected'
+        AND items.item_status = 'awaiting_confirmation'
+      ORDER BY items.updated_at DESC, items.id DESC
+      LIMIT 1
+    `,
+  );
+
+  const row = result.rows[0] ?? null;
+  return row ? {
+    importCandidateId: row.import_candidate_id,
+    operationRunId: row.operation_run_id,
+    updatedAt: row.updated_at?.toISOString?.() ?? row.updated_at ?? null,
   } : null;
 }
 

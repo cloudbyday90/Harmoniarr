@@ -492,6 +492,7 @@ export function getExecutionItemStatusClass(status) {
       return 'review-status-applied';
     case 'missing':
     case 'rejected':
+    case 'awaiting_confirmation':
     case 'queued_with_warnings':
     case 'ready_with_warnings':
       return 'review-status-held';
@@ -512,6 +513,8 @@ export function getExecutionItemStatusLabel(status) {
   switch (status) {
     case 'blocked':
       return 'Blocked';
+    case 'awaiting_confirmation':
+      return 'Confirming download request';
     case 'completed':
       return 'Completed';
     case 'downloading':

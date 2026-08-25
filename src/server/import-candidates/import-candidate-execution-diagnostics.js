@@ -131,3 +131,26 @@ export function buildDownloadAcceptanceDiagnostic({
     warningMessage: warningMessage || null,
   };
 }
+
+export function buildDownloadHandoffConfirmationDiagnostic({
+  matchedTransferCount = 0,
+  requestedFileCount = 0,
+} = {}) {
+  const matchedCount = normalizeCount(matchedTransferCount);
+  const requestedCount = normalizeCount(requestedFileCount);
+
+  return {
+    code: 'provider_confirmation_pending',
+    counts: {
+      enqueuedTransfers: matchedCount,
+      failedFiles: 0,
+      requestedFiles: requestedCount,
+    },
+    message: matchedCount > 0
+      ? `Harmoniarr found ${pluralize(matchedCount, 'transfer')} from the earlier request, but is still confirming the remaining ${pluralize(Math.max(requestedCount - matchedCount, 0), 'file')}.`
+      : 'Harmoniarr is confirming whether slskd accepted an earlier download request.',
+    operatorAction: 'Open Downloader and sync transfer state. Harmoniarr will not submit this request again until it can confirm the original outcome.',
+    title: 'Confirming the earlier download request',
+    tone: 'warning',
+  };
+}

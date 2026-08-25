@@ -11,6 +11,7 @@ test('ImportCandidateExecutionPanel exposes a handoff from live transfers to Dow
   assert.match(source, /buildDownloaderTransferLocation/);
   assert.match(source, /downloaderTransferLocation\(transfer\)/);
   assert.match(source, /Open in Downloader/);
+  assert.match(source, /<dt>Confirming<\/dt>/);
 });
 
 test('DownloaderView opens transfer details from route query handoffs', async () => {

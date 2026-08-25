@@ -173,11 +173,60 @@ function buildPersistedMissingTransfer(item) {
 }
 
 async function reconcileItemTransfers(item, {
+  findMatchingTransfers,
   missingTransferConfig,
   now,
+  providerState,
   transferSnapshot,
 }) {
   const execution = item?.planningSnapshot?.execution ?? {};
+  const handoffState = execution?.handoff?.state ?? null;
+  const requestedFiles = Array.isArray(execution.requestedFiles) ? execution.requestedFiles : [];
+  const username = item?.planningSnapshot?.candidate?.username ?? null;
+
+  if ((handoffState === 'dispatching' || handoffState === 'awaiting_confirmation')
+    && requestedFiles.length > 0
+    && username) {
+    let handoffConfirmation;
+    try {
+      handoffConfirmation = await findMatchingTransfers({
+        requestedFiles,
+        username,
+      });
+    } catch (error) {
+      if (!isSlskdError(error)) {
+        throw error;
+      }
+
+      providerState.transferSnapshotUnavailable = true;
+      handoffConfirmation = {
+        allRequestedFilesMatched: false,
+        matchedTransfers: [],
+        providerUnavailable: true,
+        requestedFileCount: requestedFiles.length,
+      };
+    }
+    const confirmedTransfers = handoffConfirmation.matchedTransfers ?? [];
+
+    return {
+      ...item,
+      handoffConfirmation: {
+        ...handoffConfirmation,
+        checkedAt: now.toISOString(),
+      },
+      liveTransferSummary: confirmedTransfers.length > 0
+        ? buildLiveTransferSummary(confirmedTransfers, {
+          item,
+          missingTransferConfig,
+          now,
+        })
+        : null,
+      liveTransfers: confirmedTransfers,
+      persistedMissingTransfer: buildPersistedMissingTransfer(item),
+      persistedTransferObservation: buildPersistedTransferObservation(item),
+    };
+  }
+
   const transfers = Array.isArray(execution.enqueuedTransfers)
     ? execution.enqueuedTransfers.filter((transfer) => transfer?.id && transfer?.username)
     : [];
@@ -235,6 +284,13 @@ function buildDisplayRunSummary(run) {
   }
 
   if (run.executionMode === 'download_enqueue') {
+    if ((run.awaitingConfirmationCount ?? 0) > 0) {
+      return {
+        message: `${run.awaitingConfirmationCount} download request${run.awaitingConfirmationCount === 1 ? ' is' : 's are'} being confirmed with Downloader; Harmoniarr will not send ${run.awaitingConfirmationCount === 1 ? 'it' : 'them'} again automatically.`,
+        status: 'attention',
+      };
+    }
+
     if ((run.queueFailedCount ?? 0) > 0) {
       return {
         message: `${run.queueFailedCount} candidate${run.queueFailedCount === 1 ? '' : 's'} failed to enqueue for download and need operator attention.`,
@@ -285,6 +341,11 @@ function buildDisplayRunSummary(run) {
 
 export function createImportCandidateExecutionSummaryService({
   buildTransferSnapshot = createSlskdTransferSnapshotService().buildTransferSnapshot,
+  findMatchingTransfers = async () => ({
+    allRequestedFilesMatched: false,
+    matchedTransfers: [],
+    requestedFileCount: 0,
+  }),
   importCandidateExecutionHeartbeatConfig = resolveImportCandidateExecutionHeartbeatConfig(),
   importCandidateExecutionHeartbeatState = createImportCandidateExecutionHeartbeatState(),
   importCandidateExecutionMissingTransferConfig = resolveImportCandidateExecutionMissingTransferConfig(),
@@ -315,14 +376,18 @@ export function createImportCandidateExecutionSummaryService({
       transferSnapshot = { getTransfer: () => null };
     }
 
+    const providerState = { transferSnapshotUnavailable };
+
     return {
       ...run,
       items: await Promise.all(items.map((item) => reconcileItemTransfers(item, {
+        findMatchingTransfers,
         missingTransferConfig: importCandidateExecutionMissingTransferConfig,
         now,
+        providerState,
         transferSnapshot,
       }))),
-      transferSnapshotUnavailable,
+      transferSnapshotUnavailable: providerState.transferSnapshotUnavailable,
     };
   }
 

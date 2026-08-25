@@ -51,7 +51,13 @@ import { createImportCandidateReleaseAddDiagnosticsService } from './import-cand
 import { createImportCandidateReleaseManualSafeAddService } from './import-candidate-release-manual-safe-add-service.js';
 import { createImportCandidateReleaseSafeAddRecheckService } from './import-candidate-release-safe-add-recheck-service.js';
 import { listImportCandidateFileDecisions } from './import-candidate-file-decision-repository.js';
-import { replaceImportExecutionRunItems, updateImportExecutionRunItem, upsertImportExecutionRunItem } from './import-candidate-execution-repository.js';
+import {
+  findUnconfirmedImportExecutionHandoff,
+  listImportExecutionRunItems,
+  replaceImportExecutionRunItems,
+  updateImportExecutionRunItem,
+  upsertImportExecutionRunItem,
+} from './import-candidate-execution-repository.js';
 import { createImportCandidateReputationEnrichmentService } from './import-candidate-reputation-enrichment-service.js';
 import { createImportCandidateService, normalizeSlskdResponsesToImportCandidates } from './import-candidate-service.js';
 import { createImportCandidatePreviewService } from './import-candidate-preview-service.js';
@@ -72,6 +78,7 @@ import { createOperationRunInterruptionGate } from '../operation-run-cancellatio
 import { createMaintenanceLockService } from '../recovery/maintenance-lock-service.js';
 import { createMaintenanceLockWriteGuardService } from '../recovery/maintenance-lock-write-guard-service.js';
 import { createSlskdTransferSnapshotService } from '../slskd/slskd-transfer-snapshot-service.js';
+import { createSlskdDownloadHandoffReconciliationService } from '../slskd/slskd-download-handoff-reconciliation-service.js';
 import { loadSettings } from '../settings.js';
 import { createAcquisitionQualityPolicyService } from '../acquisition/acquisition-quality-policy-service.js';
 
@@ -171,6 +178,9 @@ export function createImportCandidateModule({
   slskdTransferSnapshotService = createSlskdTransferSnapshotService({
     getDownloads: slskdService.getDownloads,
   }),
+  slskdDownloadHandoffReconciliationService = createSlskdDownloadHandoffReconciliationService({
+    getDownloads: slskdService.getDownloads,
+  }),
   importCandidateMediaInspectionRunStore = createImportCandidateMediaInspectionRunStore(),
   importCandidateTranscodeRunStore = createImportCandidateTranscodeRunStore(),
   importCandidateExecutionRunStore = createImportCandidateExecutionRunStore(),
@@ -200,6 +210,7 @@ export function createImportCandidateModule({
     acquireLease: importCandidateExecutionRunStore.acquireLease,
     buildSelectedImportCandidateSummary: importCandidateSelectionSummaryService.buildSelectedImportCandidateSummary,
     enqueueDownloads: slskdService.enqueueDownloads,
+    findMatchingTransfers: slskdDownloadHandoffReconciliationService.findMatchingTransfers,
     getImportCandidate: importCandidateService.getImportCandidate,
     handleImportCandidateDownloadFailure: importCandidateRecoveryService.handleImportCandidateDownloadFailure,
     isCancellationRequested: maintenanceLockOperationPauseService
@@ -218,6 +229,7 @@ export function createImportCandidateModule({
     markRunStarted: importCandidateExecutionRunStore.markRunStarted,
     recordActivityEventFn,
     releaseLease: importCandidateExecutionRunStore.releaseLease,
+    listImportExecutionRunItems,
     renewLease: importCandidateExecutionRunStore.renewLease,
     replaceImportExecutionRunItems,
     updateImportExecutionRunItem,
@@ -300,6 +312,7 @@ export function createImportCandidateModule({
       operationLabel: 'import candidate execution planning',
     }),
     createOperationRun: importCandidateExecutionRunStore.createOperationRun,
+    findUnconfirmedImportExecutionHandoff,
     getActiveRun: importCandidateExecutionRunStore.getActiveRun,
     listImportCandidates: importCandidateService.listImportCandidates,
   }),
@@ -352,6 +365,7 @@ export function createImportCandidateModule({
   }),
   importCandidateExecutionSummaryService = createImportCandidateExecutionSummaryService({
     buildTransferSnapshot: slskdTransferSnapshotService.buildTransferSnapshot,
+    findMatchingTransfers: slskdDownloadHandoffReconciliationService.findMatchingTransfers,
     importCandidateExecutionHeartbeatConfig,
     importCandidateExecutionHeartbeatState,
     importCandidateExecutionRunStore,

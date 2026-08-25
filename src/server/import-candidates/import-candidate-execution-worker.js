@@ -24,6 +24,7 @@ import {
 } from '../operation-run-cancellation.js';
 import {
   buildDownloadAcceptanceDiagnostic,
+  buildDownloadHandoffConfirmationDiagnostic,
   buildNoUnlockedFilesDiagnostic,
   buildPlanningBlockedDiagnostic,
 } from './import-candidate-execution-diagnostics.js';
@@ -78,6 +79,40 @@ function buildRunTriggerSummary({
   }).filter(([, value]) => value !== null && value !== undefined));
 }
 
+function hasUnconfirmedDownloadHandoff(item) {
+  const state = item?.planningSnapshot?.execution?.handoff?.state;
+  return state === 'dispatching' || state === 'awaiting_confirmation';
+}
+
+function buildDownloadHandoffSnapshot({
+  baseSnapshot,
+  confirmation = null,
+  requestedFiles,
+  state,
+} = {}) {
+  const previousHandoff = baseSnapshot?.execution?.handoff ?? {};
+
+  return {
+    ...baseSnapshot,
+    execution: {
+      ...baseSnapshot.execution,
+      diagnostics: {
+        ...baseSnapshot.execution?.diagnostics,
+        downloadAcceptance: buildDownloadHandoffConfirmationDiagnostic({
+          matchedTransferCount: confirmation?.matchedTransfers?.length ?? 0,
+          requestedFileCount: confirmation?.requestedFileCount ?? requestedFiles.length,
+        }),
+      },
+      handoff: {
+        ...previousHandoff,
+        lastConfirmedAt: new Date().toISOString(),
+        state,
+      },
+      requestedFiles,
+    },
+  };
+}
+
 export function createImportCandidateExecutionWorker({
   acquireLease,
   buildSelectedImportCandidateSummary = async () => ({
@@ -94,6 +129,11 @@ export function createImportCandidateExecutionWorker({
     enqueued: [],
     failed: [],
   }),
+  findMatchingTransfers = async () => ({
+    allRequestedFilesMatched: false,
+    matchedTransfers: [],
+    requestedFileCount: 0,
+  }),
   getImportCandidate = async () => null,
   handleImportCandidateDownloadFailure = async () => ({ recovered: false }),
   isCancellationRequested,
@@ -106,6 +146,7 @@ export function createImportCandidateExecutionWorker({
   markRunStarted,
   recordActivityEventFn = null,
   releaseLease,
+  listImportExecutionRunItems = async () => [],
   renewLease,
   replaceImportExecutionRunItems = async () => [],
   updateImportExecutionRunItem = async () => null,
@@ -174,8 +215,34 @@ export function createImportCandidateExecutionWorker({
 
       const selectedSummary = await buildSelectedImportCandidateSummary({ limit: 1000 });
       const candidateQueue = [...(selectedSummary.selectedCandidates ?? [])];
-      const runItems = buildRunItems(candidateQueue);
-      await replaceImportExecutionRunItems(runId, runItems);
+      const existingRunItems = await listImportExecutionRunItems(runId);
+      const persistedItemsByCandidateId = new Map(existingRunItems.map((item) => [
+        item.importCandidateId,
+        item,
+      ]));
+      const runItems = existingRunItems.length > 0 ? existingRunItems : buildRunItems(candidateQueue);
+
+      if (existingRunItems.length === 0) {
+        await replaceImportExecutionRunItems(runId, runItems);
+      } else {
+        let nextPosition = existingRunItems.reduce((highestPosition, item) => (
+          Math.max(highestPosition, item.position ?? 0)
+        ), 0) + 1;
+
+        for (const candidate of candidateQueue) {
+          if (persistedItemsByCandidateId.has(candidate.id)) {
+            continue;
+          }
+
+          const [runItem] = buildRunItems([candidate], { startPosition: nextPosition });
+          nextPosition += 1;
+          await upsertImportExecutionRunItem({
+            ...runItem,
+            operationRunId: runId,
+          });
+          persistedItemsByCandidateId.set(candidate.id, runItem);
+        }
+      }
 
       const counts = {
         blocked: 0,
@@ -183,6 +250,7 @@ export function createImportCandidateExecutionWorker({
         queued: 0,
         queuedWithWarnings: 0,
         recovered: 0,
+        awaitingConfirmation: 0,
       };
       const processedCandidateIds = new Set();
 
@@ -224,7 +292,8 @@ export function createImportCandidateExecutionWorker({
 
         processedCandidateIds.add(summaryCandidate.id);
         await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
-        const baseSnapshot = {
+        const persistedItem = persistedItemsByCandidateId.get(summaryCandidate.id) ?? null;
+        const baseSnapshot = persistedItem?.planningSnapshot ?? {
           candidate: {
             downloadAttemptCount: summaryCandidate.downloadAttemptCount ?? 0,
             fileCount: summaryCandidate.fileCount,
@@ -298,6 +367,104 @@ export function createImportCandidateExecutionWorker({
           continue;
         }
 
+        if (hasUnconfirmedDownloadHandoff(persistedItem)) {
+          const confirmation = await findMatchingTransfers({
+            requestedFiles,
+            username: summaryCandidate.username,
+          });
+
+          if (!confirmation.allRequestedFilesMatched) {
+            counts.awaitingConfirmation += 1;
+            await updateImportExecutionRunItem({
+              importCandidateId: summaryCandidate.id,
+              itemStatus: 'awaiting_confirmation',
+              operationRunId: runId,
+              planningSnapshot: buildDownloadHandoffSnapshot({
+                baseSnapshot,
+                confirmation,
+                requestedFiles,
+                state: 'awaiting_confirmation',
+              }),
+              statusMessage: 'Confirming whether slskd accepted the earlier download request before sending anything else.',
+            });
+            continue;
+          }
+
+          const recoveredEnqueueResult = {
+            enqueued: confirmation.matchedTransfers,
+            failed: [],
+          };
+          const diagnostic = buildDownloadAcceptanceDiagnostic({
+            enqueueResult: recoveredEnqueueResult,
+            requestedFiles,
+          });
+          const statusMessage = `${confirmation.matchedTransfers.length} file${confirmation.matchedTransfers.length === 1 ? '' : 's'} confirmed in slskd after an interrupted download request.`;
+          counts.queued += 1;
+          await updateImportExecutionRunItem({
+            importCandidateId: summaryCandidate.id,
+            itemStatus: 'queued',
+            operationRunId: runId,
+            planningSnapshot: {
+              ...baseSnapshot,
+              execution: {
+                ...baseSnapshot.execution,
+                diagnostics: {
+                  ...baseSnapshot.execution?.diagnostics,
+                  downloadAcceptance: diagnostic,
+                },
+                enqueuedTransfers: confirmation.matchedTransfers,
+                handoff: {
+                  ...(baseSnapshot.execution?.handoff ?? {}),
+                  confirmedAt: new Date().toISOString(),
+                  state: 'confirmed',
+                },
+                outcome: 'queued',
+                requestedFiles,
+              },
+            },
+            statusMessage,
+          });
+          await markImportCandidateDownloading({
+            importCandidateId: summaryCandidate.id,
+            reason: statusMessage,
+          });
+          recordActivityEventSafely(
+            recordActivityEventFn,
+            buildMusicQueueDownloadStartedActivityEvent({
+              candidate: summaryCandidate,
+              operationRunId: runId,
+              queuedFileCount: confirmation.matchedTransfers.length,
+            }),
+          );
+          continue;
+        }
+
+        const handoffStartedAt = new Date().toISOString();
+        await updateImportExecutionRunItem({
+          importCandidateId: summaryCandidate.id,
+          itemStatus: 'awaiting_confirmation',
+          operationRunId: runId,
+          planningSnapshot: {
+            ...baseSnapshot,
+            execution: {
+              ...baseSnapshot.execution,
+              diagnostics: {
+                ...baseSnapshot.execution?.diagnostics,
+                downloadAcceptance: buildDownloadHandoffConfirmationDiagnostic({
+                  requestedFileCount: requestedFiles.length,
+                }),
+              },
+              handoff: {
+                dispatchStartedAt: handoffStartedAt,
+                retryPolicy: 'confirm_before_retry',
+                state: 'dispatching',
+              },
+              requestedFiles,
+            },
+          },
+          statusMessage: 'Sending the download request to slskd and recording its confirmation.',
+        });
+
         const enqueueResult = await enqueueDownloads({
           files: requestedFiles,
           username: summaryCandidate.username,
@@ -346,10 +513,17 @@ export function createImportCandidateExecutionWorker({
             execution: {
               ...baseSnapshot.execution,
               diagnostics: {
+                ...baseSnapshot.execution?.diagnostics,
                 downloadAcceptance: diagnostic,
               },
               enqueuedTransfers: enqueueResult.enqueued,
               failedFilenames: enqueueResult.failed,
+              handoff: {
+                dispatchStartedAt: handoffStartedAt,
+                providerRespondedAt: new Date().toISOString(),
+                retryPolicy: 'confirm_before_retry',
+                state: 'confirmed',
+              },
               outcome: itemStatus,
               requestedFiles,
             },
@@ -387,10 +561,17 @@ export function createImportCandidateExecutionWorker({
                 execution: {
                   ...baseSnapshot.execution,
                   diagnostics: {
+                    ...baseSnapshot.execution?.diagnostics,
                     downloadAcceptance: diagnostic,
                   },
                   enqueuedTransfers: enqueueResult.enqueued,
                   failedFilenames: enqueueResult.failed,
+                  handoff: {
+                    dispatchStartedAt: handoffStartedAt,
+                    providerRespondedAt: new Date().toISOString(),
+                    retryPolicy: 'confirm_before_retry',
+                    state: 'confirmed',
+                  },
                   outcome: itemStatus,
                   recovery: recoveryResult,
                   requestedFiles,
@@ -422,6 +603,7 @@ export function createImportCandidateExecutionWorker({
         summary: {
           blockedCount: counts.blocked,
           currentStep: 'Download enqueue complete',
+          awaitingConfirmationCount: counts.awaitingConfirmation,
           executionMode: 'download_enqueue',
           processedCandidateCount: processedCandidateIds.size,
           queueFailedCount: counts.queueFailed,

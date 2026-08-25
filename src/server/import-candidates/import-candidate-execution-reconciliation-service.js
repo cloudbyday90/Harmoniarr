@@ -20,6 +20,7 @@ import {
   buildPersistedExecutionMissingTransferState,
   buildPersistedExecutionTransferSnapshot,
 } from './import-candidate-execution-transfer-snapshot.js';
+import { buildDownloadAcceptanceDiagnostic, buildDownloadHandoffConfirmationDiagnostic } from './import-candidate-execution-diagnostics.js';
 import {
   buildMusicQueueRecoveryActivityEvent,
   recordActivityEventSafely,
@@ -126,6 +127,7 @@ function buildUpdatedPlanningSnapshot(item, checkedAt) {
   };
 }
 
+
 export function createImportCandidateExecutionReconciliationService({
   buildImportCandidateExecutionSummary = async () => ({ currentRun: null }),
   getImportCandidate = async () => null,
@@ -156,6 +158,49 @@ export function createImportCandidateExecutionReconciliationService({
 
     for (const item of items) {
       const importCandidateId = item?.planningSnapshot?.candidate?.id ?? item?.importCandidateId ?? null;
+
+      if (hasUnconfirmedDownloadHandoff(item)) {
+        const confirmation = item.handoffConfirmation;
+        const confirmed = confirmation.allRequestedFilesMatched === true;
+        const handoffMessage = confirmed
+          ? `${confirmation.matchedTransfers.length} file${confirmation.matchedTransfers.length === 1 ? '' : 's'} confirmed in slskd after an interrupted download request.`
+          : 'Confirming whether slskd accepted the earlier download request before sending anything else.';
+
+        if (run?.id && importCandidateId) {
+          await updateImportExecutionRunItem({
+            importCandidateId,
+            itemStatus: confirmed ? 'queued' : 'awaiting_confirmation',
+            operationRunId: run.id,
+            planningSnapshot: confirmed
+              ? buildConfirmedDownloadHandoffSnapshot(item, checkedAt)
+              : buildPendingDownloadHandoffSnapshot(item, checkedAt),
+            statusMessage: handoffMessage,
+          });
+          snapshotsUpdated += 1;
+        }
+
+        if (confirmed && importCandidateId) {
+          const candidate = await getImportCandidate({ importCandidateId });
+          if (candidate?.status === 'selected') {
+            const result = await markImportCandidateDownloading({
+              actorUserId,
+              importCandidateId,
+              reason: handoffMessage,
+              requestMetadata,
+            });
+            if (result?.candidate) {
+              transitions.push({
+                fromStatus: candidate.status,
+                importCandidateId,
+                liveTransferStatus: item.liveTransferSummary?.status ?? null,
+                toStatus: result.candidate.status,
+              });
+            }
+          }
+        }
+        continue;
+      }
+
       const targetStatus = resolveTransferAction(item);
 
       if (run?.id && importCandidateId && shouldPersistExecutionState(item)) {
@@ -340,5 +385,67 @@ export function createImportCandidateExecutionReconciliationService({
   return {
     reconcileImportCandidateExecutionSummary,
     reconcileImportCandidateExecutionState,
+  };
+}
+
+function hasUnconfirmedDownloadHandoff(item) {
+  const state = item?.planningSnapshot?.execution?.handoff?.state;
+  return (state === 'dispatching' || state === 'awaiting_confirmation')
+    && Boolean(item?.handoffConfirmation);
+}
+
+function buildConfirmedDownloadHandoffSnapshot(item, checkedAt) {
+  const execution = item?.planningSnapshot?.execution ?? {};
+  const confirmation = item?.handoffConfirmation ?? {};
+  const requestedFiles = Array.isArray(execution.requestedFiles) ? execution.requestedFiles : [];
+  const enqueueResult = {
+    enqueued: confirmation.matchedTransfers ?? [],
+    failed: [],
+  };
+
+  return {
+    ...(item?.planningSnapshot ?? {}),
+    execution: {
+      ...execution,
+      diagnostics: {
+        ...execution.diagnostics,
+        downloadAcceptance: buildDownloadAcceptanceDiagnostic({
+          enqueueResult,
+          requestedFiles,
+        }),
+      },
+      enqueuedTransfers: enqueueResult.enqueued,
+      handoff: {
+        ...execution.handoff,
+        confirmedAt: checkedAt,
+        state: 'confirmed',
+      },
+      outcome: 'queued',
+    },
+  };
+}
+
+function buildPendingDownloadHandoffSnapshot(item, checkedAt) {
+  const execution = item?.planningSnapshot?.execution ?? {};
+  const confirmation = item?.handoffConfirmation ?? {};
+  const requestedFiles = Array.isArray(execution.requestedFiles) ? execution.requestedFiles : [];
+
+  return {
+    ...(item?.planningSnapshot ?? {}),
+    execution: {
+      ...execution,
+      diagnostics: {
+        ...execution.diagnostics,
+        downloadAcceptance: buildDownloadHandoffConfirmationDiagnostic({
+          matchedTransferCount: confirmation.matchedTransfers?.length ?? 0,
+          requestedFileCount: confirmation.requestedFileCount ?? requestedFiles.length,
+        }),
+      },
+      handoff: {
+        ...execution.handoff,
+        lastConfirmedAt: checkedAt,
+        state: 'awaiting_confirmation',
+      },
+    },
   };
 }

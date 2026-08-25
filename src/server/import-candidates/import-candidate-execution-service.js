@@ -25,6 +25,7 @@ export function createImportCandidateExecutionService({
   createOperationRun = async () => {
     throw new Error('createOperationRun dependency is required');
   },
+  findUnconfirmedImportExecutionHandoff = async () => null,
   getActiveRun = async () => null,
   listImportCandidates = async () => ({
     pagination: { total: 0 },
@@ -45,6 +46,15 @@ export function createImportCandidateExecutionService({
     const activeRun = await getActiveRun();
     if (activeRun) {
       throw createApiError(409, 'import_candidate_execution_in_progress', 'An import execution planning run is already running or queued');
+    }
+
+    const unconfirmedHandoff = await findUnconfirmedImportExecutionHandoff();
+    if (unconfirmedHandoff) {
+      throw createApiError(
+        409,
+        'import_candidate_execution_confirmation_pending',
+        'A previous download request is still being confirmed with slskd. Sync transfer state before starting another download run.',
+      );
     }
 
     const selectedCandidates = await listImportCandidates({

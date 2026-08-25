@@ -911,6 +911,10 @@ describe('getExecutionItemStatusLabel', () => {
     assert.equal(getExecutionItemStatusLabel('queue_failed'), 'Queue failed');
   });
 
+  it('returns an explicit confirmation label for an interrupted provider handoff', () => {
+    assert.equal(getExecutionItemStatusLabel('awaiting_confirmation'), 'Confirming download request');
+  });
+
   it('returns "Queued with warnings" for "queued_with_warnings"', () => {
     assert.equal(getExecutionItemStatusLabel('queued_with_warnings'), 'Queued with warnings');
   });

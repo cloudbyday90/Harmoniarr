@@ -73,6 +73,83 @@ test('buildImportCandidateExecutionSummary returns the current run with persiste
   assert.equal(summary.summary.message, '1 planned import candidate is blocked and needs operator attention.');
 });
 
+test('buildImportCandidateExecutionSummary exposes exact transfer confirmation for a checkpointed handoff', async () => {
+  const service = createImportCandidateExecutionSummaryService({
+    findMatchingTransfers: async ({ requestedFiles, username }) => ({
+      allRequestedFilesMatched: true,
+      matchedTransfers: [{
+        filename: requestedFiles[0].filename,
+        id: 'transfer-handoff-summary',
+        size: requestedFiles[0].size,
+        state: 'Queued, Remotely',
+        username,
+      }],
+      requestedFileCount: requestedFiles.length,
+    }),
+    importCandidateExecutionRunStore: {
+      getActiveRun: async () => ({
+        executionMode: 'download_enqueue',
+        id: 'run-handoff-summary',
+        status: 'completed',
+      }),
+      getLatestRun: async () => null,
+    },
+    listImportExecutionRunItemsFn: async () => [{
+      id: 'item-handoff-summary',
+      itemStatus: 'awaiting_confirmation',
+      planningSnapshot: {
+        candidate: { id: 'candidate-handoff-summary', username: 'source-user' },
+        execution: {
+          handoff: { state: 'awaiting_confirmation' },
+          requestedFiles: [{ filename: 'Autechre\\Amber\\01 Foil.flac', size: 123 }],
+        },
+      },
+      statusMessage: 'Confirming earlier request.',
+    }],
+  });
+
+  const summary = await service.buildImportCandidateExecutionSummary();
+  const item = summary.currentRun.items[0];
+
+  assert.equal(item.handoffConfirmation.allRequestedFilesMatched, true);
+  assert.equal(item.handoffConfirmation.matchedTransfers[0].id, 'transfer-handoff-summary');
+  assert.equal(item.liveTransferSummary.status, 'queued');
+});
+
+test('buildImportCandidateExecutionSummary keeps an unconfirmed handoff visible when slskd is unavailable', async () => {
+  const unavailable = Object.assign(new Error('slskd unavailable'), { code: 'slskd_unavailable' });
+  const service = createImportCandidateExecutionSummaryService({
+    findMatchingTransfers: async () => {
+      throw unavailable;
+    },
+    importCandidateExecutionRunStore: {
+      getActiveRun: async () => ({
+        executionMode: 'download_enqueue',
+        id: 'run-handoff-unavailable',
+        status: 'completed',
+      }),
+      getLatestRun: async () => null,
+    },
+    listImportExecutionRunItemsFn: async () => [{
+      id: 'item-handoff-unavailable',
+      itemStatus: 'awaiting_confirmation',
+      planningSnapshot: {
+        candidate: { id: 'candidate-handoff-unavailable', username: 'source-user' },
+        execution: {
+          handoff: { state: 'awaiting_confirmation' },
+          requestedFiles: [{ filename: 'Autechre\\Amber\\01 Foil.flac', size: 123 }],
+        },
+      },
+      statusMessage: 'Confirming earlier request.',
+    }],
+  });
+
+  const summary = await service.buildImportCandidateExecutionSummary();
+
+  assert.equal(summary.currentRun.transferSnapshotUnavailable, true);
+  assert.equal(summary.currentRun.items[0].handoffConfirmation.providerUnavailable, true);
+});
+
 test('buildImportCandidateExecutionSummary reports no run when none exist', async () => {
   const service = createImportCandidateExecutionSummaryService({
     buildTransferSnapshot: async () => ({

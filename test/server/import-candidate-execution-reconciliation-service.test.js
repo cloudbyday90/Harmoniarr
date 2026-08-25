@@ -359,3 +359,53 @@ test('reconcileImportCandidateExecutionState reports rediscovery scheduled after
     scheduled: true,
   }]);
 });
+
+test('reconcileImportCandidateExecutionState confirms a checkpointed handoff without retrying slskd', async (t) => {
+  const markImportCandidateDownloading = t.mock.fn(async ({ importCandidateId }) => ({
+    candidate: { id: importCandidateId, status: 'downloading' },
+  }));
+  const updateImportExecutionRunItem = t.mock.fn(async () => null);
+  const service = createImportCandidateExecutionReconciliationService({
+    buildImportCandidateExecutionSummary: async () => ({
+      currentRun: {
+        id: 'run-handoff-confirmation',
+        items: [{
+          handoffConfirmation: {
+            allRequestedFilesMatched: true,
+            matchedTransfers: [{
+              filename: 'Autechre\\Amber\\01 Foil.flac',
+              id: 'transfer-handoff-confirmed',
+              size: 123,
+              username: 'source-user',
+            }],
+            requestedFileCount: 1,
+          },
+          itemStatus: 'awaiting_confirmation',
+          liveTransferSummary: { status: 'queued' },
+          planningSnapshot: {
+            candidate: { id: 'candidate-handoff-confirmed' },
+            execution: {
+              handoff: { state: 'awaiting_confirmation' },
+              requestedFiles: [{ filename: 'Autechre\\Amber\\01 Foil.flac', size: 123 }],
+            },
+          },
+          statusMessage: 'Confirming earlier request.',
+        }],
+      },
+    }),
+    getImportCandidate: async () => ({
+      id: 'candidate-handoff-confirmed',
+      status: 'selected',
+    }),
+    markImportCandidateDownloading,
+    updateImportExecutionRunItem,
+  });
+
+  const result = await service.reconcileImportCandidateExecutionState();
+
+  assert.equal(markImportCandidateDownloading.mock.callCount(), 1);
+  assert.equal(updateImportExecutionRunItem.mock.callCount(), 1);
+  assert.equal(updateImportExecutionRunItem.mock.calls[0].arguments[0].itemStatus, 'queued');
+  assert.equal(updateImportExecutionRunItem.mock.calls[0].arguments[0].planningSnapshot.execution.handoff.state, 'confirmed');
+  assert.equal(result.summary.transitioned, 1);
+});
