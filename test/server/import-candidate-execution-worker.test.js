@@ -4,6 +4,7 @@ import { createImportCandidateExecutionWorker } from '../../src/server/import-ca
 
 test('import execution worker enqueues ready candidates and persists per-item outcomes', async (t) => {
   const markImportCandidateDownloading = t.mock.fn(async () => ({}));
+  const recordConfirmedTransfers = t.mock.fn(async () => []);
   const replaceImportExecutionRunItems = t.mock.fn(async () => []);
   const updateImportExecutionRunItem = t.mock.fn(async () => null);
   const markRunStarted = t.mock.fn(async () => {});
@@ -86,6 +87,7 @@ test('import execution worker enqueues ready candidates and persists per-item ou
     markRunCompleted,
     markRunFailed: async () => {},
     markRunStarted,
+    recordConfirmedTransfers,
     releaseLease: async () => {},
     replaceImportExecutionRunItems,
     updateImportExecutionRunItem,
@@ -101,6 +103,16 @@ test('import execution worker enqueues ready candidates and persists per-item ou
   assert.equal(replaceImportExecutionRunItems.mock.callCount(), 1);
   assert.equal(updateImportExecutionRunItem.mock.callCount(), 3);
   assert.equal(markImportCandidateDownloading.mock.callCount(), 1);
+  assert.deepEqual(recordConfirmedTransfers.mock.calls[0].arguments, [{
+    importCandidateId: 'candidate-1',
+    operationRunId: 'run-1',
+    transfers: [{
+      id: 'transfer-1',
+      filename: 'Autechre\\Amber\\01 Foil.flac',
+      state: 'Queued, Remotely',
+      username: 'source-user',
+    }],
+  }]);
   assert.equal(markRunStarted.mock.callCount(), 1);
   assert.equal(markRunCompleted.mock.callCount(), 1);
   assert.equal(
@@ -483,6 +495,7 @@ test('import execution worker confirms an interrupted handoff without sending a 
   };
   const enqueueDownloads = t.mock.fn(async () => ({ enqueued: [], failed: [] }));
   const markImportCandidateDownloading = t.mock.fn(async () => ({}));
+  const recordConfirmedTransfers = t.mock.fn(async () => []);
   const updateImportExecutionRunItem = t.mock.fn(async () => null);
   let resolveCompleted;
   const completed = new Promise((resolve) => {
@@ -532,6 +545,7 @@ test('import execution worker confirms an interrupted handoff without sending a 
     markRunCompleted: async (args) => resolveCompleted(args),
     markRunFailed: async () => {},
     markRunStarted: async () => {},
+    recordConfirmedTransfers,
     releaseLease: async () => {},
     updateImportExecutionRunItem,
     upsertImportExecutionRunItem: async () => null,
@@ -541,6 +555,16 @@ test('import execution worker confirms an interrupted handoff without sending a 
   const completedArgs = await completed;
 
   assert.equal(enqueueDownloads.mock.callCount(), 0);
+  assert.deepEqual(recordConfirmedTransfers.mock.calls[0].arguments, [{
+    importCandidateId: candidate.id,
+    operationRunId: 'run-confirmed-handoff',
+    transfers: [{
+      filename: 'Autechre\\Amber\\01 Foil.flac',
+      id: 'transfer-confirmed',
+      size: 123,
+      username: 'source-user',
+    }],
+  }]);
   assert.equal(markImportCandidateDownloading.mock.callCount(), 1);
   assert.equal(updateImportExecutionRunItem.mock.calls[0].arguments[0].itemStatus, 'queued');
   assert.equal(updateImportExecutionRunItem.mock.calls[0].arguments[0].planningSnapshot.execution.handoff.state, 'confirmed');

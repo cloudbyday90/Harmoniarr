@@ -47,6 +47,7 @@ import { createImportCandidateRecoveryService } from './import-candidate-recover
 import { createImportCandidateExecutionService } from './import-candidate-execution-service.js';
 import { createImportCandidateExecutionSummaryService } from './import-candidate-execution-summary-service.js';
 import { createImportCandidateExecutionWorker } from './import-candidate-execution-worker.js';
+import { createImportExecutionTransferLinkStore } from './import-execution-transfer-link-store.js';
 import { createImportCandidateAutoApplyRunService } from './import-candidate-auto-apply-run-service.js';
 import { createImportCandidateAutoDownloadRunService } from './import-candidate-auto-download-run-service.js';
 import { createImportCandidateAutoSelectionService } from './import-candidate-auto-selection-service.js';
@@ -191,6 +192,7 @@ export function createImportCandidateModule({
   importCandidateMediaInspectionRunStore = createImportCandidateMediaInspectionRunStore(),
   importCandidateTranscodeRunStore = createImportCandidateTranscodeRunStore(),
   importCandidateExecutionRunStore = createImportCandidateExecutionRunStore(),
+  importExecutionTransferLinkStore = createImportExecutionTransferLinkStore(),
   importCandidateApplyRunStore = createImportCandidateApplyRunStore(),
   importCandidateSafeAutoAddQualityGateService = createImportCandidateSafeAutoAddQualityGateService({
     preAddSpectralProofService: createMediaSpectralProofService({
@@ -235,6 +237,7 @@ export function createImportCandidateModule({
     markRunPaused: importCandidateExecutionRunStore.markRunPaused,
     markRunStarted: importCandidateExecutionRunStore.markRunStarted,
     recordActivityEventFn,
+    recordConfirmedTransfers: importExecutionTransferLinkStore.recordConfirmedTransfers,
     releaseLease: importCandidateExecutionRunStore.releaseLease,
     listImportExecutionRunItems,
     renewLease: importCandidateExecutionRunStore.renewLease,

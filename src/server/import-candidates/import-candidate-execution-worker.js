@@ -145,6 +145,7 @@ export function createImportCandidateExecutionWorker({
   markRunFailed,
   markRunStarted,
   recordActivityEventFn = null,
+  recordConfirmedTransfers = async () => [],
   releaseLease,
   listImportExecutionRunItems = async () => [],
   renewLease,
@@ -400,6 +401,11 @@ export function createImportCandidateExecutionWorker({
           });
           const statusMessage = `${confirmation.matchedTransfers.length} file${confirmation.matchedTransfers.length === 1 ? '' : 's'} confirmed in slskd after an interrupted download request.`;
           counts.queued += 1;
+          await recordConfirmedTransfers({
+            importCandidateId: summaryCandidate.id,
+            operationRunId: runId,
+            transfers: confirmation.matchedTransfers,
+          });
           await updateImportExecutionRunItem({
             importCandidateId: summaryCandidate.id,
             itemStatus: 'queued',
@@ -504,6 +510,11 @@ export function createImportCandidateExecutionWorker({
             failedMessage,
           ].filter(Boolean).join(' ');
 
+        await recordConfirmedTransfers({
+          importCandidateId: summaryCandidate.id,
+          operationRunId: runId,
+          transfers: enqueueResult.enqueued,
+        });
         await updateImportExecutionRunItem({
           importCandidateId: summaryCandidate.id,
           itemStatus,

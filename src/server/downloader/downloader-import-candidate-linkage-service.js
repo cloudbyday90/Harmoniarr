@@ -83,25 +83,23 @@ export function createDownloaderImportCandidateLinkageService({
         matched_items AS (
           SELECT DISTINCT ON (rt.transfer_key)
             rt.transfer_key,
-            iei.import_candidate_id,
+            links.import_candidate_id,
             iei.item_status AS execution_item_status,
-            iei.operation_run_id,
-            iei.updated_at AS linked_at,
+            links.operation_run_id,
+            links.linked_at,
             ic.source_search_id,
             ic.status AS candidate_status
           FROM requested_transfers rt
-          JOIN import_execution_run_items iei ON TRUE
-          JOIN LATERAL jsonb_array_elements(
-            CASE
-              WHEN jsonb_typeof(iei.planning_snapshot #> '{execution,enqueuedTransfers}') = 'array'
-                THEN iei.planning_snapshot #> '{execution,enqueuedTransfers}'
-              ELSE '[]'::jsonb
-            END
-          ) AS transfer ON TRUE
-          JOIN import_candidates ic ON ic.id = iei.import_candidate_id
-          WHERE transfer->>'id' = rt.id
-            AND transfer->>'username' = rt.username
-          ORDER BY rt.transfer_key, iei.updated_at DESC NULLS LAST, iei.created_at DESC NULLS LAST
+          JOIN import_execution_transfer_links AS links
+            ON links.provider = 'slskd'
+            AND links.provider_transfer_id = rt.id
+            AND links.source_username = rt.username
+          JOIN import_execution_run_items AS iei
+            ON iei.id = links.import_execution_run_item_id
+            AND iei.operation_run_id = links.operation_run_id
+            AND iei.import_candidate_id = links.import_candidate_id
+          JOIN import_candidates AS ic ON ic.id = links.import_candidate_id
+          ORDER BY rt.transfer_key, links.linked_at DESC NULLS LAST, links.id DESC
         )
         SELECT *
         FROM matched_items

@@ -40,9 +40,10 @@ test('buildTransferImportCandidateLinkage returns bounded candidate linkage keye
 
   assert.equal(pool.query.mock.callCount(), 1);
   assert.match(observedSql, /jsonb_to_recordset/);
-  assert.match(observedSql, /jsonb_array_elements/);
-  assert.match(observedSql, /import_execution_run_items iei/);
-  assert.match(observedSql, /JOIN import_candidates ic/);
+  assert.match(observedSql, /import_execution_transfer_links AS links/);
+  assert.match(observedSql, /JOIN import_execution_run_items AS iei/);
+  assert.match(observedSql, /JOIN import_candidates AS ic/);
+  assert.doesNotMatch(observedSql, /jsonb_array_elements/);
   assert.deepEqual(JSON.parse(observedParams[0]), [{
     id: 'transfer-1',
     transfer_key: 'source-user::transfer-1',
