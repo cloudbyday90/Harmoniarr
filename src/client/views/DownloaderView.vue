@@ -17,9 +17,10 @@
 -->
 
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import DownloaderTransferDetailDrawer from '../components/downloader/DownloaderTransferDetailDrawer.vue';
+import DownloaderTransferFilters from '../components/downloader/DownloaderTransferFilters.vue';
 import DownloaderTransferRowHandoffs from '../components/downloader/DownloaderTransferRowHandoffs.vue';
 import {
   formatTransferFilename,
@@ -41,6 +42,10 @@ import {
   omitDownloaderTransferRouteQuery,
 } from '../lib/downloader-transfer-route.js';
 import {
+  buildDownloaderTransferFilterResultLabel,
+  filterDownloaderTransfers,
+} from '../lib/downloader-transfer-filter.js';
+import {
   SETTINGS_RECOVERY_CONTEXT,
   buildSettingsRecoveryHandoffLocation,
   createSettingsRecoveryContext,
@@ -51,18 +56,13 @@ const POLL_INTERVAL_MS = 5000;
 const route = useRoute();
 const router = useRouter();
 
-const filterOptions = Object.freeze([
-  { value: 'all', label: 'All' },
-  { value: 'active', label: 'Active' },
-  { value: 'queued', label: 'Queued' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'failed', label: 'Failed' },
-]);
 const downloaderRecoveryContext = Object.freeze(createSettingsRecoveryContext({
   context: SETTINGS_RECOVERY_CONTEXT.DOWNLOADER,
 }));
 
-const selectedFilter = ref('all');
+const selectedStateFilter = ref('all');
+const musicQueueLinkedOnly = ref(false);
+const filterResultAnnouncement = ref('');
 const selectedTransferKey = ref(null);
 const actionErrorMessage = ref('');
 const pendingAction = ref('');
@@ -97,6 +97,13 @@ const allFiles = computed(() => (
     : []
 ));
 const counts = computed(() => downloaderQueue.value?.queueHealth?.counts ?? emptyCounts);
+const visibleFiles = computed(() => filterDownloaderTransfers(allFiles.value, {
+  musicQueueLinkedOnly: musicQueueLinkedOnly.value,
+  stateFilter: selectedStateFilter.value,
+}));
+const filterResultLabel = computed(() => (
+  buildDownloaderTransferFilterResultLabel(visibleFiles.value.length, counts.value.total)
+));
 
 const providerDisabled = computed(() => isDownloaderProviderDisabled(downloaderQueue.value));
 const activitySummary = computed(() => buildDownloaderActivitySummary(downloaderQueue.value));
@@ -117,27 +124,6 @@ const statusCards = computed(() => [
   { key: 'failed', label: 'Failed', value: counts.value.failed, tone: counts.value.failed > 0 ? 'danger' : 'info' },
 ]);
 const clearableTransferCount = computed(() => counts.value.completed + counts.value.failed);
-
-function matchesFilter(file) {
-  const stateCode = file?.state?.code;
-  switch (selectedFilter.value) {
-    case 'active':
-      return stateCode === 'active';
-    case 'queued':
-      return stateCode === 'queued';
-    case 'completed':
-      return stateCode === 'completed';
-    case 'failed':
-      return stateCode === 'failed';
-    default:
-      return true;
-  }
-}
-
-const visibleFiles = computed(() =>
-  allFiles.value
-    .filter(matchesFilter),
-);
 
 const selectedTransfer = computed(() => (
   selectedTransferKey.value
@@ -167,6 +153,22 @@ function selectRouteTransferIfAvailable() {
   if (!routeTransfer) return;
 
   selectedTransferKey.value = routeTransfer.transferKey;
+}
+
+async function announceFilterResult() {
+  filterResultAnnouncement.value = '';
+  await nextTick();
+  filterResultAnnouncement.value = filterResultLabel.value;
+}
+
+function updateStateFilter(stateFilter) {
+  selectedStateFilter.value = stateFilter;
+  void announceFilterResult();
+}
+
+function updateMusicQueueLinkedOnly(linkedOnly) {
+  musicQueueLinkedOnly.value = linkedOnly;
+  void announceFilterResult();
 }
 
 watch(
@@ -316,25 +318,19 @@ async function clearCompletedTransfers() {
         <div>
           <h2 class="hx-card-title">Transfer Queue</h2>
           <p class="hx-card-subtitle">
-            Showing {{ visibleFiles.length }} of {{ counts.total }} transfer{{ counts.total === 1 ? '' : 's' }}.
+            {{ filterResultLabel }}
           </p>
         </div>
         <div class="hx-card-actions">
-          <div class="ops-filter-bar" role="group" aria-label="Filter transfers">
-            <button
-              v-for="option in filterOptions"
-              :key="option.value"
-              type="button"
-              class="ops-filter-tab"
-              :data-active="selectedFilter === option.value || undefined"
-              :aria-pressed="selectedFilter === option.value"
-              @click="selectedFilter = option.value"
-            >
-              {{ option.label }}
-            </button>
-          </div>
+          <DownloaderTransferFilters
+            :music-queue-linked-only="musicQueueLinkedOnly"
+            :state-filter="selectedStateFilter"
+            @update:music-queue-linked-only="updateMusicQueueLinkedOnly"
+            @update:state-filter="updateStateFilter"
+          />
         </div>
       </div>
+      <p class="sr-only" role="status" aria-live="polite" aria-atomic="true">{{ filterResultAnnouncement }}</p>
 
       <div class="hx-card-body is-flush">
         <div v-if="isLoading && !allFiles.length" class="hx-card-body">
@@ -356,8 +352,8 @@ async function clearCompletedTransfers() {
           </div>
         </div>
         <div v-else-if="!visibleFiles.length" class="hx-empty">
-          <p class="hx-empty-title">No transfers match this filter</p>
-          <p class="hx-empty-copy">Switch filters to review other transfer states.</p>
+          <p class="hx-empty-title">No transfers match these filters</p>
+          <p class="hx-empty-copy">Change the transfer filters to review other items.</p>
         </div>
         <div v-else class="hx-table-scroll">
           <table class="hx-table">

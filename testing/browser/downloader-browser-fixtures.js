@@ -168,6 +168,86 @@ export function buildLinkedDownloaderQueueFixture(overrides = {}) {
   };
 }
 
+export function buildUnlinkedDownloaderTransferFixture(overrides = {}) {
+  return {
+    actionEligibility: {
+      actions: [],
+      canCancel: false,
+      canClear: false,
+      canPause: false,
+      canRemove: false,
+      canResume: false,
+      canRetry: false,
+      reason: 'no_action_available',
+    },
+    averageSpeed: 0,
+    diagnostics: {
+      importLinkage: {
+        candidateId: null,
+        candidateStatus: null,
+        executionItemStatus: null,
+        linkedAt: null,
+        musicQueueRelease: null,
+        operationRunId: null,
+        requestId: null,
+        sourceSearchId: null,
+        status: 'unlinked',
+        summary: 'No Import Review candidate is linked to this transfer.',
+      },
+      provider: {
+        hasProviderError: false,
+        name: 'slskd',
+        state: 'Queued',
+      },
+      queue: {
+        hasQueuePosition: true,
+        placeInQueue: 1,
+      },
+      recommendedNextAction: {
+        code: 'monitor_progress',
+        description: 'Wait for the remote peer to make this transfer available.',
+        label: 'Monitor progress',
+        tone: 'info',
+      },
+      retry: {
+        attempts: null,
+        status: 'not_tracked',
+        summary: 'Retry attempts are not tracked by Harmoniarr for live provider rows yet.',
+      },
+      severity: 'info',
+      summary: 'The transfer is waiting in the remote queue.',
+      timing: {
+        lastKnownEventAt: '2026-06-27T21:19:00.000Z',
+      },
+    },
+    directory: 'Biosphere\\Substrata',
+    filename: 'Biosphere\\Substrata\\02 Antarctica Starts Here.flac',
+    id: 'transfer-downloader-unlinked',
+    placeInQueue: 1,
+    progress: {
+      bytesTransferred: 0,
+      percentComplete: null,
+      size: 94371840,
+    },
+    sourceUser: 'queued-slskd-peer',
+    state: {
+      code: 'queued',
+      label: 'Queued',
+      raw: 'Queued',
+      terminal: false,
+      tone: 'info',
+    },
+    timestamps: {
+      endedAt: null,
+      enqueuedAt: '2026-06-27T21:19:00.000Z',
+      requestedAt: '2026-06-27T21:19:00.000Z',
+      startedAt: null,
+    },
+    transferKey: 'queued-slskd-peer::transfer-downloader-unlinked',
+    ...overrides,
+  };
+}
+
 export function buildEmptyDownloaderQueueFixture(overrides = {}) {
   return buildLinkedDownloaderQueueFixture({
     queueHealth: Object.freeze({
