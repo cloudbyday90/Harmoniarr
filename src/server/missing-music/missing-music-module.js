@@ -20,6 +20,7 @@ import { createMissingMusicDecisionService } from './missing-music-decision-serv
 import { createMissingMusicDecisionCommandService } from './missing-music-decision-command-service.js';
 import { createMissingMusicDownloadStartService } from './missing-music-download-start-service.js';
 import { createMissingMusicDecisionTargetService } from './missing-music-decision-target-service.js';
+import { createMissingMusicDownloaderHandoffService } from './missing-music-downloader-handoff-service.js';
 
 export function createMissingMusicModule({
   listAppUsers,
@@ -47,14 +48,19 @@ export function createMissingMusicModule({
     resolveMissingMusicDecisionTarget: missingMusicDecisionTargetService.resolveMissingMusicDecisionTarget,
     startImportCandidateExecutionRun,
   });
+  const missingMusicDownloaderHandoffService = createMissingMusicDownloaderHandoffService({
+    resolveMissingMusicDecisionTarget: missingMusicDecisionTargetService.resolveMissingMusicDecisionTarget,
+  });
 
   return {
     missingMusicDecisionCommandService,
     missingMusicDecisionService,
     missingMusicDecisionTargetService,
     missingMusicDownloadStartService,
+    missingMusicDownloaderHandoffService,
     routeDependencies: {
       getMissingMusicDecisionDetail: missingMusicDecisionService.getMissingMusicDecisionDetail,
+      getMissingMusicDownloaderHandoff: missingMusicDownloaderHandoffService.getMissingMusicDownloaderHandoff,
       listMissingMusicDecisions: missingMusicDecisionService.listMissingMusicDecisions,
       selectMissingMusicDecisionMatch: missingMusicDecisionCommandService.selectMissingMusicDecisionMatch,
       startMissingMusicDecisionDownload: missingMusicDownloadStartService.startMissingMusicDecisionDownload,

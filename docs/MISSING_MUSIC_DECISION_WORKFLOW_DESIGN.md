@@ -1,9 +1,9 @@
 # Missing Music decision workflow design
 
 **Status:** in progress — the server-authorized worklist, cross-user
-inspection, manual match selection, and explicit download-start confirmation
-are implemented. The remaining handoff improvement is a safe contextual view
-from Missing Music into Downloader.
+inspection, manual match selection, explicit download-start confirmation, and
+safe contextual Downloader handoff are implemented. The next workflow
+improvement is the canonical retirement of legacy Music Queue deep links.
 
 **Created:** 2026-08-26
 
@@ -543,14 +543,16 @@ Before commit, prove the workflow at the boundaries that own it:
    transfer execution, creates a targeted one-candidate run, and leaves
    provider acceptance to the durable worker. See [Missing Music download-start
    design](MISSING_MUSIC_DOWNLOAD_START_DESIGN.md).
-8. **Next:** Add a safe, administrator-only **View in Downloader** transition
-   that retains release and target-user context without exposing provider
-   identifiers or raw transfer evidence.
-9. Change canonical internal deep links from Music Queue to Missing Music and
+8. **Completed 2026-08-26:** Add a safe, administrator-only **View in
+   Downloader** transition. Downloader resolves the opaque decision ID on the
+   server, retains release and target-user context, and never accepts or
+   exposes provider identifiers or raw transfer evidence. See [Missing Music
+   Downloader handoff design](MISSING_MUSIC_DOWNLOADER_HANDOFF_DESIGN.md).
+9. **Next:** Change canonical internal deep links from Music Queue to Missing Music and
    add role-aware compatibility redirects that preserve query strings and
    hashes.
-10. Add cross-user authorization, keyboard-inspector, and full handoff browser
-   coverage before removing interim Music Queue workspace modules.
+10. Add remaining cross-user authorization and keyboard-inspector browser
+    coverage before removing interim Music Queue workspace modules.
 11. Rebuild walkthrough Compose after the command slice passes, visually
     inspect all three responsive breakpoints, then commit and push.
 

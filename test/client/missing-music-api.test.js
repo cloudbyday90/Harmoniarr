@@ -21,6 +21,7 @@ import test from 'node:test';
 import {
   fetchMissingMusicDecisionDetail,
   fetchMissingMusicDecisions,
+  fetchMissingMusicDownloaderHandoff,
   selectMissingMusicDecisionMatch,
   startMissingMusicDecisionDownload,
 } from '../../src/client/lib/missing-music-api.js';
@@ -83,6 +84,25 @@ test('fetchMissingMusicDecisionDetail encodes only the decision identifier', asy
 test('fetchMissingMusicDecisionDetail requires a non-empty decision identifier', () => {
   assert.throws(
     () => fetchMissingMusicDecisionDetail('  '),
+    /requires a decisionId/u,
+  );
+});
+
+test('fetchMissingMusicDownloaderHandoff sends only the opaque decision identifier', async (t) => {
+  const fetchMock = installFetchMock(t, { wantedReleaseId: 'wanted-amber' });
+
+  await fetchMissingMusicDownloaderHandoff('wanted/amber');
+
+  assert.equal(
+    fetchMock.mock.calls[0].arguments[0],
+    '/api/v1/missing-music/decisions/wanted%2Famber/downloader-handoff',
+  );
+  assert.equal(fetchMock.mock.calls[0].arguments[1].method, 'GET');
+});
+
+test('fetchMissingMusicDownloaderHandoff requires a non-empty decision identifier', () => {
+  assert.throws(
+    () => fetchMissingMusicDownloaderHandoff('  '),
     /requires a decisionId/u,
   );
 });

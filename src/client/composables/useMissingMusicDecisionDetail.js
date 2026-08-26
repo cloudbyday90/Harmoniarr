@@ -35,6 +35,7 @@ function normalizeDetail(payload) {
     permissions: {
       canStartDownload: payload.permissions?.canStartDownload === true,
       canSelectMatch: payload.permissions?.canSelectMatch === true,
+      canViewDownloader: payload.permissions?.canViewDownloader === true,
       isReadOnly: payload.permissions?.isReadOnly === true,
     },
     matchChoices: Array.isArray(payload.matchChoices) ? payload.matchChoices : [],

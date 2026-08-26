@@ -23,6 +23,10 @@ import {
   isSkippableBrowserRuntimeError,
   toBrowserRuntimeUnavailableReason,
 } from '../../testing/browser/playwright-smoke-runtime.js';
+import {
+  buildLinkedDownloaderQueueFixture,
+  installDownloaderBrowserFixtures,
+} from '../../testing/browser/downloader-browser-fixtures.js';
 import { bootstrapAdminThroughUi } from '../../testing/browser/operator-browser-helpers.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 
@@ -91,10 +95,13 @@ function buildWorklistPayload() {
   };
 }
 
-async function installMissingMusicFixture(browserContext, requests, { matchSelected = false } = {}) {
+async function installMissingMusicFixture(browserContext, requests, {
+  downloadStarted = false,
+  matchSelected = false,
+} = {}) {
   const state = {
     downloadStartRequest: null,
-    downloadStarted: false,
+    downloadStarted,
     matchSelected,
     selectionRequest: null,
   };
@@ -105,6 +112,22 @@ async function installMissingMusicFixture(browserContext, requests, { matchSelec
     const detailPath = '/api/v1/missing-music/decisions/wanted-amber';
     const selectionPath = `${detailPath}/matches/candidate-amber/select`;
     const downloadStartPath = `${detailPath}/start-download`;
+    const downloaderHandoffPath = `${detailPath}/downloader-handoff`;
+
+    if (route.request().method() === 'GET' && requestUrl.pathname === downloaderHandoffPath) {
+      await route.fulfill({
+        body: JSON.stringify({
+          decisionId: 'wanted-amber',
+          ok: true,
+          release: { artistName: 'Autechre', title: 'Amber' },
+          requestedFor: { username: 'Jamie' },
+          wantedReleaseId: 'wanted-amber',
+        }),
+        contentType: 'application/json',
+        status: 200,
+      });
+      return;
+    }
 
     if (route.request().method() === 'POST' && requestUrl.pathname === selectionPath) {
       const headers = route.request().headers();
@@ -175,6 +198,7 @@ async function installMissingMusicFixture(browserContext, requests, { matchSelec
         permissions: {
           canSelectMatch: !state.matchSelected,
           canStartDownload: state.matchSelected && !state.downloadStarted,
+          canViewDownloader: state.downloadStarted,
           isReadOnly: false,
         },
         scope: 'all',
@@ -189,6 +213,25 @@ async function installMissingMusicFixture(browserContext, requests, { matchSelec
   });
 
   return state;
+}
+
+function buildAmberDownloaderQueue() {
+  const defaultQueue = buildLinkedDownloaderQueueFixture();
+  const amberTransfer = {
+    ...defaultQueue.transfers[0],
+    diagnostics: {
+      ...defaultQueue.transfers[0].diagnostics,
+      importLinkage: {
+        ...defaultQueue.transfers[0].diagnostics.importLinkage,
+        musicQueueRelease: {
+          ...defaultQueue.transfers[0].diagnostics.importLinkage.musicQueueRelease,
+          wantedReleaseId: 'wanted-amber',
+        },
+      },
+    },
+  };
+
+  return buildLinkedDownloaderQueueFixture({ transfers: [amberTransfer] });
 }
 
 let browserRuntime;
@@ -328,6 +371,54 @@ suite('Missing Music decision detail browser acceptance', () => {
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
     }, {
       scenarioName: 'missing_music_download_start_confirmation',
+    });
+  });
+
+  test('hands an administrator to the release-scoped Downloader view without provider identifiers', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) {
+      t.skip(runtimeUnavailableReason);
+      return;
+    }
+
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      const pageErrors = [];
+      page.on('pageerror', (error) => pageErrors.push(error.message));
+      await installMissingMusicFixture(browserContext, [], { downloadStarted: true });
+      await installDownloaderBrowserFixtures(browserContext, { queue: buildAmberDownloaderQueue() });
+      await bootstrapAdminThroughUi(page, { baseUrl });
+
+      await page.goto(baseUrl + '/app/missing/wanted-amber', { waitUntil: 'domcontentloaded' });
+      const inspector = page.locator('.missing-music-inspector');
+      const downloaderLink = inspector.getByRole('link', {
+        name: 'View Amber downloads for Jamie in Downloader',
+      });
+      await downloaderLink.waitFor();
+      assert.equal(
+        await downloaderLink.getAttribute('href'),
+        '/app/acquisition/downloader?missingMusicDecisionId=wanted-amber',
+      );
+
+      await Promise.all([
+        page.waitForURL(/\/app\/acquisition\/downloader\?missingMusicDecisionId=wanted-amber$/u),
+        downloaderLink.click(),
+      ]);
+      const downloaderUrl = new URL(page.url());
+      assert.deepEqual([...downloaderUrl.searchParams.entries()], [['missingMusicDecisionId', 'wanted-amber']]);
+      assert.doesNotMatch(downloaderUrl.href, /healthy-slskd-peer|transfer-downloader-linked/u);
+
+      await page.getByRole('heading', { exact: true, name: 'Downloads for Amber' }).waitFor();
+      await page.getByText('Showing live transfers for Amber by Autechre, requested for Jamie.', { exact: true }).waitFor();
+      const transferQueue = page.locator('article.hx-card').filter({
+        has: page.getByRole('heading', { exact: true, name: 'Transfer Queue' }),
+      });
+      await transferQueue.getByText('01 Foil.flac', { exact: true }).waitFor();
+      const returnLink = page.getByRole('link', { name: 'Return to Amber in Missing Music' });
+      assert.equal(await returnLink.getAttribute('href'), '/app/missing/wanted-amber');
+      assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
+    }, {
+      scenarioName: 'missing_music_to_downloader_handoff',
     });
   });
 });

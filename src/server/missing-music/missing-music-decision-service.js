@@ -24,6 +24,7 @@ import {
 } from './missing-music-decision-scope-policy.js';
 import { buildMissingMusicMatchChoices } from './missing-music-match-choice-projection.js';
 import { canStartMissingMusicDownload } from './missing-music-download-start-policy.js';
+import { canViewMissingMusicDownloader } from './missing-music-downloader-handoff-policy.js';
 import { createMissingMusicDecisionTargetService } from './missing-music-decision-target-service.js';
 import {
   deriveMissingMusicDecisionState,
@@ -313,6 +314,10 @@ export function createMissingMusicDecisionService({
           actorUser,
           nextAction: decision.status.nextAction,
           targetUser: target.targetUser,
+        }),
+        canViewDownloader: canViewMissingMusicDownloader({
+          actorUser,
+          nextAction: decision.status.nextAction,
         }),
         canSelectMatch: target.targetUser.accountStatus !== 'disabled' && matchChoices.length > 0,
         isReadOnly: target.targetUser.accountStatus === 'disabled',

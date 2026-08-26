@@ -38,6 +38,7 @@ function buildActorUser(session) {
 export function registerMissingMusicRoutes(app, {
   executeIdempotentMutation = async ({ executeMutation }) => executeMutation(),
   getMissingMusicDecisionDetail,
+  getMissingMusicDownloaderHandoff,
   getRequestMetadata = defaultRequestAuthDependencies.getRequestMetadata,
   limitMissingMusicDecisionDetailRead = skipRateLimitMiddleware,
   limitMissingMusicDecisionDownloadStart = skipRateLimitMiddleware,
@@ -45,6 +46,7 @@ export function registerMissingMusicRoutes(app, {
   limitMissingMusicDecisionMutation = skipRateLimitMiddleware,
   listMissingMusicDecisions,
   requireCsrf = defaultRequestAuthDependencies.requireCsrf,
+  requireAdminSession = defaultRequestAuthDependencies.requireAdminSession,
   requireFreshAdminSession = defaultRequestAuthDependencies.requireFreshAdminSession,
   requireFreshSession = defaultRequestAuthDependencies.requireFreshSession,
   requireSession = defaultRequestAuthDependencies.requireSession,
@@ -53,6 +55,10 @@ export function registerMissingMusicRoutes(app, {
 } = {}) {
   if (typeof getMissingMusicDecisionDetail !== 'function') {
     throw new TypeError('registerMissingMusicRoutes requires getMissingMusicDecisionDetail');
+  }
+
+  if (typeof getMissingMusicDownloaderHandoff !== 'function') {
+    throw new TypeError('registerMissingMusicRoutes requires getMissingMusicDownloaderHandoff');
   }
 
   if (typeof listMissingMusicDecisions !== 'function') {
@@ -89,6 +95,19 @@ export function registerMissingMusicRoutes(app, {
   app.get('/api/v1/missing-music/decisions/:decisionId', limitMissingMusicDecisionDetailRead, asyncRoute(async (request, response) => {
     const session = await requireSession(request);
     const payload = await getMissingMusicDecisionDetail({
+      actorUser: buildActorUser(session),
+      decisionId: request.params.decisionId,
+    });
+
+    response.json({
+      ok: true,
+      ...payload,
+    });
+  }));
+
+  app.get('/api/v1/missing-music/decisions/:decisionId/downloader-handoff', limitMissingMusicDecisionDetailRead, asyncRoute(async (request, response) => {
+    const session = await requireAdminSession(request);
+    const payload = await getMissingMusicDownloaderHandoff({
       actorUser: buildActorUser(session),
       decisionId: request.params.decisionId,
     });

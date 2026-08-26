@@ -109,3 +109,17 @@ test('Missing Music tells non-administrators when a selected download requires a
   assert.equal(presentation.canStartDownload, false);
   assert.equal(presentation.nextStep, 'A household administrator can start the download.');
 });
+
+test('Missing Music exposes a purpose-specific Downloader link only when the server permits it', () => {
+  const presentation = buildMissingMusicDecisionDetailPresentation({
+    decision: {
+      release: { title: 'Amber' },
+      requestedFor: { username: 'Jamie' },
+      status: { nextAction: 'open_downloader' },
+    },
+    permissions: { canViewDownloader: true },
+  });
+
+  assert.equal(presentation.canViewDownloader, true);
+  assert.equal(presentation.downloaderLinkAccessibleLabel, 'View Amber downloads for Jamie in Downloader');
+});

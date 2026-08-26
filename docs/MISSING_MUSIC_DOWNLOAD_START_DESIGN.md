@@ -177,7 +177,9 @@ status**. Lint and the client build also pass.
 
 ## Next item
 
-The next recommended slice is the Missing Music **View in Downloader**
-transition: preserve the same release and target-user context in a safe
-administrator-only Downloader filter without exposing provider-private
-identifiers.
+The Missing Music **View in Downloader** transition is now implemented. See
+[Missing Music Downloader handoff design](MISSING_MUSIC_DOWNLOADER_HANDOFF_DESIGN.md).
+
+The next recommended slice is to move canonical internal Music Queue release
+links to Missing Music and provide role-aware legacy redirects that preserve
+ordinary URL view state without turning URL data into an authorization claim.

@@ -71,6 +71,7 @@ export function filterDownloaderTransfers(transfers, {
 }
 
 export function buildDownloaderTransferFilterResultLabel(visibleCount, totalCount, {
+  releaseContextLabel = 'Music Queue release',
   wantedReleaseId = '',
 } = {}) {
   const normalizedVisibleCount = Number.isFinite(visibleCount) ? Math.max(0, visibleCount) : 0;
@@ -78,7 +79,10 @@ export function buildDownloaderTransferFilterResultLabel(visibleCount, totalCoun
   const transferLabel = normalizedTotalCount === 1 ? 'transfer' : 'transfers';
 
   if (normalizeWantedReleaseId(wantedReleaseId)) {
-    return `Showing ${normalizedVisibleCount} ${normalizedVisibleCount === 1 ? 'transfer' : 'transfers'} linked to this Music Queue release.`;
+    const normalizedReleaseContextLabel = typeof releaseContextLabel === 'string' && releaseContextLabel.trim()
+      ? releaseContextLabel.trim()
+      : 'release';
+    return `Showing ${normalizedVisibleCount} ${normalizedVisibleCount === 1 ? 'transfer' : 'transfers'} linked to this ${normalizedReleaseContextLabel}.`;
   }
 
   return `Showing ${normalizedVisibleCount} of ${normalizedTotalCount} ${transferLabel}.`;

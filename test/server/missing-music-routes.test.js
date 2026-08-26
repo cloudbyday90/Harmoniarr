@@ -13,6 +13,12 @@ function createMissingMusicRouteTestApp(overrides = {}) {
         permissions: { isReadOnly: false },
         scope: 'mine',
       }),
+      getMissingMusicDownloaderHandoff: async () => ({
+        decisionId: 'wanted-amber',
+        release: { artistName: 'Autechre', title: 'Amber' },
+        requestedFor: { username: 'Jamie' },
+        wantedReleaseId: 'wanted-amber',
+      }),
       selectMissingMusicDecisionMatch: async () => ({ action: {} }),
       startMissingMusicDecisionDownload: async () => ({ action: {} }),
       limitMissingMusicDecisionRead: (_request, _response, next) => next(),
@@ -27,6 +33,10 @@ function createMissingMusicRouteTestApp(overrides = {}) {
       requireSession: async () => ({
         appUserId: 'user-1',
         user: { role: 'requester', username: 'listener' },
+      }),
+      requireAdminSession: async () => ({
+        appUserId: 'admin-1',
+        user: { role: 'admin', username: 'admin' },
       }),
       ...overrides,
     });
@@ -122,6 +132,63 @@ test('Missing Music detail route forwards only the route identifier and authenti
     });
     assert.equal(payload.ok, true);
     assert.equal(payload.decision.decisionId, 'wanted-amber');
+  });
+});
+
+test('Missing Music Downloader handoff uses an administrator session and forwards only the opaque decision ID', async (t) => {
+  const getMissingMusicDownloaderHandoff = t.mock.fn(async () => ({
+    decisionId: 'wanted-amber',
+    release: { artistName: 'Autechre', title: 'Amber' },
+    requestedFor: { username: 'Jamie' },
+    wantedReleaseId: 'wanted-amber',
+  }));
+  const requireAdminSession = t.mock.fn(async () => ({
+    appUserId: 'admin-1',
+    user: { role: 'admin', username: 'admin' },
+  }));
+  const app = createMissingMusicRouteTestApp({
+    getMissingMusicDownloaderHandoff,
+    requireAdminSession,
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/missing-music/decisions/wanted-amber/downloader-handoff`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireAdminSession.mock.callCount(), 1);
+    assert.deepEqual(getMissingMusicDownloaderHandoff.mock.calls[0].arguments[0], {
+      actorUser: {
+        id: 'admin-1',
+        isDisabled: false,
+        role: 'admin',
+        username: 'admin',
+      },
+      decisionId: 'wanted-amber',
+    });
+    assert.deepEqual(payload, {
+      decisionId: 'wanted-amber',
+      ok: true,
+      release: { artistName: 'Autechre', title: 'Amber' },
+      requestedFor: { username: 'Jamie' },
+      wantedReleaseId: 'wanted-amber',
+    });
+  });
+});
+
+test('Missing Music Downloader handoff preserves administrator authorization failures', async () => {
+  const app = createMissingMusicRouteTestApp({
+    requireAdminSession: async () => {
+      throw createApiError(403, 'admin_required', 'An administrator is required');
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/missing-music/decisions/wanted-amber/downloader-handoff`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 403);
+    assert.equal(payload.error.code, 'admin_required');
   });
 });
 

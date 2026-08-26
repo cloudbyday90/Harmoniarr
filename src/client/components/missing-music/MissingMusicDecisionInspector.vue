@@ -155,6 +155,20 @@ onBeforeUnmount(() => {
           </button>
           <p>Start preparing the selected match for download.</p>
         </div>
+        <div v-if="presentation.canViewDownloader" class="missing-music-inspector__view-downloader">
+          <RouterLink
+            class="hx-btn"
+            data-variant="primary"
+            :aria-label="presentation.downloaderLinkAccessibleLabel"
+            :to="{
+              name: 'acquisition-downloader',
+              query: { missingMusicDecisionId: props.decisionId },
+            }"
+          >
+            View in Downloader
+          </RouterLink>
+          <p>Monitor the submitted transfer separately from this release decision.</p>
+        </div>
         <p
           v-if="downloadStart.statusMessage.value"
           class="missing-music-inspector__selection-feedback"
@@ -339,6 +353,17 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--hx-space-2);
+}
+
+.missing-music-inspector__view-downloader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--hx-space-2);
+}
+
+.missing-music-inspector__view-downloader p {
+  color: var(--hx-text-muted);
 }
 
 .missing-music-inspector__start-download p {
