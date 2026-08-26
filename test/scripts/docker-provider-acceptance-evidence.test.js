@@ -410,6 +410,10 @@ test('runDockerProviderAcceptanceEvidence writes evidence and closes browser res
   assert.equal(calls.writeEvidence.length, 1);
   assert.equal(calls.writeEvidence[0].validationKind, 'docker-provider-acceptance');
   assert.equal(calls.writeEvidence[0].validationResult.provider.enabled, true);
+  assert.doesNotMatch(
+    JSON.stringify(calls.writeEvidence[0].validationResult),
+    /127\.0\.0\.1|admin|execution-run-1|candidate-1|Provider accepted transfer|C:\/repo/u,
+  );
   assert.equal(result.evidencePath, 'C:/repo/artifacts/provider-acceptance.json');
   assert.equal(calls.closeContext, 1);
   assert.equal(calls.closeBrowser, 1);

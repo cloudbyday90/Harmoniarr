@@ -97,9 +97,9 @@ export function buildProviderAcceptanceReadiness(result, requirements = {}) {
   if (expected.requireMusicQueueLink && Number(result?.musicQueue?.linkedTransferCount) < 1) {
     return createActionRequiredReadiness({
       code: providerAcceptanceReadinessCodes.musicQueueTransferRequired,
-      label: 'Start a Music Queue download',
-      nextAction: 'Start a download from Music Queue, wait for it to appear in Downloader, then run this check again.',
-      summary: 'No current Downloader transfer is linked to Music Queue.',
+      label: 'Continue the release in Music Queue',
+      nextAction: 'Open Music Queue. Choose a match if Harmoniarr asks, then wait for the release to appear in Downloader before running this check again.',
+      summary: 'No current Downloader transfer originated in Music Queue.',
     });
   }
 

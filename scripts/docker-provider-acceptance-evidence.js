@@ -14,6 +14,7 @@ import {
   assertMusicQueueTransferLinkagePreserved,
   summarizeMusicQueueTransferLinkage,
 } from './downloader-music-queue-evidence.js';
+import { createDockerProviderAcceptanceArtifact } from './docker-provider-acceptance-artifact.js';
 import {
   buildProviderAcceptanceReadiness,
   formatProviderAcceptanceReadinessError,
@@ -500,7 +501,7 @@ export async function runDockerProviderAcceptanceEvidence({
     const evidence = await writeDockerSmokeEvidenceFn({
       evidencePath,
       validationKind: 'docker-provider-acceptance',
-      validationResult: resultWithScreenshots,
+      validationResult: createDockerProviderAcceptanceArtifact(resultWithScreenshots),
     });
 
     try {

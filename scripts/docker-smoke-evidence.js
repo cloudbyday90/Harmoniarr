@@ -63,8 +63,94 @@ function assertBoolean(value, label) {
   }
 }
 
+function assertOnlyAllowedFields(value, allowedFields, label) {
+  assertObjectSection(value, label);
+
+  for (const field of Object.keys(value)) {
+    if (!allowedFields.has(field)) {
+      throw new Error(`${label}.${field} is not allowed in persisted evidence`);
+    }
+  }
+}
+
+const providerAcceptanceArtifactFields = new Set([
+  'checkedAt',
+  'importReview',
+  'musicQueue',
+  'paths',
+  'provider',
+  'readiness',
+  'requirements',
+]);
+
+const providerAcceptanceDiagnosticFields = new Set([
+  'acceptedTransferCount',
+  'code',
+  'failedFileCount',
+  'requestedFileCount',
+]);
+
+const providerAcceptanceImportReviewFields = new Set([
+  'currentRun',
+  'diagnosticCount',
+  'diagnostics',
+  'summaryStatus',
+]);
+
+const providerAcceptanceMusicQueueFields = new Set([
+  'afterRefresh',
+  'linkedTransferCount',
+  'totalTransferCount',
+]);
+
+const providerAcceptancePathFields = new Set([
+  'downloadMappingCount',
+  'downloadsRootConfigured',
+  'slskdBaseUrlConfigured',
+  'slskdSecretConfigured',
+]);
+
+const providerAcceptanceProviderFields = new Set([
+  'enabled',
+  'queueCounts',
+  'queueHealthStatus',
+]);
+
+const providerAcceptanceQueueCountFields = new Set([
+  'active',
+  'completed',
+  'failed',
+  'queued',
+  'total',
+]);
+
+const providerAcceptanceReadinessFields = new Set([
+  'code',
+  'label',
+  'nextAction',
+  'ready',
+  'status',
+  'summary',
+]);
+
+const providerAcceptanceRequirementsFields = new Set([
+  'requireAcceptedTransfer',
+  'requireConfiguredProvider',
+  'requireDiagnostic',
+  'requireMusicQueueLink',
+  'requirePathMapping',
+]);
+
+const providerAcceptanceRunFields = new Set([
+  'itemCount',
+  'queuedCount',
+  'queueFailedCount',
+  'requestedCandidateCount',
+  'status',
+]);
+
 function assertProviderAcceptanceReadiness(readiness, validationKind) {
-  assertObjectSection(readiness, `${validationKind}.readiness`);
+  assertOnlyAllowedFields(readiness, providerAcceptanceReadinessFields, `${validationKind}.readiness`);
   assertBoolean(readiness.ready, `${validationKind}.readiness.ready`);
   assertStringField(readiness.code, `${validationKind}.readiness.code`);
   assertStringField(readiness.label, `${validationKind}.readiness.label`);
@@ -74,7 +160,7 @@ function assertProviderAcceptanceReadiness(readiness, validationKind) {
 }
 
 function assertProviderAcceptanceRequirements(requirements, validationKind) {
-  assertObjectSection(requirements, `${validationKind}.requirements`);
+  assertOnlyAllowedFields(requirements, providerAcceptanceRequirementsFields, `${validationKind}.requirements`);
 
   for (const key of [
     'requireAcceptedTransfer',
@@ -88,15 +174,46 @@ function assertProviderAcceptanceRequirements(requirements, validationKind) {
 }
 
 function assertDockerProviderAcceptanceValidationResult(validationResult, validationKind) {
-  assertObjectSection(validationResult.provider, `${validationKind}.provider`);
-  assertObjectSection(validationResult.paths, `${validationKind}.paths`);
-  assertObjectSection(validationResult.importReview, `${validationKind}.importReview`);
-  assertObjectSection(validationResult.musicQueue, `${validationKind}.musicQueue`);
+  assertOnlyAllowedFields(validationResult, providerAcceptanceArtifactFields, validationKind);
+  assertOnlyAllowedFields(validationResult.provider, providerAcceptanceProviderFields, `${validationKind}.provider`);
+  assertOnlyAllowedFields(validationResult.paths, providerAcceptancePathFields, `${validationKind}.paths`);
+  assertOnlyAllowedFields(validationResult.importReview, providerAcceptanceImportReviewFields, `${validationKind}.importReview`);
+  assertOnlyAllowedFields(validationResult.musicQueue, providerAcceptanceMusicQueueFields, `${validationKind}.musicQueue`);
   assertNonNegativeInteger(validationResult.musicQueue.linkedTransferCount, `${validationKind}.musicQueue.linkedTransferCount`);
   assertNonNegativeInteger(validationResult.musicQueue.totalTransferCount, `${validationKind}.musicQueue.totalTransferCount`);
 
+  if (validationResult.musicQueue.afterRefresh) {
+    assertOnlyAllowedFields(
+      validationResult.musicQueue.afterRefresh,
+      providerAcceptanceMusicQueueFields,
+      `${validationKind}.musicQueue.afterRefresh`,
+    );
+  }
+
+  if (validationResult.importReview.currentRun) {
+    assertOnlyAllowedFields(
+      validationResult.importReview.currentRun,
+      providerAcceptanceRunFields,
+      `${validationKind}.importReview.currentRun`,
+    );
+  }
+
+  assertOnlyAllowedFields(
+    validationResult.provider.queueCounts,
+    providerAcceptanceQueueCountFields,
+    `${validationKind}.provider.queueCounts`,
+  );
+
   if (!Array.isArray(validationResult.importReview.diagnostics)) {
     throw new Error(`${validationKind}.importReview.diagnostics must be an array`);
+  }
+
+  for (const [index, diagnostic] of validationResult.importReview.diagnostics.entries()) {
+    assertOnlyAllowedFields(
+      diagnostic,
+      providerAcceptanceDiagnosticFields,
+      `${validationKind}.importReview.diagnostics[${index}]`,
+    );
   }
 
   if (!validationResult.readiness) {

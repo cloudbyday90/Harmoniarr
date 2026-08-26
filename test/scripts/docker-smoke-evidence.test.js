@@ -130,18 +130,23 @@ test('assertDockerSmokeEvidenceContract validates docker provider acceptance evi
     schemaVersion: 1,
     validationKind: 'docker-provider-acceptance',
     validationResult: {
-      baseUrl: 'http://127.0.0.1:47956',
       checkedAt: '2026-06-28T00:00:00.000Z',
       importReview: {
         currentRun: {
-          id: 'execution-run-1',
+          itemCount: 1,
+          queuedCount: 1,
+          queueFailedCount: 0,
+          requestedCandidateCount: 1,
           status: 'running',
         },
         diagnosticCount: 1,
         diagnostics: [{
+          acceptedTransferCount: 1,
           code: 'provider_accepted',
-          title: 'Provider accepted transfer',
+          failedFileCount: 0,
+          requestedFileCount: 1,
         }],
+        summaryStatus: 'running',
       },
       musicQueue: {
         linkedTransferCount: 1,
@@ -149,10 +154,20 @@ test('assertDockerSmokeEvidenceContract validates docker provider acceptance evi
       },
       paths: {
         downloadMappingCount: 1,
+        downloadsRootConfigured: true,
+        slskdBaseUrlConfigured: true,
+        slskdSecretConfigured: true,
       },
       provider: {
         enabled: true,
         queueHealthStatus: 'busy',
+        queueCounts: {
+          active: 1,
+          completed: 0,
+          failed: 0,
+          queued: 0,
+          total: 1,
+        },
       },
       readiness: {
         code: 'ready',
@@ -169,12 +184,48 @@ test('assertDockerSmokeEvidenceContract validates docker provider acceptance evi
         requireMusicQueueLink: false,
         requirePathMapping: true,
       },
-      username: 'walkthrough-admin',
     },
   });
 
   assert.equal(evidence.validationKind, 'docker-provider-acceptance');
   assert.equal(evidence.validationResult.importReview.diagnostics[0].code, 'provider_accepted');
+});
+
+test('assertDockerSmokeEvidenceContract rejects unbounded docker provider acceptance fields', () => {
+  assert.throws(() => assertDockerSmokeEvidenceContract({
+    generatedAt: '2026-08-26T00:00:00.000Z',
+    schemaVersion: 1,
+    validationKind: 'docker-provider-acceptance',
+    validationResult: {
+      baseUrl: 'http://127.0.0.1:47956',
+      importReview: {
+        diagnostics: [],
+      },
+      musicQueue: {
+        linkedTransferCount: 0,
+        totalTransferCount: 0,
+      },
+      paths: {},
+      provider: {
+        queueCounts: {},
+      },
+      readiness: {
+        code: 'provider_configuration_required',
+        label: 'Connect the download provider',
+        nextAction: 'Open Settings > Connections, complete the download provider connection, then run this check again.',
+        ready: false,
+        status: 'action_required',
+        summary: 'The Downloader connection is not fully configured.',
+      },
+      requirements: {
+        requireAcceptedTransfer: true,
+        requireConfiguredProvider: true,
+        requireDiagnostic: true,
+        requireMusicQueueLink: true,
+        requirePathMapping: true,
+      },
+    },
+  }), /docker-provider-acceptance\.baseUrl is not allowed in persisted evidence/u);
 });
 
 test('assertDockerSmokeEvidenceContract permits a bounded action-required provider readiness artifact', () => {
@@ -195,6 +246,7 @@ test('assertDockerSmokeEvidenceContract permits a bounded action-required provid
       },
       provider: {
         enabled: false,
+        queueCounts: {},
       },
       readiness: {
         code: 'provider_configuration_required',
@@ -231,7 +283,9 @@ test('assertDockerSmokeEvidenceContract rejects provider acceptance evidence wit
         totalTransferCount: 0,
       },
       paths: {},
-      provider: {},
+      provider: {
+        queueCounts: {},
+      },
     },
   }), /docker-provider-acceptance\.importReview\.diagnostics must include at least one diagnostic/u);
 });

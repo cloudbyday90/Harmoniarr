@@ -77,7 +77,9 @@ test('provider acceptance readiness identifies the Music Queue handoff separatel
   });
 
   assert.equal(readiness.code, providerAcceptanceReadinessCodes.musicQueueTransferRequired);
-  assert.equal(readiness.label, 'Start a Music Queue download');
+  assert.equal(readiness.label, 'Continue the release in Music Queue');
+  assert.equal(readiness.summary, 'No current Downloader transfer originated in Music Queue.');
+  assert.match(readiness.nextAction, /^Open Music Queue\. Choose a match/u);
   assert.equal(readiness.ready, false);
 });
 
