@@ -993,6 +993,7 @@ suite('Music Queue release row hierarchy browser verification', () => {
       const pageErrors = [];
       const useMatchResponse = createDeferred();
       let alternateUseRequestCount = 0;
+      let bestUseRequestCount = 0;
       page.on('pageerror', (error) => pageErrors.push(error.message));
       await bootstrapAdminThroughUi(page, { baseUrl });
       await browserContext.route(/\/api\/v1\/acquisition\/releases(?:\?.*)?$/, async (route) => {
@@ -1003,6 +1004,7 @@ suite('Music Queue release row hierarchy browser verification', () => {
       });
       await installMusicQueueReleaseDetailFixture(browserContext, buildMatchChoicePayload);
       await browserContext.route(/\/api\/v1\/acquisition\/releases\/wanted-match-choice\/matches\/match-choice-best\/use$/, async (route) => {
+        bestUseRequestCount += 1;
         await useMatchResponse.promise;
         await route.fulfill({
           body: JSON.stringify({ ok: true }),
@@ -1044,13 +1046,36 @@ suite('Music Queue release row hierarchy browser verification', () => {
       const alternateUseButton = alternateDecisionCard.getByRole('button', { name: 'Use this match' });
       const statusFeedback = reviewPanel.locator('.music-queue-review__action-feedback[role="status"]');
       const errorFeedback = reviewPanel.locator('.music-queue-review__action-feedback[role="alert"]');
-      const useMatchRequest = page.waitForRequest((request) => request.url().endsWith(
-        '/api/v1/acquisition/releases/wanted-match-choice/matches/match-choice-best/use',
-      ));
+      const confirmationDialog = page.getByRole('alertdialog', { name: 'Use this match for Child of God?' });
 
       await useButton.focus();
       await useButton.press('Enter');
+      await confirmationDialog.waitFor();
+      await confirmationDialog.getByText(
+        'Harmoniarr will save this match for Child of God. It will check the match before it can queue a download.',
+        { exact: true },
+      ).waitFor();
+      assert.equal(await alternateUseButton.isDisabled(), false);
+      assert.equal(alternateUseRequestCount, 0);
+      assert.equal(bestUseRequestCount, 0);
+      await confirmationDialog.getByRole('button', { name: 'Keep reviewing' }).click();
+      await confirmationDialog.waitFor({ state: 'detached' });
+      assert.equal(
+        await useButtonFocusTarget.evaluate((element) => globalThis.document.activeElement === element),
+        true,
+        'Cancelling a match selection should return focus to the originating action.',
+      );
+      assert.equal(alternateUseRequestCount, 0);
+      assert.equal(bestUseRequestCount, 0);
+
+      const useMatchRequest = page.waitForRequest((request) => request.url().endsWith(
+        '/api/v1/acquisition/releases/wanted-match-choice/matches/match-choice-best/use',
+      ));
+      await useButton.press('Enter');
+      await confirmationDialog.waitFor();
+      await confirmationDialog.getByRole('button', { name: 'Use this match' }).click();
       await useMatchRequest;
+      assert.equal(bestUseRequestCount, 1);
       await statusFeedback.getByText('Working', { exact: true }).waitFor();
       await statusFeedback.getByText('Using this match...', { exact: true }).waitFor();
       assert.equal(await useButtonFocusTarget.evaluate((element) => globalThis.document.activeElement === element), true);
@@ -1147,6 +1172,9 @@ suite('Music Queue release row hierarchy browser verification', () => {
       const useMatchButton = selectedMatchCard.getByRole('button', { name: 'Use this match' });
       await useMatchButton.focus();
       await useMatchButton.press('Enter');
+      const confirmationDialog = page.getByRole('alertdialog', { name: 'Use this match for Child of God?' });
+      await confirmationDialog.waitFor();
+      await confirmationDialog.getByRole('button', { name: 'Use this match' }).click();
       const updatedOutcomeHeading = reviewPanel.getByRole('heading', { exact: true, name: 'Checking matches' });
       await updatedOutcomeHeading.waitFor();
       await page.waitForFunction(() => (

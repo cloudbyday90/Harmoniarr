@@ -32,6 +32,7 @@ import {
   filterMusicQueueReleases,
   MUSIC_QUEUE_STATE_FILTERS,
 } from '../lib/music-queue-filter-presentation.js';
+import { buildMusicQueueMatchSelectionConfirmation } from '../lib/music-queue-match-selection-confirmation-presentation.js';
 import { useMusicQueue } from '../composables/useMusicQueue.js';
 import { useMusicQueueReleaseFocus } from '../composables/useMusicQueueReleaseFocus.js';
 import { useMusicQueueReleaseMutationFocus } from '../composables/useMusicQueueReleaseMutationFocus.js';
@@ -268,6 +269,16 @@ async function refreshSelectedReleaseDetail(result) {
 }
 
 async function handleUseMatch({ actionId, match, trigger, wasFocused } = {}) {
+  const release = selectedRelease.value;
+  if (!release?.id || !match?.matchId) {
+    return;
+  }
+
+  const confirmed = await confirm(buildMusicQueueMatchSelectionConfirmation(release));
+  if (!confirmed) {
+    return;
+  }
+
   await runReleaseMutation({
     actionId,
     trigger,
@@ -275,7 +286,7 @@ async function handleUseMatch({ actionId, match, trigger, wasFocused } = {}) {
     mutation: async () => {
       const result = await useMatch({
         matchId: match?.matchId,
-        wantedReleaseId: selectedRelease.value?.id,
+        wantedReleaseId: release.id,
       });
       if (result) {
         await refreshSelectedReleaseDetail(result);
