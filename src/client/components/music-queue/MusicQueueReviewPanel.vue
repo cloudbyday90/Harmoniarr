@@ -19,6 +19,7 @@
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue';
 import { buildMusicQueueReleaseActionFeedback } from '../../lib/music-queue-action-feedback-presentation.js';
+import { buildMusicQueueDownloaderHandoff } from '../../lib/music-queue-downloader-handoff.js';
 import { buildMusicQueueReviewPresentation } from '../../lib/music-queue-review-presentation.js';
 import {
   SETTINGS_RECOVERY_CONTEXT,
@@ -80,6 +81,7 @@ const headingElement = ref(null);
 const outcomeHeadingElement = ref(null);
 const reviewPanelElement = ref(null);
 const presentation = computed(() => buildMusicQueueReviewPresentation(props.review));
+const downloaderHandoff = computed(() => buildMusicQueueDownloaderHandoff(props.review));
 const releaseActionFeedback = computed(() => buildMusicQueueReleaseActionFeedback(
   props.actionFeedback,
   props.review?.releaseId,
@@ -319,7 +321,24 @@ defineExpose({ getActionElement, getHeadingElement, getOutcomeHeadingElement });
         </div>
       </section>
 
-      <section v-if="presentation.hasQualityChoice || review.action?.type === 'route'" class="music-queue-review__section" aria-labelledby="music-queue-review-continue">
+      <section v-if="downloaderHandoff" class="music-queue-review__section" aria-labelledby="music-queue-review-download-progress">
+        <div>
+          <h3 id="music-queue-review-download-progress">Download progress</h3>
+          <p>{{ downloaderHandoff.description }}</p>
+        </div>
+        <div class="music-queue-review__actions">
+          <RouterLink
+            class="hx-btn"
+            data-variant="primary"
+            :aria-label="downloaderHandoff.accessibleLabel"
+            :to="downloaderHandoff.location"
+          >
+            {{ downloaderHandoff.label }}
+          </RouterLink>
+        </div>
+      </section>
+
+      <section v-if="presentation.hasQualityChoice || (review.action?.type === 'route' && !downloaderHandoff)" class="music-queue-review__section" aria-labelledby="music-queue-review-continue">
         <div>
           <h3 id="music-queue-review-continue">Continue this release</h3>
           <p>Use an option only when it matches the quality policy you want for this release.</p>
@@ -354,7 +373,7 @@ defineExpose({ getActionElement, getHeadingElement, getOutcomeHeadingElement });
             {{ isReleaseActionRunning('search-again') ? 'Queuing...' : review.searchAgainLabel }}
           </button>
           <RouterLink
-            v-if="review.action?.type === 'route'"
+            v-if="review.action?.type === 'route' && !downloaderHandoff"
             class="hx-btn"
             data-variant="primary"
             :to="{ name: review.action.routeName }"

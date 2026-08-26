@@ -505,7 +505,7 @@ export function buildMusicQueueAction(status, recovery = null) {
     case 'download_now':
       return { code: 'download_now', label: 'Review match', type: 'review' };
     case 'open_downloader':
-      return { code: 'open_downloader', label: 'Open Downloader', type: 'route', routeName: 'downloader' };
+      return { code: 'open_downloader', label: 'View download progress', type: 'route', routeName: 'downloader' };
     case 'open_in_library':
       return { code: 'open_in_library', label: 'Open Library', type: 'route', routeName: 'library' };
     case 'recheck_library_add':
@@ -667,6 +667,7 @@ export function buildMusicQueueMatchReview(release) {
 
   return {
     action: release.action,
+    artistName: release.artistName,
     canAddToLibrary,
     canAllowFallbackQuality,
     canSearchAgain,
@@ -684,6 +685,7 @@ export function buildMusicQueueMatchReview(release) {
     ],
     reason: release.detailText,
     releaseId: release.id,
+    releaseTitle: release.releaseTitle,
     statusLabel: release.status?.label ?? 'Queued',
     statusTone: release.status?.tone ?? 'neutral',
     qualityRows: [

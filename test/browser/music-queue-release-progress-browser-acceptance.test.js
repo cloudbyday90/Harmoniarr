@@ -188,7 +188,7 @@ suite('Music Queue release progress browser acceptance', () => {
       await refreshButton.focus();
       await refreshButton.click();
       await releaseRow.getByText('Downloading', { exact: true }).waitFor();
-      await releaseRow.getByRole('link', { name: 'Open Downloader' }).waitFor();
+      await releaseRow.getByRole('link', { name: /View download progress/ }).waitFor();
       assert.match(await progress.innerText(), /2 transfers confirmed by Harmoniarr\./);
       assert.equal(await refreshButton.evaluate((element) => globalThis.document.activeElement === element), true);
       await page.locator('.music-queue-status-announcement')

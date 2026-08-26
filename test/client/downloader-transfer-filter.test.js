@@ -38,6 +38,13 @@ test('filters Downloader transfers by the independent state and Music Queue link
     musicQueueLinkedOnly: true,
     stateFilter: 'queued',
   }), []);
+  assert.deepEqual(filterDownloaderTransfers(transfers, {
+    wantedReleaseId: 'wanted-release-linked',
+  }), [linkedTransfer]);
+  assert.deepEqual(filterDownloaderTransfers(transfers, {
+    stateFilter: 'active',
+    wantedReleaseId: 'wanted-release-missing',
+  }), []);
 });
 
 test('treats only a durable wanted release identifier as Music Queue linkage', () => {
@@ -51,4 +58,8 @@ test('falls back to all states and produces an accurate result label', () => {
   assert.equal(buildDownloaderTransferFilterResultLabel(1, 1), 'Showing 1 of 1 transfer.');
   assert.equal(buildDownloaderTransferFilterResultLabel(0, 2), 'Showing 0 of 2 transfers.');
   assert.equal(buildDownloaderTransferFilterResultLabel(-1, Number.NaN), 'Showing 0 of 0 transfers.');
+  assert.equal(
+    buildDownloaderTransferFilterResultLabel(1, 2, { wantedReleaseId: 'wanted-release-linked' }),
+    'Showing 1 transfer linked to this Music Queue release.',
+  );
 });

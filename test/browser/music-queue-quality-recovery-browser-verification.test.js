@@ -216,7 +216,7 @@ suite('Music Queue strict-quality recovery browser verification', () => {
 
       await page.getByRole('button', { name: 'Refresh' }).click();
       await releaseRow.getByText('Downloading', { exact: true }).waitFor();
-      await releaseRow.getByRole('link', { name: 'Open Downloader' }).waitFor();
+      await releaseRow.getByRole('link', { name: /View download progress/ }).waitFor();
       assert.equal(await releaseRow.getByRole('button', { name: 'Review quality choice' }).count(), 0);
 
       await page.goto(`${baseUrl}/app/activity/feed`, { waitUntil: 'domcontentloaded' });
@@ -235,7 +235,7 @@ suite('Music Queue strict-quality recovery browser verification', () => {
       await releaseRow.getByText('Quality choice needed', { exact: true }).waitFor();
       await releaseRow.getByText('no other safe match is available', { exact: false }).waitFor();
       await releaseRow.getByRole('button', { name: 'Review quality choice' }).waitFor();
-      assert.equal(await releaseRow.getByRole('link', { name: 'Open Downloader' }).count(), 0);
+      assert.equal(await releaseRow.getByRole('link', { name: /View download progress/ }).count(), 0);
       assert.equal(await releaseRow.getByRole('button', { name: 'View recovery' }).count(), 0);
 
       await page.goto(`${baseUrl}/app/activity/feed`, { waitUntil: 'domcontentloaded' });

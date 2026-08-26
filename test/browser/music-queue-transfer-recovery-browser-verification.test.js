@@ -111,7 +111,7 @@ suite('Music Queue transfer recovery browser verification', () => {
       assert.doesNotMatch(await page.getByRole('main').innerText(), /\bcandidate(?:s)?\b/i);
 
       await releaseRow.getByText('Downloading', { exact: true }).waitFor({ timeout: 15_000 });
-      await releaseRow.getByRole('link', { name: 'Open Downloader' }).waitFor();
+      await releaseRow.getByRole('link', { name: /View download progress/ }).waitFor();
       await details.getByRole('heading', { name: 'Automatic Recovery by Fixture Harbor' }).waitFor();
       await details.getByText('Downloading', { exact: true }).waitFor();
       assert.ok(releaseReadCount >= 2, 'active recovery must revalidate without pressing Refresh');

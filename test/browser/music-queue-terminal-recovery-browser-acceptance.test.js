@@ -100,7 +100,7 @@ suite('Music Queue terminal recovery browser acceptance', () => {
         assertNoNormalSurfaceDiagnostics(await page.getByRole('main').innerText());
 
         await releaseRow.getByText('Downloading', { exact: true }).waitFor({ timeout: 15_000 });
-        await releaseRow.getByRole('link', { name: 'Open Downloader' }).waitFor();
+        await releaseRow.getByRole('link', { name: /View download progress/ }).waitFor();
         assert.ok(readModel.getReleaseReadCount() >= 2, 'automatic recovery must revalidate without pressing Refresh');
         assert.equal(await releaseRow.getByRole('button', { name: 'Review quality choice' }).count(), 0);
 
@@ -140,7 +140,7 @@ suite('Music Queue terminal recovery browser acceptance', () => {
           await releaseRow.getByText('Quality choice needed', { exact: true }).waitFor();
           await releaseRow.getByRole('button', { name: 'Review quality choice' }).click();
           await details.getByRole('button', { name: 'Search again' }).waitFor();
-          assert.equal(await releaseRow.getByRole('link', { name: 'Open Downloader' }).count(), 0);
+          assert.equal(await releaseRow.getByRole('link', { name: /View download progress/ }).count(), 0);
           assert.equal(await releaseRow.getByRole('link', { name: 'Open Library' }).count(), 0);
         } else {
           await releaseRow.getByText('Needs help', { exact: true }).waitFor();

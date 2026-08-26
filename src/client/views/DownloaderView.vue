@@ -42,6 +42,10 @@ import {
   omitDownloaderTransferRouteQuery,
 } from '../lib/downloader-transfer-route.js';
 import {
+  normalizeDownloaderMusicQueueHandoffRouteQuery,
+  omitDownloaderMusicQueueHandoffRouteQuery,
+} from '../lib/downloader-music-queue-handoff-route.js';
+import {
   buildDownloaderTransferFilterResultLabel,
   filterDownloaderTransfers,
 } from '../lib/downloader-transfer-filter.js';
@@ -97,12 +101,21 @@ const allFiles = computed(() => (
     : []
 ));
 const counts = computed(() => downloaderQueue.value?.queueHealth?.counts ?? emptyCounts);
+const musicQueueHandoffTarget = computed(() => (
+  normalizeDownloaderMusicQueueHandoffRouteQuery(route.query)
+));
+const musicQueueReleaseFilterActive = computed(() => Boolean(
+  musicQueueHandoffTarget.value.wantedReleaseId,
+));
 const visibleFiles = computed(() => filterDownloaderTransfers(allFiles.value, {
   musicQueueLinkedOnly: musicQueueLinkedOnly.value,
   stateFilter: selectedStateFilter.value,
+  wantedReleaseId: musicQueueHandoffTarget.value.wantedReleaseId,
 }));
 const filterResultLabel = computed(() => (
-  buildDownloaderTransferFilterResultLabel(visibleFiles.value.length, counts.value.total)
+  buildDownloaderTransferFilterResultLabel(visibleFiles.value.length, counts.value.total, {
+    wantedReleaseId: musicQueueHandoffTarget.value.wantedReleaseId,
+  })
 ));
 
 const providerDisabled = computed(() => isDownloaderProviderDisabled(downloaderQueue.value));
@@ -216,6 +229,13 @@ function clearRouteTransferHandoff() {
   });
 }
 
+function clearMusicQueueReleaseHandoff() {
+  void router.replace({
+    name: 'downloader',
+    query: omitDownloaderMusicQueueHandoffRouteQuery(route.query),
+  });
+}
+
 async function performTransferAction(action) {
   if (!selectedTransfer.value || pendingAction.value || providerDisabled.value) return;
   actionErrorMessage.value = '';
@@ -313,6 +333,32 @@ async function clearCompletedTransfers() {
       </div>
     </article>
 
+    <article v-if="musicQueueReleaseFilterActive" class="hx-card downloader-music-queue-handoff">
+      <div class="hx-card-body downloader-music-queue-handoff__body">
+        <div>
+          <h2 class="downloader-music-queue-handoff__title">Music Queue transfer</h2>
+          <p class="downloader-music-queue-handoff__copy">
+            Showing live transfers linked to this release. Download controls are here; release decisions remain in Music Queue.
+          </p>
+        </div>
+        <div class="downloader-music-queue-handoff__actions">
+          <RouterLink
+            class="hx-btn"
+            data-variant="ghost"
+            :to="{
+              name: 'music-queue-release',
+              params: { wantedReleaseId: musicQueueHandoffTarget.wantedReleaseId },
+            }"
+          >
+            Open release in Music Queue
+          </RouterLink>
+          <button type="button" class="hx-btn" data-variant="ghost" @click="clearMusicQueueReleaseHandoff">
+            Show all transfers
+          </button>
+        </div>
+      </div>
+    </article>
+
     <article class="hx-card downloader-transfer-queue">
       <div class="hx-card-header">
         <div>
@@ -324,6 +370,7 @@ async function clearCompletedTransfers() {
         <div class="hx-card-actions">
           <DownloaderTransferFilters
             :music-queue-linked-only="musicQueueLinkedOnly"
+            :music-queue-release-filter-active="musicQueueReleaseFilterActive"
             :state-filter="selectedStateFilter"
             @update:music-queue-linked-only="updateMusicQueueLinkedOnly"
             @update:state-filter="updateStateFilter"
@@ -343,17 +390,43 @@ async function clearCompletedTransfers() {
           </div>
         </div>
         <div v-else-if="!allFiles.length" class="hx-empty">
-          <p class="hx-empty-title">{{ emptyState.title }}</p>
-          <p class="hx-empty-copy">{{ emptyState.body }}</p>
-          <div v-if="emptyState.actionRouteName && emptyState.actionLabel" class="hx-empty-actions">
-            <RouterLink class="hx-btn" :to="emptyStateActionLocation">
-              {{ emptyState.actionLabel }}
-            </RouterLink>
-          </div>
+          <template v-if="musicQueueReleaseFilterActive">
+            <p class="hx-empty-title">No live transfer for this Music Queue release</p>
+            <p class="hx-empty-copy">The transfer may not have started, may have completed, or may no longer be in the live queue.</p>
+            <div class="hx-empty-actions">
+              <RouterLink
+                class="hx-btn"
+                :to="{
+                  name: 'music-queue-release',
+                  params: { wantedReleaseId: musicQueueHandoffTarget.wantedReleaseId },
+                }"
+              >
+                Open release in Music Queue
+              </RouterLink>
+            </div>
+          </template>
+          <template v-else>
+            <p class="hx-empty-title">{{ emptyState.title }}</p>
+            <p class="hx-empty-copy">{{ emptyState.body }}</p>
+            <div v-if="emptyState.actionRouteName && emptyState.actionLabel" class="hx-empty-actions">
+              <RouterLink class="hx-btn" :to="emptyStateActionLocation">
+                {{ emptyState.actionLabel }}
+              </RouterLink>
+            </div>
+          </template>
         </div>
         <div v-else-if="!visibleFiles.length" class="hx-empty">
-          <p class="hx-empty-title">No transfers match these filters</p>
-          <p class="hx-empty-copy">Change the transfer filters to review other items.</p>
+          <template v-if="musicQueueReleaseFilterActive">
+            <p class="hx-empty-title">No live transfer for this Music Queue release</p>
+            <p class="hx-empty-copy">The visible queue does not contain a transfer for this release.</p>
+            <div class="hx-empty-actions">
+              <button type="button" class="hx-btn" @click="clearMusicQueueReleaseHandoff">Show all transfers</button>
+            </div>
+          </template>
+          <template v-else>
+            <p class="hx-empty-title">No transfers match these filters</p>
+            <p class="hx-empty-copy">Change the transfer filters to review other items.</p>
+          </template>
         </div>
         <div v-else class="hx-table-scroll">
           <table class="hx-table">
@@ -506,6 +579,34 @@ async function clearCompletedTransfers() {
   line-height: 1.5;
 }
 
+.downloader-music-queue-handoff__body {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--hx-space-4);
+}
+
+.downloader-music-queue-handoff__title {
+  margin: 0;
+  color: var(--hx-text-strong);
+  font-size: var(--hx-text-base);
+}
+
+.downloader-music-queue-handoff__copy {
+  max-width: 760px;
+  margin: var(--hx-space-1) 0 0;
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-sm);
+  line-height: 1.5;
+}
+
+.downloader-music-queue-handoff__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--hx-space-2);
+}
+
 .downloader-detail-button {
   min-height: 32px;
   padding: 0 var(--hx-space-3);
@@ -524,6 +625,18 @@ async function clearCompletedTransfers() {
 
   .downloader-transfer-queue .hx-card-actions {
     align-self: stretch;
+  }
+
+  .downloader-music-queue-handoff__body {
+    flex-direction: column;
+  }
+
+  .downloader-music-queue-handoff__actions {
+    width: 100%;
+  }
+
+  .downloader-music-queue-handoff__actions > * {
+    flex: 1 1 100%;
   }
 }
 

@@ -95,7 +95,7 @@ async function assertOwnSharedMusicQueueJourney({
   await releaseRow.getByText('Downloading', { exact: true }).waitFor();
   await detail.getByRole('heading', { name: `${SHARED_RELEASE} by ${SHARED_ARTIST}` }).waitFor();
   await detail.getByText('Harmoniarr selected a verified lossless match and is downloading it now.').waitFor();
-  assert.equal(await releaseRow.getByRole('link', { name: 'Open Downloader' }).count(), 1);
+  assert.equal(await releaseRow.getByRole('link', { name: /View download progress/ }).count(), 1);
   assert.doesNotMatch(await page.getByRole('main').innerText(), new RegExp(`${policyMarker}|${otherPolicyMarker}`, 'u'));
 
   await page.goto(`${baseUrl}/app/activity/feed`, { waitUntil: 'domcontentloaded' });

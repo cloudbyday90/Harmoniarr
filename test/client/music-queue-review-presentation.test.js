@@ -94,6 +94,17 @@ test('Music Queue review keeps an automatic release calm while retaining evidenc
   assert.match(presentation.decisionCopy, /continue automatically/i);
 });
 
+test('Music Queue review distinguishes the Downloader handoff from a release decision', () => {
+  const presentation = buildMusicQueueReviewPresentation({
+    ...BASE_REVIEW,
+    action: { code: 'open_downloader', routeName: 'downloader', type: 'route' },
+    matchCards: [],
+  });
+
+  assert.equal(presentation.hasDownloaderHandoff, true);
+  assert.match(presentation.decisionCopy, /Release decisions remain in Music Queue/i);
+});
+
 test('Music Queue review presents manual library add as the one decision for a safe ready release', () => {
   const presentation = buildMusicQueueReviewPresentation({
     ...BASE_REVIEW,

@@ -31,7 +31,14 @@ function buildMatchChoiceCopy({ matchChoiceCount, visibleMatchCount }) {
   return `Choose from ${visibleMatchCount} available match${visibleMatchCount === 1 ? '' : 'es'}. Select a match only when it fits this release and your quality policy.`;
 }
 
-function getDecisionCopy({ hasManualSafeAdd, hasMatchChoices, hasQualityChoice, hasRouteAction, recovery }) {
+function getDecisionCopy({
+  hasDownloaderHandoff,
+  hasManualSafeAdd,
+  hasMatchChoices,
+  hasQualityChoice,
+  hasRouteAction,
+  recovery,
+}) {
   if (recovery?.nextStep) return recovery.nextStep;
 
   if (hasManualSafeAdd) {
@@ -44,6 +51,10 @@ function getDecisionCopy({ hasManualSafeAdd, hasMatchChoices, hasQualityChoice, 
 
   if (hasQualityChoice) {
     return 'Choose whether to keep looking for a better match or allow the available fallback quality for this release.';
+  }
+
+  if (hasDownloaderHandoff) {
+    return 'Follow this transfer in Downloader. Release decisions remain in Music Queue.';
   }
 
   if (hasRouteAction) {
@@ -66,14 +77,25 @@ export function buildMusicQueueReviewPresentation(review) {
   const hasManualSafeAdd = review.canAddToLibrary === true;
   const hasQualityChoice = Boolean(review.canAllowFallbackQuality || review.canSearchAgain);
   const hasRouteAction = review.action?.type === 'route';
+  const hasDownloaderHandoff = review.action?.code === 'open_downloader'
+    && review.action?.routeName === 'downloader'
+    && hasRouteAction;
   const recovery = review.recovery ?? null;
   const qualityRows = Array.isArray(review.qualityRows) ? review.qualityRows : [];
 
   return {
-    decisionCopy: getDecisionCopy({ hasManualSafeAdd, hasMatchChoices, hasQualityChoice, hasRouteAction, recovery }),
+    decisionCopy: getDecisionCopy({
+      hasDownloaderHandoff,
+      hasManualSafeAdd,
+      hasMatchChoices,
+      hasQualityChoice,
+      hasRouteAction,
+      recovery,
+    }),
     decisionMatchCards,
     evidenceMatchCards: hasMatchChoices ? [] : matchCards,
     hasDecision: hasManualSafeAdd || hasMatchChoices || hasQualityChoice || hasRouteAction,
+    hasDownloaderHandoff,
     hasManualSafeAdd,
     hasEvidence: matchCards.length > 0 || qualityRows.length > 0 || (review.matchRows?.length ?? 0) > 0,
     hasMatchChoices,

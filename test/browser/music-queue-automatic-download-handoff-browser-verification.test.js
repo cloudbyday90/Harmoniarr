@@ -23,12 +23,46 @@ import {
   isSkippableBrowserRuntimeError,
   toBrowserRuntimeUnavailableReason,
 } from '../../testing/browser/playwright-smoke-runtime.js';
-import { installDownloaderBrowserFixtures } from '../../testing/browser/downloader-browser-fixtures.js';
+import {
+  buildLinkedDownloaderQueueFixture,
+  buildUnlinkedDownloaderTransferFixture,
+  installDownloaderBrowserFixtures,
+} from '../../testing/browser/downloader-browser-fixtures.js';
 import { installConfiguredMusicQueueProviderFixtures } from '../../testing/browser/music-queue-browser-fixtures.js';
 import { bootstrapAdminThroughUi } from '../../testing/browser/operator-browser-helpers.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 
 const integrationRuntimeConfig = resolveIntegrationTestRuntimeConfig();
+const defaultDownloaderQueue = buildLinkedDownloaderQueueFixture();
+const automaticDownloadQueue = buildLinkedDownloaderQueueFixture({
+  queueHealth: {
+    ...defaultDownloaderQueue.queueHealth,
+    counts: {
+      ...defaultDownloaderQueue.queueHealth.counts,
+      queued: 1,
+      total: 2,
+    },
+    message: '1 active and 1 queued transfer are in the queue.',
+  },
+  transfers: [
+    {
+      ...defaultDownloaderQueue.transfers[0],
+      diagnostics: {
+        ...defaultDownloaderQueue.transfers[0].diagnostics,
+        importLinkage: {
+          ...defaultDownloaderQueue.transfers[0].diagnostics.importLinkage,
+          musicQueueRelease: {
+            artistName: 'Forest Frank',
+            releaseTitle: 'Child of God',
+            wantedReleaseId: 'wanted-forest-frank-auto-download',
+            wantedStatus: 'downloading',
+          },
+        },
+      },
+    },
+    buildUnlinkedDownloaderTransferFixture(),
+  ],
+});
 
 function buildMusicQueuePayload({ state = 'searching' } = {}) {
   const status = state === 'downloading'
@@ -155,40 +189,82 @@ suite('Music Queue automatic download handoff browser verification', () => {
 
     await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
       const pageErrors = [];
-      let queueReadCount = 0;
+      let state = 'searching';
       page.on('pageerror', (error) => pageErrors.push(error.message));
 
-      await installDownloaderBrowserFixtures(browserContext);
-      await bootstrapAdminThroughUi(page, { baseUrl });
+      await installDownloaderBrowserFixtures(browserContext, { queue: automaticDownloadQueue });
       await installConfiguredMusicQueueProviderFixtures(browserContext);
-      await browserContext.route(/\/api\/v1\/acquisition\/releases(?:\?.*)?$/, async (route) => {
-        queueReadCount += 1;
-        const state = queueReadCount > 1 ? 'downloading' : 'searching';
+      await browserContext.route(/\/api\/v1\/acquisition\/releases(?:\/[^/?]+)?(?:\?.*)?$/, async (route) => {
+        const requestUrl = new URL(route.request().url());
+        const payload = buildMusicQueuePayload({ state });
+        const releaseId = 'wanted-forest-frank-auto-download';
         await route.fulfill({
-          body: JSON.stringify(buildMusicQueuePayload({ state })),
+          body: JSON.stringify(
+            requestUrl.pathname.endsWith(`/${releaseId}`)
+              ? { checkedAt: payload.checkedAt, release: payload.releases[0] }
+              : payload,
+          ),
           contentType: 'application/json',
         });
       });
+      await bootstrapAdminThroughUi(page, { baseUrl });
 
       await page.goto(`${baseUrl}/app/music-queue`, { waitUntil: 'domcontentloaded' });
+      await page.getByLabel('Show releases').selectOption('in-progress');
       const releaseRow = page.locator('.music-queue-release-row').filter({ hasText: 'Child of God' });
       await releaseRow.getByText('Searching', { exact: true }).waitFor();
       await releaseRow.getByText('Harmoniarr is looking for an acceptable match.').waitFor();
-      assert.equal(await releaseRow.getByRole('link', { name: 'Open Downloader' }).count(), 0);
+      assert.equal(await releaseRow.getByRole('link', { name: /View download progress/ }).count(), 0);
 
+      state = 'downloading';
       await page.getByRole('button', { name: 'Refresh' }).click();
       await releaseRow.getByText('Downloading', { exact: true }).waitFor();
       await releaseRow.getByText('Quality profile: Lossless archive').waitFor();
       assert.equal(await releaseRow.getByRole('button', { name: 'Review matches' }).count(), 0);
+      const downloadProgressLink = releaseRow.getByRole('link', {
+        name: 'View download progress for Forest Frank — Child of God',
+      });
+      assert.equal(
+        await downloadProgressLink.getAttribute('href'),
+        '/app/downloader?wantedReleaseId=wanted-forest-frank-auto-download',
+      );
+
+      await Promise.all([
+        page.waitForURL(/\/app\/music-queue\/wanted-forest-frank-auto-download$/),
+        releaseRow.getByRole('button', { name: 'Details' }).click(),
+      ]);
+      const reviewPanel = page.locator('.music-queue-review');
+      await reviewPanel.getByRole('heading', {
+        name: 'Child of God by Forest Frank',
+      }).waitFor();
+      await reviewPanel.getByRole('heading', { name: 'Download progress' }).waitFor();
+      const reviewDownloadProgressLink = reviewPanel.getByRole('link', {
+        name: 'View download progress for Forest Frank — Child of God',
+      });
+      assert.equal(
+        await reviewDownloadProgressLink.getAttribute('href'),
+        '/app/downloader?wantedReleaseId=wanted-forest-frank-auto-download',
+      );
+
+      await Promise.all([
+        page.waitForURL(/\/app\/downloader\?wantedReleaseId=wanted-forest-frank-auto-download$/),
+        reviewDownloadProgressLink.click(),
+      ]);
+      await page.getByRole('heading', { exact: true, name: 'Downloader' }).waitFor();
+      await page.getByRole('heading', { exact: true, name: 'Music Queue transfer' }).waitFor();
+      await page.getByRole('heading', { exact: true, name: 'Transfer Queue' }).waitFor();
+      await page.getByText('Showing 1 transfer linked to this Music Queue release.', { exact: true }).waitFor();
+      await page.getByText('01 Foil.flac', { exact: true }).waitFor();
+      assert.equal(await page.getByText('02 Antarctica Starts Here.flac', { exact: true }).count(), 0);
+      assert.equal(await page.getByRole('checkbox', { name: 'Only transfers linked to Music Queue' }).count(), 0);
+      await page.getByRole('progressbar').waitFor();
 
       await Promise.all([
         page.waitForURL(/\/app\/downloader$/),
-        releaseRow.getByRole('link', { name: 'Open Downloader' }).click(),
+        page.getByRole('button', { name: 'Show all transfers' }).click(),
       ]);
-      await page.getByRole('heading', { exact: true, name: 'Downloader' }).waitFor();
-      await page.getByRole('heading', { exact: true, name: 'Transfer Queue' }).waitFor();
-      await page.getByText('01 Foil.flac', { exact: true }).waitFor();
-      await page.getByRole('progressbar').waitFor();
+      await page.getByText('02 Antarctica Starts Here.flac', { exact: true }).waitFor();
+      assert.equal(await page.getByRole('heading', { exact: true, name: 'Music Queue transfer' }).count(), 0);
 
       await browserContext.unrouteAll({ behavior: 'ignoreErrors' });
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
@@ -222,7 +298,7 @@ suite('Music Queue automatic download handoff browser verification', () => {
       await releaseRow.getByText('Quality: Below preference').waitFor();
       await releaseRow.getByText('Harmoniarr did not select one for your lossless archive.').waitFor();
       await releaseRow.getByRole('button', { name: 'Review quality choice' }).waitFor();
-      assert.equal(await releaseRow.getByRole('link', { name: 'Open Downloader' }).count(), 0);
+      assert.equal(await releaseRow.getByRole('link', { name: /View download progress/ }).count(), 0);
 
       await browserContext.unrouteAll({ behavior: 'ignoreErrors' });
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
@@ -255,8 +331,11 @@ suite('Music Queue automatic download handoff browser verification', () => {
       await releaseRow.getByText('Soulseek is turned off.').waitFor();
       const providerLink = releaseRow.getByRole('link', { name: 'Test Soulseek' });
       await providerLink.waitFor();
-      assert.equal(await providerLink.getAttribute('href'), '/app/settings/connections');
-      assert.equal(await releaseRow.getByRole('link', { name: 'Open Downloader' }).count(), 0);
+      assert.equal(
+        await providerLink.getAttribute('href'),
+        '/app/settings/connections?returnTo=music_queue_release&returnReleaseId=wanted-forest-frank-provider-stop',
+      );
+      assert.equal(await releaseRow.getByRole('link', { name: /View download progress/ }).count(), 0);
 
       await browserContext.unrouteAll({ behavior: 'ignoreErrors' });
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);

@@ -18,6 +18,7 @@
 
 <script setup>
 import { computed } from 'vue';
+import { buildMusicQueueDownloaderHandoff } from '../../lib/music-queue-downloader-handoff.js';
 import { buildMusicQueueReleaseRowPresentation } from '../../lib/music-queue-release-row-presentation.js';
 import {
   SETTINGS_RECOVERY_CONTEXT,
@@ -43,7 +44,10 @@ const props = defineProps({
 const emit = defineEmits(['open-review']);
 
 const presentation = computed(() => buildMusicQueueReleaseRowPresentation(props.release));
+const downloaderHandoff = computed(() => buildMusicQueueDownloaderHandoff(props.release));
 const routeActionLocation = computed(() => {
+  if (downloaderHandoff.value) return downloaderHandoff.value.location;
+
   const action = props.release.action;
   if (!action?.routeName) return null;
   if (!action.routeName.startsWith('settings-')) {
@@ -58,6 +62,10 @@ const routeActionLocation = computed(() => {
     routeName: action.routeName,
   });
 });
+const routeActionLabel = computed(() => downloaderHandoff.value?.label ?? props.release.action?.label ?? 'Open');
+const routeActionAccessibleLabel = computed(() => (
+  downloaderHandoff.value?.accessibleLabel ?? routeActionLabel.value
+));
 
 function openReview(event) {
   emit('open-review', props.release, event.currentTarget);
@@ -124,9 +132,10 @@ function openReview(event) {
         v-else
         class="hx-btn"
         data-variant="primary"
+        :aria-label="routeActionAccessibleLabel"
         :to="routeActionLocation"
       >
-        {{ release.action.label }}
+        {{ routeActionLabel }}
       </RouterLink>
       <button
         v-if="release.action.type !== 'review'"

@@ -24,6 +24,10 @@ defineProps({
     type: Boolean,
     default: false,
   },
+  musicQueueReleaseFilterActive: {
+    type: Boolean,
+    default: false,
+  },
   stateFilter: {
     type: String,
     default: 'all',
@@ -59,7 +63,7 @@ function updateMusicQueueLinkedOnly(event) {
         </option>
       </select>
     </label>
-    <label class="downloader-transfer-filter-linkage">
+    <label v-if="!musicQueueReleaseFilterActive" class="downloader-transfer-filter-linkage">
       <input
         type="checkbox"
         :checked="musicQueueLinkedOnly"

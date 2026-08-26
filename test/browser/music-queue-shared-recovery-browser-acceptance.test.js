@@ -172,7 +172,7 @@ async function assertOwnSharedRecoveryJourney({
   });
 
   await releaseRow.getByText('Downloading', { exact: true }).waitFor({ timeout: 15_000 });
-  await releaseRow.getByRole('link', { name: 'Open Downloader' }).waitFor();
+  await releaseRow.getByRole('link', { name: /View download progress/ }).waitFor();
   assert.ok(readModel.getReleaseReadCount() >= 2, 'shared recovery must revalidate without a manual refresh');
 
   await page.goto(`${baseUrl}/app/activity/feed`, { waitUntil: 'domcontentloaded' });

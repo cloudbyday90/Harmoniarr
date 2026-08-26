@@ -38,6 +38,15 @@ function matchesStateFilter(transfer, stateFilter) {
   return stateFilter === 'all' || transfer?.state?.code === stateFilter;
 }
 
+function normalizeWantedReleaseId(value) {
+  return typeof value === 'string' && value.trim() ? value.trim() : '';
+}
+
+function matchesMusicQueueRelease(transfer, wantedReleaseId) {
+  return !wantedReleaseId
+    || getDownloaderMusicQueueRelease(transfer)?.wantedReleaseId === wantedReleaseId;
+}
+
 export function isDownloaderTransferLinkedToMusicQueue(transfer) {
   return Boolean(getDownloaderMusicQueueRelease(transfer));
 }
@@ -45,23 +54,32 @@ export function isDownloaderTransferLinkedToMusicQueue(transfer) {
 export function filterDownloaderTransfers(transfers, {
   musicQueueLinkedOnly = false,
   stateFilter = 'all',
+  wantedReleaseId = '',
 } = {}) {
   if (!Array.isArray(transfers)) {
     return [];
   }
 
   const normalizedStateFilter = normalizeStateFilter(stateFilter);
+  const normalizedWantedReleaseId = normalizeWantedReleaseId(wantedReleaseId);
 
   return transfers.filter((transfer) => (
     matchesStateFilter(transfer, normalizedStateFilter)
     && (!musicQueueLinkedOnly || isDownloaderTransferLinkedToMusicQueue(transfer))
+    && matchesMusicQueueRelease(transfer, normalizedWantedReleaseId)
   ));
 }
 
-export function buildDownloaderTransferFilterResultLabel(visibleCount, totalCount) {
+export function buildDownloaderTransferFilterResultLabel(visibleCount, totalCount, {
+  wantedReleaseId = '',
+} = {}) {
   const normalizedVisibleCount = Number.isFinite(visibleCount) ? Math.max(0, visibleCount) : 0;
   const normalizedTotalCount = Number.isFinite(totalCount) ? Math.max(0, totalCount) : 0;
   const transferLabel = normalizedTotalCount === 1 ? 'transfer' : 'transfers';
+
+  if (normalizeWantedReleaseId(wantedReleaseId)) {
+    return `Showing ${normalizedVisibleCount} ${normalizedVisibleCount === 1 ? 'transfer' : 'transfers'} linked to this Music Queue release.`;
+  }
 
   return `Showing ${normalizedVisibleCount} of ${normalizedTotalCount} ${transferLabel}.`;
 }
