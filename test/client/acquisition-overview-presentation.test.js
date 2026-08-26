@@ -111,6 +111,35 @@ test('Acquisition transfer rows show only live work and retain the Downloader ha
   assert.equal(rows[1].progressLabel, 'Queued');
 });
 
+test('Acquisition transfer rows use a release-scoped handoff for a verified Music Queue link', () => {
+  const queue = createDownloaderQueue({
+    transfers: [
+      {
+        ...createDownloaderQueue().transfers[0],
+        diagnostics: {
+          importLinkage: {
+            musicQueueRelease: {
+              artistName: 'Forest Frank',
+              releaseTitle: 'Child of God',
+              wantedReleaseId: 'wanted-forest-frank',
+            },
+          },
+        },
+      },
+    ],
+  });
+
+  const [row] = buildAcquisitionTransferRows(queue);
+
+  assert.equal(row.action.label, 'View download progress');
+  assert.equal(row.action.accessibleLabel, 'View download progress for Forest Frank — Child of God');
+  assert.deepEqual(row.location, {
+    name: 'downloader',
+    query: { wantedReleaseId: 'wanted-forest-frank' },
+  });
+  assert.doesNotMatch(JSON.stringify(row.location), /source-a|transfer-active/);
+});
+
 test('Acquisition transfer panel distinguishes setup and role-restricted states from an empty queue', () => {
   assert.deepEqual(buildAcquisitionTransferPanel(createDownloaderQueue(), {
     canViewDownloader: false,

@@ -18,7 +18,10 @@
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildMusicQueueDownloaderHandoff } from '../../src/client/lib/music-queue-downloader-handoff.js';
+import {
+  buildMusicQueueDownloaderHandoff,
+  buildReleaseScopedDownloaderHandoff,
+} from '../../src/client/lib/music-queue-downloader-handoff.js';
 
 test('buildMusicQueueDownloaderHandoff creates a release-scoped Downloader route', () => {
   assert.deepEqual(buildMusicQueueDownloaderHandoff({
@@ -50,4 +53,22 @@ test('buildMusicQueueDownloaderHandoff accepts a review projection and rejects u
   assert.equal(buildMusicQueueDownloaderHandoff({
     action: { code: 'open_downloader', routeName: 'downloader', type: 'route' },
   }), null);
+});
+
+test('buildReleaseScopedDownloaderHandoff accepts a durable queue link without accepting an action', () => {
+  assert.deepEqual(buildReleaseScopedDownloaderHandoff({
+    artistName: 'Forest Frank',
+    releaseTitle: 'Child of God',
+    wantedReleaseId: 'wanted-forest-frank',
+  }), {
+    accessibleLabel: 'View download progress for Forest Frank — Child of God',
+    description: 'View the live transfer and its controls in Downloader. Release decisions remain in Music Queue.',
+    label: 'View download progress',
+    location: {
+      name: 'downloader',
+      query: { wantedReleaseId: 'wanted-forest-frank' },
+    },
+    wantedReleaseId: 'wanted-forest-frank',
+  });
+  assert.equal(buildReleaseScopedDownloaderHandoff({ artistName: 'Forest Frank' }), null);
 });

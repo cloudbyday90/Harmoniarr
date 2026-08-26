@@ -21,7 +21,7 @@ function normalizeString(value) {
 }
 
 function getReleaseId(release) {
-  return normalizeString(release?.id ?? release?.releaseId);
+  return normalizeString(release?.id ?? release?.releaseId ?? release?.wantedReleaseId);
 }
 
 function isDownloaderRouteAction(action) {
@@ -31,17 +31,17 @@ function isDownloaderRouteAction(action) {
 }
 
 /**
- * Builds the bounded, release-level route from a Music Queue release to its
- * live Downloader transfer view. Provider identifiers deliberately never
- * cross this view boundary; Downloader resolves matching transfers from its
- * existing caller-scoped queue projection.
+ * Builds the bounded, release-level route to a Downloader view. Provider
+ * identifiers deliberately never cross this view boundary; Downloader
+ * resolves matching transfers from its existing caller-scoped queue
+ * projection.
  *
- * @param {{ id?: unknown, releaseId?: unknown, artistName?: unknown, releaseTitle?: unknown, action?: object }|null} release
+ * @param {{ id?: unknown, releaseId?: unknown, wantedReleaseId?: unknown, artistName?: unknown, releaseTitle?: unknown }|null} release
  * @returns {{ accessibleLabel: string, description: string, label: string, location: object, wantedReleaseId: string }|null}
  */
-export function buildMusicQueueDownloaderHandoff(release) {
+export function buildReleaseScopedDownloaderHandoff(release) {
   const wantedReleaseId = getReleaseId(release);
-  if (!wantedReleaseId || !isDownloaderRouteAction(release?.action)) {
+  if (!wantedReleaseId) {
     return null;
   }
 
@@ -61,4 +61,19 @@ export function buildMusicQueueDownloaderHandoff(release) {
     },
     wantedReleaseId,
   };
+}
+
+/**
+ * Builds the bounded, release-level route from a Music Queue action to its
+ * live Downloader transfer view. This preserves the product rule that Music
+ * Queue only offers the Downloader handoff when the API has selected that
+ * route as the current release action.
+ *
+ * @param {{ id?: unknown, releaseId?: unknown, wantedReleaseId?: unknown, artistName?: unknown, releaseTitle?: unknown, action?: object }|null} release
+ * @returns {{ accessibleLabel: string, description: string, label: string, location: object, wantedReleaseId: string }|null}
+ */
+export function buildMusicQueueDownloaderHandoff(release) {
+  return isDownloaderRouteAction(release?.action)
+    ? buildReleaseScopedDownloaderHandoff(release)
+    : null;
 }

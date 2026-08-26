@@ -37,7 +37,8 @@ Completed before commit:
 
 ## Next recommended item
 
-After operators use the overview, add durable, explicit release-to-transfer
-correlation from the existing import execution record. That would permit a
-single release row to show verified transfer progress without filename-based
-guessing or widening visibility across users.
+Implemented on 2026-08-26 in
+[Acquisition release-to-transfer correlation outcome](ACQUISITION_RELEASE_TRANSFER_CORRELATION_OUTCOME.md).
+The next item is operator-authorized strict local provider acceptance: confirm
+the durable linkage survives a real Music Queue -> Downloader transfer without
+manufacturing provider activity during validation.

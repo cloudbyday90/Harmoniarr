@@ -50,11 +50,16 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  transferProgressByRelease: {
+    type: Object,
+    default: () => ({}),
+  },
 });
 
 const progress = computed(() => buildMusicQueueProgressStrip(props.releases, {
   activeOrAttentionOnly: props.activeOrAttentionOnly,
   releaseDetailsOnly: props.releaseDetailsOnly,
+  transferProgressByRelease: props.transferProgressByRelease,
 }));
 const headingId = computed(() => `music-queue-progress-${props.heading.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`);
 </script>
@@ -95,8 +100,17 @@ const headingId = computed(() => `music-queue-progress-${props.heading.toLowerCa
               <span class="hx-pill" :data-tone="row.statusTone">{{ row.statusLabel }}</span>
             </div>
             <p>{{ row.detail }}</p>
+            <p v-if="row.transferProgress" class="music-queue-progress__transfer-progress">
+              <strong>Download progress</strong>
+              <span>{{ row.transferProgress.summary }}</span>
+            </p>
           </div>
-          <RouterLink class="hx-btn" data-variant="ghost" :to="row.action.to">
+          <RouterLink
+            class="hx-btn"
+            data-variant="ghost"
+            :aria-label="row.action.accessibleLabel"
+            :to="row.action.to"
+          >
             {{ row.action.label }}
           </RouterLink>
         </li>
@@ -160,6 +174,19 @@ const headingId = computed(() => `music-queue-progress-${props.heading.toLowerCa
   color: var(--hx-text-muted);
   font-size: var(--hx-text-sm);
   line-height: 1.45;
+}
+
+.music-queue-progress__transfer-progress {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-1);
+  color: var(--hx-text-faint);
+  font-size: var(--hx-text-xs);
+}
+
+.music-queue-progress__transfer-progress strong {
+  color: var(--hx-text-muted);
+  font-weight: var(--hx-font-medium);
 }
 
 .music-queue-progress__message {

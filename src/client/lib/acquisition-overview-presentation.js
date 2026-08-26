@@ -17,8 +17,10 @@
  */
 
 import { formatTransferFilename } from './activity-downloads-presentation.js';
+import { getDownloaderMusicQueueRelease } from './downloader-music-queue-link.js';
 import { buildDownloaderTransferLocation } from './downloader-transfer-route.js';
 import { isDownloaderProviderDisabled } from './downloader-presentation.js';
+import { buildReleaseScopedDownloaderHandoff } from './music-queue-downloader-handoff.js';
 import {
   isMusicQueueActiveProgressRelease,
   isMusicQueueAttentionRelease,
@@ -58,10 +60,34 @@ function buildTransferDetail(transfer) {
     : 'The download client has not reported more detail yet.';
 }
 
+function buildTransferAction(transfer, title) {
+  const linkedRelease = getDownloaderMusicQueueRelease(transfer);
+  const handoff = linkedRelease
+    ? buildReleaseScopedDownloaderHandoff({
+      artistName: linkedRelease.artistName,
+      id: linkedRelease.wantedReleaseId,
+      releaseTitle: linkedRelease.releaseTitle,
+    })
+    : null;
+
+  if (handoff) {
+    return handoff;
+  }
+
+  const location = buildDownloaderTransferLocation(transfer);
+  return location
+    ? {
+      accessibleLabel: `Open ${title} in Downloader`,
+      label: 'Open',
+      location,
+    }
+    : null;
+}
+
 /**
  * Creates the compact, read-only summary for the Acquisition overview. It
- * deliberately preserves separate release and transfer lanes so that this
- * overview cannot imply an unsafe release-to-transfer correlation.
+ * deliberately preserves separate release and transfer lanes. It only shows
+ * a cross-lane relation when the queue supplies a durable wanted-release ID.
  *
  * @param {{ canViewDownloader?: boolean, downloaderQueue?: object | null, releases?: object[] }} options
  * @returns {Array<{ key: string, label: string, meta: string, tone: string, value: number }>}
@@ -119,7 +145,7 @@ export function buildAcquisitionOverviewCards({
  *
  * @param {object | null | undefined} downloaderQueue
  * @param {{ limit?: number }} options
- * @returns {Array<{ detail: string, id: string, location: object | null, progressLabel: string, progressValue: number | null, statusLabel: string, statusTone: string, title: string }>}
+ * @returns {Array<{ action: object | null, detail: string, id: string, location: object | null, progressLabel: string, progressValue: number | null, statusLabel: string, statusTone: string, title: string }>}
  */
 export function buildAcquisitionTransferRows(downloaderQueue, { limit = ACQUISITION_OVERVIEW_TRANSFER_LIMIT } = {}) {
   const normalizedLimit = Math.max(1, Math.min(Number(limit) || ACQUISITION_OVERVIEW_TRANSFER_LIMIT, 10));
@@ -134,18 +160,24 @@ export function buildAcquisitionTransferRows(downloaderQueue, { limit = ACQUISIT
       return String(left?.filename ?? '').localeCompare(String(right?.filename ?? ''));
     })
     .slice(0, normalizedLimit)
-    .map((transfer, index) => ({
-      detail: buildTransferDetail(transfer),
-      id: transfer?.transferKey ?? `${transfer?.sourceUser ?? 'unknown'}-${transfer?.id ?? index}`,
-      location: buildDownloaderTransferLocation(transfer),
-      progressLabel: getTransferProgressLabel(transfer),
-      progressValue: Number.isFinite(transfer?.progress?.percentComplete)
-        ? Math.max(0, Math.min(100, Math.round(transfer.progress.percentComplete)))
-        : null,
-      statusLabel: transfer?.state?.label ?? 'In progress',
-      statusTone: transfer?.state?.tone ?? 'info',
-      title: formatTransferFilename(transfer?.filename),
-    }));
+    .map((transfer, index) => {
+      const title = formatTransferFilename(transfer?.filename);
+      const action = buildTransferAction(transfer, title);
+
+      return {
+        action,
+        detail: buildTransferDetail(transfer),
+        id: transfer?.transferKey ?? `${transfer?.sourceUser ?? 'unknown'}-${transfer?.id ?? index}`,
+        location: action?.location ?? null,
+        progressLabel: getTransferProgressLabel(transfer),
+        progressValue: Number.isFinite(transfer?.progress?.percentComplete)
+          ? Math.max(0, Math.min(100, Math.round(transfer.progress.percentComplete)))
+          : null,
+        statusLabel: transfer?.state?.label ?? 'In progress',
+        statusTone: transfer?.state?.tone ?? 'info',
+        title,
+      };
+    });
 }
 
 /**

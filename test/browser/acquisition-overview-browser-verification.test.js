@@ -82,6 +82,15 @@ function buildDownloaderPayload() {
           sourceUser: 'fixture-source',
           state: { code: 'active', label: 'Downloading', tone: 'warning' },
           transferKey: 'fixture-source::transfer-active',
+          diagnostics: {
+            importLinkage: {
+              musicQueueRelease: {
+                artistName: 'Fixture Artist',
+                releaseTitle: 'Preparing automatically',
+                wantedReleaseId: 'wanted-progress',
+              },
+            },
+          },
         },
         {
           filename: '/downloads/Queued transfer.flac',
@@ -116,7 +125,7 @@ suite('Acquisition overview browser verification', () => {
     await browserRuntime?.cleanup();
   }, { timeout: integrationRuntimeConfig.suiteTeardownTimeoutMs });
 
-  test('shows separate release and transfer lanes with links to their existing workspaces', {
+  test('shows a verified release-to-transfer handoff without exposing provider identifiers', {
     timeout: integrationRuntimeConfig.scenarioTimeoutMs,
   }, async (t) => {
     if (runtimeUnavailableReason) {
@@ -157,11 +166,16 @@ suite('Acquisition overview browser verification', () => {
       const reviewLink = page.getByRole('link', { name: 'Review', exact: true });
       assert.equal(await reviewLink.getAttribute('href'), '/app/music-queue/wanted-action');
 
-      const transferLink = page.getByRole('link', {
-        name: 'Open Active transfer.flac in Downloader',
+      const handoffLinks = page.getByRole('link', {
+        exact: true,
+        name: 'View download progress for Fixture Artist — Preparing automatically',
       });
-      const transferHref = await transferLink.getAttribute('href');
-      assert.match(transferHref ?? '', /\/app\/downloader\?open=details&transferId=transfer-active&username=fixture-source$/);
+      assert.equal(await handoffLinks.count(), 2);
+      for (let index = 0; index < await handoffLinks.count(); index += 1) {
+        const handoffHref = await handoffLinks.nth(index).getAttribute('href');
+        assert.equal(handoffHref, '/app/downloader?wantedReleaseId=wanted-progress');
+        assert.doesNotMatch(handoffHref ?? '', /fixture-source|transfer-active/);
+      }
       await page.getByRole('progressbar', { name: 'Active transfer.flac: 50%' }).waitFor();
       await page.getByRole('link', { name: 'Open Downloader', exact: true }).waitFor();
       assert.equal(await page.getByRole('button', { name: 'Clear Completed' }).count(), 0);

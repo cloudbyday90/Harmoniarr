@@ -24,6 +24,7 @@ import {
   buildAcquisitionOverviewCards,
   buildAcquisitionTransferPanel,
 } from '../lib/acquisition-overview-presentation.js';
+import { buildAcquisitionReleaseTransferProgress } from '../lib/acquisition-release-transfer-presentation.js';
 import { sessionStore } from '../state/session.js';
 
 const canViewDownloader = computed(() => sessionStore.state.user?.role === 'admin');
@@ -46,6 +47,11 @@ const summaryCards = computed(() => buildAcquisitionOverviewCards({
 const transferPanel = computed(() => buildAcquisitionTransferPanel(downloaderQueue.value, {
   canViewDownloader: canViewDownloader.value,
 }));
+const transferProgressByRelease = computed(() => (
+  canViewDownloader.value
+    ? buildAcquisitionReleaseTransferProgress(downloaderQueue.value)
+    : {}
+));
 
 function refreshOverview() {
   void refresh();
@@ -86,6 +92,7 @@ function refreshOverview() {
         :is-loading="musicQueueIsLoading"
         :releases="releases"
         show-empty
+        :transfer-progress-by-release="transferProgressByRelease"
       />
 
       <section class="hx-card acquisition-overview__downloads" aria-labelledby="acquisition-download-progress-heading">
@@ -146,10 +153,10 @@ function refreshOverview() {
                 v-if="transfer.location"
                 class="hx-btn"
                 data-variant="ghost"
-                :aria-label="`Open ${transfer.title} in Downloader`"
+                :aria-label="transfer.action?.accessibleLabel"
                 :to="transfer.location"
               >
-                Open
+                {{ transfer.action?.label ?? 'Open' }}
               </RouterLink>
             </li>
           </ul>

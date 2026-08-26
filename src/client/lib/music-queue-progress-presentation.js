@@ -60,7 +60,7 @@ function compareProgressReleases(left, right) {
   return String(left?.releaseTitle ?? '').localeCompare(String(right?.releaseTitle ?? ''));
 }
 
-function buildRowAction(release, { releaseDetailsOnly }) {
+function buildRowAction(release, { releaseDetailsOnly, transferProgress }) {
   if (releaseDetailsOnly) {
     return {
       label: 'View details',
@@ -68,6 +68,14 @@ function buildRowAction(release, { releaseDetailsOnly }) {
         name: 'music-queue-release',
         params: { wantedReleaseId: release?.id },
       },
+    };
+  }
+
+  if (transferProgress?.handoff) {
+    return {
+      accessibleLabel: transferProgress.handoff.accessibleLabel,
+      label: transferProgress.handoff.label,
+      to: transferProgress.handoff.location,
     };
   }
 
@@ -118,6 +126,7 @@ export function buildMusicQueueProgressStrip(releases, {
   activeOrAttentionOnly = false,
   limit = 3,
   releaseDetailsOnly = false,
+  transferProgressByRelease = {},
 } = {}) {
   const normalizedReleases = Array.isArray(releases) ? releases.filter(Boolean) : [];
   const normalizedLimit = Math.max(1, Math.min(Number(limit) || 3, 6));
@@ -129,14 +138,19 @@ export function buildMusicQueueProgressStrip(releases, {
   const rows = [...visibleReleases]
     .sort(compareProgressReleases)
     .slice(0, normalizedLimit)
-    .map((release) => ({
-      action: buildRowAction(release, { releaseDetailsOnly }),
-      detail: release.detailText || 'Harmoniarr is preparing the next step for this release.',
-      id: release.id,
-      statusLabel: release.status?.label ?? 'In progress',
-      statusTone: release.status?.tone ?? 'neutral',
-      title: `${release.releaseTitle} by ${release.artistName}`,
-    }));
+    .map((release) => {
+      const transferProgress = transferProgressByRelease?.[release.id] ?? null;
+
+      return {
+        action: buildRowAction(release, { releaseDetailsOnly, transferProgress }),
+        detail: release.detailText || 'Harmoniarr is preparing the next step for this release.',
+        id: release.id,
+        statusLabel: release.status?.label ?? 'In progress',
+        statusTone: release.status?.tone ?? 'neutral',
+        title: `${release.releaseTitle} by ${release.artistName}`,
+        transferProgress,
+      };
+    });
 
   return {
     activeCount,

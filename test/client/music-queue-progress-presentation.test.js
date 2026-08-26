@@ -115,3 +115,57 @@ test('Home progress omits idle releases and sends active or attention states to 
     },
   });
 });
+
+test('Acquisition progress gives a linked live transfer an explicit Downloader handoff', () => {
+  const result = buildMusicQueueProgressStrip([
+    createRelease({ id: 'downloading', statusCode: 'downloading', statusLabel: 'Downloading' }),
+  ], {
+    transferProgressByRelease: {
+      downloading: {
+        handoff: {
+          accessibleLabel: 'View download progress for Forest Frank — Release downloading',
+          label: 'View download progress',
+          location: {
+            name: 'downloader',
+            query: { wantedReleaseId: 'downloading' },
+          },
+        },
+        summary: '1 transfer is downloading',
+      },
+    },
+  });
+
+  assert.deepEqual(result.rows[0].action, {
+    accessibleLabel: 'View download progress for Forest Frank — Release downloading',
+    label: 'View download progress',
+    to: {
+      name: 'downloader',
+      query: { wantedReleaseId: 'downloading' },
+    },
+  });
+  assert.equal(result.rows[0].transferProgress.summary, '1 transfer is downloading');
+});
+
+test('Home progress keeps its release-detail destination when download progress is linked', () => {
+  const result = buildMusicQueueProgressStrip([
+    createRelease({ id: 'downloading', statusCode: 'downloading', statusLabel: 'Downloading' }),
+  ], {
+    activeOrAttentionOnly: true,
+    releaseDetailsOnly: true,
+    transferProgressByRelease: {
+      downloading: {
+        handoff: {
+          label: 'View download progress',
+          location: { name: 'downloader', query: { wantedReleaseId: 'downloading' } },
+        },
+        summary: '1 transfer is downloading',
+      },
+    },
+  });
+
+  assert.equal(result.rows[0].action.label, 'View details');
+  assert.deepEqual(result.rows[0].action.to, {
+    name: 'music-queue-release',
+    params: { wantedReleaseId: 'downloading' },
+  });
+});
