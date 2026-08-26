@@ -28,11 +28,14 @@ test('ArtistDetailView exposes a failed reconciliation retry action without requ
   assert.match(source, /retryOperatorArtistReconciliation,/);
   assert.match(source, /const isRetryingReconciliation = ref\(false\)/);
   assert.match(source, /const reconciliationActionError = ref\(''\)/);
+  assert.match(source, /const reconciliationActionStatus = ref\(''\)/);
   assert.match(source, /const canRetryOperatorReconciliation = computed/);
   assert.match(source, /operatorReconciliation\.value\?\.status === 'failed'/);
+  assert.match(source, /formatOperatorArtistReleasePlanActivity/);
   assert.match(source, /await retryOperatorArtistReconciliation\(projection\.value\.artist\.id\)/);
+  assert.match(source, /reconciliationActionStatus\.value = 'Release plan update queued\.'/);
   assert.match(source, /await loadArtistDetail\(mbid\.value\)/);
   assert.match(source, /@click="retryReconciliation"/);
-  assert.match(source, /Retry reconciliation/);
+  assert.match(source, /Retry update/);
+  assert.match(source, /role="status" aria-atomic="true"/);
 });
-

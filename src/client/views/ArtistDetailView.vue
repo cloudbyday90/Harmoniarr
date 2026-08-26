@@ -107,9 +107,9 @@ import {
 } from '../lib/operator-track-override-remap-review.js';
 import {
   calculateOperatorArtistCoveragePercent,
-  formatOperatorArtistActivityLine,
   formatOperatorArtistCoverageLine,
 } from '../lib/operator-artist-card-presentation.js';
+import { formatOperatorArtistReleasePlanActivity } from '../lib/operator-artist-release-plan-presentation.js';
 import {
   buildOperatorReleaseReconciliationPresentation,
   buildOperatorReleaseSelectionPresentation,
@@ -201,6 +201,7 @@ const isSavingPolicy = ref(false);
 const isRetryingReconciliation = ref(false);
 const policySaveError = ref('');
 const reconciliationActionError = ref('');
+const reconciliationActionStatus = ref('');
 const pendingBulkSelectionOperation = ref(null);
 const bulkSelectionStatusMessage = ref('');
 const sectionControls = ref({});
@@ -378,7 +379,7 @@ const heroStyle = computed(() => buildArtistHeroBackgroundStyle(heroBackgroundUr
 const overviewCards = computed(() => ([
   {
     body: isArtistMonitored.value
-      ? formatOperatorArtistActivityLine(operatorReconciliation.value)
+      ? formatOperatorArtistReleasePlanActivity(operatorReconciliation.value)
       : 'Add this artist from Discover to route future releases into the monitored workflow.',
     label: 'Status',
     value: isArtistMonitored.value ? 'Monitored' : 'Available',
@@ -602,12 +603,15 @@ async function retryReconciliation() {
 
   isRetryingReconciliation.value = true;
   reconciliationActionError.value = '';
+  reconciliationActionStatus.value = '';
 
   try {
     await retryOperatorArtistReconciliation(projection.value.artist.id);
+    reconciliationActionStatus.value = 'Release plan update queued.';
     await loadArtistDetail(mbid.value);
   } catch (error) {
-    reconciliationActionError.value = getErrorMessage(error, 'Retrying artist reconciliation failed.');
+    reconciliationActionStatus.value = '';
+    reconciliationActionError.value = getErrorMessage(error, 'Retrying the release plan update failed.');
   } finally {
     isRetryingReconciliation.value = false;
   }
@@ -720,7 +724,7 @@ watch(projection, () => {
                 :disabled="isRetryingReconciliation"
                 @click="retryReconciliation"
               >
-                {{ isRetryingReconciliation ? 'Retrying...' : 'Retry reconciliation' }}
+                {{ isRetryingReconciliation ? 'Retrying update…' : 'Retry update' }}
               </button>
             </div>
           </div>
@@ -750,13 +754,16 @@ watch(projection, () => {
       <p v-if="reconciliationActionError" class="artist-detail-soft-error" role="alert">
         {{ reconciliationActionError }}
       </p>
+      <p v-if="reconciliationActionStatus" class="artist-detail-status" role="status" aria-atomic="true">
+        {{ reconciliationActionStatus }}
+      </p>
 
       <article v-if="canEditOperatorPolicy" class="hx-card artist-policy-card" aria-label="Artist policy">
         <header class="hx-card-header">
           <div>
             <h2 class="hx-card-title">Artist Policy</h2>
             <p class="hx-card-subtitle">
-              Update broad monitoring rules and release-level overrides before queueing the next reconciliation.
+              Update broad monitoring rules and release-level overrides before updating the release plan.
             </p>
           </div>
           <div class="hx-card-actions artist-policy-card__actions">
@@ -1045,8 +1052,6 @@ watch(projection, () => {
                       <p
                         v-if="release.reconciliationPresentation"
                         class="artist-detail-release-state__reconciliation"
-                        role="status"
-                        aria-atomic="true"
                       >
                         <strong>{{ release.reconciliationPresentation.label }}</strong>
                         <span>{{ release.reconciliationPresentation.detail }}</span>
@@ -1335,6 +1340,12 @@ watch(projection, () => {
 .artist-detail-soft-error {
   margin: 0;
   color: var(--hx-danger);
+  font-size: var(--hx-text-sm);
+}
+
+.artist-detail-status {
+  margin: 0;
+  color: var(--hx-text-muted);
   font-size: var(--hx-text-sm);
 }
 

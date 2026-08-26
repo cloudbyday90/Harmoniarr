@@ -28,12 +28,11 @@ import {
 import { buildArtistDetailLocation } from '../../lib/artist-detail-route.js';
 import {
   calculateOperatorArtistCoveragePercent,
-  formatOperatorArtistActivityLine,
   formatOperatorArtistCoverageLine,
   formatOperatorArtistPolicySummary,
   formatOperatorArtistWantedSummary,
-  getOperatorArtistActivityTone,
 } from '../../lib/operator-artist-card-presentation.js';
+import { buildOperatorArtistCardStatusPresentation } from '../../lib/operator-artist-card-status-presentation.js';
 
 const props = defineProps({
   artwork: {
@@ -58,7 +57,9 @@ const cardArtist = computed(() => ({
 }));
 const monitoring = computed(() => props.projection.operator?.monitoring ?? {});
 const coverage = computed(() => props.projection.operator?.coverage ?? {});
-const reconciliation = computed(() => props.projection.operator?.reconciliation ?? {});
+const cardStatus = computed(() => buildOperatorArtistCardStatusPresentation(
+  props.projection.operator?.reconciliation,
+));
 const coveragePercent = computed(() => calculateOperatorArtistCoveragePercent(coverage.value));
 const detailLocation = computed(() => (musicBrainzArtistId.value
   ? buildArtistDetailLocation(musicBrainzArtistId.value, cardArtist.value.name)
@@ -92,10 +93,11 @@ const detailLocation = computed(() => (musicBrainzArtistId.value
 
     <template #eyebrow>
       <span
+        v-if="cardStatus"
         class="hx-pill operator-artist-card__status"
-        :data-tone="getOperatorArtistActivityTone(reconciliation)"
+        :data-tone="cardStatus.tone"
       >
-        {{ formatOperatorArtistActivityLine(reconciliation) }}
+        {{ cardStatus.label }}
       </span>
     </template>
 

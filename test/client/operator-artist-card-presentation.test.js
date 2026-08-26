@@ -3,12 +3,10 @@ import test from 'node:test';
 import {
   buildOperatorHomeStats,
   calculateOperatorArtistCoveragePercent,
-  formatOperatorArtistActivityLine,
   formatOperatorArtistCoverageLine,
   formatOperatorArtistPolicySummary,
   formatOperatorArtistWantedSummary,
   formatOperatorReleaseTypes,
-  getOperatorArtistActivityTone,
 } from '../../src/client/lib/operator-artist-card-presentation.js';
 
 test('formatOperatorReleaseTypes returns a readable unique release-type list', () => {
@@ -51,17 +49,6 @@ test('formatOperatorArtistCoverageLine summarizes acquired and gap counts', () =
     unresolvedReleaseCount: 1,
   }), '2 of 5 desired releases acquired · 1 partial · 2 missing · 1 unresolved');
   assert.equal(formatOperatorArtistCoverageLine({ desiredReleaseCount: 0 }), 'No desired releases selected yet');
-});
-
-test('formatOperatorArtistActivityLine and tone map reconciliation state', () => {
-  assert.equal(formatOperatorArtistActivityLine({ status: 'running' }), 'Reconciliation running');
-  assert.equal(getOperatorArtistActivityTone({ status: 'running' }), 'warning');
-  assert.equal(formatOperatorArtistActivityLine({ status: 'completed' }), 'Last reconciliation completed');
-  assert.equal(getOperatorArtistActivityTone({ status: 'completed' }), 'success');
-  assert.equal(formatOperatorArtistActivityLine({ status: 'failed' }), 'Last reconciliation needs attention');
-  assert.equal(getOperatorArtistActivityTone({ status: 'failed' }), 'danger');
-  assert.equal(formatOperatorArtistActivityLine({ status: 'idle' }), 'Waiting for first reconciliation');
-  assert.equal(getOperatorArtistActivityTone({ status: 'idle' }), 'info');
 });
 
 test('buildOperatorHomeStats derives monitored profile dashboard cards', () => {

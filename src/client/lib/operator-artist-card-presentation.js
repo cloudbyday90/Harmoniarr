@@ -116,39 +116,6 @@ export function formatOperatorArtistCoverageLine(coverage = {}) {
   return segments.join(' · ');
 }
 
-export function formatOperatorArtistActivityLine(reconciliation = {}) {
-  switch (reconciliation.status) {
-    case 'running':
-      return 'Reconciliation running';
-    case 'queued':
-    case 'pending':
-      return 'Reconciliation queued';
-    case 'completed':
-      return 'Last reconciliation completed';
-    case 'failed':
-      return 'Last reconciliation needs attention';
-    case 'cancelled':
-      return 'Last reconciliation was cancelled';
-    default:
-      return 'Waiting for first reconciliation';
-  }
-}
-
-export function getOperatorArtistActivityTone(reconciliation = {}) {
-  switch (reconciliation.status) {
-    case 'running':
-    case 'queued':
-    case 'pending':
-      return 'warning';
-    case 'completed':
-      return 'success';
-    case 'failed':
-      return 'danger';
-    default:
-      return 'info';
-  }
-}
-
 export function buildOperatorHomeStats(projections = []) {
   const artists = Array.isArray(projections) ? projections : [];
   const desired = artists.reduce(
