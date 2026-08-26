@@ -17,10 +17,11 @@
 -->
 
 <script setup>
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { buildMissingMusicDecisionDetailPresentation } from '../../lib/missing-music-decision-detail-presentation.js';
 import { buildMissingMusicMatchChoicePresentation } from '../../lib/missing-music-match-selection-presentation.js';
 import { useMissingMusicDecisionDetail } from '../../composables/useMissingMusicDecisionDetail.js';
+import { useMissingMusicDownloadStart } from '../../composables/useMissingMusicDownloadStart.js';
 import { useMissingMusicMatchSelection } from '../../composables/useMissingMusicMatchSelection.js';
 
 const props = defineProps({
@@ -33,12 +34,14 @@ const props = defineProps({
 const headingElement = ref(null);
 const focusedDecisionId = ref('');
 const statusHeadingElement = ref(null);
+const downloadDialogElement = ref(null);
 const decisionDetail = useMissingMusicDecisionDetail({
   decisionId: computed(() => props.decisionId),
 });
 const presentation = computed(() => buildMissingMusicDecisionDetailPresentation(decisionDetail.detail.value));
 const matchChoicePresentation = computed(() => buildMissingMusicMatchChoicePresentation(decisionDetail.detail.value));
 const matchSelection = useMissingMusicMatchSelection();
+const downloadStart = useMissingMusicDownloadStart();
 
 async function focusInspectorHeading() {
   if (decisionDetail.isLoading.value || focusedDecisionId.value === props.decisionId) {
@@ -71,6 +74,31 @@ async function selectMatch(matchId) {
   await nextTick();
   statusHeadingElement.value?.focus({ preventScroll: true });
 }
+
+function openDownloadConfirmation() {
+  downloadStart.clearFeedback();
+  if (downloadDialogElement.value && !downloadDialogElement.value.open) {
+    downloadDialogElement.value.showModal();
+  }
+}
+
+function closeDownloadConfirmation() {
+  downloadDialogElement.value?.close();
+}
+
+async function startDownload() {
+  const result = await downloadStart.startDownload({ decisionId: props.decisionId });
+  if (!result) return;
+
+  closeDownloadConfirmation();
+  await decisionDetail.load();
+  await nextTick();
+  statusHeadingElement.value?.focus({ preventScroll: true });
+}
+
+onBeforeUnmount(() => {
+  closeDownloadConfirmation();
+});
 </script>
 
 <template>
@@ -116,6 +144,33 @@ async function selectMatch(matchId) {
         <span class="hx-pill" :data-tone="presentation.statusTone">{{ presentation.statusLabel }}</span>
         <p>{{ presentation.statusMessage }}</p>
         <p class="missing-music-inspector__next-step"><strong>Next step:</strong> {{ presentation.nextStep }}</p>
+        <div v-if="presentation.canStartDownload" class="missing-music-inspector__start-download">
+          <button
+            type="button"
+            class="hx-btn"
+            data-variant="primary"
+            @click="openDownloadConfirmation"
+          >
+            Start download
+          </button>
+          <p>Start preparing the selected match for download.</p>
+        </div>
+        <p
+          v-if="downloadStart.statusMessage.value"
+          class="missing-music-inspector__selection-feedback"
+          role="status"
+          aria-atomic="true"
+        >
+          {{ downloadStart.statusMessage.value }}
+        </p>
+        <p
+          v-if="downloadStart.errorMessage.value"
+          class="missing-music-inspector__selection-feedback"
+          data-tone="danger"
+          role="alert"
+        >
+          {{ downloadStart.errorMessage.value }}
+        </p>
       </section>
 
       <dl class="missing-music-inspector__facts">
@@ -199,6 +254,34 @@ async function selectMatch(matchId) {
       </section>
     </div>
   </article>
+
+  <dialog
+    ref="downloadDialogElement"
+    class="missing-music-download-dialog"
+    aria-labelledby="missing-music-download-dialog-title"
+  >
+    <form method="dialog" class="missing-music-download-dialog__content" @submit.prevent="startDownload">
+      <h2 id="missing-music-download-dialog-title">Start download?</h2>
+      <p>
+        Harmoniarr will prepare the selected match for {{ presentation.title }} by {{ presentation.artistName }}
+        for {{ presentation.username }}. It will submit the transfer only after the download worker runs.
+      </p>
+      <p
+        v-if="downloadStart.errorMessage.value"
+        class="missing-music-inspector__selection-feedback"
+        data-tone="danger"
+        role="alert"
+      >
+        {{ downloadStart.errorMessage.value }}
+      </p>
+      <div class="missing-music-download-dialog__actions">
+        <button type="button" class="hx-btn" @click="closeDownloadConfirmation">Cancel</button>
+        <button type="submit" class="hx-btn" data-variant="primary" :disabled="downloadStart.isStarting.value">
+          {{ downloadStart.isStarting.value ? 'Starting…' : 'Start download' }}
+        </button>
+      </div>
+    </form>
+  </dialog>
 </template>
 
 <style scoped>
@@ -249,6 +332,17 @@ async function selectMatch(matchId) {
   padding-left: var(--hx-space-2);
   border-left: 2px solid var(--hx-accent);
   color: var(--hx-text);
+}
+
+.missing-music-inspector__start-download {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--hx-space-2);
+}
+
+.missing-music-inspector__start-download p {
+  color: var(--hx-text-muted);
 }
 
 .missing-music-inspector__facts {
@@ -335,6 +429,39 @@ async function selectMatch(matchId) {
 
 .missing-music-inspector__match dd {
   margin: 0;
+}
+
+.missing-music-download-dialog {
+  width: min(100% - (2 * var(--hx-space-4)), 34rem);
+  padding: 0;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: var(--hx-radius-lg);
+  background: var(--hx-bg-surface);
+  color: var(--hx-text);
+  box-shadow: var(--hx-shadow-lg);
+}
+
+.missing-music-download-dialog::backdrop {
+  background: var(--hx-bg-overlay);
+}
+
+.missing-music-download-dialog__content {
+  display: grid;
+  gap: var(--hx-space-4);
+  margin: 0;
+  padding: var(--hx-space-6);
+}
+
+.missing-music-download-dialog__content h2,
+.missing-music-download-dialog__content p {
+  margin: 0;
+}
+
+.missing-music-download-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--hx-space-2);
 }
 
 @media (max-width: 640px) {

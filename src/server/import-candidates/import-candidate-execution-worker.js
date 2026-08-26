@@ -214,7 +214,10 @@ export function createImportCandidateExecutionWorker({
         },
       });
 
-      const selectedSummary = await buildSelectedImportCandidateSummary({ limit: 1000 });
+      const selectedSummary = await buildSelectedImportCandidateSummary({
+        ...(selectedCandidateId ? { candidateIds: [selectedCandidateId] } : {}),
+        limit: 1000,
+      });
       const candidateQueue = [...(selectedSummary.selectedCandidates ?? [])];
       const existingRunItems = await listImportExecutionRunItems(runId);
       const persistedItemsByCandidateId = new Map(existingRunItems.map((item) => [

@@ -121,3 +121,21 @@ test('buildSelectedImportCandidateSummary returns an empty summary when nothing 
   assert.equal(summary.summary.status, 'empty');
   assert.deepEqual(summary.selectedCandidates, []);
 });
+
+test('buildSelectedImportCandidateSummary scopes a targeted execution summary to its selected candidate', async (t) => {
+  const listImportCandidates = t.mock.fn(async () => ({
+    candidates: [],
+    pagination: { limit: 1, offset: 0, total: 0 },
+  }));
+  const service = createImportCandidateSelectionSummaryService({ listImportCandidates });
+
+  await service.buildSelectedImportCandidateSummary({ candidateIds: ['candidate-amber'], limit: 1 });
+
+  assert.deepEqual(listImportCandidates.mock.calls[0].arguments, [{
+    candidateIds: ['candidate-amber'],
+    limit: 1,
+    offset: 0,
+    requestedForUserId: null,
+    status: 'selected',
+  }]);
+});

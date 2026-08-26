@@ -57,6 +57,10 @@ export function buildMissingMusicDecisionDetailPresentation(detail) {
   const matchedTrackCount = Math.min(normalizeCount(decision.matchedTrackCount), expectedTrackCount);
   const accountIsDisabled = detail?.permissions?.isReadOnly === true
     || requestedFor.accountStatus === 'disabled';
+  const canStartDownload = detail?.permissions?.canStartDownload === true;
+  const selectedMatchNeedsAdministrator = !accountIsDisabled
+    && decision.status?.nextAction === 'download_now'
+    && !canStartDownload;
 
   return {
     accountNote: accountIsDisabled
@@ -66,9 +70,12 @@ export function buildMissingMusicDecisionDetailPresentation(detail) {
     checkedAt: formatMissingMusicDecisionCheckedAt(detail?.checkedAt),
     coverage: formatTrackCoverage(matchedTrackCount, expectedTrackCount),
     isReadOnly: accountIsDisabled,
+    canStartDownload,
     lastCheckedAt: formatMissingMusicDecisionCheckedAt(decision.lastReconciledAt),
     nextStep: accountIsDisabled
       ? 'This account is disabled; no changes can be made.'
+      : selectedMatchNeedsAdministrator
+        ? 'A household administrator can start the download.'
       : getMissingMusicNextStep(decision.status?.nextAction),
     releaseMeta: [formatReleaseType(release.releaseGroupType), normalizeText(release.releaseDate)]
       .filter(Boolean)

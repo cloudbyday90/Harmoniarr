@@ -3,14 +3,14 @@ import test from 'node:test';
 import { createApiError } from '../../src/server/auth.js';
 import { createImportCandidateExecutionService } from '../../src/server/import-candidates/import-candidate-execution-service.js';
 
-test('startImportCandidateExecutionRun queues a planning run for selected candidates', async (t) => {
+test('startImportCandidateExecutionRun queues a planning run for one targeted selected candidate', async (t) => {
   const createOperationRun = t.mock.fn(async () => ({
     id: 'run-1',
     status: 'pending',
   }));
   const listImportCandidates = t.mock.fn(async () => ({
     pagination: {
-      total: 2,
+      total: 1,
     },
   }));
   const recordAuditEventFn = t.mock.fn(async () => {});
@@ -27,32 +27,51 @@ test('startImportCandidateExecutionRun queues a planning run for selected candid
     },
     selectedCandidateId: 'candidate-1',
     sourceSearchId: 'search-1',
+    sourceWantedReleaseId: 'wanted-1',
     triggeredByUserId: 'user-1',
     triggerSource: 'auto_selection',
   });
 
   assert.equal(result.accepted, true);
   assert.deepEqual(listImportCandidates.mock.calls[0].arguments, [{
+    candidateIds: ['candidate-1'],
     limit: 1,
     offset: 0,
     status: 'selected',
   }]);
   assert.deepEqual(createOperationRun.mock.calls[0].arguments, [{
     executionMode: 'download_enqueue',
-    requestedCandidateCount: 2,
+    requestedCandidateCount: 1,
     status: 'pending',
     summary: {
       currentStep: 'queued',
       executionMode: 'download_enqueue',
-      requestedCandidateCount: 2,
+      requestedCandidateCount: 1,
       selectedCandidateId: 'candidate-1',
       sourceSearchId: 'search-1',
+      sourceWantedReleaseId: 'wanted-1',
       triggerSource: 'auto_selection',
     },
     triggeredByUserId: 'user-1',
   }]);
   assert.equal(recordAuditEventFn.mock.callCount(), 1);
   assert.equal(recordAuditEventFn.mock.calls[0].arguments[0].details.triggerSource, 'auto_selection');
+  assert.equal(recordAuditEventFn.mock.calls[0].arguments[0].details.sourceWantedReleaseId, 'wanted-1');
+});
+
+test('startImportCandidateExecutionRun rejects a targeted candidate that is no longer selected', async () => {
+  const createOperationRun = async () => {
+    throw new Error('a stale target must not create an operation run');
+  };
+  const service = createImportCandidateExecutionService({
+    createOperationRun,
+    listImportCandidates: async () => ({ pagination: { total: 0 } }),
+  });
+
+  await assert.rejects(
+    () => service.startImportCandidateExecutionRun({ selectedCandidateId: 'candidate-stale' }),
+    (error) => error.code === 'import_candidate_execution_candidate_not_selected',
+  );
 });
 
 test('startImportCandidateExecutionRun rejects empty selected state', async () => {

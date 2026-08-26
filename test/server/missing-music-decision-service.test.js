@@ -181,6 +181,7 @@ test('Missing Music detail is server-scoped, preserves disabled history, and exc
   });
   assert.equal(result.scope, 'all');
   assert.equal(result.permissions.isReadOnly, true);
+  assert.equal(result.permissions.canStartDownload, false);
   assert.equal(result.permissions.canSelectMatch, false);
   assert.equal(result.decision.decisionId, 'decision-disabled');
   assert.equal(result.decision.requestedFor.username, 'former-listener');
@@ -274,4 +275,31 @@ test('Missing Music keeps a selected match actionable and describes that the dow
     tone: 'warning',
   });
   assert.equal(result.decisions[0].state, 'action');
+});
+
+test('Missing Music detail only exposes download start to an administrator for an active selected release', async () => {
+  const { service } = createService({
+    projectMusicQueueReleaseFn: (release) => ({
+      ...projectRelease(release),
+      status: {
+        code: 'checking_matches',
+        label: 'Checking matches',
+        message: 'A selected match is waiting for a deliberate handoff.',
+        nextAction: 'download_now',
+        tone: 'info',
+      },
+    }),
+  });
+
+  const adminDetail = await service.getMissingMusicDecisionDetail({
+    actorUser: { id: 'admin-1', role: 'admin', username: 'admin' },
+    decisionId: 'decision-active',
+  });
+  const requesterDetail = await service.getMissingMusicDecisionDetail({
+    actorUser: { id: 'user-1', role: 'requester', username: 'listener' },
+    decisionId: 'decision-active',
+  });
+
+  assert.equal(adminDetail.permissions.canStartDownload, true);
+  assert.equal(requesterDetail.permissions.canStartDownload, false);
 });

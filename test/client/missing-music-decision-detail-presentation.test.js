@@ -89,10 +89,23 @@ test('Missing Music describes a selected match as awaiting an explicit download 
         tone: 'warning',
       },
     },
-    permissions: { isReadOnly: false },
+    permissions: { canStartDownload: true, isReadOnly: false },
   });
 
   assert.equal(presentation.statusLabel, 'Match selected');
   assert.equal(presentation.statusMessage, 'A match has been selected. A download will not start until someone explicitly starts it.');
+  assert.equal(presentation.canStartDownload, true);
   assert.equal(presentation.nextStep, 'Start download');
+});
+
+test('Missing Music tells non-administrators when a selected download requires an administrator', () => {
+  const presentation = buildMissingMusicDecisionDetailPresentation({
+    decision: {
+      status: { nextAction: 'download_now' },
+    },
+    permissions: { canStartDownload: false, isReadOnly: false },
+  });
+
+  assert.equal(presentation.canStartDownload, false);
+  assert.equal(presentation.nextStep, 'A household administrator can start the download.');
 });

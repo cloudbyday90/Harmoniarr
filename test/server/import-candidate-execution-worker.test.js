@@ -145,6 +145,88 @@ test('import execution worker enqueues ready candidates and persists per-item ou
   }]);
 });
 
+test('import execution worker limits a manually started run to its selected candidate', async (t) => {
+  const selectedCandidate = {
+    executionStatus: {
+      code: 'ready',
+      message: 'Ready for download enqueue.',
+    },
+    fileCount: 1,
+    folderPath: 'Autechre/Amber',
+    id: 'candidate-amber',
+    lockedFileCount: 0,
+    planning: {
+      libraryFolderPath: '/music/Autechre/Amber',
+      sourceFolderPath: '/downloads/Autechre/Amber',
+      stagingFolderPath: '/staging/import-candidates/candidate-amber/Autechre/Amber',
+    },
+    selectedAt: '2026-04-30T12:00:00.000Z',
+    sourceProvider: 'slskd',
+    sourceSearchId: 'search-amber',
+    totalSizeBytes: 123456,
+    username: 'source-user',
+  };
+  const buildSelectedImportCandidateSummary = t.mock.fn(async () => ({
+    counts: {
+      blocked: 0,
+      ready: 1,
+      readyWithWarnings: 0,
+      totalSelected: 1,
+    },
+    selectedCandidates: [selectedCandidate],
+  }));
+  const enqueueDownloads = t.mock.fn(async () => ({
+    enqueued: [{
+      filename: 'Autechre\\Amber\\01 Foil.flac',
+      id: 'transfer-amber',
+      state: 'Queued, Remotely',
+      username: 'source-user',
+    }],
+    failed: [],
+  }));
+  let resolveCompleted;
+  const completed = new Promise((resolve) => {
+    resolveCompleted = resolve;
+  });
+  const worker = createImportCandidateExecutionWorker({
+    acquireLease: async () => {},
+    buildSelectedImportCandidateSummary,
+    enqueueDownloads,
+    getImportCandidate: async ({ importCandidateId }) => ({
+      files: [{
+        filename: '01 Foil.flac',
+        folderPath: 'Autechre/Amber',
+        isLocked: false,
+        rawPayload: { filename: 'Autechre\\Amber\\01 Foil.flac' },
+        sizeBytes: 123456,
+      }],
+      id: importCandidateId,
+    }),
+    markImportCandidateDownloading: async () => {},
+    markRunCompleted: async () => { resolveCompleted(); },
+    markRunFailed: async () => {},
+    markRunStarted: async () => {},
+    recordConfirmedTransfers: async () => [],
+    releaseLease: async () => {},
+    replaceImportExecutionRunItems: async () => [],
+    updateImportExecutionRunItem: async () => null,
+  });
+
+  await worker.startWorkerRun({
+    requestedCandidateCount: 1,
+    runId: 'run-amber',
+    selectedCandidateId: 'candidate-amber',
+  });
+  await completed;
+
+  assert.deepEqual(buildSelectedImportCandidateSummary.mock.calls[0].arguments, [{
+    candidateIds: ['candidate-amber'],
+    limit: 1000,
+  }]);
+  assert.equal(enqueueDownloads.mock.callCount(), 1);
+  assert.equal(enqueueDownloads.mock.calls[0].arguments[0].username, 'source-user');
+});
+
 test('import execution worker leaves a run untouched when another worker holds its lease', async (t) => {
   const leaseUnavailable = Object.assign(
     new Error('Operation run lease is currently held by another worker'),

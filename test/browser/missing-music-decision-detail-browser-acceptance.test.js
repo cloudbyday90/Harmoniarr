@@ -28,7 +28,7 @@ import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/r
 
 const integrationRuntimeConfig = resolveIntegrationTestRuntimeConfig();
 
-function buildDecision({ matchSelected = false } = {}) {
+function buildDecision({ downloadStarted = false, matchSelected = false } = {}) {
   return {
     decisionId: 'wanted-amber',
     expectedTrackCount: 10,
@@ -45,7 +45,14 @@ function buildDecision({ matchSelected = false } = {}) {
       id: 'listener-1',
       username: 'Jamie',
     },
-    status: matchSelected
+    status: downloadStarted
+      ? {
+        label: 'Download preparation started',
+        message: 'The selected match is queued for download preparation.',
+        nextAction: 'open_downloader',
+        tone: 'info',
+      }
+      : matchSelected
       ? {
         label: 'Match selected',
         message: 'A match has been selected. A download will not start until someone explicitly starts it.',
@@ -84,9 +91,11 @@ function buildWorklistPayload() {
   };
 }
 
-async function installMissingMusicFixture(browserContext, requests) {
+async function installMissingMusicFixture(browserContext, requests, { matchSelected = false } = {}) {
   const state = {
-    matchSelected: false,
+    downloadStartRequest: null,
+    downloadStarted: false,
+    matchSelected,
     selectionRequest: null,
   };
 
@@ -95,6 +104,7 @@ async function installMissingMusicFixture(browserContext, requests) {
     requests.push(requestUrl.pathname);
     const detailPath = '/api/v1/missing-music/decisions/wanted-amber';
     const selectionPath = `${detailPath}/matches/candidate-amber/select`;
+    const downloadStartPath = `${detailPath}/start-download`;
 
     if (route.request().method() === 'POST' && requestUrl.pathname === selectionPath) {
       const headers = route.request().headers();
@@ -121,10 +131,39 @@ async function installMissingMusicFixture(browserContext, requests) {
       return;
     }
 
+    if (route.request().method() === 'POST' && requestUrl.pathname === downloadStartPath) {
+      const headers = route.request().headers();
+      state.downloadStartRequest = {
+        body: route.request().postDataJSON(),
+        csrfToken: headers['x-csrf-token'] ?? null,
+        idempotencyKey: headers['idempotency-key'] ?? null,
+      };
+      state.downloadStarted = true;
+      await route.fulfill({
+        body: JSON.stringify({
+          action: {
+            code: 'start_download',
+            decisionId: 'wanted-amber',
+            downloadPreparationStarted: true,
+            matchId: 'candidate-amber',
+            operationRunId: 'run-amber',
+            targetUserId: 'listener-1',
+          },
+          ok: true,
+        }),
+        contentType: 'application/json',
+        status: 202,
+      });
+      return;
+    }
+
     const payload = requestUrl.pathname === detailPath
       ? {
         checkedAt: '2026-08-26T16:31:00.000Z',
-        decision: buildDecision({ matchSelected: state.matchSelected }),
+        decision: buildDecision({
+          downloadStarted: state.downloadStarted,
+          matchSelected: state.matchSelected,
+        }),
         matchChoices: state.matchSelected
           ? []
           : [{
@@ -135,6 +174,7 @@ async function installMissingMusicFixture(browserContext, requests) {
           }],
         permissions: {
           canSelectMatch: !state.matchSelected,
+          canStartDownload: state.matchSelected && !state.downloadStarted,
           isReadOnly: false,
         },
         scope: 'all',
@@ -242,6 +282,52 @@ suite('Missing Music decision detail browser acceptance', () => {
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
     }, {
       scenarioName: 'missing_music_match_selection_without_download_start',
+    });
+  });
+
+  test('confirms one selected match before starting its download preparation', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) {
+      t.skip(runtimeUnavailableReason);
+      return;
+    }
+
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      const pageErrors = [];
+      page.on('pageerror', (error) => pageErrors.push(error.message));
+
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      const fixture = await installMissingMusicFixture(browserContext, [], { matchSelected: true });
+      await page.goto(baseUrl + '/app/missing/wanted-amber', { waitUntil: 'domcontentloaded' });
+
+      const inspector = page.locator('.missing-music-inspector');
+      await inspector.getByRole('button', { name: 'Start download' }).click();
+      const dialog = page.getByRole('dialog', { name: 'Start download?' });
+      await dialog.waitFor();
+      await dialog.getByText('It will submit the transfer only after the download worker runs.', { exact: false }).waitFor();
+
+      await dialog.getByRole('button', { name: 'Cancel' }).click();
+      assert.equal(await dialog.isVisible(), false);
+      assert.equal(fixture.downloadStartRequest, null);
+
+      await inspector.getByRole('button', { name: 'Start download' }).click();
+      await dialog.getByRole('button', { name: 'Start download' }).click();
+
+      const currentStatus = inspector.getByRole('heading', { exact: true, level: 3, name: 'Current status' });
+      await currentStatus.waitFor();
+      await inspector.getByText('Download preparation started', { exact: true }).waitFor();
+      await inspector.getByText('Download preparation started. Transfer progress will appear in Downloader after it is submitted.', { exact: true }).waitFor();
+      assert.equal(await currentStatus.evaluate((element) => globalThis.document.activeElement === element), true);
+      assert.deepEqual(fixture.downloadStartRequest?.body, {});
+      assert.match(fixture.downloadStartRequest?.csrfToken ?? '', /.+/u);
+      assert.match(fixture.downloadStartRequest?.idempotencyKey ?? '', /.+/u);
+      assert.equal(fixture.downloadStarted, true);
+
+      await browserContext.unrouteAll({ behavior: 'ignoreErrors' });
+      assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
+    }, {
+      scenarioName: 'missing_music_download_start_confirmation',
     });
   });
 });

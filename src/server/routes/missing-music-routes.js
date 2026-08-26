@@ -40,13 +40,16 @@ export function registerMissingMusicRoutes(app, {
   getMissingMusicDecisionDetail,
   getRequestMetadata = defaultRequestAuthDependencies.getRequestMetadata,
   limitMissingMusicDecisionDetailRead = skipRateLimitMiddleware,
+  limitMissingMusicDecisionDownloadStart = skipRateLimitMiddleware,
   limitMissingMusicDecisionRead = skipRateLimitMiddleware,
   limitMissingMusicDecisionMutation = skipRateLimitMiddleware,
   listMissingMusicDecisions,
   requireCsrf = defaultRequestAuthDependencies.requireCsrf,
+  requireFreshAdminSession = defaultRequestAuthDependencies.requireFreshAdminSession,
   requireFreshSession = defaultRequestAuthDependencies.requireFreshSession,
   requireSession = defaultRequestAuthDependencies.requireSession,
   selectMissingMusicDecisionMatch,
+  startMissingMusicDecisionDownload,
 } = {}) {
   if (typeof getMissingMusicDecisionDetail !== 'function') {
     throw new TypeError('registerMissingMusicRoutes requires getMissingMusicDecisionDetail');
@@ -58,6 +61,10 @@ export function registerMissingMusicRoutes(app, {
 
   if (typeof selectMissingMusicDecisionMatch !== 'function') {
     throw new TypeError('registerMissingMusicRoutes requires selectMissingMusicDecisionMatch');
+  }
+
+  if (typeof startMissingMusicDecisionDownload !== 'function') {
+    throw new TypeError('registerMissingMusicRoutes requires startMissingMusicDecisionDownload');
   }
 
   app.get('/api/v1/missing-music/decisions', limitMissingMusicDecisionRead, asyncRoute(async (request, response) => {
@@ -116,6 +123,33 @@ export function registerMissingMusicRoutes(app, {
     });
 
     response.status(result?.statusCode ?? 200).json({
+      ok: true,
+      ...(result?.body ?? {}),
+    });
+  }));
+
+  app.post('/api/v1/missing-music/decisions/:decisionId/start-download', limitMissingMusicDecisionDownloadStart, asyncRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
+    requireCsrf(request, session);
+    const actorUser = buildActorUser(session);
+    const result = await executeIdempotentMutation({
+      actorUserId: actorUser.id,
+      executeMutation: async () => ({
+        body: await startMissingMusicDecisionDownload({
+          actorUser,
+          decisionId: request.params.decisionId,
+          requestMetadata: getRequestMetadata(request),
+        }),
+        statusCode: 202,
+      }),
+      idempotencyKey: request.headers['idempotency-key'],
+      operationScope: 'missing-music.decisions.download.start',
+      requestPayload: {
+        decisionId: request.params.decisionId,
+      },
+    });
+
+    response.status(result?.statusCode ?? 202).json({
       ok: true,
       ...(result?.body ?? {}),
     });

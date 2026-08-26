@@ -1,9 +1,9 @@
 # Missing Music decision workflow design
 
-**Status:** in progress — the server-authorized query and read-only Missing
-Music worklist are implemented. Cross-user inspection and transfer-changing
-commands remain deliberately paused pending their explicit confirmation
-contract.
+**Status:** in progress — the server-authorized worklist, cross-user
+inspection, manual match selection, and explicit download-start confirmation
+are implemented. The remaining handoff improvement is a safe contextual view
+from Missing Music into Downloader.
 
 **Created:** 2026-08-26
 
@@ -538,15 +538,20 @@ Before commit, prove the workflow at the boundaries that own it:
    match selection is CSRF-protected, idempotent, audited, and blocked for a
    disabled target. See
    [Missing Music match-selection design](MISSING_MUSIC_MATCH_SELECTION_DESIGN.md).
-7. **Next:** Implement the explicit **Start download** confirmation, then
-   hand off accepted transfers to Downloader. It is the only Missing Music
-   command allowed to invoke transfer execution.
-8. Change canonical internal deep links from Music Queue to Missing Music and
+7. **Completed 2026-08-26:** Implement the explicit **Start download**
+   confirmation. It is the only Missing Music command allowed to invoke
+   transfer execution, creates a targeted one-candidate run, and leaves
+   provider acceptance to the durable worker. See [Missing Music download-start
+   design](MISSING_MUSIC_DOWNLOAD_START_DESIGN.md).
+8. **Next:** Add a safe, administrator-only **View in Downloader** transition
+   that retains release and target-user context without exposing provider
+   identifiers or raw transfer evidence.
+9. Change canonical internal deep links from Music Queue to Missing Music and
    add role-aware compatibility redirects that preserve query strings and
    hashes.
-9. Add cross-user authorization, keyboard-inspector, and full handoff browser
+10. Add cross-user authorization, keyboard-inspector, and full handoff browser
    coverage before removing interim Music Queue workspace modules.
-10. Rebuild walkthrough Compose after the command slice passes, visually
+11. Rebuild walkthrough Compose after the command slice passes, visually
     inspect all three responsive breakpoints, then commit and push.
 
 ## Recommendation

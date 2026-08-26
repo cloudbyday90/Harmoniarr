@@ -72,3 +72,22 @@ export function selectMissingMusicDecisionMatch({ decisionId, idempotencyKey = n
     },
   );
 }
+
+export function startMissingMusicDecisionDownload({ decisionId, idempotencyKey = null } = {}) {
+  const normalizedDecisionId = typeof decisionId === 'string' ? decisionId.trim() : '';
+  if (!normalizedDecisionId) {
+    throw new TypeError('startMissingMusicDecisionDownload requires a decisionId');
+  }
+
+  return apiRequest(
+    `/api/v1/missing-music/decisions/${encodeURIComponent(normalizedDecisionId)}/start-download`,
+    {
+      body: {},
+      headers: idempotencyKey
+        ? { 'Idempotency-Key': idempotencyKey }
+        : createControlPlaneIdempotencyHeaders('missing-music.decisions.download.start'),
+      includeCsrf: true,
+      method: 'POST',
+    },
+  );
+}

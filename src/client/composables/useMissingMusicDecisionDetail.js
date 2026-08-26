@@ -33,6 +33,7 @@ function normalizeDetail(payload) {
     checkedAt: payload.checkedAt ?? null,
     decision: payload.decision,
     permissions: {
+      canStartDownload: payload.permissions?.canStartDownload === true,
       canSelectMatch: payload.permissions?.canSelectMatch === true,
       isReadOnly: payload.permissions?.isReadOnly === true,
     },

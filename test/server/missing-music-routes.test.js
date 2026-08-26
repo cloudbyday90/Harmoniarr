@@ -14,6 +14,7 @@ function createMissingMusicRouteTestApp(overrides = {}) {
         scope: 'mine',
       }),
       selectMissingMusicDecisionMatch: async () => ({ action: {} }),
+      startMissingMusicDecisionDownload: async () => ({ action: {} }),
       limitMissingMusicDecisionRead: (_request, _response, next) => next(),
       listMissingMusicDecisions: async () => ({
         checkedAt: '2026-08-26T16:30:00.000Z',
@@ -177,6 +178,60 @@ test('Missing Music match selection requires a fresh session, CSRF, and idempote
     assert.deepEqual(executeIdempotentMutation.mock.calls[0].arguments[0].requestPayload, {
       decisionId: 'wanted-amber',
       matchId: 'candidate-amber',
+    });
+  });
+});
+
+test('Missing Music download start requires a fresh administrator session, CSRF, and a decision-only idempotent command', async (t) => {
+  const executeIdempotentMutation = t.mock.fn(async ({ executeMutation }) => executeMutation());
+  const requireFreshAdminSession = t.mock.fn(async () => ({
+    appUserId: 'admin-1',
+    user: { role: 'admin', username: 'admin' },
+  }));
+  const requireCsrf = t.mock.fn(() => {});
+  const startMissingMusicDecisionDownload = t.mock.fn(async () => ({
+    action: {
+      code: 'start_download',
+      decisionId: 'wanted-amber',
+      downloadPreparationStarted: true,
+      operationRunId: 'run-amber',
+    },
+  }));
+  const app = createMissingMusicRouteTestApp({
+    executeIdempotentMutation,
+    getRequestMetadata: () => ({ ipAddress: '127.0.0.1' }),
+    requireCsrf,
+    requireFreshAdminSession,
+    startMissingMusicDecisionDownload,
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/missing-music/decisions/wanted-amber/start-download`, {
+      headers: {
+        'content-type': 'application/json',
+        'idempotency-key': 'missing-music-download-1',
+      },
+      method: 'POST',
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 202);
+    assert.equal(payload.action.downloadPreparationStarted, true);
+    assert.equal(requireFreshAdminSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.deepEqual(startMissingMusicDecisionDownload.mock.calls[0].arguments[0], {
+      actorUser: {
+        id: 'admin-1',
+        isDisabled: false,
+        role: 'admin',
+        username: 'admin',
+      },
+      decisionId: 'wanted-amber',
+      requestMetadata: { ipAddress: '127.0.0.1' },
+    });
+    assert.equal(executeIdempotentMutation.mock.calls[0].arguments[0].operationScope, 'missing-music.decisions.download.start');
+    assert.deepEqual(executeIdempotentMutation.mock.calls[0].arguments[0].requestPayload, {
+      decisionId: 'wanted-amber',
     });
   });
 });

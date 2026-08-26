@@ -46,6 +46,7 @@ function normalizeRun(run) {
     requestedCandidateCount: toNumberOrNull(run.summary.requestedCandidateCount),
     selectedCandidateId: run.summary.selectedCandidateId ?? null,
     sourceSearchId: run.summary.sourceSearchId ?? null,
+    sourceWantedReleaseId: run.summary.sourceWantedReleaseId ?? null,
     startedAt: run.startedAt,
     status: run.status,
     totalSelected: toNumberOrNull(run.summary.totalSelected),

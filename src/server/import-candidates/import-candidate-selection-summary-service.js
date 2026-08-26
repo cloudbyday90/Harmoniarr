@@ -107,6 +107,7 @@ export function createImportCandidateSelectionSummaryService({
   async function buildSelectedImportCandidateSummary({
     actorUserId = null,
     actorUserRole = null,
+    candidateIds = null,
     limit,
     targetUser = null,
   } = {}) {
@@ -116,6 +117,7 @@ export function createImportCandidateSelectionSummaryService({
       actorUserRole,
     });
     const selectedQueue = await listImportCandidates({
+      ...(Array.isArray(candidateIds) ? { candidateIds } : {}),
       limit: normalizedLimit,
       offset: 0,
       requestedForUserId: visibilityFilter.requestedForUserId,

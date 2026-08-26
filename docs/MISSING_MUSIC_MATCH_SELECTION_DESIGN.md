@@ -1,6 +1,6 @@
 # Missing Music manual match selection
 
-**Status:** implemented — selection only; download start deferred
+**Status:** implemented — selection remains separate from download start
 
 **Date:** 2026-08-26
 
@@ -12,10 +12,10 @@ match for an active release. Selection records the next download step; it does
 not start a transfer, enqueue files, or expose a peer, path, or provider
 diagnostic.
 
-The second command slice will add an explicit **Start download** confirmation
-and hand the accepted transfer to Downloader. Keeping those commands separate
-means that a person can make an informed release decision without an accidental
-network or filesystem side effect.
+The complementary **Start download** confirmation is now implemented and
+documented in [Missing Music download-start design](MISSING_MUSIC_DOWNLOAD_START_DESIGN.md).
+Keeping those commands separate means that a person can make an informed
+release decision without an accidental network or filesystem side effect.
 
 ## Research and recommendation
 
@@ -142,9 +142,8 @@ the server; a disabled target remains readable as historical context but is
 not mutable. Activity and audit history retain the actor and target identity
 without storing raw provider evidence.
 
-## Next item
+## Follow-on
 
-Implement the separate **Start download** command. It must use a clearly named
-confirmation that identifies the release and active target account, require the
-same fresh-session/CSRF/idempotency boundary, preserve the target user through
-the Downloader handoff, and have a complete keyboard focus contract.
+The next workflow improvement is an administrator-only **View in Downloader**
+transition that retains the safe release and target-user context without
+exposing provider-private identifiers.

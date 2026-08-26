@@ -18,6 +18,7 @@
 
 import { createMissingMusicDecisionService } from './missing-music-decision-service.js';
 import { createMissingMusicDecisionCommandService } from './missing-music-decision-command-service.js';
+import { createMissingMusicDownloadStartService } from './missing-music-download-start-service.js';
 import { createMissingMusicDecisionTargetService } from './missing-music-decision-target-service.js';
 
 export function createMissingMusicModule({
@@ -25,6 +26,7 @@ export function createMissingMusicModule({
   listWantedReleasesWithMetadata,
   recordActivityEventFn = null,
   selectImportCandidate,
+  startImportCandidateExecutionRun,
 } = {}) {
   const missingMusicDecisionTargetService = createMissingMusicDecisionTargetService({
     listAppUsers,
@@ -40,15 +42,22 @@ export function createMissingMusicModule({
     resolveMissingMusicDecisionTarget: missingMusicDecisionTargetService.resolveMissingMusicDecisionTarget,
     selectImportCandidate,
   });
+  const missingMusicDownloadStartService = createMissingMusicDownloadStartService({
+    recordActivityEventFn,
+    resolveMissingMusicDecisionTarget: missingMusicDecisionTargetService.resolveMissingMusicDecisionTarget,
+    startImportCandidateExecutionRun,
+  });
 
   return {
     missingMusicDecisionCommandService,
     missingMusicDecisionService,
     missingMusicDecisionTargetService,
+    missingMusicDownloadStartService,
     routeDependencies: {
       getMissingMusicDecisionDetail: missingMusicDecisionService.getMissingMusicDecisionDetail,
       listMissingMusicDecisions: missingMusicDecisionService.listMissingMusicDecisions,
       selectMissingMusicDecisionMatch: missingMusicDecisionCommandService.selectMissingMusicDecisionMatch,
+      startMissingMusicDecisionDownload: missingMusicDownloadStartService.startMissingMusicDecisionDownload,
     },
   };
 }

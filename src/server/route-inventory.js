@@ -20,6 +20,7 @@ export const serverRouteInventory = Object.freeze([
   { method: 'GET', path: '/api/v1/missing-music/decisions', access: 'authenticated', area: 'missing-music', kind: 'read' },
   { method: 'GET', path: '/api/v1/missing-music/decisions/:decisionId', access: 'authenticated', area: 'missing-music', kind: 'read' },
   { method: 'POST', path: '/api/v1/missing-music/decisions/:decisionId/matches/:matchId/select', access: 'authenticated', area: 'missing-music', kind: 'mutation' },
+  { method: 'POST', path: '/api/v1/missing-music/decisions/:decisionId/start-download', access: 'admin', area: 'missing-music', kind: 'mutation' },
   { method: 'GET', path: '/api/v1/acquisition/releases', access: 'authenticated', area: 'music-queue', kind: 'read' },
   { method: 'GET', path: '/api/v1/acquisition/releases/:wantedReleaseId', access: 'authenticated', area: 'music-queue', kind: 'read' },
   { method: 'POST', path: '/api/v1/acquisition/releases/:wantedReleaseId/add-to-library', access: 'authenticated', area: 'music-queue', kind: 'mutation' },

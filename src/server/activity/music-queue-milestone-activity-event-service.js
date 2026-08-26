@@ -143,6 +143,26 @@ export function buildMusicQueueMatchSelectedActivityEvent({
 }
 
 /**
+ * Records that an administrator explicitly asked Harmoniarr to prepare one
+ * selected release for download. This intentionally precedes provider
+ * acceptance; the worker records the existing Download started event later.
+ */
+export function buildMusicQueueDownloadQueuedActivityEvent({
+  actorUserId = null,
+  candidate = null,
+  operationRunId = null,
+} = {}) {
+  return toActivityEvent({
+    actorUserId,
+    candidate,
+    eventType: 'music_queue_download_queued',
+    payload: {
+      operationRunId: normalizeOptionalString(operationRunId),
+    },
+  });
+}
+
+/**
  * Builds a release-scoped history event after the provider accepts a transfer.
  */
 export function buildMusicQueueDownloadStartedActivityEvent({

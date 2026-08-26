@@ -596,6 +596,9 @@ export function createApp({
     selectImportCandidate: importCandidateModule.importCandidateService?.selectImportCandidate
       ?? importCandidateModule.routeDependencies?.selectImportCandidate
       ?? null,
+    startImportCandidateExecutionRun: importCandidateModule.importCandidateExecutionService?.startImportCandidateExecutionRun
+      ?? importCandidateModule.routeDependencies?.startImportCandidateExecutionRun
+      ?? null,
   });
   const acquisitionModule = buildAcquisitionModule({
     allowMusicQueueFallbackQuality: libraryModule.libraryDiscoveryRequestStore?.allowMusicQueueFallbackQuality,
@@ -932,6 +935,11 @@ export function createApp({
     limitMissingMusicDecisionDetailRead: requestRateLimiterService.createMiddleware({
       bucketName: 'missing-music-decision-detail-read',
       limit: 120,
+      windowMs: 60 * 1000,
+    }),
+    limitMissingMusicDecisionDownloadStart: requestRateLimiterService.createMiddleware({
+      bucketName: 'missing-music-decision-download-start',
+      limit: 10,
       windowMs: 60 * 1000,
     }),
     limitMissingMusicDecisionRead: requestRateLimiterService.createMiddleware({
