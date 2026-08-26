@@ -22,6 +22,8 @@ import {
   normalizeMissingMusicAccountStatus,
   resolveMissingMusicDecisionScope,
 } from './missing-music-decision-scope-policy.js';
+import { buildMissingMusicMatchChoices } from './missing-music-match-choice-projection.js';
+import { createMissingMusicDecisionTargetService } from './missing-music-decision-target-service.js';
 import {
   deriveMissingMusicDecisionState,
   normalizeMissingMusicDecisionState,
@@ -29,7 +31,6 @@ import {
 
 const DEFAULT_PAGE_LIMIT = 50;
 const MAX_PAGE_LIMIT = 100;
-const MAX_DECISION_ID_LENGTH = 200;
 const MAX_QUERY_LENGTH = 120;
 const MAX_SOURCE_RELEASES = 2000;
 
@@ -60,23 +61,6 @@ function normalizeSearchQuery(value) {
   return query || null;
 }
 
-function normalizeDecisionId(value) {
-  if (typeof value !== 'string') {
-    throw createApiError(400, 'validation_error', 'decisionId must be text');
-  }
-
-  const decisionId = value.trim();
-  if (decisionId.length === 0 || decisionId.length > MAX_DECISION_ID_LENGTH) {
-    throw createApiError(
-      400,
-      'validation_error',
-      `decisionId must be between 1 and ${MAX_DECISION_ID_LENGTH} characters`,
-    );
-  }
-
-  return decisionId;
-}
-
 function buildRequestedFor(user) {
   return {
     accountStatus: user?.isDisabled === true ? 'disabled' : 'active',
@@ -85,9 +69,31 @@ function buildRequestedFor(user) {
   };
 }
 
+function projectMissingMusicStatus(status) {
+  const nextAction = status?.nextAction ?? null;
+
+  if (nextAction === 'download_now') {
+    return {
+      code: 'match_selected',
+      label: 'Match selected',
+      message: 'A match has been selected. A download will not start until someone explicitly starts it.',
+      nextAction,
+      tone: 'warning',
+    };
+  }
+
+  return {
+    code: status?.code ?? 'unknown',
+    label: status?.label ?? 'Waiting for an update',
+    message: status?.message ?? 'Harmoniarr is updating the release state.',
+    nextAction,
+    tone: status?.tone ?? 'neutral',
+  };
+}
+
 function projectDecision(release, requestedFor, projectMusicQueueReleaseFn) {
   const projectedRelease = projectMusicQueueReleaseFn(release);
-  const status = projectedRelease.status;
+  const status = projectMissingMusicStatus(projectedRelease.status);
 
   return {
     decisionId: projectedRelease.id,
@@ -105,14 +111,8 @@ function projectDecision(release, requestedFor, projectMusicQueueReleaseFn) {
       wantedStatus: projectedRelease.wantedStatus,
     },
     requestedFor,
-    state: deriveMissingMusicDecisionState(status?.code),
-    status: {
-      code: status?.code ?? 'unknown',
-      label: status?.label ?? 'Waiting for an update',
-      message: status?.message ?? 'Harmoniarr is updating the release state.',
-      nextAction: status?.nextAction ?? null,
-      tone: status?.tone ?? 'neutral',
-    },
+    state: deriveMissingMusicDecisionState(status.code, status.nextAction),
+    status,
   };
 }
 
@@ -132,7 +132,12 @@ function buildAvailableUserOption(user) {
   };
 }
 
-function validateDependencies({ listAppUsers, listWantedReleasesWithMetadata, projectMusicQueueReleaseFn }) {
+function validateDependencies({
+  listAppUsers,
+  listWantedReleasesWithMetadata,
+  projectMusicQueueReleaseFn,
+  resolveMissingMusicDecisionTarget,
+}) {
   if (typeof listAppUsers !== 'function') {
     throw new TypeError('createMissingMusicDecisionService requires listAppUsers');
   }
@@ -144,6 +149,10 @@ function validateDependencies({ listAppUsers, listWantedReleasesWithMetadata, pr
   if (typeof projectMusicQueueReleaseFn !== 'function') {
     throw new TypeError('createMissingMusicDecisionService requires projectMusicQueueReleaseFn');
   }
+
+  if (resolveMissingMusicDecisionTarget !== null && typeof resolveMissingMusicDecisionTarget !== 'function') {
+    throw new TypeError('createMissingMusicDecisionService resolveMissingMusicDecisionTarget must be a function');
+  }
 }
 
 export function createMissingMusicDecisionService({
@@ -151,8 +160,19 @@ export function createMissingMusicDecisionService({
   listWantedReleasesWithMetadata,
   now = () => new Date(),
   projectMusicQueueReleaseFn = projectMusicQueueRelease,
+  resolveMissingMusicDecisionTarget = null,
 } = {}) {
-  validateDependencies({ listAppUsers, listWantedReleasesWithMetadata, projectMusicQueueReleaseFn });
+  validateDependencies({
+    listAppUsers,
+    listWantedReleasesWithMetadata,
+    projectMusicQueueReleaseFn,
+    resolveMissingMusicDecisionTarget,
+  });
+  const resolveDecisionTarget = resolveMissingMusicDecisionTarget
+    ?? createMissingMusicDecisionTargetService({
+      listAppUsers,
+      listWantedReleasesWithMetadata,
+    }).resolveMissingMusicDecisionTarget;
 
   async function listMissingMusicDecisions({
     accountStatus: requestedAccountStatus = null,
@@ -267,62 +287,31 @@ export function createMissingMusicDecisionService({
    * Resolves one release through the same server-side household scope as the
    * worklist. The browser never supplies the target account as authority, and
    * this read projection intentionally excludes provider, transfer, and raw
-   * candidate evidence until a dedicated command contract exists.
+   * candidate evidence beyond its safe decision facts.
    */
   async function getMissingMusicDecisionDetail({
     actorUser,
     decisionId,
   } = {}) {
-    const normalizedDecisionId = normalizeDecisionId(decisionId);
-    const scope = resolveMissingMusicDecisionScope({
-      actorUserId: actorUser?.id,
-      actorUserRole: actorUser?.role ?? null,
-    });
-
-    let usersById;
-    let eligibleUsers;
-
-    if (scope.isAdmin && scope.scope === 'all') {
-      const allUsers = await listAppUsers();
-      usersById = new Map(allUsers.map((user) => [user.id, user]));
-      eligibleUsers = allUsers;
-    } else {
-      const currentUser = {
-        id: scope.requestedForUserId,
-        isDisabled: actorUser?.isDisabled === true,
-        username: actorUser?.username ?? null,
-      };
-      usersById = new Map([[currentUser.id, currentUser]]);
-      eligibleUsers = [currentUser];
-    }
-
-    const targetUserIds = eligibleUsers
-      .map((user) => user.id)
-      .filter((userId) => typeof userId === 'string' && userId.length > 0);
-    const sourceReleases = targetUserIds.length > 0
-      ? await listWantedReleasesWithMetadata({
-        appUserIds: targetUserIds,
-        limit: 1,
-        search: null,
-        wantedReleaseId: normalizedDecisionId,
-        wantedStatus: null,
-      })
+    const target = await resolveDecisionTarget({ actorUser, decisionId });
+    const decision = projectDecision(
+      target.release,
+      target.targetUser,
+      projectMusicQueueReleaseFn,
+    );
+    const matchChoices = decision.status.nextAction === 'review_matches'
+      ? buildMissingMusicMatchChoices(target.release)
       : [];
-    const sourceRelease = sourceReleases.find((release) => release.id === normalizedDecisionId);
-
-    if (!sourceRelease) {
-      throw createApiError(404, 'missing_music_decision_not_found', 'Missing Music release was not found');
-    }
-
-    const requestedFor = buildRequestedFor(usersById.get(sourceRelease.appUserId));
 
     return {
       checkedAt: now().toISOString(),
-      decision: projectDecision(sourceRelease, requestedFor, projectMusicQueueReleaseFn),
+      decision,
+      matchChoices,
       permissions: {
-        isReadOnly: requestedFor.accountStatus === 'disabled',
+        canSelectMatch: target.targetUser.accountStatus !== 'disabled' && matchChoices.length > 0,
+        isReadOnly: target.targetUser.accountStatus === 'disabled',
       },
-      scope: scope.scope,
+      scope: target.scope,
     };
   }
 

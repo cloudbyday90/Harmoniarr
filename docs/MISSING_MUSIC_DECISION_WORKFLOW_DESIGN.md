@@ -303,10 +303,10 @@ Additional sources checked 2026-08-26:
 - [W3C WAI Forms Tutorial — Labeling Controls](https://www.w3.org/WAI/tutorials/forms/labels/)
 - [W3C WAI Forms Tutorial — Grouping Controls](https://www.w3.org/WAI/tutorials/forms/grouping/)
 
-## Confirmation contract — decision required
+## Confirmation contract — decided
 
 The user-facing choice must be explicit before a candidate can create a
-provider transfer. One decision is still required before implementation:
+provider transfer. The command boundary adopts the following two-step model.
 
 ### Option A — use the match immediately
 
@@ -326,7 +326,7 @@ dialog presents **Start download** as the final action.
   low-confidence or manual recovery choices.
 - **Cons:** an extra interaction for routine decisions.
 
-### Recommended default
+### Adopted default
 
 Use **Option B** for a manually chosen candidate: a visible choice followed by
 a short **Start download** confirmation. Automatic policy-approved work remains
@@ -533,14 +533,14 @@ Before commit, prove the workflow at the boundaries that own it:
    routes remain compatible while their canonical redirects are implemented.
 5. **Completed 2026-08-26:** Add the modular, read-only Missing Music
    decision worklist while retaining current API/mutation contracts.
-6. **In progress 2026-08-26:** Add the server-authorized decision detail and
-   mutation boundary. The read-only detail route is complete; actor/target
-   audit retention and disabled-target mutation enforcement remain before any
-   command is enabled. See
-   [Missing Music decision-detail design](MISSING_MUSIC_DECISION_DETAIL_DESIGN.md).
-7. Implement **Use this match**, followed by the explicit **Start download**
-   confirmation recommended above, then hand off accepted transfers to
-   Downloader.
+6. **Completed 2026-08-26:** Add the server-authorized decision detail and
+   match-selection mutation boundary. The detail retains actor/target context;
+   match selection is CSRF-protected, idempotent, audited, and blocked for a
+   disabled target. See
+   [Missing Music match-selection design](MISSING_MUSIC_MATCH_SELECTION_DESIGN.md).
+7. **Next:** Implement the explicit **Start download** confirmation, then
+   hand off accepted transfers to Downloader. It is the only Missing Music
+   command allowed to invoke transfer execution.
 8. Change canonical internal deep links from Music Queue to Missing Music and
    add role-aware compatibility redirects that preserve query strings and
    hashes.

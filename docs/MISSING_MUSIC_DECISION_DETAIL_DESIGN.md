@@ -47,11 +47,12 @@ Use a **routable inspector**, not a modal:
 - The inspector heading receives focus only when the operator opens the
   release, and the visible return link makes its destination clear.
 
-The details view is intentionally read-only for this slice. The previous Music
-Queue “use match” route binds both actor and target to the signed-in user and
-immediately changes import-candidate state. Reusing it for household-wide
-Missing Music would make cross-user actions incorrect and could start an
-unconfirmed downstream workflow.
+The initial details view was deliberately read-only. Its successor now exposes
+only a narrowly scoped **Use this match** action for active accounts. The
+previous Music Queue route binds both actor and target to the signed-in user;
+reusing it for household-wide Missing Music would make cross-user actions
+incorrect. The dedicated command preserves actor/target separation and does
+not start an unconfirmed downstream workflow.
 
 ## Security boundary
 
@@ -62,7 +63,8 @@ unconfirmed downstream workflow.
 | Data minimization | Project only release-decision facts; raw provider, candidate, path, and transfer fields remain outside this API. |
 | Disabled accounts | Keep history readable to administrators, mark it read-only, and expose no mutation from the detail. |
 | Abuse resistance | Apply a separate read rate-limit bucket to the detail route. |
-| State changes | No state change exists in this slice, so neither CSRF nor idempotency is accepted here. The later command endpoint must require both. |
+| Match selection | The dedicated selection command re-resolves actor/target scope and requires fresh-session, CSRF, rate-limit, and idempotency protections. |
+| Transfer start | No transfer-start command exists yet; it remains a separate, explicitly confirmed mutation. |
 
 ## Alternatives considered
 
@@ -97,19 +99,18 @@ Sources checked 2026-08-26:
 
 ## Next command slice
 
-Implement a dedicated Missing Music command service that keeps **actor** and
-**target account** distinct. It must:
+Implement the dedicated **Start download** command. It must:
 
 1. re-resolve the decision and target scope at mutation time;
 2. reject disabled target accounts;
-3. record actor, target, release, chosen candidate, and result in audit
-   history;
+3. record actor, target, release, selected candidate, and handoff result in
+   audit history;
 4. require a fresh session, CSRF token, and idempotency key; and
-5. separate **Use this match** from a visible **Start download** confirmation.
+5. present a visible **Start download** confirmation after the existing
+   **Use this match** selection.
 
-Only that service may call the underlying candidate-selection and transfer
-workers. The client must never route a cross-user decision through the older
-session-scoped Music Queue mutation.
+Only that service may call the transfer worker. The client must never route a
+cross-user decision through the older session-scoped Music Queue mutation.
 
 ## Open pull-request assessment
 

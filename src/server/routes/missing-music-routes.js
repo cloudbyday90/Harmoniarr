@@ -36,11 +36,17 @@ function buildActorUser(session) {
 }
 
 export function registerMissingMusicRoutes(app, {
+  executeIdempotentMutation = async ({ executeMutation }) => executeMutation(),
   getMissingMusicDecisionDetail,
+  getRequestMetadata = defaultRequestAuthDependencies.getRequestMetadata,
   limitMissingMusicDecisionDetailRead = skipRateLimitMiddleware,
   limitMissingMusicDecisionRead = skipRateLimitMiddleware,
+  limitMissingMusicDecisionMutation = skipRateLimitMiddleware,
   listMissingMusicDecisions,
+  requireCsrf = defaultRequestAuthDependencies.requireCsrf,
+  requireFreshSession = defaultRequestAuthDependencies.requireFreshSession,
   requireSession = defaultRequestAuthDependencies.requireSession,
+  selectMissingMusicDecisionMatch,
 } = {}) {
   if (typeof getMissingMusicDecisionDetail !== 'function') {
     throw new TypeError('registerMissingMusicRoutes requires getMissingMusicDecisionDetail');
@@ -48,6 +54,10 @@ export function registerMissingMusicRoutes(app, {
 
   if (typeof listMissingMusicDecisions !== 'function') {
     throw new TypeError('registerMissingMusicRoutes requires listMissingMusicDecisions');
+  }
+
+  if (typeof selectMissingMusicDecisionMatch !== 'function') {
+    throw new TypeError('registerMissingMusicRoutes requires selectMissingMusicDecisionMatch');
   }
 
   app.get('/api/v1/missing-music/decisions', limitMissingMusicDecisionRead, asyncRoute(async (request, response) => {
@@ -79,6 +89,35 @@ export function registerMissingMusicRoutes(app, {
     response.json({
       ok: true,
       ...payload,
+    });
+  }));
+
+  app.post('/api/v1/missing-music/decisions/:decisionId/matches/:matchId/select', limitMissingMusicDecisionMutation, asyncRoute(async (request, response) => {
+    const session = await requireFreshSession(request);
+    requireCsrf(request, session);
+    const actorUser = buildActorUser(session);
+    const result = await executeIdempotentMutation({
+      actorUserId: actorUser.id,
+      executeMutation: async () => ({
+        body: await selectMissingMusicDecisionMatch({
+          actorUser,
+          decisionId: request.params.decisionId,
+          matchId: request.params.matchId,
+          requestMetadata: getRequestMetadata(request),
+        }),
+        statusCode: 200,
+      }),
+      idempotencyKey: request.headers['idempotency-key'],
+      operationScope: 'missing-music.decisions.matches.select',
+      requestPayload: {
+        decisionId: request.params.decisionId,
+        matchId: request.params.matchId,
+      },
+    });
+
+    response.status(result?.statusCode ?? 200).json({
+      ok: true,
+      ...(result?.body ?? {}),
     });
   }));
 }

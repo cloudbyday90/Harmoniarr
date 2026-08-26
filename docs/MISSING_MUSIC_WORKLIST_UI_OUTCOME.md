@@ -116,7 +116,11 @@ account and disabled-account history without exposing raw provider or transfer
 information. See
 [Missing Music decision-detail design](MISSING_MUSIC_DECISION_DETAIL_DESIGN.md).
 
-The next recommended item is the dedicated command service: implement
-**Use this match**, then an explicit **Start download** confirmation for a
-manually chosen candidate. It must retain actor/target audit history, reject
-disabled targets, and require a fresh session, CSRF, and idempotency.
+**Completed 2026-08-26:** The dedicated **Use this match** command now retains
+actor/target audit history, rejects disabled targets, requires a fresh session,
+CSRF, and idempotency, and explicitly does not begin a download. See
+[Missing Music match-selection design](MISSING_MUSIC_MATCH_SELECTION_DESIGN.md).
+
+The next recommended item is the explicit **Start download** confirmation for
+that already selected candidate. It must retain the same actor/target context
+through the Downloader handoff and preserve the separate command boundary.

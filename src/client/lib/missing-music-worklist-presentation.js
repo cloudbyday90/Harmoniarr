@@ -43,7 +43,7 @@ export const DEFAULT_MISSING_MUSIC_DECISION_FILTERS = Object.freeze({
 const NEXT_STEP_LABELS = Object.freeze({
   add_to_library: 'Add to library',
   configure_provider: 'Test Soulseek connection',
-  download_now: 'Review the selected match',
+  download_now: 'Start download',
   include_again: 'Include this release again',
   open_downloader: 'View in Downloader',
   open_in_library: 'Open in Library',

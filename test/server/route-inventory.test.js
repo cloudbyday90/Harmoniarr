@@ -46,6 +46,7 @@ function collectRegisteredRoutes() {
     getMissingMusicDecisionDetail: asyncNoopResult({ decision: {} }),
     listMissingMusicDecisions: asyncNoopResult({ decisions: [] }),
     requireSession: asyncNoopResult({ appUserId: 'user-1' }),
+    selectMissingMusicDecisionMatch: asyncNoopResult({ action: {} }),
   });
 
   registerAcquisitionRoutes(app, {

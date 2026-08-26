@@ -17,6 +17,7 @@
  */
 
 import { apiRequest, buildQueryString } from './api.js';
+import { createControlPlaneIdempotencyHeaders } from './control-plane-idempotency.js';
 
 /**
  * Reads only the server-authorized Missing Music decision projection. The
@@ -50,4 +51,24 @@ export function fetchMissingMusicDecisionDetail(decisionId) {
   }
 
   return apiRequest(`/api/v1/missing-music/decisions/${encodeURIComponent(normalizedDecisionId)}`);
+}
+
+export function selectMissingMusicDecisionMatch({ decisionId, idempotencyKey = null, matchId } = {}) {
+  const normalizedDecisionId = typeof decisionId === 'string' ? decisionId.trim() : '';
+  const normalizedMatchId = typeof matchId === 'string' ? matchId.trim() : '';
+  if (!normalizedDecisionId || !normalizedMatchId) {
+    throw new TypeError('selectMissingMusicDecisionMatch requires a decisionId and matchId');
+  }
+
+  return apiRequest(
+    `/api/v1/missing-music/decisions/${encodeURIComponent(normalizedDecisionId)}/matches/${encodeURIComponent(normalizedMatchId)}/select`,
+    {
+      body: {},
+      headers: idempotencyKey
+        ? { 'Idempotency-Key': idempotencyKey }
+        : createControlPlaneIdempotencyHeaders('missing-music.decisions.matches.select'),
+      includeCsrf: true,
+      method: 'POST',
+    },
+  );
 }

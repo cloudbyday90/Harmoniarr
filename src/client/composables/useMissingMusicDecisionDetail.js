@@ -33,8 +33,10 @@ function normalizeDetail(payload) {
     checkedAt: payload.checkedAt ?? null,
     decision: payload.decision,
     permissions: {
+      canSelectMatch: payload.permissions?.canSelectMatch === true,
       isReadOnly: payload.permissions?.isReadOnly === true,
     },
+    matchChoices: Array.isArray(payload.matchChoices) ? payload.matchChoices : [],
     scope: payload.scope ?? 'mine',
   };
 }

@@ -65,7 +65,10 @@ test('Missing Music links to a routable detail inspector with a labelled current
   assert.match(worklistSource, /name: 'missing-decision'/);
   assert.match(inspectorSource, /<p class="hx-eyebrow">Release status<\/p>/);
   assert.match(inspectorSource, /<h2 ref="headingElement" class="hx-card-title" tabindex="-1">/);
-  assert.match(inspectorSource, /<h3 id="missing-music-inspector-current-status">Current status<\/h3>/);
+  assert.match(inspectorSource, /<h3 id="missing-music-inspector-current-status" ref="statusHeadingElement" tabindex="-1">Current status<\/h3>/);
+  assert.match(inspectorSource, /aria-labelledby="missing-music-inspector-match-choices"/);
+  assert.match(inspectorSource, /Use this match/);
+  assert.match(inspectorSource, /Selecting a match does not start a download/);
   assert.match(inspectorSource, /Back to release decisions/);
   assert.match(missingViewSource, /<MissingMusicDecisionInspector v-if="selectedDecisionId"/);
   assert.match(routerSource, /path: 'missing\/:decisionId', name: 'missing-decision'/);

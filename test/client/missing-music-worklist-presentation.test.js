@@ -122,4 +122,5 @@ test('Missing Music separates active accounts from retained disabled history', (
     disabled: [{ accountStatus: 'disabled', id: 'alex', username: 'Alex' }],
   });
   assert.equal(getMissingMusicNextStep('open_downloader'), 'View in Downloader');
+  assert.equal(getMissingMusicNextStep('download_now'), 'Start download');
 });

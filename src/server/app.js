@@ -592,6 +592,10 @@ export function createApp({
   const missingMusicModule = buildMissingMusicModule({
     listAppUsers: appUserModule.appUserService.listAppUsers,
     listWantedReleasesWithMetadata: libraryModule.libraryWantedReleaseStore.listWantedReleasesWithMetadata,
+    recordActivityEventFn: activityModule.activityEventService.recordActivityEvent,
+    selectImportCandidate: importCandidateModule.importCandidateService?.selectImportCandidate
+      ?? importCandidateModule.routeDependencies?.selectImportCandidate
+      ?? null,
   });
   const acquisitionModule = buildAcquisitionModule({
     allowMusicQueueFallbackQuality: libraryModule.libraryDiscoveryRequestStore?.allowMusicQueueFallbackQuality,
@@ -933,6 +937,11 @@ export function createApp({
     limitMissingMusicDecisionRead: requestRateLimiterService.createMiddleware({
       bucketName: 'missing-music-decision-read',
       limit: 120,
+      windowMs: 60 * 1000,
+    }),
+    limitMissingMusicDecisionMutation: requestRateLimiterService.createMiddleware({
+      bucketName: 'missing-music-decision-mutation',
+      limit: 30,
       windowMs: 60 * 1000,
     }),
   });

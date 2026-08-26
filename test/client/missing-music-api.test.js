@@ -21,6 +21,7 @@ import test from 'node:test';
 import {
   fetchMissingMusicDecisionDetail,
   fetchMissingMusicDecisions,
+  selectMissingMusicDecisionMatch,
 } from '../../src/client/lib/missing-music-api.js';
 
 function installFetchMock(t, payload = { decisions: [] }) {
@@ -83,4 +84,29 @@ test('fetchMissingMusicDecisionDetail requires a non-empty decision identifier',
     () => fetchMissingMusicDecisionDetail('  '),
     /requires a decisionId/u,
   );
+});
+
+test('selectMissingMusicDecisionMatch submits only route identifiers with CSRF and idempotency protection', async (t) => {
+  const fetchMock = installFetchMock(t, { action: { downloadStarted: false } });
+  const originalDocument = globalThis.document;
+  globalThis.document = { cookie: 'harmoniarr_csrf=csrf-token' };
+  t.after(() => {
+    globalThis.document = originalDocument;
+  });
+
+  await selectMissingMusicDecisionMatch({
+    decisionId: 'wanted/amber',
+    idempotencyKey: 'missing-music-select-1',
+    matchId: 'candidate/amber',
+  });
+
+  assert.equal(
+    fetchMock.mock.calls[0].arguments[0],
+    '/api/v1/missing-music/decisions/wanted%2Famber/matches/candidate%2Famber/select',
+  );
+  const options = fetchMock.mock.calls[0].arguments[1];
+  assert.equal(options.method, 'POST');
+  assert.equal(options.headers.get('X-CSRF-Token'), 'csrf-token');
+  assert.equal(options.headers.get('Idempotency-Key'), 'missing-music-select-1');
+  assert.equal(options.body, '{}');
 });

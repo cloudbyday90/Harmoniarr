@@ -61,7 +61,11 @@ export function normalizeMissingMusicDecisionState(value) {
   return value.trim();
 }
 
-export function deriveMissingMusicDecisionState(statusCode) {
+export function deriveMissingMusicDecisionState(statusCode, nextAction = null) {
+  if (nextAction === 'download_now') {
+    return 'action';
+  }
+
   if (ACTION_STATUS_CODES.has(statusCode)) {
     return 'action';
   }

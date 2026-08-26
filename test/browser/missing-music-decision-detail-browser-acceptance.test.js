@@ -28,7 +28,7 @@ import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/r
 
 const integrationRuntimeConfig = resolveIntegrationTestRuntimeConfig();
 
-function buildDecision() {
+function buildDecision({ matchSelected = false } = {}) {
   return {
     decisionId: 'wanted-amber',
     expectedTrackCount: 10,
@@ -45,12 +45,19 @@ function buildDecision() {
       id: 'listener-1',
       username: 'Jamie',
     },
-    status: {
-      label: 'Choose a match',
-      message: 'Harmoniarr found options that need a selection.',
-      nextAction: 'review_matches',
-      tone: 'warning',
-    },
+    status: matchSelected
+      ? {
+        label: 'Match selected',
+        message: 'A match has been selected. A download will not start until someone explicitly starts it.',
+        nextAction: 'download_now',
+        tone: 'warning',
+      }
+      : {
+        label: 'Choose a match',
+        message: 'Harmoniarr found options that need a selection.',
+        nextAction: 'review_matches',
+        tone: 'warning',
+      },
   };
 }
 
@@ -78,15 +85,58 @@ function buildWorklistPayload() {
 }
 
 async function installMissingMusicFixture(browserContext, requests) {
+  const state = {
+    matchSelected: false,
+    selectionRequest: null,
+  };
+
   await browserContext.route('**/api/v1/missing-music/decisions**', async (route) => {
     const requestUrl = new URL(route.request().url());
     requests.push(requestUrl.pathname);
     const detailPath = '/api/v1/missing-music/decisions/wanted-amber';
+    const selectionPath = `${detailPath}/matches/candidate-amber/select`;
+
+    if (route.request().method() === 'POST' && requestUrl.pathname === selectionPath) {
+      const headers = route.request().headers();
+      state.selectionRequest = {
+        body: route.request().postDataJSON(),
+        csrfToken: headers['x-csrf-token'] ?? null,
+        idempotencyKey: headers['idempotency-key'] ?? null,
+      };
+      state.matchSelected = true;
+      await route.fulfill({
+        body: JSON.stringify({
+          action: {
+            code: 'use_match',
+            decisionId: 'wanted-amber',
+            downloadStarted: false,
+            matchId: 'candidate-amber',
+            targetUserId: 'listener-1',
+          },
+          ok: true,
+        }),
+        contentType: 'application/json',
+        status: 200,
+      });
+      return;
+    }
+
     const payload = requestUrl.pathname === detailPath
       ? {
         checkedAt: '2026-08-26T16:31:00.000Z',
-        decision: buildDecision(),
-        permissions: { isReadOnly: false },
+        decision: buildDecision({ matchSelected: state.matchSelected }),
+        matchChoices: state.matchSelected
+          ? []
+          : [{
+            fileCount: 10,
+            formats: ['FLAC'],
+            id: 'candidate-amber',
+            totalSizeBytes: 358000000,
+          }],
+        permissions: {
+          canSelectMatch: !state.matchSelected,
+          isReadOnly: false,
+        },
         scope: 'all',
       }
       : buildWorklistPayload();
@@ -97,6 +147,8 @@ async function installMissingMusicFixture(browserContext, requests) {
       status: 200,
     });
   });
+
+  return state;
 }
 
 let browserRuntime;
@@ -151,6 +203,45 @@ suite('Missing Music decision detail browser acceptance', () => {
       assert.equal(new URL(page.url()).pathname, '/app/missing');
     }, {
       scenarioName: 'missing_music_decision_detail_navigation',
+    });
+  });
+
+  test('selects one visible match without starting a download and returns focus to the updated state', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) {
+      t.skip(runtimeUnavailableReason);
+      return;
+    }
+
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      const pageErrors = [];
+      page.on('pageerror', (error) => pageErrors.push(error.message));
+
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      const fixture = await installMissingMusicFixture(browserContext, []);
+      await page.goto(baseUrl + '/app/missing/wanted-amber', { waitUntil: 'domcontentloaded' });
+
+      const inspector = page.locator('.missing-music-inspector');
+      await inspector.getByRole('heading', { exact: true, level: 3, name: 'Choose a match' }).waitFor();
+      await inspector.getByText('10 files found', { exact: true }).waitFor();
+      await inspector.getByRole('button', { name: 'Use this match for Amber — match 1' }).click();
+
+      const currentStatus = inspector.getByRole('heading', { exact: true, level: 3, name: 'Current status' });
+      await currentStatus.waitFor();
+      await inspector.getByText('Match selected', { exact: true }).waitFor();
+      await inspector.getByText('A download will not start until someone explicitly starts it.', { exact: false }).waitFor();
+      await inspector.getByText('Next step: Start download', { exact: true }).waitFor();
+      assert.equal(await currentStatus.evaluate((element) => globalThis.document.activeElement === element), true);
+      assert.deepEqual(fixture.selectionRequest?.body, {});
+      assert.match(fixture.selectionRequest?.csrfToken ?? '', /.+/u);
+      assert.match(fixture.selectionRequest?.idempotencyKey ?? '', /.+/u);
+      assert.equal(fixture.matchSelected, true);
+
+      await browserContext.unrouteAll({ behavior: 'ignoreErrors' });
+      assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
+    }, {
+      scenarioName: 'missing_music_match_selection_without_download_start',
     });
   });
 });

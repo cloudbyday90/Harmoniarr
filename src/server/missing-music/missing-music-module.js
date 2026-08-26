@@ -17,21 +17,38 @@
  */
 
 import { createMissingMusicDecisionService } from './missing-music-decision-service.js';
+import { createMissingMusicDecisionCommandService } from './missing-music-decision-command-service.js';
+import { createMissingMusicDecisionTargetService } from './missing-music-decision-target-service.js';
 
 export function createMissingMusicModule({
   listAppUsers,
   listWantedReleasesWithMetadata,
+  recordActivityEventFn = null,
+  selectImportCandidate,
 } = {}) {
-  const missingMusicDecisionService = createMissingMusicDecisionService({
+  const missingMusicDecisionTargetService = createMissingMusicDecisionTargetService({
     listAppUsers,
     listWantedReleasesWithMetadata,
   });
+  const missingMusicDecisionService = createMissingMusicDecisionService({
+    listAppUsers,
+    listWantedReleasesWithMetadata,
+    resolveMissingMusicDecisionTarget: missingMusicDecisionTargetService.resolveMissingMusicDecisionTarget,
+  });
+  const missingMusicDecisionCommandService = createMissingMusicDecisionCommandService({
+    recordActivityEventFn,
+    resolveMissingMusicDecisionTarget: missingMusicDecisionTargetService.resolveMissingMusicDecisionTarget,
+    selectImportCandidate,
+  });
 
   return {
+    missingMusicDecisionCommandService,
     missingMusicDecisionService,
+    missingMusicDecisionTargetService,
     routeDependencies: {
       getMissingMusicDecisionDetail: missingMusicDecisionService.getMissingMusicDecisionDetail,
       listMissingMusicDecisions: missingMusicDecisionService.listMissingMusicDecisions,
+      selectMissingMusicDecisionMatch: missingMusicDecisionCommandService.selectMissingMusicDecisionMatch,
     },
   };
 }

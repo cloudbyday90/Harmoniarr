@@ -78,3 +78,21 @@ test('Missing Music decision detail makes disabled account history explicitly re
   assert.equal(presentation.accountNote, 'This account is disabled. Its history is read-only.');
   assert.equal(formatMissingMusicDecisionCheckedAt(null), 'Not recorded');
 });
+
+test('Missing Music describes a selected match as awaiting an explicit download start', () => {
+  const presentation = buildMissingMusicDecisionDetailPresentation({
+    decision: {
+      status: {
+        label: 'Match selected',
+        message: 'A match has been selected. A download will not start until someone explicitly starts it.',
+        nextAction: 'download_now',
+        tone: 'warning',
+      },
+    },
+    permissions: { isReadOnly: false },
+  });
+
+  assert.equal(presentation.statusLabel, 'Match selected');
+  assert.equal(presentation.statusMessage, 'A match has been selected. A download will not start until someone explicitly starts it.');
+  assert.equal(presentation.nextStep, 'Start download');
+});

@@ -19,7 +19,9 @@
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue';
 import { buildMissingMusicDecisionDetailPresentation } from '../../lib/missing-music-decision-detail-presentation.js';
+import { buildMissingMusicMatchChoicePresentation } from '../../lib/missing-music-match-selection-presentation.js';
 import { useMissingMusicDecisionDetail } from '../../composables/useMissingMusicDecisionDetail.js';
+import { useMissingMusicMatchSelection } from '../../composables/useMissingMusicMatchSelection.js';
 
 const props = defineProps({
   decisionId: {
@@ -30,10 +32,13 @@ const props = defineProps({
 
 const headingElement = ref(null);
 const focusedDecisionId = ref('');
+const statusHeadingElement = ref(null);
 const decisionDetail = useMissingMusicDecisionDetail({
   decisionId: computed(() => props.decisionId),
 });
 const presentation = computed(() => buildMissingMusicDecisionDetailPresentation(decisionDetail.detail.value));
+const matchChoicePresentation = computed(() => buildMissingMusicMatchChoicePresentation(decisionDetail.detail.value));
+const matchSelection = useMissingMusicMatchSelection();
 
 async function focusInspectorHeading() {
   if (decisionDetail.isLoading.value || focusedDecisionId.value === props.decisionId) {
@@ -54,6 +59,18 @@ watch(
   },
   { flush: 'post' },
 );
+
+async function selectMatch(matchId) {
+  const result = await matchSelection.selectMatch({
+    decisionId: props.decisionId,
+    matchId,
+  });
+  if (!result) return;
+
+  await decisionDetail.load();
+  await nextTick();
+  statusHeadingElement.value?.focus({ preventScroll: true });
+}
 </script>
 
 <template>
@@ -95,7 +112,7 @@ watch(
       </p>
 
       <section class="missing-music-inspector__section" aria-labelledby="missing-music-inspector-current-status">
-        <h3 id="missing-music-inspector-current-status">Current status</h3>
+        <h3 id="missing-music-inspector-current-status" ref="statusHeadingElement" tabindex="-1">Current status</h3>
         <span class="hx-pill" :data-tone="presentation.statusTone">{{ presentation.statusLabel }}</span>
         <p>{{ presentation.statusMessage }}</p>
         <p class="missing-music-inspector__next-step"><strong>Next step:</strong> {{ presentation.nextStep }}</p>
@@ -123,6 +140,63 @@ watch(
       <p v-if="presentation.isReadOnly" class="missing-music-inspector__account-note">
         {{ presentation.accountNote }}
       </p>
+
+      <section
+        v-if="matchChoicePresentation.choices.length"
+        class="missing-music-inspector__section"
+        aria-labelledby="missing-music-inspector-match-choices"
+      >
+        <div>
+          <h3 id="missing-music-inspector-match-choices">{{ matchChoicePresentation.heading }}</h3>
+          <p id="missing-music-inspector-match-choice-help">
+            {{ matchChoicePresentation.instructions }}
+            <template v-if="matchChoicePresentation.canSelect">Selecting a match does not start a download.</template>
+          </p>
+        </div>
+
+        <p
+          v-if="matchSelection.statusMessage.value"
+          class="missing-music-inspector__selection-feedback"
+          role="status"
+          aria-atomic="true"
+        >
+          {{ matchSelection.statusMessage.value }}
+        </p>
+        <p
+          v-if="matchSelection.errorMessage.value"
+          class="missing-music-inspector__selection-feedback"
+          data-tone="danger"
+          role="alert"
+        >
+          {{ matchSelection.errorMessage.value }}
+        </p>
+
+        <ul class="missing-music-inspector__match-list" aria-label="Available matches">
+          <li v-for="match in matchChoicePresentation.choices" :key="match.id">
+            <article class="missing-music-inspector__match">
+              <h4>{{ match.label }}</h4>
+              <dl>
+                <div v-for="fact in match.facts" :key="fact.label">
+                  <dt>{{ fact.label }}</dt>
+                  <dd>{{ fact.value }}</dd>
+                </div>
+              </dl>
+              <button
+                v-if="matchChoicePresentation.canSelect"
+                type="button"
+                class="hx-btn"
+                data-variant="primary"
+                :aria-label="match.accessibleActionLabel"
+                :aria-describedby="'missing-music-inspector-match-choice-help'"
+                :disabled="Boolean(matchSelection.activeMatchId.value)"
+                @click="selectMatch(match.id)"
+              >
+                {{ matchSelection.activeMatchId.value === match.id ? 'Selecting…' : 'Use this match' }}
+              </button>
+            </article>
+          </li>
+        </ul>
+      </section>
     </div>
   </article>
 </template>
@@ -166,6 +240,11 @@ watch(
   font-size: var(--hx-text-base);
 }
 
+.missing-music-inspector__section h3:focus {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 3px;
+}
+
 .missing-music-inspector__next-step {
   padding-left: var(--hx-space-2);
   border-left: 2px solid var(--hx-accent);
@@ -200,8 +279,70 @@ watch(
   color: var(--hx-text-muted);
 }
 
+.missing-music-inspector__selection-feedback {
+  margin: 0;
+  padding: var(--hx-space-3);
+  border-left: 3px solid var(--hx-success);
+  background: var(--hx-success-soft);
+  color: var(--hx-text);
+}
+
+.missing-music-inspector__selection-feedback[data-tone='danger'] {
+  border-color: var(--hx-danger);
+  background: var(--hx-danger-soft);
+}
+
+.missing-music-inspector__match-list {
+  display: grid;
+  gap: var(--hx-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.missing-music-inspector__match {
+  display: grid;
+  gap: var(--hx-space-3);
+  padding: var(--hx-space-3);
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-surface-muted);
+}
+
+.missing-music-inspector__match h4,
+.missing-music-inspector__match dl {
+  margin: 0;
+}
+
+.missing-music-inspector__match dl {
+  display: grid;
+  gap: var(--hx-space-2);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.missing-music-inspector__match dl div {
+  display: grid;
+  gap: var(--hx-space-1);
+}
+
+.missing-music-inspector__match dt {
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.missing-music-inspector__match dd {
+  margin: 0;
+}
+
 @media (max-width: 640px) {
   .missing-music-inspector__facts {
+    grid-template-columns: 1fr;
+  }
+
+  .missing-music-inspector__match dl {
     grid-template-columns: 1fr;
   }
 }

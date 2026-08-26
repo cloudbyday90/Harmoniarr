@@ -781,12 +781,14 @@ export function createImportCandidateService({
 
   function selectImportCandidate({
     actorUserId = null,
+    eventDetails = null,
     importCandidateId,
     reason = null,
     requestMetadata = null,
   }) {
     return transitionCandidateReviewStatus({
       actorUserId,
+      ...(eventDetails && typeof eventDetails === 'object' ? { eventDetails } : {}),
       eventType: 'import_candidate_selected',
       fromStatuses: ['pending', 'held'],
       importCandidateId,

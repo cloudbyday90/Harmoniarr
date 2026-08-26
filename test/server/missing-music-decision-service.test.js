@@ -6,6 +6,18 @@ function createRelease({ appUserId, id, statusCode = 'pick_match' }) {
   return {
     appUserId,
     artistName: 'Portishead',
+    discoveryRequest: {
+      importReviewSummary: {
+        matches: [{
+          fileCount: 11,
+          formats: ['flac'],
+          matchId: `candidate-${id}`,
+          sourceUsername: 'must-not-leak',
+          status: 'pending',
+          totalSizeBytes: 400000000,
+        }],
+      },
+    },
     expectedTrackCount: 11,
     id,
     lastReconciledAt: '2026-08-26T16:00:00.000Z',
@@ -169,8 +181,15 @@ test('Missing Music detail is server-scoped, preserves disabled history, and exc
   });
   assert.equal(result.scope, 'all');
   assert.equal(result.permissions.isReadOnly, true);
+  assert.equal(result.permissions.canSelectMatch, false);
   assert.equal(result.decision.decisionId, 'decision-disabled');
   assert.equal(result.decision.requestedFor.username, 'former-listener');
+  assert.deepEqual(result.matchChoices, [{
+    fileCount: 11,
+    formats: ['FLAC'],
+    id: 'candidate-decision-disabled',
+    totalSizeBytes: 400000000,
+  }]);
   assert.doesNotMatch(JSON.stringify(result), /must-not-leak/u);
 });
 
@@ -225,4 +244,34 @@ test('Missing Music decision search is bounded and delegated to the server data 
     }),
     (error) => error?.status === 400 && error?.code === 'validation_error',
   );
+});
+
+test('Missing Music keeps a selected match actionable and describes that the download has not started', async () => {
+  const { service } = createService({
+    projectMusicQueueReleaseFn: (release) => ({
+      ...projectRelease(release),
+      status: {
+        code: 'checking_matches',
+        label: 'Checking matches',
+        message: 'This generic queue message must not obscure a deliberate manual selection.',
+        nextAction: 'download_now',
+        tone: 'info',
+      },
+    }),
+  });
+
+  const result = await service.listMissingMusicDecisions({
+    actorUser: { id: 'admin-1', role: 'admin', username: 'admin' },
+    state: 'action',
+  });
+
+  assert.equal(result.decisions.length, 1);
+  assert.deepEqual(result.decisions[0].status, {
+    code: 'match_selected',
+    label: 'Match selected',
+    message: 'A match has been selected. A download will not start until someone explicitly starts it.',
+    nextAction: 'download_now',
+    tone: 'warning',
+  });
+  assert.equal(result.decisions[0].state, 'action');
 });
