@@ -84,7 +84,9 @@ release path deliberately does not include that raw provider identity.
 ## Final recommendation stack
 
 1. Retain Music Queue for release decisions and Downloader for transfer
-   controls; do not merge the navigation model.
+   controls. Their primary-navigation model is superseded by the unified
+   Acquisition workspace described in
+   [Acquisition workspace navigation design](ACQUISITION_WORKSPACE_NAVIGATION_DESIGN.md).
 2. Use `wantedReleaseId` as the sole release-to-transfer join key.
 3. Give the handoff a visible action label and a release-specific accessible
    name.

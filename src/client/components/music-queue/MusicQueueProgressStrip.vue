@@ -73,7 +73,7 @@ const headingId = computed(() => `music-queue-progress-${props.heading.toLowerCa
           {{ progress.summary }}
         </p>
       </div>
-      <RouterLink class="hx-btn" data-variant="ghost" :to="{ name: 'music-queue' }">
+      <RouterLink class="hx-btn" data-variant="ghost" :to="{ name: 'acquisition-music-queue' }">
         See all
       </RouterLink>
     </header>

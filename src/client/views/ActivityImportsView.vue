@@ -249,7 +249,7 @@ watch(wantedReleaseId, (nextWantedReleaseId, previousWantedReleaseId) => {
           <p class="hx-card-subtitle">{{ releaseAddSummary?.message ?? 'No library-add result has been recorded for this release yet.' }}</p>
         </div>
         <div class="hx-card-actions">
-          <RouterLink class="hx-btn" :to="{ name: 'music-queue-release', params: { wantedReleaseId } }">
+          <RouterLink class="hx-btn" :to="{ name: 'acquisition-music-queue-release', params: { wantedReleaseId } }">
             Return to Music Queue
           </RouterLink>
           <RouterLink

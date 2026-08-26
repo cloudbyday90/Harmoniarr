@@ -66,7 +66,7 @@ function refreshOverview() {
         <h1 class="hx-page-title">Acquisition overview</h1>
         <p class="hx-page-subtitle">
           See the release steps Harmoniarr is working through and the live transfers supporting them.
-          Open Music Queue or Downloader when you want to act.
+          Choose Music Queue or Downloader above when you want to act.
         </p>
       </div>
       <div class="hx-page-actions">
@@ -105,7 +105,7 @@ function refreshOverview() {
             v-if="canViewDownloader"
             class="hx-btn"
             data-variant="ghost"
-            :to="{ name: 'downloader' }"
+            :to="{ name: 'acquisition-downloader' }"
           >
             Open Downloader
           </RouterLink>

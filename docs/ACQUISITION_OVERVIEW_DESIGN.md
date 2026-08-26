@@ -1,6 +1,12 @@
 # Acquisition overview design
 
-**Status:** implemented 2026-08-25
+**Status:** implemented 2026-08-25; navigation decision superseded 2026-08-26
+
+> Historical note: this document records the first, read-only overview slice.
+> Its decision to leave the primary navigation unchanged was superseded by
+> [Acquisition workspace navigation design](ACQUISITION_WORKSPACE_NAVIGATION_DESIGN.md).
+> The distinct ownership of release choices and transfer controls remains in
+> effect.
 
 ## Problem
 
@@ -55,9 +61,9 @@ Research was completed against the official sources below on 2026-08-25.
 2. Add a pure `acquisition-overview-presentation` module for summary cards,
    visible transfer rows, and fixed client-side limits. Keep the Vue page
    declarative.
-3. Add `/app/acquisition` as a direct, read-only prototype route. Do not change
-   the primary navigation in this slice. Existing Music Queue and Downloader
-   headers link administrators to the overview.
+3. Add `/app/acquisition` as a direct, read-only prototype route. The original
+   slice deliberately did not change primary navigation; that decision is now
+   superseded by the Acquisition workspace design.
 4. Keep the two lanes distinct:
    - **Release work**: only active or actionable Music Queue releases, with
      links to the existing release inspector.
@@ -84,8 +90,8 @@ It does not move focus or navigate automatically while data revalidates.
 
 ## Non-goals
 
-- Do not remove, rename, or redirect the existing Music Queue or Downloader
-  route.
+- Do not remove the existing Music Queue or Downloader route without a
+  backwards-compatible redirect.
 - Do not correlate a release to a transfer by filename, artist name, or another
   unsafe heuristic.
 - Do not expose Downloader source-user, file, or directory data to

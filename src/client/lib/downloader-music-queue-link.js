@@ -41,7 +41,7 @@ export function buildDownloaderMusicQueueReleaseLocation(transfer) {
   }
 
   return {
-    name: 'music-queue-release',
+    name: 'acquisition-music-queue-release',
     params: {
       wantedReleaseId: release.wantedReleaseId,
     },

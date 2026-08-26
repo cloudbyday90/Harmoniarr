@@ -224,14 +224,14 @@ function closeTransferDetail() {
 
 function clearRouteTransferHandoff() {
   void router.replace({
-    name: 'downloader',
+    name: 'acquisition-downloader',
     query: omitDownloaderTransferRouteQuery(route.query),
   });
 }
 
 function clearMusicQueueReleaseHandoff() {
   void router.replace({
-    name: 'downloader',
+    name: 'acquisition-downloader',
     query: omitDownloaderMusicQueueHandoffRouteQuery(route.query),
   });
 }
@@ -283,9 +283,6 @@ async function clearCompletedTransfers() {
         </p>
       </div>
       <div class="hx-page-actions">
-        <RouterLink class="hx-btn" data-variant="ghost" :to="{ name: 'acquisition' }">
-          Acquisition overview
-        </RouterLink>
         <button
           type="button"
           class="hx-btn"
@@ -346,7 +343,7 @@ async function clearCompletedTransfers() {
             class="hx-btn"
             data-variant="ghost"
             :to="{
-              name: 'music-queue-release',
+              name: 'acquisition-music-queue-release',
               params: { wantedReleaseId: musicQueueHandoffTarget.wantedReleaseId },
             }"
           >
@@ -397,7 +394,7 @@ async function clearCompletedTransfers() {
               <RouterLink
                 class="hx-btn"
                 :to="{
-                  name: 'music-queue-release',
+                  name: 'acquisition-music-queue-release',
                   params: { wantedReleaseId: musicQueueHandoffTarget.wantedReleaseId },
                 }"
               >

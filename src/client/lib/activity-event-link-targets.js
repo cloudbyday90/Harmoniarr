@@ -59,7 +59,7 @@ export function buildActivityEventLinkTarget(event = {}) {
               }).actionLabel
             : 'Open Music Queue',
           to: {
-            name: 'music-queue-release',
+            name: 'acquisition-music-queue-release',
             params: { wantedReleaseId },
           },
         }

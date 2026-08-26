@@ -62,7 +62,7 @@ test('Acquisition release transfer progress groups only live transfers by durabl
         description: 'View the live transfer and its controls in Downloader. Release decisions remain in Music Queue.',
         label: 'View download progress',
         location: {
-          name: 'downloader',
+          name: 'acquisition-downloader',
           query: { wantedReleaseId: 'wanted-forest-frank' },
         },
         wantedReleaseId: 'wanted-forest-frank',

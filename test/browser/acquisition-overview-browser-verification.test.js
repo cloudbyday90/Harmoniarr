@@ -23,7 +23,14 @@ import {
   isSkippableBrowserRuntimeError,
   toBrowserRuntimeUnavailableReason,
 } from '../../testing/browser/playwright-smoke-runtime.js';
-import { bootstrapAdminThroughUi } from '../../testing/browser/operator-browser-helpers.js';
+import {
+  bootstrapAdminThroughUi,
+  logoutThroughUi,
+} from '../../testing/browser/operator-browser-helpers.js';
+import {
+  createRequesterThroughApi,
+  loginRequesterThroughUi,
+} from '../../testing/browser/user-browser-helpers.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 
 const integrationRuntimeConfig = resolveIntegrationTestRuntimeConfig();
@@ -155,6 +162,21 @@ suite('Acquisition overview browser verification', () => {
       await bootstrapAdminThroughUi(page, { baseUrl });
 
       await page.goto(`${baseUrl}/app/acquisition`, { waitUntil: 'domcontentloaded' });
+      const primaryNavigation = page.locator('.hx-sidebar');
+      await primaryNavigation.getByRole('link', { name: 'Acquisition', exact: true }).waitFor();
+      assert.equal(await primaryNavigation.getByRole('link', { name: 'Music Queue', exact: true }).count(), 0);
+      assert.equal(await primaryNavigation.getByRole('link', { name: 'Downloader', exact: true }).count(), 0);
+
+      const acquisitionNavigation = page.getByRole('navigation', { name: 'Acquisition sections' });
+      await acquisitionNavigation.getByRole('link', { name: 'Overview', exact: true }).waitFor();
+      assert.equal(
+        await acquisitionNavigation.getByRole('link', { name: 'Music Queue', exact: true }).getAttribute('href'),
+        '/app/acquisition/music-queue',
+      );
+      assert.equal(
+        await acquisitionNavigation.getByRole('link', { name: 'Downloader', exact: true }).getAttribute('href'),
+        '/app/acquisition/downloader',
+      );
       await page.getByRole('heading', { exact: true, name: 'Acquisition overview' }).waitFor();
       await page.getByRole('heading', { exact: true, name: 'Release work' }).waitFor();
       await page.getByRole('heading', { exact: true, name: 'Download progress' }).waitFor();
@@ -164,7 +186,7 @@ suite('Acquisition overview browser verification', () => {
       await page.getByText('Queued transfers', { exact: true }).waitFor();
 
       const reviewLink = page.getByRole('link', { name: 'Review', exact: true });
-      assert.equal(await reviewLink.getAttribute('href'), '/app/music-queue/wanted-action');
+      assert.equal(await reviewLink.getAttribute('href'), '/app/acquisition/music-queue/wanted-action');
 
       const handoffLinks = page.getByRole('link', {
         exact: true,
@@ -173,13 +195,73 @@ suite('Acquisition overview browser verification', () => {
       assert.equal(await handoffLinks.count(), 2);
       for (let index = 0; index < await handoffLinks.count(); index += 1) {
         const handoffHref = await handoffLinks.nth(index).getAttribute('href');
-        assert.equal(handoffHref, '/app/downloader?wantedReleaseId=wanted-progress');
+        assert.equal(handoffHref, '/app/acquisition/downloader?wantedReleaseId=wanted-progress');
         assert.doesNotMatch(handoffHref ?? '', /fixture-source|transfer-active/);
       }
       await page.getByRole('progressbar', { name: 'Active transfer.flac: 50%' }).waitFor();
       await page.getByRole('link', { name: 'Open Downloader', exact: true }).waitFor();
       assert.equal(await page.getByRole('button', { name: 'Clear Completed' }).count(), 0);
+
+      await page.goto(`${baseUrl}/app/music-queue/wanted-action?source=legacy#release-details`, {
+        waitUntil: 'domcontentloaded',
+      });
+      await page.waitForFunction(() => {
+        const location = new URL(globalThis.location.href);
+        return location.pathname === '/app/acquisition/music-queue/wanted-action'
+          && location.searchParams.get('source') === 'legacy'
+          && location.hash === '#release-details';
+      });
+      assert.match(
+        await acquisitionNavigation.getByRole('link', { name: 'Music Queue', exact: true }).getAttribute('class') ?? '',
+        /\bis-active\b/u,
+      );
+
+      await page.goto(`${baseUrl}/app/downloader?wantedReleaseId=wanted-progress#transfer-progress`, {
+        waitUntil: 'domcontentloaded',
+      });
+      await page.waitForFunction(() => {
+        const location = new URL(globalThis.location.href);
+        return location.pathname === '/app/acquisition/downloader'
+          && location.searchParams.get('wantedReleaseId') === 'wanted-progress'
+          && location.hash === '#transfer-progress';
+      });
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
     }, { scenarioName: 'acquisition_overview' });
+  });
+
+  test('keeps the nested Downloader route unavailable to requesters', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) {
+      t.skip(runtimeUnavailableReason);
+      return;
+    }
+
+    await browserRuntime.runScenario(async ({ baseUrl, page }) => {
+      const downloaderRequests = [];
+      page.on('request', (request) => {
+        if (new URL(request.url()).pathname === '/api/v1/downloader/queue') {
+          downloaderRequests.push(request.url());
+        }
+      });
+
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      await createRequesterThroughApi(page, {
+        password: 'InitialPass123!',
+        username: 'acquisition-requester',
+      });
+      await logoutThroughUi(page);
+      await loginRequesterThroughUi(page, {
+        baseUrl,
+        initialPassword: 'InitialPass123!',
+        readyPassword: 'ReadyPass123!',
+        username: 'acquisition-requester',
+      });
+
+      await page.goto(`${baseUrl}/app/acquisition/downloader`, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('heading', { exact: true, name: 'Home' }).waitFor();
+      assert.equal(new URL(page.url()).pathname, '/app');
+      assert.deepEqual(downloaderRequests, []);
+    }, { scenarioName: 'acquisition_requester_downloader_redirect' });
   });
 });

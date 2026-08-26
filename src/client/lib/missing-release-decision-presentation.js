@@ -34,14 +34,14 @@ function getReleaseIdentity(release) {
  * navigation hint; server-side scoped reads remain the authorization boundary.
  *
  * @param {object|null|undefined} release
- * @returns {{name: 'music-queue-release', params: {wantedReleaseId: string}}|null}
+ * @returns {{name: 'acquisition-music-queue-release', params: {wantedReleaseId: string}}|null}
  */
 export function buildMissingReleaseMusicQueueRoute(release) {
   const wantedReleaseId = normalizeText(release?.wantedReleaseId) ?? normalizeText(release?.id);
   if (!wantedReleaseId) return null;
 
   return {
-    name: 'music-queue-release',
+    name: 'acquisition-music-queue-release',
     params: { wantedReleaseId },
   };
 }

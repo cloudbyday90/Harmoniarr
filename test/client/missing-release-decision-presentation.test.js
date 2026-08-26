@@ -20,7 +20,7 @@ test('buildMissingReleaseMusicQueueRoute uses only the durable wanted-release id
       musicbrainzReleaseId: 'musicbrainz-amber',
     }),
     {
-      name: 'music-queue-release',
+      name: 'acquisition-music-queue-release',
       params: { wantedReleaseId: 'wanted-amber' },
     },
   );

@@ -15,7 +15,7 @@
   waiting`.
 - A linked Release work row and its matching Download progress row both use
   **View download progress** and open
-  `/app/downloader?wantedReleaseId=…`; the new handoff contains neither a
+  `/app/acquisition/downloader?wantedReleaseId=…`; the new handoff contains neither a
   provider username nor a transfer ID.
 - The Home progress strip continues to open release details, preserving its
   lightweight overview role.
@@ -27,6 +27,11 @@ open the correctly scoped Downloader view directly from either Acquisition
 lane. Music Queue continues to own decisions; Downloader continues to own
 transfer controls. An unlinked transfer remains visibly separate instead of
 being guessed into a release relationship.
+
+> **Navigation note (2026-08-26):** The linked handoffs now open the nested
+> Acquisition workspace routes. The release-to-transfer ownership boundary
+> above is unchanged; only the primary navigation model was consolidated. See
+> [Acquisition workspace navigation outcome](ACQUISITION_WORKSPACE_NAVIGATION_OUTCOME.md).
 
 ## Validation evidence
 

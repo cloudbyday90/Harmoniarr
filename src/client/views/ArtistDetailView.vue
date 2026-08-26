@@ -1090,7 +1090,7 @@ watch(projection, () => {
                       class="hx-btn artist-detail-selection__queue-link"
                       data-variant="ghost"
                       :to="{
-                        name: 'music-queue-release',
+                        name: 'acquisition-music-queue-release',
                         params: { wantedReleaseId: release.musicQueueRelease.id },
                       }"
                       :aria-label="`Open ${release.title ?? 'this release'} in Music Queue`"

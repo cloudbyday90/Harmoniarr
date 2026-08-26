@@ -32,7 +32,8 @@ const ActivityReleasesView = () => import('./views/ActivityReleasesView.vue');
 const ActivityUsersView = () => import('./views/ActivityUsersView.vue');
 const ActivityWantedView = () => import('./views/ActivityWantedView.vue');
 const ActivityWorkspaceView = () => import('./views/ActivityWorkspaceView.vue');
-const AcquisitionView = () => import('./views/AcquisitionView.vue');
+const AcquisitionOverviewView = () => import('./views/AcquisitionView.vue');
+const AcquisitionWorkspaceView = () => import('./views/AcquisitionWorkspaceView.vue');
 const ArtistDetailView = () => import('./views/ArtistDetailView.vue');
 const BootstrapSetupView = () => import('./views/BootstrapSetupView.vue');
 const ClaimAccountView = () => import('./views/ClaimAccountView.vue');
@@ -84,6 +85,7 @@ const requesterRestrictedRouteNames = new Set([
   'activity-failed',
   'activity-monitored-artists',
   'acquisition',
+  'acquisition-downloader',
   'downloader',
   'settings',
   'settings-connections',
@@ -119,11 +121,22 @@ const router = createRouter({
         { path: 'onboarding', name: 'onboarding', component: OnboardingView },
         { path: 'discover', name: 'discover', component: DiscoverView },
         { path: 'library', name: 'library', component: LibraryView },
-        { path: 'acquisition', name: 'acquisition', component: AcquisitionView },
-        { path: 'music-queue', name: 'music-queue', component: MusicQueueView },
-        { path: 'music-queue/:wantedReleaseId', name: 'music-queue-release', component: MusicQueueView },
         { path: 'missing', name: 'missing', component: MissingView },
-        { path: 'downloader', name: 'downloader', component: DownloaderView },
+        {
+          path: 'acquisition',
+          component: AcquisitionWorkspaceView,
+          children: [
+            { path: '', name: 'acquisition', component: AcquisitionOverviewView },
+            { path: 'music-queue', name: 'acquisition-music-queue', component: MusicQueueView },
+            { path: 'music-queue/:wantedReleaseId', name: 'acquisition-music-queue-release', component: MusicQueueView },
+            { path: 'downloader', name: 'acquisition-downloader', component: DownloaderView },
+          ],
+        },
+        // Existing saved links and route-name callers remain valid while the
+        // unified Acquisition workspace becomes the single primary destination.
+        { path: 'music-queue', name: 'music-queue', redirect: (to) => ({ name: 'acquisition-music-queue', query: to.query, hash: to.hash }) },
+        { path: 'music-queue/:wantedReleaseId', name: 'music-queue-release', redirect: (to) => ({ name: 'acquisition-music-queue-release', params: to.params, query: to.query, hash: to.hash }) },
+        { path: 'downloader', name: 'downloader', redirect: (to) => ({ name: 'acquisition-downloader', query: to.query, hash: to.hash }) },
         { path: 'search', name: 'search', component: SearchView },
         { path: 'requests', name: 'request-music', component: RequestMusicView },
         { path: 'requests/:id', name: 'request-detail', component: RequestDetailView },
@@ -142,7 +155,7 @@ const router = createRouter({
             { path: 'diagnostics/failed-library-adds', name: 'activity-diagnostics-failed-library-adds', component: ActivityImportsView, props: { status: 'failed', title: 'Failed library adds', subtitle: 'Library-add records that need investigation.', emptyTitle: 'No failed library adds', emptyCopy: 'Failed library adds will appear here when the add worker reports them.' } },
             { path: 'candidates', name: 'activity-candidates', redirect: (to) => ({ name: 'activity-diagnostics-matches', query: to.query, hash: to.hash }) },
             { path: 'requests', name: 'activity-requests', component: RequestMusicView },
-            { path: 'queue', name: 'activity-queue', redirect: (to) => ({ name: 'music-queue', query: to.query, hash: to.hash }) },
+            { path: 'queue', name: 'activity-queue', redirect: (to) => ({ name: 'acquisition-music-queue', query: to.query, hash: to.hash }) },
             { path: 'wanted', name: 'activity-wanted', component: ActivityWantedView },
             { path: 'imports', name: 'activity-imports', redirect: (to) => ({ name: 'activity-diagnostics-library-adds', query: to.query, hash: to.hash }) },
             { path: 'releases', name: 'activity-releases', component: ActivityReleasesView },

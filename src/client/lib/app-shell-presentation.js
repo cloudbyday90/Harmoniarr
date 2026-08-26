@@ -27,10 +27,9 @@
 
 const OPERATOR_NAV = Object.freeze([
   Object.freeze({ name: 'dashboard', label: 'Home', icon: 'library', exact: true }),
-  Object.freeze({ name: 'music-queue', label: 'Music Queue', icon: 'music' }),
   Object.freeze({ name: 'discover', label: 'Discover', icon: 'discover' }),
+  Object.freeze({ name: 'acquisition', label: 'Acquisition', icon: 'music' }),
   Object.freeze({ name: 'missing', label: 'Missing music', icon: 'missing' }),
-  Object.freeze({ name: 'downloader', label: 'Downloader', icon: 'download' }),
   Object.freeze({ name: 'activity', label: 'Activity', icon: 'activity' }),
   Object.freeze({ name: 'settings', label: 'Settings', icon: 'settings' }),
 ]);

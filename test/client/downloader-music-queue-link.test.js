@@ -27,7 +27,7 @@ test('Downloader Music Queue handoff resolves a durable release destination and 
     wantedStatus: 'missing',
   });
   assert.deepEqual(buildDownloaderMusicQueueReleaseLocation(linkedTransfer), {
-    name: 'music-queue-release',
+    name: 'acquisition-music-queue-release',
     params: { wantedReleaseId: 'wanted-release-1' },
   });
   assert.equal(

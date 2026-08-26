@@ -62,7 +62,7 @@ test('buildActivityEventLinkTarget resolves allowed quality fallback to Music Qu
   assert.deepEqual(target, {
     label: 'Open Music Queue',
     to: {
-      name: 'music-queue-release',
+      name: 'acquisition-music-queue-release',
       params: { wantedReleaseId: 'wanted-1' },
     },
   });
@@ -81,7 +81,7 @@ test('buildActivityEventLinkTarget resolves quality blocks to Music Queue review
   assert.deepEqual(target, {
     label: 'Review quality choice',
     to: {
-      name: 'music-queue-release',
+      name: 'acquisition-music-queue-release',
       params: { wantedReleaseId: 'wanted-1' },
     },
   });
@@ -98,7 +98,7 @@ test('buildActivityEventLinkTarget resolves Music Queue lifecycle events to the 
   assert.deepEqual(target, {
     label: 'Open Music Queue',
     to: {
-      name: 'music-queue-release',
+      name: 'acquisition-music-queue-release',
       params: { wantedReleaseId: 'wanted-1' },
     },
   });
@@ -119,7 +119,7 @@ test('buildActivityEventLinkTarget resolves import safety stops to release-centr
   assert.deepEqual(target, {
     label: 'Review lossless check',
     to: {
-      name: 'music-queue-release',
+      name: 'acquisition-music-queue-release',
       params: { wantedReleaseId: 'wanted-1' },
     },
   });
@@ -151,7 +151,7 @@ test('buildActivityEventLinkTarget resolves a recovered provider search to Music
   assert.deepEqual(target, {
     label: 'Open Music Queue',
     to: {
-      name: 'music-queue-release',
+      name: 'acquisition-music-queue-release',
       params: { wantedReleaseId: 'wanted-1' },
     },
   });
@@ -242,7 +242,7 @@ test('buildActivityEventLinkTarget offers one safe handoff for audio and request
   }), {
     label: 'Review quality choice',
     to: {
-      name: 'music-queue-release',
+      name: 'acquisition-music-queue-release',
       params: { wantedReleaseId: 'wanted-1' },
     },
   });

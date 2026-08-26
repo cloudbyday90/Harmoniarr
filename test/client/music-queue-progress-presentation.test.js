@@ -54,7 +54,7 @@ test('Music Queue progress prioritizes recoverable attention before automatic wo
   assert.match(result.summary, /2 releases need your attention/);
   assert.equal(result.rows[0].action.label, 'Review');
   assert.deepEqual(result.rows[0].action.to, {
-    name: 'music-queue-release',
+    name: 'acquisition-music-queue-release',
     params: { wantedReleaseId: 'quality' },
   });
 });
@@ -110,7 +110,7 @@ test('Home progress omits idle releases and sends active or attention states to 
   assert.deepEqual(result.rows[0].action, {
     label: 'View details',
     to: {
-      name: 'music-queue-release',
+      name: 'acquisition-music-queue-release',
       params: { wantedReleaseId: 'match' },
     },
   });
@@ -126,7 +126,7 @@ test('Acquisition progress gives a linked live transfer an explicit Downloader h
           accessibleLabel: 'View download progress for Forest Frank — Release downloading',
           label: 'View download progress',
           location: {
-            name: 'downloader',
+            name: 'acquisition-downloader',
             query: { wantedReleaseId: 'downloading' },
           },
         },
@@ -139,7 +139,7 @@ test('Acquisition progress gives a linked live transfer an explicit Downloader h
     accessibleLabel: 'View download progress for Forest Frank — Release downloading',
     label: 'View download progress',
     to: {
-      name: 'downloader',
+      name: 'acquisition-downloader',
       query: { wantedReleaseId: 'downloading' },
     },
   });
@@ -156,7 +156,7 @@ test('Home progress keeps its release-detail destination when download progress 
       downloading: {
         handoff: {
           label: 'View download progress',
-          location: { name: 'downloader', query: { wantedReleaseId: 'downloading' } },
+          location: { name: 'acquisition-downloader', query: { wantedReleaseId: 'downloading' } },
         },
         summary: '1 transfer is downloading',
       },
@@ -165,7 +165,7 @@ test('Home progress keeps its release-detail destination when download progress 
 
   assert.equal(result.rows[0].action.label, 'View details');
   assert.deepEqual(result.rows[0].action.to, {
-    name: 'music-queue-release',
+    name: 'acquisition-music-queue-release',
     params: { wantedReleaseId: 'downloading' },
   });
 });

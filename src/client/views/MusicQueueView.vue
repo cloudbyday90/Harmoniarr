@@ -99,7 +99,6 @@ const {
 } = useMusicQueueReleaseDetail({ wantedReleaseId: requestedReleaseId });
 
 const isRequester = computed(() => sessionStore.state.user?.role === 'requester');
-const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
 const hasProviderDependentMusicQueueWork = computed(() =>
   hasMusicQueueProviderDependentWork(releases.value),
 );
@@ -195,8 +194,8 @@ const musicQueueErrorMessage = computed(() => errorMessage.value);
 function openReview(release, trigger) {
   musicQueueReleaseFocus.selectFromRow({ releaseId: release.id, trigger });
   selectedReleaseId.value = release.id;
-  if (route.name !== 'music-queue-release' || route.params.wantedReleaseId !== release.id) {
-    void router.replace({ name: 'music-queue-release', params: { wantedReleaseId: release.id } });
+  if (route.name !== 'acquisition-music-queue-release' || route.params.wantedReleaseId !== release.id) {
+    void router.replace({ name: 'acquisition-music-queue-release', params: { wantedReleaseId: release.id } });
   }
 }
 
@@ -207,8 +206,8 @@ function closeReview() {
   );
   selectedReleaseId.value = null;
   void musicQueueReleaseFocus.focusFirstAvailableAfterRender(focusCandidates);
-  if (route.name === 'music-queue-release') {
-    void router.replace({ name: 'music-queue' });
+  if (route.name === 'acquisition-music-queue-release') {
+    void router.replace({ name: 'acquisition-music-queue' });
   }
 }
 
@@ -468,9 +467,6 @@ watch(releases, (updatedReleases) => {
         </p>
       </div>
       <div class="hx-page-actions">
-        <RouterLink v-if="isAdmin" class="hx-btn" data-variant="ghost" :to="{ name: 'acquisition' }">
-          Acquisition overview
-        </RouterLink>
         <button
           type="button"
           class="hx-btn"

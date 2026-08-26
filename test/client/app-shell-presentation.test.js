@@ -11,12 +11,22 @@ import {
 // buildOperatorNav
 // ---------------------------------------------------------------------------
 
-test('buildOperatorNav returns 7 items in expected order', () => {
+test('buildOperatorNav uses Acquisition as the single release-and-transfer workspace', () => {
   const nav = buildOperatorNav();
   assert.deepEqual(
     nav.map((item) => item.name),
-    ['dashboard', 'music-queue', 'discover', 'missing', 'downloader', 'activity', 'settings'],
+    ['dashboard', 'discover', 'acquisition', 'missing', 'activity', 'settings'],
   );
+});
+
+test('buildOperatorNav identifies Acquisition with the music icon', () => {
+  const nav = buildOperatorNav();
+  const acquisition = nav.find((item) => item.name === 'acquisition');
+  assert.ok(acquisition, 'Acquisition item must exist in operator nav');
+  assert.equal(acquisition.label, 'Acquisition');
+  assert.equal(acquisition.icon, 'music');
+  assert.ok(!nav.some((item) => item.name === 'music-queue'));
+  assert.ok(!nav.some((item) => item.name === 'downloader'));
 });
 
 test('buildOperatorNav missing item uses icon "missing"', () => {
@@ -34,13 +44,6 @@ test('buildOperatorNav missing item does not use an info icon', () => {
     'missing releases should not be represented by an info icon');
   assert.notEqual(missingItem.icon, 'info-circle',
     'missing releases should not be represented by an info-circle icon');
-});
-
-test('buildOperatorNav downloader item uses icon "download"', () => {
-  const nav = buildOperatorNav();
-  const downloader = nav.find((item) => item.name === 'downloader');
-  assert.ok(downloader, 'downloader item must exist in operator nav');
-  assert.equal(downloader.icon, 'download');
 });
 
 test('buildOperatorNav dashboard item has exact: true', () => {
@@ -99,7 +102,7 @@ test('buildVisibleNav for operator returns operator nav regardless of count', ()
   const nav = buildVisibleNav(false, 0);
   assert.deepEqual(
     nav.map((item) => item.name),
-    ['dashboard', 'music-queue', 'discover', 'missing', 'downloader', 'activity', 'settings'],
+    ['dashboard', 'discover', 'acquisition', 'missing', 'activity', 'settings'],
   );
 });
 

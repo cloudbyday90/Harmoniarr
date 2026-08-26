@@ -112,7 +112,7 @@ const shouldShowImportPendingDetails = computed(() =>
         <p>
           Follow automatic searches, downloads, and quality recovery in Music Queue. These details are available for exceptional diagnosis.
         </p>
-        <RouterLink class="hx-btn" data-variant="ghost" :to="{ name: 'music-queue' }">
+        <RouterLink class="hx-btn" data-variant="ghost" :to="{ name: 'acquisition-music-queue' }">
           Open Music Queue
         </RouterLink>
       </div>

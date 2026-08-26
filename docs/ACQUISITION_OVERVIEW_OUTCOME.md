@@ -2,10 +2,16 @@
 
 **Completed:** 2026-08-25
 
+> **Superseded navigation note (2026-08-26):** This outcome accurately records
+> the first overview slice, but its separate primary-navigation model is no
+> longer the product direction. See
+> [Acquisition workspace navigation outcome](ACQUISITION_WORKSPACE_NAVIGATION_OUTCOME.md).
+
 ## Delivered
 
-- Added a read-only `/app/acquisition` overview route without changing the
-  established primary navigation.
+- Added a read-only `/app/acquisition` overview route. It was initially
+  unlisted in primary navigation; it is now the entry point for the unified
+  Acquisition workspace.
 - Added modular ESM client presentation and composable layers that compose the
   existing Music Queue and Downloader read models with independent SWR refresh
   state.
@@ -23,9 +29,9 @@ questions: which releases are moving or have a clear next step, and which
 downloads are currently active or queued. They can then explicitly open the
 release inspector or Downloader detail they need.
 
-Music Queue and Downloader remain the source-of-truth workspaces. This keeps
-the Sonarr/Radarr-style release workflow and SABnzbd-style transfer diagnostics
-complementary without turning either into an overloaded all-in-one screen.
+Music Queue and Downloader remain the source-of-truth workspaces. The later
+Acquisition workspace change makes them one navigation domain without turning
+either into an overloaded all-in-one screen.
 
 ## Validation
 

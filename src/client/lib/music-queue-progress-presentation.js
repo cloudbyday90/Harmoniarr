@@ -65,7 +65,7 @@ function buildRowAction(release, { releaseDetailsOnly, transferProgress }) {
     return {
       label: 'View details',
       to: {
-        name: 'music-queue-release',
+        name: 'acquisition-music-queue-release',
         params: { wantedReleaseId: release?.id },
       },
     };
@@ -95,7 +95,7 @@ function buildRowAction(release, { releaseDetailsOnly, transferProgress }) {
   return {
     label: isMusicQueueAttentionRelease(release) ? 'Review' : 'Open Music Queue',
     to: {
-      name: 'music-queue-release',
+      name: 'acquisition-music-queue-release',
       params: { wantedReleaseId: release?.id },
     },
   };

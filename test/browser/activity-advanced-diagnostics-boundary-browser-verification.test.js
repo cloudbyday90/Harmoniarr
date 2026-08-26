@@ -147,7 +147,7 @@ suite('Activity advanced diagnostics boundary browser verification', () => {
       });
       await page.waitForFunction(() => {
         const url = new URL(globalThis.location.href);
-        return url.pathname === '/app/music-queue'
+        return url.pathname === '/app/acquisition/music-queue'
           && url.searchParams.get('artist') === 'legacy-artist'
           && url.hash === '#music-queue-release-list';
       });

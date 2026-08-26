@@ -56,7 +56,7 @@ export function buildReleaseScopedDownloaderHandoff(release) {
     description: 'View the live transfer and its controls in Downloader. Release decisions remain in Music Queue.',
     label,
     location: {
-      name: 'downloader',
+      name: 'acquisition-downloader',
       query: { wantedReleaseId },
     },
     wantedReleaseId,
