@@ -318,8 +318,8 @@ test('assertProviderAcceptanceEvidenceResult can require a Music Queue-linked tr
   );
 });
 
-test('resolveDockerProviderAcceptanceInputs reads walkthrough defaults and strict evidence options', () => {
-  const inputs = resolveDockerProviderAcceptanceInputs({
+test('resolveDockerProviderAcceptanceInputs reads walkthrough defaults and strict evidence options', async () => {
+  const inputs = await resolveDockerProviderAcceptanceInputs({
     args: ['--require-accepted-transfer', '--require-music-queue-link', '--timeout-ms', '25000'],
     env: {
       [dockerProviderAcceptanceEvidencePathEnvVar]: 'artifacts/provider-acceptance.json',
@@ -344,6 +344,22 @@ test('resolveDockerProviderAcceptanceInputs reads walkthrough defaults and stric
     timeoutMs: 25_000,
     username: 'walkthrough-admin',
   });
+});
+
+test('resolveDockerProviderAcceptanceInputs accepts a file-backed walkthrough password', async () => {
+  const inputs = await resolveDockerProviderAcceptanceInputs({
+    args: ['--password-file', 'C:/secrets/walkthrough-password'],
+    env: {
+      HARMONIARR_WALKTHROUGH_USERNAME: 'walkthrough-admin',
+    },
+    readFileFn: async (path, encoding) => {
+      assert.equal(path, 'C:/secrets/walkthrough-password');
+      assert.equal(encoding, 'utf8');
+      return 'FilePass123!\n';
+    },
+  });
+
+  assert.equal(inputs.password, 'FilePass123!');
 });
 
 test('runDockerProviderAcceptanceEvidence writes evidence and closes browser resources', async () => {

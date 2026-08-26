@@ -14,14 +14,17 @@ import {
 import { getOptionalDockerSmokeEvidencePath } from './docker-smoke-evidence.js';
 import { getBooleanInput, getOptionalStringInput, getRequiredStringInput, parseStrictScriptOptions } from './script-input-resolution.js';
 import { runDirectScriptTask } from './script-runtime.js';
+import { getRequiredSecretInput } from './secret-input.js';
 
 export const dockerProviderAcceptanceEvidencePathEnvVar = 'HARMONIARR_DOCKER_PROVIDER_ACCEPTANCE_EVIDENCE_PATH';
+export const dockerProviderAcceptancePasswordFileEnvVar = 'HARMONIARR_WALKTHROUGH_PASSWORD_FILE';
 
 export const validateDockerProviderAcceptanceCliOptions = Object.freeze({
   'base-url': { type: 'string' },
   'evidence-path': { type: 'string' },
   headless: { type: 'boolean' },
   password: { type: 'string' },
+  'password-file': { type: 'string' },
   'require-accepted-transfer': { type: 'boolean' },
   'require-configured-provider': { type: 'boolean' },
   'require-diagnostic': { type: 'boolean' },
@@ -45,9 +48,10 @@ function parsePositiveInteger(value, fieldName, defaultValue) {
   return parsed;
 }
 
-export function resolveDockerProviderAcceptanceInputs({
+export async function resolveDockerProviderAcceptanceInputs({
   args = process.argv.slice(2),
   env = process.env,
+  readFileFn,
 } = {}) {
   const { values } = parseStrictScriptOptions(validateDockerProviderAcceptanceCliOptions, {
     allowPositionals: true,
@@ -71,7 +75,15 @@ export function resolveDockerProviderAcceptanceInputs({
       ?? defaultDockerProviderAcceptanceBaseUrl,
     evidencePath,
     headless: getBooleanInput(values, 'headless', 'HARMONIARR_DOCKER_PROVIDER_ACCEPTANCE_HEADLESS', env, true),
-    password: getRequiredStringInput(values, 'password', 'HARMONIARR_WALKTHROUGH_PASSWORD', env),
+    password: await getRequiredSecretInput({
+      env,
+      envName: 'HARMONIARR_WALKTHROUGH_PASSWORD',
+      fileEnvName: dockerProviderAcceptancePasswordFileEnvVar,
+      fileOptionName: 'password-file',
+      optionName: 'password',
+      readFileFn,
+      values,
+    }),
     requireAcceptedTransfer: getBooleanInput(
       values,
       'require-accepted-transfer',
@@ -121,7 +133,7 @@ export function resolveDockerProviderAcceptanceInputs({
 export async function runDockerProviderAcceptanceFromEnvironment(env = process.env, {
   args = process.argv.slice(2),
 } = {}) {
-  const inputs = resolveDockerProviderAcceptanceInputs({ args, env });
+  const inputs = await resolveDockerProviderAcceptanceInputs({ args, env });
   return runDockerProviderAcceptanceEvidence(inputs);
 }
 

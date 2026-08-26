@@ -176,9 +176,22 @@ To capture replayable local evidence from a configured walkthrough:
 $env:HARMONIARR_DOCKER_PROVIDER_ACCEPTANCE_EVIDENCE_PATH = ".tmp\docker-provider-acceptance\provider-acceptance.json"
 $env:HARMONIARR_DOCKER_PROVIDER_ACCEPTANCE_SCREENSHOT_DIR = ".tmp\docker-provider-acceptance\screenshots"
 $env:HARMONIARR_WALKTHROUGH_USERNAME = "walkthrough-admin"
-$env:HARMONIARR_WALKTHROUGH_PASSWORD = "HarmoniarrLocal123!"
+$env:HARMONIARR_WALKTHROUGH_PASSWORD_FILE = "C:\secrets\harmoniarr-walkthrough-password"
 npm run validate:docker-provider-acceptance
 ```
+
+The password file must contain only the password, with an optional final
+newline. Do not point `HARMONIARR_WALKTHROUGH_PASSWORD_FILE` at
+`docker/walkthrough.env`, because that file uses `KEY=value` entries rather
+than a password-only secret. The validator reads the secret into its transient
+browser context and never writes it to its evidence artifact or terminal
+result. Do not set `HARMONIARR_WALKTHROUGH_PASSWORD` or pass `--password` at
+the same time.
+
+The previous environment-variable input remains supported for an existing
+disposable walkthrough, but a password-only file is preferred. Do not place a
+password directly in a command line: other local processes may be able to read
+command arguments while the validator is running.
 
 The evidence command verifies configured provider status, path mapping
 presence, durable Import Review download acceptance diagnostics, and the
