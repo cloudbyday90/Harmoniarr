@@ -235,6 +235,71 @@ Mutations resolve `decisionId` server-side, then enforce the caller's role:
 This keeps authorization in services and routes, rather than accepting a raw
 target user ID as a client-side assertion.
 
+### Implemented query boundary — 2026-08-26
+
+The first multi-user slice is now available as a read-only, server-authorized
+query:
+
+```text
+GET /api/v1/missing-music/decisions
+  ?scope=all|mine
+  &requestedForUserId=<admin-only optional user ID>
+  &accountStatus=active|disabled|all
+  &state=action|searching|downloading|ready|all
+  &q=<artist or release text, 120 characters maximum>
+  &limit=<1..100>
+  &offset=<non-negative integer>
+```
+
+The route always obtains the actor from the authenticated server session. A
+non-admin's requested scope resolves to `mine`; an attempt to name another
+user is rejected. An administrator defaults to all active users and may switch
+to a named user or the disabled-user history. The response exposes only an
+opaque `decisionId`, release facts, track coverage, the target-user display
+fact, and an allowlisted status/next-action presentation. It does not include
+candidate payloads, provider usernames, transfer IDs, paths, or raw evidence.
+
+The `state` value is derived on the server from the existing Music Queue
+status policy. It keeps the worklist understandable without creating a second
+status rule set:
+
+| State | Includes | Intended filter label |
+| --- | --- | --- |
+| `action` | A match, recovery, setup, quality, or safe-add choice is required | **Choose an action** |
+| `searching` | Search, scoring, retry, or automatic recovery continues | **Working automatically** |
+| `downloading` | Files are downloading or being added | **Downloading or adding** |
+| `ready` | Verified files are ready for the library | **Ready to add** |
+| `all` | Every current state, including an unrecognized future state | **All states** |
+
+The initial projection is intentionally capped at 2,000 source releases per
+request. When the cap is reached, `page.sourceLimitReached` is true so a future
+UI can ask the administrator to refine the user, account-status, state, or
+search filter instead of silently hiding history. A later performance slice can
+move state projection into a dedicated indexed database read model; this slice
+does not duplicate the established acquisition-status logic just to make that
+optimization early.
+
+### Security and W3C rationale
+
+The scope policy is enforced inside the query service, not only in a hidden UI
+control. That follows OWASP's recommendation to validate authorization on each
+request and to make authorization decisions server-side. The database query is
+restricted to the resulting target-user IDs; a requester's browser therefore
+never receives another household member's decision rows or user options.
+
+The forthcoming filter toolbar will use visible labels—**User**, **Account
+status**, **Work state**, and **Search releases**—and one semantic group. W3C
+explains that a control's label must describe its purpose and that related
+controls should be grouped both visually and in the markup. This is why the API
+uses concrete state categories instead of an unexplained generic
+"needs review" filter.
+
+Additional sources checked 2026-08-26:
+
+- [OWASP Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html)
+- [W3C WAI Forms Tutorial — Labeling Controls](https://www.w3.org/WAI/tutorials/forms/labels/)
+- [W3C WAI Forms Tutorial — Grouping Controls](https://www.w3.org/WAI/tutorials/forms/grouping/)
+
 ## Confirmation contract — decision required
 
 The user-facing choice must be explicit before a candidate can create a

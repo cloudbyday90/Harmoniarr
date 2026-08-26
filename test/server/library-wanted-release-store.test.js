@@ -287,6 +287,32 @@ test('listWantedReleasesWithMetadata keeps artist filtering parameterized and us
   assert.deepEqual(observedParams, ['user-1', 'artist-1', 4]);
 });
 
+test('listWantedReleasesWithMetadata supports parameterized multi-user and search filters', async () => {
+  let observedParams = [];
+  let observedSql = '';
+  const store = createLibraryWantedReleaseStore({
+    getPoolFn: () => ({
+      query: async (sql, params) => {
+        observedSql = sql;
+        observedParams = params;
+        return { rows: [] };
+      },
+    }),
+  });
+
+  await store.listWantedReleasesWithMetadata({
+    appUserIds: ['user-1', 'user-2'],
+    limit: 4,
+    search: 'Portishead',
+  });
+
+  assert.match(observedSql, /lwr\.app_user_id = ANY\(\$1::uuid\[\]\)/u);
+  assert.match(observedSql, /LOWER\(ma\.name\) LIKE \$2/u);
+  assert.match(observedSql, /LOWER\(mrg\.title\) LIKE \$2/u);
+  assert.match(observedSql, /LOWER\(mr\.title\) LIKE \$2/u);
+  assert.deepEqual(observedParams, [['user-1', 'user-2'], '%portishead%', 4]);
+});
+
 test('listWantedReleasesWithMetadata returns null discoveryRequest when none exists', async () => {
   const store = createLibraryWantedReleaseStore({
     getPoolFn: () => ({

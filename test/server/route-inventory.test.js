@@ -10,6 +10,7 @@ import { registerAdminRecoveryRoutes } from '../../src/server/routes/admin-recov
 import { registerDownloaderRoutes } from '../../src/server/routes/downloader-routes.js';
 import { registerImportCandidateRoutes } from '../../src/server/routes/import-candidate-routes.js';
 import { registerLibraryRoutes } from '../../src/server/routes/library-routes.js';
+import { registerMissingMusicRoutes } from '../../src/server/routes/missing-music-routes.js';
 import { registerMetadataRoutes } from '../../src/server/routes/metadata-routes.js';
 import { registerOperationsRoutes } from '../../src/server/routes/operations-routes.js';
 import { registerProviderRoutes } from '../../src/server/routes/provider-routes.js';
@@ -40,6 +41,11 @@ function asyncNoopResult(result = {}) {
 
 function collectRegisteredRoutes() {
   const { app, routes } = createRecordingApp();
+
+  registerMissingMusicRoutes(app, {
+    listMissingMusicDecisions: asyncNoopResult({ decisions: [] }),
+    requireSession: asyncNoopResult({ appUserId: 'user-1' }),
+  });
 
   registerAcquisitionRoutes(app, {
     getMusicQueueRelease: asyncNoopResult({ release: {} }),

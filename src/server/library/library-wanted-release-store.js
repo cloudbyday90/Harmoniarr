@@ -384,7 +384,9 @@ export function createLibraryWantedReleaseStore({
 
   async function listWantedReleasesWithMetadata({
     appUserId = null,
+    appUserIds = null,
     metadataArtistId = null,
+    search = null,
     wantedStatus = null,
     limit = 500,
   } = {}) {
@@ -396,6 +398,17 @@ export function createLibraryWantedReleaseStore({
       conditions.push(`lwr.app_user_id = $${params.length}`);
     }
 
+    const normalizedAppUserIds = Array.isArray(appUserIds)
+      ? [...new Set(appUserIds
+        .filter((value) => typeof value === 'string')
+        .map((value) => value.trim())
+        .filter(Boolean))]
+      : null;
+    if (normalizedAppUserIds?.length > 0) {
+      params.push(normalizedAppUserIds);
+      conditions.push(`lwr.app_user_id = ANY($${params.length}::uuid[])`);
+    }
+
     if (typeof metadataArtistId === 'string' && metadataArtistId.trim().length > 0) {
       params.push(metadataArtistId.trim());
       conditions.push(`lwr.metadata_artist_id = $${params.length}`);
@@ -404,6 +417,15 @@ export function createLibraryWantedReleaseStore({
     if (wantedStatus === 'missing' || wantedStatus === 'partial') {
       params.push(wantedStatus);
       conditions.push(`lwr.wanted_status = $${params.length}`);
+    }
+
+    if (typeof search === 'string' && search.trim().length > 0) {
+      params.push(`%${search.trim().toLowerCase().slice(0, 120)}%`);
+      conditions.push(`(
+        LOWER(ma.name) LIKE $${params.length}
+        OR LOWER(mrg.title) LIKE $${params.length}
+        OR LOWER(mr.title) LIKE $${params.length}
+      )`);
     }
 
     params.push(Math.min(Math.max(1, Number.parseInt(String(limit ?? 500), 10) || 500), 2000));

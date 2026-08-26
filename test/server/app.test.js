@@ -25,6 +25,7 @@ suite('createApp', () => {
     importCandidateAutoSelectionService: { selectHighConfidenceCandidate: () => {} },
     routeDependencies: { importCandidates: 'deps' },
   };
+  const missingMusicModule = { routeDependencies: { missingMusic: 'deps' } };
   const libraryModule = {
     libraryDiscoveryRequestService: {
       reconcileDiscoveryRequests: t.mock.fn(async () => {}),
@@ -127,6 +128,7 @@ suite('createApp', () => {
   };
   const createMediaToolingStatusService = t.mock.fn(() => mediaToolingStatusService);
   const createLibraryModule = t.mock.fn(() => libraryModule);
+  const createMissingMusicModule = t.mock.fn(() => missingMusicModule);
   const createMetadataModule = t.mock.fn(() => metadataModule);
   const createOperationsModule = t.mock.fn(() => operationsModule);
   const createProviderModule = t.mock.fn(() => providerModule);
@@ -147,6 +149,7 @@ suite('createApp', () => {
   const registerDownloaderRoutes = t.mock.fn();
   const registerImportCandidateRoutes = t.mock.fn();
   const registerLibraryRoutes = t.mock.fn();
+  const registerMissingMusicRoutes = t.mock.fn();
   const registerMetadataRoutes = t.mock.fn();
   const registerOperationsRoutes = t.mock.fn();
   const registerProviderRoutes = t.mock.fn();
@@ -175,6 +178,7 @@ suite('createApp', () => {
     createDownloaderModule,
     createImportCandidateModule,
     createLibraryModule,
+    createMissingMusicModule,
     createMediaToolingStatusService,
     createMetadataModule,
     createOperationsModule,
@@ -189,6 +193,7 @@ suite('createApp', () => {
     registerDownloaderRoutes,
     registerImportCandidateRoutes,
     registerLibraryRoutes,
+    registerMissingMusicRoutes,
     registerMetadataRoutes,
     registerOperationsRoutes,
     registerProviderRoutes,
@@ -205,6 +210,7 @@ suite('createApp', () => {
   assert.equal(createImportCandidateModule.mock.callCount(), 1);
   assert.equal(createMediaToolingStatusService.mock.callCount(), 1);
   assert.equal(createLibraryModule.mock.callCount(), 1);
+  assert.equal(createMissingMusicModule.mock.callCount(), 1);
   assert.equal(createMetadataModule.mock.callCount(), 1);
   assert.equal(createOperationsModule.mock.callCount(), 1);
   assert.equal(createProviderModule.mock.callCount(), 1);
@@ -426,6 +432,7 @@ suite('createApp', () => {
   assert.equal(registerDownloaderRoutes.mock.callCount(), 1);
   assert.equal(registerImportCandidateRoutes.mock.callCount(), 1);
   assert.equal(registerLibraryRoutes.mock.callCount(), 1);
+  assert.equal(registerMissingMusicRoutes.mock.callCount(), 1);
   assert.equal(registerMetadataRoutes.mock.callCount(), 1);
   assert.equal(registerOperationsRoutes.mock.callCount(), 1);
   assert.equal(registerProviderRoutes.mock.callCount(), 1);
@@ -461,6 +468,9 @@ suite('createApp', () => {
   assert.equal(typeof registerLibraryRoutes.mock.calls[0].arguments[1].limitMediaRequestMutation, 'function');
   assert.equal(typeof registerLibraryRoutes.mock.calls[0].arguments[1].limitMediaRequestAdminMutation, 'function');
   assert.equal(registerLibraryRoutes.mock.calls[0].arguments[1].startLibraryDiscoveryRun, libraryModule.routeDependencies.startLibraryDiscoveryRun);
+  assert.equal(registerMissingMusicRoutes.mock.calls[0].arguments[0], app);
+  assert.equal(registerMissingMusicRoutes.mock.calls[0].arguments[1].missingMusic, 'deps');
+  assert.equal(typeof registerMissingMusicRoutes.mock.calls[0].arguments[1].limitMissingMusicDecisionRead, 'function');
   assert.equal(registerMetadataRoutes.mock.calls[0].arguments[0], app);
   assert.equal(registerMetadataRoutes.mock.calls[0].arguments[1].metadata, metadataModule.routeDependencies.metadata);
   assert.equal(typeof registerMetadataRoutes.mock.calls[0].arguments[1].limitMetadataArtistRefreshRun, 'function');
@@ -585,6 +595,9 @@ suite('createApp', () => {
       libraryDiscoveryRequestService: {
         reconcileDiscoveryRequests: async () => {},
       },
+      libraryWantedReleaseStore: {
+        listWantedReleasesWithMetadata: async () => [],
+      },
       libraryWantedReleaseService: {
         reconcileWantedReleases: async () => {},
       },
@@ -596,6 +609,7 @@ suite('createApp', () => {
         }),
       },
     }),
+    createMissingMusicModule: () => ({ routeDependencies: {} }),
     createMetadataModule: () => ({
       musicBrainzSearchService: { checkProviderHealth: async () => ({ status: 'healthy' }) },
       routeDependencies: {},
@@ -628,6 +642,7 @@ suite('createApp', () => {
     },
     registerImportCandidateRoutes: () => {},
     registerLibraryRoutes: () => {},
+    registerMissingMusicRoutes: () => {},
     registerMetadataRoutes: () => {},
     registerSlskdRoutes: () => {},
     registerSystemRoutes: () => {},

@@ -185,7 +185,13 @@ function buildQualityEvidence(release, qualityPolicyService) {
   });
 }
 
-function projectRelease(release, { qualityPolicyService, statusService }) {
+export function projectMusicQueueRelease(
+  release,
+  {
+    qualityPolicyService = createAcquisitionQualityPolicyService(),
+    statusService = createAcquisitionPipelineStatusService(),
+  } = {},
+) {
   const quality = buildQualityEvidence(release, qualityPolicyService);
   const evidence = {
     add: buildAddEvidence(release),
@@ -353,7 +359,7 @@ export function createAcquisitionPipelineService({
       throw createApiError(404, 'music_queue_release_not_found', 'Music Queue release was not found');
     }
 
-    const projectedRelease = projectRelease(release, { qualityPolicyService, statusService });
+    const projectedRelease = projectMusicQueueRelease(release, { qualityPolicyService, statusService });
     if (!REDISCOVERY_ALLOWED_STATUS_CODES.has(projectedRelease.status?.code)) {
       throw createApiError(409, 'music_queue_retry_not_available', 'This release is not stopped in a state that can be searched again');
     }
@@ -441,7 +447,7 @@ export function createAcquisitionPipelineService({
       throw createApiError(404, 'music_queue_release_not_found', 'Music Queue release was not found');
     }
 
-    const projectedRelease = projectRelease(release, { qualityPolicyService, statusService });
+    const projectedRelease = projectMusicQueueRelease(release, { qualityPolicyService, statusService });
     if (projectedRelease.status?.code !== 'quality_choice_needed') {
       throw createApiError(409, 'music_queue_fallback_not_available', 'This release is not waiting for a quality choice');
     }
@@ -575,7 +581,7 @@ export function createAcquisitionPipelineService({
       throw createApiError(404, 'music_queue_release_not_found', 'Music Queue release was not found');
     }
 
-    const projectedRelease = projectRelease(release, { qualityPolicyService, statusService });
+    const projectedRelease = projectMusicQueueRelease(release, { qualityPolicyService, statusService });
     if (projectedRelease.status?.code !== 'ready_to_add') {
       throw createApiError(409, 'music_queue_manual_add_not_available', 'This release is not ready to add to the library');
     }
@@ -674,7 +680,7 @@ export function createAcquisitionPipelineService({
       metadataArtistId: normalizeString(metadataArtistId) || null,
       offset,
     });
-    const releases = payload.releases.map((release) => projectRelease(release, {
+    const releases = payload.releases.map((release) => projectMusicQueueRelease(release, {
       qualityPolicyService,
       statusService,
     }));
@@ -699,7 +705,7 @@ export function createAcquisitionPipelineService({
 
     return {
       checkedAt: new Date().toISOString(),
-      release: projectRelease(release, { qualityPolicyService, statusService }),
+      release: projectMusicQueueRelease(release, { qualityPolicyService, statusService }),
     };
   }
 

@@ -36,6 +36,7 @@ import {
 import { normalizeDatabaseConnectionError } from './database-error-mapper.js';
 import { createImportCandidateModule } from './import-candidates/import-candidate-module.js';
 import { createLibraryModule } from './library/library-module.js';
+import { createMissingMusicModule } from './missing-music/missing-music-module.js';
 import { createPushModule } from './push/push-module.js';
 import { createFulfillmentModule } from './fulfillment/fulfillment-module.js';
 import { createPlexWebhookIngestionService } from './integrations/plex/plex-webhook-ingestion-service.js';
@@ -68,6 +69,7 @@ import { registerAdminRecoveryRoutes } from './routes/admin-recovery-routes.js';
 import { registerDownloaderRoutes } from './routes/downloader-routes.js';
 import { registerImportCandidateRoutes } from './routes/import-candidate-routes.js';
 import { registerLibraryRoutes } from './routes/library-routes.js';
+import { registerMissingMusicRoutes } from './routes/missing-music-routes.js';
 import { registerMetadataRoutes } from './routes/metadata-routes.js';
 import { registerOperationsRoutes } from './routes/operations-routes.js';
 import { registerProviderRoutes } from './routes/provider-routes.js';
@@ -183,6 +185,7 @@ export function createApp({
   createDownloaderModule: buildDownloaderModule = createDownloaderModule,
   createImportCandidateModule: buildImportCandidateModule = createImportCandidateModule,
   createLibraryModule: buildLibraryModule = createLibraryModule,
+  createMissingMusicModule: buildMissingMusicModule = createMissingMusicModule,
   createPushModule: buildPushModule = createPushModule,
   createFulfillmentModule: buildFulfillmentModule = createFulfillmentModule,
   createMediaToolingStatusService: buildMediaToolingStatusService = createMediaToolingStatusService,
@@ -202,6 +205,7 @@ export function createApp({
   registerDownloaderRoutes: mountDownloaderRoutes = registerDownloaderRoutes,
   registerImportCandidateRoutes: mountImportCandidateRoutes = registerImportCandidateRoutes,
   registerLibraryRoutes: mountLibraryRoutes = registerLibraryRoutes,
+  registerMissingMusicRoutes: mountMissingMusicRoutes = registerMissingMusicRoutes,
   registerMetadataRoutes: mountMetadataRoutes = registerMetadataRoutes,
   registerOperationsRoutes: mountOperationsRoutes = registerOperationsRoutes,
   registerProviderRoutes: mountProviderRoutes = registerProviderRoutes,
@@ -585,6 +589,10 @@ export function createApp({
     slskdService: slskdModule.slskdService,
   });
   const controlPlaneIdempotencyService = createControlPlaneIdempotencyService();
+  const missingMusicModule = buildMissingMusicModule({
+    listAppUsers: appUserModule.appUserService.listAppUsers,
+    listWantedReleasesWithMetadata: libraryModule.libraryWantedReleaseStore.listWantedReleasesWithMetadata,
+  });
   const acquisitionModule = buildAcquisitionModule({
     allowMusicQueueFallbackQuality: libraryModule.libraryDiscoveryRequestStore?.allowMusicQueueFallbackQuality,
     buildLibraryWantedReleases: libraryModule.routeDependencies.buildLibraryWantedReleases,
@@ -911,6 +919,14 @@ export function createApp({
     }),
     limitMusicQueueRead: requestRateLimiterService.createMiddleware({
       bucketName: 'music-queue-read',
+      limit: 120,
+      windowMs: 60 * 1000,
+    }),
+  });
+  mountMissingMusicRoutes(app, {
+    ...missingMusicModule.routeDependencies,
+    limitMissingMusicDecisionRead: requestRateLimiterService.createMiddleware({
+      bucketName: 'missing-music-decision-read',
       limit: 120,
       windowMs: 60 * 1000,
     }),
