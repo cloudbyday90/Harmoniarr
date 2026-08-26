@@ -56,7 +56,7 @@ export async function installConfiguredMusicQueueProviderFixtures(browserContext
  *
  * @param {import('playwright').BrowserContext} browserContext
  * @param {{ activityEvents?: Array<object>, addToLibraryResponse?: object, release?: object, releaseAfterSearchAgain?: object, releaseSequence?: Array<object>, searchAgainResponse?: object }} options
- * @returns {Promise<{getAddToLibraryRequestCount: () => number, getReleaseReadCount: () => number, getSearchAgainRequestCount: () => number}>}
+ * @returns {Promise<{getAddToLibraryRequestCount: () => number, getReleaseReadCount: () => number, getSearchAgainRequestCount: () => number, setRelease: (release: object) => void}>}
  */
 export async function installScopedMusicQueueReadModelFixtures(browserContext, {
   activityEvents = [],
@@ -81,6 +81,16 @@ export async function installScopedMusicQueueReadModelFixtures(browserContext, {
   let addToLibraryRequestCount = 0;
   let searchAgainRequestCount = 0;
   let currentRelease = initialRelease;
+  let hasManualReleaseOverride = false;
+
+  function setRelease(nextRelease) {
+    if (nextRelease?.id !== initialRelease.id) {
+      throw new TypeError('Music Queue fixture release updates must keep the original release id');
+    }
+
+    currentRelease = nextRelease;
+    hasManualReleaseOverride = true;
+  }
 
   await installConfiguredMusicQueueProviderFixtures(browserContext);
 
@@ -116,7 +126,7 @@ export async function installScopedMusicQueueReadModelFixtures(browserContext, {
       return;
     }
 
-    if (!releaseAfterSearchAgain) {
+    if (!releaseAfterSearchAgain && !hasManualReleaseOverride) {
       currentRelease = releases[Math.min(releaseReadCount, releases.length - 1)];
     }
 
@@ -173,5 +183,6 @@ export async function installScopedMusicQueueReadModelFixtures(browserContext, {
     getAddToLibraryRequestCount: () => addToLibraryRequestCount,
     getReleaseReadCount: () => releaseReadCount,
     getSearchAgainRequestCount: () => searchAgainRequestCount,
+    setRelease,
   };
 }

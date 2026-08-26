@@ -161,6 +161,12 @@ const linkedDownloaderQueue = Object.freeze({
   truncated: false,
 });
 
+const downloaderQueueFixtureStateKey = '__harmoniarrDownloaderQueueFixtureState';
+
+function cloneFixtureValue(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
 export function buildLinkedDownloaderQueueFixture(overrides = {}) {
   return {
     ...linkedDownloaderQueue,
@@ -277,7 +283,7 @@ export function buildEmptyDownloaderQueueFixture(overrides = {}) {
 export async function installDownloaderBrowserFixtures(browserContext, {
   queue = buildLinkedDownloaderQueueFixture(),
 } = {}) {
-  await browserContext.addInitScript(({ queuePayload }) => {
+  await browserContext.addInitScript(({ queuePayload, stateKey }) => {
     const originalFetch = globalThis.fetch.bind(globalThis);
 
     function buildJsonResponse(body, status = 200) {
@@ -292,6 +298,10 @@ export async function installDownloaderBrowserFixtures(browserContext, {
     function clone(value) {
       return JSON.parse(JSON.stringify(value));
     }
+
+    globalThis[stateKey] = {
+      queuePayload: clone(queuePayload),
+    };
 
     globalThis.fetch = async (input, init) => {
       const requestUrl = typeof input === 'string'
@@ -308,12 +318,41 @@ export async function installDownloaderBrowserFixtures(browserContext, {
 
       if (method === 'GET' && url.pathname === '/api/v1/downloader/queue') {
         return buildJsonResponse({
-          downloader: clone(queuePayload),
+          downloader: clone(globalThis[stateKey].queuePayload),
           ok: true,
         });
       }
 
       return originalFetch(input, init);
     };
-  }, { queuePayload: queue });
+  }, {
+    queuePayload: queue,
+    stateKey: downloaderQueueFixtureStateKey,
+  });
+
+  return {
+    /**
+     * Replaces the queue returned to every current page in this isolated
+     * browser context. It lets a scenario verify a bounded state transition
+     * (for example, a live transfer leaving Downloader) without a real
+     * provider or network request.
+     *
+     * @param {object} nextQueue
+     * @returns {Promise<void>}
+     */
+    async setQueue(nextQueue) {
+      const queuePayload = cloneFixtureValue(nextQueue);
+      await Promise.all(browserContext.pages().map((page) => page.evaluate((state) => {
+        const fixtureState = globalThis[state.stateKey];
+        if (!fixtureState) {
+          throw new Error('Downloader fixture state is unavailable on this page');
+        }
+
+        fixtureState.queuePayload = state.queuePayload;
+      }, {
+        queuePayload,
+        stateKey: downloaderQueueFixtureStateKey,
+      })));
+    },
+  };
 }
