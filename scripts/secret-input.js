@@ -15,14 +15,14 @@ function createSecretFileReadError(fileEnvName) {
 }
 
 /**
- * Resolves a sensitive CLI input from exactly one source. File contents stay
- * in memory only and are intentionally not included in errors or result
- * metadata. Direct inputs remain supported for backward compatibility.
+ * Resolves an optional sensitive CLI input from exactly one source. File
+ * contents stay in memory only and are intentionally not included in errors or
+ * result metadata. Direct inputs remain supported for backward compatibility.
  *
  * @param {{ env?: object, envName: string, fileEnvName: string, fileOptionName: string, optionName: string, readFileFn?: typeof readFile, values?: object }} options
- * @returns {Promise<string>}
+ * @returns {Promise<string | null>}
  */
-export async function getRequiredSecretInput({
+export async function getOptionalSecretInput({
   env = process.env,
   envName,
   fileEnvName,
@@ -43,7 +43,7 @@ export async function getRequiredSecretInput({
   }
 
   if (!filePath) {
-    throw new Error(`${envName} or ${fileEnvName} is required`);
+    return null;
   }
 
   let contents;
@@ -59,4 +59,20 @@ export async function getRequiredSecretInput({
   }
 
   return secret;
+}
+
+/**
+ * Resolves a required sensitive CLI input from exactly one source.
+ *
+ * @param {{ env?: object, envName: string, fileEnvName: string, fileOptionName: string, optionName: string, readFileFn?: typeof readFile, values?: object }} options
+ * @returns {Promise<string>}
+ */
+export async function getRequiredSecretInput(options = {}) {
+  const secret = await getOptionalSecretInput(options);
+
+  if (secret) {
+    return secret;
+  }
+
+  throw new Error(`${options.envName} or ${options.fileEnvName} is required`);
 }

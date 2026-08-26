@@ -18,8 +18,8 @@ test('createReleaseEvidenceRunId returns UTC timestamp-based run id', () => {
   );
 });
 
-test('resolveReleaseEvidencePackInputs derives default evidence directory and summary path', () => {
-  const inputs = resolveReleaseEvidencePackInputs({
+test('resolveReleaseEvidencePackInputs derives default evidence directory and summary path', async () => {
+  const inputs = await resolveReleaseEvidencePackInputs({
     args: [],
     env: {},
     nowFn: () => new Date('2026-05-09T14:30:45.000Z'),
@@ -42,8 +42,8 @@ test('resolveReleaseEvidencePackInputs derives default evidence directory and su
   });
 });
 
-test('resolveReleaseEvidencePackInputs accepts CLI and environment overrides', () => {
-  const inputs = resolveReleaseEvidencePackInputs({
+test('resolveReleaseEvidencePackInputs accepts CLI and environment overrides', async () => {
+  const inputs = await resolveReleaseEvidencePackInputs({
     args: [
       '--image-ref', 'ghcr.io/cloudbyday90/harmoniarr@sha256:candidate',
       '--baseline-image-ref', 'ghcr.io/cloudbyday90/harmoniarr@sha256:baseline',
@@ -81,6 +81,27 @@ test('resolveReleaseEvidencePackInputs accepts CLI and environment overrides', (
     runId: 'manual-run-id',
     summaryPath: 'artifacts/custom/summary.json',
   });
+});
+
+test('resolveReleaseEvidencePackInputs accepts a password-only file when browser smoke is enabled', async () => {
+  const inputs = await resolveReleaseEvidencePackInputs({
+    args: [
+      '--browser-password-file', 'C:/secrets/walkthrough-password',
+      '--browser-username', 'walkthrough-admin',
+      '--include-browser-smoke',
+    ],
+    env: {},
+    nowFn: () => new Date('2026-05-09T14:30:45.000Z'),
+    readFileFn: async (path, encoding) => {
+      assert.equal(path, 'C:/secrets/walkthrough-password');
+      assert.equal(encoding, 'utf8');
+      return ' FilePass123!\n';
+    },
+  });
+
+  assert.equal(inputs.browserPassword, 'FilePass123!');
+  assert.equal(inputs.browserUsername, 'walkthrough-admin');
+  assert.equal(inputs.includeBrowserSmoke, true);
 });
 
 test('runReleaseEvidencePackValidation records a skipped browser smoke summary when not enabled', async () => {

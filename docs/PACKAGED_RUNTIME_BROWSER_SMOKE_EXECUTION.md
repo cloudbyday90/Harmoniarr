@@ -77,12 +77,20 @@ user-facing headings: `Activity`, `Background Jobs`, and `Match diagnostics`.
 
 `scripts/validate-docker-browser-smoke.js` accepts:
 
+- `--password-file`
 - `--screenshot-dir`
+- `HARMONIARR_WALKTHROUGH_PASSWORD_FILE`
 - `HARMONIARR_DOCKER_BROWSER_SMOKE_SCREENSHOT_DIR`
 
 `scripts/release-evidence-pack.js` passes the same screenshot directory through
 when browser smoke is enabled, defaulting to `browser-smoke-screenshots` inside
 the release evidence directory.
+
+For a browser smoke included in a release-evidence pack, use either
+`--browser-password-file` or `HARMONIARR_WALKTHROUGH_PASSWORD_FILE`. Configure
+one password source only: the file input is preferred, while the existing
+direct password option and environment variable remain available for a
+disposable local walkthrough.
 
 The release-image workflow now also sets
 `HARMONIARR_DOCKER_BROWSER_SMOKE_SCREENSHOT_DIR`, uploads
@@ -97,10 +105,16 @@ Command:
 $env:HARMONIARR_DOCKER_BROWSER_SMOKE_EVIDENCE_PATH = ".tmp\docker-browser-smoke-evidence\harmoniarr-docker-smoke-browser-operator.json"
 $env:HARMONIARR_DOCKER_BROWSER_SMOKE_SCREENSHOT_DIR = ".tmp\docker-browser-smoke-evidence\screenshots"
 $env:HARMONIARR_WALKTHROUGH_USERNAME = "walkthrough-admin"
-$env:HARMONIARR_WALKTHROUGH_PASSWORD = "HarmoniarrLocal123!"
+$env:HARMONIARR_WALKTHROUGH_PASSWORD_FILE = "C:\secrets\harmoniarr-walkthrough-password"
 $env:HARMONIARR_DOCKER_BROWSER_SMOKE_TIMEOUT_MS = "30000"
 npm run validate:docker-browser-smoke
 ```
+
+The password file must contain only the password, with an optional final
+newline. Keep it outside the repository and do not use `docker/walkthrough.env`
+as the password file: it contains `KEY=value` entries. The command reads the
+password only into its transient browser context and does not include the
+secret or file path in terminal output or evidence.
 
 Evidence generated:
 

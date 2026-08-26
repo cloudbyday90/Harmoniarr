@@ -10,8 +10,8 @@ import {
   dockerBrowserSmokeEvidencePathEnvVar,
 } from '../../scripts/validate-docker-browser-smoke.js';
 
-test('resolveDockerBrowserSmokeInputs reads defaults and required walkthrough credentials from environment', () => {
-  const inputs = resolveDockerBrowserSmokeInputs({
+test('resolveDockerBrowserSmokeInputs reads defaults and required walkthrough credentials from environment', async () => {
+  const inputs = await resolveDockerBrowserSmokeInputs({
     args: [],
     env: {
       HARMONIARR_WALKTHROUGH_PASSWORD: 'HarmoniarrLocal123!',
@@ -28,8 +28,8 @@ test('resolveDockerBrowserSmokeInputs reads defaults and required walkthrough cr
   assert.equal(inputs.screenshotDir, null);
 });
 
-test('resolveDockerBrowserSmokeInputs accepts CLI overrides and dedicated evidence path env', () => {
-  const inputs = resolveDockerBrowserSmokeInputs({
+test('resolveDockerBrowserSmokeInputs accepts CLI overrides and dedicated evidence path env', async () => {
+  const inputs = await resolveDockerBrowserSmokeInputs({
     args: [
       '--base-url', 'http://127.0.0.1:49100',
       '--username', 'admin',
@@ -54,6 +54,24 @@ test('resolveDockerBrowserSmokeInputs accepts CLI overrides and dedicated eviden
     timeoutMs: 25_000,
     username: 'admin',
   });
+});
+
+test('resolveDockerBrowserSmokeInputs reads a password-only file without exposing its path', async () => {
+  const inputs = await resolveDockerBrowserSmokeInputs({
+    args: [
+      '--password-file', 'C:/secrets/walkthrough-password',
+    ],
+    env: {
+      HARMONIARR_WALKTHROUGH_USERNAME: 'walkthrough-admin',
+    },
+    readFileFn: async (path, encoding) => {
+      assert.equal(path, 'C:/secrets/walkthrough-password');
+      assert.equal(encoding, 'utf8');
+      return ' FilePass123!\n';
+    },
+  });
+
+  assert.equal(inputs.password, 'FilePass123!');
 });
 
 test('runDockerOperatorBrowserSmoke runs scenario and writes evidence', async () => {

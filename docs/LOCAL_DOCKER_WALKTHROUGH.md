@@ -302,11 +302,20 @@ To capture packaged-runtime browser evidence from the walkthrough stack:
 $env:HARMONIARR_DOCKER_BROWSER_SMOKE_EVIDENCE_PATH = ".tmp\docker-browser-smoke-evidence\harmoniarr-docker-smoke-browser-operator.json"
 $env:HARMONIARR_DOCKER_BROWSER_SMOKE_SCREENSHOT_DIR = ".tmp\docker-browser-smoke-evidence\screenshots"
 $env:HARMONIARR_WALKTHROUGH_USERNAME = "walkthrough-admin"
-$env:HARMONIARR_WALKTHROUGH_PASSWORD = "HarmoniarrLocal123!"
+$env:HARMONIARR_WALKTHROUGH_PASSWORD_FILE = "C:\secrets\harmoniarr-walkthrough-password"
 npm run validate:docker-browser-smoke
 $env:HARMONIARR_DOCKER_SMOKE_EVIDENCE_PATH = ".tmp\docker-browser-smoke-evidence\harmoniarr-docker-smoke-browser-operator.json"
 npm run validate:docker-smoke-evidence
 ```
+
+For the browser smoke and an optional browser smoke inside
+`npm run validate:release-evidence-pack`, use a password-only file with
+`HARMONIARR_WALKTHROUGH_PASSWORD_FILE`, `--password-file`, or
+`--browser-password-file`. Use exactly one password source. The direct
+password inputs remain available for an existing disposable walkthrough, but a
+file outside the repository is preferred. The password file may end with one
+newline and must not be `docker/walkthrough.env`, which uses `KEY=value`
+entries.
 
 The deployment-path validator creates an isolated Compose project, writes JSON
 evidence, and cleans up containers, volumes, and temporary bind-mount data when

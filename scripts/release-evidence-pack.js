@@ -14,6 +14,7 @@ import {
 } from './docker-browser-smoke-validation.js';
 import { dockerDeploymentSummaryPathEnvVar, writeDockerDeploymentManifest } from './docker-deployment-manifest.js';
 import { runDockerDeploymentPathValidation } from './docker-deployment-validation.js';
+import { getOptionalSecretInput, getRequiredSecretInput } from './secret-input.js';
 import {
   getBooleanInput,
   getOptionalStringInput,
@@ -25,6 +26,7 @@ import {
 export const releaseEvidenceDirEnvVar = 'HARMONIARR_RELEASE_EVIDENCE_DIR';
 export const releaseEvidenceRunIdEnvVar = 'HARMONIARR_RELEASE_EVIDENCE_RUN_ID';
 export const releaseEvidenceIncludeBrowserSmokeEnvVar = 'HARMONIARR_RELEASE_EVIDENCE_INCLUDE_BROWSER_SMOKE';
+export const releaseEvidenceBrowserPasswordFileEnvVar = 'HARMONIARR_WALKTHROUGH_PASSWORD_FILE';
 
 const defaultEvidenceRootDir = 'artifacts/release-evidence';
 const defaultBrowserSmokeEvidenceFileName = 'harmoniarr-docker-browser-smoke.json';
@@ -35,6 +37,7 @@ export const releaseEvidencePackCliOptions = Object.freeze({
   'browser-evidence-path': { type: 'string' },
   'browser-headless': { type: 'boolean' },
   'browser-password': { type: 'string' },
+  'browser-password-file': { type: 'string' },
   'browser-screenshot-dir': { type: 'string' },
   'browser-timeout-ms': { type: 'string' },
   'browser-username': { type: 'string' },
@@ -83,10 +86,11 @@ export function createReleaseEvidenceRunId(date = new Date()) {
   return `${year}${month}${day}-${hour}${minute}${second}`;
 }
 
-export function resolveReleaseEvidencePackInputs({
+export async function resolveReleaseEvidencePackInputs({
   args = process.argv.slice(2),
   env = process.env,
   nowFn = () => new Date(),
+  readFileFn,
 } = {}) {
   const { values } = parseStrictScriptOptions(releaseEvidencePackCliOptions, {
     allowPositionals: true,
@@ -118,8 +122,24 @@ export function resolveReleaseEvidencePackInputs({
     browserEvidencePath,
     browserHeadless,
     browserPassword: includeBrowserSmoke
-      ? getRequiredStringInput(values, 'browser-password', 'HARMONIARR_WALKTHROUGH_PASSWORD', env)
-      : getOptionalStringInput(values, 'browser-password', 'HARMONIARR_WALKTHROUGH_PASSWORD', env),
+      ? await getRequiredSecretInput({
+        env,
+        envName: 'HARMONIARR_WALKTHROUGH_PASSWORD',
+        fileEnvName: releaseEvidenceBrowserPasswordFileEnvVar,
+        fileOptionName: 'browser-password-file',
+        optionName: 'browser-password',
+        readFileFn,
+        values,
+      })
+      : await getOptionalSecretInput({
+        env,
+        envName: 'HARMONIARR_WALKTHROUGH_PASSWORD',
+        fileEnvName: releaseEvidenceBrowserPasswordFileEnvVar,
+        fileOptionName: 'browser-password-file',
+        optionName: 'browser-password',
+        readFileFn,
+        values,
+      }),
     browserScreenshotDir,
     browserTimeoutMs,
     browserUsername: includeBrowserSmoke
@@ -220,6 +240,6 @@ export async function runReleaseEvidencePackFromEnvironment(env = process.env, {
   nowFn = () => new Date(),
   runReleaseEvidencePackValidationFn = runReleaseEvidencePackValidation,
 } = {}) {
-  const inputs = resolveReleaseEvidencePackInputs({ args, env, nowFn });
+  const inputs = await resolveReleaseEvidencePackInputs({ args, env, nowFn });
   return runReleaseEvidencePackValidationFn(inputs);
 }

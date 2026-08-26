@@ -9,7 +9,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { getRequiredSecretInput } from '../../scripts/secret-input.js';
+import { getOptionalSecretInput, getRequiredSecretInput } from '../../scripts/secret-input.js';
 
 const passwordOptions = Object.freeze({
   envName: 'HARMONIARR_WALKTHROUGH_PASSWORD',
@@ -46,6 +46,21 @@ test('getRequiredSecretInput reads and trims a password-only secret file', async
   });
 
   assert.equal(password, 'FilePass123!');
+});
+
+test('getOptionalSecretInput returns null without a configured secret source', async () => {
+  let readCount = 0;
+
+  const password = await getOptionalSecretInput({
+    ...passwordOptions,
+    readFileFn: async () => {
+      readCount += 1;
+      return 'unused';
+    },
+  });
+
+  assert.equal(password, null);
+  assert.equal(readCount, 0);
 });
 
 test('getRequiredSecretInput rejects ambiguous, missing, unreadable, and empty inputs without exposing content', async () => {

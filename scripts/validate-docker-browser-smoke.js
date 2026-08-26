@@ -12,16 +12,19 @@ import {
   runDockerOperatorBrowserSmoke,
 } from './docker-browser-smoke-validation.js';
 import { getOptionalDockerSmokeEvidencePath } from './docker-smoke-evidence.js';
+import { getRequiredSecretInput } from './secret-input.js';
 import { getBooleanInput, getOptionalStringInput, getRequiredStringInput, parseStrictScriptOptions } from './script-input-resolution.js';
 import { runDirectScriptTask } from './script-runtime.js';
 
 export const dockerBrowserSmokeEvidencePathEnvVar = 'HARMONIARR_DOCKER_BROWSER_SMOKE_EVIDENCE_PATH';
+export const dockerBrowserSmokePasswordFileEnvVar = 'HARMONIARR_WALKTHROUGH_PASSWORD_FILE';
 
 export const validateDockerBrowserSmokeCliOptions = Object.freeze({
   'base-url': { type: 'string' },
   'evidence-path': { type: 'string' },
   headless: { type: 'boolean' },
   password: { type: 'string' },
+  'password-file': { type: 'string' },
   'screenshot-dir': { type: 'string' },
   'timeout-ms': { type: 'string' },
   username: { type: 'string' },
@@ -40,9 +43,10 @@ function parsePositiveInteger(value, fieldName, defaultValue) {
   return parsed;
 }
 
-export function resolveDockerBrowserSmokeInputs({
+export async function resolveDockerBrowserSmokeInputs({
   args = process.argv.slice(2),
   env = process.env,
+  readFileFn,
 } = {}) {
   const { values } = parseStrictScriptOptions(validateDockerBrowserSmokeCliOptions, {
     allowPositionals: true,
@@ -57,7 +61,15 @@ export function resolveDockerBrowserSmokeInputs({
     baseUrl: getOptionalStringInput(values, 'base-url', 'HARMONIARR_BASE_URL', env) ?? defaultDockerBrowserSmokeBaseUrl,
     evidencePath,
     headless: getBooleanInput(values, 'headless', 'HARMONIARR_DOCKER_BROWSER_SMOKE_HEADLESS', env, true),
-    password: getRequiredStringInput(values, 'password', 'HARMONIARR_WALKTHROUGH_PASSWORD', env),
+    password: await getRequiredSecretInput({
+      env,
+      envName: 'HARMONIARR_WALKTHROUGH_PASSWORD',
+      fileEnvName: dockerBrowserSmokePasswordFileEnvVar,
+      fileOptionName: 'password-file',
+      optionName: 'password',
+      readFileFn,
+      values,
+    }),
     screenshotDir: getOptionalStringInput(values, 'screenshot-dir', 'HARMONIARR_DOCKER_BROWSER_SMOKE_SCREENSHOT_DIR', env),
     timeoutMs,
     username: getRequiredStringInput(values, 'username', 'HARMONIARR_WALKTHROUGH_USERNAME', env),
@@ -67,7 +79,7 @@ export function resolveDockerBrowserSmokeInputs({
 export async function runDockerBrowserSmokeFromEnvironment(env = process.env, {
   args = process.argv.slice(2),
 } = {}) {
-  const inputs = resolveDockerBrowserSmokeInputs({ args, env });
+  const inputs = await resolveDockerBrowserSmokeInputs({ args, env });
   return runDockerOperatorBrowserSmoke(inputs);
 }
 
