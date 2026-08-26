@@ -12,7 +12,7 @@ test('buildDownloaderTransferLocation creates a details route for a live transfe
     id: 'transfer-1',
     username: 'source-user',
   }), {
-    name: 'acquisition-downloader',
+    name: 'downloader',
     query: {
       open: 'details',
       transferId: 'transfer-1',
@@ -26,7 +26,7 @@ test('buildDownloaderTransferLocation accepts normalized Downloader rows', () =>
     id: 'transfer-2',
     sourceUser: 'source-user-2',
   }), {
-    name: 'acquisition-downloader',
+    name: 'downloader',
     query: {
       open: 'details',
       transferId: 'transfer-2',

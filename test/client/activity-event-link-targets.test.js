@@ -51,7 +51,7 @@ test('buildActivityEventLinkTarget returns null for activity events without a su
   assert.equal(buildActivityEventLinkTarget(), null);
 });
 
-test('buildActivityEventLinkTarget resolves allowed quality fallback to Music Queue', () => {
+test('buildActivityEventLinkTarget resolves allowed quality fallback to Missing Music', () => {
   const target = buildActivityEventLinkTarget({
     entityId: 'wanted-1',
     entityType: 'wanted_release',
@@ -60,15 +60,15 @@ test('buildActivityEventLinkTarget resolves allowed quality fallback to Music Qu
   });
 
   assert.deepEqual(target, {
-    label: 'Open Music Queue',
+    label: 'Open in Missing Music',
     to: {
-      name: 'acquisition-music-queue-release',
-      params: { wantedReleaseId: 'wanted-1' },
+      name: 'missing-decision',
+      params: { decisionId: 'wanted-1' },
     },
   });
 });
 
-test('buildActivityEventLinkTarget resolves quality blocks to Music Queue review', () => {
+test('buildActivityEventLinkTarget resolves quality blocks to Missing Music review', () => {
   const target = buildActivityEventLinkTarget({
     entityId: 'wanted-1',
     entityType: 'wanted_release',
@@ -79,15 +79,15 @@ test('buildActivityEventLinkTarget resolves quality blocks to Music Queue review
   });
 
   assert.deepEqual(target, {
-    label: 'Review quality choice',
+    label: 'Review quality choice in Missing Music',
     to: {
-      name: 'acquisition-music-queue-release',
-      params: { wantedReleaseId: 'wanted-1' },
+      name: 'missing-decision',
+      params: { decisionId: 'wanted-1' },
     },
   });
 });
 
-test('buildActivityEventLinkTarget resolves Music Queue lifecycle events to the release', () => {
+test('buildActivityEventLinkTarget resolves Music Queue lifecycle events to Missing Music', () => {
   const target = buildActivityEventLinkTarget({
     entityId: 'wanted-1',
     entityType: 'wanted_release',
@@ -96,10 +96,10 @@ test('buildActivityEventLinkTarget resolves Music Queue lifecycle events to the 
   });
 
   assert.deepEqual(target, {
-    label: 'Open Music Queue',
+    label: 'Open in Missing Music',
     to: {
-      name: 'acquisition-music-queue-release',
-      params: { wantedReleaseId: 'wanted-1' },
+      name: 'missing-decision',
+      params: { decisionId: 'wanted-1' },
     },
   });
 });
@@ -117,10 +117,10 @@ test('buildActivityEventLinkTarget resolves import safety stops to release-centr
   });
 
   assert.deepEqual(target, {
-    label: 'Review lossless check',
+    label: 'Review lossless check in Missing Music',
     to: {
-      name: 'acquisition-music-queue-release',
-      params: { wantedReleaseId: 'wanted-1' },
+      name: 'missing-decision',
+      params: { decisionId: 'wanted-1' },
     },
   });
 });
@@ -137,10 +137,10 @@ test('buildActivityEventLinkTarget does not let a reason override a non-media bl
     },
   });
 
-  assert.equal(target.label, 'Review library conflict');
+  assert.equal(target.label, 'Review library conflict in Missing Music');
 });
 
-test('buildActivityEventLinkTarget resolves a recovered provider search to Music Queue', () => {
+test('buildActivityEventLinkTarget resolves a recovered provider search to Missing Music', () => {
   const target = buildActivityEventLinkTarget({
     entityId: 'wanted-1',
     entityType: 'wanted_release',
@@ -149,15 +149,15 @@ test('buildActivityEventLinkTarget resolves a recovered provider search to Music
   });
 
   assert.deepEqual(target, {
-    label: 'Open Music Queue',
+    label: 'Open in Missing Music',
     to: {
-      name: 'acquisition-music-queue-release',
-      params: { wantedReleaseId: 'wanted-1' },
+      name: 'missing-decision',
+      params: { decisionId: 'wanted-1' },
     },
   });
 });
 
-test('buildActivityEventLinkTarget does not treat import candidate ids as Music Queue release ids', () => {
+test('buildActivityEventLinkTarget does not treat import candidate IDs as Missing Music decision IDs', () => {
   const target = buildActivityEventLinkTarget({
     entityId: 'candidate-1',
     entityType: 'import_candidate',
@@ -230,7 +230,7 @@ test('buildActivityEventLinkTarget offers one safe handoff for audio and request
       name: 'settings-connections',
       query: {
         returnReleaseId: 'wanted-1',
-        returnTo: 'music_queue_release',
+        returnTo: 'missing_music_decision',
       },
     },
   });
@@ -240,10 +240,10 @@ test('buildActivityEventLinkTarget offers one safe handoff for audio and request
     eventType: 'music_queue_audio_warning',
     extraPayload: { wantedReleaseId: 'wanted-1' },
   }), {
-    label: 'Review quality choice',
+    label: 'Review quality choice in Missing Music',
     to: {
-      name: 'acquisition-music-queue-release',
-      params: { wantedReleaseId: 'wanted-1' },
+      name: 'missing-decision',
+      params: { decisionId: 'wanted-1' },
     },
   });
   assert.deepEqual(buildActivityEventLinkTarget({

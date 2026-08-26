@@ -1095,12 +1095,12 @@ watch(projection, () => {
                       class="hx-btn artist-detail-selection__queue-link"
                       data-variant="ghost"
                       :to="{
-                        name: 'acquisition-music-queue-release',
-                        params: { wantedReleaseId: release.musicQueueRelease.id },
+                        name: 'missing-decision',
+                        params: { decisionId: release.musicQueueRelease.id },
                       }"
-                      :aria-label="`Open ${release.title ?? 'this release'} in Music Queue`"
+                      :aria-label="`Open ${release.title ?? 'this release'} in Missing Music`"
                     >
-                      Open in Music Queue
+                      Open in Missing Music
                     </RouterLink>
                   </template>
                 </ReleaseCard>

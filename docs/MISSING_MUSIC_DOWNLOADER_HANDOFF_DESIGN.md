@@ -149,9 +149,14 @@ Focused tests must prove that:
 The implementation also runs the repository's normal checks and rebuilds the
 local walkthrough Compose stack after all checks pass.
 
-## Next recommended item
+## Follow-up
 
-Retire or redirect the remaining legacy Music Queue deep links to their
-canonical Missing Music decision pages, retaining query strings and hashes and
-testing requester-safe routing. That migration should be separate from this
-handoff so compatibility and authorization changes remain easy to verify.
+**Completed 2026-08-26:** Legacy Music Queue and interim Acquisition deep
+links now redirect to their canonical Missing Music decision pages while
+retaining query strings and hashes. The compatibility work remains separate
+from this handoff; see [Missing Music canonical links and legacy
+redirects](MISSING_MUSIC_LEGACY_DEEP_LINKS_DESIGN.md).
+
+Next, add cross-user authorization and keyboard-inspector browser coverage,
+then remove the now-unreachable legacy workspace modules in a dedicated
+cleanup change.

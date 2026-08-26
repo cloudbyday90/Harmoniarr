@@ -21,10 +21,10 @@ import { computed, nextTick, onBeforeUnmount, watch } from 'vue';
 import { formatTransferFilename } from '../../lib/activity-downloads-presentation.js';
 import { buildDownloaderImportCandidateLocation } from '../../lib/downloader-import-review-link.js';
 import {
-  buildDownloaderMusicQueueReleaseLinkLabel,
-  buildDownloaderMusicQueueReleaseLocation,
-  getDownloaderMusicQueueRelease,
-} from '../../lib/downloader-music-queue-link.js';
+  buildDownloaderMissingMusicDecisionLinkLabel,
+  buildDownloaderMissingMusicDecisionLocation,
+  getDownloaderMissingMusicDecision,
+} from '../../lib/downloader-missing-music-release-link.js';
 import { formatOperationTimestampShort } from '../../lib/operation-run-presentation.js';
 import { formatBytes, formatSpeed } from '../../lib/search-presentation.js';
 
@@ -48,9 +48,9 @@ const title = computed(() => (
 
 const diagnostics = computed(() => props.transfer?.diagnostics ?? {});
 const importCandidateLocation = computed(() => buildDownloaderImportCandidateLocation(props.transfer));
-const musicQueueRelease = computed(() => getDownloaderMusicQueueRelease(props.transfer));
-const musicQueueReleaseLocation = computed(() => buildDownloaderMusicQueueReleaseLocation(props.transfer));
-const musicQueueReleaseLinkLabel = computed(() => buildDownloaderMusicQueueReleaseLinkLabel(props.transfer));
+const missingMusicDecision = computed(() => getDownloaderMissingMusicDecision(props.transfer));
+const missingMusicDecisionLocation = computed(() => buildDownloaderMissingMusicDecisionLocation(props.transfer));
+const missingMusicDecisionLinkLabel = computed(() => buildDownloaderMissingMusicDecisionLinkLabel(props.transfer));
 const recommendedAction = computed(() => diagnostics.value.recommendedNextAction ?? null);
 const timestamps = computed(() => props.transfer?.timestamps ?? {});
 const transferActions = computed(() => (
@@ -229,16 +229,16 @@ onBeforeUnmount(() => {
               </RouterLink>
             </dd>
           </div>
-          <div v-if="musicQueueReleaseLocation">
-            <dt>Music Queue release</dt>
+          <div v-if="missingMusicDecisionLocation">
+            <dt>Missing Music release</dt>
             <dd>
-              <span>{{ musicQueueRelease?.artistName ? `${musicQueueRelease.artistName} — ` : '' }}{{ musicQueueRelease?.releaseTitle ?? 'Linked release' }}</span>
+              <span>{{ missingMusicDecision?.artistName ? `${missingMusicDecision.artistName} — ` : '' }}{{ missingMusicDecision?.releaseTitle ?? 'Linked release' }}</span>
               <RouterLink
                 class="downloader-detail-import-link"
-                :to="musicQueueReleaseLocation"
+                :to="missingMusicDecisionLocation"
                 @click="closeDrawer"
               >
-                {{ musicQueueReleaseLinkLabel }}
+                {{ missingMusicDecisionLinkLabel }}
               </RouterLink>
             </dd>
           </div>

@@ -40,13 +40,13 @@ test('DownloaderTransferDetailDrawer exposes import candidate drill-through when
   assert.match(source, /diagnostics\.importLinkage\?\.summary/);
 });
 
-test('DownloaderTransferDetailDrawer exposes a descriptive Music Queue release handoff only when available', async () => {
+test('DownloaderTransferDetailDrawer exposes a descriptive Missing Music release handoff only when available', async () => {
   const source = await readFile(drawerPath, 'utf8');
 
-  assert.match(source, /buildDownloaderMusicQueueReleaseLocation/);
-  assert.match(source, /Music Queue release/);
-  assert.match(source, /musicQueueReleaseLocation/);
-  assert.match(source, /musicQueueReleaseLinkLabel/);
+  assert.match(source, /buildDownloaderMissingMusicDecisionLocation/);
+  assert.match(source, /Missing Music release/);
+  assert.match(source, /missingMusicDecisionLocation/);
+  assert.match(source, /missingMusicDecisionLinkLabel/);
 });
 
 test('DownloaderView opens diagnostics from an explicit Details action', async () => {
@@ -62,9 +62,9 @@ test('DownloaderTransferRowHandoffs renders only its durable transfer destinatio
   const source = await readFile(rowHandoffsPath, 'utf8');
 
   assert.match(source, /buildDownloaderImportCandidateLocation/);
-  assert.match(source, /buildDownloaderMusicQueueReleaseLocation/);
-  assert.match(source, /buildDownloaderMusicQueueReleaseLinkLabel/);
-  assert.match(source, /v-if="musicQueueReleaseLocation"/);
+  assert.match(source, /buildDownloaderMissingMusicDecisionLocation/);
+  assert.match(source, /buildDownloaderMissingMusicDecisionLinkLabel/);
+  assert.match(source, /v-if="missingMusicDecisionLocation"/);
   assert.match(source, /<RouterLink/);
   assert.match(source, /Open advanced diagnostics/);
   assert.match(source, /min-height: 24px/);

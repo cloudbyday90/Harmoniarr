@@ -139,7 +139,7 @@ const releaseHandoffWantedReleaseId = computed(() => (
     : musicQueueHandoffTarget.value.wantedReleaseId
 ));
 const releaseFilterContextLabel = computed(() => (
-  missingMusicHandoffRequested.value ? 'release' : 'Music Queue release'
+  missingMusicHandoffRequested.value ? 'release' : 'Missing Music release'
 ));
 const visibleFiles = computed(() => {
   if (missingMusicHandoffRequested.value && !missingMusicHandoffPresentation.value.isReady) {
@@ -269,14 +269,14 @@ function closeTransferDetail() {
 
 function clearRouteTransferHandoff() {
   void router.replace({
-    name: 'acquisition-downloader',
+    name: 'downloader',
     query: omitDownloaderTransferRouteQuery(route.query),
   });
 }
 
 function clearReleaseHandoff() {
   void router.replace({
-    name: 'acquisition-downloader',
+    name: 'downloader',
     query: omitDownloaderMusicQueueHandoffRouteQuery(
       omitMissingMusicDownloaderHandoffRouteQuery(route.query),
     ),
@@ -425,9 +425,9 @@ async function clearCompletedTransfers() {
     >
       <div class="hx-card-body downloader-release-handoff__body">
         <div>
-          <h2 class="downloader-release-handoff__title">Music Queue transfer</h2>
+          <h2 class="downloader-release-handoff__title">Missing Music transfer</h2>
           <p class="downloader-release-handoff__copy">
-            Showing live transfers linked to this release. Download controls are here; release decisions remain in Music Queue.
+            Showing live transfers linked to this release. Download controls are here; release decisions remain in Missing Music.
           </p>
         </div>
         <div class="downloader-release-handoff__actions">
@@ -435,11 +435,11 @@ async function clearCompletedTransfers() {
             class="hx-btn"
             data-variant="ghost"
             :to="{
-              name: 'acquisition-music-queue-release',
-              params: { wantedReleaseId: musicQueueHandoffTarget.wantedReleaseId },
+              name: 'missing-decision',
+              params: { decisionId: musicQueueHandoffTarget.wantedReleaseId },
             }"
           >
-            Open release in Music Queue
+            Open release in Missing Music
           </RouterLink>
           <button type="button" class="hx-btn" data-variant="ghost" @click="clearReleaseHandoff">
             Show all transfers
@@ -505,17 +505,17 @@ async function clearCompletedTransfers() {
             </div>
           </template>
           <template v-else-if="releaseFilterActive">
-            <p class="hx-empty-title">No live transfer for this Music Queue release</p>
+            <p class="hx-empty-title">No live transfer for this Missing Music release</p>
             <p class="hx-empty-copy">The transfer may not have started, may have completed, or may no longer be in the live queue.</p>
             <div class="hx-empty-actions">
               <RouterLink
                 class="hx-btn"
                 :to="{
-                  name: 'acquisition-music-queue-release',
-                  params: { wantedReleaseId: musicQueueHandoffTarget.wantedReleaseId },
+                  name: 'missing-decision',
+                  params: { decisionId: musicQueueHandoffTarget.wantedReleaseId },
                 }"
               >
-                Open release in Music Queue
+                Open release in Missing Music
               </RouterLink>
             </div>
           </template>
@@ -538,7 +538,7 @@ async function clearCompletedTransfers() {
             </div>
           </template>
           <template v-else-if="releaseFilterActive">
-            <p class="hx-empty-title">No live transfer for this Music Queue release</p>
+            <p class="hx-empty-title">No live transfer for this Missing Music release</p>
             <p class="hx-empty-copy">The visible queue does not contain a transfer for this release.</p>
             <div class="hx-empty-actions">
               <button type="button" class="hx-btn" @click="clearReleaseHandoff">Show all transfers</button>

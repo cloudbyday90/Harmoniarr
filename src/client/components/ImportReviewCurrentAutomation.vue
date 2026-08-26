@@ -98,7 +98,7 @@ const shouldShowImportPendingDetails = computed(() =>
         <p class="import-review-current-automation__eyebrow">Current automation</p>
         <h2 class="import-review-current-automation__title">Download and library progress</h2>
         <p class="import-review-current-automation__copy">
-          Music Queue follows normal progress. Open this only to inspect selected matches or completed downloads that need a library step.
+          Missing Music follows normal release progress. Open this only to inspect selected matches or completed downloads that need a library step.
         </p>
       </hgroup>
       <div class="import-review-current-automation__state">
@@ -110,10 +110,10 @@ const shouldShowImportPendingDetails = computed(() =>
     <div class="import-review-current-automation__content">
       <div class="import-review-current-automation__handoff">
         <p>
-          Follow automatic searches, downloads, and quality recovery in Music Queue. These details are available for exceptional diagnosis.
+          Follow automatic searches, downloads, and quality recovery in Missing Music. These details are available for exceptional diagnosis.
         </p>
-        <RouterLink class="hx-btn" data-variant="ghost" :to="{ name: 'acquisition-music-queue' }">
-          Open Music Queue
+        <RouterLink class="hx-btn" data-variant="ghost" :to="{ name: 'missing' }">
+          Open Missing Music
         </RouterLink>
       </div>
 

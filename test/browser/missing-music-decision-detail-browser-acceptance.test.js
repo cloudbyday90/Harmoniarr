@@ -397,11 +397,11 @@ suite('Missing Music decision detail browser acceptance', () => {
       await downloaderLink.waitFor();
       assert.equal(
         await downloaderLink.getAttribute('href'),
-        '/app/acquisition/downloader?missingMusicDecisionId=wanted-amber',
+        '/app/downloader?missingMusicDecisionId=wanted-amber',
       );
 
       await Promise.all([
-        page.waitForURL(/\/app\/acquisition\/downloader\?missingMusicDecisionId=wanted-amber$/u),
+        page.waitForURL(/\/app\/downloader\?missingMusicDecisionId=wanted-amber$/u),
         downloaderLink.click(),
       ]);
       const downloaderUrl = new URL(page.url());

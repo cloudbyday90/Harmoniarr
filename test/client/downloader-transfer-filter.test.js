@@ -28,7 +28,7 @@ const unlinkedTransfer = Object.freeze({
   state: Object.freeze({ code: 'queued' }),
 });
 
-test('filters Downloader transfers by the independent state and Music Queue linkage conditions', () => {
+test('filters Downloader transfers by the independent state and release-linkage conditions', () => {
   const transfers = [linkedTransfer, unlinkedTransfer];
 
   assert.deepEqual(filterDownloaderTransfers(transfers), transfers);
@@ -47,7 +47,7 @@ test('filters Downloader transfers by the independent state and Music Queue link
   }), []);
 });
 
-test('treats only a durable wanted release identifier as Music Queue linkage', () => {
+test('treats only a durable wanted release identifier as a release linkage', () => {
   assert.equal(isDownloaderTransferLinkedToMusicQueue(linkedTransfer), true);
   assert.equal(isDownloaderTransferLinkedToMusicQueue(unlinkedTransfer), false);
   assert.equal(isDownloaderTransferLinkedToMusicQueue(null), false);
@@ -60,6 +60,6 @@ test('falls back to all states and produces an accurate result label', () => {
   assert.equal(buildDownloaderTransferFilterResultLabel(-1, Number.NaN), 'Showing 0 of 0 transfers.');
   assert.equal(
     buildDownloaderTransferFilterResultLabel(1, 2, { wantedReleaseId: 'wanted-release-linked' }),
-    'Showing 1 transfer linked to this Music Queue release.',
+    'Showing 1 transfer linked to this Missing Music release.',
   );
 });

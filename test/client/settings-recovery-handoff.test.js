@@ -76,6 +76,35 @@ test('Settings recovery serializes a bounded release context and restores only i
   );
 });
 
+test('Settings recovery restores the canonical Missing Music decision route for new release contexts', () => {
+  const recoveryContext = createSettingsRecoveryContext({
+    context: SETTINGS_RECOVERY_CONTEXT.MISSING_MUSIC_DECISION,
+    wantedReleaseId: 'wanted-release-1',
+  });
+
+  assert.deepEqual(
+    buildSettingsRecoveryHandoffLocation({
+      recoveryContext,
+      routeName: 'settings-connections',
+    }),
+    {
+      name: 'settings-connections',
+      query: {
+        [SETTINGS_RECOVERY_QUERY_KEY]: SETTINGS_RECOVERY_CONTEXT.MISSING_MUSIC_DECISION,
+        [SETTINGS_RECOVERY_RELEASE_QUERY_KEY]: 'wanted-release-1',
+      },
+    },
+  );
+  assert.deepEqual(
+    buildSettingsRecoveryReturnAction({ recoveryContext }),
+    {
+      label: 'Return to Missing Music',
+      params: { decisionId: 'wanted-release-1' },
+      routeName: 'missing-decision',
+    },
+  );
+});
+
 test('Settings folder recovery returns only after server folder validation is healthy', () => {
   const recoveryContext = createSettingsRecoveryContext({
     context: SETTINGS_RECOVERY_CONTEXT.ACTIVITY_LIBRARY_ADD_RELEASE,

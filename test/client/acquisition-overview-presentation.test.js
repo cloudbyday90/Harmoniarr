@@ -102,7 +102,7 @@ test('Acquisition transfer rows show only live work and retain the Downloader ha
   ]);
   assert.equal(rows[0].title, 'Zeta.flac');
   assert.equal(rows[0].progressValue, 65);
-  assert.equal(rows[0].location.name, 'acquisition-downloader');
+  assert.equal(rows[0].location.name, 'downloader');
   assert.deepEqual(rows[0].location.query, {
     open: 'details',
     transferId: 'transfer-active',
@@ -134,7 +134,7 @@ test('Acquisition transfer rows use a release-scoped handoff for a verified Musi
   assert.equal(row.action.label, 'View download progress');
   assert.equal(row.action.accessibleLabel, 'View download progress for Forest Frank — Child of God');
   assert.deepEqual(row.location, {
-    name: 'acquisition-downloader',
+    name: 'downloader',
     query: { wantedReleaseId: 'wanted-forest-frank' },
   });
   assert.doesNotMatch(JSON.stringify(row.location), /source-a|transfer-active/);

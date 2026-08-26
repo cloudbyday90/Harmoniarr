@@ -69,7 +69,7 @@ function updateMusicQueueLinkedOnly(event) {
         :checked="musicQueueLinkedOnly"
         @change="updateMusicQueueLinkedOnly"
       >
-      <span>Only transfers linked to Music Queue</span>
+      <span>Only transfers linked to Missing Music</span>
     </label>
   </fieldset>
 </template>

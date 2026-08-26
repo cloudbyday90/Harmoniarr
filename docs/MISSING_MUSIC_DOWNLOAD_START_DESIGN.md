@@ -180,6 +180,11 @@ status**. Lint and the client build also pass.
 The Missing Music **View in Downloader** transition is now implemented. See
 [Missing Music Downloader handoff design](MISSING_MUSIC_DOWNLOADER_HANDOFF_DESIGN.md).
 
-The next recommended slice is to move canonical internal Music Queue release
-links to Missing Music and provide role-aware legacy redirects that preserve
-ordinary URL view state without turning URL data into an authorization claim.
+**Completed 2026-08-26:** Canonical internal Music Queue release links now use
+Missing Music, with role-aware legacy redirects that retain ordinary URL view
+state without turning it into an authorization claim. See [Missing Music
+canonical links and legacy redirects](MISSING_MUSIC_LEGACY_DEEP_LINKS_DESIGN.md).
+
+The next recommended slice is the remaining cross-user authorization and
+keyboard-inspector browser coverage, followed by a dedicated removal of the
+unreachable legacy workspace modules.

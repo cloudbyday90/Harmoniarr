@@ -132,17 +132,17 @@ suite('Downloader import-candidate linkage browser verification', () => {
         await linkedTransferRow.locator('button, a').evaluateAll((controls) => controls.map((control) => control.textContent?.trim() ?? '')),
         [
           'Details',
-          'Open Music Queue release: Autechre — Amber',
+          'Open Missing Music release: Autechre — Amber',
           'Open advanced diagnostics',
         ],
       );
 
-      const musicQueueRowLink = linkedTransferRow.getByRole('link', {
-        name: 'Open Music Queue release: Autechre — Amber',
+      const missingMusicRowLink = linkedTransferRow.getByRole('link', {
+        name: 'Open Missing Music release: Autechre — Amber',
       });
-      await musicQueueRowLink.waitFor();
-      await musicQueueRowLink.click();
-      await page.waitForFunction(() => globalThis.location.pathname === '/app/music-queue/wanted-release-downloader-linked');
+      await missingMusicRowLink.waitFor();
+      await missingMusicRowLink.click();
+      await page.waitForFunction(() => globalThis.location.pathname === '/app/missing/wanted-release-downloader-linked');
 
       await page.goto(`${baseUrl}/app/downloader`, { waitUntil: 'domcontentloaded' });
       const restoredLinkedTransferRow = page.getByRole('row').filter({ hasText: '01 Foil.flac' });
@@ -158,12 +158,12 @@ suite('Downloader import-candidate linkage browser verification', () => {
       const dialog = page.locator('.downloader-detail-drawer');
       await dialog.waitFor();
       await dialog.getByText('Linked to Import Review candidate.', { exact: true }).waitFor();
-      const musicQueueLink = dialog.getByRole('link', {
-        name: 'Open Music Queue release: Autechre — Amber',
+      const missingMusicLink = dialog.getByRole('link', {
+        name: 'Open Missing Music release: Autechre — Amber',
       });
-      await musicQueueLink.waitFor();
-      await musicQueueLink.click();
-      await page.waitForFunction(() => globalThis.location.pathname === '/app/music-queue/wanted-release-downloader-linked');
+      await missingMusicLink.waitFor();
+      await missingMusicLink.click();
+      await page.waitForFunction(() => globalThis.location.pathname === '/app/missing/wanted-release-downloader-linked');
 
       await page.goto(`${baseUrl}/app/downloader`, { waitUntil: 'domcontentloaded' });
       const restoredDialogTransferRow = page.getByRole('row').filter({ hasText: '01 Foil.flac' });

@@ -54,7 +54,7 @@ test('SettingsLibraryView wires discovery fields and automation toggle to form.l
   assert.match(source, /v-model\.number="form\.library\.discoveryBatchSize"/);
   assert.match(source, /v-model\.number="form\.library\.maxSearchAttempts"/);
   assert.match(source, /Automatically start download runs for high-confidence selections/);
-  assert.match(source, /Other matches remain in Music Queue for review/);
+  assert.match(source, /Other matches remain in Missing Music for review/);
 });
 
 test('SettingsLibraryView constrains inputs to validator ranges', async () => {

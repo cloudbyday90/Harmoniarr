@@ -152,7 +152,7 @@ onMounted(() => { void loadSettings(); });
           </SettingsFormGroup>
           <SettingsFormGroup
             title="Automatic downloads"
-            description="Starts downloads only for an unambiguous high-confidence match. Other matches remain in Music Queue for review."
+            description="Starts downloads only for an unambiguous high-confidence match. Other matches remain in Missing Music for review."
           >
             <label class="cfg-check">
               <input type="checkbox" v-model="form.library.autoStartDownloadsAfterSelection" />

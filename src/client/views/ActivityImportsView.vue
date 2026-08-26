@@ -172,14 +172,14 @@ const pageSubtitle = computed(() => {
   }
 
   if (isReleaseUnavailable.value) {
-    return 'This Music Queue link is not available.';
+    return 'This Missing Music link is not available.';
   }
 
   if (releaseAddRelease.value) {
     return `Recent safe library-add outcomes for ${releaseAddRelease.value.releaseTitle} by ${releaseAddRelease.value.artistName}.`;
   }
 
-  return 'Recent safe library-add outcomes for this Music Queue release.';
+  return 'Recent safe library-add outcomes for this Missing Music release.';
 });
 
 function importStatusTone(code) {
@@ -249,8 +249,8 @@ watch(wantedReleaseId, (nextWantedReleaseId, previousWantedReleaseId) => {
           <p class="hx-card-subtitle">{{ releaseAddSummary?.message ?? 'No library-add result has been recorded for this release yet.' }}</p>
         </div>
         <div class="hx-card-actions">
-          <RouterLink class="hx-btn" :to="{ name: 'acquisition-music-queue-release', params: { wantedReleaseId } }">
-            Return to Music Queue
+          <RouterLink class="hx-btn" :to="{ name: 'missing-decision', params: { decisionId: wantedReleaseId } }">
+            Return to Missing Music
           </RouterLink>
           <RouterLink
             v-if="releaseAddLatestOutcome?.presentation?.settingsRouteName"

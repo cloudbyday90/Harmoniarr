@@ -44,7 +44,7 @@ export function buildDownloaderTransferLocation(transfer) {
   }
 
   return {
-    name: 'acquisition-downloader',
+    name: 'downloader',
     query: {
       open: 'details',
       transferId: id,

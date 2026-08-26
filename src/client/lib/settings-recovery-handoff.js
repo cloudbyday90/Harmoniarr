@@ -22,6 +22,8 @@ export const SETTINGS_RECOVERY_CONTEXT = Object.freeze({
   ACTIVITY_TIMELINE: 'activity_timeline',
   DASHBOARD: 'dashboard',
   DOWNLOADER: 'downloader',
+  MISSING_MUSIC: 'missing_music',
+  MISSING_MUSIC_DECISION: 'missing_music_decision',
   MUSIC_QUEUE: 'music_queue',
   MUSIC_QUEUE_RELEASE: 'music_queue_release',
 });
@@ -63,6 +65,19 @@ const RECOVERY_DESTINATIONS = Object.freeze({
     label: 'Return to Downloader',
     providerReadyCopy: 'Return to Downloader to see current download progress.',
     routeName: 'downloader',
+  }),
+  [SETTINGS_RECOVERY_CONTEXT.MISSING_MUSIC]: Object.freeze({
+    folderReadyCopy: 'Return to Missing Music to see the next release action.',
+    label: 'Return to Missing Music',
+    providerReadyCopy: 'Missing Music can continue its normal checks. Harmoniarr has not started a download yet.',
+    routeName: 'missing',
+  }),
+  [SETTINGS_RECOVERY_CONTEXT.MISSING_MUSIC_DECISION]: Object.freeze({
+    folderReadyCopy: "Return to Missing Music to see this release's next action.",
+    label: 'Return to Missing Music',
+    providerReadyCopy: 'Missing Music can continue its normal checks. Harmoniarr has not started a download yet.',
+    requiresReleaseId: true,
+    routeName: 'missing-decision',
   }),
   [SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE]: Object.freeze({
     folderReadyCopy: 'Return to Music Queue to see the next automatic step.',
@@ -200,6 +215,8 @@ export function buildSettingsRecoveryReturnAction({
   if (normalizedContext.wantedReleaseId) {
     if (normalizedContext.context === SETTINGS_RECOVERY_CONTEXT.ACTIVITY_LIBRARY_ADD_RELEASE) {
       action.query = { wantedReleaseId: normalizedContext.wantedReleaseId };
+    } else if (normalizedContext.context === SETTINGS_RECOVERY_CONTEXT.MISSING_MUSIC_DECISION) {
+      action.params = { decisionId: normalizedContext.wantedReleaseId };
     } else {
       action.params = { wantedReleaseId: normalizedContext.wantedReleaseId };
     }

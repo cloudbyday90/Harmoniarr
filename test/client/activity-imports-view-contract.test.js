@@ -45,7 +45,7 @@ test('ActivityImportsView imports every formatter used by the imports table temp
   assert.match(source, /Library-add details/);
   assert.match(source, /Library-add details unavailable/);
   assert.match(source, /Recent safe library-add outcomes/);
-  assert.match(source, /Return to Music Queue/);
+  assert.match(source, /Return to Missing Music/);
   assert.match(source, /Open match diagnostics/);
   assert.match(source, /formatCandidateCountLabel\(candidateCount\.value\)/);
   assert.match(source, /\{\{ formatSourceProvider\(candidate\.sourceProvider\) \}\}/);

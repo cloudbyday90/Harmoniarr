@@ -18,6 +18,11 @@
 
 import { createRouter, createWebHistory } from 'vue-router';
 import AppShell from './components/AppShell.vue';
+import {
+  redirectLegacyAcquisitionDownloader,
+  redirectLegacyMusicQueueRelease,
+  redirectLegacyMusicQueueWorklist,
+} from './lib/missing-music-legacy-route-redirect.js';
 import { resolveRouterScroll } from './lib/router-scroll.js';
 import { sessionStore } from './state/session.js';
 
@@ -32,8 +37,6 @@ const ActivityReleasesView = () => import('./views/ActivityReleasesView.vue');
 const ActivityUsersView = () => import('./views/ActivityUsersView.vue');
 const ActivityWantedView = () => import('./views/ActivityWantedView.vue');
 const ActivityWorkspaceView = () => import('./views/ActivityWorkspaceView.vue');
-const AcquisitionOverviewView = () => import('./views/AcquisitionView.vue');
-const AcquisitionWorkspaceView = () => import('./views/AcquisitionWorkspaceView.vue');
 const ArtistDetailView = () => import('./views/ArtistDetailView.vue');
 const BootstrapSetupView = () => import('./views/BootstrapSetupView.vue');
 const ClaimAccountView = () => import('./views/ClaimAccountView.vue');
@@ -43,7 +46,6 @@ const LibraryView = () => import('./views/LibraryView.vue');
 const LoginView = () => import('./views/LoginView.vue');
 const MetadataView = () => import('./views/MetadataView.vue');
 const MissingView = () => import('./views/MissingView.vue');
-const MusicQueueView = () => import('./views/MusicQueueView.vue');
 const OnboardingView = () => import('./views/OnboardingView.vue');
 const OperationsView = () => import('./views/OperationsView.vue');
 const RecoveryView = () => import('./views/RecoveryView.vue');
@@ -122,21 +124,17 @@ const router = createRouter({
         { path: 'library', name: 'library', component: LibraryView },
         { path: 'missing', name: 'missing', component: MissingView },
         { path: 'missing/:decisionId', name: 'missing-decision', component: MissingView },
-        {
-          path: 'acquisition',
-          component: AcquisitionWorkspaceView,
-          children: [
-            { path: '', name: 'acquisition', component: AcquisitionOverviewView },
-            { path: 'music-queue', name: 'acquisition-music-queue', component: MusicQueueView },
-            { path: 'music-queue/:wantedReleaseId', name: 'acquisition-music-queue-release', component: MusicQueueView },
-            { path: 'downloader', name: 'acquisition-downloader', component: DownloaderView },
-          ],
-        },
-        // Existing saved links and route-name callers remain valid while the
-        // unified Acquisition workspace becomes the single primary destination.
-        { path: 'music-queue', name: 'music-queue', redirect: (to) => ({ name: 'acquisition-music-queue', query: to.query, hash: to.hash }) },
-        { path: 'music-queue/:wantedReleaseId', name: 'music-queue-release', redirect: (to) => ({ name: 'acquisition-music-queue-release', params: to.params, query: to.query, hash: to.hash }) },
-        { path: 'downloader', name: 'downloader', redirect: (to) => ({ name: 'acquisition-downloader', query: to.query, hash: to.hash }) },
+        // Legacy Music Queue and interim Acquisition paths remain valid for
+        // saved links, but release decisions now have one canonical Missing
+        // Music destination. The server resolves every decision under the
+        // authenticated actor's permitted scope.
+        { path: 'acquisition', name: 'acquisition', redirect: redirectLegacyMusicQueueWorklist },
+        { path: 'acquisition/music-queue', name: 'acquisition-music-queue', redirect: redirectLegacyMusicQueueWorklist },
+        { path: 'acquisition/music-queue/:wantedReleaseId', name: 'acquisition-music-queue-release', redirect: redirectLegacyMusicQueueRelease },
+        { path: 'acquisition/downloader', name: 'acquisition-downloader', redirect: redirectLegacyAcquisitionDownloader },
+        { path: 'music-queue', name: 'music-queue', redirect: redirectLegacyMusicQueueWorklist },
+        { path: 'music-queue/:wantedReleaseId', name: 'music-queue-release', redirect: redirectLegacyMusicQueueRelease },
+        { path: 'downloader', name: 'downloader', component: DownloaderView },
         { path: 'search', name: 'search', component: SearchView },
         { path: 'requests', name: 'request-music', component: RequestMusicView },
         { path: 'requests/:id', name: 'request-detail', component: RequestDetailView },
@@ -155,7 +153,7 @@ const router = createRouter({
             { path: 'diagnostics/failed-library-adds', name: 'activity-diagnostics-failed-library-adds', component: ActivityImportsView, props: { status: 'failed', title: 'Failed library adds', subtitle: 'Library-add records that need investigation.', emptyTitle: 'No failed library adds', emptyCopy: 'Failed library adds will appear here when the add worker reports them.' } },
             { path: 'candidates', name: 'activity-candidates', redirect: (to) => ({ name: 'activity-diagnostics-matches', query: to.query, hash: to.hash }) },
             { path: 'requests', name: 'activity-requests', component: RequestMusicView },
-            { path: 'queue', name: 'activity-queue', redirect: (to) => ({ name: 'acquisition-music-queue', query: to.query, hash: to.hash }) },
+            { path: 'queue', name: 'activity-queue', redirect: redirectLegacyMusicQueueWorklist },
             { path: 'wanted', name: 'activity-wanted', component: ActivityWantedView },
             { path: 'imports', name: 'activity-imports', redirect: (to) => ({ name: 'activity-diagnostics-library-adds', query: to.query, hash: to.hash }) },
             { path: 'releases', name: 'activity-releases', component: ActivityReleasesView },

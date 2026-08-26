@@ -1,9 +1,10 @@
 # Missing Music decision workflow design
 
 **Status:** in progress — the server-authorized worklist, cross-user
-inspection, manual match selection, explicit download-start confirmation, and
-safe contextual Downloader handoff are implemented. The next workflow
-improvement is the canonical retirement of legacy Music Queue deep links.
+inspection, manual match selection, explicit download-start confirmation, safe
+contextual Downloader handoff, and canonical Missing Music deep links are
+implemented. The next workflow improvement is the remaining cross-user and
+keyboard browser coverage before bounded legacy-module retirement.
 
 **Created:** 2026-08-26
 
@@ -548,13 +549,15 @@ Before commit, prove the workflow at the boundaries that own it:
    server, retains release and target-user context, and never accepts or
    exposes provider identifiers or raw transfer evidence. See [Missing Music
    Downloader handoff design](MISSING_MUSIC_DOWNLOADER_HANDOFF_DESIGN.md).
-9. **Next:** Change canonical internal deep links from Music Queue to Missing Music and
-   add role-aware compatibility redirects that preserve query strings and
-   hashes.
-10. Add remaining cross-user authorization and keyboard-inspector browser
-    coverage before removing interim Music Queue workspace modules.
+9. **Completed 2026-08-26:** Change canonical internal deep links from Music
+   Queue to Missing Music and add role-aware compatibility redirects that
+   preserve query strings and hashes. See [Missing Music canonical links and
+   legacy redirects](MISSING_MUSIC_LEGACY_DEEP_LINKS_DESIGN.md).
+10. **Next:** Add remaining cross-user authorization and keyboard-inspector browser
+   coverage before removing interim Music Queue workspace modules.
 11. Rebuild walkthrough Compose after the command slice passes, visually
-    inspect all three responsive breakpoints, then commit and push.
+    inspect all three responsive breakpoints, then remove the unreachable
+    interim workspace modules in a separate commit.
 
 ## Recommendation
 

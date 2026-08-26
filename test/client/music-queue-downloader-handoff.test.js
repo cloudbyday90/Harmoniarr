@@ -34,7 +34,7 @@ test('buildMusicQueueDownloaderHandoff creates a release-scoped Downloader route
     description: 'View the live transfer and its controls in Downloader. Release decisions remain in Music Queue.',
     label: 'View download progress',
     location: {
-      name: 'acquisition-downloader',
+      name: 'downloader',
       query: { wantedReleaseId: 'wanted-forest-frank' },
     },
     wantedReleaseId: 'wanted-forest-frank',
@@ -65,7 +65,7 @@ test('buildReleaseScopedDownloaderHandoff accepts a durable queue link without a
     description: 'View the live transfer and its controls in Downloader. Release decisions remain in Music Queue.',
     label: 'View download progress',
     location: {
-      name: 'acquisition-downloader',
+      name: 'downloader',
       query: { wantedReleaseId: 'wanted-forest-frank' },
     },
     wantedReleaseId: 'wanted-forest-frank',

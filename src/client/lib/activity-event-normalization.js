@@ -286,12 +286,12 @@ export function getActivityEventDetail(event) {
     return event.extraPayload?.rediscoveryScheduled === true
       ? 'Harmoniarr will search again later.'
       : event.extraPayload?.rediscoveryExhausted === true
-        ? 'Harmoniarr stopped automatic recovery. Open Music Queue to search again.'
+        ? 'Harmoniarr stopped automatic recovery. Open Missing Music to search again.'
       : 'Harmoniarr could not find another safe match.';
   }
 
   if (event.eventType === 'music_queue_download_failed') {
-    return 'Harmoniarr could not choose another safe match. Open Music Queue to review what happened.';
+    return 'Harmoniarr could not choose another safe match. Open Missing Music to review what happened.';
   }
 
   if (event.eventType === 'music_queue_import_blocked') {

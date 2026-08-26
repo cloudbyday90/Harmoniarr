@@ -12,7 +12,7 @@ test('DownloaderTransferFilters uses grouped native controls with visible labels
   assert.match(source, /<legend class="sr-only">Filter transfers<\/legend>/);
   assert.match(source, /<select class="hx-select" :value="stateFilter" @change="updateStateFilter">/);
   assert.match(source, /<input\s+type="checkbox"/);
-  assert.match(source, /Only transfers linked to Music Queue/);
+  assert.match(source, /Only transfers linked to Missing Music/);
   assert.match(source, /min-height: 44px/);
   assert.match(source, /\.downloader-transfer-filters\s*\{[\s\S]*?width: 100%;/);
   assert.match(source, /\.downloader-transfer-filter-linkage\s*\{[\s\S]*?width: 100%;/);

@@ -51,16 +51,16 @@ export function buildActivityEventLinkTarget(event = {}) {
       ? {
           label: event.eventType === 'music_queue_quality_blocked'
             || event.eventType === 'music_queue_audio_warning'
-            ? 'Review quality choice'
+            ? 'Review quality choice in Missing Music'
             : event.eventType === 'music_queue_import_blocked'
-              ? buildMusicQueueAddRecoveryPresentation({
+              ? `${buildMusicQueueAddRecoveryPresentation({
                 blockerCode: event.extraPayload?.addBlockerCode,
                 recoveryReasonCode: event.extraPayload?.recoveryReasonCode,
-              }).actionLabel
-            : 'Open Music Queue',
+              }).actionLabel} in Missing Music`
+              : 'Open in Missing Music',
           to: {
-            name: 'acquisition-music-queue-release',
-            params: { wantedReleaseId },
+            name: 'missing-decision',
+            params: { decisionId: wantedReleaseId },
           },
         }
       : null;
@@ -74,7 +74,7 @@ export function buildActivityEventLinkTarget(event = {}) {
       to: buildSettingsRecoveryHandoffLocation({
         recoveryContext: createSettingsRecoveryContext({
           context: wantedReleaseId
-            ? SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE_RELEASE
+            ? SETTINGS_RECOVERY_CONTEXT.MISSING_MUSIC_DECISION
             : SETTINGS_RECOVERY_CONTEXT.ACTIVITY_TIMELINE,
           wantedReleaseId,
         }),

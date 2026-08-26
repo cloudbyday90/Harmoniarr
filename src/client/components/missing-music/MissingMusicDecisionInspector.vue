@@ -161,7 +161,7 @@ onBeforeUnmount(() => {
             data-variant="primary"
             :aria-label="presentation.downloaderLinkAccessibleLabel"
             :to="{
-              name: 'acquisition-downloader',
+              name: 'downloader',
               query: { missingMusicDecisionId: props.decisionId },
             }"
           >

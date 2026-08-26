@@ -150,7 +150,7 @@ suite('Downloader Music Queue filter browser verification', () => {
 
       const stateFilter = page.getByLabel('State');
       const musicQueueLinkedOnly = page.getByRole('checkbox', {
-        name: 'Only transfers linked to Music Queue',
+        name: 'Only transfers linked to Missing Music',
       });
       await stateFilter.selectOption('queued');
       await transferQueueCard.locator('.hx-card-subtitle').filter({
@@ -178,7 +178,7 @@ suite('Downloader Music Queue filter browser verification', () => {
       const linkedTransferRow = page.getByRole('row').filter({ hasText: '01 Foil.flac' });
       await linkedTransferRow.waitFor();
       await linkedTransferRow.getByRole('link', {
-        name: 'Open Music Queue release: Autechre — Amber',
+        name: 'Open Missing Music release: Autechre — Amber',
       }).waitFor();
 
       await page.evaluate(() => {

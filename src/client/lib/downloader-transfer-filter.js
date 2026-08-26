@@ -71,7 +71,7 @@ export function filterDownloaderTransfers(transfers, {
 }
 
 export function buildDownloaderTransferFilterResultLabel(visibleCount, totalCount, {
-  releaseContextLabel = 'Music Queue release',
+  releaseContextLabel = 'Missing Music release',
   wantedReleaseId = '',
 } = {}) {
   const normalizedVisibleCount = Number.isFinite(visibleCount) ? Math.max(0, visibleCount) : 0;

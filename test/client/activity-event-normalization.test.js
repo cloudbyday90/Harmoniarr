@@ -349,7 +349,7 @@ test('getActivityEventLabel and detail make Music Queue recovery understandable 
   assert.equal(getActivityEventDetail(exhausted), 'Harmoniarr will search again later.');
   assert.equal(
     getActivityEventDetail(boundedStop),
-    'Harmoniarr stopped automatic recovery. Open Music Queue to search again.',
+    'Harmoniarr stopped automatic recovery. Open Missing Music to search again.',
   );
 });
 

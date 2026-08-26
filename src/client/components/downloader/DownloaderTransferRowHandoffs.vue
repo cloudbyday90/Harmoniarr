@@ -20,30 +20,30 @@
 import { computed } from 'vue';
 import { buildDownloaderImportCandidateLocation } from '../../lib/downloader-import-review-link.js';
 import {
-  buildDownloaderMusicQueueReleaseLinkLabel,
-  buildDownloaderMusicQueueReleaseLocation,
-} from '../../lib/downloader-music-queue-link.js';
+  buildDownloaderMissingMusicDecisionLinkLabel,
+  buildDownloaderMissingMusicDecisionLocation,
+} from '../../lib/downloader-missing-music-release-link.js';
 
 const props = defineProps({
   transfer: { type: Object, default: null },
 });
 
 const importCandidateLocation = computed(() => buildDownloaderImportCandidateLocation(props.transfer));
-const musicQueueReleaseLocation = computed(() => buildDownloaderMusicQueueReleaseLocation(props.transfer));
-const musicQueueReleaseLinkLabel = computed(() => buildDownloaderMusicQueueReleaseLinkLabel(props.transfer));
+const missingMusicDecisionLocation = computed(() => buildDownloaderMissingMusicDecisionLocation(props.transfer));
+const missingMusicDecisionLinkLabel = computed(() => buildDownloaderMissingMusicDecisionLinkLabel(props.transfer));
 const hasHandoffs = computed(() => Boolean(
-  importCandidateLocation.value || musicQueueReleaseLocation.value,
+  importCandidateLocation.value || missingMusicDecisionLocation.value,
 ));
 </script>
 
 <template>
   <div v-if="hasHandoffs" class="downloader-transfer-row-handoffs">
     <RouterLink
-      v-if="musicQueueReleaseLocation"
+      v-if="missingMusicDecisionLocation"
       class="downloader-transfer-row-handoff"
-      :to="musicQueueReleaseLocation"
+      :to="missingMusicDecisionLocation"
     >
-      {{ musicQueueReleaseLinkLabel }}
+      {{ missingMusicDecisionLinkLabel }}
     </RouterLink>
     <RouterLink
       v-if="importCandidateLocation"

@@ -154,7 +154,7 @@ suite('Activity Imports import-readiness browser verification', () => {
         'A status-only library-add handoff should expand its relevant automation context.',
       );
       await page.getByText('1 download waiting to add · 1 item blocked', { exact: true }).waitFor();
-      await page.getByRole('link', { name: 'Open Music Queue' }).waitFor();
+      await page.getByRole('link', { name: 'Open Missing Music' }).waitFor();
 
       await page.locator('details.import-review-current-automation summary').click();
       await openImportReviewCurrentAutomation(page);
