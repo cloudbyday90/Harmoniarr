@@ -30,6 +30,7 @@ import {
 import { buildMusicQueueSummaryCards, normalizeMusicQueueRelease } from '../lib/acquisition-pipeline-presentation.js';
 import { getErrorMessage } from '../lib/error-utils.js';
 import { createMusicQueueActionFeedback } from '../lib/music-queue-action-feedback-presentation.js';
+import { buildMusicQueueMatchSelectionSuccessMessage } from '../lib/music-queue-match-selection-feedback-presentation.js';
 import { createMusicQueueReleaseMutationGate } from '../lib/music-queue-release-mutation-gate.js';
 import { createRetryIdempotencyKeyStore } from '../lib/retry-idempotency-key-store.js';
 import {
@@ -189,7 +190,12 @@ export function useMusicQueue({
       if (idempotencyScope) {
         retryIdempotencyKeyStore.clear(actionKey);
       }
-      setActionFeedback({ actionKey, message: successMessage, phase: 'success', wantedReleaseId });
+      setActionFeedback({
+        actionKey,
+        message: typeof successMessage === 'function' ? successMessage(payload) : successMessage,
+        phase: 'success',
+        wantedReleaseId,
+      });
       await resource.load();
       return payload;
     } catch (error) {
@@ -220,7 +226,7 @@ export function useMusicQueue({
       idempotencyScope: 'acquisition.music-queue.matches.use',
       matchId,
       pendingMessage: 'Using this match...',
-      successMessage: 'Match selected. Harmoniarr will use it for the next download step.',
+      successMessage: buildMusicQueueMatchSelectionSuccessMessage,
       wantedReleaseId,
     });
   }

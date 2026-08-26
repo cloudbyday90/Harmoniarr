@@ -1062,7 +1062,7 @@ suite('Music Queue release row hierarchy browser verification', () => {
 
       useMatchResponse.resolve();
       await statusFeedback.getByText('Updated', { exact: true }).waitFor();
-      await statusFeedback.getByText('Match selected. Harmoniarr will use it for the next download step.', { exact: true }).waitFor();
+      await statusFeedback.getByText('Match selected. Harmoniarr will update this release as it prepares the next step.', { exact: true }).waitFor();
       await page.waitForFunction(() => (
         globalThis.document.querySelector('[data-music-queue-action="use-match:match-choice-alternate"]')
           ?.disabled === false

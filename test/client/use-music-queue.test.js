@@ -136,7 +136,7 @@ test('Music Queue keeps working, success, and failure feedback scoped to the rel
   await action;
   assert.deepEqual(musicQueue.actionFeedback.value, {
     actionKey: 'wanted-1:match-1:use',
-    message: 'Match selected. Harmoniarr will use it for the next download step.',
+    message: 'Match selected. Harmoniarr will update this release as it prepares the next step.',
     phase: 'success',
     wantedReleaseId: 'wanted-1',
   });
@@ -332,6 +332,10 @@ test('Music Queue applies an authoritative mutation release before its list reva
 
   assert.equal(musicQueue.releases.value[0].statusCode, 'checking_matches');
   assert.deepEqual(musicQueue.releases.value[0].status, updatedRelease.status);
+  assert.equal(
+    musicQueue.actionFeedback.value.message,
+    'Match selected. Harmoniarr will automatically queue the selected match for download when its checks finish.',
+  );
 
   listRefresh.resolve({
     pagination: { total: 1 },

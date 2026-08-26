@@ -204,6 +204,11 @@ the release and quality evidence, then explicitly choose the match that fits
 your policy before running this strict proof. Harmoniarr never selects or
 submits a provider download merely because candidates were found.
 
+After a match is selected, Music Queue reports the release's returned handoff
+state in the selected-release status message. It confirms that the worker is
+checking or progressing the release, but does not claim provider acceptance;
+use Downloader and the strict proof below to establish that separately.
+
 The extra `--` is required by the repository's npm 12 script invocation before
 forwarding flags to the Node validator. Boolean options are presence flags;
 do not append `true` or `false`. For an intentionally unconfigured walkthrough
