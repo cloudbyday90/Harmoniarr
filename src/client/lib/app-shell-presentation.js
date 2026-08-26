@@ -25,25 +25,44 @@
  * @typedef {{ name: string, label: string, icon: string, exact?: true, badge?: number }} NavItem
  */
 
+const ADMIN_NAV = Object.freeze([
+  Object.freeze({ name: 'dashboard', label: 'Home', icon: 'library', exact: true }),
+  Object.freeze({ name: 'discover', label: 'Discover', icon: 'discover' }),
+  Object.freeze({ name: 'missing', label: 'Missing Music', icon: 'missing' }),
+  Object.freeze({ name: 'downloader', label: 'Downloader', icon: 'download' }),
+  Object.freeze({ name: 'activity', label: 'Activity', icon: 'activity' }),
+  Object.freeze({ name: 'settings', label: 'Settings', icon: 'settings' }),
+]);
+
 const OPERATOR_NAV = Object.freeze([
   Object.freeze({ name: 'dashboard', label: 'Home', icon: 'library', exact: true }),
   Object.freeze({ name: 'discover', label: 'Discover', icon: 'discover' }),
-  Object.freeze({ name: 'acquisition', label: 'Acquisition', icon: 'music' }),
-  Object.freeze({ name: 'missing', label: 'Missing music', icon: 'missing' }),
+  Object.freeze({ name: 'missing', label: 'Missing Music', icon: 'missing' }),
   Object.freeze({ name: 'activity', label: 'Activity', icon: 'activity' }),
   Object.freeze({ name: 'settings', label: 'Settings', icon: 'settings' }),
 ]);
 
 const REQUESTER_NAV = Object.freeze([
   Object.freeze({ name: 'dashboard', label: 'Home', icon: 'library', exact: true }),
-  Object.freeze({ name: 'music-queue', label: 'Music Queue', icon: 'music' }),
+  Object.freeze({ name: 'missing', label: 'Missing Music', icon: 'missing' }),
   Object.freeze({ name: 'discover', label: 'Discover', icon: 'discover' }),
   Object.freeze({ name: 'search', label: 'Search', icon: 'search' }),
   Object.freeze({ name: 'my-requests', label: 'My Requests', icon: 'requests' }),
 ]);
 
 /**
- * Returns the operator navigation items.
+ * Returns the administrator navigation items. Downloader is present only for
+ * administrators because its server endpoint exposes household transfer work.
+ *
+ * @returns {readonly NavItem[]}
+ */
+export function buildAdminNav() {
+  return ADMIN_NAV;
+}
+
+/**
+ * Returns the operator navigation items. Operators receive Missing Music, but
+ * not the protected transfer workspace.
  *
  * @returns {readonly NavItem[]}
  */
@@ -61,19 +80,25 @@ export function buildRequesterNav() {
 }
 
 /**
- * Returns the nav items to render for the current session.  For requesters,
+ * Returns the nav items to render for the current session. For requesters,
  * a non-zero `requesterNotificationCount` is applied as a badge on the
  * "My Requests" item so the count is visible in the nav rail.
  *
  * The function never mutates its inputs.
  *
- * @param {boolean} isRequester
+ * @param {'admin'|'operator'|'requester'|boolean|null|undefined} role
  * @param {number} requesterNotificationCount
  * @returns {readonly NavItem[]}
  */
-export function buildVisibleNav(isRequester, requesterNotificationCount) {
-  const base = isRequester ? REQUESTER_NAV : OPERATOR_NAV;
-  if (!isRequester) return base;
+export function buildVisibleNav(role, requesterNotificationCount) {
+  // Preserve the prior boolean input while callers migrate to the explicit
+  // session role. This is a view convenience only, never an authorization
+  // decision.
+  const normalizedRole = role === true ? 'requester' : role;
+  if (normalizedRole === 'admin') return ADMIN_NAV;
+  if (normalizedRole !== 'requester') return OPERATOR_NAV;
+
+  const base = REQUESTER_NAV;
   const count = requesterNotificationCount ?? 0;
   if (count <= 0) return base;
   return base.map((item) => (item.name === 'my-requests' ? { ...item, badge: count } : item));

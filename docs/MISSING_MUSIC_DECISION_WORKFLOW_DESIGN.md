@@ -1,8 +1,9 @@
 # Missing Music decision workflow design
 
-**Status:** proposed — the Missing Music transfer-decision work is intentionally
-paused pending the download-confirmation decision. The independent Home
-artist-card status correction may proceed without that decision.
+**Status:** in progress — the server-authorized query and read-only Missing
+Music worklist are implemented. Cross-user inspection and transfer-changing
+commands remain deliberately paused pending their explicit confirmation
+contract.
 
 **Created:** 2026-08-26
 
@@ -172,7 +173,9 @@ silently select or download the same release for Alex.
 
 Each row shows:
 
-- release artwork, artist, title, and concise quality/track context;
+- artist, title, concise type/date context, and library coverage; the initial
+  worklist intentionally omits artwork so the scan is compact and decision
+  facts remain primary;
 - **For _username_** as the primary ownership fact;
 - **Requested by _username_** only when that differs from the target user;
 - the current state and its one explicit next action;
@@ -428,11 +431,12 @@ It should not create a large replacement singleton view.
 
 | Responsibility | Planned module | Notes |
 | --- | --- | --- |
-| State-to-action wording and routes | `src/client/lib/missing-music-decision-presentation.js` | Pure ESM; one place for labels, accessible names, scope facts, and release-safe locations. |
+| State-to-action wording and filters | `src/client/lib/missing-music-worklist-presentation.js` | Pure ESM; one place for labels, row facts, scope text, and safe next-step wording. |
 | Scope/filter policy | `src/server/missing-music/missing-music-scope-policy.js` | Pure ESM policy that derives allowed scope from the authenticated role. |
 | Admin decision query | `src/server/missing-music/*-service.js` and `*-store.js` | Server-side pagination/filtering; no browser fan-out across users. |
-| Missing-release inventory | Existing `MissingView.vue`, reduced to page composition | Retains library coverage, user filter, summary, and release cards. |
-| Actionable release list/inspector | `MissingMusicDecisionList.vue` and `MissingMusicReviewPanel.vue` | Reuses focused Music Queue composables and review pieces before any internal renaming. |
+| Missing-release inventory | Existing `MissingView.vue`, reduced to page composition | Retains library coverage and summary, then renders the dedicated worklist. |
+| Read-only decision worklist | `MissingMusicDecisionWorklist.vue` and `useMissingMusicDecisions.js` | Renders one server-authorized request, native labelled filters, and an explicit next step without client-side scope decisions. |
+| Actionable release inspector | Future `MissingMusicReviewPanel.vue` | Requires the scoped detail and mutation boundary before it may reuse any Music Queue review piece. |
 | Candidate selection mutations | Scoped Missing Music service/API boundary | Keeps actor and target distinct while retaining CSRF and idempotency behavior. |
 | Transfer operation | Existing `DownloaderView.vue` | Keeps transfer filters, controls, and admin protection. |
 | Home artist-card status | `src/client/lib/operator-artist-card-status-presentation.js` | Pure ESM; hides successful internal runs, describes only current or exceptional release-plan work. |
@@ -522,20 +526,25 @@ Before commit, prove the workflow at the boundaries that own it:
    completed-job noise, surface only active or exceptional release-plan work,
    and add focused presentation and accessibility tests. This slice is
    independent of the download-confirmation decision.
-3. Add the admin-only cross-user decision query, scope policy, audit context,
-   and disabled-user retention behavior.
-4. Mark the earlier Acquisition workspace design and outcome as superseded by
-   this document.
-5. Replace primary navigation and establish canonical, role-aware
-   compatibility routes.
-6. Add the modular Missing Music decision presentation and inspector while
-   retaining working API/mutation contracts until their scoped replacement is
-   complete.
-7. Change internal handoffs from Music Queue to Missing Music and restore
-   Downloader as the transfer destination.
-8. Add tests before removing the interim Acquisition workspace modules.
-9. Run validation, rebuild walkthrough Compose, visually inspect all three
-   responsive breakpoints, then commit and push.
+3. **Completed 2026-08-26:** Add the admin-only cross-user decision query,
+   scope policy, audit context, and disabled-user retention behavior.
+4. **Completed 2026-08-26:** Replace the duplicate primary Acquisition link
+   with role-specific Missing Music and Downloader navigation. Existing legacy
+   routes remain compatible while their canonical redirects are implemented.
+5. **Completed 2026-08-26:** Add the modular, read-only Missing Music
+   decision worklist while retaining current API/mutation contracts.
+6. Add the server-authorized decision detail and mutation boundary, including
+   audit actor/target retention and disabled-target read-only enforcement.
+7. Implement **Use this match**, followed by the explicit **Start download**
+   confirmation recommended above, then hand off accepted transfers to
+   Downloader.
+8. Change canonical internal deep links from Music Queue to Missing Music and
+   add role-aware compatibility redirects that preserve query strings and
+   hashes.
+9. Add cross-user authorization, keyboard-inspector, and full handoff browser
+   coverage before removing interim Music Queue workspace modules.
+10. Rebuild walkthrough Compose after the command slice passes, visually
+    inspect all three responsive breakpoints, then commit and push.
 
 ## Recommendation
 

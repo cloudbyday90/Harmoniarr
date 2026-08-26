@@ -27,7 +27,6 @@ const EMPTY_STATE_PATH = new URL('../../src/client/components/EmptyState.vue', i
 const ACTION_CTA_SITES = [
   '../../src/client/components/home/OperatorHomePanel.vue',
   '../../src/client/views/LibraryView.vue',
-  '../../src/client/views/MissingView.vue',
   '../../src/client/views/MyRequestsView.vue',
 ];
 

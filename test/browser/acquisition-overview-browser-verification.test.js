@@ -115,7 +115,7 @@ function buildDownloaderPayload() {
 let browserRuntime;
 let runtimeUnavailableReason = null;
 
-suite('Acquisition overview browser verification', () => {
+suite('Legacy Acquisition compatibility browser verification', () => {
   before(async () => {
     try {
       browserRuntime = await createBrowserSmokeRuntime({ config: integrationRuntimeConfig });
@@ -132,7 +132,7 @@ suite('Acquisition overview browser verification', () => {
     await browserRuntime?.cleanup();
   }, { timeout: integrationRuntimeConfig.suiteTeardownTimeoutMs });
 
-  test('shows a verified release-to-transfer handoff without exposing provider identifiers', {
+  test('keeps the legacy overview available without presenting Acquisition as a primary destination', {
     timeout: integrationRuntimeConfig.scenarioTimeoutMs,
   }, async (t) => {
     if (runtimeUnavailableReason) {
@@ -163,9 +163,10 @@ suite('Acquisition overview browser verification', () => {
 
       await page.goto(`${baseUrl}/app/acquisition`, { waitUntil: 'domcontentloaded' });
       const primaryNavigation = page.locator('.hx-sidebar');
-      await primaryNavigation.getByRole('link', { name: 'Acquisition', exact: true }).waitFor();
+      await primaryNavigation.getByRole('link', { name: 'Missing Music', exact: true }).waitFor();
+      await primaryNavigation.getByRole('link', { name: 'Downloader', exact: true }).waitFor();
+      assert.equal(await primaryNavigation.getByRole('link', { name: 'Acquisition', exact: true }).count(), 0);
       assert.equal(await primaryNavigation.getByRole('link', { name: 'Music Queue', exact: true }).count(), 0);
-      assert.equal(await primaryNavigation.getByRole('link', { name: 'Downloader', exact: true }).count(), 0);
 
       const acquisitionNavigation = page.getByRole('navigation', { name: 'Acquisition sections' });
       await acquisitionNavigation.getByRole('link', { name: 'Overview', exact: true }).waitFor();

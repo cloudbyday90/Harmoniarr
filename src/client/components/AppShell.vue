@@ -62,6 +62,7 @@ watch(resolvedTheme, (t) => {
 });
 
 const isRequester = computed(() => sessionStore.state.user?.role === 'requester');
+const userRole = computed(() => sessionStore.state.user?.role ?? 'operator');
 const userInitial = computed(() => {
   const name = sessionStore.state.user?.username ?? '?';
   return name.slice(0, 1).toUpperCase();
@@ -247,7 +248,7 @@ async function openAccount() {
   await router.push({ name: 'account-security' });
 }
 
-const visibleNav = computed(() => buildVisibleNav(isRequester.value, requesterNotificationCount.value));
+const visibleNav = computed(() => buildVisibleNav(userRole.value, requesterNotificationCount.value));
 
 const searchOpen = ref(false);
 

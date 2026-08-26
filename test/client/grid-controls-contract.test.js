@@ -23,7 +23,6 @@ import test from 'node:test';
 const GRID_CONTROLS_PATH = new URL('../../src/client/components/GridControls.vue', import.meta.url);
 const GRID_CONTROL_CONSUMER_PATHS = [
   new URL('../../src/client/views/LibraryView.vue', import.meta.url),
-  new URL('../../src/client/views/MissingView.vue', import.meta.url),
   new URL('../../src/client/views/MyRequestsView.vue', import.meta.url),
   new URL('../../src/client/components/home/RequesterHomePanel.vue', import.meta.url),
   new URL('../../src/client/components/home/OperatorHomePanel.vue', import.meta.url),

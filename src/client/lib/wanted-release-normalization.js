@@ -862,7 +862,7 @@ export function sortWantedReleases(releases, field, order) {
  * @returns {string}
  */
 export function buildMissingPageSubtitle() {
-  return 'Selected releases that are not yet fully in your library. Start a search to add one to Music Queue.';
+  return 'Review selected releases that are not yet fully in your library and see the next clear step.';
 }
 
 /**

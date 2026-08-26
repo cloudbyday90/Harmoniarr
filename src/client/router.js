@@ -65,7 +65,6 @@ const SettingsWorkspaceView = () => import('./views/SettingsWorkspaceView.vue');
 const UserDetailView = () => import('./views/UserDetailView.vue');
 
 const requesterRestrictedRouteNames = new Set([
-  'missing',
   'onboarding',
   'activity',
   'activity-feed',

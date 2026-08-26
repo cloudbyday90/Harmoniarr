@@ -31,7 +31,6 @@ import {
 } from '../../testing/browser/downloader-browser-fixtures.js';
 import { installScopedMusicQueueReadModelFixtures } from '../../testing/browser/music-queue-browser-fixtures.js';
 import { bootstrapAdminThroughUi } from '../../testing/browser/operator-browser-helpers.js';
-import { installWantedBrowserFixtures } from '../../testing/browser/wanted-browser-fixtures.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 
 const integrationRuntimeConfig = resolveIntegrationTestRuntimeConfig();
@@ -115,7 +114,7 @@ const completedDownloaderQueue = Object.freeze(buildEmptyDownloaderQueueFixture(
 let browserRuntime;
 let runtimeUnavailableReason = null;
 
-suite('Missing Music to Downloader browser acceptance', () => {
+suite('Legacy Music Queue to Downloader browser compatibility', () => {
   before(async () => {
     try {
       browserRuntime = await createBrowserSmokeRuntime({ config: integrationRuntimeConfig });
@@ -133,7 +132,7 @@ suite('Missing Music to Downloader browser acceptance', () => {
     await browserRuntime?.cleanup();
   }, { timeout: integrationRuntimeConfig.suiteTeardownTimeoutMs });
 
-  test('carries one confirmed Missing Music release through automatic download and its scoped live-transfer outcome', {
+  test('keeps a direct legacy Music Queue release link connected to its scoped live-transfer outcome', {
     timeout: integrationRuntimeConfig.scenarioTimeoutMs,
   }, async (t) => {
     if (runtimeUnavailableReason) {
@@ -143,59 +142,16 @@ suite('Missing Music to Downloader browser acceptance', () => {
 
     await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
       const pageErrors = [];
-      let searchRequest = null;
       page.on('pageerror', (error) => pageErrors.push(error.message));
 
-      await installWantedBrowserFixtures(browserContext);
       const musicQueueFixtures = await installScopedMusicQueueReadModelFixtures(browserContext, {
         release: searchingRelease,
       });
       const downloaderFixtures = await installDownloaderBrowserFixtures(browserContext, {
         queue: activeDownloaderQueue,
       });
-      await browserContext.route('**/api/v1/library/media-requests', async (route) => {
-        searchRequest = {
-          body: route.request().postDataJSON(),
-          csrfHeaderPresent: Boolean(await route.request().headerValue('x-csrf-token')),
-          method: route.request().method(),
-        };
-        await route.fulfill({
-          body: JSON.stringify({
-            mediaRequest: { id: 'request-amber-browser-acceptance' },
-            ok: true,
-          }),
-          contentType: 'application/json',
-          status: 201,
-        });
-      });
-
       await bootstrapAdminThroughUi(page, { baseUrl });
-      await page.goto(`${baseUrl}/app/missing`, { waitUntil: 'domcontentloaded' });
-
-      await page.getByRole('button', {
-        name: 'Start a search for Autechre — Amber',
-      }).click();
-      const confirmation = page.getByRole('dialog', { name: 'Search for this release?' });
-      await confirmation.getByText(
-        'Harmoniarr will add this release to Music Queue, where it will be searched using your active settings.',
-      ).waitFor();
-
-      await Promise.all([
-        page.waitForURL(new RegExp(`/app/music-queue/${wantedReleaseId}$`)),
-        confirmation.getByRole('button', { name: 'Start search' }).click(),
-      ]);
-      assert.deepEqual(searchRequest, {
-        body: {
-          artistName: 'Autechre',
-          expectedReleaseDate: null,
-          musicbrainzReleaseId: 'mb-release-amber',
-          releaseGroupId: 'mb-rg-amber',
-          releaseTitle: 'Amber',
-          requestKind: 'release',
-        },
-        csrfHeaderPresent: true,
-        method: 'POST',
-      });
+      await page.goto(`${baseUrl}/app/music-queue/${wantedReleaseId}`, { waitUntil: 'domcontentloaded' });
 
       const musicQueueUrl = new URL(page.url());
       assert.equal(musicQueueUrl.pathname, `/app/music-queue/${wantedReleaseId}`);
@@ -217,11 +173,11 @@ suite('Missing Music to Downloader browser acceptance', () => {
       await downloadProgressLink.waitFor();
       assert.equal(
         await downloadProgressLink.getAttribute('href'),
-        `/app/downloader?wantedReleaseId=${wantedReleaseId}`,
+        `/app/acquisition/downloader?wantedReleaseId=${wantedReleaseId}`,
       );
 
       await Promise.all([
-        page.waitForURL(new RegExp(`/app/downloader\\?wantedReleaseId=${wantedReleaseId}$`)),
+        page.waitForURL(new RegExp(`/app/acquisition/downloader\\?wantedReleaseId=${wantedReleaseId}$`)),
         downloadProgressLink.click(),
       ]);
       const downloaderUrl = new URL(page.url());
@@ -245,6 +201,6 @@ suite('Missing Music to Downloader browser acceptance', () => {
       await transferQueue.getByRole('link', { name: 'Open release in Music Queue' }).waitFor();
 
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
-    }, { scenarioName: 'missing_music_to_downloader_lifecycle' });
+    }, { scenarioName: 'legacy_music_queue_to_downloader_lifecycle' });
   });
 });

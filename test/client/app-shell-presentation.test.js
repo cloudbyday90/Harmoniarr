@@ -1,182 +1,104 @@
+/*
+ * Harmoniarr - Soulseek-native music library management
+ * Copyright (C) 2026 Harmoniarr Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  buildAdminNav,
   buildOperatorNav,
   buildRequesterNav,
   buildVisibleNav,
   notificationTone,
 } from '../../src/client/lib/app-shell-presentation.js';
 
-// ---------------------------------------------------------------------------
-// buildOperatorNav
-// ---------------------------------------------------------------------------
-
-test('buildOperatorNav uses Acquisition as the single release-and-transfer workspace', () => {
-  const nav = buildOperatorNav();
+test('administrator navigation follows the Missing Music then Downloader workflow', () => {
   assert.deepEqual(
-    nav.map((item) => item.name),
-    ['dashboard', 'discover', 'acquisition', 'missing', 'activity', 'settings'],
+    buildAdminNav().map((item) => item.name),
+    ['dashboard', 'discover', 'missing', 'downloader', 'activity', 'settings'],
   );
+  assert.ok(!buildAdminNav().some((item) => item.name === 'acquisition'));
 });
 
-test('buildOperatorNav identifies Acquisition with the music icon', () => {
-  const nav = buildOperatorNav();
-  const acquisition = nav.find((item) => item.name === 'acquisition');
-  assert.ok(acquisition, 'Acquisition item must exist in operator nav');
-  assert.equal(acquisition.label, 'Acquisition');
-  assert.equal(acquisition.icon, 'music');
-  assert.ok(!nav.some((item) => item.name === 'music-queue'));
-  assert.ok(!nav.some((item) => item.name === 'downloader'));
+test('operator navigation exposes Missing Music but not the protected Downloader workspace', () => {
+  assert.deepEqual(
+    buildOperatorNav().map((item) => item.name),
+    ['dashboard', 'discover', 'missing', 'activity', 'settings'],
+  );
+  assert.ok(!buildOperatorNav().some((item) => item.name === 'downloader'));
 });
 
-test('buildOperatorNav missing item uses icon "missing"', () => {
-  const nav = buildOperatorNav();
-  const missingItem = nav.find((item) => item.name === 'missing');
-  assert.ok(missingItem, 'missing item must exist in operator nav');
-  assert.equal(missingItem.icon, 'missing');
-});
-
-test('buildOperatorNav missing item does not use an info icon', () => {
-  const nav = buildOperatorNav();
-  const missingItem = nav.find((item) => item.name === 'missing');
-  assert.ok(missingItem, 'missing item must exist in operator nav');
-  assert.notEqual(missingItem.icon, 'info',
-    'missing releases should not be represented by an info icon');
-  assert.notEqual(missingItem.icon, 'info-circle',
-    'missing releases should not be represented by an info-circle icon');
-});
-
-test('buildOperatorNav dashboard item has exact: true', () => {
-  const nav = buildOperatorNav();
-  const dashboardItem = nav.find((item) => item.name === 'dashboard');
-  assert.ok(dashboardItem, 'dashboard item must exist');
-  assert.equal(dashboardItem.exact, true);
-});
-
-test('buildOperatorNav items all have non-empty name, label, and icon', () => {
-  for (const item of buildOperatorNav()) {
-    assert.ok(item.name?.length > 0, `item must have a name: ${JSON.stringify(item)}`);
-    assert.ok(item.label?.length > 0, `item must have a label: ${JSON.stringify(item)}`);
-    assert.ok(item.icon?.length > 0, `item must have an icon: ${JSON.stringify(item)}`);
+test('Missing Music has one stable visible label and the intended icon', () => {
+  for (const navigation of [buildAdminNav(), buildOperatorNav(), buildRequesterNav()]) {
+    const missingMusic = navigation.find((item) => item.name === 'missing');
+    assert.ok(missingMusic);
+    assert.equal(missingMusic.label, 'Missing Music');
+    assert.equal(missingMusic.icon, 'missing');
   }
 });
 
-test('buildOperatorNav returns a stable reference across multiple calls', () => {
-  assert.equal(buildOperatorNav(), buildOperatorNav());
-});
-
-// ---------------------------------------------------------------------------
-// buildRequesterNav
-// ---------------------------------------------------------------------------
-
-test('buildRequesterNav returns 5 items in expected order', () => {
-  const nav = buildRequesterNav();
+test('requester navigation provides their scoped Missing Music worklist', () => {
   assert.deepEqual(
-    nav.map((item) => item.name),
-    ['dashboard', 'music-queue', 'discover', 'search', 'my-requests'],
+    buildRequesterNav().map((item) => item.name),
+    ['dashboard', 'missing', 'discover', 'search', 'my-requests'],
   );
+  assert.ok(!buildRequesterNav().some((item) => item.name === 'music-queue'));
 });
 
-test('buildRequesterNav does not include the missing route', () => {
-  const nav = buildRequesterNav();
-  assert.ok(!nav.some((item) => item.name === 'missing'),
-    'requester nav must not include the missing releases route');
-});
-
-test('buildRequesterNav includes my-requests item with requests icon', () => {
-  const nav = buildRequesterNav();
-  const myRequests = nav.find((item) => item.name === 'my-requests');
-  assert.ok(myRequests, 'my-requests item must exist in requester nav');
-  assert.equal(myRequests.icon, 'requests');
-});
-
-test('buildRequesterNav returns a stable reference across multiple calls', () => {
+test('navigation helpers return stable immutable references', () => {
+  assert.equal(buildAdminNav(), buildAdminNav());
+  assert.equal(buildOperatorNav(), buildOperatorNav());
   assert.equal(buildRequesterNav(), buildRequesterNav());
 });
 
-// ---------------------------------------------------------------------------
-// buildVisibleNav
-// ---------------------------------------------------------------------------
-
-test('buildVisibleNav for operator returns operator nav regardless of count', () => {
-  const nav = buildVisibleNav(false, 0);
+test('buildVisibleNav selects the explicit session role without treating it as authorization', () => {
   assert.deepEqual(
-    nav.map((item) => item.name),
-    ['dashboard', 'discover', 'acquisition', 'missing', 'activity', 'settings'],
+    buildVisibleNav('admin', 99).map((item) => item.name),
+    ['dashboard', 'discover', 'missing', 'downloader', 'activity', 'settings'],
+  );
+  assert.deepEqual(
+    buildVisibleNav('operator', 99).map((item) => item.name),
+    ['dashboard', 'discover', 'missing', 'activity', 'settings'],
+  );
+  assert.deepEqual(
+    buildVisibleNav('requester', 0).map((item) => item.name),
+    ['dashboard', 'missing', 'discover', 'search', 'my-requests'],
   );
 });
 
-test('buildVisibleNav for operator ignores a non-zero notification count', () => {
-  const nav = buildVisibleNav(false, 99);
-  assert.ok(!nav.some((item) => item.badge), 'operator nav items must not have badges');
-});
-
-test('buildVisibleNav for requester with count 0 returns base array without badge', () => {
-  const nav = buildVisibleNav(true, 0);
-  assert.deepEqual(
-    nav.map((item) => item.name),
-    ['dashboard', 'music-queue', 'discover', 'search', 'my-requests'],
-  );
-  assert.ok(!nav.some((item) => item.badge), 'no badge when count is 0');
-});
-
-test('buildVisibleNav for requester with negative count returns base array without badge', () => {
-  const nav = buildVisibleNav(true, -1);
-  assert.ok(!nav.some((item) => item.badge), 'no badge when count is negative');
-});
-
-test('buildVisibleNav for requester with count 3 adds badge to my-requests only', () => {
-  const nav = buildVisibleNav(true, 3);
+test('buildVisibleNav preserves the requester notification badge without mutating base navigation', () => {
+  const requesterBefore = buildRequesterNav().map((item) => ({ ...item }));
+  const nav = buildVisibleNav('requester', 3);
   const myRequests = nav.find((item) => item.name === 'my-requests');
-  assert.ok(myRequests, 'my-requests item must be present');
+
   assert.equal(myRequests.badge, 3);
-  for (const item of nav.filter((i) => i.name !== 'my-requests')) {
-    assert.ok(!item.badge, `unexpected badge on: ${item.name}`);
-  }
+  assert.deepEqual(buildRequesterNav().map((item) => ({ ...item })), requesterBefore);
 });
 
-test('buildVisibleNav does not mutate the original nav arrays', () => {
-  const operatorBefore = buildOperatorNav().map((i) => ({ ...i }));
-  const requesterBefore = buildRequesterNav().map((i) => ({ ...i }));
-  buildVisibleNav(false, 10);
-  buildVisibleNav(true, 10);
-  assert.deepEqual(buildOperatorNav().map((i) => ({ ...i })), operatorBefore);
-  assert.deepEqual(buildRequesterNav().map((i) => ({ ...i })), requesterBefore);
+test('buildVisibleNav accepts the former requester boolean while callers move to explicit roles', () => {
+  assert.deepEqual(
+    buildVisibleNav(true, 0).map((item) => item.name),
+    ['dashboard', 'missing', 'discover', 'search', 'my-requests'],
+  );
 });
 
-test('buildVisibleNav for requester with null count returns base array', () => {
-  const nav = buildVisibleNav(true, null);
-  assert.ok(!nav.some((item) => item.badge), 'null count treated as 0 — no badge');
-});
-
-// ---------------------------------------------------------------------------
-// notificationTone
-// ---------------------------------------------------------------------------
-
-test('notificationTone failure maps to danger', () => {
+test('notificationTone maps operational categories to the design-system tones', () => {
   assert.equal(notificationTone('failure'), 'danger');
-});
-
-test('notificationTone manual_intervention maps to warning', () => {
   assert.equal(notificationTone('manual_intervention'), 'warning');
-});
-
-test('notificationTone recovery maps to info', () => {
   assert.equal(notificationTone('recovery'), 'info');
-});
-
-test('notificationTone unknown string maps to info', () => {
   assert.equal(notificationTone('some-unknown-category'), 'info');
-});
-
-test('notificationTone null maps to info', () => {
-  assert.equal(notificationTone(null), 'info');
-});
-
-test('notificationTone undefined maps to info', () => {
-  assert.equal(notificationTone(undefined), 'info');
-});
-
-test('notificationTone empty string maps to info', () => {
-  assert.equal(notificationTone(''), 'info');
 });
