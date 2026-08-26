@@ -31,6 +31,7 @@ import {
   createManagedSlskdSmokeSecrets,
   managedSlskdSmokeValidationKind,
 } from './managed-slskd-smoke-contract.js';
+import { createRedactedDockerValidationError } from './docker-validation-redaction.js';
 import { runBufferedCommand } from './process-runtime.js';
 
 const rootDir = fileURLToPath(new URL('..', import.meta.url));
@@ -74,16 +75,6 @@ function parsePortBindings(output) {
   } catch {
     throw new Error('Managed slskd smoke could not parse provider port bindings');
   }
-}
-
-function redactValues(text, values) {
-  return values.reduce((result, value) => {
-    if (typeof value !== 'string' || value.length === 0) {
-      return result;
-    }
-
-    return result.replaceAll(value, '[redacted]');
-  }, text);
 }
 
 async function getAvailablePort() {
@@ -399,15 +390,17 @@ export async function validateManagedSlskdSmoke({
       // Preserve the original failure when logs are unavailable.
     }
 
-    if (logs) {
-      const redactedLogs = redactValues(logs, Object.values(secrets));
-      throw new Error(
-        `${error instanceof Error ? error.message : String(error)}\nManaged provider logs (redacted):\n${redactedLogs}`,
-        { cause: error },
-      );
-    }
-
-    throw error;
+    throw createRedactedDockerValidationError({
+      error,
+      logLabel: 'Managed provider logs',
+      logs,
+      sensitivePaths: [workspaceRoot, ...Object.values(directories)],
+      sensitiveValues: [
+        ...Object.values(secrets),
+        vapidKeys.privateKey,
+        vapidKeys.publicKey,
+      ],
+    });
   } finally {
     try {
       await stopComposeProject({ composeArgs, env, runCommandFn });

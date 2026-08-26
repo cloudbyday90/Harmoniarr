@@ -8,7 +8,7 @@
  * (at your option) any later version.
  */
 
-import { copyFile, mkdir } from 'node:fs/promises';
+import { copyFile, mkdir, readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { basename, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -20,7 +20,10 @@ import {
   findControlledProviderFixtureBySearchText,
 } from './controlled-provider-fixture-catalog.mjs';
 
-const apiKey = process.env.CONTROLLED_PROVIDER_API_KEY ?? '';
+const apiKey = (await readFile(
+  process.env.CONTROLLED_PROVIDER_API_KEY_FILE ?? '/run/secrets/controlled_provider_api_key',
+  'utf8',
+)).trim();
 const downloadsRoot = process.env.CONTROLLED_PROVIDER_DOWNLOADS_ROOT ?? '/data/downloads';
 const port = Number.parseInt(process.env.PORT ?? '5030', 10);
 const searches = new Map();

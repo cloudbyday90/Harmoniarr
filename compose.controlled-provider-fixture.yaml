@@ -1,8 +1,10 @@
 services:
   harmoniarr:
     environment:
-      CONTROLLED_PROVIDER_API_KEY: ${CONTROLLED_PROVIDER_API_KEY:?Set CONTROLLED_PROVIDER_API_KEY for the controlled provider test}
       HARMONIARR_TEST_DISABLE_BACKGROUND_SERVICES: 'true'
+    secrets:
+      - source: controlled_provider_api_key
+        target: controlled_provider_api_key
     volumes:
       - "./testing/docker/controlled-provider-fixture-catalog.mjs:/validation/controlled-provider-fixture-catalog.mjs:ro"
       - "./testing/docker/controlled-provider-music-queue-linkage-verifier.mjs:/validation/controlled-provider-music-queue-linkage-verifier.mjs:ro"
@@ -14,9 +16,12 @@ services:
     user: "${PUID:-1000}:${PGID:-1000}"
     read_only: true
     environment:
-      CONTROLLED_PROVIDER_API_KEY: ${CONTROLLED_PROVIDER_API_KEY:?Set CONTROLLED_PROVIDER_API_KEY for the controlled provider test}
       CONTROLLED_PROVIDER_DOWNLOADS_ROOT: /data/downloads
+      CONTROLLED_PROVIDER_API_KEY_FILE: /run/secrets/controlled_provider_api_key
       PORT: 5030
+    secrets:
+      - source: controlled_provider_api_key
+        target: controlled_provider_api_key
     volumes:
       - "${HARMONIARR_DOWNLOADS:-/srv/slskd/downloads}:/data/downloads"
       - "./testing/docker/controlled-provider-fixture-catalog.mjs:/fixture/controlled-provider-fixture-catalog.mjs:ro"
@@ -34,3 +39,7 @@ services:
       - ALL
     tmpfs:
       - /tmp:size=32m,mode=1777
+
+secrets:
+  controlled_provider_api_key:
+    file: ${HARMONIARR_CONTROLLED_PROVIDER_SECRET_FILE:?Set HARMONIARR_CONTROLLED_PROVIDER_SECRET_FILE for the controlled provider test}

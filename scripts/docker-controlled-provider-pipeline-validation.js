@@ -17,6 +17,9 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { generateVapidKeyPair } from '../src/server/push/vapid-keys.js';
+import { assertControlledProviderPipelineEvidence } from './controlled-provider-pipeline-evidence.js';
+import { writeControlledProviderApiKeySecret } from './controlled-provider-validation-secret.js';
+import { createRedactedDockerValidationError } from './docker-validation-redaction.js';
 import { runBufferedCommand } from './process-runtime.js';
 
 const rootDir = fileURLToPath(new URL('..', import.meta.url));
@@ -48,7 +51,7 @@ async function getAvailablePort() {
 }
 
 async function createWorkspace(baseDir) {
-  const directories = Object.fromEntries(['appData', 'downloads', 'music', 'staging', 'transcodeTemp'].map((name) => [name, resolve(baseDir, name)]));
+  const directories = Object.fromEntries(['appData', 'downloads', 'music', 'secrets', 'staging', 'transcodeTemp'].map((name) => [name, resolve(baseDir, name)]));
   await Promise.all(Object.values(directories).map((directory) => mkdir(directory, { mode: 0o700, recursive: true })));
   return directories;
 }
@@ -71,13 +74,19 @@ async function collectComposeLogs({ composeArgs, env }) {
   }
 }
 
-function buildEnvironment({ appPort, directories, imageRef, processEnv, providerApiKey, vapidKeys }) {
+function buildEnvironment({
+  appPort,
+  directories,
+  imageRef,
+  processEnv,
+  providerApiKeySecretPath,
+  vapidKeys,
+}) {
   const environment = { ...processEnv };
   delete environment.HARMONIARR_IMAGE;
   return {
     ...environment,
     APP_PORT: '3000',
-    CONTROLLED_PROVIDER_API_KEY: providerApiKey,
     HARMONIARR_APPDATA: directories.appData,
     HARMONIARR_CONTACT_EMAIL: 'controlled-provider-validation@harmoniarr.local',
     HARMONIARR_CONTACT_URL: 'https://harmoniarr.local/controlled-provider-validation',
@@ -85,6 +94,7 @@ function buildEnvironment({ appPort, directories, imageRef, processEnv, provider
     HARMONIARR_IMAGE: imageRef,
     HARMONIARR_MUSIC: directories.music,
     HARMONIARR_PORT: String(appPort),
+    HARMONIARR_CONTROLLED_PROVIDER_SECRET_FILE: providerApiKeySecretPath,
     HARMONIARR_STAGING: directories.staging,
     HARMONIARR_TRANSCODE_TEMP: directories.transcodeTemp,
     PGID: '1000',
@@ -140,99 +150,7 @@ async function copyAndRunVerifier({ composeArgs, env }) {
   });
   const payload = result.stdout.trim().split(/\r?\n/u).filter(Boolean).at(-1);
   if (!payload) throw new Error('Controlled-provider verifier did not produce a result');
-  const parsed = JSON.parse(payload);
-  const recoveryVerified = parsed?.recovery?.primaryFinalStatus === 'failed'
-    && typeof parsed?.recovery?.fallbackApplyRunId === 'string'
-    && parsed.recovery.fallbackApplyRunId.length > 0;
-  const sourceDisappearanceRecoveryVerified = parsed?.sourceDisappearanceRecovery?.primaryFinalStatus === 'failed'
-    && typeof parsed?.sourceDisappearanceRecovery?.fallbackApplyRunId === 'string'
-    && parsed.sourceDisappearanceRecovery.fallbackApplyRunId.length > 0
-    && parsed.sourceDisappearanceRecovery.terminalOutcome === 'source_disappeared';
-  const qualityRecoveryVerified = parsed?.qualityRecovery?.primaryFinalStatus === 'failed'
-    && parsed?.qualityRecovery?.primaryAudioCodec === 'flac'
-    && parsed?.qualityRecovery?.primaryFilename?.endsWith('.flac')
-    && typeof parsed?.qualityRecovery?.fallbackApplyRunId === 'string'
-    && parsed.qualityRecovery.fallbackApplyRunId.length > 0
-    && parsed.qualityRecovery.fallbackFinalStatus === 'applied';
-  const qualityExhaustionVerified = parsed?.qualityExhaustion?.primaryFinalStatus === 'failed'
-    && parsed?.qualityExhaustion?.primaryAudioCodec === 'flac'
-    && parsed?.qualityExhaustion?.primaryFilename?.endsWith('.flac')
-    && parsed.qualityExhaustion.qualityRecoveryExhaustedCount === 1
-    && parsed.qualityExhaustion.followUpRunId === null
-    && parsed.qualityExhaustion.libraryFileCountBefore === parsed.qualityExhaustion.libraryFileCountAfter
-    && parsed.qualityExhaustion.musicQueueStatus === 'needs_help_adding'
-    && parsed.qualityExhaustion.musicQueueNextAction === 'review_add_plan'
-    && parsed.qualityExhaustion.activityEntityId === parsed.qualityExhaustion.wantedReleaseId
-    && parsed.qualityExhaustion.activityBlockerCode === 'media_verification';
-  const sharedDiscoveryVerified = parsed?.sharedDiscovery?.providerSearchCount === 1
-    && parsed?.sharedDiscovery?.providerTransferCount === 1
-    && parsed.sharedDiscovery.operatorCount === 2
-    && parsed.sharedDiscovery.musicQueueOutcomeCount === 2
-    && parsed.sharedDiscovery.crossOperatorReadDenied === true
-    && parsed.sharedDiscovery.candidatePolicyRedacted === true
-    && parsed.sharedDiscovery.activityPolicyRedacted === true;
-  const sharedRecoveryVerified = parsed?.sharedRecovery?.providerSearchCount === 1
-    && parsed?.sharedRecovery?.providerTransferCount === 2
-    && parsed.sharedRecovery.operatorCount === 2
-    && parsed.sharedRecovery.recoveryChainCount === 1
-    && parsed.sharedRecovery.recoveryActivityCount === 2
-    && parsed.sharedRecovery.fallbackActivityCount === 2
-    && parsed.sharedRecovery.musicQueueTryingNextOutcomeCount === 2
-    && parsed.sharedRecovery.musicQueueDownloadingOutcomeCount === 2
-    && parsed.sharedRecovery.primaryFinalStatus === 'failed'
-    && parsed.sharedRecovery.fallbackCandidateStatus === 'downloading'
-    && typeof parsed.sharedRecovery.fallbackRunId === 'string'
-    && parsed.sharedRecovery.fallbackRunId.length > 0
-    && parsed.sharedRecovery.crossOperatorReadDenied === true
-    && parsed.sharedRecovery.candidatePolicyRedacted === true
-    && parsed.sharedRecovery.activityPolicyRedacted === true
-    && parsed.sharedRecovery.downloaderMusicQueueLinkage?.operatorCount === 2
-    && parsed.sharedRecovery.downloaderMusicQueueLinkage.linkedTransferCount === 2
-    && parsed.sharedRecovery.downloaderMusicQueueLinkage.siblingReleaseRedacted === true
-    && parsed.sharedRecovery.downloaderMusicQueueLinkage.operatorIdentityRedacted === true
-    && parsed.sharedRecovery.downloaderMusicQueueLinkage.privatePolicyRedacted === true;
-  const sharedBoundedStopVerified = parsed?.sharedBoundedStop?.providerSearchCount === 1
-    && parsed?.sharedBoundedStop?.providerTransferCount === 1
-    && parsed.sharedBoundedStop.operatorCount === 2
-    && parsed.sharedBoundedStop.musicQueueNoMatchesOutcomeCount === 2
-    && parsed.sharedBoundedStop.activityCount === 2
-    && parsed.sharedBoundedStop.primaryFinalStatus === 'failed'
-    && parsed.sharedBoundedStop.requestStatus === 'blocked'
-    && parsed.sharedBoundedStop.requestBlockedReason === 'download_recovery_exhausted'
-    && Array.isArray(parsed.sharedBoundedStop.repeatDispatchCandidateCounts)
-    && parsed.sharedBoundedStop.repeatDispatchCandidateCounts.every((count) => count === 0)
-    && parsed.sharedBoundedStop.crossOperatorReadDenied === true
-    && parsed.sharedBoundedStop.candidatePolicyRedacted === true
-    && parsed.sharedBoundedStop.activityPolicyRedacted === true;
-  const sharedManualRestartVerified = parsed?.sharedManualRestart?.providerSearchCount === 1
-    && parsed?.sharedManualRestart?.providerTransferCount === 1
-    && parsed.sharedManualRestart.operatorCount === 2
-    && parsed.sharedManualRestart.musicQueueReadyToAddOutcomeCount === 2
-    && parsed.sharedManualRestart.activityCount === 1
-    && parsed.sharedManualRestart.restartAlreadyQueuedCount === 1
-    && typeof parsed.sharedManualRestart.restartRunId === 'string'
-    && parsed.sharedManualRestart.restartRunId.length > 0
-    && parsed.sharedManualRestart.requestStatus === 'cooldown'
-    && parsed.sharedManualRestart.requestBlockedReason === 'automatic_cooldown'
-    && parsed.sharedManualRestart.researchAttemptCount === 0
-    && parsed.sharedManualRestart.searchAttemptCount === 0
-    && parsed.sharedManualRestart.crossOperatorReadDenied === true
-    && parsed.sharedManualRestart.candidatePolicyRedacted === true
-    && parsed.sharedManualRestart.activityPolicyRedacted === true;
-  if (parsed?.pipeline?.finalStatus !== 'applied'
-    || parsed.catalogFixtures !== 17
-    || parsed.catalogCandidates !== 20
-    || !recoveryVerified
-    || !sourceDisappearanceRecoveryVerified
-    || !qualityRecoveryVerified
-    || !qualityExhaustionVerified
-    || !sharedDiscoveryVerified
-    || !sharedRecoveryVerified
-    || !sharedBoundedStopVerified
-    || !sharedManualRestartVerified) {
-    throw new Error(`Controlled-provider verifier returned incomplete evidence: ${JSON.stringify(parsed)}`);
-  }
-  return parsed;
+  return assertControlledProviderPipelineEvidence(JSON.parse(payload));
 }
 
 export async function runDockerControlledProviderPipelineValidation({
@@ -244,38 +162,93 @@ export async function runDockerControlledProviderPipelineValidation({
   startupTimeoutSeconds = defaultStartupTimeoutSeconds,
 } = {}) {
   const workspaceRoot = await mkdtemp(resolve(tmpdir(), 'harmoniarr-controlled-provider-validation-'));
-  const directories = await createWorkspace(workspaceRoot);
-  const appPort = await getAvailablePort();
-  const vapidKeys = generateVapidKeyPair();
-  const providerApiKey = randomBytes(32).toString('base64url');
-  const effectiveImageRef = imageRef ?? `harmoniarr:controlled-provider-${projectName}`;
-  const env = buildEnvironment({ appPort, directories, imageRef: effectiveImageRef, processEnv, providerApiKey, vapidKeys });
   const composeArgs = ['compose', '-f', composeFilePath, '-f', overlayFilePath, '-p', projectName];
+  let directories = null;
+  let env = null;
+  let providerApiKey = null;
+  let providerApiKeySecretPath = null;
+  let vapidKeys = null;
+  let result = null;
+  let validationError = null;
+
+  const getSensitivePaths = () => [
+    workspaceRoot,
+    providerApiKeySecretPath,
+    ...Object.values(directories ?? {}),
+  ];
+  const getSensitiveValues = () => [
+    providerApiKey,
+    vapidKeys?.privateKey,
+    vapidKeys?.publicKey,
+  ];
 
   try {
+    directories = await createWorkspace(workspaceRoot);
+    const appPort = await getAvailablePort();
+    vapidKeys = generateVapidKeyPair();
+    providerApiKey = randomBytes(32).toString('base64url');
+    providerApiKeySecretPath = await writeControlledProviderApiKeySecret({
+      apiKey: providerApiKey,
+      secretDirectory: directories.secrets,
+    });
+    const effectiveImageRef = imageRef ?? `harmoniarr:controlled-provider-${projectName}`;
+    env = buildEnvironment({
+      appPort,
+      directories,
+      imageRef: effectiveImageRef,
+      processEnv,
+      providerApiKeySecretPath,
+      vapidKeys,
+    });
     if (buildImage) {
       await runCompose({ args: ['build', ...(noCache ? ['--no-cache'] : []), 'harmoniarr'], composeArgs, env, timeoutMs: 300_000 });
     }
     await runCompose({ args: ['up', buildImage ? '--no-build' : '--no-build', '--detach', '--wait', '--wait-timeout', String(startupTimeoutSeconds)], composeArgs, env, timeoutMs: (startupTimeoutSeconds + 30) * 1000 });
     await waitForHealth({ port: appPort, timeoutMs: startupTimeoutSeconds * 1000 });
     await generateFixtureAudio({ composeArgs, env });
-    try {
-      const result = await copyAndRunVerifier({ composeArgs, env });
-      return { ...result, projectName };
-    } catch (error) {
-      const logs = await collectComposeLogs({ composeArgs, env });
-      if (logs) {
-        error.message = `${error.message}\n\nCompose logs:\n${logs}`;
-      }
-      throw error;
-    }
-  } finally {
+    result = await copyAndRunVerifier({ composeArgs, env });
+  } catch (error) {
+    validationError = error;
+  }
+
+  const logs = validationError && env
+    ? await collectComposeLogs({ composeArgs, env })
+    : null;
+  let cleanupError = null;
+
+  if (env) {
     try {
       await runCompose({ args: ['down', '--volumes', '--remove-orphans'], composeArgs, env, timeoutMs: 60_000 });
-    } finally {
-      await rm(workspaceRoot, { force: true, recursive: true });
+    } catch (error) {
+      cleanupError = error;
     }
   }
+
+  try {
+    await rm(workspaceRoot, { force: true, recursive: true });
+  } catch (error) {
+    cleanupError ??= error;
+  }
+
+  if (validationError) {
+    throw createRedactedDockerValidationError({
+      error: validationError,
+      logLabel: 'Controlled-provider Compose logs',
+      logs,
+      sensitivePaths: getSensitivePaths(),
+      sensitiveValues: getSensitiveValues(),
+    });
+  }
+
+  if (cleanupError) {
+    throw createRedactedDockerValidationError({
+      error: cleanupError,
+      sensitivePaths: getSensitivePaths(),
+      sensitiveValues: getSensitiveValues(),
+    });
+  }
+
+  return { ...result, projectName };
 }
 
 export function resolveDockerControlledProviderPipelineValidationInputs({ args = process.argv.slice(2), env = process.env } = {}) {

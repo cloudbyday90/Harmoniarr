@@ -10,7 +10,7 @@
 
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { readdir, rm, stat } from 'node:fs/promises';
+import { readFile, readdir, rm, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
@@ -31,7 +31,7 @@ import { persistSettings } from '/app/server-dist/settings.js';
 const downloadsRoot = '/data/downloads';
 const musicRoot = '/data/music';
 const stagingRoot = '/data/staging';
-const providerApiKey = process.env.CONTROLLED_PROVIDER_API_KEY;
+const providerApiKey = (await readFile('/run/secrets/controlled_provider_api_key', 'utf8')).trim();
 const controlledProviderFixtureBaseUrl = 'http://controlled-provider:5030';
 const activityEvidenceTimeoutMs = 20_000;
 
