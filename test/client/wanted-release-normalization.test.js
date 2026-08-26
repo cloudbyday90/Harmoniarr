@@ -150,6 +150,13 @@ test('normalizeWantedReleaseForCard preserves manual-selection state needed by M
   assert.equal(result.selectionState, 'selected');
 });
 
+test('normalizeWantedReleaseForCard preserves the durable wanted-release identity for Music Queue navigation', () => {
+  const result = normalizeWantedReleaseForCard({ id: 'wanted-amber' });
+
+  assert.equal(result.id, null);
+  assert.equal(result.wantedReleaseId, 'wanted-amber');
+});
+
 test('normalizeWantedReleaseForCard forwards metadataReleaseId for recovery actions', () => {
   const result = normalizeWantedReleaseForCard({ metadataReleaseId: 'local-release-uuid' });
   assert.equal(result.metadataReleaseId, 'local-release-uuid');

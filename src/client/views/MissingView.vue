@@ -18,11 +18,12 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue';
+import { useRouter } from 'vue-router';
 import ConfirmRequestModal from '../components/media/ConfirmRequestModal.vue';
 import EmptyState from '../components/EmptyState.vue';
 import GridControls from '../components/GridControls.vue';
+import MissingReleaseDecisionActions from '../components/media/MissingReleaseDecisionActions.vue';
 import ReleaseCard from '../components/media/ReleaseCard.vue';
-import RequestButton from '../components/media/RequestButton.vue';
 import { useArtworkGridRoving } from '../composables/useArtworkGridRoving.js';
 import { useGridState } from '../composables/useGridState.js';
 import { useDownloadRecoveryRetry } from '../composables/useDownloadRecoveryRetry.js';
@@ -31,8 +32,8 @@ import { useLibraryWantedReleases } from '../composables/useLibraryWantedRelease
 import { useLibraryReconciliationSummary } from '../composables/useLibraryReconciliationSummary.js';
 import { getManualSelectionLabel, useManualReleaseInclusion } from '../composables/useManualReleaseInclusion.js';
 import { useReleaseRequest } from '../composables/useReleaseRequest.js';
-import { useRequestUsers } from '../composables/useRequestUsers.js';
 import { getErrorMessage } from '../lib/error-utils.js';
+import { buildMissingReleaseMusicQueueRoute } from '../lib/missing-release-decision-presentation.js';
 import {
   buildDownloadRecoveryNotice,
   buildMissingPageSubtitle,
@@ -40,15 +41,11 @@ import {
   buildWantedReleasesCardSubtitle,
   formatLastReconciledAt,
   formatMissingSummaryStatus,
-  formatWantedTrackCounts,
   getMissingSummaryTone,
-  getWantedStatusLabel,
-  getWantedStatusTone,
   normalizeWantedReleaseForCard,
   shouldShowMissingSummaryPill,
   sortWantedReleases,
 } from '../lib/wanted-release-normalization.js';
-import { sessionStore } from '../state/session.js';
 
 const wanted = useLibraryWantedSummary({ pollIntervalMs: 30000, revalidateOnFocus: true });
 const releases = useLibraryWantedReleases({ pollIntervalMs: 30000, revalidateOnFocus: true });
@@ -61,9 +58,7 @@ const {
 } = useReleaseRequest();
 const recoveryRetry = useDownloadRecoveryRetry();
 const manualInclusion = useManualReleaseInclusion();
-
-const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
-const { users: requestForUsers, loadUsers: loadRequestForUsers } = useRequestUsers();
+const router = useRouter();
 
 // ── Sort / filter definitions ─────────────────────────────────────────────────
 
@@ -131,7 +126,6 @@ function openConfirmModal(release) {
   confirmRelease.value = release;
   confirmError.value = null;
   confirmModalOpen.value = true;
-  if (isAdmin.value) void loadRequestForUsers();
 }
 
 function closeConfirmModal() {
@@ -150,13 +144,18 @@ const confirmIsRequested = computed(() =>
   confirmRelease.value ? isRequested(confirmRelease.value) : false,
 );
 
-async function handleConfirmRequest({ requestedForUserId = null } = {}) {
+async function handleConfirmRequest() {
   if (!confirmRelease.value) return;
+  const release = confirmRelease.value;
   confirmError.value = null;
-  const result = await requestRelease(confirmRelease.value, { requestedForUserId });
+  const result = await requestRelease(release);
   if (result.ok) {
     confirmModalOpen.value = false;
     confirmRelease.value = null;
+    const location = buildMissingReleaseMusicQueueRoute(release);
+    if (location) {
+      await router.push(location);
+    }
   } else if (!result.skipped) {
     confirmError.value = getErrorMessage(result.error, 'Request failed. Please try again.');
   }
@@ -235,6 +234,13 @@ async function retryDownloadRecovery(release) {
   const result = await recoveryRetry.retryDownloadRecovery(release);
   if (result.ok) {
     refreshAll();
+  }
+}
+
+function openMusicQueue(release) {
+  const location = buildMissingReleaseMusicQueueRoute(release);
+  if (location) {
+    void router.push(location);
   }
 }
 
@@ -362,80 +368,25 @@ onBeforeUnmount(() => {
           <li v-for="(release, index) in normalizedReleases" :key="filteredReleases[index]?.id ?? index">
           <ReleaseCard
             :release="release"
-            :requested="isRequested(release)"
-            :requesting="isRequesting(release)"
-            @request="openConfirmModal(release)"
+            detail-action-label="Open Music Queue"
+            @detail="openMusicQueue(release)"
           >
             <template #actions>
-              <div class="hx-wanted-card-actions">
-                <div class="hx-wanted-card-meta">
-                  <span
-                    class="hx-pill"
-                    :data-tone="getWantedStatusTone(release.wantedStatus)"
-                  >
-                    {{ getWantedStatusLabel(release.wantedStatus) }}
-                  </span>
-                  <span
-                    v-if="formatWantedTrackCounts(release)"
-                    class="hx-text-muted"
-                  >
-                    {{ formatWantedTrackCounts(release) }}
-                  </span>
-                </div>
-                <div
-                  v-if="release.downloadRecoveryNotice"
-                  class="hx-wanted-recovery-notice"
-                  role="status"
-                >
-                  <p class="hx-wanted-recovery-title">{{ release.downloadRecoveryNotice.title }}</p>
-                  <p>{{ release.downloadRecoveryNotice.message }}</p>
-                  <dl>
-                    <template v-for="detail in release.downloadRecoveryNotice.details" :key="detail.label">
-                      <dt>{{ detail.label }}</dt>
-                      <dd>{{ detail.value }}</dd>
-                    </template>
-                  </dl>
-                  <button
-                    type="button"
-                    class="hx-btn"
-                    data-variant="primary"
-                    :disabled="recoveryRetry.isRetrying(release)"
-                    :aria-label="`Search again for ${release.title ?? 'this release'}`"
-                    @click="retryDownloadRecovery(release)"
-                  >
-                    {{ recoveryRetry.isRetrying(release) ? 'Starting search…' : 'Search again' }}
-                  </button>
-                </div>
-                <RequestButton
-                  :requested="isRequested(release)"
-                  :loading="isRequesting(release)"
-                  idle-label="Start search"
-                  loading-label="Starting search…"
-                  requested-label="Search started"
-                  :aria-label="isRequested(release)
-                    ? `${release.title ?? 'Release'} — search started`
-                    : `Start a search for ${release.title ?? 'this release'}`"
-                  @request="openConfirmModal(release)"
-                />
-                <span
-                  v-if="manualInclusion.isManualSelection(release)"
-                  class="hx-pill"
-                  data-tone="info"
-                >
-                  {{ getManualSelectionLabel(release) }}
-                </span>
-                <button
-                  v-else-if="manualInclusion.canIncludeManually(release)"
-                  type="button"
-                  class="hx-btn"
-                  data-variant="ghost"
-                  :disabled="manualInclusion.isIncluding(release)"
-                  :aria-label="`Keep ${release.title ?? 'this release'} selected manually`"
-                  @click="openManualInclusionModal(release)"
-                >
-                  {{ manualInclusion.isIncluding(release) ? 'Saving selection…' : 'Keep selected manually' }}
-                </button>
-              </div>
+              <MissingReleaseDecisionActions
+                :can-keep-selected-manually="manualInclusion.canIncludeManually(release)"
+                :download-recovery-notice="release.downloadRecoveryNotice"
+                :is-keeping-selected-manually="manualInclusion.isIncluding(release)"
+                :is-manual-selection="manualInclusion.isManualSelection(release)"
+                :is-retrying-search="recoveryRetry.isRetrying(release)"
+                :is-starting-search="isRequesting(release)"
+                :manual-selection-label="getManualSelectionLabel(release)"
+                :release="release"
+                :search-started="isRequested(release)"
+                @keep-selected-manually="openManualInclusionModal(release)"
+                @open-music-queue="openMusicQueue(release)"
+                @retry-search="retryDownloadRecovery(release)"
+                @start-search="openConfirmModal(release)"
+              />
             </template>
           </ReleaseCard>
           </li>
@@ -525,7 +476,6 @@ onBeforeUnmount(() => {
     :loading="confirmIsRequesting"
     :requested="confirmIsRequested"
     :error-message="confirmError"
-    :users="isAdmin ? requestForUsers : []"
     action-context="music_queue_search"
     dialog-id="missing-music-search-confirmation"
     @confirm="handleConfirmRequest"
@@ -544,62 +494,3 @@ onBeforeUnmount(() => {
     @close="closeManualInclusionModal"
   />
 </template>
-
-<style scoped>
-/* ── Wanted card action area ─────────────────────────────────────────────── */
-.hx-wanted-card-actions {
-  display: flex;
-  flex-direction: column;
-  gap: var(--hx-space-2);
-  width: 100%;
-}
-
-.hx-wanted-card-meta {
-  display: flex;
-  align-items: center;
-  gap: var(--hx-space-2);
-  flex-wrap: wrap;
-}
-
-.hx-wanted-recovery-notice {
-  display: grid;
-  gap: var(--hx-space-2);
-  padding: var(--hx-space-3);
-  border: 1px solid color-mix(in oklab, var(--hx-danger) 35%, var(--hx-border));
-  border-radius: var(--hx-radius-md);
-  background: color-mix(in oklab, var(--hx-danger) 8%, transparent);
-  color: var(--hx-text);
-  font-size: var(--hx-text-sm);
-}
-
-.hx-wanted-recovery-title {
-  margin: 0;
-  font-weight: 700;
-  color: var(--hx-danger);
-}
-
-.hx-wanted-recovery-notice p {
-  margin: 0;
-}
-
-.hx-wanted-recovery-notice dl {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  gap: var(--hx-space-1) var(--hx-space-2);
-  margin: 0;
-}
-
-.hx-wanted-recovery-notice dt {
-  color: var(--hx-text-muted);
-}
-
-.hx-wanted-recovery-notice dd {
-  margin: 0;
-  font-weight: 600;
-  overflow-wrap: anywhere;
-}
-
-.hx-wanted-recovery-notice .hx-btn {
-  justify-self: start;
-}
-</style>

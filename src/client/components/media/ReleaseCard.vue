@@ -84,6 +84,11 @@ const props = defineProps({
     type: String,
     default: null,
   },
+  /** Visible-purpose prefix for the artwork/body detail action. */
+  detailActionLabel: {
+    type: String,
+    default: 'View details',
+  },
 });
 
 const emit = defineEmits(['request', 'detail']);
@@ -175,7 +180,7 @@ const accentStyle = computed(() => {
       class="hx-media-card__link-area"
       role="button"
       tabindex="0"
-      :aria-label="`View details for ${releaseTitle || 'this release'}`"
+      :aria-label="`${detailActionLabel} for ${releaseTitle || 'this release'}`"
       @click="handleDetail"
       @keydown="handlePrimaryKeydown"
     >

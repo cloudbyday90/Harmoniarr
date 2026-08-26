@@ -92,6 +92,7 @@ const emit = defineEmits(['confirm', 'close']);
 const dialogRef = ref(null);
 const closeButtonRef = ref(null);
 const confirmButtonRef = ref(null);
+const cancelButtonRef = ref(null);
 let previouslyFocusedElement = null;
 
 /**
@@ -100,8 +101,9 @@ let previouslyFocusedElement = null;
  */
 const selectedForUserId = ref(null);
 const dialogHeadingId = computed(() => `${props.dialogId}-heading`);
+const dialogDescriptionId = computed(() => `${props.dialogId}-description`);
 
-function openDialogSession() {
+async function openDialogSession() {
   if (!dialogRef.value) return;
   previouslyFocusedElement = globalThis.document?.activeElement instanceof HTMLElement
     ? globalThis.document.activeElement
@@ -110,7 +112,8 @@ function openDialogSession() {
     dialogRef.value.showModal();
   }
   selectedForUserId.value = null;
-  closeButtonRef.value?.focus({ preventScroll: true });
+  await nextTick();
+  cancelButtonRef.value?.focus({ preventScroll: true });
 }
 
 function closeDialogSession() {
@@ -125,7 +128,7 @@ function closeDialogSession() {
 
 onMounted(() => {
   if (props.open) {
-    openDialogSession();
+    void openDialogSession();
   }
 });
 
@@ -134,7 +137,7 @@ watch(
   (isOpen) => {
     if (!dialogRef.value) return;
     if (isOpen) {
-      openDialogSession();
+      void openDialogSession();
     } else {
       closeDialogSession();
     }
@@ -248,6 +251,7 @@ function handleConfirm() {
     role="dialog"
     aria-modal="true"
     :aria-labelledby="dialogHeadingId"
+    :aria-describedby="dialogDescriptionId"
     @cancel="handleCancel"
     @click="handleBackdropClick"
     @keydown="handleKeydown"
@@ -282,7 +286,7 @@ function handleConfirm() {
           </div>
         </div>
 
-        <p class="crm-explanation">{{ actionCopy.explanation }}</p>
+        <p :id="dialogDescriptionId" class="crm-explanation">{{ actionCopy.explanation }}</p>
 
         <div v-if="users.length >= 2" class="crm-for-user">
           <label class="crm-for-user__label" for="crm-for-user-select">Request for</label>
@@ -302,16 +306,18 @@ function handleConfirm() {
 
       <footer class="crm-footer">
         <button
-          ref="confirmButtonRef"
+          ref="cancelButtonRef"
           type="button"
           class="hx-btn"
           data-variant="ghost"
+          autofocus
           :disabled="loading"
           @click="handleClose"
         >
           Cancel
         </button>
         <button
+          ref="confirmButtonRef"
           type="button"
           class="hx-btn"
           data-variant="primary"

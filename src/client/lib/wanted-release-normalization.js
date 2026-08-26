@@ -77,6 +77,9 @@ export function normalizeWantedReleaseForCard(release) {
     metadataReleaseGroupId: release.metadataReleaseGroupId ?? null,
     selectionSource: release.evidence?.selectionSource ?? null,
     selectionState: release.evidence?.selectionState ?? null,
+    // `id` remains null for artwork safety. Keep the durable wanted-release
+    // identity under an explicit name for release-scoped Music Queue routing.
+    wantedReleaseId: release.id ?? null,
 
     // Forwarded for potential artist-detail navigation.
     metadataArtistId: release.metadataArtistId ?? null,

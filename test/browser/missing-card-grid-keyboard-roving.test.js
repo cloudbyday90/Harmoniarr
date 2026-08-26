@@ -98,10 +98,10 @@ suite('Missing release-card browser keyboard roving coverage', () => {
         controlSelector: cardActionSelector,
       });
 
-      assert.deepEqual(controlTabindexes[0], ['-1', '-1']);
+      assert.deepEqual(controlTabindexes[0], ['-1', '-1', '-1']);
       assert.ok(
-        controlTabindexes[2].length >= 3,
-        'the active recovery card should expose Search again, Search, and manual-selection controls',
+        controlTabindexes[2].length >= 4,
+        'the active recovery card should expose Search again, Search, Music Queue, and manual-selection controls',
       );
       assert.deepEqual(
         controlTabindexes[2].map((value) => value ?? null),
@@ -158,8 +158,8 @@ suite('Missing release-card browser keyboard roving coverage', () => {
       const dialog = page.getByRole('dialog', { name: 'Keep this release selected manually?' });
       await dialog.waitFor();
       await assertLocatorFocused(
-        dialog.getByRole('button', { name: 'Close' }),
-        'the manual inclusion dialog should move focus inside the modal',
+        dialog.getByRole('button', { name: 'Cancel' }),
+        'the manual inclusion dialog should focus the least-destructive action',
       );
       await dialog.getByText('Harmoniarr will queue reconciliation; it will not start a search.').waitFor();
       await dialog.getByRole('button', { name: 'Keep selected manually' }).click();
@@ -171,6 +171,73 @@ suite('Missing release-card browser keyboard roving coverage', () => {
       });
     }, {
       scenarioName: 'missing_music_manual_inclusion',
+    });
+  });
+
+  test('Missing Music names the search consequence and opens the matching Music Queue release', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) {
+      t.skip(runtimeUnavailableReason);
+      return;
+    }
+
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      await installWantedBrowserFixtures(browserContext);
+      let searchRequest = null;
+      await browserContext.route('**/api/v1/library/media-requests', async (route) => {
+        searchRequest = {
+          body: route.request().postDataJSON(),
+          method: route.request().method(),
+        };
+        await route.fulfill({
+          body: JSON.stringify({
+            mediaRequest: { id: 'request-amber' },
+            ok: true,
+          }),
+          contentType: 'application/json',
+          status: 201,
+        });
+      });
+      await bootstrapAdminThroughUi(page, { baseUrl });
+
+      await page.goto(`${baseUrl}/app/missing`, { waitUntil: 'domcontentloaded' });
+      await page.getByText(
+        'Start a search, then choose a match in Music Queue if Harmoniarr cannot decide automatically.',
+      ).first().waitFor();
+
+      await page.getByRole('button', {
+        name: 'Start a search for Autechre — Amber',
+      }).click();
+      const dialog = page.getByRole('dialog', { name: 'Search for this release?' });
+      await dialog.waitFor();
+      assert.equal(await dialog.getByLabel('Request for').count(), 0);
+      const descriptionId = await dialog.getAttribute('aria-describedby');
+      assert.ok(descriptionId);
+      const description = page.locator(`#${descriptionId}`);
+      await description.waitFor();
+      assert.equal(
+        await description.textContent(),
+        'Harmoniarr will add this release to Music Queue, where it will be searched using your active settings.',
+      );
+
+      await Promise.all([
+        page.waitForURL(/\/app\/music-queue\/wanted-amber$/),
+        dialog.getByRole('button', { name: 'Start search' }).click(),
+      ]);
+      assert.deepEqual(searchRequest, {
+        body: {
+          artistName: 'Autechre',
+          expectedReleaseDate: null,
+          musicbrainzReleaseId: 'mb-release-amber',
+          releaseGroupId: 'mb-rg-amber',
+          releaseTitle: 'Amber',
+          requestKind: 'release',
+        },
+        method: 'POST',
+      });
+    }, {
+      scenarioName: 'missing_music_decision_workspace',
     });
   });
 });
