@@ -29,6 +29,7 @@ import {
 
 const DEFAULT_PAGE_LIMIT = 50;
 const MAX_PAGE_LIMIT = 100;
+const MAX_DECISION_ID_LENGTH = 200;
 const MAX_QUERY_LENGTH = 120;
 const MAX_SOURCE_RELEASES = 2000;
 
@@ -57,6 +58,23 @@ function normalizeSearchQuery(value) {
   }
 
   return query || null;
+}
+
+function normalizeDecisionId(value) {
+  if (typeof value !== 'string') {
+    throw createApiError(400, 'validation_error', 'decisionId must be text');
+  }
+
+  const decisionId = value.trim();
+  if (decisionId.length === 0 || decisionId.length > MAX_DECISION_ID_LENGTH) {
+    throw createApiError(
+      400,
+      'validation_error',
+      `decisionId must be between 1 and ${MAX_DECISION_ID_LENGTH} characters`,
+    );
+  }
+
+  return decisionId;
 }
 
 function buildRequestedFor(user) {
@@ -245,7 +263,71 @@ export function createMissingMusicDecisionService({
     };
   }
 
+  /**
+   * Resolves one release through the same server-side household scope as the
+   * worklist. The browser never supplies the target account as authority, and
+   * this read projection intentionally excludes provider, transfer, and raw
+   * candidate evidence until a dedicated command contract exists.
+   */
+  async function getMissingMusicDecisionDetail({
+    actorUser,
+    decisionId,
+  } = {}) {
+    const normalizedDecisionId = normalizeDecisionId(decisionId);
+    const scope = resolveMissingMusicDecisionScope({
+      actorUserId: actorUser?.id,
+      actorUserRole: actorUser?.role ?? null,
+    });
+
+    let usersById;
+    let eligibleUsers;
+
+    if (scope.isAdmin && scope.scope === 'all') {
+      const allUsers = await listAppUsers();
+      usersById = new Map(allUsers.map((user) => [user.id, user]));
+      eligibleUsers = allUsers;
+    } else {
+      const currentUser = {
+        id: scope.requestedForUserId,
+        isDisabled: actorUser?.isDisabled === true,
+        username: actorUser?.username ?? null,
+      };
+      usersById = new Map([[currentUser.id, currentUser]]);
+      eligibleUsers = [currentUser];
+    }
+
+    const targetUserIds = eligibleUsers
+      .map((user) => user.id)
+      .filter((userId) => typeof userId === 'string' && userId.length > 0);
+    const sourceReleases = targetUserIds.length > 0
+      ? await listWantedReleasesWithMetadata({
+        appUserIds: targetUserIds,
+        limit: 1,
+        search: null,
+        wantedReleaseId: normalizedDecisionId,
+        wantedStatus: null,
+      })
+      : [];
+    const sourceRelease = sourceReleases.find((release) => release.id === normalizedDecisionId);
+
+    if (!sourceRelease) {
+      throw createApiError(404, 'missing_music_decision_not_found', 'Missing Music release was not found');
+    }
+
+    const requestedFor = buildRequestedFor(usersById.get(sourceRelease.appUserId));
+
+    return {
+      checkedAt: now().toISOString(),
+      decision: projectDecision(sourceRelease, requestedFor, projectMusicQueueReleaseFn),
+      permissions: {
+        isReadOnly: requestedFor.accountStatus === 'disabled',
+      },
+      scope: scope.scope,
+    };
+  }
+
   return {
+    getMissingMusicDecisionDetail,
     listMissingMusicDecisions,
   };
 }

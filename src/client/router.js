@@ -121,6 +121,7 @@ const router = createRouter({
         { path: 'discover', name: 'discover', component: DiscoverView },
         { path: 'library', name: 'library', component: LibraryView },
         { path: 'missing', name: 'missing', component: MissingView },
+        { path: 'missing/:decisionId', name: 'missing-decision', component: MissingView },
         {
           path: 'acquisition',
           component: AcquisitionWorkspaceView,

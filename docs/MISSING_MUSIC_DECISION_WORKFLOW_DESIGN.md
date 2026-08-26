@@ -533,8 +533,11 @@ Before commit, prove the workflow at the boundaries that own it:
    routes remain compatible while their canonical redirects are implemented.
 5. **Completed 2026-08-26:** Add the modular, read-only Missing Music
    decision worklist while retaining current API/mutation contracts.
-6. Add the server-authorized decision detail and mutation boundary, including
-   audit actor/target retention and disabled-target read-only enforcement.
+6. **In progress 2026-08-26:** Add the server-authorized decision detail and
+   mutation boundary. The read-only detail route is complete; actor/target
+   audit retention and disabled-target mutation enforcement remain before any
+   command is enabled. See
+   [Missing Music decision-detail design](MISSING_MUSIC_DECISION_DETAIL_DESIGN.md).
 7. Implement **Use this match**, followed by the explicit **Start download**
    confirmation recommended above, then hand off accepted transfers to
    Downloader.

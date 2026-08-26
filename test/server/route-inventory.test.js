@@ -43,6 +43,7 @@ function collectRegisteredRoutes() {
   const { app, routes } = createRecordingApp();
 
   registerMissingMusicRoutes(app, {
+    getMissingMusicDecisionDetail: asyncNoopResult({ decision: {} }),
     listMissingMusicDecisions: asyncNoopResult({ decisions: [] }),
     requireSession: asyncNoopResult({ appUserId: 'user-1' }),
   });

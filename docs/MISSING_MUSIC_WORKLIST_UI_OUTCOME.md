@@ -108,9 +108,15 @@ plain-language next step, and switching from active accounts to disabled
 history. It stubs only the safe read projection; no provider or mutation
 endpoint is involved.
 
-## Next recommended item
+## Follow-on work
 
-Add the server-authorized Missing Music decision-detail and command boundary,
-then replace the legacy Music Queue inspector with a role-aware Missing Music
-inspector. That next step must implement the explicit **Use this match** then
-**Start download** confirmation for manually selected candidates.
+**Completed 2026-08-26:** The server-authorized Missing Music detail read and
+routed, role-aware status inspector are now available. They retain the target
+account and disabled-account history without exposing raw provider or transfer
+information. See
+[Missing Music decision-detail design](MISSING_MUSIC_DECISION_DETAIL_DESIGN.md).
+
+The next recommended item is the dedicated command service: implement
+**Use this match**, then an explicit **Start download** confirmation for a
+manually chosen candidate. It must retain actor/target audit history, reject
+disabled targets, and require a fresh session, CSRF, and idempotency.

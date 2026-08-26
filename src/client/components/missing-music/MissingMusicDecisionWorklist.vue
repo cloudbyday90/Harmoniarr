@@ -71,6 +71,10 @@ function resetFilters() {
   void applyFilters();
 }
 
+function getDetailAccessibleLabel(row) {
+  return 'Open status details for ' + row.artistName + ' — ' + row.title;
+}
+
 defineExpose({
   refresh: decisionResource.refresh,
 });
@@ -202,7 +206,17 @@ defineExpose({
         <article class="missing-music-worklist__row" :data-tone="row.statusTone">
           <div class="missing-music-worklist__row-heading">
             <div>
-              <h3>{{ row.title }}</h3>
+              <h3>
+                <RouterLink
+                  v-if="row.decisionId"
+                  class="missing-music-worklist__detail-link"
+                  :aria-label="getDetailAccessibleLabel(row)"
+                  :to="{ name: 'missing-decision', params: { decisionId: row.decisionId } }"
+                >
+                  {{ row.title }}
+                </RouterLink>
+                <template v-else>{{ row.title }}</template>
+              </h3>
               <p>{{ row.artistName }}<template v-if="row.releaseMeta"> · {{ row.releaseMeta }}</template></p>
             </div>
             <span class="hx-pill" :data-tone="row.statusTone">{{ row.statusLabel }}</span>
@@ -326,6 +340,16 @@ defineExpose({
 .missing-music-worklist__row h3 {
   color: var(--hx-text-strong);
   font-size: var(--hx-text-base);
+}
+
+.missing-music-worklist__detail-link {
+  color: inherit;
+  text-decoration-color: transparent;
+}
+
+.missing-music-worklist__detail-link:hover {
+  color: var(--hx-accent);
+  text-decoration-color: currentColor;
 }
 
 .missing-music-worklist__row-heading p,

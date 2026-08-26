@@ -30,6 +30,7 @@ export function createMissingMusicModule({
   return {
     missingMusicDecisionService,
     routeDependencies: {
+      getMissingMusicDecisionDetail: missingMusicDecisionService.getMissingMusicDecisionDetail,
       listMissingMusicDecisions: missingMusicDecisionService.listMissingMusicDecisions,
     },
   };

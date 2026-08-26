@@ -18,7 +18,10 @@
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { fetchMissingMusicDecisions } from '../../src/client/lib/missing-music-api.js';
+import {
+  fetchMissingMusicDecisionDetail,
+  fetchMissingMusicDecisions,
+} from '../../src/client/lib/missing-music-api.js';
 
 function installFetchMock(t, payload = { decisions: [] }) {
   const originalFetch = globalThis.fetch;
@@ -60,5 +63,24 @@ test('fetchMissingMusicDecisions keeps the UI default focused on action-ready ac
   assert.equal(
     fetchMock.mock.calls[0].arguments[0],
     '/api/v1/missing-music/decisions?accountStatus=active&limit=50&offset=0&scope=all&state=action',
+  );
+});
+
+test('fetchMissingMusicDecisionDetail encodes only the decision identifier', async (t) => {
+  const fetchMock = installFetchMock(t, { decision: {} });
+
+  await fetchMissingMusicDecisionDetail('wanted/amber');
+
+  assert.equal(
+    fetchMock.mock.calls[0].arguments[0],
+    '/api/v1/missing-music/decisions/wanted%2Famber',
+  );
+  assert.equal(fetchMock.mock.calls[0].arguments[1].method, 'GET');
+});
+
+test('fetchMissingMusicDecisionDetail requires a non-empty decision identifier', () => {
+  assert.throws(
+    () => fetchMissingMusicDecisionDetail('  '),
+    /requires a decisionId/u,
   );
 });

@@ -26,11 +26,26 @@ function optionalQueryString(value) {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 }
 
+function buildActorUser(session) {
+  return {
+    id: session.appUserId,
+    isDisabled: session.user?.isDisabled === true,
+    role: session.user?.role ?? null,
+    username: session.user?.username ?? null,
+  };
+}
+
 export function registerMissingMusicRoutes(app, {
+  getMissingMusicDecisionDetail,
+  limitMissingMusicDecisionDetailRead = skipRateLimitMiddleware,
   limitMissingMusicDecisionRead = skipRateLimitMiddleware,
   listMissingMusicDecisions,
   requireSession = defaultRequestAuthDependencies.requireSession,
 } = {}) {
+  if (typeof getMissingMusicDecisionDetail !== 'function') {
+    throw new TypeError('registerMissingMusicRoutes requires getMissingMusicDecisionDetail');
+  }
+
   if (typeof listMissingMusicDecisions !== 'function') {
     throw new TypeError('registerMissingMusicRoutes requires listMissingMusicDecisions');
   }
@@ -39,18 +54,26 @@ export function registerMissingMusicRoutes(app, {
     const session = await requireSession(request);
     const payload = await listMissingMusicDecisions({
       accountStatus: optionalQueryString(request.query.accountStatus),
-      actorUser: {
-        id: session.appUserId,
-        isDisabled: session.user?.isDisabled === true,
-        role: session.user?.role ?? null,
-        username: session.user?.username ?? null,
-      },
+      actorUser: buildActorUser(session),
       limit: sanitizePageLimit(request.query.limit, { default: 50, max: 100 }),
       offset: sanitizePageOffset(request.query.offset),
       q: optionalQueryString(request.query.q),
       requestedForUserId: optionalQueryString(request.query.requestedForUserId),
       scope: optionalQueryString(request.query.scope),
       state: optionalQueryString(request.query.state),
+    });
+
+    response.json({
+      ok: true,
+      ...payload,
+    });
+  }));
+
+  app.get('/api/v1/missing-music/decisions/:decisionId', limitMissingMusicDecisionDetailRead, asyncRoute(async (request, response) => {
+    const session = await requireSession(request);
+    const payload = await getMissingMusicDecisionDetail({
+      actorUser: buildActorUser(session),
+      decisionId: request.params.decisionId,
     });
 
     response.json({

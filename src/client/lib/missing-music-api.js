@@ -40,5 +40,14 @@ export function fetchMissingMusicDecisions({
     requestedForUserId,
     scope,
     state,
-  })}`);
+ })}`);
+}
+
+export function fetchMissingMusicDecisionDetail(decisionId) {
+  const normalizedDecisionId = typeof decisionId === 'string' ? decisionId.trim() : '';
+  if (!normalizedDecisionId) {
+    throw new TypeError('fetchMissingMusicDecisionDetail requires a decisionId');
+  }
+
+  return apiRequest(`/api/v1/missing-music/decisions/${encodeURIComponent(normalizedDecisionId)}`);
 }

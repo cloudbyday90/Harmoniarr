@@ -18,6 +18,8 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
+import MissingMusicDecisionInspector from '../components/missing-music/MissingMusicDecisionInspector.vue';
 import MissingMusicDecisionWorklist from '../components/missing-music/MissingMusicDecisionWorklist.vue';
 import { useLibraryWantedSummary } from '../composables/useLibraryWantedSummary.js';
 import { useLibraryReconciliationSummary } from '../composables/useLibraryReconciliationSummary.js';
@@ -32,6 +34,12 @@ import {
 
 const wanted = useLibraryWantedSummary({ pollIntervalMs: 30000, revalidateOnFocus: true });
 const reconciliation = useLibraryReconciliationSummary({ pollIntervalMs: 30000, revalidateOnFocus: true });
+const route = useRoute();
+const selectedDecisionId = computed(() => (
+  typeof route.params.decisionId === 'string' && route.params.decisionId.trim().length > 0
+    ? route.params.decisionId.trim()
+    : null
+));
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
@@ -126,6 +134,8 @@ onBeforeUnmount(() => {
         <p>{{ wanted.summary.value.message }}</p>
       </div>
     </article>
+
+    <MissingMusicDecisionInspector v-if="selectedDecisionId" :decision-id="selectedDecisionId" />
 
     <MissingMusicDecisionWorklist />
 

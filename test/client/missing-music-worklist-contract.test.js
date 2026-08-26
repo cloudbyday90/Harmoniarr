@@ -21,7 +21,9 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 const COMPONENT_PATH = new URL('../../src/client/components/missing-music/MissingMusicDecisionWorklist.vue', import.meta.url);
+const INSPECTOR_PATH = new URL('../../src/client/components/missing-music/MissingMusicDecisionInspector.vue', import.meta.url);
 const MISSING_VIEW_PATH = new URL('../../src/client/views/MissingView.vue', import.meta.url);
+const ROUTER_PATH = new URL('../../src/client/router.js', import.meta.url);
 
 test('Missing Music worklist groups filters and gives every control a visible label', async () => {
   const source = await readFile(COMPONENT_PATH, 'utf8');
@@ -49,4 +51,22 @@ test('MissingView uses the authorized worklist instead of a parallel client-side
   assert.match(source, /<MissingMusicDecisionWorklist \/>/);
   assert.doesNotMatch(source, /MissingReleaseDecisionActions/);
   assert.doesNotMatch(source, /useLibraryWantedReleases/);
+});
+
+test('Missing Music links to a routable detail inspector with a labelled current status', async () => {
+  const [worklistSource, inspectorSource, missingViewSource, routerSource] = await Promise.all([
+    readFile(COMPONENT_PATH, 'utf8'),
+    readFile(INSPECTOR_PATH, 'utf8'),
+    readFile(MISSING_VIEW_PATH, 'utf8'),
+    readFile(ROUTER_PATH, 'utf8'),
+  ]);
+
+  assert.match(worklistSource, /Open status details for/);
+  assert.match(worklistSource, /name: 'missing-decision'/);
+  assert.match(inspectorSource, /<p class="hx-eyebrow">Release status<\/p>/);
+  assert.match(inspectorSource, /<h2 ref="headingElement" class="hx-card-title" tabindex="-1">/);
+  assert.match(inspectorSource, /<h3 id="missing-music-inspector-current-status">Current status<\/h3>/);
+  assert.match(inspectorSource, /Back to release decisions/);
+  assert.match(missingViewSource, /<MissingMusicDecisionInspector v-if="selectedDecisionId"/);
+  assert.match(routerSource, /path: 'missing\/:decisionId', name: 'missing-decision'/);
 });

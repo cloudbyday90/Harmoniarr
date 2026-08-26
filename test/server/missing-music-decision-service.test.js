@@ -152,6 +152,63 @@ test('non-admins never enumerate other users and only query their own decision r
   assert.equal(result.decisions[0].requestedFor.username, 'listener');
 });
 
+test('Missing Music detail is server-scoped, preserves disabled history, and excludes private evidence', async () => {
+  const { listWantedReleasesWithMetadata, service } = createService();
+
+  const result = await service.getMissingMusicDecisionDetail({
+    actorUser: { id: 'admin-1', role: 'admin', username: 'admin' },
+    decisionId: 'decision-disabled',
+  });
+
+  assert.deepEqual(listWantedReleasesWithMetadata.mock.calls[0].arguments[0], {
+    appUserIds: ['admin-1', 'user-1', 'user-2'],
+    limit: 1,
+    search: null,
+    wantedReleaseId: 'decision-disabled',
+    wantedStatus: null,
+  });
+  assert.equal(result.scope, 'all');
+  assert.equal(result.permissions.isReadOnly, true);
+  assert.equal(result.decision.decisionId, 'decision-disabled');
+  assert.equal(result.decision.requestedFor.username, 'former-listener');
+  assert.doesNotMatch(JSON.stringify(result), /must-not-leak/u);
+});
+
+test('Missing Music detail does not reveal another user’s release to a non-admin', async () => {
+  const { listAppUsers, listWantedReleasesWithMetadata, service } = createService();
+
+  await assert.rejects(
+    () => service.getMissingMusicDecisionDetail({
+      actorUser: { id: 'user-1', role: 'requester', username: 'listener' },
+      decisionId: 'decision-disabled',
+    }),
+    (error) => error?.status === 404 && error?.code === 'missing_music_decision_not_found',
+  );
+
+  assert.equal(listAppUsers.mock.callCount(), 0);
+  assert.deepEqual(listWantedReleasesWithMetadata.mock.calls[0].arguments[0], {
+    appUserIds: ['user-1'],
+    limit: 1,
+    search: null,
+    wantedReleaseId: 'decision-disabled',
+    wantedStatus: null,
+  });
+});
+
+test('Missing Music detail rejects empty and oversized decision identifiers', async () => {
+  const { service } = createService();
+  const actorUser = { id: 'admin-1', role: 'admin', username: 'admin' };
+
+  await assert.rejects(
+    () => service.getMissingMusicDecisionDetail({ actorUser, decisionId: '' }),
+    (error) => error?.status === 400 && error?.code === 'validation_error',
+  );
+  await assert.rejects(
+    () => service.getMissingMusicDecisionDetail({ actorUser, decisionId: 'x'.repeat(201) }),
+    (error) => error?.status === 400 && error?.code === 'validation_error',
+  );
+});
+
 test('Missing Music decision search is bounded and delegated to the server data boundary', async () => {
   const { listWantedReleasesWithMetadata, service } = createService();
 

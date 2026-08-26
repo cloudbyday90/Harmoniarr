@@ -313,6 +313,30 @@ test('listWantedReleasesWithMetadata supports parameterized multi-user and searc
   assert.deepEqual(observedParams, [['user-1', 'user-2'], '%portishead%', 4]);
 });
 
+test('listWantedReleasesWithMetadata scopes a direct wanted-release lookup before limiting it', async () => {
+  let observedParams = [];
+  let observedSql = '';
+  const store = createLibraryWantedReleaseStore({
+    getPoolFn: () => ({
+      query: async (sql, params) => {
+        observedSql = sql;
+        observedParams = params;
+        return { rows: [] };
+      },
+    }),
+  });
+
+  await store.listWantedReleasesWithMetadata({
+    appUserIds: ['user-1', 'user-2'],
+    limit: 1,
+    wantedReleaseId: 'wanted-amber',
+  });
+
+  assert.match(observedSql, /lwr\.app_user_id = ANY\(\$1::uuid\[\]\)/u);
+  assert.match(observedSql, /lwr\.id = \$2/u);
+  assert.deepEqual(observedParams, [['user-1', 'user-2'], 'wanted-amber', 1]);
+});
+
 test('listWantedReleasesWithMetadata returns null discoveryRequest when none exists', async () => {
   const store = createLibraryWantedReleaseStore({
     getPoolFn: () => ({

@@ -470,6 +470,7 @@ suite('createApp', () => {
   assert.equal(registerLibraryRoutes.mock.calls[0].arguments[1].startLibraryDiscoveryRun, libraryModule.routeDependencies.startLibraryDiscoveryRun);
   assert.equal(registerMissingMusicRoutes.mock.calls[0].arguments[0], app);
   assert.equal(registerMissingMusicRoutes.mock.calls[0].arguments[1].missingMusic, 'deps');
+  assert.equal(typeof registerMissingMusicRoutes.mock.calls[0].arguments[1].limitMissingMusicDecisionDetailRead, 'function');
   assert.equal(typeof registerMissingMusicRoutes.mock.calls[0].arguments[1].limitMissingMusicDecisionRead, 'function');
   assert.equal(registerMetadataRoutes.mock.calls[0].arguments[0], app);
   assert.equal(registerMetadataRoutes.mock.calls[0].arguments[1].metadata, metadataModule.routeDependencies.metadata);

@@ -387,6 +387,7 @@ export function createLibraryWantedReleaseStore({
     appUserIds = null,
     metadataArtistId = null,
     search = null,
+    wantedReleaseId = null,
     wantedStatus = null,
     limit = 500,
   } = {}) {
@@ -412,6 +413,11 @@ export function createLibraryWantedReleaseStore({
     if (typeof metadataArtistId === 'string' && metadataArtistId.trim().length > 0) {
       params.push(metadataArtistId.trim());
       conditions.push(`lwr.metadata_artist_id = $${params.length}`);
+    }
+
+    if (typeof wantedReleaseId === 'string' && wantedReleaseId.trim().length > 0) {
+      params.push(wantedReleaseId.trim());
+      conditions.push(`lwr.id = $${params.length}`);
     }
 
     if (wantedStatus === 'missing' || wantedStatus === 'partial') {

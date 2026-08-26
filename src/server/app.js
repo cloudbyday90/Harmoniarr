@@ -925,6 +925,11 @@ export function createApp({
   });
   mountMissingMusicRoutes(app, {
     ...missingMusicModule.routeDependencies,
+    limitMissingMusicDecisionDetailRead: requestRateLimiterService.createMiddleware({
+      bucketName: 'missing-music-decision-detail-read',
+      limit: 120,
+      windowMs: 60 * 1000,
+    }),
     limitMissingMusicDecisionRead: requestRateLimiterService.createMiddleware({
       bucketName: 'missing-music-decision-read',
       limit: 120,
