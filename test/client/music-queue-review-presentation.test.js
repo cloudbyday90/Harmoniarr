@@ -34,18 +34,40 @@ const BASE_REVIEW = {
 test('Music Queue review presents actionable matches before optional evidence', () => {
   const presentation = buildMusicQueueReviewPresentation({
     ...BASE_REVIEW,
+    matchChoiceCount: 12,
     matchCards: [{ canRejectMatch: true, canUseMatch: true, id: 'match-1' }],
   });
 
   assert.equal(presentation.hasDecision, true);
   assert.equal(presentation.hasMatchChoices, true);
   assert.equal(presentation.evidenceMatchCards.length, 0);
+  assert.equal(presentation.matchChoiceCount, 12);
+  assert.equal(
+    presentation.matchChoiceCopy,
+    'Showing 1 highest-ranked match of 12 candidates. Select a match only when it fits this release and your quality policy.',
+  );
   assert.deepEqual(presentation.decisionMatchCards.map((match) => match.id), ['match-1']);
   assert.deepEqual(presentation.primaryQualityRows.map((row) => row.label), [
     'Profile',
     'Decision',
     'Verification',
   ]);
+});
+
+test('Music Queue review keeps its guidance concise when every available match is shown', () => {
+  const presentation = buildMusicQueueReviewPresentation({
+    ...BASE_REVIEW,
+    matchChoiceCount: 2,
+    matchCards: [
+      { canRejectMatch: true, canUseMatch: true, id: 'match-1' },
+      { canRejectMatch: true, canUseMatch: true, id: 'match-2' },
+    ],
+  });
+
+  assert.equal(
+    presentation.matchChoiceCopy,
+    'Choose from 2 available matches. Select a match only when it fits this release and your quality policy.',
+  );
 });
 
 test('Music Queue review keeps non-actionable match evidence behind the disclosure', () => {

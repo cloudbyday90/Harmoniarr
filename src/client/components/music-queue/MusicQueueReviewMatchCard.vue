@@ -18,7 +18,10 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue';
-import { buildMusicQueueMatchCardPresentation } from '../../lib/music-queue-match-card-presentation.js';
+import {
+  buildMusicQueueMatchActionLabel,
+  buildMusicQueueMatchCardPresentation,
+} from '../../lib/music-queue-match-card-presentation.js';
 
 const props = defineProps({
   actionRunning: {
@@ -85,6 +88,10 @@ function isActionRunning(action) {
 function isActionNativelyDisabled(action) {
   return areActionsUnavailable.value && !isActionRunning(action);
 }
+
+function getActionAccessibleName(action) {
+  return buildMusicQueueMatchActionLabel(action, props.match);
+}
 </script>
 
 <template>
@@ -116,6 +123,7 @@ function isActionNativelyDisabled(action) {
         class="hx-btn"
         data-variant="primary"
         :data-music-queue-action="`use-match:${match.id}`"
+        :aria-label="getActionAccessibleName('use')"
         :aria-describedby="isActionRunning('use') ? unavailableDescriptionId || undefined : undefined"
         :aria-disabled="isActionRunning('use') || undefined"
         :disabled="isActionNativelyDisabled('use')"
@@ -129,6 +137,7 @@ function isActionNativelyDisabled(action) {
         class="hx-btn"
         data-variant="ghost"
         :data-music-queue-action="`reject-match:${match.id}`"
+        :aria-label="getActionAccessibleName('reject')"
         :aria-describedby="isActionRunning('reject') ? unavailableDescriptionId || undefined : undefined"
         :aria-disabled="isActionRunning('reject') || undefined"
         :disabled="isActionNativelyDisabled('reject')"

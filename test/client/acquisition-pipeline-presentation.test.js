@@ -291,6 +291,7 @@ test('buildMusicQueueMatchReview returns match and quality rows for the details 
   assert.equal(review.canSearchAgain, false);
   assert.equal(review.reason, 'The best match is below the high-confidence threshold.');
   assert.equal(review.matchCards.length, 2);
+  assert.equal(review.matchChoiceCount, 3);
   assert.equal(review.matchCards[0].qualityFitLabel, 'Preferred quality');
   assert.equal(review.matchCards[0].canUseMatch, true);
   assert.equal(review.matchCards[0].canRejectMatch, true);

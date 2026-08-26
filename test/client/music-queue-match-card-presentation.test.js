@@ -18,7 +18,10 @@
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildMusicQueueMatchCardPresentation } from '../../src/client/lib/music-queue-match-card-presentation.js';
+import {
+  buildMusicQueueMatchActionLabel,
+  buildMusicQueueMatchCardPresentation,
+} from '../../src/client/lib/music-queue-match-card-presentation.js';
 
 const MATCH = {
   fileLabel: '12 files',
@@ -34,6 +37,12 @@ const MATCH = {
   sizeLabel: '117.7 MB',
   trackCoverageLabel: '12 of 12 tracks matched',
 };
+
+test('Music Queue match action labels retain the visible action and identify its match', () => {
+  assert.equal(buildMusicQueueMatchActionLabel('use', { label: 'Match 1' }), 'Use this match: Match 1');
+  assert.equal(buildMusicQueueMatchActionLabel('reject', { label: 'Match 1' }), 'Reject match: Match 1');
+  assert.equal(buildMusicQueueMatchActionLabel('use'), 'Use this match');
+});
 
 test('Music Queue decision cards keep only selection facts before the action', () => {
   const presentation = buildMusicQueueMatchCardPresentation(MATCH, { isDecision: true });

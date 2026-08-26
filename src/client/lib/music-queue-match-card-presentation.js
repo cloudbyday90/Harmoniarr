@@ -20,6 +20,15 @@ function normalizeQualityRows(rows) {
   return Array.isArray(rows) ? rows.filter((row) => row?.label && row?.value) : [];
 }
 
+function normalizeText(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+const ACTION_LABELS = Object.freeze({
+  reject: 'Reject match',
+  use: 'Use this match',
+});
+
 function buildDecisionFacts(match) {
   return [
     {
@@ -39,6 +48,14 @@ function buildEvidenceFacts(match) {
     { label: 'Size', value: match.sizeLabel },
     { label: 'Source health', value: match.healthLabel },
   ];
+}
+
+export function buildMusicQueueMatchActionLabel(action, match = {}) {
+  const actionLabel = ACTION_LABELS[action] ?? '';
+  const matchLabel = normalizeText(match?.label);
+  if (!actionLabel || !matchLabel) return actionLabel;
+
+  return `${actionLabel}: ${matchLabel}`;
 }
 
 export function buildMusicQueueMatchCardPresentation(match, { isDecision = false } = {}) {

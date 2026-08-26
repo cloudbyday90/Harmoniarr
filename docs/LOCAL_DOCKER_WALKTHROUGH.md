@@ -198,6 +198,12 @@ same linkage remains available:
 npm run validate:docker-provider-acceptance -- -- --require-accepted-transfer --require-music-queue-link
 ```
 
+When Music Queue offers a shortlist of matches, it identifies how many
+candidates were discovered and shows the highest-ranked choices first. Review
+the release and quality evidence, then explicitly choose the match that fits
+your policy before running this strict proof. Harmoniarr never selects or
+submits a provider download merely because candidates were found.
+
 The extra `--` is required by the repository's npm 12 script invocation before
 forwarding flags to the Node validator. Boolean options are presence flags;
 do not append `true` or `false`. For an intentionally unconfigured walkthrough

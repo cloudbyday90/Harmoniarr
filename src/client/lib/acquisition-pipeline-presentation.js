@@ -673,6 +673,7 @@ export function buildMusicQueueMatchReview(release) {
     fallbackQualityLabel: 'Allow fallback quality',
     heading: `${release.releaseTitle} by ${release.artistName}`,
     matchCards: buildMatchCards(release),
+    matchChoiceCount: matchSummary.totalCount,
     matchRows: [
       { label: 'Matches found', value: String(matchSummary.totalCount ?? 0) },
       { label: 'Ready to review', value: String(matchSummary.pendingCount ?? 0) },

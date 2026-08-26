@@ -18,6 +18,19 @@
 
 const PRIMARY_QUALITY_ROW_LABELS = new Set(['Profile', 'Decision', 'Verification']);
 
+function getNonNegativeCount(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 0;
+}
+
+function buildMatchChoiceCopy({ matchChoiceCount, visibleMatchCount }) {
+  if (matchChoiceCount > visibleMatchCount) {
+    return `Showing ${visibleMatchCount} highest-ranked match${visibleMatchCount === 1 ? '' : 'es'} of ${matchChoiceCount} candidates. Select a match only when it fits this release and your quality policy.`;
+  }
+
+  return `Choose from ${visibleMatchCount} available match${visibleMatchCount === 1 ? '' : 'es'}. Select a match only when it fits this release and your quality policy.`;
+}
+
 function getDecisionCopy({ hasManualSafeAdd, hasMatchChoices, hasQualityChoice, hasRouteAction, recovery }) {
   if (recovery?.nextStep) return recovery.nextStep;
 
@@ -46,6 +59,10 @@ export function buildMusicQueueReviewPresentation(review) {
   const matchCards = Array.isArray(review.matchCards) ? review.matchCards : [];
   const decisionMatchCards = matchCards.filter((match) => match.canUseMatch || match.canRejectMatch);
   const hasMatchChoices = decisionMatchCards.length > 0;
+  const matchChoiceCount = Math.max(
+    decisionMatchCards.length,
+    getNonNegativeCount(review.matchChoiceCount),
+  );
   const hasManualSafeAdd = review.canAddToLibrary === true;
   const hasQualityChoice = Boolean(review.canAllowFallbackQuality || review.canSearchAgain);
   const hasRouteAction = review.action?.type === 'route';
@@ -61,6 +78,13 @@ export function buildMusicQueueReviewPresentation(review) {
     hasEvidence: matchCards.length > 0 || qualityRows.length > 0 || (review.matchRows?.length ?? 0) > 0,
     hasMatchChoices,
     hasQualityChoice,
+    matchChoiceCopy: hasMatchChoices
+      ? buildMatchChoiceCopy({
+        matchChoiceCount,
+        visibleMatchCount: decisionMatchCards.length,
+      })
+      : '',
+    matchChoiceCount,
     primaryQualityRows: qualityRows.filter((row) => PRIMARY_QUALITY_ROW_LABELS.has(row.label)),
     recovery,
   };

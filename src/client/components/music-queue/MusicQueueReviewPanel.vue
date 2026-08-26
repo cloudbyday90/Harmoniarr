@@ -244,7 +244,7 @@ defineExpose({ getActionElement, getHeadingElement, getOutcomeHeadingElement });
       <section v-if="presentation.hasMatchChoices" class="music-queue-review__section" aria-labelledby="music-queue-review-match-choice">
         <div>
           <h3 id="music-queue-review-match-choice">Choose a match</h3>
-          <p>Only these matches can move this release forward right now.</p>
+          <p>{{ presentation.matchChoiceCopy }}</p>
         </div>
         <div class="music-queue-review__match-list" role="list">
           <MusicQueueReviewMatchCard

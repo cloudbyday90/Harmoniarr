@@ -204,7 +204,7 @@ function buildMatchChoicePayload() {
           scoreGap: 3,
         },
         statusCounts: { pending: 2 },
-        totalCount: 2,
+        totalCount: 8,
       },
     },
     expectedTrackCount: 12,
@@ -921,8 +921,12 @@ suite('Music Queue release row hierarchy browser verification', () => {
 
       const reviewPanel = page.locator('.music-queue-review');
       const decisionCard = reviewPanel.locator('.music-queue-review-match').filter({ hasText: 'Match 1' });
-      await decisionCard.getByRole('button', { name: 'Use this match' }).waitFor();
-      await decisionCard.getByRole('button', { name: 'Reject match' }).waitFor();
+      await reviewPanel.getByText(
+        'Showing 2 highest-ranked matches of 8 candidates. Select a match only when it fits this release and your quality policy.',
+        { exact: true },
+      ).waitFor();
+      await decisionCard.getByRole('button', { exact: true, name: 'Use this match: Match 1' }).waitFor();
+      await decisionCard.getByRole('button', { exact: true, name: 'Reject match: Match 1' }).waitFor();
       await decisionCard.getByText('Quality', { exact: true }).waitFor();
       await decisionCard.getByText('Format', { exact: true }).waitFor();
       await decisionCard.getByText('Tracks', { exact: true }).waitFor();
@@ -931,9 +935,9 @@ suite('Music Queue release row hierarchy browser verification', () => {
 
       const matchDetails = decisionCard.locator('details.music-queue-review-match__details');
       assert.equal(await matchDetails.evaluate((element) => element.open), false);
-      await decisionCard.getByRole('button', { name: 'Use this match' }).focus();
-      await decisionCard.getByRole('button', { name: 'Use this match' }).press('Tab');
-      await decisionCard.getByRole('button', { name: 'Reject match' }).press('Tab');
+      await decisionCard.getByRole('button', { exact: true, name: 'Use this match: Match 1' }).focus();
+      await decisionCard.getByRole('button', { exact: true, name: 'Use this match: Match 1' }).press('Tab');
+      await decisionCard.getByRole('button', { exact: true, name: 'Reject match: Match 1' }).press('Tab');
       assert.equal(
         await matchDetails.locator('summary').evaluate((element) => globalThis.document.activeElement === element),
         true,
