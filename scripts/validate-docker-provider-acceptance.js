@@ -11,6 +11,7 @@ import {
   renderDockerProviderAcceptanceSuccessMessage,
   runDockerProviderAcceptanceEvidence,
 } from './docker-provider-acceptance-evidence.js';
+import { resolveDockerProviderAcceptanceRequirements } from './docker-provider-acceptance-requirements.js';
 import { getOptionalDockerSmokeEvidencePath } from './docker-smoke-evidence.js';
 import { getBooleanInput, getOptionalStringInput, getRequiredStringInput, parseStrictScriptOptions } from './script-input-resolution.js';
 import { runDirectScriptTask } from './script-runtime.js';
@@ -25,6 +26,7 @@ export const validateDockerProviderAcceptanceCliOptions = Object.freeze({
   headless: { type: 'boolean' },
   password: { type: 'string' },
   'password-file': { type: 'string' },
+  'readiness-only': { type: 'boolean' },
   'require-accepted-transfer': { type: 'boolean' },
   'require-configured-provider': { type: 'boolean' },
   'require-diagnostic': { type: 'boolean' },
@@ -69,6 +71,7 @@ export async function resolveDockerProviderAcceptanceInputs({
     dockerProviderAcceptanceEvidencePathEnvVar,
     env,
   ) ?? getOptionalDockerSmokeEvidencePath(env);
+  const requirements = resolveDockerProviderAcceptanceRequirements({ env, values });
 
   return {
     baseUrl: getOptionalStringInput(values, 'base-url', 'HARMONIARR_BASE_URL', env)
@@ -84,41 +87,7 @@ export async function resolveDockerProviderAcceptanceInputs({
       readFileFn,
       values,
     }),
-    requireAcceptedTransfer: getBooleanInput(
-      values,
-      'require-accepted-transfer',
-      'HARMONIARR_DOCKER_PROVIDER_ACCEPTANCE_REQUIRE_ACCEPTED_TRANSFER',
-      env,
-      false,
-    ),
-    requireConfiguredProvider: getBooleanInput(
-      values,
-      'require-configured-provider',
-      'HARMONIARR_DOCKER_PROVIDER_ACCEPTANCE_REQUIRE_CONFIGURED_PROVIDER',
-      env,
-      true,
-    ),
-    requireDiagnostic: getBooleanInput(
-      values,
-      'require-diagnostic',
-      'HARMONIARR_DOCKER_PROVIDER_ACCEPTANCE_REQUIRE_DIAGNOSTIC',
-      env,
-      true,
-    ),
-    requireMusicQueueLink: getBooleanInput(
-      values,
-      'require-music-queue-link',
-      'HARMONIARR_DOCKER_PROVIDER_ACCEPTANCE_REQUIRE_MUSIC_QUEUE_LINK',
-      env,
-      false,
-    ),
-    requirePathMapping: getBooleanInput(
-      values,
-      'require-path-mapping',
-      'HARMONIARR_DOCKER_PROVIDER_ACCEPTANCE_REQUIRE_PATH_MAPPING',
-      env,
-      true,
-    ),
+    ...requirements,
     screenshotDir: getOptionalStringInput(
       values,
       'screenshot-dir',

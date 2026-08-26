@@ -5,6 +5,7 @@ import {
   assertProviderAcceptanceEvidenceResult,
   buildProviderAcceptanceEvidenceResult,
   openImportReviewRunHistoryDisclosure,
+  renderDockerProviderAcceptanceSuccessMessage,
   runDockerProviderAcceptanceEvidence,
   summarizeExecutionDiagnostics,
 } from '../../scripts/docker-provider-acceptance-evidence.js';
@@ -360,6 +361,54 @@ test('resolveDockerProviderAcceptanceInputs accepts a file-backed walkthrough pa
   });
 
   assert.equal(inputs.password, 'FilePass123!');
+});
+
+test('resolveDockerProviderAcceptanceInputs selects read-only readiness requirements', async () => {
+  const inputs = await resolveDockerProviderAcceptanceInputs({
+    args: ['--readiness-only'],
+    env: {
+      HARMONIARR_WALKTHROUGH_PASSWORD: 'HarmoniarrLocal123!',
+      HARMONIARR_WALKTHROUGH_USERNAME: 'walkthrough-admin',
+    },
+  });
+
+  assert.equal(inputs.requireAcceptedTransfer, false);
+  assert.equal(inputs.requireConfiguredProvider, true);
+  assert.equal(inputs.requireDiagnostic, false);
+  assert.equal(inputs.requireMusicQueueLink, false);
+  assert.equal(inputs.requirePathMapping, true);
+});
+
+test('renderDockerProviderAcceptanceSuccessMessage distinguishes readiness from transfer acceptance', () => {
+  const readinessMessage = renderDockerProviderAcceptanceSuccessMessage({
+    baseUrl: 'http://127.0.0.1:47956',
+    importReview: { diagnostics: [] },
+    provider: { queueHealthStatus: 'ready' },
+    requirements: {
+      requireAcceptedTransfer: false,
+      requireConfiguredProvider: true,
+      requireDiagnostic: false,
+      requireMusicQueueLink: false,
+      requirePathMapping: true,
+    },
+    username: 'walkthrough-admin',
+  });
+  const acceptanceMessage = renderDockerProviderAcceptanceSuccessMessage({
+    baseUrl: 'http://127.0.0.1:47956',
+    importReview: { diagnostics: [] },
+    provider: { queueHealthStatus: 'ready' },
+    requirements: {
+      requireAcceptedTransfer: false,
+      requireConfiguredProvider: true,
+      requireDiagnostic: true,
+      requireMusicQueueLink: false,
+      requirePathMapping: true,
+    },
+    username: 'walkthrough-admin',
+  });
+
+  assert.match(readinessMessage, /^Docker provider readiness evidence passed/u);
+  assert.match(acceptanceMessage, /^Docker provider acceptance evidence passed/u);
 });
 
 test('runDockerProviderAcceptanceEvidence writes evidence and closes browser resources', async () => {

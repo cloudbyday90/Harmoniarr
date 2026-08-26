@@ -198,6 +198,20 @@ presence, durable Import Review download acceptance diagnostics, and the
 browser-visible diagnostic panel. To require that slskd accepted at least one
 transfer, run:
 
+Before starting an Import Review download run, verify the connection and path
+mapping alone with the explicit read-only mode. It never starts a provider
+request or transfer, and it does not claim that one has been accepted:
+
+```powershell
+npm run validate:docker-provider-acceptance -- -- --readiness-only
+```
+
+Readiness-only keeps provider configuration and download path mapping required.
+It rejects an accepted-transfer, diagnostic, or Music Queue-link requirement,
+and it rejects attempts to turn either setup prerequisite off. Use the strict
+checks below only after an operator has intentionally started a local provider
+run.
+
 ```powershell
 npm run validate:docker-provider-acceptance -- -- --require-accepted-transfer
 ```

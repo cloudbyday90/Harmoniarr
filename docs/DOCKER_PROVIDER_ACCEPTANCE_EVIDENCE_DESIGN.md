@@ -123,6 +123,19 @@ $env:HARMONIARR_WALKTHROUGH_PASSWORD = "HarmoniarrLocal123!"
 npm run validate:docker-provider-acceptance
 ```
 
+To verify only the safe setup prerequisites before starting an Import Review
+download run, use readiness-only mode. It requires the configured provider and
+download path mapping, but intentionally does not require a diagnostic,
+provider-accepted transfer, or Music Queue-linked transfer:
+
+```powershell
+npm run validate:docker-provider-acceptance -- -- --readiness-only
+```
+
+Readiness-only mode rejects conflicting strict execution flags and attempts to
+disable either setup prerequisite. It is a read-only preparation check, not
+evidence that a provider accepted a transfer.
+
 For a stricter acceptance proof:
 
 ```powershell

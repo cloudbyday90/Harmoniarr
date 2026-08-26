@@ -20,6 +20,7 @@ import {
   formatProviderAcceptanceReadinessError,
   resolveProviderAcceptanceRequirements,
 } from './docker-provider-acceptance-readiness.js';
+import { isDockerProviderReadinessOnly } from './docker-provider-acceptance-requirements.js';
 import { writeDockerSmokeEvidence } from './docker-smoke-evidence.js';
 
 export const defaultDockerProviderAcceptanceBaseUrl = 'http://127.0.0.1:47956';
@@ -427,11 +428,15 @@ export function renderDockerProviderAcceptanceSuccessMessage({
   evidencePath,
   importReview,
   provider,
+  requirements,
   username,
 } = {}) {
   const diagnosticCodes = importReview?.diagnostics?.map((diagnostic) => diagnostic.code).join(', ') || 'none';
   const evidenceSummary = evidencePath ? `; evidence ${evidencePath}` : '';
-  return `Docker provider acceptance evidence passed for ${username} on ${baseUrl} (provider ${provider?.queueHealthStatus ?? 'unknown'}; diagnostics ${diagnosticCodes}${evidenceSummary})`;
+  const validationMode = isDockerProviderReadinessOnly(requirements)
+    ? 'readiness'
+    : 'acceptance';
+  return `Docker provider ${validationMode} evidence passed for ${username} on ${baseUrl} (provider ${provider?.queueHealthStatus ?? 'unknown'}; diagnostics ${diagnosticCodes}${evidenceSummary})`;
 }
 
 export async function runDockerProviderAcceptanceEvidence({
