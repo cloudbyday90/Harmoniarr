@@ -30,8 +30,8 @@ import {
 import { buildMusicQueueSummaryCards, normalizeMusicQueueRelease } from '../lib/acquisition-pipeline-presentation.js';
 import { getErrorMessage } from '../lib/error-utils.js';
 import { createMissingMusicActionFeedback } from '../lib/missing-music-action-feedback-presentation.js';
-import { buildMusicQueueMatchSelectionSuccessMessage } from '../lib/music-queue-match-selection-feedback-presentation.js';
-import { createMusicQueueReleaseMutationGate } from '../lib/music-queue-release-mutation-gate.js';
+import { buildMissingMusicMatchSelectionSuccessMessage } from '../lib/missing-music-match-selection-feedback-presentation.js';
+import { createMissingMusicReleaseMutationGate } from '../lib/missing-music-release-mutation-gate.js';
 import { createRetryIdempotencyKeyStore } from '../lib/retry-idempotency-key-store.js';
 import {
   isMissingMusicActiveProgressRelease,
@@ -70,7 +70,7 @@ export function useMusicQueue({
   const activeMutationWantedReleaseId = ref('');
   const activeReleaseActionKey = ref('');
   const hasArtistScope = metadataArtistId !== null;
-  const releaseMutationGate = createMusicQueueReleaseMutationGate();
+  const releaseMutationGate = createMissingMusicReleaseMutationGate();
   const retryIdempotencyKeyStore = createRetryIdempotencyKeyStore();
 
   function getMetadataArtistId() {
@@ -226,7 +226,7 @@ export function useMusicQueue({
       idempotencyScope: 'acquisition.music-queue.matches.use',
       matchId,
       pendingMessage: 'Using this match...',
-      successMessage: buildMusicQueueMatchSelectionSuccessMessage,
+      successMessage: buildMissingMusicMatchSelectionSuccessMessage,
       wantedReleaseId,
     });
   }

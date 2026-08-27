@@ -16,46 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-function normalizeWantedReleaseId(value) {
-  return typeof value === 'string' ? value.trim() : '';
-}
-
-/**
- * Keeps client-side Music Queue mutations single-flight. The active release
- * identifier is intentionally exposed as plain state so a selected inspector
- * can consistently make every competing action unavailable before its request
- * begins.
- */
-export function createMusicQueueReleaseMutationGate() {
-  let activeWantedReleaseId = '';
-
-  function acquire(wantedReleaseId) {
-    const normalizedWantedReleaseId = normalizeWantedReleaseId(wantedReleaseId);
-    if (!normalizedWantedReleaseId || activeWantedReleaseId) {
-      return false;
-    }
-
-    activeWantedReleaseId = normalizedWantedReleaseId;
-    return true;
-  }
-
-  function release(wantedReleaseId) {
-    const normalizedWantedReleaseId = normalizeWantedReleaseId(wantedReleaseId);
-    if (!normalizedWantedReleaseId || activeWantedReleaseId !== normalizedWantedReleaseId) {
-      return false;
-    }
-
-    activeWantedReleaseId = '';
-    return true;
-  }
-
-  function getActiveWantedReleaseId() {
-    return activeWantedReleaseId;
-  }
-
-  return {
-    acquire,
-    getActiveWantedReleaseId,
-    release,
-  };
-}
+// Compatibility facade for callers that have not yet moved to Missing Music.
+export {
+  createMissingMusicReleaseMutationGate as createMusicQueueReleaseMutationGate,
+} from './missing-music-release-mutation-gate.js';

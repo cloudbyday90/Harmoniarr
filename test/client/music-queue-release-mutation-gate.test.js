@@ -20,9 +20,17 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { createMusicQueueReleaseMutationGate } from '../../src/client/lib/music-queue-release-mutation-gate.js';
+import { createMissingMusicReleaseMutationGate } from '../../src/client/lib/missing-music-release-mutation-gate.js';
 
-test('Music Queue release mutation gate permits one active release action and only its owner can release it', () => {
-  const gate = createMusicQueueReleaseMutationGate();
+test('Missing Music mutation gate retains the legacy export identity', () => {
+  assert.equal(
+    createMusicQueueReleaseMutationGate,
+    createMissingMusicReleaseMutationGate,
+  );
+});
+
+test('Missing Music mutation gate permits one active release action and only its owner can release it', () => {
+  const gate = createMissingMusicReleaseMutationGate();
 
   assert.equal(gate.acquire(' wanted-1 '), true);
   assert.equal(gate.getActiveWantedReleaseId(), 'wanted-1');
@@ -35,8 +43,8 @@ test('Music Queue release mutation gate permits one active release action and on
   assert.equal(gate.acquire('wanted-2'), true);
 });
 
-test('Music Queue release mutation gate rejects blank release identifiers', () => {
-  const gate = createMusicQueueReleaseMutationGate();
+test('Missing Music mutation gate rejects blank release identifiers', () => {
+  const gate = createMissingMusicReleaseMutationGate();
 
   assert.equal(gate.acquire(), false);
   assert.equal(gate.acquire('   '), false);

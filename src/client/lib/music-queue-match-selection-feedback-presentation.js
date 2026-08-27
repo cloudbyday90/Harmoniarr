@@ -16,21 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { buildMusicQueueReleaseTransitionPresentation } from './music-queue-release-transition-presentation.js';
-
-const FALLBACK_SUCCESS_MESSAGE = 'Match selected. Harmoniarr will update this release as it prepares the next step.';
-
-/**
- * Builds a bounded, state-derived confirmation after a manual Music Queue
- * match selection. The response release is authoritative; the client does not
- * infer that a provider transfer has been accepted.
- *
- * @param {{ release?: { status?: { code?: unknown }, statusCode?: unknown } } | null | undefined} result
- * @returns {string}
- */
-export function buildMusicQueueMatchSelectionSuccessMessage(result) {
-  const transition = buildMusicQueueReleaseTransitionPresentation(result?.release);
-  return transition
-    ? `Match selected. ${transition.message}`
-    : FALLBACK_SUCCESS_MESSAGE;
-}
+// Compatibility facade for callers that have not yet moved to Missing Music.
+export {
+  buildMissingMusicMatchSelectionSuccessMessage as buildMusicQueueMatchSelectionSuccessMessage,
+} from './missing-music-match-selection-feedback-presentation.js';

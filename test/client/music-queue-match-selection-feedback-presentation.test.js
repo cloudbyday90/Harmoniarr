@@ -19,25 +19,33 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildMusicQueueMatchSelectionSuccessMessage } from '../../src/client/lib/music-queue-match-selection-feedback-presentation.js';
+import { buildMissingMusicMatchSelectionSuccessMessage } from '../../src/client/lib/missing-music-match-selection-feedback-presentation.js';
 
-test('Music Queue match selection feedback uses the authoritative automatic handoff state', () => {
+test('Missing Music match selection feedback retains the legacy export identity', () => {
   assert.equal(
-    buildMusicQueueMatchSelectionSuccessMessage({
+    buildMusicQueueMatchSelectionSuccessMessage,
+    buildMissingMusicMatchSelectionSuccessMessage,
+  );
+});
+
+test('Missing Music match selection feedback uses the authoritative automatic handoff state', () => {
+  assert.equal(
+    buildMissingMusicMatchSelectionSuccessMessage({
       release: { status: { code: 'checking_matches' } },
     }),
     'Match selected. Harmoniarr will automatically queue the selected match for download when its checks finish.',
   );
   assert.equal(
-    buildMusicQueueMatchSelectionSuccessMessage({
+    buildMissingMusicMatchSelectionSuccessMessage({
       release: { statusCode: 'downloading' },
     }),
     'Match selected. Harmoniarr will automatically check the files, then add them to the library.',
   );
 });
 
-test('Music Queue match selection feedback avoids claiming a download when no handoff state is returned', () => {
+test('Missing Music match selection feedback avoids claiming a download when no handoff state is returned', () => {
   assert.equal(
-    buildMusicQueueMatchSelectionSuccessMessage({ ok: true }),
+    buildMissingMusicMatchSelectionSuccessMessage({ ok: true }),
     'Match selected. Harmoniarr will update this release as it prepares the next step.',
   );
 });
