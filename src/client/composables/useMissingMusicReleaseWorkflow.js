@@ -16,13 +16,442 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-// Canonical client entry point. The legacy composable remains an ESM adapter
-// until its remaining internal dependencies move in a later migration phase.
-export {
-  hasActiveMusicQueueProgress as hasActiveMissingMusicReleaseProgress,
-  useMusicQueue as useMissingMusicReleaseWorkflow,
-} from './useMusicQueue.js';
-
-export {
+import { computed, readonly, ref, toValue, watch } from 'vue';
+import { useAsyncResource } from './useAsyncResource.js';
+import {
+  addMissingMusicReleaseToLibrary as defaultAddMusicQueueReleaseToLibrary,
+  allowMissingMusicFallbackQuality as defaultAllowMusicQueueFallbackQuality,
+  fetchMissingMusicReleases as defaultFetchMusicQueueReleases,
+  recheckMissingMusicReleaseSafeAdd as defaultRecheckMusicQueueReleaseSafeAdd,
+  rejectMissingMusicMatch as defaultRejectMusicQueueMatch,
+  searchMissingMusicReleaseAgain as defaultSearchMusicQueueReleaseAgain,
+  selectMissingMusicMatch as defaultUseMusicQueueMatch,
+} from '../lib/missing-music-release-api.js';
+import { buildMusicQueueSummaryCards, normalizeMusicQueueRelease } from '../lib/acquisition-pipeline-presentation.js';
+import { getErrorMessage } from '../lib/error-utils.js';
+import { createMissingMusicActionFeedback } from '../lib/missing-music-action-feedback-presentation.js';
+import { buildMissingMusicMatchSelectionSuccessMessage } from '../lib/missing-music-match-selection-feedback-presentation.js';
+import { createMissingMusicReleaseMutationGate } from '../lib/missing-music-release-mutation-gate.js';
+import { createRetryIdempotencyKeyStore } from '../lib/retry-idempotency-key-store.js';
+import {
+  isMissingMusicActiveProgressRelease,
   MISSING_MUSIC_ACTIVE_PROGRESS_STATUSES,
 } from '../lib/missing-music-progress-state.js';
+
+export { MISSING_MUSIC_ACTIVE_PROGRESS_STATUSES };
+
+/**
+ * Keeps short-lived automatic work visible without continuously polling stable
+ * releases that require no background UI update.
+ *
+ * @param {{ releases?: Array<{ status?: { code?: string }, statusCode?: string }> } | null | undefined} payload
+ * @returns {boolean}
+ */
+export function hasActiveMissingMusicReleaseProgress(payload) {
+  const releases = Array.isArray(payload?.releases) ? payload.releases : [];
+  return releases.some(isMissingMusicActiveProgressRelease);
+}
+
+export function useMissingMusicReleaseWorkflow({
+  addMusicQueueReleaseToLibrary = defaultAddMusicQueueReleaseToLibrary,
+  allowMusicQueueFallbackQuality = defaultAllowMusicQueueFallbackQuality,
+  fetchMusicQueueReleases = defaultFetchMusicQueueReleases,
+  immediate = true,
+  limit = 100,
+  metadataArtistId = null,
+  pollIntervalMs = 10000,
+  rejectMusicQueueMatch = defaultRejectMusicQueueMatch,
+  recheckMusicQueueReleaseSafeAdd = defaultRecheckMusicQueueReleaseSafeAdd,
+  searchMusicQueueReleaseAgain = defaultSearchMusicQueueReleaseAgain,
+  useMusicQueueMatch = defaultUseMusicQueueMatch,
+} = {}) {
+  const actionFeedback = ref(null);
+  const activeMatchActionKey = ref('');
+  const activeMutationWantedReleaseId = ref('');
+  const activeReleaseActionKey = ref('');
+  const hasArtistScope = metadataArtistId !== null;
+  const releaseMutationGate = createMissingMusicReleaseMutationGate();
+  const retryIdempotencyKeyStore = createRetryIdempotencyKeyStore();
+
+  function getMetadataArtistId() {
+    const value = toValue(metadataArtistId);
+    return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+  }
+
+  const resource = useAsyncResource({
+    fallbackErrorMessage: 'Missing Music failed to load',
+    fetcher: () => fetchMusicQueueReleases({
+      limit,
+      metadataArtistId: getMetadataArtistId(),
+    }),
+    immediate: hasArtistScope ? false : immediate,
+    initialData: { pagination: { total: 0 }, releases: [], summary: { counts: {}, total: 0 } },
+    pollIntervalMs,
+    pollWhile: (payload) => (
+      (!hasArtistScope || Boolean(getMetadataArtistId()))
+      && hasActiveMissingMusicReleaseProgress(payload)
+    ),
+    project: (payload) => ({
+      checkedAt: payload?.checkedAt ?? null,
+      pagination: payload?.pagination ?? { total: 0 },
+      releases: Array.isArray(payload?.releases) ? payload.releases.map(normalizeMusicQueueRelease) : [],
+      summary: payload?.summary ?? { counts: {}, total: 0 },
+    }),
+    revalidateOnFocus: true,
+  });
+
+  if (hasArtistScope) {
+    watch(getMetadataArtistId, (nextMetadataArtistId, previousMetadataArtistId) => {
+      if (nextMetadataArtistId === previousMetadataArtistId && previousMetadataArtistId !== undefined) {
+        return;
+      }
+
+      resource.reset();
+      if (nextMetadataArtistId) {
+        void resource.load();
+      }
+    }, { immediate: true });
+  }
+
+  const releases = computed(() => resource.data.value.releases ?? []);
+  const summaryCards = computed(() => buildMusicQueueSummaryCards(resource.data.value.summary));
+  const totalCount = computed(() => resource.data.value.pagination?.total ?? releases.value.length);
+
+  function applyMutationRelease(payload) {
+    const updatedRelease = normalizeMusicQueueRelease(payload?.release);
+    if (!updatedRelease?.id || !Array.isArray(resource.data.value.releases)) {
+      return;
+    }
+
+    let didReplace = false;
+    const nextReleases = resource.data.value.releases.map((release) => {
+      if (release.id !== updatedRelease.id) return release;
+      didReplace = true;
+      return updatedRelease;
+    });
+
+    if (didReplace) {
+      resource.data.value = {
+        ...resource.data.value,
+        releases: nextReleases,
+      };
+    }
+  }
+
+  function setActionFeedback({ actionKey, message, phase, wantedReleaseId }) {
+    actionFeedback.value = createMissingMusicActionFeedback({
+      actionKey,
+      message,
+      phase,
+      wantedReleaseId,
+    });
+  }
+
+  function acquireReleaseMutation(wantedReleaseId) {
+    if (!releaseMutationGate.acquire(wantedReleaseId)) {
+      return false;
+    }
+
+    activeMutationWantedReleaseId.value = releaseMutationGate.getActiveWantedReleaseId();
+    return true;
+  }
+
+  function releaseReleaseMutation(wantedReleaseId) {
+    releaseMutationGate.release(wantedReleaseId);
+    activeMutationWantedReleaseId.value = releaseMutationGate.getActiveWantedReleaseId();
+  }
+
+  async function runMatchAction({
+    actionKey,
+    apiFn,
+    matchId,
+    idempotencyScope = null,
+    pendingMessage,
+    successMessage,
+    wantedReleaseId,
+  }) {
+    if (!wantedReleaseId || !matchId) {
+      return null;
+    }
+
+    if (!acquireReleaseMutation(wantedReleaseId)) {
+      return null;
+    }
+
+    activeMatchActionKey.value = actionKey;
+    setActionFeedback({ actionKey, message: pendingMessage, phase: 'working', wantedReleaseId });
+
+    try {
+      const idempotencyKey = idempotencyScope
+        ? retryIdempotencyKeyStore.getOrCreate({ actionKey, scope: idempotencyScope })
+        : null;
+      const payload = await apiFn({ idempotencyKey, matchId, wantedReleaseId });
+      applyMutationRelease(payload);
+      if (idempotencyScope) {
+        retryIdempotencyKeyStore.clear(actionKey);
+      }
+      setActionFeedback({
+        actionKey,
+        message: typeof successMessage === 'function' ? successMessage(payload) : successMessage,
+        phase: 'success',
+        wantedReleaseId,
+      });
+      await resource.load();
+      return payload;
+    } catch (error) {
+      if (idempotencyScope && Number.isInteger(error?.status)) {
+        retryIdempotencyKeyStore.clear(actionKey);
+      }
+      if (error?.code === 'music_queue_candidate_already_active') {
+        await resource.load();
+      }
+      setActionFeedback({
+        actionKey,
+        message: getErrorMessage(error, 'Missing Music match action failed.') || 'Missing Music match action failed.',
+        phase: 'error',
+        wantedReleaseId,
+      });
+      return null;
+    } finally {
+      activeMatchActionKey.value = '';
+      releaseReleaseMutation(wantedReleaseId);
+    }
+  }
+
+  function useMatch({ matchId, wantedReleaseId } = {}) {
+    const actionKey = `${wantedReleaseId}:${matchId}:use`;
+    return runMatchAction({
+      actionKey,
+      apiFn: useMusicQueueMatch,
+      idempotencyScope: 'acquisition.music-queue.matches.use',
+      matchId,
+      pendingMessage: 'Using this match...',
+      successMessage: buildMissingMusicMatchSelectionSuccessMessage,
+      wantedReleaseId,
+    });
+  }
+
+  function rejectMatch({ matchId, wantedReleaseId } = {}) {
+    return runMatchAction({
+      actionKey: `${wantedReleaseId}:${matchId}:reject`,
+      apiFn: rejectMusicQueueMatch,
+      matchId,
+      pendingMessage: 'Rejecting this match...',
+      successMessage: 'Match rejected. Harmoniarr will not choose it for this release.',
+      wantedReleaseId,
+    });
+  }
+
+  async function searchAgain({ wantedReleaseId } = {}) {
+    if (!wantedReleaseId) {
+      return null;
+    }
+
+    if (!acquireReleaseMutation(wantedReleaseId)) {
+      return null;
+    }
+
+    const actionKey = `${wantedReleaseId}:search-again`;
+    activeReleaseActionKey.value = actionKey;
+    setActionFeedback({
+      actionKey,
+      message: 'Queuing another search...',
+      phase: 'working',
+      wantedReleaseId,
+    });
+
+    try {
+      const payload = await searchMusicQueueReleaseAgain({ wantedReleaseId });
+      applyMutationRelease(payload);
+      setActionFeedback({
+        actionKey,
+        message: payload?.action?.restartAlreadyQueued
+          ? 'A search is already queued for this release. Harmoniarr will continue it automatically.'
+          : payload?.action?.dispatchAlreadyActive
+          ? 'Search queued. Discovery is already running and will pick this up.'
+          : 'Search queued. Harmoniarr will look for this release again.',
+        phase: 'success',
+        wantedReleaseId,
+      });
+      await resource.load();
+      return payload;
+    } catch (error) {
+      setActionFeedback({
+        actionKey,
+        message: getErrorMessage(error, 'Missing Music search retry failed.') || 'Missing Music search retry failed.',
+        phase: 'error',
+        wantedReleaseId,
+      });
+      return null;
+    } finally {
+      activeReleaseActionKey.value = '';
+      releaseReleaseMutation(wantedReleaseId);
+    }
+  }
+
+  async function allowFallbackQuality({ wantedReleaseId } = {}) {
+    if (!wantedReleaseId) {
+      return null;
+    }
+
+    if (!acquireReleaseMutation(wantedReleaseId)) {
+      return null;
+    }
+
+    const actionKey = `${wantedReleaseId}:allow-fallback-quality`;
+    activeReleaseActionKey.value = actionKey;
+    setActionFeedback({
+      actionKey,
+      message: 'Saving the fallback-quality choice...',
+      phase: 'working',
+      wantedReleaseId,
+    });
+
+    try {
+      const payload = await allowMusicQueueFallbackQuality({ wantedReleaseId });
+      applyMutationRelease(payload);
+      setActionFeedback({
+        actionKey,
+        message: payload?.action?.dispatchAlreadyActive
+          ? 'Fallback quality allowed. Discovery is already running and will pick this up.'
+          : 'Fallback quality allowed. Harmoniarr will look for an acceptable match.',
+        phase: 'success',
+        wantedReleaseId,
+      });
+      await resource.load();
+      return payload;
+    } catch (error) {
+      setActionFeedback({
+        actionKey,
+        message: getErrorMessage(error, 'Missing Music fallback quality update failed.') || 'Missing Music fallback quality update failed.',
+        phase: 'error',
+        wantedReleaseId,
+      });
+      return null;
+    } finally {
+      activeReleaseActionKey.value = '';
+      releaseReleaseMutation(wantedReleaseId);
+    }
+  }
+
+  async function recheckLibraryAdd({ wantedReleaseId } = {}) {
+    if (!wantedReleaseId) {
+      return null;
+    }
+
+    if (!acquireReleaseMutation(wantedReleaseId)) {
+      return null;
+    }
+
+    const actionKey = `${wantedReleaseId}:recheck-library-add`;
+    activeReleaseActionKey.value = actionKey;
+    setActionFeedback({
+      actionKey,
+      message: 'Rechecking this completed download...',
+      phase: 'working',
+      wantedReleaseId,
+    });
+
+    try {
+      const payload = await recheckMusicQueueReleaseSafeAdd({ wantedReleaseId });
+      applyMutationRelease(payload);
+      const outcome = payload?.action?.outcome;
+      const message = outcome === 'queued'
+        ? 'Audio check passed. Harmoniarr queued this release for a safe library add.'
+        : outcome === 'deferred'
+        ? 'Audio check passed, but another library add is already active. Try this release again after that work finishes.'
+        : outcome === 'prerequisite_not_ready'
+        ? 'Media tools are not ready yet, so Harmoniarr left this completed download unchanged.'
+        : outcome === 'still_needs_review'
+        ? 'This completed download still needs review before Harmoniarr can add it safely.'
+        : 'This release is no longer eligible for an automatic library-add recheck.';
+      setActionFeedback({
+        actionKey,
+        message,
+        phase: outcome === 'queued' ? 'success' : 'error',
+        wantedReleaseId,
+      });
+      await resource.load();
+      return payload;
+    } catch (error) {
+      setActionFeedback({
+        actionKey,
+        message: getErrorMessage(error, 'Missing Music library-add recheck failed.') || 'Missing Music library-add recheck failed.',
+        phase: 'error',
+        wantedReleaseId,
+      });
+      return null;
+    } finally {
+      activeReleaseActionKey.value = '';
+      releaseReleaseMutation(wantedReleaseId);
+    }
+  }
+
+  async function addToLibrary({ wantedReleaseId } = {}) {
+    if (!wantedReleaseId) {
+      return null;
+    }
+
+    if (!acquireReleaseMutation(wantedReleaseId)) {
+      return null;
+    }
+
+    const actionKey = `${wantedReleaseId}:add-to-library`;
+    activeReleaseActionKey.value = actionKey;
+    setActionFeedback({
+      actionKey,
+      message: 'Checking the completed files before adding them to your library...',
+      phase: 'working',
+      wantedReleaseId,
+    });
+
+    try {
+      const payload = await addMusicQueueReleaseToLibrary({ wantedReleaseId });
+      applyMutationRelease(payload);
+      const outcome = payload?.action?.outcome;
+      const message = outcome === 'queued'
+        ? 'Harmoniarr verified the completed files and queued this release to be added to your library.'
+        : outcome === 'deferred'
+        ? 'This release is safe to add, but another library add is already active. Harmoniarr will keep it ready.'
+        : outcome === 'still_needs_review'
+        ? 'Harmoniarr checked the completed files again and found something that needs review before adding.'
+        : 'This release is no longer ready to add. Harmoniarr refreshed its status.';
+      setActionFeedback({
+        actionKey,
+        message,
+        phase: ['queued', 'deferred'].includes(outcome) ? 'success' : 'error',
+        wantedReleaseId,
+      });
+      await resource.load();
+      return payload;
+    } catch (error) {
+      setActionFeedback({
+        actionKey,
+        message: getErrorMessage(error, 'Missing Music library add failed.') || 'Missing Music library add failed.',
+        phase: 'error',
+        wantedReleaseId,
+      });
+      return null;
+    } finally {
+      activeReleaseActionKey.value = '';
+      releaseReleaseMutation(wantedReleaseId);
+    }
+  }
+
+  return {
+    ...resource,
+    actionFeedback: readonly(actionFeedback),
+    activeMatchActionKey: readonly(activeMatchActionKey),
+    activeMutationWantedReleaseId: readonly(activeMutationWantedReleaseId),
+    activeReleaseActionKey: readonly(activeReleaseActionKey),
+    addToLibrary,
+    allowFallbackQuality,
+    recheckLibraryAdd,
+    rejectMatch,
+    releases,
+    searchAgain,
+    summaryCards,
+    totalCount,
+    useMatch,
+  };
+}

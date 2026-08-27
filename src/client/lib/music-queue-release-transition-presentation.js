@@ -16,30 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-const AUTOMATIC_TRANSITION_MESSAGES = Object.freeze({
-  adding_to_library: 'Harmoniarr will finish adding the files and update this release.',
-  checking_matches: 'Harmoniarr will automatically queue the selected match for download when its checks finish.',
-  downloading: 'Harmoniarr will automatically check the files, then add them to the library.',
-  queued_for_search: 'Harmoniarr will automatically search for a matching release in the next pass.',
-  ready_to_add: 'Harmoniarr will automatically add the verified files to the library.',
-  retrying_search: 'Harmoniarr will automatically search again after the retry delay.',
-  searching: 'Harmoniarr will automatically check the best results against the selected quality settings.',
-  trying_next_match: 'Harmoniarr will automatically try the next eligible match.',
-});
-
-/**
- * Builds the one compact automatic handoff shown in a normal Music Queue row.
- * Unknown and attention states intentionally return null rather than claiming
- * a client-inferred next operation.
- *
- * @param {{ status?: { code?: unknown }, statusCode?: unknown }} release
- * @returns {{ label: string, message: string } | null}
- */
-export function buildMusicQueueReleaseTransitionPresentation(release = {}) {
-  const statusCode = typeof release?.statusCode === 'string'
-    ? release.statusCode
-    : release?.status?.code;
-  const message = AUTOMATIC_TRANSITION_MESSAGES[statusCode];
-
-  return message ? { label: 'Up next', message } : null;
-}
+// Compatibility facade for callers that have not yet moved to Missing Music.
+export {
+  buildMissingMusicReleaseTransitionPresentation as buildMusicQueueReleaseTransitionPresentation,
+} from './missing-music-release-transition-presentation.js';

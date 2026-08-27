@@ -52,6 +52,8 @@ import { buildMusicQueueMatchSelectionSuccessMessage } from '../../src/client/li
 import { buildMissingMusicMatchSelectionSuccessMessage } from '../../src/client/lib/missing-music-match-selection-feedback-presentation.js';
 import { createMusicQueueReleaseMutationGate } from '../../src/client/lib/music-queue-release-mutation-gate.js';
 import { createMissingMusicReleaseMutationGate } from '../../src/client/lib/missing-music-release-mutation-gate.js';
+import { buildMusicQueueReleaseTransitionPresentation } from '../../src/client/lib/music-queue-release-transition-presentation.js';
+import { buildMissingMusicReleaseTransitionPresentation } from '../../src/client/lib/missing-music-release-transition-presentation.js';
 import {
   MUSIC_QUEUE_ATTENTION_STATUSES,
   getMusicQueueReleaseStatusCode,
@@ -93,6 +95,7 @@ test('legacy client entry points remain aliases of canonical Missing Music modul
   assert.equal(createMusicQueueActionFeedback, createMissingMusicActionFeedback);
   assert.equal(buildMusicQueueMatchSelectionSuccessMessage, buildMissingMusicMatchSelectionSuccessMessage);
   assert.equal(createMusicQueueReleaseMutationGate, createMissingMusicReleaseMutationGate);
+  assert.equal(buildMusicQueueReleaseTransitionPresentation, buildMissingMusicReleaseTransitionPresentation);
   assert.equal(MUSIC_QUEUE_ACTIVE_PROGRESS_STATUSES, MISSING_MUSIC_ACTIVE_PROGRESS_STATUSES);
   assert.equal(MUSIC_QUEUE_ATTENTION_STATUSES, MISSING_MUSIC_ATTENTION_STATUSES);
   assert.equal(getMusicQueueReleaseStatusCode, getMissingMusicReleaseStatusCode);

@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { buildMusicQueueReleaseTransitionPresentation } from './music-queue-release-transition-presentation.js';
+import { buildMissingMusicReleaseTransitionPresentation } from './missing-music-release-transition-presentation.js';
 
 const FALLBACK_SUCCESS_MESSAGE = 'Match selected. Harmoniarr will update this release as it prepares the next step.';
 
@@ -29,7 +29,7 @@ const FALLBACK_SUCCESS_MESSAGE = 'Match selected. Harmoniarr will update this re
  * @returns {string}
  */
 export function buildMissingMusicMatchSelectionSuccessMessage(result) {
-  const transition = buildMusicQueueReleaseTransitionPresentation(result?.release);
+  const transition = buildMissingMusicReleaseTransitionPresentation(result?.release);
   return transition
     ? `Match selected. ${transition.message}`
     : FALLBACK_SUCCESS_MESSAGE;
