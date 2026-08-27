@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import harmoniarrIcon from '../assets/harmoniarr-icon.svg';
 import { sessionStore } from '../state/session.js';
@@ -30,6 +30,7 @@ import { buildVisibleNav, notificationTone } from '../lib/app-shell-presentation
 import { formatOperationTimestampShort } from '../lib/operation-run-presentation.js';
 import { formatDependencyProviderLabel, formatDependencyStatusLabel, getDependencyStatusClass } from '../lib/settings-connections-presentation.js';
 import { resolveMenuFocus } from '../lib/menu-keyboard-navigation.js';
+import { useMobileNavigationState } from '../composables/useMobileNavigationState.js';
 import ToastStack from './ToastStack.vue';
 import ConfirmDialogHost from './ConfirmDialogHost.vue';
 import PwaUpdateBanner from './PwaUpdateBanner.vue';
@@ -41,17 +42,46 @@ const route = useRoute();
 // ── Mobile sidebar drawer ─────────────────────────────────────────────────────
 
 const sidebarOpen = ref(false);
+const sidebarElement = ref(null);
+const menuButtonElement = ref(null);
+const { isMobileNavigation } = useMobileNavigationState();
+const isSidebarHidden = computed(() => isMobileNavigation.value && !sidebarOpen.value);
+
+function focusSidebarNavigation() {
+  void nextTick(() => sidebarElement.value?.querySelector('.hx-sidebar-link')?.focus());
+}
 
 function toggleSidebar() {
-  sidebarOpen.value = !sidebarOpen.value;
+  if (sidebarOpen.value) {
+    closeSidebar({ restoreFocus: true });
+    return;
+  }
+
+  sidebarOpen.value = true;
+  focusSidebarNavigation();
 }
 
-function closeSidebar() {
+function closeSidebar({ restoreFocus = false } = {}) {
   sidebarOpen.value = false;
+
+  if (restoreFocus && isMobileNavigation.value) {
+    void nextTick(() => menuButtonElement.value?.focus());
+  }
 }
 
-// Close the drawer automatically when the user navigates to a new route.
-watch(() => route.path, () => { sidebarOpen.value = false; });
+watch(isMobileNavigation, (isMobile) => {
+  if (!isMobile || sidebarOpen.value || !sidebarElement.value?.contains(document.activeElement)) {
+    return;
+  }
+
+  void nextTick(() => menuButtonElement.value?.focus());
+});
+// Close the drawer automatically when the user navigates to a new route. When
+// the navigation started in the mobile drawer, return focus to its visible
+// trigger before the now-inert drawer can remove the focused link.
+watch(() => route.path, () => {
+  closeSidebar({ restoreFocus: isMobileNavigation.value && sidebarOpen.value });
+});
 
 // Theme — applied immediately (composable calls applyToDocument in constructor)
 // and kept reactive. Provided as injection so child views can read/set preference.
@@ -307,6 +337,7 @@ onBeforeUnmount(() => {
       <div class="hx-topbar-actions">
         <!-- Hamburger: hidden on desktop via CSS, visible at ≤640px -->
         <button
+          ref="menuButtonElement"
           type="button"
           class="hx-topbar-hamburger"
           :aria-label="sidebarOpen ? 'Close menu' : 'Open menu'"
@@ -470,7 +501,15 @@ onBeforeUnmount(() => {
       </div>
     </header>
 
-    <aside class="hx-sidebar" :class="{ 'is-open': sidebarOpen }" aria-label="Primary">
+    <aside
+      ref="sidebarElement"
+      class="hx-sidebar"
+      :class="{ 'is-open': sidebarOpen }"
+      :aria-hidden="isSidebarHidden ? 'true' : undefined"
+      :inert="isSidebarHidden"
+      aria-label="Primary"
+      @keydown.esc="closeSidebar({ restoreFocus: true })"
+    >
       <nav class="hx-sidebar-nav">
         <RouterLink
           v-for="item in visibleNav"
@@ -511,7 +550,7 @@ onBeforeUnmount(() => {
       class="hx-sidebar-backdrop"
       aria-hidden="true"
       tabindex="-1"
-      @click="closeSidebar"
+      @click="closeSidebar({ restoreFocus: true })"
     />
 
     <!-- Mobile: bottom tab bar (hidden on desktop via CSS) -->
