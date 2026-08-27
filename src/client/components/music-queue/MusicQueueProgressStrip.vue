@@ -19,7 +19,7 @@
 <script setup>
 import { computed } from 'vue';
 import { RouterLink } from 'vue-router';
-import { buildMusicQueueProgressStrip } from '../../lib/music-queue-progress-presentation.js';
+import { buildMissingMusicProgressStrip } from '../../lib/missing-music-progress-presentation.js';
 
 const props = defineProps({
   activeOrAttentionOnly: {
@@ -32,7 +32,7 @@ const props = defineProps({
   },
   heading: {
     type: String,
-    default: 'Music Queue',
+    default: 'Missing Music',
   },
   isLoading: {
     type: Boolean,
@@ -56,12 +56,12 @@ const props = defineProps({
   },
 });
 
-const progress = computed(() => buildMusicQueueProgressStrip(props.releases, {
+const progress = computed(() => buildMissingMusicProgressStrip(props.releases, {
   activeOrAttentionOnly: props.activeOrAttentionOnly,
   releaseDetailsOnly: props.releaseDetailsOnly,
   transferProgressByRelease: props.transferProgressByRelease,
 }));
-const headingId = computed(() => `music-queue-progress-${props.heading.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`);
+const headingId = computed(() => `missing-music-progress-${props.heading.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`);
 </script>
 
 <template>
@@ -73,19 +73,19 @@ const headingId = computed(() => `music-queue-progress-${props.heading.toLowerCa
           {{ progress.summary }}
         </p>
       </div>
-      <RouterLink class="hx-btn" data-variant="ghost" :to="{ name: 'acquisition-music-queue' }">
+      <RouterLink class="hx-btn" data-variant="ghost" :to="{ name: 'missing' }">
         See all
       </RouterLink>
     </header>
 
     <div class="hx-card-body music-queue-progress__body">
-      <div v-if="isLoading" class="hx-skeleton-stack" aria-label="Loading Music Queue progress" aria-busy="true">
+      <div v-if="isLoading" class="hx-skeleton-stack" aria-label="Loading Missing Music progress" aria-busy="true">
         <div class="hx-skeleton" />
         <div class="hx-skeleton" />
       </div>
 
       <p v-else-if="errorMessage" class="music-queue-progress__message" role="status">
-        Music Queue progress could not be refreshed. Open Music Queue to try again.
+        Missing Music progress could not be refreshed. Open Missing Music to try again.
       </p>
 
       <p v-else-if="progress.totalCount === 0 && showEmpty" class="music-queue-progress__message">

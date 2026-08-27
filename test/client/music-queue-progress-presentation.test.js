@@ -18,7 +18,7 @@
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildMusicQueueProgressStrip } from '../../src/client/lib/music-queue-progress-presentation.js';
+import { buildMissingMusicProgressStrip } from '../../src/client/lib/missing-music-progress-presentation.js';
 
 function createRelease({
   id,
@@ -40,8 +40,8 @@ function createRelease({
   };
 }
 
-test('Music Queue progress prioritizes recoverable attention before automatic work', () => {
-  const result = buildMusicQueueProgressStrip([
+test('Missing Music progress prioritizes recoverable attention before automatic work', () => {
+  const result = buildMissingMusicProgressStrip([
     createRelease({ id: 'queued', statusCode: 'queued_for_search', statusLabel: 'Waiting' }),
     createRelease({ id: 'downloading', statusCode: 'downloading', statusLabel: 'Downloading' }),
     createRelease({ id: 'quality', statusCode: 'quality_choice_needed', statusLabel: 'Quality choice needed', statusTone: 'warning' }),
@@ -54,13 +54,13 @@ test('Music Queue progress prioritizes recoverable attention before automatic wo
   assert.match(result.summary, /2 releases need your attention/);
   assert.equal(result.rows[0].action.label, 'Review');
   assert.deepEqual(result.rows[0].action.to, {
-    name: 'acquisition-music-queue-release',
-    params: { wantedReleaseId: 'quality' },
+    name: 'missing-decision',
+    params: { decisionId: 'quality' },
   });
 });
 
-test('Music Queue progress links setup blockers to their dedicated safe route', () => {
-  const result = buildMusicQueueProgressStrip([
+test('Missing Music progress links setup blockers to their dedicated safe route', () => {
+  const result = buildMissingMusicProgressStrip([
     createRelease({
       action: { label: 'Set up folders', routeName: 'settings-media-storage', type: 'route' },
       id: 'setup',
@@ -76,23 +76,23 @@ test('Music Queue progress links setup blockers to their dedicated safe route', 
       name: 'settings-media-storage',
       query: {
         returnReleaseId: 'setup',
-        returnTo: 'music_queue_release',
+        returnTo: 'missing_music_decision',
       },
     },
   });
 });
 
-test('Music Queue progress describes an empty scoped queue without a false completion claim', () => {
-  const result = buildMusicQueueProgressStrip([]);
+test('Missing Music progress describes an empty scoped queue without a false completion claim', () => {
+  const result = buildMissingMusicProgressStrip([]);
 
   assert.equal(result.attentionCount, 0);
   assert.equal(result.totalCount, 0);
   assert.deepEqual(result.rows, []);
-  assert.equal(result.summary, 'Nothing is waiting in Music Queue right now.');
+  assert.equal(result.summary, 'Nothing is waiting in Missing Music right now.');
 });
 
 test('Home progress omits idle releases and sends active or attention states to release detail', () => {
-  const result = buildMusicQueueProgressStrip([
+  const result = buildMissingMusicProgressStrip([
     createRelease({ id: 'in-library', statusCode: 'in_library', statusLabel: 'In library' }),
     createRelease({ id: 'queued', statusCode: 'queued_for_search', statusLabel: 'Waiting' }),
     createRelease({ id: 'searching', statusCode: 'searching', statusLabel: 'Searching' }),
@@ -110,14 +110,14 @@ test('Home progress omits idle releases and sends active or attention states to 
   assert.deepEqual(result.rows[0].action, {
     label: 'View details',
     to: {
-      name: 'acquisition-music-queue-release',
-      params: { wantedReleaseId: 'match' },
+      name: 'missing-decision',
+      params: { decisionId: 'match' },
     },
   });
 });
 
-test('Acquisition progress gives a linked live transfer an explicit Downloader handoff', () => {
-  const result = buildMusicQueueProgressStrip([
+test('Missing Music progress gives a linked live transfer an explicit Downloader handoff', () => {
+  const result = buildMissingMusicProgressStrip([
     createRelease({ id: 'downloading', statusCode: 'downloading', statusLabel: 'Downloading' }),
   ], {
     transferProgressByRelease: {
@@ -147,7 +147,7 @@ test('Acquisition progress gives a linked live transfer an explicit Downloader h
 });
 
 test('Home progress keeps its release-detail destination when download progress is linked', () => {
-  const result = buildMusicQueueProgressStrip([
+  const result = buildMissingMusicProgressStrip([
     createRelease({ id: 'downloading', statusCode: 'downloading', statusLabel: 'Downloading' }),
   ], {
     activeOrAttentionOnly: true,
@@ -165,7 +165,7 @@ test('Home progress keeps its release-detail destination when download progress 
 
   assert.equal(result.rows[0].action.label, 'View details');
   assert.deepEqual(result.rows[0].action.to, {
-    name: 'acquisition-music-queue-release',
-    params: { wantedReleaseId: 'downloading' },
+    name: 'missing-decision',
+    params: { decisionId: 'downloading' },
   });
 });

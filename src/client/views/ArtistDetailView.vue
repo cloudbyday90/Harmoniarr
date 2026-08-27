@@ -25,12 +25,12 @@ import ReleaseDetailModal from '../components/media/ReleaseDetailModal.vue';
 import ArtistDetailRelatedArtistCard from '../components/media/ArtistDetailRelatedArtistCard.vue';
 import ArtistReleaseSectionGrid from '../components/media/ArtistReleaseSectionGrid.vue';
 import EmptyState from '../components/EmptyState.vue';
-import MusicQueueProgressStrip from '../components/music-queue/MusicQueueProgressStrip.vue';
+import MissingMusicProgressStrip from '../components/missing-music/MissingMusicProgressStrip.vue';
 import ReleaseCard from '../components/media/ReleaseCard.vue';
 import { useArtistDetail } from '../composables/useArtistDetail.js';
 import { useArtistDetailArtwork } from '../composables/useArtistDetailArtwork.js';
 import { useManualEditionSelection } from '../composables/useManualEditionSelection.js';
-import { useMusicQueue } from '../composables/useMusicQueue.js';
+import { useMissingMusicReleaseWorkflow } from '../composables/useMissingMusicReleaseWorkflow.js';
 import { useReleaseRequest } from '../composables/useReleaseRequest.js';
 import { useRequestUsers } from '../composables/useRequestUsers.js';
 import {
@@ -300,7 +300,7 @@ const {
   isLoading: isMusicQueueLoading,
   load: loadMusicQueue,
   releases: musicQueueReleases,
-} = useMusicQueue({
+} = useMissingMusicReleaseWorkflow({
   limit: 100,
   metadataArtistId: musicQueueMetadataArtistId,
   pollIntervalMs: 30000,
@@ -739,9 +739,9 @@ watch(projection, () => {
         </div>
       </article>
 
-      <MusicQueueProgressStrip
+      <MissingMusicProgressStrip
         v-if="isArtistMonitored"
-        heading="Music Queue for this artist"
+        heading="Missing Music for this artist"
         :error-message="musicQueueErrorMessage"
         :is-loading="isMusicQueueLoading"
         :releases="musicQueueReleases"

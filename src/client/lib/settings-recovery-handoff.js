@@ -80,16 +80,16 @@ const RECOVERY_DESTINATIONS = Object.freeze({
     routeName: 'missing-decision',
   }),
   [SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE]: Object.freeze({
-    folderReadyCopy: 'Return to Music Queue to see the next automatic step.',
-    label: 'Return to Music Queue',
-    providerReadyCopy: 'Music Queue can continue its normal checks. Harmoniarr has not started a download yet.',
-    routeName: 'music-queue',
+    folderReadyCopy: 'Return to Missing Music to see the next automatic step.',
+    label: 'Return to Missing Music',
+    providerReadyCopy: 'Missing Music can continue its normal checks. Harmoniarr has not started a download yet.',
+    routeName: 'missing',
   }),
   [SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE_RELEASE]: Object.freeze({
-    folderReadyCopy: "Return to Music Queue to see this release's next automatic step.",
-    label: 'Return to Music Queue',
-    providerReadyCopy: 'Music Queue can continue its normal checks. Harmoniarr has not started a download yet.',
-    routeName: 'music-queue-release',
+    folderReadyCopy: "Return to Missing Music to see this release's next automatic step.",
+    label: 'Return to Missing Music',
+    providerReadyCopy: 'Missing Music can continue its normal checks. Harmoniarr has not started a download yet.',
+    routeName: 'missing-decision',
     requiresReleaseId: true,
   }),
 });
@@ -215,7 +215,10 @@ export function buildSettingsRecoveryReturnAction({
   if (normalizedContext.wantedReleaseId) {
     if (normalizedContext.context === SETTINGS_RECOVERY_CONTEXT.ACTIVITY_LIBRARY_ADD_RELEASE) {
       action.query = { wantedReleaseId: normalizedContext.wantedReleaseId };
-    } else if (normalizedContext.context === SETTINGS_RECOVERY_CONTEXT.MISSING_MUSIC_DECISION) {
+    } else if ([
+      SETTINGS_RECOVERY_CONTEXT.MISSING_MUSIC_DECISION,
+      SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE_RELEASE,
+    ].includes(normalizedContext.context)) {
       action.params = { decisionId: normalizedContext.wantedReleaseId };
     } else {
       action.params = { wantedReleaseId: normalizedContext.wantedReleaseId };

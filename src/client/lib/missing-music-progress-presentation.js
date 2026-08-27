@@ -16,16 +16,6 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-// Compatibility facade for client modules that have not yet moved to the
-// canonical Missing Music names. Request URLs and idempotency namespaces stay
-// in the implementation so the server contract remains unchanged.
 export {
-  addMissingMusicReleaseToLibrary as addMusicQueueReleaseToLibrary,
-  allowMissingMusicFallbackQuality as allowMusicQueueFallbackQuality,
-  fetchMissingMusicRelease as fetchMusicQueueRelease,
-  fetchMissingMusicReleases as fetchMusicQueueReleases,
-  recheckMissingMusicReleaseSafeAdd as recheckMusicQueueReleaseSafeAdd,
-  rejectMissingMusicMatch as rejectMusicQueueMatch,
-  searchMissingMusicReleaseAgain as searchMusicQueueReleaseAgain,
-  selectMissingMusicMatch as useMusicQueueMatch,
-} from './missing-music-release-api.js';
+  buildMusicQueueProgressStrip as buildMissingMusicProgressStrip,
+} from './music-queue-progress-presentation.js';

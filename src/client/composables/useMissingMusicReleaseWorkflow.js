@@ -16,16 +16,10 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-// Compatibility facade for client modules that have not yet moved to the
-// canonical Missing Music names. Request URLs and idempotency namespaces stay
-// in the implementation so the server contract remains unchanged.
+// Canonical client entry point. The legacy composable remains an ESM adapter
+// until its remaining internal dependencies move in a later migration phase.
 export {
-  addMissingMusicReleaseToLibrary as addMusicQueueReleaseToLibrary,
-  allowMissingMusicFallbackQuality as allowMusicQueueFallbackQuality,
-  fetchMissingMusicRelease as fetchMusicQueueRelease,
-  fetchMissingMusicReleases as fetchMusicQueueReleases,
-  recheckMissingMusicReleaseSafeAdd as recheckMusicQueueReleaseSafeAdd,
-  rejectMissingMusicMatch as rejectMusicQueueMatch,
-  searchMissingMusicReleaseAgain as searchMusicQueueReleaseAgain,
-  selectMissingMusicMatch as useMusicQueueMatch,
-} from './missing-music-release-api.js';
+  MUSIC_QUEUE_ACTIVE_PROGRESS_STATUSES as MISSING_MUSIC_ACTIVE_PROGRESS_STATUSES,
+  hasActiveMusicQueueProgress as hasActiveMissingMusicReleaseProgress,
+  useMusicQueue as useMissingMusicReleaseWorkflow,
+} from './useMusicQueue.js';

@@ -19,14 +19,14 @@
 import { computed, readonly, ref, toValue, watch } from 'vue';
 import { useAsyncResource } from './useAsyncResource.js';
 import {
-  addMusicQueueReleaseToLibrary as defaultAddMusicQueueReleaseToLibrary,
-  allowMusicQueueFallbackQuality as defaultAllowMusicQueueFallbackQuality,
-  fetchMusicQueueReleases as defaultFetchMusicQueueReleases,
-  recheckMusicQueueReleaseSafeAdd as defaultRecheckMusicQueueReleaseSafeAdd,
-  rejectMusicQueueMatch as defaultRejectMusicQueueMatch,
-  searchMusicQueueReleaseAgain as defaultSearchMusicQueueReleaseAgain,
-  useMusicQueueMatch as defaultUseMusicQueueMatch,
-} from '../lib/acquisition-api.js';
+  addMissingMusicReleaseToLibrary as defaultAddMusicQueueReleaseToLibrary,
+  allowMissingMusicFallbackQuality as defaultAllowMusicQueueFallbackQuality,
+  fetchMissingMusicReleases as defaultFetchMusicQueueReleases,
+  recheckMissingMusicReleaseSafeAdd as defaultRecheckMusicQueueReleaseSafeAdd,
+  rejectMissingMusicMatch as defaultRejectMusicQueueMatch,
+  searchMissingMusicReleaseAgain as defaultSearchMusicQueueReleaseAgain,
+  selectMissingMusicMatch as defaultUseMusicQueueMatch,
+} from '../lib/missing-music-release-api.js';
 import { buildMusicQueueSummaryCards, normalizeMusicQueueRelease } from '../lib/acquisition-pipeline-presentation.js';
 import { getErrorMessage } from '../lib/error-utils.js';
 import { createMusicQueueActionFeedback } from '../lib/music-queue-action-feedback-presentation.js';
@@ -79,7 +79,7 @@ export function useMusicQueue({
   }
 
   const resource = useAsyncResource({
-    fallbackErrorMessage: 'Music Queue failed to load',
+    fallbackErrorMessage: 'Missing Music failed to load',
     fetcher: () => fetchMusicQueueReleases({
       limit,
       metadataArtistId: getMetadataArtistId(),
@@ -207,7 +207,7 @@ export function useMusicQueue({
       }
       setActionFeedback({
         actionKey,
-        message: getErrorMessage(error, 'Music Queue match action failed.') || 'Music Queue match action failed.',
+        message: getErrorMessage(error, 'Missing Music match action failed.') || 'Missing Music match action failed.',
         phase: 'error',
         wantedReleaseId,
       });
@@ -278,7 +278,7 @@ export function useMusicQueue({
     } catch (error) {
       setActionFeedback({
         actionKey,
-        message: getErrorMessage(error, 'Music Queue search retry failed.') || 'Music Queue search retry failed.',
+        message: getErrorMessage(error, 'Missing Music search retry failed.') || 'Missing Music search retry failed.',
         phase: 'error',
         wantedReleaseId,
       });
@@ -323,7 +323,7 @@ export function useMusicQueue({
     } catch (error) {
       setActionFeedback({
         actionKey,
-        message: getErrorMessage(error, 'Music Queue fallback quality update failed.') || 'Music Queue fallback quality update failed.',
+        message: getErrorMessage(error, 'Missing Music fallback quality update failed.') || 'Missing Music fallback quality update failed.',
         phase: 'error',
         wantedReleaseId,
       });
@@ -376,7 +376,7 @@ export function useMusicQueue({
     } catch (error) {
       setActionFeedback({
         actionKey,
-        message: getErrorMessage(error, 'Music Queue library-add recheck failed.') || 'Music Queue library-add recheck failed.',
+        message: getErrorMessage(error, 'Missing Music library-add recheck failed.') || 'Missing Music library-add recheck failed.',
         phase: 'error',
         wantedReleaseId,
       });
@@ -427,7 +427,7 @@ export function useMusicQueue({
     } catch (error) {
       setActionFeedback({
         actionKey,
-        message: getErrorMessage(error, 'Music Queue library add failed.') || 'Music Queue library add failed.',
+        message: getErrorMessage(error, 'Missing Music library add failed.') || 'Missing Music library add failed.',
         phase: 'error',
         wantedReleaseId,
       });

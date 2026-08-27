@@ -21,8 +21,11 @@ import {
   buildSettingsRecoveryReturnAction,
 } from './settings-recovery-handoff.js';
 
-function isMusicQueueReleaseRecovery(recoveryContext) {
-  return recoveryContext?.context === SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE_RELEASE
+function isMissingMusicReleaseRecovery(recoveryContext) {
+  return [
+    SETTINGS_RECOVERY_CONTEXT.MISSING_MUSIC_DECISION,
+    SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE_RELEASE,
+  ].includes(recoveryContext?.context)
     && typeof recoveryContext.wantedReleaseId === 'string'
     && recoveryContext.wantedReleaseId.length > 0;
 }
@@ -35,7 +38,7 @@ export function buildSettingsMusicQueueSafeAddRecheckConfirmation({
   recoveryContext = null,
   recheck = null,
 } = {}) {
-  if (!isMusicQueueReleaseRecovery(recoveryContext)) return null;
+  if (!isMissingMusicReleaseRecovery(recoveryContext)) return null;
 
   const outcome = recheck?.action?.outcome;
   const action = buildSettingsRecoveryReturnAction({ recoveryContext });
@@ -51,7 +54,7 @@ export function buildSettingsMusicQueueSafeAddRecheckConfirmation({
     case 'deferred':
       return {
         action,
-        copy: 'The recheck passed, but another library add is active. Return to Music Queue after that work finishes to see whether this release needs another try.',
+        copy: 'The recheck passed, but another library add is active. Return to Missing Music after that work finishes to see whether this release needs another try.',
         outcome,
         title: 'Library add is waiting',
         tone: 'warning',

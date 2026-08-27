@@ -51,9 +51,9 @@ import {
   buildSettingsFolderRecoveryConfirmation,
   resolveSettingsRecoveryContext,
 } from '../lib/settings-recovery-handoff.js';
-import { buildSettingsMusicQueueSafeAddRecheckConfirmation } from '../lib/settings-music-queue-safe-add-recheck-presentation.js';
+import { buildSettingsMissingMusicSafeAddRecheckConfirmation } from '../lib/settings-missing-music-safe-add-recheck-presentation.js';
 import { buildSettingsSaveState } from '../lib/settings-save-state-presentation.js';
-import { recheckMusicQueueReleaseSafeAdd } from '../lib/acquisition-api.js';
+import { recheckMissingMusicReleaseSafeAdd } from '../lib/missing-music-release-api.js';
 
 const route = useRoute();
 const pathValidation = ref(null);
@@ -163,10 +163,10 @@ async function handleSaveSettings() {
   }
 
   try {
-    const recheck = await recheckMusicQueueReleaseSafeAdd({
+    const recheck = await recheckMissingMusicReleaseSafeAdd({
       wantedReleaseId: recoveryContext.value.wantedReleaseId,
     });
-    recoveryConfirmation.value = buildSettingsMusicQueueSafeAddRecheckConfirmation({
+    recoveryConfirmation.value = buildSettingsMissingMusicSafeAddRecheckConfirmation({
       recoveryContext: recoveryContext.value,
       recheck,
     }) ?? folderConfirmation;

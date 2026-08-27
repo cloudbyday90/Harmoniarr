@@ -28,7 +28,7 @@ import {
   createSettingsRecoveryContext,
   resolveSettingsRecoveryContext,
 } from '../../src/client/lib/settings-recovery-handoff.js';
-import { buildSettingsMusicQueueSafeAddRecheckConfirmation } from '../../src/client/lib/settings-music-queue-safe-add-recheck-presentation.js';
+import { buildSettingsMissingMusicSafeAddRecheckConfirmation } from '../../src/client/lib/settings-missing-music-safe-add-recheck-presentation.js';
 
 test('Settings recovery contexts accept only fixed internal destinations', () => {
   assert.deepEqual(
@@ -69,9 +69,9 @@ test('Settings recovery serializes a bounded release context and restores only i
   assert.deepEqual(
     buildSettingsRecoveryReturnAction({ recoveryContext }),
     {
-      label: 'Return to Music Queue',
-      params: { wantedReleaseId: 'wanted-release-1' },
-      routeName: 'music-queue-release',
+      label: 'Return to Missing Music',
+      params: { decisionId: 'wanted-release-1' },
+      routeName: 'missing-decision',
     },
   );
 });
@@ -133,25 +133,25 @@ test('Settings folder recovery returns only after server folder validation is he
   assert.doesNotMatch(JSON.stringify(unresolved), /private|mount failure/i);
 });
 
-test('Settings recheck feedback exposes only the scoped Music Queue release outcome', () => {
+test('Settings recheck feedback exposes only the scoped Missing Music release outcome', () => {
   const recoveryContext = createSettingsRecoveryContext({
     context: SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE_RELEASE,
     wantedReleaseId: 'wanted-release-1',
   });
-  const queued = buildSettingsMusicQueueSafeAddRecheckConfirmation({
+  const queued = buildSettingsMissingMusicSafeAddRecheckConfirmation({
     recoveryContext,
     recheck: { action: { outcome: 'queued', runId: 'apply-run-1' } },
   });
-  const blocked = buildSettingsMusicQueueSafeAddRecheckConfirmation({
+  const blocked = buildSettingsMissingMusicSafeAddRecheckConfirmation({
     recoveryContext,
     recheck: { action: { outcome: 'still_needs_review', internalPath: '/private/downloads' } },
   });
 
   assert.equal(queued.title, 'Library add resumed');
   assert.deepEqual(queued.action, {
-    label: 'Return to Music Queue',
-    params: { wantedReleaseId: 'wanted-release-1' },
-    routeName: 'music-queue-release',
+    label: 'Return to Missing Music',
+    params: { decisionId: 'wanted-release-1' },
+    routeName: 'missing-decision',
   });
   assert.equal(blocked.title, 'Library add still needs review');
   assert.doesNotMatch(JSON.stringify(blocked), /private|downloads|apply-run/i);

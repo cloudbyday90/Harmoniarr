@@ -65,8 +65,8 @@ function buildRowAction(release, { releaseDetailsOnly, transferProgress }) {
     return {
       label: 'View details',
       to: {
-        name: 'acquisition-music-queue-release',
-        params: { wantedReleaseId: release?.id },
+        name: 'missing-decision',
+        params: { decisionId: release?.id },
       },
     };
   }
@@ -84,7 +84,7 @@ function buildRowAction(release, { releaseDetailsOnly, transferProgress }) {
       label: release.action.label,
       to: buildSettingsRecoveryHandoffLocation({
         recoveryContext: createSettingsRecoveryContext({
-          context: SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE_RELEASE,
+          context: SETTINGS_RECOVERY_CONTEXT.MISSING_MUSIC_DECISION,
           wantedReleaseId: release?.id,
         }),
         routeName: release.action.routeName,
@@ -93,17 +93,17 @@ function buildRowAction(release, { releaseDetailsOnly, transferProgress }) {
   }
 
   return {
-    label: isMusicQueueAttentionRelease(release) ? 'Review' : 'Open Music Queue',
+    label: isMusicQueueAttentionRelease(release) ? 'Review' : 'Open Missing Music',
     to: {
-      name: 'acquisition-music-queue-release',
-      params: { wantedReleaseId: release?.id },
+      name: 'missing-decision',
+      params: { decisionId: release?.id },
     },
   };
 }
 
 function buildSummary({ activeCount, attentionCount, totalCount }) {
   if (totalCount === 0) {
-    return 'Nothing is waiting in Music Queue right now.';
+    return 'Nothing is waiting in Missing Music right now.';
   }
 
   if (attentionCount > 0 && activeCount > 0) {
@@ -114,12 +114,12 @@ function buildSummary({ activeCount, attentionCount, totalCount }) {
     return `${attentionCount} release${attentionCount === 1 ? ' needs' : 's need'} your attention.`;
   }
 
-  return `${totalCount} release${totalCount === 1 ? ' is' : 's are'} moving through Music Queue automatically.`;
+  return `${totalCount} release${totalCount === 1 ? ' is' : 's are'} moving through Missing Music automatically.`;
 }
 
 /**
  * Shapes the narrow, release-centered status surface used outside the full
- * Music Queue. It deliberately offers navigation only; workflow mutations
+ * Missing Music. It deliberately offers navigation only; workflow mutations
  * remain on the release detail where scope and confirmation are visible.
  */
 export function buildMusicQueueProgressStrip(releases, {
