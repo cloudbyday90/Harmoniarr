@@ -19,19 +19,19 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  buildMusicQueueReleaseActionFeedback,
-  createMusicQueueActionFeedback,
-} from '../../src/client/lib/music-queue-action-feedback-presentation.js';
+  buildMissingMusicReleaseActionFeedback,
+  createMissingMusicActionFeedback,
+} from '../../src/client/lib/missing-music-action-feedback-presentation.js';
 
-test('Music Queue action feedback presents working, success, and error with appropriate live-region semantics', () => {
-  const feedback = createMusicQueueActionFeedback({
+test('Missing Music action feedback presents working, success, and error with appropriate live-region semantics', () => {
+  const feedback = createMissingMusicActionFeedback({
     actionKey: 'wanted-1:match-1:use',
     message: 'Using this match...',
     phase: 'working',
     wantedReleaseId: 'wanted-1',
   });
 
-  assert.deepEqual(buildMusicQueueReleaseActionFeedback(feedback, 'wanted-1'), {
+  assert.deepEqual(buildMissingMusicReleaseActionFeedback(feedback, 'wanted-1'), {
     actionKey: 'wanted-1:match-1:use',
     label: 'Working',
     message: 'Using this match...',
@@ -42,18 +42,18 @@ test('Music Queue action feedback presents working, success, and error with appr
   });
 
   feedback.phase = 'success';
-  assert.equal(buildMusicQueueReleaseActionFeedback(feedback, 'wanted-1').role, 'status');
-  assert.equal(buildMusicQueueReleaseActionFeedback(feedback, 'wanted-1').tone, 'success');
+  assert.equal(buildMissingMusicReleaseActionFeedback(feedback, 'wanted-1').role, 'status');
+  assert.equal(buildMissingMusicReleaseActionFeedback(feedback, 'wanted-1').tone, 'success');
 
   feedback.phase = 'error';
-  assert.equal(buildMusicQueueReleaseActionFeedback(feedback, 'wanted-1').label, 'Could not continue');
-  assert.equal(buildMusicQueueReleaseActionFeedback(feedback, 'wanted-1').role, 'alert');
-  assert.equal(buildMusicQueueReleaseActionFeedback(feedback, 'wanted-1').tone, 'danger');
+  assert.equal(buildMissingMusicReleaseActionFeedback(feedback, 'wanted-1').label, 'Could not continue');
+  assert.equal(buildMissingMusicReleaseActionFeedback(feedback, 'wanted-1').role, 'alert');
+  assert.equal(buildMissingMusicReleaseActionFeedback(feedback, 'wanted-1').tone, 'danger');
 });
 
-test('Music Queue action feedback remains bounded and release-scoped', () => {
+test('Missing Music action feedback remains bounded and release-scoped', () => {
   const longMessage = `Could not use the selected match: ${'x'.repeat(300)}`;
-  const feedback = createMusicQueueActionFeedback({
+  const feedback = createMissingMusicActionFeedback({
     actionKey: 'wanted-1:search-again',
     message: longMessage,
     phase: 'error',
@@ -62,7 +62,7 @@ test('Music Queue action feedback remains bounded and release-scoped', () => {
 
   assert.equal(feedback.message.length, 280);
   assert.match(feedback.message, /\.\.\.$/);
-  assert.equal(buildMusicQueueReleaseActionFeedback(feedback, 'wanted-2'), null);
-  assert.equal(createMusicQueueActionFeedback({ message: 'Missing release', phase: 'error' }), null);
-  assert.equal(createMusicQueueActionFeedback({ wantedReleaseId: 'wanted-1', message: 'Unknown', phase: 'unknown' }), null);
+  assert.equal(buildMissingMusicReleaseActionFeedback(feedback, 'wanted-2'), null);
+  assert.equal(createMissingMusicActionFeedback({ message: 'Missing release', phase: 'error' }), null);
+  assert.equal(createMissingMusicActionFeedback({ wantedReleaseId: 'wanted-1', message: 'Unknown', phase: 'unknown' }), null);
 });

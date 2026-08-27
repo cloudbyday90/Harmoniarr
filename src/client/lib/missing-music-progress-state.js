@@ -16,12 +16,43 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-export {
-  MUSIC_QUEUE_ACTIVE_PROGRESS_STATUSES as MISSING_MUSIC_ACTIVE_PROGRESS_STATUSES,
-  MUSIC_QUEUE_ATTENTION_STATUSES as MISSING_MUSIC_ATTENTION_STATUSES,
-  getMusicQueueReleaseStatusCode as getMissingMusicReleaseStatusCode,
-  hasMusicQueueHomeProgress as hasMissingMusicHomeProgress,
-  isMusicQueueActiveProgressRelease as isMissingMusicActiveProgressRelease,
-  isMusicQueueAttentionRelease as isMissingMusicAttentionRelease,
-  isMusicQueueHomeProgressRelease as isMissingMusicHomeProgressRelease,
-} from './music-queue-progress-state.js';
+export const MISSING_MUSIC_ACTIVE_PROGRESS_STATUSES = Object.freeze([
+  'adding_to_library',
+  'checking_matches',
+  'downloading',
+  'ready_to_add',
+  'searching',
+  'trying_next_match',
+]);
+
+export const MISSING_MUSIC_ATTENTION_STATUSES = Object.freeze([
+  'failed',
+  'needs_help_adding',
+  'needs_setup',
+  'no_matches_left',
+  'pick_match',
+  'quality_choice_needed',
+]);
+
+const activeProgressStatusSet = new Set(MISSING_MUSIC_ACTIVE_PROGRESS_STATUSES);
+const attentionStatusSet = new Set(MISSING_MUSIC_ATTENTION_STATUSES);
+
+export function getMissingMusicReleaseStatusCode(release) {
+  return release?.statusCode ?? release?.status?.code ?? '';
+}
+
+export function isMissingMusicActiveProgressRelease(release) {
+  return activeProgressStatusSet.has(getMissingMusicReleaseStatusCode(release));
+}
+
+export function isMissingMusicAttentionRelease(release) {
+  return attentionStatusSet.has(getMissingMusicReleaseStatusCode(release));
+}
+
+export function isMissingMusicHomeProgressRelease(release) {
+  return isMissingMusicActiveProgressRelease(release) || isMissingMusicAttentionRelease(release);
+}
+
+export function hasMissingMusicHomeProgress(releases) {
+  return Array.isArray(releases) && releases.some(isMissingMusicHomeProgressRelease);
+}

@@ -16,70 +16,10 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-const MAX_MESSAGE_LENGTH = 280;
-
-const PHASE_PRESENTATION = Object.freeze({
-  error: Object.freeze({ label: 'Could not continue', role: 'alert', tone: 'danger' }),
-  success: Object.freeze({ label: 'Updated', role: 'status', tone: 'success' }),
-  working: Object.freeze({ label: 'Working', role: 'status', tone: 'info' }),
-});
-
-function normalizeText(value) {
-  return typeof value === 'string' ? value.trim() : '';
-}
-
-function truncateMessage(message) {
-  if (message.length <= MAX_MESSAGE_LENGTH) return message;
-  return `${message.slice(0, MAX_MESSAGE_LENGTH - 3).trimEnd()}...`;
-}
-
-/**
- * Creates the one short-lived action result retained by Music Queue. It is
- * intentionally release-keyed and bounded so asynchronous feedback stays in
- * the current review context without becoming an in-page notification feed.
- *
- * @param {{ actionKey?: unknown, message?: unknown, phase?: unknown, wantedReleaseId?: unknown }} input
- * @returns {{ actionKey: string, message: string, phase: 'working'|'success'|'error', wantedReleaseId: string } | null}
- */
-export function createMusicQueueActionFeedback({
-  actionKey,
-  message,
-  phase,
-  wantedReleaseId,
-} = {}) {
-  const normalizedActionKey = normalizeText(actionKey);
-  const normalizedMessage = truncateMessage(normalizeText(message));
-  const normalizedReleaseId = normalizeText(wantedReleaseId);
-
-  if (!normalizedActionKey || !normalizedMessage || !normalizedReleaseId || !PHASE_PRESENTATION[phase]) {
-    return null;
-  }
-
-  return {
-    actionKey: normalizedActionKey,
-    message: normalizedMessage,
-    phase,
-    wantedReleaseId: normalizedReleaseId,
-  };
-}
-
-/**
- * Returns a display-safe action result only for the selected release.
- *
- * @param {ReturnType<typeof createMusicQueueActionFeedback> | null | undefined} feedback
- * @param {unknown} wantedReleaseId
- * @returns {{ actionKey: string, label: string, message: string, phase: 'working'|'success'|'error', role: 'status'|'alert', tone: 'info'|'success'|'danger', wantedReleaseId: string } | null}
- */
-export function buildMusicQueueReleaseActionFeedback(feedback, wantedReleaseId) {
-  const normalizedReleaseId = normalizeText(wantedReleaseId);
-  const phasePresentation = PHASE_PRESENTATION[feedback?.phase];
-
-  if (!normalizedReleaseId || feedback?.wantedReleaseId !== normalizedReleaseId || !phasePresentation) {
-    return null;
-  }
-
-  return {
-    ...feedback,
-    ...phasePresentation,
-  };
-}
+// Compatibility facade for callers that have not yet moved to canonical
+// Missing Music feedback names. The implementation retains the same bounded,
+// release-scoped feedback and accessibility semantics.
+export {
+  buildMissingMusicReleaseActionFeedback as buildMusicQueueReleaseActionFeedback,
+  createMissingMusicActionFeedback as createMusicQueueActionFeedback,
+} from './missing-music-action-feedback-presentation.js';

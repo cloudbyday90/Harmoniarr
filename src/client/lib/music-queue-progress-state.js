@@ -16,43 +16,14 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-export const MUSIC_QUEUE_ACTIVE_PROGRESS_STATUSES = Object.freeze([
-  'adding_to_library',
-  'checking_matches',
-  'downloading',
-  'ready_to_add',
-  'searching',
-  'trying_next_match',
-]);
-
-export const MUSIC_QUEUE_ATTENTION_STATUSES = Object.freeze([
-  'failed',
-  'needs_help_adding',
-  'needs_setup',
-  'no_matches_left',
-  'pick_match',
-  'quality_choice_needed',
-]);
-
-const activeProgressStatusSet = new Set(MUSIC_QUEUE_ACTIVE_PROGRESS_STATUSES);
-const attentionStatusSet = new Set(MUSIC_QUEUE_ATTENTION_STATUSES);
-
-export function getMusicQueueReleaseStatusCode(release) {
-  return release?.statusCode ?? release?.status?.code ?? '';
-}
-
-export function isMusicQueueActiveProgressRelease(release) {
-  return activeProgressStatusSet.has(getMusicQueueReleaseStatusCode(release));
-}
-
-export function isMusicQueueAttentionRelease(release) {
-  return attentionStatusSet.has(getMusicQueueReleaseStatusCode(release));
-}
-
-export function isMusicQueueHomeProgressRelease(release) {
-  return isMusicQueueActiveProgressRelease(release) || isMusicQueueAttentionRelease(release);
-}
-
-export function hasMusicQueueHomeProgress(releases) {
-  return Array.isArray(releases) && releases.some(isMusicQueueHomeProgressRelease);
-}
+// Compatibility facade for callers that have not yet moved to the canonical
+// Missing Music state names. The implementation lives in the canonical module.
+export {
+  MISSING_MUSIC_ACTIVE_PROGRESS_STATUSES as MUSIC_QUEUE_ACTIVE_PROGRESS_STATUSES,
+  MISSING_MUSIC_ATTENTION_STATUSES as MUSIC_QUEUE_ATTENTION_STATUSES,
+  getMissingMusicReleaseStatusCode as getMusicQueueReleaseStatusCode,
+  hasMissingMusicHomeProgress as hasMusicQueueHomeProgress,
+  isMissingMusicActiveProgressRelease as isMusicQueueActiveProgressRelease,
+  isMissingMusicAttentionRelease as isMusicQueueAttentionRelease,
+  isMissingMusicHomeProgressRelease as isMusicQueueHomeProgressRelease,
+} from './missing-music-progress-state.js';

@@ -29,16 +29,16 @@ import {
 } from '../lib/missing-music-release-api.js';
 import { buildMusicQueueSummaryCards, normalizeMusicQueueRelease } from '../lib/acquisition-pipeline-presentation.js';
 import { getErrorMessage } from '../lib/error-utils.js';
-import { createMusicQueueActionFeedback } from '../lib/music-queue-action-feedback-presentation.js';
+import { createMissingMusicActionFeedback } from '../lib/missing-music-action-feedback-presentation.js';
 import { buildMusicQueueMatchSelectionSuccessMessage } from '../lib/music-queue-match-selection-feedback-presentation.js';
 import { createMusicQueueReleaseMutationGate } from '../lib/music-queue-release-mutation-gate.js';
 import { createRetryIdempotencyKeyStore } from '../lib/retry-idempotency-key-store.js';
 import {
-  isMusicQueueActiveProgressRelease,
-  MUSIC_QUEUE_ACTIVE_PROGRESS_STATUSES,
-} from '../lib/music-queue-progress-state.js';
+  isMissingMusicActiveProgressRelease,
+  MISSING_MUSIC_ACTIVE_PROGRESS_STATUSES,
+} from '../lib/missing-music-progress-state.js';
 
-export { MUSIC_QUEUE_ACTIVE_PROGRESS_STATUSES };
+export { MISSING_MUSIC_ACTIVE_PROGRESS_STATUSES as MUSIC_QUEUE_ACTIVE_PROGRESS_STATUSES };
 
 /**
  * Keeps short-lived automatic work visible without continuously polling stable
@@ -49,7 +49,7 @@ export { MUSIC_QUEUE_ACTIVE_PROGRESS_STATUSES };
  */
 export function hasActiveMusicQueueProgress(payload) {
   const releases = Array.isArray(payload?.releases) ? payload.releases : [];
-  return releases.some(isMusicQueueActiveProgressRelease);
+  return releases.some(isMissingMusicActiveProgressRelease);
 }
 
 export function useMusicQueue({
@@ -139,7 +139,7 @@ export function useMusicQueue({
   }
 
   function setActionFeedback({ actionKey, message, phase, wantedReleaseId }) {
-    actionFeedback.value = createMusicQueueActionFeedback({
+    actionFeedback.value = createMissingMusicActionFeedback({
       actionKey,
       message,
       phase,

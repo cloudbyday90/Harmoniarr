@@ -35,9 +35,9 @@ const STATUS_PRIORITY = Object.freeze({
 });
 
 import {
-  isMusicQueueAttentionRelease,
-  isMusicQueueHomeProgressRelease,
-} from './music-queue-progress-state.js';
+  isMissingMusicAttentionRelease,
+  isMissingMusicHomeProgressRelease,
+} from './missing-music-progress-state.js';
 import {
   SETTINGS_RECOVERY_CONTEXT,
   buildSettingsRecoveryHandoffLocation,
@@ -93,7 +93,7 @@ function buildRowAction(release, { releaseDetailsOnly, transferProgress }) {
   }
 
   return {
-    label: isMusicQueueAttentionRelease(release) ? 'Review' : 'Open Missing Music',
+    label: isMissingMusicAttentionRelease(release) ? 'Review' : 'Open Missing Music',
     to: {
       name: 'missing-decision',
       params: { decisionId: release?.id },
@@ -131,9 +131,9 @@ export function buildMusicQueueProgressStrip(releases, {
   const normalizedReleases = Array.isArray(releases) ? releases.filter(Boolean) : [];
   const normalizedLimit = Math.max(1, Math.min(Number(limit) || 3, 6));
   const visibleReleases = activeOrAttentionOnly
-    ? normalizedReleases.filter(isMusicQueueHomeProgressRelease)
+    ? normalizedReleases.filter(isMissingMusicHomeProgressRelease)
     : normalizedReleases;
-  const attentionCount = visibleReleases.filter(isMusicQueueAttentionRelease).length;
+  const attentionCount = visibleReleases.filter(isMissingMusicAttentionRelease).length;
   const activeCount = visibleReleases.length - attentionCount;
   const rows = [...visibleReleases]
     .sort(compareProgressReleases)

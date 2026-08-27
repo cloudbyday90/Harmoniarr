@@ -41,6 +41,30 @@ import {
 import { buildMusicQueueProgressStrip } from '../../src/client/lib/music-queue-progress-presentation.js';
 import { buildMissingMusicProgressStrip } from '../../src/client/lib/missing-music-progress-presentation.js';
 import {
+  buildMusicQueueReleaseActionFeedback,
+  createMusicQueueActionFeedback,
+} from '../../src/client/lib/music-queue-action-feedback-presentation.js';
+import {
+  buildMissingMusicReleaseActionFeedback,
+  createMissingMusicActionFeedback,
+} from '../../src/client/lib/missing-music-action-feedback-presentation.js';
+import {
+  MUSIC_QUEUE_ATTENTION_STATUSES,
+  getMusicQueueReleaseStatusCode,
+  hasMusicQueueHomeProgress,
+  isMusicQueueActiveProgressRelease,
+  isMusicQueueAttentionRelease,
+  isMusicQueueHomeProgressRelease,
+} from '../../src/client/lib/music-queue-progress-state.js';
+import {
+  MISSING_MUSIC_ATTENTION_STATUSES,
+  getMissingMusicReleaseStatusCode,
+  hasMissingMusicHomeProgress,
+  isMissingMusicActiveProgressRelease,
+  isMissingMusicAttentionRelease,
+  isMissingMusicHomeProgressRelease,
+} from '../../src/client/lib/missing-music-progress-state.js';
+import {
   MUSIC_QUEUE_ACTIVE_PROGRESS_STATUSES,
   hasActiveMusicQueueProgress,
   useMusicQueue,
@@ -61,7 +85,15 @@ test('legacy client entry points remain aliases of canonical Missing Music modul
   assert.equal(searchMusicQueueReleaseAgain, searchMissingMusicReleaseAgain);
   assert.equal(useMusicQueueMatch, selectMissingMusicMatch);
   assert.equal(buildMusicQueueProgressStrip, buildMissingMusicProgressStrip);
+  assert.equal(buildMusicQueueReleaseActionFeedback, buildMissingMusicReleaseActionFeedback);
+  assert.equal(createMusicQueueActionFeedback, createMissingMusicActionFeedback);
   assert.equal(MUSIC_QUEUE_ACTIVE_PROGRESS_STATUSES, MISSING_MUSIC_ACTIVE_PROGRESS_STATUSES);
+  assert.equal(MUSIC_QUEUE_ATTENTION_STATUSES, MISSING_MUSIC_ATTENTION_STATUSES);
+  assert.equal(getMusicQueueReleaseStatusCode, getMissingMusicReleaseStatusCode);
   assert.equal(hasActiveMusicQueueProgress, hasActiveMissingMusicReleaseProgress);
+  assert.equal(hasMusicQueueHomeProgress, hasMissingMusicHomeProgress);
+  assert.equal(isMusicQueueActiveProgressRelease, isMissingMusicActiveProgressRelease);
+  assert.equal(isMusicQueueAttentionRelease, isMissingMusicAttentionRelease);
+  assert.equal(isMusicQueueHomeProgressRelease, isMissingMusicHomeProgressRelease);
   assert.equal(useMusicQueue, useMissingMusicReleaseWorkflow);
 });

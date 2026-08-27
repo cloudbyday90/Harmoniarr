@@ -19,7 +19,10 @@
 // Canonical client entry point. The legacy composable remains an ESM adapter
 // until its remaining internal dependencies move in a later migration phase.
 export {
-  MUSIC_QUEUE_ACTIVE_PROGRESS_STATUSES as MISSING_MUSIC_ACTIVE_PROGRESS_STATUSES,
   hasActiveMusicQueueProgress as hasActiveMissingMusicReleaseProgress,
   useMusicQueue as useMissingMusicReleaseWorkflow,
 } from './useMusicQueue.js';
+
+export {
+  MISSING_MUSIC_ACTIVE_PROGRESS_STATUSES,
+} from '../lib/missing-music-progress-state.js';
