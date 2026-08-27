@@ -27,6 +27,12 @@ import {
   buildLinkedDownloaderQueueFixture,
   installDownloaderBrowserFixtures,
 } from '../../testing/browser/downloader-browser-fixtures.js';
+import {
+  assertFocusWithin,
+  assertLocatorFocused,
+  assertTabFocusContained,
+  assertVisibleFocusOutline,
+} from '../../testing/browser/keyboard-accessibility-helpers.js';
 import { bootstrapAdminThroughUi } from '../../testing/browser/operator-browser-helpers.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 
@@ -274,7 +280,8 @@ suite('Missing Music decision detail browser acceptance', () => {
       const heading = page.getByRole('heading', { exact: true, level: 2, name: 'Amber' });
       await heading.waitFor();
       assert.equal(new URL(page.url()).pathname, '/app/missing/wanted-amber');
-      assert.equal(await heading.evaluate((element) => globalThis.document.activeElement === element), true);
+      await assertLocatorFocused(heading, 'opening release details should focus the inspector title');
+      await assertVisibleFocusOutline(heading, 'the inspector title focus indicator should be visible');
       const inspector = page.locator('.missing-music-inspector');
       await inspector.getByRole('heading', { exact: true, level: 3, name: 'Current status' }).waitFor();
       await inspector.getByText('Jamie', { exact: true }).waitFor();
@@ -282,8 +289,11 @@ suite('Missing Music decision detail browser acceptance', () => {
       assert.ok(requests.includes('/api/v1/missing-music/decisions/wanted-amber'));
 
       await page.getByRole('link', { name: 'Back to release decisions' }).click();
-      await page.getByRole('heading', { exact: true, level: 1, name: 'Missing Music' }).waitFor();
+      const pageHeading = page.getByRole('heading', { exact: true, level: 1, name: 'Missing Music' });
+      await pageHeading.waitFor();
       assert.equal(new URL(page.url()).pathname, '/app/missing');
+      await assertLocatorFocused(pageHeading, 'returning to release decisions should focus the Missing Music page title');
+      await assertVisibleFocusOutline(pageHeading, 'the Missing Music page title focus indicator should be visible');
     }, {
       scenarioName: 'missing_music_decision_detail_navigation',
     });
@@ -345,16 +355,23 @@ suite('Missing Music decision detail browser acceptance', () => {
       await page.goto(baseUrl + '/app/missing/wanted-amber', { waitUntil: 'domcontentloaded' });
 
       const inspector = page.locator('.missing-music-inspector');
-      await inspector.getByRole('button', { name: 'Start download' }).click();
+      const startDownloadButton = inspector.getByRole('button', { name: 'Start download' });
+      await startDownloadButton.focus();
+      await assertVisibleFocusOutline(startDownloadButton, 'the Start download button focus indicator should be visible');
+      await page.keyboard.press('Enter');
       const dialog = page.getByRole('dialog', { name: 'Start download?' });
       await dialog.waitFor();
       await dialog.getByText('It will submit the transfer only after the download worker runs.', { exact: false }).waitFor();
+      await assertFocusWithin(dialog, 'opening the native confirmation dialog should move focus inside it');
+      await assertTabFocusContained(page, dialog, { steps: 4 });
 
-      await dialog.getByRole('button', { name: 'Cancel' }).click();
-      assert.equal(await dialog.isVisible(), false);
+      await page.keyboard.press('Escape');
+      await dialog.waitFor({ state: 'hidden' });
       assert.equal(fixture.downloadStartRequest, null);
+      await assertLocatorFocused(startDownloadButton, 'dismissing the dialog should return focus to Start download');
+      await assertVisibleFocusOutline(startDownloadButton, 'returned Start download focus should remain visible');
 
-      await inspector.getByRole('button', { name: 'Start download' }).click();
+      await startDownloadButton.click();
       await dialog.getByRole('button', { name: 'Start download' }).click();
 
       const currentStatus = inspector.getByRole('heading', { exact: true, level: 3, name: 'Current status' });

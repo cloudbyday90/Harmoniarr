@@ -35,87 +35,33 @@ import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/r
 
 const integrationRuntimeConfig = resolveIntegrationTestRuntimeConfig();
 
-function buildMusicQueuePayload() {
+function buildAdministratorWorklistPayload() {
   return {
-    checkedAt: '2026-08-25T12:00:00.000Z',
-    pagination: { limit: 100, offset: 0, total: 2 },
-    releases: [
-      {
-        artistName: 'Fixture Artist',
-        expectedTrackCount: 10,
-        id: 'wanted-action',
-        matchedTrackCount: 0,
-        missingTrackCount: 10,
-        quality: { code: 'accepted', profile: { code: 'lossless_archive' } },
-        releaseTitle: 'Choose a match',
-        status: {
-          code: 'pick_match',
-          detail: 'Choose one of the available matches before the download can continue.',
-          label: 'Choose a match',
-          tone: 'warning',
-        },
-      },
-      {
-        artistName: 'Fixture Artist',
-        expectedTrackCount: 12,
-        id: 'wanted-progress',
-        matchedTrackCount: 12,
-        missingTrackCount: 0,
-        quality: { code: 'accepted', profile: { code: 'lossless_archive' } },
-        releaseTitle: 'Preparing automatically',
-        status: {
-          code: 'downloading',
-          detail: 'Harmoniarr is waiting for the selected download to finish.',
-          label: 'Downloading',
-          tone: 'info',
-        },
-      },
-    ],
-    summary: { counts: { downloading: 1, pick_match: 1 }, total: 2 },
-  };
-}
-
-function buildDownloaderPayload() {
-  return {
-    downloader: {
-      providerState: { enabled: true, message: 'Soulseek download provider is ready.' },
-      queueHealth: { counts: { active: 1, queued: 1 } },
-      transfers: [
-        {
-          averageSpeed: 1024,
-          filename: '/downloads/Active transfer.flac',
-          id: 'transfer-active',
-          progress: { percentComplete: 50, size: 2048 },
-          sourceUser: 'fixture-source',
-          state: { code: 'active', label: 'Downloading', tone: 'warning' },
-          transferKey: 'fixture-source::transfer-active',
-          diagnostics: {
-            importLinkage: {
-              musicQueueRelease: {
-                artistName: 'Fixture Artist',
-                releaseTitle: 'Preparing automatically',
-                wantedReleaseId: 'wanted-progress',
-              },
-            },
-          },
-        },
-        {
-          filename: '/downloads/Queued transfer.flac',
-          id: 'transfer-queued',
-          progress: { percentComplete: null, size: 4096 },
-          sourceUser: 'fixture-source',
-          state: { code: 'queued', label: 'Queued', tone: 'info' },
-          transferKey: 'fixture-source::transfer-queued',
-        },
-      ],
+    checkedAt: '2026-08-27T16:00:00.000Z',
+    decisions: [],
+    filters: {
+      accountStatus: 'active',
+      q: '',
+      requestedForUserId: '',
+      state: 'action',
     },
+    page: {
+      limit: 50,
+      offset: 0,
+      sourceLimitReached: false,
+      total: 0,
+    },
+    scope: 'all',
+    users: [
+      { accountStatus: 'active', id: 'listener-1', username: 'Jamie' },
+    ],
   };
 }
 
 let browserRuntime;
 let runtimeUnavailableReason = null;
 
-suite('Legacy Acquisition compatibility browser verification', () => {
+suite('Missing Music legacy route scope browser acceptance', () => {
   before(async () => {
     try {
       browserRuntime = await createBrowserSmokeRuntime({ config: integrationRuntimeConfig });
@@ -124,6 +70,7 @@ suite('Legacy Acquisition compatibility browser verification', () => {
       if (!isSkippableBrowserRuntimeError(error)) {
         throw error;
       }
+
       runtimeUnavailableReason = toBrowserRuntimeUnavailableReason(error);
     }
   }, { timeout: integrationRuntimeConfig.suiteSetupTimeoutMs });
@@ -132,7 +79,7 @@ suite('Legacy Acquisition compatibility browser verification', () => {
     await browserRuntime?.cleanup();
   }, { timeout: integrationRuntimeConfig.suiteTeardownTimeoutMs });
 
-  test('keeps the legacy overview available without presenting Acquisition as a primary destination', {
+  test('canonicalizes an administrator legacy worklist link without making its URL user filter authoritative', {
     timeout: integrationRuntimeConfig.scenarioTimeoutMs,
   }, async (t) => {
     if (runtimeUnavailableReason) {
@@ -141,96 +88,42 @@ suite('Legacy Acquisition compatibility browser verification', () => {
     }
 
     await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
-      const pageErrors = [];
-      page.on('pageerror', (error) => {
-        pageErrors.push(error.message);
-      });
-      await browserContext.route(/\/api\/v1\/acquisition\/releases(?:\?.*)?$/, async (route) => {
+      const decisionRequests = [];
+      await browserContext.route('**/api/v1/missing-music/decisions**', async (route) => {
+        const requestUrl = new URL(route.request().url());
+        decisionRequests.push(requestUrl);
         await route.fulfill({
-          body: JSON.stringify(buildMusicQueuePayload()),
+          body: JSON.stringify({ ok: true, ...buildAdministratorWorklistPayload() }),
           contentType: 'application/json',
           status: 200,
         });
       });
-      await browserContext.route(/\/api\/v1\/downloader\/queue(?:\?.*)?$/, async (route) => {
-        await route.fulfill({
-          body: JSON.stringify(buildDownloaderPayload()),
-          contentType: 'application/json',
-          status: 200,
-        });
-      });
-      await bootstrapAdminThroughUi(page, { baseUrl });
 
-      await page.goto(`${baseUrl}/app/acquisition`, { waitUntil: 'domcontentloaded' });
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      await page.goto(
+        `${baseUrl}/app/acquisition?requestedForUserId=listener-1&state=downloading#release-decisions`,
+        { waitUntil: 'domcontentloaded' },
+      );
+
+      await page.waitForFunction(() => {
+        const location = new URL(globalThis.location.href);
+        return location.pathname === '/app/missing'
+          && location.searchParams.get('requestedForUserId') === 'listener-1'
+          && location.searchParams.get('state') === 'downloading'
+          && location.hash === '#release-decisions';
+      });
       const primaryNavigation = page.locator('.hx-sidebar');
-      await primaryNavigation.getByRole('link', { name: 'Missing Music', exact: true }).waitFor();
-      await primaryNavigation.getByRole('link', { name: 'Downloader', exact: true }).waitFor();
+      await page.getByRole('heading', { exact: true, level: 1, name: 'Missing Music' }).waitFor();
+      await page.getByLabel('User').waitFor();
       assert.equal(await primaryNavigation.getByRole('link', { name: 'Acquisition', exact: true }).count(), 0);
       assert.equal(await primaryNavigation.getByRole('link', { name: 'Music Queue', exact: true }).count(), 0);
-
-      const acquisitionNavigation = page.getByRole('navigation', { name: 'Acquisition sections' });
-      await acquisitionNavigation.getByRole('link', { name: 'Overview', exact: true }).waitFor();
-      assert.equal(
-        await acquisitionNavigation.getByRole('link', { name: 'Music Queue', exact: true }).getAttribute('href'),
-        '/app/acquisition/music-queue',
-      );
-      assert.equal(
-        await acquisitionNavigation.getByRole('link', { name: 'Downloader', exact: true }).getAttribute('href'),
-        '/app/acquisition/downloader',
-      );
-      await page.getByRole('heading', { exact: true, name: 'Acquisition overview' }).waitFor();
-      await page.getByRole('heading', { exact: true, name: 'Release work' }).waitFor();
-      await page.getByRole('heading', { exact: true, name: 'Download progress' }).waitFor();
-      await page.getByText('Available actions', { exact: true }).waitFor();
-      await page.getByText('Moving automatically', { exact: true }).waitFor();
-      await page.getByText('Active transfers', { exact: true }).waitFor();
-      await page.getByText('Queued transfers', { exact: true }).waitFor();
-
-      const reviewLink = page.getByRole('link', { name: 'Review', exact: true });
-      assert.equal(await reviewLink.getAttribute('href'), '/app/acquisition/music-queue/wanted-action');
-
-      const handoffLinks = page.getByRole('link', {
-        exact: true,
-        name: 'View download progress for Fixture Artist — Preparing automatically',
-      });
-      assert.equal(await handoffLinks.count(), 2);
-      for (let index = 0; index < await handoffLinks.count(); index += 1) {
-        const handoffHref = await handoffLinks.nth(index).getAttribute('href');
-        assert.equal(handoffHref, '/app/acquisition/downloader?wantedReleaseId=wanted-progress');
-        assert.doesNotMatch(handoffHref ?? '', /fixture-source|transfer-active/);
-      }
-      await page.getByRole('progressbar', { name: 'Active transfer.flac: 50%' }).waitFor();
-      await page.getByRole('link', { name: 'Open Downloader', exact: true }).waitFor();
-      assert.equal(await page.getByRole('button', { name: 'Clear Completed' }).count(), 0);
-
-      await page.goto(`${baseUrl}/app/music-queue/wanted-action?source=legacy#release-details`, {
-        waitUntil: 'domcontentloaded',
-      });
-      await page.waitForFunction(() => {
-        const location = new URL(globalThis.location.href);
-        return location.pathname === '/app/acquisition/music-queue/wanted-action'
-          && location.searchParams.get('source') === 'legacy'
-          && location.hash === '#release-details';
-      });
-      assert.match(
-        await acquisitionNavigation.getByRole('link', { name: 'Music Queue', exact: true }).getAttribute('class') ?? '',
-        /\bis-active\b/u,
-      );
-
-      await page.goto(`${baseUrl}/app/downloader?wantedReleaseId=wanted-progress#transfer-progress`, {
-        waitUntil: 'domcontentloaded',
-      });
-      await page.waitForFunction(() => {
-        const location = new URL(globalThis.location.href);
-        return location.pathname === '/app/acquisition/downloader'
-          && location.searchParams.get('wantedReleaseId') === 'wanted-progress'
-          && location.hash === '#transfer-progress';
-      });
-      assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
-    }, { scenarioName: 'acquisition_overview' });
+      assert.equal(decisionRequests.length, 1);
+      assert.equal(decisionRequests[0].searchParams.get('requestedForUserId'), null);
+      assert.equal(decisionRequests[0].searchParams.get('scope'), 'all');
+    }, { scenarioName: 'missing_music_administrator_legacy_worklist_scope' });
   });
 
-  test('keeps the nested Downloader route unavailable to requesters', {
+  test('keeps a requester on their own Missing Music scope after legacy worklist and release links', {
     timeout: integrationRuntimeConfig.scenarioTimeoutMs,
   }, async (t) => {
     if (runtimeUnavailableReason) {
@@ -238,31 +131,68 @@ suite('Legacy Acquisition compatibility browser verification', () => {
       return;
     }
 
-    await browserRuntime.runScenario(async ({ baseUrl, page }) => {
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      const decisionRequests = [];
       const downloaderRequests = [];
       page.on('request', (request) => {
-        if (new URL(request.url()).pathname === '/api/v1/downloader/queue') {
-          downloaderRequests.push(request.url());
+        const requestUrl = new URL(request.url());
+        if (requestUrl.pathname.startsWith('/api/v1/missing-music/decisions/')) {
+          decisionRequests.push(requestUrl);
+        }
+        if (requestUrl.pathname === '/api/v1/downloader/queue') {
+          downloaderRequests.push(requestUrl);
         }
       });
 
       await bootstrapAdminThroughUi(page, { baseUrl });
       await createRequesterThroughApi(page, {
         password: 'InitialPass123!',
-        username: 'acquisition-requester',
+        username: 'legacy-scope-requester',
       });
       await logoutThroughUi(page);
       await loginRequesterThroughUi(page, {
         baseUrl,
         initialPassword: 'InitialPass123!',
         readyPassword: 'ReadyPass123!',
-        username: 'acquisition-requester',
+        username: 'legacy-scope-requester',
       });
+
+      await page.goto(`${baseUrl}/app/acquisition?requestedForUserId=admin-1`, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('heading', { exact: true, level: 1, name: 'Missing Music' }).waitFor();
+      assert.equal(await page.getByLabel('User').count(), 0);
+
+      await browserContext.route('**/api/v1/missing-music/decisions/not-owned', async (route) => {
+        await route.fulfill({
+          body: JSON.stringify({
+            error: {
+              code: 'missing_music_decision_not_found',
+              message: 'Missing Music release was not found',
+            },
+          }),
+          contentType: 'application/json',
+          status: 404,
+        });
+      });
+
+      await page.goto(
+        `${baseUrl}/app/music-queue/not-owned?requestedForUserId=admin-1#current-status`,
+        { waitUntil: 'domcontentloaded' },
+      );
+      await page.waitForFunction(() => {
+        const location = new URL(globalThis.location.href);
+        return location.pathname === '/app/missing/not-owned'
+          && location.searchParams.get('requestedForUserId') === 'admin-1'
+          && location.hash === '#current-status';
+      });
+      await page.getByText('The requested release is unavailable or you do not have access to it.').waitFor();
+      assert.equal(decisionRequests.length, 1);
+      assert.equal(decisionRequests[0].pathname, '/api/v1/missing-music/decisions/not-owned');
+      assert.equal(decisionRequests[0].search, '');
 
       await page.goto(`${baseUrl}/app/acquisition/downloader`, { waitUntil: 'domcontentloaded' });
       await page.getByRole('heading', { exact: true, name: 'Home' }).waitFor();
       assert.equal(new URL(page.url()).pathname, '/app');
       assert.deepEqual(downloaderRequests, []);
-    }, { scenarioName: 'acquisition_requester_downloader_redirect' });
+    }, { scenarioName: 'missing_music_requester_legacy_scope' });
   });
 });

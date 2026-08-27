@@ -553,11 +553,15 @@ Before commit, prove the workflow at the boundaries that own it:
    Queue to Missing Music and add role-aware compatibility redirects that
    preserve query strings and hashes. See [Missing Music canonical links and
    legacy redirects](MISSING_MUSIC_LEGACY_DEEP_LINKS_DESIGN.md).
-10. **Next:** Add remaining cross-user authorization and keyboard-inspector browser
-   coverage before removing interim Music Queue workspace modules.
-11. Rebuild walkthrough Compose after the command slice passes, visually
-    inspect all three responsive breakpoints, then remove the unreachable
-    interim workspace modules in a separate commit.
+10. **Completed 2026-08-27:** Add remaining cross-user authorization and
+    keyboard-inspector browser coverage. Legacy URL state remains
+    non-authoritative; requester and administrator browser paths are covered;
+    the native download dialog now satisfies forward Tab containment and
+    Escape focus return. See [Missing Music scope and keyboard validation
+    outcome](MISSING_MUSIC_SCOPE_AND_KEYBOARD_VALIDATION_OUTCOME.md).
+11. **Next:** Rebuild walkthrough Compose after the command slice passes,
+    visually inspect all three responsive breakpoints, then remove the
+    unreachable interim workspace modules in a separate commit.
 
 ## Recommendation
 

@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import MissingMusicDecisionInspector from '../components/missing-music/MissingMusicDecisionInspector.vue';
 import MissingMusicDecisionWorklist from '../components/missing-music/MissingMusicDecisionWorklist.vue';
@@ -40,6 +40,18 @@ const selectedDecisionId = computed(() => (
     ? route.params.decisionId.trim()
     : null
 ));
+const pageHeadingElement = ref(null);
+
+async function focusPageHeadingAfterInspectorClose() {
+  await nextTick();
+  pageHeadingElement.value?.focus({ preventScroll: true });
+}
+
+watch(selectedDecisionId, (decisionId, previousDecisionId) => {
+  if (!previousDecisionId || decisionId) return;
+
+  void focusPageHeadingAfterInspectorClose();
+});
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
@@ -80,7 +92,7 @@ onBeforeUnmount(() => {
   <section class="hx-page">
     <header class="hx-page-header">
       <div>
-        <h1 class="hx-page-title">Missing Music</h1>
+        <h1 ref="pageHeadingElement" class="hx-page-title missing-music-page-title" tabindex="-1">Missing Music</h1>
         <p class="hx-page-subtitle">{{ buildMissingPageSubtitle() }}</p>
       </div>
       <div class="hx-page-actions">
@@ -216,3 +228,10 @@ onBeforeUnmount(() => {
   </section>
 
 </template>
+
+<style scoped>
+.missing-music-page-title:focus {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 3px;
+}
+</style>

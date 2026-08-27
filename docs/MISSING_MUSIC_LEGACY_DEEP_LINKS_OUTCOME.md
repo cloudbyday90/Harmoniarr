@@ -56,12 +56,16 @@ cannot gain scope by altering a URL.
   bootstrap helper all succeeded; `GET /healthz` returned `200` with no pending
   migrations.
 
-## Remaining recommendation
+## Follow-up recommendation
 
-Add the remaining cross-user authorization and keyboard-inspector browser
-coverage, then remove the now-unreachable interim Music Queue and Acquisition
-view modules in a dedicated cleanup change. Keeping that retirement separate
-avoids mixing compatibility protection with a broad deletion.
+Cross-user legacy-route and keyboard-inspector coverage is complete. Rebuild
+the walkthrough Compose service and inspect the Missing Music workflow at the
+supported responsive breakpoints, then remove the now-unreachable interim
+Music Queue and Acquisition view modules in a dedicated cleanup change.
+Keeping that retirement separate avoids mixing compatibility protection with a
+broad deletion.
+
+See [Missing Music scope and keyboard validation outcome](MISSING_MUSIC_SCOPE_AND_KEYBOARD_VALIDATION_OUTCOME.md).
 
 The approved design and sources are in
 [Missing Music canonical links and legacy redirects](MISSING_MUSIC_LEGACY_DEEP_LINKS_DESIGN.md).

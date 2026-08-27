@@ -20,6 +20,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { buildMissingMusicDecisionDetailPresentation } from '../../lib/missing-music-decision-detail-presentation.js';
 import { buildMissingMusicMatchChoicePresentation } from '../../lib/missing-music-match-selection-presentation.js';
+import { trapModalTabFocus } from '../../lib/modal-focus-trap.js';
 import { useMissingMusicDecisionDetail } from '../../composables/useMissingMusicDecisionDetail.js';
 import { useMissingMusicDownloadStart } from '../../composables/useMissingMusicDownloadStart.js';
 import { useMissingMusicMatchSelection } from '../../composables/useMissingMusicMatchSelection.js';
@@ -109,7 +110,7 @@ onBeforeUnmount(() => {
     <header class="hx-card-header">
       <div>
         <p class="hx-eyebrow">Release status</p>
-        <h2 ref="headingElement" class="hx-card-title" tabindex="-1">
+        <h2 ref="headingElement" class="hx-card-title missing-music-inspector__heading" tabindex="-1">
           {{ presentation.title }}
         </h2>
       </div>
@@ -273,6 +274,7 @@ onBeforeUnmount(() => {
     ref="downloadDialogElement"
     class="missing-music-download-dialog"
     aria-labelledby="missing-music-download-dialog-title"
+    @keydown="trapModalTabFocus"
   >
     <form method="dialog" class="missing-music-download-dialog__content" @submit.prevent="startDownload">
       <h2 id="missing-music-download-dialog-title">Start download?</h2>
@@ -305,6 +307,11 @@ onBeforeUnmount(() => {
 
 .missing-music-inspector__state {
   color: var(--hx-text-muted);
+}
+
+.missing-music-inspector__heading:focus {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 3px;
 }
 
 .missing-music-inspector__state p,
