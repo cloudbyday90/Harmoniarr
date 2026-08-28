@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { buildMusicQueueProviderRepairNotice } from './music-queue-provider-repair-presentation.js';
+import { buildMissingMusicProviderRepairNotice } from './missing-music-provider-repair-presentation.js';
 import { MISSING_MUSIC_PROVIDER_READY_RECOVERY_CONTEXT } from './missing-music-provider-recovery-visibility-presentation.js';
 import {
   SETTINGS_RECOVERY_CONTEXT,
@@ -99,7 +99,7 @@ export function buildSettingsProviderRecoveryConfirmation({
   const destination = getSettingsRecoveryDestination(recoveryContext);
   if (!destination) return null;
 
-  const repairNotice = buildMusicQueueProviderRepairNotice({
+  const repairNotice = buildMissingMusicProviderRepairNotice({
     dependencies: connectionStatus ? [connectionStatus] : dependencies,
     setupProgress,
   });

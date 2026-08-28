@@ -47,6 +47,10 @@ import {
 } from '../../src/client/lib/missing-music-release-api.js';
 import { buildMusicQueueProgressStrip } from '../../src/client/lib/music-queue-progress-presentation.js';
 import {
+  buildMusicQueueProviderRepairNotice,
+  hasMusicQueueProviderDependentWork,
+} from '../../src/client/lib/music-queue-provider-repair-presentation.js';
+import {
   buildMusicQueueProviderRecoveryVisibility,
   isMusicQueueProviderReadyRecoveryContext,
   MUSIC_QUEUE_PROVIDER_READY_RECOVERY_CONTEXT,
@@ -55,6 +59,10 @@ import {
 import { buildMusicQueueRecoveryPresentation } from '../../src/client/lib/music-queue-recovery-presentation.js';
 import { buildMusicQueueReleaseProgressPresentation } from '../../src/client/lib/music-queue-release-progress-presentation.js';
 import { buildMissingMusicProgressStrip } from '../../src/client/lib/missing-music-progress-presentation.js';
+import {
+  buildMissingMusicProviderRepairNotice,
+  hasMissingMusicProviderDependentWork,
+} from '../../src/client/lib/missing-music-provider-repair-presentation.js';
 import {
   buildMissingMusicProviderRecoveryVisibility,
   isMissingMusicProviderReadyRecoveryContext,
@@ -128,6 +136,8 @@ test('legacy client entry points remain aliases of canonical Missing Music modul
   assert.equal(buildMusicQueueSummaryCards, buildMissingMusicSummaryCards);
   assert.equal(buildMusicQueueMatchReview, buildMissingMusicMatchReview);
   assert.equal(buildMusicQueueProgressStrip, buildMissingMusicProgressStrip);
+  assert.equal(buildMusicQueueProviderRepairNotice, buildMissingMusicProviderRepairNotice);
+  assert.equal(hasMusicQueueProviderDependentWork, hasMissingMusicProviderDependentWork);
   assert.equal(buildMusicQueueProviderRecoveryVisibility, buildMissingMusicProviderRecoveryVisibility);
   assert.equal(isMusicQueueProviderReadyRecoveryContext, isMissingMusicProviderReadyRecoveryContext);
   assert.equal(MUSIC_QUEUE_PROVIDER_READY_RECOVERY_CONTEXT, MISSING_MUSIC_PROVIDER_READY_RECOVERY_CONTEXT);

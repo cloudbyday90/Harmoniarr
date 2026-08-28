@@ -1,6 +1,7 @@
 # Music Queue Provider Repair Context Design
 
-Status: **Implemented.**
+Status: **Implemented.** Canonical module ownership now follows Missing Music;
+see [Missing Music Provider Repair Presentation Migration](MISSING_MUSIC_PROVIDER_REPAIR_PRESENTATION_MIGRATION_DESIGN.md).
 
 ## Objective
 

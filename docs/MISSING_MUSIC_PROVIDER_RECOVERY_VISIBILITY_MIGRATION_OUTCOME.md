@@ -25,4 +25,5 @@ The canonical Missing Music module now owns the fixed provider-ready recovery ma
 
 ## Next recommendation
 
-Audit `music-queue-provider-repair-presentation.js` next. It may remain a pure read-model formatter, but it composes connection and setup evidence and should first be checked for server-correlation or administrative-state boundaries.
+The provider-repair audit is now underway. Its design and result are recorded
+in [Missing Music Provider Repair Presentation Migration](MISSING_MUSIC_PROVIDER_REPAIR_PRESENTATION_MIGRATION_DESIGN.md).
