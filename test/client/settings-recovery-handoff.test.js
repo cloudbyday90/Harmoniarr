@@ -28,6 +28,7 @@ import {
   createSettingsRecoveryContext,
   resolveSettingsRecoveryContext,
 } from '../../src/client/lib/settings-recovery-handoff.js';
+import { buildSettingsMusicQueueSafeAddRecheckConfirmation } from '../../src/client/lib/settings-music-queue-safe-add-recheck-presentation.js';
 import { buildSettingsMissingMusicSafeAddRecheckConfirmation } from '../../src/client/lib/settings-missing-music-safe-add-recheck-presentation.js';
 
 test('Settings recovery contexts accept only fixed internal destinations', () => {
@@ -155,4 +156,32 @@ test('Settings recheck feedback exposes only the scoped Missing Music release ou
   });
   assert.equal(blocked.title, 'Library add still needs review');
   assert.doesNotMatch(JSON.stringify(blocked), /private|downloads|apply-run/i);
+});
+
+test('Settings Missing Music recheck feedback identifies deferred work without claiming a library add', () => {
+  const recoveryContext = createSettingsRecoveryContext({
+    context: SETTINGS_RECOVERY_CONTEXT.MISSING_MUSIC_DECISION,
+    wantedReleaseId: 'wanted-release-1',
+  });
+
+  const deferred = buildSettingsMissingMusicSafeAddRecheckConfirmation({
+    recoveryContext,
+    recheck: { action: { outcome: 'deferred', runId: 'apply-run-1' } },
+  });
+
+  assert.equal(deferred.title, 'Library add is waiting');
+  assert.equal(deferred.tone, 'warning');
+  assert.match(deferred.copy, /another library add is active/i);
+  assert.doesNotMatch(JSON.stringify(deferred), /apply-run/i);
+  assert.equal(buildSettingsMissingMusicSafeAddRecheckConfirmation({
+    recoveryContext: { context: SETTINGS_RECOVERY_CONTEXT.MISSING_MUSIC_DECISION },
+    recheck: { action: { outcome: 'queued' } },
+  }), null);
+});
+
+test('legacy Settings Music Queue recheck export remains the canonical Missing Music binding', () => {
+  assert.equal(
+    buildSettingsMusicQueueSafeAddRecheckConfirmation,
+    buildSettingsMissingMusicSafeAddRecheckConfirmation,
+  );
 });

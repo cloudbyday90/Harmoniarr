@@ -30,7 +30,8 @@ Dependabot PR #41 was fetched locally and inspected without merging. Its direct 
 
 ## Next recommendation
 
-Audit `settings-music-queue-safe-add-recheck-presentation.js` next. Settings Media Storage already imports its Missing Music facade, but the implementation still uses a Music Queue name and combines bounded server recheck evidence with a Settings return action. Confirm its server-correlation and recovery-context boundaries first, then move only the safe client projection into a canonical Missing Music ESM module.
+The safe-add recheck audit is now underway. Its design and result are recorded
+in [Missing Music Safe-Add Recheck Presentation Migration](MISSING_MUSIC_SAFE_ADD_RECHECK_PRESENTATION_MIGRATION_DESIGN.md).
 
 ## Sources
 

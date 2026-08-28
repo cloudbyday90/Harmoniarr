@@ -16,6 +16,58 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-export {
-  buildSettingsMusicQueueSafeAddRecheckConfirmation as buildSettingsMissingMusicSafeAddRecheckConfirmation,
-} from './settings-music-queue-safe-add-recheck-presentation.js';
+import {
+  SETTINGS_RECOVERY_CONTEXT,
+  buildSettingsRecoveryReturnAction,
+} from './settings-recovery-handoff.js';
+
+function isMissingMusicReleaseRecovery(recoveryContext) {
+  return [
+    SETTINGS_RECOVERY_CONTEXT.MISSING_MUSIC_DECISION,
+    SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE_RELEASE,
+  ].includes(recoveryContext?.context)
+    && typeof recoveryContext.wantedReleaseId === 'string'
+    && recoveryContext.wantedReleaseId.length > 0;
+}
+
+/**
+ * Turns a bounded server recheck outcome into Settings feedback. No candidate,
+ * filesystem, provider, or media-tool detail is included in this normal path.
+ */
+export function buildSettingsMissingMusicSafeAddRecheckConfirmation({
+  recoveryContext = null,
+  recheck = null,
+} = {}) {
+  if (!isMissingMusicReleaseRecovery(recoveryContext)) return null;
+
+  const outcome = recheck?.action?.outcome;
+  const action = buildSettingsRecoveryReturnAction({ recoveryContext });
+  switch (outcome) {
+    case 'queued':
+      return {
+        action,
+        copy: 'Harmoniarr rechecked this completed download and queued only this release for a safe library add.',
+        outcome,
+        title: 'Library add resumed',
+        tone: 'success',
+      };
+    case 'deferred':
+      return {
+        action,
+        copy: 'The recheck passed, but another library add is active. Return to Missing Music after that work finishes to see whether this release needs another try.',
+        outcome,
+        title: 'Library add is waiting',
+        tone: 'warning',
+      };
+    case 'still_needs_review':
+      return {
+        action,
+        copy: 'Harmoniarr rechecked this completed download but it still needs review before it can be added safely.',
+        outcome,
+        title: 'Library add still needs review',
+        tone: 'warning',
+      };
+    default:
+      return null;
+  }
+}

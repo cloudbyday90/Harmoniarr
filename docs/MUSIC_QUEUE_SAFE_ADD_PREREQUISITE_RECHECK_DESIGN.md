@@ -1,6 +1,7 @@
 # Music Queue Safe Add Prerequisite Recheck Design
 
-Status: **Implemented.**
+Status: **Implemented.** Canonical Settings presentation ownership now follows
+Missing Music; see [Missing Music Safe-Add Recheck Presentation Migration](MISSING_MUSIC_SAFE_ADD_RECHECK_PRESENTATION_MIGRATION_DESIGN.md).
 
 Date: 2026-08-01.
 
