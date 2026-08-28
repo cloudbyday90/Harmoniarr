@@ -29,6 +29,13 @@ import {
   useMusicQueueMatch,
 } from '../../src/client/lib/acquisition-api.js';
 import {
+  buildMusicQueueAction,
+  buildMusicQueueMatchReview,
+  buildMusicQueueSummaryCards,
+  getMusicQueueStatusClass,
+  normalizeMusicQueueRelease,
+} from '../../src/client/lib/acquisition-pipeline-presentation.js';
+import {
   addMissingMusicReleaseToLibrary,
   allowMissingMusicFallbackQuality,
   fetchMissingMusicRelease,
@@ -40,6 +47,15 @@ import {
 } from '../../src/client/lib/missing-music-release-api.js';
 import { buildMusicQueueProgressStrip } from '../../src/client/lib/music-queue-progress-presentation.js';
 import { buildMissingMusicProgressStrip } from '../../src/client/lib/missing-music-progress-presentation.js';
+import {
+  buildMissingMusicReleaseAction,
+  getMissingMusicReleaseStatusClass,
+} from '../../src/client/lib/missing-music-release-action-presentation.js';
+import {
+  buildMissingMusicSummaryCards,
+  normalizeMissingMusicRelease,
+} from '../../src/client/lib/missing-music-release-normalization.js';
+import { buildMissingMusicMatchReview } from '../../src/client/lib/missing-music-release-review-presentation.js';
 import {
   buildMusicQueueReleaseActionFeedback,
   createMusicQueueActionFeedback,
@@ -90,6 +106,11 @@ test('legacy client entry points remain aliases of canonical Missing Music modul
   assert.equal(rejectMusicQueueMatch, rejectMissingMusicMatch);
   assert.equal(searchMusicQueueReleaseAgain, searchMissingMusicReleaseAgain);
   assert.equal(useMusicQueueMatch, selectMissingMusicMatch);
+  assert.equal(buildMusicQueueAction, buildMissingMusicReleaseAction);
+  assert.equal(getMusicQueueStatusClass, getMissingMusicReleaseStatusClass);
+  assert.equal(normalizeMusicQueueRelease, normalizeMissingMusicRelease);
+  assert.equal(buildMusicQueueSummaryCards, buildMissingMusicSummaryCards);
+  assert.equal(buildMusicQueueMatchReview, buildMissingMusicMatchReview);
   assert.equal(buildMusicQueueProgressStrip, buildMissingMusicProgressStrip);
   assert.equal(buildMusicQueueReleaseActionFeedback, buildMissingMusicReleaseActionFeedback);
   assert.equal(createMusicQueueActionFeedback, createMissingMusicActionFeedback);

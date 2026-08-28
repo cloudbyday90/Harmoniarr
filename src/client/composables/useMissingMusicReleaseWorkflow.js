@@ -27,7 +27,10 @@ import {
   searchMissingMusicReleaseAgain as defaultSearchMusicQueueReleaseAgain,
   selectMissingMusicMatch as defaultUseMusicQueueMatch,
 } from '../lib/missing-music-release-api.js';
-import { buildMusicQueueSummaryCards, normalizeMusicQueueRelease } from '../lib/acquisition-pipeline-presentation.js';
+import {
+  buildMissingMusicSummaryCards,
+  normalizeMissingMusicRelease,
+} from '../lib/missing-music-release-normalization.js';
 import { getErrorMessage } from '../lib/error-utils.js';
 import { createMissingMusicActionFeedback } from '../lib/missing-music-action-feedback-presentation.js';
 import { buildMissingMusicMatchSelectionSuccessMessage } from '../lib/missing-music-match-selection-feedback-presentation.js';
@@ -94,7 +97,7 @@ export function useMissingMusicReleaseWorkflow({
     project: (payload) => ({
       checkedAt: payload?.checkedAt ?? null,
       pagination: payload?.pagination ?? { total: 0 },
-      releases: Array.isArray(payload?.releases) ? payload.releases.map(normalizeMusicQueueRelease) : [],
+      releases: Array.isArray(payload?.releases) ? payload.releases.map(normalizeMissingMusicRelease) : [],
       summary: payload?.summary ?? { counts: {}, total: 0 },
     }),
     revalidateOnFocus: true,
@@ -114,11 +117,11 @@ export function useMissingMusicReleaseWorkflow({
   }
 
   const releases = computed(() => resource.data.value.releases ?? []);
-  const summaryCards = computed(() => buildMusicQueueSummaryCards(resource.data.value.summary));
+  const summaryCards = computed(() => buildMissingMusicSummaryCards(resource.data.value.summary));
   const totalCount = computed(() => resource.data.value.pagination?.total ?? releases.value.length);
 
   function applyMutationRelease(payload) {
-    const updatedRelease = normalizeMusicQueueRelease(payload?.release);
+    const updatedRelease = normalizeMissingMusicRelease(payload?.release);
     if (!updatedRelease?.id || !Array.isArray(resource.data.value.releases)) {
       return;
     }
