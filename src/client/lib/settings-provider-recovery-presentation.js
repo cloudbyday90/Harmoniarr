@@ -17,7 +17,7 @@
  */
 
 import { buildMusicQueueProviderRepairNotice } from './music-queue-provider-repair-presentation.js';
-import { MUSIC_QUEUE_PROVIDER_READY_RECOVERY_CONTEXT } from './music-queue-provider-recovery-visibility-presentation.js';
+import { MISSING_MUSIC_PROVIDER_READY_RECOVERY_CONTEXT } from './missing-music-provider-recovery-visibility-presentation.js';
 import {
   SETTINGS_RECOVERY_CONTEXT,
   buildSettingsRecoveryReturnAction,
@@ -75,7 +75,7 @@ function buildReadyAction(recoveryContext) {
 
   return buildSettingsRecoveryReturnAction({
     query: shouldShowMusicQueueRecovery
-      ? { recovery: MUSIC_QUEUE_PROVIDER_READY_RECOVERY_CONTEXT }
+      ? { recovery: MISSING_MUSIC_PROVIDER_READY_RECOVERY_CONTEXT }
       : null,
     recoveryContext,
   });

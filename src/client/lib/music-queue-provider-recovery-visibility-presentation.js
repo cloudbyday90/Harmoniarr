@@ -16,68 +16,9 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-export const MUSIC_QUEUE_PROVIDER_READY_RECOVERY_CONTEXT = 'provider_ready';
-
-function normalizeRouteQuery(query) {
-  return query && typeof query === 'object' ? query : {};
-}
-
-function getReleaseLabel(release) {
-  const releaseTitle = typeof release?.releaseTitle === 'string' && release.releaseTitle.trim().length > 0
-    ? release.releaseTitle.trim()
-    : 'This release';
-  const artistName = typeof release?.artistName === 'string' && release.artistName.trim().length > 0
-    ? release.artistName.trim()
-    : null;
-
-  return artistName ? `${releaseTitle} by ${artistName}` : releaseTitle;
-}
-
-export function isMusicQueueProviderReadyRecoveryContext(value) {
-  return value === MUSIC_QUEUE_PROVIDER_READY_RECOVERY_CONTEXT;
-}
-
-export function omitMusicQueueProviderReadyRecoveryQuery(query) {
-  const { recovery, ...remainingQuery } = normalizeRouteQuery(query);
-  return remainingQuery;
-}
-
-/**
- * The queue API is already deterministically ordered by the server. Preserve
- * that ordering so this message identifies the first eligible release without
- * creating a client-side scheduling policy.
- */
-export function buildMusicQueueProviderRecoveryVisibility({
-  releases = [],
-  refreshFailed = false,
-} = {}) {
-  if (refreshFailed) {
-    return {
-      copy: 'Soulseek is ready, but Music Queue could not refresh yet. It will retry during its normal checks.',
-      outcome: 'refresh_failed',
-      title: 'Music Queue has not refreshed yet',
-      tone: 'warning',
-    };
-  }
-
-  const nextEligibleRelease = Array.isArray(releases)
-    ? releases.find((release) => release?.statusCode === 'queued_for_search')
-    : null;
-
-  if (!nextEligibleRelease) {
-    return {
-      copy: 'Music Queue refreshed. No release is waiting for a normal search check right now.',
-      outcome: 'no_waiting_release',
-      title: 'Music Queue is ready',
-      tone: 'success',
-    };
-  }
-
-  return {
-    copy: `${getReleaseLabel(nextEligibleRelease)} is waiting for its next normal search check. Harmoniarr has not started a download yet.`,
-    outcome: 'waiting_for_search',
-    releaseId: nextEligibleRelease.id ?? null,
-    title: 'Music Queue is ready',
-    tone: 'success',
-  };
-}
+export {
+  MISSING_MUSIC_PROVIDER_READY_RECOVERY_CONTEXT as MUSIC_QUEUE_PROVIDER_READY_RECOVERY_CONTEXT,
+  buildMissingMusicProviderRecoveryVisibility as buildMusicQueueProviderRecoveryVisibility,
+  isMissingMusicProviderReadyRecoveryContext as isMusicQueueProviderReadyRecoveryContext,
+  omitMissingMusicProviderReadyRecoveryQuery as omitMusicQueueProviderReadyRecoveryQuery,
+} from './missing-music-provider-recovery-visibility-presentation.js';

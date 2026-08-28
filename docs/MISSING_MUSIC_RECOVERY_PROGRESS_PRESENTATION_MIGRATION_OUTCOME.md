@@ -22,6 +22,8 @@ Recovery guidance and release progress are now owned by focused Missing Music ES
 - `npm run test:client` passed: 4,153 tests.
 - `npm run validate` passed copyright, migration, schema snapshot, ESM, Compose topology, lint, server, client, script, integration, and production-build gates. The integration suite passed 37 tests.
 
-## Next recommendation
+## Follow-up
 
-Classify `music-queue-provider-recovery-visibility-presentation.js` before migrating it. It may expose provider recovery state that has stronger operational and authorization implications than the pure release-formatting modules completed here.
+The provider-recovery visibility module was subsequently classified as a pure
+client formatter and migrated behind an ESM compatibility facade. See
+[MISSING_MUSIC_PROVIDER_RECOVERY_VISIBILITY_MIGRATION_OUTCOME.md](./MISSING_MUSIC_PROVIDER_RECOVERY_VISIBILITY_MIGRATION_OUTCOME.md).

@@ -46,9 +46,21 @@ import {
   selectMissingMusicMatch,
 } from '../../src/client/lib/missing-music-release-api.js';
 import { buildMusicQueueProgressStrip } from '../../src/client/lib/music-queue-progress-presentation.js';
+import {
+  buildMusicQueueProviderRecoveryVisibility,
+  isMusicQueueProviderReadyRecoveryContext,
+  MUSIC_QUEUE_PROVIDER_READY_RECOVERY_CONTEXT,
+  omitMusicQueueProviderReadyRecoveryQuery,
+} from '../../src/client/lib/music-queue-provider-recovery-visibility-presentation.js';
 import { buildMusicQueueRecoveryPresentation } from '../../src/client/lib/music-queue-recovery-presentation.js';
 import { buildMusicQueueReleaseProgressPresentation } from '../../src/client/lib/music-queue-release-progress-presentation.js';
 import { buildMissingMusicProgressStrip } from '../../src/client/lib/missing-music-progress-presentation.js';
+import {
+  buildMissingMusicProviderRecoveryVisibility,
+  isMissingMusicProviderReadyRecoveryContext,
+  MISSING_MUSIC_PROVIDER_READY_RECOVERY_CONTEXT,
+  omitMissingMusicProviderReadyRecoveryQuery,
+} from '../../src/client/lib/missing-music-provider-recovery-visibility-presentation.js';
 import { buildMissingMusicReleaseProgressPresentation } from '../../src/client/lib/missing-music-release-progress-presentation.js';
 import { buildMissingMusicReleaseRecoveryPresentation } from '../../src/client/lib/missing-music-release-recovery-presentation.js';
 import {
@@ -116,6 +128,10 @@ test('legacy client entry points remain aliases of canonical Missing Music modul
   assert.equal(buildMusicQueueSummaryCards, buildMissingMusicSummaryCards);
   assert.equal(buildMusicQueueMatchReview, buildMissingMusicMatchReview);
   assert.equal(buildMusicQueueProgressStrip, buildMissingMusicProgressStrip);
+  assert.equal(buildMusicQueueProviderRecoveryVisibility, buildMissingMusicProviderRecoveryVisibility);
+  assert.equal(isMusicQueueProviderReadyRecoveryContext, isMissingMusicProviderReadyRecoveryContext);
+  assert.equal(MUSIC_QUEUE_PROVIDER_READY_RECOVERY_CONTEXT, MISSING_MUSIC_PROVIDER_READY_RECOVERY_CONTEXT);
+  assert.equal(omitMusicQueueProviderReadyRecoveryQuery, omitMissingMusicProviderReadyRecoveryQuery);
   assert.equal(buildMusicQueueRecoveryPresentation, buildMissingMusicReleaseRecoveryPresentation);
   assert.equal(buildMusicQueueReleaseProgressPresentation, buildMissingMusicReleaseProgressPresentation);
   assert.equal(buildMusicQueueReleaseActionFeedback, buildMissingMusicReleaseActionFeedback);

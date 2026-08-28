@@ -19,31 +19,31 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  buildMusicQueueProviderRecoveryVisibility,
-  isMusicQueueProviderReadyRecoveryContext,
-  MUSIC_QUEUE_PROVIDER_READY_RECOVERY_CONTEXT,
-  omitMusicQueueProviderReadyRecoveryQuery,
-} from '../../src/client/lib/music-queue-provider-recovery-visibility-presentation.js';
+  buildMissingMusicProviderRecoveryVisibility,
+  isMissingMusicProviderReadyRecoveryContext,
+  MISSING_MUSIC_PROVIDER_READY_RECOVERY_CONTEXT,
+  omitMissingMusicProviderReadyRecoveryQuery,
+} from '../../src/client/lib/missing-music-provider-recovery-visibility-presentation.js';
 
-test('Music Queue recovery accepts only its fixed ready return context', () => {
-  assert.equal(isMusicQueueProviderReadyRecoveryContext(MUSIC_QUEUE_PROVIDER_READY_RECOVERY_CONTEXT), true);
-  assert.equal(isMusicQueueProviderReadyRecoveryContext('music_queue'), false);
-  assert.equal(isMusicQueueProviderReadyRecoveryContext('/app/music-queue'), false);
-  assert.equal(isMusicQueueProviderReadyRecoveryContext('https://outside.example'), false);
+test('Missing Music recovery accepts only its fixed ready return context', () => {
+  assert.equal(isMissingMusicProviderReadyRecoveryContext(MISSING_MUSIC_PROVIDER_READY_RECOVERY_CONTEXT), true);
+  assert.equal(isMissingMusicProviderReadyRecoveryContext('music_queue'), false);
+  assert.equal(isMissingMusicProviderReadyRecoveryContext('/app/music-queue'), false);
+  assert.equal(isMissingMusicProviderReadyRecoveryContext('https://outside.example'), false);
 });
 
-test('Music Queue recovery consumes only its one-time query key', () => {
-  assert.deepEqual(omitMusicQueueProviderReadyRecoveryQuery({
-    recovery: MUSIC_QUEUE_PROVIDER_READY_RECOVERY_CONTEXT,
+test('Missing Music recovery consumes only its one-time query key', () => {
+  assert.deepEqual(omitMissingMusicProviderReadyRecoveryQuery({
+    recovery: MISSING_MUSIC_PROVIDER_READY_RECOVERY_CONTEXT,
     release: 'wanted-1',
   }), {
     release: 'wanted-1',
   });
-  assert.deepEqual(omitMusicQueueProviderReadyRecoveryQuery(null), {});
+  assert.deepEqual(omitMissingMusicProviderReadyRecoveryQuery(null), {});
 });
 
-test('Music Queue recovery reports the first API-ordered release waiting for a normal search', () => {
-  const visibility = buildMusicQueueProviderRecoveryVisibility({
+test('Missing Music recovery reports the first API-ordered release waiting for a normal search', () => {
+  const visibility = buildMissingMusicProviderRecoveryVisibility({
     releases: [
       { artistName: 'Forest Frank', id: 'active', releaseTitle: 'Good Day', statusCode: 'searching' },
       { artistName: 'Forest Frank', id: 'first-waiting', releaseTitle: 'New Hymns', statusCode: 'queued_for_search' },
@@ -60,8 +60,8 @@ test('Music Queue recovery reports the first API-ordered release waiting for a n
   });
 });
 
-test('Music Queue recovery does not mislabel active or blocked work as waiting', () => {
-  const visibility = buildMusicQueueProviderRecoveryVisibility({
+test('Missing Music recovery does not mislabel active or blocked work as waiting', () => {
+  const visibility = buildMissingMusicProviderRecoveryVisibility({
     releases: [
       { id: 'searching', statusCode: 'searching' },
       { id: 'downloading', statusCode: 'downloading' },
@@ -73,8 +73,8 @@ test('Music Queue recovery does not mislabel active or blocked work as waiting',
   assert.match(visibility.copy, /No release is waiting for a normal search check/);
 });
 
-test('Music Queue recovery keeps failed refresh feedback generic', () => {
-  const visibility = buildMusicQueueProviderRecoveryVisibility({
+test('Missing Music recovery keeps failed refresh feedback generic', () => {
+  const visibility = buildMissingMusicProviderRecoveryVisibility({
     refreshFailed: true,
     releases: [{ id: 'waiting', statusCode: 'queued_for_search' }],
   });
