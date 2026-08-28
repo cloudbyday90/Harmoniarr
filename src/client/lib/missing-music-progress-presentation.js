@@ -16,6 +16,147 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-export {
-  buildMusicQueueProgressStrip as buildMissingMusicProgressStrip,
-} from './music-queue-progress-presentation.js';
+const STATUS_PRIORITY = Object.freeze({
+  needs_setup: 0,
+  quality_choice_needed: 1,
+  pick_match: 2,
+  needs_help_adding: 3,
+  failed: 4,
+  no_matches_left: 5,
+  ready_to_add: 6,
+  adding_to_library: 7,
+  downloading: 8,
+  trying_next_match: 9,
+  searching: 10,
+  checking_matches: 11,
+  retrying_search: 12,
+  queued_for_search: 13,
+  in_library: 14,
+});
+
+import {
+  isMissingMusicAttentionRelease,
+  isMissingMusicHomeProgressRelease,
+} from './missing-music-progress-state.js';
+import {
+  SETTINGS_RECOVERY_CONTEXT,
+  buildSettingsRecoveryHandoffLocation,
+  createSettingsRecoveryContext,
+} from './settings-recovery-handoff.js';
+
+function getPriority(release) {
+  return STATUS_PRIORITY[release?.statusCode] ?? Number.MAX_SAFE_INTEGER;
+}
+
+function compareProgressReleases(left, right) {
+  const priorityDifference = getPriority(left) - getPriority(right);
+  if (priorityDifference !== 0) return priorityDifference;
+
+  const activityDifference = String(right?.lastActivityAt ?? '').localeCompare(
+    String(left?.lastActivityAt ?? ''),
+  );
+  if (activityDifference !== 0) return activityDifference;
+
+  return String(left?.releaseTitle ?? '').localeCompare(String(right?.releaseTitle ?? ''));
+}
+
+function buildRowAction(release, { releaseDetailsOnly, transferProgress }) {
+  if (releaseDetailsOnly) {
+    return {
+      label: 'View details',
+      to: {
+        name: 'missing-decision',
+        params: { decisionId: release?.id },
+      },
+    };
+  }
+
+  if (transferProgress?.handoff) {
+    return {
+      accessibleLabel: transferProgress.handoff.accessibleLabel,
+      label: transferProgress.handoff.label,
+      to: transferProgress.handoff.location,
+    };
+  }
+
+  if (release?.statusCode === 'needs_setup' && release?.action?.type === 'route') {
+    return {
+      label: release.action.label,
+      to: buildSettingsRecoveryHandoffLocation({
+        recoveryContext: createSettingsRecoveryContext({
+          context: SETTINGS_RECOVERY_CONTEXT.MISSING_MUSIC_DECISION,
+          wantedReleaseId: release?.id,
+        }),
+        routeName: release.action.routeName,
+      }),
+    };
+  }
+
+  return {
+    label: isMissingMusicAttentionRelease(release) ? 'Review' : 'Open Missing Music',
+    to: {
+      name: 'missing-decision',
+      params: { decisionId: release?.id },
+    },
+  };
+}
+
+function buildSummary({ activeCount, attentionCount, totalCount }) {
+  if (totalCount === 0) {
+    return 'Nothing is waiting in Missing Music right now.';
+  }
+
+  if (attentionCount > 0 && activeCount > 0) {
+    return `${attentionCount} release${attentionCount === 1 ? ' needs' : 's need'} your attention. ${activeCount} ${activeCount === 1 ? 'is' : 'are'} still moving automatically.`;
+  }
+
+  if (attentionCount > 0) {
+    return `${attentionCount} release${attentionCount === 1 ? ' needs' : 's need'} your attention.`;
+  }
+
+  return `${totalCount} release${totalCount === 1 ? ' is' : 's are'} moving through Missing Music automatically.`;
+}
+
+/**
+ * Shapes the narrow, release-centered status surface used outside the full
+ * Missing Music. It deliberately offers navigation only; workflow mutations
+ * remain on the release detail where scope and confirmation are visible.
+ */
+export function buildMissingMusicProgressStrip(releases, {
+  activeOrAttentionOnly = false,
+  limit = 3,
+  releaseDetailsOnly = false,
+  transferProgressByRelease = {},
+} = {}) {
+  const normalizedReleases = Array.isArray(releases) ? releases.filter(Boolean) : [];
+  const normalizedLimit = Math.max(1, Math.min(Number(limit) || 3, 6));
+  const visibleReleases = activeOrAttentionOnly
+    ? normalizedReleases.filter(isMissingMusicHomeProgressRelease)
+    : normalizedReleases;
+  const attentionCount = visibleReleases.filter(isMissingMusicAttentionRelease).length;
+  const activeCount = visibleReleases.length - attentionCount;
+  const rows = [...visibleReleases]
+    .sort(compareProgressReleases)
+    .slice(0, normalizedLimit)
+    .map((release) => {
+      const transferProgress = transferProgressByRelease?.[release.id] ?? null;
+
+      return {
+        action: buildRowAction(release, { releaseDetailsOnly, transferProgress }),
+        detail: release.detailText || 'Harmoniarr is preparing the next step for this release.',
+        id: release.id,
+        statusLabel: release.status?.label ?? 'In progress',
+        statusTone: release.status?.tone ?? 'neutral',
+        title: `${release.releaseTitle} by ${release.artistName}`,
+        transferProgress,
+      };
+    });
+
+  return {
+    activeCount,
+    attentionCount,
+    rows,
+    summary: buildSummary({ activeCount, attentionCount, totalCount: visibleReleases.length }),
+    totalCount: visibleReleases.length,
+  };
+}
