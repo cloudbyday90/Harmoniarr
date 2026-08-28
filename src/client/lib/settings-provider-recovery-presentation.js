@@ -71,8 +71,8 @@ function buildUnresolvedConfirmation(repairNotice) {
 function buildReadyAction(recoveryContext) {
   const normalizedRecoveryContext = createSettingsRecoveryContext(recoveryContext ?? {});
   const shouldShowMissingMusicProviderRecovery = [
+    SETTINGS_RECOVERY_CONTEXT.MISSING_MUSIC,
     SETTINGS_RECOVERY_CONTEXT.MISSING_MUSIC_DECISION,
-    SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE,
   ].includes(normalizedRecoveryContext?.context);
 
   return buildSettingsRecoveryReturnAction({

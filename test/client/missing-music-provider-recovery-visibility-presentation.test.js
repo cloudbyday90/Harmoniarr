@@ -55,7 +55,7 @@ test('Missing Music recovery reports the first API-ordered release waiting for a
     copy: 'New Hymns by Forest Frank is waiting for its next normal search check. Harmoniarr has not started a download yet.',
     outcome: 'waiting_for_search',
     releaseId: 'first-waiting',
-    title: 'Music Queue is ready',
+    title: 'Missing Music is ready',
     tone: 'success',
   });
 });
@@ -71,6 +71,7 @@ test('Missing Music recovery does not mislabel active or blocked work as waiting
 
   assert.equal(visibility.outcome, 'no_waiting_release');
   assert.match(visibility.copy, /No release is waiting for a normal search check/);
+  assert.match(visibility.title, /Missing Music/);
 });
 
 test('Missing Music recovery keeps failed refresh feedback generic', () => {
@@ -80,5 +81,6 @@ test('Missing Music recovery keeps failed refresh feedback generic', () => {
   });
 
   assert.equal(visibility.outcome, 'refresh_failed');
+  assert.match(visibility.title, /Missing Music/);
   assert.doesNotMatch(JSON.stringify(visibility), /secret|https?:|path/i);
 });

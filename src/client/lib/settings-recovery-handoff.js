@@ -35,6 +35,7 @@ const LEGACY_REPAIR_QUERY_KEY = 'repair';
 const SAFE_RELEASE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._~-]{0,127}$/;
 
 const LEGACY_RECOVERY_CONTEXT_ALIASES = Object.freeze({
+  [SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE]: SETTINGS_RECOVERY_CONTEXT.MISSING_MUSIC,
   [SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE_RELEASE]: SETTINGS_RECOVERY_CONTEXT.MISSING_MUSIC_DECISION,
 });
 
@@ -82,12 +83,6 @@ const RECOVERY_DESTINATIONS = Object.freeze({
     providerReadyCopy: 'Missing Music can continue its normal checks. Harmoniarr has not started a download yet.',
     requiresReleaseId: true,
     routeName: 'missing-decision',
-  }),
-  [SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE]: Object.freeze({
-    folderReadyCopy: 'Return to Missing Music to see the next automatic step.',
-    label: 'Return to Missing Music',
-    providerReadyCopy: 'Missing Music can continue its normal checks. Harmoniarr has not started a download yet.',
-    routeName: 'missing',
   }),
 });
 

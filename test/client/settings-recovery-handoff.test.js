@@ -99,6 +99,43 @@ test('Settings recovery translates a legacy scoped-release context and serialize
   );
 });
 
+test('Settings recovery translates a legacy generic worklist context and serializes only Missing Music', () => {
+  const recoveryContext = createSettingsRecoveryContext({
+    context: SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE,
+  });
+
+  assert.deepEqual(recoveryContext, {
+    context: SETTINGS_RECOVERY_CONTEXT.MISSING_MUSIC,
+  });
+  assert.deepEqual(
+    resolveSettingsRecoveryContext({
+      [SETTINGS_RECOVERY_QUERY_KEY]: SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE,
+    }),
+    recoveryContext,
+  );
+  assert.deepEqual(
+    resolveSettingsRecoveryContext({ repair: SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE }),
+    recoveryContext,
+  );
+  assert.deepEqual(
+    buildSettingsRecoveryHandoffLocation({
+      recoveryContext,
+      routeName: 'settings-connections',
+    }),
+    {
+      name: 'settings-connections',
+      query: { [SETTINGS_RECOVERY_QUERY_KEY]: SETTINGS_RECOVERY_CONTEXT.MISSING_MUSIC },
+    },
+  );
+  assert.deepEqual(
+    buildSettingsRecoveryReturnAction({ recoveryContext }),
+    {
+      label: 'Return to Missing Music',
+      routeName: 'missing',
+    },
+  );
+});
+
 test('Settings recovery restores the canonical Missing Music decision route for new release contexts', () => {
   const recoveryContext = createSettingsRecoveryContext({
     context: SETTINGS_RECOVERY_CONTEXT.MISSING_MUSIC_DECISION,
@@ -180,8 +217,8 @@ test('Settings recheck feedback exposes only the scoped Missing Music release ou
   assert.doesNotMatch(JSON.stringify(blocked), /private|downloads|apply-run/i);
 });
 
-test('Settings provider recovery retains its one-time Missing Music visibility marker after legacy normalization', () => {
-  const confirmation = buildSettingsProviderRecoveryConfirmation({
+test('Settings provider recovery retains its one-time Missing Music marker after legacy normalization', () => {
+  const scopedConfirmation = buildSettingsProviderRecoveryConfirmation({
     connectionStatus: { provider: 'slskd', status: 'healthy' },
     recoveryContext: {
       context: SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE_RELEASE,
@@ -190,12 +227,29 @@ test('Settings provider recovery retains its one-time Missing Music visibility m
     setupProgress: { soulseek: { providerMode: 'external' } },
   });
 
-  assert.deepEqual(confirmation.action, {
+  const genericConfirmation = buildSettingsProviderRecoveryConfirmation({
+    connectionStatus: { provider: 'slskd', status: 'healthy' },
+    recoveryContext: { context: SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE },
+    setupProgress: { soulseek: { providerMode: 'external' } },
+  });
+  const canonicalGenericConfirmation = buildSettingsProviderRecoveryConfirmation({
+    connectionStatus: { provider: 'slskd', status: 'healthy' },
+    recoveryContext: { context: SETTINGS_RECOVERY_CONTEXT.MISSING_MUSIC },
+    setupProgress: { soulseek: { providerMode: 'external' } },
+  });
+
+  assert.deepEqual(scopedConfirmation.action, {
     label: 'Return to Missing Music',
     params: { decisionId: 'wanted-release-1' },
     query: { recovery: 'provider_ready' },
     routeName: 'missing-decision',
   });
+  assert.deepEqual(genericConfirmation.action, {
+    label: 'Return to Missing Music',
+    query: { recovery: 'provider_ready' },
+    routeName: 'missing',
+  });
+  assert.deepEqual(canonicalGenericConfirmation.action, genericConfirmation.action);
 });
 
 test('Settings Missing Music recheck feedback identifies deferred work without claiming a library add', () => {

@@ -66,10 +66,9 @@ intentionally deferred to a dedicated browser-test modernization change.
 
 ## Next recommended work
 
-Audit the remaining generic `MUSIC_QUEUE` Settings recovery token separately.
-It has different, non-release semantics and must not be folded into this
-release-scoped mapping without first mapping its historical URLs, provider
-ready-state behavior, and administrator-visible history requirements.
+The generic `MUSIC_QUEUE` Settings recovery token has its own non-release
+semantics. Its completed design is now documented separately in [Missing Music
+Legacy Settings Worklist Context Design](MISSING_MUSIC_LEGACY_SETTINGS_WORKLIST_CONTEXT_DESIGN.md).
 
 ## Related design
 

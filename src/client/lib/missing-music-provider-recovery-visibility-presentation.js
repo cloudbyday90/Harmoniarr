@@ -53,9 +53,9 @@ export function buildMissingMusicProviderRecoveryVisibility({
 } = {}) {
   if (refreshFailed) {
     return {
-      copy: 'Soulseek is ready, but Music Queue could not refresh yet. It will retry during its normal checks.',
+      copy: 'Soulseek is ready, but Missing Music could not refresh yet. It will retry during its normal checks.',
       outcome: 'refresh_failed',
-      title: 'Music Queue has not refreshed yet',
+      title: 'Missing Music has not refreshed yet',
       tone: 'warning',
     };
   }
@@ -66,9 +66,9 @@ export function buildMissingMusicProviderRecoveryVisibility({
 
   if (!nextEligibleRelease) {
     return {
-      copy: 'Music Queue refreshed. No release is waiting for a normal search check right now.',
+      copy: 'Missing Music refreshed. No release is waiting for a normal search check right now.',
       outcome: 'no_waiting_release',
-      title: 'Music Queue is ready',
+      title: 'Missing Music is ready',
       tone: 'success',
     };
   }
@@ -77,7 +77,7 @@ export function buildMissingMusicProviderRecoveryVisibility({
     copy: `${getReleaseLabel(nextEligibleRelease)} is waiting for its next normal search check. Harmoniarr has not started a download yet.`,
     outcome: 'waiting_for_search',
     releaseId: nextEligibleRelease.id ?? null,
-    title: 'Music Queue is ready',
+    title: 'Missing Music is ready',
     tone: 'success',
   };
 }
