@@ -200,7 +200,7 @@ suite('Music Queue folder setup recovery confirmation browser verification', () 
       await stoppedRelease.getByText('Needs setup', { exact: true }).waitFor();
       assert.equal(
         await stoppedRelease.getByRole('link', { name: 'Set up folders' }).getAttribute('href'),
-        '/app/settings/media-storage?returnTo=music_queue_release&returnReleaseId=wanted-forest-frank-folders',
+        '/app/settings/media-storage?returnTo=missing_music_decision&returnReleaseId=wanted-forest-frank-folders',
       );
       await Promise.all([
         page.waitForURL(/\/app\/settings\/media-storage(?:\?.*)?$/),
@@ -208,7 +208,7 @@ suite('Music Queue folder setup recovery confirmation browser verification', () 
       ]);
       assert.match(
         page.url(),
-        /\/app\/settings\/media-storage\?returnTo=music_queue_release&returnReleaseId=wanted-forest-frank-folders$/,
+        /\/app\/settings\/media-storage\?returnTo=missing_music_decision&returnReleaseId=wanted-forest-frank-folders$/,
       );
 
       await page.getByRole('heading', { name: 'Media folders' }).waitFor();

@@ -333,7 +333,7 @@ suite('Music Queue automatic download handoff browser verification', () => {
       await providerLink.waitFor();
       assert.equal(
         await providerLink.getAttribute('href'),
-        '/app/settings/connections?returnTo=music_queue_release&returnReleaseId=wanted-forest-frank-provider-stop',
+        '/app/settings/connections?returnTo=missing_music_decision&returnReleaseId=wanted-forest-frank-provider-stop',
       );
       assert.equal(await releaseRow.getByRole('link', { name: /View download progress/ }).count(), 0);
 

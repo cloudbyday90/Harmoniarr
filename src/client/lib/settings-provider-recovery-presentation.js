@@ -21,6 +21,7 @@ import { MISSING_MUSIC_PROVIDER_READY_RECOVERY_CONTEXT } from './missing-music-p
 import {
   SETTINGS_RECOVERY_CONTEXT,
   buildSettingsRecoveryReturnAction,
+  createSettingsRecoveryContext,
   getSettingsRecoveryDestination,
 } from './settings-recovery-handoff.js';
 
@@ -68,16 +69,17 @@ function buildUnresolvedConfirmation(repairNotice) {
 }
 
 function buildReadyAction(recoveryContext) {
-  const shouldShowMusicQueueRecovery = [
+  const normalizedRecoveryContext = createSettingsRecoveryContext(recoveryContext ?? {});
+  const shouldShowMissingMusicProviderRecovery = [
+    SETTINGS_RECOVERY_CONTEXT.MISSING_MUSIC_DECISION,
     SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE,
-    SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE_RELEASE,
-  ].includes(recoveryContext?.context);
+  ].includes(normalizedRecoveryContext?.context);
 
   return buildSettingsRecoveryReturnAction({
-    query: shouldShowMusicQueueRecovery
+    query: shouldShowMissingMusicProviderRecovery
       ? { recovery: MISSING_MUSIC_PROVIDER_READY_RECOVERY_CONTEXT }
       : null,
-    recoveryContext,
+    recoveryContext: normalizedRecoveryContext,
   });
 }
 

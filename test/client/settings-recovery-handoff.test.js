@@ -30,6 +30,7 @@ import {
 } from '../../src/client/lib/settings-recovery-handoff.js';
 import { buildSettingsMusicQueueSafeAddRecheckConfirmation } from '../../src/client/lib/settings-music-queue-safe-add-recheck-presentation.js';
 import { buildSettingsMissingMusicSafeAddRecheckConfirmation } from '../../src/client/lib/settings-missing-music-safe-add-recheck-presentation.js';
+import { buildSettingsProviderRecoveryConfirmation } from '../../src/client/lib/settings-provider-recovery-presentation.js';
 
 test('Settings recovery contexts accept only fixed internal destinations', () => {
   assert.deepEqual(
@@ -39,6 +40,8 @@ test('Settings recovery contexts accept only fixed internal destinations', () =>
   assert.equal(resolveSettingsRecoveryContext({ [SETTINGS_RECOVERY_QUERY_KEY]: '/app/downloader' }), null);
   assert.equal(resolveSettingsRecoveryContext({ [SETTINGS_RECOVERY_QUERY_KEY]: 'https://outside.example' }), null);
   assert.equal(resolveSettingsRecoveryContext({ [SETTINGS_RECOVERY_QUERY_KEY]: SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE_RELEASE }), null);
+  assert.equal(createSettingsRecoveryContext({ context: 'toString' }), null);
+  assert.equal(createSettingsRecoveryContext({ context: 'constructor' }), null);
   assert.equal(
     createSettingsRecoveryContext({
       context: SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE_RELEASE,
@@ -48,11 +51,30 @@ test('Settings recovery contexts accept only fixed internal destinations', () =>
   );
 });
 
-test('Settings recovery serializes a bounded release context and restores only its named route', () => {
+test('Settings recovery translates a legacy scoped-release context and serializes only the canonical route', () => {
   const recoveryContext = createSettingsRecoveryContext({
     context: SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE_RELEASE,
     wantedReleaseId: 'wanted-release-1',
   });
+
+  assert.deepEqual(recoveryContext, {
+    context: SETTINGS_RECOVERY_CONTEXT.MISSING_MUSIC_DECISION,
+    wantedReleaseId: 'wanted-release-1',
+  });
+  assert.deepEqual(
+    resolveSettingsRecoveryContext({
+      [SETTINGS_RECOVERY_QUERY_KEY]: SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE_RELEASE,
+      [SETTINGS_RECOVERY_RELEASE_QUERY_KEY]: 'wanted-release-1',
+    }),
+    recoveryContext,
+  );
+  assert.deepEqual(
+    resolveSettingsRecoveryContext({
+      repair: SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE_RELEASE,
+      [SETTINGS_RECOVERY_RELEASE_QUERY_KEY]: 'wanted-release-1',
+    }),
+    recoveryContext,
+  );
 
   assert.deepEqual(
     buildSettingsRecoveryHandoffLocation({
@@ -62,7 +84,7 @@ test('Settings recovery serializes a bounded release context and restores only i
     {
       name: 'settings-media-storage',
       query: {
-        [SETTINGS_RECOVERY_QUERY_KEY]: SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE_RELEASE,
+        [SETTINGS_RECOVERY_QUERY_KEY]: SETTINGS_RECOVERY_CONTEXT.MISSING_MUSIC_DECISION,
         [SETTINGS_RECOVERY_RELEASE_QUERY_KEY]: 'wanted-release-1',
       },
     },
@@ -156,6 +178,24 @@ test('Settings recheck feedback exposes only the scoped Missing Music release ou
   });
   assert.equal(blocked.title, 'Library add still needs review');
   assert.doesNotMatch(JSON.stringify(blocked), /private|downloads|apply-run/i);
+});
+
+test('Settings provider recovery retains its one-time Missing Music visibility marker after legacy normalization', () => {
+  const confirmation = buildSettingsProviderRecoveryConfirmation({
+    connectionStatus: { provider: 'slskd', status: 'healthy' },
+    recoveryContext: {
+      context: SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE_RELEASE,
+      wantedReleaseId: 'wanted-release-1',
+    },
+    setupProgress: { soulseek: { providerMode: 'external' } },
+  });
+
+  assert.deepEqual(confirmation.action, {
+    label: 'Return to Missing Music',
+    params: { decisionId: 'wanted-release-1' },
+    query: { recovery: 'provider_ready' },
+    routeName: 'missing-decision',
+  });
 });
 
 test('Settings Missing Music recheck feedback identifies deferred work without claiming a library add', () => {

@@ -29,9 +29,13 @@ GitHub CLI authentication is unavailable. Reachable Dependabot PR #41 was inspec
 - `npm run test:client` passed: 4,158 tests. Existing Vue lifecycle-harness warnings did not cause failures.
 - `npm run validate` passed copyright, migration, schema snapshot, ESM, Compose topology, lint, server, client, script, integration, and production-build gates.
 
-## Next recommendation
+## Follow-up
 
-Audit the remaining `MUSIC_QUEUE_RELEASE` legacy recovery context in `settings-recovery-handoff.js`. It is still intentionally accepted for historical deep links, but canonical callers use `MISSING_MUSIC_DECISION`. First map all producers and retained-history dependencies; only then decide whether to retain, translate, or deprecate the legacy context without widening allowed destinations.
+The release-scoped legacy context audit is now implemented in [Missing Music
+Legacy Settings Recovery Context](MISSING_MUSIC_LEGACY_SETTINGS_RECOVERY_CONTEXT_OUTCOME.md).
+The next bounded audit is the generic `MUSIC_QUEUE` Settings recovery token;
+its no-release and provider-ready semantics require a separate compatibility
+decision.
 
 ## Sources
 

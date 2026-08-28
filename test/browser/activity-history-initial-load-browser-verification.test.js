@@ -169,7 +169,7 @@ suite('Activity history initial-load browser verification', () => {
       await audioEntry.getByRole('link', { name: 'Check connections' }).waitFor();
       assert.match(
         await audioEntry.getByRole('link', { name: 'Check connections' }).getAttribute('href'),
-        /\/app\/settings\/connections\?returnTo=music_queue_release&returnReleaseId=wanted-audio$/,
+        /\/app\/settings\/connections\?returnTo=missing_music_decision&returnReleaseId=wanted-audio$/,
       );
 
       await page.getByLabel('Show activity').selectOption('library');

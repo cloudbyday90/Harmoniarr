@@ -34,6 +34,10 @@ export const SETTINGS_RECOVERY_RELEASE_QUERY_KEY = 'returnReleaseId';
 const LEGACY_REPAIR_QUERY_KEY = 'repair';
 const SAFE_RELEASE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._~-]{0,127}$/;
 
+const LEGACY_RECOVERY_CONTEXT_ALIASES = Object.freeze({
+  [SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE_RELEASE]: SETTINGS_RECOVERY_CONTEXT.MISSING_MUSIC_DECISION,
+});
+
 const RECOVERY_DESTINATIONS = Object.freeze({
   [SETTINGS_RECOVERY_CONTEXT.ACTIVITY_LIBRARY_ADDS]: Object.freeze({
     folderReadyCopy: 'Return to Activity to review the current library-add status.',
@@ -85,13 +89,6 @@ const RECOVERY_DESTINATIONS = Object.freeze({
     providerReadyCopy: 'Missing Music can continue its normal checks. Harmoniarr has not started a download yet.',
     routeName: 'missing',
   }),
-  [SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE_RELEASE]: Object.freeze({
-    folderReadyCopy: "Return to Missing Music to see this release's next automatic step.",
-    label: 'Return to Missing Music',
-    providerReadyCopy: 'Missing Music can continue its normal checks. Harmoniarr has not started a download yet.',
-    routeName: 'missing-decision',
-    requiresReleaseId: true,
-  }),
 });
 
 function readSingleQueryValue(value) {
@@ -101,6 +98,20 @@ function readSingleQueryValue(value) {
 function normalizeReleaseId(value) {
   const normalized = typeof value === 'string' ? value.trim() : '';
   return SAFE_RELEASE_ID_PATTERN.test(normalized) ? normalized : null;
+}
+
+function normalizeRecoveryContext(context) {
+  if (typeof context !== 'string') return null;
+
+  return Object.hasOwn(LEGACY_RECOVERY_CONTEXT_ALIASES, context)
+    ? LEGACY_RECOVERY_CONTEXT_ALIASES[context]
+    : context;
+}
+
+function getRecoveryDestination(context) {
+  return typeof context === 'string' && Object.hasOwn(RECOVERY_DESTINATIONS, context)
+    ? RECOVERY_DESTINATIONS[context]
+    : null;
 }
 
 /**
@@ -115,18 +126,19 @@ export function createSettingsRecoveryContext({
   context,
   wantedReleaseId = null,
 } = {}) {
-  const destination = RECOVERY_DESTINATIONS[context];
+  const normalizedRecoveryContext = normalizeRecoveryContext(context);
+  const destination = getRecoveryDestination(normalizedRecoveryContext);
   if (!destination) return null;
 
   if (!destination.requiresReleaseId) {
-    return { context };
+    return { context: normalizedRecoveryContext };
   }
 
   const normalizedReleaseId = normalizeReleaseId(wantedReleaseId);
   if (!normalizedReleaseId) return null;
 
   return {
-    context,
+    context: normalizedRecoveryContext,
     wantedReleaseId: normalizedReleaseId,
   };
 }
@@ -158,7 +170,7 @@ export function getSettingsRecoveryDestination(recoveryContext) {
   const normalizedContext = createSettingsRecoveryContext(recoveryContext ?? {});
   if (!normalizedContext) return null;
 
-  const destination = RECOVERY_DESTINATIONS[normalizedContext.context];
+  const destination = getRecoveryDestination(normalizedContext.context);
   return {
     folderReadyCopy: destination.folderReadyCopy,
     label: destination.label,
@@ -215,10 +227,7 @@ export function buildSettingsRecoveryReturnAction({
   if (normalizedContext.wantedReleaseId) {
     if (normalizedContext.context === SETTINGS_RECOVERY_CONTEXT.ACTIVITY_LIBRARY_ADD_RELEASE) {
       action.query = { wantedReleaseId: normalizedContext.wantedReleaseId };
-    } else if ([
-      SETTINGS_RECOVERY_CONTEXT.MISSING_MUSIC_DECISION,
-      SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE_RELEASE,
-    ].includes(normalizedContext.context)) {
+    } else if (normalizedContext.context === SETTINGS_RECOVERY_CONTEXT.MISSING_MUSIC_DECISION) {
       action.params = { decisionId: normalizedContext.wantedReleaseId };
     } else {
       action.params = { wantedReleaseId: normalizedContext.wantedReleaseId };

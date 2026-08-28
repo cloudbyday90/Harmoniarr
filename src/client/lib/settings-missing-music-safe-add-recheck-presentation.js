@@ -19,15 +19,15 @@
 import {
   SETTINGS_RECOVERY_CONTEXT,
   buildSettingsRecoveryReturnAction,
+  createSettingsRecoveryContext,
 } from './settings-recovery-handoff.js';
 
 function isMissingMusicReleaseRecovery(recoveryContext) {
-  return [
-    SETTINGS_RECOVERY_CONTEXT.MISSING_MUSIC_DECISION,
-    SETTINGS_RECOVERY_CONTEXT.MUSIC_QUEUE_RELEASE,
-  ].includes(recoveryContext?.context)
-    && typeof recoveryContext.wantedReleaseId === 'string'
-    && recoveryContext.wantedReleaseId.length > 0;
+  const normalizedRecoveryContext = createSettingsRecoveryContext(recoveryContext ?? {});
+
+  return normalizedRecoveryContext?.context === SETTINGS_RECOVERY_CONTEXT.MISSING_MUSIC_DECISION
+    && typeof normalizedRecoveryContext.wantedReleaseId === 'string'
+    && normalizedRecoveryContext.wantedReleaseId.length > 0;
 }
 
 /**
