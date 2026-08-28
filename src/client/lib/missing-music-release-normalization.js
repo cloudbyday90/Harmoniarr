@@ -25,7 +25,7 @@ import {
   getMissingMusicLastActivityAt,
   getMissingMusicReleaseYear,
 } from './missing-music-presentation-utils.js';
-import { buildMusicQueueRecoveryPresentation } from './music-queue-recovery-presentation.js';
+import { buildMissingMusicReleaseRecoveryPresentation } from './missing-music-release-recovery-presentation.js';
 import { formatOperationTimestampShort } from './operation-run-presentation.js';
 
 const DEFAULT_STATUS = Object.freeze({
@@ -69,7 +69,7 @@ export function normalizeMissingMusicRelease(release) {
   const qualitySummary = buildMissingMusicQualitySummary(release);
   const releaseTypeLabel = formatMissingMusicReleaseType(release?.releaseGroupType);
   const releaseYear = getMissingMusicReleaseYear(release?.releaseDate);
-  const recovery = buildMusicQueueRecoveryPresentation(status);
+  const recovery = buildMissingMusicReleaseRecoveryPresentation(status);
   const action = buildMissingMusicReleaseAction(status, recovery);
 
   return {

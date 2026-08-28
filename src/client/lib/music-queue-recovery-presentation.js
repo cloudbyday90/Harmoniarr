@@ -16,40 +16,4 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-const AUTOMATIC_RECOVERY = Object.freeze({
-  kind: 'automatic',
-  nextStep: 'No action is needed. Harmoniarr will continue this release automatically.',
-});
-
-export function buildMusicQueueRecoveryPresentation(status = {}) {
-  switch (status.code) {
-    case 'trying_next_match':
-      return {
-        ...AUTOMATIC_RECOVERY,
-        detail: 'A previous match did not work. Harmoniarr is moving to the next eligible match automatically.',
-      };
-    case 'retrying_search':
-      return {
-        ...AUTOMATIC_RECOVERY,
-        detail: 'No acceptable match was found in the last search. Harmoniarr will try again automatically.',
-      };
-    case 'no_matches_left':
-      return {
-        canSearchAgain: true,
-        detail: 'No acceptable matches remain for this release. Harmoniarr has stopped automatic recovery.',
-        kind: 'action_required',
-        nextStep: 'Review the result, then choose Search again to begin a new search.',
-        retryLabel: 'Search again',
-      };
-    case 'failed':
-      return {
-        canSearchAgain: true,
-        detail: 'The last search did not finish. Harmoniarr needs a new search before it can continue.',
-        kind: 'action_required',
-        nextStep: 'Review the result, then choose Try again to begin a new search.',
-        retryLabel: 'Try again',
-      };
-    default:
-      return null;
-  }
-}
+export { buildMissingMusicReleaseRecoveryPresentation as buildMusicQueueRecoveryPresentation } from './missing-music-release-recovery-presentation.js';

@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildMusicQueueRecoveryPresentation } from '../../src/client/lib/music-queue-recovery-presentation.js';
+import { buildMissingMusicReleaseRecoveryPresentation } from '../../src/client/lib/missing-music-release-recovery-presentation.js';
 
-test('Music Queue recovery keeps next-match and scheduled-search recovery automatic', () => {
+test('Missing Music recovery keeps next-match and scheduled-search recovery automatic', () => {
   for (const code of ['trying_next_match', 'retrying_search']) {
-    const recovery = buildMusicQueueRecoveryPresentation({ code });
+    const recovery = buildMissingMusicReleaseRecoveryPresentation({ code });
 
     assert.equal(recovery.kind, 'automatic');
     assert.equal(recovery.canSearchAgain, undefined);
@@ -12,9 +12,9 @@ test('Music Queue recovery keeps next-match and scheduled-search recovery automa
   }
 });
 
-test('Music Queue recovery gives exhausted and failed searches one explicit retry action', () => {
-  const exhausted = buildMusicQueueRecoveryPresentation({ code: 'no_matches_left' });
-  const failed = buildMusicQueueRecoveryPresentation({ code: 'failed' });
+test('Missing Music recovery gives exhausted and failed searches one explicit retry action', () => {
+  const exhausted = buildMissingMusicReleaseRecoveryPresentation({ code: 'no_matches_left' });
+  const failed = buildMissingMusicReleaseRecoveryPresentation({ code: 'failed' });
 
   assert.deepEqual(
     { canSearchAgain: exhausted.canSearchAgain, retryLabel: exhausted.retryLabel },

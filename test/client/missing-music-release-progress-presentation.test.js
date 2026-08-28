@@ -18,10 +18,10 @@
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildMusicQueueReleaseProgressPresentation } from '../../src/client/lib/music-queue-release-progress-presentation.js';
+import { buildMissingMusicReleaseProgressPresentation } from '../../src/client/lib/missing-music-release-progress-presentation.js';
 
-test('Music Queue release progress presents durable download confirmation in a stable ordered flow', () => {
-  const progress = buildMusicQueueReleaseProgressPresentation({
+test('Missing Music release progress presents durable download confirmation in a stable ordered flow', () => {
+  const progress = buildMissingMusicReleaseProgressPresentation({
     matchSummary: {
       confirmedTransferCount: 2,
       latestConfirmedTransferAt: '2026-08-25T19:12:00.000Z',
@@ -46,8 +46,8 @@ test('Music Queue release progress presents durable download confirmation in a s
   assert.match(progress.steps[2].detail, /Confirmed /);
 });
 
-test('Music Queue release progress prefers the current status over older derived detail', () => {
-  const progress = buildMusicQueueReleaseProgressPresentation({
+test('Missing Music release progress prefers the current status over older derived detail', () => {
+  const progress = buildMissingMusicReleaseProgressPresentation({
     detailText: 'A previous match still has older evaluation detail.',
     status: {
       code: 'searching',
@@ -60,8 +60,8 @@ test('Music Queue release progress prefers the current status over older derived
   assert.equal(progress.steps[0].detail, 'Harmoniarr is looking for matching files.');
 });
 
-test('Music Queue release progress makes the blocked step explicit without adding another action', () => {
-  const progress = buildMusicQueueReleaseProgressPresentation({
+test('Missing Music release progress makes the blocked step explicit without adding another action', () => {
+  const progress = buildMissingMusicReleaseProgressPresentation({
     matchSummary: { totalCount: 2 },
     status: {
       code: 'quality_choice_needed',
@@ -80,8 +80,8 @@ test('Music Queue release progress makes the blocked step explicit without addin
   assert.match(progress.summary, /^Choose match: The best match/);
 });
 
-test('Music Queue release progress completes every stage only after the release is in the library', () => {
-  const progress = buildMusicQueueReleaseProgressPresentation({
+test('Missing Music release progress completes every stage only after the release is in the library', () => {
+  const progress = buildMissingMusicReleaseProgressPresentation({
     status: {
       code: 'in_library',
       message: 'The desired release is already in the library.',

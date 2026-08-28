@@ -17,7 +17,7 @@
  */
 
 import { buildMissingMusicMatchCards } from './missing-music-match-presentation.js';
-import { buildMusicQueueReleaseProgressPresentation } from './music-queue-release-progress-presentation.js';
+import { buildMissingMusicReleaseProgressPresentation } from './missing-music-release-progress-presentation.js';
 
 export function buildMissingMusicMatchReview(release) {
   if (!release) return null;
@@ -71,7 +71,7 @@ export function buildMissingMusicMatchReview(release) {
       { label: 'Library gate', value: qualitySummary.autoAddLabel },
     ],
     qualityGuidance: qualitySummary.reviewGuidance,
-    progress: buildMusicQueueReleaseProgressPresentation(release),
+    progress: buildMissingMusicReleaseProgressPresentation(release),
     recovery,
     repair: release.repair,
     searchAgainLabel: recovery?.retryLabel ?? (release.statusCode === 'quality_choice_needed' ? 'Search again' : 'Try again'),

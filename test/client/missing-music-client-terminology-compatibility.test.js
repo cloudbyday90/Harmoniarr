@@ -46,7 +46,11 @@ import {
   selectMissingMusicMatch,
 } from '../../src/client/lib/missing-music-release-api.js';
 import { buildMusicQueueProgressStrip } from '../../src/client/lib/music-queue-progress-presentation.js';
+import { buildMusicQueueRecoveryPresentation } from '../../src/client/lib/music-queue-recovery-presentation.js';
+import { buildMusicQueueReleaseProgressPresentation } from '../../src/client/lib/music-queue-release-progress-presentation.js';
 import { buildMissingMusicProgressStrip } from '../../src/client/lib/missing-music-progress-presentation.js';
+import { buildMissingMusicReleaseProgressPresentation } from '../../src/client/lib/missing-music-release-progress-presentation.js';
+import { buildMissingMusicReleaseRecoveryPresentation } from '../../src/client/lib/missing-music-release-recovery-presentation.js';
 import {
   buildMissingMusicReleaseAction,
   getMissingMusicReleaseStatusClass,
@@ -112,6 +116,8 @@ test('legacy client entry points remain aliases of canonical Missing Music modul
   assert.equal(buildMusicQueueSummaryCards, buildMissingMusicSummaryCards);
   assert.equal(buildMusicQueueMatchReview, buildMissingMusicMatchReview);
   assert.equal(buildMusicQueueProgressStrip, buildMissingMusicProgressStrip);
+  assert.equal(buildMusicQueueRecoveryPresentation, buildMissingMusicReleaseRecoveryPresentation);
+  assert.equal(buildMusicQueueReleaseProgressPresentation, buildMissingMusicReleaseProgressPresentation);
   assert.equal(buildMusicQueueReleaseActionFeedback, buildMissingMusicReleaseActionFeedback);
   assert.equal(createMusicQueueActionFeedback, createMissingMusicActionFeedback);
   assert.equal(buildMusicQueueMatchSelectionSuccessMessage, buildMissingMusicMatchSelectionSuccessMessage);
