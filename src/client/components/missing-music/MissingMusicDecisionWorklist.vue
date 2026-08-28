@@ -352,6 +352,14 @@ defineExpose({
   text-decoration-color: currentColor;
 }
 
+/* The release title is the row's keyboard entry point. Keep its focus ring as
+   clear as the surrounding controls without showing it for pointer use. */
+.missing-music-worklist__detail-link:focus-visible {
+  border-radius: var(--hx-radius-xs);
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 2px;
+}
+
 .missing-music-worklist__row-heading p,
 .missing-music-worklist__message,
 .missing-music-worklist__facts {

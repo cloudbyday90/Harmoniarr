@@ -275,7 +275,11 @@ suite('Missing Music decision detail browser acceptance', () => {
       await bootstrapAdminThroughUi(page, { baseUrl });
 
       await page.goto(baseUrl + '/app/missing', { waitUntil: 'domcontentloaded' });
-      await page.getByRole('link', { name: 'Open status details for Autechre — Amber' }).click();
+      const detailLink = page.getByRole('link', { name: 'Open status details for Autechre — Amber' });
+      await detailLink.focus();
+      await assertLocatorFocused(detailLink, 'the release-details link should receive keyboard focus');
+      await assertVisibleFocusOutline(detailLink, 'the release-details link focus indicator should be visible');
+      await detailLink.click();
 
       const heading = page.getByRole('heading', { exact: true, level: 2, name: 'Amber' });
       await heading.waitFor();

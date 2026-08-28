@@ -147,10 +147,11 @@ suite('Activity advanced diagnostics boundary browser verification', () => {
       });
       await page.waitForFunction(() => {
         const url = new URL(globalThis.location.href);
-        return url.pathname === '/app/acquisition/music-queue'
+        return url.pathname === '/app/missing'
           && url.searchParams.get('artist') === 'legacy-artist'
           && url.hash === '#music-queue-release-list';
       });
+      await page.getByRole('heading', { exact: true, name: 'Missing Music' }).waitFor();
 
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
       await page.goto('about:blank', { waitUntil: 'load' });

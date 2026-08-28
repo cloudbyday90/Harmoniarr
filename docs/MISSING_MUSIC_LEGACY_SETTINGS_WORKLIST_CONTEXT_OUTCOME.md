@@ -54,10 +54,11 @@ on `main`, so it is stale and was not applied.
 
 ## Next recommended work
 
-Modernize the two stale Music Queue browser verification suites to interact
-through Missing Music's canonical controls and assert the current Settings
-recovery URLs and accessible labels. This will turn a known deferred browser
-gap into coverage of the user-visible, canonical workflow.
+The deferred Music Queue browser work is superseded by the focused acceptance
+modernization documented in
+[Missing Music Browser Acceptance Modernization Design](MISSING_MUSIC_BROWSER_ACCEPTANCE_MODERNIZATION_DESIGN.md).
+That audit identified four obsolete browser modules and one stale Activity
+compatibility assertion, rather than only two suites.
 
 ## Related design
 
