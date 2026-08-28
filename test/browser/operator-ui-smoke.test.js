@@ -44,7 +44,7 @@ suite('browser operator workflow smoke coverage', () => {
     timeout: integrationRuntimeConfig.suiteTeardownTimeoutMs,
   });
 
-  test('Home leaves Music Queue loading and release work to the dedicated page', {
+  test('Home leaves Missing Music decision work to the dedicated page', {
     timeout: integrationRuntimeConfig.scenarioTimeoutMs,
   }, async (t) => {
     if (runtimeUnavailableReason) {
@@ -53,16 +53,23 @@ suite('browser operator workflow smoke coverage', () => {
     }
 
     await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
-      let musicQueueRequestCount = 0;
-      await browserContext.route(/\/api\/v1\/acquisition\/releases(?:\?.*)?$/u, async (route) => {
-        musicQueueRequestCount += 1;
+      let missingMusicRequestCount = 0;
+      await browserContext.route(/\/api\/v1\/missing-music\/decisions(?:\?.*)?$/u, async (route) => {
+        missingMusicRequestCount += 1;
         await route.fulfill({
           body: JSON.stringify({
             checkedAt: null,
+            decisions: [],
+            filters: {
+              accountStatus: 'active',
+              q: '',
+              requestedForUserId: '',
+              state: 'action',
+            },
             ok: true,
-            pagination: { total: 0 },
-            releases: [],
-            summary: { counts: {}, total: 0 },
+            page: { limit: 50, offset: 0, total: 0 },
+            scope: 'all',
+            users: [],
           }),
           contentType: 'application/json',
           status: 200,
@@ -75,19 +82,19 @@ suite('browser operator workflow smoke coverage', () => {
       await page.evaluate(() => new Promise((resolve) => {
         globalThis.requestAnimationFrame(() => resolve());
       }));
-      assert.equal(musicQueueRequestCount, 0);
-      assert.equal(await page.locator('.operator-home').getByRole('heading', { name: 'Music Queue' }).count(), 0);
+      assert.equal(missingMusicRequestCount, 0);
+      assert.equal(await page.locator('.operator-home').getByRole('heading', { name: 'Missing Music' }).count(), 0);
 
-      const musicQueueRequest = page.waitForRequest((request) => (
-        new URL(request.url()).pathname === '/api/v1/acquisition/releases'
+      const missingMusicRequest = page.waitForRequest((request) => (
+        new URL(request.url()).pathname === '/api/v1/missing-music/decisions'
       ));
       await navigateWithinApp(page, {
-        heading: 'Music Queue',
-        linkName: 'Music Queue',
-        urlPattern: /\/app\/music-queue(?:\?.*)?(?:#.*)?$/,
+        heading: 'Missing Music',
+        linkName: 'Missing Music',
+        urlPattern: /\/app\/missing(?:\?.*)?(?:#.*)?$/,
       });
-      await musicQueueRequest;
-      assert.equal(musicQueueRequestCount, 1);
+      await missingMusicRequest;
+      assert.equal(missingMusicRequestCount, 1);
     }, {
       scenarioName: 'home_music_queue_boundary',
     });
@@ -208,7 +215,6 @@ suite('browser operator workflow smoke coverage', () => {
       await page.getByLabel('Selection state for Geogaddi').selectOption('unselected');
       await page.getByText('Unsaved changes').waitFor();
       await page.getByRole('button', { name: 'Save policy' }).click();
-      await page.getByText('Reconciliation queued').waitFor();
       await page.getByText('Manual exclusion').waitFor();
 
       await navigateWithinApp(page, {
@@ -217,7 +223,6 @@ suite('browser operator workflow smoke coverage', () => {
         urlPattern: /\/app(?:\?.*)?(?:#.*)?$/,
       });
       await page.getByRole('heading', { name: 'Monitored Artists' }).waitFor();
-      await page.getByText('Reconciliation queued').waitFor();
 
       await page.goto(`${baseUrl}/app/search`, { waitUntil: 'domcontentloaded' });
       await page.getByRole('heading', { name: 'Search', exact: true }).waitFor();

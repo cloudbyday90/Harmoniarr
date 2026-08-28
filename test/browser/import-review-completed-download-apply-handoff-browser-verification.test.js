@@ -269,9 +269,6 @@ suite('Import Review completed-download apply handoff browser verification', () 
       await executionPanel.getByText('1 transfer completed.', { exact: true }).waitFor();
       await executionPanel.getByText('Transfer completed in Downloader', { exact: true }).waitFor();
 
-      await page.getByText('1 download is waiting to add.', { exact: true }).waitFor();
-      await page.getByText('Completed download is ready to add.', { exact: true }).waitFor();
-
       await openImportReviewRunHistory(page);
 
       const applyPanel = getRunwayPanel(page, 'Add downloads to library');

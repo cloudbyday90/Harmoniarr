@@ -242,11 +242,11 @@ suite('Issue #4 browser visual evidence', () => {
       });
       await page.getByRole('heading', { exact: true, name: 'Home' }).waitFor();
       await page.getByText('Artists you\'re monitoring and music you care about.').waitFor();
-      const monitoredArtistsRegion = page.locator('section[aria-label="Monitored artists"]');
-      await monitoredArtistsRegion.getByText('Boards of Canada').waitFor();
-      await monitoredArtistsRegion.getByRole('link', { name: 'Find more artists' }).waitFor();
+      const monitoredArtists = page.getByRole('list', { name: 'Monitored artists' });
+      await monitoredArtists.getByText('Boards of Canada').waitFor();
+      await monitoredArtists.getByRole('link', { name: 'Find more artists' }).waitFor();
       await evidence.capture(page, {
-        description: 'Requester Home populated with monitored artist artwork cards and the Discover tail card.',
+        description: 'Requester Home shows monitored artist artwork cards and the Discover tail card.',
         name: 'requester-home',
         surface: 'requester-home',
       });

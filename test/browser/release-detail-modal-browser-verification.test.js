@@ -29,7 +29,7 @@ import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/r
 
 const integrationRuntimeConfig = resolveIntegrationTestRuntimeConfig();
 
-function buildManualSelectionMusicQueuePayload({ includeRelease = false } = {}) {
+function buildManualSelectionMissingMusicPayload({ includeRelease = false } = {}) {
   const releases = includeRelease ? [{
     artistName: 'Boards of Canada',
     evidence: {
@@ -222,17 +222,11 @@ suite('Release Detail modal browser verification', () => {
 
     await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
       let manualEditionSaved = false;
-      const queuePayload = () => buildManualSelectionMusicQueuePayload({
-        includeRelease: manualEditionSaved,
-      });
-      await browserContext.route(/\/api\/v1\/acquisition\/releases(?:\/wanted-mhtrtc)?(?:\?.*)?$/, async (route) => {
-        const requestUrl = new URL(route.request().url());
-        const payload = queuePayload();
-        const wantedReleaseId = requestUrl.pathname.endsWith('/wanted-mhtrtc')
-          ? payload.releases[0] ?? null
-          : null;
+      await browserContext.route(/\/api\/v1\/acquisition\/releases(?:\?.*)?$/u, async (route) => {
         await route.fulfill({
-          body: JSON.stringify(wantedReleaseId ? { checkedAt: payload.checkedAt, release: wantedReleaseId } : payload),
+          body: JSON.stringify(buildManualSelectionMissingMusicPayload({
+            includeRelease: manualEditionSaved,
+          })),
           contentType: 'application/json',
           status: 200,
         });
@@ -260,15 +254,11 @@ suite('Release Detail modal browser verification', () => {
       await page.getByRole('heading', { exact: true, name: 'Boards of Canada' }).waitFor();
       await page.getByText('Edition selected', { exact: true }).waitFor();
 
-      const musicQueueLink = page.getByRole('link', {
-        name: 'Open Music Has the Right to Children in Music Queue',
+      const missingMusicLink = page.getByRole('link', {
+        name: 'Open Music Has the Right to Children in Missing Music',
       });
-      await musicQueueLink.waitFor();
-      await musicQueueLink.click();
-      await page.waitForURL(/\/app\/music-queue\/wanted-mhtrtc$/u);
-      await page.getByLabel('Show releases').selectOption('scheduled');
-      const queueRow = page.getByRole('listitem').filter({ hasText: 'Music Has the Right to Children' });
-      await queueRow.getByText('Edition selected', { exact: true }).waitFor();
+      await missingMusicLink.waitFor();
+      assert.equal(await missingMusicLink.getAttribute('href'), '/app/missing/wanted-mhtrtc');
 
       await page.goto('about:blank', { waitUntil: 'load' });
     }, {

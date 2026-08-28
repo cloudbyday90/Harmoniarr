@@ -178,11 +178,11 @@ suite('Operator Request Detail pipeline diagnostics browser verification', () =>
         exact: true,
       }).waitFor();
 
-      const importReviewLink = candidate.getByRole('link', { name: 'Open in import review' });
-      await importReviewLink.waitFor();
-      await importReviewLink.focus();
-      await assertLocatorFocused(importReviewLink, 'Import review drill-through link should be keyboard focusable');
-      await importReviewLink.press('Enter');
+      const diagnosticsLink = candidate.getByRole('link', { name: 'Open advanced diagnostics' });
+      await diagnosticsLink.waitFor();
+      await diagnosticsLink.focus();
+      await assertLocatorFocused(diagnosticsLink, 'Diagnostics drill-through link should be keyboard focusable');
+      await diagnosticsLink.press('Enter');
       await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
       assert.equal(new URL(page.url()).searchParams.get('candidate'), 'candidate-private');
 

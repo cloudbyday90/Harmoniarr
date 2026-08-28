@@ -143,8 +143,9 @@ The focused script uses Node's
 [`--test-force-exit`](https://nodejs.org/api/cli.html) after all assertions
 finish. The browser integration harness can retain an event-loop handle after
 it has cleaned up its isolated app runtime; this flag gives the focused local
-test a deterministic completion boundary. It is deliberately scoped to this
-one browser validation rather than the general Node test suite.
+test a deterministic completion boundary. The general `test:browser` command
+uses the same browser-only boundary while the ordinary Node and integration
+suites retain their default completion behavior.
 
 ## Final Recommendation Stack
 

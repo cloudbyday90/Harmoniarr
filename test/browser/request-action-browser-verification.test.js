@@ -91,8 +91,8 @@ suite('Request action browser verification', () => {
 
       const confirmDialog = page.getByRole('dialog', { name: 'Request this release?' });
       await confirmDialog.waitFor();
-      const confirmCloseButton = confirmDialog.getByRole('button', { name: 'Close' });
-      await assertLocatorFocused(confirmCloseButton, 'Confirm Request should move initial focus to Close');
+      const confirmCancelButton = confirmDialog.getByRole('button', { name: 'Cancel' });
+      await assertLocatorFocused(confirmCancelButton, 'Confirm Request should move initial focus to Cancel');
       await assertTabFocusContained(page, confirmDialog, { steps: 5 });
       await assertFocusWithin(confirmDialog, 'Confirm Request tab sequence should remain in the dialog');
       await confirmDialog.getByLabel('Request for').selectOption('fixture-listener-user');

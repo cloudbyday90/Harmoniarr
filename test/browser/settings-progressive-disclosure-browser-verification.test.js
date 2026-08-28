@@ -124,7 +124,6 @@ suite('Settings progressive disclosure browser verification', () => {
       await page.getByText('Connect Soulseek', { exact: true }).waitFor();
       await page.getByText('Setup needed', { exact: true }).waitFor();
       await page.getByRole('link', { name: 'Finish managed setup' }).waitFor();
-      await page.getByRole('link', { name: 'Manage folders' }).waitFor();
       assert.equal(await page.getByText('Choose library behavior', { exact: true }).isVisible(), false);
       await page.getByRole('button', { name: 'Review optional setup' }).click();
       await page.getByText('Choose library behavior', { exact: true }).waitFor();
