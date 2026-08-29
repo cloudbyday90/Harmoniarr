@@ -1,6 +1,6 @@
 # Recovery Browser Backup Isolation — Design
 
-**Status:** Implementing
+**Status:** Implemented and remotely confirmed
 **Date:** 2026-08-29
 
 ## Problem

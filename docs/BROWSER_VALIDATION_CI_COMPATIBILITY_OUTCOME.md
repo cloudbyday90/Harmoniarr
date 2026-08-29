@@ -1,6 +1,6 @@
 # Browser Validation CI Compatibility — Outcome
 
-**Status:** Local validation complete; recovery filesystem isolation repaired; remote confirmation pending
+**Status:** Recovery filesystem isolation remotely confirmed
 **Date:** 2026-08-29
 
 ## Delivered result
@@ -49,8 +49,12 @@ path disclosure. The full design and local validation record are in
 [Recovery Browser Backup Isolation — Design](RECOVERY_BROWSER_BACKUP_ISOLATION_DESIGN.md)
 and [Recovery Browser Backup Isolation — Outcome](RECOVERY_BROWSER_BACKUP_ISOLATION_OUTCOME.md).
 
+[Browser Validation run 5](https://github.com/cloudbyday90/Harmoniarr/actions/runs/33246937282)
+passed on the Linux two-worker runner after the repair. The browser suite,
+evidence summary, and isolation-evidence artifact all completed successfully.
+
 ## Next recommended item
 
-Obtain one green remote two-worker Browser Validation run. Only then begin the
-planned ten-run bounded evidence review; do not change worker count or action
-timeouts before that sample remains clean and its timing is reviewed.
+Begin the planned ten-run bounded evidence review without changing the worker
+count or action timeout. Review suite duration and the artifact after the
+sample before considering a capacity change.

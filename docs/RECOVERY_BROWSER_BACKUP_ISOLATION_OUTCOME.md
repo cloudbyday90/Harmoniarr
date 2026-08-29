@@ -1,6 +1,6 @@
 # Recovery Browser Backup Isolation — Outcome
 
-**Status:** Local validation complete; remote Browser Validation confirmation pending
+**Status:** Complete
 **Date:** 2026-08-29
 
 ## Delivered result
@@ -44,9 +44,12 @@ None was merged or applied locally.
 - `npm run validate` completed successfully: linting, copyright, ESM,
   migration, schema, topology, server, client, script, and integration suites,
   followed by both production builds.
+- [Browser Validation run 5](https://github.com/cloudbyday90/Harmoniarr/actions/runs/33246937282)
+  completed successfully on Linux with two workers. The isolated browser suite,
+  evidence summary, and evidence-artifact upload all passed.
 
 ## Next recommended item
 
-Confirm one green Linux two-worker Browser Validation run. If it is green,
-begin the bounded ten-run evidence review already specified in the browser CI
-compatibility plan; do not change worker count or action timeouts first.
+Begin the bounded ten-run Browser Validation evidence review specified in the
+browser CI compatibility plan. Keep the two-worker configuration and existing
+action timeout fixed during the sample so it measures the repaired baseline.
