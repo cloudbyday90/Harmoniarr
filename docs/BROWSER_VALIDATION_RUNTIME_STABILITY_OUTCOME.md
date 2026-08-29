@@ -1,6 +1,6 @@
 # Browser Validation Runtime Stability — Outcome
 
-**Status:** Implemented locally; awaiting CI verification
+**Status:** Verified
 **Date:** 2026-08-29
 
 ## Delivered change
@@ -19,8 +19,17 @@ workflow permissions, and self-hosted application behavior intact.
   teardown, so the change targets test-file runtime contention rather than
   cleanup policy. The retained manifest and strict review report are linked
   from [Browser Validation Serial Collection Outcome](BROWSER_VALIDATION_SERIAL_COLLECTION_OUTCOME.md).
-- A post-change workflow dispatch is required before this outcome can be
-  marked verified.
+- Full repository tests completed after the change, followed by successful
+  client/server build, ESM, copyright, migration, schema-snapshot, and Compose
+  topology checks.
+- The walkthrough Compose image rebuilt and the forced recreation of its one
+  Harmoniarr service completed healthy; bootstrap retained the existing
+  walkthrough administrator.
+- Push-triggered [Browser Validation run 33255343725](https://github.com/cloudbyday90/Harmoniarr/actions/runs/33255343725)
+  passed on commit `998472c520076af5406592b8a546f6fe81d38a0a`.
+  Its bounded artifact records one worker, a passing browser suite, 329.8
+  seconds duration, zero browser-test processes, zero Testcontainers, and
+  `cleanup.status: clean` after the existing 25-second cleanup window.
 
 ## Security outcome
 
@@ -30,7 +39,6 @@ existing read-only workflow permission and pinned actions.
 
 ## Next item
 
-Verify one serial Browser Validation workflow at the committed change. If that
-run passes with clean teardown, investigate the two-worker runtime separately
-before any future capacity increase; do not treat a serial pass as proof that
-the two-worker configuration is healthy.
+Investigate the two-worker runtime separately with a deliberately scoped,
+instrumented experiment before any future capacity increase. Do not treat this
+serial pass as proof that the two-worker configuration is healthy.
