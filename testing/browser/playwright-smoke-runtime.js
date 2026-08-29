@@ -10,6 +10,12 @@ import { access } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { chromium } from 'playwright';
 import { createIntegrationAppRuntime } from '../integration/app-runtime.js';
+import {
+  createBrowserRuntimeDiagnostic,
+  createBrowserRuntimeDiagnosticObserver,
+  emitBrowserRuntimeDiagnostic,
+  isBrowserRuntimeDiagnosticEnabled,
+} from './browser-runtime-diagnostic.js';
 import { installBrowserOnboardingFixture } from './onboarding-browser-fixture.js';
 import { installBrowserSystemOverviewFixture } from './system-overview-browser-fixture.js';
 
@@ -89,6 +95,9 @@ export async function createBrowserSmokeRuntime({
         await installBrowserOnboardingFixture(browserContext);
         await installBrowserSystemOverviewFixture(browserContext);
         const page = await browserContext.newPage();
+        const diagnosticObserver = isBrowserRuntimeDiagnosticEnabled()
+          ? createBrowserRuntimeDiagnosticObserver(page)
+          : null;
         page.setDefaultTimeout(getBrowserDefaultTimeoutMs(context.config));
 
         try {
@@ -98,6 +107,17 @@ export async function createBrowserSmokeRuntime({
             browserContext,
             page,
           });
+        } catch (error) {
+          if (diagnosticObserver) {
+            const diagnostic = await createBrowserRuntimeDiagnostic({
+              error,
+              observer: diagnosticObserver,
+              scenarioName,
+            });
+            emitBrowserRuntimeDiagnostic(diagnostic);
+          }
+
+          throw error;
         } finally {
           await browserContext.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
           await browserContext.close().catch(() => {});

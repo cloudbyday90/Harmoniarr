@@ -9,12 +9,46 @@
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { suite, test } from 'node:test';
+import { browserRuntimeDiagnosticMarker } from '../../testing/browser/browser-runtime-diagnostic.js';
 import {
   buildBrowserTestNodeArguments,
   defaultBrowserTestConcurrency,
   parseBrowserTestConcurrency,
   runBrowserTests,
 } from '../../scripts/browser-test-runner.js';
+
+function createBrowserRuntimeDiagnosticRecord() {
+  return {
+    error: {
+      category: 'timeout',
+      readinessTarget: 'heading',
+    },
+    network: {
+      apiRequestCount: 1,
+      apiRequestFailureCount: 0,
+      apiResponseCount: 1,
+      responseStatusCounts: {
+        '2xx': 1,
+        '3xx': 0,
+        '4xx': 0,
+        '5xx': 0,
+        other: 0,
+      },
+    },
+    page: {
+      consoleErrorCount: 0,
+      documentReadyState: 'complete',
+      pageErrorCount: 0,
+      routeCategory: 'artist_detail',
+    },
+    scenarioCategory: 'artist_detail',
+    timing: {
+      domContentLoadedMs: 120,
+      elapsedMs: 30_000,
+      loadMs: 200,
+    },
+  };
+}
 
 suite('browser test runner', () => {
   test('uses the approved two-worker default', () => {
@@ -190,5 +224,44 @@ suite('browser test runner', () => {
     child.emit('exit', 1, null);
 
     await assert.rejects(pending, /Browser tests exited with code 1/u);
+  });
+
+  test('collects bounded browser runtime diagnostics without retaining child output', async () => {
+    const child = Object.assign(new EventEmitter(), {
+      stderr: new EventEmitter(),
+      stdout: new EventEmitter(),
+    });
+    const writes = [];
+    const forwardedOutput = [];
+    const pending = runBrowserTests({
+      env: {
+        HARMONIARR_BROWSER_RUNTIME_DIAGNOSTIC: '1',
+        HARMONIARR_BROWSER_RUNTIME_DIAGNOSTIC_PATH: 'artifacts/browser-runtime-diagnostic.json',
+      },
+      forwardChildOutput: (_stream, chunk) => forwardedOutput.push(String(chunk)),
+      spawnChild() {
+        return child;
+      },
+      writeRuntimeDiagnosticEvidence: async (input) => writes.push(input),
+    });
+    const record = createBrowserRuntimeDiagnosticRecord();
+
+    child.stderr.emit('data', `${browserRuntimeDiagnosticMarker}${JSON.stringify(record)}\n`);
+    child.emit('close', 1, null);
+
+    await assert.rejects(pending, /Browser tests exited with code 1/u);
+    assert.deepEqual(forwardedOutput, [`${browserRuntimeDiagnosticMarker}${JSON.stringify(record)}\n`]);
+    assert.equal(writes.length, 1);
+    assert.deepEqual(writes[0].records, [record]);
+    assert.equal(writes[0].discardedRecordCount, 0);
+    assert.equal(writes[0].invalidRecordCount, 0);
+  });
+
+  test('requires explicit runtime diagnostic opt-in when an evidence path is configured', async () => {
+    await assert.rejects(runBrowserTests({
+      env: {
+        HARMONIARR_BROWSER_RUNTIME_DIAGNOSTIC_PATH: 'artifacts/browser-runtime-diagnostic.json',
+      },
+    }), /HARMONIARR_BROWSER_RUNTIME_DIAGNOSTIC=1 is required/u);
   });
 });

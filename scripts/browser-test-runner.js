@@ -14,6 +14,12 @@ import {
   waitForBrowserTestCleanup,
   writeBrowserTestEvidence,
 } from './browser-test-evidence.js';
+import {
+  createBrowserRuntimeDiagnosticOutputCollector,
+  getOptionalBrowserRuntimeDiagnosticEvidencePath,
+  writeBrowserRuntimeDiagnosticEvidence,
+} from './browser-runtime-diagnostic-evidence.js';
+import { browserRuntimeDiagnosticEnabledEnvVar } from '../testing/browser/browser-runtime-diagnostic.js';
 
 export const defaultBrowserTestConcurrency = 2;
 
@@ -59,17 +65,29 @@ export function buildBrowserTestNodeArguments(concurrency) {
 
 export async function runBrowserTests({
   args = process.argv.slice(2),
+  createDiagnosticOutputCollector = createBrowserRuntimeDiagnosticOutputCollector,
   cwd = process.cwd(),
   env = process.env,
+  forwardChildOutput = (stream, chunk) => stream.write(chunk),
   now = Date.now,
   nodePath = process.execPath,
   spawnChild = spawn,
   waitForCleanup = waitForBrowserTestCleanup,
+  writeRuntimeDiagnosticEvidence = writeBrowserRuntimeDiagnosticEvidence,
   writeEvidence = writeBrowserTestEvidence,
 } = {}) {
   const concurrency = parseBrowserTestConcurrency(args);
   const nodeArguments = buildBrowserTestNodeArguments(concurrency);
   const configuredEvidencePath = getOptionalBrowserTestEvidencePath(env);
+  const configuredRuntimeDiagnosticEvidencePath = getOptionalBrowserRuntimeDiagnosticEvidencePath(env);
+
+  if (configuredRuntimeDiagnosticEvidencePath && env?.[browserRuntimeDiagnosticEnabledEnvVar] !== '1') {
+    throw new Error(`${browserRuntimeDiagnosticEnabledEnvVar}=1 is required when browser runtime diagnostic evidence is enabled`);
+  }
+
+  const diagnosticOutputCollector = configuredRuntimeDiagnosticEvidencePath
+    ? createDiagnosticOutputCollector()
+    : null;
   const startedAtMs = now();
   let testFailure = null;
 
@@ -77,12 +95,21 @@ export async function runBrowserTests({
     await new Promise((resolvePromise, reject) => {
       const child = spawnChild(nodePath, nodeArguments, {
         cwd,
-        stdio: 'inherit',
+        stdio: diagnosticOutputCollector ? ['ignore', 'pipe', 'pipe'] : 'inherit',
         windowsHide: true,
       });
 
+      if (diagnosticOutputCollector) {
+        for (const [stream, output] of [[child.stdout, process.stdout], [child.stderr, process.stderr]]) {
+          stream?.on('data', (chunk) => {
+            diagnosticOutputCollector.addChunk(chunk);
+            forwardChildOutput(output, chunk);
+          });
+        }
+      }
+
       child.once('error', reject);
-      child.once('exit', (code, signal) => {
+      child.once(diagnosticOutputCollector ? 'close' : 'exit', (code, signal) => {
         if (code === 0) {
           resolvePromise();
           return;
@@ -101,10 +128,32 @@ export async function runBrowserTests({
   }
 
   const durationMs = Math.max(0, now() - startedAtMs);
+  let runtimeDiagnosticFailure = null;
+
+  if (configuredRuntimeDiagnosticEvidencePath) {
+    try {
+      await writeRuntimeDiagnosticEvidence({
+        browserTest: {
+          durationMs,
+          status: testFailure ? 'failed' : 'passed',
+          workerCount: concurrency,
+        },
+        cwd,
+        evidencePath: configuredRuntimeDiagnosticEvidencePath,
+        ...diagnosticOutputCollector.finish(),
+      });
+    } catch (error) {
+      runtimeDiagnosticFailure = error;
+    }
+  }
 
   if (!configuredEvidencePath) {
     if (testFailure) {
       throw testFailure;
+    }
+
+    if (runtimeDiagnosticFailure) {
+      throw runtimeDiagnosticFailure;
     }
 
     return { concurrency, durationMs };
@@ -136,6 +185,10 @@ export async function runBrowserTests({
 
   if (testFailure) {
     throw testFailure;
+  }
+
+  if (runtimeDiagnosticFailure) {
+    throw runtimeDiagnosticFailure;
   }
 
   if (cleanup.status !== 'clean') {

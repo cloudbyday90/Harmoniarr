@@ -58,6 +58,7 @@
     "test": "npm run lint && npm run check:test-hygiene && npm run test:node",
     "test:browser": "npm run test:browser:prepare && npm run test:browser:run",
     "test:browser:prepare": "npm run build:client && npx playwright install chromium",
+    "test:browser:diagnostic": "npm run test:browser:prepare && npm run test:browser:run -- --concurrency=2",
     "test:browser:run": "node scripts/run-browser-tests.js",
     "test:browser:serial": "npm run test:browser:prepare && npm run test:browser:run -- --concurrency=1",
     "test:client": "node --test \"test/client/**/*.test.js\"",
