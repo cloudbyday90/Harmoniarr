@@ -1,6 +1,6 @@
 # Browser Runtime Diagnostic — Outcome
 
-**Status:** Local two-worker sample verified; GitHub Actions result pending
+**Status:** Verified
 **Date:** 2026-08-29
 
 ## Delivered
@@ -52,8 +52,22 @@ The following passed after implementation:
 - `npm run validate:security` — package audit reported zero vulnerabilities.
 - `git diff --check`
 
-The manually dispatched workflow result is recorded after the initial commit is
-pushed.
+## GitHub Actions two-worker sample
+
+Manual [Browser Runtime Diagnostic run 33256995736](https://github.com/cloudbyday90/Harmoniarr/actions/runs/33256995736)
+passed on commit `15020c61786ec6be29375003743dc1bbc3f715e0`. Its schema-validated
+artifact records:
+
+- 2 Node test-file workers;
+- a passing suite in 290.4 seconds;
+- zero failed-scenario records, invalid records, and discarded records; and
+- `cleanup.status: clean` after 11 checks, with zero browser-test Node
+  processes and zero Testcontainers remaining.
+
+Like the local run, this is a healthy single sample. It confirms that the
+manual workflow, bounded evidence path, and cleanup contract work in GitHub
+Actions. It does not contradict or replace the prior ten-run baseline, so the
+protected Browser Validation workflow remains serial.
 
 ## Open PR outcome
 
@@ -69,7 +83,9 @@ open Dependabot PR.
 
 ## Next item
 
-Dispatch the new workflow at the committed source SHA. Use its bounded artifact
-to decide whether a larger fixed-SHA two-worker sample is warranted. Keep
-Browser Validation serial until that sample provides a reproducible capacity
-finding.
+Use the manual diagnostic only for a deliberately designed, fixed-SHA sample
+set if runtime contention needs to be re-evaluated. Keep Browser Validation
+serial until that sample provides a reproducible capacity finding. If a future
+diagnostic records failures, group only the bounded categories before deciding
+whether to investigate browser capacity, navigation readiness, or a product
+contract separately.
