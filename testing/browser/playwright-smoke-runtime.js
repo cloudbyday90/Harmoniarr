@@ -70,12 +70,14 @@ export function toBrowserRuntimeUnavailableReason(error) {
 export async function createBrowserSmokeRuntime({
   clientDistDir = defaultClientDistDir,
   config,
+  createAppFn,
 } = {}) {
   await ensureBuiltClientDistDir(clientDistDir);
 
   const integrationRuntime = await createIntegrationAppRuntime({
     clientDistDir,
     config,
+    createAppFn,
   });
 
   return {
