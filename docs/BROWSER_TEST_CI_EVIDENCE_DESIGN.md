@@ -1,6 +1,6 @@
 # Browser Test CI Evidence — Design
 
-**Status:** Approved for implementation
+**Status:** Implemented; ten-run review tooling available
 **Date:** 2026-08-28
 
 ## Purpose
@@ -126,9 +126,10 @@ WCAG-EM scope, sampling, evaluation, and reporting model.
    use the 14-day artifact for trend review rather than raw logs.
 4. **Treat non-clean cleanup as a failure**, not as a warning or automatic
    retry condition.
-5. **Review evidence across at least 10 representative CI runs** before any
-   capacity experiment; do not raise the default worker count without a new
-   isolation, memory, database, Docker, and accessibility assessment.
+5. **Review evidence across exactly 10 consecutive CI runs** with
+   `npm run review:browser-evidence` before any capacity experiment; do not
+   raise the default worker count without a new isolation, memory, database,
+   Docker, and accessibility assessment.
 
 ## Sources checked 2026-08-28
 

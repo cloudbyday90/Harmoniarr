@@ -63,9 +63,11 @@ No open PR was safe and applicable to apply locally.
 
 ## Next recommended item
 
-Observe the bounded artifact across at least 10 representative CI runs before
-considering any concurrency experiment. If timing or cleanup drifts, retain
-the two-worker limit and investigate the resource lifecycle first.
+Collect ten consecutive fixed-configuration Browser Validation artifacts and
+run `npm run review:browser-evidence` using the strict manifest contract. If
+timing, cleanup, or worker count drifts, retain the two-worker limit and
+investigate the resource lifecycle first. See
+[Browser Validation Evidence Review Design](BROWSER_VALIDATION_EVIDENCE_REVIEW_DESIGN.md).
 
 ## Related design
 

@@ -52,6 +52,7 @@
     "prepare:database": "node dist/server/prepare-database.js",
     "probe:release-mirror-capabilities": "node scripts/probe-release-mirror-capabilities.js",
     "promote:release-mirror-trust": "node scripts/promote-release-mirror-trust.js",
+    "review:browser-evidence": "node scripts/review-browser-test-evidence.js",
     "start": "node dist/server/index.js",
     "test": "npm run lint && npm run check:test-hygiene && npm run test:node",
     "test:browser": "npm run test:browser:prepare && npm run test:browser:run",

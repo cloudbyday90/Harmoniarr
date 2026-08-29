@@ -1,6 +1,6 @@
 # Browser Validation CI Compatibility — Design
 
-**Status:** Implemented; remote confirmation pending
+**Status:** Implemented and remotely confirmed
 **Date:** 2026-08-29
 
 ## Finding
@@ -66,8 +66,9 @@ Playwright's 30-second default as the dedicated action budget, and retains its
 
 ## Recommendation stack
 
-1. Keep two browser workers and inspect a successful ten-run evidence sample
-   before considering a capacity experiment.
+1. Keep two browser workers and inspect the fixed, consecutive ten-run evidence
+   sample with `npm run review:browser-evidence` before considering a capacity
+   experiment.
 2. Test responsive disclosures at a narrow viewport with overflow assertions.
 3. Propagate one validated integration configuration through all browser
    scenarios, with a distinct browser-action timeout so UI waits cannot drift
