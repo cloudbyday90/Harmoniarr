@@ -21,6 +21,7 @@ import { computed, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import ConfirmRequestModal from '../components/media/ConfirmRequestModal.vue';
+import ArtistDetailDiscographyLoadingState from '../components/media/ArtistDetailDiscographyLoadingState.vue';
 import ReleaseDetailModal from '../components/media/ReleaseDetailModal.vue';
 import ArtistDetailRelatedArtistCard from '../components/media/ArtistDetailRelatedArtistCard.vue';
 import ArtistReleaseSectionGrid from '../components/media/ArtistReleaseSectionGrid.vue';
@@ -378,11 +379,13 @@ const heroStyle = computed(() => buildArtistHeroBackgroundStyle(heroBackgroundUr
 
 const overviewCards = computed(() => ([
   {
-    body: isArtistMonitored.value
-      ? formatOperatorArtistReleasePlanActivity(operatorReconciliation.value)
-      : 'Add this artist from Discover to route future releases into the monitored workflow.',
+    body: isLoading.value
+      ? 'Loading monitored status and the current release plan.'
+      : isArtistMonitored.value
+        ? formatOperatorArtistReleasePlanActivity(operatorReconciliation.value)
+        : 'Add this artist from Discover to route future releases into the monitored workflow.',
     label: 'Status',
-    value: isArtistMonitored.value ? 'Monitored' : 'Available',
+    value: isLoading.value ? 'Loading' : isArtistMonitored.value ? 'Monitored' : 'Available',
   },
   {
     body: hasDiscography.value
@@ -634,15 +637,8 @@ watch(projection, () => {
 
 <template>
   <section class="hx-page artist-detail-page">
-    <article v-if="isLoading" class="hx-card artist-detail-loading" aria-live="polite" aria-busy="true">
-      <div class="hx-card-body">
-        <p class="artist-detail-loading__title">Loading artist detail...</p>
-        <p class="artist-detail-loading__body">Discography and artwork are being prepared.</p>
-      </div>
-    </article>
-
     <EmptyState
-      v-else-if="discographyError && !artist && !nameHint"
+      v-if="!isLoading && discographyError && !artist && !nameHint"
       :title="formatDiscographyError(discographyError)"
       :body="buildArtistDetailErrorBody()"
     >
@@ -684,10 +680,10 @@ watch(projection, () => {
             </p>
             <div class="artist-stage__signals">
               <span class="hx-pill" :data-tone="isArtistMonitored ? 'success' : 'info'">
-                {{ isArtistMonitored ? 'Monitored artist' : 'Not monitored yet' }}
+                {{ isLoading ? 'Loading artist status' : isArtistMonitored ? 'Monitored artist' : 'Not monitored yet' }}
               </span>
               <span class="hx-pill" data-tone="info">
-                {{ discographySectionCount }} section{{ discographySectionCount === 1 ? '' : 's' }}
+                {{ isLoading ? 'Loading release catalog' : `${discographySectionCount} section${discographySectionCount === 1 ? '' : 's'}` }}
               </span>
               <span v-if="isRefreshingArtwork" class="hx-pill" data-tone="warning">Refreshing artwork</span>
             </div>
@@ -706,7 +702,7 @@ watch(projection, () => {
                 type="button"
                 class="hx-btn hx-btn-icon"
                 data-variant="ghost"
-                :disabled="isRefreshingArtwork"
+                :disabled="isLoading || isRefreshingArtwork"
                 aria-label="Refresh artwork"
                 title="Refresh artwork"
                 @click="loadArtistArtwork(true)"
@@ -892,17 +888,25 @@ watch(projection, () => {
           <div>
             <h2 class="hx-card-title">Discography</h2>
             <p class="hx-card-subtitle">
-              {{ hasDiscography ? `${discographyReleaseCount} release groups across ${discographySectionCount} sections.` : 'Release groups appear here when they are available.' }}
+              {{ isLoading ? 'The release catalog is loading.' : hasDiscography ? `${discographyReleaseCount} release groups across ${discographySectionCount} sections.` : 'Release groups appear here when they are available.' }}
             </p>
           </div>
         </header>
 
-        <div class="hx-card-body artist-detail-section-card__body">
+        <div
+          class="hx-card-body artist-detail-section-card__body"
+          :aria-busy="isLoading ? 'true' : undefined"
+        >
           <p class="artist-detail-visually-hidden" role="status" aria-live="polite">
             {{ bulkSelectionStatusMessage }}
           </p>
 
-          <p v-if="discographyError" class="artist-detail-soft-error" role="alert">
+          <ArtistDetailDiscographyLoadingState
+            v-if="isLoading"
+            :artist-name="artistName"
+          />
+
+          <p v-else-if="discographyError" class="artist-detail-soft-error" role="alert">
             {{ formatDiscographyError(discographyError) }}
           </p>
 
@@ -1206,13 +1210,6 @@ watch(projection, () => {
   display: grid;
   gap: var(--hx-space-5);
   align-content: start;
-}
-
-.artist-detail-loading__title {
-  margin: 0;
-  font-size: var(--hx-text-base);
-  font-weight: 700;
-  color: var(--hx-text-strong);
 }
 
 .artist-detail-loading__body {

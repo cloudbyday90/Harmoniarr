@@ -870,10 +870,12 @@ export async function markMetadataReleaseRequestLinked(page, requestKey) {
 }
 
 export async function installMetadataBrowserFixtures(browserContext, {
+  artistDetailLocalDelayMs = 0,
   includeArtistDetailCacheSamples = false,
   similarArtistsDelayMs = 0,
 } = {}) {
   await browserContext.addInitScript(({
+    artistDetailLocalDelayMs: configuredArtistDetailLocalDelayMs,
     fixture,
     includeArtistDetailCacheSamples: includeCacheSamples,
     similarArtistsDelayMs: configuredSimilarArtistsDelayMs,
@@ -882,8 +884,8 @@ export async function installMetadataBrowserFixtures(browserContext, {
     const fixtureStateStorageKey = 'harmoniarr:metadata-browser-fixture-state:v1';
     const state = loadFixtureState();
 
-    async function delaySimilarArtistsResponse(input, init) {
-      if (configuredSimilarArtistsDelayMs <= 0) {
+    async function delayFixtureResponse(delayMs, input, init) {
+      if (delayMs <= 0) {
         return;
       }
 
@@ -904,9 +906,17 @@ export async function installMetadataBrowserFixtures(browserContext, {
           resolve();
         };
 
-        timer = globalThis.setTimeout(complete, configuredSimilarArtistsDelayMs);
+        timer = globalThis.setTimeout(complete, delayMs);
         requestSignal?.addEventListener('abort', onAbort, { once: true });
       });
+    }
+
+    function delaySimilarArtistsResponse(input, init) {
+      return delayFixtureResponse(configuredSimilarArtistsDelayMs, input, init);
+    }
+
+    function delayArtistDetailLocalResponse(input, init) {
+      return delayFixtureResponse(configuredArtistDetailLocalDelayMs, input, init);
     }
 
     function getArtistFixtureEntries() {
@@ -2929,6 +2939,7 @@ export async function installMetadataBrowserFixtures(browserContext, {
       }
 
       if (method === 'GET' && path.startsWith('/api/v1/metadata/musicbrainz/artists/') && path.endsWith('/local')) {
+        await delayArtistDetailLocalResponse(input, init);
         const musicBrainzArtistId = decodeURIComponent(
           path.slice('/api/v1/metadata/musicbrainz/artists/'.length, -'/local'.length),
         );
@@ -3021,6 +3032,7 @@ export async function installMetadataBrowserFixtures(browserContext, {
       return originalFetch(input, init);
     };
   }, {
+    artistDetailLocalDelayMs,
     fixture: metadataFixture,
     includeArtistDetailCacheSamples,
     similarArtistsDelayMs,

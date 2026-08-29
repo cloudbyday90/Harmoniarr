@@ -74,6 +74,7 @@
     "validate:artist-detail-cache-browser-evidence": "npm run build:client && node --test --test-force-exit --test-concurrency=1 test/browser/artist-detail-cache-server-timing-browser-verification.test.js",
     "validate:artist-detail-cache-pair": "node --test --test-concurrency=1 test/integration/artist-detail-cache-paired-route.test.js",
     "validate:artist-detail-cache-workload": "node --test --test-concurrency=1 test/server/artist-detail-cache-sample-workload.test.js test/integration/artist-detail-cache-sample-workload.test.js",
+    "validate:artist-detail-progressive-loading": "npm run build:client && node --test --test-force-exit --test-concurrency=1 test/browser/artist-detail-progressive-shell-browser-verification.test.js",
     "validate:docker-fresh-install": "node scripts/validate-docker-fresh-install.js",
     "validate:docker-deployment-path": "node scripts/validate-docker-deployment-path.js",
     "validate:docker-file-backed-music-queue": "node scripts/validate-docker-file-backed-music-queue.js",
