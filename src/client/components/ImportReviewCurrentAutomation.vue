@@ -180,6 +180,7 @@ const shouldShowImportPendingDetails = computed(() =>
 
 .import-review-current-automation__heading {
   margin: 0;
+  min-width: 0;
 }
 
 .import-review-current-automation__eyebrow {
@@ -252,7 +253,16 @@ const shouldShowImportPendingDetails = computed(() =>
 }
 
 @media (max-width: 760px) {
-  .import-review-current-automation__summary,
+  .import-review-current-automation__summary {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .import-review-current-automation__heading,
+  .import-review-current-automation__state {
+    width: 100%;
+  }
+
   .import-review-current-automation__handoff {
     align-items: flex-start;
   }

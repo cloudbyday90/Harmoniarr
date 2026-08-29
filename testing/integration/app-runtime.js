@@ -157,6 +157,7 @@ export async function createIntegrationAppRuntime({
                 client: createSessionHttpClient(baseUrl, {
                   requestTimeoutMs: config.httpRequestTimeoutMs,
                 }),
+                config,
                 databaseConfig,
                 databaseName,
                 getPoolFn: getPool,

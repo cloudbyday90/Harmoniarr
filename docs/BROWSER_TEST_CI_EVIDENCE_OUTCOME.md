@@ -38,6 +38,16 @@ URLs, user information, request details, or secrets.
   ESM, Compose policy, lint, hygiene, node suites, integration suites, and the
   production build.
 
+## First remote execution
+
+The first remote run reached the browser suite after the CI npm-policy
+alignment. Its setup, npm 12 bootstrap, strict `npm ci`, Chromium install,
+evidence summary, and evidence-artifact upload completed successfully. The
+browser suite exposed an unrelated responsive overflow and two timing-sensitive
+UI waits; it therefore did not produce a successful baseline sample. The
+targeted correction retains two workers and is documented in
+[Browser Validation CI Compatibility Design](BROWSER_VALIDATION_CI_COMPATIBILITY_DESIGN.md).
+
 ## Open PR assessment
 
 GitHub CLI access currently returns `HTTP 401`, so authenticated PR discovery

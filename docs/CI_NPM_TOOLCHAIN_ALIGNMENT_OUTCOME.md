@@ -1,6 +1,6 @@
 # CI npm Toolchain Alignment — Outcome
 
-**Status:** Local validation complete; remote confirmation pending
+**Status:** Toolchain confirmed remotely; browser-suite correction pending remote confirmation
 **Date:** 2026-08-29
 
 ## Delivered result
@@ -15,10 +15,16 @@ script without a recorded decision still fails installation.
 
 ## Validation record
 
-Remote GitHub Actions confirmation will be added after the implementation
-commit is pushed. The local validation will cover both the previously failing
-Node 24/npm 11 strict-policy path and the selected Node 24/npm 12 CI path,
-plus the repository's focused contracts and standard validation suite.
+Local validation passed both the previously failing Node 24/npm 11 strict
+policy path and the selected Node 24/npm 12 CI path, focused contracts, the
+full repository validation suite, npm audit, and registry-signature checks.
+
+The first remote Browser Validation run on the implementation commit confirmed
+the toolchain correction: pinned Node setup, npm 12.0.2 bootstrap, strict
+`npm ci`, and Chromium installation all passed. The job later exposed three
+pre-existing browser-suite issues; its evidence summary and artifact were
+published successfully. Those browser corrections are documented separately
+in [Browser Validation CI Compatibility Design](BROWSER_VALIDATION_CI_COMPATIBILITY_DESIGN.md).
 
 ## Open PR assessment
 
