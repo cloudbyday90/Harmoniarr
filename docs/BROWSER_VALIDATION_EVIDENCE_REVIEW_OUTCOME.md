@@ -105,9 +105,11 @@ while retaining the fixed 30-second timeout and two-worker policy. See
 and [Browser Page-Readiness Fixture Outcome](BROWSER_PAGE_READINESS_FIXTURE_OUTCOME.md)
 for the scoped decision, security boundary, and next validation step.
 
-After the resulting Browser Validation run is reviewed, collect a new serial
-set of ten `workflow_dispatch` artifacts from one unchanged `main` commit. Do
-not raise browser worker count until that report is `baseline_confirmed`.
+The corrected [Browser Validation run 33251108741](https://github.com/cloudbyday90/Harmoniarr/actions/runs/33251108741)
+passed all 89 browser tests with the retained two-worker policy. Collect a new
+serial set of ten `workflow_dispatch` artifacts from unchanged commit
+`3d432b7`; do not raise browser worker count until that report is
+`baseline_confirmed`.
 
 ## Related design
 

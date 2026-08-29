@@ -1,6 +1,6 @@
 # Browser Page-Readiness Fixture — Outcome
 
-**Status:** Corrected locally; remote Browser Validation pending
+**Status:** Validated locally and in Browser Validation
 **Date:** 2026-08-29
 
 ## Delivered result
@@ -47,12 +47,14 @@ into the working tree.
   previously failing browser suites. The complete corrected browser suite
   passed with 89 tests across 63 suites in 260.9 seconds, still using two
   workers and the original timeout.
+- Corrected [Browser Validation run 33251108741](https://github.com/cloudbyday90/Harmoniarr/actions/runs/33251108741)
+  passed independently: 89 tests across 63 suites, 89 passed, 0 failed, in
+  284.3 seconds. Its evidence summary and artifact upload also passed.
 
-## Remaining operational step
+## Next operational step
 
-Review the one Browser Validation run triggered by this change. If it passes,
-begin a new non-overlapping `workflow_dispatch` collection from that one
-commit; retain every result until the existing ten-run evidence review can
+Begin a new non-overlapping `workflow_dispatch` collection from commit
+`3d432b7`; retain every result until the existing ten-run evidence review can
 report `baseline_confirmed`.
 
 ## Related design
