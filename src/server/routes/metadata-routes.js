@@ -19,6 +19,7 @@
 import { createApiError, getRequestMetadata, requireCsrf, requireSession } from '../auth.js';
 import { createRequestAuthDependencies } from '../auth-module.js';
 import { asyncRoute, sanitizePageLimit, sanitizePageOffset } from '../http.js';
+import { appendArtistDetailCacheServerTiming } from '../metadata/artist-detail-cache-server-timing.js';
 import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
 import { sendRetiredRouteResponse } from './retired-route-response.js';
 
@@ -101,12 +102,14 @@ export function registerMetadataRoutes(app, {
     throw createApiError(503, 'operator_artist_reconciliation_unavailable', 'Artist reconciliation is temporarily unavailable');
   },
 }) {
-  function registerSessionGetJsonRoute(path, buildResponseBody) {
+  function registerSessionGetJsonRoute(path, buildResponseBody, decorateResponse = () => {}) {
     app.get(path, metadataRoute(async (request, response) => {
       await requireSessionFn(request);
+      const body = await buildResponseBody(request);
+      decorateResponse(response, body);
       response.json({
         ok: true,
-        ...await buildResponseBody(request),
+        ...body,
       });
     }));
   }
@@ -371,6 +374,8 @@ export function registerMetadataRoutes(app, {
       cache: result.cache ?? null,
       similar: result.similar,
     };
+  }, (response, body) => {
+    appendArtistDetailCacheServerTiming(response, body.cache);
   });
 
   registerSessionGetJsonRoute('/api/v1/metadata/musicbrainz/artists/:artistId/local', async (request) => {
@@ -492,7 +497,9 @@ export function registerMetadataRoutes(app, {
       type: request.query.type,
       releaseGroupStatus: request.query.releaseGroupStatus,
     }),
-  }));
+  }), (response, body) => {
+    appendArtistDetailCacheServerTiming(response, body.browse?.cache);
+  });
 
   registerSessionGetJsonRoute('/api/v1/metadata/musicbrainz/release-groups/:releaseGroupId/releases', async (request) => ({
     provider: 'musicbrainz',

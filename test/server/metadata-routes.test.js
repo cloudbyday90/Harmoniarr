@@ -420,6 +420,8 @@ test('metadata provider artist browse route preserves the SWR cache metadata ins
       ok: true,
       provider: 'musicbrainz',
     });
+    assert.equal(response.headers.get('server-timing'), 'harmoniarr-cache;desc="stale/background/stale"');
+    assert.equal(response.headers.get('timing-allow-origin'), null);
   });
 });
 
@@ -1466,6 +1468,8 @@ test('metadata similar artists route returns shared similar payload with sanitiz
     assert.equal(payload.ok, true);
     assert.deepEqual(payload.cache, { lookup: 'fresh', refresh: 'none', refreshDurationMs: null, state: 'fresh' });
     assert.equal(payload.similar.length, 1);
+    assert.equal(response.headers.get('server-timing'), 'harmoniarr-cache;desc="fresh/none/fresh"');
+    assert.equal(response.headers.get('timing-allow-origin'), null);
     const callArgs = getSimilarArtists.mock.calls[0].arguments[0];
     assert.equal(callArgs.artistMbid, 'test-mbid');
     assert.equal(callArgs.limit, 20);

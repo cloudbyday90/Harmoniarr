@@ -59,7 +59,9 @@ async function requestArtistDetailProviderData(baseUrl, artistId) {
 
   return {
     discography: await discographyResponse.json(),
+    discographyServerTiming: discographyResponse.headers.get('server-timing'),
     relatedArtists: await relatedArtistsResponse.json(),
+    relatedArtistsServerTiming: relatedArtistsResponse.headers.get('server-timing'),
   };
 }
 
@@ -103,15 +105,32 @@ async function waitForCondition(condition, message) {
   throw new Error(`${message} within ${cacheCoalescingWaitTimeoutMs}ms`);
 }
 
-function assertArtistDetailProviderPayloads({ discography, relatedArtists }, cacheExpectation) {
+function assertCacheServerTiming(serverTiming, { lookup, refresh }) {
+  const expectedDescription = `${lookup}/${refresh}/fresh`;
+  if (refresh === 'foreground') {
+    assert.match(serverTiming, new RegExp(`^harmoniarr-cache;desc="${expectedDescription}";dur=\\d+$`, 'u'));
+    return;
+  }
+
+  assert.equal(serverTiming, `harmoniarr-cache;desc="${expectedDescription}"`);
+}
+
+function assertArtistDetailProviderPayloads({
+  discography,
+  discographyServerTiming,
+  relatedArtists,
+  relatedArtistsServerTiming,
+}, cacheExpectation) {
   assert.equal(discography.ok, true);
   assert.equal(discography.provider, 'musicbrainz');
   assert.equal(discography.browse.results.length, 1);
   assertCacheMetadata(discography.browse.cache, cacheExpectation);
+  assertCacheServerTiming(discographyServerTiming, cacheExpectation);
 
   assert.equal(relatedArtists.ok, true);
   assert.equal(relatedArtists.similar.length, 8);
   assertCacheMetadata(relatedArtists.cache, cacheExpectation);
+  assertCacheServerTiming(relatedArtistsServerTiming, cacheExpectation);
 }
 
 test('Artist Detail provider routes preserve the cold-then-fresh cache contract', {
