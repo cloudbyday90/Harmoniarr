@@ -6,7 +6,7 @@
  * See LICENSE file for details.
  */
 
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 import { resolveBrowserTestEvidencePath } from './browser-test-evidence.js';
@@ -27,6 +27,7 @@ import {
   browserTestEvidenceReviewRequiredSampleCount,
   browserTestEvidenceReviewSchemaVersion,
   createBrowserTestEvidenceReviewInput,
+  parseBrowserTestEvidenceReviewInput,
 } from './browser-test-evidence-review.js';
 import { runBufferedCommand } from './process-runtime.js';
 
@@ -53,6 +54,16 @@ function assertPositiveSafeIntegerAtMost(value, maximum, label) {
   if (value > maximum) {
     throw new Error(`${label} must not exceed ${maximum}`);
   }
+}
+
+export function parseBrowserValidationSampleRunId(value, label = 'initialRunId') {
+  if (typeof value !== 'string' || !/^\d+$/u.test(value)) {
+    throw new Error(`${label} must be a positive safe integer`);
+  }
+
+  const runId = Number(value);
+  assertPositiveSafeInteger(runId, label);
+  return runId;
 }
 
 function getNewWorkflowRunCandidate({ baselineSha, knownRunIds, workflowRuns }) {
@@ -185,6 +196,42 @@ async function writeCollectionManifest({ cwd, mkdirFn, outputPath, samples, writ
   };
 }
 
+async function readCollectionManifest({ cwd, outputPath, readCollectionManifestFn }) {
+  const resolvedOutputPath = resolveBrowserTestEvidencePath(outputPath, { cwd });
+
+  try {
+    return parseBrowserTestEvidenceReviewInput(await readCollectionManifestFn(resolvedOutputPath, 'utf8'));
+  } catch (error) {
+    if (error && typeof error === 'object' && error.code === 'ENOENT') {
+      return createCollectionManifest([]);
+    }
+
+    throw error;
+  }
+}
+
+function assertSampleSourceCommit(samples, baselineSha) {
+  for (const sample of samples) {
+    if (sample.workflowRun.headSha !== baselineSha) {
+      throw new Error(`Existing Browser Validation sample ${sample.runId} used unexpected commit ${sample.workflowRun.headSha}`);
+    }
+  }
+}
+
+function assertRecoveredRunFollowsRetainedSamples(samples, workflowRun, runId) {
+  if (samples.some((sample) => sample.runId === runId)) {
+    throw new Error(`Recovered Browser Validation run ${runId} is already retained`);
+  }
+
+  const latestCompletedAtMs = Math.max(
+    ...samples.map((sample) => Date.parse(sample.workflowRun.completedAt)),
+  );
+  if (Number.isFinite(latestCompletedAtMs)
+    && Date.parse(workflowRun.startedAt) < latestCompletedAtMs) {
+    throw new Error(`Recovered Browser Validation run ${runId} started before the retained collection completed`);
+  }
+}
+
 export function createBrowserValidationSampleCollectionSummary({
   baselineSha,
   completed,
@@ -205,12 +252,14 @@ export async function collectBrowserValidationSamples({
   commandRunner = runBufferedCommand,
   cwd = process.cwd(),
   env = process.env,
+  initialRunId = null,
   mkdtempFn,
   mkdirFn = mkdir,
   nowFn = Date.now,
   outputPath,
   pollIntervalMs = browserValidationSamplePollIntervalMs,
   readFileFn,
+  readCollectionManifestFn = readFile,
   removeDirectoryFn,
   repository = null,
   sampleCount = browserTestEvidenceReviewRequiredSampleCount,
@@ -236,10 +285,101 @@ export async function collectBrowserValidationSamples({
     repository: resolvedRepository,
     timeoutMs: pollIntervalMs,
   });
-  const samples = [];
+  const existingManifest = await readCollectionManifest({
+    cwd,
+    outputPath: resolvedOutputPath,
+    readCollectionManifestFn,
+  });
+  const samples = [...existingManifest.samples];
+  assertSampleSourceCommit(samples, baselineSha);
+  if (samples.length > sampleCount) {
+    throw new Error(`Existing Browser Validation collection has more than ${sampleCount} samples`);
+  }
+  const resolvedInitialRunId = initialRunId === null
+    ? null
+    : typeof initialRunId === 'number'
+      ? (assertPositiveSafeInteger(initialRunId, 'initialRunId'), initialRunId)
+      : parseBrowserValidationSampleRunId(initialRunId);
   let persisted = null;
 
-  for (let index = 0; index < sampleCount; index += 1) {
+  if (resolvedInitialRunId !== null) {
+    if (samples.length >= sampleCount) {
+      throw new Error(`Recovered Browser Validation run ${resolvedInitialRunId} exceeds the selected sample count`);
+    }
+
+    const initialWorkflowRun = await getBrowserValidationWorkflowRun({
+      commandRunner,
+      cwd,
+      env,
+      repository: resolvedRepository,
+      runId: resolvedInitialRunId,
+      timeoutMs: pollIntervalMs,
+    });
+    if (initialWorkflowRun.terminalWorkflowRun === null) {
+      throw new Error(`Initial Browser Validation run ${resolvedInitialRunId} has not completed`);
+    }
+    if (initialWorkflowRun.terminalWorkflowRun.headSha !== baselineSha) {
+      throw new Error(`Initial Browser Validation run ${resolvedInitialRunId} used unexpected commit ${initialWorkflowRun.terminalWorkflowRun.headSha}`);
+    }
+    assertRecoveredRunFollowsRetainedSamples(
+      samples,
+      initialWorkflowRun.terminalWorkflowRun,
+      resolvedInitialRunId,
+    );
+
+    let initialEvidence;
+    try {
+      initialEvidence = await downloadBrowserValidationEvidence({
+        commandRunner,
+        cwd,
+        env,
+        mkdtempFn,
+        readFileFn,
+        removeDirectoryFn,
+        repository: resolvedRepository,
+        runId: resolvedInitialRunId,
+        timeoutMs: pollIntervalMs,
+        tmpdirFn,
+      });
+    } catch {
+      initialEvidence = null;
+    }
+
+    samples.push(createCollectionSample({
+      evidence: initialEvidence,
+      runId: resolvedInitialRunId,
+      workflowRun: initialWorkflowRun.terminalWorkflowRun,
+    }));
+    persisted = await writeCollectionManifest({
+      cwd,
+      mkdirFn,
+      outputPath: resolvedOutputPath,
+      samples,
+      writeFileFn,
+    });
+
+    if (initialEvidence === null) {
+      return {
+        baselineSha,
+        completed: false,
+        manifest: persisted.manifest,
+        outputPath: persisted.outputPath,
+        sampleCount: samples.length,
+      };
+    }
+  }
+
+  if (samples.length === sampleCount) {
+    return {
+      baselineSha,
+      completed: true,
+      manifest: persisted?.manifest ?? existingManifest,
+      outputPath: persisted?.outputPath ?? resolvedOutputPath,
+      sampleCount: samples.length,
+    };
+  }
+
+  while (samples.length < sampleCount) {
     const existingWorkflowRuns = await listBrowserValidationWorkflowRuns({
       commandRunner,
       cwd,

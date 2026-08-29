@@ -14,7 +14,7 @@ const requiredWorkflowFragments = [
   'npx playwright install --with-deps chromium',
   'HARMONIARR_BROWSER_TEST_EVIDENCE_PATH: browser-test-evidence/harmoniarr-browser-test.json',
   'HARMONIARR_BROWSER_TEST_CLEANUP_WAIT_MS: 25000',
-  'npm run test:browser',
+  'npm run test:browser:serial',
   'node scripts/write-browser-test-evidence-summary.js',
   "if: always() && hashFiles('browser-test-evidence/harmoniarr-browser-test.json') != ''",
   'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',

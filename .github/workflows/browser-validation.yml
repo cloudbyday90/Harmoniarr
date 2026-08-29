@@ -34,8 +34,8 @@ jobs:
         run: npm ci
       - name: Install Chromium system dependencies
         run: npx playwright install --with-deps chromium
-      - name: Run isolated browser suite
-        run: npm run test:browser
+      - name: Run serial browser suite
+        run: npm run test:browser:serial
         env:
           HARMONIARR_BROWSER_TEST_CLEANUP_WAIT_MS: 25000
           HARMONIARR_BROWSER_TEST_EVIDENCE_PATH: browser-test-evidence/harmoniarr-browser-test.json

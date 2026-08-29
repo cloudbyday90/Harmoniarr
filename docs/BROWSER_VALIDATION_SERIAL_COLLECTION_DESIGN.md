@@ -70,6 +70,15 @@ npm run collect:browser-evidence
 It always selects ten runs. The operator then reviews the written manifest
 with the existing command and a distinct workspace-relative output path.
 
+If an operator shell ends after a workflow has already been dispatched, set
+`HARMONIARR_BROWSER_VALIDATION_SAMPLE_COLLECTION_INITIAL_RUN_ID` to that one
+completed run ID when restarting. The collector verifies its source commit,
+retains its bounded artifact, and resumes only after it is terminal. It can
+recover one unretained run after a partial-manifest interruption only when the
+run follows the retained samples chronologically and does not duplicate an ID.
+If a partial manifest already exists, rerunning the command resumes from its
+retained samples rather than replacing them.
+
 ## Collection flow
 
 ```text

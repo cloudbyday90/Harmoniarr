@@ -14,6 +14,7 @@ import {
   browserValidationEvidenceFileName,
   collectBrowserValidationSamples,
   createBrowserValidationSampleCollectionSummary,
+  parseBrowserValidationSampleRunId,
 } from '../../scripts/browser-validation-sample-collection.js';
 
 const baselineSha = 'a'.repeat(40);
@@ -192,6 +193,76 @@ test('serial Browser Validation collection retains a terminal run without an art
   assert.equal(writes[0].samples[0].evidence, null);
 });
 
+test('serial Browser Validation collection can retain a completed initial run after an interrupted operator session', async () => {
+  const { calls, runCommand } = createCommandRunner();
+  const missingManifest = new Error('manifest not found');
+  missingManifest.code = 'ENOENT';
+
+  const result = await collectBrowserValidationSamples({
+    commandRunner: runCommand,
+    cwd: process.cwd(),
+    initialRunId: 91_001,
+    mkdtempFn: async () => 'C:/temporary/harmoniarr-browser-validation-c',
+    mkdirFn: async () => {},
+    outputPath: 'artifacts/browser-validation-input.json',
+    pollIntervalMs: 1,
+    readCollectionManifestFn: async () => {
+      throw missingManifest;
+    },
+    readFileFn: async () => createEvidence(),
+    removeDirectoryFn: async () => {},
+    repository,
+    sampleCount: 1,
+    tmpdirFn: () => 'C:/temporary',
+    writeFileFn: async () => {},
+  });
+
+  assert.equal(result.completed, true);
+  assert.equal(result.sampleCount, 1);
+  assert.equal(result.manifest.samples[0].runId, 91_001);
+  assert.equal(calls.some(({ args }) => args[0] === 'workflow'), false);
+});
+
+test('serial Browser Validation collection recovers one completed run after a partial manifest write interruption', async () => {
+  const { calls, runCommand } = createCommandRunner();
+  const retainedSample = {
+    evidence: JSON.parse(createEvidence()),
+    runId: 91_000,
+    workflowRun: {
+      completedAt: '2026-08-29T12:59:00.000Z',
+      conclusion: 'success',
+      event: 'workflow_dispatch',
+      headBranch: 'main',
+      headSha: baselineSha,
+      startedAt: '2026-08-29T12:54:00.000Z',
+    },
+  };
+
+  const result = await collectBrowserValidationSamples({
+    commandRunner: runCommand,
+    cwd: process.cwd(),
+    initialRunId: 91_001,
+    mkdtempFn: async () => 'C:/temporary/harmoniarr-browser-validation-d',
+    mkdirFn: async () => {},
+    outputPath: 'artifacts/browser-validation-input.json',
+    pollIntervalMs: 1,
+    readCollectionManifestFn: async () => JSON.stringify({
+      samples: [retainedSample],
+      schemaVersion: 2,
+    }),
+    readFileFn: async () => createEvidence(),
+    removeDirectoryFn: async () => {},
+    repository,
+    sampleCount: 2,
+    tmpdirFn: () => 'C:/temporary',
+    writeFileFn: async () => {},
+  });
+
+  assert.equal(result.completed, true);
+  assert.deepEqual(result.manifest.samples.map((sample) => sample.runId), [91_000, 91_001]);
+  assert.equal(calls.some(({ args }) => args[0] === 'workflow'), false);
+});
+
 test('serial Browser Validation collection refuses concurrent or source-drifted workflow runs', async () => {
   const activeRunner = createCommandRunner({
     existingRuns: [createWorkflowRun({ id: 91_000, status: 'in_progress' })],
@@ -243,4 +314,9 @@ test('serial Browser Validation collection validates its bounded operator inputs
     /browser test evidence path must remain within the working directory/u,
   );
   assert.equal(browserValidationEvidenceFileName, 'harmoniarr-browser-test.json');
+  assert.equal(parseBrowserValidationSampleRunId('91001'), 91_001);
+  assert.throws(
+    () => parseBrowserValidationSampleRunId('-1'),
+    /initialRunId must be a positive safe integer/u,
+  );
 });
