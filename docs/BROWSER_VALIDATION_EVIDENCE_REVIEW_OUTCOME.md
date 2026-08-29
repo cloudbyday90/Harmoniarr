@@ -40,14 +40,18 @@ None is safe or useful to apply to this focused evidence-review change.
   verifies `incomplete`, and browser failure, cleanup drift, worker-count
   drift, duplicate run IDs, extra fields, malformed JSON, and identical or
   out-of-workspace paths are rejected or reported safely.
+- [Browser Validation run 33247929097](https://github.com/cloudbyday90/Harmoniarr/actions/runs/33247929097)
+  passed remotely. Its isolated browser suite, bounded evidence summary, and
+  366-byte `harmoniarr-browser-isolation-evidence` artifact all completed
+  successfully; the artifact expires 2026-09-12.
 
 ## Remaining operational step
 
-Collect ten consecutive fixed-configuration `Browser Validation` artifacts
-from `main`, build the manifest described in the design, and run the local
-command. This implementation commit will trigger one normal Browser Validation
-run; it is evidence of no regression, not a substitute for the full ten-run
-sample. Do not raise browser worker count until that report is
+Collect nine additional consecutive fixed-configuration `Browser Validation`
+artifacts from `main`, add this run's evidence as the first selected sample,
+build the manifest described in the design, and run the local command. This
+successful run is evidence of no regression, not a substitute for the full
+ten-run baseline. Do not raise browser worker count until that report is
 `baseline_confirmed`.
 
 ## Related design
