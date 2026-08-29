@@ -14,13 +14,13 @@ import { createIntegrationAppRuntime } from '../integration/app-runtime.js';
 const defaultClientDistDir = resolve(import.meta.dirname, '../../dist/client');
 
 export function getBrowserDefaultTimeoutMs(config) {
-  const timeoutMs = config?.httpRequestTimeoutMs;
+  const timeoutMs = config?.browserActionTimeoutMs;
 
   if (Number.isSafeInteger(timeoutMs) && timeoutMs > 0) {
     return timeoutMs;
   }
 
-  return 10_000;
+  return 30_000;
 }
 
 async function ensureBuiltClientDistDir(clientDistDir) {

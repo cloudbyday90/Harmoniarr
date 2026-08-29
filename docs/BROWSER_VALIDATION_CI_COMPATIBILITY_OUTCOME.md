@@ -10,10 +10,11 @@ content at the mobile breakpoint and permits its heading to shrink and wrap.
 This removes the Linux-detected horizontal overflow while preserving native
 `details` semantics and its keyboard focus treatment.
 
-Browser scenarios now receive the existing 15-second integration action
-timeout. The integration runtime supplies that validated configuration to each
-scenario, while direct runtime use keeps a bounded 10-second fallback. No
-timeout is disabled and no sleep or retry is added.
+Browser scenarios now receive a dedicated 30-second browser-action timeout,
+separate from the 15-second HTTP request budget. The integration runtime
+supplies that validated configuration to each scenario, while direct runtime
+use keeps the same bounded fallback. No timeout is disabled and no sleep or
+retry is added.
 
 ## Validation record
 

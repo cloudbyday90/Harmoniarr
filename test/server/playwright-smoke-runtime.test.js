@@ -11,11 +11,11 @@ import test from 'node:test';
 
 import { getBrowserDefaultTimeoutMs } from '../../testing/browser/playwright-smoke-runtime.js';
 
-test('browser smoke runtime uses the integration action timeout when available', () => {
-  assert.equal(getBrowserDefaultTimeoutMs({ httpRequestTimeoutMs: 15_000 }), 15_000);
+test('browser smoke runtime uses its dedicated action timeout when available', () => {
+  assert.equal(getBrowserDefaultTimeoutMs({ browserActionTimeoutMs: 28_000 }), 28_000);
 });
 
 test('browser smoke runtime retains a bounded fallback action timeout', () => {
-  assert.equal(getBrowserDefaultTimeoutMs(null), 10_000);
-  assert.equal(getBrowserDefaultTimeoutMs({ httpRequestTimeoutMs: 0 }), 10_000);
+  assert.equal(getBrowserDefaultTimeoutMs(null), 30_000);
+  assert.equal(getBrowserDefaultTimeoutMs({ browserActionTimeoutMs: 0 }), 30_000);
 });

@@ -51,6 +51,11 @@ function parseBoolean(value, name, fallback) {
 
 export function resolveIntegrationTestRuntimeConfig(env = process.env) {
   return {
+    browserActionTimeoutMs: parsePositiveInteger(
+      env.HARMONIARR_INTEGRATION_BROWSER_ACTION_TIMEOUT_MS,
+      'HARMONIARR_INTEGRATION_BROWSER_ACTION_TIMEOUT_MS',
+      30_000,
+    ),
     containerStopTimeoutMs: parsePositiveInteger(
       env.HARMONIARR_INTEGRATION_CONTAINER_STOP_TIMEOUT_MS,
       'HARMONIARR_INTEGRATION_CONTAINER_STOP_TIMEOUT_MS',

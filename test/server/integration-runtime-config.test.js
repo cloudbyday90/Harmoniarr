@@ -5,6 +5,7 @@ import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/r
 suite('integration runtime config', () => {
   test('resolves safe integration defaults', () => {
     assert.deepEqual(resolveIntegrationTestRuntimeConfig({}), {
+      browserActionTimeoutMs: 30000,
       containerStopTimeoutMs: 10000,
       httpRequestTimeoutMs: 15000,
       keepArtifactsOnFailure: false,
@@ -24,6 +25,7 @@ suite('integration runtime config', () => {
 
   test('accepts explicit overrides', () => {
     const config = resolveIntegrationTestRuntimeConfig({
+      HARMONIARR_INTEGRATION_BROWSER_ACTION_TIMEOUT_MS: '28000',
       HARMONIARR_INTEGRATION_CONTAINER_STOP_TIMEOUT_MS: '12000',
       HARMONIARR_INTEGRATION_HTTP_REQUEST_TIMEOUT_MS: '14000',
       HARMONIARR_INTEGRATION_KEEP_ARTIFACTS_ON_FAILURE: 'true',
@@ -40,6 +42,7 @@ suite('integration runtime config', () => {
       HARMONIARR_INTEGRATION_USE_CONTAINER_REUSE: 'true',
     });
 
+    assert.equal(config.browserActionTimeoutMs, 28000);
     assert.equal(config.containerStopTimeoutMs, 12000);
     assert.equal(config.httpRequestTimeoutMs, 14000);
     assert.equal(config.keepArtifactsOnFailure, true);
@@ -62,6 +65,13 @@ suite('integration runtime config', () => {
         HARMONIARR_INTEGRATION_KEEP_ARTIFACTS_ON_FAILURE: 'sometimes',
       }),
       /HARMONIARR_INTEGRATION_KEEP_ARTIFACTS_ON_FAILURE must be "true" or "false"/,
+    );
+
+    assert.throws(
+      () => resolveIntegrationTestRuntimeConfig({
+        HARMONIARR_INTEGRATION_BROWSER_ACTION_TIMEOUT_MS: '0',
+      }),
+      /HARMONIARR_INTEGRATION_BROWSER_ACTION_TIMEOUT_MS must be greater than 0/,
     );
 
     assert.throws(

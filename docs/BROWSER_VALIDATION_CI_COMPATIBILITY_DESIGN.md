@@ -16,7 +16,10 @@ workflow exposed three browser-suite failures that had not appeared locally:
 The browser runtime was intended to use Harmoniarr's integration request
 timeout (15 seconds by default), but the integration runtime did not pass its
 validated configuration through the scenario context. The browser layer
-therefore silently used its 10-second fallback.
+therefore silently used its 10-second fallback. The first correction exposed
+a second boundary: browser action readiness is not the same as a single HTTP
+request. A real backup creation can make several bounded requests before its
+"Review restore" control is available.
 
 ## Decision
 
@@ -25,10 +28,11 @@ therefore silently used its 10-second fallback.
 2. Make the disclosure summary stack its status beneath the explanatory
    heading at the mobile breakpoint. Its heading has a zero flex minimum so
    text can reflow rather than widening the panel.
-3. Pass the existing validated integration configuration into each scenario
-   context, then use that configuration for Playwright's default action
-   timeout.
-4. Keep a bounded 10-second fallback for direct runtime use without a
+3. Pass the validated integration configuration into each scenario context,
+   then use a dedicated 30-second browser-action timeout. This matches
+   Playwright's default action budget while remaining well below the
+   90-second scenario cap.
+4. Keep a bounded 30-second fallback for direct runtime use without a
    configuration object. Do not disable timeouts, insert fixed sleeps, or add
    retry loops.
 5. Cover timeout resolution with a small ESM unit test, run the three failed
@@ -43,7 +47,8 @@ therefore silently used its 10-second fallback.
 | Disable Playwright action timeouts | Avoids short failures | Can leave broken CI hanging until the job cap | Reject |
 | Add fixed delays to affected tests | Superficially simple | Creates slower, flakier tests without a state signal | Reject |
 | Increase only individual test waits | Limits blast radius | Duplicates a configuration value that the runtime already owns | Reject |
-| Restore the configured bounded timeout and fix mobile reflow | Retains deterministic locator waits and makes the UI usable | Requires a small context and CSS correction | **Adopt** |
+| Couple browser waits to the HTTP request budget | Shares a number | A browser workflow can legitimately include several requests | Reject |
+| Restore a dedicated bounded browser-action timeout and fix mobile reflow | Retains deterministic locator waits and makes the UI usable | Requires a small config, context, and CSS correction | **Adopt** |
 
 ## W3C and test-model alignment
 
@@ -55,9 +60,9 @@ horizontal overflow.
 
 Playwright documents `page.setDefaultTimeout()` as the configurable bounded
 maximum for locator actions and explicitly discourages time-based waits in
-tests. Harmoniarr continues to wait for semantic visible controls and retains
-its 90-second per-scenario ceiling rather than adding sleeps or unbounded
-retries.
+tests. Harmoniarr continues to wait for semantic visible controls, uses
+Playwright's 30-second default as the dedicated action budget, and retains its
+90-second per-scenario ceiling rather than adding sleeps or unbounded retries.
 
 ## Recommendation stack
 
@@ -65,7 +70,8 @@ retries.
    before considering a capacity experiment.
 2. Test responsive disclosures at a narrow viewport with overflow assertions.
 3. Propagate one validated integration configuration through all browser
-   scenarios so UI action limits cannot drift from test-runtime policy.
+   scenarios, with a distinct browser-action timeout so UI waits cannot drift
+   from test-runtime policy or be conflated with HTTP budgets.
 4. Keep bounded, state-based Playwright locator waits; never use sleeps as a
    test-readiness mechanism.
 
