@@ -97,12 +97,13 @@ real page-readiness problem and not an artifact-collection or cleanup issue.
 ## Page-readiness repair
 
 The browser integration runtime now fixtures the app-shell's unrelated
-system-overview heartbeat before its first page is created. That removes live
-provider-health checks from page-workflow scenarios while retaining the fixed
-30-second timeout and two-worker policy. See [Browser Page-Readiness Fixture
-Design](BROWSER_PAGE_READINESS_FIXTURE_DESIGN.md) and [Browser Page-Readiness
-Fixture Outcome](BROWSER_PAGE_READINESS_FIXTURE_OUTCOME.md) for the scoped
-decision, security boundary, and next validation step.
+system-overview heartbeat and bootstrap's first-run summary before its first
+page is created. Those endpoints both trigger live provider-health checks, so
+the paired fixtures remove this external work from page-workflow scenarios
+while retaining the fixed 30-second timeout and two-worker policy. See
+[Browser Page-Readiness Fixture Design](BROWSER_PAGE_READINESS_FIXTURE_DESIGN.md)
+and [Browser Page-Readiness Fixture Outcome](BROWSER_PAGE_READINESS_FIXTURE_OUTCOME.md)
+for the scoped decision, security boundary, and next validation step.
 
 After the resulting Browser Validation run is reviewed, collect a new serial
 set of ten `workflow_dispatch` artifacts from one unchanged `main` commit. Do

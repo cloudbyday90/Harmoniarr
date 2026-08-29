@@ -15,8 +15,10 @@ reason to raise the action timeout, retry an assertion, or reduce workers.
 The app shell always starts its heartbeat after it mounts. Its
 `GET /api/v1/system/overview` request performs live dependency health checks,
 including MusicBrainz, even when a browser scenario is testing an unrelated
-page. That introduces remote provider availability and provider-response
-latency into every page journey.
+page. Bootstrap also lands on the first-run view, whose
+`GET /api/v1/system/onboarding` summary performs the same MusicBrainz health
+check. Together, these introduce remote provider availability and
+provider-response latency into every page journey.
 
 ## Research and decision
 
@@ -33,12 +35,14 @@ does not add test-only DOM attributes or change end-user markup.
 
 ## Design
 
-`testing/browser/system-overview-browser-fixture.js` owns one small ESM
-fixture. Before a scenario creates its first page, the browser runtime installs
-a context route for `GET /api/v1/system/overview` that returns only:
+Two small ESM fixture modules own the shared browser-readiness boundary. Before
+a scenario creates its first page, the browser runtime installs context routes
+for `GET /api/v1/system/overview` and `GET /api/v1/system/onboarding`. They
+return only:
 
 - a zero active-job count;
 - healthy status for the three shell indicators; and
+- an empty, completed first-run checklist; and
 - no URLs, provider details, credentials, users, paths, logs, or request data.
 
 The response is `no-store`, matching the server's API-cache boundary. A method
@@ -59,7 +63,7 @@ only remove an external, unrelated health probe from page-workflow tests.
 | Increase the 30-second action timeout | Small code change | Masks a shared fault and slows failure feedback | Rejected |
 | Retry failed page assertions | Might hide temporary service delays | Reduces diagnostic value and leaves external dependency in place | Rejected |
 | Run browser tests serially | Could reduce contention | Violates the retained two-worker policy and lowers CI coverage efficiency | Rejected |
-| Fixture the unrelated system overview at the context boundary | Keeps two workers and real page semantics while removing live provider I/O | Browser UI tests no longer verify the complete overview response | **Adopted** |
+| Fixture the unrelated readiness endpoints at the context boundary | Keeps two workers and real page semantics while removing live provider I/O | Browser UI tests no longer verify the complete overview or onboarding response | **Adopted** |
 | Mock each affected test individually | Narrow setup | Repeats behavior and misses future scenarios | Rejected |
 
 ## Security and multi-user boundaries
@@ -76,8 +80,8 @@ only remove an external, unrelated health probe from page-workflow tests.
 
 ## Recommendation stack
 
-1. **Adopt the context-level overview fixture** for browser page-workflow
-   tests.
+1. **Adopt the context-level overview and onboarding fixtures** for browser
+   page-workflow tests.
 2. **Keep the 30-second action timeout and two-worker setting unchanged.**
 3. **Use semantic role and label locators** to prove the actual accessible UI
    becomes ready.

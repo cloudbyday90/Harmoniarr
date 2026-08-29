@@ -1,14 +1,14 @@
 # Browser Page-Readiness Fixture — Outcome
 
-**Status:** Implemented; remote Browser Validation pending
+**Status:** Corrected locally; remote Browser Validation pending
 **Date:** 2026-08-29
 
 ## Delivered result
 
-The shared Playwright smoke runtime now installs a deterministic,
-privacy-safe system-overview fixture before it creates each scenario's first
-page. Browser journeys no longer perform live provider-health probes merely to
-render the app-shell heartbeat.
+The shared Playwright smoke runtime now installs deterministic, privacy-safe
+system-overview and onboarding fixtures before it creates each scenario's
+first page. Browser journeys no longer perform live provider-health probes
+merely to render the app-shell heartbeat or complete bootstrap navigation.
 
 The change keeps the fixed 30-second browser action timeout and two-worker
 policy. It does not modify production behavior, page markup, multi-user access,
@@ -38,6 +38,15 @@ into the working tree.
   policy: 89 tests across 63 suites in 297.5 seconds.
 - `npm test` passed, including 37 integration tests; `npm run build` then
   completed successfully.
+- Remote Browser Validation run
+  [33250417031](https://github.com/cloudbyday90/Harmoniarr/actions/runs/33250417031)
+  exposed the remaining live first-run summary: 87 of 89 tests passed, while
+  two unrelated headings again waited for 30 seconds. The result confirmed the
+  second readiness endpoint and triggered the bounded onboarding fixture.
+- The corrected route-contract unit tests passed (8 tests), as did both
+  previously failing browser suites. The complete corrected browser suite
+  passed with 89 tests across 63 suites in 260.9 seconds, still using two
+  workers and the original timeout.
 
 ## Remaining operational step
 
