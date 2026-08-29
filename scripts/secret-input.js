@@ -76,3 +76,39 @@ export async function getRequiredSecretInput(options = {}) {
 
   throw new Error(`${options.envName} or ${options.fileEnvName} is required`);
 }
+
+/**
+ * Resolves a required secret exclusively from a file path. New diagnostic
+ * commands use this stricter variant so a password cannot be supplied through
+ * a command line argument or inherited as a plain environment value.
+ *
+ * @param {{ env?: object, fileEnvName: string, fileOptionName: string, readFileFn?: typeof readFile, values?: object }} options
+ * @returns {Promise<string>}
+ */
+export async function getRequiredSecretFileInput({
+  env = process.env,
+  fileEnvName,
+  fileOptionName,
+  readFileFn = readFile,
+  values = {},
+} = {}) {
+  const filePath = getOptionalStringInput(values, fileOptionName, fileEnvName, env);
+
+  if (!filePath) {
+    throw new Error(`${fileEnvName} is required`);
+  }
+
+  let contents;
+  try {
+    contents = await readFileFn(filePath, 'utf8');
+  } catch {
+    throw createSecretFileReadError(fileEnvName);
+  }
+
+  const secret = normalizeOptionalString(contents);
+  if (!secret) {
+    throw createSecretFileReadError(fileEnvName);
+  }
+
+  return secret;
+}

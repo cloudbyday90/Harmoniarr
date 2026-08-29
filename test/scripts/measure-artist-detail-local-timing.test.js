@@ -1,0 +1,216 @@
+/*
+ * Harmoniarr - Soulseek-native music library management
+ * Copyright (C) 2026 Harmoniarr Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import { createArtistDetailLocalTimingEvidence } from '../../scripts/artist-detail-local-timing-evidence.js';
+import {
+  createArtistDetailTimingObserver,
+  normalizeLoopbackBaseUrl,
+  normalizeArtistDetailRequestTiming,
+  resolveArtistDetailTimingInputs,
+  writeArtistDetailLocalTimingEvidence,
+} from '../../scripts/measure-artist-detail-local-timing.js';
+
+const artistMbid = 'dbe5c8d5-5f05-4f22-b4b1-4f49f91b3a88';
+
+function createFakePage() {
+  const listeners = new Map();
+
+  return {
+    emit(event, value) {
+      for (const listener of listeners.get(event) ?? []) {
+        listener(value);
+      }
+    },
+    off(event, listener) {
+      listeners.set(event, (listeners.get(event) ?? []).filter((candidate) => candidate !== listener));
+    },
+    on(event, listener) {
+      listeners.set(event, [...(listeners.get(event) ?? []), listener]);
+    },
+  };
+}
+
+function createFakeRequest({ responseEnd, startTime, status = 200, url }) {
+  return {
+    response: async () => ({ status: () => status }),
+    timing: () => ({ responseEnd, startTime }),
+    url: () => url,
+  };
+}
+
+test('local Artist Detail timing inputs require a loopback deployment and a file-only password', async () => {
+  const inputs = await resolveArtistDetailTimingInputs({
+    args: [
+      '--artist-mbid', artistMbid,
+      '--base-url', 'http://localhost:47956',
+      '--no-headless',
+      '--password-file', 'C:/secrets/harmoniarr-password',
+      '--username', 'local-admin',
+    ],
+    readFileFn: async (path, encoding) => {
+      assert.equal(path, 'C:/secrets/harmoniarr-password');
+      assert.equal(encoding, 'utf8');
+      return ' local-password\n';
+    },
+  });
+
+  assert.deepEqual(inputs, {
+    artistMbid,
+    baseUrl: 'http://localhost:47956',
+    evidencePath: null,
+    headless: false,
+    password: 'local-password',
+    timeoutMs: 30_000,
+    username: 'local-admin',
+  });
+
+  await assert.rejects(
+    resolveArtistDetailTimingInputs({
+      args: [
+        '--artist-mbid', artistMbid,
+        '--base-url', 'https://example.com',
+        '--password-file', 'C:/secrets/harmoniarr-password',
+        '--username', 'local-admin',
+      ],
+      readFileFn: async () => 'local-password',
+    }),
+    /base-url must be a loopback HTTP URL/u,
+  );
+});
+
+test('local Artist Detail timing URL validation blocks credentials and deployment subpaths', () => {
+  assert.equal(normalizeLoopbackBaseUrl('http://127.0.0.1:47956/'), 'http://127.0.0.1:47956');
+  assert.throws(
+    () => normalizeLoopbackBaseUrl('http://user:password@127.0.0.1:47956/'),
+    /without credentials/u,
+  );
+  assert.throws(
+    () => normalizeLoopbackBaseUrl('http://127.0.0.1:47956/app'),
+    /without credentials, path, query, or fragment/u,
+  );
+});
+
+test('local Artist Detail timing normalizes Playwright milestones without retaining an absolute request clock', () => {
+  assert.deepEqual(normalizeArtistDetailRequestTiming({
+    responseEnd: 41.5,
+    startTime: 1_728_000_050_000,
+  }, 1_728_000_000_000), {
+    duration: 41.5,
+    responseEnd: 50_041.5,
+    startTime: 50_000,
+  });
+  assert.throws(
+    () => normalizeArtistDetailRequestTiming({ responseEnd: -1, startTime: 10 }, 0),
+    /request timing is invalid/u,
+  );
+});
+
+test('local Artist Detail timing observer emits only bounded request observations', async () => {
+  const page = createFakePage();
+  const observer = createArtistDetailTimingObserver({ artistMbid, page });
+  const localRequest = createFakeRequest({
+    responseEnd: 8,
+    startTime: 1_728_000_000_000,
+    url: `http://127.0.0.1:47956/api/v1/metadata/musicbrainz/artists/${artistMbid}/local`,
+  });
+  const projectionRequest = createFakeRequest({
+    responseEnd: 5,
+    startTime: 1_728_000_000_011,
+    url: 'http://127.0.0.1:47956/api/v1/metadata/artists/local-artist-id/operator',
+  });
+
+  page.emit('request', localRequest);
+  page.emit('requestfinished', localRequest);
+  page.emit('request', projectionRequest);
+  page.emit('requestfinished', projectionRequest);
+
+  const [localMetadata, operatorProjection] = await Promise.all([
+    observer.waitForCompletion('local_metadata'),
+    observer.waitForCompletion('operator_projection'),
+  ]);
+  observer.stop();
+
+  assert.deepEqual([localMetadata, operatorProjection], [
+    {
+      endpoint: 'local_metadata',
+      statusFamily: '2xx',
+      timing: { clientRequestDurationMs: 8, responseEndMs: 8, startTimeMs: 0 },
+    },
+    {
+      endpoint: 'operator_projection',
+      statusFamily: '2xx',
+      timing: { clientRequestDurationMs: 5, responseEndMs: 16, startTimeMs: 11 },
+    },
+  ]);
+  assert.equal(JSON.stringify([localMetadata, operatorProjection]).includes('local-artist-id'), false);
+});
+
+test('local Artist Detail timing evidence remains within the workspace when persisted', async () => {
+  const writes = [];
+  const evidence = createArtistDetailLocalTimingEvidence({
+    capturedAt: '2026-08-29T12:00:00.000Z',
+    outcome: 'local_projection',
+    requests: [
+      {
+        endpoint: 'local_metadata',
+        statusFamily: '2xx',
+        timing: { clientRequestDurationMs: 5, responseEndMs: 5, startTimeMs: 0 },
+      },
+      {
+        endpoint: 'operator_projection',
+        statusFamily: '2xx',
+        timing: { clientRequestDurationMs: 7, responseEndMs: 13, startTimeMs: 6 },
+      },
+    ],
+  });
+
+  const evidencePath = await writeArtistDetailLocalTimingEvidence({
+    cwd: process.cwd(),
+    evidence,
+    evidencePath: 'artifacts/artist-detail-local-timing.json',
+    mkdirFn: async () => {},
+    writeFileFn: async (filePath, content, encoding) => writes.push({ content, encoding, filePath }),
+  });
+
+  assert.match(evidencePath, /artifacts/u);
+  assert.equal(writes[0].encoding, 'utf8');
+  assert.equal(writes[0].content.includes('http'), false);
+  await assert.rejects(
+    writeArtistDetailLocalTimingEvidence({
+      cwd: process.cwd(),
+      evidence: { ...evidence, username: 'local-admin' },
+      evidencePath: 'artifacts/artist-detail-local-timing.json',
+      mkdirFn: async () => {},
+      writeFileFn: async () => {},
+    }),
+    /username is not allowed/u,
+  );
+  await assert.rejects(
+    writeArtistDetailLocalTimingEvidence({
+      cwd: process.cwd(),
+      evidence,
+      evidencePath: '../outside-workspace.json',
+      mkdirFn: async () => {},
+      writeFileFn: async () => {},
+    }),
+    /must remain within the working directory/u,
+  );
+});

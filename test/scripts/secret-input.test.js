@@ -9,7 +9,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { getOptionalSecretInput, getRequiredSecretInput } from '../../scripts/secret-input.js';
+import {
+  getOptionalSecretInput,
+  getRequiredSecretFileInput,
+  getRequiredSecretInput,
+} from '../../scripts/secret-input.js';
 
 const passwordOptions = Object.freeze({
   envName: 'HARMONIARR_WALKTHROUGH_PASSWORD',
@@ -46,6 +50,29 @@ test('getRequiredSecretInput reads and trims a password-only secret file', async
   });
 
   assert.equal(password, 'FilePass123!');
+});
+
+test('getRequiredSecretFileInput accepts only a password file and keeps its contents out of errors', async () => {
+  const password = await getRequiredSecretFileInput({
+    ...passwordOptions,
+    readFileFn: async () => ' FilePass123!\n',
+    values: { 'password-file': 'C:/secrets/walkthrough-password' },
+  });
+
+  assert.equal(password, 'FilePass123!');
+  await assert.rejects(
+    getRequiredSecretFileInput({
+      ...passwordOptions,
+      readFileFn: async () => {
+        throw new Error('C:/secrets/walkthrough-password: permission denied');
+      },
+      values: { 'password-file': 'C:/secrets/walkthrough-password' },
+    }),
+    (error) => (
+      error.message === 'HARMONIARR_WALKTHROUGH_PASSWORD_FILE could not be read'
+      && !error.message.includes('C:/secrets')
+    ),
+  );
 });
 
 test('getOptionalSecretInput returns null without a configured secret source', async () => {
