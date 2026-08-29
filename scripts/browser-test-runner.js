@@ -8,6 +8,13 @@
 
 import { spawn } from 'node:child_process';
 
+import {
+  getBrowserTestCleanupWaitMs,
+  getOptionalBrowserTestEvidencePath,
+  waitForBrowserTestCleanup,
+  writeBrowserTestEvidence,
+} from './browser-test-evidence.js';
+
 export const defaultBrowserTestConcurrency = 2;
 
 function parsePositiveSafeInteger(value, optionName) {
@@ -53,34 +60,87 @@ export function buildBrowserTestNodeArguments(concurrency) {
 export async function runBrowserTests({
   args = process.argv.slice(2),
   cwd = process.cwd(),
+  env = process.env,
+  now = Date.now,
   nodePath = process.execPath,
   spawnChild = spawn,
+  waitForCleanup = waitForBrowserTestCleanup,
+  writeEvidence = writeBrowserTestEvidence,
 } = {}) {
   const concurrency = parseBrowserTestConcurrency(args);
   const nodeArguments = buildBrowserTestNodeArguments(concurrency);
+  const configuredEvidencePath = getOptionalBrowserTestEvidencePath(env);
+  const startedAtMs = now();
+  let testFailure = null;
 
-  await new Promise((resolve, reject) => {
-    const child = spawnChild(nodePath, nodeArguments, {
-      cwd,
-      stdio: 'inherit',
-      windowsHide: true,
+  try {
+    await new Promise((resolvePromise, reject) => {
+      const child = spawnChild(nodePath, nodeArguments, {
+        cwd,
+        stdio: 'inherit',
+        windowsHide: true,
+      });
+
+      child.once('error', reject);
+      child.once('exit', (code, signal) => {
+        if (code === 0) {
+          resolvePromise();
+          return;
+        }
+
+        if (signal) {
+          reject(new Error(`Browser tests terminated by signal ${signal}`));
+          return;
+        }
+
+        reject(new Error(`Browser tests exited with code ${code ?? 'unknown'}`));
+      });
     });
+  } catch (error) {
+    testFailure = error;
+  }
 
-    child.once('error', reject);
-    child.once('exit', (code, signal) => {
-      if (code === 0) {
-        resolve();
-        return;
-      }
+  const durationMs = Math.max(0, now() - startedAtMs);
 
-      if (signal) {
-        reject(new Error(`Browser tests terminated by signal ${signal}`));
-        return;
-      }
+  if (!configuredEvidencePath) {
+    if (testFailure) {
+      throw testFailure;
+    }
 
-      reject(new Error(`Browser tests exited with code ${code ?? 'unknown'}`));
-    });
+    return { concurrency, durationMs };
+  }
+
+  const cleanup = await waitForCleanup({
+    cwd,
+    maxWaitMs: getBrowserTestCleanupWaitMs(env),
   });
 
-  return { concurrency };
+  try {
+    await writeEvidence({
+      browserTest: {
+        durationMs,
+        status: testFailure ? 'failed' : 'passed',
+        workerCount: concurrency,
+      },
+      cleanup,
+      cwd,
+      evidencePath: configuredEvidencePath,
+    });
+  } catch (error) {
+    if (testFailure) {
+      throw testFailure;
+    }
+
+    throw error;
+  }
+
+  if (testFailure) {
+    throw testFailure;
+  }
+
+  if (cleanup.status !== 'clean') {
+    throw new Error(`Browser test cleanup did not complete cleanly (${cleanup.status})`);
+  }
+
+  return { concurrency, durationMs };
 }

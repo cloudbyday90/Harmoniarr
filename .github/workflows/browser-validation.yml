@@ -1,0 +1,59 @@
+name: Browser Validation
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.txt'
+      - 'docs/**'
+      - 'logo/**'
+  push:
+    branches: [ main, develop ]
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.txt'
+      - 'docs/**'
+      - 'logo/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser-validation:
+    name: Browser isolation evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+      - name: Install root dependencies
+        run: npm ci
+      - name: Install Chromium system dependencies
+        run: npx playwright install --with-deps chromium
+      - name: Run isolated browser suite
+        run: npm run test:browser
+        env:
+          HARMONIARR_BROWSER_TEST_CLEANUP_WAIT_MS: 25000
+          HARMONIARR_BROWSER_TEST_EVIDENCE_PATH: browser-test-evidence/harmoniarr-browser-test.json
+      - name: Publish browser evidence summary
+        if: always() && hashFiles('browser-test-evidence/harmoniarr-browser-test.json') != ''
+        run: node scripts/write-browser-test-evidence-summary.js
+        env:
+          HARMONIARR_BROWSER_TEST_EVIDENCE_PATH: browser-test-evidence/harmoniarr-browser-test.json
+          HARMONIARR_BROWSER_TEST_EVIDENCE_SUMMARY_PATH: ${{ github.step_summary }}
+      - name: Upload browser isolation evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: harmoniarr-browser-isolation-evidence
+          path: browser-test-evidence/harmoniarr-browser-test.json
+          if-no-files-found: warn
+          retention-days: 14

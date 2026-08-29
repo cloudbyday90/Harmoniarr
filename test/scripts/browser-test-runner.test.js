@@ -38,7 +38,7 @@ suite('browser test runner', () => {
     ]);
   });
 
-  test('runs the Node test child with inherited output and returns resolved concurrency', async () => {
+  test('runs the Node test child with inherited output and returns resolved concurrency and duration', async () => {
     const child = new EventEmitter();
     let nodeArguments = null;
     let nodePath = null;
@@ -46,6 +46,7 @@ suite('browser test runner', () => {
     const pending = runBrowserTests({
       args: ['--concurrency=1'],
       cwd: 'workspace-root',
+      now: () => 100,
       nodePath: 'node-under-test',
       spawnChild(receivedNodePath, receivedNodeArguments, receivedOptions) {
         nodePath = receivedNodePath;
@@ -57,7 +58,7 @@ suite('browser test runner', () => {
 
     child.emit('exit', 0, null);
 
-    assert.deepEqual(await pending, { concurrency: 1 });
+    assert.deepEqual(await pending, { concurrency: 1, durationMs: 0 });
     assert.equal(nodePath, 'node-under-test');
     assert.deepEqual(nodeArguments, buildBrowserTestNodeArguments(1));
     assert.deepEqual(options, {
@@ -78,5 +79,116 @@ suite('browser test runner', () => {
     child.emit('exit', 1, null);
 
     await assert.rejects(pending, /Browser tests exited with code 1/);
+  });
+
+  test('records bounded evidence after an isolated browser run without exposing child output', async () => {
+    const child = new EventEmitter();
+    const evidenceWrites = [];
+    let cleanupInput = null;
+    let clock = 0;
+    const pending = runBrowserTests({
+      env: {
+        HARMONIARR_BROWSER_TEST_CLEANUP_WAIT_MS: '25000',
+        HARMONIARR_BROWSER_TEST_EVIDENCE_PATH: 'artifacts/browser-test.json',
+      },
+      now: () => {
+        clock += 42;
+        return clock;
+      },
+      spawnChild() {
+        return child;
+      },
+      waitForCleanup: async (input) => {
+        cleanupInput = input;
+        return {
+          attempts: 1,
+          browserTestProcessCount: 0,
+          maxWaitMs: 25_000,
+          status: 'clean',
+          testcontainerCount: 0,
+        };
+      },
+      writeEvidence: async (input) => {
+        evidenceWrites.push(input);
+      },
+    });
+
+    child.emit('exit', 0, null);
+
+    assert.deepEqual(await pending, { concurrency: 2, durationMs: 42 });
+    assert.deepEqual(cleanupInput, {
+      cwd: process.cwd(),
+      maxWaitMs: 25_000,
+    });
+    assert.deepEqual(evidenceWrites, [{
+      browserTest: {
+        durationMs: 42,
+        status: 'passed',
+        workerCount: 2,
+      },
+      cleanup: {
+        attempts: 1,
+        browserTestProcessCount: 0,
+        maxWaitMs: 25_000,
+        status: 'clean',
+        testcontainerCount: 0,
+      },
+      cwd: process.cwd(),
+      evidencePath: 'artifacts/browser-test.json',
+    }]);
+  });
+
+  test('preserves a test failure after collecting evidence', async () => {
+    const child = new EventEmitter();
+    let evidenceStatus = null;
+    const pending = runBrowserTests({
+      env: {
+        HARMONIARR_BROWSER_TEST_EVIDENCE_PATH: 'artifacts/browser-test.json',
+      },
+      spawnChild() {
+        return child;
+      },
+      waitForCleanup: async () => ({
+        attempts: 1,
+        browserTestProcessCount: 0,
+        maxWaitMs: 25_000,
+        status: 'clean',
+        testcontainerCount: 0,
+      }),
+      writeEvidence: async ({ browserTest }) => {
+        evidenceStatus = browserTest.status;
+      },
+    });
+
+    child.emit('exit', 1, null);
+
+    await assert.rejects(pending, /Browser tests exited with code 1/u);
+    assert.equal(evidenceStatus, 'failed');
+  });
+
+  test('preserves a test failure when writing evidence also fails', async () => {
+    const child = new EventEmitter();
+    const pending = runBrowserTests({
+      env: {
+        HARMONIARR_BROWSER_TEST_EVIDENCE_PATH: 'artifacts/browser-test.json',
+      },
+      spawnChild() {
+        return child;
+      },
+      waitForCleanup: async () => ({
+        attempts: 1,
+        browserTestProcessCount: 0,
+        maxWaitMs: 25_000,
+        status: 'clean',
+        testcontainerCount: 0,
+      }),
+      writeEvidence: async () => {
+        throw new Error('evidence write failed');
+      },
+    });
+
+    child.emit('exit', 1, null);
+
+    await assert.rejects(pending, /Browser tests exited with code 1/u);
   });
 });
