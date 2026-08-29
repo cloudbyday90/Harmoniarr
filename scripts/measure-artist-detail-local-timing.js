@@ -21,10 +21,14 @@ import { dirname } from 'node:path';
 import { chromium } from 'playwright';
 
 import {
-  assertArtistDetailLocalTimingEvidenceContract,
   createArtistDetailLocalTimingEvidence,
   createArtistDetailTimingRequest,
 } from './artist-detail-local-timing-evidence.js';
+import {
+  assertArtistDetailLocalTimingArtifactContract,
+  createArtistDetailLocalTimingBatchEvidence,
+  maximumArtistDetailTimingBatchSamples,
+} from './artist-detail-local-timing-batch-evidence.js';
 import { resolveBrowserTestEvidencePath } from './browser-test-evidence.js';
 import { getRequiredSecretFileInput } from './secret-input.js';
 import {
@@ -40,6 +44,7 @@ export const artistDetailTimingPasswordFileEnvVar = 'HARMONIARR_ARTIST_DETAIL_TI
 export const artistDetailTimingEvidencePathEnvVar = 'HARMONIARR_ARTIST_DETAIL_TIMING_EVIDENCE_PATH';
 export const artistDetailTimingTransitionWaitMs = 2_000;
 export const defaultArtistDetailTimingTimeoutMs = 30_000;
+export const defaultArtistDetailTimingRuns = 1;
 
 export const artistDetailTimingCliOptions = Object.freeze({
   'artist-mbid': { type: 'string' },
@@ -47,6 +52,7 @@ export const artistDetailTimingCliOptions = Object.freeze({
   'evidence-path': { type: 'string' },
   headless: { type: 'boolean' },
   'password-file': { type: 'string' },
+  runs: { type: 'string' },
   'timeout-ms': { type: 'string' },
   username: { type: 'string' },
 });
@@ -54,14 +60,17 @@ export const artistDetailTimingCliOptions = Object.freeze({
 const loopbackHostnames = new Set(['127.0.0.1', '::1', 'localhost']);
 const musicBrainzArtistIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 
-function parsePositiveInteger(value, fieldName, defaultValue) {
+function parsePositiveInteger(value, fieldName, defaultValue, maximum) {
   if (value == null || String(value).trim() === '') {
     return defaultValue;
   }
 
   const parsed = Number.parseInt(String(value), 10);
-  if (!Number.isSafeInteger(parsed) || parsed < 1) {
-    throw new Error(`${fieldName} must be a positive integer`);
+  if (!Number.isSafeInteger(parsed) || parsed < 1 || (maximum != null && parsed > maximum)) {
+    const constraint = maximum == null
+      ? 'a positive integer'
+      : `a positive integer no greater than ${maximum}`;
+    throw new Error(`${fieldName} must be ${constraint}`);
   }
 
   return parsed;
@@ -384,6 +393,30 @@ export async function measureArtistDetailLocalTiming({
   }
 }
 
+/**
+ * Repeats the same read-only local Artist Detail visit sequentially. Every
+ * visit starts a separate browser context, which avoids carrying browser
+ * session-cache state from one timing sample to the next.
+ */
+export async function measureArtistDetailLocalTimingRuns({
+  measureTimingFn = measureArtistDetailLocalTiming,
+  runs = defaultArtistDetailTimingRuns,
+  ...inputs
+} = {}) {
+  if (!Number.isSafeInteger(runs) || runs < 1 || runs > maximumArtistDetailTimingBatchSamples) {
+    throw new Error(`runs must be a positive integer no greater than ${maximumArtistDetailTimingBatchSamples}`);
+  }
+
+  const samples = [];
+  for (let index = 0; index < runs; index += 1) {
+    samples.push(await measureTimingFn(inputs));
+  }
+
+  return runs === 1
+    ? samples[0]
+    : createArtistDetailLocalTimingBatchEvidence({ samples });
+}
+
 export async function writeArtistDetailLocalTimingEvidence({
   cwd = process.cwd(),
   evidence,
@@ -392,7 +425,7 @@ export async function writeArtistDetailLocalTimingEvidence({
   writeFileFn = writeFile,
 } = {}) {
   const resolvedEvidencePath = resolveBrowserTestEvidencePath(evidencePath, { cwd });
-  const validatedEvidence = assertArtistDetailLocalTimingEvidenceContract(evidence);
+  const validatedEvidence = assertArtistDetailLocalTimingArtifactContract(evidence);
   await mkdirFn(dirname(resolvedEvidencePath), { recursive: true });
   await writeFileFn(resolvedEvidencePath, `${JSON.stringify(validatedEvidence, null, 2)}\n`, 'utf8');
   return resolvedEvidencePath;
@@ -431,6 +464,12 @@ export async function resolveArtistDetailTimingInputs({
       'timeout-ms',
       defaultArtistDetailTimingTimeoutMs,
     ),
+    runs: parsePositiveInteger(
+      values.runs ?? env.HARMONIARR_ARTIST_DETAIL_TIMING_RUNS,
+      'runs',
+      defaultArtistDetailTimingRuns,
+      maximumArtistDetailTimingBatchSamples,
+    ),
     username: getRequiredStringInput(values, 'username', 'HARMONIARR_ARTIST_DETAIL_TIMING_USERNAME', env),
   };
 }
@@ -440,7 +479,7 @@ export async function runArtistDetailTimingFromEnvironment(env = process.env, {
   cwd = process.cwd(),
 } = {}) {
   const inputs = await resolveArtistDetailTimingInputs({ args, env });
-  const evidence = await measureArtistDetailLocalTiming(inputs);
+  const evidence = await measureArtistDetailLocalTimingRuns(inputs);
 
   if (inputs.evidencePath) {
     await writeArtistDetailLocalTimingEvidence({

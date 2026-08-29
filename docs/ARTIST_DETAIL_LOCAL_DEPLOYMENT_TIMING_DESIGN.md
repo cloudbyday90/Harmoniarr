@@ -162,9 +162,11 @@ None safely applies to this change, so no PR was copied or merged locally:
 4. Keep user projections, requests, and history scoped to their owner. Do not
    shorten the chain by sharing private operator state across users.
 
-## Next item
+## Follow-up measurement
 
-Run one bounded capture for a reproducibly slow local Artist Detail load. Use
-the outcome and the dominant request category to choose a single targeted
-database, projection, or provider-cache regression—rather than changing
-orchestration pre-emptively.
+[Artist Detail Local Deployment Timing Batch Design](ARTIST_DETAIL_LOCAL_DEPLOYMENT_TIMING_BATCH_DESIGN.md)
+extends this one-shot command with a bounded three-sample comparison workflow.
+Use it for a reproducibly slow local Artist Detail load, then choose one
+targeted database, projection, or provider-cache regression from the repeated
+outcome and dominant request category—rather than changing orchestration
+pre-emptively.

@@ -22,6 +22,7 @@ import test from 'node:test';
 import { createArtistDetailLocalTimingEvidence } from '../../scripts/artist-detail-local-timing-evidence.js';
 import {
   createArtistDetailTimingObserver,
+  measureArtistDetailLocalTimingRuns,
   normalizeLoopbackBaseUrl,
   normalizeArtistDetailRequestTiming,
   resolveArtistDetailTimingInputs,
@@ -63,6 +64,7 @@ test('local Artist Detail timing inputs require a loopback deployment and a file
       '--base-url', 'http://localhost:47956',
       '--no-headless',
       '--password-file', 'C:/secrets/harmoniarr-password',
+      '--runs', '3',
       '--username', 'local-admin',
     ],
     readFileFn: async (path, encoding) => {
@@ -78,6 +80,7 @@ test('local Artist Detail timing inputs require a loopback deployment and a file
     evidencePath: null,
     headless: false,
     password: 'local-password',
+    runs: 3,
     timeoutMs: 30_000,
     username: 'local-admin',
   });
@@ -93,6 +96,75 @@ test('local Artist Detail timing inputs require a loopback deployment and a file
       readFileFn: async () => 'local-password',
     }),
     /base-url must be a loopback HTTP URL/u,
+  );
+  await assert.rejects(
+    resolveArtistDetailTimingInputs({
+      args: [
+        '--artist-mbid', artistMbid,
+        '--password-file', 'C:/secrets/harmoniarr-password',
+        '--runs', '6',
+        '--username', 'local-admin',
+      ],
+      readFileFn: async () => 'local-password',
+    }),
+    /runs must be a positive integer no greater than 5/u,
+  );
+});
+
+test('local Artist Detail timing runs create bounded summary evidence without sharing a browser session', async () => {
+  const measurements = [
+    createArtistDetailLocalTimingEvidence({
+      capturedAt: '2026-08-29T12:00:00.000Z',
+      outcome: 'local_projection',
+      requests: [
+        {
+          endpoint: 'local_metadata',
+          statusFamily: '2xx',
+          timing: { clientRequestDurationMs: 10, responseEndMs: 10, startTimeMs: 0 },
+        },
+        {
+          endpoint: 'operator_projection',
+          statusFamily: '2xx',
+          timing: { clientRequestDurationMs: 20, responseEndMs: 30, startTimeMs: 10 },
+        },
+      ],
+    }),
+    createArtistDetailLocalTimingEvidence({
+      capturedAt: '2026-08-29T12:01:00.000Z',
+      outcome: 'local_projection',
+      requests: [
+        {
+          endpoint: 'local_metadata',
+          statusFamily: '2xx',
+          timing: { clientRequestDurationMs: 30, responseEndMs: 30, startTimeMs: 0 },
+        },
+        {
+          endpoint: 'operator_projection',
+          statusFamily: '2xx',
+          timing: { clientRequestDurationMs: 40, responseEndMs: 70, startTimeMs: 30 },
+        },
+      ],
+    }),
+  ];
+  const receivedInputs = [];
+
+  const evidence = await measureArtistDetailLocalTimingRuns({
+    artistMbid,
+    measureTimingFn: async (inputs) => {
+      receivedInputs.push(inputs);
+      return measurements.shift();
+    },
+    runs: 2,
+  });
+
+  assert.equal(receivedInputs.length, 2);
+  assert.equal(evidence.artifactType, 'artist_detail_local_timing_batch');
+  assert.equal(evidence.sampleCount, 2);
+  assert.equal(evidence.outcomeIsConsistent, true);
+  assert.equal(JSON.stringify(evidence).includes(artistMbid), false);
+  await assert.rejects(
+    measureArtistDetailLocalTimingRuns({ runs: 6 }),
+    /no greater than 5/u,
   );
 });
 
