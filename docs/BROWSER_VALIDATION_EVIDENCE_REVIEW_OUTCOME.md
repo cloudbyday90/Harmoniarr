@@ -107,9 +107,15 @@ for the scoped decision, security boundary, and next validation step.
 
 The corrected [Browser Validation run 33251108741](https://github.com/cloudbyday90/Harmoniarr/actions/runs/33251108741)
 passed all 89 browser tests with the retained two-worker policy. Collect a new
-serial set of ten `workflow_dispatch` artifacts from unchanged commit
-`3d432b7`; do not raise browser worker count until that report is
+serial set of ten `workflow_dispatch` artifacts from the unchanged collector
+implementation commit; do not raise browser worker count until that report is
 `baseline_confirmed`.
+
+The follow-up now has a local serial collector and a schema-version-2 review
+contract that retains a selected terminal run even when its bounded artifact is
+unavailable. The production collection must begin from the collector's own
+unchanged implementation commit; see [Browser Validation Serial Collection
+Outcome](BROWSER_VALIDATION_SERIAL_COLLECTION_OUTCOME.md).
 
 ## Related design
 

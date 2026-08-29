@@ -108,6 +108,39 @@ test('browser evidence review keeps an incomplete sample distinct from a failed 
   }]);
 });
 
+test('browser evidence review retains terminal cancellation metadata when its bounded artifact is unavailable', () => {
+  const samples = createSamples();
+  samples[3] = {
+    ...samples[3],
+    evidence: null,
+    workflowRun: {
+      ...samples[3].workflowRun,
+      conclusion: 'cancelled',
+    },
+  };
+
+  const review = createBrowserTestEvidenceReview({ samples });
+  const summary = renderBrowserTestEvidenceReviewSummary(review);
+
+  assert.equal(review.status, 'review_required');
+  assert.deepEqual(review.findings, [
+    { code: 'browser_test_evidence_unavailable', runIds: [80_003] },
+  ]);
+  assert.equal(review.samples[3].browserTest, null);
+  assert.equal(review.samples[3].cleanup, null);
+  assert.match(summary, /Browser-test evidence was unavailable for run IDs: 80003\./u);
+});
+
+test('browser evidence review continues to read version-one manifests with complete evidence', () => {
+  const review = createBrowserTestEvidenceReview({
+    schemaVersion: 1,
+    samples: createSamples(),
+  });
+
+  assert.equal(review.status, 'baseline_confirmed');
+  assert.equal(review.schemaVersion, 2);
+});
+
 test('browser evidence review reports cleanup and worker-count drift without retaining raw runtime details', () => {
   const samples = createSamples();
   samples[2] = {
@@ -218,6 +251,25 @@ test('browser evidence review rejects malformed, duplicate, and untrusted manife
       }],
     }),
     /workflowRun.event must equal/u,
+  );
+  assert.throws(
+    () => createBrowserTestEvidenceReview({
+      schemaVersion: 1,
+      samples: [{
+        ...createSamples(1)[0],
+        evidence: null,
+      }],
+    }),
+    /browser test evidence must be an object/u,
+  );
+  assert.throws(
+    () => createBrowserTestEvidenceReview({
+      samples: [{
+        ...createSamples(1)[0],
+        workflowRun: { ...createSamples(1)[0].workflowRun, conclusion: 'queued' },
+      }],
+    }),
+    /supported terminal GitHub Actions conclusion/u,
   );
 });
 

@@ -1,6 +1,6 @@
 # Browser Validation Evidence Review — Design
 
-**Status:** Implemented; sample-integrity hardening applied
+**Status:** Implemented; sample-integrity and terminal-evidence hardening applied
 **Date:** 2026-08-29
 
 ## Purpose and scope
@@ -33,7 +33,7 @@ cross-workflow execution path.
 
 ## Design
 
-The implementation consists of three small ESM files:
+The implementation consists of small ESM files:
 
 - `scripts/browser-test-evidence-review.js` owns the strict manifest contract,
   review calculation, and JSON report persistence.
@@ -41,6 +41,9 @@ The implementation consists of three small ESM files:
 - `test/scripts/browser-test-evidence-review.test.js` covers valid and invalid
   manifests, review outcomes, descriptive duration statistics, safe paths, and
   console-summary wording.
+- `scripts/browser-validation-sample-collection.js` and its thin CLI provide
+  the separately documented local serial collector. The review command itself
+  still does not call GitHub or download artifacts.
 
 The CLI reads these environment variables:
 
@@ -55,11 +58,14 @@ accepts paths outside the checkout.
 
 ### Manifest and report contract
 
-The input manifest has schema version 1 and an allow-listed array of samples:
+The current input manifest has schema version 2 and an allow-listed array of
+samples. Version 1 remains valid for the retained historic evidence; version 2
+can use `"evidence": null` only when the selected terminal run's named
+artifact is unavailable.
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "samples": [
     {
       "runId": 33246937282,
@@ -103,9 +109,9 @@ review result:
   `workflow_dispatch` commit; each run began after the preceding one completed,
   every browser test passed, cleanup was clean, and worker count was two.
 - `incomplete` — fewer than ten samples and no other discrepancy.
-- `review_required` — a failed test, non-clean cleanup, worker-count change,
-  changed source commit, overlapping workflow runs, unexpected workflow source,
-  or more than ten samples was supplied.
+- `review_required` — a failed test, unavailable evidence, non-clean cleanup,
+  worker-count change, changed source commit, overlapping workflow runs,
+  unexpected workflow source, or more than ten samples was supplied.
 
 The statistics are descriptive only. There is intentionally no duration
 threshold: hosted-runner timing varies, whereas a non-clean teardown or altered
@@ -118,11 +124,14 @@ worker count is immediately actionable.
 2. On `main`, dispatch one workflow run and wait for it to complete before
    dispatching the next. Collect ten runs from the same commit with no
    browser-test configuration change between the first and final run. Do not
-   omit a failed, cancelled, or non-clean result from the selected set.
+   omit a failed, cancelled, or non-clean result from the selected set. If the
+   selected run has no usable evidence artifact, retain its terminal metadata
+   with `evidence: null`, stop, and report it as review-required.
 3. For each completed run, download only the
    `harmoniarr-browser-isolation-evidence` artifact before its 14-day retention
-   period expires. If an artifact is unavailable, stop and mark the review
-   incomplete; do not substitute an older run.
+   period expires. If an artifact is unavailable, retain the selected terminal
+   run with `evidence: null`, stop, and mark the review as requiring follow-up;
+   do not substitute an older run.
 4. Copy each JSON evidence file into one manifest with its GitHub run ID and
    allow-listed workflow metadata. The review command verifies that the source
    commit is consistent and that runs did not overlap.
@@ -140,8 +149,8 @@ test variable.
 - Browser evidence remains anonymous operational data. The review does not
   collect account, requester, administrator, session, release, provider, or
   library information.
-- Artifact acquisition uses GitHub's normal UI or a caller-managed read-only
-  token; Harmoniarr stores no GitHub token and grants no new workflow
+- Artifact acquisition and manual dispatch use the caller's normal GitHub
+  authentication; Harmoniarr stores no GitHub token and grants no new workflow
   permissions.
 - Strict JSON parsing, exact field allow-lists, numeric run identifiers, and
   workspace-relative paths keep malformed input from becoming shell code,
@@ -157,7 +166,7 @@ test variable.
 | Inspect job summaries manually | No code | Error-prone, not reproducible, weak audit trail | Rejected |
 | Collect artifacts in a `workflow_run` workflow | Automated history | Broader privilege and unsafe artifact boundary | Rejected |
 | Store raw logs and system details | More diagnostics | Retains unnecessary environment data | Rejected |
-| Local strict-manifest review with source and serial-execution checks | Repeatable, bounded data, no new CI privilege, rejects an uncontrolled batch | Operator downloads ten small artifacts and waits for completion | **Adopted** |
+| Local serial collector plus strict-manifest review | Repeatable, bounded data, no new CI privilege, retains selected terminal outcomes | Caller must authorize workflow dispatch and wait for completion | **Adopted** |
 | Raise worker count now | Potential faster runs | No stability baseline | Deferred |
 
 ## Recommendation stack
@@ -173,6 +182,8 @@ test variable.
 5. **Continue W3C-guided human accessibility evaluation** for representative
    requester and administrator flows; this operational review does not replace
    it.
+
+See [Browser Validation Serial Collection Design](BROWSER_VALIDATION_SERIAL_COLLECTION_DESIGN.md) for the collector's command, source-SHA, temporary-artifact, and concurrency safeguards.
 
 ## Official sources checked 2026-08-29
 

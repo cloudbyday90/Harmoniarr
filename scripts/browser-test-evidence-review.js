@@ -17,7 +17,19 @@ import {
 export const browserTestEvidenceReviewInputPathEnvVar = 'HARMONIARR_BROWSER_TEST_EVIDENCE_REVIEW_INPUT_PATH';
 export const browserTestEvidenceReviewOutputPathEnvVar = 'HARMONIARR_BROWSER_TEST_EVIDENCE_REVIEW_OUTPUT_PATH';
 export const browserTestEvidenceReviewRequiredSampleCount = 10;
-export const browserTestEvidenceReviewSchemaVersion = 1;
+export const browserTestEvidenceReviewSchemaVersion = 2;
+
+const supportedBrowserTestEvidenceReviewSchemaVersions = new Set([1, browserTestEvidenceReviewSchemaVersion]);
+const terminalWorkflowConclusions = new Set([
+  'action_required',
+  'cancelled',
+  'failure',
+  'neutral',
+  'skipped',
+  'stale',
+  'success',
+  'timed_out',
+]);
 
 function assertObject(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -65,8 +77,8 @@ function assertWorkflowRun(workflowRun, label) {
     throw new Error(`${label}.completedAt must not precede ${label}.startedAt`);
   }
 
-  if (workflowRun.conclusion !== 'failure' && workflowRun.conclusion !== 'success') {
-    throw new Error(`${label}.conclusion must be either "failure" or "success"`);
+  if (!terminalWorkflowConclusions.has(workflowRun.conclusion)) {
+    throw new Error(`${label}.conclusion must be a supported terminal GitHub Actions conclusion`);
   }
 
   if (workflowRun.event !== 'workflow_dispatch') {
@@ -101,7 +113,9 @@ function getMedian(values) {
 }
 
 function summarizeDurations(samples) {
-  const durations = samples.map(({ evidence }) => evidence.browserTest.durationMs);
+  const durations = samples
+    .filter(({ evidence }) => evidence !== null)
+    .map(({ evidence }) => evidence.browserTest.durationMs);
 
   if (durations.length === 0) {
     return null;
@@ -168,26 +182,34 @@ function createFindings(samples) {
     });
   }
 
+  const evidenceUnavailableRunIds = collectRunIds(samples, ({ evidence }) => evidence === null);
+  if (evidenceUnavailableRunIds.length > 0) {
+    findings.push({ code: 'browser_test_evidence_unavailable', runIds: evidenceUnavailableRunIds });
+  }
+
   const workflowResultMismatchRunIds = collectRunIds(samples, ({ evidence, workflowRun }) => {
-    return evidence.browserTest.status === 'passed'
-      ? workflowRun.conclusion !== 'success'
-      : workflowRun.conclusion !== 'failure';
+    if (evidence === null) {
+      return false;
+    }
+
+    return (evidence.browserTest.status === 'passed' && workflowRun.conclusion !== 'success')
+      || (evidence.browserTest.status === 'failed' && workflowRun.conclusion === 'success');
   });
   if (workflowResultMismatchRunIds.length > 0) {
     findings.push({ code: 'workflow_result_mismatch', runIds: workflowResultMismatchRunIds });
   }
 
-  const failedRunIds = collectRunIds(samples, ({ evidence }) => evidence.browserTest.status !== 'passed');
+  const failedRunIds = collectRunIds(samples, ({ evidence }) => evidence !== null && evidence.browserTest.status !== 'passed');
   if (failedRunIds.length > 0) {
     findings.push({ code: 'browser_test_failed', runIds: failedRunIds });
   }
 
-  const cleanupRunIds = collectRunIds(samples, ({ evidence }) => evidence.cleanup.status !== 'clean');
+  const cleanupRunIds = collectRunIds(samples, ({ evidence }) => evidence !== null && evidence.cleanup.status !== 'clean');
   if (cleanupRunIds.length > 0) {
     findings.push({ code: 'cleanup_not_clean', runIds: cleanupRunIds });
   }
 
-  const workerCountRunIds = collectRunIds(samples, ({ evidence }) => evidence.browserTest.workerCount !== 2);
+  const workerCountRunIds = collectRunIds(samples, ({ evidence }) => evidence !== null && evidence.browserTest.workerCount !== 2);
   if (workerCountRunIds.length > 0) {
     findings.push({ code: 'worker_count_changed', runIds: workerCountRunIds });
   }
@@ -205,10 +227,14 @@ function getReviewStatus(findings) {
     : 'review_required';
 }
 
-function createSample(sample, index, runIds) {
+function createSample(sample, index, runIds, schemaVersion) {
   const label = `browser test evidence review input.samples[${index}]`;
   assertOnlyAllowedFields(sample, new Set(['evidence', 'runId', 'workflowRun']), label);
   assertPositiveSafeInteger(sample.runId, `${label}.runId`);
+
+  if (!Object.hasOwn(sample, 'evidence')) {
+    throw new Error(`${label}.evidence is required`);
+  }
 
   if (runIds.has(sample.runId)) {
     throw new Error(`${label}.runId must be unique`);
@@ -217,7 +243,9 @@ function createSample(sample, index, runIds) {
   runIds.add(sample.runId);
 
   return {
-    evidence: assertBrowserTestEvidenceContract(sample.evidence),
+    evidence: sample.evidence === null && schemaVersion === browserTestEvidenceReviewSchemaVersion
+      ? null
+      : assertBrowserTestEvidenceContract(sample.evidence),
     runId: sample.runId,
     workflowRun: assertWorkflowRun(sample.workflowRun, `${label}.workflowRun`),
   };
@@ -225,17 +253,17 @@ function createSample(sample, index, runIds) {
 
 function summarizeSample({ evidence, runId, workflowRun }) {
   return {
-    browserTest: { ...evidence.browserTest },
-    cleanup: { ...evidence.cleanup },
-    generatedAt: evidence.generatedAt,
+    browserTest: evidence === null ? null : { ...evidence.browserTest },
+    cleanup: evidence === null ? null : { ...evidence.cleanup },
+    generatedAt: evidence === null ? null : evidence.generatedAt,
     runId,
     workflowRun,
   };
 }
 
 export function createBrowserTestEvidenceReviewInput({ samples, schemaVersion } = {}) {
-  if (schemaVersion !== browserTestEvidenceReviewSchemaVersion) {
-    throw new Error(`browser test evidence review input.schemaVersion must equal ${browserTestEvidenceReviewSchemaVersion}`);
+  if (!supportedBrowserTestEvidenceReviewSchemaVersions.has(schemaVersion)) {
+    throw new Error(`browser test evidence review input.schemaVersion must equal one of: ${[...supportedBrowserTestEvidenceReviewSchemaVersions].join(', ')}`);
   }
 
   if (!Array.isArray(samples)) {
@@ -245,7 +273,7 @@ export function createBrowserTestEvidenceReviewInput({ samples, schemaVersion } 
   const runIds = new Set();
 
   return {
-    samples: samples.map((sample, index) => createSample(sample, index, runIds)),
+    samples: samples.map((sample, index) => createSample(sample, index, runIds, schemaVersion)),
     schemaVersion: browserTestEvidenceReviewSchemaVersion,
   };
 }
@@ -338,6 +366,8 @@ function formatFinding(finding) {
       return `Source commit changed across the selected run IDs: ${finding.headShas.join(', ')}.`;
     case 'workflow_runs_overlapped':
       return `Workflow runs overlapped: ${finding.runIds.join(', ')}.`;
+    case 'browser_test_evidence_unavailable':
+      return `Browser-test evidence was unavailable for run IDs: ${finding.runIds.join(', ')}.`;
     case 'workflow_result_mismatch':
       return `Workflow and browser-test outcomes differ for run IDs: ${finding.runIds.join(', ')}.`;
     case 'browser_test_failed':
