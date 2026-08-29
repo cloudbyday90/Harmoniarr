@@ -84,6 +84,16 @@ This adds no GitHub workflow, workflow permission, token, raw log, or archive
 processing to Harmoniarr. Artifact download remains an operator-controlled,
 read-only action and the local review parses only its strict JSON schema.
 
+## Post-hardening remote confirmation
+
+[Browser Validation run 33248920107](https://github.com/cloudbyday90/Harmoniarr/actions/runs/33248920107)
+ran from the sample-integrity commit and failed in the browser suite while its
+setup, evidence summary, and artifact upload completed. Its bounded artifact
+again recorded two workers and clean teardown with zero remaining containers or
+browser-test processes. The failures were a 30-second Artist Detail heading
+wait and a requester Search heading wait, confirming that the next repair is a
+real page-readiness problem and not an artifact-collection or cleanup issue.
+
 ## Remaining operational step
 
 Investigate the browser page-readiness failures exposed by the retained trial.
