@@ -126,6 +126,7 @@
   },
   "allowScripts": {
     "cpu-features": false,
+    "fsevents": false,
     "protobufjs": false,
     "ssh2": false
   }

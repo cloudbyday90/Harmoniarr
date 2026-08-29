@@ -10,7 +10,7 @@ const requiredWorkflowFragments = [
   'permissions:\n  contents: read',
   'timeout-minutes: 20',
   'actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd',
-  'actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e',
+  'uses: ./.github/actions/setup-project-npm',
   'npx playwright install --with-deps chromium',
   'HARMONIARR_BROWSER_TEST_EVIDENCE_PATH: browser-test-evidence/harmoniarr-browser-test.json',
   'HARMONIARR_BROWSER_TEST_CLEANUP_WAIT_MS: 25000',
