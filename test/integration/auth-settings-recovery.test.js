@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { access } from 'node:fs/promises';
 import { after, before, suite, test } from 'node:test';
+import { relative } from 'node:path';
 import { operationRunRegistry } from '../../src/shared/operation-run-descriptors.js';
 import { createIntegrationAppRuntime } from '../../testing/integration/app-runtime.js';
 import { bootstrapAdminSession } from '../../testing/integration/auth-helpers.js';
@@ -337,7 +339,7 @@ suite('integration auth, settings, and recovery routes', () => {
       return;
     }
 
-    await integrationRuntime.runScenario(async ({ client, getPoolFn }) => {
+    await integrationRuntime.runScenario(async ({ backupsDir, client, getPoolFn }) => {
       await bootstrapAdminSession(client);
 
       const backedUpSettings = {
@@ -378,6 +380,17 @@ suite('integration auth, settings, and recovery routes', () => {
 
       assert.ok(backupArtifactId);
       assert.ok(expectedPayloadSha256);
+
+      const storedBackupResult = await getPoolFn().query(
+        'SELECT storage_path FROM backup_artifacts WHERE id = $1',
+        [backupArtifactId],
+      );
+      const storagePath = storedBackupResult.rows[0]?.storage_path;
+      const relativeStoragePath = relative(backupsDir, storagePath ?? '');
+
+      assert.ok(storagePath);
+      assert.equal(relativeStoragePath, backupCreateResponse.payload.backupArtifact.filename);
+      await access(storagePath);
 
       const backupListResponse = await listBackupExports(client, { limit: 5 });
       assert.equal(backupListResponse.response.status, 200);

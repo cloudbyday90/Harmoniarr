@@ -142,6 +142,7 @@ suite('browser operator workflow smoke coverage', () => {
       });
 
       await page.getByRole('button', { name: 'Create backup' }).click();
+      await page.getByText('Backup created. Review it in backup history below.').waitFor();
       await page.getByRole('button', { name: 'Review restore' }).click();
       await page.getByRole('button', { name: 'Show file actions' }).click();
       await page.getByRole('link', { name: 'Download backup' }).waitFor();

@@ -27,6 +27,7 @@ import {
   formatTimestamp,
 } from '../lib/backup-restore-presentation.js';
 import { buildSettingsRecoveryPosture } from '../lib/settings-recovery-presentation.js';
+import { buildRecoveryBackupCreateStatus } from '../lib/recovery-backup-create-presentation.js';
 import {
   describeLockImpact,
   formatDiagnosticTimestamp,
@@ -58,6 +59,7 @@ const {
   isDeleting,
   isLoading: isLoadingBackups,
   isLoadingPreview,
+  lastCreatedBackupArtifact,
   lastRestoreResult,
   lastRestoreRun,
   loadBackups,
@@ -112,6 +114,10 @@ const restoreRunTarget = computed(() => buildOperationRunLinkTarget({
   operationType: lastRestoreRun.value?.operationType,
   runId: lastRestoreRun.value?.id,
 }));
+const backupCreateStatus = computed(() => buildRecoveryBackupCreateStatus({
+  isCreating: isCreating.value,
+  lastCreatedBackupArtifact: lastCreatedBackupArtifact.value,
+}));
 
 function buildMergedRecoveryRouteQuery(nextState) {
   const query = { ...route.query };
@@ -139,7 +145,7 @@ async function handleCreateBackup() {
   const result = await createBackup();
   if (!result) return;
   isBackupHistoryOpen.value = true;
-  await replaceRecoveryRouteState({ backupArtifactId: selectedBackupId.value ?? '' });
+  await replaceRecoveryRouteState({ backupArtifactId: result.backupArtifact?.id ?? selectedBackupId.value ?? '' });
 }
 
 async function handleDeleteBackup() {
@@ -216,12 +222,13 @@ watch(hasActiveLocks, (nextHasActiveLocks) => {
           <button type="button" class="hx-btn" @click="refreshRecoveryStatus" :disabled="isLoadingBackups || isLoadingLocks">
             {{ isLoadingBackups || isLoadingLocks ? 'Refreshing...' : 'Refresh status' }}
           </button>
-          <button type="button" class="hx-btn" data-variant="primary" @click="handleCreateBackup" :disabled="isCreating">
+          <button type="button" class="hx-btn" data-variant="primary" aria-controls="recovery-backup-create-status settings-recovery-backup-history" @click="handleCreateBackup" :disabled="isCreating">
             {{ isCreating ? 'Creating...' : 'Create backup' }}
           </button>
         </div>
-        <p v-if="backupActionErrorMessage" class="recovery-workspace__error">{{ backupActionErrorMessage }}</p>
-        <p v-else-if="backupErrorMessage" class="recovery-workspace__error">{{ backupErrorMessage }}</p>
+        <p id="recovery-backup-create-status" class="recovery-workspace__create-status" role="status" aria-atomic="true" :data-state="backupCreateStatus.state">{{ backupCreateStatus.message }}</p>
+        <p v-if="backupActionErrorMessage" class="recovery-workspace__error" role="alert">{{ backupActionErrorMessage }}</p>
+        <p v-else-if="backupErrorMessage" class="recovery-workspace__error" role="alert">{{ backupErrorMessage }}</p>
       </div>
     </article>
 
@@ -417,6 +424,8 @@ watch(hasActiveLocks, (nextHasActiveLocks) => {
 <style scoped>
 .recovery-workspace { display: grid; gap: var(--hx-space-5); }
 .recovery-workspace__posture-message { color: var(--hx-text); margin: 0; }
+.recovery-workspace__create-status { color: var(--hx-text-muted); font-size: var(--hx-text-sm); margin: var(--hx-space-3) 0 0; min-height: 1.25rem; }
+.recovery-workspace__create-status[data-state="created"] { color: var(--hx-success); }
 .recovery-workspace__posture-checks { display: grid; gap: var(--hx-space-2); grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); margin: var(--hx-space-4) 0; }
 .recovery-workspace__posture-check { align-items: center; border: 1px solid var(--hx-border-subtle); border-radius: var(--hx-radius-sm); display: flex; font-size: var(--hx-text-sm); gap: var(--hx-space-2); justify-content: space-between; padding: var(--hx-space-2) var(--hx-space-3); }
 .recovery-workspace__tasks { display: grid; gap: var(--hx-space-3); }

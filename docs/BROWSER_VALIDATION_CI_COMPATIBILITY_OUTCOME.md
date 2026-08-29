@@ -1,6 +1,6 @@
 # Browser Validation CI Compatibility — Outcome
 
-**Status:** Local validation complete; remote recovery-workflow investigation required
+**Status:** Local validation complete; recovery filesystem isolation repaired; remote confirmation pending
 **Date:** 2026-08-29
 
 ## Delivered result
@@ -34,11 +34,23 @@ setup, strict installation, evidence-summary publication, and evidence-artifact
 upload succeeded in both runs. This is not sufficient evidence to raise a
 timeout again or reduce worker count.
 
+## Recovery follow-up
+
+The investigation identified the missing isolation boundary: every scenario
+received a temporary database and workspace, but recovery backup creation
+silently fell back to the shared `/app/data/backups` production path. The test
+runtime now supplies a scenario-owned `HARMONIARR_BACKUPS` directory, and the
+real recovery route test verifies that the persisted artifact is inside it.
+
+The Settings recovery screen now gives a concise status while a backup is
+being made, confirms completion, and announces failures as alerts. This makes
+the action result clear without adding a retry, sleep, timeout increase, or
+path disclosure. The full design and local validation record are in
+[Recovery Browser Backup Isolation — Design](RECOVERY_BROWSER_BACKUP_ISOLATION_DESIGN.md)
+and [Recovery Browser Backup Isolation — Outcome](RECOVERY_BROWSER_BACKUP_ISOLATION_OUTCOME.md).
+
 ## Next recommended item
 
-Instrument the backup creation and inventory/readback path in the operator
-browser scenario so a Linux failure records the bounded UI error or the
-specific missing request/state transition. Repair that root cause, then obtain
-one green remote run before beginning the planned ten-run bounded evidence
-review. Do not change browser concurrency until that sample remains clean and
-its timing is reviewed.
+Obtain one green remote two-worker Browser Validation run. Only then begin the
+planned ten-run bounded evidence review; do not change worker count or action
+timeouts before that sample remains clean and its timing is reviewed.

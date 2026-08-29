@@ -49,6 +49,7 @@ export function useRecoveryBackups({
   const isDeleting = ref(false);
   const isLoading = ref(true);
   const isLoadingPreview = ref(false);
+  const lastCreatedBackupArtifact = ref(null);
   const lastRestoreResult = ref(null);
   const lastRestoreRun = ref(null);
   const selectionRequestGate = createLatestRequestGate();
@@ -141,9 +142,11 @@ export function useRecoveryBackups({
   async function createBackup() {
     isCreating.value = true;
     actionErrorMessage.value = '';
+    lastCreatedBackupArtifact.value = null;
 
     try {
       const result = await startBackupExport();
+      lastCreatedBackupArtifact.value = result.backupArtifact ?? null;
       await loadBackups({ preferredBackupArtifactId: result.backupArtifact?.id ?? null });
       return result;
     } catch (error) {
@@ -212,6 +215,7 @@ export function useRecoveryBackups({
     isDeleting,
     isLoading,
     isLoadingPreview,
+    lastCreatedBackupArtifact,
     lastRestoreResult,
     lastRestoreRun,
     loadBackups,

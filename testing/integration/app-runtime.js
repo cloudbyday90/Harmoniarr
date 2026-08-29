@@ -58,6 +58,19 @@ function buildTestPoolEnvironment(config) {
   };
 }
 
+/**
+ * Keeps every test-created backup under the same temporary workspace that
+ * already owns the scenario database and browser artifacts.
+ *
+ * @param {string} workspaceDir
+ * @returns {{ HARMONIARR_BACKUPS: string }}
+ */
+export function buildIntegrationBackupEnvironment(workspaceDir) {
+  return {
+    HARMONIARR_BACKUPS: join(workspaceDir, 'backups'),
+  };
+}
+
 async function createRuntimeWorkspace() {
   const workspaceDir = await mkdtemp(join(tmpdir(), 'harmoniarr-integration-'));
   const clientDistDir = join(workspaceDir, 'client');
@@ -131,6 +144,7 @@ export async function createIntegrationAppRuntime({
 
         return withEnvironmentVariables({
           HARMONIARR_CONTACT_EMAIL: 'integration-tests@example.invalid',
+          ...buildIntegrationBackupEnvironment(scenarioWorkspaceDir),
           ...buildTestPoolEnvironment(config),
           PGDATABASE: databaseConfig.database,
           PGHOST: databaseConfig.host,
@@ -162,6 +176,7 @@ export async function createIntegrationAppRuntime({
                 databaseName,
                 getPoolFn: getPool,
                 postgresSource: source,
+                backupsDir: join(scenarioWorkspaceDir, 'backups'),
                 workspaceDir: scenarioWorkspaceDir,
               }),
               {
@@ -205,6 +220,7 @@ export async function withIntegrationApp({
 
         return withEnvironmentVariables({
           HARMONIARR_CONTACT_EMAIL: 'integration-tests@example.invalid',
+          ...buildIntegrationBackupEnvironment(runtimeWorkspace.workspaceDir),
           ...buildTestPoolEnvironment(config),
           PGDATABASE: databaseConfig.database,
           PGHOST: databaseConfig.host,
@@ -235,6 +251,7 @@ export async function withIntegrationApp({
                 databaseName,
                 getPoolFn: getPool,
                 postgresSource: source,
+                backupsDir: join(runtimeWorkspace.workspaceDir, 'backups'),
                 workspaceDir: runtimeWorkspace.workspaceDir,
               }),
               {

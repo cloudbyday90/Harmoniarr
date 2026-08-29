@@ -118,8 +118,36 @@ test('useRecoveryBackups creates a backup and reloads the selected backup detail
   const result = await workflow.createBackup();
 
   assert.equal(result.accepted, true);
+  assert.equal(workflow.lastCreatedBackupArtifact.value.id, 'backup-new');
   assert.equal(workflow.selectedBackupId.value, 'backup-new');
   assert.equal(workflow.selectedBackupArtifact.value.filename, 'new-backup.json');
+});
+
+test('useRecoveryBackups clears the prior created backup when the next creation fails', async () => {
+  let createAttempt = 0;
+  const workflow = useRecoveryBackups({
+    fetchBackupExports: async () => ({ backupArtifacts: [] }),
+    startBackupExport: async () => {
+      createAttempt += 1;
+      if (createAttempt === 1) {
+        return {
+          accepted: true,
+          backupArtifact: { id: 'backup-new' },
+        };
+      }
+
+      throw new Error('Backup storage is unavailable');
+    },
+  });
+
+  await workflow.createBackup();
+  assert.equal(workflow.lastCreatedBackupArtifact.value.id, 'backup-new');
+
+  const result = await workflow.createBackup();
+
+  assert.equal(result, null);
+  assert.equal(workflow.lastCreatedBackupArtifact.value, null);
+  assert.equal(workflow.actionErrorMessage.value, 'Backup storage is unavailable');
 });
 
 test('useRecoveryBackups deletes the selected backup and selects the next available artifact', async () => {
