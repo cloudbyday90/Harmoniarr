@@ -18,7 +18,10 @@
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildArtistDetailCacheBrowserEvidence } from '../../testing/browser/artist-detail-cache-browser-evidence.js';
+import {
+  buildArtistDetailCacheBrowserEvidence,
+  buildArtistDetailRequestTimingEvidence,
+} from '../../testing/browser/artist-detail-cache-browser-evidence.js';
 
 function createResourceTiming({
   description = 'cold/foreground/fresh',
@@ -27,11 +30,13 @@ function createResourceTiming({
 } = {}) {
   return {
     durationMs,
+    responseEndMs: 31.5,
     serverTiming: [{
       description,
       durationMs: serverDurationMs,
       name: 'harmoniarr-cache',
     }],
+    startTimeMs: 11.7,
   };
 }
 
@@ -104,4 +109,41 @@ test('buildArtistDetailCacheBrowserEvidence rejects malformed or mismatched timi
       serverTiming: 'harmoniarr-cache;desc="fresh/none/fresh"',
     });
   }, /metric description does not match/u);
+});
+
+test('buildArtistDetailRequestTimingEvidence retains only allowlisted local request timing', () => {
+  const evidence = buildArtistDetailRequestTimingEvidence({
+    endpoint: 'operator_projection',
+    resourceTiming: createResourceTiming({ durationMs: 19.8 }),
+  });
+
+  assert.deepEqual(evidence, {
+    endpoint: 'operator_projection',
+    timing: {
+      clientRequestDurationMs: 20,
+      responseEndMs: 32,
+      startTimeMs: 12,
+    },
+  });
+  assert.equal(JSON.stringify(evidence).includes('http'), false);
+});
+
+test('buildArtistDetailRequestTimingEvidence rejects unknown endpoints and inverted timings', () => {
+  assert.throws(() => {
+    buildArtistDetailRequestTimingEvidence({
+      endpoint: 'discography',
+      resourceTiming: createResourceTiming(),
+    });
+  }, /request timing endpoint is invalid/u);
+
+  assert.throws(() => {
+    buildArtistDetailRequestTimingEvidence({
+      endpoint: 'local_metadata',
+      resourceTiming: {
+        ...createResourceTiming(),
+        responseEndMs: 11,
+        startTimeMs: 12,
+      },
+    });
+  }, /timing order is invalid/u);
 });

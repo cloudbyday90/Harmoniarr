@@ -9,6 +9,7 @@ export async function seedMetadataReleaseFixture({
   trackLengthMs = 322000,
   trackTitle = 'Foil',
 } = {}) {
+  const musicBrainzArtistId = randomUUID();
   const artistResult = await queryable.query(
     `
       INSERT INTO metadata_artists (
@@ -21,7 +22,7 @@ export async function seedMetadataReleaseFixture({
       VALUES ('musicbrainz', $1, $2, $3, $3)
       RETURNING id
     `,
-    [`artist-${randomUUID()}`, randomUUID(), artistName],
+    [`artist-${randomUUID()}`, musicBrainzArtistId, artistName],
   );
   const metadataArtistId = artistResult.rows[0].id;
 
@@ -120,5 +121,6 @@ export async function seedMetadataReleaseFixture({
     metadataReleaseGroupId,
     metadataReleaseId,
     metadataTrackId: trackResult.rows[0].id,
+    musicBrainzArtistId,
   };
 }

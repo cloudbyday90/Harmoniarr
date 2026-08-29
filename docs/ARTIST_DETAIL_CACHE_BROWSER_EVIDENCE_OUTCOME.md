@@ -71,7 +71,10 @@ authenticated API data.
 
 ## Next item
 
-No broad cache rearchitecture is warranted from this result. When a future
-home-hosted symptom is reproducible, capture its concrete endpoint and cache
-phase, add the smallest matching regression beside this proof, and only then
-consider a targeted cache-policy or provider-client change.
+The follow-up local-metadata and operator-projection proof is implemented in
+[Artist Detail Local and Operator Timing Design](ARTIST_DETAIL_LOCAL_OPERATOR_TIMING_DESIGN.md)
+and its accompanying outcome record. No broad cache rearchitecture is
+warranted from this result. When a future home-hosted symptom is reproducible,
+capture its concrete endpoint and cache phase, add the smallest matching
+regression beside this proof, and only then consider a targeted cache-policy
+or provider-client change.

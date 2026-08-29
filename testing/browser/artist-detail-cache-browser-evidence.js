@@ -17,6 +17,7 @@
  */
 
 const endpointValues = new Set(['discography', 'related_artists']);
+const requestTimingEndpointValues = new Set(['local_metadata', 'operator_projection']);
 const lookupValues = new Set(['cold', 'fresh', 'stale']);
 const phaseValues = new Set(['cold', 'fresh', 'stale']);
 const refreshValues = new Set(['background', 'foreground', 'none']);
@@ -35,6 +36,22 @@ function normalizeDuration(value, label) {
   }
 
   return Math.round(value);
+}
+
+function createClientTiming(resourceTiming) {
+  const clientRequestDurationMs = normalizeDuration(resourceTiming?.durationMs, 'client duration');
+  const responseEndMs = normalizeDuration(resourceTiming?.responseEndMs, 'response end');
+  const startTimeMs = normalizeDuration(resourceTiming?.startTimeMs, 'start time');
+
+  if (responseEndMs < startTimeMs) {
+    throw new Error('Artist Detail cache browser evidence timing order is invalid');
+  }
+
+  return Object.freeze({
+    clientRequestDurationMs,
+    responseEndMs,
+    startTimeMs,
+  });
 }
 
 function parseArtistDetailCacheServerTiming(serverTiming) {
@@ -89,7 +106,7 @@ export function buildArtistDetailCacheBrowserEvidence({
   assertAllowedValue(phase, phaseValues, 'phase');
 
   const cache = parseArtistDetailCacheServerTiming(serverTiming);
-  const clientRequestDurationMs = normalizeDuration(resourceTiming?.durationMs, 'client duration');
+  const clientTiming = createClientTiming(resourceTiming);
   const metric = findCacheServerTimingMetric(resourceTiming?.serverTiming);
 
   if (metric.description !== cache.description) {
@@ -110,8 +127,22 @@ export function buildArtistDetailCacheBrowserEvidence({
     endpoint,
     phase,
     timing: Object.freeze({
-      clientRequestDurationMs,
+      clientRequestDurationMs: clientTiming.clientRequestDurationMs,
       serverRefreshDurationMs: cache.serverRefreshDurationMs,
     }),
+  });
+}
+
+/**
+ * Builds a bounded timing artifact for the authenticated local-metadata and
+ * operator-projection legs that precede the provider-backed Discography path.
+ * Request URLs, identifiers, payloads, sessions, and headers are excluded.
+ */
+export function buildArtistDetailRequestTimingEvidence({ endpoint, resourceTiming }) {
+  assertAllowedValue(endpoint, requestTimingEndpointValues, 'request timing endpoint');
+
+  return Object.freeze({
+    endpoint,
+    timing: createClientTiming(resourceTiming),
   });
 }

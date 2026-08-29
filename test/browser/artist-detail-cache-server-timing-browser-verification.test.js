@@ -19,7 +19,10 @@
 import assert from 'node:assert/strict';
 import { after, before, suite, test } from 'node:test';
 import { isDeepStrictEqual } from 'node:util';
-import { buildArtistDetailCacheBrowserEvidence } from '../../testing/browser/artist-detail-cache-browser-evidence.js';
+import {
+  buildArtistDetailCacheBrowserEvidence,
+  buildArtistDetailRequestTimingEvidence,
+} from '../../testing/browser/artist-detail-cache-browser-evidence.js';
 import { createArtistDetailCacheBrowserEvidenceAppFactory } from '../../testing/browser/artist-detail-cache-browser-evidence-app.js';
 import {
   createBrowserSmokeRuntime,
@@ -29,6 +32,7 @@ import {
 import { bootstrapAdminThroughUi } from '../../testing/browser/operator-browser-helpers.js';
 import { artistDetailCacheSampleCatalog } from '../../testing/metadata/artist-detail-cache-sample-catalog.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
+import { seedMetadataReleaseFixture } from '../../testing/integration/metadata-fixtures.js';
 
 const integrationRuntimeConfig = resolveIntegrationTestRuntimeConfig();
 const expectedColdProviderCalls = Object.freeze({
@@ -57,12 +61,21 @@ let runtimeUnavailableReason = null;
 
 function getProviderEndpointPath(endpoint, artistId) {
   const encodedArtistId = encodeURIComponent(artistId);
-  return endpoint === 'discography'
-    ? `/api/v1/metadata/musicbrainz/artists/${encodedArtistId}/release-groups`
-    : `/api/v1/metadata/artists/${encodedArtistId}/similar`;
+  switch (endpoint) {
+    case 'discography':
+      return `/api/v1/metadata/musicbrainz/artists/${encodedArtistId}/release-groups`;
+    case 'related_artists':
+      return `/api/v1/metadata/artists/${encodedArtistId}/similar`;
+    case 'local_metadata':
+      return `/api/v1/metadata/musicbrainz/artists/${encodedArtistId}/local`;
+    case 'operator_projection':
+      return `/api/v1/metadata/artists/${encodedArtistId}/operator`;
+    default:
+      throw new Error('Artist Detail browser evidence endpoint is invalid');
+  }
 }
 
-function waitForProviderResponse(page, endpoint, artistId) {
+function waitForArtistDetailResponse(page, endpoint, artistId) {
   const path = getProviderEndpointPath(endpoint, artistId);
 
   return page.waitForResponse((response) => {
@@ -80,11 +93,13 @@ async function readResourceTiming(page, response) {
 
     return {
       durationMs: timing.duration,
+      responseEndMs: timing.responseEnd,
       serverTiming: timing.serverTiming.map((metric) => ({
         description: metric.description,
         durationMs: metric.duration,
         name: metric.name,
       })),
+      startTimeMs: timing.startTime,
     };
   }, response.url());
 }
@@ -96,8 +111,8 @@ function getServerTimingHeader(response) {
 }
 
 async function captureArtistDetailCachePhase({ baseUrl, page, phase, sample }) {
-  const discographyResponse = waitForProviderResponse(page, 'discography', sample.musicBrainzArtistId);
-  const relatedArtistsResponse = waitForProviderResponse(page, 'related_artists', sample.musicBrainzArtistId);
+  const discographyResponse = waitForArtistDetailResponse(page, 'discography', sample.musicBrainzArtistId);
+  const relatedArtistsResponse = waitForArtistDetailResponse(page, 'related_artists', sample.musicBrainzArtistId);
 
   await page.goto(`${baseUrl}/app/artists/${sample.musicBrainzArtistId}`, {
     waitUntil: 'domcontentloaded',
@@ -128,6 +143,46 @@ async function captureArtistDetailCachePhase({ baseUrl, page, phase, sample }) {
       phase,
       resourceTiming: relatedArtistsResourceTiming,
       serverTiming: getServerTimingHeader(relatedArtists),
+    }),
+  ];
+}
+
+async function captureLocalOperatorTimingEvidence({
+  baseUrl,
+  localArtistId,
+  musicBrainzArtistId,
+  page,
+  releaseTitle,
+}) {
+  const localMetadataResponse = waitForArtistDetailResponse(page, 'local_metadata', musicBrainzArtistId);
+  const operatorProjectionResponse = waitForArtistDetailResponse(page, 'operator_projection', localArtistId);
+
+  await page.goto(`${baseUrl}/app/artists/${musicBrainzArtistId}`, {
+    waitUntil: 'domcontentloaded',
+  });
+
+  const [localMetadata, operatorProjection] = await Promise.all([
+    localMetadataResponse,
+    operatorProjectionResponse,
+  ]);
+  assert.equal(localMetadata.status(), 200);
+  assert.equal(operatorProjection.status(), 200);
+  await page.getByRole('heading', { exact: true, name: 'Discography' }).waitFor();
+  await page.getByText(releaseTitle, { exact: true }).waitFor();
+
+  const [localMetadataResourceTiming, operatorProjectionResourceTiming] = await Promise.all([
+    readResourceTiming(page, localMetadata),
+    readResourceTiming(page, operatorProjection),
+  ]);
+
+  return [
+    buildArtistDetailRequestTimingEvidence({
+      endpoint: 'local_metadata',
+      resourceTiming: localMetadataResourceTiming,
+    }),
+    buildArtistDetailRequestTimingEvidence({
+      endpoint: 'operator_projection',
+      resourceTiming: operatorProjectionResourceTiming,
     }),
   ];
 }
@@ -170,6 +225,26 @@ function assertPhaseEvidence(evidence, phase) {
   }
 }
 
+function assertLocalOperatorTimingEvidence(evidence) {
+  assert.deepEqual(
+    evidence.map(({ endpoint }) => endpoint),
+    ['local_metadata', 'operator_projection'],
+  );
+
+  for (const entry of evidence) {
+    assert.equal(Number.isSafeInteger(entry.timing.clientRequestDurationMs), true);
+    assert.equal(Number.isSafeInteger(entry.timing.responseEndMs), true);
+    assert.equal(Number.isSafeInteger(entry.timing.startTimeMs), true);
+    assert.equal(entry.timing.clientRequestDurationMs >= 0, true);
+    assert.equal(entry.timing.responseEndMs >= entry.timing.startTimeMs, true);
+  }
+
+  assert.equal(
+    evidence[0].timing.responseEndMs <= evidence[1].timing.startTimeMs,
+    true,
+  );
+}
+
 suite('Artist Detail cache browser Server-Timing evidence', () => {
   before(async () => {
     try {
@@ -205,7 +280,7 @@ suite('Artist Detail cache browser Server-Timing evidence', () => {
     }
 
     const sample = artistDetailCacheSampleCatalog[0];
-    await browserRuntime.runScenario(async ({ baseUrl, page }) => {
+    await browserRuntime.runScenario(async ({ baseUrl, getPoolFn, page }) => {
       await bootstrapAdminThroughUi(page, { baseUrl });
 
       const cold = await captureArtistDetailCachePhase({ baseUrl, page, phase: 'cold', sample });
@@ -221,7 +296,22 @@ suite('Artist Detail cache browser Server-Timing evidence', () => {
       assertPhaseEvidence(stale, 'stale');
       await waitForProviderCalls(cacheEvidenceAppFactory.getProviderCalls, expectedStaleProviderCalls);
 
-      t.diagnostic(JSON.stringify({ cold, fresh, stale }));
+      const localArtist = await seedMetadataReleaseFixture({
+        artistName: 'Local timing artist',
+        queryable: getPoolFn(),
+        releaseTitle: 'Local operator timing release',
+      });
+      const localOperator = await captureLocalOperatorTimingEvidence({
+        baseUrl,
+        localArtistId: localArtist.metadataArtistId,
+        musicBrainzArtistId: localArtist.musicBrainzArtistId,
+        page,
+        releaseTitle: 'Local operator timing release',
+      });
+      assertLocalOperatorTimingEvidence(localOperator);
+      assert.equal(cacheEvidenceAppFactory.getProviderCalls().discography, expectedStaleProviderCalls.discography);
+
+      t.diagnostic(JSON.stringify({ cold, fresh, localOperator, stale }));
       await page.goto('about:blank', { waitUntil: 'load' });
     }, {
       scenarioName: 'artist_detail_cache_server_timing_evidence',
