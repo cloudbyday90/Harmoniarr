@@ -10,6 +10,7 @@ import { access } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { chromium } from 'playwright';
 import { createIntegrationAppRuntime } from '../integration/app-runtime.js';
+import { installBrowserSystemOverviewFixture } from './system-overview-browser-fixture.js';
 
 const defaultClientDistDir = resolve(import.meta.dirname, '../../dist/client');
 
@@ -84,6 +85,7 @@ export async function createBrowserSmokeRuntime({
         const browserContext = await browser.newContext({
           serviceWorkers: 'block',
         });
+        await installBrowserSystemOverviewFixture(browserContext);
         const page = await browserContext.newPage();
         page.setDefaultTimeout(getBrowserDefaultTimeoutMs(context.config));
 
