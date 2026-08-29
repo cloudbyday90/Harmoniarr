@@ -1,6 +1,6 @@
 # Browser Validation CI Compatibility — Outcome
 
-**Status:** Local validation complete; remote confirmation pending
+**Status:** Local validation complete; remote recovery-workflow investigation required
 **Date:** 2026-08-29
 
 ## Delivered result
@@ -26,11 +26,19 @@ retry is added.
 - Browser timeout resolution and integration runtime configuration unit tests
   passed.
 
-Remote confirmation will be recorded after the correction commit's Browser
-Validation run completes.
+Remote Browser Validation runs identified a real unresolved recovery-workflow
+problem under Linux two-worker concurrency. Run 3 timed out after 15 seconds
+and run 4 after the dedicated 30-second action budget while waiting for the
+semantic "Review restore" control; the control never appeared. Dependency
+setup, strict installation, evidence-summary publication, and evidence-artifact
+upload succeeded in both runs. This is not sufficient evidence to raise a
+timeout again or reduce worker count.
 
 ## Next recommended item
 
-Once the first remote browser run is green, begin the planned ten-run bounded
-evidence review. Do not change browser concurrency until that sample remains
-clean and its timing is reviewed.
+Instrument the backup creation and inventory/readback path in the operator
+browser scenario so a Linux failure records the bounded UI error or the
+specific missing request/state transition. Repair that root cause, then obtain
+one green remote run before beginning the planned ten-run bounded evidence
+review. Do not change browser concurrency until that sample remains clean and
+its timing is reviewed.
