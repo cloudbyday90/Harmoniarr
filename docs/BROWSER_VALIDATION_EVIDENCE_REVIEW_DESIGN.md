@@ -1,14 +1,15 @@
 # Browser Validation Evidence Review — Design
 
-**Status:** Approved for implementation
+**Status:** Implemented; sample-integrity hardening applied
 **Date:** 2026-08-29
 
 ## Purpose and scope
 
 Browser Validation already records a deliberately small artifact for each run:
 the browser-suite outcome, the fixed Node worker count, child-run duration, and
-cleanup result. This design adds a local, repeatable review of **ten consecutive
-Browser Validation runs** before any browser-capacity experiment.
+cleanup result. This design adds a local, repeatable review of **ten consecutive,
+non-overlapping Browser Validation runs from one commit** before any
+browser-capacity experiment.
 
 The review answers one operational question: did the established two-worker
 browser-validation configuration run cleanly across the selected sample? It is
@@ -62,6 +63,14 @@ The input manifest has schema version 1 and an allow-listed array of samples:
   "samples": [
     {
       "runId": 33246937282,
+      "workflowRun": {
+        "completedAt": "2026-08-29T12:05:00.000Z",
+        "conclusion": "success",
+        "event": "workflow_dispatch",
+        "headBranch": "main",
+        "headSha": "0123456789abcdef0123456789abcdef01234567",
+        "startedAt": "2026-08-29T12:00:00.000Z"
+      },
       "evidence": {
         "browserTest": { "durationMs": 300000, "status": "passed", "workerCount": 2 },
         "cleanup": {
@@ -79,19 +88,23 @@ The input manifest has schema version 1 and an allow-listed array of samples:
 }
 ```
 
-Each `runId` is a unique positive safe integer. Each `evidence` object must
-pass the pre-existing browser-evidence contract, so no user, request, log,
-path, URL, credential, container ID, or command line can enter either the
-manifest or the report.
+Each `runId` is a unique positive safe integer. Each sample also contains an
+allow-listed `workflowRun` record with its `startedAt`, `completedAt`,
+`headSha`, event, branch, and conclusion. Each `evidence` object must pass the
+pre-existing browser-evidence contract, so no user, request, log, path, URL,
+credential, container ID, or command line can enter either the manifest or the
+report.
 
 The report records the supplied count, an allow-listed per-run outcome,
 descriptive duration values (minimum, median, p95, and maximum), and the
 review result:
 
-- `baseline_confirmed` — exactly ten samples; every browser test passed,
-  cleanup was clean, and worker count was two.
+- `baseline_confirmed` — exactly ten samples from one `main`
+  `workflow_dispatch` commit; each run began after the preceding one completed,
+  every browser test passed, cleanup was clean, and worker count was two.
 - `incomplete` — fewer than ten samples and no other discrepancy.
 - `review_required` — a failed test, non-clean cleanup, worker-count change,
+  changed source commit, overlapping workflow runs, unexpected workflow source,
   or more than ten samples was supplied.
 
 The statistics are descriptive only. There is intentionally no duration
@@ -102,20 +115,25 @@ worker count is immediately actionable.
 
 1. Retain the existing `Browser Validation` workflow configuration: two Node
    workers, 25-second bounded cleanup inspection, and its current job ceiling.
-2. On `main`, dispatch the workflow ten times in sequence with no browser-test
-   configuration change between the first and final run. Do not omit a failed,
-   cancelled, or non-clean result from the selected set.
+2. On `main`, dispatch one workflow run and wait for it to complete before
+   dispatching the next. Collect ten runs from the same commit with no
+   browser-test configuration change between the first and final run. Do not
+   omit a failed, cancelled, or non-clean result from the selected set.
 3. For each completed run, download only the
    `harmoniarr-browser-isolation-evidence` artifact before its 14-day retention
    period expires. If an artifact is unavailable, stop and mark the review
    incomplete; do not substitute an older run.
-4. Copy each JSON evidence file into one manifest with its GitHub run ID.
+4. Copy each JSON evidence file into one manifest with its GitHub run ID and
+   allow-listed workflow metadata. The review command verifies that the source
+   commit is consistent and that runs did not overlap.
 5. Run `npm run review:browser-evidence`. Treat `baseline_confirmed` as the
    evidence result; otherwise inspect the named run IDs and retain the current
    two-worker limit.
 
 This is deliberately a structured, reproducible operational sample—not a
 random accessibility sample and not an attempt to discard unfavorable runs.
+Serial execution prevents competing hosted jobs from becoming an unrecorded
+test variable.
 
 ## Security and multi-user boundaries
 
@@ -139,15 +157,15 @@ random accessibility sample and not an attempt to discard unfavorable runs.
 | Inspect job summaries manually | No code | Error-prone, not reproducible, weak audit trail | Rejected |
 | Collect artifacts in a `workflow_run` workflow | Automated history | Broader privilege and unsafe artifact boundary | Rejected |
 | Store raw logs and system details | More diagnostics | Retains unnecessary environment data | Rejected |
-| Local strict-manifest review | Repeatable, bounded data, no new CI privilege | Operator downloads ten small artifacts | **Adopted** |
+| Local strict-manifest review with source and serial-execution checks | Repeatable, bounded data, no new CI privilege, rejects an uncontrolled batch | Operator downloads ten small artifacts and waits for completion | **Adopted** |
 | Raise worker count now | Potential faster runs | No stability baseline | Deferred |
 
 ## Recommendation stack
 
 1. **Adopt the local strict-manifest review** and retain only the existing
    bounded evidence fields.
-2. **Collect ten consecutive fixed-configuration runs**, recording every
-   selected outcome and its GitHub run ID.
+2. **Collect ten non-overlapping runs from one commit**, recording every
+   selected outcome, GitHub run ID, and bounded workflow metadata.
 3. **Treat cleanup or worker-count drift as a review failure**; inspect the
    relevant run rather than retrying or increasing timeouts blindly.
 4. **Keep timing descriptive** until a separately designed capacity experiment

@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "samples": [
+    {
+      "runId": 33248334591,
+      "workflowRun": {
+        "completedAt": "2026-08-29T10:44:34Z",
+        "conclusion": "failure",
+        "event": "workflow_dispatch",
+        "headBranch": "main",
+        "headSha": "4e4d9bb8cfeb544e398fdb2ab9743cc270857b42",
+        "startedAt": "2026-08-29T10:39:33Z"
+      },
+      "evidence": {
+        "browserTest": { "durationMs": 242516, "status": "failed", "workerCount": 2 },
+        "cleanup": { "attempts": 11, "browserTestProcessCount": 0, "maxWaitMs": 25000, "status": "clean", "testcontainerCount": 0 },
+        "generatedAt": "2026-08-29T10:44:30.017Z",
+        "schemaVersion": 1
+      }
+    },
+    {
+      "runId": 33248336240,
+      "workflowRun": {
+        "completedAt": "2026-08-29T10:46:15Z",
+        "conclusion": "failure",
+        "event": "workflow_dispatch",
+        "headBranch": "main",
+        "headSha": "4e4d9bb8cfeb544e398fdb2ab9743cc270857b42",
+        "startedAt": "2026-08-29T10:39:36Z"
+      },
+      "evidence": {
+        "browserTest": { "durationMs": 326534, "status": "failed", "workerCount": 2 },
+        "cleanup": { "attempts": 10, "browserTestProcessCount": 0, "maxWaitMs": 25000, "status": "clean", "testcontainerCount": 0 },
+        "generatedAt": "2026-08-29T10:46:10.276Z",
+        "schemaVersion": 1
+      }
+    },
+    {
+      "runId": 33248337940,
+      "workflowRun": {
+        "completedAt": "2026-08-29T10:45:41Z",
+        "conclusion": "failure",
+        "event": "workflow_dispatch",
+        "headBranch": "main",
+        "headSha": "4e4d9bb8cfeb544e398fdb2ab9743cc270857b42",
+        "startedAt": "2026-08-29T10:39:40Z"
+      },
+      "evidence": {
+        "browserTest": { "durationMs": 302877, "status": "failed", "workerCount": 2 },
+        "cleanup": { "attempts": 11, "browserTestProcessCount": 0, "maxWaitMs": 25000, "status": "clean", "testcontainerCount": 0 },
+        "generatedAt": "2026-08-29T10:45:36.795Z",
+        "schemaVersion": 1
+      }
+    },
+    {
+      "runId": 33248339588,
+      "workflowRun": {
+        "completedAt": "2026-08-29T10:46:23Z",
+        "conclusion": "failure",
+        "event": "workflow_dispatch",
+        "headBranch": "main",
+        "headSha": "4e4d9bb8cfeb544e398fdb2ab9743cc270857b42",
+        "startedAt": "2026-08-29T10:39:43Z"
+      },
+      "evidence": {
+        "browserTest": { "durationMs": 334295, "status": "failed", "workerCount": 2 },
+        "cleanup": { "attempts": 11, "browserTestProcessCount": 0, "maxWaitMs": 25000, "status": "clean", "testcontainerCount": 0 },
+        "generatedAt": "2026-08-29T10:46:17.680Z",
+        "schemaVersion": 1
+      }
+    },
+    {
+      "runId": 33248341674,
+      "workflowRun": {
+        "completedAt": "2026-08-29T10:45:33Z",
+        "conclusion": "failure",
+        "event": "workflow_dispatch",
+        "headBranch": "main",
+        "headSha": "4e4d9bb8cfeb544e398fdb2ab9743cc270857b42",
+        "startedAt": "2026-08-29T10:39:46Z"
+      },
+      "evidence": {
+        "browserTest": { "durationMs": 291624, "status": "failed", "workerCount": 2 },
+        "cleanup": { "attempts": 11, "browserTestProcessCount": 0, "maxWaitMs": 25000, "status": "clean", "testcontainerCount": 0 },
+        "generatedAt": "2026-08-29T10:45:30.561Z",
+        "schemaVersion": 1
+      }
+    },
+    {
+      "runId": 33248343915,
+      "workflowRun": {
+        "completedAt": "2026-08-29T10:45:34Z",
+        "conclusion": "failure",
+        "event": "workflow_dispatch",
+        "headBranch": "main",
+        "headSha": "4e4d9bb8cfeb544e398fdb2ab9743cc270857b42",
+        "startedAt": "2026-08-29T10:39:50Z"
+      },
+      "evidence": {
+        "browserTest": { "durationMs": 289603, "status": "failed", "workerCount": 2 },
+        "cleanup": { "attempts": 12, "browserTestProcessCount": 0, "maxWaitMs": 25000, "status": "clean", "testcontainerCount": 0 },
+        "generatedAt": "2026-08-29T10:45:31.861Z",
+        "schemaVersion": 1
+      }
+    },
+    {
+      "runId": 33248346028,
+      "workflowRun": {
+        "completedAt": "2026-08-29T10:45:15Z",
+        "conclusion": "failure",
+        "event": "workflow_dispatch",
+        "headBranch": "main",
+        "headSha": "4e4d9bb8cfeb544e398fdb2ab9743cc270857b42",
+        "startedAt": "2026-08-29T10:39:53Z"
+      },
+      "evidence": {
+        "browserTest": { "durationMs": 265977, "status": "failed", "workerCount": 2 },
+        "cleanup": { "attempts": 11, "browserTestProcessCount": 0, "maxWaitMs": 25000, "status": "clean", "testcontainerCount": 0 },
+        "generatedAt": "2026-08-29T10:45:12.262Z",
+        "schemaVersion": 1
+      }
+    },
+    {
+      "runId": 33248348491,
+      "workflowRun": {
+        "completedAt": "2026-08-29T10:46:39Z",
+        "conclusion": "failure",
+        "event": "workflow_dispatch",
+        "headBranch": "main",
+        "headSha": "4e4d9bb8cfeb544e398fdb2ab9743cc270857b42",
+        "startedAt": "2026-08-29T10:39:57Z"
+      },
+      "evidence": {
+        "browserTest": { "durationMs": 329178, "status": "failed", "workerCount": 2 },
+        "cleanup": { "attempts": 11, "browserTestProcessCount": 0, "maxWaitMs": 25000, "status": "clean", "testcontainerCount": 0 },
+        "generatedAt": "2026-08-29T10:46:33.421Z",
+        "schemaVersion": 1
+      }
+    },
+    {
+      "runId": 33248350703,
+      "workflowRun": {
+        "completedAt": "2026-08-29T10:46:31Z",
+        "conclusion": "failure",
+        "event": "workflow_dispatch",
+        "headBranch": "main",
+        "headSha": "4e4d9bb8cfeb544e398fdb2ab9743cc270857b42",
+        "startedAt": "2026-08-29T10:40:01Z"
+      },
+      "evidence": {
+        "browserTest": { "durationMs": 326846, "status": "failed", "workerCount": 2 },
+        "cleanup": { "attempts": 11, "browserTestProcessCount": 0, "maxWaitMs": 25000, "status": "clean", "testcontainerCount": 0 },
+        "generatedAt": "2026-08-29T10:46:25.306Z",
+        "schemaVersion": 1
+      }
+    }
+  ]
+}

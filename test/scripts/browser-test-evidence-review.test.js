@@ -51,6 +51,14 @@ function createSamples(count = browserTestEvidenceReviewRequiredSampleCount) {
   return Array.from({ length: count }, (_, index) => ({
     evidence: createEvidence({ durationMs: (index + 1) * 100_000 }),
     runId: 80_000 + index,
+    workflowRun: {
+      completedAt: `2026-08-29T13:${String(index * 2 + 1).padStart(2, '0')}:00.000Z`,
+      conclusion: 'success',
+      event: 'workflow_dispatch',
+      headBranch: 'main',
+      headSha: 'a'.repeat(40),
+      startedAt: `2026-08-29T13:${String(index * 2).padStart(2, '0')}:00.000Z`,
+    },
   }));
 }
 
@@ -79,7 +87,11 @@ test('browser evidence review keeps an incomplete sample distinct from a failed 
   const incomplete = createBrowserTestEvidenceReview({ samples: createSamples(2) });
   const reviewRequired = createBrowserTestEvidenceReview({
     samples: createSamples().map((sample, index) => index === 4
-      ? { ...sample, evidence: createEvidence({ status: 'failed' }) }
+      ? {
+          ...sample,
+          evidence: createEvidence({ status: 'failed' }),
+          workflowRun: { ...sample.workflowRun, conclusion: 'failure' },
+        }
       : sample),
   });
 
@@ -119,6 +131,65 @@ test('browser evidence review reports cleanup and worker-count drift without ret
   assert.doesNotMatch(JSON.stringify(review), /container id|command line|workspaceRoot/iu);
 });
 
+test('browser evidence review requires one source commit and non-overlapping workflow dispatches', () => {
+  const samples = createSamples();
+  samples[1] = {
+    ...samples[1],
+    workflowRun: {
+      ...samples[1].workflowRun,
+      headSha: 'b'.repeat(40),
+      startedAt: '2026-08-29T13:00:30.000Z',
+    },
+  };
+
+  const review = createBrowserTestEvidenceReview({ samples });
+  const summary = renderBrowserTestEvidenceReviewSummary(review);
+
+  assert.equal(review.status, 'review_required');
+  assert.deepEqual(review.findings, [
+    { code: 'source_commit_changed', headShas: ['a'.repeat(40), 'b'.repeat(40)] },
+    { code: 'workflow_runs_overlapped', runIds: [80_000, 80_001] },
+  ]);
+  assert.match(summary, /Source commit changed across the selected run IDs/u);
+  assert.match(summary, /Workflow runs overlapped: 80000, 80001/u);
+});
+
+test('browser evidence review detects a long run overlapping a later non-adjacent run', () => {
+  const samples = createSamples(3);
+  samples[0] = {
+    ...samples[0],
+    workflowRun: { ...samples[0].workflowRun, completedAt: '2026-08-29T13:05:00.000Z' },
+  };
+  samples[1] = {
+    ...samples[1],
+    workflowRun: {
+      ...samples[1].workflowRun,
+      completedAt: '2026-08-29T13:02:00.000Z',
+      startedAt: '2026-08-29T13:01:00.000Z',
+    },
+  };
+  samples[2] = {
+    ...samples[2],
+    workflowRun: {
+      ...samples[2].workflowRun,
+      completedAt: '2026-08-29T13:04:00.000Z',
+      startedAt: '2026-08-29T13:03:00.000Z',
+    },
+  };
+
+  const review = createBrowserTestEvidenceReview({ samples });
+
+  assert.equal(review.status, 'review_required');
+  assert.deepEqual(review.findings, [
+    {
+      code: 'sample_count_shortfall',
+      receivedSampleCount: 3,
+      requiredSampleCount: 10,
+    },
+    { code: 'workflow_runs_overlapped', runIds: [80_000, 80_001, 80_002] },
+  ]);
+});
+
 test('browser evidence review rejects malformed, duplicate, and untrusted manifest input', () => {
   const samples = createSamples(2);
   samples[1] = { ...samples[1], runId: samples[0].runId };
@@ -138,6 +209,15 @@ test('browser evidence review rejects malformed, duplicate, and untrusted manife
   assert.throws(
     () => parseBrowserTestEvidenceReviewInput('{not-json'),
     /must be valid JSON/u,
+  );
+  assert.throws(
+    () => createBrowserTestEvidenceReview({
+      samples: [{
+        ...createSamples(1)[0],
+        workflowRun: { ...createSamples(1)[0].workflowRun, event: 'push' },
+      }],
+    }),
+    /workflowRun.event must equal/u,
   );
 });
 

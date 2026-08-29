@@ -49,6 +49,41 @@ function assertIsoTimestamp(value, label) {
   }
 }
 
+function assertWorkflowRun(workflowRun, label) {
+  assertOnlyAllowedFields(workflowRun, new Set([
+    'completedAt',
+    'conclusion',
+    'event',
+    'headBranch',
+    'headSha',
+    'startedAt',
+  ]), label);
+  assertIsoTimestamp(workflowRun.startedAt, `${label}.startedAt`);
+  assertIsoTimestamp(workflowRun.completedAt, `${label}.completedAt`);
+
+  if (Date.parse(workflowRun.completedAt) < Date.parse(workflowRun.startedAt)) {
+    throw new Error(`${label}.completedAt must not precede ${label}.startedAt`);
+  }
+
+  if (workflowRun.conclusion !== 'failure' && workflowRun.conclusion !== 'success') {
+    throw new Error(`${label}.conclusion must be either "failure" or "success"`);
+  }
+
+  if (workflowRun.event !== 'workflow_dispatch') {
+    throw new Error(`${label}.event must equal "workflow_dispatch"`);
+  }
+
+  if (workflowRun.headBranch !== 'main') {
+    throw new Error(`${label}.headBranch must equal "main"`);
+  }
+
+  if (typeof workflowRun.headSha !== 'string' || !/^[a-f0-9]{40}$/u.test(workflowRun.headSha)) {
+    throw new Error(`${label}.headSha must be a lowercase 40-character Git SHA`);
+  }
+
+  return { ...workflowRun };
+}
+
 function getNearestRank(values, percentile) {
   const sortedValues = [...values].sort((left, right) => left - right);
   const index = Math.max(0, Math.ceil(sortedValues.length * percentile) - 1);
@@ -103,6 +138,45 @@ function createFindings(samples) {
     });
   }
 
+  const headShas = [...new Set(samples.map(({ workflowRun }) => workflowRun.headSha))];
+  if (headShas.length > 1) {
+    findings.push({ code: 'source_commit_changed', headShas });
+  }
+
+  const chronologicalSamples = [...samples].sort((left, right) => {
+    return Date.parse(left.workflowRun.startedAt) - Date.parse(right.workflowRun.startedAt);
+  });
+  const overlappingRunIds = [];
+  let activeSample = chronologicalSamples[0] ?? null;
+
+  for (let index = 1; index < chronologicalSamples.length; index += 1) {
+    const sample = chronologicalSamples[index];
+
+    if (Date.parse(activeSample.workflowRun.completedAt) > Date.parse(sample.workflowRun.startedAt)) {
+      overlappingRunIds.push(activeSample.runId, sample.runId);
+    }
+
+    if (Date.parse(sample.workflowRun.completedAt) > Date.parse(activeSample.workflowRun.completedAt)) {
+      activeSample = sample;
+    }
+  }
+
+  if (overlappingRunIds.length > 0) {
+    findings.push({
+      code: 'workflow_runs_overlapped',
+      runIds: [...new Set(overlappingRunIds)],
+    });
+  }
+
+  const workflowResultMismatchRunIds = collectRunIds(samples, ({ evidence, workflowRun }) => {
+    return evidence.browserTest.status === 'passed'
+      ? workflowRun.conclusion !== 'success'
+      : workflowRun.conclusion !== 'failure';
+  });
+  if (workflowResultMismatchRunIds.length > 0) {
+    findings.push({ code: 'workflow_result_mismatch', runIds: workflowResultMismatchRunIds });
+  }
+
   const failedRunIds = collectRunIds(samples, ({ evidence }) => evidence.browserTest.status !== 'passed');
   if (failedRunIds.length > 0) {
     findings.push({ code: 'browser_test_failed', runIds: failedRunIds });
@@ -133,7 +207,7 @@ function getReviewStatus(findings) {
 
 function createSample(sample, index, runIds) {
   const label = `browser test evidence review input.samples[${index}]`;
-  assertOnlyAllowedFields(sample, new Set(['evidence', 'runId']), label);
+  assertOnlyAllowedFields(sample, new Set(['evidence', 'runId', 'workflowRun']), label);
   assertPositiveSafeInteger(sample.runId, `${label}.runId`);
 
   if (runIds.has(sample.runId)) {
@@ -145,15 +219,17 @@ function createSample(sample, index, runIds) {
   return {
     evidence: assertBrowserTestEvidenceContract(sample.evidence),
     runId: sample.runId,
+    workflowRun: assertWorkflowRun(sample.workflowRun, `${label}.workflowRun`),
   };
 }
 
-function summarizeSample({ evidence, runId }) {
+function summarizeSample({ evidence, runId, workflowRun }) {
   return {
     browserTest: { ...evidence.browserTest },
     cleanup: { ...evidence.cleanup },
     generatedAt: evidence.generatedAt,
     runId,
+    workflowRun,
   };
 }
 
@@ -258,12 +334,20 @@ function formatFinding(finding) {
       return `${finding.receivedSampleCount} of ${finding.requiredSampleCount} required samples are available.`;
     case 'sample_count_exceeded':
       return `${finding.receivedSampleCount} samples were supplied; review exactly ${finding.requiredSampleCount}.`;
+    case 'source_commit_changed':
+      return `Source commit changed across the selected run IDs: ${finding.headShas.join(', ')}.`;
+    case 'workflow_runs_overlapped':
+      return `Workflow runs overlapped: ${finding.runIds.join(', ')}.`;
+    case 'workflow_result_mismatch':
+      return `Workflow and browser-test outcomes differ for run IDs: ${finding.runIds.join(', ')}.`;
     case 'browser_test_failed':
       return `Browser tests did not pass for run IDs: ${finding.runIds.join(', ')}.`;
     case 'cleanup_not_clean':
       return `Cleanup was not clean for run IDs: ${finding.runIds.join(', ')}.`;
-    default:
+    case 'worker_count_changed':
       return `Worker count changed for run IDs: ${finding.runIds.join(', ')}.`;
+    default:
+      throw new Error(`Unsupported browser test evidence review finding: ${finding.code}`);
   }
 }
 

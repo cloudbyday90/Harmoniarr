@@ -1,6 +1,6 @@
 # Browser Validation Evidence Review — Outcome
 
-**Status:** Implemented and locally validated
+**Status:** Sample-integrity hardening implemented; baseline blocked
 **Date:** 2026-08-29
 
 ## Delivered result
@@ -30,9 +30,9 @@ None is safe or useful to apply to this focused evidence-review change.
 
 ## Validation record
 
-- Five focused browser-evidence review tests passed.
+- Seven focused browser-evidence review tests passed.
 - `npm run lint:scripts`, `npm run lint:test`, and `npm run test:scripts`
-  passed; the script suite reported **291 passing tests**.
+  passed; the script suite reported **293 passing tests**.
 - `npm run validate` passed, including copyright, migration, schema, ESM,
   Compose, lint, hygiene, server, client, script, integration, and production
   build checks.
@@ -45,14 +45,53 @@ None is safe or useful to apply to this focused evidence-review change.
   366-byte `harmoniarr-browser-isolation-evidence` artifact all completed
   successfully; the artifact expires 2026-09-12.
 
+## First collection attempt
+
+One ordinary push-triggered Browser Validation run completed successfully at
+commit `26ecfc0`, but it is outside the stricter `workflow_dispatch` sample
+scope. Nine follow-up `workflow_dispatch` runs at commit `4e4d9bb` were started
+in rapid succession. Their full bounded input and generated result are retained
+in [the input manifest](evidence/BROWSER_VALIDATION_EVIDENCE_REVIEW_2026-08-29_INPUT.json)
+and [the review report](evidence/BROWSER_VALIDATION_EVIDENCE_REVIEW_2026-08-29_REPORT.json).
+
+Every one of the nine dispatcher-scoped artifacts reported two workers and
+`clean` cleanup with zero remaining Testcontainers and browser-test Node
+processes. Every browser suite nevertheless failed. The observed failures were
+different 30-second semantic locator and route-navigation waits, including
+artist detail, Library, Activity, Search, requester history, and legacy
+Downloader handoff paths. The report therefore records `review_required` with
+the exact run IDs, a 9/10 shortfall, overlapping workflow runs, and failed
+browser tests; it does not expose raw logs, user data, or provider details.
+
+This does **not** establish a browser reliability baseline. More importantly,
+the nine runs overlapped, so hosted-job concurrency became an unrecorded test
+variable. The evidence is retained as a failed collection attempt, not omitted
+or replaced. The review contract now requires a single source
+commit and non-overlapping completed `workflow_dispatch` runs before it can
+return `baseline_confirmed`.
+
+## Sample-integrity hardening
+
+The manifest contract now requires allow-listed source metadata for each run:
+the `main` branch, `workflow_dispatch` event, lowercase 40-character source
+commit, terminal workflow conclusion, and start/completion timestamps. It
+rejects unexpected source fields and records source-commit changes, workflow
+outcome mismatches, and overlapping intervals as review findings. The overlap
+algorithm retains a run with the latest completion time so it also detects a
+long run overlapping a later non-adjacent run.
+
+This adds no GitHub workflow, workflow permission, token, raw log, or archive
+processing to Harmoniarr. Artifact download remains an operator-controlled,
+read-only action and the local review parses only its strict JSON schema.
+
 ## Remaining operational step
 
-Collect nine additional consecutive fixed-configuration `Browser Validation`
-artifacts from `main`, add this run's evidence as the first selected sample,
-build the manifest described in the design, and run the local command. This
-successful run is evidence of no regression, not a substitute for the full
-ten-run baseline. Do not raise browser worker count until that report is
-`baseline_confirmed`.
+Investigate the browser page-readiness failures exposed by the retained trial.
+The likely next scope is the browser integration runtime's deterministic app
+readiness boundary, not a longer generic timeout or lower worker count. After
+that repair is validated, collect a new serial set of ten Browser Validation
+artifacts from one unchanged `main` commit. Do not raise browser worker count
+until that report is `baseline_confirmed`.
 
 ## Related design
 
