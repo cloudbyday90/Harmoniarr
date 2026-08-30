@@ -38,10 +38,15 @@ function createRequest(endpoint, status = 200) {
   });
 }
 
+function createPresentation({ observedAtMs = 47, state = 'ready' } = {}) {
+  return { observedAtMs, state };
+}
+
 test('Artist Detail local timing evidence keeps only request categories, status families, and rounded timing', () => {
   const evidence = createArtistDetailLocalTimingEvidence({
     capturedAt: '2026-08-29T12:00:00.000Z',
     outcome: 'local_projection',
+    presentation: createPresentation(),
     requests: [
       createRequest('local_metadata'),
       createRequest('operator_projection'),
@@ -51,6 +56,10 @@ test('Artist Detail local timing evidence keeps only request categories, status 
   assert.deepEqual(evidence, {
     capturedAt: '2026-08-29T12:00:00.000Z',
     outcome: 'local_projection',
+    presentation: {
+      observedAtMs: 47,
+      state: 'ready',
+    },
     requests: [
       {
         endpoint: 'local_metadata',
@@ -71,7 +80,7 @@ test('Artist Detail local timing evidence keeps only request categories, status 
         },
       },
     ],
-    schemaVersion: 1,
+    schemaVersion: 2,
   });
   assert.equal(JSON.stringify(evidence).includes('artist-id'), false);
   assert.equal(JSON.stringify(evidence).includes('http'), false);
@@ -81,6 +90,7 @@ test('Artist Detail local timing evidence requires the request sequence implied 
   assert.throws(() => createArtistDetailLocalTimingEvidence({
     capturedAt: '2026-08-29T12:00:00.000Z',
     outcome: 'provider_fallback_after_operator_projection',
+    presentation: createPresentation(),
     requests: [
       createRequest('local_metadata'),
       createRequest('discography'),
@@ -90,6 +100,7 @@ test('Artist Detail local timing evidence requires the request sequence implied 
   assert.throws(() => createArtistDetailLocalTimingEvidence({
     capturedAt: '2026-08-29T12:00:00.000Z',
     outcome: 'local_projection',
+    presentation: createPresentation(),
     requests: [{
       ...createRequest('local_metadata'),
       url: 'http://127.0.0.1/private-artist',
@@ -99,10 +110,17 @@ test('Artist Detail local timing evidence requires the request sequence implied 
   assert.throws(() => assertArtistDetailLocalTimingEvidenceContract({
     capturedAt: '2026-08-29T12:00:00.000Z',
     outcome: 'local_projection',
+    presentation: createPresentation(),
     requests: [createRequest('local_metadata'), createRequest('operator_projection')],
-    schemaVersion: 1,
+    schemaVersion: 2,
     username: 'local-admin',
   }), /username is not allowed/u);
+
+  assert.throws(() => createArtistDetailLocalTimingEvidence({
+    capturedAt: '2026-08-29T12:00:00.000Z',
+    outcome: 'local_projection',
+    requests: [createRequest('local_metadata'), createRequest('operator_projection')],
+  }), /presentation evidence must be an object/u);
 });
 
 test('Artist Detail local timing evidence bounds status and resource timing inputs', () => {

@@ -174,3 +174,8 @@ Use it for a reproducibly slow local Artist Detail load, then choose one
 targeted database, projection, or provider-cache regression from the repeated
 outcome and dominant request category—rather than changing orchestration
 pre-emptively.
+
+[Artist Detail Local Presentation Timing Design](ARTIST_DETAIL_LOCAL_PRESENTATION_TIMING_DESIGN.md)
+then extends the safe artifact to verify the user-observable Discography
+loading state after those requests settle. Its schema version 2 supersedes the
+original request-only local artifact.

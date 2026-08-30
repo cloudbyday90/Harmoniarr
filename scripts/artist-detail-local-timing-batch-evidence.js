@@ -18,6 +18,7 @@
 
 import { isDeepStrictEqual } from 'node:util';
 
+import { artistDetailPresentationStates } from './artist-detail-local-presentation-evidence.js';
 import { assertArtistDetailLocalTimingEvidenceContract } from './artist-detail-local-timing-evidence.js';
 
 const endpointOrder = Object.freeze(['local_metadata', 'operator_projection', 'discography']);
@@ -26,6 +27,7 @@ const outcomeOrder = Object.freeze([
   'provider_fallback_after_local_lookup',
   'provider_fallback_after_operator_projection',
 ]);
+const presentationStateOrder = artistDetailPresentationStates;
 export const minimumArtistDetailTimingBatchSamples = 2;
 export const maximumArtistDetailTimingBatchSamples = 5;
 export const artistDetailLocalTimingBatchArtifactType = 'artist_detail_local_timing_batch';
@@ -79,6 +81,28 @@ function normalizeOutcomeCounts(counts, sampleCount) {
 
   if (countedSamples !== sampleCount) {
     throw new Error('local Artist Detail timing batch evidence outcomeCounts must total sampleCount');
+  }
+
+  return Object.freeze(normalizedCounts);
+}
+
+function normalizePresentationStateCounts(counts, sampleCount) {
+  assertOnlyAllowedFields(counts, new Set(presentationStateOrder), 'local Artist Detail timing batch evidence presentation stateCounts');
+
+  const normalizedCounts = {};
+  let countedSamples = 0;
+  for (const state of presentationStateOrder) {
+    const count = counts[state];
+    if (!Number.isSafeInteger(count) || count < 0 || count > sampleCount) {
+      throw new Error(`local Artist Detail timing batch evidence presentation stateCounts.${state} is invalid`);
+    }
+
+    normalizedCounts[state] = count;
+    countedSamples += count;
+  }
+
+  if (countedSamples !== sampleCount) {
+    throw new Error('local Artist Detail timing batch evidence presentation stateCounts must total sampleCount');
   }
 
   return Object.freeze(normalizedCounts);
@@ -138,6 +162,27 @@ function normalizeEndpointTiming(entry, sampleCount) {
   });
 }
 
+function normalizePresentationSummary(summary, sampleCount) {
+  assertOnlyAllowedFields(summary, new Set([
+    'observedAtMs',
+    'stateCounts',
+    'stateIsConsistent',
+  ]), 'local Artist Detail timing batch evidence presentation');
+
+  if (typeof summary.stateIsConsistent !== 'boolean') {
+    throw new Error('local Artist Detail timing batch evidence presentation stateIsConsistent is invalid');
+  }
+
+  return Object.freeze({
+    observedAtMs: normalizeMetricSummary(
+      summary.observedAtMs,
+      'local Artist Detail timing batch evidence presentation observation time',
+    ),
+    stateCounts: normalizePresentationStateCounts(summary.stateCounts, sampleCount),
+    stateIsConsistent: summary.stateIsConsistent,
+  });
+}
+
 function interpolatePercentile(sortedValues, percentile) {
   const offset = (sortedValues.length - 1) * percentile;
   const lowerIndex = Math.floor(offset);
@@ -184,6 +229,19 @@ function createOutcomeCounts(samples) {
   return Object.freeze(counts);
 }
 
+function createPresentationSummary(samples) {
+  const stateCounts = Object.fromEntries(presentationStateOrder.map((state) => [state, 0]));
+  for (const sample of samples) {
+    stateCounts[sample.presentation.state] += 1;
+  }
+
+  return Object.freeze({
+    observedAtMs: createMetricSummary(samples.map((sample) => sample.presentation.observedAtMs)),
+    stateCounts: Object.freeze(stateCounts),
+    stateIsConsistent: Object.values(stateCounts).filter((count) => count > 0).length === 1,
+  });
+}
+
 function normalizeSamples(samples) {
   if (!Array.isArray(samples)) {
     throw new Error('local Artist Detail timing batch evidence samples must be an array');
@@ -208,6 +266,7 @@ export function createArtistDetailLocalTimingBatchEvidence({
   assertIsoTimestamp(capturedAt, 'local Artist Detail timing batch evidence capturedAt');
   const normalizedSamples = normalizeSamples(samples);
   const outcomeCounts = createOutcomeCounts(normalizedSamples);
+  const presentation = createPresentationSummary(normalizedSamples);
 
   return Object.freeze({
     artifactType: artistDetailLocalTimingBatchArtifactType,
@@ -215,9 +274,10 @@ export function createArtistDetailLocalTimingBatchEvidence({
     endpointTimings: createEndpointTimings(normalizedSamples),
     outcomeCounts,
     outcomeIsConsistent: Object.values(outcomeCounts).filter((count) => count > 0).length === 1,
+    presentation,
     sampleCount: normalizedSamples.length,
     samples: normalizedSamples,
-    schemaVersion: 1,
+    schemaVersion: 2,
   });
 }
 
@@ -233,6 +293,7 @@ export function assertArtistDetailLocalTimingBatchEvidenceContract(evidence) {
     'endpointTimings',
     'outcomeCounts',
     'outcomeIsConsistent',
+    'presentation',
     'sampleCount',
     'samples',
     'schemaVersion',
@@ -241,7 +302,7 @@ export function assertArtistDetailLocalTimingBatchEvidenceContract(evidence) {
   if (evidence.artifactType !== artistDetailLocalTimingBatchArtifactType) {
     throw new Error('local Artist Detail timing batch evidence artifactType is invalid');
   }
-  if (evidence.schemaVersion !== 1) {
+  if (evidence.schemaVersion !== 2) {
     throw new Error('local Artist Detail timing batch evidence schemaVersion is invalid');
   }
   assertIsoTimestamp(evidence.capturedAt, 'local Artist Detail timing batch evidence capturedAt');
@@ -271,10 +332,12 @@ export function assertArtistDetailLocalTimingBatchEvidenceContract(evidence) {
     endpointTimings: normalizedEndpointTimings,
     outcomeCounts: normalizeOutcomeCounts(evidence.outcomeCounts, evidence.sampleCount),
     outcomeIsConsistent: evidence.outcomeIsConsistent,
+    presentation: normalizePresentationSummary(evidence.presentation, evidence.sampleCount),
   }, {
     endpointTimings: expectedEvidence.endpointTimings,
     outcomeCounts: expectedEvidence.outcomeCounts,
     outcomeIsConsistent: expectedEvidence.outcomeIsConsistent,
+    presentation: expectedEvidence.presentation,
   })) {
     throw new Error('local Artist Detail timing batch evidence summary does not match samples');
   }

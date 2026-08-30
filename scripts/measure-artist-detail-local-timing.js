@@ -21,6 +21,10 @@ import { dirname } from 'node:path';
 import { chromium } from 'playwright';
 
 import {
+  defaultArtistDetailPresentationWaitMs,
+  observeArtistDetailPresentation,
+} from './artist-detail-local-presentation-observer.js';
+import {
   createArtistDetailLocalTimingEvidence,
   createArtistDetailTimingRequest,
 } from './artist-detail-local-timing-evidence.js';
@@ -330,6 +334,19 @@ async function logInThroughUi({ baseUrl, page, password, username }) {
   await page.waitForURL(/\/app(?:\?.*)?$/u);
 }
 
+async function createTimingEvidenceWithPresentation({
+  outcome,
+  presentationObservation,
+  requests,
+}) {
+  const presentation = await presentationObservation;
+  return createArtistDetailLocalTimingEvidence({
+    outcome,
+    presentation,
+    requests,
+  });
+}
+
 /**
  * Runs one read-only Artist Detail visit and returns only a bounded diagnostic
  * artifact. It does not create, alter, export, or persist application data.
@@ -339,7 +356,9 @@ export async function measureArtistDetailLocalTiming({
   baseUrl,
   headless = true,
   launchBrowserFn,
+  observePresentationFn = observeArtistDetailPresentation,
   password,
+  presentationTimeoutMs = defaultArtistDetailPresentationWaitMs,
   timeoutMs = defaultArtistDetailTimingTimeoutMs,
   username,
 } = {}) {
@@ -353,10 +372,15 @@ export async function measureArtistDetailLocalTiming({
     await logInThroughUi({ baseUrl, page, password, username });
 
     const observer = createArtistDetailTimingObserver({ artistMbid, page });
+    let presentationObservation = null;
     try {
       await page.goto(`${baseUrl}/app/artists/${encodeURIComponent(artistMbid)}`, {
         waitUntil: 'domcontentloaded',
       });
+      presentationObservation = Promise.resolve(observePresentationFn({
+        page,
+        timeoutMs: presentationTimeoutMs,
+      }));
 
       const localMetadata = await observer.waitForCompletion('local_metadata');
       const hasOperatorProjection = localMetadata.statusFamily === '2xx'
@@ -366,25 +390,34 @@ export async function measureArtistDetailLocalTiming({
         const operatorProjection = await observer.waitForCompletion('operator_projection');
         const hasProviderFallback = await doesEndpointBegin(observer, 'discography');
         if (!hasProviderFallback) {
-          return createArtistDetailLocalTimingEvidence({
+          const evidence = await createTimingEvidenceWithPresentation({
             outcome: 'local_projection',
+            presentationObservation,
             requests: [localMetadata, operatorProjection],
           });
+          return evidence;
         }
 
         const discography = await observer.waitForCompletion('discography');
-        return createArtistDetailLocalTimingEvidence({
+        const evidence = await createTimingEvidenceWithPresentation({
           outcome: 'provider_fallback_after_operator_projection',
+          presentationObservation,
           requests: [localMetadata, operatorProjection, discography],
         });
+        return evidence;
       }
 
       const discography = await observer.waitForCompletion('discography');
-      return createArtistDetailLocalTimingEvidence({
+      const evidence = await createTimingEvidenceWithPresentation({
         outcome: 'provider_fallback_after_local_lookup',
+        presentationObservation,
         requests: [localMetadata, discography],
       });
+      return evidence;
     } finally {
+      if (presentationObservation) {
+        await presentationObservation.catch(() => {});
+      }
       observer.stop();
     }
   } finally {

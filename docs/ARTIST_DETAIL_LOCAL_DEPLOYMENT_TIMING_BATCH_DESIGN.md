@@ -89,9 +89,12 @@ be written. Unexpected fields and altered summaries are rejected.
 
 - The command retains its loopback-only base URL, file-only password input,
   workspace-only evidence path, and read-only browser navigation.
-- Each sample stays within the original schema. The batch cannot add an artist
-  identifier, user identity, username, URL, request/response body, cookie,
-  header, credential, or absolute request clock through aggregate fields.
+- Each sample stays within the allowlisted schema. The batch cannot add an
+  artist identifier, user identity, username, URL, request/response body,
+  cookie, header, credential, or absolute request clock through aggregate
+  fields. The later schema-version-2 presentation extension adds only fixed
+  state labels and rounded navigation-relative observation time; see [Artist
+  Detail Local Presentation Timing Design](ARTIST_DETAIL_LOCAL_PRESENTATION_TIMING_DESIGN.md).
 - The authenticated operator projection remains scoped to the account used for
   the capture. A batch does not combine or expose projections across users.
 - Runs are sequential and capped at five. They do not add parallel provider
@@ -115,8 +118,9 @@ npm run measure:artist-detail-local-timing -- -- `
 ```
 
 `HARMONIARR_ARTIST_DETAIL_TIMING_RUNS` provides the same bounded optional
-input. Omitting it, or passing `--runs 1`, preserves the previous single
-artifact shape. Values outside one through five are rejected.
+input. Omitting it, or passing `--runs 1`, returns one version-2 single-sample
+artifact; values from two through five return the corresponding version-2
+batch artifact. Values outside one through five are rejected.
 
 With npm 12, retain both separators after the script name: the first ends npm
 option parsing and the second starts arguments for the ESM script. This was

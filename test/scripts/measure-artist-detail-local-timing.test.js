@@ -22,6 +22,7 @@ import test from 'node:test';
 import { createArtistDetailLocalTimingEvidence } from '../../scripts/artist-detail-local-timing-evidence.js';
 import {
   createArtistDetailTimingObserver,
+  measureArtistDetailLocalTiming,
   measureArtistDetailLocalTimingRuns,
   normalizeLoopbackBaseUrl,
   normalizeArtistDetailRequestTiming,
@@ -54,6 +55,67 @@ function createFakeRequest({ responseEnd, startTime, status = 200, url }) {
     response: async () => ({ status: () => status }),
     timing: () => ({ responseEnd, startTime }),
     url: () => url,
+  };
+}
+
+function createMeasurementBrowser() {
+  const page = createFakePage();
+  let presentationFinished = false;
+  let closedBeforePresentation = false;
+  const localRequest = createFakeRequest({
+    responseEnd: 8,
+    startTime: 1_728_000_000_000,
+    url: `http://127.0.0.1:47956/api/v1/metadata/musicbrainz/artists/${artistMbid}/local`,
+  });
+  const operatorRequest = createFakeRequest({
+    responseEnd: 6,
+    startTime: 1_728_000_000_010,
+    url: 'http://127.0.0.1:47956/api/v1/metadata/artists/local-artist-id/operator',
+  });
+  const discographyRequest = createFakeRequest({
+    responseEnd: 9,
+    startTime: 1_728_000_000_020,
+    url: `http://127.0.0.1:47956/api/v1/metadata/musicbrainz/artists/${artistMbid}/release-groups`,
+  });
+
+  page.getByLabel = () => ({ fill: async () => {} });
+  page.getByRole = () => ({ click: async () => {}, waitFor: async () => {} });
+  page.goto = async (url) => {
+    if (!url.includes(`/app/artists/${artistMbid}`)) {
+      return;
+    }
+
+    for (const request of [localRequest, operatorRequest, discographyRequest]) {
+      page.emit('request', request);
+      page.emit('requestfinished', request);
+    }
+  };
+  page.setDefaultTimeout = () => {};
+  page.waitForURL = async () => {};
+
+  const browserContext = {
+    close: async () => {
+      closedBeforePresentation = !presentationFinished;
+    },
+    newPage: async () => page,
+  };
+  const browser = {
+    close: async () => {},
+    newContext: async () => browserContext,
+  };
+
+  return {
+    browser,
+    get closedBeforePresentation() {
+      return closedBeforePresentation;
+    },
+    observePresentationFn: async () => {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 10);
+      });
+      presentationFinished = true;
+      return { observedAtMs: 42, state: 'ready' };
+    },
   };
 }
 
@@ -116,6 +178,7 @@ test('local Artist Detail timing runs create bounded summary evidence without sh
     createArtistDetailLocalTimingEvidence({
       capturedAt: '2026-08-29T12:00:00.000Z',
       outcome: 'local_projection',
+      presentation: { observedAtMs: 41, state: 'ready' },
       requests: [
         {
           endpoint: 'local_metadata',
@@ -132,6 +195,7 @@ test('local Artist Detail timing runs create bounded summary evidence without sh
     createArtistDetailLocalTimingEvidence({
       capturedAt: '2026-08-29T12:01:00.000Z',
       outcome: 'local_projection',
+      presentation: { observedAtMs: 83, state: 'ready' },
       requests: [
         {
           endpoint: 'local_metadata',
@@ -235,11 +299,29 @@ test('local Artist Detail timing observer emits only bounded request observation
   assert.equal(JSON.stringify([localMetadata, operatorProjection]).includes('local-artist-id'), false);
 });
 
+test('local Artist Detail timing waits for presentation evidence before closing its browser context', async () => {
+  const measurementBrowser = createMeasurementBrowser();
+
+  const evidence = await measureArtistDetailLocalTiming({
+    artistMbid,
+    baseUrl: 'http://127.0.0.1:47956',
+    launchBrowserFn: async () => measurementBrowser.browser,
+    observePresentationFn: measurementBrowser.observePresentationFn,
+    password: 'local-password',
+    username: 'local-admin',
+  });
+
+  assert.equal(measurementBrowser.closedBeforePresentation, false);
+  assert.deepEqual(evidence.presentation, { observedAtMs: 42, state: 'ready' });
+  assert.equal(evidence.outcome, 'provider_fallback_after_operator_projection');
+});
+
 test('local Artist Detail timing evidence remains within the workspace when persisted', async () => {
   const writes = [];
   const evidence = createArtistDetailLocalTimingEvidence({
     capturedAt: '2026-08-29T12:00:00.000Z',
     outcome: 'local_projection',
+    presentation: { observedAtMs: 31, state: 'ready' },
     requests: [
       {
         endpoint: 'local_metadata',

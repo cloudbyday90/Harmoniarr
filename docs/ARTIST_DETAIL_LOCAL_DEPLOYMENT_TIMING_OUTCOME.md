@@ -27,6 +27,9 @@ diagnostic tool rather than a change to normal user behavior.
   for newly designed diagnostic scripts; legacy scripts retain their existing
   compatibility behavior.
 - `package.json` adds `npm run measure:artist-detail-local-timing`.
+- The current artifact is schema version 2 and includes the separate,
+  accessibility-aligned presentation observation described in [Artist Detail
+  Local Presentation Timing Outcome](ARTIST_DETAIL_LOCAL_PRESENTATION_TIMING_OUTCOME.md).
 
 ## Verification
 

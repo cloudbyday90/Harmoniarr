@@ -16,6 +16,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { assertArtistDetailPresentationEvidenceContract } from './artist-detail-local-presentation-evidence.js';
+
 const endpointValues = new Set(['discography', 'local_metadata', 'operator_projection']);
 const outcomeValues = new Set([
   'local_projection',
@@ -158,11 +160,12 @@ export function createArtistDetailTimingRequest({ endpoint, status, timing } = {
  * of the contract: it shows whether the current artist used the local
  * projection or a provider Discography fallback without disclosing why.
  *
- * @param {{ capturedAt?: string, outcome: string, requests: object[] }} input
+ * @param {{ capturedAt?: string, outcome: string, presentation: object, requests: object[] }} input
  */
 export function createArtistDetailLocalTimingEvidence({
   capturedAt = new Date().toISOString(),
   outcome,
+  presentation,
   requests,
 } = {}) {
   assertIsoTimestamp(capturedAt, 'local Artist Detail timing evidence capturedAt');
@@ -180,11 +183,14 @@ export function createArtistDetailLocalTimingEvidence({
     throw new Error('local Artist Detail timing evidence requests do not match the outcome');
   }
 
+  const normalizedPresentation = assertArtistDetailPresentationEvidenceContract(presentation);
+
   return Object.freeze({
     capturedAt,
     outcome,
+    presentation: normalizedPresentation,
     requests: Object.freeze(normalizedRequests),
-    schemaVersion: 1,
+    schemaVersion: 2,
   });
 }
 
@@ -198,11 +204,12 @@ export function assertArtistDetailLocalTimingEvidenceContract(evidence) {
   assertOnlyAllowedFields(evidence, new Set([
     'capturedAt',
     'outcome',
+    'presentation',
     'requests',
     'schemaVersion',
   ]), 'local Artist Detail timing evidence');
 
-  if (evidence.schemaVersion !== 1) {
+  if (evidence.schemaVersion !== 2) {
     throw new Error('local Artist Detail timing evidence schemaVersion is invalid');
   }
 

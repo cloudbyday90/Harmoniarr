@@ -26,10 +26,20 @@ import {
 } from '../../scripts/artist-detail-local-timing-batch-evidence.js';
 import { createArtistDetailLocalTimingEvidence } from '../../scripts/artist-detail-local-timing-evidence.js';
 
-function createSample({ duration, outcome = 'local_projection', projectionDuration = duration + 10 }) {
+function createSample({
+  duration,
+  outcome = 'local_projection',
+  presentationObservedAtMs = duration + 100,
+  presentationState = 'ready',
+  projectionDuration = duration + 10,
+}) {
   return createArtistDetailLocalTimingEvidence({
     capturedAt: '2026-08-29T12:00:00.000Z',
     outcome,
+    presentation: {
+      observedAtMs: presentationObservedAtMs,
+      state: presentationState,
+    },
     requests: outcome === 'provider_fallback_after_local_lookup'
       ? [
         {
@@ -74,6 +84,11 @@ test('Artist Detail timing batch evidence aggregates only bounded sample data', 
     provider_fallback_after_operator_projection: 0,
   });
   assert.equal(evidence.outcomeIsConsistent, true);
+  assert.deepEqual(evidence.presentation, {
+    observedAtMs: { maximumMs: 130, minimumMs: 110, p50Ms: 120, p95Ms: 129 },
+    stateCounts: { ready: 3, still_loading: 0, unavailable: 0 },
+    stateIsConsistent: true,
+  });
   assert.deepEqual(evidence.endpointTimings[0], {
     clientRequestDurationMs: { maximumMs: 30, minimumMs: 10, p50Ms: 20, p95Ms: 29 },
     endpoint: 'local_metadata',
@@ -92,11 +107,16 @@ test('Artist Detail timing batch evidence detects a varied cache outcome and rej
     capturedAt: '2026-08-29T13:00:00.000Z',
     samples: [
       createSample({ duration: 10 }),
-      createSample({ duration: 20, outcome: 'provider_fallback_after_local_lookup' }),
+      createSample({
+        duration: 20,
+        outcome: 'provider_fallback_after_local_lookup',
+        presentationState: 'still_loading',
+      }),
     ],
   });
 
   assert.equal(evidence.outcomeIsConsistent, false);
+  assert.equal(evidence.presentation.stateIsConsistent, false);
   assert.equal(evidence.endpointTimings.some(({ endpoint }) => endpoint === 'discography'), true);
   assert.throws(
     () => assertArtistDetailLocalTimingBatchEvidenceContract({
@@ -104,6 +124,16 @@ test('Artist Detail timing batch evidence detects a varied cache outcome and rej
       endpointTimings: evidence.endpointTimings.map((entry) => entry.endpoint === 'local_metadata'
         ? { ...entry, clientRequestDurationMs: { ...entry.clientRequestDurationMs, p95Ms: 18 } }
         : entry),
+    }),
+    /summary does not match samples/u,
+  );
+  assert.throws(
+    () => assertArtistDetailLocalTimingBatchEvidenceContract({
+      ...evidence,
+      presentation: {
+        ...evidence.presentation,
+        stateCounts: { ...evidence.presentation.stateCounts, ready: 2, still_loading: 0 },
+      },
     }),
     /summary does not match samples/u,
   );

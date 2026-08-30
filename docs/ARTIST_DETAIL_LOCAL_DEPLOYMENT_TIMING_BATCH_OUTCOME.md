@@ -8,8 +8,8 @@ Date: 2026-08-30
 Harmoniarr can now compare repeated, local Artist Detail measurements without
 changing production caching or collecting telemetry. The existing command
 accepts `--runs 2` through `--runs 5`; `--runs 3` produces the recommended
-small comparison set. One run remains backward-compatible and returns the
-original single-sample artifact.
+small comparison set. One run returns a version-2 single-sample artifact;
+two through five runs return a version-2 batch artifact.
 
 The new batch artifact states whether the browser used a consistent route
 outcome, counts the fixed outcomes, and summarizes every observed allowlisted
@@ -38,6 +38,10 @@ diagnostic arguments to the ESM script.
 - `scripts/artist-detail-local-timing-batch-evidence.js` provides the ESM
   batch schema, percentile calculation, strict aggregate validation, and a
   shared single-or-batch write contract.
+- `scripts/artist-detail-local-presentation-evidence.js` and
+  `scripts/artist-detail-local-presentation-observer.js` extend every sample
+  with a fixed semantic presentation result after the allowlisted requests
+  settle. See [Artist Detail Local Presentation Timing Outcome](ARTIST_DETAIL_LOCAL_PRESENTATION_TIMING_OUTCOME.md).
 - `scripts/measure-artist-detail-local-timing.js` accepts the bounded `runs`
   option and performs sequential independent browser-context measurements.
 - `test/scripts/artist-detail-local-timing-batch-evidence.test.js` verifies
