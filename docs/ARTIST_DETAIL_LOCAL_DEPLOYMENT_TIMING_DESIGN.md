@@ -120,7 +120,7 @@ Run it only after reproducing an Artist Detail load for a local artist. The
 password file should contain only the password and should not be committed.
 
 ```powershell
-npm run measure:artist-detail-local-timing -- `
+npm run measure:artist-detail-local-timing -- -- `
   --artist-mbid 01234567-89ab-cdef-0123-456789abcdef `
   --username local-admin `
   --password-file C:\secrets\harmoniarr-password `
@@ -129,6 +129,10 @@ npm run measure:artist-detail-local-timing -- `
 
 The standard output is the safe JSON artifact. `--evidence-path` is optional;
 when supplied it writes the same artifact under the repository workspace.
+With npm 12, the first `--` terminates npm options and the second one begins
+the script arguments. Keep both separators so that `--artist-mbid` and other
+diagnostic options reach the ESM script instead of being parsed as npm
+configuration.
 
 ## Options and trade-offs
 

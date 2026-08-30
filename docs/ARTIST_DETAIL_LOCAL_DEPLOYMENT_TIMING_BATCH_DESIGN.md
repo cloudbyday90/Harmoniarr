@@ -1,7 +1,7 @@
 # Artist Detail Local Deployment Timing Batch Design
 
 Status: Implemented
-Date: 2026-08-29
+Date: 2026-08-30
 Owner: Metadata architecture + quality engineering
 
 ## Decision
@@ -33,7 +33,7 @@ only for a reproducible report and keeps the evidence on the deployment host.
 
 ## Standards and research review
 
-Reviewed on 2026-08-29 against current primary sources:
+Reviewed on 2026-08-30 against current primary sources:
 
 - [W3C Resource Timing](https://www.w3.org/TR/resource-timing/) defines a
   browser resource-timing model with navigation-relative values. Its security
@@ -106,7 +106,7 @@ account whose experience is being investigated. Do not commit the password
 file or the optional evidence artifact.
 
 ```powershell
-npm run measure:artist-detail-local-timing -- `
+npm run measure:artist-detail-local-timing -- -- `
   --artist-mbid 01234567-89ab-cdef-0123-456789abcdef `
   --username local-admin `
   --password-file C:\secrets\harmoniarr-password `
@@ -117,6 +117,10 @@ npm run measure:artist-detail-local-timing -- `
 `HARMONIARR_ARTIST_DETAIL_TIMING_RUNS` provides the same bounded optional
 input. Omitting it, or passing `--runs 1`, preserves the previous single
 artifact shape. Values outside one through five are rejected.
+
+With npm 12, retain both separators after the script name: the first ends npm
+option parsing and the second starts arguments for the ESM script. This was
+verified against the local walkthrough on 2026-08-30.
 
 ## Options and trade-offs
 

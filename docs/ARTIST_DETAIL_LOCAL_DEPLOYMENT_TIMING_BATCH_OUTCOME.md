@@ -1,7 +1,7 @@
 # Artist Detail Local Deployment Timing Batch Outcome
 
 Status: Implemented
-Date: 2026-08-29
+Date: 2026-08-30
 
 ## Outcome
 
@@ -15,6 +15,23 @@ The new batch artifact states whether the browser used a consistent route
 outcome, counts the fixed outcomes, and summarizes every observed allowlisted
 endpoint with minimum, P50, P95, and maximum rounded milliseconds. It also
 retains the individually validated samples required to verify those summaries.
+
+## Local walkthrough evidence
+
+On 2026-08-30, three authenticated, read-only visits against the rebuilt
+walkthrough used `local_projection` on every run. Local metadata completed at
+P50 17 ms and P95 29 ms; the per-user operator projection completed at P50
+25 ms and P95 52 ms. No provider Discography fallback began.
+
+This is a healthy local walkthrough baseline, not proof that a separate
+operator's slow report is resolved. It establishes that the local-first path
+and its per-user projection are fast in the rebuilt environment, so changing
+SWR, cache expiry, or request concurrency here would be unsupported.
+
+The capture also verified npm 12 invocation behavior: use
+`npm run measure:artist-detail-local-timing -- -- --artist-mbid ...`. The
+first separator ends npm option parsing and the second forwards the
+diagnostic arguments to the ESM script.
 
 ## Implementation
 
@@ -50,6 +67,8 @@ The following verification passed on 2026-08-29:
 
 ## Recommendation retained
 
-Use the batch only to choose a specific follow-up regression. It is not a
-runtime analytics feature and it must not be used to relax the local-first,
-per-user projection boundary or to make provider requests eager.
+Do not change the Artist Detail cache path from this walkthrough result. Run
+the same three-sample capture under the affected account and artist if the
+original slow report recurs. Use the repeated outcome to choose one focused
+regression; do not relax the local-first, per-user projection boundary or make
+provider requests eager.
