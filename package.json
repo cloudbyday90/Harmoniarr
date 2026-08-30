@@ -53,6 +53,7 @@
     "probe:release-mirror-capabilities": "node scripts/probe-release-mirror-capabilities.js",
     "promote:release-mirror-trust": "node scripts/promote-release-mirror-trust.js",
     "collect:browser-evidence": "node scripts/collect-browser-validation-samples.js",
+    "assess:artist-detail-local-timing": "node scripts/assess-artist-detail-local-timing.js",
     "measure:artist-detail-local-timing": "node scripts/measure-artist-detail-local-timing.js",
     "review:browser-evidence": "node scripts/review-browser-test-evidence.js",
     "start": "node dist/server/index.js",
