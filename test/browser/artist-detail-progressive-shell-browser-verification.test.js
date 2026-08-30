@@ -56,7 +56,7 @@ suite('Artist Detail progressive shell browser coverage', () => {
     timeout: integrationRuntimeConfig.suiteTeardownTimeoutMs,
   });
 
-  test('Artist Detail keeps the known profile visible while local metadata is loading', {
+  test('Artist Detail keeps the known profile visible and settles Discography after local metadata loads', {
     timeout: integrationRuntimeConfig.scenarioTimeoutMs,
   }, async (t) => {
     if (runtimeUnavailableReason) {
@@ -78,6 +78,19 @@ suite('Artist Detail progressive shell browser coverage', () => {
       await page.getByRole('heading', { exact: true, name: 'Boards of Canada' }).waitFor();
       await page.getByText('Loading releases for Boards of Canada…', { exact: true }).waitFor();
 
+      const discographyRegion = page.getByRole('article', {
+        exact: true,
+        name: 'Discography',
+      });
+      const busyDiscographyBody = discographyRegion.locator('[aria-busy="true"]');
+
+      await busyDiscographyBody.waitFor({ state: 'visible' });
+      assert.equal(
+        await busyDiscographyBody.count(),
+        1,
+        'Discography has one busy region while its local metadata is loading',
+      );
+
       assert.equal(
         await page.getByText('Loading artist detail...', { exact: true }).count(),
         0,
@@ -85,6 +98,12 @@ suite('Artist Detail progressive shell browser coverage', () => {
 
       await page.getByRole('heading', { exact: true, name: 'Discography' }).waitFor();
       await page.getByText('Music Has the Right to Children', { exact: true }).waitFor();
+      await busyDiscographyBody.waitFor({ state: 'detached' });
+      assert.equal(
+        await busyDiscographyBody.count(),
+        0,
+        'Discography is no longer busy once its loaded release is rendered',
+      );
     }, {
       scenarioName: 'artist_detail_progressive_shell',
     });
