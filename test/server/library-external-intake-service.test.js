@@ -34,8 +34,80 @@ test('queueExternalMediaRequestPlanning queues a planning run and patches eviden
   assert.equal(result.reusedExistingRun, false);
   assert.equal(result.run, run);
   assert.equal(createOperationRun.mock.callCount(), 1);
+  assert.equal(createOperationRun.mock.calls[0].arguments[0].queryable, null);
   assert.equal(mergeMediaRequestEvidence.mock.callCount(), 1);
+  assert.equal(mergeMediaRequestEvidence.mock.calls[0].arguments[0].queryable, null);
   assert.equal(recordAuditEventFn.mock.callCount(), 1);
+  assert.equal(recordAuditEventFn.mock.calls[0].arguments[1], null);
+});
+
+test('queueExternalMediaRequestPlanning enlists maintenance, reuse, enqueue, evidence, and audit in the request transaction', async (t) => {
+  const queryable = { query: t.mock.fn() };
+  const run = { id: 'transaction-run', mediaRequestId: 'transaction-request' };
+  const assertMaintenanceWriteAllowed = t.mock.fn(async () => {});
+  const getActiveRunByMediaRequestId = t.mock.fn(async () => null);
+  const createOperationRun = t.mock.fn(async () => run);
+  const mergeMediaRequestEvidence = t.mock.fn(async () => {});
+  const recordAuditEventFn = t.mock.fn(async () => {});
+  const service = createLibraryExternalIntakeService({
+    assertMaintenanceWriteAllowed,
+    createOperationRun,
+    getActiveRunByMediaRequestId,
+    getNow: () => new Date('2026-09-10T12:00:00Z'),
+    mediaRequestStore: { mergeMediaRequestEvidence },
+    recordAuditEventFn,
+  });
+
+  const result = await service.queueExternalMediaRequestPlanning({
+    mediaRequestId: 'transaction-request',
+    normalizedSource: {
+      canonicalUrl: 'https://open.spotify.com/playlist/abc',
+      provider: 'spotify',
+      resourceType: 'playlist',
+      sourceIdentifier: 'abc',
+    },
+    queryable,
+    triggeredByUserId: 'admin',
+  });
+
+  assert.equal(result.run, run);
+  assert.deepEqual(assertMaintenanceWriteAllowed.mock.calls[0].arguments, [{ queryable }]);
+  assert.deepEqual(getActiveRunByMediaRequestId.mock.calls[0].arguments, ['transaction-request', queryable]);
+  assert.equal(createOperationRun.mock.calls[0].arguments[0].queryable, queryable);
+  const evidenceWrite = mergeMediaRequestEvidence.mock.calls[0].arguments[0];
+  assert.equal(evidenceWrite.queryable, queryable);
+  assert.equal(evidenceWrite.evidencePatch.providerAutomation.operationRunId, run.id);
+  assert.equal(recordAuditEventFn.mock.calls[0].arguments[1], queryable);
+  assert.equal(recordAuditEventFn.mock.calls[0].arguments[0].entityId, run.id);
+});
+
+test('queueExternalMediaRequestPlanning reuses a run visible in the caller transaction without writing again', async (t) => {
+  const queryable = { query: t.mock.fn() };
+  const run = { id: 'uncommitted-run', mediaRequestId: 'transaction-request' };
+  const createOperationRun = t.mock.fn(async () => {});
+  const mergeMediaRequestEvidence = t.mock.fn(async () => {});
+  const recordAuditEventFn = t.mock.fn(async () => {});
+  const service = createLibraryExternalIntakeService({
+    createOperationRun,
+    getActiveRunByMediaRequestId: async (mediaRequestId, transaction) => {
+      assert.equal(mediaRequestId, 'transaction-request');
+      assert.equal(transaction, queryable);
+      return run;
+    },
+    mediaRequestStore: { mergeMediaRequestEvidence },
+    recordAuditEventFn,
+  });
+
+  const result = await service.queueExternalMediaRequestPlanning({
+    mediaRequestId: 'transaction-request',
+    queryable,
+  });
+
+  assert.equal(result.reusedExistingRun, true);
+  assert.equal(result.run, run);
+  assert.equal(createOperationRun.mock.callCount(), 0);
+  assert.equal(mergeMediaRequestEvidence.mock.callCount(), 0);
+  assert.equal(recordAuditEventFn.mock.callCount(), 0);
 });
 
 test('queueExternalMediaRequestPlanning reuses an active run without creating a duplicate', async (t) => {

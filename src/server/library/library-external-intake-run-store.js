@@ -51,6 +51,7 @@ export function createLibraryExternalIntakeRunStore({
   async function createOperationRun({
     canonicalUrl,
     mediaRequestId,
+    queryable = null,
     resourceType,
     sourceIdentifier,
     sourceProvider,
@@ -60,6 +61,7 @@ export function createLibraryExternalIntakeRunStore({
   }) {
     const run = await operationRunStore.createOperationRun({
       maxAttempts: 3,
+      queryable,
       status,
       summary: {
         canonicalUrl,
@@ -75,8 +77,8 @@ export function createLibraryExternalIntakeRunStore({
     return normalizeRun(run);
   }
 
-  async function getActiveRunByMediaRequestId(mediaRequestId) {
-    const pool = getPoolFn();
+  async function getActiveRunByMediaRequestId(mediaRequestId, queryable = null) {
+    const pool = queryable ?? getPoolFn();
     const result = await pool.query(
       `
         SELECT id, status, summary

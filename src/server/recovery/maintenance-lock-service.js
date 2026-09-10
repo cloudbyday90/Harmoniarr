@@ -39,12 +39,12 @@ function normalizeLock(row) {
 export function createMaintenanceLockService({
   getPoolFn = getPool,
 } = {}) {
-  async function listActiveMaintenanceLocks({ lockTypes = null } = {}) {
+  async function listActiveMaintenanceLocks({ lockTypes = null, queryable = null } = {}) {
     const normalizedLockTypes = Array.isArray(lockTypes) && lockTypes.length > 0
       ? lockTypes.filter((lockType) => typeof lockType === 'string' && lockType.trim().length > 0)
       : [];
 
-    const pool = getPoolFn();
+    const pool = queryable ?? getPoolFn();
     const hasLockTypeFilter = normalizedLockTypes.length > 0;
     const result = await pool.query(
       `

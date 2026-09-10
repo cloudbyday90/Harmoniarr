@@ -348,8 +348,12 @@ watch(
             >
               {{ rm.isSubmitting.value ? 'Submitting\u2026' : 'Submit request' }}
             </button>
-            <span v-if="rm.successMessage.value" class="hx-pill" data-tone="success">{{ rm.successMessage.value }}</span>
-            <span v-if="rm.errorMessage.value" class="hx-pill" data-tone="danger">{{ rm.errorMessage.value }}</span>
+            <span role="status" aria-atomic="true">
+              <span v-if="rm.successMessage.value" class="hx-pill" data-tone="success">{{ rm.successMessage.value }}</span>
+            </span>
+            <span role="alert" aria-atomic="true">
+              <span v-if="rm.errorMessage.value" class="hx-pill" data-tone="danger">{{ rm.errorMessage.value }}</span>
+            </span>
           </div>
 
         </form>

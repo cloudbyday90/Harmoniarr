@@ -2,6 +2,37 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createOperationRunStore } from '../../src/server/operation-run-store.js';
 
+test('operation run creation stays in the supplied transaction without borrowing a pool connection', async (t) => {
+  const queryable = {
+    query: t.mock.fn(async (_sql, params) => ({
+      rows: [{
+        id: 'transaction-run',
+        operation_type: params[0],
+        status: params[1],
+        summary: JSON.parse(params[3]),
+        max_attempts: params[5],
+      }],
+    })),
+  };
+  const store = createOperationRunStore({
+    getPoolFn: () => assert.fail('Transactional enqueue must not use the pool'),
+    operationType: 'library_external_intake_planning',
+  });
+
+  const run = await store.createOperationRun({
+    maxAttempts: 3,
+    queryable,
+    summary: { mediaRequestId: 'request-1' },
+    triggeredByUserId: 'admin',
+  });
+
+  assert.equal(queryable.query.mock.callCount(), 1);
+  assert.equal(run.id, 'transaction-run');
+  assert.equal(run.status, 'pending');
+  assert.equal(run.maxAttempts, 3);
+  assert.deepEqual(run.summary, { mediaRequestId: 'request-1' });
+});
+
 test('operation run store delegates lease operations through the shared job lease store', async (t) => {
   const acquireLease = t.mock.fn(async () => ({}));
   const getLease = t.mock.fn(async () => ({ leaseKey: 'library_scan:run-5' }));

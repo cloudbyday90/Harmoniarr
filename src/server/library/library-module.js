@@ -144,8 +144,9 @@ export function createLibraryModule({
     providerIngestRequestStore: libraryProviderIngestRequestStore,
   }),
   libraryExternalIntakeService = createLibraryExternalIntakeService({
-    assertMaintenanceWriteAllowed: () => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+    assertMaintenanceWriteAllowed: ({ queryable } = {}) => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
       operationLabel: 'library external intake planning',
+      queryable,
     }),
     createOperationRun: libraryExternalIntakeRunStore.createOperationRun,
     getActiveRunByMediaRequestId: libraryExternalIntakeRunStore.getActiveRunByMediaRequestId,

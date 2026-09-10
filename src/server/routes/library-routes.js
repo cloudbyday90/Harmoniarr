@@ -299,9 +299,12 @@ export function registerLibraryRoutes(app, {
       responseBody.fanOutMessage = `Request created for ${fanOut.totalTargets} user${fanOut.totalTargets === 1 ? '' : 's'} (${fanOut.childCount} additional target${fanOut.childCount === 1 ? '' : 's'}).`;
       responseBody.fanOutChildIds = fanOut.children;
       responseBody.fanOutChildCount = fanOut.childCount;
-      if (fanOut.ineligible.length > 0) {
-        responseBody.fanOutIneligibleTargets = fanOut.ineligible;
-      }
+    }
+    if (fanOut?.ineligible.length > 0) {
+      responseBody.fanOutIneligibleTargets = fanOut.ineligible;
+      const savedMessage = responseBody.fanOutMessage ?? `Request created for ${fanOut.totalTargets} user${fanOut.totalTargets === 1 ? '' : 's'}.`;
+      const skippedMessage = `${fanOut.ineligible.length} ineligible user${fanOut.ineligible.length === 1 ? ' was' : 's were'} skipped.`;
+      responseBody.fanOutMessage = `${savedMessage} ${skippedMessage}`;
     }
 
     response.status(201).json({

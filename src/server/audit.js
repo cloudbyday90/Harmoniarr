@@ -28,8 +28,8 @@ export async function recordAuditEvent({
   entityId = null,
   ipAddress = null,
   userAgent = null,
-}) {
-  await getPool().query(
+}, queryable = null) {
+  await (queryable ?? getPool()).query(
     `
       INSERT INTO audit_events (
         occurred_at,

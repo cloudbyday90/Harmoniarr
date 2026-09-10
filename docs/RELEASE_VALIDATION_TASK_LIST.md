@@ -20,6 +20,15 @@ Issue #4 platform evidence map: `docs/ISSUE_4_RELEASE_VALIDATION_EVIDENCE.md`
 
 ## Test And Validation Gates
 
+- Atomic multi-user request creation now has PostgreSQL failure-injection proof
+  for child, audit, and durable external-planning failures, plus Chromium proof
+  of safe retry feedback. See [the focused outcome](MEDIA_REQUEST_ATOMIC_CREATION_OUTCOME.md).
+  This evidence does not establish HTTP replay idempotency or completed external
+  acquisition for child targets; the latter remains an explicit follow-up.
+- The September dependency update passes `npm run validate:security` with
+  zero reported vulnerabilities and Windows/Alpine x64 native-package checks.
+  See [dependency validation evidence](DEPENDENCY_SECURITY_UPDATE_2026_09_OUTCOME.md).
+
 - [ ] Use `docs/ISSUE_4_RELEASE_VALIDATION_EVIDENCE.md` to confirm each shipped Issue #4 platform step has focused tests, browser scenarios, schema evidence, and release evidence tasks before closing release readiness.
 - [ ] Run unit tests for validators, service logic, and normalization helpers.
 - [ ] Run integration tests for auth/session, settings, import review, jobs, and recovery-sensitive operations.

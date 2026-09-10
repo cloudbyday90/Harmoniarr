@@ -3,7 +3,16 @@ import test from 'node:test';
 import { createApiError } from '../../src/server/auth.js';
 import { createLibraryMediaRequestFulfillmentService } from '../../src/server/library/library-media-request-fulfillment-service.js';
 import { createLibraryMediaRequestNotificationService } from '../../src/server/library/library-media-request-notification-service.js';
-import { createLibraryMediaRequestService } from '../../src/server/library/library-media-request-service.js';
+import { createLibraryMediaRequestService as createRealLibraryMediaRequestService } from '../../src/server/library/library-media-request-service.js';
+
+const requestTransactionClient = Object.freeze({ transactionScope: 'media-request-service-test' });
+
+function createLibraryMediaRequestService(options) {
+  return createRealLibraryMediaRequestService({
+    withRequestTransaction: async (work) => work(requestTransactionClient),
+    ...options,
+  });
+}
 
 test('createLibraryMediaRequestService marks matched local releases as already existing media', async (t) => {
   const createMediaRequest = t.mock.fn(async (payload) => ({

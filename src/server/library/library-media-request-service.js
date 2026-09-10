@@ -21,7 +21,8 @@ import { recordAuditEvent } from '../audit.js';
 import { buildMediaRequestTargetEligibility } from '../media-request-target-eligibility.js';
 import { createMetadataSearchService } from '../metadata/metadata-search-service.js';
 import { normalizeMetadataReleaseDateForDateColumn } from '../metadata/metadata-release-date-normalization.js';
-import { normalizeExternalMediaSource } from './external-media-source-parser.js';
+import { createLibraryMediaRequestCreationService } from './library-media-request-creation-service.js';
+import { normalizeMediaRequestCreationError } from './library-media-request-creation-error.js';
 import { createLibraryMediaRequestFulfillmentService } from './library-media-request-fulfillment-service.js';
 import { createLibraryMediaRequestNotificationService } from './library-media-request-notification-service.js';
 import { createLibraryReleaseAvailabilityStore } from './library-release-availability-store.js';
@@ -344,7 +345,16 @@ export function createLibraryMediaRequestService({
   recordActivityEventFn = null,
   recordAuditEventFn = recordAuditEvent,
   onRequestCreatedFn = null,
+  withRequestTransaction,
 } = {}) {
+  const requestCreationService = createLibraryMediaRequestCreationService({
+    externalIntakeService,
+    mediaRequestStore,
+    onRequestCreatedFn,
+    recordActivityEventFn,
+    recordAuditEventFn,
+    withRequestTransaction,
+  });
   async function getReadableMediaRequest({
     actorUserId,
     actorUserRole,
@@ -424,7 +434,15 @@ export function createLibraryMediaRequestService({
     return { ineligible, resolved };
   }
 
-  async function createMediaRequest({ actorUserId, actorUserRole = null, payload, requestMetadata }) {
+  async function createMediaRequest(input) {
+    try {
+      return await prepareAndCreateMediaRequest(input);
+    } catch (error) {
+      throw normalizeMediaRequestCreationError(error);
+    }
+  }
+
+  async function prepareAndCreateMediaRequest({ actorUserId, actorUserRole = null, payload, requestMetadata }) {
     const draft = validateDraft(payload ?? {});
     const normalizedQuery = buildNormalizedQuery(draft);
     const expectedReleaseDate = normalizeOptionalDate(payload?.expectedReleaseDate, 'expectedReleaseDate');
@@ -453,28 +471,18 @@ export function createLibraryMediaRequestService({
       requestedForUserId: singleTargetOverride,
     });
 
-    return createSingleMediaRequest({
+    return createRequestsForTargets({
       actorUserId,
       draft,
       expectedReleaseDate,
       normalizedQuery,
       payload,
-      requestedForUserId,
+      targetUserIds: [requestedForUserId],
       requestMetadata,
     });
   }
 
-  async function createSingleMediaRequest({
-    actorUserId,
-    draft,
-    expectedReleaseDate,
-    normalizedQuery,
-    payload,
-    requestedForUserId,
-    requestMetadata,
-    fanOutParentId = null,
-    fanOutChildCount = 0,
-  }) {
+  async function prepareMediaRequest({ actorUserId, draft, expectedReleaseDate, normalizedQuery, payload }) {
     let matchedMetadataReleaseGroupId = null;
     let matchedMetadataReleaseId = null;
     let musicbrainzReleaseId = normalizeOptionalMbReleaseId(payload?.musicbrainzReleaseId);
@@ -524,35 +532,10 @@ export function createLibraryMediaRequestService({
       }
     }
 
-    let linkedRequestId = null;
-    let linked = false;
-
-    if (requestState !== 'already_exists' && draft.requestKind !== 'external_url') {
-      const existingRequest = await mediaRequestStore.findActiveDuplicateRequest({
-        musicbrainzReleaseId,
-        artistName: draft.artistName,
-        releaseTitle: draft.releaseTitle,
-        excludeRequestedForUserId: requestedForUserId,
-      });
-
-      if (existingRequest) {
-        linkedRequestId = existingRequest.id;
-        linked = true;
-        evidence = {
-          ...evidence,
-          dedupLinkedToRequestId: existingRequest.id,
-          dedupMatchMethod: musicbrainzReleaseId ? 'musicbrainz_release_id' : 'artist_title_text',
-        };
-      }
-    }
-
-    const mediaRequest = await mediaRequestStore.createMediaRequest({
+    return {
       artistName: draft.artistName,
       evidence,
       expectedReleaseDate,
-      fanOutChildCount,
-      fanOutParentId,
-      linkedRequestId,
       matchedMetadataReleaseGroupId,
       matchedMetadataReleaseId,
       musicbrainzReleaseId,
@@ -562,73 +545,15 @@ export function createLibraryMediaRequestService({
       requestKind: draft.requestKind,
       requestState,
       requestedByUserId: actorUserId,
-      requestedForUserId,
       sourceProvider,
       sourceUrl: draft.sourceUrl,
       trackTitle: draft.trackTitle,
-    });
+    };
+  }
 
-    await recordAuditEventFn({
-      actorType: 'app_user',
-      actorUserId,
-      details: {
-        delegated: requestedForUserId !== actorUserId,
-        fanOutChildCount,
-        fanOutParentId,
-        linked,
-        linkedToRequestId: linkedRequestId,
-        requestId: mediaRequest.id,
-        requestKind: mediaRequest.requestKind,
-        requestState: mediaRequest.requestState,
-        requestedForUserId,
-      },
-      entityId: mediaRequest.id,
-      entityType: 'media_request',
-      eventType: 'media_request_created',
-      ipAddress: requestMetadata?.ipAddress ?? null,
-      summary: `Created ${mediaRequest.requestKind} music request as ${mediaRequest.requestState}${linked ? ' (linked to existing request)' : ''}${fanOutParentId ? ' (fan-out child)' : ''}`,
-      userAgent: requestMetadata?.userAgent ?? null,
-    });
-
-    if (typeof recordActivityEventFn === 'function') {
-      void recordActivityEventFn({
-        actorUserId,
-        entityArtist: draft.artistName ?? null,
-        entityId: mediaRequest.id,
-        entityTitle: draft.releaseTitle ?? draft.artistName ?? null,
-        entityType: 'media_request',
-        eventType: 'request_created',
-      }).catch(() => {});
-    }
-
-    if (typeof onRequestCreatedFn === 'function') {
-      void onRequestCreatedFn({
-        actorUserId,
-        artistName: draft.artistName ?? null,
-        requestKind: draft.requestKind,
-        releaseTitle: draft.releaseTitle ?? null,
-      }).catch(() => {});
-    }
-
-    if (
-      mediaRequest.requestKind === 'external_url'
-      && mediaRequest.requestState === 'needs_fetch'
-      && mediaRequest.sourceUrl
-      && externalIntakeService?.queueExternalMediaRequestPlanning
-    ) {
-      const normalizedSource = normalizeExternalMediaSource(mediaRequest.sourceUrl);
-      if (normalizedSource) {
-        await externalIntakeService.queueExternalMediaRequestPlanning({
-          mediaRequestId: mediaRequest.id,
-          normalizedSource,
-          requestMetadata,
-          triggerSource: 'request_submit',
-          triggeredByUserId: actorUserId,
-        });
-      }
-    }
-
-    return { ...mediaRequest, linked };
+  async function createRequestsForTargets({ targetUserIds, ineligible = null, requestMetadata, ...input }) {
+    const request = await prepareMediaRequest(input);
+    return requestCreationService.createRequestFamily({ request, targetUserIds, ineligible, requestMetadata });
   }
 
   async function createFanOutMediaRequest({
@@ -651,87 +576,16 @@ export function createLibraryMediaRequestService({
       throw createApiError(409, 'media_request_no_eligible_targets', 'No eligible target users were found for the multi-target request');
     }
 
-    const firstTargetUserId = resolved[0].id;
-
-    const parentRequest = await createSingleMediaRequest({
+    return createRequestsForTargets({
       actorUserId,
       draft,
       expectedReleaseDate,
+      ineligible,
       normalizedQuery,
       payload,
-      requestedForUserId: firstTargetUserId,
+      targetUserIds: resolved.map((user) => user.id),
       requestMetadata,
     });
-
-    if (resolved.length <= 1) {
-      return {
-        ...parentRequest,
-        fanOut: { childCount: 0, ineligible, totalTargets: resolved.length },
-      };
-    }
-
-    const additionalTargetIds = resolved.slice(1).map((user) => user.id);
-    const fanOutChildren = await mediaRequestStore.createFanOutChildRequests({
-      parentRequest,
-      targetUserIds: additionalTargetIds,
-      linkedRequestId: parentRequest.linkedRequestId,
-    });
-
-    const childCount = fanOutChildren.length;
-    await mediaRequestStore.updateFanOutChildCount({
-      mediaRequestId: parentRequest.id,
-      childCount,
-    });
-
-    for (const child of fanOutChildren) {
-      if (typeof recordActivityEventFn === 'function') {
-        void recordActivityEventFn({
-          actorUserId,
-          entityArtist: draft.artistName ?? null,
-          entityId: child.id,
-          entityTitle: draft.releaseTitle ?? draft.artistName ?? null,
-          entityType: 'media_request',
-          eventType: 'request_created',
-        }).catch(() => {});
-      }
-    }
-
-    await recordAuditEventFn({
-      actorType: 'app_user',
-      actorUserId,
-      details: {
-        fanOutChildCount: childCount,
-        ineligibleCount: ineligible.length,
-        parentRequestId: parentRequest.id,
-        targetUserCount: resolved.length,
-      },
-      entityId: parentRequest.id,
-      entityType: 'media_request',
-      eventType: 'media_request_fan_out_created',
-      ipAddress: requestMetadata?.ipAddress ?? null,
-      summary: `Created fan-out media request for ${resolved.length} users (${childCount} children)`,
-      userAgent: requestMetadata?.userAgent ?? null,
-    });
-
-    if (typeof onRequestCreatedFn === 'function') {
-      void onRequestCreatedFn({
-        actorUserId,
-        artistName: draft.artistName ?? null,
-        requestKind: draft.requestKind,
-        releaseTitle: draft.releaseTitle ?? null,
-      }).catch(() => {});
-    }
-
-    return {
-      ...parentRequest,
-      fanOutChildCount: childCount,
-      fanOut: {
-        childCount,
-        children: fanOutChildren.map((child) => child.id),
-        ineligible,
-        totalTargets: resolved.length,
-      },
-    };
   }
 
   async function listMediaRequests({

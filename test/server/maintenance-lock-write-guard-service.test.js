@@ -24,3 +24,17 @@ test('assertNoActiveWriteLocks rejects when a blocking lock exists', async () =>
     (error) => error.code === 'recovery_lock_conflict',
   );
 });
+
+test('assertNoActiveWriteLocks enlists the caller transaction in its lock read', async () => {
+  const queryable = {};
+  const service = createMaintenanceLockWriteGuardService({
+    listActiveMaintenanceLocks: async (input) => {
+      assert.equal(input.queryable, queryable);
+      return [{ id: 'lock-transaction', lockType: 'maintenance' }];
+    },
+  });
+  await assert.rejects(
+    service.assertNoActiveWriteLocks({ queryable }),
+    { code: 'recovery_lock_conflict' },
+  );
+});

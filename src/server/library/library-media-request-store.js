@@ -401,8 +401,8 @@ export function createLibraryMediaRequestStore({
     return mapSummaryCounts(result.rows[0] ?? {});
   }
 
-  async function mergeMediaRequestEvidence({ evidencePatch, mediaRequestId }) {
-    const pool = getPoolFn();
+  async function mergeMediaRequestEvidence({ evidencePatch, mediaRequestId, queryable = null }) {
+    const pool = queryable ?? getPoolFn();
     await pool.query(
       `
         UPDATE media_requests
@@ -482,12 +482,12 @@ export function createLibraryMediaRequestStore({
     return result.rows.map(mapMediaRequestRow);
   }
 
-  async function createFanOutChildRequests({ parentRequest, targetUserIds, linkedRequestId = null }) {
+  async function createFanOutChildRequests({ parentRequest, targetUserIds, linkedRequestId = null, queryable = null }) {
     if (!Array.isArray(targetUserIds) || targetUserIds.length === 0) {
       return [];
     }
 
-    const pool = getPoolFn();
+    const pool = queryable ?? getPoolFn();
     const values = [];
     const params = [];
     let paramIdx = 1;
@@ -495,7 +495,7 @@ export function createLibraryMediaRequestStore({
     for (const targetUserId of targetUserIds) {
       const offset = (paramIdx - 1) * 19;
       values.push(
-        `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13}, $${offset + 14}::jsonb, $${offset + 15}, $${offset + 16}, $${offset + 17}, $${offset + 18}, $${offset + 19})`,
+        `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13}, $${offset + 14}::jsonb, $${offset + 15}, $${offset + 16}, $${offset + 17}, $${offset + 18}, $${offset + 19}, NOW())`,
       );
       params.push(
         parentRequest.requestedByUser.id,
@@ -554,7 +554,7 @@ export function createLibraryMediaRequestStore({
     const childIds = result.rows.map((row) => row.id);
     const children = [];
     for (const childId of childIds) {
-      const child = await getMediaRequestById({ mediaRequestId: childId });
+      const child = await getMediaRequestById({ mediaRequestId: childId, queryable: pool });
       if (child) {
         children.push(child);
       }
@@ -563,8 +563,8 @@ export function createLibraryMediaRequestStore({
     return children;
   }
 
-  async function updateFanOutChildCount({ mediaRequestId, childCount }) {
-    const pool = getPoolFn();
+  async function updateFanOutChildCount({ mediaRequestId, childCount, queryable = null }) {
+    const pool = queryable ?? getPoolFn();
     await pool.query(
       `
         UPDATE media_requests

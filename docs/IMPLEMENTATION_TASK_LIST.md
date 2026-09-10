@@ -6,6 +6,25 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Release preparation (2026-09-10)
+
+- Atomic music request creation now uses one transaction for the eligible
+  parent/children, child count, audits, and existing external-planning job.
+  Failure injection against PostgreSQL proves rollback and clean retries;
+  optional notifications run after commit. Request feedback hides unexpected
+  database errors and exposes accessible status/alert regions. See
+  [design](MEDIA_REQUEST_ATOMIC_CREATION_DESIGN.md) and
+  [outcome](MEDIA_REQUEST_ATOMIC_CREATION_OUTCOME.md).
+- Follow-up: prove external URL child fulfillment and ownership propagation;
+  then address the confirmed Music Queue/provider-catalog pagination gaps.
+- Release security validation also led to compatible sharp and qs updates.
+  The final dependency audit reports zero vulnerabilities; Windows and Alpine
+  native compatibility checks passed. See the [dependency design](DEPENDENCY_SECURITY_UPDATE_2026_09_DESIGN.md)
+  and [validation outcome](DEPENDENCY_SECURITY_UPDATE_2026_09_OUTCOME.md).
+- Final combined validation passed 7,747 tests with zero failures or skips,
+  repository policy/lint checks, and both builds. The focused Request Music
+  Chromium/PostgreSQL regression also passed against the final dependencies.
+
 ## Current Status (2026-05-23)
 
 - Current validation baseline: 1534 server / 3087 client tests pass.

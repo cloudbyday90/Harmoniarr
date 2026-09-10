@@ -182,8 +182,8 @@ export function createOperationRunStore({
     return Math.min(parsed, 25);
   }
 
-  async function createOperationRun({ maxAttempts = 1, nextAttemptAt = null, status = 'pending', summary = {}, triggeredByUserId = null }) {
-    const pool = getPoolFn();
+  async function createOperationRun({ maxAttempts = 1, nextAttemptAt = null, queryable = null, status = 'pending', summary = {}, triggeredByUserId = null }) {
+    const pool = queryable ?? getPoolFn();
     const result = await pool.query(
       `
         INSERT INTO operation_runs (

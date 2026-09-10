@@ -22,9 +22,10 @@ import { defaultBlockingMaintenanceLockTypes } from './maintenance-lock-policy.j
 export function createMaintenanceLockWriteGuardService({
   listActiveMaintenanceLocks = async () => [],
 } = {}) {
-  async function assertNoActiveWriteLocks({ operationLabel = 'write operations' } = {}) {
+  async function assertNoActiveWriteLocks({ operationLabel = 'write operations', queryable = null } = {}) {
     const blockingLocks = await listActiveMaintenanceLocks({
       lockTypes: [...defaultBlockingMaintenanceLockTypes],
+      ...(queryable ? { queryable } : {}),
     });
 
     if (blockingLocks.length > 0) {

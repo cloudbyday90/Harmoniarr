@@ -34,13 +34,14 @@ export function createLibraryExternalIntakeService({
   async function queueExternalMediaRequestPlanning({
     mediaRequestId,
     normalizedSource,
+    queryable = null,
     requestMetadata = null,
     triggerSource = 'request_submit',
     triggeredByUserId = null,
   }) {
-    await assertMaintenanceWriteAllowed();
+    await assertMaintenanceWriteAllowed({ queryable });
 
-    const activeRun = await getActiveRunByMediaRequestId(mediaRequestId);
+    const activeRun = await getActiveRunByMediaRequestId(mediaRequestId, queryable);
     if (activeRun) {
       return {
         accepted: true,
@@ -52,6 +53,7 @@ export function createLibraryExternalIntakeService({
     const run = await createOperationRun({
       canonicalUrl: normalizedSource.canonicalUrl,
       mediaRequestId,
+      queryable,
       resourceType: normalizedSource.resourceType,
       sourceIdentifier: normalizedSource.sourceIdentifier,
       sourceProvider: normalizedSource.provider,
@@ -75,6 +77,7 @@ export function createLibraryExternalIntakeService({
           },
         },
         mediaRequestId,
+        queryable,
       });
     }
 
@@ -95,7 +98,7 @@ export function createLibraryExternalIntakeService({
       ipAddress: requestMetadata?.ipAddress ?? null,
       summary: 'External provider intake planning queued',
       userAgent: requestMetadata?.userAgent ?? null,
-    });
+    }, queryable);
 
     return {
       accepted: true,
