@@ -16,6 +16,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { buildExternalRequestProgressStatus } from './library-external-request-progress.js';
+
 const candidateStatusPriority = new Map([
   ['applied', 700],
   ['import_pending', 600],
@@ -115,6 +117,22 @@ function mapCandidateFulfillmentStatus(candidate) {
 
 export function buildFallbackMediaRequestFulfillmentStatus(request) {
   switch (request?.requestState) {
+    case 'cancelled':
+      return {
+        code: 'cancelled',
+        detail: 'This request was cancelled.',
+        label: 'Cancelled',
+        occurredAt: request?.updatedAt ?? request?.createdAt ?? null,
+        tone: 'idle',
+      };
+    case 'failed':
+      return {
+        code: 'failed',
+        detail: 'This request needs operator attention.',
+        label: 'Failed',
+        occurredAt: request?.updatedAt ?? request?.createdAt ?? null,
+        tone: 'failed',
+      };
     case 'already_exists':
       return {
         code: 'already_available',
@@ -143,6 +161,9 @@ export function buildFallbackMediaRequestFulfillmentStatus(request) {
 }
 
 export function buildMediaRequestFulfillmentStatus({ importCandidates = [], request } = {}) {
+  if (request?.requestState === 'cancelled') {
+    return buildFallbackMediaRequestFulfillmentStatus(request);
+  }
   if (!Array.isArray(importCandidates) || importCandidates.length === 0) {
     return buildFallbackMediaRequestFulfillmentStatus(request);
   }
@@ -208,6 +229,8 @@ export function buildMediaRequestFulfillmentCounts(mediaRequests) {
       case 'failed':
         counts.failed += 1;
         break;
+      case 'cancelled':
+        break;
       default:
         counts.underReview += 1;
         break;
@@ -219,6 +242,7 @@ export function buildMediaRequestFulfillmentCounts(mediaRequests) {
 
 export function createLibraryMediaRequestFulfillmentService({
   listImportCandidatesBySourceMediaRequestIds = async () => [],
+  listExternalRequestProgressByIds = async () => [],
   getMediaRequestById = async () => null,
 } = {}) {
   async function enrichMediaRequests(mediaRequests) {
@@ -228,15 +252,23 @@ export function createLibraryMediaRequestFulfillmentService({
       .filter(Boolean);
 
     const linkedRequestIds = requests
-      .filter((request) => request?.linkedRequestId)
+      .filter((request) => request?.requestKind !== 'external_url' && request?.linkedRequestId)
       .map((request) => normalizeMediaRequestId(request.linkedRequestId))
       .filter((id) => !sourceMediaRequestIds.includes(id));
 
     const allRequestIds = [...new Set([...sourceMediaRequestIds, ...linkedRequestIds])];
 
-    const importCandidates = allRequestIds.length > 0
-      ? await listImportCandidatesBySourceMediaRequestIds({ sourceMediaRequestIds: allRequestIds })
-      : [];
+    const externalRequestIds = requests.filter((request) => request?.requestKind === 'external_url')
+      .map((request) => normalizeMediaRequestId(request.id)).filter(Boolean);
+    const [importCandidates, externalProgress] = await Promise.all([
+      allRequestIds.length > 0
+        ? listImportCandidatesBySourceMediaRequestIds({ sourceMediaRequestIds: allRequestIds })
+        : [],
+      externalRequestIds.length > 0
+        ? listExternalRequestProgressByIds({ mediaRequestIds: externalRequestIds })
+        : [],
+    ]);
+    const progressByRequestId = new Map(externalProgress.map((progress) => [progress.mediaRequestId, progress]));
     const candidatesByRequestId = new Map();
 
     for (const candidate of importCandidates) {
@@ -261,13 +293,17 @@ export function createLibraryMediaRequestFulfillmentService({
     }
 
     return requests.map((request) => {
-      const directCandidates = candidatesByRequestId.get(normalizeMediaRequestId(request?.id)) ?? [];
+      const requestCandidates = candidatesByRequestId.get(normalizeMediaRequestId(request?.id)) ?? [];
+      const directCandidates = request?.requestKind === 'external_url'
+        ? requestCandidates.filter((candidate) => request.requestedForUser?.id
+          && candidate.normalizedPayload?.requestOwnership?.sourceRequestedForUserId === request.requestedForUser.id)
+        : requestCandidates;
 
       let linked = false;
       let linkedToUsername = null;
       let candidates = directCandidates;
 
-      if (request?.linkedRequestId && directCandidates.length === 0) {
+      if (request?.requestKind !== 'external_url' && request?.linkedRequestId && directCandidates.length === 0) {
         const primaryCandidates = candidatesByRequestId.get(normalizeMediaRequestId(request.linkedRequestId)) ?? [];
         if (primaryCandidates.length > 0) {
           candidates = primaryCandidates;
@@ -282,8 +318,11 @@ export function createLibraryMediaRequestFulfillmentService({
         }
       }
 
+      const preparationStatus = candidates.length === 0 && request?.requestState === 'needs_fetch'
+        ? buildExternalRequestProgressStatus({ request, progress: progressByRequestId.get(request.id) })
+        : null;
       const fulfillmentStatus = {
-        ...buildMediaRequestFulfillmentStatus({ importCandidates: candidates, request }),
+        ...(preparationStatus ?? buildMediaRequestFulfillmentStatus({ importCandidates: candidates, request })),
       };
 
       if (linked) {

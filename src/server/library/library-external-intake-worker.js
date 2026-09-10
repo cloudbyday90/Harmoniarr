@@ -71,6 +71,19 @@ export function createLibraryExternalIntakeWorker({
         triggerSource,
       });
 
+      await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
+      if (queueExternalMediaRequestExecution && result.providerIngestRequests.length > 0) {
+        await queueExternalMediaRequestExecution({
+          canonicalUrl: result.normalizedSource.canonicalUrl,
+          mediaRequestId,
+          resourceType: result.normalizedSource.resourceType,
+          sourceIdentifier: result.normalizedSource.sourceIdentifier,
+          sourceProvider: result.normalizedSource.provider,
+          triggerSource: 'planning_complete',
+          triggeredByUserId,
+        });
+      }
+      await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
       await markRunCompleted({
         runId,
         summary: {
@@ -86,17 +99,6 @@ export function createLibraryExternalIntakeWorker({
         },
       });
 
-      if (queueExternalMediaRequestExecution && result.providerIngestRequests.length > 0) {
-        await queueExternalMediaRequestExecution({
-          canonicalUrl: result.normalizedSource.canonicalUrl,
-          mediaRequestId,
-          resourceType: result.normalizedSource.resourceType,
-          sourceIdentifier: result.normalizedSource.sourceIdentifier,
-          sourceProvider: result.normalizedSource.provider,
-          triggerSource: 'planning_complete',
-          triggeredByUserId,
-        });
-      }
     } catch (error) {
       if (isOperationRunPauseError(error)) {
         finalLeaseStatus = 'paused';

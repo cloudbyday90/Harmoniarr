@@ -213,7 +213,9 @@ function formatTimestamp(ts) {
         <p class="hx-page-subtitle">{{ requestKindLabel }}</p>
       </div>
       <div class="hx-page-actions">
-        <span v-if="mediaRequest?.fulfillmentStatus" class="hx-pill" :data-tone="fulfillmentTone">{{ fulfillmentLabel }}</span>
+        <span role="status" aria-label="Request fulfillment" aria-atomic="true">
+          <span v-if="mediaRequest?.fulfillmentStatus" class="hx-pill" :data-tone="fulfillmentTone">{{ fulfillmentLabel }}</span>
+        </span>
         <span v-if="isRevalidating" class="rdl-revalidating" aria-label="Refreshing">↻</span>
         <button v-if="isCancellable" type="button" class="hx-btn" data-variant="danger" :disabled="isCancelling" @click="handleCancel">{{ isCancelling ? 'Cancelling\u2026' : 'Cancel request' }}</button>
         <button v-if="isAdmin && mediaRequest" type="button" class="hx-btn" data-variant="ghost" @click="openReassignModal">Reassign</button>

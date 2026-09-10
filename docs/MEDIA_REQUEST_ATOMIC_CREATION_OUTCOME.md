@@ -4,6 +4,10 @@ Status: Implemented and validated
 Date: 2026-09-10
 Design: [Research, alternatives, and recommendation stack](MEDIA_REQUEST_ATOMIC_CREATION_DESIGN.md)
 
+Follow-up: [External request target ownership outcome](EXTERNAL_REQUEST_TARGET_OWNERSHIP_OUTCOME.md)
+records the subsequent per-target planning and ownership changes. The evidence
+below describes the original atomic-creation implementation.
+
 ## Delivered behavior
 
 Music request creation now commits the eligible parent/child family, stored

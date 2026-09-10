@@ -1698,3 +1698,50 @@ test('listMediaRequests without cursor returns totalCount from countMediaRequest
   assert.equal('nextCursor' in result, false);
   assert.equal(countMediaRequests.mock.callCount(), 1);
 });
+
+for (const requestKind of ['release', 'external_url']) {
+  for (const actorUserRole of ['requester', 'operator']) {
+    test(`${actorUserRole} cancellation of their ${requestKind} parent request preserves sibling targets`, async (t) => {
+      let requestState = 'needs_fetch';
+      const updateRequestState = t.mock.fn(async ({ newState }) => {
+        requestState = newState;
+        return true;
+      });
+      const cancelFanOutChildren = t.mock.fn(async () => ['child-1', 'child-2']);
+      const insertMediaRequestEvent = t.mock.fn(async () => {});
+      const recordAuditEventFn = t.mock.fn(async () => {});
+      const service = createLibraryMediaRequestService({
+        mediaRequestStore: {
+          cancelFanOutChildren,
+          getMediaRequestById: async () => ({
+            id: 'parent-1',
+            fanOutChildCount: 2,
+            requestKind,
+            requestState,
+            requestedByUser: { id: 'admin-1' },
+            requestedForUser: { id: 'target-1' },
+          }),
+          insertMediaRequestEvent,
+          updateRequestState,
+        },
+        recordAuditEventFn,
+      });
+
+      const result = await service.cancelMediaRequest({
+        actorUserId: 'target-1',
+        actorUserRole,
+        mediaRequestId: 'parent-1',
+      });
+
+      assert.equal(result.requestState, 'cancelled');
+      assert.equal(result.cancelledChildCount, 0);
+      assert.equal(cancelFanOutChildren.mock.callCount(), 0);
+      assert.deepEqual(updateRequestState.mock.calls.map((call) => call.arguments[0]), [{
+        mediaRequestId: 'parent-1',
+        newState: 'cancelled',
+      }]);
+      assert.deepEqual(insertMediaRequestEvent.mock.calls.map((call) => call.arguments[0].mediaRequestId), ['parent-1']);
+      assert.deepEqual(recordAuditEventFn.mock.calls.map((call) => call.arguments[0].eventType), ['media_request_cancelled']);
+    });
+  }
+}

@@ -136,7 +136,7 @@ test('request creation commits every target and audit before publishing one noti
   assert.ok(fixture.calls.findIndex(({ kind }) => kind === 'COMMIT') < fixture.calls.findIndex(({ kind }) => kind === 'activity'));
 });
 
-test('external request creation queues normalized planning on the same client before commit', async () => {
+test('external request creation queues normalized planning for every target on the same client before commit', async () => {
   const fixture = createCreationFixture();
   const input = createRequestInput();
   input.request = {
@@ -154,7 +154,9 @@ test('external request creation queues normalized planning on the same client be
   assert.equal(queueCall.payload.triggeredByUserId, 'admin-1');
   assert.equal(queueCall.payload.triggerSource, 'request_submit');
   assert.equal(queueCall.payload.requestMetadata, input.requestMetadata);
-  assert.equal(fixture.calls.filter(({ kind }) => kind === 'queue').length, 1);
+  const queueCalls = fixture.calls.filter(({ kind }) => kind === 'queue');
+  assert.deepEqual(queueCalls.map(({ payload }) => payload.mediaRequestId), ['parent-1', 'child-1', 'child-2']);
+  assert.ok(queueCalls.every(({ queryable }) => queryable === fixture.client));
   assert.equal(fixture.calls.some(({ kind }) => kind === 'duplicate'), false);
   assert.ok(fixture.calls.indexOf(queueCall) < fixture.calls.findIndex(({ kind }) => kind === 'COMMIT'));
 });

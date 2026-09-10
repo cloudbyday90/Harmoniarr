@@ -24,7 +24,13 @@ Issue #4 platform evidence map: `docs/ISSUE_4_RELEASE_VALIDATION_EVIDENCE.md`
   for child, audit, and durable external-planning failures, plus Chromium proof
   of safe retry feedback. See [the focused outcome](MEDIA_REQUEST_ATOMIC_CREATION_OUTCOME.md).
   This evidence does not establish HTTP replay idempotency or completed external
-  acquisition for child targets; the latter remains an explicit follow-up.
+  acquisition for child targets. The [target ownership follow-up](EXTERNAL_REQUEST_TARGET_OWNERSHIP_OUTCOME.md)
+  adds independent child planning, cancellation, scoped fulfillment/pipeline
+  reads, and accessible preparation feedback. Provider-to-discovery handoff
+  remains a separate release gap.
+- The combined external-target change passes `npm run validate`: 7,793 tests,
+  zero failures or skips, repository checks, and both builds; its focused browser
+  status regression also passes. Exact commands and limits are in the linked outcome.
 - The September dependency update passes `npm run validate:security` with
   zero reported vulnerabilities and Windows/Alpine x64 native-package checks.
   See [dependency validation evidence](DEPENDENCY_SECURITY_UPDATE_2026_09_OUTCOME.md).

@@ -55,7 +55,7 @@ export function createLibraryMediaRequestPipelineStore({
   getPoolFn = getPool,
   queryable = null,
 } = {}) {
-  async function listPipelineCandidates({ mediaRequestId }) {
+  async function listPipelineCandidates({ mediaRequestId, requestedForUserId = null }) {
     const db = queryable ?? getPoolFn();
     const candidateResult = await db.query(
       `
@@ -65,6 +65,7 @@ export function createLibraryMediaRequestPipelineStore({
           discovered_at, created_at, updated_at
         FROM import_candidates
         WHERE normalized_payload -> 'requestOwnership' ->> 'sourceMediaRequestId' = $1
+          AND ($2::text IS NULL OR normalized_payload -> 'requestOwnership' ->> 'sourceRequestedForUserId' = $2)
         ORDER BY
           CASE status
             WHEN 'applied' THEN 0
@@ -79,7 +80,7 @@ export function createLibraryMediaRequestPipelineStore({
           END,
           updated_at DESC
       `,
-      [mediaRequestId],
+      [mediaRequestId, requestedForUserId],
     );
 
     if (candidateResult.rows.length === 0) {

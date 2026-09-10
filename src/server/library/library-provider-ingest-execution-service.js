@@ -17,6 +17,8 @@
  */
 
 import { recordAuditEvent } from '../audit.js';
+import { isOperationRunCancellationError, isOperationRunPauseError } from '../operation-run-cancellation.js';
+import { createLibraryExternalRequestActiveService } from './library-external-request-active-service.js';
 import { createLibraryMediaRequestStore } from './library-media-request-store.js';
 import { createLibraryProviderIngestRequestStore } from './library-provider-ingest-request-store.js';
 import { createLibraryProviderIngestExecutionRunStore } from './library-provider-ingest-execution-run-store.js';
@@ -48,87 +50,26 @@ function deriveSpotifyArtistAlbumsRequests({ mediaRequestId, pageData }) {
   return { derivedRequests, nextPageCursor: pageData?.next ?? null };
 }
 
-export function createLibraryExternalIntakeService({
-  assertMaintenanceWriteAllowed = async () => {},
-  createOperationRun,
-  getActiveRunByMediaRequestId,
-  getNow = () => new Date(),
-  mediaRequestStore = createLibraryMediaRequestStore(),
-  recordAuditEventFn = recordAuditEvent,
-} = {}) {
-  async function queueExternalMediaRequestPlanning({ mediaRequestId, normalizedSource, requestMetadata = {}, triggerSource = 'request_submit', triggeredByUserId = null }) {
-    await assertMaintenanceWriteAllowed();
-
-    const existingRun = await getActiveRunByMediaRequestId(mediaRequestId);
-    if (existingRun) {
-      return { accepted: true, reusedExistingRun: true, run: existingRun };
-    }
-
-    const run = await createOperationRun({
-      canonicalUrl: normalizedSource.canonicalUrl,
-      mediaRequestId,
-      resourceType: normalizedSource.resourceType,
-      sourceIdentifier: normalizedSource.sourceIdentifier,
-      sourceProvider: normalizedSource.provider,
-      status: 'pending',
-      triggerSource,
-      triggeredByUserId,
-    });
-
-    await mediaRequestStore.mergeMediaRequestEvidence({
-      evidencePatch: {
-        providerAutomation: {
-          operationRunId: run.id,
-          queuedAt: getNow().toISOString(),
-          status: 'queued',
-        },
-      },
-      mediaRequestId,
-    });
-
-    await recordAuditEventFn({
-      actorType: triggeredByUserId ? 'app_user' : 'system',
-      actorUserId: triggeredByUserId,
-      details: {
-        canonicalUrl: normalizedSource.canonicalUrl,
-        mediaRequestId,
-        operationRunId: run.id,
-        sourceProvider: normalizedSource.provider,
-        triggerSource,
-      },
-      entityId: mediaRequestId,
-      entityType: 'media_request',
-      eventType: 'library_external_intake_planning_queued',
-      ipAddress: requestMetadata.ipAddress ?? null,
-      summary: 'External provider intake planning queued',
-      userAgent: requestMetadata.userAgent ?? null,
-    });
-
-    return { accepted: true, reusedExistingRun: false, run };
-  }
-
-  return {
-    queueExternalMediaRequestPlanning,
-  };
-}
-
 export function createLibraryProviderIngestExecutionService({
   assertMaintenanceWriteAllowed = async () => {},
   executionRunStore = createLibraryProviderIngestExecutionRunStore(),
   getNow = () => new Date(),
   mediaRequestStore = createLibraryMediaRequestStore(),
+  getActiveExternalRequest = createLibraryExternalRequestActiveService({ mediaRequestStore }).getActiveExternalRequest,
   providerIngestRequestStore = createLibraryProviderIngestRequestStore(),
   recordAuditEventFn = recordAuditEvent,
   resolveProviderClients = () => ({}),
 } = {}) {
   async function queueExternalMediaRequestExecution({ mediaRequestId, canonicalUrl, resourceType, sourceIdentifier, sourceProvider, triggerSource = 'planning_complete', triggeredByUserId = null } = {}) {
     await assertMaintenanceWriteAllowed();
+    await getActiveExternalRequest({ mediaRequestId });
 
     const existingRun = await executionRunStore.getActiveRunByMediaRequestId(mediaRequestId);
     if (existingRun) {
       return { accepted: true, reusedExistingRun: true, run: existingRun };
     }
 
+    await getActiveExternalRequest({ mediaRequestId });
     const run = await executionRunStore.createOperationRun({
       canonicalUrl,
       mediaRequestId,
@@ -144,11 +85,13 @@ export function createLibraryProviderIngestExecutionService({
   }
 
   async function executeProviderIngestRequests({ mediaRequestId, operationRunId = null, triggerSource = 'planning_complete', triggeredByUserId = null } = {}) {
+    await getActiveExternalRequest({ mediaRequestId, operationRunId });
     const plannedRows = await providerIngestRequestStore.listPlannedProviderIngestRequests({ mediaRequestId });
     if (plannedRows.length === 0) {
       return { executedCount: 0, failedCount: 0, mediaRequestId };
     }
 
+    await getActiveExternalRequest({ mediaRequestId, operationRunId });
     const clients = await resolveProviderClients();
     const settings = clients.settings ?? {};
     const playlistExpansionPolicy = normalizePlaylistExpansionPolicy(settings.playlistExpansionPolicy);
@@ -159,6 +102,7 @@ export function createLibraryProviderIngestExecutionService({
     const derivedIngestRequests = [];
 
     for (const row of plannedRows) {
+      await getActiveExternalRequest({ mediaRequestId, operationRunId });
       try {
         let pageData = null;
         let nextPageCursor = null;
@@ -223,6 +167,9 @@ export function createLibraryProviderIngestExecutionService({
           }
         }
 
+        // A cancelled request must not publish new provider results or derived work.
+        await getActiveExternalRequest({ mediaRequestId, operationRunId });
+
         // Persist raw provider response as evidence on the row.
         await providerIngestRequestStore.updateProviderIngestRequestStatus({
           evidence: { fetchedAt: getNow().toISOString(), response: pageData },
@@ -234,6 +181,9 @@ export function createLibraryProviderIngestExecutionService({
         derivedIngestRequests.push(...newDerivedRequests);
         executedCount++;
       } catch (error) {
+        if (isOperationRunCancellationError(error) || isOperationRunPauseError(error) || error?.code === 'media_request_not_found') {
+          throw error;
+        }
         await providerIngestRequestStore.updateProviderIngestRequestStatus({
           evidence: { errorCode: error.code ?? 'unknown_error', errorMessage: error.message, failedAt: getNow().toISOString() },
           id: row.id,
@@ -244,6 +194,8 @@ export function createLibraryProviderIngestExecutionService({
       }
     }
 
+    await getActiveExternalRequest({ mediaRequestId, operationRunId });
+
     // Persist any derived ingest requests (e.g. album rows from a playlist page).
     let insertedDerived = [];
     if (derivedIngestRequests.length > 0) {
@@ -252,6 +204,7 @@ export function createLibraryProviderIngestExecutionService({
       });
     }
 
+    await getActiveExternalRequest({ mediaRequestId, operationRunId });
     const executedAt = getNow().toISOString();
     await mediaRequestStore.mergeMediaRequestEvidence({
       evidencePatch: {

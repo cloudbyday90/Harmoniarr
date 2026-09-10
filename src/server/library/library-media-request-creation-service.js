@@ -120,17 +120,19 @@ export function createLibraryMediaRequestCreationService({
         }, queryable);
       }
 
-      // Persist required planning intent on this client. The existing worker can
-      // discover it only after COMMIT; no provider execution occurs here.
+      // Every target owns its planning intent. Workers discover these jobs only
+      // after COMMIT; no provider execution occurs inside the transaction.
       if (normalizedSource && externalIntakeService?.queueExternalMediaRequestPlanning) {
-        await externalIntakeService.queueExternalMediaRequestPlanning({
-          mediaRequestId: parent.id,
-          normalizedSource,
-          queryable,
-          requestMetadata,
-          triggerSource: 'request_submit',
-          triggeredByUserId: request.requestedByUserId,
-        });
+        for (const targetRequest of [parent, ...children]) {
+          await externalIntakeService.queueExternalMediaRequestPlanning({
+            mediaRequestId: targetRequest.id,
+            normalizedSource,
+            queryable,
+            requestMetadata,
+            triggerSource: 'request_submit',
+            triggeredByUserId: request.requestedByUserId,
+          });
+        }
       }
       return { children, linked: Boolean(linkedRequestId), parent };
     });

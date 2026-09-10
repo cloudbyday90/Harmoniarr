@@ -35,13 +35,18 @@ export function createLibraryMediaRequestPipelineService({
       return { candidates: [] };
     }
 
-    await getReadableMediaRequest({
+    const request = await getReadableMediaRequest({
       actorUserId,
       actorUserRole,
       mediaRequestId,
     });
 
-    const candidates = await pipelineStore.listPipelineCandidates({ mediaRequestId });
+    const candidates = await pipelineStore.listPipelineCandidates({
+      mediaRequestId,
+      ...(request?.requestKind === 'external_url'
+        ? { requestedForUserId: request.requestedForUser?.id ?? '' }
+        : {}),
+    });
 
     return {
       candidates: candidates.map((candidate, index) => projectMediaRequestPipelineCandidate(candidate, {

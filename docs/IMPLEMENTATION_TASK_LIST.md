@@ -15,15 +15,21 @@ Database model source: `docs/DATABASE_MODEL.md`
   database errors and exposes accessible status/alert regions. See
   [design](MEDIA_REQUEST_ATOMIC_CREATION_DESIGN.md) and
   [outcome](MEDIA_REQUEST_ATOMIC_CREATION_OUTCOME.md).
-- Follow-up: prove external URL child fulfillment and ownership propagation;
-  then address the confirmed Music Queue/provider-catalog pagination gaps.
+- External URL children now receive their own planning jobs in the same
+  creation transaction. Preparation, cancellation, and fulfillment remain
+  target-scoped; parent completion cannot complete a sibling. See the
+  [ownership design](EXTERNAL_REQUEST_TARGET_OWNERSHIP_DESIGN.md) and
+  [outcome](EXTERNAL_REQUEST_TARGET_OWNERSHIP_OUTCOME.md).
+- Follow-up: connect prepared provider metadata to target-owned discovery and
+  add audited recovery for historical children without planning jobs. Then
+  address the confirmed Music Queue/provider-catalog pagination gaps.
 - Release security validation also led to compatible sharp and qs updates.
   The final dependency audit reports zero vulnerabilities; Windows and Alpine
   native compatibility checks passed. See the [dependency design](DEPENDENCY_SECURITY_UPDATE_2026_09_DESIGN.md)
   and [validation outcome](DEPENDENCY_SECURITY_UPDATE_2026_09_OUTCOME.md).
-- Final combined validation passed 7,747 tests with zero failures or skips,
-  repository policy/lint checks, and both builds. The focused Request Music
-  Chromium/PostgreSQL regression also passed against the final dependencies.
+- Final combined validation passed 7,793 tests with zero failures or skips,
+  repository policy/lint checks, and both builds. The focused Request Detail
+  preparation-feedback browser regression also passed.
 
 ## Current Status (2026-05-23)
 

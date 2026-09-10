@@ -25,6 +25,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
   const createMediaRequest = () => {};
   const extractLibraryFileTags = () => {};
   const listMediaRequests = () => {};
+  const listMediaRequestEventsPage = () => {};
   const matchLibraryFiles = () => {};
   const prefetchMonitoredArtistArtwork = () => {};
   const reconcileDiscoveryRequests = () => {};
@@ -50,7 +51,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
   const getMediaRequestReassignmentHistory = () => {};
   const cancelMediaRequest = () => {};
   const reassignMediaRequest = () => {};
-  const libraryMediaRequestService = { buildMediaRequestDetail, buildMediaRequestSummary, cancelMediaRequest, createMediaRequest, getMediaRequestReassignmentHistory, listMediaRequests, reassignMediaRequest };
+  const libraryMediaRequestService = { buildMediaRequestDetail, buildMediaRequestSummary, cancelMediaRequest, createMediaRequest, getMediaRequestReassignmentHistory, listMediaRequestEventsPage, listMediaRequests, reassignMediaRequest };
   const libraryMediaRequestStore = {};
   const libraryOrganizeApplyRunStore = {};
   const libraryOrganizeApplyService = { startLibraryOrganizeApplyRun };
@@ -210,6 +211,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
     cancelMediaRequest,
     createMediaRequest,
     getMediaRequestReassignmentHistory,
+    listMediaRequestEventsPage,
     listMediaRequests,
     reassignMediaRequest,
     retryDownloadRecoveryDiscoveryRequest,

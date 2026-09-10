@@ -21,22 +21,17 @@ import { recordAuditEvent } from '../audit.js';
 import { buildProviderIngestPlan, normalizeExternalMediaSource } from './external-media-source-parser.js';
 import { createLibraryMediaRequestStore } from './library-media-request-store.js';
 import { createLibraryProviderIngestRequestStore } from './library-provider-ingest-request-store.js';
+import { createLibraryExternalRequestActiveService } from './library-external-request-active-service.js';
 
 export function createLibraryProviderIngestPlanningService({
   getNow = () => new Date(),
   mediaRequestStore = createLibraryMediaRequestStore(),
+  getActiveExternalRequest = createLibraryExternalRequestActiveService({ mediaRequestStore }).getActiveExternalRequest,
   providerIngestRequestStore = createLibraryProviderIngestRequestStore(),
   recordAuditEventFn = recordAuditEvent,
 } = {}) {
   async function planExternalMediaRequest({ mediaRequestId, operationRunId = null, triggeredByUserId = null, triggerSource = 'request_submit' } = {}) {
-    const mediaRequest = await mediaRequestStore.getMediaRequestById({ mediaRequestId });
-    if (!mediaRequest) {
-      throw createApiError(404, 'media_request_not_found', 'Media request was not found');
-    }
-
-    if (mediaRequest.requestKind !== 'external_url' || !mediaRequest.sourceUrl) {
-      throw createApiError(409, 'media_request_not_external_url', 'Media request does not contain an external provider URL');
-    }
+    const mediaRequest = await getActiveExternalRequest({ mediaRequestId, operationRunId });
 
     const normalizedSource = normalizeExternalMediaSource(mediaRequest.sourceUrl);
     if (!normalizedSource) {
@@ -48,6 +43,7 @@ export function createLibraryProviderIngestPlanningService({
       mediaRequestId,
       providerIngestRequests: ingestPlan,
     });
+    await getActiveExternalRequest({ mediaRequestId, operationRunId });
     const plannedAt = getNow().toISOString();
 
     await mediaRequestStore.mergeMediaRequestEvidence({

@@ -70,6 +70,7 @@ export function createLibraryProviderIngestExecutionWorker({
         triggeredByUserId,
       });
 
+      await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
       await markRunCompleted({
         runId,
         summary: {

@@ -24,6 +24,7 @@ import { createLibraryCatalogStore } from './library-catalog-store.js';
 import { createLibraryExternalIntakeRunStore } from './library-external-intake-run-store.js';
 import { createLibraryExternalIntakeService } from './library-external-intake-service.js';
 import { createLibraryExternalIntakeWorker } from './library-external-intake-worker.js';
+import { createLibraryExternalRequestProgressStore } from './library-external-request-progress-store.js';
 import { createLibraryProviderIngestExecutionRunStore } from './library-provider-ingest-execution-run-store.js';
 import { createLibraryProviderIngestExecutionService } from './library-provider-ingest-execution-service.js';
 import { createLibraryProviderIngestExecutionWorker } from './library-provider-ingest-execution-worker.js';
@@ -124,7 +125,9 @@ export function createLibraryModule({
   }),
   libraryReleaseAvailabilityStore = createLibraryReleaseAvailabilityStore(),
   libraryMediaRequestStore = createLibraryMediaRequestStore(),
+  libraryExternalRequestProgressStore = createLibraryExternalRequestProgressStore(),
   libraryMediaRequestFulfillmentService = createLibraryMediaRequestFulfillmentService({
+    listExternalRequestProgressByIds: libraryExternalRequestProgressStore.listExternalRequestProgressByIds,
     listImportCandidatesBySourceMediaRequestIds: importCandidateService?.listImportCandidatesBySourceMediaRequestIds,
     getMediaRequestById: libraryMediaRequestStore.getMediaRequestById,
   }),
@@ -463,6 +466,7 @@ export function createLibraryModule({
       cancelMediaRequest: libraryMediaRequestService.cancelMediaRequest,
       createMediaRequest: libraryMediaRequestService.createMediaRequest,
       getMediaRequestReassignmentHistory: libraryMediaRequestService.getMediaRequestReassignmentHistory,
+      listMediaRequestEventsPage: libraryMediaRequestService.listMediaRequestEventsPage,
       listMediaRequests: libraryMediaRequestService.listMediaRequests,
       reassignMediaRequest: libraryMediaRequestService.reassignMediaRequest,
       retryDownloadRecoveryDiscoveryRequest: libraryDiscoveryRecoveryRetryService.retryDownloadRecoveryDiscoveryRequest,

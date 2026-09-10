@@ -4,6 +4,9 @@ Status: Implemented
 Date: 2026-09-10
 Outcome: [Implementation and validation outcome](MEDIA_REQUEST_ATOMIC_CREATION_OUTCOME.md)
 
+Follow-up: [External request target ownership](EXTERNAL_REQUEST_TARGET_OWNERSHIP_DESIGN.md)
+extends this transaction to planning jobs for every eligible external target.
+
 ## Problem and product boundary
 
 An administrator can request music for multiple eligible users. Before this
@@ -113,7 +116,8 @@ No PR was applied or merged because none fit this change and runtime baseline.
 
 ## Next item
 
-Independent review found a more immediate follow-up: external URL families queue
+At the conclusion of this change, independent review found a more immediate
+follow-up: external URL families queue
 planning for the parent, while children currently have neither their own
 planning run nor a link that fulfillment follows to the parent. Define and prove
 the shared fulfillment/ownership contract for these children before claiming

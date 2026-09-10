@@ -26,7 +26,7 @@ test('listPipelineCandidates returns empty without querying run items when no ca
 
   assert.deepEqual(await store.listPipelineCandidates({ mediaRequestId: 'req-1' }), []);
   assert.equal(query.mock.callCount(), 1);
-  assert.deepEqual(query.mock.calls[0].arguments[1], ['req-1']);
+  assert.deepEqual(query.mock.calls[0].arguments[1], ['req-1', null]);
 });
 
 test('listPipelineCandidates maps the latest execution snapshot and apply state', async () => {

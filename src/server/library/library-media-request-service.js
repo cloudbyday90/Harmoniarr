@@ -817,7 +817,7 @@ export function createLibraryMediaRequestService({
 
     let cancelledChildIds = [];
 
-    if (existingRequest.fanOutChildCount > 0) {
+    if (actorUserRole === 'admin' && existingRequest.fanOutChildCount > 0) {
       cancelledChildIds = await mediaRequestStore.cancelFanOutChildren({
         parentMediaRequestId: mediaRequestId,
         cancellableStates: CANCELLABLE_STATES,

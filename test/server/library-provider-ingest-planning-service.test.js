@@ -80,6 +80,7 @@ test('planExternalMediaRequest rejects when provider URL is unsupported', async 
       getMediaRequestById: async () => ({
         id: 'req-1',
         requestKind: 'external_url',
+        requestState: 'needs_fetch',
         sourceUrl: 'https://example.com/unsupported',
       }),
       mergeMediaRequestEvidence: async () => {},
@@ -93,4 +94,53 @@ test('planExternalMediaRequest rejects when provider URL is unsupported', async 
     service.planExternalMediaRequest({ mediaRequestId: 'req-1' }),
     (error) => error?.code === 'provider_url_not_supported',
   );
+});
+
+test('planExternalMediaRequest stops before writing a plan for a cancelled child', async (t) => {
+  const replaceProviderIngestRequests = t.mock.fn(async () => []);
+  const service = createLibraryProviderIngestPlanningService({
+    mediaRequestStore: {
+      getMediaRequestById: async () => ({
+        id: 'child-1',
+        requestKind: 'external_url',
+        requestState: 'cancelled',
+        sourceUrl: 'https://open.spotify.com/album/album-1',
+      }),
+    },
+    providerIngestRequestStore: { replaceProviderIngestRequests },
+  });
+
+  await assert.rejects(service.planExternalMediaRequest({ mediaRequestId: 'child-1', operationRunId: 'run-1' }), {
+    code: 'operation_run_cancelled',
+    runId: 'run-1',
+  });
+  assert.equal(replaceProviderIngestRequests.mock.callCount(), 0);
+});
+
+test('planExternalMediaRequest does not publish successful planning after cancellation during persistence', async (t) => {
+  let requestState = 'needs_fetch';
+  const mergeMediaRequestEvidence = t.mock.fn(async () => {});
+  const recordAuditEventFn = t.mock.fn(async () => {});
+  const service = createLibraryProviderIngestPlanningService({
+    mediaRequestStore: {
+      getMediaRequestById: async () => ({
+        id: 'child-1',
+        requestKind: 'external_url',
+        requestState,
+        sourceUrl: 'https://open.spotify.com/album/album-1',
+      }),
+      mergeMediaRequestEvidence,
+    },
+    providerIngestRequestStore: {
+      replaceProviderIngestRequests: async () => {
+        requestState = 'cancelled';
+        return [{ id: 'plan-1' }];
+      },
+    },
+    recordAuditEventFn,
+  });
+
+  await assert.rejects(service.planExternalMediaRequest({ mediaRequestId: 'child-1' }), { code: 'operation_run_cancelled' });
+  assert.equal(mergeMediaRequestEvidence.mock.callCount(), 0);
+  assert.equal(recordAuditEventFn.mock.callCount(), 0);
 });

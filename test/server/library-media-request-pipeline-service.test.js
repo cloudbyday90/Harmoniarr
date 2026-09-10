@@ -59,6 +59,16 @@ test('buildPipeline authorizes the request before loading candidates', async (t)
   }]);
 });
 
+test('external pipeline reads use the current target owner after request authorization', async (t) => {
+  const listPipelineCandidates = t.mock.fn(async () => []);
+  const service = createLibraryMediaRequestPipelineService({
+    getReadableMediaRequest: async () => ({ id: 'child', requestKind: 'external_url', requestedForUser: { id: 'current-owner' } }),
+    pipelineStore: { listPipelineCandidates },
+  });
+  await service.buildPipeline({ actorUserId: 'admin', actorUserRole: 'admin', mediaRequestId: 'child' });
+  assert.deepEqual(listPipelineCandidates.mock.calls[0].arguments, [{ mediaRequestId: 'child', requestedForUserId: 'current-owner' }]);
+});
+
 test('buildPipeline returns requester-safe candidates without peer, folder, or run diagnostics', async () => {
   const service = createLibraryMediaRequestPipelineService({
     getReadableMediaRequest: async () => ({ id: 'req-1' }),
