@@ -101,6 +101,8 @@ Recommended stack: Node 24 LTS, modular native ESM factories, parameterized Post
 
 The next release item is **immutable-image fresh-install and upgrade acceptance**, including the new pagination indexes and packaged recovery tools. Performance materialization and automatic provider traversal should follow evidence of need and safe operating limits.
 
+September 11 follow-up: [immutable candidate acceptance](IMMUTABLE_CANDIDATE_ACCEPTANCE_OUTCOME.md) now proves this transition against source-identified local image IDs, including the 97-to-98 migration upgrade and retained request ownership. Published digest/provenance and accepted-baseline gates remain open. The next bounded code recommendation is cancellation/reassignment Activity event continuity.
+
 ## Open PR disposition
 
 GitHub MCP refreshed all three open PRs and their complete patches. None contains an applicable change: #23 and #24 are superseded by newer pinned local actions; #40 changes only the controlled test fixture to Node 26 while the platform remains on Node 24 LTS. The design records verified links and immutable heads. No PR was applied, modified, or merged.

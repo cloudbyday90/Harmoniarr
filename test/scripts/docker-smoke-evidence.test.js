@@ -124,6 +124,16 @@ test('assertDockerSmokeEvidenceContract validates released-image evidence payloa
   assert.equal(evidence.validationResult.requestMusicFlow.delegatedRequestId, 'request-1');
 });
 
+test('upgrade-path evidence uses the upgrade contract emitted by deployment validation', () => {
+  for (const validationKind of ['upgrade', 'upgrade-path']) {
+    assert.throws(() => createDockerSmokeEvidence({ validationKind, validationResult: {} }), /settingsPersistence must be an object/);
+    assert.throws(() => createDockerSmokeEvidence({ validationKind, validationResult: { settingsPersistence: {} } }), /upgradedRuntime must be an object/);
+    assert.equal(createDockerSmokeEvidence({ validationKind,
+      validationResult: { settingsPersistence: { persisted: true }, upgradedRuntime: {} },
+    }).validationKind, validationKind);
+  }
+});
+
 test('assertDockerSmokeEvidenceContract validates docker provider acceptance evidence payloads', () => {
   const evidence = assertDockerSmokeEvidenceContract({
     generatedAt: '2026-06-28T00:00:00.000Z',

@@ -14,6 +14,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createSessionHttpClient } from '../src/shared/http-session-client.js';
 import { runBufferedCommand } from './process-runtime.js';
+import { cleanupDockerSmokeWorkspace } from './docker-smoke-cleanup.js';
 
 const rootDir = fileURLToPath(new URL('..', import.meta.url));
 const embeddedPostgresInitLogSnippet = 'initializing embedded PostgreSQL cluster at';
@@ -1305,12 +1306,15 @@ export async function validateDockerFreshInstall({
   requestTimeoutMs = defaultSessionRequestTimeoutMs,
   runCommandFn = runCommand,
   smokeAdminCredentials = defaultSmokeAdminCredentials,
+  smokeRequestTargetCredentials = defaultSmokeRequestTargetCredentials,
   startupRefusalCommandTimeoutMs = defaultStartupRefusalCommandTimeoutMs,
   startupValidationFailureScenario = defaultStartupValidationFailureScenario,
+  strictCleanup = false,
   tempRootDir = tmpdir(),
   verifyBackupRestoreFlow = false,
   verifyExistingDataRestart = false,
   verifyRequestMusicFlow = false,
+  verifyRuntimeFn = null,
 } = {}) {
   const workspaceRoot = await mkdtempFn(resolve(tempRootDir, 'harmoniarr-docker-smoke-'));
   const port = await getAvailablePortFn();
@@ -1340,6 +1344,9 @@ export async function validateDockerFreshInstall({
       port,
       runCommandFn,
     });
+    if (verifyRuntimeFn) {
+      freshInstall.acceptance = await verifyRuntimeFn({ composeArgs, env, runCommandFn, phase: 'fresh-install' });
+    }
 
     let backupRestoreFlow = null;
     let embeddedPostgresPersistence = null;
@@ -1379,6 +1386,7 @@ export async function validateDockerFreshInstall({
         port,
         requestTimeoutMs,
         smokeAdminCredentials,
+        targetUserCredentials: smokeRequestTargetCredentials,
       });
     }
 
@@ -1414,6 +1422,9 @@ export async function validateDockerFreshInstall({
         port,
         runCommandFn,
       });
+      if (verifyRuntimeFn) {
+        existingDataRestart.acceptance = await verifyRuntimeFn({ composeArgs, env, runCommandFn, phase: 'existing-data-restart' });
+      }
       embeddedPostgresPersistence = await verifyEmbeddedPostgresPersistenceProbe({
         composeArgs,
         env,
@@ -1442,6 +1453,7 @@ export async function validateDockerFreshInstall({
 
     return {
       backupRestoreFlow,
+      ...(strictCleanup ? { cleanupVerified: true } : {}),
       embeddedPostgresPersistence,
       existingDataRestart,
       freshInstall,
@@ -1453,18 +1465,9 @@ export async function validateDockerFreshInstall({
       workspaceRoot,
     };
   } finally {
-    try {
-      await stopComposeProject({
-        composeArgs,
-        env,
-        removeVolumes: true,
-        runCommandFn,
-      });
-    } catch {
-      // Best-effort cleanup keeps the validation idempotent without masking the original failure.
-    }
-
-    await removeFn(workspaceRoot, { force: true, recursive: true });
+    await cleanupDockerSmokeWorkspace({ composeArgs, env, projectName, removeFn, runCommandFn,
+      stopProjectFn: stopComposeProject, strictCleanup, tempRootDir, workspaceRoot,
+      workspacePrefix: 'harmoniarr-docker-smoke-' });
   }
 }
 
@@ -1484,7 +1487,9 @@ export async function validateDockerUpgradePath({
   runCommandFn = runCommand,
   settingsProbe = defaultUpgradeSettingsProbe,
   smokeAdminCredentials = defaultSmokeAdminCredentials,
+  strictCleanup = false,
   tempRootDir = tmpdir(),
+  verifyRuntimeFn = null,
 } = {}) {
   if (typeof baselineImageRef !== 'string' || baselineImageRef.trim().length === 0) {
     throw new Error('baselineImageRef is required to validate the Docker upgrade path');
@@ -1540,6 +1545,9 @@ export async function validateDockerUpgradePath({
       client: baselineClient,
       settingsPatch: settingsProbe,
     });
+    if (verifyRuntimeFn) {
+      baselineRuntime.acceptance = await verifyRuntimeFn({ composeArgs, env: baselineEnv, runCommandFn, phase: 'baseline' });
+    }
 
     await stopComposeProject({
       composeArgs,
@@ -1564,6 +1572,9 @@ export async function validateDockerUpgradePath({
       port,
       runCommandFn,
     });
+    if (verifyRuntimeFn) {
+      upgradedRuntime.acceptance = await verifyRuntimeFn({ composeArgs, env: candidateEnv, runCommandFn, phase: 'upgraded' });
+    }
     const settingsPersistence = await validateUpgradeSettingsPersistence({
       fetchFn,
       port,
@@ -1574,6 +1585,7 @@ export async function validateDockerUpgradePath({
 
     return {
       baselineImageRef,
+      ...(strictCleanup ? { cleanupVerified: true } : {}),
       baselineRuntime,
       candidateImageRef: candidateImageRef ?? null,
       port,
@@ -1586,17 +1598,8 @@ export async function validateDockerUpgradePath({
       workspaceRoot,
     };
   } finally {
-    try {
-      await stopComposeProject({
-        composeArgs,
-        env: candidateEnv,
-        removeVolumes: true,
-        runCommandFn,
-      });
-    } catch {
-      // Best-effort cleanup keeps the validation idempotent without masking the original failure.
-    }
-
-    await removeFn(workspaceRoot, { force: true, recursive: true });
+    await cleanupDockerSmokeWorkspace({ composeArgs, env: candidateEnv, projectName, removeFn, runCommandFn,
+      stopProjectFn: stopComposeProject, strictCleanup, tempRootDir, workspaceRoot,
+      workspacePrefix: 'harmoniarr-docker-upgrade-' });
   }
 }

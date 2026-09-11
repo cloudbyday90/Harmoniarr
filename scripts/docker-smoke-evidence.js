@@ -283,6 +283,7 @@ export function assertDockerSmokeValidationResultContract({
       assertFreshInstallValidationResult(normalizedValidationResult, validationKind);
       break;
     case 'upgrade':
+    case 'upgrade-path':
       assertUpgradeValidationResult(normalizedValidationResult, validationKind);
       break;
     case 'docker-provider-acceptance':

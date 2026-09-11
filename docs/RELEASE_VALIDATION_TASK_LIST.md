@@ -42,8 +42,13 @@ Issue #4 platform evidence map: `docs/ISSUE_4_RELEASE_VALIDATION_EVIDENCE.md`
   progress](MUSIC_QUEUE_PAGINATION_OUTCOME.md) replaces the capped broad decision
   read with bounded cursor traversal and adds safe current-collection preparation
   counts. Its tests and limits are recorded separately from packaged release proof.
-- [ ] Capture immutable candidate-image fresh-install and upgrade evidence for the
-  pagination schema and packaged recovery environment before release closure.
+- [x] Capture immutable local candidate-image fresh-install, restart, and upgrade
+  evidence for the pagination schema and packaged recovery environment. The
+  [candidate acceptance outcome](IMMUTABLE_CANDIDATE_ACCEPTANCE_OUTCOME.md) records
+  the 97-to-98 migration transition, request continuity, runtime identity, and cleanup.
+- [ ] Repeat strict candidate acceptance with published registry digests, verified
+  provenance, an accepted release baseline, and each supported platform. Local
+  image evidence does not close the artifact-delivery trust gate.
 
 - Atomic multi-user request creation now has PostgreSQL failure-injection proof
   for child, audit, and durable external-planning failures, plus Chromium proof

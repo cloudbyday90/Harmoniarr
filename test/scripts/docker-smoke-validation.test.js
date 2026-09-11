@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { mkdtemp, stat } from 'node:fs/promises';
 import test from 'node:test';
 
 import { validateDockerFreshInstall, validateDockerUpgradePath } from '../../scripts/docker-smoke-validation.js';
@@ -958,4 +959,85 @@ test('validateDockerUpgradePath validates persisted settings across a baseline-t
   assert.equal(composeUpCalls.length, 2);
   assert.ok(composeUpCalls[0].args.includes('--no-build'));
   assert.ok(composeUpCalls[1].args.includes('--build'));
+});
+
+function createHookTestOptions({ fetchFn, runCommandFn } = {}) {
+  return { fetchFn: fetchFn ?? (async () => createFetchResponse({ ok: true, pendingMigrations: 0, service: 'ok' })),
+    getAvailablePortFn: async () => 4307, processEnv: {}, projectName: 'harmoniarr-hooks-test',
+    mkdtempFn: async () => '/tmp/harmoniarr-docker-smoke-hooks', removeFn: async () => {},
+    makeDirectoryLayoutFn: async () => ({ appData: '/tmp/appdata', downloads: '/tmp/downloads',
+      music: '/tmp/music', staging: '/tmp/staging', transcodeTemp: '/tmp/transcode-temp' }),
+    runCommandFn: runCommandFn ?? createRunCommandStub().runCommandFn,
+    startupValidationFailureScenario: null,
+  };
+}
+
+test('fresh install and restart verify each actual runtime and retain separate acceptance results', async () => {
+  const phases = [];
+  const result = await validateDockerFreshInstall({ ...createHookTestOptions(), imageRef: 'sha256:fixture',
+    verifyExistingDataRestart: true,
+    verifyRuntimeFn: async (context) => {
+      phases.push(context.phase);
+      assert.equal(context.env.HARMONIARR_IMAGE, 'sha256:fixture');
+      assert.ok(context.composeArgs.includes('harmoniarr-hooks-test'));
+      assert.equal(typeof context.runCommandFn, 'function');
+      return { checked: context.phase };
+    },
+  });
+  assert.deepEqual(phases, ['fresh-install', 'existing-data-restart']);
+  assert.deepEqual(result.freshInstall.acceptance, { checked: 'fresh-install' });
+  assert.deepEqual(result.existingDataRestart.acceptance, { checked: 'existing-data-restart' });
+});
+
+test('upgrade verifies baseline after authenticated settings mutation and verifies the distinct upgraded runtime', async () => {
+  const api = createSmokeApiFetchStub();
+  const commands = createRunCommandStub();
+  const observed = [];
+  const result = await validateDockerUpgradePath({ ...createHookTestOptions({ fetchFn: api.fetchFn, runCommandFn: commands.runCommandFn }),
+    baselineImageRef: 'sha256:baseline', candidateImageRef: 'sha256:candidate',
+    verifyRuntimeFn: async (context) => {
+      if (context.phase === 'baseline') {
+        assert.ok(api.calls.some((call) => call.method === 'PUT' && call.path === '/api/v1/settings'));
+        assert.equal(commands.calls.filter((call) => call.args.includes('down')).length, 0);
+      }
+      observed.push([context.phase, context.env.HARMONIARR_IMAGE]);
+      return { checked: true };
+    },
+  });
+  assert.deepEqual(observed, [['baseline', 'sha256:baseline'], ['upgraded', 'sha256:candidate']]);
+  assert.equal(result.baselineRuntime.acceptance.checked, true);
+  assert.equal(result.upgradedRuntime.acceptance.checked, true);
+});
+
+test('failed runtime acceptance rejects the scenario and still attempts cleanup', async () => {
+  const commands = createRunCommandStub();
+  await assert.rejects(validateDockerFreshInstall({ ...createHookTestOptions({ runCommandFn: commands.runCommandFn }),
+    verifyRuntimeFn: async () => { throw new Error('Packaged image mismatch'); },
+  }), /Packaged image mismatch/);
+  assert.ok(commands.calls.some((call) => call.args.includes('down') && call.args.includes('--volumes')));
+});
+
+test('fresh install delegates request music with caller-generated target credentials', async () => {
+  const api = createSmokeApiFetchStub();
+  const credentials = { username: 'random-listener', role: 'requester', password: 'unique-fixture-password-A1!' };
+  const result = await validateDockerFreshInstall({ ...createHookTestOptions({ fetchFn: api.fetchFn }),
+    smokeRequestTargetCredentials: credentials, verifyRequestMusicFlow: true,
+  });
+  assert.equal(result.requestMusicFlow.requestedForUsername, 'random-listener');
+});
+
+test('strict smoke scenarios return cleanup proof only after actual owned workspace removal', async () => {
+  for (const scenario of [validateDockerFreshInstall, validateDockerUpgradePath]) {
+    const commands = createRunCommandStub();
+    let workspaceRoot;
+    const result = await scenario({ ...createHookTestOptions({ fetchFn: createSmokeApiFetchStub().fetchFn }),
+      baselineImageRef: 'sha256:baseline', candidateImageRef: 'sha256:candidate', strictCleanup: true,
+      mkdtempFn: async (prefix) => { workspaceRoot = await mkdtemp(prefix); return workspaceRoot; },
+      removeFn: undefined,
+      runCommandFn: async (request) => ['container', 'network', 'volume'].includes(request.args[0])
+        ? { exitCode: 0, stdout: '' } : commands.runCommandFn(request),
+    });
+    assert.equal(result.cleanupVerified, true);
+    await assert.rejects(stat(workspaceRoot), { code: 'ENOENT' });
+  }
 });
