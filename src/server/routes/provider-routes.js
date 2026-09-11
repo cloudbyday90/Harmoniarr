@@ -19,6 +19,7 @@
 import { createRequestAuthDependencies } from '../auth-module.js';
 import { asyncRoute } from '../http.js';
 import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
+import { registerProviderCollectionAccessRoutes } from './provider-collection-access-routes.js';
 
 const defaultRequestAuthDependencies = createRequestAuthDependencies();
 
@@ -57,6 +58,7 @@ export function registerProviderRoutes(app, {
   buildPlexLinkStatus,
   buildSpotifyOAuthStatus,
   buildYoutubeOAuthStatus,
+  checkProviderCollectionAccess,
   clearPlexLink,
   clearSpotifyAuthorization,
   clearYoutubeAuthorization,
@@ -66,6 +68,7 @@ export function registerProviderRoutes(app, {
   getRequestMetadata = defaultRequestAuthDependencies.getRequestMetadata,
   limitProviderOAuthStart = skipRateLimitMiddleware,
   limitProviderOAuthClear = skipRateLimitMiddleware,
+  limitProviderAccessCheck = skipRateLimitMiddleware,
   requireCsrf = defaultRequestAuthDependencies.requireCsrf,
   requireFreshAdminSession = defaultRequestAuthDependencies.requireFreshAdminSession,
   requireSession = defaultRequestAuthDependencies.requireSession,
@@ -73,6 +76,10 @@ export function registerProviderRoutes(app, {
   startSpotifyAuthorization,
   startYoutubeAuthorization,
 }) {
+  registerProviderCollectionAccessRoutes(app, {
+    checkProviderCollectionAccess, limitProviderAccessCheck, requireCsrf, requireFreshAdminSession,
+  });
+
   app.get('/api/v1/providers/status', asyncRoute(async (request, response) => {
     await requireSession(request);
 

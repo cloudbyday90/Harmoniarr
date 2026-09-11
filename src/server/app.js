@@ -856,6 +856,12 @@ export function createApp({
   });
   mountProviderRoutes(app, {
     ...providerModule.routeDependencies,
+    limitProviderAccessCheck: requestRateLimiterService.createMiddleware({
+      bucketName: 'provider-collection-access',
+      keyFn: () => 'single-node',
+      limit: 4,
+      windowMs: 60 * 1000,
+    }),
     limitProviderOAuthStart: requestRateLimiterService.createMiddleware({
       bucketName: 'provider-oauth-start',
       limit: 10,

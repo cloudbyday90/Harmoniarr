@@ -49,6 +49,8 @@ The broader ownership regression now verifies that an imported historical playli
 
 ## Recommendations and next release item
 
+Follow-up: the bounded provider diagnostic and opt-in evidence collector are now implemented. See the separate [provider access outcome](PROVIDER_ACCESS_ACCEPTANCE_OUTCOME.md) for validation, current live-access limitations, and the next release priorities. The table below records the recommendations at this document's original baseline.
+
 | Priority | Recommendation | Benefit | Cost or limitation |
 | --- | --- | --- | --- |
 | 1 | Add opt-in live-provider acceptance evidence and provider access diagnostics | Verifies authenticated multi-page access, actual envelopes, throttling, and Spotify quota-mode behavior on supported accounts. | Requires operator-owned credentials and test collections; provider entitlements can limit coverage. |

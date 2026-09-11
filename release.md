@@ -36,6 +36,7 @@ These workflows make up the release boundary that must stay green for a real rel
 - `npm run validate` passes on the release commit.
 - `npm run validate:database` passes when migrations, schema bootstrap, or startup preparation changed.
 - `npm run validate:security` passes.
+- Provider-collection access claims are backed by source-specific opt-in evidence from [the provider access runbook](docs/PROVIDER_ACCESS_ACCEPTANCE_OUTCOME.md); controlled tests and saved configuration alone do not establish live account access.
 - Schema snapshot is refreshed when migrations changed.
 - Docker image builds locally when Docker is available.
 - If release, maintenance, or mirror scripts changed, the affected workflow scripts are replayed locally with the `node --env-file` pattern from [docs/WORKFLOW_SCRIPT_LOCAL_REPLAY.md](docs/WORKFLOW_SCRIPT_LOCAL_REPLAY.md) before the first GitHub Actions run is treated as evidence.

@@ -17,6 +17,7 @@
  */
 
 import { createSign } from 'node:crypto';
+import { createProviderJsonRequestService } from '../providers/provider-json-request-service.js';
 
 const appleMusicApiBaseUrl = 'https://api.music.apple.com/v1';
 
@@ -31,30 +32,6 @@ function createAppleMusicError(code, message, details = {}) {
   error.code = code;
   error.details = details;
   return error;
-}
-
-function classifyAppleMusicStatus(status, url) {
-  if (status === 401) {
-    return createAppleMusicError('apple_music_unauthorized', 'Apple Music authentication failed — check developer token');
-  }
-
-  if (status === 403) {
-    return createAppleMusicError('apple_music_forbidden', 'Apple Music access denied for this resource', { url });
-  }
-
-  if (status === 404) {
-    return createAppleMusicError('apple_music_not_found', 'Apple Music resource not found', { url });
-  }
-
-  if (status === 429) {
-    return createAppleMusicError('apple_music_rate_limited', 'Apple Music API rate limit exceeded');
-  }
-
-  if (status >= 500) {
-    return createAppleMusicError('apple_music_unavailable', `Apple Music API returned ${status}`, { status });
-  }
-
-  return createAppleMusicError('apple_music_request_failed', `Unexpected Apple Music API status ${status}`, { status, url });
 }
 
 /**
@@ -89,12 +66,15 @@ export function createAppleMusicClient({
   privateKey,
   requestTimeoutMs = 15000,
   fetchFn = globalThis.fetch,
+  requestPolicy = {},
 } = {}) {
   if (!teamId || !keyId || !privateKey) {
     throw createAppleMusicError('apple_music_misconfigured', 'Apple Music teamId, keyId, and privateKey are required');
   }
 
-  // In-memory token cache — scoped to this client instance.
+  const { requestJson } = createProviderJsonRequestService({ provider: 'apple_music', fetchFn, requestTimeoutMs, requestPolicy });
+
+  // In-memory token cache is scoped to this client instance.
   let cachedToken = null;
   let tokenExpiresAt = 0;
 
@@ -104,7 +84,11 @@ export function createAppleMusicClient({
       return cachedToken;
     }
 
-    const { expiresAt, token } = generateAppleMusicDeveloperToken({ keyId, privateKey, teamId });
+    let signed;
+    try { signed = generateAppleMusicDeveloperToken({ keyId, privateKey, teamId }); } catch {
+      throw createAppleMusicError('apple_music_misconfigured', 'Apple Music signing credentials are invalid');
+    }
+    const { expiresAt, token } = signed;
     cachedToken = token;
     tokenExpiresAt = expiresAt;
     return cachedToken;
@@ -119,39 +103,7 @@ export function createAppleMusicClient({
       }
     }
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
-
-    let response;
-    try {
-      response = await fetchFn(url.toString(), {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        signal: controller.signal,
-      });
-    } catch (error) {
-      if (error?.name === 'AbortError') {
-        throw createAppleMusicError('apple_music_timeout', `Apple Music API request timed out: ${path}`);
-      }
-
-      throw createAppleMusicError('apple_music_unavailable', `Apple Music API request failed: ${path}`, { cause: error?.message });
-    } finally {
-      clearTimeout(timeout);
-    }
-
-    if (response.status === 429) {
-      const retryAfter = Number.parseInt(response.headers.get('Retry-After') ?? '60', 10);
-      const err = classifyAppleMusicStatus(429, url.toString());
-      err.details.retryAfterSeconds = retryAfter;
-      throw err;
-    }
-
-    if (!response.ok) {
-      throw classifyAppleMusicStatus(response.status, url.toString());
-    }
-
-    return response.json();
+    return requestJson({ url: url.toString(), headers: { Authorization: `Bearer ${token}` } });
   }
 
   async function getCatalogPlaylist(storefront, playlistId, { offset = 0, limit = 100 } = {}) {

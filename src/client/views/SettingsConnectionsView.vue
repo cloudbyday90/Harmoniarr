@@ -28,6 +28,7 @@ import {
 import SettingsDisclosure from '../components/settings/SettingsDisclosure.vue';
 import SettingsFormGroup from '../components/settings/SettingsFormGroup.vue';
 import SettingsProviderConnectionStatus from '../components/settings/SettingsProviderConnectionStatus.vue';
+import SettingsProviderCollectionAccessCheck from '../components/settings/SettingsProviderCollectionAccessCheck.vue';
 import SettingsRecoveryConfirmation from '../components/settings/SettingsRecoveryConfirmation.vue';
 import SettingsSaveBar from '../components/settings/SettingsSaveBar.vue';
 import SoulseekProviderModeGuidance from '../components/settings/SoulseekProviderModeGuidance.vue';
@@ -39,6 +40,7 @@ import { buildSettingsProviderRecoveryConfirmation } from '../lib/settings-provi
 import { resolveSettingsRecoveryContext } from '../lib/settings-recovery-handoff.js';
 import { buildSettingsSoulseekProviderState } from '../lib/settings-provider-state-presentation.js';
 import { buildSettingsSaveState } from '../lib/settings-save-state-presentation.js';
+import { sessionStore } from '../state/session.js';
 
 const toast = useToast();
 const route = useRoute();
@@ -331,6 +333,11 @@ onMounted(() => {
           show-label="Set up optional services"
           hide-label="Hide optional services"
         >
+          <SettingsProviderCollectionAccessCheck
+            v-if="sessionStore.state.user?.role === 'admin'"
+            :is-saving="isSaving"
+            :settings-dirty="isDirty"
+          />
           <div class="cfg-provider-list">
 
             <!-- Spotify -->

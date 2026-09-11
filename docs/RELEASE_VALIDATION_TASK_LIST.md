@@ -20,6 +20,18 @@ Issue #4 platform evidence map: `docs/ISSUE_4_RELEASE_VALIDATION_EVIDENCE.md`
 
 ## Test And Validation Gates
 
+- September 11 follow-up: [external collection completion](EXTERNAL_COLLECTION_COMPLETION_OUTCOME.md)
+  implements the bounded provider-to-discovery review flow. The subsequent
+  [provider access outcome](PROVIDER_ACCESS_ACCEPTANCE_OUTCOME.md) adds explicit
+  saved-connection diagnostics, protected route and browser coverage, and a strict
+  opt-in evidence collector. Earlier evidence entries below retain their original
+  baseline. Live provider access remains unverified: all three music providers
+  are disabled in the discovered walkthrough deployment.
+- [ ] Capture strict multi-page access evidence with eligible saved provider
+  connections; use required deployment CSRF and the provider access runbook.
+- [ ] Prove full PostgreSQL backup/restore continuity for request decisions,
+  collection revisions, retained continuation work, and operation state.
+
 - Atomic multi-user request creation now has PostgreSQL failure-injection proof
   for child, audit, and durable external-planning failures, plus Chromium proof
   of safe retry feedback. See [the focused outcome](MEDIA_REQUEST_ATOMIC_CREATION_OUTCOME.md).

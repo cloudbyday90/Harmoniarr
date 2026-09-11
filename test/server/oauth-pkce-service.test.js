@@ -29,25 +29,25 @@ function createMemoryEncryptedSecretService() {
 function createTestServiceConfig(overrides = {}) {
   const encryptedSecretService = overrides.encryptedSecretService ?? createMemoryEncryptedSecretService();
   const settings = {
-    providers: { testClientId: 'test-client' },
+    providers: { spotifyClientId: 'test-client' },
     system: { baseUrl: 'https://harmoniarr.example' },
   };
 
   return {
-    authorizeUrl: 'https://auth.example.com/authorize',
-    callbackPath: '/api/v1/providers/test/oauth/callback',
-    clientIdSettingKey: 'testClientId',
+    authorizeUrl: 'https://accounts.spotify.com/authorize',
+    callbackPath: '/api/v1/providers/spotify/oauth/callback',
+    clientIdSettingKey: 'spotifyClientId',
     defaultScopes: ['read', 'write'],
     encryptedSecretService,
     fetchFn: overrides.fetchFn ?? globalThis.fetch,
     getNow: overrides.getNow ?? (() => new Date('2026-05-02T12:00:00.000Z')),
     getPoolFn: () => ({}),
     loadSettingsFn: async () => settings,
-    providerLabel: 'Test',
-    providerPrefix: 'test',
+    providerLabel: 'Spotify',
+    providerPrefix: 'spotify',
     recordAuditEventFn: overrides.recordAuditEventFn ?? (async () => {}),
     resolveClientCredentials: overrides.resolveClientCredentials ?? (async () => ({ clientId: 'test-client' })),
-    tokenUrl: 'https://auth.example.com/token',
+    tokenUrl: 'https://accounts.spotify.com/api/token',
   };
 }
 
@@ -61,14 +61,14 @@ test('startAuthorization stores PKCE state and returns authorization URL', async
   });
   const authorizeUrl = new URL(result.authorizationUrl);
 
-  assert.equal(authorizeUrl.origin, 'https://auth.example.com');
+  assert.equal(authorizeUrl.origin, 'https://accounts.spotify.com');
   assert.equal(authorizeUrl.pathname, '/authorize');
   assert.equal(authorizeUrl.searchParams.get('client_id'), 'test-client');
   assert.equal(authorizeUrl.searchParams.get('code_challenge_method'), 'S256');
-  assert.equal(authorizeUrl.searchParams.get('redirect_uri'), 'https://harmoniarr.example/api/v1/providers/test/oauth/callback');
+  assert.equal(authorizeUrl.searchParams.get('redirect_uri'), 'https://harmoniarr.example/api/v1/providers/spotify/oauth/callback');
   assert.equal(authorizeUrl.searchParams.get('scope'), 'read write');
   assert.equal(authorizeUrl.searchParams.get('response_type'), 'code');
-  assert.equal(result.provider, 'test');
+  assert.equal(result.provider, 'spotify');
   assert.equal(result.scopes.length, 2);
   assert.equal(recordAuditEventFn.mock.callCount(), 1);
 });
@@ -93,14 +93,14 @@ test('completeAuthorization exchanges code and stores encrypted token', async (t
   assert.equal(fetchFn.mock.callCount(), 1);
   assert.match(String(fetchFn.mock.calls[0].arguments[1].body), /grant_type=authorization_code/);
   assert.match(String(fetchFn.mock.calls[0].arguments[1].body), /code=callback-code/);
-  assert.equal(config.encryptedSecretService.secrets.has('providers.test.oauth.token'), true);
+  assert.equal(config.encryptedSecretService.secrets.has('providers.spotify.oauth.token'), true);
 });
 
 test('resolveAccessToken refreshes expired tokens and preserves refresh token', async (t) => {
   const encryptedSecretService = createMemoryEncryptedSecretService();
   await encryptedSecretService.setSecretValue({
     metadata: { expiresAt: '2026-05-02T11:59:00.000Z', tokenType: 'Bearer' },
-    name: 'providers.test.oauth.token',
+    name: 'providers.spotify.oauth.token',
     plaintextValue: JSON.stringify({
       accessToken: 'old-access-token',
       expiresAt: '2026-05-02T11:59:00.000Z',
@@ -116,7 +116,7 @@ test('resolveAccessToken refreshes expired tokens and preserves refresh token', 
   const service = createOAuthPKCEService(createTestServiceConfig({ encryptedSecretService, fetchFn }));
 
   const accessToken = await service.resolveAccessToken({});
-  const storedToken = JSON.parse(encryptedSecretService.secrets.get('providers.test.oauth.token').plaintextValue);
+  const storedToken = JSON.parse(encryptedSecretService.secrets.get('providers.spotify.oauth.token').plaintextValue);
 
   assert.equal(accessToken, 'new-access-token');
   assert.equal(storedToken.refreshToken, 'refresh-token');
@@ -134,7 +134,7 @@ test('clearAuthorization removes stored token', async () => {
   const encryptedSecretService = createMemoryEncryptedSecretService();
   await encryptedSecretService.setSecretValue({
     metadata: {},
-    name: 'providers.test.oauth.token',
+    name: 'providers.spotify.oauth.token',
     plaintextValue: JSON.stringify({ accessToken: 'token', refreshToken: 'refresh' }),
   });
   const service = createOAuthPKCEService(createTestServiceConfig({ encryptedSecretService }));
@@ -144,9 +144,9 @@ test('clearAuthorization removes stored token', async () => {
     requestMetadata: {},
   });
 
-  assert.equal(result.provider, 'test');
+  assert.equal(result.provider, 'spotify');
   assert.equal(result.status.linked, false);
-  assert.equal(encryptedSecretService.secrets.has('providers.test.oauth.token'), false);
+  assert.equal(encryptedSecretService.secrets.has('providers.spotify.oauth.token'), false);
 });
 
 test('completeAuthorization rejects expired state', async (t) => {
@@ -168,7 +168,7 @@ test('completeAuthorization rejects expired state', async (t) => {
 
   await assert.rejects(
     () => service.completeAuthorization({ code: 'code', state }),
-    { code: 'test_oauth_state_expired' },
+    { code: 'spotify_oauth_state_expired' },
   );
   assert.equal(fetchFn.mock.callCount(), 0);
 });
@@ -224,7 +224,7 @@ test('resolveAccessToken includes extra refresh params from resolveClientCredent
   const encryptedSecretService = createMemoryEncryptedSecretService();
   await encryptedSecretService.setSecretValue({
     metadata: { expiresAt: '2026-05-02T11:59:00.000Z' },
-    name: 'providers.test.oauth.token',
+    name: 'providers.spotify.oauth.token',
     plaintextValue: JSON.stringify({
       accessToken: 'old',
       expiresAt: '2026-05-02T11:59:00.000Z',

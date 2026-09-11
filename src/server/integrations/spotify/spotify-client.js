@@ -16,6 +16,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createProviderJsonRequestService } from '../providers/provider-json-request-service.js';
+
 const spotifyAccountsBaseUrl = 'https://accounts.spotify.com';
 const spotifyApiBaseUrl = 'https://api.spotify.com/v1';
 
@@ -26,42 +28,21 @@ function createSpotifyError(code, message, details = {}) {
   return error;
 }
 
-function classifySpotifyStatus(status, url) {
-  if (status === 401) {
-    return createSpotifyError('spotify_unauthorized', 'Spotify authentication failed — check client credentials');
-  }
-
-  if (status === 403) {
-    return createSpotifyError('spotify_forbidden', 'Spotify access denied for this resource');
-  }
-
-  if (status === 404) {
-    return createSpotifyError('spotify_not_found', 'Spotify resource not found', { url });
-  }
-
-  if (status === 429) {
-    return createSpotifyError('spotify_rate_limited', 'Spotify rate limit exceeded');
-  }
-
-  if (status >= 500) {
-    return createSpotifyError('spotify_unavailable', `Spotify API returned ${status}`, { status });
-  }
-
-  return createSpotifyError('spotify_request_failed', `Unexpected Spotify API status ${status}`, { status, url });
-}
-
 export function createSpotifyClient({
   accessTokenProvider = null,
   clientId,
   clientSecret,
   requestTimeoutMs = 15000,
   fetchFn = globalThis.fetch,
+  requestPolicy = {},
 } = {}) {
   if (!accessTokenProvider && (!clientId || !clientSecret)) {
     throw createSpotifyError('spotify_misconfigured', 'Spotify client ID and client secret are required');
   }
 
-  // In-memory token cache — scoped to this client instance.
+  const { requestJson } = createProviderJsonRequestService({ provider: 'spotify', fetchFn, requestTimeoutMs, requestPolicy });
+
+  // In-memory token cache is scoped to this client instance.
   let cachedToken = null;
   let tokenExpiresAt = 0;
 
@@ -72,35 +53,15 @@ export function createSpotifyClient({
     }
 
     const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
-
-    let response;
-    try {
-      response = await fetchFn(`${spotifyAccountsBaseUrl}/api/token`, {
-        body: 'grant_type=client_credentials',
-        headers: {
-          Authorization: `Basic ${credentials}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        method: 'POST',
-        signal: controller.signal,
-      });
-    } catch (error) {
-      if (error?.name === 'AbortError') {
-        throw createSpotifyError('spotify_timeout', 'Spotify token request timed out');
-      }
-
-      throw createSpotifyError('spotify_unavailable', 'Spotify token request failed', { cause: error?.message });
-    } finally {
-      clearTimeout(timeout);
+    const body = await requestJson({ url: `${spotifyAccountsBaseUrl}/api/token`,
+      body: 'grant_type=client_credentials',
+      headers: { Authorization: `Basic ${credentials}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+      method: 'POST', oauth: true,
+    });
+    if (typeof body.access_token !== 'string' || !body.access_token
+      || !Number.isSafeInteger(body.expires_in ?? 3600) || (body.expires_in ?? 3600) < 1) {
+      throw Object.assign(new Error('Spotify token endpoint returned an invalid response'), { code: 'spotify_invalid_response', diagnosticCode: 'response_invalid' });
     }
-
-    if (!response.ok) {
-      throw classifySpotifyStatus(response.status, `${spotifyAccountsBaseUrl}/api/token`);
-    }
-
-    const body = await response.json();
     cachedToken = body.access_token;
     tokenExpiresAt = now + (body.expires_in ?? 3600) * 1000;
     return cachedToken;
@@ -118,39 +79,7 @@ export function createSpotifyClient({
       }
     }
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
-
-    let response;
-    try {
-      response = await fetchFn(url.toString(), {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        signal: controller.signal,
-      });
-    } catch (error) {
-      if (error?.name === 'AbortError') {
-        throw createSpotifyError('spotify_timeout', `Spotify API request timed out: ${path}`);
-      }
-
-      throw createSpotifyError('spotify_unavailable', `Spotify API request failed: ${path}`, { cause: error?.message });
-    } finally {
-      clearTimeout(timeout);
-    }
-
-    if (response.status === 429) {
-      const retryAfter = Number.parseInt(response.headers.get('Retry-After') ?? '60', 10);
-      const err = classifySpotifyStatus(429, url.toString());
-      err.details.retryAfterSeconds = retryAfter;
-      throw err;
-    }
-
-    if (!response.ok) {
-      throw classifySpotifyStatus(response.status, url.toString());
-    }
-
-    return response.json();
+    return requestJson({ url: url.toString(), headers: { Authorization: `Bearer ${token}` } });
   }
 
   async function getPlaylist(playlistId, { market = null, offset = 0, limit = 50 } = {}) {

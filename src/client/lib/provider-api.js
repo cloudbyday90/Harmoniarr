@@ -21,3 +21,12 @@ import { apiRequest } from './api.js';
 export function fetchProviderStatus() {
   return apiRequest('/api/v1/providers/status');
 }
+
+export function checkProviderCollectionAccess({ sourceUrl }, { signal } = {}) {
+  return apiRequest('/api/v1/providers/collection-access-check', {
+    body: { sourceUrl },
+    includeCsrf: true,
+    method: 'POST',
+    signal,
+  });
+}

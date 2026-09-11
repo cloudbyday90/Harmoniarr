@@ -19,6 +19,8 @@ Harmoniarr is being planned as a self-hosted FOSS application with no SLA or ope
 - [External request discovery outcome and next step](docs/EXTERNAL_REQUEST_DISCOVERY_HANDOFF_OUTCOME.md)
 - [External collection design, sources, and tradeoffs](docs/EXTERNAL_COLLECTION_COMPLETION_DESIGN.md)
 - [External collection outcome and release follow-up](docs/EXTERNAL_COLLECTION_COMPLETION_OUTCOME.md)
+- [Provider access research, design, and tradeoffs](docs/PROVIDER_ACCESS_ACCEPTANCE_DESIGN.md)
+- [Provider access outcome and acceptance runbook](docs/PROVIDER_ACCESS_ACCEPTANCE_OUTCOME.md)
 - [Local workflow-script replay](docs/WORKFLOW_SCRIPT_LOCAL_REPLAY.md)
 
 ## Current Direction
@@ -26,7 +28,7 @@ Harmoniarr is being planned as a self-hosted FOSS application with no SLA or ope
 The current planning baseline includes a few explicit v1 decisions:
 
 - Local first-run admin setup with Classifarr-style cookie-based browser auth.
-- Refresh-token-backed sessions with default-on CSRF protection for cookie-authenticated writes, plus an explicit deployment-level opt-out for tightly trusted local-only installs.
+- Refresh-token-backed sessions with deployment-controlled CSRF protection for cookie-authenticated writes. Release deployments should set `security.csrfProtectionMode` to `required`; an opt-out exists for tightly trusted local-only installs.
 - Optional lightweight integration tokens may be added for local automation if a real use case appears, but normal browser administration remains session-based.
 - Explicit path-mapping and staging boundaries between `slskd`, Harmoniarr, and final library roots.
 - Staging-first treatment of completed Soulseek downloads before import into the library.

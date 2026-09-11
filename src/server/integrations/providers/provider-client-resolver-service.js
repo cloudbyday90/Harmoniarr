@@ -35,70 +35,61 @@ export function createProviderClientResolverService({
   spotifyOAuthService = createSpotifyOAuthService(),
   youtubeOAuthService = createYouTubeOAuthService({ providerCredentialsService }),
 } = {}) {
+  async function resolveProviderClient({ provider, requestPolicy = null, settings: suppliedSettings = null } = {}) {
+    const settings = suppliedSettings ?? await loadSettingsFn();
+    const providerSettings = settings.providers ?? {};
+    const settingPrefix = { spotify: 'spotify', youtube: 'youtube', apple_music: 'appleMusic' }[provider];
+    if (!settingPrefix) throw new Error('Unsupported provider');
+    const result = { client: null, enabled: Boolean(providerSettings[`${settingPrefix}Enabled`]), configured: false, authMode: 'none' };
+    if (!result.enabled) return result;
+    const queryable = getPoolFn();
+    const options = { requestTimeoutMs: providerSettings.requestTimeoutMs, ...(requestPolicy ? { requestPolicy } : {}) };
+    try {
+      if (provider === 'spotify' || provider === 'youtube') {
+        result.authMode = 'oauth_user';
+        const oauthService = provider === 'spotify' ? spotifyOAuthService : youtubeOAuthService;
+        const token = await oauthService.resolveAccessToken(queryable, requestPolicy ? { requestPolicy } : {});
+        if (token) {
+          const createClient = provider === 'spotify' ? createSpotifyClientFn : createYouTubeClientFn;
+          result.client = createClient({ ...options, accessTokenProvider: async () => token });
+        } else if (provider === 'spotify') {
+          result.authMode = 'client_credentials';
+          const clientSecret = await providerCredentialsService.resolveSpotifyClientSecret(queryable);
+          if (providerSettings.spotifyClientId && clientSecret) result.client = createSpotifyClientFn({ ...options, clientId: providerSettings.spotifyClientId, clientSecret });
+        } else {
+          result.authMode = 'api_key';
+          const apiKey = await providerCredentialsService.resolveYoutubeApiKey(queryable);
+          if (apiKey) result.client = createYouTubeClientFn({ ...options, apiKey });
+        }
+      } else {
+        result.authMode = 'developer_token';
+        const privateKey = await providerCredentialsService.resolveAppleMusicPrivateKey(queryable);
+        if (providerSettings.appleMusicTeamId && providerSettings.appleMusicKeyId && privateKey) result.client = createAppleMusicClientFn({
+          ...options, keyId: providerSettings.appleMusicKeyId, privateKey, teamId: providerSettings.appleMusicTeamId,
+        });
+      }
+      result.configured = Boolean(result.client);
+      if (!result.configured) result.authMode = 'none';
+      return result;
+    } catch (error) {
+      error.providerAuthMode = result.authMode;
+      throw error;
+    }
+  }
+
   async function resolveProviderClients() {
     const settings = await loadSettingsFn();
     const providerSettings = settings.providers ?? {};
-    const queryable = getPoolFn();
-    const clients = {
-      settings: {
-        appleMusicStorefront: providerSettings.appleMusicStorefront ?? 'us',
-        playlistExpansionPolicy: providerSettings.playlistExpansionPolicy ?? 'bounded',
-      },
-    };
-
-    if (providerSettings.spotifyEnabled) {
-      const spotifyAccessToken = await spotifyOAuthService.resolveAccessToken(queryable);
-      if (spotifyAccessToken) {
-        clients.spotify = createSpotifyClientFn({
-          accessTokenProvider: async () => spotifyAccessToken,
-          requestTimeoutMs: providerSettings.requestTimeoutMs,
-        });
-      } else {
-        const clientSecret = await providerCredentialsService.resolveSpotifyClientSecret(queryable);
-        if (providerSettings.spotifyClientId && clientSecret) {
-          clients.spotify = createSpotifyClientFn({
-            clientId: providerSettings.spotifyClientId,
-            clientSecret,
-            requestTimeoutMs: providerSettings.requestTimeoutMs,
-          });
-        }
-      }
+    const clients = { settings: {
+      appleMusicStorefront: providerSettings.appleMusicStorefront ?? 'us',
+      playlistExpansionPolicy: providerSettings.playlistExpansionPolicy ?? 'bounded',
+    } };
+    for (const provider of ['spotify', 'youtube', 'apple_music']) {
+      const result = await resolveProviderClient({ provider, settings });
+      if (result.client) clients[provider === 'apple_music' ? 'appleMusic' : provider] = result.client;
     }
-
-    if (providerSettings.youtubeEnabled) {
-      const youtubeAccessToken = await youtubeOAuthService.resolveAccessToken(queryable);
-      if (youtubeAccessToken) {
-        clients.youtube = createYouTubeClientFn({
-          accessTokenProvider: async () => youtubeAccessToken,
-          requestTimeoutMs: providerSettings.requestTimeoutMs,
-        });
-      } else {
-        const apiKey = await providerCredentialsService.resolveYoutubeApiKey(queryable);
-        if (apiKey) {
-          clients.youtube = createYouTubeClientFn({
-            apiKey,
-            requestTimeoutMs: providerSettings.requestTimeoutMs,
-          });
-        }
-      }
-    }
-
-    if (providerSettings.appleMusicEnabled) {
-      const privateKey = await providerCredentialsService.resolveAppleMusicPrivateKey(queryable);
-      if (providerSettings.appleMusicTeamId && providerSettings.appleMusicKeyId && privateKey) {
-        clients.appleMusic = createAppleMusicClientFn({
-          keyId: providerSettings.appleMusicKeyId,
-          privateKey,
-          requestTimeoutMs: providerSettings.requestTimeoutMs,
-          teamId: providerSettings.appleMusicTeamId,
-        });
-      }
-    }
-
     return clients;
   }
 
-  return {
-    resolveProviderClients,
-  };
+  return { resolveProviderClient, resolveProviderClients };
 }

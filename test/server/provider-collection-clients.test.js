@@ -8,7 +8,7 @@ test('Spotify collection client requests current items, complete entry envelopes
   const calls = [];
   const client = createSpotifyClient({ accessTokenProvider: async () => 'test-access-token', fetchFn: async (url, options) => {
     calls.push({ url: new URL(url), options });
-    return { ok: true, json: async () => ({}) };
+    return new Response(JSON.stringify({}));
   } });
   await client.getPlaylistItems('playlist', { offset: 50 });
   await client.getPlaylistSnapshot('playlist');
@@ -30,7 +30,7 @@ test('Apple collection clients read the relationship endpoints in the requested 
   const calls = [];
   const client = createAppleMusicClient({ teamId: 'test-team', keyId: 'test-key', privateKey, fetchFn: async (url) => {
     calls.push(new URL(url));
-    return { ok: true, json: async () => ({ data: [] }) };
+    return new Response(JSON.stringify({ data: [] }));
   } });
   await client.getCatalogPlaylistTracks('gb', 'pl.test', { offset: 100 });
   await client.getCatalogArtistAlbums('de', '123', { offset: 25 });

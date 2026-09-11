@@ -126,6 +126,7 @@ export const serverRouteInventory = Object.freeze([
   { method: 'GET', path: '/api/v1/system/library-scan-summary', access: 'admin', area: 'system', kind: 'diagnostic' },
   { method: 'GET', path: '/api/v1/system/fs/browse', access: 'admin', area: 'system', kind: 'read' },
   { method: 'GET', path: '/api/v1/providers/status', access: 'authenticated', area: 'providers', kind: 'read' },
+  { method: 'POST', path: '/api/v1/providers/collection-access-check', access: 'admin', area: 'providers', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/providers/plex/link/start', access: 'admin', area: 'providers', kind: 'mutation' },
   { method: 'GET', path: '/api/v1/providers/plex/link/callback', access: 'public', area: 'providers', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/providers/plex/link/clear', access: 'admin', area: 'providers', kind: 'mutation' },

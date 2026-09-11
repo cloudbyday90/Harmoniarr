@@ -21,13 +21,13 @@ import { recordAuditEvent } from '../../audit.js';
 import { getPool } from '../../database.js';
 import { createEncryptedSecretService } from '../../encrypted-secret-service.js';
 import { loadSettings } from '../../settings.js';
+import { createProviderJsonRequestService } from './provider-json-request-service.js';
+import { createProviderRequestError } from './provider-request-error.js';
 import {
   buildRedirectUri,
   buildTokenMetadata,
   createBase64UrlRandom,
   createCodeChallenge,
-  createOAuthError,
-  readJsonResponse,
   safeJsonParse,
   toTokenPayload,
 } from './oauth-helpers.js';
@@ -61,24 +61,15 @@ export function createOAuthPKCEService({
   const tokenSecretName = `providers.${providerPrefix}.oauth.token`;
   const pendingPrefix = `providers.${providerPrefix}.oauth.pending.`;
 
-  async function exchangeToken(body) {
-    const response = await fetchFn(tokenUrl, {
-      body: new URLSearchParams(body),
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      method: 'POST',
+  async function exchangeToken(body, requestPolicy = {}) {
+    const { requestJson } = createProviderJsonRequestService({ provider: providerPrefix, fetchFn, requestPolicy });
+    const responseBody = await requestJson({ url: tokenUrl,
+      body: new URLSearchParams(body), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, method: 'POST', oauth: true,
     });
-
-    const responseBody = await readJsonResponse(response);
-    if (!response.ok) {
-      throw createOAuthError(
-        `${providerPrefix}_oauth_token_exchange_failed`,
-        responseBody.error_description ?? responseBody.error ?? `Token endpoint returned ${response.status}`,
-        { status: response.status },
-      );
+    if (typeof responseBody.access_token !== 'string' || !responseBody.access_token
+      || !Number.isSafeInteger(responseBody.expires_in ?? 3600) || (responseBody.expires_in ?? 3600) < 1) {
+      throw createProviderRequestError(providerPrefix, 'response_invalid');
     }
-
     return responseBody;
   }
 
@@ -268,7 +259,8 @@ export function createOAuthPKCEService({
     };
   }
 
-  async function resolveAccessToken(queryable = getPoolFn()) {
+  async function resolveAccessToken(queryable = getPoolFn(), { requestPolicy = {} } = {}) {
+    if (requestPolicy.signal?.aborted) throw createProviderRequestError(providerPrefix, 'timeout');
     const tokenValue = await encryptedSecretService.getSecretValue({
       name: tokenSecretName,
       queryable,
@@ -293,7 +285,8 @@ export function createOAuthPKCEService({
       refresh_token: tokenPayload.refreshToken,
       ...credentials.extraRefreshParams ?? {},
     };
-    const body = await exchangeToken(refreshBody);
+    const body = await exchangeToken(refreshBody, requestPolicy);
+    if (requestPolicy.signal?.aborted) throw createProviderRequestError(providerPrefix, 'timeout');
     const refreshedPayload = toTokenPayload({
       body,
       now,

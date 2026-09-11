@@ -20,19 +20,27 @@ import { createAppleMusicStatusService } from './integrations/apple-music/apple-
 import { createPlexOwnerLinkService } from './integrations/plex/plex-owner-link-service.js';
 import { createSpotifyOAuthService } from './integrations/spotify/spotify-oauth-service.js';
 import { createYouTubeOAuthService } from './integrations/youtube/youtube-oauth-service.js';
+import { createProviderClientResolverService } from './integrations/providers/provider-client-resolver-service.js';
+import { createProviderCollectionAccessCheckService } from './integrations/providers/provider-collection-access-check-service.js';
 
 export function createProviderModule({
   appleMusicStatusService = createAppleMusicStatusService(),
   plexOwnerLinkService = createPlexOwnerLinkService(),
   spotifyOAuthService = createSpotifyOAuthService(),
   youtubeOAuthService = createYouTubeOAuthService(),
+  providerClientResolverService = createProviderClientResolverService({ spotifyOAuthService, youtubeOAuthService }),
+  providerCollectionAccessCheckService = createProviderCollectionAccessCheckService({
+    resolveProviderClient: providerClientResolverService.resolveProviderClient,
+  }),
 } = {}) {
   return {
     appleMusicStatusService,
     plexOwnerLinkService,
     spotifyOAuthService,
     youtubeOAuthService,
+    providerCollectionAccessCheckService,
     routeDependencies: {
+      checkProviderCollectionAccess: providerCollectionAccessCheckService.checkCollectionAccess,
       buildAppleMusicStatus: appleMusicStatusService.buildStatus,
       buildPlexLinkStatus: plexOwnerLinkService.buildStatus,
       buildSpotifyOAuthStatus: spotifyOAuthService.buildStatus,

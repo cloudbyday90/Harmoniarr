@@ -130,3 +130,28 @@ test('resolveAccessToken refreshes expired tokens and preserves refresh token wh
   assert.equal(fetchFn.mock.callCount(), 1);
   assert.match(String(fetchFn.mock.calls[0].arguments[1].body), /grant_type=refresh_token/);
 });
+
+test('OAuth refresh participates in the access check budget and never returns provider error descriptions', async (t) => {
+  const encryptedSecretService = createMemoryEncryptedSecretService();
+  const plaintextValue = JSON.stringify({ accessToken: 'expired', refreshToken: 'PRIVATE-REFRESH-TOKEN', expiresAt: '2020-01-01T00:00:00Z' });
+  await encryptedSecretService.setSecretValue({ name: 'providers.spotify.oauth.token', plaintextValue });
+  const beforeRequest = t.mock.fn(async () => {});
+  const fetchFn = t.mock.fn(async () => new Response(JSON.stringify({ error: 'invalid_grant', error_description: 'PRIVATE-REFRESH-TOKEN' }), { status: 400 }));
+  const service = createSpotifyOAuthService({ encryptedSecretService, fetchFn, loadSettingsFn: async () => createSettings() });
+  await assert.rejects(service.resolveAccessToken({}, { requestPolicy: { beforeRequest } }), (error) => {
+    assert.equal(error.code, 'spotify_oauth_token_exchange_failed');
+    assert.equal(error.diagnosticCode, 'credentials_rejected');
+    assert.equal(JSON.stringify({ ...error, message: error.message }).includes('PRIVATE-REFRESH-TOKEN'), false);
+    return true;
+  });
+  assert.equal(beforeRequest.mock.callCount(), 1);
+  assert.equal(encryptedSecretService.secrets.get('providers.spotify.oauth.token').plaintextValue, plaintextValue);
+});
+
+test('an aborted access check cannot refresh or overwrite OAuth credentials', async (t) => {
+  const fetchFn = t.mock.fn(async () => assert.fail('An aborted check cannot contact the token endpoint'));
+  const service = createSpotifyOAuthService({ fetchFn });
+  const signal = AbortSignal.abort();
+  await assert.rejects(service.resolveAccessToken({}, { requestPolicy: { signal } }), { diagnosticCode: 'timeout' });
+  assert.equal(fetchFn.mock.callCount(), 0);
+});

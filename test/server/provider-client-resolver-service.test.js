@@ -2,6 +2,30 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createProviderClientResolverService } from '../../src/server/integrations/providers/provider-client-resolver-service.js';
 
+test('selecting YouTube does not resolve or refresh unrelated enabled provider credentials', async () => {
+  const requestPolicy = { signal: new AbortController().signal, beforeRequest: async () => {} };
+  const service = createProviderClientResolverService({
+    loadSettingsFn: async () => ({ providers: { spotifyEnabled: true, youtubeEnabled: true, appleMusicEnabled: true } }),
+    getPoolFn: () => ({}),
+    spotifyOAuthService: { resolveAccessToken: async () => assert.fail('Do not refresh unrelated Spotify authorization') },
+    youtubeOAuthService: { resolveAccessToken: async (_queryable, options) => { assert.equal(options.requestPolicy, requestPolicy); return 'private-token'; } },
+    createYouTubeClientFn: (options) => { assert.equal(options.requestPolicy, requestPolicy); return { configured: true }; },
+    providerCredentialsService: { resolveAppleMusicPrivateKey: async () => assert.fail('Do not read unrelated Apple credentials') },
+  });
+  const resolved = await service.resolveProviderClient({ provider: 'youtube', requestPolicy });
+  assert.equal(resolved.authMode, 'oauth_user');
+  assert.equal(resolved.configured, true);
+});
+
+test('selected provider refresh failure retains its auth mode without falling back silently', async () => {
+  const service = createProviderClientResolverService({
+    loadSettingsFn: async () => ({ providers: { spotifyEnabled: true } }), getPoolFn: () => ({}),
+    spotifyOAuthService: { resolveAccessToken: async () => { throw new Error('Refresh failed'); } },
+    providerCredentialsService: { resolveSpotifyClientSecret: async () => assert.fail('Do not replace a failed account authorization with application access') },
+  });
+  await assert.rejects(service.resolveProviderClient({ provider: 'spotify' }), { providerAuthMode: 'oauth_user' });
+});
+
 test('resolveProviderClients builds enabled provider clients from settings and stored secrets', async (t) => {
   const createSpotifyClientFn = t.mock.fn((config) => ({ provider: 'spotify', config }));
   const createYouTubeClientFn = t.mock.fn((config) => ({ provider: 'youtube', config }));
