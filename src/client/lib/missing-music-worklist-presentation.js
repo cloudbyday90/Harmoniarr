@@ -130,9 +130,16 @@ export function buildMissingMusicDecisionRow(decision) {
 }
 
 export function buildMissingMusicStatusAnnouncement(payload) {
+  if (payload?.isLoading) return 'Loading release decisions.';
   const decisionCount = Array.isArray(payload?.decisions) ? payload.decisions.length : 0;
   const scopeLabel = getScopeLabel(payload?.scope, payload?.filters);
   const total = normalizeCount(payload?.page?.total);
+
+  if (payload?.page?.total === null) {
+    const pageNumber = normalizeCount(payload.pageNumber) || 1;
+    const remaining = payload.page.hasMore ? ' More releases remain to check.' : '';
+    return `Page ${pageNumber}: ${decisionCount} release${decisionCount === 1 ? '' : 's'} shown for ${scopeLabel}.${remaining}`;
+  }
 
   if (decisionCount === 0) {
     return `No releases are shown for ${scopeLabel}.`;

@@ -100,6 +100,13 @@ export function useExternalRequestReview({
       return true;
     } catch (error) {
       if (request.isCurrent()) {
+        if (error?.code === 'external_request_inactive') {
+          collection.value = null;
+          preparation.value = { canRecover: false, action: null };
+          items.value = [];
+          intents.value = [];
+          canStartCollection.value = false;
+        }
         errorMessage.value = error instanceof Error ? error.message : 'Could not load external request review.';
         if (!preserveStatus) statusMessage.value = '';
       }

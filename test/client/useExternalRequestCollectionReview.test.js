@@ -60,6 +60,23 @@ test('failed page navigation preserves the visible page and history', async () =
   assert.equal(state.errorMessage.value, 'Page unavailable');
 });
 
+test('an inactive request clears stale preparation progress and recovery controls', async () => {
+  let inactive = false;
+  const state = stateWith({ fetchReviewFn: async () => {
+    if (inactive) throw Object.assign(new Error('This request is no longer awaiting acquisition.'), { code: 'external_request_inactive' });
+    return payload({ collection: { ...ready, status: 'preparing' }, preparation: { canRecover: true, progress: { revision: 3 } } });
+  } });
+  await state.load({ mediaRequestId: 'r1' });
+  assert.equal(state.preparation.value.canRecover, true);
+  inactive = true;
+  await state.load({ mediaRequestId: 'r1' });
+  assert.equal(state.collection.value, null);
+  assert.deepEqual(state.preparation.value, { canRecover: false, action: null });
+  assert.deepEqual(state.items.value, []);
+  assert.deepEqual(state.intents.value, []);
+  assert.equal(state.canStartCollection.value, false);
+});
+
 test('tracked inclusion sends the captured revision and requires a ready collection', async () => {
   let collection = { ...ready, status: 'preparing' };
   const calls = [];

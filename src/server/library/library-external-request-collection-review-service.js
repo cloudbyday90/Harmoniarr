@@ -14,6 +14,8 @@ import { createLibraryExternalRequestCollectionReviewStore } from './library-ext
 import { createLibraryExternalRequestReviewAccessService, normalizeExternalReviewId as uuid } from './library-external-request-review-access-service.js';
 import { assertCollectionReady, assertCollectionRevision, assertCollectionTarget, presentCollection } from './library-external-request-collection-review-policy.js';
 import { projectExternalRequestReviewItem } from './library-external-request-review-evidence.js';
+import { createLibraryExternalRequestCollectionProgressStore } from './library-external-request-collection-progress-store.js';
+import { projectExternalCollectionPreparationProgress } from './library-external-request-collection-progress.js';
 
 function conflict(message) {
   return createApiError(409, 'external_collection_review_conflict', message);
@@ -21,6 +23,7 @@ function conflict(message) {
 
 export function createLibraryExternalRequestCollectionReviewService({
   collectionReviewStore = createLibraryExternalRequestCollectionReviewStore(),
+  collectionProgressStore = createLibraryExternalRequestCollectionProgressStore(),
   collectionIntakeService, reviewStore, mediaRequestStore, getAppUserById,
   executionRunStore, planningRunStore,
   withTransaction = createDatabaseTransactionRunner(),
@@ -86,8 +89,12 @@ export function createLibraryExternalRequestCollectionReviewService({
       const canRecover = presented.targetMatches && collection.status === 'preparing'
         && !running
         && await collectionReviewStore.hasUnfinishedWork({ mediaRequestId, queryable });
+      const progress = presented.targetMatches ? projectExternalCollectionPreparationProgress(
+        await collectionProgressStore.getPreparationProgress({ mediaRequestId,
+          requestedForUserId: request.requestedForUser.id, revision: collection.revision, queryable }),
+      ) : null;
       return { items, intents, collection: presented, canStartCollection: false,
-        preparation: { canRecover, action: canRecover ? 'execute' : null },
+        preparation: { canRecover, action: canRecover ? 'execute' : null, progress },
         pagination: { hasMore: page.hasMore, nextCursor: page.hasMore ? page.items.at(-1).id : null, limit },
       };
     });

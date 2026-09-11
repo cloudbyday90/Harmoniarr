@@ -71,8 +71,13 @@ function createService(overrides = {}) {
   const listAppUsers = test.mock.fn(async () => users);
   const listWantedReleasesWithMetadata = test.mock.fn(async ({ appUserIds }) => releases
     .filter((release) => appUserIds.includes(release.appUserId)));
+  const listWantedReleaseIdentityPage = test.mock.fn(async ({ appUserIds }) => ({
+    rows: releases.filter((release) => appUserIds.includes(release.appUserId)).map((release) => ({ id: release.id, createdAtKey: '2026-09-11T00:00:00.000000Z' })),
+    hasMore: false,
+  }));
   const service = createMissingMusicDecisionService({
     listAppUsers,
+    listWantedReleaseIdentityPage,
     listWantedReleasesWithMetadata,
     now: () => new Date('2026-08-26T16:30:00.000Z'),
     projectMusicQueueReleaseFn: projectRelease,
@@ -93,8 +98,9 @@ test('admins receive active users by default with release-only decision facts', 
   assert.equal(result.filters.accountStatus, 'active');
   assert.deepEqual(listWantedReleasesWithMetadata.mock.calls[0].arguments[0], {
     appUserIds: ['admin-1', 'user-1'],
-    limit: 2000,
+    limit: 1,
     search: null,
+    wantedReleaseIds: ['decision-active'],
     wantedStatus: null,
   });
   assert.deepEqual(result.users, [

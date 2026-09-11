@@ -124,3 +124,14 @@ test('Missing Music separates active accounts from retained disabled history', (
   assert.equal(getMissingMusicNextStep('open_downloader'), 'View in Downloader');
   assert.equal(getMissingMusicNextStep('download_now'), 'Start download');
 });
+
+test('cursor page status distinguishes more source rows from an exact matching total', () => {
+  assert.equal(buildMissingMusicStatusAnnouncement({
+    decisions: [], pageNumber: 2, filters: { accountStatus: 'active' }, scope: 'all',
+    page: { total: null, hasMore: true },
+  }), 'Page 2: 0 releases shown for all active accounts. More releases remain to check.');
+  assert.equal(buildMissingMusicStatusAnnouncement({
+    decisions: [{}], pageNumber: 3, filters: {}, scope: 'mine', page: { total: null, hasMore: false },
+  }), 'Page 3: 1 release shown for your account.');
+  assert.equal(buildMissingMusicStatusAnnouncement({ isLoading: true }), 'Loading release decisions.');
+});

@@ -100,6 +100,8 @@ Recommended stack: Node 24 LTS, small native ESM factories with injected stores 
 
 The next independent implementation item is **Music Queue pagination and preparation progress**. Start by measuring the current list queries, define deterministic server paging with recipient authorization applied before pagination, then add client navigation and progress without changing reviewed decisions or automatically starting acquisition.
 
+September 11 follow-up: the [pagination outcome](MUSIC_QUEUE_PAGINATION_OUTCOME.md) implements this item in the canonical Missing Music workspace and external collection review. It records bounded cursor reads, preparation facts, validation, and the next immutable-image release gate.
+
 ## Open PR review
 
 GitHub MCP refreshed all three open PRs and their complete patches. No applicable patch remained: #23 and #24 are superseded by newer locally pinned workflow actions; #40 moves only the controlled fixture to Node 26 while the platform remains on Node 24 LTS. The design records the verified links and immutable heads. No PR was applied, changed, or merged.

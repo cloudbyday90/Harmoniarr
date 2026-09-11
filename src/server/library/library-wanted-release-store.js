@@ -20,6 +20,7 @@ import { getPool } from '../database.js';
 import { buildImportCandidateSelectionReadiness } from '../import-candidates/import-candidate-selection-readiness.js';
 import { normalizeMetadataReleaseDateForDateColumn } from '../metadata/metadata-release-date-normalization.js';
 import { createLibraryDiscoveryRequestWantedReleaseLinkStore } from './library-discovery-request-wanted-release-link-store.js';
+import { createLibraryWantedReleasePageStore } from './library-wanted-release-page-store.js';
 
 function toInteger(value) {
   return Number.parseInt(String(value ?? 0), 10) || 0;
@@ -388,6 +389,7 @@ export function createLibraryWantedReleaseStore({
     metadataArtistId = null,
     search = null,
     wantedReleaseId = null,
+    wantedReleaseIds = null,
     wantedStatus = null,
     limit = 500,
   } = {}) {
@@ -405,6 +407,7 @@ export function createLibraryWantedReleaseStore({
         .map((value) => value.trim())
         .filter(Boolean))]
       : null;
+    if (Array.isArray(appUserIds) && normalizedAppUserIds.length === 0) return [];
     if (normalizedAppUserIds?.length > 0) {
       params.push(normalizedAppUserIds);
       conditions.push(`lwr.app_user_id = ANY($${params.length}::uuid[])`);
@@ -418,6 +421,15 @@ export function createLibraryWantedReleaseStore({
     if (typeof wantedReleaseId === 'string' && wantedReleaseId.trim().length > 0) {
       params.push(wantedReleaseId.trim());
       conditions.push(`lwr.id = $${params.length}`);
+    }
+
+    if (wantedReleaseIds !== null && !Array.isArray(wantedReleaseIds)) throw new TypeError('Wanted-release page identities must be an array');
+    if (Array.isArray(wantedReleaseIds)) {
+      const ids = [...new Set(wantedReleaseIds.filter((id) => typeof id === 'string' && id))];
+      if (ids.length === 0) return [];
+      if (ids.length > 100) throw new TypeError('Wanted-release page enrichment is limited to 100 identities');
+      params.push(ids);
+      conditions.push(`lwr.id = ANY($${params.length}::uuid[])`);
     }
 
     if (wantedStatus === 'missing' || wantedStatus === 'partial') {
@@ -863,6 +875,7 @@ export function createLibraryWantedReleaseStore({
   }
 
   return {
+    ...createLibraryWantedReleasePageStore({ getPoolFn }),
     listLibraryWantedReleases,
     listWantedReleasesWithMetadata,
     listWantedStatusesForReleaseGroups,

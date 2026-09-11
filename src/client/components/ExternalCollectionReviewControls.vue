@@ -8,6 +8,7 @@
 
 <script setup>
 import { computed } from 'vue';
+import CollectionPreparationProgress from './CollectionPreparationProgress.vue';
 
 const props = defineProps({
   collection: { type: Object, default: null },
@@ -35,9 +36,10 @@ const statusLabel = computed(() => ({
     <template v-if="collection">
       <div role="status" aria-atomic="true" class="hx-collection-review-summary">
         <span class="hx-pill">{{ statusLabel }}</span>
-        <span>{{ collection.pagesCompleted }} pages prepared · {{ collection.itemsSeen }} source entries seen</span>
+        <span v-if="!preparation.progress">{{ collection.pagesCompleted }} pages prepared · {{ collection.itemsSeen }} source entries seen</span>
         <span>{{ collection.leafCount }} items · {{ collection.includedCount }} included · {{ collection.excludedCount }} excluded · {{ collection.pendingCount }} pending</span>
       </div>
+      <CollectionPreparationProgress :collection="collection" :progress="preparation.progress" />
       <p v-if="collection.blockedReason" class="hx-collection-review-error" role="alert">{{ collection.blockedReason }}</p>
       <p v-if="collection.targetMatches === false" class="hx-collection-review-error">This collection belongs to a previous target. Create a separate request for the current target; accepted work keeps its original target.</p>
       <p v-if="collection.reviewedAt" class="hx-text-muted">This reviewed collection selection is final. Fulfillment requires successful import of every included release.</p>

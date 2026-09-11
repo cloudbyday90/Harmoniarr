@@ -26,25 +26,21 @@ import { buildMissingMusicMatchChoices } from './missing-music-match-choice-proj
 import { canStartMissingMusicDownload } from './missing-music-download-start-policy.js';
 import { canViewMissingMusicDownloader } from './missing-music-downloader-handoff-policy.js';
 import { createMissingMusicDecisionTargetService } from './missing-music-decision-target-service.js';
+import { createMissingMusicDecisionPageService } from './missing-music-decision-page-service.js';
+import {
+  assertMissingMusicCursorPagination,
+  buildMissingMusicCursorContext,
+  decodeMissingMusicCursor,
+  encodeMissingMusicCursor,
+  normalizeMissingMusicPageLimit,
+} from './missing-music-decision-page-policy.js';
 import {
   deriveMissingMusicDecisionState,
   normalizeMissingMusicDecisionState,
 } from './missing-music-decision-state.js';
 
 const DEFAULT_PAGE_LIMIT = 50;
-const MAX_PAGE_LIMIT = 100;
 const MAX_QUERY_LENGTH = 120;
-const MAX_SOURCE_RELEASES = 2000;
-
-function normalizePageLimit(value) {
-  const parsed = Number.parseInt(String(value ?? DEFAULT_PAGE_LIMIT), 10);
-  return Math.min(Math.max(Number.isInteger(parsed) ? parsed : DEFAULT_PAGE_LIMIT, 1), MAX_PAGE_LIMIT);
-}
-
-function normalizePageOffset(value) {
-  const parsed = Number.parseInt(String(value ?? 0), 10);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
-}
 
 function normalizeSearchQuery(value) {
   if (value === null || value === undefined || value === '') {
@@ -159,6 +155,7 @@ function validateDependencies({
 
 export function createMissingMusicDecisionService({
   listAppUsers,
+  listWantedReleaseIdentityPage,
   listWantedReleasesWithMetadata,
   now = () => new Date(),
   projectMusicQueueReleaseFn = projectMusicQueueRelease,
@@ -175,10 +172,12 @@ export function createMissingMusicDecisionService({
       listAppUsers,
       listWantedReleasesWithMetadata,
     }).resolveMissingMusicDecisionTarget;
+  const decisionPageService = createMissingMusicDecisionPageService({ listWantedReleaseIdentityPage, listWantedReleasesWithMetadata });
 
   async function listMissingMusicDecisions({
     accountStatus: requestedAccountStatus = null,
     actorUser,
+    cursor = null,
     limit = DEFAULT_PAGE_LIMIT,
     offset = 0,
     q = null,
@@ -196,8 +195,8 @@ export function createMissingMusicDecisionService({
     const accountStatus = normalizeMissingMusicAccountStatus(requestedAccountStatus);
     const state = normalizeMissingMusicDecisionState(requestedState);
     const search = normalizeSearchQuery(q);
-    const pageLimit = normalizePageLimit(limit);
-    const pageOffset = normalizePageOffset(offset);
+    const pageLimit = normalizeMissingMusicPageLimit(limit);
+    assertMissingMusicCursorPagination(offset);
 
     let usersById;
     let eligibleUsers;
@@ -228,6 +227,10 @@ export function createMissingMusicDecisionService({
     }
 
     const targetUserIds = eligibleUsers.map((user) => user.id);
+    const cursorContext = buildMissingMusicCursorContext({
+      actorUserId, accountStatus, limit: pageLimit, scope: scope.scope, search, state, targetUserIds,
+    });
+    const after = decodeMissingMusicCursor(cursor, cursorContext);
     if (targetUserIds.length === 0) {
       return {
         checkedAt: now().toISOString(),
@@ -240,34 +243,28 @@ export function createMissingMusicDecisionService({
         },
         page: {
           limit: pageLimit,
-          offset: pageOffset,
+          offset: 0,
           sourceLimitReached: false,
-          total: 0,
+          total: null,
+          hasMore: false,
+          nextCursor: null,
+          scannedCount: 0,
+          scanLimitReached: false,
         },
         scope: scope.scope,
         users: availableUsers,
       };
     }
 
-    const sourceReleases = await listWantedReleasesWithMetadata({
+    const page = await decisionPageService.readDecisionPage({
       appUserIds: targetUserIds,
-      limit: MAX_SOURCE_RELEASES,
-      search,
-      wantedStatus: null,
+      after, limit: pageLimit, search, state,
+      projectDecision: (release) => projectDecision(release, buildRequestedFor(usersById.get(release.appUserId)), projectMusicQueueReleaseFn),
     });
-    const sourceLimitReached = sourceReleases.length >= MAX_SOURCE_RELEASES;
-    const decisions = sourceReleases
-      .map((release) => projectDecision(
-        release,
-        buildRequestedFor(usersById.get(release.appUserId)),
-        projectMusicQueueReleaseFn,
-      ))
-      .filter((decision) => state === 'all' || decision.state === state);
-    const page = decisions.slice(pageOffset, pageOffset + pageLimit);
 
     return {
       checkedAt: now().toISOString(),
-      decisions: page,
+      decisions: page.decisions,
       filters: {
         accountStatus,
         q: search,
@@ -276,9 +273,13 @@ export function createMissingMusicDecisionService({
       },
       page: {
         limit: pageLimit,
-        offset: pageOffset,
-        sourceLimitReached,
-        total: decisions.length,
+        offset: 0,
+        sourceLimitReached: false,
+        total: null,
+        hasMore: page.hasMore,
+        nextCursor: page.nextAnchor ? encodeMissingMusicCursor(page.nextAnchor, cursorContext) : null,
+        scannedCount: page.scannedCount,
+        scanLimitReached: page.scanLimitReached,
       },
       scope: scope.scope,
       users: availableUsers,

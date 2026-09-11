@@ -73,6 +73,7 @@ test('Missing Music decisions route forwards bounded, labelled filter values wit
         role: 'admin',
         username: 'admin',
       },
+      cursor: null,
       limit: 100,
       offset: 5,
       q: 'portishead',

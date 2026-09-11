@@ -17,7 +17,8 @@
 -->
 
 <script setup>
-import { computed, reactive } from 'vue';
+import { computed, nextTick, reactive, ref } from 'vue';
+import MissingMusicPagination from './MissingMusicPagination.vue';
 import { useMissingMusicDecisions } from '../../composables/useMissingMusicDecisions.js';
 import {
   buildMissingMusicDecisionRow,
@@ -31,6 +32,8 @@ import {
 
 const decisionResource = useMissingMusicDecisions();
 const draftFilters = reactive(createMissingMusicDecisionFilters());
+const resultsHeading = ref(null);
+const busy = computed(() => decisionResource.isLoading.value || decisionResource.isRevalidating.value);
 
 const rows = computed(() => decisionResource.decisions.value.map(buildMissingMusicDecisionRow));
 const usersByAccountStatus = computed(() => splitMissingMusicUsers(decisionResource.users.value));
@@ -40,6 +43,8 @@ const statusAnnouncement = computed(() => buildMissingMusicStatusAnnouncement({
   filters: decisionResource.filters.value,
   page: decisionResource.page.value,
   scope: decisionResource.scope.value,
+  isLoading: decisionResource.isLoading.value,
+  pageNumber: decisionResource.pageNumber.value,
 }));
 const hasActiveFilters = computed(() => (
   draftFilters.accountStatus !== DEFAULT_MISSING_MUSIC_DECISION_FILTERS.accountStatus
@@ -75,6 +80,16 @@ function getDetailAccessibleLabel(row) {
   return 'Open status details for ' + row.artistName + ' — ' + row.title;
 }
 
+async function navigatePage(action) {
+  const trigger = document.activeElement;
+  const changed = await decisionResource[action]();
+  await nextTick();
+  if (document.activeElement === trigger || document.activeElement === document.body) {
+    if (changed) resultsHeading.value?.focus();
+    else if (trigger?.isConnected && !trigger.disabled) trigger.focus({ preventScroll: true });
+  }
+}
+
 defineExpose({
   refresh: decisionResource.refresh,
 });
@@ -84,7 +99,7 @@ defineExpose({
   <article class="hx-card missing-music-worklist">
     <header class="hx-card-header">
       <div>
-        <h2 class="hx-card-title">Release decisions</h2>
+        <h2 ref="resultsHeading" class="hx-card-title missing-music-worklist__heading" tabindex="-1">Release decisions</h2>
         <p class="hx-card-subtitle">
           See what Harmoniarr is doing and the next clear step for each missing release.
         </p>
@@ -180,12 +195,12 @@ defineExpose({
       {{ statusAnnouncement }}
     </p>
 
-    <div v-if="decisionResource.errorMessage.value" class="hx-alert" data-tone="danger">
+    <div v-if="decisionResource.errorMessage.value" class="hx-alert" data-tone="danger" role="alert">
       {{ decisionResource.errorMessage.value }}
     </div>
 
-    <div v-if="decisionResource.page.value.sourceLimitReached" class="hx-alert" data-tone="warning">
-      Refine the filters to see a complete result. Harmoniarr reached this worklist's safe result limit.
+    <div v-if="decisionResource.page.value.scanLimitReached && !decisionResource.isLoading.value" class="hx-alert" data-tone="info">
+      More releases remain to check against these filters. Continue to the next page or narrow your search.
     </div>
 
     <div v-if="decisionResource.isLoading.value" class="hx-card-body">
@@ -196,8 +211,8 @@ defineExpose({
 
     <div v-else-if="rows.length === 0" class="hx-card-body">
       <div class="hx-empty">
-        <h3 class="hx-empty-title">No releases match these filters</h3>
-        <p class="hx-empty-copy">Try another state or account status, or clear the filters.</p>
+        <h3 class="hx-empty-title">{{ decisionResource.canGoNext.value ? 'No matching releases on this page' : 'No releases on this page' }}</h3>
+        <p class="hx-empty-copy">{{ decisionResource.canGoNext.value ? 'Continue to the next page to check more releases against these filters.' : 'Return to the first page, try another filter, or refresh for current results.' }}</p>
       </div>
     </div>
 
@@ -242,10 +257,17 @@ defineExpose({
         </article>
       </li>
     </ul>
+    <MissingMusicPagination
+      :busy="busy" :can-go-previous="decisionResource.canGoPrevious.value"
+      :can-go-next="decisionResource.canGoNext.value" :page-number="decisionResource.pageNumber.value"
+      @first="navigatePage('firstPage')" @previous="navigatePage('previousPage')" @next="navigatePage('nextPage')"
+    />
   </article>
 </template>
 
 <style scoped>
+.missing-music-worklist__heading:focus { outline: 2px solid var(--hx-accent); outline-offset: 3px; }
+
 .missing-music-worklist {
   display: grid;
   gap: var(--hx-space-4);

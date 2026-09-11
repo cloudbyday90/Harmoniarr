@@ -9,6 +9,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createLibraryMediaRequestFulfillmentService } from '../../src/server/library/library-media-request-fulfillment-service.js';
+import { buildExternalRequestCollectionFulfillmentStatus } from '../../src/server/library/library-external-request-collection-fulfillment.js';
 
 async function scenario({ status = 'reviewed', included = ['first', 'second'], applied = ['first', 'second'],
   target = 'listener', candidateTarget = 'listener', requestState = 'needs_fetch', tracked = true, sourceType = 'playlist' } = {}) {
@@ -50,4 +51,19 @@ test('cancellation dominates even fully imported reviewed selections', async () 
 test('historical collection imports without a review ledger cannot use generic fulfillment', async () => {
   for (const sourceType of ['playlist', 'artist']) assert.equal((await scenario({ tracked: false, sourceType })).code, 'under_review');
   assert.equal((await scenario({ tracked: false, sourceType: 'album' })).code, 'fulfilled');
+});
+
+test('active collection details expose scoped captured counts without treating metadata as acquired music', () => {
+  const request = { id: 'request', requestKind: 'external_url', requestState: 'needs_fetch', requestedForUser: { id: 'listener' } };
+  const collection = { status: 'preparing', requestedForUserId: 'listener', pagesCompleted: 2, leafCount: 25 };
+  const status = buildExternalRequestCollectionFulfillmentStatus({ request, collection });
+  assert.equal(status.code, 'under_review');
+  assert.equal(status.label, 'Preparing collection');
+  assert.match(status.detail, /2 provider pages prepared; 25 collection items captured/);
+  assert.match(status.detail, /Downloads and imports are tracked separately/);
+  const reassigned = buildExternalRequestCollectionFulfillmentStatus({ request, collection: { ...collection, requestedForUserId: 'old-listener' } });
+  assert.equal(reassigned.label, 'Collection review');
+  assert.ok(!reassigned.detail.includes('25'));
+  const blocked = buildExternalRequestCollectionFulfillmentStatus({ request, collection: { ...collection, status: 'blocked' } });
+  assert.equal(blocked.label, 'Collection preparation blocked');
 });

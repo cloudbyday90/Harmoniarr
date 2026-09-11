@@ -26,22 +26,24 @@ import { createControlPlaneIdempotencyHeaders } from './control-plane-idempotenc
  */
 export function fetchMissingMusicDecisions({
   accountStatus = 'active',
+  cursor = null,
   limit = 50,
   offset = 0,
   q = null,
   requestedForUserId = null,
   scope = 'all',
   state = 'action',
-} = {}) {
+} = {}, { signal } = {}) {
   return apiRequest(`/api/v1/missing-music/decisions${buildQueryString({
     accountStatus,
+    cursor,
     limit,
     offset,
     q,
     requestedForUserId,
     scope,
     state,
- })}`);
+ })}`, { signal });
 }
 
 export function fetchMissingMusicDecisionDetail(decisionId) {

@@ -112,6 +112,8 @@ export const criticalSchemaAnchors = Object.freeze({
     { index: 'metadata_artist_refresh_state_due_idx' },
     { index: 'metadata_provider_response_cache_fetched_at_idx' },
     { index: 'library_wanted_releases_user_status_idx' },
+    { index: 'library_wanted_releases_created_id_idx' },
+    { index: 'library_wanted_releases_user_created_id_idx' },
     { index: 'library_wanted_releases_user_artist_idx' },
     { index: 'operator_library_release_visibility_user_state_idx' },
     { index: 'operator_library_release_visibility_release_idx' },

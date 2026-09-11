@@ -480,9 +480,10 @@ suite('integration external request discovery review', () => {
     await legacyStore.pruneOldRuns({ retainCount: 1 });
     assert.deepEqual(new Set((await readRuns(context.pool)).map((run) => run.id)), new Set([approval.run.id, retainedByFloor.id]));
 
-    await assert.rejects(context.pool.query('DELETE FROM operation_runs WHERE id = $1', [approval.run.id]), {
-      code: '23001', constraint: 'library_external_request_release_intents_operation_run_id_fkey',
-    });
+    await assert.rejects(context.pool.query('DELETE FROM operation_runs WHERE id = $1', [approval.run.id]), (error) => (
+      ['23001', '23503'].includes(error.code)
+      && error.constraint === 'library_external_request_release_intents_operation_run_id_fkey'
+    ));
     assert.equal((await readIntents(context.pool))[0].operation_run_id, approval.run.id);
     await context.pool.query('DELETE FROM media_requests WHERE id = $1', [fixture.requests[0].id]);
     assert.deepEqual(await readIntents(context.pool), []);

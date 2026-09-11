@@ -34,6 +34,7 @@ watch([() => props.mediaRequest.id, () => props.mediaRequest.requestedForUser?.i
 onBeforeUnmount(reset);
 
 function refresh() {
+  if (isLoading.value || isMutating.value) return false;
   return load({ mediaRequestId: props.mediaRequest.id });
 }
 
@@ -61,7 +62,7 @@ function belongsToPreviousTarget(intent) {
         <h2 id="external-review-heading" class="hx-card-title">Review external music</h2>
         <p class="hx-card-subtitle">Choose the matching local catalog edition to search for {{ targetName }}. Import candidates require review before download or import.</p>
       </div>
-      <button type="button" class="hx-btn" :disabled="isLoading || isMutating" @click="refresh">Refresh review</button>
+      <button type="button" class="hx-btn" :aria-disabled="isLoading || isMutating" @click="refresh">Refresh review</button>
     </header>
     <div class="hx-card-body hx-external-review-body">
       <div role="status" aria-atomic="true" class="hx-text-muted">{{ statusMessage }}</div>

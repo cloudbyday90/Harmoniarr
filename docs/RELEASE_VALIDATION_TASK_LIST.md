@@ -38,6 +38,12 @@ Issue #4 platform evidence map: `docs/ISSUE_4_RELEASE_VALIDATION_EVIDENCE.md`
 - [ ] Rehearse operator recovery with protected real backup/key handling,
   role/configuration and media continuity, source-worker fencing, and external
   transfer reconciliation. Generated fixtures do not close this operational gate.
+- September 11 worklist follow-up: [Missing Music pagination and preparation
+  progress](MUSIC_QUEUE_PAGINATION_OUTCOME.md) replaces the capped broad decision
+  read with bounded cursor traversal and adds safe current-collection preparation
+  counts. Its tests and limits are recorded separately from packaged release proof.
+- [ ] Capture immutable candidate-image fresh-install and upgrade evidence for the
+  pagination schema and packaged recovery environment before release closure.
 
 - Atomic multi-user request creation now has PostgreSQL failure-injection proof
   for child, audit, and durable external-planning failures, plus Chromium proof

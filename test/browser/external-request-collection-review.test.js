@@ -209,4 +209,77 @@ suite('external collection review', () => {
       await page.goto('about:blank');
     }, { scenarioName: 'external_collection_explicit_batches' });
   });
+
+  test('preparation counts refresh by keyboard, preserve unknown totals, and stop active copy for blocked or inactive requests', {
+    timeout: config.scenarioTimeoutMs,
+  }, async (t) => {
+    if (unavailableReason) { t.skip(unavailableReason); return; }
+    await runtime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      await installDetail(browserContext);
+      let stage = 'queued';
+      let reads = 0;
+      await browserContext.route(reviewMatcher, async (route) => {
+        reads += 1;
+        if (stage === 'inactive') {
+          await route.fulfill({ status: 409, json: { error: { code: 'external_request_inactive', message: 'This request is no longer awaiting acquisition.' } } });
+          return;
+        }
+        const exhausted = stage === 'exhausted';
+        const blocked = stage === 'blocked';
+        await route.fulfill({ json: {
+          collection: { status: blocked ? 'blocked' : 'preparing', revision: reads, targetMatches: true,
+            pagesCompleted: exhausted ? 2 : 1, itemsSeen: 3, leafCount: 3,
+            includedCount: 0, excludedCount: 0, pendingCount: 3, canFinalize: false, canRestart: blocked },
+          preparation: { canRecover: exhausted, action: exhausted ? 'execute' : null, progress: {
+            revision: reads, work: { total: 5, completed: exhausted ? 4 : 1, pending: exhausted ? 1 : 3,
+              failed: exhausted ? 0 : 1, processing: 0, unsupported: 0 },
+            operations: { queued: stage === 'queued' ? 1 : 0, running: stage === 'running' ? 1 : 0 },
+            pages: { completed: exhausted ? 2 : 1, pending: exhausted ? 0 : 1, failed: 0,
+              total: exhausted ? 2 : null, traversalComplete: exhausted },
+            entriesSeen: 3, leavesCaptured: 3,
+          } },
+          items: [], intents: [], pagination: { hasMore: false, nextCursor: null, limit: 25 },
+        } });
+      });
+      await page.goto(`${baseUrl}/app/requests/${requestId}`, { waitUntil: 'domcontentloaded' });
+      const panel = page.getByRole('article', { name: 'Review external music' });
+      const progress = panel.getByRole('region', { name: 'Metadata preparation', exact: true });
+      const refresh = panel.getByRole('button', { name: 'Refresh review', exact: true });
+      await progress.getByRole('status').getByText('1 preparation batch queued', { exact: true }).waitFor();
+      await progress.getByText('1 provider page captured · total pages unknown').waitFor();
+      assert.equal(await progress.getByRole('progressbar').count(), 0);
+      assert.equal(reads, 1);
+      stage = 'running';
+      await refresh.focus();
+      await refresh.press('Enter');
+      await progress.getByRole('status').getByText('1 preparation batch running', { exact: true }).waitFor();
+      assert.equal(await refresh.evaluate((element) => element === globalThis.document.activeElement), true);
+      assert.equal(reads, 2);
+      stage = 'exhausted';
+      await refresh.press('Enter');
+      await progress.getByText('2 provider pages captured · page traversal complete').waitFor();
+      await progress.getByText('5 captured metadata tasks · 4 completed · 1 pending · 0 failed').waitFor();
+      await progress.getByText(/Album metadata may still need preparation/).waitFor();
+      assert.equal(await panel.getByRole('button', { name: 'Finalize collection selection', exact: true }).count(), 0);
+      await mkdir('.tmp', { recursive: true });
+      for (const [width, theme] of [[1280, 'light'], [800, 'dark'], [390, 'light'], [390, 'dark']]) {
+        await page.setViewportSize({ width, height: 1000 });
+        await page.evaluate((value) => globalThis.document.documentElement.setAttribute('data-theme', value), theme);
+        assert.equal(await progress.evaluate((element) => element.scrollWidth > element.clientWidth), false);
+        await progress.screenshot({ path: `.tmp/collection-preparation-progress-${width}-${theme}.png` });
+      }
+      stage = 'blocked';
+      await refresh.click();
+      await progress.getByRole('status').getByText('Metadata preparation blocked', { exact: true }).waitFor();
+      assert.equal(await progress.getByText('1 preparation batch running', { exact: true }).count(), 0);
+      assert.equal(await progress.getByText('2 provider pages captured · page traversal complete', { exact: true }).count(), 0);
+      stage = 'inactive';
+      await refresh.click();
+      await panel.getByRole('alert').getByText('This request is no longer awaiting acquisition.').waitFor();
+      assert.equal(await progress.count(), 0);
+      assert.equal(reads, 5);
+      await page.goto('about:blank');
+    }, { scenarioName: 'external_collection_preparation_progress' });
+  });
 });

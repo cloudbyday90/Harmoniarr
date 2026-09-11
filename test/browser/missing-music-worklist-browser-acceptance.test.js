@@ -17,6 +17,8 @@
  */
 
 import assert from 'node:assert/strict';
+import { mkdir } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { after, before, suite, test } from 'node:test';
 import {
   createBrowserSmokeRuntime,
@@ -177,5 +179,78 @@ suite('Missing Music worklist browser acceptance', () => {
     }, {
       scenarioName: 'missing_music_worklist_filters_and_next_step',
     });
+  });
+
+  test('navigates sparse cursor pages by keyboard, retries failures, and resets filters', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) { t.skip(runtimeUnavailableReason); return; }
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      const requests = [];
+      let rejectSecondPage = false;
+      await browserContext.route('**/api/v1/missing-music/decisions**', async (route) => {
+        const query = Object.fromEntries(new URL(route.request().url()).searchParams);
+        requests.push(query);
+        if (rejectSecondPage && query.cursor === 'second') {
+          rejectSecondPage = false;
+          await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { message: 'Could not load this page.' } }) });
+          return;
+        }
+        const payload = buildDecisionPayload(query);
+        const nextCursor = query.cursor === 'third' ? null : query.cursor === 'second' ? 'third' : 'second';
+        if (query.cursor === 'second') payload.decisions = [];
+        if (query.cursor === 'third') payload.decisions[0].release.title = 'Incunabula';
+        payload.page = { total: null, limit: 50, hasMore: Boolean(nextCursor), nextCursor, scanLimitReached: query.cursor === 'second', scannedCount: 200 };
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, ...payload }) });
+      });
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      await page.goto(`${baseUrl}/app/missing`, { waitUntil: 'domcontentloaded' });
+      const navigation = page.getByRole('navigation', { name: 'Missing Music result pages' });
+      const next = navigation.getByRole('button', { name: 'Next page', exact: true });
+      await page.getByRole('heading', { name: /Amber/ }).waitFor();
+      assert.equal(await navigation.getByRole('button', { name: 'Previous page' }).isDisabled(), true);
+      await next.focus();
+      await next.press('Enter');
+      await page.getByRole('heading', { name: 'No matching releases on this page' }).waitFor();
+      await page.waitForFunction(() => globalThis.document.activeElement?.textContent?.trim() === 'Release decisions');
+      assert.match(await page.getByRole('status').textContent(), /Page 2: 0 releases.*More releases remain/);
+      assert.equal(await next.isDisabled(), false);
+      await next.focus();
+      await next.press('Space');
+      await page.getByRole('heading', { name: /Incunabula/ }).waitFor();
+      assert.equal(await next.isDisabled(), true);
+      await navigation.getByRole('button', { name: 'Previous page' }).click();
+      await page.getByRole('heading', { name: 'No matching releases on this page' }).waitFor();
+      assert.equal(requests.at(-1).cursor, 'second');
+      await navigation.getByRole('button', { name: 'First page' }).click();
+      await page.getByRole('heading', { name: /Amber/ }).waitFor();
+      rejectSecondPage = true;
+      await next.click();
+      await page.getByRole('alert').filter({ hasText: 'Could not load this page.' }).waitFor();
+      await page.waitForFunction(() => globalThis.document.activeElement?.textContent?.trim() === 'Next page');
+      assert.match(await navigation.textContent(), /Page 1/);
+      assert.equal(await page.getByRole('heading', { name: /Amber/ }).isVisible(), true);
+      await next.click();
+      await page.getByRole('heading', { name: 'No matching releases on this page' }).waitFor();
+      await page.getByLabel('Work state', { exact: true }).selectOption('all');
+      await page.getByRole('heading', { name: /Amber/ }).waitFor();
+      assert.equal(requests.at(-1).cursor, undefined);
+      assert.equal(requests.at(-1).state, 'all');
+      assert.equal(await navigation.getByRole('button', { name: 'Previous page' }).isDisabled(), true);
+
+      const screenshotDirectory = resolve('.tmp/missing-music-pagination');
+      await mkdir(screenshotDirectory, { recursive: true });
+      for (const width of [390, 800, 1280]) {
+        await page.setViewportSize({ width, height: 1000 });
+        for (const theme of ['light', 'dark']) {
+          await page.evaluate((value) => globalThis.document.documentElement.setAttribute('data-theme', value), theme);
+          await navigation.scrollIntoViewIfNeeded();
+          await next.click({ trial: true });
+          assert.equal(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth), true);
+          if (width === 390) assert.ok((await next.boundingBox()).height >= 44);
+          await page.screenshot({ path: resolve(screenshotDirectory, `pagination-${width}-${theme}.png`), fullPage: true, animations: 'disabled' });
+        }
+      }
+    }, { scenarioName: 'missing_music_cursor_navigation' });
   });
 });

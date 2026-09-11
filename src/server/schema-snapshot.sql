@@ -7130,3 +7130,45 @@ SET migration_key = EXCLUDED.migration_key,
     error_message = NULL,
     application_version = NULL,
     updated_at = NOW();
+
+-- Migration: 20260911_103324_missing_music_keyset_paging_indexes.sql
+-- Checksum: 325f74a8340f795f04bb7c73c8de87aafd1019245a25f576882eef84e88e31cf
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+-- This program is free software: licensed under GPL-3.0
+-- See LICENSE file for details.
+-- Forward-only migration.
+BEGIN;
+
+CREATE INDEX library_wanted_releases_created_id_idx
+  ON library_wanted_releases (created_at DESC, id DESC);
+CREATE INDEX library_wanted_releases_user_created_id_idx
+  ON library_wanted_releases (app_user_id, created_at DESC, id DESC);
+
+COMMIT;
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260911_103324',
+  '20260911_103324_missing_music_keyset_paging_indexes.sql',
+  'missing_music_keyset_paging_indexes',
+  '325f74a8340f795f04bb7c73c8de87aafd1019245a25f576882eef84e88e31cf',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();

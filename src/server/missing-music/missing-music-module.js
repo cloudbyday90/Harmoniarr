@@ -24,6 +24,7 @@ import { createMissingMusicDownloaderHandoffService } from './missing-music-down
 
 export function createMissingMusicModule({
   listAppUsers,
+  listWantedReleaseIdentityPage,
   listWantedReleasesWithMetadata,
   recordActivityEventFn = null,
   selectImportCandidate,
@@ -35,6 +36,7 @@ export function createMissingMusicModule({
   });
   const missingMusicDecisionService = createMissingMusicDecisionService({
     listAppUsers,
+    listWantedReleaseIdentityPage,
     listWantedReleasesWithMetadata,
     resolveMissingMusicDecisionTarget: missingMusicDecisionTargetService.resolveMissingMusicDecisionTarget,
   });

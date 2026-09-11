@@ -591,6 +591,7 @@ export function createApp({
   const controlPlaneIdempotencyService = createControlPlaneIdempotencyService();
   const missingMusicModule = buildMissingMusicModule({
     listAppUsers: appUserModule.appUserService.listAppUsers,
+    listWantedReleaseIdentityPage: libraryModule.libraryWantedReleaseStore.listWantedReleaseIdentityPage,
     listWantedReleasesWithMetadata: libraryModule.libraryWantedReleaseStore.listWantedReleasesWithMetadata,
     recordActivityEventFn: activityModule.activityEventService.recordActivityEvent,
     selectImportCandidate: importCandidateModule.importCandidateService?.selectImportCandidate

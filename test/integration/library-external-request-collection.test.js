@@ -11,6 +11,7 @@ import { randomUUID } from 'node:crypto';
 import { after, before, suite, test } from 'node:test';
 import { createAppUserService } from '../../src/server/app-user-service.js';
 import { createLibraryExternalRequestCollectionIntakeService } from '../../src/server/library/library-external-request-collection-intake-service.js';
+import { createLibraryExternalRequestCollectionProgressStore } from '../../src/server/library/library-external-request-collection-progress-store.js';
 import { createLibraryModule } from '../../src/server/library/library-module.js';
 import { createIntegrationAppRuntime } from '../../testing/integration/app-runtime.js';
 import { bootstrapAdminSession, loginWithPassword } from '../../testing/integration/auth-helpers.js';
@@ -181,6 +182,78 @@ suite('integration external request collections', () => {
   }, { timeout: config.suiteSetupTimeoutMs });
 
   after(async () => { await runtime?.cleanup(); }, { timeout: config.suiteTeardownTimeoutMs });
+
+  test('reports request-scoped preparation counts, unknown traversal totals, and eligible running batches from one revision', {
+    timeout: config.scenarioTimeoutMs,
+  }, async (t) => runScenario(t, async (context) => {
+    const fixture = await createFamily(context, { count: 2 });
+    const [request, sibling] = fixture.requests;
+    const started = await startCollection(context, request.id);
+    await startCollection(context, sibling.id);
+    const store = createLibraryExternalRequestCollectionProgressStore({ getPoolFn: () => context.pool });
+    let review = await getReview(context, request.id, '?limit=1');
+    assert.deepEqual(review.preparation.progress.work, { total: 1, completed: 0, pending: 1, failed: 0, processing: 0, unsupported: 0 });
+    assert.deepEqual(review.preparation.progress.operations, { queued: 1, running: 0 });
+    assert.equal(review.preparation.progress.pages.total, null);
+    assert.equal(review.preparation.progress.revision, review.collection.revision);
+    assert.equal(await store.getPreparationProgress({ mediaRequestId: request.id, requestedForUserId: request.requested_for_user_id,
+      revision: review.collection.revision + 1 }), null);
+    assert.equal(await store.getPreparationProgress({ mediaRequestId: request.id, requestedForUserId: sibling.requested_for_user_id,
+      revision: review.collection.revision }), null);
+    await context.pool.query("UPDATE operation_runs SET status = 'running' WHERE id = $1", [started.run.id]);
+    const pages = [playlistPage(['album1', 'album2'], { next: 'https://api.spotify.com/v1/playlists/collection123/items?offset=2&limit=100', total: 3 }),
+      playlistPage(['album3'], { offset: 2, total: 3 })];
+    const intake = createIntake({ pages, spotifyOverrides: { async getAlbum(id) {
+      if (id === 'album1') throw new Error('Fixture metadata preparation failure');
+      return album(id);
+    } } });
+    await intake.service.executeCollection({ mediaRequestId: request.id, operationRunId: started.run.id });
+    review = await getReview(context, request.id, '?limit=1');
+    assert.equal(review.items.length, 1);
+    assert.equal(review.preparation.progress.leavesCaptured, 2);
+    assert.deepEqual(review.preparation.progress.work, { total: 4, completed: 1, pending: 3, failed: 0, processing: 0, unsupported: 0 });
+    assert.deepEqual(review.preparation.progress.operations, { queued: 0, running: 1 });
+    assert.deepEqual(review.preparation.progress.pages, { completed: 1, pending: 1, failed: 0, total: null, traversalComplete: false });
+    await finishPreparationRuns(context.pool);
+    const recovered = await postReview(context, request.id, '/recover', {});
+    await intake.service.executeCollection({ mediaRequestId: request.id, operationRunId: recovered.payload.run.id });
+    await finishPreparationRuns(context.pool);
+    review = await getReview(context, request.id);
+    assert.deepEqual(review.preparation.progress.work, { total: 5, completed: 3, pending: 1, failed: 1, processing: 0, unsupported: 0 });
+    assert.deepEqual(review.preparation.progress.pages, { completed: 2, pending: 0, failed: 0, total: 2, traversalComplete: true });
+    assert.equal(review.collection.status, 'preparing');
+    assert.equal(review.preparation.canRecover, true);
+    const detail = await context.client.requestJson(`${requestPath}/${request.id}`);
+    assert.equal(detail.payload.mediaRequest.fulfillmentStatus.code, 'under_review');
+    assert.match(detail.payload.mediaRequest.fulfillmentStatus.detail, /2 provider pages prepared; 3 collection items captured/);
+    await context.pool.query('UPDATE media_requests SET requested_for_user_id = $2 WHERE id = $1', [request.id, sibling.requested_for_user_id]);
+    review = await getReview(context, request.id);
+    assert.equal(review.collection.targetMatches, false);
+    assert.equal(review.preparation.progress, null);
+    const cancelled = await context.client.requestJson(`${requestPath}/${request.id}/cancel`, {
+      method: 'POST', csrf: true, json: { reason: 'Preparation is no longer wanted' },
+    });
+    assert.equal(cancelled.response.status, 200);
+    const inactive = await context.client.requestJson(reviewPath(request.id));
+    assert.equal(inactive.response.status, 409);
+    assert.equal(inactive.payload.error.code, 'external_request_inactive');
+  }));
+
+  test('blocked page preparation keeps its total unknown and suppresses stale active batch labels', {
+    timeout: config.scenarioTimeoutMs,
+  }, async (t) => runScenario(t, async (context) => {
+    const fixture = await createFamily(context);
+    const mediaRequestId = fixture.requests[0].id;
+    const started = await startCollection(context, mediaRequestId);
+    const intake = createIntake({ spotifyOverrides: { async getPlaylistItems() { return { items: [] }; } } });
+    await intake.service.executeCollection({ mediaRequestId, operationRunId: started.run.id });
+    const review = await getReview(context, mediaRequestId);
+    assert.equal(review.collection.status, 'blocked');
+    assert.deepEqual(review.preparation.progress.work, { total: 1, completed: 0, pending: 0, failed: 1, processing: 0, unsupported: 0 });
+    assert.equal(review.preparation.progress.pages.total, null);
+    assert.equal(review.preparation.progress.pages.failed, 1);
+    assert.deepEqual(review.preparation.progress.operations, { queued: 0, running: 0 });
+  }));
 
   test('automatically creates tracked collections through the module planning service and resumes without resetting committed evidence', {
     timeout: config.scenarioTimeoutMs,

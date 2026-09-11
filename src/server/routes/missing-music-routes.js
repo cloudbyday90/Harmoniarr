@@ -78,6 +78,7 @@ export function registerMissingMusicRoutes(app, {
     const payload = await listMissingMusicDecisions({
       accountStatus: optionalQueryString(request.query.accountStatus),
       actorUser: buildActorUser(session),
+      cursor: request.query.cursor ?? null,
       limit: sanitizePageLimit(request.query.limit, { default: 50, max: 100 }),
       offset: sanitizePageOffset(request.query.offset),
       q: optionalQueryString(request.query.q),

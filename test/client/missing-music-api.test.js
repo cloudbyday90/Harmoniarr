@@ -44,7 +44,8 @@ test('fetchMissingMusicDecisions sends only bounded worklist filter values', asy
   await fetchMissingMusicDecisions({
     accountStatus: 'disabled',
     limit: 25,
-    offset: 10,
+    cursor: 'opaque_cursor',
+    offset: 0,
     q: 'Autechre & Amber',
     requestedForUserId: 'user/2',
     scope: 'all',
@@ -53,7 +54,7 @@ test('fetchMissingMusicDecisions sends only bounded worklist filter values', asy
 
   assert.equal(
     fetchMock.mock.calls[0].arguments[0],
-    '/api/v1/missing-music/decisions?accountStatus=disabled&limit=25&offset=10&q=Autechre+%26+Amber&requestedForUserId=user%2F2&scope=all&state=action',
+    '/api/v1/missing-music/decisions?accountStatus=disabled&cursor=opaque_cursor&limit=25&offset=0&q=Autechre+%26+Amber&requestedForUserId=user%2F2&scope=all&state=action',
   );
   assert.equal(fetchMock.mock.calls[0].arguments[1].method, 'GET');
 });
@@ -67,6 +68,14 @@ test('fetchMissingMusicDecisions keeps the UI default focused on action-ready ac
     fetchMock.mock.calls[0].arguments[0],
     '/api/v1/missing-music/decisions?accountStatus=active&limit=50&offset=0&scope=all&state=action',
   );
+});
+
+test('worklist reads pass abort signals without putting them in the URL', async (t) => {
+  const fetchMock = installFetchMock(t);
+  const controller = new AbortController();
+  await fetchMissingMusicDecisions({ cursor: 'next_page' }, { signal: controller.signal });
+  assert.equal(fetchMock.mock.calls[0].arguments[1].signal, controller.signal);
+  assert.equal(new URL(fetchMock.mock.calls[0].arguments[0], 'http://localhost').searchParams.has('signal'), false);
 });
 
 test('fetchMissingMusicDecisionDetail encodes only the decision identifier', async (t) => {

@@ -23,6 +23,8 @@ Harmoniarr is being planned as a self-hosted FOSS application with no SLA or ope
 - [Provider access outcome and acceptance runbook](docs/PROVIDER_ACCESS_ACCEPTANCE_OUTCOME.md)
 - [PostgreSQL recovery research, design, and tradeoffs](docs/POSTGRES_RECOVERY_REHEARSAL_DESIGN.md)
 - [PostgreSQL recovery outcome and next release work](docs/POSTGRES_RECOVERY_REHEARSAL_OUTCOME.md)
+- [Missing Music pagination and preparation design](docs/MUSIC_QUEUE_PAGINATION_DESIGN.md)
+- [Missing Music pagination outcome and release follow-up](docs/MUSIC_QUEUE_PAGINATION_OUTCOME.md)
 - [Local workflow-script replay](docs/WORKFLOW_SCRIPT_LOCAL_REPLAY.md)
 
 ## Current Direction
