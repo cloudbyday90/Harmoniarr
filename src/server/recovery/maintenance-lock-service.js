@@ -39,11 +39,18 @@ function normalizeLock(row) {
 export function createMaintenanceLockService({
   getPoolFn = getPool,
 } = {}) {
-  async function listActiveMaintenanceLocks({ lockTypes = null, queryable = null } = {}) {
+  async function listActiveMaintenanceLocks({ lockTypes = null, queryable = null, lockForTransaction = false } = {}) {
     const normalizedLockTypes = Array.isArray(lockTypes) && lockTypes.length > 0
       ? lockTypes.filter((lockType) => typeof lockType === 'string' && lockType.trim().length > 0)
       : [];
 
+    if (lockForTransaction) {
+      if (!queryable) throw new Error('A transaction client is required to protect maintenance-guarded writes');
+      // Keep the absence of a blocking lock stable until this transaction ends.
+      // SHARE allows other guarded writes and blocks maintenance INSERT/UPDATE/DELETE.
+      // Call before application row locks, and never mutate maintenance_locks here.
+      await queryable.query('LOCK TABLE maintenance_locks IN SHARE MODE');
+    }
     const pool = queryable ?? getPoolFn();
     const hasLockTypeFilter = normalizedLockTypes.length > 0;
     const result = await pool.query(

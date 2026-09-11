@@ -11,7 +11,7 @@ import { asyncRoute } from '../http.js';
 import { normalizeExternalRequestReviewError } from '../library/library-external-request-review-error.js';
 
 export function registerLibraryExternalRequestReviewRoutes(app, {
-  externalRequestReviewService, requireSession, requireFreshAdminSession,
+  externalRequestReviewService, externalRequestCollectionReviewService, requireSession, requireFreshAdminSession,
   requireCsrf, limitMediaRequestAdminMutation, getRequestMetadata,
 }) {
   async function review(work) {
@@ -30,7 +30,9 @@ export function registerLibraryExternalRequestReviewRoutes(app, {
 
   app.get('/api/v1/library/media-requests/:mediaRequestId/external-review', asyncRoute(async (request, response) => {
     await requireReviewSession(request);
-    response.json({ ok: true, ...await review(() => externalRequestReviewService.buildReview({ mediaRequestId: request.params.mediaRequestId })) });
+    response.json({ ok: true, ...await review(() => externalRequestReviewService.buildReview({
+      mediaRequestId: request.params.mediaRequestId, cursor: request.query.cursor, limit: request.query.limit,
+    })) });
   }));
 
   app.get('/api/v1/library/media-requests/:mediaRequestId/external-review/releases', asyncRoute(async (request, response) => {
@@ -47,6 +49,7 @@ export function registerLibraryExternalRequestReviewRoutes(app, {
       mediaRequestId: request.params.mediaRequestId,
       providerIngestRequestId: request.body?.providerIngestRequestId,
       metadataReleaseId: request.body?.metadataReleaseId,
+      expectedRevision: request.body?.expectedRevision,
       actorUserId: session.appUserId, requestMetadata: getRequestMetadata(request),
     })) });
   }));
@@ -56,6 +59,34 @@ export function registerLibraryExternalRequestReviewRoutes(app, {
     requireCsrf(request, session);
     response.status(202).json({ ok: true, ...await review(() => externalRequestReviewService.recoverPreparation({
       mediaRequestId: request.params.mediaRequestId, actorUserId: session.appUserId, requestMetadata: getRequestMetadata(request),
+    })) });
+  }));
+
+  app.post('/api/v1/library/media-requests/:mediaRequestId/external-review/collection/start', limitMediaRequestAdminMutation, asyncRoute(async (request, response) => {
+    const session = await requireReviewSession(request, true);
+    requireCsrf(request, session);
+    response.status(202).json({ ok: true, ...await review(() => externalRequestCollectionReviewService.startCollection({
+      mediaRequestId: request.params.mediaRequestId, restart: request.body?.restart,
+      actorUserId: session.appUserId, requestMetadata: getRequestMetadata(request),
+    })) });
+  }));
+
+  app.post('/api/v1/library/media-requests/:mediaRequestId/external-review/collection/items/:collectionItemId/exclude', limitMediaRequestAdminMutation, asyncRoute(async (request, response) => {
+    const session = await requireReviewSession(request, true);
+    requireCsrf(request, session);
+    response.json({ ok: true, ...await review(() => externalRequestCollectionReviewService.excludeItem({
+      mediaRequestId: request.params.mediaRequestId, collectionItemId: request.params.collectionItemId,
+      reason: request.body?.reason, expectedRevision: request.body?.expectedRevision,
+      actorUserId: session.appUserId, requestMetadata: getRequestMetadata(request),
+    })) });
+  }));
+
+  app.post('/api/v1/library/media-requests/:mediaRequestId/external-review/collection/finalize', limitMediaRequestAdminMutation, asyncRoute(async (request, response) => {
+    const session = await requireReviewSession(request, true);
+    requireCsrf(request, session);
+    response.json({ ok: true, ...await review(() => externalRequestCollectionReviewService.finalizeCollection({
+      mediaRequestId: request.params.mediaRequestId, expectedRevision: request.body?.expectedRevision,
+      actorUserId: session.appUserId, requestMetadata: getRequestMetadata(request),
     })) });
   }));
 }

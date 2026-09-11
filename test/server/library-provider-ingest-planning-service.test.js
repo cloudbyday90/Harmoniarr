@@ -2,6 +2,20 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createLibraryProviderIngestPlanningService } from '../../src/server/library/library-provider-ingest-planning-service.js';
 
+test('collection planning delegates to resumable preparation instead of replacing provider checkpoints', async (t) => {
+  const result = { collection: { status: 'preparing' }, providerIngestRequests: [{ id: 'page' }] };
+  const initializeCollection = t.mock.fn(async () => result);
+  const replaceProviderIngestRequests = t.mock.fn(async () => assert.fail('Collection checkpoints must remain durable'));
+  const service = createLibraryProviderIngestPlanningService({
+    collectionIntakeService: { initializeCollection },
+    getActiveExternalRequest: async () => ({ sourceUrl: 'https://music.apple.com/gb/playlist/example/pl.example' }),
+    providerIngestRequestStore: { replaceProviderIngestRequests },
+  });
+  assert.equal(await service.planExternalMediaRequest({ mediaRequestId: 'request', operationRunId: 'run' }), result);
+  assert.equal(initializeCollection.mock.calls[0].arguments[0].normalizedSource.storefront, 'gb');
+  assert.equal(replaceProviderIngestRequests.mock.callCount(), 0);
+});
+
 test('planExternalMediaRequest builds ingest plan for external_url request and patches evidence', async (t) => {
   const mergeMediaRequestEvidence = t.mock.fn(async () => {});
   const replaceProviderIngestRequests = t.mock.fn(async ({ providerIngestRequests }) => providerIngestRequests.map((r, i) => ({ ...r, id: `ingest-${i}` })));

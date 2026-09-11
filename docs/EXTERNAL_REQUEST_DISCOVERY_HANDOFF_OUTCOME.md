@@ -63,6 +63,8 @@ All three open PRs were inspected by immutable head through GitHub MCP. PRs #23 
 
 ## Limits and next release item
 
+September 11 follow-up: the pagination and collection completion item below is implemented in [External collection outcome](EXTERNAL_COLLECTION_COMPLETION_OUTCOME.md). The earlier validation counts and behavior in this document describe the September 10 increment.
+
 Tracks and YouTube videos are not implicitly broadened into album acquisitions. Artist and playlist rows are containers; only their completed album leaves can be approved. This increment searches existing local release metadata and does not automatically import or infer a MusicBrainz edition from a provider title.
 
 Provider paging and a durable collection completion policy are the next release item. Persist a stable item ledger and bounded page cursors, ensure page expansion and its checkpoint commit atomically, and represent explicit inclusion/exclusion before marking a collection complete. Prove repeated cursors, partial provider failures, cancellation, and recipient isolation with real database tests. Expose completion and remaining work through paginated review/Music Queue reads.

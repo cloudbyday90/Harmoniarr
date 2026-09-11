@@ -30,6 +30,7 @@ test('assertNoActiveWriteLocks enlists the caller transaction in its lock read',
   const service = createMaintenanceLockWriteGuardService({
     listActiveMaintenanceLocks: async (input) => {
       assert.equal(input.queryable, queryable);
+      assert.equal(input.lockForTransaction, true);
       return [{ id: 'lock-transaction', lockType: 'maintenance' }];
     },
   });

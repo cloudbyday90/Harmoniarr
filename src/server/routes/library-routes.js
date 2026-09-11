@@ -43,6 +43,7 @@ export function registerLibraryRoutes(app, {
   cancelMediaRequest,
   createMediaRequest,
   externalRequestReviewService = null,
+  externalRequestCollectionReviewService = null,
   getRequestMetadata = defaultRequestAuthDependencies.getRequestMetadata,
   getMediaRequestReassignmentHistory,
   limitLibraryDiscoveryRun = skipRateLimitMiddleware,
@@ -68,7 +69,7 @@ export function registerLibraryRoutes(app, {
   startLibraryScan,
 }) {
   registerLibraryExternalRequestReviewRoutes(app, {
-    externalRequestReviewService, requireSession, requireFreshAdminSession,
+    externalRequestReviewService, externalRequestCollectionReviewService, requireSession, requireFreshAdminSession,
     requireCsrf, limitMediaRequestAdminMutation, getRequestMetadata,
   });
 

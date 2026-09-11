@@ -285,14 +285,16 @@ suite('integration external request target ownership', () => {
       },
       queryable: pool,
     });
-    const expectedCodes = ['fulfilled', 'downloading', 'queued'];
+    // Historical playlist imports have no finalized selection proving coverage.
+    const expectedCodes = ['under_review', 'downloading', 'queued'];
+    const expectedCountKeys = ['underReview', 'downloading', 'queued'];
     for (let index = 0; index < 3; index += 1) {
       const target = await loginRequester(baseUrl, users[index]);
       const summary = await target.requestJson('/api/v1/library/media-request-summary?scope=all');
       assert.equal(summary.response.status, 200);
       assert.equal(summary.payload.scope, 'mine');
       assert.equal(summary.payload.counts.totalRequests, 1);
-      assert.equal(summary.payload.fulfillmentCounts[expectedCodes[index]], 1);
+      assert.equal(summary.payload.fulfillmentCounts[expectedCountKeys[index]], 1);
       assert.equal(summary.payload.recentRequests[0].fulfillmentStatus.code, expectedCodes[index]);
       const listing = await target.requestJson(`${requestPath}?scope=all`);
       assert.equal(listing.response.status, 200);
@@ -302,6 +304,7 @@ suite('integration external request target ownership', () => {
       const detail = await target.requestJson(`${requestPath}/${requests[index].id}`);
       assert.equal(detail.response.status, 200);
       assert.equal(detail.payload.mediaRequest.fulfillmentStatus.code, expectedCodes[index]);
+      if (index === 0) assert.match(detail.payload.mediaRequest.fulfillmentStatus.detail, /captured and finalized selection/);
       const ownEvents = await target.requestJson(`${requestPath}/${requests[index].id}/events`);
       assert.equal(ownEvents.response.status, 200);
       assert.ok(Array.isArray(ownEvents.payload.events));

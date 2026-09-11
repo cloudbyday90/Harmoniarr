@@ -9,17 +9,23 @@
 <script setup>
 import { computed, onBeforeUnmount, watch } from 'vue';
 import { useExternalRequestReview } from '../composables/useExternalRequestReview.js';
-import { formatSourceProvider } from '../lib/import-candidate-presentation.js';
+import ExternalCollectionReviewControls from './ExternalCollectionReviewControls.vue';
+import ExternalRequestReviewItem from './ExternalRequestReviewItem.vue';
 
 const props = defineProps({ mediaRequest: { type: Object, required: true } });
 const emit = defineEmits(['updated']);
 const {
-  items, intents, preparation, drafts, isLoading, isMutating,
+  items, intents, preparation, collection, canStartCollection, pagination, pageNumber, canGoPrevious,
+  drafts, isLoading, isMutating,
   errorMessage, statusMessage, load, search, approve, recover, reset,
+  nextPage, previousPage, exclude, startCollection, finalizeCollection,
 } = useExternalRequestReview();
 const targetName = computed(() => props.mediaRequest.requestedForUser?.username ?? 'the request target');
-const reviewableItems = computed(() => items.value.filter((item) => item.reviewable
+const visibleItems = computed(() => collection.value ? items.value : items.value.filter((item) => item.reviewable
   && !intents.value.some((intent) => intent.providerKey === item.providerKey)));
+
+const canDecide = computed(() => collection.value?.status === 'ready'
+  && !collection.value.reviewedAt && collection.value.targetMatches !== false);
 
 watch([() => props.mediaRequest.id, () => props.mediaRequest.requestedForUser?.id], () => {
   reset();
@@ -31,25 +37,8 @@ function refresh() {
   return load({ mediaRequestId: props.mediaRequest.id });
 }
 
-async function handleApprove(itemId) {
-  if (await approve(itemId)) emit('updated');
-}
-
-async function handleRecover() {
-  if (await recover()) emit('updated');
-}
-
-function releaseLabel(release) {
-  return [
-    release.artistName, release.title, release.releaseDate, release.country,
-    release.trackCount != null ? `${release.trackCount} tracks` : null,
-  ].filter(Boolean).join(' · ');
-}
-
-function selectedEditionLabel(itemId) {
-  const draft = drafts.value[itemId];
-  const release = draft?.releases.find((candidate) => candidate.id === draft.selectedReleaseId);
-  return release ? releaseLabel(release) : '';
+async function save(action, ...args) {
+  if (await action(...args)) emit('updated');
 }
 
 function intentStatus(status) {
@@ -78,52 +67,30 @@ function belongsToPreviousTarget(intent) {
       <div role="status" aria-atomic="true" class="hx-text-muted">{{ statusMessage }}</div>
       <div role="alert" aria-atomic="true" class="hx-external-review-error">{{ errorMessage }}</div>
       <p v-if="isLoading" class="hx-text-muted" aria-busy="true">Loading prepared music.</p>
-      <div v-if="preparation.canRecover" class="hx-external-review-recovery">
+      <ExternalCollectionReviewControls
+        :collection="collection" :can-start-collection="canStartCollection" :preparation="preparation"
+        :pagination="pagination" :page-number="pageNumber" :can-go-previous="canGoPrevious"
+        :busy="isLoading || isMutating" :target-name="targetName"
+        @start="save(startCollection)" @restart="save(startCollection, true)" @recover="save(recover)"
+        @finalize="save(finalizeCollection)" @next="nextPage" @previous="previousPage"
+      />
+      <div v-if="!collection && !canStartCollection && preparation.canRecover" class="hx-external-review-recovery">
         <p class="hx-text-muted">{{ preparation.action === 'execute' ? 'Pending or failed provider items need metadata preparation before they can be reviewed.' : 'This request needs provider planning before music can be reviewed.' }}</p>
-        <button type="button" class="hx-btn" :disabled="isMutating || isLoading" @click="handleRecover">
+        <button type="button" class="hx-btn" :disabled="isMutating || isLoading" @click="save(recover)">
           {{ isMutating ? 'Saving…' : preparation.action === 'execute' ? 'Prepare provider metadata' : 'Plan this external request' }}
         </button>
       </div>
-      <p v-if="!isLoading && !reviewableItems.length && !intents.length" class="hx-text-muted">
-        No prepared albums are ready for review. Tracks and videos are not converted into album searches. Refresh after preparation finishes.
+      <p v-if="!isLoading && !visibleItems.length && !intents.length" class="hx-text-muted">
+        {{ collection ? 'No captured items on this review page. Check preparation and refresh after queued work finishes.' : 'No prepared albums are ready for review. Tracks and videos are not converted into album searches. Refresh after preparation finishes.' }}
       </p>
-      <form v-for="item in reviewableItems" :key="item.id" class="hx-external-review-item" @submit.prevent="handleApprove(item.id)">
-        <fieldset :disabled="isMutating || isLoading">
-          <legend>{{ item.artistName ? `${item.artistName} · ` : '' }}{{ item.title || 'Prepared album' }}</legend>
-          <p class="hx-text-muted">
-            {{ formatSourceProvider(item.sourceProvider) }}<template v-if="item.releaseDate"> · {{ item.releaseDate }}</template><template v-if="item.trackCount != null"> · {{ item.trackCount }} tracks</template>
-          </p>
-          <div class="hx-form-row">
-            <div class="hx-field">
-              <label :for="`external-artist-${item.id}`" class="hx-field-label">Artist in local catalog</label>
-              <input :id="`external-artist-${item.id}`" v-model="drafts[item.id].artistName" class="hx-input" maxlength="300" :disabled="drafts[item.id].isSearching" />
-            </div>
-            <div class="hx-field">
-              <label :for="`external-release-${item.id}`" class="hx-field-label">Release in local catalog</label>
-              <input :id="`external-release-${item.id}`" v-model="drafts[item.id].releaseTitle" class="hx-input" maxlength="300" :disabled="drafts[item.id].isSearching" />
-            </div>
-          </div>
-          <button type="button" class="hx-btn" :disabled="drafts[item.id].isSearching || !drafts[item.id].artistName.trim() || !drafts[item.id].releaseTitle.trim()" @click="search(item.id)">
-            {{ drafts[item.id].isSearching ? 'Finding editions…' : 'Find local editions' }}
-          </button>
-          <div role="status" aria-atomic="true" class="hx-text-muted">{{ drafts[item.id].statusMessage }}</div>
-          <div role="alert" aria-atomic="true" class="hx-external-review-error">{{ drafts[item.id].errorMessage }}</div>
-          <p v-if="drafts[item.id].searchComplete && !drafts[item.id].releases.length" class="hx-text-muted">No matching local editions. Adjust the search or add catalog metadata before continuing.</p>
-          <div v-if="drafts[item.id].releases.length" class="hx-field">
-            <label :for="`external-edition-${item.id}`" class="hx-field-label">Matching local edition</label>
-            <select :id="`external-edition-${item.id}`" v-model="drafts[item.id].selectedReleaseId" class="hx-select" required :disabled="drafts[item.id].isSearching" :aria-describedby="`external-edition-detail-${item.id}`">
-              <option value="" disabled>Choose an edition</option>
-              <option v-for="release in drafts[item.id].releases" :key="release.id" :value="release.id">{{ releaseLabel(release) }}</option>
-            </select>
-            <p :id="`external-edition-detail-${item.id}`" class="hx-text-muted hx-external-review-edition">{{ selectedEditionLabel(item.id) }}</p>
-          </div>
-          <button type="submit" class="hx-btn" data-variant="primary" :disabled="!drafts[item.id].selectedReleaseId || drafts[item.id].isSearching">
-            {{ isMutating ? 'Saving…' : `Search this release for ${targetName}` }}
-          </button>
-        </fieldset>
-      </form>
+      <ExternalRequestReviewItem
+        v-for="item in visibleItems" :key="item.collectionItemId || item.id" v-model:draft="drafts[item.id]"
+        :item="item" :target-name="targetName" :busy="isMutating || isLoading"
+        :can-exclude="canDecide && Boolean(item.collectionItemId) && item.decision === 'pending'"
+        @search="search(item.id)" @approve="save(approve, item.id)" @exclude="save(exclude, item.id)"
+      />
       <section v-if="intents.length" aria-labelledby="external-accepted-heading">
-        <h3 id="external-accepted-heading" class="hx-card-title">Accepted release searches</h3>
+        <h3 id="external-accepted-heading" class="hx-card-title">Accepted release searches{{ collection ? ' on this page' : '' }}</h3>
         <ul class="hx-external-review-intents">
           <li v-for="intent in intents" :key="intent.id">
             <span>{{ intent.artistName }} · {{ intent.releaseTitle }}</span>
@@ -138,34 +105,15 @@ function belongsToPreviousTarget(intent) {
 </template>
 
 <style scoped>
-.hx-external-review-body,
-.hx-external-review-item fieldset {
-  display: grid;
-  gap: var(--hx-space-3);
-  min-width: 0;
-}
-.hx-external-review-item fieldset {
-  border: 1px solid var(--hx-border);
-  border-radius: var(--hx-radius-sm);
-  padding: var(--hx-space-4);
-  margin: 0;
-}
-.hx-external-review-item legend { color: var(--hx-text-strong); font-weight: 600; }
-.hx-external-review-item .hx-btn,
-.hx-external-review-recovery .hx-btn { justify-self: start; }
+.hx-external-review-body { display: grid; gap: var(--hx-space-3); min-width: 0; }
 .hx-external-review .hx-card-header > .hx-btn { flex-shrink: 0; }
 .hx-external-review-error { color: var(--hx-danger); }
 .hx-external-review-intents { padding-left: var(--hx-space-5); }
 .hx-external-review-intents li { padding: var(--hx-space-2) 0; overflow-wrap: anywhere; }
 .hx-external-review-intents .hx-pill { margin-left: var(--hx-space-2); }
-.hx-external-review .hx-select { max-width: 100%; }
-.hx-external-review-edition { overflow-wrap: anywhere; }
 .hx-external-review p { margin: 0; }
 @media (max-width: 640px) {
   .hx-external-review .hx-card-header { flex-wrap: wrap; }
-  .hx-external-review .hx-form-row { display: grid; grid-template-columns: 1fr; }
-  .hx-external-review .hx-btn,
-  .hx-external-review .hx-select,
-  .hx-external-review .hx-input { min-height: 44px; }
+  .hx-external-review .hx-btn { min-height: 44px; }
 }
 </style>

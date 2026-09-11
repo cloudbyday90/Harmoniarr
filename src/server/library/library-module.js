@@ -28,6 +28,8 @@ import { createLibraryExternalRequestProgressStore } from './library-external-re
 import { createLibraryExternalRequestReviewStore } from './library-external-request-review-store.js';
 import { createLibraryExternalRequestReviewService } from './library-external-request-review-service.js';
 import { createLibraryExternalRequestDiscoveryModule } from './library-external-request-discovery-module.js';
+import { createLibraryExternalRequestCollectionIntakeStore } from './library-external-request-collection-intake-store.js';
+import { createLibraryExternalRequestCollectionIntakeService } from './library-external-request-collection-intake-service.js';
 import { createLibraryProviderIngestExecutionRunStore } from './library-provider-ingest-execution-run-store.js';
 import { createLibraryProviderIngestExecutionService } from './library-provider-ingest-execution-service.js';
 import { createLibraryProviderIngestExecutionWorker } from './library-provider-ingest-execution-worker.js';
@@ -51,6 +53,8 @@ import { createLibraryEmbeddedArtworkService } from './library-embedded-artwork-
 import { createLibraryFileMatcherService } from './library-file-matcher-service.js';
 import { createLibraryFileMatchStore } from './library-file-match-store.js';
 import { createLibraryMediaRequestFulfillmentService } from './library-media-request-fulfillment-service.js';
+import { createLibraryExternalRequestCollectionReviewStore } from './library-external-request-collection-review-store.js';
+import { createLibraryExternalRequestCollectionReviewService } from './library-external-request-collection-review-service.js';
 import { createLibraryMediaRequestNotificationService } from './library-media-request-notification-service.js';
 import { createLibraryMediaRequestPipelineService } from './library-media-request-pipeline-service.js';
 import { createLibraryMediaRequestPipelineStore } from './library-media-request-pipeline-store.js';
@@ -130,7 +134,9 @@ export function createLibraryModule({
   libraryMediaRequestStore = createLibraryMediaRequestStore(),
   libraryExternalRequestProgressStore = createLibraryExternalRequestProgressStore(),
   externalRequestReviewStore = createLibraryExternalRequestReviewStore(),
+  externalRequestCollectionReviewStore = createLibraryExternalRequestCollectionReviewStore(),
   libraryMediaRequestFulfillmentService = createLibraryMediaRequestFulfillmentService({
+    listExternalRequestCollectionsByIds: externalRequestCollectionReviewStore.listCollectionsByMediaRequestIds,
     listExternalRequestIntentsByIds: externalRequestReviewStore.listIntentsByMediaRequestIds,
     listExternalRequestProgressByIds: libraryExternalRequestProgressStore.listExternalRequestProgressByIds,
     listImportCandidatesBySourceMediaRequestIds: importCandidateService?.listImportCandidatesBySourceMediaRequestIds,
@@ -147,7 +153,24 @@ export function createLibraryModule({
     listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks,
   }),
   libraryExternalIntakeRunStore = createLibraryExternalIntakeRunStore(),
+  collectionIntakeStore = createLibraryExternalRequestCollectionIntakeStore(),
+  collectionIntakeService = createLibraryExternalRequestCollectionIntakeService({
+    collectionStore: collectionIntakeStore,
+    getAppUserById,
+    mediaRequestStore: libraryMediaRequestStore,
+    resolveProviderClients: providerClientResolverService.resolveProviderClients,
+    isCancellationRequested: maintenanceLockOperationPauseService
+      ? createOperationRunInterruptionGate({
+        isCancellationRequested: collectionIntakeStore.isCancellationRequested,
+        operationLabel: 'Provider collection preparation',
+        operationPauseService: maintenanceLockOperationPauseService,
+      }) : collectionIntakeStore.isCancellationRequested,
+    assertMaintenanceWriteAllowed: ({ queryable } = {}) => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+      operationLabel: 'provider collection preparation', queryable,
+    }),
+  }),
   libraryProviderIngestPlanningService = createLibraryProviderIngestPlanningService({
+    collectionIntakeService,
     mediaRequestStore: libraryMediaRequestStore,
     providerIngestRequestStore: libraryProviderIngestRequestStore,
   }),
@@ -162,6 +185,7 @@ export function createLibraryModule({
   }),
   libraryProviderIngestExecutionRunStore = createLibraryProviderIngestExecutionRunStore(),
   libraryProviderIngestExecutionService = createLibraryProviderIngestExecutionService({
+    collectionIntakeService,
     assertMaintenanceWriteAllowed: () => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
       operationLabel: 'library provider ingest execution',
     }),
@@ -404,7 +428,20 @@ export function createLibraryModule({
       operationLabel: 'external request release discovery', queryable,
     }),
   });
+  const externalRequestCollectionReviewService = createLibraryExternalRequestCollectionReviewService({
+    collectionReviewStore: externalRequestCollectionReviewStore,
+    collectionIntakeService,
+    reviewStore: externalRequestReviewStore,
+    mediaRequestStore: libraryMediaRequestStore,
+    getAppUserById,
+    executionRunStore: libraryProviderIngestExecutionRunStore,
+    planningRunStore: libraryExternalIntakeRunStore,
+    assertMaintenanceWriteAllowed: ({ queryable } = {}) => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+      operationLabel: 'external collection review', queryable,
+    }),
+  });
   const externalRequestReviewService = createLibraryExternalRequestReviewService({
+    collectionReviewService: externalRequestCollectionReviewService,
     reviewStore: externalRequestReviewStore,
     mediaRequestStore: libraryMediaRequestStore,
     providerIngestRequestStore: libraryProviderIngestRequestStore,
@@ -424,7 +461,11 @@ export function createLibraryModule({
     });
 
   return {
+    collectionIntakeService,
+    collectionIntakeStore,
     ...externalRequestDiscoveryModule,
+    externalRequestCollectionReviewService,
+    externalRequestCollectionReviewStore,
     externalRequestReviewService,
     externalRequestReviewStore,
     libraryCatalogStore,
@@ -482,6 +523,7 @@ export function createLibraryModule({
     libraryWantedSummaryStore,
     libraryScanWorker,
     routeDependencies: {
+      externalRequestCollectionReviewService,
       externalRequestReviewService,
       buildLibraryDiscoveryRunDetail: libraryDiscoverySummaryService.buildLibraryDiscoveryRunDetail,
       buildLibraryDiscoverySummary: libraryDiscoverySummaryService.buildLibraryDiscoverySummary,

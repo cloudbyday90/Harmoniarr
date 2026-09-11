@@ -46,8 +46,8 @@ export function createLibraryExternalRequestDiscoveryService({
     }
 
     async function assertCurrentTarget({ queryable = null } = {}) {
-      await throwIfOperationRunCancellationRequested({ isCancellationRequested, queryable, runId: operationRunId });
       await assertMaintenanceWriteAllowed({ queryable });
+      await throwIfOperationRunCancellationRequested({ isCancellationRequested, queryable, runId: operationRunId });
       if (queryable) {
         await reviewStore.lockRequest({ mediaRequestId, queryable });
       }

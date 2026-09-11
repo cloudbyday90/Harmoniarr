@@ -169,6 +169,14 @@ export function createAppleMusicClient({
     });
   }
 
+  async function getCatalogPlaylistTracks(storefront, playlistId, { offset = 0, limit = 100 } = {}) {
+    return appleMusicGet(`/catalog/${storefront}/playlists/${playlistId}/tracks`, { include: 'albums,artists', limit, offset });
+  }
+
+  async function getCatalogArtistAlbums(storefront, artistId, { offset = 0, limit = 25 } = {}) {
+    return appleMusicGet(`/catalog/${storefront}/artists/${artistId}/albums`, { limit, offset });
+  }
+
   async function getCatalogArtist(storefront, artistId, { offset = 0, limit = 25 } = {}) {
     return appleMusicGet(`/catalog/${storefront}/artists/${artistId}`, {
       'include': 'albums',
@@ -184,6 +192,8 @@ export function createAppleMusicClient({
   }
 
   return {
+    getCatalogPlaylistTracks,
+    getCatalogArtistAlbums,
     getCatalogAlbum,
     getCatalogArtist,
     getCatalogPlaylist,

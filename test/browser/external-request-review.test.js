@@ -64,7 +64,7 @@ suite('external request review', () => {
       let attempts = 0;
       let reviewReads = 0;
       const selectedBodies = [];
-      await browserContext.route(`**${reviewPath}`, async (route) => {
+      await browserContext.route(new RegExp(`${reviewPath}(?:\\?.*)?$`), async (route) => {
         reviewReads += 1;
         await route.fulfill({ json: {
           items: [{ id: 'provider-album', providerKey: 'spotify:album:fixture', sourceProvider: 'spotify',
@@ -153,7 +153,7 @@ suite('external request review', () => {
       await installRequestDetail(browserContext);
       let queued = false;
       let recoveryCalls = 0;
-      await browserContext.route(`**${reviewPath}`, (route) => route.fulfill({ json: {
+      await browserContext.route(new RegExp(`${reviewPath}(?:\\?.*)?$`), (route) => route.fulfill({ json: {
         items: [], intents: [], preparation: { canRecover: !queued, action: queued ? null : 'plan' },
       } }));
       await browserContext.route(`**${reviewPath}/recover`, async (route) => {
@@ -183,7 +183,7 @@ suite('external request review', () => {
     await runtime.runScenario(async ({ baseUrl, browserContext, page }) => {
       await bootstrapAdminThroughUi(page, { baseUrl });
       await installRequestDetail(browserContext);
-      await browserContext.route(`**${reviewPath}`, (route) => route.fulfill({ json: {
+      await browserContext.route(new RegExp(`${reviewPath}(?:\\?.*)?$`), (route) => route.fulfill({ json: {
         items: [{ id: 'p1', providerKey: 'spotify:album:fixture', sourceProvider: 'spotify', title: 'Album', artistName: 'Artist', reviewable: true }],
         intents: [{ id: 'i1', providerKey: 'spotify:album:fixture', releaseTitle: 'Album', artistName: 'Artist', requestedForUserId: 'previous-target', status: 'completed' }],
         preparation: { canRecover: false, action: null },

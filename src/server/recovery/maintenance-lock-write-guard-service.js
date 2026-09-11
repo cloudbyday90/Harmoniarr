@@ -25,7 +25,7 @@ export function createMaintenanceLockWriteGuardService({
   async function assertNoActiveWriteLocks({ operationLabel = 'write operations', queryable = null } = {}) {
     const blockingLocks = await listActiveMaintenanceLocks({
       lockTypes: [...defaultBlockingMaintenanceLockTypes],
-      ...(queryable ? { queryable } : {}),
+      ...(queryable ? { queryable, lockForTransaction: true } : {}),
     });
 
     if (blockingLocks.length > 0) {

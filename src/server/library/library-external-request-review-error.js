@@ -15,6 +15,12 @@ const publicCodes = new Set([
   'provider_ingest_request_not_found', 'external_request_item_not_reviewable',
   'external_request_review_conflict', 'metadata_release_not_found',
   'external_request_preparation_complete', 'recovery_lock_conflict',
+  'external_collection_target_changed', 'external_collection_stale_review',
+  'external_collection_not_ready', 'external_collection_review_conflict',
+  'external_collection_not_found', 'external_collection_item_not_found',
+  'external_collection_required', 'external_request_preparation_active',
+  'external_collection_restart_unavailable', 'external_collection_blocked',
+  'external_collection_legacy_approvals',
 ]);
 
 export function normalizeExternalRequestReviewError(error) {

@@ -18,6 +18,7 @@
 
 import { buildExternalRequestProgressStatus } from './library-external-request-progress.js';
 import { buildExternalRequestIntentFulfillmentStatus } from './library-external-request-intent-fulfillment.js';
+import { buildExternalRequestCollectionFulfillmentStatus } from './library-external-request-collection-fulfillment.js';
 
 const candidateStatusPriority = new Map([
   ['applied', 700],
@@ -245,6 +246,7 @@ export function createLibraryMediaRequestFulfillmentService({
   listImportCandidatesBySourceMediaRequestIds = async () => [],
   listExternalRequestProgressByIds = async () => [],
   listExternalRequestIntentsByIds = async () => [],
+  listExternalRequestCollectionsByIds = async () => [],
   getMediaRequestById = async () => null,
 } = {}) {
   async function enrichMediaRequests(mediaRequests) {
@@ -262,7 +264,7 @@ export function createLibraryMediaRequestFulfillmentService({
 
     const externalRequestIds = requests.filter((request) => request?.requestKind === 'external_url')
       .map((request) => normalizeMediaRequestId(request.id)).filter(Boolean);
-    const [importCandidates, externalProgress, externalIntents] = await Promise.all([
+    const [importCandidates, externalProgress, externalIntents, externalCollections] = await Promise.all([
       allRequestIds.length > 0
         ? listImportCandidatesBySourceMediaRequestIds({ sourceMediaRequestIds: allRequestIds })
         : [],
@@ -272,7 +274,11 @@ export function createLibraryMediaRequestFulfillmentService({
       externalRequestIds.length > 0
         ? listExternalRequestIntentsByIds({ mediaRequestIds: externalRequestIds })
         : [],
+      externalRequestIds.length > 0
+        ? listExternalRequestCollectionsByIds({ mediaRequestIds: externalRequestIds })
+        : [],
     ]);
+    const collectionsByRequestId = new Map(externalCollections.map((collection) => [collection.mediaRequestId, collection]));
     const progressByRequestId = new Map(externalProgress.map((progress) => [progress.mediaRequestId, progress]));
     const candidatesByRequestId = new Map();
 
@@ -326,9 +332,11 @@ export function createLibraryMediaRequestFulfillmentService({
       const preparationStatus = candidates.length === 0 && request?.requestState === 'needs_fetch'
         ? buildExternalRequestProgressStatus({ request, progress: progressByRequestId.get(request.id) })
         : null;
+      const requestIntents = externalIntents.filter((intent) => intent.mediaRequestId === request.id);
       const fulfillmentStatus = {
-        ...(buildExternalRequestIntentFulfillmentStatus({
-          request, intents: externalIntents.filter((intent) => intent.mediaRequestId === request.id), candidates,
+        ...(buildExternalRequestCollectionFulfillmentStatus({ request, collection: collectionsByRequestId.get(request.id), candidates, intents: requestIntents })
+          ?? buildExternalRequestIntentFulfillmentStatus({
+          request, intents: requestIntents, candidates,
         }) ?? preparationStatus ?? buildMediaRequestFulfillmentStatus({ importCandidates: candidates, request })),
       };
 

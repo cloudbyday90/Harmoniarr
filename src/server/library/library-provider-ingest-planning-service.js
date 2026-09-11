@@ -22,6 +22,7 @@ import { buildProviderIngestPlan, normalizeExternalMediaSource } from './externa
 import { createLibraryMediaRequestStore } from './library-media-request-store.js';
 import { createLibraryProviderIngestRequestStore } from './library-provider-ingest-request-store.js';
 import { createLibraryExternalRequestActiveService } from './library-external-request-active-service.js';
+import { isCollectionSource } from './provider-collection-cursor-policy.js';
 
 export function createLibraryProviderIngestPlanningService({
   getNow = () => new Date(),
@@ -29,6 +30,7 @@ export function createLibraryProviderIngestPlanningService({
   getActiveExternalRequest = createLibraryExternalRequestActiveService({ mediaRequestStore }).getActiveExternalRequest,
   providerIngestRequestStore = createLibraryProviderIngestRequestStore(),
   recordAuditEventFn = recordAuditEvent,
+  collectionIntakeService = null,
 } = {}) {
   async function planExternalMediaRequest({ mediaRequestId, operationRunId = null, triggeredByUserId = null, triggerSource = 'request_submit' } = {}) {
     const mediaRequest = await getActiveExternalRequest({ mediaRequestId, operationRunId });
@@ -36,6 +38,10 @@ export function createLibraryProviderIngestPlanningService({
     const normalizedSource = normalizeExternalMediaSource(mediaRequest.sourceUrl);
     if (!normalizedSource) {
       throw createApiError(409, 'provider_url_not_supported', 'External provider URL could not be normalized into an ingest plan');
+    }
+
+    if (collectionIntakeService && isCollectionSource(normalizedSource)) {
+      return collectionIntakeService.initializeCollection({ mediaRequestId, normalizedSource, operationRunId, triggeredByUserId });
     }
 
     const ingestPlan = buildProviderIngestPlan({ normalizedSource });

@@ -211,6 +211,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
     cancelMediaRequest,
     createMediaRequest,
     externalRequestReviewService: libraryModule.externalRequestReviewService,
+    externalRequestCollectionReviewService: libraryModule.externalRequestCollectionReviewService,
     getMediaRequestReassignmentHistory,
     listMediaRequestEventsPage,
     listMediaRequests,

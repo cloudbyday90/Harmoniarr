@@ -10,7 +10,6 @@ import { createApiError } from '../auth.js';
 import { recordAuditEvent } from '../audit.js';
 import { createAppUserService } from '../app-user-service.js';
 import { createDatabaseTransactionRunner } from '../database-transaction-service.js';
-import { buildMediaRequestTargetEligibility } from '../media-request-target-eligibility.js';
 import { createMetadataSearchService } from '../metadata/metadata-search-service.js';
 import { normalizeExternalMediaSource } from './external-media-source-parser.js';
 import { createLibraryMediaRequestStore } from './library-media-request-store.js';
@@ -21,13 +20,7 @@ import { createLibraryProviderIngestExecutionRunStore } from './library-provider
 import { createLibraryExternalRequestDiscoveryRunStore } from './library-external-request-discovery-run-store.js';
 import { createLibraryExternalRequestReviewStore } from './library-external-request-review-store.js';
 import { buildExternalRequestPreparationState, projectExternalRequestReviewItem } from './library-external-request-review-evidence.js';
-
-function uuid(value, name) {
-  if (typeof value !== 'string' || !/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(value)) {
-    throw createApiError(400, 'validation_error', `${name} must be a UUID`);
-  }
-  return value.toLowerCase();
-}
+import { createLibraryExternalRequestReviewAccessService, normalizeExternalReviewId as uuid } from './library-external-request-review-access-service.js';
 
 function conflict() {
   return createApiError(409, 'external_request_review_conflict', 'This provider album or release already has a different approval. Review the existing decision.');
@@ -50,36 +43,28 @@ export function createLibraryExternalRequestReviewService({
   recordAuditEventFn = recordAuditEvent,
   assertMaintenanceWriteAllowed = async () => {},
   metadataSearchService = null,
+  collectionReviewService = null,
 } = {}) {
-  async function loadRequest(mediaRequestId, queryable = null) {
-    uuid(mediaRequestId, 'mediaRequestId');
-    const request = await mediaRequestStore.getMediaRequestById({ mediaRequestId, queryable });
-    if (!request) throw createApiError(404, 'media_request_not_found', 'The specified media request could not be found');
-    if (request.requestKind !== 'external_url') throw createApiError(409, 'external_request_required', 'Provider review requires an external request');
-    if (request.requestState !== 'needs_fetch') throw createApiError(409, 'external_request_inactive', 'This request is no longer awaiting acquisition');
-    return request;
-  }
-
-  async function assertEligibleTarget(request, queryable) {
-    const user = await getAppUserById({ userId: request.requestedForUser?.id, queryable });
-    if (!buildMediaRequestTargetEligibility(user).eligible) {
-      throw createApiError(409, 'media_request_target_ineligible', 'The request target is not currently eligible for music requests');
-    }
-  }
+  const { loadRequest, assertEligibleTarget } = createLibraryExternalRequestReviewAccessService({ mediaRequestStore, getAppUserById });
 
   async function activePreparation(mediaRequestId, queryable = null) {
     return await planningRunStore.getActiveRunByMediaRequestId(mediaRequestId, queryable)
       ?? await executionRunStore.getActiveRunByMediaRequestId(mediaRequestId, queryable);
   }
 
-  async function buildReview({ mediaRequestId }) {
-    await loadRequest(mediaRequestId);
+  async function buildReview({ mediaRequestId, cursor, limit }) {
+    const collectionReview = await collectionReviewService?.buildReview({ mediaRequestId, cursor, limit });
+    if (collectionReview) return collectionReview;
+    const request = await loadRequest(mediaRequestId);
     const rows = await providerIngestRequestStore.listProviderIngestRequests({ mediaRequestId });
     const intents = await reviewStore.listIntents({ mediaRequestId });
+    const activeRun = await activePreparation(mediaRequestId);
     return {
       items: rows.map(projectExternalRequestReviewItem),
       intents,
-      preparation: buildExternalRequestPreparationState({ items: rows, activeRun: await activePreparation(mediaRequestId) }),
+      ...(collectionReviewService ? { collection: null,
+        canStartCollection: !activeRun && intents.length === 0 && ['playlist', 'artist'].includes(normalizeExternalMediaSource(request.sourceUrl)?.resourceType) } : {}),
+      preparation: buildExternalRequestPreparationState({ items: rows, activeRun }),
     };
   }
 
@@ -105,7 +90,7 @@ export function createLibraryExternalRequestReviewService({
     }, queryable);
   }
 
-  async function approveRelease({ mediaRequestId, providerIngestRequestId, metadataReleaseId, actorUserId, requestMetadata = null }) {
+  async function approveRelease({ mediaRequestId, providerIngestRequestId, metadataReleaseId, expectedRevision, actorUserId, requestMetadata = null }) {
     mediaRequestId = uuid(mediaRequestId, 'mediaRequestId');
     providerIngestRequestId = uuid(providerIngestRequestId, 'providerIngestRequestId');
     metadataReleaseId = uuid(metadataReleaseId, 'metadataReleaseId');
@@ -114,16 +99,19 @@ export function createLibraryExternalRequestReviewService({
       await reviewStore.lockRequest({ mediaRequestId, queryable });
       const request = await loadRequest(mediaRequestId, queryable);
       await assertEligibleTarget(request, queryable);
-      const rows = await providerIngestRequestStore.listProviderIngestRequests({ mediaRequestId, queryable });
-      const row = rows.find((item) => item.id === providerIngestRequestId);
+      const collectionContext = await collectionReviewService?.prepareInclusion({ mediaRequestId, providerIngestRequestId, expectedRevision, request, queryable });
+      const row = collectionContext ? collectionContext.item.providerRow
+        : (await providerIngestRequestStore.listProviderIngestRequests({ mediaRequestId, queryable }))
+          .find((item) => item.id === providerIngestRequestId);
       if (!row) throw createApiError(404, 'provider_ingest_request_not_found', 'The provider item does not belong to this request');
       const item = projectExternalRequestReviewItem(row);
       if (!item.reviewable) throw createApiError(409, 'external_request_item_not_reviewable', 'Only completed provider albums with artist and title evidence can be approved');
       const intents = await reviewStore.listIntents({ mediaRequestId, queryable });
       const existing = intents.find((intent) => intent.providerKey === item.providerKey || intent.metadataReleaseId === metadataReleaseId);
       if (existing) {
-        if (existing.providerKey !== item.providerKey || existing.metadataReleaseId !== metadataReleaseId
+        if ((!collectionContext && existing.providerKey !== item.providerKey) || existing.metadataReleaseId !== metadataReleaseId
           || existing.requestedForUserId !== request.requestedForUser?.id) throw conflict();
+        await collectionReviewService?.recordInclusion({ context: collectionContext, intent: existing, actorUserId, requestMetadata, queryable });
         return { accepted: true, reusedExistingIntent: true, intent: existing,
           run: existing.operationRunId ? { id: existing.operationRunId, status: existing.status } : null };
       }
@@ -137,6 +125,7 @@ export function createLibraryExternalRequestReviewService({
       });
       const run = await discoveryRunStore.createOperationRun({ intentId: intent.id, mediaRequestId, triggeredByUserId: actorUserId, triggerSource: 'operator_review', queryable });
       const savedIntent = await reviewStore.setIntentRun({ intentId: intent.id, operationRunId: run.id, queryable });
+      await collectionReviewService?.recordInclusion({ context: collectionContext, intent: savedIntent, actorUserId, requestMetadata, queryable });
       await audit({ actorUserId, mediaRequestId, eventType: 'external_request_release_approved',
         summary: 'Provider album approved for target-owned release discovery',
         details: { intentId: intent.id, metadataReleaseId, requestedForUserId: intent.requestedForUserId, providerKey: item.providerKey, operationRunId: run.id },
@@ -152,6 +141,7 @@ export function createLibraryExternalRequestReviewService({
       await reviewStore.lockRequest({ mediaRequestId, queryable });
       const request = await loadRequest(mediaRequestId, queryable);
       await assertEligibleTarget(request, queryable);
+      await collectionReviewService?.assertPreparationRecovery({ mediaRequestId, request, queryable });
       const activeRun = await activePreparation(mediaRequestId, queryable);
       if (activeRun) return { accepted: true, reusedExistingRun: true, run: activeRun };
       const items = await providerIngestRequestStore.listProviderIngestRequests({ mediaRequestId, queryable });

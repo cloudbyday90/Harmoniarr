@@ -3,6 +3,19 @@ import test from 'node:test';
 import { createApiError } from '../../src/server/auth.js';
 import { createLibraryProviderIngestExecutionService } from '../../src/server/library/library-provider-ingest-execution-service.js';
 
+test('tracked collection execution uses bounded atomic batches instead of legacy provider expansion', async (t) => {
+  const result = { executedCount: 10, failedCount: 0, collection: { status: 'preparing' } };
+  const executeCollection = t.mock.fn(async () => result);
+  const listPlannedProviderIngestRequests = t.mock.fn(async () => assert.fail('Tracked collections must use their durable batch'));
+  const service = createLibraryProviderIngestExecutionService({
+    collectionIntakeService: { getCollection: async () => ({ mediaRequestId: 'request' }), executeCollection },
+    providerIngestRequestStore: { listPlannedProviderIngestRequests },
+  });
+  assert.equal(await service.executeProviderIngestRequests({ mediaRequestId: 'request', operationRunId: 'run' }), result);
+  assert.equal(executeCollection.mock.calls[0].arguments[0].operationRunId, 'run');
+  assert.equal(listPlannedProviderIngestRequests.mock.callCount(), 0);
+});
+
 test('executeProviderIngestRequests applies bounded playlist policy through provider expansion service', async (t) => {
   const insertProviderIngestRequests = t.mock.fn(async ({ providerIngestRequests }) => providerIngestRequests.map((request, index) => ({ ...request, id: `derived-${index}` })));
   const updateProviderIngestRequestStatus = t.mock.fn(async (input) => input);

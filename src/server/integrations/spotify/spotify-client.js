@@ -165,18 +165,21 @@ export function createSpotifyClient({
 
   async function getPlaylistItems(playlistId, { market = null, offset = 0, limit = 50 } = {}) {
     return spotifyGet(`/playlists/${playlistId}/items`, {
-      additional_types: 'track',
-      fields: 'next,offset,total,items(track(id,name,duration_ms,artists(id,name),album(id,name,release_date,total_tracks)))',
+      additional_types: 'track,episode',
       limit,
       market,
       offset,
     });
   }
 
-  async function getArtistAlbums(artistId, { albumTypes = 'album,single,ep', limit = 50, offset = 0 } = {}) {
+  async function getPlaylistSnapshot(playlistId) {
+    return spotifyGet(`/playlists/${playlistId}`, { fields: 'id,snapshot_id' });
+  }
+
+  async function getArtistAlbums(artistId, { albumTypes = 'album,single', limit = 10, offset = 0 } = {}) {
     return spotifyGet(`/artists/${artistId}/albums`, {
       include_groups: albumTypes,
-      limit,
+      limit: Math.min(limit, 10),
       offset,
     });
   }
@@ -194,6 +197,7 @@ export function createSpotifyClient({
   }
 
   return {
+    getPlaylistSnapshot,
     getAlbum,
     getArtist,
     getArtistAlbums,

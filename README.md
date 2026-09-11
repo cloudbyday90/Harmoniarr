@@ -17,6 +17,8 @@ Harmoniarr is being planned as a self-hosted FOSS application with no SLA or ope
 - [Release checklist](release.md)
 - [External request discovery design and tradeoffs](docs/EXTERNAL_REQUEST_DISCOVERY_HANDOFF_DESIGN.md)
 - [External request discovery outcome and next step](docs/EXTERNAL_REQUEST_DISCOVERY_HANDOFF_OUTCOME.md)
+- [External collection design, sources, and tradeoffs](docs/EXTERNAL_COLLECTION_COMPLETION_DESIGN.md)
+- [External collection outcome and release follow-up](docs/EXTERNAL_COLLECTION_COMPLETION_OUTCOME.md)
 - [Local workflow-script replay](docs/WORKFLOW_SCRIPT_LOCAL_REPLAY.md)
 
 ## Current Direction
@@ -40,9 +42,9 @@ The repository now includes the deployment scaffolding for the planned standard 
 - `compose.slskd-example.yaml`
 - `.env.example`
 
-This is still a scaffold, not a supported runnable release. The container bootstrap shape is defined, but the actual Harmoniarr application runtime is still pending.
+The application builds and boots with embedded PostgreSQL, tracked SQL migrations, an Express API, and a Vue client on port `3000`. `/healthz` supports smoke validation. Library management, acquisition review, and recovery are implemented; the platform remains under validation toward its first supported release.
 
-The current scaffold now does build and boot successfully: embedded PostgreSQL is initialized inside the container, tracked SQL migrations are applied at startup, an Express API serves a minimal Vue client on port `3000`, and `/healthz` responds for smoke-test validation. This is still an early bootstrap slice rather than the finished Harmoniarr feature set.
+External artist and playlist requests use bounded provider preparation and explicit collection review. Administrators include local release editions or exclude captured items with a reason, then finalize the selection. Fulfillment requires imports for every distinct included release belonging to the request target.
 
 The planned container target is 64-bit only. The current baseline should support `amd64` and `arm64`; 32-bit targets are not part of the supported runtime posture.
 

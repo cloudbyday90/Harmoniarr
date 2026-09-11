@@ -59,6 +59,7 @@ export function createLibraryProviderIngestExecutionService({
   providerIngestRequestStore = createLibraryProviderIngestRequestStore(),
   recordAuditEventFn = recordAuditEvent,
   resolveProviderClients = () => ({}),
+  collectionIntakeService = null,
 } = {}) {
   async function queueExternalMediaRequestExecution({ mediaRequestId, canonicalUrl, resourceType, sourceIdentifier, sourceProvider, triggerSource = 'planning_complete', triggeredByUserId = null } = {}) {
     await assertMaintenanceWriteAllowed();
@@ -85,6 +86,9 @@ export function createLibraryProviderIngestExecutionService({
   }
 
   async function executeProviderIngestRequests({ mediaRequestId, operationRunId = null, triggerSource = 'planning_complete', triggeredByUserId = null } = {}) {
+    if (collectionIntakeService && await collectionIntakeService.getCollection({ mediaRequestId })) {
+      return collectionIntakeService.executeCollection({ mediaRequestId, operationRunId, triggerSource, triggeredByUserId });
+    }
     await getActiveExternalRequest({ mediaRequestId, operationRunId });
     const plannedRows = await providerIngestRequestStore.listPlannedProviderIngestRequests({ mediaRequestId });
     if (plannedRows.length === 0) {
