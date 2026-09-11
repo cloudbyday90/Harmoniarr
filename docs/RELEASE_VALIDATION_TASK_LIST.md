@@ -29,8 +29,15 @@ Issue #4 platform evidence map: `docs/ISSUE_4_RELEASE_VALIDATION_EVIDENCE.md`
   are disabled in the discovered walkthrough deployment.
 - [ ] Capture strict multi-page access evidence with eligible saved provider
   connections; use required deployment CSRF and the provider access runbook.
-- [ ] Prove full PostgreSQL backup/restore continuity for request decisions,
-  collection revisions, retained continuation work, and operation state.
+- [x] Prove full PostgreSQL backup/restore continuity for generated request decisions,
+  collection revisions, retained continuation work, and operation state. The
+  [September 11 rehearsal outcome](POSTGRES_RECOVERY_REHEARSAL_OUTCOME.md) records
+  a real PostgreSQL 18.6 custom archive round trip, atomic failure rollback,
+  external-key checks, and cancellation preservation. Repository Validation now
+  runs the isolated command and retains sanitized evidence.
+- [ ] Rehearse operator recovery with protected real backup/key handling,
+  role/configuration and media continuity, source-worker fencing, and external
+  transfer reconciliation. Generated fixtures do not close this operational gate.
 
 - Atomic multi-user request creation now has PostgreSQL failure-injection proof
   for child, audit, and durable external-planning failures, plus Chromium proof

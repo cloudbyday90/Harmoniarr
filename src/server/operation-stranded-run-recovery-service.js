@@ -68,6 +68,7 @@ export function createOperationStrandedRunRecoveryService({
     if (candidateRuns.length === 0) {
       return {
         activeLeaseCount: 0,
+        cancelledCount: 0,
         failedCount: 0,
         retriedCount: 0,
         scannedCount: 0,
@@ -85,6 +86,7 @@ export function createOperationStrandedRunRecoveryService({
     );
 
     let activeLeaseCount = 0;
+    let cancelledCount = 0;
     let failedCount = 0;
     let retriedCount = 0;
 
@@ -129,7 +131,9 @@ export function createOperationStrandedRunRecoveryService({
           },
         });
 
-        if (recoveredRun) {
+        if (recoveredRun?.status === 'cancelled') {
+          cancelledCount += 1;
+        } else if (recoveredRun) {
           retriedCount += 1;
         }
 
@@ -146,13 +150,16 @@ export function createOperationStrandedRunRecoveryService({
         },
       });
 
-      if (failedRun) {
+      if (failedRun?.status === 'cancelled') {
+        cancelledCount += 1;
+      } else if (failedRun) {
         failedCount += 1;
       }
     }
 
     return {
       activeLeaseCount,
+      cancelledCount,
       failedCount,
       retriedCount,
       scannedCount: candidateRuns.length,

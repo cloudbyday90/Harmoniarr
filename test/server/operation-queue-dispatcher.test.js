@@ -22,6 +22,7 @@ test('operation queue dispatcher claims runnable runs and launches matching hand
   const artworkHandler = t.mock.fn(async () => {});
   const recoverStrandedRuns = t.mock.fn(async () => ({
     activeLeaseCount: 1,
+    cancelledCount: 2,
     failedCount: 0,
     retriedCount: 1,
     scannedCount: 2,
@@ -74,6 +75,7 @@ test('operation queue dispatcher claims runnable runs and launches matching hand
     },
   }]);
   assert.deepEqual(result, {
+    cancelledCount: 2,
     claimedCount: 2,
     failedCount: 0,
     retriedCount: 1,
@@ -129,6 +131,7 @@ test('operation queue dispatcher skips claims while maintenance dispatch readine
   assert.equal(recoverStrandedRuns.mock.callCount(), 0);
   assert.equal(claimNextRunnableRun.mock.callCount(), 0);
   assert.deepEqual(result, {
+    cancelledCount: 0,
     claimedCount: 0,
     failedCount: 0,
     nextRetryAt: '2026-05-04T12:00:00.000Z',

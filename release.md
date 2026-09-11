@@ -36,6 +36,7 @@ These workflows make up the release boundary that must stay green for a real rel
 - `npm run validate` passes on the release commit.
 - `npm run validate:database` passes when migrations, schema bootstrap, or startup preparation changed.
 - `npm run validate:security` passes.
+- `npm run validate:postgres-recovery` passes against its isolated generated fixture; retain the sanitized evidence and keep operator backup/cutover claims separate.
 - Provider-collection access claims are backed by source-specific opt-in evidence from [the provider access runbook](docs/PROVIDER_ACCESS_ACCEPTANCE_OUTCOME.md); controlled tests and saved configuration alone do not establish live account access.
 - Schema snapshot is refreshed when migrations changed.
 - Docker image builds locally when Docker is available.
@@ -57,6 +58,14 @@ Run database-specific validation when relevant:
 ```bash
 npm run validate:database
 ```
+
+Run the full PostgreSQL continuity rehearsal with a local Docker engine and a new evidence path:
+
+```powershell
+npm run validate:postgres-recovery -- --evidence-path .tmp/release/postgres-recovery-evidence.json
+```
+
+This creates and removes an owned PostgreSQL 18.6 fixture container, performs a real dump/restore, and tests retained request work, encryption-key dependence, lease/cancellation behavior, and atomic failure rollback. It accepts no operator database or archive input and starts no application workers. See the separate [design](docs/POSTGRES_RECOVERY_REHEARSAL_DESIGN.md) and [outcome](docs/POSTGRES_RECOVERY_REHEARSAL_OUTCOME.md). The `Repository Validation` workflow runs the same direct ESM entry point in its independent recovery job and retains only sanitized evidence. A missing Docker runtime or failed command cannot count as passed recovery proof.
 
 Build the image locally when Docker is available:
 

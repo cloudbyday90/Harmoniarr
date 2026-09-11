@@ -68,6 +68,7 @@ export function createOperationQueueDispatcher({
 
       if (dispatchReadiness && dispatchReadiness.allowed === false) {
         return {
+          cancelledCount: 0,
           claimedCount: 0,
           failedCount: 0,
           nextRetryAt: dispatchReadiness.nextRetryAt ?? null,
@@ -104,6 +105,7 @@ export function createOperationQueueDispatcher({
       }
 
       return {
+        cancelledCount: recoveryResult?.cancelledCount ?? 0,
         claimedCount,
         failedCount: recoveryResult?.failedCount ?? 0,
         retriedCount: recoveryResult?.retriedCount ?? 0,

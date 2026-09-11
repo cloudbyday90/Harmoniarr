@@ -83,6 +83,7 @@
     "validate:docker-controlled-provider-pipeline": "node scripts/validate-docker-controlled-provider-pipeline.js",
     "validate:docker-provider-acceptance": "node scripts/validate-docker-provider-acceptance.js",
     "validate:provider-collection-access": "node scripts/validate-provider-collection-access.js",
+    "validate:postgres-recovery": "node scripts/validate-postgres-recovery.js",
     "validate:managed-slskd-smoke": "node scripts/validate-managed-slskd-smoke.js",
     "validate:docker-upgrade": "node scripts/validate-docker-upgrade.js",
     "validate:docker-released-image": "node scripts/validate-docker-released-image.js",

@@ -80,6 +80,8 @@ Recommended stack: Node 24 LTS, modular native ESM, existing encrypted OAuth sto
 
 The next independent code item is **PostgreSQL backup/restore continuity for requests, decisions, and retained collection work**, while live provider evidence awaits saved connection configuration. Keep full database recovery distinct from the existing logical settings/wanted export.
 
+September 11 follow-up: the [PostgreSQL recovery outcome](POSTGRES_RECOVERY_REHEARSAL_OUTCOME.md) records a passing full generated-fixture archive rehearsal and a cancellation-recovery fix. It advances the next independent code item to Music Queue pagination and preparation progress. The live-provider and operator-recovery limits above remain open.
+
 ## Pull request disposition
 
 GitHub MCP refreshed all open PRs and inspected each complete patch. No patch is applicable: #23 and #24 are superseded by newer pinned workflow actions already local; #40 upgrades only the fixture to Node 26, diverging from the Node 24 platform. The design records their exact immutable heads and discovered links. No PR was merged or changed.

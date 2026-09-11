@@ -442,6 +442,7 @@ suite('integration operations lifecycle and library lock routes', () => {
       const pausedRun = await readOperationRunQueueState(getPoolFn, seededRun.id);
 
       assert.deepEqual(pausedResult, {
+        cancelledCount: 0,
         claimedCount: 0,
         failedCount: 0,
         nextRetryAt: null,
@@ -468,6 +469,7 @@ suite('integration operations lifecycle and library lock routes', () => {
       const claimedRun = await readOperationRunQueueState(getPoolFn, seededRun.id);
 
       assert.deepEqual(resumedResult, {
+        cancelledCount: 0,
         claimedCount: 1,
         failedCount: 0,
         retriedCount: 0,

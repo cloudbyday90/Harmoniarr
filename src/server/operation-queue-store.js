@@ -230,14 +230,16 @@ export function createOperationQueueStore({
     const result = await getPoolFn().query(
       `
         UPDATE operation_runs
-        SET status = 'pending',
-            finished_at = NULL,
-            summary = COALESCE(summary, '{}'::jsonb) || $2::jsonb,
+        SET status = CASE WHEN cancel_requested_at IS NOT NULL THEN 'cancelled' ELSE 'pending' END,
+            finished_at = CASE WHEN cancel_requested_at IS NOT NULL THEN NOW() ELSE NULL END,
+            summary = COALESCE(summary, '{}'::jsonb) || $2::jsonb ||
+              CASE WHEN cancel_requested_at IS NOT NULL THEN jsonb_build_object(
+                'currentStep', 'Cancellation completed after stranded run recovery',
+                'retryScheduledAt', NULL
+              ) ELSE '{}'::jsonb END,
             error_message = NULL,
-            cancel_requested_at = NULL,
-            cancel_requested_by_user_id = NULL,
-            cancelled_at = NULL,
-            next_attempt_at = $3::timestamptz,
+            cancelled_at = CASE WHEN cancel_requested_at IS NOT NULL THEN COALESCE(cancelled_at, NOW()) ELSE cancelled_at END,
+            next_attempt_at = CASE WHEN cancel_requested_at IS NOT NULL THEN next_attempt_at ELSE $3::timestamptz END,
             max_attempts = COALESCE($4, max_attempts),
             claimed_at = NULL,
             claimed_by_instance_id = NULL
@@ -271,12 +273,17 @@ export function createOperationQueueStore({
     const result = await getPoolFn().query(
       `
         UPDATE operation_runs
-        SET status = 'failed',
+        SET status = CASE WHEN cancel_requested_at IS NOT NULL THEN 'cancelled' ELSE 'failed' END,
             finished_at = NOW(),
-            summary = COALESCE(summary, '{}'::jsonb) || $2::jsonb,
+            summary = COALESCE(summary, '{}'::jsonb) || $2::jsonb ||
+              CASE WHEN cancel_requested_at IS NOT NULL THEN jsonb_build_object(
+                'currentStep', 'Cancellation completed after stranded run recovery',
+                'retryScheduledAt', NULL
+              ) ELSE '{}'::jsonb END,
+            cancelled_at = CASE WHEN cancel_requested_at IS NOT NULL THEN COALESCE(cancelled_at, NOW()) ELSE cancelled_at END,
             claimed_at = NULL,
             claimed_by_instance_id = NULL,
-            error_message = $3
+            error_message = CASE WHEN cancel_requested_at IS NOT NULL THEN NULL ELSE $3 END
         WHERE id = $1
           AND status = 'running'
         RETURNING

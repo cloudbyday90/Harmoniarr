@@ -36,6 +36,8 @@ Non-goals for v1:
 
 ## Recovery Layers
 
+The September 2026 [PostgreSQL rehearsal design](POSTGRES_RECOVERY_REHEARSAL_DESIGN.md) and [executed outcome](POSTGRES_RECOVERY_REHEARSAL_OUTCOME.md) add generated-fixture proof for a full database archive, request decisions, retained work, encryption-key dependency, and lease/cancellation recovery. Run `npm run validate:postgres-recovery -- --evidence-path .tmp/postgres-recovery.json` with a local Docker engine and a new output path. This separate CLI does not expand the app-managed export below or restore an operator database. Real recovery still requires protected keys, roles/configuration, media continuity, and worker cutover controls.
+
 Harmoniarr should treat recovery as two separate layers.
 
 ### Layer 1: Logical App Backup

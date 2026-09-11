@@ -58,6 +58,7 @@ test('operation stranded run recovery retries running work whose lease has expir
   });
   assert.deepEqual(result, {
     activeLeaseCount: 0,
+    cancelledCount: 0,
     failedCount: 0,
     retriedCount: 1,
     scannedCount: 1,
@@ -104,9 +105,31 @@ test('operation stranded run recovery fails exhausted running work with a missin
   });
   assert.deepEqual(result, {
     activeLeaseCount: 0,
+    cancelledCount: 0,
     failedCount: 1,
     retriedCount: 0,
     scannedCount: 1,
     skipped: false,
   });
 });
+for (const exhausted of [false, true]) {
+  test(`stranded recovery reports persisted cancellation when ${exhausted ? 'the retry budget is exhausted' : 'a retry was otherwise available'}`, async (t) => {
+    const cancelled = { id: 'run-cancelled', status: 'cancelled' };
+    const recoverRunForRetry = t.mock.fn(async () => cancelled);
+    const markStrandedRunFailed = t.mock.fn(async () => cancelled);
+    const service = createOperationStrandedRunRecoveryService({
+      jobLeaseStore: { listLeases: async () => [], releaseLease: async () => {} },
+      operationQueueStore: {
+        listRecoverableRuns: async () => [{ id: cancelled.id, operationType: 'library_scan', attemptCount: 1, maxAttempts: 3 }],
+        recoverRunForRetry, markStrandedRunFailed,
+      },
+      retryPolicyService: { buildRetrySchedule: () => exhausted ? null : { nextAttemptAt: '2026-09-11T12:00:00.000Z' } },
+    });
+    const result = await service.recoverStrandedRuns();
+    assert.equal(result.cancelledCount, 1);
+    assert.equal(result.retriedCount, 0);
+    assert.equal(result.failedCount, 0);
+    assert.equal(recoverRunForRetry.mock.callCount(), exhausted ? 0 : 1);
+    assert.equal(markStrandedRunFailed.mock.callCount(), exhausted ? 1 : 0);
+  });
+}
