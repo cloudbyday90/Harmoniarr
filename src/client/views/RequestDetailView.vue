@@ -19,6 +19,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import ExternalRequestReviewPanel from '../components/ExternalRequestReviewPanel.vue';
 import ReassignRequestModal from '../components/ReassignRequestModal.vue';
 import RequestEventTimeline from '../components/RequestEventTimeline.vue';
 import RequestJourneyTimeline from '../components/RequestJourneyTimeline.vue';
@@ -308,6 +309,12 @@ function formatTimestamp(ts) {
           </dl>
         </div>
       </article>
+
+      <ExternalRequestReviewPanel
+        v-if="isAdmin && mediaRequest.requestKind === 'external_url' && mediaRequest.requestState === 'needs_fetch'"
+        :media-request="mediaRequest"
+        @updated="load({ mediaRequestId: route.params.id })"
+      />
 
       <article v-if="hasPipeline" class="hx-card">
         <header class="hx-card-header">

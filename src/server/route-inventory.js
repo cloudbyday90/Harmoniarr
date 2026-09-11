@@ -17,6 +17,10 @@
  */
 
 export const serverRouteInventory = Object.freeze([
+  { method: 'GET', path: '/api/v1/library/media-requests/:mediaRequestId/external-review', access: 'admin', area: 'library', kind: 'read' },
+  { method: 'GET', path: '/api/v1/library/media-requests/:mediaRequestId/external-review/releases', access: 'admin', area: 'library', kind: 'read' },
+  { method: 'POST', path: '/api/v1/library/media-requests/:mediaRequestId/external-review/approve', access: 'admin', area: 'library', kind: 'mutation' },
+  { method: 'POST', path: '/api/v1/library/media-requests/:mediaRequestId/external-review/recover', access: 'admin', area: 'library', kind: 'mutation' },
   { method: 'GET', path: '/api/v1/missing-music/decisions', access: 'authenticated', area: 'missing-music', kind: 'read' },
   { method: 'GET', path: '/api/v1/missing-music/decisions/:decisionId', access: 'authenticated', area: 'missing-music', kind: 'read' },
   { method: 'GET', path: '/api/v1/missing-music/decisions/:decisionId/downloader-handoff', access: 'admin', area: 'missing-music', kind: 'read' },

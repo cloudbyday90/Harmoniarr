@@ -107,8 +107,9 @@ None is applicable. No PR is applied or merged as part of this change.
 
 ## Next release item
 
-Provider execution currently stores fetched metadata, but does not establish
-matched releases for discovery. Build the provider-metadata-to-discovery handoff
-with per-target identity and an explicit review gate before claiming end-to-end
-external acquisition. Include an audited recovery path for historical orphaned
-children. Then resume Music Queue/provider-catalog pagination from the release review.
+The subsequent [discovery handoff design](EXTERNAL_REQUEST_DISCOVERY_HANDOFF_DESIGN.md)
+and [outcome](EXTERNAL_REQUEST_DISCOVERY_HANDOFF_OUTCOME.md) implement explicit
+album review, target-owned search, and audited preparation recovery. Complete
+provider-catalog pagination and collection completeness next, then resume Music
+Queue pagination. This preparation design alone does not establish end-to-end
+collection acquisition.

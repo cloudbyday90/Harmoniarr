@@ -102,8 +102,9 @@ checked work boundaries; a provider request already sent may finish. The change
 does not provide HTTP POST replay idempotency or a new job deduplication guarantee.
 
 Provider response preparation is not the complete external acquisition pipeline.
-The next release item is the provider-metadata-to-discovery handoff, preserving
-target identity and operator review, with an audited recovery path for historical
-children that never received planning jobs. Existing rows are not silently
-resubmitted to providers at startup. Music Queue/provider-catalog pagination
-remains the following item in the release review.
+The reviewed provider-metadata-to-discovery handoff and audited recovery for
+historical children are implemented in the subsequent
+[discovery handoff outcome](EXTERNAL_REQUEST_DISCOVERY_HANDOFF_OUTCOME.md).
+Existing rows are not silently resubmitted to providers at startup. The next item
+is bounded provider-catalog pagination with explicit collection completion,
+followed by the Music Queue pagination work from the release review.

@@ -12,6 +12,7 @@ import { operationRunRegistry } from '../../shared/operation-run-descriptors.js'
 const operationTypes = [
   operationRunRegistry.libraryExternalIntakePlanning.operationType,
   operationRunRegistry.libraryExternalIntakeExecution.operationType,
+  operationRunRegistry.libraryExternalRequestDiscovery.operationType,
 ];
 
 export function createLibraryExternalRequestProgressStore({ getPoolFn = getPool } = {}) {
@@ -35,14 +36,20 @@ export function createLibraryExternalRequestProgressStore({ getPoolFn = getPool 
       FROM operation_runs
       WHERE operation_type = ANY($1::text[])
         AND summary->>'mediaRequestId' = ANY($2::text[])
+        AND (operation_type <> $3 OR EXISTS (
+          SELECT 1 FROM library_external_request_release_intents intent
+          JOIN media_requests request ON request.id = intent.media_request_id
+          WHERE intent.operation_run_id = operation_runs.id
+            AND intent.requested_for_user_id = request.requested_for_user_id
+        ))
       ORDER BY summary->>'mediaRequestId',
         CASE WHEN status IN ('pending', 'running') THEN 0 ELSE 1 END,
         created_at DESC, id DESC
-    `, [operationTypes, ids]);
+    `, [operationTypes, ids, operationTypes[2]]);
 
     return result.rows.map((row) => ({
       mediaRequestId: row.media_request_id,
-      phase: row.operation_type === operationTypes[1] ? 'execution' : 'planning',
+      phase: row.operation_type === operationTypes[2] ? 'discovery' : row.operation_type === operationTypes[1] ? 'execution' : 'planning',
       status: row.status,
       occurredAt: row.occurred_at ?? null,
       failedCount: Math.max(0, Number.parseInt(row.failed_count, 10) || 0),

@@ -1,8 +1,8 @@
 # Harmoniarr
 
-Harmoniarr is a planned standalone Docker-hosted music library manager inspired by Lidarr, designed around Soulseek as the primary acquisition source.
+Harmoniarr is a self-hosted, Docker-hosted music library manager inspired by Lidarr, with Soulseek as the primary acquisition source.
 
-The current repository contains planning documents while product, architecture, and implementation direction are being finalized.
+The repository contains the Node.js ESM server, Vue client, PostgreSQL schema, automated validation, and design documents. The platform is under active development toward its first release.
 
 Harmoniarr is being planned as a self-hosted FOSS application with no SLA or operational warranty. The docs in this repository describe intended behavior and design direction, not a hosted-service support commitment.
 
@@ -15,6 +15,8 @@ Harmoniarr is being planned as a self-hosted FOSS application with no SLA or ope
 - [Security policy and posture](docs/SECURITY_POLICY.md)
 - [Security benchmarks](docs/SECURITY_BENCHMARKS.md)
 - [Release checklist](release.md)
+- [External request discovery design and tradeoffs](docs/EXTERNAL_REQUEST_DISCOVERY_HANDOFF_DESIGN.md)
+- [External request discovery outcome and next step](docs/EXTERNAL_REQUEST_DISCOVERY_HANDOFF_OUTCOME.md)
 - [Local workflow-script replay](docs/WORKFLOW_SCRIPT_LOCAL_REPLAY.md)
 
 ## Current Direction

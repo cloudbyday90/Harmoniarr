@@ -61,9 +61,10 @@ export function createMaintenanceLockOperationPauseService({
   blockingLockTypes = defaultBlockingMaintenanceLockTypes,
   listActiveMaintenanceLocks = async () => [],
 } = {}) {
-  async function resolveOperationReadiness({ operationLabel } = {}) {
+  async function resolveOperationReadiness({ operationLabel, queryable = null } = {}) {
     const blockingLocks = await listActiveMaintenanceLocks({
       lockTypes: [...blockingLockTypes],
+      ...(queryable ? { queryable } : {}),
     });
 
     if (!Array.isArray(blockingLocks) || blockingLocks.length < 1) {

@@ -118,3 +118,15 @@ test('countPrunableOperationRuns counts without deleting', async () => {
   assert.match(pool.calls[0].text, /SELECT COUNT\(\*\)/);
   assert.ok(!/DELETE/.test(pool.calls[0].text));
 });
+
+test('ledger pruning and its preview preserve runs backing durable external release approvals', async () => {
+  const pool = createFakePool(() => ({ rows: [{ prunable_count: 0 }], rowCount: 0 }));
+  const options = { getPoolFn: pool.getPoolFn, olderThanIso: '2026-09-01T00:00:00Z', retainCountPerType: 1 };
+  await countPrunableOperationRuns(options);
+  await pruneOperationRunsLedger(options);
+  await createOperationRunStore({ getPoolFn: pool.getPoolFn, operationType: 'library_external_request_discovery' }).pruneOldRuns({ retainCount: 1 });
+  assert.equal(pool.calls.length, 3);
+  for (const { text } of pool.calls) {
+    assert.match(text, /AND NOT EXISTS \(\s+SELECT 1 FROM library_external_request_release_intents retained_intent\s+WHERE retained_intent\.operation_run_id = operation_runs\.id\s+\)/);
+  }
+});

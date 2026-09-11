@@ -20,6 +20,9 @@ const publicSchema = 'public';
 
 export const criticalSchemaAnchors = Object.freeze({
   columns: Object.freeze([
+    { table: 'library_external_request_release_intents', column: 'requested_for_user_id' },
+    { table: 'library_external_request_release_intents', column: 'provider_evidence' },
+    { table: 'library_external_request_release_intents', column: 'operation_run_id' },
     { table: 'schema_migrations', column: 'filename' },
     { table: 'schema_migrations', column: 'checksum' },
     { table: 'schema_migrations', column: 'status' },
@@ -56,6 +59,8 @@ export const criticalSchemaAnchors = Object.freeze({
     { table: 'library_files', column: 'tag_extracted_modified_at' },
   ]),
   constraints: Object.freeze([
+    { table: 'library_external_request_release_intents', constraint: 'external_request_release_intents_release_unique' },
+    { table: 'library_external_request_release_intents', constraint: 'external_request_release_intents_provider_unique' },
     { table: 'schema_migrations', constraint: 'schema_migrations_filename_key' },
     { table: 'operation_runs', constraint: 'operation_runs_pkey' },
     { table: 'media_requests', constraint: 'media_requests_state_check' },
@@ -106,6 +111,7 @@ export const criticalSchemaAnchors = Object.freeze({
     { index: 'operator_artist_reconciliation_snapshot_latest_idx' },
   ]),
   tables: Object.freeze([
+    { table: 'library_external_request_release_intents' },
     { table: 'schema_migrations' },
     { table: 'operation_runs' },
     { table: 'media_requests' },

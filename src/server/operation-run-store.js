@@ -36,6 +36,12 @@ function clampRetainCountPerType(retainCountPerType) {
   return Math.max(1, Math.min(Number.isInteger(retainCountPerType) ? retainCountPerType : 50, 1000));
 }
 
+// Referenced discovery runs are part of the approved request's durable retry state.
+const unreferencedByExternalRequestIntentSql = `NOT EXISTS (
+  SELECT 1 FROM library_external_request_release_intents retained_intent
+  WHERE retained_intent.operation_run_id = operation_runs.id
+)`;
+
 /**
  * Global, cross-operation-type retention sweep for the operation-run ledger.
  *
@@ -59,6 +65,7 @@ export async function pruneOperationRunsLedger({
     `
       DELETE FROM operation_runs
       WHERE status IN ('completed', 'failed', 'cancelled')
+        AND ${unreferencedByExternalRequestIntentSql}
         AND COALESCE(finished_at, cancelled_at, started_at, created_at) < $1
         AND id NOT IN (
           SELECT id
@@ -99,6 +106,7 @@ export async function countPrunableOperationRuns({
       SELECT COUNT(*)::int AS prunable_count
       FROM operation_runs
       WHERE status IN ('completed', 'failed', 'cancelled')
+        AND ${unreferencedByExternalRequestIntentSql}
         AND COALESCE(finished_at, cancelled_at, started_at, created_at) < $1
         AND id NOT IN (
           SELECT id
@@ -362,6 +370,7 @@ export function createOperationRunStore({
         DELETE FROM operation_runs
         WHERE operation_type = $1
           AND status IN ('completed', 'failed', 'cancelled')
+          AND ${unreferencedByExternalRequestIntentSql}
           AND id NOT IN (
             SELECT id
             FROM operation_runs
@@ -375,8 +384,8 @@ export function createOperationRunStore({
     );
   }
 
-  async function isCancellationRequested({ runId }) {
-    const pool = getPoolFn();
+  async function isCancellationRequested({ runId, queryable = null }) {
+    const pool = queryable ?? getPoolFn();
     const result = await pool.query(
       `
         SELECT cancel_requested_at

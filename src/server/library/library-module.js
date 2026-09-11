@@ -25,6 +25,9 @@ import { createLibraryExternalIntakeRunStore } from './library-external-intake-r
 import { createLibraryExternalIntakeService } from './library-external-intake-service.js';
 import { createLibraryExternalIntakeWorker } from './library-external-intake-worker.js';
 import { createLibraryExternalRequestProgressStore } from './library-external-request-progress-store.js';
+import { createLibraryExternalRequestReviewStore } from './library-external-request-review-store.js';
+import { createLibraryExternalRequestReviewService } from './library-external-request-review-service.js';
+import { createLibraryExternalRequestDiscoveryModule } from './library-external-request-discovery-module.js';
 import { createLibraryProviderIngestExecutionRunStore } from './library-provider-ingest-execution-run-store.js';
 import { createLibraryProviderIngestExecutionService } from './library-provider-ingest-execution-service.js';
 import { createLibraryProviderIngestExecutionWorker } from './library-provider-ingest-execution-worker.js';
@@ -126,7 +129,9 @@ export function createLibraryModule({
   libraryReleaseAvailabilityStore = createLibraryReleaseAvailabilityStore(),
   libraryMediaRequestStore = createLibraryMediaRequestStore(),
   libraryExternalRequestProgressStore = createLibraryExternalRequestProgressStore(),
+  externalRequestReviewStore = createLibraryExternalRequestReviewStore(),
   libraryMediaRequestFulfillmentService = createLibraryMediaRequestFulfillmentService({
+    listExternalRequestIntentsByIds: externalRequestReviewStore.listIntentsByMediaRequestIds,
     listExternalRequestProgressByIds: libraryExternalRequestProgressStore.listExternalRequestProgressByIds,
     listImportCandidatesBySourceMediaRequestIds: importCandidateService?.listImportCandidatesBySourceMediaRequestIds,
     getMediaRequestById: libraryMediaRequestStore.getMediaRequestById,
@@ -387,6 +392,31 @@ export function createLibraryModule({
     settingsService,
   }),
 } = {}) {
+  const externalRequestDiscoveryModule = createLibraryExternalRequestDiscoveryModule({
+    reviewStore: externalRequestReviewStore,
+    mediaRequestStore: libraryMediaRequestStore,
+    getAppUserById,
+    slskdService,
+    importCandidateService,
+    getReleaseTracklistExpectationsFn: async ({ metadataReleaseId }) => buildReleaseTracklistExpectations(await listMetadataTracksByReleaseId(metadataReleaseId)),
+    operationPauseService: maintenanceLockOperationPauseService,
+    assertMaintenanceWriteAllowed: ({ queryable } = {}) => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+      operationLabel: 'external request release discovery', queryable,
+    }),
+  });
+  const externalRequestReviewService = createLibraryExternalRequestReviewService({
+    reviewStore: externalRequestReviewStore,
+    mediaRequestStore: libraryMediaRequestStore,
+    providerIngestRequestStore: libraryProviderIngestRequestStore,
+    discoveryRunStore: externalRequestDiscoveryModule.externalRequestDiscoveryRunStore,
+    planningRunStore: libraryExternalIntakeRunStore,
+    executionRunStore: libraryProviderIngestExecutionRunStore,
+    externalIntakeService: libraryExternalIntakeService,
+    getAppUserById,
+    assertMaintenanceWriteAllowed: ({ queryable } = {}) => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+      operationLabel: 'external request review', queryable,
+    }),
+  });
   const resolvedLibraryMediaRequestPipelineService = libraryMediaRequestPipelineService
     ?? createLibraryMediaRequestPipelineService({
       getReadableMediaRequest: libraryMediaRequestService.getReadableMediaRequest,
@@ -394,6 +424,9 @@ export function createLibraryModule({
     });
 
   return {
+    ...externalRequestDiscoveryModule,
+    externalRequestReviewService,
+    externalRequestReviewStore,
     libraryCatalogStore,
     libraryDiscoveryDispatchService,
     libraryDiscoveryFolderSetupRecoveryService,
@@ -449,6 +482,7 @@ export function createLibraryModule({
     libraryWantedSummaryStore,
     libraryScanWorker,
     routeDependencies: {
+      externalRequestReviewService,
       buildLibraryDiscoveryRunDetail: libraryDiscoverySummaryService.buildLibraryDiscoveryRunDetail,
       buildLibraryDiscoverySummary: libraryDiscoverySummaryService.buildLibraryDiscoverySummary,
       buildLibraryFilterOptions: libraryReleasesService.buildLibraryFilterOptions,

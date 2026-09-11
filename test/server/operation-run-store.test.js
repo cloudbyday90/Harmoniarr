@@ -2,6 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createOperationRunStore } from '../../src/server/operation-run-store.js';
 
+test('transaction cancellation checks do not borrow another pool connection', async (t) => {
+  const queryable = { query: t.mock.fn(async () => ({ rows: [{ cancel_requested_at: '2026-09-10T00:00:00Z' }] })) };
+  const store = createOperationRunStore({ getPoolFn: () => assert.fail('Cancellation guard must remain on its transaction'), operationType: 'library_external_request_discovery' });
+  assert.equal(await store.isCancellationRequested({ runId: 'run', queryable }), true);
+  assert.deepEqual(queryable.query.mock.calls[0].arguments[1], ['run', 'library_external_request_discovery']);
+});
+
 test('operation run creation stays in the supplied transaction without borrowing a pool connection', async (t) => {
   const queryable = {
     query: t.mock.fn(async (_sql, params) => ({

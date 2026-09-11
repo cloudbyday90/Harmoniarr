@@ -268,6 +268,7 @@ test('findNextCandidateForRecovery scopes by search or metadata release and excl
   assert.match(sql, /source_search_id = \$2::text/);
   assert.match(sql, /normalized_payload #>> '\{discoveryScope,metadataReleaseId\}' = \$3::text/);
   assert.match(sql, /normalized_payload #>> '\{requestOwnership,metadataReleaseId\}' = \$3::text/);
+  assert.match(sql, /normalized_payload #>> '\{requestOwnership,externalRequestReleaseIntentId\}' IS NULL/);
   assert.deepEqual(values, ['candidate-1', 'search-1', 'release-1', 3]);
   assert.equal(candidate.id, 'candidate-2');
 });

@@ -37,6 +37,20 @@ test('buildImportCandidateAutoSelectionEvaluation identifies a high-confidence b
   assert.equal(evaluation.readiness.scoreGap, 13);
 });
 
+test('external request candidates require explicit source-file review even with a perfect score', async (t) => {
+  const candidate = buildCandidate({ compositeScore: 100, id: 'external-candidate' });
+  candidate.normalizedPayload.requestOwnership = { externalRequestReleaseIntentId: 'intent' };
+  const selectImportCandidate = t.mock.fn(async () => assert.fail('Source files require explicit import review'));
+  const service = createImportCandidateAutoSelectionService({
+    listImportCandidates: async () => ({ candidates: [candidate] }),
+    selectImportCandidate,
+  });
+  const result = await service.selectHighConfidenceCandidate({ sourceSearchId: 'external-search' });
+  assert.equal(result.selected, false);
+  assert.equal(result.scoredCandidateCount, 0);
+  assert.equal(selectImportCandidate.mock.callCount(), 0);
+});
+
 test('selectHighConfidenceCandidate selects only the best auto-selectable candidate', async (t) => {
   const listImportCandidates = t.mock.fn(async () => ({
     candidates: [

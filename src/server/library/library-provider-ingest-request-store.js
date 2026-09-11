@@ -107,8 +107,8 @@ export function createLibraryProviderIngestRequestStore({
     }
   }
 
-  async function listProviderIngestRequests({ mediaRequestId }) {
-    const pool = getPoolFn();
+  async function listProviderIngestRequests({ mediaRequestId, queryable = null }) {
+    const pool = queryable ?? getPoolFn();
     const result = await pool.query(
       `
         SELECT

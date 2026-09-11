@@ -259,6 +259,7 @@ export async function findNextCandidateForRecovery({
       FROM import_candidates
       WHERE ${hasExcludedIdArray ? 'id <> ALL($5::text[])' : 'id <> $1'}
         AND status IN ('pending', 'held')
+        AND normalized_payload #>> '{requestOwnership,externalRequestReleaseIntentId}' IS NULL
         AND download_attempt_count < $4
         AND (
           ($2::text IS NOT NULL AND source_search_id = $2::text)

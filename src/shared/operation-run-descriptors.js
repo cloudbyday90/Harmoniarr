@@ -73,6 +73,14 @@ export const operationRunRegistry = Object.freeze({
     supportsManualRetry: true,
     title: 'External intake execution',
   }),
+  libraryExternalRequestDiscovery: Object.freeze({
+    leaseJobType: 'library_external_request_discovery',
+    operationType: 'library_external_request_discovery',
+    startedEventType: 'library_external_request_discovery_started',
+    supportsCancellation: true,
+    supportsManualRetry: true,
+    title: 'External request discovery',
+  }),
   libraryDiscoveryDispatch: Object.freeze({
     leaseJobType: 'library_discovery_dispatch',
     operationType: 'library_discovery_dispatch',

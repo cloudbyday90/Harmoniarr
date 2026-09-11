@@ -8,6 +8,27 @@ import {
   isOperationRunPauseError,
   throwIfOperationRunCancellationRequested,
 } from '../../src/server/operation-run-cancellation.js';
+import { createMaintenanceLockOperationPauseService } from '../../src/server/recovery/maintenance-lock-operation-pause-service.js';
+
+test('transaction interruption checks share one queryable through cancellation and maintenance checks', async (t) => {
+  const queryable = { query: async () => {} };
+  const isCancellationRequested = t.mock.fn(async (args) => {
+    assert.equal(args.queryable, queryable);
+    return false;
+  });
+  const listActiveMaintenanceLocks = t.mock.fn(async (args) => {
+    assert.equal(args.queryable, queryable);
+    return [];
+  });
+  const gate = createOperationRunInterruptionGate({
+    isCancellationRequested,
+    operationLabel: 'External request discovery',
+    operationPauseService: createMaintenanceLockOperationPauseService({ listActiveMaintenanceLocks }),
+  });
+  await throwIfOperationRunCancellationRequested({ isCancellationRequested: gate, queryable, runId: 'run' });
+  assert.equal(isCancellationRequested.mock.callCount(), 1);
+  assert.equal(listActiveMaintenanceLocks.mock.callCount(), 1);
+});
 
 test('throwIfOperationRunCancellationRequested throws the shared cancellation error when requested', async () => {
   await assert.rejects(

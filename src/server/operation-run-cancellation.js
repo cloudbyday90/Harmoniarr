@@ -55,8 +55,8 @@ export function createOperationRunInterruptionGate({
   operationLabel,
   operationPauseService = null,
 } = {}) {
-  return async function checkOperationRunInterruption({ runId } = {}) {
-    if (await isCancellationRequested({ runId })) {
+  return async function checkOperationRunInterruption({ runId, queryable = null } = {}) {
+    if (await isCancellationRequested({ runId, ...(queryable ? { queryable } : {}) })) {
       return true;
     }
 
@@ -64,7 +64,7 @@ export function createOperationRunInterruptionGate({
       return false;
     }
 
-    const readiness = await operationPauseService.resolveOperationReadiness({ operationLabel });
+    const readiness = await operationPauseService.resolveOperationReadiness({ operationLabel, ...(queryable ? { queryable } : {}) });
     if (readiness?.allowed !== false) {
       return false;
     }
@@ -81,13 +81,14 @@ export function createOperationRunInterruptionGate({
 
 export async function throwIfOperationRunCancellationRequested({
   isCancellationRequested,
+  queryable = null,
   runId,
 } = {}) {
   if (!isCancellationRequested) {
     return;
   }
 
-  const interruption = await isCancellationRequested({ runId });
+  const interruption = await isCancellationRequested({ runId, ...(queryable ? { queryable } : {}) });
   if (interruption === true) {
     throw createOperationRunCancellationError({ runId });
   }

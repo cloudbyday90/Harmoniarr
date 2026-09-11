@@ -1070,6 +1070,7 @@ export function createImportCandidateService({
   async function ingestSlskdSearchResponses({
     actorUserId = null,
     albumTitle = null,
+    beforePersistCandidates = null,
     blacklistedTitleTerms = null,
     discoveryScope = null,
     expectedTrackCount = null,
@@ -1169,6 +1170,9 @@ export function createImportCandidateService({
     }
 
     const storedCandidates = await withTransaction(async (client) => {
+      if (beforePersistCandidates) {
+        await beforePersistCandidates({ queryable: client });
+      }
       const stored = [];
 
       for (const candidate of enrichedCandidates) {

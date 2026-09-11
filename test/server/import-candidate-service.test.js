@@ -408,6 +408,34 @@ test('createImportCandidateService ingests slskd responses in one transaction an
   assert.equal(result.candidates[0].files[0].filename, '01 Wildlife Analysis.flac');
 });
 
+test('candidate persistence guard rejects stale requests after provider work and rolls back before writes', async (t) => {
+  const { client, pool } = createPool(t);
+  const upsertImportCandidateFn = t.mock.fn(async () => assert.fail('Stale request cannot persist candidates'));
+  const recordAuditEventFn = t.mock.fn();
+  let providerReturned = false;
+  const service = createImportCandidateService({
+    pool,
+    recordAuditEventFn,
+    upsertImportCandidateFn,
+    slskdService: { getSearchResponses: async () => {
+      providerReturned = true;
+      return { searchId: 'search', responses: [{ username: 'peer', files: [{ filename: 'Artist\\Release\\01 Track.flac', size: 321 }] }] };
+    } },
+  });
+  await assert.rejects(service.ingestSlskdSearchResponses({
+    beforePersistCandidates: async ({ queryable }) => {
+      assert.equal(providerReturned, true);
+      assert.equal(queryable, client);
+      throw Object.assign(new Error('Request cancelled'), { code: 'operation_run_cancelled' });
+    },
+    searchId: 'search',
+  }), { code: 'operation_run_cancelled' });
+  assert.deepEqual(client.query.mock.calls.map((call) => call.arguments[0]), ['BEGIN', 'ROLLBACK']);
+  assert.equal(upsertImportCandidateFn.mock.callCount(), 0);
+  assert.equal(recordAuditEventFn.mock.callCount(), 0);
+  assert.equal(client.release.mock.callCount(), 1);
+});
+
 test('createImportCandidateService waits for asynchronous slskd search responses before ingesting', async (t) => {
   const { pool } = createPool(t);
   const getSearchResponses = t.mock.fn(async () => ({

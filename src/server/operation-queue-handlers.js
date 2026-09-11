@@ -27,6 +27,7 @@ export const defaultOperationQueueDispatchOperationTypes = Object.freeze([
   operationRunRegistry.libraryDiscoveryDispatch.operationType,
   operationRunRegistry.libraryExternalIntakePlanning.operationType,
   operationRunRegistry.libraryExternalIntakeExecution.operationType,
+  operationRunRegistry.libraryExternalRequestDiscovery.operationType,
   operationRunRegistry.libraryOrganizeApply.operationType,
   operationRunRegistry.libraryScan.operationType,
   operationRunRegistry.metadataArtistRefresh.operationType,
@@ -121,6 +122,16 @@ export function createOperationQueueHandlers({
       sourceIdentifier: run.summary.sourceIdentifier ?? null,
       sourceProvider: run.summary.sourceProvider ?? null,
       triggerSource: run.summary.triggerSource ?? 'planning_complete',
+      triggeredByUserId: run.triggeredByUserId ?? null,
+    });
+  }
+
+  if (libraryModule?.libraryExternalRequestDiscoveryWorker?.startWorkerRun) {
+    handlers[operationRunRegistry.libraryExternalRequestDiscovery.operationType] = async ({ run }) => libraryModule.libraryExternalRequestDiscoveryWorker.startWorkerRun({
+      intentId: run.summary.intentId ?? null,
+      mediaRequestId: run.summary.mediaRequestId ?? null,
+      runId: run.id,
+      triggerSource: run.summary.triggerSource ?? 'operator_review',
       triggeredByUserId: run.triggeredByUserId ?? null,
     });
   }

@@ -19,6 +19,18 @@ export function buildExternalRequestProgressStatus({ request, progress } = {}) {
   }
   const occurredAt = progress.occurredAt ?? request.updatedAt ?? request.createdAt ?? null;
 
+  if (progress.phase === 'discovery') {
+    const messages = {
+      pending: ['queued', 'Approved release search queued', 'The approved release is queued for this request target.'],
+      running: ['queued', 'Searching approved release', 'Discovery is running for this request target.'],
+      completed: ['under_review', 'Approved release search completed', 'Review discovery results before importing music. Search completion does not mean music was imported.'],
+      cancelled: ['under_review', 'Approved release search stopped', 'The search stopped. Administrator review is needed before continuing.'],
+      failed: ['failed', 'Approved release search failed', 'Discovery could not finish. Administrator attention is needed.'],
+    };
+    const message = messages[progress.status];
+    return message ? { code: message[0], label: message[1], detail: message[2], occurredAt, tone: progress.status === 'failed' ? 'failed' : 'held' } : null;
+  }
+
   if (progress.status === 'failed') {
     return {
       code: 'failed',

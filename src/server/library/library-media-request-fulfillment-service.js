@@ -17,6 +17,7 @@
  */
 
 import { buildExternalRequestProgressStatus } from './library-external-request-progress.js';
+import { buildExternalRequestIntentFulfillmentStatus } from './library-external-request-intent-fulfillment.js';
 
 const candidateStatusPriority = new Map([
   ['applied', 700],
@@ -243,6 +244,7 @@ export function buildMediaRequestFulfillmentCounts(mediaRequests) {
 export function createLibraryMediaRequestFulfillmentService({
   listImportCandidatesBySourceMediaRequestIds = async () => [],
   listExternalRequestProgressByIds = async () => [],
+  listExternalRequestIntentsByIds = async () => [],
   getMediaRequestById = async () => null,
 } = {}) {
   async function enrichMediaRequests(mediaRequests) {
@@ -260,12 +262,15 @@ export function createLibraryMediaRequestFulfillmentService({
 
     const externalRequestIds = requests.filter((request) => request?.requestKind === 'external_url')
       .map((request) => normalizeMediaRequestId(request.id)).filter(Boolean);
-    const [importCandidates, externalProgress] = await Promise.all([
+    const [importCandidates, externalProgress, externalIntents] = await Promise.all([
       allRequestIds.length > 0
         ? listImportCandidatesBySourceMediaRequestIds({ sourceMediaRequestIds: allRequestIds })
         : [],
       externalRequestIds.length > 0
         ? listExternalRequestProgressByIds({ mediaRequestIds: externalRequestIds })
+        : [],
+      externalRequestIds.length > 0
+        ? listExternalRequestIntentsByIds({ mediaRequestIds: externalRequestIds })
         : [],
     ]);
     const progressByRequestId = new Map(externalProgress.map((progress) => [progress.mediaRequestId, progress]));
@@ -322,7 +327,9 @@ export function createLibraryMediaRequestFulfillmentService({
         ? buildExternalRequestProgressStatus({ request, progress: progressByRequestId.get(request.id) })
         : null;
       const fulfillmentStatus = {
-        ...(preparationStatus ?? buildMediaRequestFulfillmentStatus({ importCandidates: candidates, request })),
+        ...(buildExternalRequestIntentFulfillmentStatus({
+          request, intents: externalIntents.filter((intent) => intent.mediaRequestId === request.id), candidates,
+        }) ?? preparationStatus ?? buildMediaRequestFulfillmentStatus({ importCandidates: candidates, request })),
       };
 
       if (linked) {

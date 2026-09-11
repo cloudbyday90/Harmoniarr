@@ -58,6 +58,8 @@ function buildStatusCounts(candidates) {
 
 function buildScoredCandidates(candidates) {
   return candidates
+    // Approved metadata still requires an operator to review the actual source files.
+    .filter((candidate) => !candidate?.normalizedPayload?.requestOwnership?.externalRequestReleaseIntentId)
     .map((candidate) => ({
       candidate,
       score: getCandidateCompositeScore(candidate),

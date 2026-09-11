@@ -241,9 +241,9 @@ export function createAppUserService({
       ON app_user_plex_profiles.app_user_id = app_users.id
   `;
 
-  async function getAppUserById({ userId }) {
+  async function getAppUserById({ userId, queryable = null }) {
     const normalizedUserId = normalizeUserId(userId);
-    const result = await getPoolFn().query(`${appUserSelectSql} WHERE app_users.id = $1 LIMIT 1`, [normalizedUserId]);
+    const result = await (queryable ?? getPoolFn()).query(`${appUserSelectSql} WHERE app_users.id = $1 LIMIT 1${queryable ? ' FOR SHARE OF app_users' : ''}`, [normalizedUserId]);
 
     if ((result.rowCount ?? result.rows.length ?? 0) === 0) {
       return null;

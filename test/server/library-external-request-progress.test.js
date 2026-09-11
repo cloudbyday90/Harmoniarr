@@ -31,6 +31,11 @@ for (const [phase, status, failedCount, expectedCode, expectedLabel] of [
   ['execution', 'completed', 1, 'under_review', 'Provider details need review'],
   ['planning', 'failed', 0, 'failed', 'Provider preparation failed'],
   ['execution', 'cancelled', 0, 'under_review', 'Provider preparation stopped'],
+  ['discovery', 'pending', 0, 'queued', 'Approved release search queued'],
+  ['discovery', 'running', 0, 'queued', 'Searching approved release'],
+  ['discovery', 'completed', 0, 'under_review', 'Approved release search completed'],
+  ['discovery', 'failed', 0, 'failed', 'Approved release search failed'],
+  ['discovery', 'cancelled', 0, 'under_review', 'Approved release search stopped'],
 ]) {
   test(`external ${phase} ${status} with ${failedCount} failures reports preparation, never import completion`, () => {
     const progress = { phase, status, failedCount, occurredAt: '2026-09-10T12:00:00Z', errorMessage: 'secret provider diagnostic' };
@@ -61,7 +66,7 @@ test('external preparation reads expose only normalized progress for server-sele
     } }),
   });
   const result = await store.listExternalRequestProgressByIds({ mediaRequestIds: ['child', 'child', null] });
-  assert.deepEqual(parameters, [['library_external_intake_planning', 'library_external_intake_execution'], ['child']]);
+  assert.deepEqual(parameters, [['library_external_intake_planning', 'library_external_intake_execution', 'library_external_request_discovery'], ['child'], 'library_external_request_discovery']);
   assert.deepEqual(result, [{ mediaRequestId: 'child', phase: 'execution', status: 'completed', occurredAt: '2026-09-10T12:00:00Z', failedCount: 2, pendingRequestCount: 3 }]);
 });
 

@@ -2,6 +2,15 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createOperationQueueHandlers } from '../../src/server/operation-queue-handlers.js';
 
+test('external release discovery queue handler preserves the reviewed intent and original request', async (t) => {
+  const startWorkerRun = t.mock.fn(async () => {});
+  const handlers = createOperationQueueHandlers({ libraryModule: { libraryExternalRequestDiscoveryWorker: { startWorkerRun } } });
+  await handlers.library_external_request_discovery({ run: {
+    id: 'run', summary: { intentId: 'intent', mediaRequestId: 'request', triggerSource: 'operator_review' }, triggeredByUserId: 'admin',
+  } });
+  assert.deepEqual(startWorkerRun.mock.calls[0].arguments[0], { intentId: 'intent', mediaRequestId: 'request', runId: 'run', triggerSource: 'operator_review', triggeredByUserId: 'admin' });
+});
+
 test('operation queue handlers register shared operation types and map run summaries to worker inputs', async (t) => {
   const artworkCleanupStartWorkerRun = t.mock.fn(async () => {});
   const importCandidateExecutionStartWorkerRun = t.mock.fn(async () => {});

@@ -21,6 +21,7 @@ import { createApiError } from '../auth.js';
 import { hasAppUserPermission } from '../app-user-permission-service.js';
 import { asyncRoute, sanitizePageLimit, sanitizePageOffset } from '../http.js';
 import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
+import { registerLibraryExternalRequestReviewRoutes } from './library-external-request-review-routes.js';
 
 const defaultRequestAuthDependencies = createRequestAuthDependencies();
 
@@ -41,6 +42,7 @@ export function registerLibraryRoutes(app, {
   bulkCancelMediaRequests,
   cancelMediaRequest,
   createMediaRequest,
+  externalRequestReviewService = null,
   getRequestMetadata = defaultRequestAuthDependencies.getRequestMetadata,
   getMediaRequestReassignmentHistory,
   limitLibraryDiscoveryRun = skipRateLimitMiddleware,
@@ -65,6 +67,11 @@ export function registerLibraryRoutes(app, {
   startLibraryDiscoveryRun,
   startLibraryScan,
 }) {
+  registerLibraryExternalRequestReviewRoutes(app, {
+    externalRequestReviewService, requireSession, requireFreshAdminSession,
+    requireCsrf, limitMediaRequestAdminMutation, getRequestMetadata,
+  });
+
   function resolveMediaRequestScope(session, requestedScope) {
     if (session?.user?.role === 'admin') {
       return requestedScope === 'mine' ? 'mine' : 'all';

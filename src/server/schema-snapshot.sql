@@ -6977,3 +6977,62 @@ SET migration_key = EXCLUDED.migration_key,
     error_message = NULL,
     application_version = NULL,
     updated_at = NOW();
+
+-- Migration: 20260911_002422_external_request_release_intents.sql
+-- Checksum: a1167704ff9a6c8c89e2fc14eb4d179eed142852df3a9eeaaa2bef1ad7a713bc
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: licensed under GPL-3.0
+-- See LICENSE file for details.
+--
+-- Forward-only migration.
+BEGIN;
+
+CREATE TABLE library_external_request_release_intents (
+  id uuid PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
+  media_request_id uuid NOT NULL REFERENCES media_requests(id) ON DELETE CASCADE,
+  metadata_release_id uuid NOT NULL REFERENCES metadata_releases(id) ON DELETE RESTRICT,
+  requested_for_user_id uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  provider_key text NOT NULL,
+  provider_evidence jsonb NOT NULL DEFAULT '{}'::jsonb,
+  approved_by_user_id uuid REFERENCES app_users(id) ON DELETE SET NULL,
+  operation_run_id uuid REFERENCES operation_runs(id) ON DELETE RESTRICT,
+  created_at timestamptz NOT NULL DEFAULT NOW(),
+  CONSTRAINT external_request_release_intents_release_unique UNIQUE (media_request_id, metadata_release_id),
+  CONSTRAINT external_request_release_intents_provider_unique UNIQUE (media_request_id, provider_key),
+  CONSTRAINT external_request_release_intents_evidence_object CHECK (jsonb_typeof(provider_evidence) = 'object')
+);
+
+CREATE INDEX external_request_release_intents_target_idx
+  ON library_external_request_release_intents (requested_for_user_id);
+CREATE INDEX external_request_release_intents_operation_idx
+  ON library_external_request_release_intents (operation_run_id);
+
+COMMIT;
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260911_002422',
+  '20260911_002422_external_request_release_intents.sql',
+  'external_request_release_intents',
+  'a1167704ff9a6c8c89e2fc14eb4d179eed142852df3a9eeaaa2bef1ad7a713bc',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
