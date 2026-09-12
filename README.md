@@ -29,6 +29,8 @@ Harmoniarr is being planned as a self-hosted FOSS application with no SLA or ope
 - [Immutable candidate acceptance outcome and next release work](docs/IMMUTABLE_CANDIDATE_ACCEPTANCE_OUTCOME.md)
 - [Request lifecycle Activity design](docs/REQUEST_LIFECYCLE_ACTIVITY_DESIGN.md)
 - [Request lifecycle Activity outcome and recommendations](docs/REQUEST_LIFECYCLE_ACTIVITY_OUTCOME.md)
+- [Transactional request lifecycle design](docs/TRANSACTIONAL_REQUEST_LIFECYCLE_DESIGN.md)
+- [Transactional request lifecycle outcome](docs/TRANSACTIONAL_REQUEST_LIFECYCLE_OUTCOME.md)
 - [Local workflow-script replay](docs/WORKFLOW_SCRIPT_LOCAL_REPLAY.md)
 
 ## Current Direction

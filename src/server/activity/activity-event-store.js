@@ -84,8 +84,9 @@ export function createActivityEventStore({ getPoolFn = getPool } = {}) {
     entityTitle = null,
     entityArtist = null,
     extraPayload = null,
+    queryable = null,
   }) {
-    const pool = getPoolFn();
+    const pool = queryable ?? getPoolFn();
     const result = await pool.query(
       `INSERT INTO activity_events
          (event_type, actor_user_id, entity_type, entity_id, entity_title, entity_artist, extra_payload)

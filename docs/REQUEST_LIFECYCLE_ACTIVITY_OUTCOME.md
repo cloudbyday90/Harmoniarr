@@ -2,6 +2,8 @@
 
 Recorded September 12, 2026. See the separate [design and official-source research](REQUEST_LIFECYCLE_ACTIVITY_DESIGN.md).
 
+Subsequent work: the [transactional lifecycle design](TRANSACTIONAL_REQUEST_LIFECYCLE_DESIGN.md) replaces best-effort cancellation/reassignment publication with a strict same-database commit. The historical results below describe the earlier repair; see the [new outcome](TRANSACTIONAL_REQUEST_LIFECYCLE_OUTCOME.md) for current guarantees and priorities.
+
 ## Implemented behavior
 
 Successful cancellation and reassignment can now appear in household Activity as `Music request cancelled` and `Music request reassigned`. Both event types are registered across the server, PostgreSQL constraint, client normalization, filtering, and presentation. The forward-only migration brings the schema snapshot to 99 migrations and preserves all previously accepted event types.

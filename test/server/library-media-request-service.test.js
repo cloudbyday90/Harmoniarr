@@ -10,7 +10,9 @@ const requestTransactionClient = Object.freeze({ transactionScope: 'media-reques
 function createLibraryMediaRequestService(options) {
   return createRealLibraryMediaRequestService({
     withRequestTransaction: async (work) => work(requestTransactionClient),
+    activityEventStore: { insertActivityEvent: async () => {} },
     ...options,
+    mediaRequestStore: { lockMediaRequest: async () => {}, lockFanOutChildren: async () => [], ...options.mediaRequestStore },
   });
 }
 
@@ -1426,8 +1428,10 @@ test('reassignMediaRequest updates ownership and records both domain event and a
   const insertMediaRequestEvent = t.mock.fn(async () => {});
   const recordAuditEventFn = t.mock.fn(async () => {});
   const recordActivityEventFn = t.mock.fn(async () => {});
+  const insertActivityEvent = t.mock.fn(async () => {});
 
   const service = createLibraryMediaRequestService({
+    activityEventStore: { insertActivityEvent },
     getAppUserById: t.mock.fn(async () => ({
       id: 'user-new',
       username: 'new-target',
@@ -1465,6 +1469,7 @@ test('reassignMediaRequest updates ownership and records both domain event and a
   assert.deepEqual(updateRequestedForUserId.mock.calls[0].arguments[0], {
     mediaRequestId: 'request-1',
     newRequestedForUserId: 'user-new',
+    queryable: requestTransactionClient,
   });
 
   assert.equal(insertMediaRequestEvent.mock.callCount(), 1);
@@ -1482,8 +1487,9 @@ test('reassignMediaRequest updates ownership and records both domain event and a
   assert.equal(auditArgs.entityId, 'request-1');
   assert.equal(auditArgs.ipAddress, '10.0.0.1');
 
-  assert.equal(recordActivityEventFn.mock.callCount(), 1);
-  assert.equal(recordActivityEventFn.mock.calls[0].arguments[0].eventType, 'request_reassigned');
+  assert.equal(recordActivityEventFn.mock.callCount(), 0);
+  assert.equal(insertActivityEvent.mock.callCount(), 1);
+  assert.equal(insertActivityEvent.mock.calls[0].arguments[0].eventType, 'request_reassigned');
 });
 
 test('reassignMediaRequest works without a reason', async (t) => {
@@ -1559,13 +1565,15 @@ test('cancelMediaRequest cascades cancellation to fan-out children', async (t) =
 
   const updateRequestState = t.mock.fn(async () => true);
   const insertMediaRequestEvent = t.mock.fn(async () => {});
-  const cancelFanOutChildren = t.mock.fn(async () => ['child-1', 'child-2']);
+  const lockFanOutChildren = t.mock.fn(async () => [
+    { id: 'child-1', requestState: 'needs_fetch' }, { id: 'child-2', requestState: 'needs_review' },
+  ]);
   const recordAuditEventFn = t.mock.fn(async () => {});
   const recordActivityEventFn = t.mock.fn(async () => {});
 
   const service = createLibraryMediaRequestService({
     mediaRequestStore: {
-      cancelFanOutChildren,
+      lockFanOutChildren,
       getMediaRequestById,
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
       insertMediaRequestEvent,
@@ -1584,8 +1592,8 @@ test('cancelMediaRequest cascades cancellation to fan-out children', async (t) =
   });
 
   assert.equal(result.cancelledChildCount, 2);
-  assert.equal(cancelFanOutChildren.mock.callCount(), 1);
-  assert.equal(cancelFanOutChildren.mock.calls[0].arguments[0].parentMediaRequestId, 'parent-1');
+  assert.equal(lockFanOutChildren.mock.callCount(), 1);
+  assert.equal(lockFanOutChildren.mock.calls[0].arguments[0].parentMediaRequestId, 'parent-1');
 
   assert.equal(insertMediaRequestEvent.mock.callCount(), 3);
   assert.equal(insertMediaRequestEvent.mock.calls[0].arguments[0].mediaRequestId, 'child-1');
@@ -1699,6 +1707,37 @@ test('listMediaRequests without cursor returns totalCount from countMediaRequest
   assert.equal(countMediaRequests.mock.callCount(), 1);
 });
 
+test('reassignMediaRequest rejects a case-only UUID target change before recording any lifecycle writes', async (t) => {
+  const targetId = 'a1000000-b100-c100-d100-e10000000000';
+  const getAppUserById = t.mock.fn(async () => ({ id: targetId, isDisabled: false }));
+  const insertActivityEvent = t.mock.fn(async () => {});
+  const service = createLibraryMediaRequestService({
+    getAppUserById,
+    activityEventStore: { insertActivityEvent },
+    mediaRequestStore: { getMediaRequestById: async () => ({ id: 'request-1', requestedForUser: { id: targetId } }) },
+  });
+  await assert.rejects(service.reassignMediaRequest({ actorUserId: 'admin-1', actorUserRole: 'admin',
+    mediaRequestId: 'request-1', newRequestedForUserId: targetId.toUpperCase() }), { code: 'reassignment_noop', status: 409 });
+  assert.equal(getAppUserById.mock.callCount(), 0);
+  assert.equal(insertActivityEvent.mock.callCount(), 0);
+});
+
+test('reassignMediaRequest uses the resolved target identity for alternate PostgreSQL UUID spelling', async (t) => {
+  const targetId = 'a1000000-b100-c100-d100-e10000000000';
+  const getAppUserById = t.mock.fn(async () => ({ id: targetId, isDisabled: false }));
+  const insertActivityEvent = t.mock.fn(async () => {});
+  const service = createLibraryMediaRequestService({
+    getAppUserById, activityEventStore: { insertActivityEvent },
+    mediaRequestStore: { getMediaRequestById: async () => ({ id: 'request-1', requestedForUser: { id: targetId } }) },
+  });
+  for (const alternateId of [targetId.replaceAll('-', ''), `{${targetId}}`]) {
+    await assert.rejects(service.reassignMediaRequest({ actorUserId: 'admin-1', actorUserRole: 'admin',
+      mediaRequestId: 'request-1', newRequestedForUserId: alternateId }), { code: 'reassignment_noop', status: 409 });
+  }
+  assert.equal(getAppUserById.mock.callCount(), 2);
+  assert.equal(insertActivityEvent.mock.callCount(), 0);
+});
+
 for (const requestKind of ['release', 'external_url']) {
   for (const actorUserRole of ['requester', 'operator']) {
     test(`${actorUserRole} cancellation of their ${requestKind} parent request preserves sibling targets`, async (t) => {
@@ -1739,6 +1778,7 @@ for (const requestKind of ['release', 'external_url']) {
       assert.deepEqual(updateRequestState.mock.calls.map((call) => call.arguments[0]), [{
         mediaRequestId: 'parent-1',
         newState: 'cancelled',
+        queryable: requestTransactionClient,
       }]);
       assert.deepEqual(insertMediaRequestEvent.mock.calls.map((call) => call.arguments[0].mediaRequestId), ['parent-1']);
       assert.deepEqual(recordAuditEventFn.mock.calls.map((call) => call.arguments[0].eventType), ['media_request_cancelled']);

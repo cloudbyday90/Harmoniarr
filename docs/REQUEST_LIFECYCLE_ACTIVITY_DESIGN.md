@@ -2,6 +2,8 @@
 
 Design date: 2026-09-12. Harmoniarr is a Docker-first music library manager using Node 24 native ESM, PostgreSQL 18, and Vue. This slice restores the cancellation/reassignment Activity events identified in the previous release review.
 
+This document records the initial privacy repair. Its best-effort lifecycle publication contract is superseded by the [transactional lifecycle design](TRANSACTIONAL_REQUEST_LIFECYCLE_DESIGN.md); the public projection and presentation choices are retained.
+
 ## Problem and boundaries
 
 The request service emits `request_cancelled` and `request_reassigned`, but the Activity service and database CHECK constraint reject both. The household feed consequently omits those successful actions. Existing request history and restricted audit records retain the operations.

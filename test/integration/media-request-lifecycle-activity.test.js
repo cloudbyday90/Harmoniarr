@@ -63,17 +63,46 @@ async function readLifecycleRows(pool, mediaRequestId) {
 }
 
 async function awaitLifecycleRows(pool, mediaRequestId, expectedCount) {
-  // Activity remains best-effort and is dispatched after the domain mutation.
-  // Wait for its observed insert; this does not assert transactional delivery.
-  const deadline = Date.now() + 3000;
-  let rows;
-  do {
-    rows = await readLifecycleRows(pool, mediaRequestId);
-    if (rows.length >= expectedCount) break;
-    await delay(20);
-  } while (Date.now() < deadline);
+  // A successful response must already have committed household Activity.
+  const rows = await readLifecycleRows(pool, mediaRequestId);
   assert.equal(rows.length, expectedCount);
   return rows;
+}
+
+async function readAtomicState(pool) {
+  const requests = await pool.query(`SELECT id, request_state, requested_for_user_id, updated_at
+    FROM media_requests ORDER BY id`);
+  const history = await pool.query(`SELECT * FROM media_request_events
+    WHERE event_type IN ('cancelled', 'reassigned') ORDER BY id`);
+  const audit = await pool.query(`SELECT * FROM audit_events
+    WHERE event_type IN ('media_request_cancelled', 'media_request_reassigned', 'media_request_fan_out_cancelled') ORDER BY id`);
+  const activity = await pool.query(`SELECT * FROM activity_events
+    WHERE event_type IN ('request_cancelled', 'request_reassigned') ORDER BY id`);
+  return { requests: requests.rows, history: history.rows, audit: audit.rows, activity: activity.rows };
+}
+
+async function withInsertFailure(pool, table, work) {
+  assert.ok(['media_request_events', 'audit_events', 'activity_events'].includes(table));
+  await pool.query(`CREATE FUNCTION reject_lifecycle_fixture() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN RAISE EXCEPTION 'Injected lifecycle persistence failure'; END $$`);
+  await pool.query(`CREATE TRIGGER reject_lifecycle_fixture BEFORE INSERT ON ${table}
+    FOR EACH ROW EXECUTE FUNCTION reject_lifecycle_fixture()`);
+  try { await work(); }
+  finally {
+    await pool.query(`DROP TRIGGER reject_lifecycle_fixture ON ${table}`);
+    await pool.query('DROP FUNCTION reject_lifecycle_fixture()');
+  }
+}
+
+async function waitForBlockedMutation(pool, blockerPid) {
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline) {
+    const blocked = await pool.query(`SELECT count(*)::int AS count FROM pg_stat_activity
+      WHERE datname = current_database() AND $1::int = ANY(pg_blocking_pids(pid))`, [blockerPid]);
+    if (blocked.rows[0].count > 0) return;
+    await delay(20);
+  }
+  assert.fail('Expected lifecycle mutation to wait for the held request lock');
 }
 
 function assertSafeEvent(event, context, mediaRequestId, eventType) {
@@ -117,6 +146,171 @@ suite('integration request lifecycle Activity', () => {
   }, { timeout: config.suiteSetupTimeoutMs });
   after(async () => { await runtime?.cleanup(); }, { timeout: config.suiteTeardownTimeoutMs });
 
+  for (const action of ['cancel', 'reassign']) {
+    for (const table of ['media_request_events', 'audit_events', 'activity_events']) {
+      test(`${action} rolls back every lifecycle record when ${table} fails and permits a clean retry`, {
+        timeout: config.scenarioTimeoutMs,
+      }, async (t) => runScenario(t, async (context) => {
+        const request = await createRequest(context);
+        const initial = await readAtomicState(context.pool);
+        const payload = { reason: privateReason, newRequestedForUserId: context.users[1].id };
+        await withInsertFailure(context.pool, table, async () => {
+          const failed = await mutate(context.client, request.id, action, payload);
+          assert.equal(failed.response.status, 500);
+          assert.deepEqual(await readAtomicState(context.pool), initial);
+        });
+        assert.equal((await mutate(context.client, request.id, action, payload)).response.status, 200);
+        const committed = await readAtomicState(context.pool);
+        assert.equal(committed.history.length, 1);
+        assert.equal(committed.audit.length, 1);
+        assert.equal(committed.activity.length, 1);
+        assert.equal(committed.activity[0].entity_title, null);
+        assert.equal(committed.activity[0].extra_payload, null);
+      }));
+    }
+
+    test(`concurrent duplicate ${action} commits one transition and one set of lifecycle records`, {
+      timeout: config.scenarioTimeoutMs,
+    }, async (t) => runScenario(t, async (context) => {
+      const request = await createRequest(context);
+      const payload = { reason: privateReason, newRequestedForUserId: context.users[1].id };
+      const responses = await Promise.all([
+        mutate(context.client, request.id, action, payload),
+        mutate(context.client, request.id, action, payload),
+      ]);
+      assert.deepEqual(responses.map((result) => result.response.status).sort(), [200, 409]);
+      const state = await readAtomicState(context.pool);
+      assert.equal(state.history.length, 1);
+      assert.equal(state.audit.length, 1);
+      assert.equal(state.activity.length, 1);
+    }));
+  }
+
+  test('fan-out cancellation rolls back the whole family on Activity failure and records actual child states on retry', {
+    timeout: config.scenarioTimeoutMs,
+  }, async (t) => runScenario(t, async (context) => {
+    const created = await context.client.requestJson(requestPath, {
+      csrf: true, method: 'POST', json: { requestKind: 'release', artistName: 'Family Artist',
+        releaseTitle: 'Family Release', requestedForUserIds: context.users.map((user) => user.id) },
+    });
+    assert.equal(created.response.status, 201);
+    const request = created.payload.mediaRequest;
+    const children = (await context.pool.query('SELECT id FROM media_requests WHERE fan_out_parent_id = $1 ORDER BY id', [request.id])).rows;
+    assert.equal(children.length, 2);
+    await context.pool.query("UPDATE media_requests SET request_state = 'needs_review' WHERE id = $1", [children[0].id]);
+    const initial = await readAtomicState(context.pool);
+    await withInsertFailure(context.pool, 'activity_events', async () => {
+      assert.equal((await mutate(context.client, request.id, 'cancel', { reason: privateReason })).response.status, 500);
+      assert.deepEqual(await readAtomicState(context.pool), initial);
+    });
+    const response = await mutate(context.client, request.id, 'cancel', { reason: privateReason });
+    assert.equal(response.response.status, 200);
+    assert.equal(response.payload.mediaRequest.cancelledChildCount, 2);
+    const final = await readAtomicState(context.pool);
+    assert.ok(final.requests.every((row) => row.request_state === 'cancelled'));
+    assert.equal(final.history.length, 3);
+    assert.equal(final.audit.length, 2);
+    assert.equal(final.activity.length, 1);
+    assert.equal(final.history.find((row) => row.media_request_id === children[0].id).details.previousState, 'needs_review');
+    assert.equal(final.history.find((row) => row.media_request_id === children[1].id).details.previousState, 'needs_fetch');
+  }));
+
+  test('concurrent distinct reassignments preserve a continuous ownership history', {
+    timeout: config.scenarioTimeoutMs,
+  }, async (t) => runScenario(t, async (context) => {
+    const request = await createRequest(context);
+    const responses = await Promise.all(context.users.slice(1).map((user) =>
+      mutate(context.client, request.id, 'reassign', { newRequestedForUserId: user.id })));
+    assert.ok(responses.every((result) => result.response.status === 200));
+    const state = await readAtomicState(context.pool);
+    assert.equal(state.history.length, 2);
+    assert.equal(state.audit.length, 2);
+    assert.equal(state.activity.length, 2);
+    const first = state.history.find((row) => row.previous_requested_for_user_id === context.users[0].id);
+    assert.ok(first);
+    const second = state.history.find((row) => row.previous_requested_for_user_id === first.new_requested_for_user_id);
+    assert.ok(second, 'Second writer must use the first writer\'s committed recipient');
+    assert.equal(state.requests[0].requested_for_user_id, second.new_requested_for_user_id);
+  }));
+
+  test('bulk cancellation reports a safe item error and preserves state when durable Activity fails', {
+    timeout: config.scenarioTimeoutMs,
+  }, async (t) => runScenario(t, async (context) => {
+    const request = await createRequest(context);
+    const initial = await readAtomicState(context.pool);
+    await withInsertFailure(context.pool, 'activity_events', async () => {
+      const response = await context.client.requestJson(`${requestPath}/bulk-cancel`, {
+        csrf: true, method: 'POST', json: { mediaRequestIds: [request.id], reason: privateReason },
+      });
+      assert.equal(response.response.status, 200);
+      assert.equal(response.payload.failed, 1);
+      assert.equal(response.payload.succeeded, 0);
+      const error = response.payload.results[0].error;
+      assert.equal(error.code, 'media_request_lifecycle_failed');
+      assert.equal(error.status, 500);
+      assert.equal(JSON.stringify(response.payload).includes('Injected lifecycle persistence failure'), false);
+      assert.equal(JSON.stringify(response.payload).includes(privateReason), false);
+      assert.deepEqual(await readAtomicState(context.pool), initial);
+    });
+  }));
+
+  test('cancellation rechecks ownership after waiting for a conflicting request write', {
+    timeout: config.scenarioTimeoutMs,
+  }, async (t) => runScenario(t, async (context) => {
+    const request = await createRequest(context);
+    const originalRecipient = createSessionHttpClient(context.baseUrl);
+    assert.equal((await loginWithPassword(originalRecipient, {
+      username: context.users[0].username, password,
+    })).response.status, 200);
+    const blocker = await context.pool.connect();
+    let pending;
+    try {
+      await blocker.query('BEGIN');
+      const { rows } = await blocker.query('SELECT pg_backend_pid() AS pid');
+      await blocker.query('UPDATE media_requests SET requested_for_user_id = $2 WHERE id = $1',
+        [request.id, context.users[1].id]);
+      pending = mutate(originalRecipient, request.id, 'cancel', { reason: privateReason });
+      await waitForBlockedMutation(blocker, rows[0].pid);
+      await blocker.query('COMMIT');
+      assert.equal((await pending).response.status, 403);
+      const state = await readAtomicState(context.pool);
+      assert.equal(state.requests[0].request_state, request.requestState);
+      assert.equal(state.requests[0].requested_for_user_id, context.users[1].id);
+      assert.deepEqual(state.history, []);
+      assert.deepEqual(state.audit, []);
+      assert.deepEqual(state.activity, []);
+    } finally {
+      await blocker.query('ROLLBACK');
+      blocker.release();
+      await pending;
+    }
+  }));
+
+  test('reassignment rejects a target disabled while it waits for the user lock', {
+    timeout: config.scenarioTimeoutMs,
+  }, async (t) => runScenario(t, async (context) => {
+    const request = await createRequest(context);
+    const initial = await readAtomicState(context.pool);
+    const blocker = await context.pool.connect();
+    let pending;
+    try {
+      await blocker.query('BEGIN');
+      const { rows } = await blocker.query('SELECT pg_backend_pid() AS pid');
+      await blocker.query('UPDATE app_users SET is_disabled = TRUE WHERE id = $1', [context.users[1].id]);
+      pending = mutate(context.client, request.id, 'reassign', { newRequestedForUserId: context.users[1].id });
+      await waitForBlockedMutation(blocker, rows[0].pid);
+      await blocker.query('COMMIT');
+      const response = await pending;
+      assert.equal(response.response.status, 409);
+      assert.equal(response.payload.error.code, 'media_request_target_ineligible');
+      assert.deepEqual(await readAtomicState(context.pool), initial);
+    } finally {
+      await blocker.query('ROLLBACK');
+      blocker.release();
+      await pending;
+    }
+  }));
+
   test('successful reassignment and cancellation each appear once without private request detail in household Activity', {
     timeout: config.scenarioTimeoutMs,
   }, async (t) => runScenario(t, async (context) => {
@@ -128,6 +322,16 @@ suite('integration request lifecycle Activity', () => {
     const noop = await mutate(context.client, request.id, 'reassign', { newRequestedForUserId: context.users[1].id, reason: privateReason });
     assert.equal(noop.response.status, 409);
     assert.equal(noop.payload.error.code, 'reassignment_noop');
+    const uppercaseNoop = await mutate(context.client, request.id, 'reassign', {
+      newRequestedForUserId: context.users[1].id.toUpperCase(), reason: privateReason,
+    });
+    assert.equal(uppercaseNoop.response.status, 409);
+    assert.equal(uppercaseNoop.payload.error.code, 'reassignment_noop');
+    const compactNoop = await mutate(context.client, request.id, 'reassign', {
+      newRequestedForUserId: context.users[1].id.replaceAll('-', ''),
+    });
+    assert.equal(compactNoop.response.status, 409);
+    assert.equal(compactNoop.payload.error.code, 'reassignment_noop');
     const cancelled = await mutate(context.client, request.id, 'cancel', { reason: privateReason });
     assert.equal(cancelled.response.status, 200);
     assert.equal(cancelled.payload.mediaRequest.requestState, 'cancelled');

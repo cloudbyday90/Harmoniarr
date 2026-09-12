@@ -18,7 +18,7 @@
 
 import { createApiError } from '../auth.js';
 import { recordAuditEvent } from '../audit.js';
-import { publishRequestLifecycleActivityEvent } from '../activity/request-lifecycle-activity-event-service.js';
+import { createLibraryMediaRequestLifecycleService } from './library-media-request-lifecycle-service.js';
 import { buildMediaRequestTargetEligibility } from '../media-request-target-eligibility.js';
 import { createMetadataSearchService } from '../metadata/metadata-search-service.js';
 import { normalizeMetadataReleaseDateForDateColumn } from '../metadata/metadata-release-date-normalization.js';
@@ -344,6 +344,7 @@ export function createLibraryMediaRequestService({
   metadataSearchService = createMetadataSearchService(),
   releaseAvailabilityStore = createLibraryReleaseAvailabilityStore(),
   recordActivityEventFn = null,
+  activityEventStore,
   recordAuditEventFn = recordAuditEvent,
   onRequestCreatedFn = null,
   withRequestTransaction,
@@ -355,6 +356,9 @@ export function createLibraryMediaRequestService({
     recordActivityEventFn,
     recordAuditEventFn,
     withRequestTransaction,
+  });
+  const requestLifecycleService = createLibraryMediaRequestLifecycleService({
+    activityEventStore, getAppUserById, mediaRequestStore, recordAuditEventFn, withRequestTransaction,
   });
   async function getReadableMediaRequest({
     actorUserId,
@@ -638,98 +642,6 @@ export function createLibraryMediaRequestService({
     };
   }
 
-  async function reassignMediaRequest({
-    actorUserId,
-    actorUserRole = null,
-    mediaRequestId,
-    newRequestedForUserId,
-    reason,
-    requestMetadata = null,
-  }) {
-    if (actorUserRole !== 'admin') {
-      throw createApiError(403, 'forbidden', 'Only administrators can reassign media requests');
-    }
-
-    const normalizedReason = normalizeOptionalText(reason, 'reason', { maxLength: 500 });
-    const normalizedNewUserId = normalizeRequiredText(newRequestedForUserId, 'newRequestedForUserId');
-
-    const existingRequest = await mediaRequestStore.getMediaRequestById({ mediaRequestId });
-    if (!existingRequest) {
-      throw createApiError(404, 'media_request_not_found', 'The specified media request could not be found');
-    }
-
-    const currentForUserId = existingRequest.requestedForUser?.id;
-    if (currentForUserId === normalizedNewUserId) {
-      throw createApiError(409, 'reassignment_noop', 'The media request is already assigned to the specified user');
-    }
-
-    if (typeof getAppUserById !== 'function') {
-      throw new Error('Media request reassignment requires getAppUserById');
-    }
-
-    const targetUser = await getAppUserById({ userId: normalizedNewUserId });
-    if (!targetUser) {
-      throw createApiError(404, 'app_user_not_found', 'The target user could not be found');
-    }
-
-    const targetEligibility = buildMediaRequestTargetEligibility(targetUser);
-    if (!targetEligibility.eligible) {
-      throw createApiError(409, 'media_request_target_ineligible', 'The target user is not currently eligible for media requests');
-    }
-
-    const updated = await mediaRequestStore.updateRequestedForUserId({
-      mediaRequestId,
-      newRequestedForUserId: normalizedNewUserId,
-    });
-
-    if (!updated) {
-      throw createApiError(404, 'media_request_not_found', 'The specified media request could not be updated');
-    }
-
-    await mediaRequestStore.insertMediaRequestEvent({
-      actorUserId,
-      details: {
-        artistName: existingRequest.artistName,
-        releaseTitle: existingRequest.releaseTitle,
-        requestKind: existingRequest.requestKind,
-        requestState: existingRequest.requestState,
-      },
-      eventType: 'reassigned',
-      mediaRequestId,
-      newRequestedForUserId: normalizedNewUserId,
-      previousRequestedForUserId: currentForUserId,
-      reason: normalizedReason,
-    });
-
-    const reassignedRequest = await mediaRequestStore.getMediaRequestById({ mediaRequestId });
-
-    await recordAuditEventFn({
-      actorType: 'app_user',
-      actorUserId,
-      details: {
-        newRequestedForUserId: normalizedNewUserId,
-        previousRequestedForUserId: currentForUserId,
-        reason: normalizedReason,
-        requestId: mediaRequestId,
-      },
-      entityId: mediaRequestId,
-      entityType: 'media_request',
-      eventType: 'media_request_reassigned',
-      ipAddress: requestMetadata?.ipAddress ?? null,
-      summary: `Reassigned media request from user ${currentForUserId} to user ${normalizedNewUserId}${normalizedReason ? `: ${normalizedReason}` : ''}`,
-      userAgent: requestMetadata?.userAgent ?? null,
-    });
-
-    publishRequestLifecycleActivityEvent({
-      actorUserId,
-      eventType: 'request_reassigned',
-      mediaRequestId,
-      recordActivityEventFn,
-    });
-
-    return reassignedRequest;
-  }
-
   async function getMediaRequestReassignmentHistory({ mediaRequestId, limit = 50 } = {}) {
     const result = await mediaRequestStore.listMediaRequestEvents({ mediaRequestId, limit });
     return result.events;
@@ -772,140 +684,15 @@ export function createLibraryMediaRequestService({
     };
   }
 
-  async function cancelMediaRequest({
-    actorUserId,
-    actorUserRole = null,
-    mediaRequestId,
-    reason,
-    requestMetadata = null,
-  }) {
-    const existingRequest = await mediaRequestStore.getMediaRequestById({ mediaRequestId });
-    if (!existingRequest) {
-      throw createApiError(404, 'media_request_not_found', 'The specified media request could not be found');
-    }
-
-    if (existingRequest.requestState === 'cancelled') {
-      throw createApiError(409, 'request_already_cancelled', 'This request is already cancelled');
-    }
-
-    const isOwnRequest = existingRequest.requestedForUser?.id === actorUserId
-      || existingRequest.requestedByUser?.id === actorUserId;
-
-    if (actorUserRole !== 'admin' && !isOwnRequest) {
-      throw createApiError(403, 'forbidden', 'You can only cancel your own requests');
-    }
-
-    const CANCELLABLE_STATES = ['needs_fetch', 'needs_review'];
-    const cancellableStates = new Set(CANCELLABLE_STATES);
-    if (!cancellableStates.has(existingRequest.requestState)) {
-      throw createApiError(409, 'request_not_cancellable', `Requests in state "${existingRequest.requestState}" cannot be cancelled`);
-    }
-
-    const normalizedReason = reason ? normalizeOptionalText(reason, 'reason', { maxLength: 500 }) : null;
-
-    const updated = await mediaRequestStore.updateRequestState({
-      mediaRequestId,
-      newState: 'cancelled',
-    });
-
-    if (!updated) {
-      throw createApiError(404, 'media_request_not_found', 'The specified media request could not be updated');
-    }
-
-    let cancelledChildIds = [];
-
-    if (actorUserRole === 'admin' && existingRequest.fanOutChildCount > 0) {
-      cancelledChildIds = await mediaRequestStore.cancelFanOutChildren({
-        parentMediaRequestId: mediaRequestId,
-        cancellableStates: CANCELLABLE_STATES,
-      });
-
-      for (const childId of cancelledChildIds) {
-        await mediaRequestStore.insertMediaRequestEvent({
-          actorUserId,
-          details: {
-            cascadeFromParentId: mediaRequestId,
-            previousState: 'needs_fetch',
-          },
-          eventType: 'cancelled',
-          mediaRequestId: childId,
-          reason: normalizedReason,
-        });
-      }
-
-      if (typeof recordAuditEventFn === 'function' && cancelledChildIds.length > 0) {
-        void recordAuditEventFn({
-          actorType: 'app_user',
-          actorUserId,
-          details: {
-            cancelledChildCount: cancelledChildIds.length,
-            parentRequestId: mediaRequestId,
-            reason: normalizedReason,
-          },
-          entityId: mediaRequestId,
-          entityType: 'media_request',
-          eventType: 'media_request_fan_out_cancelled',
-          ipAddress: requestMetadata?.ipAddress ?? null,
-          summary: `Cascade-cancelled ${cancelledChildIds.length} fan-out child request${cancelledChildIds.length === 1 ? '' : 's'}`,
-          userAgent: requestMetadata?.userAgent ?? null,
-        }).catch(() => {});
-      }
-    }
-
-    await mediaRequestStore.insertMediaRequestEvent({
-      actorUserId,
-      details: {
-        artistName: existingRequest.artistName,
-        previousState: existingRequest.requestState,
-        releaseTitle: existingRequest.releaseTitle,
-        requestKind: existingRequest.requestKind,
-      },
-      eventType: 'cancelled',
-      mediaRequestId,
-      reason: normalizedReason,
-    });
-
-    if (typeof recordAuditEventFn === 'function') {
-      void recordAuditEventFn({
-        actorType: 'app_user',
-        actorUserId,
-        details: {
-          previousState: existingRequest.requestState,
-          reason: normalizedReason,
-          requestId: mediaRequestId,
-        },
-        entityId: mediaRequestId,
-        entityType: 'media_request',
-        eventType: 'media_request_cancelled',
-        ipAddress: requestMetadata?.ipAddress ?? null,
-        summary: `Cancelled media request${normalizedReason ? `: ${normalizedReason}` : ''}`,
-        userAgent: requestMetadata?.userAgent ?? null,
-      }).catch(() => {});
-    }
-
-    publishRequestLifecycleActivityEvent({
-      actorUserId,
-      eventType: 'request_cancelled',
-      mediaRequestId,
-      recordActivityEventFn,
-    });
-
-    const cancelledRequest = await mediaRequestStore.getMediaRequestById({ mediaRequestId });
-    return {
-      ...cancelledRequest,
-      cancelledChildCount: cancelledChildIds.length,
-    };
-  }
-
   return {
     buildMediaRequestDetail,
     buildMediaRequestSummary,
-    cancelMediaRequest,
+    cancelMediaRequest: requestLifecycleService.cancelMediaRequest,
     createMediaRequest,
     getReadableMediaRequest,
     getMediaRequestReassignmentHistory,
     listMediaRequestEventsPage,
     listMediaRequests,
-    reassignMediaRequest,
+    reassignMediaRequest: requestLifecycleService.reassignMediaRequest,
   };
 }

@@ -51,8 +51,12 @@ Issue #4 platform evidence map: `docs/ISSUE_4_RELEASE_VALIDATION_EVIDENCE.md`
   image evidence does not close the artifact-delivery trust gate.
 - [x] Restore cancellation/reassignment Activity registration, schema acceptance,
   public payload projection, and safe Requests navigation. See the separate
-  [request lifecycle outcome](REQUEST_LIFECYCLE_ACTIVITY_OUTCOME.md). Delivery
-  remains best effort; atomic mutation/publication is a separate follow-up.
+  [request lifecycle outcome](REQUEST_LIFECYCLE_ACTIVITY_OUTCOME.md).
+- [x] Commit cancellation/reassignment, private history/audit, and public Activity
+  together with request locks and PostgreSQL rollback/concurrency proof. See the
+  [transactional lifecycle outcome](TRANSACTIONAL_REQUEST_LIFECYCLE_OUTCOME.md).
+- [ ] Align transactional recipient eligibility with concurrent Plex profile
+  refresh. Local account disable locking does not cover the separate profile row.
 
 - Atomic multi-user request creation now has PostgreSQL failure-injection proof
   for child, audit, and durable external-planning failures, plus Chromium proof

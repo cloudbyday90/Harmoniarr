@@ -576,8 +576,18 @@ export function createLibraryMediaRequestStore({
     );
   }
 
-  async function updateRequestedForUserId({ mediaRequestId, newRequestedForUserId }) {
-    const pool = getPoolFn();
+  async function lockMediaRequest({ mediaRequestId, queryable }) {
+    await queryable.query('SELECT id FROM media_requests WHERE id = $1 FOR UPDATE', [mediaRequestId]);
+  }
+
+  async function lockFanOutChildren({ parentMediaRequestId, queryable }) {
+    const result = await queryable.query(`SELECT id, request_state AS "requestState" FROM media_requests
+      WHERE fan_out_parent_id = $1 ORDER BY id FOR UPDATE`, [parentMediaRequestId]);
+    return result.rows;
+  }
+
+  async function updateRequestedForUserId({ mediaRequestId, newRequestedForUserId, queryable = null }) {
+    const pool = queryable ?? getPoolFn();
     const result = await pool.query(
       `
         UPDATE media_requests
@@ -592,8 +602,8 @@ export function createLibraryMediaRequestStore({
     return result.rows.length > 0;
   }
 
-  async function updateRequestState({ mediaRequestId, newState }) {
-    const pool = getPoolFn();
+  async function updateRequestState({ mediaRequestId, newState, queryable = null }) {
+    const pool = queryable ?? getPoolFn();
     const result = await pool.query(
       `
         UPDATE media_requests
@@ -608,8 +618,8 @@ export function createLibraryMediaRequestStore({
     return result.rows.length > 0;
   }
 
-  async function cancelFanOutChildren({ parentMediaRequestId, cancellableStates }) {
-    const pool = getPoolFn();
+  async function cancelFanOutChildren({ parentMediaRequestId, cancellableStates, queryable = null }) {
+    const pool = queryable ?? getPoolFn();
     const stateParams = cancellableStates.map((_, i) => `$${i + 2}`).join(', ');
     const result = await pool.query(
       `
@@ -754,6 +764,8 @@ export function createLibraryMediaRequestStore({
     listActiveRequestsByMetadataReleaseIds,
     listMediaRequestEvents,
     listMediaRequests,
+    lockFanOutChildren,
+    lockMediaRequest,
     mergeMediaRequestEvidence,
     updateFanOutChildCount,
     updateRequestedForUserId,
