@@ -115,10 +115,10 @@ suite('Request failure and retry-state browser verification', () => {
       await confirmButton.press('Enter');
       await confirmDialog.waitFor({ state: 'hidden' });
       const requestedCardButton = releasesList.getByRole('button', {
-        name: 'Music Has the Right to Children — already requested',
+        name: 'Request Music Has the Right to Children',
       });
       await requestedCardButton.waitFor();
-      assert.equal(await requestedCardButton.getAttribute('disabled'), '');
+      assert.equal(await requestedCardButton.isEnabled(), true, 'Requesting for another listener must leave the self action available');
 
       fixtureState = await readMetadataBrowserFixtureState(page);
       assert.equal(fixtureState.mediaRequests.length, 1);

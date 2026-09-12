@@ -18,7 +18,7 @@ import {
   markBoardsOfCanadaAddedInMetadataBrowserFixture,
   readMetadataBrowserFixtureState,
 } from '../../testing/browser/metadata-browser-fixtures.js';
-import { bootstrapAdminThroughUi } from '../../testing/browser/operator-browser-helpers.js';
+import { bootstrapAdminThroughUi, logoutThroughUi } from '../../testing/browser/operator-browser-helpers.js';
 import {
   assertFocusWithin,
   assertLocatorFocused,
@@ -29,6 +29,7 @@ import {
   openGeogaddiReleaseDetail,
   searchCatalogReleases,
 } from '../../testing/browser/request-action-browser-helpers.js';
+import { createRequesterThroughApi, loginRequesterThroughUi } from '../../testing/browser/user-browser-helpers.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 
 const integrationRuntimeConfig = resolveIntegrationTestRuntimeConfig();
@@ -101,11 +102,16 @@ suite('Request action browser verification', () => {
       await confirmButton.press('Enter');
       await confirmDialog.waitFor({ state: 'hidden' });
 
-      const requestedCardButton = releasesList.getByRole('button', {
-        name: 'Music Has the Right to Children — already requested',
-      });
-      await requestedCardButton.waitFor();
-      assert.equal(await requestedCardButton.getAttribute('disabled'), '', 'Requested card action should be disabled');
+      // A request for another listener must not disable the session user's card action.
+      await cardRequestButton.waitFor();
+      assert.equal(await cardRequestButton.isEnabled(), true);
+      await cardRequestButton.click();
+      await confirmDialog.waitFor();
+      assert.equal(await confirmDialog.getByRole('button', { name: 'Confirm request' }).isEnabled(), true);
+      await confirmDialog.getByLabel('Request for').selectOption('fixture-listener-user');
+      assert.equal(await confirmDialog.getByRole('button', { name: 'Requested', exact: true }).isDisabled(), true);
+      await confirmDialog.getByLabel('Request for').selectOption({ label: 'Myself' });
+      await confirmDialog.getByRole('button', { name: 'Cancel', exact: true }).click();
 
       let fixtureState = await readMetadataBrowserFixtureState(page);
       assert.equal(fixtureState.mediaRequests.length, 1);
@@ -138,4 +144,70 @@ suite('Request action browser verification', () => {
       scenarioName: 'request_action_browser_verification',
     });
   });
+  for (const surface of ['activity', 'requester-home']) {
+    test(`${surface} keeps confirmation controls locked during submission and restores retry`, {
+      timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+    }, async (t) => {
+      if (runtimeUnavailableReason) {
+        t.skip(runtimeUnavailableReason);
+        return;
+      }
+      await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+        await installMetadataBrowserFixtures(browserContext);
+        await bootstrapAdminThroughUi(page, { baseUrl });
+        if (surface === 'requester-home') {
+          await createRequesterThroughApi(page, { username: 'listener', password: 'RequesterPass123!' });
+          await logoutThroughUi(page);
+          await loginRequesterThroughUi(page, {
+            baseUrl, beforeReadyNavigation: markBoardsOfCanadaAddedInMetadataBrowserFixture, username: 'listener', initialPassword: 'RequesterPass123!', readyPassword: 'RequesterReady123!',
+          });
+        }
+        await page.route('**/api/v1/library/release-radar*', (route) => route.fulfill({
+          json: { recent: [{ musicbrainzReleaseGroupId: 'mb-rg-pending', releaseGroupTitle: 'Pending release', artistName: 'Fixture artist' }], upcoming: [] },
+        }));
+        await page.goto(`${baseUrl}/app${surface === 'activity' ? '/activity/releases' : ''}`, { waitUntil: 'domcontentloaded' });
+        await page.getByRole('button', { name: 'Request Pending release', exact: true }).click();
+        const dialog = page.getByRole('dialog', { name: 'Request this release?' });
+        const recipient = dialog.getByLabel('Request for');
+        if (surface === 'activity') await recipient.selectOption('fixture-listener-user');
+        else assert.equal(await recipient.count(), 0);
+        await page.evaluate(() => {
+          const originalFetch = globalThis.fetch.bind(globalThis);
+          globalThis.__recipientRequestStarted = false;
+          const gate = new Promise((resolve) => { globalThis.__releaseRecipientResponse = resolve; });
+          globalThis.fetch = async (input, init) => {
+            const url = typeof input === 'string' ? input : input.url;
+            if (url.endsWith('/api/v1/library/media-requests') && init?.method === 'POST') {
+              globalThis.__recipientRequestStarted = true;
+              await gate;
+              return new Response(JSON.stringify({ error: { message: 'Please retry this request.' } }), {
+                status: 503, headers: { 'content-type': 'application/json' },
+              });
+            }
+            return originalFetch(input, init);
+          };
+        });
+        await dialog.getByRole('button', { name: 'Confirm request' }).click();
+        await page.waitForFunction(() => globalThis.__recipientRequestStarted);
+        try {
+          assert.equal(await dialog.getByRole('button', { name: 'Requesting…' }).isDisabled(), true);
+          assert.equal(await dialog.getByRole('button', { name: 'Cancel', exact: true }).isDisabled(), true);
+          if (surface === 'activity') assert.equal(await recipient.isDisabled(), true);
+          await page.keyboard.press('Escape');
+          assert.equal(await dialog.isVisible(), true);
+        } finally {
+          await page.evaluate(() => globalThis.__releaseRecipientResponse());
+        }
+        await dialog.getByRole('alert').waitFor();
+        assert.equal(await dialog.getByRole('button', { name: 'Confirm request' }).isEnabled(), true);
+        assert.equal(await dialog.getByRole('button', { name: 'Cancel', exact: true }).isEnabled(), true);
+        if (surface === 'activity') {
+          assert.equal(await recipient.isEnabled(), true);
+          assert.equal(await recipient.inputValue(), 'fixture-listener-user');
+        }
+        await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+      }, { scenarioName: `request_pending_${surface}` });
+    });
+  }
+
 });

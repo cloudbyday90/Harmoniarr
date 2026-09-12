@@ -166,22 +166,16 @@ test('useReleaseRequest requestRelease returns { ok: false, error } on failure',
 // Duplicate / double-click protection
 // ---------------------------------------------------------------------------
 
-test('useReleaseRequest requestRelease skips when already in requesting state', async (t) => {
-  const submitRequest = t.mock.fn(makeSubmitDouble());
-  const toast = createToastDouble(t);
-  const { isRequesting, requestingIds, requestRelease } = useReleaseRequest({ submitRequest, toast });
-  const release = makeRelease();
-
-  // Manually seed requestingIds to simulate an in-flight request.
-  requestingIds.value = new Set(['release:mbid-release-99']);
-
-  const result = await requestRelease(release);
-
-  assert.equal(result.ok, false);
-  assert.equal(result.skipped, true);
-  assert.equal(result.reason, 'requesting');
-  assert.equal(submitRequest.mock.callCount(), 0);
-  assert.equal(isRequesting(release), true);
+test('useReleaseRequest requesting IDs expose pending self requests', async (t) => {
+  let finish;
+  const state = useReleaseRequest({ toast: createToastDouble(t), submitRequest: () => new Promise((resolve) => { finish = resolve; }) });
+  const pending = state.requestRelease(makeRelease());
+  assert.equal(state.requestingIds.value.has('release:mbid-release-99'), true);
+  assert.equal(state.isRequesting('release:mbid-release-99'), true);
+  assert.equal(state.isRequesting('release:other'), false);
+  finish({});
+  await pending;
+  assert.equal(state.requestingIds.value.size, 0);
 });
 
 test('useReleaseRequest requestRelease skips when already in requested state', async (t) => {
@@ -382,24 +376,13 @@ test('useReleaseRequest requestRelease omits requestedForUserId when explicitly 
   assert.equal(Object.hasOwn(payload, 'requestedForUserId'), false);
 });
 
-test('useReleaseRequest requestRelease still succeeds and marks requested when requestedForUserId is given', async (t) => {
-  const submitRequest = t.mock.fn(makeSubmitDouble());
-  const toast = createToastDouble(t);
-  const { isRequested, requestRelease } = useReleaseRequest({ submitRequest, toast });
+test('useReleaseRequest marks only the selected recipient requested', async (t) => {
+  const state = useReleaseRequest({ submitRequest: makeSubmitDouble(), toast: createToastDouble(t) });
   const release = makeRelease();
-
-  const result = await requestRelease(release, { requestedForUserId: 'user-42' });
-
-  assert.equal(result.ok, true);
-  assert.equal(isRequested(release), true);
-});
-
-test('useReleaseRequest isRequesting accepts a key string directly', (t) => {
-  const toast = createToastDouble(t);
-  const { isRequesting, requestingIds } = useReleaseRequest({ toast });
-  requestingIds.value = new Set(['release:key-2']);
-  assert.equal(isRequesting('release:key-2'), true);
-  assert.equal(isRequesting('release:other'), false);
+  assert.equal((await state.requestRelease(release, { requestedForUserId: 'user-42' })).ok, true);
+  assert.equal(state.isRequested(release, { requestedForUserId: 'user-42' }), true);
+  assert.equal(state.isRequested(release), false);
+  assert.equal(state.requestedIds.value.size, 0);
 });
 
 test('useReleaseRequest requestRelease shows info toast when response indicates linked request', async (t) => {
@@ -440,4 +423,83 @@ test('useReleaseRequest requestRelease handles legacy response format without li
 
   assert.equal(toast.success.mock.callCount(), 1);
   assert.equal(toast.info.mock.callCount(), 0);
+});
+
+
+test('recipient requests are independent, including concurrent work and retry', async (t) => {
+  const pending = new Map();
+  const submitRequest = t.mock.fn((payload) => new Promise((resolve, reject) => {
+    pending.set(payload.requestedForUserId, { resolve, reject });
+  }));
+  const state = useReleaseRequest({ submitRequest, toast: createToastDouble(t), getCurrentUserId: () => 'admin' });
+  const release = makeRelease();
+  const a = { requestedForUserId: 'A' };
+  const b = { requestedForUserId: 'B' };
+  const workA = state.requestRelease(release, a);
+  const workB = state.requestRelease(release, b);
+  assert.equal(submitRequest.mock.callCount(), 2);
+  assert.equal((await state.requestRelease(release, a)).reason, 'requesting');
+  assert.equal(state.canRequest(release, b), false);
+  pending.get('A').resolve({});
+  await workA;
+  assert.equal(state.isRequested(release, a), true);
+  assert.equal(state.isRequested(release, b), false);
+  assert.equal(state.isRequesting(release, b), true);
+  pending.get('B').reject(new Error('temporary failure'));
+  await workB;
+  assert.equal(state.canRequest(release, b), true);
+  const retry = state.requestRelease(release, b);
+  pending.get('B').resolve({});
+  await retry;
+  assert.equal(state.isRequested(release, b), true);
+  assert.equal((await state.requestRelease(release, a)).reason, 'requested');
+  assert.equal(submitRequest.mock.callCount(), 3);
+});
+
+test('sequential requests for two recipients submit twice', async (t) => {
+  const submitRequest = t.mock.fn(async () => ({}));
+  const state = useReleaseRequest({ submitRequest, toast: createToastDouble(t) });
+  for (const requestedForUserId of ['A', 'B']) {
+    assert.deepEqual(await state.requestRelease(makeRelease(), { requestedForUserId }), { ok: true });
+  }
+  assert.deepEqual(submitRequest.mock.calls.map((call) => call.arguments[0].requestedForUserId), ['A', 'B']);
+});
+
+test('implicit self and explicit self share duplicate protection and initial state', async (t) => {
+  const submitRequest = t.mock.fn(async () => ({}));
+  const state = useReleaseRequest({ submitRequest, toast: createToastDouble(t), getCurrentUserId: () => 'admin',
+    initialRequestedIds: ['release:seed'] });
+  assert.equal(state.isRequested('release:seed', { requestedForUserId: 'admin' }), true);
+  assert.equal(state.isRequested('release:seed', { requestedForUserId: 'other' }), false);
+  await state.requestRelease(makeRelease());
+  assert.equal((await state.requestRelease(makeRelease(), { requestedForUserId: 'admin' })).reason, 'requested');
+  assert.equal(submitRequest.mock.callCount(), 1);
+});
+
+test('late completions stay with the captured actor and recipient', async (t) => {
+  let actor = 'admin-A';
+  let finish;
+  const toast = createToastDouble(t);
+  const state = useReleaseRequest({ getCurrentUserId: () => actor, toast,
+    submitRequest: () => new Promise((resolve) => { finish = resolve; }) });
+  const options = { requestedForUserId: 'recipient-A' };
+  const work = state.requestRelease(makeRelease(), options);
+  options.requestedForUserId = 'recipient-B';
+  actor = 'admin-B';
+  finish({});
+  await work;
+  assert.equal(state.isRequested(makeRelease(), { requestedForUserId: 'recipient-A' }), false);
+  assert.equal(toast.success.mock.callCount(), 0);
+  actor = 'admin-A';
+  assert.equal(state.isRequested(makeRelease(), { requestedForUserId: 'recipient-A' }), true);
+  assert.equal(state.isRequested(makeRelease(), options), false);
+});
+
+test('invalid recipient cannot silently become a self request', async (t) => {
+  const submitRequest = t.mock.fn(async () => ({}));
+  const state = useReleaseRequest({ submitRequest, toast: createToastDouble(t) });
+  for (const requestedForUserId of ['', '  ', 42, {}]) {
+    assert.equal((await state.requestRelease(makeRelease(), { requestedForUserId })).ok, false);
+  }
+  assert.equal(submitRequest.mock.callCount(), 0);
 });

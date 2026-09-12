@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, onMounted, ref, useTemplateRef } from 'vue';
+import { computed, onMounted, ref, useTemplateRef, watch } from 'vue';
 import ConfirmRequestModal from '../components/media/ConfirmRequestModal.vue';
 import ActivityResourceState from '../components/activity/ActivityResourceState.vue';
 import ReleaseCard from '../components/media/ReleaseCard.vue';
@@ -59,9 +59,15 @@ const { users: requestForUsers, loadUsers: loadRequestForUsers } = useRequestUse
 
 const confirmModalOpen = ref(false);
 const confirmRelease = ref(null);
+const confirmRequestedForUserId = ref(null);
 const confirmError = ref(null);
 
+watch(confirmRequestedForUserId, () => {
+  confirmError.value = null;
+});
+
 function openConfirmModal(release) {
+  confirmRequestedForUserId.value = null;
   confirmRelease.value = release;
   confirmError.value = null;
   confirmModalOpen.value = true;
@@ -69,7 +75,7 @@ function openConfirmModal(release) {
 }
 
 function closeConfirmModal() {
-  if (!isRequesting(confirmRelease.value)) {
+  if (!isRequesting(confirmRelease.value, { requestedForUserId: confirmRequestedForUserId.value })) {
     confirmModalOpen.value = false;
     confirmRelease.value = null;
     confirmError.value = null;
@@ -77,11 +83,11 @@ function closeConfirmModal() {
 }
 
 const confirmIsRequesting = computed(() =>
-  confirmRelease.value ? isRequesting(confirmRelease.value) : false,
+  confirmRelease.value ? isRequesting(confirmRelease.value, { requestedForUserId: confirmRequestedForUserId.value }) : false,
 );
 
 const confirmIsRequested = computed(() =>
-  confirmRelease.value ? isRequested(confirmRelease.value) : false,
+  confirmRelease.value ? isRequested(confirmRelease.value, { requestedForUserId: confirmRequestedForUserId.value }) : false,
 );
 
 async function handleConfirmRequest({ requestedForUserId = null } = {}) {
@@ -230,11 +236,12 @@ onMounted(() => radar.load());
   </section>
 
   <ConfirmRequestModal
+    v-model:requested-for-user-id="confirmRequestedForUserId"
     :open="confirmModalOpen"
     :release="confirmRelease"
-    :is-requesting="confirmIsRequesting"
-    :is-requested="confirmIsRequested"
-    :error="confirmError"
+    :loading="confirmIsRequesting"
+    :requested="confirmIsRequested"
+    :error-message="confirmError"
     :users="isAdmin ? requestForUsers : []"
     @confirm="handleConfirmRequest"
     @close="closeConfirmModal"

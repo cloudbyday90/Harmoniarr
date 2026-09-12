@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue';
 import ArtistCard from '../components/media/ArtistCard.vue';
 import AddArtistModal from '../components/media/AddArtistModal.vue';
 import ConfirmRequestModal from '../components/media/ConfirmRequestModal.vue';
@@ -149,9 +149,15 @@ function closeDetailModal() {
 
 const confirmModalOpen = ref(false);
 const confirmRelease = ref(null);
+const confirmRequestedForUserId = ref(null);
 const confirmError = ref(null);
 
+watch(confirmRequestedForUserId, () => {
+  confirmError.value = null;
+});
+
 function openConfirmModal(release) {
+  confirmRequestedForUserId.value = null;
   confirmRelease.value = release;
   confirmError.value = null;
   confirmModalOpen.value = true;
@@ -161,7 +167,7 @@ function openConfirmModal(release) {
 }
 
 function closeConfirmModal() {
-  if (!isRequesting(confirmRelease.value)) {
+  if (!isRequesting(confirmRelease.value, { requestedForUserId: confirmRequestedForUserId.value })) {
     confirmModalOpen.value = false;
     confirmRelease.value = null;
     confirmError.value = null;
@@ -169,11 +175,11 @@ function closeConfirmModal() {
 }
 
 const confirmIsRequesting = computed(() =>
-  (confirmRelease.value ? isRequesting(confirmRelease.value) : false),
+  (confirmRelease.value ? isRequesting(confirmRelease.value, { requestedForUserId: confirmRequestedForUserId.value }) : false),
 );
 
 const confirmIsRequested = computed(() =>
-  (confirmRelease.value ? isRequested(confirmRelease.value) : false),
+  (confirmRelease.value ? isRequested(confirmRelease.value, { requestedForUserId: confirmRequestedForUserId.value }) : false),
 );
 
 async function handleConfirmRequest({ requestedForUserId = null } = {}) {
@@ -651,6 +657,7 @@ onBeforeUnmount(() => destroyNetworkWorkflow());
     </template>
 
     <ConfirmRequestModal
+      v-model:requested-for-user-id="confirmRequestedForUserId"
       :open="confirmModalOpen"
       :release="confirmRelease"
       :loading="confirmIsRequesting"

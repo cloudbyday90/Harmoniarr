@@ -153,6 +153,9 @@ const requestButtonRef = ref(null);
 const editionMenuOpen = ref(false);
 const requestError = ref(null);
 const selectedForUserId = ref(null);
+watch(selectedForUserId, () => {
+  requestError.value = null;
+});
 let previouslyFocusedElement = null;
 
 const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
@@ -163,7 +166,6 @@ const {
   media,
   ownership,
   allReleases,
-  requestState,
   source,
   loading,
   error,
@@ -247,13 +249,11 @@ const releaseForRequest = computed(() => {
 });
 
 const isCurrentlyRequesting = computed(() =>
-  releaseForRequest.value ? isRequesting(releaseForRequest.value) : false,
+  releaseForRequest.value ? isRequesting(releaseForRequest.value, { requestedForUserId: selectedForUserId.value }) : false,
 );
 
 const isCurrentlyRequested = computed(() =>
-  requestState.value?.status === 'needs_fetch' ||
-  requestState.value?.status === 'already_exists' ||
-  (releaseForRequest.value ? isRequested(releaseForRequest.value) : false),
+  (releaseForRequest.value ? isRequested(releaseForRequest.value, { requestedForUserId: selectedForUserId.value }) : false),
 );
 
 const musicBrainzReleaseUrl = computed(() => {

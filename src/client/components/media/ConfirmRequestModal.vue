@@ -99,7 +99,7 @@ let previouslyFocusedElement = null;
  * The selected beneficiary user ID for the "Request for" selector.
  * null means "myself" (the session user). Reset whenever the modal opens.
  */
-const selectedForUserId = ref(null);
+const selectedForUserId = defineModel('requestedForUserId', { type: String, default: null });
 const dialogHeadingId = computed(() => `${props.dialogId}-heading`);
 const dialogDescriptionId = computed(() => `${props.dialogId}-description`);
 
@@ -240,6 +240,7 @@ function handleKeydown(event) {
 }
 
 function handleConfirm() {
+  if (props.loading || props.requested) return;
   emit('confirm', { requestedForUserId: selectedForUserId.value ?? null });
 }
 </script>
