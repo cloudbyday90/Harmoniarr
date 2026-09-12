@@ -33,6 +33,6 @@ Already queued push messages and queue retries are outside this enqueue-time gat
 
 Use the shared explicit preference decision, the household broadcaster, the small direct-recipient dispatch factory, and existing queue/cooldown infrastructure. This protects potential opt-outs and preserves failure evidence without extra delivery state. The tradeoff is that an unavailable preference can cause an event notification to be missed unless a caller invokes dispatch again.
 
-Next revalidate category preferences at queued delivery and retry time, with bounded deferral for unavailable reads and explicit handling of disabled users/categories. That will close the gap for messages enqueued before preferences changed. Treat durable replay of currently withheld enqueue attempts as a separate delivery guarantee.
+Follow-up implemented: [queued delivery preference checks](QUEUED_NOTIFICATION_PREFERENCE_OUTCOME.md). The original recommendation was to revalidate category preferences at queued delivery and retry time, with bounded deferral for unavailable reads and explicit handling of disabled users/categories. That will close the gap for messages enqueued before preferences changed. Treat durable replay of currently withheld enqueue attempts as a separate delivery guarantee.
 
 See the [design, official September 2026 research, alternatives, and PR disposition](NOTIFICATION_PREFERENCE_FAILURE_DESIGN.md).

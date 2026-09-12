@@ -22,6 +22,8 @@ import { createPushNotificationService } from './push-notification-service.js';
 import { createPushNotificationHistoryCleanupHeartbeat } from './push-notification-history-cleanup-heartbeat.js';
 import { createPushNotificationQueueStore } from './push-notification-queue-store.js';
 import { createPushSubscriptionStore } from './push-subscription-store.js';
+import { createPushNotificationDeliveryPolicyStore } from './push-notification-delivery-policy-store.js';
+import { createPushNotificationDeliveryPolicyService } from './push-notification-delivery-policy-service.js';
 
 /**
  * Push module factory. Wires together the subscription store and notification
@@ -36,12 +38,15 @@ export function createPushModule({
   pushNotificationDeliveryHeartbeat = null,
   pushNotificationDispatchService = null,
   pushNotificationHistoryCleanupHeartbeat = null,
+  pushNotificationDeliveryPolicyStore = createPushNotificationDeliveryPolicyStore(),
+  pushNotificationDeliveryPolicyService = createPushNotificationDeliveryPolicyService({ pushNotificationDeliveryPolicyStore }),
   pushNotificationQueueStore = createPushNotificationQueueStore(),
   pushSubscriptionStore = createPushSubscriptionStore(),
   pushNotificationService = createPushNotificationService({ pushSubscriptionStore }),
 } = {}) {
   const resolvedPushNotificationDispatchService = pushNotificationDispatchService
     ?? createPushNotificationDispatchService({
+      pushNotificationDeliveryPolicyService,
       pushNotificationQueueStore,
       pushNotificationService,
       pushSubscriptionStore,
@@ -57,6 +62,8 @@ export function createPushModule({
 
   return {
     pushNotificationDeliveryHeartbeat: resolvedPushNotificationDeliveryHeartbeat,
+    pushNotificationDeliveryPolicyStore,
+    pushNotificationDeliveryPolicyService,
     pushNotificationDispatchService: resolvedPushNotificationDispatchService,
     pushNotificationHistoryCleanupHeartbeat: resolvedPushNotificationHistoryCleanupHeartbeat,
     pushNotificationQueueStore,

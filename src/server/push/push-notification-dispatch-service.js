@@ -19,6 +19,7 @@
 import { createPushNotificationQueueStore } from './push-notification-queue-store.js';
 import { createPushNotificationService, DEFAULT_TTL_SECONDS } from './push-notification-service.js';
 import { createPushSubscriptionStore } from './push-subscription-store.js';
+import { createPushNotificationDeliveryPolicyService } from './push-notification-delivery-policy-service.js';
 
 const DEFAULT_CLAIM_WINDOW_MS = 60000;
 const DEFAULT_COALESCE_WINDOW_MS = 2 * 60 * 1000;
@@ -40,12 +41,31 @@ export function createPushNotificationDispatchService({
   coalesceWindowMs = DEFAULT_COALESCE_WINDOW_MS,
   maxAttempts = DEFAULT_MAX_ATTEMPTS,
   nowFn = () => new Date(),
+  pushNotificationDeliveryPolicyService = createPushNotificationDeliveryPolicyService(),
   pushNotificationQueueStore = createPushNotificationQueueStore(),
   pushNotificationService = createPushNotificationService(),
   pushSubscriptionStore = createPushSubscriptionStore(),
   retryBaseMs = DEFAULT_RETRY_BASE_MS,
   stderr = process.stderr,
 } = {}) {
+  function reportQueueFailure() {
+    try {
+      const result = stderr.write('[harmoniarr-push] Notification queue worker could not complete a queued delivery.\n');
+      if (typeof result?.catch === 'function') result.catch(() => {});
+    } catch { /* Diagnostic failures must not interrupt recipient processing. */ }
+  }
+
+  async function checkDeliveryPolicy(notification) {
+    try {
+      const decision = await pushNotificationDeliveryPolicyService.getDeliveryDecision({
+        eventType: notification.eventType, userId: notification.userId,
+      });
+      if (typeof decision?.allowed === 'boolean' && typeof decision.retryable === 'boolean'
+        && !(decision.allowed && decision.retryable)) return decision;
+    } catch { /* An unavailable evaluator cannot authorize a network send. */ }
+    return { allowed: false, retryable: true };
+  }
+
   async function sendNotificationToUser({
     coalesceKey = null,
     eventType = 'generic',
@@ -177,18 +197,29 @@ export function createPushNotificationDispatchService({
           ? await pushSubscriptionStore.getSubscriptionById(notification.subscriptionId)
           : null;
 
-        if (!subscription) {
+        if (!subscription || subscription.id !== notification.subscriptionId
+          || subscription.userId !== notification.userId) {
           expiredCount += 1;
           await pushNotificationQueueStore.markNotificationFailed(notification.id, { expired: true });
           continue;
         }
 
-        const result = await pushNotificationService.sendNotificationToSubscription({
-          payload: notification.payload,
-          subscription,
-          ttl: notification.ttlSeconds,
-          userId: notification.userId,
-        });
+        const decision = await checkDeliveryPolicy(notification);
+        if (!decision.allowed && !decision.retryable) {
+          // "Expired" also means permanently suppressed: no longer eligible
+          // for delivery. It is not a claim about the queue row's local age.
+          expiredCount += 1;
+          await pushNotificationQueueStore.markNotificationFailed(notification.id, { expired: true });
+          continue;
+        }
+        const result = decision.allowed
+          ? await pushNotificationService.sendNotificationToSubscription({
+            payload: notification.payload,
+            subscription,
+            ttl: notification.ttlSeconds,
+            userId: notification.userId,
+          })
+          : { status: 'failed', retryable: true };
 
         if (result.status === 'sent') {
           deliveredCount += 1;
@@ -214,9 +245,9 @@ export function createPushNotificationDispatchService({
 
         failedCount += 1;
         await pushNotificationQueueStore.markNotificationFailed(notification.id, { failed: true });
-      } catch (error) {
+      } catch {
         failedCount += 1;
-        stderr.write(`[harmoniarr-push] Notification queue worker failed for id=${notification.id}: ${error?.message ?? error}\n`);
+        reportQueueFailure();
         await pushNotificationQueueStore.markNotificationFailed(notification.id, { failed: true });
       }
     }
