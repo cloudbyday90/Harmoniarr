@@ -21,6 +21,7 @@ import { getPool } from '../database.js';
 function mapNotificationQueueRow(row) {
   return {
     attempts: row.attempts ?? 0,
+    claimToken: row.claim_token ?? null,
     coalesceKey: row.coalesce_key ?? null,
     createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
     eventType: row.event_type,
@@ -53,11 +54,12 @@ export function createPushNotificationQueueStore({ getPoolFn = getPool } = {}) {
       `UPDATE notification_queue
        SET status = 'pending',
            attempts = attempts + 1,
-           next_attempt_at = NOW() + ($2 * INTERVAL '1 millisecond')
+           claim_token = harmoniarr_generate_uuid(),
+           next_attempt_at = clock_timestamp() + ($2 * INTERVAL '1 millisecond')
        WHERE id IN (
           SELECT id FROM notification_queue
-          WHERE status = 'pending' AND next_attempt_at <= NOW()
-          ORDER BY next_attempt_at ASC
+          WHERE status = 'pending' AND next_attempt_at <= clock_timestamp()
+          ORDER BY next_attempt_at ASC, id ASC
           LIMIT $1
           FOR UPDATE SKIP LOCKED
         )
@@ -67,24 +69,57 @@ export function createPushNotificationQueueStore({ getPoolFn = getPool } = {}) {
     return result.rows.map(mapNotificationQueueRow);
   }
 
-  async function markNotificationSent(id) {
-    const pool = getPoolFn();
-    await pool.query(
-      `UPDATE notification_queue
-       SET status = 'sent', sent_at = NOW()
-       WHERE id = $1`,
-      [id]
-    );
+  function validClaimToken(claimToken) {
+    return typeof claimToken === 'string'
+      && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(claimToken);
   }
 
-  async function markNotificationFailed(id, { expired = false, failed = false, nextAttemptAt = null } = {}) {
-    const pool = getPoolFn();
+  async function isNotificationClaimActive(id, { claimToken } = {}) {
+    if (!validClaimToken(claimToken)) return false;
+    const result = await getPoolFn().query(
+      `SELECT id FROM notification_queue
+       WHERE id = $1 AND claim_token = $2::uuid AND status = 'pending'
+         AND next_attempt_at > clock_timestamp()`,
+      [id, claimToken],
+    );
+    return result.rows.length === 1;
+  }
+
+  async function markNotificationSent(id, { claimToken } = {}) {
+    if (!validClaimToken(claimToken)) return false;
+    const result = await getPoolFn().query(
+      `WITH owned AS MATERIALIZED (
+         SELECT id, next_attempt_at FROM notification_queue
+         WHERE id = $1 AND claim_token = $2::uuid AND status = 'pending' FOR UPDATE
+       )
+       UPDATE notification_queue AS queue
+       SET status = 'sent', sent_at = clock_timestamp(), claim_token = NULL
+       FROM owned
+       WHERE queue.id = owned.id AND queue.claim_token = $2::uuid AND queue.status = 'pending'
+         AND owned.next_attempt_at > clock_timestamp()
+       RETURNING queue.id`,
+      [id, claimToken],
+    );
+    return result.rows.length === 1;
+  }
+
+  async function markNotificationFailed(id, { claimToken, expired = false, failed = false, nextAttemptAt = null } = {}) {
+    if (!validClaimToken(claimToken)) return false;
     const status = expired ? 'expired' : (failed ? 'failed' : 'pending');
-    const query = nextAttemptAt
-      ? 'UPDATE notification_queue SET status = $1, next_attempt_at = $2 WHERE id = $3'
-      : 'UPDATE notification_queue SET status = $1 WHERE id = $2';
-    const params = nextAttemptAt ? [status, nextAttemptAt, id] : [status, id];
-    await pool.query(query, params);
+    const result = await getPoolFn().query(
+      `WITH owned AS MATERIALIZED (
+         SELECT id, next_attempt_at FROM notification_queue
+         WHERE id = $1 AND claim_token = $2::uuid AND status = 'pending' FOR UPDATE
+       )
+       UPDATE notification_queue AS queue
+       SET status = $3, next_attempt_at = COALESCE($4::timestamptz, queue.next_attempt_at), claim_token = NULL
+       FROM owned
+       WHERE queue.id = owned.id AND queue.claim_token = $2::uuid AND queue.status = 'pending'
+         AND owned.next_attempt_at > clock_timestamp()
+       RETURNING queue.id`,
+      [id, claimToken, status, nextAttemptAt],
+    );
+    return result.rows.length === 1;
   }
 
   async function getLatestSentNotificationAt({ userId, eventType, coalesceKey = null, since = null }) {
@@ -118,7 +153,7 @@ export function createPushNotificationQueueStore({ getPoolFn = getPool } = {}) {
         WHERE user_id = $1
           AND event_type = $2
           AND coalesce_key = $3
-          AND status = 'pending'
+          AND status = 'pending' AND claim_token IS NULL AND attempts = 0
           AND ($4::timestamptz IS NULL OR created_at >= $4::timestamptz)
         ORDER BY created_at DESC`,
       [userId, eventType, coalesceKey, since ?? null],
@@ -142,7 +177,7 @@ export function createPushNotificationQueueStore({ getPoolFn = getPool } = {}) {
           SET payload = $2::jsonb,
               ttl_seconds = $3
         WHERE id = ANY($1::uuid[])
-          AND status = 'pending'
+          AND status = 'pending' AND claim_token IS NULL AND attempts = 0
         RETURNING *`,
       [normalizedIds, JSON.stringify(payload), ttlSeconds],
     );
@@ -195,6 +230,7 @@ export function createPushNotificationQueueStore({ getPoolFn = getPool } = {}) {
     getLatestSentNotificationAt,
     claimPendingNotifications,
     listPendingNotificationsForCoalesce,
+    isNotificationClaimActive,
     markNotificationSent,
     markNotificationFailed,
     recordSentNotification,

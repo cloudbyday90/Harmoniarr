@@ -58,6 +58,7 @@ test('enqueueNotification stringifies payload and maps queue row fields', async 
   ]);
   assert.deepEqual(result, {
     attempts: 0,
+    claimToken: null,
     coalesceKey: 'releaseAdded:radiohead:kid-a',
     createdAt: '2026-05-22T12:00:00.000Z',
     eventType: 'releaseAdded',
@@ -93,7 +94,7 @@ test('claimPendingNotifications extends claim window and maps returned rows', as
 
   const result = await store.claimPendingNotifications({ claimWindowMs: 45000, limit: 10 });
 
-  assert.match(query.mock.calls[0].arguments[0], /next_attempt_at = NOW\(\) \+ \(\$2 \* INTERVAL '1 millisecond'\)/);
+  assert.match(query.mock.calls[0].arguments[0], /next_attempt_at = clock_timestamp\(\) \+ \(\$2 \* INTERVAL '1 millisecond'\)/);
   assert.deepEqual(query.mock.calls[0].arguments[1], [10, 45000]);
   assert.equal(result[0].attempts, 1);
   assert.equal(result[0].subscriptionId, 'sub-2');
@@ -170,4 +171,14 @@ test('deleteSentNotificationHistory deletes only aged sent history rows and retu
   assert.deepEqual(result, { deletedCount: 3 });
   assert.match(query.mock.calls[0].arguments[0], /status = 'sent'/);
   assert.deepEqual(query.mock.calls[0].arguments[1], ['2026-05-01T00:00:00.000Z']);
+});
+
+
+test('missing or malformed claim tokens cannot perform a queue lookup or completion', async () => {
+  const store = createPushNotificationQueueStore({ getPoolFn: () => { assert.fail('invalid claims must not reach SQL'); } });
+  for (const claimToken of [undefined, null, '', 'not-a-uuid']) {
+    assert.equal(await store.isNotificationClaimActive('queue-1', { claimToken }), false);
+    assert.equal(await store.markNotificationSent('queue-1', { claimToken }), false);
+    assert.equal(await store.markNotificationFailed('queue-1', { claimToken, failed: true }), false);
+  }
 });

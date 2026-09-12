@@ -21,6 +21,8 @@ import test from 'node:test';
 import { createPushNotificationDispatchService } from '../../src/server/push/push-notification-dispatch-service.js';
 import { createPushNotificationDeliveryPolicyService } from '../../src/server/push/push-notification-delivery-policy-service.js';
 
+const CLAIM_TOKEN = '01234567-89ab-4cde-8fab-0123456789ab';
+
 function createDeliveryPolicyService(getDeliveryAccount = async ({ userId }) => ({
   id: userId, isDisabled: false, role: 'requester', userPreferences: {},
 })) {
@@ -31,9 +33,10 @@ function createQueueStore(overrides = {}) {
   return {
     claimPendingNotifications: async () => [],
     enqueueNotification: async () => ({}),
+    isNotificationClaimActive: async () => true,
     listPendingNotificationsForCoalesce: async () => [],
-    markNotificationFailed: async () => {},
-    markNotificationSent: async () => {},
+    markNotificationFailed: async () => true,
+    markNotificationSent: async () => true,
     updatePendingNotificationPayload: async () => [],
     ...overrides,
   };
@@ -92,7 +95,7 @@ test('dispatch service coalesces pending rows and enqueues only missing subscrip
       listPendingNotificationsForCoalesce: async () => [
         { id: 'queue-1', subscriptionId: 'sub-1' },
       ],
-      updatePendingNotificationPayload: async (args) => { updated.push(args); return []; },
+      updatePendingNotificationPayload: async (args) => { updated.push(args); return [{ id: 'queue-1', subscriptionId: 'sub-1' }]; },
     }),
     pushSubscriptionStore: createSubscriptionStore({
       listSubscriptionsForUser: async () => [{ id: 'sub-1' }, { id: 'sub-2' }],
@@ -123,6 +126,7 @@ test('dispatch service delivers claimed rows and retries transient failures with
     pushNotificationQueueStore: createQueueStore({
       claimPendingNotifications: async () => [{
         attempts: 1,
+        claimToken: CLAIM_TOKEN,
         eventType: 'releaseAdded',
         id: 'queue-2',
         payload: { title: 'Queued' },
@@ -130,8 +134,8 @@ test('dispatch service delivers claimed rows and retries transient failures with
         ttlSeconds: 120,
         userId: 'user-2',
       }],
-      markNotificationFailed: async (id, args) => { markedFailed.push({ id, ...args }); },
-      markNotificationSent: async (id) => { markedSent.push(id); },
+      markNotificationFailed: async (id, args) => { markedFailed.push({ id, ...args }); return true; },
+      markNotificationSent: async (id) => { markedSent.push(id); return true; },
     }),
     pushNotificationService: createPushService({
       sendNotificationToSubscription: async () => ({ retryAt: null, retryable: true, status: 'failed' }),
@@ -146,10 +150,12 @@ test('dispatch service delivers claimed rows and retries transient failures with
   assert.deepEqual(markedSent, []);
   assert.deepEqual(markedFailed, [{
     id: 'queue-2',
+    claimToken: CLAIM_TOKEN,
     nextAttemptAt: '2026-05-22T12:01:00.000Z',
   }]);
   assert.deepEqual(result, {
     claimedCount: 1,
+    claimLostCount: 0,
     deliveredCount: 0,
     expiredCount: 0,
     failedCount: 0,
@@ -165,6 +171,7 @@ test('dispatch service marks invalid subscriptions expired and caps retries into
       claimPendingNotifications: async () => [
         {
           attempts: 1,
+          claimToken: CLAIM_TOKEN,
           eventType: 'releaseAdded',
           id: 'queue-expired',
           payload: { title: 'Expired' },
@@ -174,6 +181,7 @@ test('dispatch service marks invalid subscriptions expired and caps retries into
         },
         {
           attempts: 3,
+          claimToken: CLAIM_TOKEN,
           eventType: 'releaseAdded',
           id: 'queue-failed',
           payload: { title: 'Failed' },
@@ -182,8 +190,8 @@ test('dispatch service marks invalid subscriptions expired and caps retries into
           userId: 'user-4',
         },
       ],
-      markNotificationFailed: async (id, args) => { markedFailed.push({ id, ...args }); },
-      markNotificationSent: async () => {},
+      markNotificationFailed: async (id, args) => { markedFailed.push({ id, ...args }); return true; },
+      markNotificationSent: async () => true,
     }),
     pushNotificationService: createPushService({
       sendNotificationToSubscription: async ({ subscription }) => {
@@ -203,11 +211,12 @@ test('dispatch service marks invalid subscriptions expired and caps retries into
   const result = await service.deliverPendingNotifications();
 
   assert.deepEqual(markedFailed, [
-    { id: 'queue-expired', expired: true },
-    { id: 'queue-failed', failed: true },
+    { id: 'queue-expired', claimToken: CLAIM_TOKEN, expired: true },
+    { id: 'queue-failed', claimToken: CLAIM_TOKEN, failed: true },
   ]);
   assert.deepEqual(result, {
     claimedCount: 2,
+    claimLostCount: 0,
     deliveredCount: 0,
     expiredCount: 1,
     failedCount: 1,
@@ -221,14 +230,15 @@ test('dispatch service expires queue rows when the active subscription no longer
     pushNotificationQueueStore: createQueueStore({
       claimPendingNotifications: async () => [{
         attempts: 1,
+        claimToken: CLAIM_TOKEN,
         id: 'queue-missing-sub',
         payload: { title: 'Missing sub' },
         subscriptionId: 'missing-sub',
         ttlSeconds: 120,
         userId: 'user-5',
       }],
-      markNotificationFailed: async (id, args) => { markedFailed.push({ id, ...args }); },
-      markNotificationSent: async () => {},
+      markNotificationFailed: async (id, args) => { markedFailed.push({ id, ...args }); return true; },
+      markNotificationSent: async () => true,
     }),
     pushNotificationService: createPushService(),
     pushSubscriptionStore: createSubscriptionStore({
@@ -238,35 +248,41 @@ test('dispatch service expires queue rows when the active subscription no longer
 
   const result = await service.deliverPendingNotifications();
 
-  assert.deepEqual(markedFailed, [{ id: 'queue-missing-sub', expired: true }]);
+  assert.deepEqual(markedFailed, [{ id: 'queue-missing-sub', claimToken: CLAIM_TOKEN, expired: true }]);
   assert.equal(result.expiredCount, 1);
 });
 
 function queuedNotification(overrides = {}) {
-  return { attempts: 1, eventType: 'releaseAdded', id: 'queued-1', userId: 'user-1', subscriptionId: 'sub-1',
+  return { attempts: 1, claimToken: CLAIM_TOKEN, eventType: 'releaseAdded', id: 'queued-1', userId: 'user-1', subscriptionId: 'sub-1',
     payload: { title: 'Private queued message' }, ttlSeconds: 120, ...overrides };
 }
 
 function createDeliveryHarness({ claims = [[queuedNotification()]], getDeliveryAccount, policy,
   getSubscriptionById = async (id) => ({ id, userId: 'user-1', endpoint: 'https://push.example.invalid/private' }),
-  send = async () => ({ status: 'sent' }), stderr = { write() {} },
+  send = async () => ({ status: 'sent' }), stderr = { write() {} }, queueOverrides = {},
 } = {}) {
   const marked = [];
   const sent = [];
+  const completionCalls = [];
   const service = createPushNotificationDispatchService({
     nowFn: () => new Date('2026-09-12T12:00:00.000Z'), stderr,
     pushNotificationDeliveryPolicyService: policy ?? createDeliveryPolicyService(getDeliveryAccount),
     pushSubscriptionStore: createSubscriptionStore({ getSubscriptionById }),
     pushNotificationQueueStore: createQueueStore({
       claimPendingNotifications: async () => claims.shift() ?? [],
-      markNotificationSent: async (id) => { marked.push({ id, sent: true }); },
-      markNotificationFailed: async (id, state) => { marked.push({ id, ...state }); },
+      markNotificationSent: async (id, state) => {
+        completionCalls.push({ id, ...state, sent: true }); marked.push({ id, sent: true }); return true;
+      },
+      markNotificationFailed: async (id, { claimToken, ...state }) => {
+        completionCalls.push({ id, claimToken, ...state }); marked.push({ id, ...state }); return true;
+      },
+      ...queueOverrides,
     }),
     pushNotificationService: createPushService({ sendNotificationToSubscription: async (input) => {
       sent.push(input); return send(input);
     } }),
   });
-  return { ...service, marked, sent };
+  return { ...service, marked, sent, completionCalls };
 }
 
 test('delivery rechecks preferences after a transport retry and never sends opted-out retained work', async () => {
@@ -293,7 +309,7 @@ test('a valid account decision is not cached across subscriptions within one cla
       userPreferences: { notificationPreferences: { releaseAdded: enabled } } }),
     send: async () => { enabled = false; return { status: 'sent' }; },
   });
-  assert.deepEqual(await harness.deliverPendingNotifications(), { claimedCount: 2, deliveredCount: 1,
+  assert.deepEqual(await harness.deliverPendingNotifications(), { claimedCount: 2, claimLostCount: 0, deliveredCount: 1,
     expiredCount: 1, failedCount: 0, retriedCount: 0 });
   assert.equal(harness.sent.length, 1);
   assert.deepEqual(harness.marked, [{ id: 'queued-1', sent: true }, { id: 'queued-2', expired: true }]);
@@ -311,7 +327,7 @@ test('an unavailable recipient lookup retries without sending and does not block
       return { id: userId, isDisabled: false, role: 'requester', userPreferences: {} };
     },
   });
-  assert.deepEqual(await harness.deliverPendingNotifications(), { claimedCount: 2, deliveredCount: 1,
+  assert.deepEqual(await harness.deliverPendingNotifications(), { claimedCount: 2, claimLostCount: 0, deliveredCount: 1,
     expiredCount: 0, failedCount: 0, retriedCount: 1 });
   assert.deepEqual(harness.sent.map((entry) => entry.userId), ['user-2']);
   unavailable = false;
@@ -373,7 +389,9 @@ test('the direct dispatcher default rejects generic queued work without an appli
   const service = createPushNotificationDispatchService({
     pushSubscriptionStore: createSubscriptionStore({ getSubscriptionById: async () => ({ id: 'sub-1', userId: 'user-1' }) }),
     pushNotificationQueueStore: createQueueStore({ claimPendingNotifications: async () => [queuedNotification({ eventType: 'generic' })],
-      markNotificationFailed: async (id, state) => marked.push({ id, ...state }) }),
+      markNotificationFailed: async (id, { claimToken, ...state }) => {
+        assert.equal(claimToken, CLAIM_TOKEN); marked.push({ id, ...state }); return true;
+      } }),
     pushNotificationService: createPushService({ sendNotificationToSubscription: async () => { sent++; return { status: 'sent' }; } }),
   });
   assert.equal((await service.deliverPendingNotifications()).expiredCount, 1);
@@ -396,4 +414,176 @@ test('throwing or rejected diagnostic sinks cannot abort sibling delivery or exp
     assert.equal(result.deliveredCount, 1);
     assert.deepEqual(logs, ['[harmoniarr-push] Notification queue worker could not complete a queued delivery.\n']);
   }
+});
+
+function deliverySummary(overrides = {}) {
+  return { claimedCount: 1, claimLostCount: 0, deliveredCount: 0, expiredCount: 0, failedCount: 0, retriedCount: 0, ...overrides };
+}
+
+test('empty delivery summaries include claim loss without inventing claims', async () => {
+  for (const rows of [[], null, undefined]) {
+    const harness = createDeliveryHarness({ claims: [rows] });
+    assert.deepEqual(await harness.deliverPendingNotifications(), deliverySummary({ claimedCount: 0 }));
+  }
+});
+
+test('missing or malformed tokens cannot read recipient state, send, or attempt an unfenced completion', async () => {
+  const rows = [undefined, null, '', 'not-a-token', {}, 1].map((claimToken) => queuedNotification({ claimToken }));
+  const harness = createDeliveryHarness({ claims: [rows],
+    getSubscriptionById: async () => { assert.fail('token validation must precede preparation'); },
+  });
+  assert.deepEqual(await harness.deliverPendingNotifications(), deliverySummary({ claimedCount: 6, claimLostCount: 6 }));
+  assert.deepEqual(harness.sent, []);
+  assert.deepEqual(harness.completionCalls, []);
+});
+
+test('final preflight observes ownership lost during a slow policy read and leaves eligible siblings independent', async () => {
+  let resolveReadStarted;
+  let releaseRead;
+  const readStarted = new Promise((resolve) => { resolveReadStarted = resolve; });
+  const blockedRead = new Promise((resolve) => { releaseRead = resolve; });
+  let firstClaimActive = true;
+  const calls = [];
+  const harness = createDeliveryHarness({
+    claims: [[queuedNotification(), queuedNotification({ id: 'queued-2', userId: 'user-2', subscriptionId: 'sub-2' })]],
+    getSubscriptionById: async (id) => { calls.push(`subscription:${id}`); return { id, userId: id === 'sub-1' ? 'user-1' : 'user-2' }; },
+    policy: { getDeliveryDecision: async ({ userId }) => {
+      calls.push(`policy:${userId}`);
+      if (userId === 'user-1') { resolveReadStarted(); await blockedRead; }
+      return { allowed: true, retryable: false };
+    } },
+    queueOverrides: { isNotificationClaimActive: async (id, { claimToken }) => {
+      calls.push(`preflight:${id}`); assert.equal(claimToken, CLAIM_TOKEN);
+      return id === 'queued-1' ? firstClaimActive : true;
+    } },
+  });
+  const delivery = harness.deliverPendingNotifications();
+  await readStarted;
+  firstClaimActive = false;
+  releaseRead();
+  assert.deepEqual(await delivery, deliverySummary({ claimedCount: 2, claimLostCount: 1, deliveredCount: 1 }));
+  assert.deepEqual(calls, ['subscription:sub-1', 'policy:user-1', 'preflight:queued-1',
+    'subscription:sub-2', 'policy:user-2', 'preflight:queued-2']);
+  assert.deepEqual(harness.sent.map((entry) => entry.userId), ['user-2']);
+  assert.deepEqual(harness.completionCalls, [{ id: 'queued-2', claimToken: CLAIM_TOKEN, sent: true }]);
+});
+
+test('every transport outcome counts only a strict true completion and passes the exact claim token', async () => {
+  for (const [transportResult, counter, expectedState] of [
+    [{ status: 'sent' }, 'deliveredCount', { sent: true }],
+    [{ status: 'expired' }, 'expiredCount', { expired: true }],
+    [{ status: 'failed', retryable: false }, 'failedCount', { failed: true }],
+    [{ status: 'failed', retryable: true }, 'retriedCount', { nextAttemptAt: '2026-09-12T12:01:00.000Z' }],
+  ]) {
+    for (const persisted of [true, false, undefined, 1]) {
+      const writes = [];
+      const token = 'deadbeef-89ab-4cde-8fab-0123456789ab';
+      const harness = createDeliveryHarness({ claims: [[queuedNotification({ claimToken: token })]],
+        send: async () => transportResult,
+        queueOverrides: {
+          isNotificationClaimActive: async (id, options) => {
+            assert.equal(id, 'queued-1'); assert.deepEqual(options, { claimToken: token }); return true;
+          },
+          markNotificationSent: async (id, options) => { writes.push({ id, ...options, sent: true }); return persisted; },
+          markNotificationFailed: async (id, options) => { writes.push({ id, ...options }); return persisted; },
+        },
+      });
+      const result = await harness.deliverPendingNotifications();
+      assert.deepEqual(result, deliverySummary(persisted === true ? { [counter]: 1 } : { claimLostCount: 1 }));
+      assert.equal(harness.sent.length, 1);
+      assert.deepEqual(writes, [{ id: 'queued-1', claimToken: token, ...expectedState }]);
+    }
+  }
+});
+
+test('suppression and unavailable-policy retries also lose cleanly when conditional completion loses ownership', async () => {
+  for (const decision of [{ allowed: false, retryable: false }, { allowed: false, retryable: true }]) {
+    const writes = [];
+    const harness = createDeliveryHarness({ policy: { getDeliveryDecision: async () => decision },
+      queueOverrides: {
+        isNotificationClaimActive: async () => { assert.fail('no transport preflight is needed for a suppressed send'); },
+        markNotificationFailed: async (id, options) => { writes.push({ id, ...options }); return false; },
+      },
+    });
+    assert.deepEqual(await harness.deliverPendingNotifications(), deliverySummary({ claimLostCount: 1 }));
+    assert.equal(harness.sent.length, 0);
+    assert.deepEqual(writes, [{ id: 'queued-1', claimToken: CLAIM_TOKEN,
+      ...(decision.retryable ? { nextAttemptAt: '2026-09-12T12:01:00.000Z' } : { expired: true }) }]);
+  }
+});
+
+test('an ambiguous sent completion failure never issues a second failure update or returns false success', async () => {
+  let sentWrites = 0;
+  const harness = createDeliveryHarness({ queueOverrides: {
+    markNotificationSent: async () => { sentWrites++; throw new Error('private database connection state'); },
+    markNotificationFailed: async () => { assert.fail('a failed acknowledgement cannot justify rewriting sent state'); },
+  } });
+  await assert.rejects(harness.deliverPendingNotifications(), (error) => {
+    assert.equal(error.message, 'Notification queue completion could not be persisted');
+    assert.equal(error.cause, undefined); return true;
+  });
+  assert.equal(harness.sent.length, 1);
+  assert.equal(sentWrites, 1);
+});
+
+test('preflight database outages stop before network and do not manufacture lost-claim or failed-completion outcomes', async () => {
+  const harness = createDeliveryHarness({ queueOverrides: {
+    isNotificationClaimActive: async () => { throw new Error('private database connection state'); },
+    markNotificationFailed: async () => { assert.fail('a claim read outage cannot authorize an unrelated status write'); },
+  } });
+  await assert.rejects(harness.deliverPendingNotifications(), (error) => {
+    assert.equal(error.message, 'Notification queue claim could not be verified');
+    assert.equal(error.cause, undefined); return true;
+  });
+  assert.equal(harness.sent.length, 0);
+  assert.deepEqual(harness.completionCalls, []);
+});
+
+test('failed-state persistence errors are attempted once and do not fabricate failed delivery accounting', async () => {
+  let writes = 0;
+  const harness = createDeliveryHarness({ send: async () => ({ status: 'failed' }), queueOverrides: {
+    markNotificationFailed: async () => { writes++; throw new Error('private database failure'); },
+  } });
+  await assert.rejects(harness.deliverPendingNotifications(), /Notification queue completion could not be persisted/);
+  assert.equal(writes, 1);
+  assert.equal(harness.sent.length, 1);
+});
+
+test('coalescing uses returned updates and preserves a new payload when every observed row loses its claim race', async () => {
+  const enqueued = [];
+  const service = createPushNotificationDispatchService({ pushNotificationService: createPushService(),
+    pushSubscriptionStore: createSubscriptionStore({ listSubscriptionsForUser: async () => [{ id: 'sub-1' }, { id: 'sub-2' }] }),
+    pushNotificationQueueStore: createQueueStore({
+      listPendingNotificationsForCoalesce: async () => [{ id: 'old-1', subscriptionId: 'sub-1' }, { id: 'old-2', subscriptionId: 'sub-2' }],
+      updatePendingNotificationPayload: async () => [],
+      enqueueNotification: async (input) => { enqueued.push(input); return {}; },
+    }),
+  });
+  assert.deepEqual(await service.sendNotificationToUser({ userId: 'user-1', eventType: 'releaseAdded',
+    coalesceKey: 'same-release', payload: { title: 'Newer message' }, ttl: 90 }),
+  { failed: 0, queued: 2, removed: 0, sent: 0, updated: 0 });
+  assert.deepEqual(enqueued.map((row) => row.subscriptionId), ['sub-1', 'sub-2']);
+  assert.ok(enqueued.every((row) => row.payload.title === 'Newer message' && row.ttlSeconds === 90 && row.userId === 'user-1'));
+});
+
+test('partially successful coalescing counts actual rows and enqueues only once per subscription with any lost candidate', async () => {
+  const enqueued = [];
+  const service = createPushNotificationDispatchService({ pushNotificationService: createPushService(),
+    pushSubscriptionStore: createSubscriptionStore({ listSubscriptionsForUser: async () => [{ id: 'sub-1' }, { id: 'sub-2' }, { id: 'sub-3' }] }),
+    pushNotificationQueueStore: createQueueStore({
+      listPendingNotificationsForCoalesce: async () => [
+        { id: 'old-1a', subscriptionId: 'sub-1' }, { id: 'old-1b', subscriptionId: 'sub-1' },
+        { id: 'old-1c', subscriptionId: 'sub-1' }, { id: 'old-2', subscriptionId: 'sub-2' },
+      ],
+      updatePendingNotificationPayload: async ({ ids }) => {
+        assert.deepEqual(ids, ['old-1a', 'old-1b', 'old-1c', 'old-2']);
+        return [{ id: 'old-1a', subscriptionId: 'sub-1' }, { id: 'old-2', subscriptionId: 'sub-2' }];
+      },
+      enqueueNotification: async (input) => { enqueued.push(input); return {}; },
+    }),
+  });
+  assert.deepEqual(await service.sendNotificationToUser({ userId: 'user-1', eventType: 'releaseAdded',
+    coalesceKey: 'same-release', payload: { title: 'Newest message' } }),
+  { failed: 0, queued: 2, removed: 0, sent: 0, updated: 2 });
+  assert.deepEqual(enqueued.map((row) => row.subscriptionId).sort(), ['sub-1', 'sub-3']);
 });

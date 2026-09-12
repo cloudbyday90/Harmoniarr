@@ -33,6 +33,6 @@ The gate is a check immediately before transport, not a lock spanning external I
 
 ## Next release item
 
-Fence queue claims so that a worker whose claim has expired cannot finalize a row reclaimed by another worker. The current worker claims up to 50 rows for a 60-second window and processes them sequentially; final state updates only match the row ID. Long network calls, multiple workers, or restarts can expose stale writes and duplicate delivery. Design claim tokens, conditional completion, and bounded transport/claim processing together. Preserve at-least-once delivery language: a database fence cannot make an external push submission exactly once.
+Follow-up implemented: [push queue claim fencing](PUSH_QUEUE_CLAIM_FENCING_OUTCOME.md). The original recommendation was to fence queue claims so that a worker whose claim has expired cannot finalize a row reclaimed by another worker. The current worker claims up to 50 rows for a 60-second window and processes them sequentially; final state updates only match the row ID. Long network calls, multiple workers, or restarts can expose stale writes and duplicate delivery. Design claim tokens, conditional completion, and bounded transport/claim processing together. Preserve at-least-once delivery language: a database fence cannot make an external push submission exactly once.
 
 See the separate [design, current official sources, alternatives, and PR disposition](QUEUED_NOTIFICATION_PREFERENCE_DESIGN.md).

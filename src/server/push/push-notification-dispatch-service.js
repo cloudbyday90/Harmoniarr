@@ -20,21 +20,12 @@ import { createPushNotificationQueueStore } from './push-notification-queue-stor
 import { createPushNotificationService, DEFAULT_TTL_SECONDS } from './push-notification-service.js';
 import { createPushSubscriptionStore } from './push-subscription-store.js';
 import { createPushNotificationDeliveryPolicyService } from './push-notification-delivery-policy-service.js';
+import { createPushNotificationDeliveryWorker } from './push-notification-delivery-worker.js';
 
 const DEFAULT_CLAIM_WINDOW_MS = 60000;
 const DEFAULT_COALESCE_WINDOW_MS = 2 * 60 * 1000;
 const DEFAULT_MAX_ATTEMPTS = 3;
 const DEFAULT_RETRY_BASE_MS = 30000;
-
-function normalizeDate(value, fallbackNow) {
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? fallbackNow : parsed;
-}
-
-function computeRetryAt({ attempts, now, retryBaseMs }) {
-  const multiplier = Math.max(1, 2 ** Math.max(0, Number(attempts) || 0));
-  return new Date(now.getTime() + (multiplier * retryBaseMs)).toISOString();
-}
 
 export function createPushNotificationDispatchService({
   claimWindowMs = DEFAULT_CLAIM_WINDOW_MS,
@@ -48,23 +39,8 @@ export function createPushNotificationDispatchService({
   retryBaseMs = DEFAULT_RETRY_BASE_MS,
   stderr = process.stderr,
 } = {}) {
-  function reportQueueFailure() {
-    try {
-      const result = stderr.write('[harmoniarr-push] Notification queue worker could not complete a queued delivery.\n');
-      if (typeof result?.catch === 'function') result.catch(() => {});
-    } catch { /* Diagnostic failures must not interrupt recipient processing. */ }
-  }
-
-  async function checkDeliveryPolicy(notification) {
-    try {
-      const decision = await pushNotificationDeliveryPolicyService.getDeliveryDecision({
-        eventType: notification.eventType, userId: notification.userId,
-      });
-      if (typeof decision?.allowed === 'boolean' && typeof decision.retryable === 'boolean'
-        && !(decision.allowed && decision.retryable)) return decision;
-    } catch { /* An unavailable evaluator cannot authorize a network send. */ }
-    return { allowed: false, retryable: true };
-  }
+  const deliveryWorker = createPushNotificationDeliveryWorker({ maxAttempts, nowFn, pushNotificationDeliveryPolicyService,
+    pushNotificationQueueStore, pushNotificationService, pushSubscriptionStore, retryBaseMs, stderr });
 
   async function sendNotificationToUser({
     coalesceKey = null,
@@ -140,12 +116,24 @@ export function createPushNotificationDispatchService({
       subscriptionsToEnqueue.push(subscription);
     }
 
+    let updatedRows = [];
     if (idsToUpdate.length > 0) {
-      await pushNotificationQueueStore.updatePendingNotificationPayload({
+      updatedRows = await pushNotificationQueueStore.updatePendingNotificationPayload({
         ids: idsToUpdate,
         payload,
         ttlSeconds,
       });
+    }
+    const expectedIds = new Set(idsToUpdate);
+    const updatedIds = new Set((Array.isArray(updatedRows) ? updatedRows : [])
+      .filter((row) => expectedIds.has(row.id)).map((row) => row.id));
+    for (const subscription of subscriptions) {
+      const observedRows = pendingRowsBySubscriptionId.get(subscription.id) ?? [];
+      if (observedRows.some((row) => !updatedIds.has(row.id))) {
+        // A claim can win between the lookup and conditional UPDATE. Retain
+        // the producer's newer payload in independent pending work.
+        subscriptionsToEnqueue.push(subscription);
+      }
     }
 
     if (subscriptionsToEnqueue.length > 0) {
@@ -166,7 +154,7 @@ export function createPushNotificationDispatchService({
       queued: subscriptionsToEnqueue.length,
       removed: 0,
       sent: 0,
-      updated: idsToUpdate.length,
+      updated: updatedIds.size,
     };
   }
 
@@ -176,89 +164,11 @@ export function createPushNotificationDispatchService({
       limit,
     });
 
-    if (!Array.isArray(claimedNotifications) || claimedNotifications.length < 1) {
-      return {
-        claimedCount: 0,
-        deliveredCount: 0,
-        expiredCount: 0,
-        failedCount: 0,
-        retriedCount: 0,
-      };
-    }
-
-    let deliveredCount = 0;
-    let expiredCount = 0;
-    let failedCount = 0;
-    let retriedCount = 0;
-
-    for (const notification of claimedNotifications) {
-      try {
-        const subscription = notification.subscriptionId
-          ? await pushSubscriptionStore.getSubscriptionById(notification.subscriptionId)
-          : null;
-
-        if (!subscription || subscription.id !== notification.subscriptionId
-          || subscription.userId !== notification.userId) {
-          expiredCount += 1;
-          await pushNotificationQueueStore.markNotificationFailed(notification.id, { expired: true });
-          continue;
-        }
-
-        const decision = await checkDeliveryPolicy(notification);
-        if (!decision.allowed && !decision.retryable) {
-          // "Expired" also means permanently suppressed: no longer eligible
-          // for delivery. It is not a claim about the queue row's local age.
-          expiredCount += 1;
-          await pushNotificationQueueStore.markNotificationFailed(notification.id, { expired: true });
-          continue;
-        }
-        const result = decision.allowed
-          ? await pushNotificationService.sendNotificationToSubscription({
-            payload: notification.payload,
-            subscription,
-            ttl: notification.ttlSeconds,
-            userId: notification.userId,
-          })
-          : { status: 'failed', retryable: true };
-
-        if (result.status === 'sent') {
-          deliveredCount += 1;
-          await pushNotificationQueueStore.markNotificationSent(notification.id);
-          continue;
-        }
-
-        if (result.status === 'expired') {
-          expiredCount += 1;
-          await pushNotificationQueueStore.markNotificationFailed(notification.id, { expired: true });
-          continue;
-        }
-
-        if (result.retryable && notification.attempts < maxAttempts) {
-          retriedCount += 1;
-          const now = nowFn();
-          const retryAt = result.retryAt
-            ? normalizeDate(result.retryAt, now).toISOString()
-            : computeRetryAt({ attempts: notification.attempts, now, retryBaseMs });
-          await pushNotificationQueueStore.markNotificationFailed(notification.id, { nextAttemptAt: retryAt });
-          continue;
-        }
-
-        failedCount += 1;
-        await pushNotificationQueueStore.markNotificationFailed(notification.id, { failed: true });
-      } catch {
-        failedCount += 1;
-        reportQueueFailure();
-        await pushNotificationQueueStore.markNotificationFailed(notification.id, { failed: true });
-      }
-    }
-
-    return {
-      claimedCount: claimedNotifications.length,
-      deliveredCount,
-      expiredCount,
-      failedCount,
-      retriedCount,
-    };
+    const rows = Array.isArray(claimedNotifications) ? claimedNotifications : [];
+    const summary = { claimedCount: rows.length, claimLostCount: 0, deliveredCount: 0,
+      expiredCount: 0, failedCount: 0, retriedCount: 0 };
+    for (const notification of rows) summary[await deliveryWorker.deliverNotification(notification)] += 1;
+    return summary;
   }
 
   return {

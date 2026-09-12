@@ -7253,3 +7253,44 @@ SET migration_key = EXCLUDED.migration_key,
     error_message = NULL,
     application_version = NULL,
     updated_at = NOW();
+
+-- Migration: 20260912_232305_add_notification_queue_claim_fencing.sql
+-- Checksum: 47436c197966f8f4d2349ccb2d29d8495e9f93d838231b081f306f0089b685db
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+-- This program is free software: licensed under GPL-3.0
+-- See LICENSE file for details.
+
+BEGIN;
+
+ALTER TABLE notification_queue ADD COLUMN claim_token UUID;
+ALTER TABLE notification_queue ADD CONSTRAINT notification_queue_claim_pending_check
+  CHECK (claim_token IS NULL OR status = 'pending');
+
+COMMIT;
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260912_232305',
+  '20260912_232305_add_notification_queue_claim_fencing.sql',
+  'add_notification_queue_claim_fencing',
+  '47436c197966f8f4d2349ccb2d29d8495e9f93d838231b081f306f0089b685db',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();

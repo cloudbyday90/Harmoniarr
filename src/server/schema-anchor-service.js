@@ -20,6 +20,7 @@ const publicSchema = 'public';
 
 export const criticalSchemaAnchors = Object.freeze({
   columns: Object.freeze([
+    { table: 'notification_queue', column: 'claim_token' },
     { table: 'library_external_request_release_intents', column: 'requested_for_user_id' },
     { table: 'library_external_request_release_intents', column: 'provider_evidence' },
     { table: 'library_external_request_release_intents', column: 'operation_run_id' },
@@ -64,6 +65,7 @@ export const criticalSchemaAnchors = Object.freeze({
     { table: 'library_files', column: 'tag_extracted_modified_at' },
   ]),
   constraints: Object.freeze([
+    { table: 'notification_queue', constraint: 'notification_queue_claim_pending_check' },
     { table: 'library_external_request_release_intents', constraint: 'external_request_release_intents_release_unique' },
     { table: 'library_external_request_release_intents', constraint: 'external_request_release_intents_provider_unique' },
     { table: 'library_external_request_collections', constraint: 'external_collection_reviewed_state' },
