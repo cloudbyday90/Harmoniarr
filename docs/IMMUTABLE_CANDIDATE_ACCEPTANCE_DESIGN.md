@@ -2,6 +2,8 @@
 
 Design date: 2026-09-11. Scope: the first release follow-up from [Missing Music pagination](MUSIC_QUEUE_PAGINATION_OUTCOME.md).
 
+September 12 follow-up: the [published trust design](PUBLISHED_CANDIDATE_TRUST_DESIGN.md) adds provenance verification before runtime execution. The harness now also permits unchanged-schema patch upgrades while retaining ledger and request-continuity proof. The historical local upgrade evidence remains separate from published trust.
+
 ## Purpose and decision
 
 Harmoniarr is a Docker-first, Soulseek-native music library manager with a Node 24 native ESM application, Vue client, and embedded PostgreSQL 18. Source validation cannot prove that the packaged application starts, migrates retained data, and includes its recovery binaries. Test one immutable candidate through fresh installation, restart, and upgrade from a distinct immutable baseline.

@@ -86,6 +86,18 @@ test('packaged baseline and upgrade preserve a generated request and immutable o
   assert.doesNotMatch(JSON.stringify(upgraded), /candidate-continuity|password_hash|requestId|username|checksum|SELECT/);
 });
 
+test('a patch release upgrade can retain the existing ledger while proving request continuity', async () => {
+  const runtime = createPackagedCommandFixture({ candidate: true });
+  const checks = createCandidateSchemaChecks({ runCommandFn: runtime.runCommandFn });
+  const baseline = await checks.checkPhase({ composeArgs, phase: 'baseline' });
+  const upgraded = await checks.checkPhase({ composeArgs, phase: 'upgraded' });
+  assert.equal(upgraded.migrationCount, baseline.migrationCount);
+  assert.equal(upgraded.migrationsAdded, 0);
+  assert.equal(upgraded.migrationChecksumsVerified, true);
+  assert.equal(upgraded.requestContinuityVerified, true);
+  assert.equal(upgraded.indexesVerified, true);
+});
+
 test('fresh install and restart remain read-only and verify unchanged migration records without creating users', async () => {
   const runtime = createPackagedCommandFixture({ candidate: true });
   const checks = createCandidateSchemaChecks();

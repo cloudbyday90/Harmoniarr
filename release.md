@@ -109,7 +109,7 @@ Expected local evidence files when the command runs successfully:
 
 Use `npm run validate:docker-candidate` to test one resolved immutable application image across fresh installation, existing-data restart, and upgrade. This additional gate verifies actual container identity, the packaged migration ledger and pagination indexes, a retained generated request, packaged PostgreSQL recovery tools, and cleanup. It creates isolated fixtures with generated credentials and does not inherit the operator's `.env` or database/provider configuration. Docker Engine API 1.49+ is required for platform-manifest inspection on a containerd image store.
 
-Obtain image references and source commits from the actual build/release metadata. Tags alone are rejected. Both images must carry the expected `org.opencontainers.image.revision` label, have distinct identities and source revisions, and use the same platform. The current transition check requires a baseline before `20260911_103324_missing_music_keyset_paging_indexes.sql` and a candidate containing that migration; it deliberately fails an already-migrated baseline.
+Obtain image references and source commits from the actual build/release metadata. Tags alone are rejected. Both images must carry the expected `org.opencontainers.image.revision` label, have distinct identities and source revisions, and use the same platform. The candidate must contain the required pagination migration and indexes. A patch-release upgrade may add zero migrations, provided the retained ledger/checksums and request continuity remain intact.
 
 ```powershell
 npm run validate:docker-candidate -- `
@@ -123,6 +123,22 @@ npm run validate:docker-candidate -- `
 For pre-publication testing, build source-identified candidate/baseline images using `docker build --label org.opencontainers.image.revision=<full-source-commit-sha>` from their respective source checkouts. Resolve their full local IDs with `docker image inspect <build-tag> --format '{{.Id}}'`, pass those IDs instead of registry references, and add `--allow-local-images`. The command never builds or substitutes an image during a scenario. Local evidence is marked `local-artifact-runtime`; it does not establish registry publication, provenance, or an accepted release baseline.
 
 Each run requires a new evidence file. Failed validation leaves no passed artifact. Retain the successful sanitized JSON along with source/build metadata. The release attestation/contract gate still verifies trusted origin independently; a matching revision label is not attestation verification. See the separate [design](docs/IMMUTABLE_CANDIDATE_ACCEPTANCE_DESIGN.md) and [outcome](docs/IMMUTABLE_CANDIDATE_ACCEPTANCE_OUTCOME.md).
+
+### Published candidate provenance before execution
+
+Use the stricter wrapper when published GHCR digests and source commits are available. It requires working GitHub CLI and registry authentication and verifies both images before allocating the runtime fixture. The signer is the selected repository's `.github/workflows/release-image.yml`, with source and signer commits bound to the supplied revisions and self-hosted runners denied. No local-image or imported-verification fallback is available.
+
+```powershell
+npm run validate:published-candidate -- `
+  --candidate-image <candidate-ghcr-digest-reference> `
+  --baseline-image <baseline-ghcr-digest-reference> `
+  --candidate-revision <full-candidate-commit-sha> `
+  --baseline-revision <full-baseline-commit-sha> `
+  --baseline-release-tag <explicitly-selected-published-baseline-tag> `
+  --evidence-path .tmp/release/published-candidate-acceptance.json
+```
+
+Use actual release metadata for these values; placeholders are not runnable artifact references. The default repository is `cloudbyday90/Harmoniarr`. The wrapper checks baseline publication, tag commit, and the official release metadata asset. Its `publishedBaselineVerified` result does **not** establish independently reviewed baseline acceptance: `acceptedReleaseBaselineVerified` remains false. Retain a separately reviewed baseline acceptance record before treating this as a release gate. See the [published trust design](docs/PUBLISHED_CANDIDATE_TRUST_DESIGN.md) and [outcome](docs/PUBLISHED_CANDIDATE_TRUST_OUTCOME.md).
 
 Optional top-level summary artifact:
 

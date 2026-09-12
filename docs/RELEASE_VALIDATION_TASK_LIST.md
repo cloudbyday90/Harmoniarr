@@ -49,6 +49,10 @@ Issue #4 platform evidence map: `docs/ISSUE_4_RELEASE_VALIDATION_EVIDENCE.md`
 - [ ] Repeat strict candidate acceptance with published registry digests, verified
   provenance, an accepted release baseline, and each supported platform. Local
   image evidence does not close the artifact-delivery trust gate.
+- [x] Add a published-candidate wrapper that verifies live provenance before
+  image execution and checks baseline publication separately from approval.
+  [Trust tooling outcome](PUBLISHED_CANDIDATE_TRUST_OUTCOME.md) records the
+  unavailable release inputs and failed access preflight; the live gate stays open.
 - [x] Restore cancellation/reassignment Activity registration, schema acceptance,
   public payload projection, and safe Requests navigation. See the separate
   [request lifecycle outcome](REQUEST_LIFECYCLE_ACTIVITY_OUTCOME.md).

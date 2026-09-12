@@ -120,7 +120,7 @@ export function createCandidateSchemaChecks({
       if (!seed) {
         verifyPreservation(previous.probe, probe, fixture);
         added = probe.ledger.length - previous.probe.ledger.length;
-        check(phase === 'upgraded' ? added > 0 : added === 0);
+        check(phase === 'upgraded' ? added >= 0 : added === 0);
       }
       if (phase !== 'baseline') {
         check(probe.ledger.some((row) => row.filename === expectedMigrationFilename));
@@ -129,7 +129,6 @@ export function createCandidateSchemaChecks({
         for (const index of probe.indexes) check(index.valid === true && index.ready === true
           && index.tableName === 'library_wanted_releases' && index.definition === expectedIndexDefinitions[index.name]);
       }
-      if (phase === 'upgraded') check(!previous.probe.ledger.some((row) => row.filename === expectedMigrationFilename));
       const dumpVersion = toolVersion(await execute(['pg_dump', '--version']), 'pg_dump');
       const restoreVersion = toolVersion(await execute(['pg_restore', '--version']), 'pg_restore');
       const [toolMajor, toolMinor] = dumpVersion.split('.').map(Number);

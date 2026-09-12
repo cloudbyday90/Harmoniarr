@@ -14,7 +14,7 @@ const inputs = { candidateImageRef, baselineImageRef, candidateRevision, baselin
 const args = ['--candidate-image', candidateImageRef, '--baseline-image', baselineImageRef,
   '--candidate-revision', candidateRevision, '--baseline-revision', baselineRevision, '--allow-local-images'];
 
-function acceptanceHarness({ cleanupFailure = false, missingProof = false } = {}) {
+function acceptanceHarness({ cleanupFailure = false, missingProof = false, migrationsAdded = 1 } = {}) {
   const images = [];
   const options = {
     ...inputs,
@@ -32,7 +32,7 @@ function acceptanceHarness({ cleanupFailure = false, missingProof = false } = {}
     createSchemaChecksFn: () => ({ checkPhase: async ({ phase }) => ({ migrationChecksumsVerified: true,
       migrationCount: phase === 'baseline' ? 97 : 98, indexesVerified: phase !== 'baseline',
       packagedToolsVerified: true, continuityVerified: ['upgraded', 'existing-data-restart'].includes(phase),
-      requestContinuityVerified: phase === 'upgraded', migrationsAdded: phase === 'upgraded' ? 1 : 0 }) }),
+      requestContinuityVerified: phase === 'upgraded', migrationsAdded: phase === 'upgraded' ? migrationsAdded : 0 }) }),
     validateFreshFn: async (settings) => {
       assert.equal(settings.buildImage, false);
       assert.equal(settings.imageRef, candidateImageRef);
@@ -77,6 +77,16 @@ test('cleanup or incomplete proof cannot produce a passed acceptance artifact', 
   for (const scenario of [{ cleanupFailure: true }, { missingProof: true }]) {
     await assert.rejects(validateDockerCandidateAcceptance(acceptanceHarness(scenario).options),
       (error) => error.code === 'candidate_acceptance_failed' && !error.message.includes('sensitive'));
+  }
+});
+
+test('patch release acceptance permits no new migration but rejects a shrinking ledger', async () => {
+  const evidence = await validateDockerCandidateAcceptance(acceptanceHarness({ migrationsAdded: 0 }).options);
+  assert.equal(evidence.checks.upgraded.migrationsAdded, 0);
+  assert.equal(evidence.checks.upgraded.requestContinuityVerified, true);
+  for (const migrationsAdded of [-1, null, '0']) {
+    await assert.rejects(validateDockerCandidateAcceptance(acceptanceHarness({ migrationsAdded }).options),
+      { code: 'candidate_acceptance_failed' });
   }
 });
 

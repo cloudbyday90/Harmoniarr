@@ -23,6 +23,7 @@ function summarizeRuntime(runtime, expectedImage, { continuity = false, candidat
   requireCheck(/^sha256:[a-f0-9]{64}$/.test(image.containerImageId));
   requireCheck(schema?.migrationChecksumsVerified === true && schema.packagedToolsVerified === true);
   requireCheck(Number.isSafeInteger(schema.migrationCount) && schema.migrationCount > 0);
+  requireCheck(Number.isSafeInteger(schema.migrationsAdded) && schema.migrationsAdded >= 0);
   if (candidate) requireCheck(schema.indexesVerified === true);
   if (continuity) requireCheck(schema.continuityVerified === true);
   requireCheck(runtime.healthBody?.pendingMigrations === 0);
@@ -43,7 +44,7 @@ function summarizeRuntime(runtime, expectedImage, { continuity = false, candidat
     pgRestoreVersion: schema.pgRestoreVersion ?? null,
     continuityVerified: schema.continuityVerified === true,
     requestContinuityVerified: schema.requestContinuityVerified === true,
-    migrationsAdded: Number.isSafeInteger(schema.migrationsAdded) ? schema.migrationsAdded : 0,
+    migrationsAdded: schema.migrationsAdded,
     pendingMigrations: 0,
   };
 }
@@ -98,7 +99,7 @@ export async function validateDockerCandidateAcceptance({
       requireCheck(fresh.embeddedPostgresPersistence && fresh.startupFailure?.serviceStatus === 'exited');
       requireCheck(upgrade.settingsPersistence?.persisted === true);
       const upgraded = summarizeRuntime(upgrade.upgradedRuntime, candidate, { continuity: true });
-      requireCheck(upgraded.migrationsAdded > 0 && upgraded.requestContinuityVerified);
+      requireCheck(upgraded.migrationsAdded >= 0 && upgraded.requestContinuityVerified);
       return {
         schemaVersion: 1,
         validationKind: 'immutable-candidate-acceptance',

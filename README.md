@@ -33,6 +33,8 @@ Harmoniarr is being planned as a self-hosted FOSS application with no SLA or ope
 - [Transactional request lifecycle outcome](docs/TRANSACTIONAL_REQUEST_LIFECYCLE_OUTCOME.md)
 - [Recipient eligibility consistency design](docs/RECIPIENT_ELIGIBILITY_CONSISTENCY_DESIGN.md)
 - [Recipient eligibility consistency outcome](docs/RECIPIENT_ELIGIBILITY_CONSISTENCY_OUTCOME.md)
+- [Published candidate trust design](docs/PUBLISHED_CANDIDATE_TRUST_DESIGN.md)
+- [Published candidate trust outcome](docs/PUBLISHED_CANDIDATE_TRUST_OUTCOME.md)
 - [Local workflow-script replay](docs/WORKFLOW_SCRIPT_LOCAL_REPLAY.md)
 
 ## Current Direction
