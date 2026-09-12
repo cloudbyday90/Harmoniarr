@@ -18,6 +18,7 @@
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createMusicBrainzCatalogService } from '../../../src/server/metadata/musicbrainz-catalog-service.js';
 import { createReleaseGroupTracklistService } from '../../../src/server/metadata/release-group-tracklist-service.js';
 
 function makeReleaseRow(overrides = {}) {
@@ -289,3 +290,23 @@ test('getReleaseGroupTracklist returns requestState from media_requests for sess
     requestedAt: '2026-01-01T00:00:00Z',
   });
 });
+
+for (const releaseGroup of [null, { id: 'rg-empty' }]) {
+  test(`tracklist fallback honors the real catalog page contract for ${releaseGroup ? 'an empty local group' : 'an uncached group'}`, async (t) => {
+    const browseReleaseGroupReleases = t.mock.fn(async (options) => {
+      assert.deepEqual(options, { releaseGroupId: 'mb-rg-sessions', limit: 25, offset: 0 });
+      return { 'release-count': 1, releases: [{ id: 'mb-sessions', title: 'Sessions', date: '2024' }] };
+    });
+    const service = createReleaseGroupTracklistService({
+      getPoolFn: async () => makePool({ releaseGroup }),
+      musicBrainzCatalogService: createMusicBrainzCatalogService({
+        musicBrainzClient: { browseReleaseGroupReleases },
+      }),
+    });
+    const result = await service.getReleaseGroupTracklist({ releaseGroupMbid: 'mb-rg-sessions' });
+    assert.equal(browseReleaseGroupReleases.mock.callCount(), 1);
+    assert.equal(result.source, 'musicbrainz');
+    assert.equal(result.release.title, 'Sessions');
+    assert.equal(result.allReleases[0].musicbrainzReleaseId, 'mb-sessions');
+  });
+}

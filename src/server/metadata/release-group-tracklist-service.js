@@ -245,7 +245,7 @@ export function createReleaseGroupTracklistService({
   async function buildMusicBrainzFallback({ releaseGroupMbid, preferReleaseMbid, pool: _pool }) {
     const mbData = await musicBrainzCatalogService.getReleaseGroupReleases({
       releaseGroupId: releaseGroupMbid,
-      limit: 100,
+      limit: 25,
     });
 
     // Fire-and-forget import so the release group is available next time.
