@@ -51,6 +51,8 @@ function getTimelineCategory(eventType) {
     case 'release_added':
       return { category: 'library', categoryLabel: 'Library' };
     case 'request_created':
+    case 'request_cancelled':
+    case 'request_reassigned':
     case 'request_fulfilled':
       return { category: 'requests', categoryLabel: 'Request' };
     case 'artist_monitored':

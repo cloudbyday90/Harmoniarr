@@ -49,6 +49,10 @@ Issue #4 platform evidence map: `docs/ISSUE_4_RELEASE_VALIDATION_EVIDENCE.md`
 - [ ] Repeat strict candidate acceptance with published registry digests, verified
   provenance, an accepted release baseline, and each supported platform. Local
   image evidence does not close the artifact-delivery trust gate.
+- [x] Restore cancellation/reassignment Activity registration, schema acceptance,
+  public payload projection, and safe Requests navigation. See the separate
+  [request lifecycle outcome](REQUEST_LIFECYCLE_ACTIVITY_OUTCOME.md). Delivery
+  remains best effort; atomic mutation/publication is a separate follow-up.
 
 - Atomic multi-user request creation now has PostgreSQL failure-injection proof
   for child, audit, and durable external-planning failures, plus Chromium proof

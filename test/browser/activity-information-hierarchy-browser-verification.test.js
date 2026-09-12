@@ -117,6 +117,35 @@ suite('Activity information hierarchy browser verification', () => {
     await browserRuntime?.cleanup();
   }, { timeout: integrationRuntimeConfig.suiteTeardownTimeoutMs });
 
+  test('request lifecycle events stay generic and keyboard links open the scoped request list', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) { t.skip(runtimeUnavailableReason); return; }
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      const events = ['request_cancelled', 'request_reassigned'].map((eventType, index) => ({
+        id: `lifecycle-${index}`, eventType, entityType: 'media_request', entityId: 'inaccessible-request',
+        entityTitle: 'PRIVATE TITLE', entityArtist: 'PRIVATE ARTIST',
+        extraPayload: { reason: 'PRIVATE REASON', requestedForUserId: 'PRIVATE RECIPIENT' },
+        occurredAt: '2026-09-12T00:00:00.000Z',
+      }));
+      await browserContext.route(/\/api\/v1\/activity\/feed(?:\?.*)?$/, async (route) => {
+        await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, events, total: 2 }) });
+      });
+      await page.goto(`${baseUrl}/app/activity/feed`, { waitUntil: 'domcontentloaded' });
+      await page.getByText('Music request cancelled', { exact: true }).waitFor();
+      await page.getByText('Music request reassigned', { exact: true }).waitFor();
+      await page.getByLabel('Show activity').selectOption('requests');
+      const links = page.getByRole('link', { name: 'Open requests', exact: true });
+      assert.equal(await links.count(), 2);
+      assert.equal((await page.locator('body').innerText()).includes('PRIVATE'), false);
+      await links.first().focus();
+      await page.keyboard.press('Enter');
+      await page.waitForURL('**/app/requests');
+      assert.equal(new URL(page.url()).pathname, '/app/requests');
+    }, { scenarioName: 'request_lifecycle_activity_navigation' });
+  });
+
   test('keeps normal history quiet while making repair states obvious at desktop and mobile widths', {
     timeout: integrationRuntimeConfig.scenarioTimeoutMs,
   }, async (t) => {

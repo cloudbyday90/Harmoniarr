@@ -17,10 +17,12 @@
  */
 
 import { createActivityEventStore } from './activity-event-store.js';
+import { projectRequestLifecycleActivity, requestLifecycleActivityTypes } from '../../shared/request-lifecycle-activity.js';
 
 const defaultLimit = 50;
 const maxLimit = 200;
 const allowedEventTypes = new Set([
+  ...requestLifecycleActivityTypes,
   'request_created',
   'download_completed',
   'release_added',
@@ -115,7 +117,7 @@ export function createActivityEventService({
         return;
       }
 
-      await activityEventStore.insertActivityEvent({
+      await activityEventStore.insertActivityEvent(projectRequestLifecycleActivity({
         eventType,
         actorUserId,
         entityType,
@@ -123,7 +125,7 @@ export function createActivityEventService({
         entityTitle,
         entityArtist,
         extraPayload,
-      });
+      }));
     } catch (error) {
       stderr.write(`[harmoniarr] activity event recording failed (${eventType}): ${error?.message ?? error}\n`);
     }
@@ -156,7 +158,7 @@ export function createActivityEventService({
 
     return {
       checkedAt: getNow().toISOString(),
-      events,
+      events: events.map(projectRequestLifecycleActivity),
       total: events.length,
     };
   }

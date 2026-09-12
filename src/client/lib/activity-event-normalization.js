@@ -23,6 +23,7 @@ import {
 } from '../../shared/release-activity-presentation.js';
 import { buildMusicQueueAddRecoveryPresentation } from '../../shared/music-queue-add-recovery-presentation.js';
 import { formatArtistPolicyActivityDetail } from './artist-policy-activity-presentation.js';
+import { getRequestLifecycleActivityLabel, isRequestLifecycleActivity, projectRequestLifecycleActivity } from '../../shared/request-lifecycle-activity.js';
 
 function getMusicQueueAddBlockerDetail({ addBlockerCode, recoveryReasonCode }) {
   return buildMusicQueueAddRecoveryPresentation({
@@ -46,6 +47,7 @@ function getMusicQueueAddBlockerDetail({ addBlockerCode, recoveryReasonCode }) {
  */
 export function normalizeActivityEvent(event) {
   if (!event) return {};
+  event = projectRequestLifecycleActivity(event);
   const releasePresentation = event.eventType === 'release_added'
     ? normalizeReleaseActivityPresentation({
       entityArtist: event.entityArtist ?? null,
@@ -92,6 +94,8 @@ function formatFallbackReleaseSubject(event) {
  * @returns {string}
  */
 export function getActivityEventLabel(event, currentUserId = null) {
+  const lifecycleLabel = getRequestLifecycleActivityLabel(event.eventType);
+  if (lifecycleLabel) return lifecycleLabel;
   const title = event.entityTitle ?? null;
   const artist = event.entityArtist ?? null;
   const requestedForUserId = event.extraPayload?.requestedForUserId ?? event.actorUserId ?? null;
@@ -323,6 +327,7 @@ export function getActivityEventDetail(event) {
  * @returns {string}
  */
 export function getActivityEventIcon(eventType) {
+  if (isRequestLifecycleActivity(eventType)) return 'music-request';
   switch (eventType) {
     case 'request_created':
       return 'music-request';

@@ -18,6 +18,7 @@
 
 import { createApiError } from '../auth.js';
 import { recordAuditEvent } from '../audit.js';
+import { publishRequestLifecycleActivityEvent } from '../activity/request-lifecycle-activity-event-service.js';
 import { buildMediaRequestTargetEligibility } from '../media-request-target-eligibility.js';
 import { createMetadataSearchService } from '../metadata/metadata-search-service.js';
 import { normalizeMetadataReleaseDateForDateColumn } from '../metadata/metadata-release-date-normalization.js';
@@ -719,16 +720,12 @@ export function createLibraryMediaRequestService({
       userAgent: requestMetadata?.userAgent ?? null,
     });
 
-    if (typeof recordActivityEventFn === 'function') {
-      void recordActivityEventFn({
-        actorUserId,
-        entityArtist: existingRequest.artistName ?? null,
-        entityId: mediaRequestId,
-        entityTitle: existingRequest.releaseTitle ?? existingRequest.artistName ?? null,
-        entityType: 'media_request',
-        eventType: 'request_reassigned',
-      }).catch(() => {});
-    }
+    publishRequestLifecycleActivityEvent({
+      actorUserId,
+      eventType: 'request_reassigned',
+      mediaRequestId,
+      recordActivityEventFn,
+    });
 
     return reassignedRequest;
   }
@@ -886,16 +883,12 @@ export function createLibraryMediaRequestService({
       }).catch(() => {});
     }
 
-    if (typeof recordActivityEventFn === 'function') {
-      void recordActivityEventFn({
-        actorUserId,
-        entityArtist: existingRequest.artistName ?? null,
-        entityId: mediaRequestId,
-        entityTitle: existingRequest.releaseTitle ?? existingRequest.artistName ?? null,
-        entityType: 'media_request',
-        eventType: 'request_cancelled',
-      }).catch(() => {});
-    }
+    publishRequestLifecycleActivityEvent({
+      actorUserId,
+      eventType: 'request_cancelled',
+      mediaRequestId,
+      recordActivityEventFn,
+    });
 
     const cancelledRequest = await mediaRequestStore.getMediaRequestById({ mediaRequestId });
     return {

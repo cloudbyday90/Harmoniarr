@@ -17,6 +17,7 @@
  */
 
 import { getArtistPolicyActivityRouteTarget } from './artist-policy-activity-presentation.js';
+import { isRequestLifecycleActivity } from '../../shared/request-lifecycle-activity.js';
 import { buildMusicQueueAddRecoveryPresentation } from '../../shared/music-queue-add-recovery-presentation.js';
 import {
   SETTINGS_RECOVERY_CONTEXT,
@@ -25,6 +26,9 @@ import {
 } from './settings-recovery-handoff.js';
 
 export function buildActivityEventLinkTarget(event = {}) {
+  if (isRequestLifecycleActivity(event.eventType)) {
+    return { label: 'Open requests', to: { name: 'request-music' } };
+  }
   if (event.eventType === 'artist_policy_saved') {
     return getArtistPolicyActivityRouteTarget(event.extraPayload ?? {});
   }
