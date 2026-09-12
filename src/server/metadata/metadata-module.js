@@ -172,6 +172,7 @@ export function createMetadataModule({
       getLatestOperatorArtistReconciliationSnapshot: resolvedOperatorArtistReconciliationSnapshotService.getLatestOperatorArtistReconciliationSnapshot,
       getLatestRunByOperatorArtist: resolvedOperatorArtistReconciliationRunStore.getLatestRunByOperatorArtist,
       getMetadataArtist: resolvedMetadataReadService.getArtist,
+      getMetadataArtistProjectionInputs: resolvedMetadataReadService.getArtistProjectionInputs,
       getOperatorArtistMonitoring: resolvedOperatorArtistMonitoringService.getOperatorArtistMonitoring,
       getPendingRunByOperatorArtist: resolvedOperatorArtistReconciliationRunStore.getPendingRunByOperatorArtist,
       getRunningRunByOperatorArtist: resolvedOperatorArtistReconciliationRunStore.getRunningRunByOperatorArtist,

@@ -96,6 +96,7 @@ function buildOverview({
 
 export function createOperatorArtistProjectionService({
   getMetadataArtist = null,
+  getMetadataArtistProjectionInputs = null,
   listLibraryReleaseReconciliationsByMetadataReleaseIds = null,
   getOperatorArtistMonitoring = null,
   getLatestOperatorArtistReconciliationSnapshot = null,
@@ -127,6 +128,8 @@ export function createOperatorArtistProjectionService({
     ?? createOperatorTrackOverrideStore();
 
   const readMetadataArtist = getMetadataArtist ?? resolvedMetadataReadService.getArtist;
+  const readSummaryInputs = getMetadataArtistProjectionInputs ?? getMetadataArtist
+    ?? resolvedMetadataReadService.getArtistProjectionInputs ?? readMetadataArtist;
   const readLibraryReleaseReconciliations = listLibraryReleaseReconciliationsByMetadataReleaseIds
     ?? resolvedLibraryReleaseReconciliationStore.listReconciliationsByMetadataReleaseIds;
   const readOperatorArtistMonitoring = getOperatorArtistMonitoring
@@ -156,7 +159,7 @@ export function createOperatorArtistProjectionService({
       releaseGroupSelections,
       trackOverrides,
     ] = await Promise.all([
-      readMetadataArtist({ artistId: metadataArtistId }),
+      (readView === 'summary' ? readSummaryInputs : readMetadataArtist)({ artistId: metadataArtistId }),
       readOperatorArtistMonitoring({ appUserId, metadataArtistId }),
       readLatestSnapshot({ appUserId, metadataArtistId }),
       readLatestRun({ appUserId, metadataArtistId }),

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
+import { setImmediate as settleAsyncWork } from 'node:timers/promises';
 
 function makeDetail(overrides = {}) {
   return {
@@ -101,8 +102,9 @@ describe('useMediaRequestDetail SWR', () => {
     detail.destroy();
   });
 
-  test('polling stops when fulfillment becomes inactive', async () => {
+  test('polling stops when fulfillment becomes inactive', async (t) => {
     const { useMediaRequestDetail } = await import('../../src/client/composables/useMediaRequestDetail.js');
+    t.mock.timers.enable({ apis: ['setTimeout'] });
 
     let callCount = 0;
     const fetchDetailFn = async () => {
@@ -122,16 +124,30 @@ describe('useMediaRequestDetail SWR', () => {
     };
 
     const detail = useMediaRequestDetail({ fetchDetailFn, pollIntervalMs: 30 });
+    t.after(() => detail.destroy());
 
     await detail.load({ mediaRequestId: 'req-1' });
+    assert.equal(callCount, 1);
 
-    await new Promise((resolve) => { setTimeout(resolve, 200); });
-    const countAfterPoll = callCount;
+    t.mock.timers.tick(29);
+    assert.equal(callCount, 1, 'poll does not start before the interval');
+    t.mock.timers.tick(1);
+    // Mock ticks invoke the timer; its async load and rescheduling still need to settle.
+    await settleAsyncWork();
+    assert.equal(callCount, 2);
+    assert.equal(detail.mediaRequest.value.fulfillmentStatus.code, 'downloading');
 
-    await new Promise((resolve) => { setTimeout(resolve, 150); });
-    assert.equal(callCount, countAfterPoll, 'polling stopped after fulfillment became inactive');
+    t.mock.timers.tick(30);
+    await settleAsyncWork();
+    assert.equal(callCount, 3);
+    assert.equal(detail.mediaRequest.value.fulfillmentStatus.code, 'fulfilled');
+    assert.equal(detail.isRevalidating.value, false);
 
-    detail.destroy();
+    for (const elapsed of [30, 150, 1000]) {
+      t.mock.timers.tick(elapsed);
+      await settleAsyncWork();
+      assert.equal(callCount, 3, 'polling stopped after fulfillment became inactive');
+    }
   });
 
   test('destroy stops polling', async () => {

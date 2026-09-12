@@ -234,3 +234,59 @@ test('createMetadataModule shares an injected MusicBrainz client with default ca
     },
   ]);
 });
+
+test('createMetadataModule routes summary projections to compact inputs and default projections to full metadata', async () => {
+  const reads = [];
+  const artist = { id: 'artist-1', name: 'Example Artist' };
+  const compactInputs = {
+    artist,
+    aliases: [],
+    detectionEvents: [],
+    releaseGroups: [{ id: 'group-1', primaryType: 'Album' }],
+    releases: [],
+  };
+  const fullInputs = {
+    ...compactInputs,
+    releaseGroups: [{ id: 'group-1', primaryType: 'Album', title: 'Full album title', editionCount: 1 }],
+    releases: [{ id: 'edition-1', releaseGroupId: 'group-1', title: 'Full edition title', isCanonical: false }],
+  };
+  const metadataModule = createMetadataModule({
+    metadataReadService: {
+      getArtist: async (input) => {
+        reads.push({ method: 'full', input });
+        return fullInputs;
+      },
+      getArtistProjectionInputs: async (input) => {
+        reads.push({ method: 'compact', input });
+        return compactInputs;
+      },
+    },
+    operatorArtistMonitoringService: { getOperatorArtistMonitoring: async () => null },
+    operatorArtistReconciliationSnapshotService: { getLatestOperatorArtistReconciliationSnapshot: async () => null },
+    operatorArtistReconciliationRunStore: {
+      getLatestRunByOperatorArtist: async () => null,
+      getPendingRunByOperatorArtist: async () => null,
+      getRunningRunByOperatorArtist: async () => null,
+    },
+    operatorReleaseGroupSelectionStore: { listOperatorReleaseGroupSelections: async () => [] },
+    operatorTrackOverrideStore: { listOperatorTrackOverrides: async () => [] },
+  });
+  const input = { appUserId: 'operator-1', metadataArtistId: artist.id };
+
+  const summary = await metadataModule.routeDependencies.getOperatorArtistProjection({ ...input, view: 'summary' });
+  assert.deepEqual(reads, [{ method: 'compact', input: { artistId: artist.id } }]);
+  assert.deepEqual(summary.artist, artist);
+  assert.equal(summary.operator.overview.releaseGroupCount, 1);
+  assert.equal(Object.hasOwn(summary, 'releaseGroups'), false);
+  assert.equal(Object.hasOwn(summary, 'releases'), false);
+
+  const full = await metadataModule.routeDependencies.getOperatorArtistProjection(input);
+  assert.deepEqual(reads, [
+    { method: 'compact', input: { artistId: artist.id } },
+    { method: 'full', input: { artistId: artist.id } },
+  ]);
+  assert.equal(full.releaseGroups[0].title, 'Full album title');
+  assert.deepEqual(full.releases, fullInputs.releases);
+  const { releaseGroups: _groups, releases: _releases, ...fullSummary } = full;
+  assert.deepEqual(summary, fullSummary);
+});

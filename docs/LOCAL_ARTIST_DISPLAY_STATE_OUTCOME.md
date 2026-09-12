@@ -1,5 +1,7 @@
 # Local artist display and saved-state outcome
 
+Follow-up: [compact global inputs](COMPACT_OPERATOR_SUMMARY_OUTCOME.md) records the subsequent server-read optimization. The measurements and limits below describe the display-separation change.
+
 ## Delivered
 
 Artist Detail now opts into an operator summary that retains complete saved monitoring, release-group selections, track overrides, coverage, overview, and revision state while omitting catalog arrays. Imported artists with local groups load actor-scoped display pages separately. Empty local catalogs retain the existing remote fallback; legacy full responses remain supported.

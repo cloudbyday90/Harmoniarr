@@ -1,20 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
+import { setImmediate as settleAsyncWork } from 'node:timers/promises';
 import { useMediaRequestPipeline } from '../../src/client/composables/useMediaRequestPipeline.js';
 
 function makeCandidates(...statuses) {
   return statuses.map((status, i) => ({ id: `cand-${i}`, status, username: `user${i}` }));
-}
-
-async function waitFor(predicate, { timeoutMs = 250, intervalMs = 10 } = {}) {
-  const deadline = Date.now() + timeoutMs;
-
-  while (Date.now() < deadline) {
-    if (predicate()) return;
-    await new Promise((resolve) => { setTimeout(resolve, intervalMs); });
-  }
-
-  assert.fail('Timed out waiting for the expected state');
 }
 
 describe('useMediaRequestPipeline SWR', () => {
@@ -84,7 +74,8 @@ describe('useMediaRequestPipeline SWR', () => {
     pipeline.destroy();
   });
 
-  test('polling stops when all candidates reach terminal status', async () => {
+  test('polling stops when all candidates reach terminal status', async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
     let callCount = 0;
     const fetchPipelineFn = async () => {
       callCount += 1;
@@ -95,16 +86,30 @@ describe('useMediaRequestPipeline SWR', () => {
     };
 
     const pipeline = useMediaRequestPipeline({ fetchPipelineFn, pollIntervalMs: 30 });
+    t.after(() => pipeline.destroy());
 
     await pipeline.load({ mediaRequestId: 'req-1' });
+    assert.equal(callCount, 1);
 
-    await waitFor(() => callCount >= 3);
-    const countAfterTerminal = callCount;
+    t.mock.timers.tick(29);
+    assert.equal(callCount, 1, 'poll does not start before the interval');
+    t.mock.timers.tick(1);
+    // Mock ticks invoke the timer; its async load and rescheduling still need to settle.
+    await settleAsyncWork();
+    assert.equal(callCount, 2);
+    assert.deepEqual(pipeline.candidates.value, makeCandidates('downloading'));
 
-    await new Promise((resolve) => { setTimeout(resolve, 100); });
-    assert.equal(callCount, countAfterTerminal, 'polling stopped after candidates became terminal');
+    t.mock.timers.tick(30);
+    await settleAsyncWork();
+    assert.equal(callCount, 3);
+    assert.deepEqual(pipeline.candidates.value, makeCandidates('applied'));
+    assert.equal(pipeline.isRevalidating.value, false);
 
-    pipeline.destroy();
+    for (const elapsed of [30, 150, 1000]) {
+      t.mock.timers.tick(elapsed);
+      await settleAsyncWork();
+      assert.equal(callCount, 3, 'polling stopped after candidates became terminal');
+    }
   });
 
   test('destroy stops polling', async () => {

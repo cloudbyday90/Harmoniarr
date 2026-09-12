@@ -19,6 +19,7 @@
 import { mapMetadataReleaseGroup as mapReleaseGroup } from './metadata-release-group-presentation.js';
 import { mapMetadataRelease as mapRelease } from './metadata-release-presentation.js';
 import { normalizeMetadataArtistReadView } from './metadata-artist-read-view.js';
+import { createMetadataArtistProjectionStore } from './metadata-artist-projection-store.js';
 import { getPool } from '../database.js';
 import { createMetadataMonitoredArtistStore } from './metadata-monitored-artist-store.js';
 import { createMetadataReleaseDetectionService } from './metadata-release-detection-service.js';
@@ -124,6 +125,7 @@ function mapTrack(row) {
 export function createMetadataReadService({
   pool = getPool(),
   metadataReleaseDetectionService = createMetadataReleaseDetectionService(),
+  metadataArtistProjectionStore = createMetadataArtistProjectionStore({ getPoolFn: () => pool }),
   metadataMonitoredArtistStore = createMetadataMonitoredArtistStore({ getPoolFn: () => pool }),
 } = {}) {
   async function buildArtistPayload(artist) {
@@ -157,6 +159,27 @@ export function createMetadataReadService({
     }
 
     return buildArtistPayload(artist);
+  }
+
+  // Internal complete identities for summary calculations, not a public catalog representation.
+  async function getArtistProjectionInputs({ artistId }) {
+    const artist = await getMetadataArtistById(artistId, pool);
+    if (!artist) throw createMetadataNotFoundError('artist', artistId);
+    const [aliases, detectionEventsPage, catalog] = await Promise.all([
+      listMetadataArtistAliases(artist.id, pool),
+      metadataReleaseDetectionService.listDetectionEventsPageForArtist({ metadataArtistId: artist.id }),
+      metadataArtistProjectionStore.readArtistCatalogInputs(artist.id),
+    ]);
+    return {
+      artist: mapArtist(artist),
+      aliases: aliases.map(mapAlias),
+      detectionEvents: detectionEventsPage.entries,
+      detectionEventsPageInfo: detectionEventsPage.pageInfo,
+      releaseGroups: catalog.map((row) => ({ id: row.id, primaryType: row.primary_type })),
+      releases: catalog.filter((row) => row.canonical_release_id).map((row) => ({
+        id: row.canonical_release_id, releaseGroupId: row.id, isCanonical: true,
+      })),
+    };
   }
 
   async function getArtistByMusicBrainzId({ musicBrainzArtistId, view }) {
@@ -288,6 +311,7 @@ export function createMetadataReadService({
   }
 
   return {
+    getArtistProjectionInputs,
     getArtistDetectionEvents,
     getArtist,
     getArtistByMusicBrainzId,
