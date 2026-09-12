@@ -82,7 +82,7 @@ import { createRuntimeResourceService } from './runtime-resource-service.js';
 import { loadSettings } from './settings.js';
 import { createFidelityThresholdLoaders } from './fidelity-threshold-settings.js';
 import { createSettingsService } from './settings-service.js';
-import { shouldSendNotification } from './notification/notification-preference-service.js';
+import { createNotificationPreferenceDispatchService } from './notification/notification-preference-dispatch-service.js';
 import { broadcastAdminNotification } from './notification/notification-admin-dispatch-service.js';
 import { createNotificationDispatchCooldownService } from './notification/notification-dispatch-cooldown-service.js';
 import { createNotificationDispatchHistoryService } from './notification/notification-dispatch-history-service.js';
@@ -324,6 +324,7 @@ export function createApp({
     listAppUsers: appUserModule.appUserService.listAppUsers,
     sendNotificationToUser: pushModule.pushNotificationDispatchService.sendNotificationToUser,
   };
+  const preferenceDispatchService = createNotificationPreferenceDispatchService(notificationDispatchDeps);
   const householdNotificationCooldowns = Object.freeze({
     artistMonitoredMs: 30 * 60 * 1000,
     downloadCompletedMs: 10 * 60 * 1000,
@@ -413,24 +414,15 @@ export function createApp({
         url: '/app/library',
       },
     }),
-    sendFulfillmentNotificationFn: async ({ userId }) => {
-      const allowed = await shouldSendNotification({
-        category: 'requestFulfilled',
-        getUserPreferences: appUserModule.appUserService.getUserPreferences,
-        userId,
-      });
-      if (!allowed) return { sent: 0, failed: 0, removed: 0 };
-
-      return pushModule.pushNotificationDispatchService.sendNotificationToUser({
-        eventType: 'requestFulfilled',
-        payload: {
-          body: 'Your requested music has been added to your library.',
-          title: 'Music request ready',
-          url: '/app/my-requests',
-        },
-        userId,
-      });
-    },
+    sendFulfillmentNotificationFn: ({ userId }) => preferenceDispatchService.sendNotification({
+      category: 'requestFulfilled',
+      userId,
+      payload: {
+        body: 'Your requested music has been added to your library.',
+        title: 'Music request ready',
+        url: '/app/my-requests',
+      },
+    }),
     mediaInspectionService: createMediaInspectionService({
       ffprobeBin: ffprobeBinary,
       getMediaToolingStatus: mediaToolingStatusService.getStatus,

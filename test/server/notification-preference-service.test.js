@@ -18,7 +18,7 @@
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { shouldSendNotification } from '../../src/server/notification/notification-preference-service.js';
+import { getNotificationPreferenceDecision, shouldSendNotification } from '../../src/server/notification/notification-preference-service.js';
 import { buildDefaultNotificationPreferences } from '../../src/server/notification/notification-preference-constants.js';
 
 const ALL_ENABLED = buildDefaultNotificationPreferences();
@@ -51,13 +51,13 @@ test('shouldSendNotification returns false for unknown category', async () => {
   assert.equal(result, false);
 });
 
-test('shouldSendNotification returns true (fail-open) when getUserPreferences throws', async () => {
+test('shouldSendNotification returns false when getUserPreferences throws', async () => {
   const result = await shouldSendNotification({
     category: 'requestFulfilled',
     getUserPreferences: async () => { throw new Error('db down'); },
     userId: 'user-1',
   });
-  assert.equal(result, true);
+  assert.equal(result, false);
 });
 
 test('shouldSendNotification defaults to true when notificationPreferences is missing', async () => {
@@ -88,3 +88,56 @@ test('shouldSendNotification checks trustOverride for admin category', async () 
   });
   assert.equal(result, false);
 });
+
+
+for (const [label, preferences] of [
+  ['null', null], ['undefined', undefined], ['array', []], ['string', 'enabled'],
+  ['number', 1], ['boolean', true], ['function', () => ({})], ['Date', new Date(0)],
+]) {
+  test(`notification preference decision fails closed for a malformed ${label} read`, async () => {
+    const options = { category: 'artistMonitored', userId: 'user-1', getUserPreferences: async () => preferences };
+    assert.deepEqual(await getNotificationPreferenceDecision(options), { allowed: false, failed: true });
+    assert.equal(await shouldSendNotification(options), false);
+  });
+}
+
+test('notification preference decision contains read errors and distinguishes them from disabled categories', async (t) => {
+  const getUserPreferences = t.mock.fn(async ({ userId }) => {
+    assert.equal(userId, 'user-1');
+    throw new Error('private credential and preference data');
+  });
+  assert.deepEqual(await getNotificationPreferenceDecision({ category: 'artistMonitored', userId: 'user-1', getUserPreferences }),
+    { allowed: false, failed: true });
+  assert.equal(getUserPreferences.mock.callCount(), 1);
+  assert.deepEqual(await getNotificationPreferenceDecision({ category: 'artistMonitored', userId: 'user-1',
+    getUserPreferences: async () => ({ notificationPreferences: { artistMonitored: false } }),
+  }), { allowed: false, failed: false });
+  getUserPreferences.mock.resetCalls();
+  assert.deepEqual(await getNotificationPreferenceDecision({ category: 'unknown', userId: 'user-1', getUserPreferences }),
+    { allowed: false, failed: false });
+  assert.equal(getUserPreferences.mock.callCount(), 0);
+});
+
+test('notification preference decision preserves enabled defaults after a valid preference read', async () => {
+  for (const preferences of [{}, Object.create(null), { notificationPreferences: Object.create(null) }, { notificationPreferences: {} }, { notificationPreferences: { artistMonitored: true } }]) {
+    assert.deepEqual(await getNotificationPreferenceDecision({ category: 'artistMonitored', userId: 'user-1',
+      getUserPreferences: async () => preferences,
+    }), { allowed: true, failed: false });
+  }
+});
+
+
+for (const [label, notificationPreferences] of [
+  ['null category map', null], ['array category map', []], ['Date category map', new Date(0)], ['string category map', 'enabled'],
+  ['number category map', 1], ['boolean category map', true],
+  ['null category value', { artistMonitored: null }], ['string category value', { artistMonitored: 'false' }],
+  ['numeric category value', { artistMonitored: 1 }], ['object category value', { artistMonitored: {} }],
+]) {
+  test(`notification preference decision rejects a malformed ${label} instead of restoring enabled defaults`, async () => {
+    const input = { category: 'artistMonitored', userId: 'user-1',
+      getUserPreferences: async () => ({ notificationPreferences }),
+    };
+    assert.deepEqual(await getNotificationPreferenceDecision(input), { allowed: false, failed: true });
+    assert.equal(await shouldSendNotification(input), false);
+  });
+}

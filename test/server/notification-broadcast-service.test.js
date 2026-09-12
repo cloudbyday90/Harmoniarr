@@ -46,17 +46,19 @@ test('notification broadcast counts rejected and downstream-failed recipients on
   ]);
 });
 
-test('notification broadcast reports a failed preference read while preserving the existing send fallback', async (t) => {
-  const sendNotificationToUser = t.mock.fn(async () => ({ failed: 3, sent: 1 }));
-  const markDispatched = t.mock.fn(async () => {});
+test('notification broadcast does not check cooldown, send or mark after a failed preference read', async (t) => {
+  const sendNotificationToUser = t.mock.fn();
+  const shouldDispatch = t.mock.fn();
+  const markDispatched = t.mock.fn();
   const result = await broadcastNotification(options({
     getUserPreferences: async () => { throw new Error('private preferences read failed'); },
     sendNotificationToUser,
-    dispatchCooldownService: { markDispatched },
+    dispatchCooldownService: { shouldDispatch, markDispatched },
   }));
-  assert.deepEqual(result, { failed: 1 }, 'Preference and send failures count once for the same recipient');
-  assert.equal(sendNotificationToUser.mock.callCount(), 1);
-  assert.equal(markDispatched.mock.callCount(), 1);
+  assert.deepEqual(result, { failed: 1 });
+  assert.equal(shouldDispatch.mock.callCount(), 0);
+  assert.equal(sendNotificationToUser.mock.callCount(), 0);
+  assert.equal(markDispatched.mock.callCount(), 0);
 });
 
 test('notification broadcast keeps normal preference, explicit suppression and cooldown skips successful', async (t) => {
@@ -101,18 +103,68 @@ test('notification broadcast reports cooldown failures without changing successf
   assert.equal(markDispatched.mock.callCount(), 2);
 });
 
-test('notification broadcast reports a degraded preference read even when an existing cooldown suppresses sending', async (t) => {
+test('notification broadcast reports a preference failure without consulting an existing cooldown', async (t) => {
   const sendNotificationToUser = t.mock.fn();
+  const shouldDispatch = t.mock.fn(async () => false);
   const result = await broadcastNotification(options({
     getUserPreferences: async () => { throw new Error('unavailable'); },
-    dispatchCooldownService: { shouldDispatch: async () => false },
+    dispatchCooldownService: { shouldDispatch },
     sendNotificationToUser,
   }));
   assert.deepEqual(result, { failed: 1 });
   assert.equal(sendNotificationToUser.mock.callCount(), 0);
+  assert.equal(shouldDispatch.mock.callCount(), 0);
 });
 
 test('notification broadcast returns zero failures for empty recipients and successful void send callbacks', async () => {
   assert.deepEqual(await broadcastNotification(options({ listAppUsers: async () => [] })), { failed: 0 });
   assert.deepEqual(await broadcastNotification(options({ sendNotificationToUser: () => {} })), { failed: 0 });
+});
+
+
+for (const [label, preferences] of [['null', null], ['undefined', undefined], ['array', []], ['string', 'enabled'], ['number', 1], ['boolean', true],
+  ['category map', { notificationPreferences: null }],
+  ['category value', { notificationPreferences: { artistMonitored: 'false' } }]]) {
+  test(`notification broadcast isolates a malformed ${label} preference read while sending to healthy recipients`, async (t) => {
+    const sendNotificationToUser = t.mock.fn(async () => ({ sent: 1, failed: 0 }));
+    const shouldDispatch = t.mock.fn(async () => true);
+    const markDispatched = t.mock.fn();
+    const result = await broadcastNotification(options({
+      listAppUsers: async () => [{ id: 'failed' }, { id: 'healthy' }],
+      getUserPreferences: async ({ userId }) => userId === 'failed' ? preferences : {},
+      sendNotificationToUser,
+      dispatchCooldownService: { shouldDispatch, markDispatched },
+    }));
+    assert.deepEqual(result, { failed: 1 });
+    for (const callback of [shouldDispatch, sendNotificationToUser, markDispatched]) {
+      assert.deepEqual(callback.mock.calls.map(({ arguments: [input] }) => input.userId), ['healthy']);
+    }
+  });
+}
+
+test('a later broadcast reads recovered preferences anew without suppressing healthy recipients during the outage', async (t) => {
+  let recovered = false;
+  const getUserPreferences = t.mock.fn(async ({ userId }) => {
+    if (userId === 'recovering' && !recovered) throw new Error('private storage failure');
+    return { notificationPreferences: { artistMonitored: true } };
+  });
+  const shouldDispatch = t.mock.fn(async () => true);
+  const sendNotificationToUser = t.mock.fn(async () => ({ sent: 1, failed: 0 }));
+  const markDispatched = t.mock.fn();
+  const input = options({
+    listAppUsers: async () => [{ id: 'recovering' }, { id: 'healthy' }],
+    getUserPreferences, sendNotificationToUser,
+    dispatchCooldownService: { shouldDispatch, markDispatched },
+  });
+  assert.deepEqual(await broadcastNotification(input), { failed: 1 });
+  for (const callback of [shouldDispatch, sendNotificationToUser, markDispatched]) {
+    assert.deepEqual(callback.mock.calls.map(({ arguments: [entry] }) => entry.userId), ['healthy']);
+    callback.mock.resetCalls();
+  }
+  recovered = true;
+  assert.deepEqual(await broadcastNotification(input), { failed: 0 });
+  for (const callback of [shouldDispatch, sendNotificationToUser, markDispatched]) {
+    assert.deepEqual(callback.mock.calls.map(({ arguments: [entry] }) => entry.userId).sort(), ['healthy', 'recovering']);
+  }
+  assert.equal(getUserPreferences.mock.callCount(), 4);
 });

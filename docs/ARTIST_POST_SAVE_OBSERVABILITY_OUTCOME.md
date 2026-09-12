@@ -2,6 +2,8 @@
 
 Follow-up: required artist Activity now commits inside the save transaction; see [transactional Activity outcome](ARTIST_TRANSACTIONAL_ACTIVITY_OUTCOME.md). The evidence below describes the earlier best-effort Activity implementation. Notification, refresh, and projection diagnostics remain applicable.
 
+Notification follow-up: [preference read failures now block initial dispatch](NOTIFICATION_PREFERENCE_FAILURE_OUTCOME.md); the earlier degraded-send behavior below is historical.
+
 ## Delivered
 
 Artist save follow-ups now run through a small ESM service after the transaction commits. Activity writes, monitor notifications, metadata refresh dispatch, and projection reads produce fixed structured warning evidence when they fail. A refresh already in progress remains an expected coalesced outcome. The successful save, snapshot revision, and queued reconciliation response remain authoritative.

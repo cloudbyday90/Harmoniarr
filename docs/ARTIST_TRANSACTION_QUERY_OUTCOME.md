@@ -18,6 +18,6 @@ Use sequential awaits on the normal transaction client and retain Promise.all fo
 
 No UI feedback or focus behavior changes, so no new W3C interaction mechanism or browser test is needed. Durable Activity and external notification guarantees remain as documented in the preceding designs.
 
-Next review notification preference read failures: `shouldSendNotification` currently permits sending when preferences cannot be read. For ordinary notifications, prefer preserving the user's potential opt-out by deferring delivery and reporting the degraded read. Define any critical-alert exception explicitly rather than silently allowing all categories.
+Follow-up implemented: [notification preference failure handling](NOTIFICATION_PREFERENCE_FAILURE_OUTCOME.md). The original next-step finding was: `shouldSendNotification` currently permits sending when preferences cannot be read. For ordinary notifications, prefer preserving the user's potential opt-out by deferring delivery and reporting the degraded read. Define any critical-alert exception explicitly rather than silently allowing all categories.
 
 See the [design, official September 2026 research, alternatives, and PR disposition](ARTIST_TRANSACTION_QUERY_DESIGN.md).

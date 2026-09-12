@@ -19,34 +19,30 @@
 import { normalizeUserPreferences } from '../app-user-service.js';
 import { NOTIFICATION_CATEGORY_KEYS } from './notification-preference-constants.js';
 
-/**
- * Determine whether a push notification should be sent for the given category
- * to the given user.
- *
- * Reads the user's `notificationPreferences` and returns `true` when the
- * category is enabled (the default). Returns `false` when the user has
- * explicitly disabled the category or when the category is not recognised.
- *
- * Never throws — on any read error the notification is allowed through
- * (fail-open) so that misconfigured preferences never silently suppress
- * important alerts.
- *
- * @param {object} options
- * @param {string} options.userId
- * @param {string} options.category - A key from NOTIFICATION_CATEGORIES.
- * @param {function} options.getUserPreferences - Injectable preference reader.
- * @returns {Promise<boolean>}
- */
-export async function shouldSendNotification({ category, getUserPreferences, userId }) {
-  if (!NOTIFICATION_CATEGORY_KEYS.includes(category)) {
-    return false;
-  }
+const isRecord = (value) => value !== null && typeof value === 'object'
+  && [Object.prototype, null].includes(Object.getPrototypeOf(value));
 
+/** A missing preference retains its default; an unavailable or malformed read cannot authorize delivery. */
+export async function getNotificationPreferenceDecision({ category, getUserPreferences, userId }) {
+  if (!NOTIFICATION_CATEGORY_KEYS.includes(category)) return { allowed: false, failed: false };
   try {
     const preferences = await getUserPreferences({ userId });
-    const normalised = normalizeUserPreferences(preferences);
-    return Boolean(normalised.notificationPreferences?.[category]);
+    if (!isRecord(preferences)) return { allowed: false, failed: true };
+    if (Object.hasOwn(preferences, 'notificationPreferences')) {
+      const notificationPreferences = preferences.notificationPreferences;
+      if (!isRecord(notificationPreferences)
+        || (Object.hasOwn(notificationPreferences, category) && typeof notificationPreferences[category] !== 'boolean')) {
+        return { allowed: false, failed: true };
+      }
+    }
+    const normalized = normalizeUserPreferences(preferences);
+    return { allowed: normalized.notificationPreferences[category] === true, failed: false };
   } catch {
-    return true;
+    return { allowed: false, failed: true };
   }
+}
+
+/** Compatibility helper for callers that only need the allow/deny decision. */
+export async function shouldSendNotification(input) {
+  return (await getNotificationPreferenceDecision(input)).allowed;
 }

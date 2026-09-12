@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { shouldSendNotification } from './notification-preference-service.js';
+import { getNotificationPreferenceDecision } from './notification-preference-service.js';
 
 /**
  * Broadcast a push notification to every matching user with the given category
@@ -70,20 +70,8 @@ export async function broadcastNotification({
         return;
       }
 
-      let preferenceReadFailed = false;
-      const allowed = await shouldSendNotification({
-        category,
-        getUserPreferences: async (input) => {
-          try {
-            return await getUserPreferences(input);
-          } catch (error) {
-            preferenceReadFailed = true;
-            throw error;
-          }
-        },
-        userId: recipient.id,
-      });
-      if (!allowed) return;
+      const decision = await getNotificationPreferenceDecision({ category, getUserPreferences, userId: recipient.id });
+      if (!decision.allowed) return { failed: decision.failed };
 
       if (dispatchCooldownService?.shouldDispatch && !await dispatchCooldownService.shouldDispatch({
         category,
@@ -91,7 +79,7 @@ export async function broadcastNotification({
         cooldownMs,
         userId: recipient.id,
       })) {
-        return { failed: preferenceReadFailed };
+        return { failed: false };
       }
 
       const result = await sendNotificationToUser({
@@ -107,7 +95,7 @@ export async function broadcastNotification({
         payload,
         userId: recipient.id,
       });
-      return { failed: preferenceReadFailed || (Number.isFinite(result?.failed) && result.failed > 0) };
+      return { failed: Number.isFinite(result?.failed) && result.failed > 0 };
     }),
   );
 
