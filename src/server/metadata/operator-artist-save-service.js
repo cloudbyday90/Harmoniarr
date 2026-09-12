@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createOperatorArtistActivityService } from './operator-artist-activity-service.js';
 import { createOperatorArtistPostSaveService } from './operator-artist-post-save-service.js';
 import { getPool } from '../database.js';
 import { normalizeExpectedSnapshotRevision } from './operator-artist-snapshot-revision.js';
@@ -386,7 +387,7 @@ export function createOperatorArtistSaveService({
   operatorArtistReconciliationSnapshotStore = createOperatorArtistReconciliationSnapshotStore(),
   operatorReleaseGroupSelectionStore = createOperatorReleaseGroupSelectionStore(),
   operatorTrackOverrideStore = createOperatorTrackOverrideStore(),
-  recordActivityEventFn = null,
+  operatorArtistActivityService = createOperatorArtistActivityService(),
   startMetadataArtistRefresh = null,
   postSaveReporter,
 } = {}) {
@@ -580,24 +581,19 @@ export function createOperatorArtistSaveService({
           snapshot,
         });
 
+        const becameMonitored = !existingMonitoring.wasMonitored
+          && normalizedMonitoringPatch.isMonitored === true;
+        await operatorArtistActivityService.recordSaveActivity({
+          client,
+          actorUserId: triggeredByUserId ?? appUserId,
+          artist,
+          becameMonitored,
+          policyChangeSummary,
+          triggerSource,
+        });
+
         await client.query('COMMIT');
         const followUpContext = { snapshotId: snapshot.id, snapshotRevision: snapshot.snapshotRevision };
-
-        if (policyChangeSummary.hasChanges && typeof recordActivityEventFn === 'function') {
-          const actorUserId = triggeredByUserId ?? appUserId;
-          void postSave.run('policy_activity', () => recordActivityEventFn({
-            actorUserId,
-            entityId: metadataArtistId,
-            entityTitle: artist.name ?? null,
-            entityType: 'artist',
-            eventType: 'artist_policy_saved',
-            extraPayload: {
-              ...policyChangeSummary,
-              artistMusicBrainzId: artist.musicBrainzArtistId,
-              triggerSource,
-            },
-          }), followUpContext);
-        }
 
         if (normalizedMonitoringPatch.isMonitored === true && typeof startMetadataArtistRefresh === 'function') {
           // Kick off a metadata catalog refresh so the artist's discography is
@@ -611,24 +607,9 @@ export function createOperatorArtistSaveService({
           }), followUpContext);
         }
 
-        // Fire "artist newly monitored" side effects exactly once, only on the
-        // genuine unmonitored -> monitored transition, after the commit. Fired
-        // out-of-band so a notification/activity failure cannot roll back the
-        // save. Idempotent across the retry loop: this only runs on the
-        // successful attempt that returns.
-        const becameMonitored = !existingMonitoring.wasMonitored
-          && normalizedMonitoringPatch.isMonitored === true;
+        // External notification dispatch stays best effort after the required Activity is committed.
         if (becameMonitored) {
           const actorUserId = triggeredByUserId ?? appUserId;
-          if (typeof recordActivityEventFn === 'function') {
-            void postSave.run('monitored_activity', () => recordActivityEventFn({
-              actorUserId,
-              entityId: metadataArtistId,
-              entityTitle: artist.name ?? null,
-              entityType: 'artist',
-              eventType: 'artist_monitored',
-            }), followUpContext);
-          }
           if (typeof onArtistMonitoredFn === 'function') {
             void postSave.run('notification', () => onArtistMonitoredFn({
               actorUserId,

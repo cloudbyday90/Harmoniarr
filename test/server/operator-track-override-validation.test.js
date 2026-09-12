@@ -132,7 +132,8 @@ test('track override validation retains paired positions and complete recording 
 
 test('canonical artist save rejects malformed track identities before acquiring persistence', async (t) => {
   const getPoolFn = t.mock.fn(() => assert.fail('Invalid track overrides must not acquire persistence'));
-  const service = createOperatorArtistSaveService({ getPoolFn, getOperatorArtistProjection: async () => null });
+  const service = createOperatorArtistSaveService({ getPoolFn, getOperatorArtistProjection: async () => null,
+    operatorArtistActivityService: { recordSaveActivity: async () => assert.fail('Invalid overrides must not record activity') } });
   const save = (trackOverrides) => service.saveOperatorArtist({
     appUserId: 'operator-1',
     metadataArtistId: 'artist-1',

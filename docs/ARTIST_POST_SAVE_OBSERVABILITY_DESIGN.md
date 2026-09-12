@@ -2,6 +2,8 @@
 
 Design reviewed September 12, 2026.
 
+Follow-up: required artist Activity now uses the save transaction; see [transactional Activity design](ARTIST_TRANSACTIONAL_ACTIVITY_DESIGN.md). The best-effort Activity discussion below describes the previous design. External notification, refresh, and projection diagnostics remain applicable.
+
 Artist detail saves operator monitoring, release and track exceptions, a versioned snapshot, and reconciliation work in one transaction. Those committed decisions remain successful if later Activity, immediate metadata refresh, household notification, or response-projection work fails. The current follow-up catches hide several failures, making a successful save with degraded follow-up behavior difficult to diagnose.
 
 ## Existing boundaries

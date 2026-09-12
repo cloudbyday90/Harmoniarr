@@ -8,7 +8,6 @@
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createActivityEventService } from '../../src/server/activity/activity-event-service.js';
 import { createOperatorArtistSaveService } from '../../src/server/metadata/operator-artist-save-service.js';
 import { defaultOperatorArtistMonitoringPolicy } from '../../src/server/metadata/operator-artist-monitoring-policy.js';
 import { createOperatorArtistMonitoringStore } from '../../src/server/metadata/operator-artist-monitoring-store.js';
@@ -20,7 +19,7 @@ import { applyPendingMigrations } from '../../src/server/migrations.js';
 import { seedMetadataReleaseFixture } from '../../testing/integration/metadata-fixtures.js';
 import { withDockerizedPostgresDatabase } from '../../testing/postgres-docker-database.js';
 
-test('committed artist save stays durable and singular when every post-save observer fails', { timeout: 120_000 }, async () => {
+test('committed artist save and Activity stay durable and singular when external follow-ups and projection fail', { timeout: 120_000 }, async () => {
   await withDockerizedPostgresDatabase({ run: async ({ getPoolFn }) => {
     await applyPendingMigrations({ getPoolFn });
     const pool = getPoolFn();
@@ -40,13 +39,8 @@ test('committed artist save stays durable and singular when every post-save obse
     } });
     const observed = [];
     const warnings = [];
-    const activityDiagnostics = [];
     const observe = (phase, payload) => observed.push({ phase, payload, committed: transactionCommands.includes('COMMIT') });
     const uniqueFailure = () => Object.assign(new Error('private sql token=secret'), { code: '23505' });
-    const activity = createActivityEventService({
-      activityEventStore: { insertActivityEvent: async (payload) => { observe(payload.eventType, payload); throw uniqueFailure(); } },
-      stderr: { write: (line) => { activityDiagnostics.push(JSON.parse(line)); throw new Error('broken diagnostic sink'); } },
-    });
     const service = createOperatorArtistSaveService({
       getPoolFn: transactionPool,
       operatorArtistMonitoringStore: createOperatorArtistMonitoringStore({ getPoolFn }),
@@ -55,7 +49,6 @@ test('committed artist save stays durable and singular when every post-save obse
       operatorReleaseGroupSelectionStore: createOperatorReleaseGroupSelectionStore({ getPoolFn }),
       operatorTrackOverrideStore: createOperatorTrackOverrideStore({ getPoolFn }),
       getOperatorArtistProjection: async (payload) => { observe('projection', payload); throw uniqueFailure(); },
-      recordActivityEventFn: activity.recordActivityEvent,
       startMetadataArtistRefresh: async (payload) => { observe('refresh', payload); throw uniqueFailure(); },
       onArtistMonitoredFn: async (payload) => { observe('notification', payload); return { failed: 1, sent: 0 }; },
       postSaveReporter: { writeWarning: (line) => { warnings.push(JSON.parse(line)); throw uniqueFailure(); } },
@@ -92,16 +85,23 @@ test('committed artist save stays durable and singular when every post-save obse
     assert.deepEqual(savedMonitoring, [{ app_user_id: appUserId, is_monitored: true, acquisition_profile_key: 'storage_saver' }]);
     const savedSelections = (await pool.query('SELECT app_user_id, selection_state, resolved_metadata_release_id FROM operator_release_group_selection')).rows;
     assert.deepEqual(savedSelections, [{ app_user_id: appUserId, selection_state: 'partial', resolved_metadata_release_id: metadata.metadataReleaseId }]);
-    assert.deepEqual(observed.map(({ phase }) => phase).sort(), ['artist_monitored', 'artist_policy_saved', 'notification', 'projection', 'refresh']);
+    const activity = (await pool.query(`SELECT event_type, actor_user_id, entity_type, entity_id, extra_payload
+      FROM activity_events ORDER BY event_type`)).rows;
+    assert.deepEqual(activity.map(({ event_type }) => event_type), ['artist_monitored', 'artist_policy_saved'],
+      'The required default Activity store must persist both events on the save transaction');
+    assert.ok(activity.every((event) => event.actor_user_id === triggeredByUserId
+      && event.entity_type === 'artist' && event.entity_id === metadata.metadataArtistId));
+    assert.equal(activity[0].extra_payload, null);
+    assert.deepEqual(activity[1].extra_payload.snapshot, { id: snapshots[0].id, snapshotRevision: 1 });
+    assert.equal(activity[1].extra_payload.reconciliation.runId, runs[0].id);
+    assert.equal(activity[1].extra_payload.hasChanges, true);
+    assert.deepEqual(observed.map(({ phase }) => phase).sort(), ['notification', 'projection', 'refresh']);
     assert.ok(observed.every(({ committed }) => committed));
-    for (const event of observed.filter(({ phase }) => ['artist_monitored', 'artist_policy_saved', 'notification'].includes(phase))) {
-      assert.equal(event.payload.actorUserId, triggeredByUserId);
-    }
+    assert.equal(observed.find(({ phase }) => phase === 'notification').payload.actorUserId, triggeredByUserId);
     assert.equal(observed.find(({ phase }) => phase === 'projection').payload.appUserId, appUserId);
     assert.equal(observed.find(({ phase }) => phase === 'refresh').payload.triggeredByUserId, triggeredByUserId);
-    assert.deepEqual(warnings.map(({ phase }) => phase).sort(), ['metadata_refresh', 'monitored_activity', 'notification', 'policy_activity', 'projection']);
+    assert.deepEqual(warnings.map(({ phase }) => phase).sort(), ['metadata_refresh', 'notification', 'projection']);
     assert.ok(warnings.every((warning) => warning.saveCommitted === true && warning.snapshotId === snapshots[0].id && warning.snapshotRevision === 1));
-    assert.equal(activityDiagnostics.length, 2, 'Actual nonthrowing activity boundary exposes both insert failures');
-    assert.doesNotMatch(JSON.stringify([...warnings, ...activityDiagnostics]), /private|secret|token|sql/u);
+    assert.doesNotMatch(JSON.stringify(warnings), /private|secret|token|sql/u);
   } });
 });

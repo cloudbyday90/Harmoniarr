@@ -640,7 +640,6 @@ export function createApp({
     providerHealthRecorder,
     reconcileDiscoveryRequests: libraryModule.libraryDiscoveryRequestService.reconcileDiscoveryRequests,
     reconcileWantedReleases: libraryModule.libraryWantedReleaseService.reconcileWantedReleases,
-    recordActivityEventFn: activityModule.activityEventService.recordActivityEvent,
   });
   const dependencyHealthService = createDependencyHealthService({
     recorder: providerHealthRecorder,

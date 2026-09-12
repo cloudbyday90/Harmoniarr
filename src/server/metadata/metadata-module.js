@@ -109,7 +109,6 @@ export function createMetadataModule({
   metadataProviderResponseCacheStore = null,
   metadataSearchService = null,
   providerHealthRecorder = null,
-  recordActivityEventFn = null,
   recordAuditEventFn = undefined,
   musicBrainzClient = null,
   musicBrainzCatalogService = null,
@@ -193,7 +192,6 @@ export function createMetadataModule({
       operatorArtistReconciliationSnapshotStore: resolvedOperatorArtistReconciliationSnapshotStore,
       operatorReleaseGroupSelectionStore: resolvedOperatorReleaseGroupSelectionStore,
       operatorTrackOverrideStore: resolvedOperatorTrackOverrideStore,
-      recordActivityEventFn,
       // Late-bound: the metadata artist refresh service is resolved further
       // below. Adding/monitoring an artist queues a per-artist discography
       // refresh so their releases populate without waiting on the heartbeat.

@@ -1,8 +1,27 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { setImmediate as settlePostSave } from 'node:timers/promises';
-import { createActivityEventService } from '../../src/server/activity/activity-event-service.js';
+import { createOperatorArtistActivityService } from '../../src/server/metadata/operator-artist-activity-service.js';
 import { createOperatorArtistSaveService } from '../../src/server/metadata/operator-artist-save-service.js';
+
+// Persistence/activity behavior is exercised separately; unrelated save fixtures supply an explicit transaction writer.
+function createSaveServiceForTest(options) {
+  return createOperatorArtistSaveService({
+    operatorArtistActivityService: { recordSaveActivity: async () => {} },
+    ...options,
+  });
+}
+
+function captureActivity(events, beforeInsert = () => {}) {
+  return createOperatorArtistActivityService({ activityEventStore: {
+    insertActivityEvent: async (payload) => {
+      assert.equal(typeof payload.queryable?.query, 'function', 'Activity must use the active transaction client');
+      beforeInsert(payload);
+      events.push(payload);
+      return { id: `activity-${events.length}` };
+    },
+  } });
+}
 
 test('saveOperatorArtist rejects a stale snapshot revision before replacing user selections', async (t) => {
   const query = t.mock.fn(async (sql) => {
@@ -17,7 +36,7 @@ test('saveOperatorArtist rejects a stale snapshot revision before replacing user
     throw new Error(`Unexpected SQL: ${sql}`);
   });
   const replaceOperatorArtistReleaseGroupSelections = t.mock.fn();
-  const service = createOperatorArtistSaveService({
+  const service = createSaveServiceForTest({
     getPoolFn: () => ({
       connect: async () => ({ query, release: () => {} }),
     }),
@@ -124,7 +143,7 @@ test('saveOperatorArtist persists normalized state, snapshots it, and queues rec
     releaseGroups: [{ id: 'release-group-1' }],
     releases: [{ id: '33333333-3333-4333-8333-333333333333' }],
   }));
-  const service = createOperatorArtistSaveService({
+  const service = createSaveServiceForTest({
     getOperatorArtistProjection,
     getPoolFn: () => ({ connect }),
     operatorArtistMonitoringStore: {
@@ -310,7 +329,7 @@ test('saveOperatorArtist persists normalized state, snapshots it, and queues rec
 });
 
 test('saveOperatorArtist rejects overrides when selectionSourceMode is policy_only', async () => {
-  const service = createOperatorArtistSaveService({
+  const service = createSaveServiceForTest({
     getPoolFn: () => ({
       connect: async () => {
         throw new Error('should not open transaction');
@@ -390,7 +409,7 @@ test('saveOperatorArtist retries the transaction once on unique constraint races
       updatedAt: '2026-05-25T12:05:00.000Z',
     };
   });
-  const service = createOperatorArtistSaveService({
+  const service = createSaveServiceForTest({
     getOperatorArtistProjection: async () => null,
     getPoolFn: () => ({ connect }),
     operatorArtistMonitoringStore: {
@@ -490,7 +509,7 @@ function createMonitoringSaveHarness() {
 
 test('saveOperatorArtist queues a metadata discography refresh when an artist is monitored', async (t) => {
   const startMetadataArtistRefresh = t.mock.fn(async () => ({ accepted: true }));
-  const service = createOperatorArtistSaveService({
+  const service = createSaveServiceForTest({
     ...createMonitoringSaveHarness(),
     startMetadataArtistRefresh,
   });
@@ -521,7 +540,7 @@ test('saveOperatorArtist queues a metadata discography refresh when an artist is
 
 test('saveOperatorArtist does not queue a metadata refresh when the artist is not monitored', async (t) => {
   const startMetadataArtistRefresh = t.mock.fn(async () => ({ accepted: true }));
-  const service = createOperatorArtistSaveService({
+  const service = createSaveServiceForTest({
     ...createMonitoringSaveHarness(),
     startMetadataArtistRefresh,
   });
@@ -548,7 +567,7 @@ test('saveOperatorArtist still resolves when a queued discography refresh is alr
     error.code = 'metadata_artist_refresh_in_progress';
     throw error;
   });
-  const service = createOperatorArtistSaveService({
+  const service = createSaveServiceForTest({
     ...createMonitoringSaveHarness(),
     startMetadataArtistRefresh,
   });
@@ -606,7 +625,7 @@ test('saveOperatorArtist records an artist_policy_saved activity event with boun
   });
   const client = { query, release: t.mock.fn(() => {}) };
   const activityEvents = [];
-  const service = createOperatorArtistSaveService({
+  const service = createSaveServiceForTest({
     getOperatorArtistProjection: async () => ({ artist: { id: 'artist-1' }, operator: { monitoring: { isMonitored: true } } }),
     getPoolFn: () => ({ connect: async () => client }),
     operatorArtistMonitoringStore: {
@@ -650,7 +669,10 @@ test('saveOperatorArtist records an artist_policy_saved activity event with boun
       }],
       replaceOperatorArtistTrackOverrides: async () => {},
     },
-    recordActivityEventFn: async (payload) => { activityEvents.push(payload); },
+    operatorArtistActivityService: captureActivity(activityEvents, (payload) => {
+      assert.equal(payload.queryable, client);
+      assert.equal(query.mock.calls.some((call) => call.arguments[0] === 'COMMIT'), false);
+    }),
   });
 
   await service.saveOperatorArtist({
@@ -726,11 +748,11 @@ function buildTransitionTestPool({ existingIsMonitored }) {
 test('saveOperatorArtist fires monitor side effects only on the unmonitored -> monitored transition', async (t) => {
   const notifications = [];
   const activityEvents = [];
-  const service = createOperatorArtistSaveService({
+  const service = createSaveServiceForTest({
     getPoolFn: () => buildTransitionTestPool({ existingIsMonitored: false }),
     getOperatorArtistProjection: async () => ({ operator: { monitoring: { isMonitored: true } } }),
     onArtistMonitoredFn: async (payload) => { notifications.push(payload); },
-    recordActivityEventFn: async (payload) => { activityEvents.push(payload); },
+    operatorArtistActivityService: captureActivity(activityEvents),
     operatorArtistMonitoringStore: { upsertOperatorArtistMonitoring: async () => {} },
     operatorArtistReconciliationRunStore: {
       queueLatestSnapshotRun: async () => ({ action: 'created', run: { id: 'run-1', status: 'pending' }, runningRun: null }),
@@ -766,11 +788,11 @@ test('saveOperatorArtist fires monitor side effects only on the unmonitored -> m
 test('saveOperatorArtist does not fire monitor side effects when the artist was already monitored', async () => {
   const notifications = [];
   const activityEvents = [];
-  const service = createOperatorArtistSaveService({
+  const service = createSaveServiceForTest({
     getPoolFn: () => buildTransitionTestPool({ existingIsMonitored: true }),
     getOperatorArtistProjection: async () => ({ operator: { monitoring: { isMonitored: true } } }),
     onArtistMonitoredFn: async (payload) => { notifications.push(payload); },
-    recordActivityEventFn: async (payload) => { activityEvents.push(payload); },
+    operatorArtistActivityService: captureActivity(activityEvents),
     operatorArtistMonitoringStore: { upsertOperatorArtistMonitoring: async () => {} },
     operatorArtistReconciliationRunStore: {
       queueLatestSnapshotRun: async () => ({ action: 'created', run: { id: 'run-1', status: 'pending' }, runningRun: null }),
@@ -801,7 +823,7 @@ test('saveOperatorArtist does not fire monitor side effects when the artist was 
 for (const revision of [undefined, null, -1, 1.2, '0', false, Number.MAX_SAFE_INTEGER + 1]) {
   test(`artist save rejects invalid expected revision ${String(revision)} before connecting`, async () => {
     let connected = false;
-    const service = createOperatorArtistSaveService({
+    const service = createSaveServiceForTest({
       getPoolFn: () => { connected = true; throw new Error('must not connect'); },
     });
     await assert.rejects(service.saveOperatorArtist({
@@ -814,7 +836,7 @@ for (const revision of [undefined, null, -1, 1.2, '0', false, Number.MAX_SAFE_IN
 }
 
 
-test('committed save reports actual activity and follow-up failures without rollback or mutation retry', async () => {
+test('committed save reports nontransactional follow-up failures without rollback or mutation retry', async () => {
   const harness = createMonitoringSaveHarness();
   const sql = [];
   const pool = harness.getPoolFn();
@@ -824,13 +846,8 @@ test('committed save reports actual activity and follow-up failures without roll
     return { ...client, query: async (statement, values) => { sql.push(statement); return client.query(statement, values); } };
   };
   const evidence = [];
-  const activity = createActivityEventService({
-    activityEventStore: { insertActivityEvent: async () => { throw new Error('token=secret'); } },
-    stderr: { write: () => {} },
-  });
-  const service = createOperatorArtistSaveService({
+  const service = createSaveServiceForTest({
     ...harness, getPoolFn: () => pool,
-    recordActivityEventFn: activity.recordActivityEvent,
     startMetadataArtistRefresh: async () => { throw new Error('provider-secret'); },
     onArtistMonitoredFn: async () => ({ failed: 1 }),
     getOperatorArtistProjection: async () => { throw Object.assign(new Error('db-secret'), { code: '23505' }); },
@@ -852,7 +869,48 @@ test('committed save reports actual activity and follow-up failures without roll
   assert.equal(sql.filter((statement) => statement === 'BEGIN').length, 1);
   assert.equal(sql.includes('ROLLBACK'), false);
   assert.deepEqual(evidence.map((entry) => entry.phase).sort(),
-    ['metadata_refresh', 'monitored_activity', 'notification', 'policy_activity', 'projection']);
+    ['metadata_refresh', 'notification', 'projection']);
   assert.ok(evidence.every((entry) => entry.saveCommitted && entry.snapshotRevision === 1));
   assert.ok(!JSON.stringify(evidence).includes('secret'));
+});
+
+test('transactional activity failure rejects the save before COMMIT and prevents detached follow-ups', async () => {
+  const harness = createMonitoringSaveHarness();
+  const sql = [];
+  const events = [];
+  let followUps = 0;
+  let released = 0;
+  const pool = harness.getPoolFn();
+  const originalConnect = pool.connect;
+  pool.connect = async () => {
+    const client = await originalConnect();
+    return { query: async (statement, parameters) => {
+      sql.push(statement);
+      return client.query(statement, parameters);
+    }, release: () => { released += 1; client.release(); } };
+  };
+  const failure = new Error('Atomic Activity persistence failed');
+  const service = createSaveServiceForTest({
+    ...harness, getPoolFn: () => pool,
+    operatorArtistActivityService: createOperatorArtistActivityService({ activityEventStore: {
+      insertActivityEvent: async (payload) => {
+        events.push(payload);
+        assert.equal(sql.includes('COMMIT'), false);
+        assert.equal(typeof payload.queryable?.query, 'function');
+        if (events.length === 2) throw failure;
+        return { id: 'first-activity-in-transaction' };
+      },
+    } }),
+    getOperatorArtistProjection: async () => { followUps += 1; },
+    startMetadataArtistRefresh: async () => { followUps += 1; },
+    onArtistMonitoredFn: async () => { followUps += 1; },
+  });
+  await assert.rejects(service.saveOperatorArtist({ appUserId: 'user-1', metadataArtistId: 'artist-1',
+    expectedSnapshotRevision: 0, draft: { monitoring: { isMonitored: true }, releaseGroupSelections: [], trackOverrides: [] },
+  }), failure);
+  await settlePostSave();
+  assert.deepEqual(sql.filter((statement) => ['BEGIN', 'COMMIT', 'ROLLBACK'].includes(statement)), ['BEGIN', 'ROLLBACK']);
+  assert.deepEqual(events.map(({ eventType }) => eventType), ['artist_policy_saved', 'artist_monitored']);
+  assert.equal(followUps, 0);
+  assert.equal(released, 1);
 });
