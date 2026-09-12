@@ -19,6 +19,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import ArtworkImage from '../ArtworkImage.vue';
+import ReleaseDetailLoadState from './ReleaseDetailLoadState.vue';
 import { useReleaseDetail } from '../../composables/useReleaseDetail.js';
 import { useReleaseRequest } from '../../composables/useReleaseRequest.js';
 import { useActiveUsers } from '../../composables/useActiveUsers.js';
@@ -175,6 +176,8 @@ const {
   switchEdition,
   setDefaultEdition,
   cancel: cancelReleaseDetail,
+  retry: retryReleaseDetail,
+  canRetry,
 } = useReleaseDetail();
 
 const {
@@ -391,6 +394,10 @@ watch(
 
 // ── Event handlers ────────────────────────────────────────────────────────────
 
+function focusAfterReleaseRetry() {
+  if (props.open && dialogRef.value?.open) closeButtonRef.value?.focus({ preventScroll: true });
+}
+
 function handleCancel(event) {
   event.preventDefault();
   if (!isCurrentlyRequesting.value) {
@@ -585,13 +592,17 @@ function handleTrackOverrideRepair(action, trackOverride) {
           </div>
         </div>
 
-        <!-- ── Loading ───────────────────────────────────────────────── -->
-        <p v-if="loading" class="rdm-loading" aria-live="polite" aria-busy="true">Loading…</p>
+        <ReleaseDetailLoadState
+          v-if="open"
+          :key="JSON.stringify([releaseGroupMbid, preferReleaseMbid])"
+          :loading="loading"
+          :error="error"
+          :can-retry="canRetry"
+          :retry="retryReleaseDetail"
+          :focus-after-retry="focusAfterReleaseRetry"
+        />
 
-        <!-- ── Error ─────────────────────────────────────────────────── -->
-        <p v-else-if="error" class="rdm-error" role="alert">{{ error }}</p>
-
-        <template v-else>
+        <template v-if="!loading && !error">
           <!-- ── Ownership callout ───────────────────────────────────── -->
           <div v-if="showOwnershipCallout" class="rdm-ownership-callout" role="note">
             <span class="hx-pill" data-tone="warning">Partial</span>

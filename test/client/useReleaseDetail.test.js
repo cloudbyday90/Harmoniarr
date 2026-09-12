@@ -233,3 +233,97 @@ for (const transition of ['close', 'edition']) {
     });
   }
 }
+
+
+test('retry replays the exact failed edition read, blocks concurrent clicks and clears after success', async () => {
+  const pending = deferred();
+  const calls = [];
+  const detail = useReleaseDetail({ fetchTracklist: async (group, options) => {
+    calls.push({ group, ...options });
+    if (calls.length === 1) throw new Error('Unavailable');
+    return pending.promise;
+  } });
+  await detail.load('group', { preferReleaseMbid: 'mbid-edition', preferReleaseId: 'local-edition' });
+  assert.equal(detail.canRetry.value, true);
+  const retrying = detail.retry();
+  assert.equal(detail.canRetry.value, false);
+  assert.equal(detail.retry(), undefined);
+  assert.equal(calls.length, 2);
+  assert.deepEqual(calls.map(({ group, preferReleaseMbid, preferReleaseId }) => ({ group, preferReleaseMbid, preferReleaseId })), [
+    { group: 'group', preferReleaseMbid: 'mbid-edition', preferReleaseId: 'local-edition' },
+    { group: 'group', preferReleaseMbid: 'mbid-edition', preferReleaseId: 'local-edition' },
+  ]);
+  assert.notEqual(calls[0].signal, calls[1].signal);
+  pending.resolve(makeTracklistResponse());
+  await retrying;
+  assert.equal(detail.canRetry.value, false);
+  assert.equal(detail.retry(), undefined);
+});
+
+test('repeated read failures remain retryable until cancel invalidates the target', async () => {
+  let calls = 0;
+  const detail = useReleaseDetail({ fetchTracklist: async () => { calls += 1; throw new Error('Unavailable'); } });
+  await detail.load('group');
+  await detail.retry();
+  assert.equal(calls, 2);
+  assert.equal(detail.canRetry.value, true);
+  detail.cancel();
+  assert.equal(detail.canRetry.value, false);
+  assert.equal(detail.retry(), undefined);
+  assert.equal(calls, 2);
+});
+
+test('stale failure cannot replace the current retry target after a new group opens', async () => {
+  const old = deferred();
+  const calls = [];
+  const detail = useReleaseDetail({ fetchTracklist: async (group, options) => {
+    calls.push({ group, preferReleaseId: options.preferReleaseId });
+    if (group === 'old') return old.promise;
+    throw new Error('Current unavailable');
+  } });
+  const obsolete = detail.load('old', { preferReleaseId: 'old-edition' });
+  await detail.load('current', { preferReleaseId: 'current-edition' });
+  old.reject(new Error('Old unavailable'));
+  await obsolete;
+  await detail.retry();
+  assert.deepEqual(calls.at(-1), { group: 'current', preferReleaseId: 'current-edition' });
+});
+
+test('retry after a successful canonical mutation only repeats its failed read, never the write', async () => {
+  let mutations = 0;
+  const reads = [];
+  const detail = useReleaseDetail({
+    setCanonical: async () => { mutations += 1; },
+    fetchTracklist: async (group, options) => {
+      reads.push({ group, preferReleaseId: options.preferReleaseId });
+      if (reads.length === 1) throw new Error('Read failed after save');
+      return makeTracklistResponse();
+    },
+  });
+  await detail.setDefaultEdition('group', 'canonical-edition');
+  assert.equal(detail.canRetry.value, true);
+  await detail.retry();
+  assert.equal(mutations, 1);
+  assert.deepEqual(reads, [
+    { group: 'group', preferReleaseId: 'canonical-edition' },
+    { group: 'group', preferReleaseId: 'canonical-edition' },
+  ]);
+});
+
+
+for (const message of ['', '   ']) {
+  test(`blank read error ${JSON.stringify(message)} retains visible failure and retry`, async () => {
+    let calls = 0;
+    const detail = useReleaseDetail({ fetchTracklist: async () => {
+      calls += 1;
+      if (calls === 1) throw new Error(message);
+      return makeTracklistResponse();
+    } });
+    await detail.load('group');
+    assert.equal(detail.error.value, 'Could not load release details.');
+    assert.equal(detail.canRetry.value, true);
+    await detail.retry();
+    assert.equal(calls, 2);
+    assert.equal(detail.error.value, null);
+  });
+}

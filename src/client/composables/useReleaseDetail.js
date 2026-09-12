@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { readonly, ref } from 'vue';
+import { computed, readonly, ref } from 'vue';
 import { fetchReleaseGroupTracklist, markReleaseCanonical } from '../lib/metadata-api.js';
 import { getErrorMessage } from '../lib/error-utils.js';
 
@@ -47,6 +47,9 @@ export function useReleaseDetail({
 
   let abortController = null;
   let generation = 0;
+  const failedRead = ref(null);
+  const canRetry = computed(() => Boolean(failedRead.value && error.value)
+    && !loading.value && !isSavingCanonical.value);
 
   function clearData() {
     release.value = null;
@@ -62,6 +65,7 @@ export function useReleaseDetail({
     generation += 1;
     abortController?.abort();
     abortController = null;
+    failedRead.value = null;
     clearData();
     loading.value = false;
     error.value = null;
@@ -92,13 +96,21 @@ export function useReleaseDetail({
       source.value = data?.source ?? null;
     } catch (err) {
       if (token !== generation || signal.aborted || err?.name === 'AbortError') return;
-      error.value = getErrorMessage(err, 'Could not load release details.');
+      failedRead.value = { releaseGroupMbid, preferReleaseMbid, preferReleaseId };
+      const message = getErrorMessage(err, 'Could not load release details.');
+      error.value = message.trim() ? message : 'Could not load release details.';
     } finally {
       if (token === generation) {
         loading.value = false;
         abortController = null;
       }
     }
+  }
+
+  function retry() {
+    if (!canRetry.value) return;
+    const { releaseGroupMbid, preferReleaseMbid, preferReleaseId } = failedRead.value;
+    return load(releaseGroupMbid, { preferReleaseMbid, preferReleaseId });
   }
 
   function switchEdition(releaseGroupMbid, releaseId) {
@@ -133,6 +145,8 @@ export function useReleaseDetail({
     error: readonly(error),
     canonicalError: readonly(canonicalError),
     isSavingCanonical: readonly(isSavingCanonical),
+    canRetry,
+    retry,
     cancel,
     load,
     switchEdition,
