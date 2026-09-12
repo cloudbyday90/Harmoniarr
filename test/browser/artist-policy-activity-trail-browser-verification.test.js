@@ -37,7 +37,7 @@ async function openBoardsReleaseDetail(page, baseUrl) {
     name: 'View details for Music Has the Right to Children',
   }).click();
 
-  const dialog = page.getByRole('dialog', { name: 'Release detail' });
+  const dialog = page.getByRole('dialog', { name: 'Music Has the Right to Children' });
   await dialog.waitFor();
   await dialog.getByText('Roygbiv').waitFor();
   await dialog.getByText('Needs review', { exact: true }).waitFor();

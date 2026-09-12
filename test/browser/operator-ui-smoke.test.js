@@ -207,7 +207,7 @@ suite('browser operator workflow smoke coverage', () => {
       await page.getByRole('heading', { name: 'Related artists' }).waitFor();
       await page.getByText('Music Has the Right to Children').waitFor();
       await page.getByRole('button', { name: 'View details for Music Has the Right to Children' }).click();
-      const releaseDetailDialog = page.getByRole('dialog', { name: 'Release detail' });
+      const releaseDetailDialog = page.getByRole('dialog', { name: 'Music Has the Right to Children' });
       await releaseDetailDialog.getByText('Roygbiv').waitFor();
       await releaseDetailDialog.getByLabel('Desired state for Roygbiv').selectOption('suppressed');
       await releaseDetailDialog.getByText('Track overrides are saved with Artist Policy.').waitFor();

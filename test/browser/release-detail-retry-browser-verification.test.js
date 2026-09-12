@@ -56,8 +56,11 @@ async function prepareRetryScenario({ baseUrl, browserContext, page }) {
   });
   const opener = page.getByRole('button', { name: 'View details for Music Has the Right to Children' });
   await opener.click();
-  const dialog = page.getByRole('dialog', { name: 'Release detail' });
+  const dialog = page.getByRole('dialog', { name: 'Music Has the Right to Children' });
   await dialog.getByText('Could not load release details', { exact: true }).waitFor();
+  const heading = dialog.getByRole('heading', { level: 2, name: 'Music Has the Right to Children', exact: true });
+  await heading.waitFor();
+  assert.equal(await dialog.getAttribute('aria-labelledby'), await heading.getAttribute('id'));
   return { dialog, opener, retry: dialog.getByRole('button', { name: /^Retry/u }) };
 }
 
@@ -98,6 +101,7 @@ suite('Release detail retry browser verification', () => {
       await assertLocatorFocused(retry, 'Retry retains keyboard focus while loading');
       assert.equal(await retry.getAttribute('aria-disabled'), 'true');
       await dialog.getByRole('status').filter({ hasText: 'Loading release details.' }).waitFor();
+      await dialog.getByRole('heading', { level: 2, name: 'Music Has the Right to Children', exact: true }).waitFor();
       await retry.evaluate((button) => { button.click(); button.click(); });
       assert.equal(await page.evaluate(() => globalThis.releaseDetailRetryFixture.calls.length), 2);
 
@@ -114,6 +118,7 @@ suite('Release detail retry browser verification', () => {
       await releasePendingRead(page, 'success');
       await dialog.getByText('Roygbiv', { exact: true }).waitFor();
       await dialog.getByRole('status').filter({ hasText: 'Release details loaded.' }).waitFor();
+      assert.equal(await dialog.getByRole('heading', { level: 2, name: 'Music Has the Right to Children', exact: true }).count(), 1);
       await assertLocatorFocused(dialog.getByRole('button', { name: 'Close', exact: true }),
         'Successful retry moves focus from the removed Retry button to Close');
       const calls = await page.evaluate(() => globalThis.releaseDetailRetryFixture.calls);

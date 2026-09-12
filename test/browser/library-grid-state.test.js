@@ -169,7 +169,7 @@ suite('browser Library grid state coverage', () => {
       await page.getByRole('button', { name: 'Request remaining 5 tracks' }).click();
       await tracklistResponse;
 
-      await page.getByRole('dialog', { name: 'Release detail' }).waitFor();
+      await page.getByRole('dialog', { name: 'Geogaddi' }).waitFor();
       await page.getByText('Geogaddi').last().waitFor();
       await page.getByText('18 of 23 tracks in library').waitFor();
       await page.getByText('Music Is Math').waitFor();

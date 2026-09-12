@@ -90,7 +90,7 @@ async function openMusicHasTheRightToChildrenDialog({ baseUrl, page, pageErrors 
   await assertLocatorFocused(releaseCard, 'Release card should be focused before opening detail');
   await page.keyboard.press('Enter');
 
-  const dialog = page.getByRole('dialog', { name: 'Release detail' });
+  const dialog = page.getByRole('dialog', { name: 'Music Has the Right to Children' });
   try {
     await dialog.waitFor();
   } catch (error) {
@@ -334,8 +334,11 @@ suite('Release Detail modal browser verification', () => {
       });
       const card = page.getByRole('button', { name: 'View details for Music Has the Right to Children', exact: true });
       await card.click();
-      const dialog = page.getByRole('dialog', { name: 'Release detail', exact: true });
+      const dialog = page.getByRole('dialog', { name: 'Music Has the Right to Children', exact: true });
       await page.waitForFunction(() => Boolean(globalThis.__finishOldRelease));
+      const heading = dialog.getByRole('heading', { level: 2, name: 'Music Has the Right to Children', exact: true });
+      await heading.waitFor();
+      assert.equal(await dialog.getAttribute('aria-labelledby'), await heading.getAttribute('id'));
       await dialog.getByRole('button', { name: 'Close', exact: true }).click();
       assert.equal(await page.evaluate(() => globalThis.__oldReleaseSignal?.aborted), true);
       await card.click();

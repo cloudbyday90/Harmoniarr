@@ -30,7 +30,7 @@ async function installEditionCatalog(page, remote) {
     const editions = Array.from({ length: 9 }, (_, index) => ({
       id: isRemote ? null : `local-edition-${index + 1}`,
       musicbrainzReleaseId: `mb-edition-${index + 1}`,
-      title: `Edition ${index + 1}`,
+      title: isRemote && index === 8 ? 'Edition 9: An expanded anniversary collection of alternate recordings and previously unheard performances' : `Edition ${index + 1}`,
       country: 'GB',
       releaseDate: `2000-${String(index + 1).padStart(2, '0')}-01`,
       trackCount: index + 1,
@@ -88,9 +88,11 @@ suite('Release edition selector browser verification', () => {
         await page.getByRole('heading', { name: 'Boards of Canada', exact: true }).waitFor();
         await installEditionCatalog(page, remote);
         await page.getByRole('button', { name: 'View details for Music Has the Right to Children' }).click();
-        const dialog = page.getByRole('dialog', { name: 'Release detail' });
+        const dialog = page.getByRole('dialog').filter({ has: page.locator('h2.rdm-release-title') });
         const picker = dialog.getByRole('combobox', { name: 'Preview an edition', exact: true });
         await picker.waitFor();
+        await page.getByRole('dialog', { name: 'Edition 1', exact: true }).waitFor();
+        assert.equal(await dialog.getByRole('heading', { level: 2, name: 'Edition 1', exact: true }).count(), 1);
         const prefix = remote ? 'musicbrainz:mb-edition-' : 'local:local-edition-';
         assert.equal(await picker.locator('option').count(), 9);
         assert.equal(await picker.inputValue(), `${prefix}1`);
@@ -110,7 +112,14 @@ suite('Release edition selector browser verification', () => {
         await picker.waitFor();
         assert.equal(await picker.inputValue(), `${prefix}9`);
         assert.equal(await picker.locator('option:checked').count(), 1);
-        await dialog.locator('.rdm-hero').getByText('Edition 9', { exact: true }).waitFor();
+        const selectedTitle = remote
+          ? 'Edition 9: An expanded anniversary collection of alternate recordings and previously unheard performances'
+          : 'Edition 9';
+        await page.getByRole('dialog', { name: selectedTitle, exact: true }).waitFor();
+        const heading = dialog.getByRole('heading', { level: 2, name: selectedTitle, exact: true });
+        assert.equal(await heading.count(), 1);
+        assert.equal(await dialog.getAttribute('aria-labelledby'), await heading.getAttribute('id'));
+        assert.equal(await page.getByRole('dialog', { name: 'Edition 1', exact: true }).count(), 0);
         assert.equal(await dialog.getByRole('button', { name: 'Close', exact: true }).evaluate((button) => (
           button === globalThis.document.activeElement
         )), true, 'Preview keeps focus on the persistent Close control');
@@ -125,6 +134,15 @@ suite('Release edition selector browser verification', () => {
           await page.evaluate((value) => globalThis.document.documentElement.setAttribute('data-theme', value), theme);
           for (const width of [390, 800, 1280]) {
             await page.setViewportSize({ width, height: 844 });
+            await heading.scrollIntoViewIfNeeded();
+            const headingBounds = await heading.boundingBox();
+            const closeBounds = await dialog.getByRole('button', { name: 'Close', exact: true }).boundingBox();
+            assert.ok(headingBounds && closeBounds && headingBounds.x >= 0
+              && headingBounds.x + headingBounds.width <= closeBounds.x
+              && closeBounds.x + closeBounds.width <= width
+              && closeBounds.y >= 0 && closeBounds.y + closeBounds.height <= 844,
+            `${theme} title and Close remain visible without overlap at ${width}px`);
+            if (remote && width === 390) await page.screenshot({ path: `.tmp/heading-long-title-${theme}.png` });
             await picker.scrollIntoViewIfNeeded();
             const bounds = await picker.boundingBox();
             assert.ok(bounds && bounds.x >= 0 && bounds.x + bounds.width <= width,

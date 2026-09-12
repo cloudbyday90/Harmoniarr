@@ -45,7 +45,7 @@ export async function openGeogaddiReleaseDetail(page, baseUrl) {
   await assertLocatorFocused(geogaddiCard, 'Geogaddi card should be focused before opening Release Detail');
   await geogaddiCard.press('Enter');
 
-  const dialog = page.getByRole('dialog', { name: 'Release detail' });
+  const dialog = page.getByRole('dialog', { name: 'Geogaddi', exact: true });
   await dialog.waitFor();
   await dialog.getByText('Ready Lets Go').waitFor();
   return { dialog, geogaddiCard };

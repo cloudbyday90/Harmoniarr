@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue';
 import ArtworkImage from '../ArtworkImage.vue';
 import ReleaseEditionPicker from './ReleaseEditionPicker.vue';
 import ReleaseDetailLoadState from './ReleaseDetailLoadState.vue';
@@ -188,7 +188,11 @@ const {
 
 // ── Computed ─────────────────────────────────────────────────────────────────
 
-const displayTitle = computed(() => release.value?.title ?? props.releaseTitle ?? '');
+const headingId = useId();
+const displayTitle = computed(() => {
+  const title = [release.value?.title, props.releaseTitle].find((value) => typeof value === 'string' && value.trim());
+  return title?.trim() ?? 'Release details';
+});
 const displayArtist = computed(() => props.artistName ?? '');
 const displayYear = computed(() => {
   const d = release.value?.releaseDate ?? null;
@@ -538,7 +542,7 @@ function handleTrackOverrideRepair(action, trackOverride) {
     class="rdm-dialog"
     role="dialog"
     aria-modal="true"
-    aria-labelledby="rdm-heading"
+    :aria-labelledby="headingId"
     tabindex="-1"
     @cancel="handleCancel"
     @click="handleBackdropClick"
@@ -547,7 +551,7 @@ function handleTrackOverrideRepair(action, trackOverride) {
     <div class="rdm-shell">
       <!-- ── Header ──────────────────────────────────────────────────────── -->
       <header class="rdm-header">
-        <h2 id="rdm-heading" class="sr-only">Release detail</h2>
+        <h2 :id="headingId" class="rdm-release-title" :title="displayTitle">{{ displayTitle }}</h2>
         <button
           ref="closeButtonRef"
           type="button"
@@ -571,7 +575,6 @@ function handleTrackOverrideRepair(action, trackOverride) {
             />
           </div>
           <div class="rdm-hero-info">
-            <p class="rdm-release-title">{{ displayTitle || '—' }}</p>
             <p v-if="displayArtist" class="rdm-artist-name">{{ displayArtist }}</p>
             <p class="rdm-meta-line">
               <span v-if="displayYear">{{ displayYear }}</span>
@@ -904,7 +907,8 @@ function handleTrackOverrideRepair(action, trackOverride) {
 .rdm-header {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
+  gap: var(--hx-space-3);
   padding: var(--hx-space-3) var(--hx-space-4);
   border-bottom: 1px solid var(--hx-border-subtle);
   flex-shrink: 0;
@@ -942,7 +946,16 @@ function handleTrackOverrideRepair(action, trackOverride) {
   min-width: 0;
 }
 
+.rdm-close { flex-shrink: 0; }
+
 .rdm-release-title {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
   margin: 0;
   font-size: var(--hx-text-lg);
   font-weight: 700;
