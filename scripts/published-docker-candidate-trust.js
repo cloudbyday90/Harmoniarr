@@ -7,8 +7,9 @@
 
 import { createHash } from 'node:crypto';
 import { createPublishedCandidateCommand } from './published-docker-candidate-command.js';
-import { normalizePublishedCandidateInputs, parseVerifiedImageAttestations, publishedCandidatePredicateType,
+import { normalizePublishedCandidateInputs,
   selectBaselineMetadataAsset, verifyBaselineMetadata } from './published-docker-candidate-policy.js';
+import { verifyPublishedImageProvenance } from './published-image-provenance.js';
 
 export async function verifyPublishedCandidateTrust(options, {
   runTrustCommandFn = createPublishedCandidateCommand(), env = process.env,
@@ -27,13 +28,9 @@ export async function verifyPublishedCandidateTrust(options, {
       '--header', 'X-GitHub-Api-Version: 2022-11-28', path], 30_000);
   }
   async function verifyImage(reference, revision) {
-    const output = await run(['attestation', 'verify', `oci://${reference}`,
-      '--hostname', 'github.com', '--repo', inputs.repository,
-      '--signer-workflow', inputs.signerWorkflow, '--source-digest', revision,
-      '--signer-digest', revision,
-      '--deny-self-hosted-runners', '--predicate-type', publishedCandidatePredicateType,
-      '--limit', '10', '--format', 'json'], 90_000);
-    return { ...parseVerifiedImageAttestations(output, { reference, imageName: inputs.imageName }), revision };
+    const result = await verifyPublishedImageProvenance({ imageRef: reference, revision, repository: inputs.repository },
+      { runTrustCommandFn, env });
+    return { reference: result.reference, attestationCount: result.attestationCount, revision: result.revision };
   }
   const candidate = await verifyImage(inputs.candidateImageRef, inputs.candidateRevision);
   const baseline = await verifyImage(inputs.baselineImageRef, inputs.baselineRevision);

@@ -5,28 +5,18 @@
  * See LICENSE file for details.
  */
 
-import { assertCandidateRevision } from './docker-candidate-identity.js';
 import { defaultReleaseAssetNames, verifyReleaseContract } from './release-contract.js';
+import { normalizePublishedImageInputs, publishedImagePredicateType } from './published-image-provenance-policy.js';
 
-export const publishedCandidatePredicateType = 'https://slsa.dev/provenance/v1';
+export { publishedImagePredicateType as publishedCandidatePredicateType };
 export const publishedCandidateBaselinePolicy = 'operator-selected-published-release';
 
 export function normalizePublishedCandidateInputs({
   candidateImageRef, baselineImageRef, candidateRevision, baselineRevision,
   baselineReleaseTag, repository = 'cloudbyday90/Harmoniarr',
 } = {}) {
-  if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,99}\/[a-zA-Z0-9][a-zA-Z0-9_.-]{0,99}$/.test(repository ?? '')) {
-    throw new Error('A GitHub owner and repository are required');
-  }
-  const imageName = `ghcr.io/${repository.toLowerCase()}`;
-  for (const reference of [candidateImageRef, baselineImageRef]) {
-    if (typeof reference !== 'string' || !reference.startsWith(`${imageName}@`)
-      || !/^sha256:[a-f0-9]{64}$/.test(reference.slice(imageName.length + 1))) {
-      throw new Error('Published acceptance requires canonical GHCR SHA-256 digest references');
-    }
-  }
-  assertCandidateRevision(candidateRevision);
-  assertCandidateRevision(baselineRevision);
+  const { imageName, signerWorkflow } = normalizePublishedImageInputs({ imageRef: candidateImageRef, revision: candidateRevision, repository });
+  normalizePublishedImageInputs({ imageRef: baselineImageRef, revision: baselineRevision, repository });
   if (candidateImageRef === baselineImageRef || candidateRevision === baselineRevision) {
     throw new Error('Published upgrade acceptance requires distinct images and source revisions');
   }
@@ -35,27 +25,7 @@ export function normalizePublishedCandidateInputs({
     throw new Error('An explicit baseline release tag is required');
   }
   return { candidateImageRef, baselineImageRef, candidateRevision, baselineRevision,
-    baselineReleaseTag, repository, imageName, signerWorkflow: `${repository}/.github/workflows/release-image.yml` };
-}
-
-export function parseVerifiedImageAttestations(text, { reference, imageName }) {
-  const records = JSON.parse(text);
-  const digest = reference.split('@sha256:')[1];
-  if (!Array.isArray(records) || records.length === 0 || records.length > 10) {
-    throw new Error('Published image verification did not return bounded attestations');
-  }
-  const matching = records.filter((record) => {
-    const result = record?.verificationResult;
-    const certificate = result?.signature?.certificate;
-    return certificate && typeof certificate === 'object' && !Array.isArray(certificate)
-      && result.statement?.predicateType === publishedCandidatePredicateType
-      && Array.isArray(result.statement.subject)
-      && result.statement.subject.some((subject) => subject?.name === imageName && subject.digest?.sha256 === digest);
-  });
-  if (matching.length === 0) throw new Error('Verified image attestations do not bind the expected digest');
-  // Signature, issuer, source digest, workflow and runner restrictions were
-  // enforced by the live gh verifier. Predicate data is not an identity source.
-  return { reference, attestationCount: matching.length };
+    baselineReleaseTag, repository, imageName, signerWorkflow };
 }
 
 export function selectBaselineMetadataAsset(release, inputs) {

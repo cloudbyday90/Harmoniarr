@@ -9,6 +9,10 @@ on:
         description: Prior immutable image reference to validate upgrades from; defaults to repository variable DOCKER_UPGRADE_BASELINE_IMAGE
         required: false
         type: string
+      baseline_revision:
+        description: Full source commit SHA for baseline_image; defaults with image to DOCKER_UPGRADE_BASELINE_REVISION
+        required: false
+        type: string
       release_tag:
         description: Release tag to publish, for example v0.1.0-beta
         required: true
@@ -50,9 +54,6 @@ jobs:
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version-file: '.nvmrc'
-
-      - name: Install Playwright Chromium runtime
-        run: npx playwright install chromium --with-deps
 
       - name: Resolve release publish plan
         id: release
@@ -227,14 +228,19 @@ jobs:
           HARMONIARR_SUMMARY_VERIFICATION_ASSET_NAME: harmoniarr-release-verification.txt
         run: node scripts/release-workflow-summary.js publish-image
 
-  verify-published-image:
-    name: Verify Published Image
+  verify-image-provenance:
+    name: Verify Image Provenance Before Runtime
     needs: publish-image
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     permissions:
       contents: read
       packages: read
+      attestations: read
+    outputs:
+      baseline_enabled: ${{ steps.baseline.outputs.baseline_enabled }}
+      baseline_image: ${{ steps.baseline.outputs.baseline_image }}
+      baseline_revision: ${{ steps.baseline.outputs.baseline_revision }}
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -244,6 +250,80 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      - name: Resolve upgrade baseline pair
+        id: baseline
+        env:
+          HARMONIARR_REPOSITORY: ${{ github.repository }}
+          HARMONIARR_INPUT_BASELINE_IMAGE: ${{ inputs.baseline_image }}
+          HARMONIARR_INPUT_BASELINE_REVISION: ${{ inputs.baseline_revision }}
+          HARMONIARR_DEFAULT_BASELINE_IMAGE: ${{ vars['DOCKER_UPGRADE_BASELINE_IMAGE'] }}
+          HARMONIARR_DEFAULT_BASELINE_REVISION: ${{ vars['DOCKER_UPGRADE_BASELINE_REVISION'] }}
+        run: node scripts/release-baseline-plan.js
+
+      - name: Log in to GHCR
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify candidate provenance before runtime
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HARMONIARR_REPOSITORY: ${{ github.repository }}
+          HARMONIARR_IMAGE: ${{ needs.publish-image.outputs.image_ref }}
+          HARMONIARR_IMAGE_REVISION: ${{ github.sha }}
+          HARMONIARR_PROVENANCE_EVIDENCE_PATH: supply-chain/image-attestation.json
+        run: node scripts/verify-published-image-provenance.js
+
+      - name: Verify baseline provenance before runtime
+        if: ${{ steps.baseline.outputs.baseline_enabled == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HARMONIARR_REPOSITORY: ${{ github.repository }}
+          HARMONIARR_IMAGE: ${{ steps.baseline.outputs.baseline_image }}
+          HARMONIARR_IMAGE_REVISION: ${{ steps.baseline.outputs.baseline_revision }}
+          HARMONIARR_PROVENANCE_EVIDENCE_PATH: supply-chain/baseline-image-attestation.json
+        run: node scripts/verify-published-image-provenance.js
+
+      - name: Upload attestation verification artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: harmoniarr-image-attestation.json
+          path: supply-chain/image-attestation.json
+          if-no-files-found: error
+
+      - name: Upload baseline attestation verification artifact
+        if: ${{ steps.baseline.outputs.baseline_enabled == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: harmoniarr-baseline-image-attestation.json
+          path: supply-chain/baseline-image-attestation.json
+          if-no-files-found: error
+
+  verify-published-image:
+    name: Verify Published Image
+    needs:
+      - publish-image
+      - verify-image-provenance
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up project npm
+        uses: ./.github/actions/setup-project-npm
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium runtime
+        run: npx playwright install chromium --with-deps
+
       - name: Log in to GHCR
         uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
         with:
@@ -252,7 +332,9 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Pull published immutable image
-        run: docker pull "${{ needs.publish-image.outputs.image_ref }}"
+        env:
+          HARMONIARR_IMAGE: ${{ needs.publish-image.outputs.image_ref }}
+        run: docker pull "$HARMONIARR_IMAGE"
 
       - name: Validate published image fresh and existing-data startup
         env:
@@ -276,9 +358,10 @@ jobs:
         env:
           HARMONIARR_DOCKER_BROWSER_SMOKE_EVIDENCE_PATH: supply-chain/harmoniarr-docker-smoke-browser-operator.json
           HARMONIARR_DOCKER_BROWSER_SMOKE_SCREENSHOT_DIR: supply-chain/browser-smoke-screenshots
+          HARMONIARR_IMAGE: ${{ needs.publish-image.outputs.image_ref }}
           HARMONIARR_WALKTHROUGH_PASSWORD: HarmoniarrLocal123!
           HARMONIARR_WALKTHROUGH_USERNAME: walkthrough-admin
-        run: docker tag "${{ needs.publish-image.outputs.image_ref }}" harmoniarr:walkthrough-local && docker compose -f compose.walkthrough.yaml up -d --no-build harmoniarr && docker compose -f compose.walkthrough.yaml --profile bootstrap run --rm walkthrough-bootstrap && npm run validate:docker-browser-smoke
+        run: docker tag "$HARMONIARR_IMAGE" harmoniarr:walkthrough-local && docker compose -f compose.walkthrough.yaml up -d --no-build harmoniarr && docker compose -f compose.walkthrough.yaml --profile bootstrap run --rm walkthrough-bootstrap && npm run validate:docker-browser-smoke
 
       - name: Verify published-image browser smoke evidence artifact
         env:
@@ -313,10 +396,11 @@ jobs:
         run: node scripts/release-workflow-summary.js verify-published-image
 
   verify-upgrade-path:
-    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.baseline_image != '') || vars['DOCKER_UPGRADE_BASELINE_IMAGE'] != '' }}
+    if: ${{ needs.verify-image-provenance.outputs.baseline_enabled == 'true' }}
     name: Verify Upgrade Path
     needs:
       - publish-image
+      - verify-image-provenance
       - verify-published-image
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -340,11 +424,13 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Pull published immutable image
-        run: docker pull "${{ needs.publish-image.outputs.image_ref }}"
+        env:
+          HARMONIARR_IMAGE: ${{ needs.publish-image.outputs.image_ref }}
+        run: docker pull "$HARMONIARR_IMAGE"
 
       - name: Validate published image upgrade path
         env:
-          HARMONIARR_BASELINE_IMAGE: ${{ github.event_name == 'workflow_dispatch' && inputs.baseline_image || vars['DOCKER_UPGRADE_BASELINE_IMAGE'] }}
+          HARMONIARR_BASELINE_IMAGE: ${{ needs.verify-image-provenance.outputs.baseline_image }}
           HARMONIARR_DOCKER_SMOKE_EVIDENCE_PATH: supply-chain/harmoniarr-docker-smoke-upgrade-path.json
           HARMONIARR_IMAGE: ${{ needs.publish-image.outputs.image_ref }}
         run: npm run validate:docker-upgrade
@@ -362,10 +448,11 @@ jobs:
           if-no-files-found: error
 
   verify-release-contract:
-    if: ${{ always() && github.event_name == 'release' && needs.publish-image.result == 'success' && needs.verify-published-image.result == 'success' && (needs.verify-upgrade-path.result == 'success' || needs.verify-upgrade-path.result == 'skipped') }}
+    if: ${{ always() && !cancelled() && github.event_name == 'release' && needs.verify-image-provenance.result == 'success' && needs.publish-image.result == 'success' && needs.verify-published-image.result == 'success' && (needs.verify-upgrade-path.result == 'success' || needs.verify-upgrade-path.result == 'skipped') }}
     name: Verify Release Contract
     needs:
       - publish-image
+      - verify-image-provenance
       - verify-published-image
       - verify-upgrade-path
     runs-on: ubuntu-latest
@@ -517,24 +604,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Verify published image attestation
-        if: ${{ !github.event.repository.private }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh attestation verify "oci://${{ needs.publish-image.outputs.image_ref }}" --repo "${{ github.repository }}" --format json > supply-chain/image-attestation.json
-
-      - name: Upload attestation verification artifact
-        if: ${{ !github.event.repository.private }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: harmoniarr-image-attestation.json
-          path: supply-chain/image-attestation.json
-          if-no-files-found: error
-
       - name: Publish release-contract summary
         env:
-          HARMONIARR_SUMMARY_ATTESTATION_STATUS: ${{ github.event.repository.private && 'skipped for private repository' || 'passed' }}
+          HARMONIARR_SUMMARY_ATTESTATION_STATUS: provenance verified before runtime
           HARMONIARR_SUMMARY_BROWSER_SMOKE_EVIDENCE_STATUS: published-image browser-smoke artifact passed
           HARMONIARR_SUMMARY_DEPLOYMENT_SUMMARY_ARTIFACT_NAME: harmoniarr-docker-deployment-summary.json
           HARMONIARR_SUMMARY_DOCKERHUB_MIRROR_STATUS: ${{ needs.publish-image.outputs.dockerhub_enabled == 'true' && 'passed' || 'skipped' }}

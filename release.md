@@ -42,7 +42,7 @@ These workflows make up the release boundary that must stay green for a real rel
 - Docker image builds locally when Docker is available.
 - If release, maintenance, or mirror scripts changed, the affected workflow scripts are replayed locally with the `node --env-file` pattern from [docs/WORKFLOW_SCRIPT_LOCAL_REPLAY.md](docs/WORKFLOW_SCRIPT_LOCAL_REPLAY.md) before the first GitHub Actions run is treated as evidence.
 - The plan for operator deployment notes explicitly records the immutable image reference as `tag@sha256:digest`, not tag-only text.
-- If the repo is private or internal, attestation support is evaluated before provenance checks are treated as blocking.
+- Provenance verification is mandatory before released-image execution, including private repositories. Missing attestation support or access blocks that gate.
 
 ## Local Preflight
 
@@ -172,7 +172,7 @@ Preferred final path:
 
 Optional operator path:
 
-- `Release Image` also supports `workflow_dispatch` with `release_tag` and optional `baseline_image` inputs.
+- `Release Image` also supports `workflow_dispatch` with `release_tag` and optional paired `baseline_image` and `baseline_revision` inputs. Supply both when overriding; otherwise the pair comes from `DOCKER_UPGRADE_BASELINE_IMAGE` and `DOCKER_UPGRADE_BASELINE_REVISION`. Incomplete pairs fail closed.
 - Use that path for reruns or operator-driven image publication when needed.
 - Do not treat `workflow_dispatch` as equivalent to the final GitHub Release publication path, because the steps that upload assets to the GitHub Release only run on the real `release` event.
 
@@ -196,14 +196,16 @@ Expected `Release Image` workflow artifacts:
 - `harmoniarr-docker-smoke-released-image.json`
 - `harmoniarr-docker-smoke-upgrade-path.json` when upgrade validation ran
 - `harmoniarr-docker-deployment-summary.json`
-- `harmoniarr-image-attestation.json` when attestation verification ran
+- `harmoniarr-image-attestation.json`: sanitized provenance result from the mandatory pre-runtime gate
+- `harmoniarr-baseline-image-attestation.json`: corresponding baseline result when configured
 
 Expected `Release Image` verification stages:
 
 - `publish-image`: build and push multi-arch image, generate SBOM release asset, write metadata assets, and attach provenance when supported
+- `verify-image-provenance`: verify candidate origin against the exact repository, release workflow, source and signer SHA before runtime; verify any configured baseline with its explicit full revision. See the [design](docs/RELEASE_PROVENANCE_GATE_DESIGN.md).
 - `verify-published-image`: pull the immutable image, run `npm run validate:docker-released-image`, verify the emitted smoke evidence contract, and upload the archived evidence
-- `verify-upgrade-path`: when a baseline image is configured, run `npm run validate:docker-upgrade`, verify the emitted upgrade evidence contract, and upload the archived evidence
-- `verify-release-contract`: download release assets, download archived smoke evidence, re-verify the evidence contracts, validate the metadata and Compose override assets, verify mirror behavior, and run `gh attestation verify` for the published immutable image when supported
+- `verify-upgrade-path`: after provenance passes, when a complete baseline pair is configured, run `npm run validate:docker-upgrade`, verify the emitted upgrade evidence contract, and upload the archived evidence
+- `verify-release-contract`: download release assets, download archived smoke evidence, re-verify the evidence contracts, validate the metadata and Compose override assets, verify mirror behavior, and require the earlier provenance gate to have succeeded
 
 ## Post-Publish Verification
 
@@ -213,11 +215,17 @@ Verify the release assets and immutability boundary first:
 gh release view vX.Y.Z-beta --repo cloudbyday90/Harmoniarr --json assets,tagName,isImmutable
 ```
 
-Verify the published image attestation against the immutable image reference:
+Verify the published image with the same strict policy used by CI (PowerShell):
 
-```bash
-gh attestation verify "oci://ghcr.io/cloudbyday90/harmoniarr@sha256:<published-digest>" --repo cloudbyday90/Harmoniarr
+```powershell
+$env:HARMONIARR_REPOSITORY = 'cloudbyday90/Harmoniarr'
+$env:HARMONIARR_IMAGE = 'ghcr.io/cloudbyday90/harmoniarr@sha256:<published-digest>'
+$env:HARMONIARR_IMAGE_REVISION = '<full-source-commit-sha>'
+$env:HARMONIARR_PROVENANCE_EVIDENCE_PATH = '.tmp/new-image-provenance.json'
+node scripts/verify-published-image-provenance.js
 ```
+
+Use actual digest/revision values and an authenticated GitHub/registry session. Select a new evidence path. This verifies origin only; it does not establish runtime acceptance.
 
 Then confirm all of the following:
 

@@ -104,7 +104,7 @@ Issue #4 platform evidence map: `docs/ISSUE_4_RELEASE_VALIDATION_EVIDENCE.md`
 - [x] Validate fresh-install schema bootstrap against a disposable PostgreSQL database.
 - [x] Validate upgrade from the prior accepted state or baseline image.
 	- `npm run validate:docker-upgrade` now drives a baseline image followed by the candidate image against the same bind-mounted state, proving post-upgrade startup plus persisted settings continuity through the shared smoke contract.
-	- The `release-image` workflow now also exposes an optional `baseline_image` dispatch input, falls back to repository variable `DOCKER_UPGRADE_BASELINE_IMAGE`, and uploads `harmoniarr-docker-smoke-upgrade-path.json` when published-image upgrade validation runs in CI.
+	- The `release-image` workflow requires paired optional `baseline_image`/`baseline_revision` inputs or paired `DOCKER_UPGRADE_BASELINE_IMAGE`/`DOCKER_UPGRADE_BASELINE_REVISION` variables, verifies their provenance before execution, and uploads `harmoniarr-docker-smoke-upgrade-path.json` when published-image upgrade validation runs in CI.
 	- Live local-tag upgrade execution passed on 2026-06-27 from `harmoniarr-walkthrough:latest` to `ghcr.io/cloudbyday90/harmoniarr:0.1.0-beta`, with verified upgrade-path evidence under `.tmp/docker-release-upgrade-evidence`. Final release closure should repeat with registry-authenticated immutable digest refs because GHCR digest access returned `denied` in the local environment.
 - [x] Validate startup refusal on incompatible or unsafe configuration states.
 	- The shared Docker smoke contract now includes a fail-closed invalid-startup scenario using `docker compose up --abort-on-container-failure --exit-code-from harmoniarr`, asserting both service exit code `1` and the expected startup-refusal log message for an invalid bootstrap-owner configuration.
@@ -185,3 +185,6 @@ Issue #4 platform evidence map: `docs/ISSUE_4_RELEASE_VALIDATION_EVIDENCE.md`
 - [ ] V1 has an executable release-readiness checklist rather than implicit confidence.
 - [ ] Validation covers fresh install, upgrade, restore, and critical operational safety paths.
 - [ ] Packaging and documentation are synchronized with what actually ships.
+
+- [x] Wire mandatory candidate and configured-baseline provenance verification before released-image runtime jobs. See [design](RELEASE_PROVENANCE_GATE_DESIGN.md) and [outcome](RELEASE_PROVENANCE_GATE_OUTCOME.md).
+- [ ] Complete a live published-image run through that gate with reviewed baseline acceptance evidence.

@@ -534,8 +534,8 @@ export function validateReleaseImageWorkflowContract(source) {
       issues.push(`${releaseImageUpgradeValidationStep.name} must run ${releaseImageUpgradeValidationStep.command}`);
     }
 
-    if (!block.includes(`HARMONIARR_BASELINE_IMAGE: \${{ github.event_name == 'workflow_dispatch' && inputs.${releaseImageUpgradeWorkflow.baselineInputName} || vars['${releaseImageUpgradeWorkflow.baselineVariableName}'] }}`.replace('\\', ''))) {
-      issues.push(`${releaseImageUpgradeValidationStep.name} must source HARMONIARR_BASELINE_IMAGE from workflow input or repository variable`);
+    if (!block.includes(`HARMONIARR_BASELINE_IMAGE: \${{ needs.verify-image-provenance.outputs.baseline_image }}`)) {
+      issues.push(`${releaseImageUpgradeValidationStep.name} must consume the verified baseline image`);
     }
 
     if (!block.includes(`HARMONIARR_IMAGE: \${{ needs.publish-image.outputs.image_ref }}`)) {

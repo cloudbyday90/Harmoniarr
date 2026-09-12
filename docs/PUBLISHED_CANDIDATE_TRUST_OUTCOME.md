@@ -50,8 +50,12 @@ All current open PR heads and complete patches were reviewed through GitHub MCP.
 | --- | --- | --- | --- |
 | 1 | Move strict origin verification before image execution in the publishing workflow. | Applies the new policy automatically to candidate and baseline execution. | Requires explicit baseline revision/approval inputs and a policy for the first release. |
 | 2 | Establish a reviewed baseline record and run the new command with accessible published digests. | Closes the missing published runtime/provenance evidence. | Requires valid GitHub/registry access and actual artifacts; no local fallback can close it. |
-| 3 | Design draft → attach assets → publish handling for immutable GitHub releases. | Protects tag/assets after release publication. | Current post-publication asset upload sequence must change. |
+| 3 | Design draft â†’ attach assets â†’ publish handling for immutable GitHub releases. | Protects tag/assets after release publication. | Current post-publication asset upload sequence must change. |
 | 4 | Complete live provider and operator recovery acceptance against the final candidate. | Verifies external access and recoverability in the shipped runtime. | Requires eligible saved connections and isolated recovery rehearsal. |
 | 5 | Add supported-platform execution and representative load evidence. | Exposes architecture-specific and scale regressions. | Requires suitable runners and explicit performance budgets. |
 
 Retain Node 24 native ESM, small policy/orchestration/command modules, canonical GHCR digests, live GitHub certificate-policy verification, isolated Docker runtime checks, and sanitized evidence written after cleanup. Keep publication, provenance, runtime success, and independent release approval as separate facts. The next code item is moving the publishing workflow's existing repository-only, post-smoke provenance check before execution with the stricter identity policy; the live release gate remains blocked by artifact/access/baseline prerequisites.
+
+## Follow-up implementation
+
+The first recommendation is implemented in the [release provenance gate outcome](RELEASE_PROVENANCE_GATE_OUTCOME.md). Live published acceptance and baseline approval remain separate outstanding gates.
