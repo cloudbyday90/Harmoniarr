@@ -97,6 +97,8 @@ async function withInsertFailure(pool, table, work) {
 async function waitForBlockedMutation(pool, blockerPid) {
   const deadline = Date.now() + 5000;
   while (Date.now() < deadline) {
+    // The lock holder is in a transaction; refresh its activity snapshot before polling.
+    await pool.query('SELECT pg_stat_clear_snapshot()');
     const blocked = await pool.query(`SELECT count(*)::int AS count FROM pg_stat_activity
       WHERE datname = current_database() AND $1::int = ANY(pg_blocking_pids(pid))`, [blockerPid]);
     if (blocked.rows[0].count > 0) return;

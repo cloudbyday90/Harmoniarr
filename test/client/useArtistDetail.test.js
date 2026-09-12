@@ -795,3 +795,16 @@ test('useArtistDetail navigation suppresses old load-more failures and clears ol
   assert.equal(detail.discographyPageError.value, null);
   assert.deepEqual(detail.discographyPagination.value, { loaded: 1, total: 1, hasMore: false, complete: true });
 });
+
+test('Artist Detail requests a lightweight identity before the complete operator projection', async () => {
+  const calls = [];
+  const detail = useArtistDetail({
+    resolveLocal: async (_mbid, options) => { calls.push(options.view); return { artist: makeArtist() }; },
+    fetchOperatorProjection: async () => { calls.push('projection'); return { artist: makeArtist(), releaseGroups: [makeReleaseGroup()] }; },
+    browseReleaseGroups: async () => assert.fail('A complete nonempty local projection must not trigger remote browse'),
+    fetchSimilar: async () => ({ similarArtists: [] }),
+  });
+  await detail.loadArtistDetail('artist-mbid');
+  assert.deepEqual(calls, ['summary', 'projection']);
+  assert.equal(detail.releaseGroups.value.length, 1);
+});

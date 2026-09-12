@@ -67,8 +67,8 @@ export function fetchMetadataRelease(releaseId, { signal } = {}) {
   return apiRequest(`/api/v1/metadata/releases/${encodeURIComponent(releaseId)}`, { signal });
 }
 
-export function resolveMusicBrainzArtistLocal(artistId, { signal } = {}) {
-  return apiRequest(`/api/v1/metadata/musicbrainz/artists/${encodeURIComponent(artistId)}/local`, { signal });
+export function resolveMusicBrainzArtistLocal(artistId, { signal, view } = {}) {
+  return apiRequest(`/api/v1/metadata/musicbrainz/artists/${encodeURIComponent(artistId)}/local${buildQueryString({ view })}`, { signal });
 }
 
 export function resolveMusicBrainzReleaseGroupLocal(releaseGroupId, { signal } = {}) {

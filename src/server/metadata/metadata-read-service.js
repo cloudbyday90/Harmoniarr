@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { normalizeMetadataArtistReadView } from './metadata-artist-read-view.js';
 import { getPool } from '../database.js';
 import { createMetadataMonitoredArtistStore } from './metadata-monitored-artist-store.js';
 import { createMetadataReleaseDetectionService } from './metadata-release-detection-service.js';
@@ -200,10 +201,18 @@ export function createMetadataReadService({
     return buildArtistPayload(artist);
   }
 
-  async function getArtistByMusicBrainzId({ musicBrainzArtistId }) {
+  async function getArtistByMusicBrainzId({ musicBrainzArtistId, view }) {
+    const readView = normalizeMetadataArtistReadView(view);
     const artist = await getMetadataArtistByMusicBrainzArtistId(musicBrainzArtistId, pool);
     if (!artist) {
       throw createMetadataNotFoundError('artist', musicBrainzArtistId);
+    }
+
+    if (readView === 'summary') {
+      return {
+        artist: mapArtist(artist),
+        monitoring: await metadataMonitoredArtistStore.getArtistMonitoringStatus(artist.id),
+      };
     }
 
     return buildArtistPayload(artist);

@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { normalizeMetadataArtistReadView } from '../metadata/metadata-artist-read-view.js';
 import { createApiError, getRequestMetadata, requireCsrf, requireSession } from '../auth.js';
 import { createRequestAuthDependencies } from '../auth-module.js';
 import { asyncRoute, sanitizePageLimit, sanitizePageOffset } from '../http.js';
@@ -379,9 +380,13 @@ export function registerMetadataRoutes(app, {
   });
 
   registerSessionGetJsonRoute('/api/v1/metadata/musicbrainz/artists/:artistId/local', async (request) => {
+    const view = normalizeMetadataArtistReadView(request.query.view);
     const result = await getMetadataArtistByMusicBrainzId({
+      view,
       musicBrainzArtistId: request.params.artistId,
     });
+
+    if (view === 'summary') return { artist: result.artist, monitoring: result.monitoring };
 
     return {
       artist: result.artist,

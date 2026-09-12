@@ -128,7 +128,7 @@ export function useArtistDetail({
     usesCatalogPages.value = false;
     let localPayload = null;
     try {
-      localPayload = await resolveLocal(mbid, { signal: requestSignal });
+      localPayload = await resolveLocal(mbid, { signal: requestSignal, view: 'summary' });
     } catch (error) {
       if (!request.isCurrent() || isAbortError(error)) {
         if (request.isCurrent()) {

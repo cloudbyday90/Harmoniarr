@@ -313,3 +313,15 @@ test('operator draft saves reject missing and invalid revisions without a networ
   }
   assert.equal(globalThis.fetch.mock.callCount(), 0);
 });
+
+test('artist local summary is opt-in and forwards cancellation', async (t) => {
+  globalThis.document = { cookie: '' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse());
+  const controller = new AbortController();
+  await resolveMusicBrainzArtistLocal('mb-artist-1', { view: 'summary', signal: controller.signal });
+  const [url, options] = globalThis.fetch.mock.calls[0].arguments;
+  assert.equal(url, '/api/v1/metadata/musicbrainz/artists/mb-artist-1/local?view=summary');
+  assert.equal(options.signal, controller.signal);
+  await resolveMusicBrainzArtistLocal('mb-artist-1');
+  assert.equal(globalThis.fetch.mock.calls[1].arguments[0], '/api/v1/metadata/musicbrainz/artists/mb-artist-1/local');
+});
