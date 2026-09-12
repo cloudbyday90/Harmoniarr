@@ -783,10 +783,14 @@ function handleTrackOverrideRepair(action, trackOverride) {
                   v-for="track in medium.tracks"
                   :key="track.position"
                   class="rdm-track"
-                  :class="{ 'has-track-override-controls': canEditTrackOverrides, 'is-owned': track.isOwned }"
+                  :class="{ 'has-track-override-controls': canEditTrackOverrides, 'is-owned': track.isOwned === true }"
                   >
-                  <span class="rdm-track-owned" aria-label="In library">
-                    {{ track.isOwned ? '●' : '○' }}
+                  <span
+                    class="rdm-track-owned"
+                    :title="track.isOwned === true ? 'In library' : 'Not matched in library'"
+                  >
+                    <span aria-hidden="true">{{ track.isOwned === true ? '●' : '○' }}</span>
+                    <span class="sr-only">{{ track.isOwned === true ? 'In library' : 'Not matched in library' }}</span>
                   </span>
                   <span class="rdm-track-num">{{ track.numberText ?? track.position }}</span>
                   <span class="rdm-track-title">{{ track.title }}</span>

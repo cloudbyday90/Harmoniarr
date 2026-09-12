@@ -157,6 +157,15 @@ suite('Release Detail modal browser verification', () => {
 
       ({ dialog, releaseCard } = await openMusicHasTheRightToChildrenDialog({ baseUrl, page, pageErrors }));
       await dialog.getByText('Roygbiv').waitFor();
+      const ownedRow = dialog.getByRole('listitem').filter({ has: page.getByText('Wildlife Analysis', { exact: true }) });
+      const unmatchedRow = dialog.getByRole('listitem').filter({ has: page.getByText('An Eagle in Your Mind', { exact: true }) });
+      assert.match(await ownedRow.ariaSnapshot(), /In library/u);
+      assert.doesNotMatch(await ownedRow.ariaSnapshot(), /Not matched|[●○]/u);
+      assert.match(await unmatchedRow.ariaSnapshot(), /Not matched in library/u);
+      assert.doesNotMatch(await unmatchedRow.ariaSnapshot(), /[●○]/u);
+      assert.equal(await ownedRow.locator('.rdm-track-owned').getAttribute('title'), 'In library');
+      assert.equal(await unmatchedRow.locator('.rdm-track-owned').getAttribute('title'), 'Not matched in library');
+
       await dialog.getByText('1 track override needs review before saving Artist Policy.').waitFor();
       await dialog.getByText('Needs review', { exact: true }).waitFor();
       await dialog.getByText('Saved override may need remapping after metadata changed.').waitFor();
@@ -183,6 +192,10 @@ suite('Release Detail modal browser verification', () => {
       await editionPicker.selectOption(usEditionValue);
       await dialog.getByRole('button', { name: 'Preview edition', exact: true }).click();
       await dialog.getByText('Left Side Drive').waitFor();
+      assert.match(await ownedRow.ariaSnapshot(), /Not matched in library/u);
+      assert.equal(await ownedRow.locator('.rdm-track-owned').getAttribute('title'), 'Not matched in library');
+      assert.equal(await ownedRow.evaluate((row) => row.classList.contains('is-owned')), false);
+      assert.doesNotMatch(await ownedRow.ariaSnapshot(), /[●○]/u);
       await dialog.locator('.rdm-hero .rdm-meta-line').getByText('4 tracks', { exact: true }).waitFor();
       assert.equal(await editionPicker.inputValue(), usEditionValue);
 
