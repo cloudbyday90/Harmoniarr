@@ -23,6 +23,7 @@ import { useRoute } from 'vue-router';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import ConfirmRequestModal from '../components/media/ConfirmRequestModal.vue';
 import ArtistDetailDiscographyLoadingState from '../components/media/ArtistDetailDiscographyLoadingState.vue';
+import ArtistDiscographyPagination from '../components/media/ArtistDiscographyPagination.vue';
 import ReleaseDetailModal from '../components/media/ReleaseDetailModal.vue';
 import ArtistDetailRelatedArtistCard from '../components/media/ArtistDetailRelatedArtistCard.vue';
 import ArtistReleaseSectionGrid from '../components/media/ArtistReleaseSectionGrid.vue';
@@ -137,6 +138,10 @@ const {
   isMonitored,
   artistError,
   discographyError,
+  discographyPagination,
+  isLoadingMoreDiscography,
+  discographyPageError,
+  loadMoreDiscography,
   relatedError,
   cancelArtistDetailLoad,
   loadArtistDetail,
@@ -1112,6 +1117,13 @@ watch(projection, () => {
               </ArtistReleaseSectionGrid>
             </section>
           </div>
+          <ArtistDiscographyPagination
+            v-if="discographyPagination && !isLoading && !discographyError"
+            :pagination="discographyPagination"
+            :loading="isLoadingMoreDiscography"
+            :error="discographyPageError"
+            @load-more="loadMoreDiscography"
+          />
         </div>
       </article>
 

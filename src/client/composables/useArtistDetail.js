@@ -25,6 +25,7 @@ import {
   fetchOperatorArtistProjection,
   resolveMusicBrainzArtistLocal,
 } from '../lib/metadata-api.js';
+import { useArtistDiscographyPages } from './useArtistDiscographyPages.js';
 import { useArtistDetailRelatedArtists } from './useArtistDetailRelatedArtists.js';
 
 /**
@@ -54,7 +55,7 @@ import { useArtistDetailRelatedArtists } from './useArtistDetailRelatedArtists.j
  * @param {function} [options.fetchOperatorProjection] - Override for testing.
  * @param {function} [options.browseReleaseGroups] - Override for testing.
  * @param {function} [options.fetchSimilar] - Override for testing.
- * @param {number} [options.releaseGroupLimit=100] - Max release groups to load.
+ * @param {number} [options.releaseGroupLimit=25] - Release groups per catalog page.
  * @param {number} [options.similarLimit=8] - Max related artists to show.
  */
 export function useArtistDetail({
@@ -62,15 +63,19 @@ export function useArtistDetail({
   fetchOperatorProjection = fetchOperatorArtistProjection,
   browseReleaseGroups = browseMusicBrainzArtistReleaseGroups,
   fetchSimilar,
-  releaseGroupLimit = 100,
+  releaseGroupLimit = 25,
   similarLimit = 8,
 } = {}) {
   const artist = ref(null);
   const operator = ref(null);
   const projection = ref(null);
   const monitoring = ref(null);
-  const releaseGroups = ref([]);
-  const discographyCache = ref(null);
+  const localReleaseGroups = ref([]);
+  const usesCatalogPages = ref(false);
+  const catalogPages = useArtistDiscographyPages({ browseReleaseGroups, limit: releaseGroupLimit });
+  const releaseGroups = computed(() => usesCatalogPages.value ? catalogPages.results.value : localReleaseGroups.value);
+  const discographyCache = computed(() => usesCatalogPages.value ? catalogPages.cache.value : null);
+  const discographyPagination = computed(() => usesCatalogPages.value ? catalogPages.pagination.value : null);
   const isLoading = ref(false);
   const artistError = ref(null);
   const discographyError = ref(null);
@@ -102,6 +107,7 @@ export function useArtistDetail({
    * @param {{ signal?: AbortSignal }} [opts]
    */
   async function loadArtistDetail(mbid, { signal } = {}) {
+    catalogPages.reset();
     if (!mbid) {
       artistDetailRequestGate.invalidate();
       invalidateRelatedArtists();
@@ -118,8 +124,8 @@ export function useArtistDetail({
     monitoring.value = null;
     operator.value = null;
     projection.value = null;
-    releaseGroups.value = [];
-    discographyCache.value = null;
+    localReleaseGroups.value = [];
+    usesCatalogPages.value = false;
     let localPayload = null;
     try {
       localPayload = await resolveLocal(mbid, { signal: requestSignal });
@@ -164,7 +170,7 @@ export function useArtistDetail({
             operator.value = operatorPayload?.operator ?? null;
             artist.value = operatorPayload?.artist ?? artist.value;
             monitoring.value = operatorPayload?.operator?.monitoring ?? monitoring.value;
-            releaseGroups.value = projectedReleaseGroups;
+            localReleaseGroups.value = projectedReleaseGroups;
             shouldBrowseDiscography = projectedReleaseGroups.length === 0;
           } catch (error) {
             if (!request.isCurrent() || isAbortError(error)) {
@@ -188,20 +194,8 @@ export function useArtistDetail({
       }
 
       try {
-        const discographyResult = await browseReleaseGroups({
-          artistId: mbid,
-          limit: releaseGroupLimit,
-          signal: requestSignal,
-        });
-        if (!request.isCurrent()) {
-          return;
-        }
-
-        const browsePayload = discographyResult?.browse ?? discographyResult;
-        releaseGroups.value = Array.isArray(browsePayload?.results)
-          ? browsePayload.results
-          : [];
-        discographyCache.value = browsePayload?.cache ?? null;
+        usesCatalogPages.value = true;
+        await catalogPages.start(mbid, { signal: requestSignal, isCurrent: request.isCurrent });
       } catch (error) {
         if (!request.isCurrent() || isAbortError(error)) {
           return;
@@ -211,7 +205,7 @@ export function useArtistDetail({
           error,
           'Could not load discography.',
         );
-        releaseGroups.value = [];
+        localReleaseGroups.value = [];
       }
     } finally {
       if (request.isCurrent() && !requestSignal?.aborted) {
@@ -230,6 +224,7 @@ export function useArtistDetail({
   }
 
   function cancelArtistDetailLoad() {
+    catalogPages.reset();
     artistDetailRequestGate.invalidate();
     invalidateRelatedArtists();
     isLoading.value = false;
@@ -250,9 +245,11 @@ export function useArtistDetail({
     operator.value = nextProjection?.operator ?? null;
     artist.value = nextProjection?.artist ?? artist.value;
     monitoring.value = nextProjection?.operator?.monitoring ?? monitoring.value;
-    releaseGroups.value = Array.isArray(nextProjection?.releaseGroups)
-      ? nextProjection.releaseGroups
-      : releaseGroups.value;
+    if (Array.isArray(nextProjection?.releaseGroups)) {
+      catalogPages.reset();
+      usesCatalogPages.value = false;
+      localReleaseGroups.value = nextProjection.releaseGroups;
+    }
   }
 
   return {
@@ -262,6 +259,10 @@ export function useArtistDetail({
     monitoring: readonly(monitoring),
     releaseGroups: readonly(releaseGroups),
     discographyCache: readonly(discographyCache),
+    discographyPagination,
+    isLoadingMoreDiscography: catalogPages.isLoadingMore,
+    discographyPageError: catalogPages.error,
+    loadMoreDiscography: catalogPages.loadMore,
     relatedArtists: readonly(relatedArtists),
     relatedArtistsCache,
     isLoading: readonly(isLoading),

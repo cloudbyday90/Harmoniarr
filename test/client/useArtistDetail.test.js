@@ -718,3 +718,80 @@ test('useArtistDetail clears errors on a successful second load', async (t) => {
   assert.equal(discographyError.value, null);
   assert.equal(releaseGroups.value.length, 1);
 });
+
+
+test('useArtistDetail remote catalog defaults to 25 and appends pages without reloading artist or projection', async () => {
+  const reads = [];
+  let localReads = 0;
+  let projectionReads = 0;
+  const detail = useArtistDetail({
+    resolveLocal: async () => { localReads += 1; return { artist: makeArtist() }; },
+    fetchOperatorProjection: async () => { projectionReads += 1; return { releaseGroups: [] }; },
+    browseReleaseGroups: async ({ offset, limit }) => {
+      reads.push({ offset, limit });
+      return { browse: { results: Array.from({ length: offset === 0 ? 25 : 2 }, (_, index) =>
+        makeReleaseGroup({ id: `remote-${offset + index}` })), total: 27, offset, limit } };
+    },
+    fetchSimilar: createSimilarDouble(),
+  });
+  await detail.loadArtistDetail('mb-1');
+  const originalProjection = detail.projection.value;
+  assert.deepEqual(detail.discographyPagination.value, { loaded: 25, total: 27, hasMore: true, complete: false });
+  await detail.loadMoreDiscography();
+  assert.deepEqual(reads, [{ offset: 0, limit: 25 }, { offset: 25, limit: 25 }]);
+  assert.equal(detail.releaseGroups.value.length, 27);
+  assert.equal(detail.projection.value, originalProjection, 'Appending must not trigger the projection watcher that resets drafts');
+  assert.equal(localReads, 1);
+  assert.equal(projectionReads, 1);
+  assert.equal(detail.discographyPagination.value.complete, true);
+});
+
+test('useArtistDetail projection takeover cancels an in-flight remote page and prevents late catalog overwrite', async () => {
+  const pendingPage = createDeferred();
+  let pageSignal;
+  let reads = 0;
+  const detail = useArtistDetail({
+    resolveLocal: createLocalDouble({ artist: null }),
+    browseReleaseGroups: ({ offset, signal }) => {
+      reads += 1;
+      pageSignal = signal;
+      return offset === 0 ? { results: [makeReleaseGroup({ id: 'remote-first' })], total: 2 } : pendingPage.promise;
+    },
+    releaseGroupLimit: 1,
+    fetchSimilar: createSimilarDouble(),
+  });
+  await detail.loadArtistDetail('mb-1');
+  const loading = detail.loadMoreDiscography();
+  const saved = { artist: makeArtist(), releaseGroups: [makeReleaseGroup({ id: 'saved-local' })] };
+  detail.setOperatorProjection(saved);
+  assert.equal(pageSignal.aborted, true);
+  assert.equal(detail.discographyPagination.value, null);
+  assert.equal(detail.isLoadingMoreDiscography.value, false);
+  pendingPage.resolve({ results: [makeReleaseGroup({ id: 'obsolete-remote' })], total: 2 });
+  assert.equal(await loading, false);
+  assert.deepEqual(detail.releaseGroups.value.map(({ id }) => id), ['saved-local']);
+  assert.equal(detail.projection.value.artist.id, saved.artist.id);
+  assert.equal(await detail.loadMoreDiscography(), false);
+  assert.equal(reads, 2);
+});
+
+test('useArtistDetail navigation suppresses old load-more failures and clears old remote pagination', async () => {
+  const pendingPage = createDeferred();
+  const detail = useArtistDetail({
+    resolveLocal: createLocalDouble({ artist: null }),
+    browseReleaseGroups: ({ artistId, offset }) => {
+      if (artistId === 'old' && offset > 0) return pendingPage.promise;
+      return { results: [makeReleaseGroup({ id: artistId })], total: artistId === 'old' ? 2 : 1 };
+    },
+    releaseGroupLimit: 1,
+    fetchSimilar: createSimilarDouble(),
+  });
+  await detail.loadArtistDetail('old');
+  const loading = detail.loadMoreDiscography();
+  await detail.loadArtistDetail('new');
+  pendingPage.reject(new Error('old page failed'));
+  assert.equal(await loading, false);
+  assert.deepEqual(detail.releaseGroups.value.map(({ id }) => id), ['new']);
+  assert.equal(detail.discographyPageError.value, null);
+  assert.deepEqual(detail.discographyPagination.value, { loaded: 1, total: 1, hasMore: false, complete: true });
+});
