@@ -1179,6 +1179,7 @@ watch(projection, () => {
       :operator-edition-selection-error="manualEditionSelectionError"
       :operator-edition-selection-saving="isSelectingManualEdition"
       :operator-selected-release-id="detailOperatorReleaseGroup?.operatorState?.resolvedMetadataReleaseId ?? null"
+      :artwork-url="getReleaseArtwork(detailRelease?.releaseGroup?.id ?? detailRelease?.releaseGroupId)?.url ?? null"
       :release-title="detailRelease?.title ?? null"
       :artist-name="artist?.name ?? null"
       :release-year="detailRelease?.date ? String(detailRelease.date).slice(0, 4) : null"

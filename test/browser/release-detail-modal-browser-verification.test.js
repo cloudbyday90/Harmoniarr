@@ -157,6 +157,9 @@ suite('Release Detail modal browser verification', () => {
 
       ({ dialog, releaseCard } = await openMusicHasTheRightToChildrenDialog({ baseUrl, page, pageErrors }));
       await dialog.getByText('Roygbiv').waitFor();
+      const resolvedCover = dialog.locator('.rdm-artwork img');
+      await resolvedCover.waitFor();
+      assert.match(await resolvedCover.getAttribute('src'), /^data:image\/svg\+xml/u);
       const ownedRow = dialog.getByRole('listitem').filter({ has: page.getByText('Wildlife Analysis', { exact: true }) });
       const unmatchedRow = dialog.getByRole('listitem').filter({ has: page.getByText('An Eagle in Your Mind', { exact: true }) });
       assert.match(await ownedRow.ariaSnapshot(), /In library/u);

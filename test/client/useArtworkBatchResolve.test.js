@@ -18,6 +18,7 @@
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { effectScope } from 'vue';
 import { useArtworkBatchResolve } from '../../src/client/composables/useArtworkBatchResolve.js';
 
 function createMockBatchFn(resolvedMap = {}) {
@@ -180,4 +181,65 @@ test('useArtworkBatchResolve preserves existing data on subsequent failure', asy
   await resolve([{ ownerType: 'musicbrainz_release', ownerId: 'mbid-2', artworkRole: 'cover_front' }]);
   assert.ok(getResolved('musicbrainz_release', 'mbid-1', 'cover_front'), 'previous data preserved');
   assert.equal(getResolved('musicbrainz_release', 'mbid-2', 'cover_front'), null);
+});
+
+test('overlapping artwork calls retain pending state until every current call completes', async () => {
+  const finish = [];
+  const artwork = useArtworkBatchResolve({ batchResolveFn: () => new Promise((resolve) => { finish.push(resolve); }) });
+  const first = artwork.resolve([{}]);
+  const second = artwork.resolve([{}]);
+  await new Promise((resolve) => { setImmediate(resolve); });
+  finish[0]({ resolved: { first: true } });
+  await first;
+  assert.equal(artwork.isResolving.value, true);
+  assert.deepEqual(artwork.artworkMap.value, { first: true });
+  finish[1]({ resolved: { second: true } });
+  await second;
+  assert.equal(artwork.isResolving.value, false);
+  assert.deepEqual(artwork.artworkMap.value, { first: true, second: true });
+});
+
+test('clear invalidates old artwork and its finalizer without disturbing a new resolution', async () => {
+  const finish = [];
+  const artwork = useArtworkBatchResolve({ batchResolveFn: () => new Promise((resolve) => { finish.push(resolve); }) });
+  const old = artwork.resolve([{}]);
+  await new Promise((resolve) => { setImmediate(resolve); });
+  artwork.clear();
+  const current = artwork.resolve([{}]);
+  await new Promise((resolve) => { setImmediate(resolve); });
+  finish[0]({ resolved: { stale: true } });
+  await old;
+  assert.equal(artwork.isResolving.value, true);
+  assert.deepEqual(artwork.artworkMap.value, {});
+  finish[1]({ resolved: { current: true } });
+  await current;
+  assert.deepEqual(artwork.artworkMap.value, { current: true });
+  assert.equal(artwork.isResolving.value, false);
+});
+
+test('artwork composable keeps successful sibling batch results on partial failure', async () => {
+  const artwork = useArtworkBatchResolve({ batchResolveFn: async (batch) => {
+    if (batch[0] === 0) throw new Error('Failed first batch');
+    return { resolved: { retained: { url: 'cover' } } };
+  } });
+  await artwork.resolve(Array.from({ length: 51 }, (_, index) => index));
+  assert.deepEqual(artwork.artworkMap.value, { retained: { url: 'cover' } });
+  assert.equal(artwork.isResolving.value, false);
+});
+
+test('disposed artwork composable rejects late resolve calls without repopulating state', async () => {
+  let calls = 0;
+  const scope = effectScope();
+  const artwork = scope.run(() => useArtworkBatchResolve({ batchResolveFn: async () => {
+    calls += 1;
+    return { resolved: { cover: { url: 'cover' } } };
+  } }));
+  await artwork.resolve([{}]);
+  assert.equal(calls, 1);
+  scope.stop();
+  assert.deepEqual(artwork.artworkMap.value, {});
+  await artwork.resolve([{}]);
+  assert.equal(calls, 1);
+  assert.deepEqual(artwork.artworkMap.value, {});
+  assert.equal(artwork.isResolving.value, false);
 });

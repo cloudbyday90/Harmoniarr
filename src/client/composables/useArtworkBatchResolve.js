@@ -16,16 +16,20 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { ref } from 'vue';
+import { computed, getCurrentScope, onScopeDispose, ref } from 'vue';
 import { batchResolveArtwork as defaultBatchResolve } from '../lib/artwork-api.js';
 
-const BATCH_LIMIT = 50;
+import { createArtworkBatchResolver } from '../lib/artwork-batch-resolver.js';
 
 export function useArtworkBatchResolve({
   batchResolveFn = defaultBatchResolve,
 } = {}) {
   const artworkMap = ref({});
-  const isResolving = ref(false);
+  const pendingCalls = ref(0);
+  const isResolving = computed(() => pendingCalls.value > 0);
+  const { resolveBatches } = createArtworkBatchResolver({ batchResolveFn });
+  let generation = 0;
+  let disposed = false;
 
   function buildKey(ownerType, ownerId, artworkRole) {
     return `${ownerType}:${ownerId}:${artworkRole ?? 'cover_front'}`;
@@ -36,35 +40,29 @@ export function useArtworkBatchResolve({
   }
 
   async function resolve(requests) {
-    if (!requests || requests.length === 0) return;
-
-    isResolving.value = true;
-
-    const batches = [];
-    for (let i = 0; i < requests.length; i += BATCH_LIMIT) {
-      batches.push(requests.slice(i, i + BATCH_LIMIT));
-    }
-
+    if (disposed || !Array.isArray(requests) || requests.length === 0) return;
+    const token = generation;
+    pendingCalls.value += 1;
     try {
-      const allResults = await Promise.all(
-        batches.map((batch) => batchResolveFn(batch)),
-      );
-
-      const merged = { ...artworkMap.value };
-      for (const { resolved } of allResults) {
-        Object.assign(merged, resolved);
-      }
-      artworkMap.value = merged;
-    } catch {
-      // Silently leave existing map — cards fall back to CAA direct / placeholder
+      return await resolveBatches(requests, {
+        shouldContinue: () => !disposed && token === generation,
+        onResolved: (resolved) => { artworkMap.value = { ...artworkMap.value, ...resolved }; },
+      });
     } finally {
-      isResolving.value = false;
+      if (token === generation) pendingCalls.value -= 1;
     }
   }
 
   function clear() {
+    generation += 1;
+    pendingCalls.value = 0;
     artworkMap.value = {};
   }
+
+  if (getCurrentScope()) onScopeDispose(() => {
+    disposed = true;
+    clear();
+  });
 
   return { artworkMap, clear, getResolved, isResolving, resolve };
 }

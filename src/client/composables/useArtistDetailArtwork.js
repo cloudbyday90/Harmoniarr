@@ -16,11 +16,13 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { readonly, ref, toValue, watch } from 'vue';
+import { getCurrentScope, onScopeDispose, readonly, ref, toValue, watch } from 'vue';
 import {
   batchResolveArtwork as defaultBatchResolveArtwork,
   resolveArtwork as defaultResolveArtwork,
 } from '../lib/artwork-api.js';
+
+import { createArtworkBatchResolver } from '../lib/artwork-batch-resolver.js';
 
 function artworkKey(ownerType, ownerId, artworkRole) {
   return `${ownerType}:${ownerId}:${artworkRole}`;
@@ -93,17 +95,23 @@ export function useArtistDetailArtwork({
   const discographyArtwork = ref({});
   const relatedArtwork = ref({});
 
+  const { resolveBatches } = createArtworkBatchResolver({ batchResolveFn: batchResolveArtworkFn });
   let heroLoadToken = 0;
+  let disposed = false;
+  if (getCurrentScope()) {
+    onScopeDispose(() => { disposed = true; heroLoadToken += 1; });
+  }
 
   async function loadArtistArtwork(refresh = false) {
+    const token = ++heroLoadToken;
     const currentMbid = toValue(artistMbid);
-    if (!currentMbid) {
+    if (!currentMbid || disposed) {
+      isRefreshingArtwork.value = false;
       heroBackgroundUrl.value = null;
       heroThumbnailUrl.value = null;
       return;
     }
 
-    const token = ++heroLoadToken;
     if (!refresh) {
       heroBackgroundUrl.value = null;
       heroThumbnailUrl.value = null;
@@ -111,27 +119,31 @@ export function useArtistDetailArtwork({
 
     isRefreshingArtwork.value = true;
     try {
-      const [backgroundResult, thumbnailResult] = await Promise.all([
-        resolveArtworkFn({
+      const [backgroundResult, thumbnailResult] = await Promise.allSettled([
+        Promise.resolve().then(() => resolveArtworkFn({
           artworkRole: 'artist_background',
           ownerId: currentMbid,
           ownerType: 'musicbrainz_artist',
           refresh,
-        }),
-        resolveArtworkFn({
+        })),
+        Promise.resolve().then(() => resolveArtworkFn({
           artworkRole: 'artist_thumbnail',
           ownerId: currentMbid,
           ownerType: 'musicbrainz_artist',
           refresh,
-        }),
+        })),
       ]);
 
       if (token !== heroLoadToken || currentMbid !== toValue(artistMbid)) {
         return;
       }
 
-      heroBackgroundUrl.value = backgroundResult?.url ?? null;
-      heroThumbnailUrl.value = thumbnailResult?.url ?? null;
+      if (backgroundResult.status === 'fulfilled') {
+        heroBackgroundUrl.value = backgroundResult.value?.url ?? null;
+      }
+      if (thumbnailResult.status === 'fulfilled') {
+        heroThumbnailUrl.value = thumbnailResult.value?.url ?? null;
+      }
     } catch {
       if (token !== heroLoadToken || currentMbid !== toValue(artistMbid)) {
         return;
@@ -155,42 +167,28 @@ export function useArtistDetailArtwork({
   }
 
   watch(() => toValue(artistMbid), () => {
+    discographyArtwork.value = {};
+    relatedArtwork.value = {};
     void loadArtistArtwork(false);
   }, { immediate: true });
 
-  watch(() => toValue(discographySections), async (sections) => {
-    const requests = buildArtistDetailDiscographyArtworkRequests(sections, discographyArtwork.value);
-    if (requests.length === 0) {
-      return;
-    }
+  function watchArtwork(source, buildRequests, target) {
+    watch([() => toValue(artistMbid), () => toValue(source)], ([mbid, entries], _previous, onCleanup) => {
+      let active = true;
+      onCleanup(() => { active = false; });
+      if (!mbid) return;
+      const shouldContinue = () => active && !disposed && mbid === toValue(artistMbid);
+      void resolveBatches(buildRequests(entries, target.value), {
+        shouldContinue,
+        onResolved: (resolved) => {
+          target.value = { ...target.value, ...resolved };
+        },
+      });
+    }, { immediate: true });
+  }
 
-    try {
-      const { resolved } = await batchResolveArtworkFn(requests);
-      discographyArtwork.value = {
-        ...discographyArtwork.value,
-        ...resolved,
-      };
-    } catch {
-      // Discography artwork is decorative; silently degrade.
-    }
-  }, { immediate: true });
-
-  watch(() => toValue(relatedArtists), async (artists) => {
-    const requests = buildArtistDetailRelatedArtworkRequests(artists, relatedArtwork.value);
-    if (requests.length === 0) {
-      return;
-    }
-
-    try {
-      const { resolved } = await batchResolveArtworkFn(requests);
-      relatedArtwork.value = {
-        ...relatedArtwork.value,
-        ...resolved,
-      };
-    } catch {
-      // Related artwork is decorative; silently degrade.
-    }
-  }, { immediate: true });
+  watchArtwork(discographySections, buildArtistDetailDiscographyArtworkRequests, discographyArtwork);
+  watchArtwork(relatedArtists, buildArtistDetailRelatedArtworkRequests, relatedArtwork);
 
   return {
     discographyArtwork: readonly(discographyArtwork),
