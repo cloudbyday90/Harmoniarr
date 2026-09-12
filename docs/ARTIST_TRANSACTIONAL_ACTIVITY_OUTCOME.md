@@ -24,6 +24,6 @@ Required event persistence now shares the save's availability: an Activity schem
 
 Keep the existing save lock/revision check, PostgreSQL transaction, narrow Activity writer, Activity store, and Activity feed. This removes the dual-write gap without queue complexity. Use an outbox only when delivery must cross a separate resource boundary.
 
-Next address notification delivery guarantees explicitly: persist required dispatch intent with idempotent consumers and bounded recovery only if the product requires eventual delivery. Before that larger change, resolve the existing overlapping `client.query()` calls within artist transactions, which emit a PostgreSQL client deprecation warning and can be replaced with sequential awaits.
+Next address notification delivery guarantees explicitly: persist required dispatch intent with idempotent consumers and bounded recovery only if the product requires eventual delivery. The overlapping reads in the artist save transaction have now been replaced with sequential awaits; see [query-ordering outcome](ARTIST_TRANSACTION_QUERY_OUTCOME.md).
 
 See the [design, alternatives, official September 2026 research, and PR disposition](ARTIST_TRANSACTIONAL_ACTIVITY_DESIGN.md).

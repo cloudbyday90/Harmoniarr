@@ -478,31 +478,27 @@ export function createOperatorArtistSaveService({
             expectedSnapshotRevision: normalizedExpectedSnapshotRevision, snapshotRevision,
           });
         }
-        const [
-          previousMonitoring,
-          previousReleaseGroupSelections,
-          previousTrackOverrides,
-        ] = await Promise.all([
-          getPreviousMonitoringPolicy({
-            appUserId,
-            client,
-            existingMonitoring,
-            metadataArtistId,
-            operatorArtistMonitoringStore,
-          }),
-          listPreviousReleaseGroupSelections({
-            appUserId,
-            client,
-            metadataArtistId,
-            operatorReleaseGroupSelectionStore,
-          }),
-          listPreviousTrackOverrides({
-            appUserId,
-            client,
-            metadataArtistId,
-            operatorTrackOverrideStore,
-          }),
-        ]);
+        // One transaction client executes one query at a time. Await each read
+        // so a rejection cannot leave later reads queued ahead of ROLLBACK.
+        const previousMonitoring = await getPreviousMonitoringPolicy({
+          appUserId,
+          client,
+          existingMonitoring,
+          metadataArtistId,
+          operatorArtistMonitoringStore,
+        });
+        const previousReleaseGroupSelections = await listPreviousReleaseGroupSelections({
+          appUserId,
+          client,
+          metadataArtistId,
+          operatorReleaseGroupSelectionStore,
+        });
+        const previousTrackOverrides = await listPreviousTrackOverrides({
+          appUserId,
+          client,
+          metadataArtistId,
+          operatorTrackOverrideStore,
+        });
 
         await fetchReleaseGroupOwnership({
           client,

@@ -914,3 +914,102 @@ test('transactional activity failure rejects the save before COMMIT and prevents
   assert.equal(followUps, 0);
   assert.equal(released, 1);
 });
+
+
+function deferredRead() {
+  let resolve;
+  let reject;
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+function createPreviousReadHarness() {
+  const harness = createMonitoringSaveHarness();
+  const basePool = harness.getPoolFn();
+  const reads = ['monitoring', 'selections', 'overrides'];
+  const gates = Object.fromEntries(reads.map((name) => [name, { entered: deferredRead(), settled: deferredRead() }]));
+  const events = [];
+  let activeRead = null;
+  const getPoolFn = () => ({ connect: async () => {
+    const baseClient = await basePool.connect();
+    return {
+      release: () => { events.push('release'); baseClient.release(); },
+      query: async (sql, parameters) => {
+        assert.equal(activeRead, null, `Transaction query ${sql} overlaps ${activeRead}`);
+        if (!sql.startsWith('previous:')) {
+          events.push(sql);
+          return baseClient.query(sql, parameters);
+        }
+        const name = sql.slice('previous:'.length);
+        activeRead = name;
+        events.push(`start:${name}`);
+        gates[name].entered.resolve();
+        try {
+          await gates[name].settled.promise;
+          return name === 'monitoring' ? { isMonitored: false } : [];
+        } finally {
+          events.push(`settled:${name}`);
+          activeRead = null;
+        }
+      },
+    };
+  } });
+  const service = createSaveServiceForTest({
+    ...harness, getPoolFn,
+    operatorArtistMonitoringStore: {
+      ...harness.operatorArtistMonitoringStore,
+      getOperatorArtistMonitoring: ({ queryable }) => queryable.query('previous:monitoring'),
+    },
+    operatorReleaseGroupSelectionStore: {
+      ...harness.operatorReleaseGroupSelectionStore,
+      listOperatorReleaseGroupSelections: ({ queryable }) => queryable.query('previous:selections'),
+    },
+    operatorTrackOverrideStore: {
+      ...harness.operatorTrackOverrideStore,
+      listOperatorTrackOverrides: ({ queryable }) => queryable.query('previous:overrides'),
+    },
+  });
+  const save = () => service.saveOperatorArtist({
+    appUserId: 'user-1', metadataArtistId: 'artist-1', expectedSnapshotRevision: 0,
+    draft: { monitoring: { isMonitored: false }, releaseGroupSelections: [], trackOverrides: [] },
+  });
+  return { events, gates, save };
+}
+
+test('artist save awaits each previous-state read before using the transaction client again', async () => {
+  const { events, gates, save } = createPreviousReadHarness();
+  const saving = save();
+  for (const [index, name] of ['monitoring', 'selections', 'overrides'].entries()) {
+    await gates[name].entered.promise;
+    assert.deepEqual(events.filter((event) => event.startsWith('start:')),
+      ['monitoring', 'selections', 'overrides'].slice(0, index + 1).map((entry) => `start:${entry}`));
+    assert.equal(events.includes('COMMIT'), false);
+    assert.equal(events.includes('ROLLBACK'), false);
+    gates[name].settled.resolve();
+  }
+  await saving;
+  assert.deepEqual(events.filter((event) => /^(start|settled):/.test(event)), [
+    'start:monitoring', 'settled:monitoring', 'start:selections', 'settled:selections',
+    'start:overrides', 'settled:overrides',
+  ]);
+  assert.equal(events.filter((event) => event === 'COMMIT').length, 1);
+  assert.equal(events.includes('ROLLBACK'), false);
+});
+
+test('artist save waits for a failed previous-state read before rollback and never starts later reads', async () => {
+  const { events, gates, save } = createPreviousReadHarness();
+  const failure = new Error('Previous monitoring read failed');
+  const rejectedSave = assert.rejects(save(), failure);
+  await gates.monitoring.entered.promise;
+  assert.deepEqual(events.filter((event) => event.startsWith('start:')), ['start:monitoring']);
+  assert.equal(events.includes('ROLLBACK'), false);
+  assert.equal(events.includes('release'), false);
+  gates.monitoring.settled.reject(failure);
+  await rejectedSave;
+  assert.deepEqual(events.filter((event) => /^(start|settled):/.test(event)), ['start:monitoring', 'settled:monitoring']);
+  assert.ok(events.indexOf('ROLLBACK') > events.indexOf('settled:monitoring'));
+  assert.deepEqual(events.filter((event) => ['COMMIT', 'ROLLBACK', 'release'].includes(event)), ['ROLLBACK', 'release']);
+});
