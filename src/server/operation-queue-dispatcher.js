@@ -39,6 +39,7 @@ export function createOperationQueueDispatcher({
   onError = async () => {},
   operationQueueStore = createOperationQueueStore(),
   operationStrandedRunRecoveryService = null,
+  recoverFailedOperatorArtistReconciliations = null,
 } = {}) {
   const supportedOperationTypes = Object.keys(handlers).filter(Boolean);
   const resolvedDispatchIntervalMs = normalizeDispatchIntervalMs(intervalMs);
@@ -88,6 +89,15 @@ export function createOperationQueueDispatcher({
           operationTypes: supportedOperationTypes,
         })
         : null;
+
+      if (recoverFailedOperatorArtistReconciliations) {
+        try {
+          await recoverFailedOperatorArtistReconciliations({ operationTypes: supportedOperationTypes });
+        } catch (error) {
+          // Recovery failure must be reported without blocking unrelated queued work.
+          await onError(error, { phase: 'artist_reconciliation_recovery' });
+        }
+      }
 
       let claimedCount = 0;
 

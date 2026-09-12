@@ -1,5 +1,7 @@
 # Activity Imports And Reconciliation Recovery Design
 
+September 12, 2026 update: the projection-triggered recovery described below is superseded by [Artist reads and reconciliation recovery](ARTIST_READ_RECOVERY_DESIGN.md). Artist GETs are now read-only; bounded automatic recovery belongs to the dispatcher sweep. The protected manual Retry remains. Historical implementation details below describe the earlier design.
+
 Status: Implemented
 Date: 2026-06-28
 

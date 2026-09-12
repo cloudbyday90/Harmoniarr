@@ -26,7 +26,6 @@ import {
   summarizeOperatorArtistCoverage,
 } from './operator-artist-coverage-summary-service.js';
 import { createOperatorArtistReconciliationRunStore } from './operator-artist-reconciliation-run-store.js';
-import { createOperatorArtistReconciliationRecoveryService } from './operator-artist-reconciliation-recovery-service.js';
 import { createOperatorArtistReconciliationSnapshotService } from './operator-artist-reconciliation-snapshot-service.js';
 import { createOperatorReleaseGroupSelectionStore } from './operator-release-group-selection-store.js';
 import { createOperatorTrackOverrideStore } from './operator-track-override-store.js';
@@ -108,7 +107,6 @@ export function createOperatorArtistProjectionService({
   metadataReadService = null,
   operatorArtistMonitoringService = null,
   operatorArtistReconciliationRunStore = null,
-  operatorArtistReconciliationRecoveryService = null,
   operatorArtistReconciliationSnapshotService = null,
   operatorReleaseGroupSelectionStore = null,
   operatorTrackOverrideStore = null,
@@ -122,8 +120,6 @@ export function createOperatorArtistProjectionService({
     ?? createOperatorArtistReconciliationSnapshotService();
   const resolvedOperatorArtistReconciliationRunStore = operatorArtistReconciliationRunStore
     ?? createOperatorArtistReconciliationRunStore();
-  const resolvedOperatorArtistReconciliationRecoveryService = operatorArtistReconciliationRecoveryService
-    ?? createOperatorArtistReconciliationRecoveryService();
   const resolvedOperatorReleaseGroupSelectionStore = operatorReleaseGroupSelectionStore
     ?? createOperatorReleaseGroupSelectionStore();
   const resolvedOperatorTrackOverrideStore = operatorTrackOverrideStore
@@ -153,7 +149,7 @@ export function createOperatorArtistProjectionService({
       monitoring,
       latestSnapshot,
       latestRun,
-      initialPendingRun,
+      pendingRun,
       runningRun,
       releaseGroupSelections,
       trackOverrides,
@@ -182,24 +178,6 @@ export function createOperatorArtistProjectionService({
       ? releaseGroupSelections
       : [];
     const resolvedTrackOverrides = Array.isArray(trackOverrides) ? trackOverrides : [];
-    let pendingRun = initialPendingRun;
-    let reconciliationRecovery = null;
-
-    if (!pendingRun && !runningRun && latestRun?.status === 'failed') {
-      reconciliationRecovery = await resolvedOperatorArtistReconciliationRecoveryService.recoverFailedOperatorArtistReconciliation({
-        appUserId,
-        latestRun,
-        latestSnapshot,
-        metadataArtistId,
-        pendingRun,
-        runningRun,
-      });
-
-      if (reconciliationRecovery?.run) {
-        pendingRun = reconciliationRecovery.run;
-      }
-    }
-
     const {
       effectiveReleaseGroups: releaseGroups,
       orphanedReleaseGroupSelections,
@@ -241,7 +219,7 @@ export function createOperatorArtistProjectionService({
           latestRun,
           latestSnapshot: summarizeSnapshot(latestSnapshot),
           pendingRun,
-          recovery: reconciliationRecovery,
+          recovery: null,
           runningRun,
           status: runningRun
             ? 'running'

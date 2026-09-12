@@ -223,6 +223,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
         },
       },
       metadataModule: {
+        operatorArtistReconciliationRecoverySweepService: { recoverFailedRuns: async () => ({ recoveredCount: 0 }) },
         metadataArtistRefreshService: {
           startMetadataArtistRefresh: async () => ({ accepted: true }),
         },
@@ -284,6 +285,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
       onError,
       operationQueueStore,
       operationStrandedRunRecoveryService: injectedRecoveryService,
+      recoverFailedOperatorArtistReconciliations,
     }) => {
       assert.equal(typeof dispatchPauseService.resolveDispatchReadiness, 'function');
       assert.equal(typeof onError, 'function');
@@ -291,6 +293,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
       assert.equal(typeof handlers.library_scan, 'function');
       assert.equal(typeof operationQueueStore.claimNextRunnableRun, 'function');
       assert.equal(injectedRecoveryService, operationStrandedRunRecoveryService);
+      assert.equal(typeof recoverFailedOperatorArtistReconciliations, 'function');
       return operationQueueDispatcher;
     },
     createOperationQueueHandlers: ({ artworkModule, importCandidateModule, libraryModule, metadataModule }) => {

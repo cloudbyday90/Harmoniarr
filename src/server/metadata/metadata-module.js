@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createOperatorArtistReconciliationRecoverySweepService } from './operator-artist-reconciliation-recovery-sweep-service.js';
 import { createMetadataArtistRefreshRunStore } from './metadata-artist-refresh-run-store.js';
 import { createMetadataRefreshDispatchPolicyService } from './metadata-refresh-dispatch-policy-service.js';
 import { createMetadataReleaseDetectionService } from './metadata-release-detection-service.js';
@@ -35,7 +36,6 @@ import { createOperatorArtistMonitoringStore } from './operator-artist-monitorin
 import { createOperatorArtistReconciliationRunStore } from './operator-artist-reconciliation-run-store.js';
 import { createOperatorArtistReconciliationExecutionService } from './operator-artist-reconciliation-execution-service.js';
 import { createOperatorArtistReconciliationRequestService } from './operator-artist-reconciliation-request-service.js';
-import { createOperatorArtistReconciliationRecoveryService } from './operator-artist-reconciliation-recovery-service.js';
 import { createOperatorArtistReconciliationService } from './operator-artist-reconciliation-service.js';
 import { createOperatorArtistReconciliationSnapshotService } from './operator-artist-reconciliation-snapshot-service.js';
 import { createOperatorArtistReconciliationSnapshotStore } from './operator-artist-reconciliation-snapshot-store.js';
@@ -160,9 +160,6 @@ export function createMetadataModule({
       queueLatestSnapshotRun: resolvedOperatorArtistReconciliationRunStore.queueLatestSnapshotRun,
       recordAuditEventFn,
     });
-  const resolvedOperatorArtistReconciliationRecoveryService = createOperatorArtistReconciliationRecoveryService({
-    queueOperatorArtistReconciliation: resolvedOperatorArtistReconciliationService.queueOperatorArtistReconciliation,
-  });
   const resolvedOperatorArtistProjectionService = operatorArtistProjectionService
     ?? createOperatorArtistProjectionService({
       getLatestOperatorArtistReconciliationSnapshot: resolvedOperatorArtistReconciliationSnapshotService.getLatestOperatorArtistReconciliationSnapshot,
@@ -173,7 +170,6 @@ export function createMetadataModule({
       getRunningRunByOperatorArtist: resolvedOperatorArtistReconciliationRunStore.getRunningRunByOperatorArtist,
       listOperatorReleaseGroupSelections: resolvedOperatorReleaseGroupSelectionStore.listOperatorReleaseGroupSelections,
       listOperatorTrackOverrides: resolvedOperatorTrackOverrideStore.listOperatorTrackOverrides,
-      operatorArtistReconciliationRecoveryService: resolvedOperatorArtistReconciliationRecoveryService,
     });
   const resolvedOperatorMonitoredArtistProjectionService = operatorMonitoredArtistProjectionService
     ?? createOperatorMonitoredArtistProjectionService({
@@ -371,6 +367,7 @@ export function createMetadataModule({
     musicBrainzImportService: resolvedMusicBrainzImportService,
     musicBrainzSearchService: resolvedMusicBrainzSearchService,
     similarArtistsService: resolvedSimilarArtistsService,
+    operatorArtistReconciliationRecoverySweepService: createOperatorArtistReconciliationRecoverySweepService(),
     routeDependencies: {
       browseMusicBrainzArtistReleaseGroups: resolvedMusicBrainzCatalogService.browseArtistReleaseGroups,
       getMetadataArtistDetectionEvents: resolvedMetadataReadService.getArtistDetectionEvents,

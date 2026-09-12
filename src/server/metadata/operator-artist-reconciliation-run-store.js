@@ -17,6 +17,7 @@
  */
 
 import { getPool } from '../database.js';
+import { createOperatorArtistSaveStateStore } from './operator-artist-save-state-store.js';
 import { createOperationRunStore } from '../operation-run-store.js';
 import { operationRunRegistry } from '../../shared/operation-run-descriptors.js';
 
@@ -80,6 +81,7 @@ export function createOperatorArtistReconciliationRunStore({
   getPoolFn = getPool,
 } = {}) {
   const operationDescriptor = operationRunRegistry.operatorArtistReconciliation;
+  const saveStateStore = createOperatorArtistSaveStateStore();
   const operationRunStore = createOperationRunStore({
     getPoolFn,
     leaseJobType: operationDescriptor.leaseJobType,
@@ -320,6 +322,10 @@ export function createOperatorArtistReconciliationRunStore({
           await queryClient.query('BEGIN');
         }
 
+        await saveStateStore.lockOperatorArtistSave({
+          appUserId, metadataArtistId, client: queryClient,
+        });
+
         const runningRow = await selectRunForStatus({
           appUserId,
           client: queryClient,
@@ -411,6 +417,10 @@ export function createOperatorArtistReconciliationRunStore({
     markRunPaused: operationRunStore.markRunPaused,
     markRunStarted: operationRunStore.markRunStarted,
     queueLatestSnapshotRun,
+    async insertRecoverySnapshotRun(input) {
+      if (!input.client) throw new Error('Recovery enqueue requires a transaction client');
+      return normalizeRun(await insertPendingRun({ ...input, triggerSource: 'failure_recovery', triggeredByUserId: null }));
+    },
     releaseLease: operationRunStore.releaseLease,
     renewLease: operationRunStore.renewLease,
   };

@@ -201,6 +201,7 @@ export async function startServerRuntime({
     },
     operationQueueStore,
     operationStrandedRunRecoveryService,
+    recoverFailedOperatorArtistReconciliations: metadataModule.operatorArtistReconciliationRecoverySweepService?.recoverFailedRuns,
   });
 
   const server = app.listen(appPort, host, () => {

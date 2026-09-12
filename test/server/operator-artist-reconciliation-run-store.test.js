@@ -79,6 +79,7 @@ test('getActiveRunByOperatorArtist reads the active pending or running run', asy
 
 test('queueLatestSnapshotRun creates a queued follow-up when a running run already exists', async (t) => {
   const query = t.mock.fn(async (sql, params = []) => {
+    if (sql.includes('pg_advisory_xact_lock')) return { rows: [] };
     if (sql === 'BEGIN' || sql === 'COMMIT') {
       return { rows: [] };
     }
@@ -150,12 +151,15 @@ test('queueLatestSnapshotRun creates a queued follow-up when a running run alrea
   });
 
   assert.equal(result.action, 'queued_follow_up');
+  assert.equal(query.mock.calls[0].arguments[0], 'BEGIN');
+  assert.match(query.mock.calls[1].arguments[0], /pg_advisory_xact_lock/u);
   assert.equal(result.runningRun?.id, 'run-running');
   assert.equal(result.run?.id, 'run-pending');
 });
 
 test('queueLatestSnapshotRun replaces an existing pending follow-up with the latest snapshot', async (t) => {
   const query = t.mock.fn(async (sql, params = []) => {
+    if (sql.includes('pg_advisory_xact_lock')) return { rows: [] };
     if (sql === 'BEGIN' || sql === 'COMMIT') {
       return { rows: [] };
     }
@@ -250,6 +254,7 @@ test('queueLatestSnapshotRun replaces an existing pending follow-up with the lat
 
 test('queueLatestSnapshotRun can operate within an existing transaction client', async (t) => {
   const query = t.mock.fn(async (sql, params = []) => {
+    if (sql.includes('pg_advisory_xact_lock')) return { rows: [] };
     if (sql.includes('FROM operation_runs') && params[1] === 'running') {
       return { rows: [] };
     }

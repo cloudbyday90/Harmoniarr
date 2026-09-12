@@ -145,3 +145,39 @@ test('operation queue dispatcher skips claims while maintenance dispatch readine
     skipped: true,
   });
 });
+
+for (const paused of [false, true]) {
+  test(`artist recovery follows dispatch readiness (paused=${paused}) before claiming`, async () => {
+    const calls = [];
+    const dispatcher = createOperationQueueDispatcher({
+      createIntervalHeartbeatRunnerFn: ({ onTick }) => ({ tick: onTick }),
+      handlers: { operator_artist_reconciliation: async () => {} },
+      dispatchPauseService: { resolveDispatchReadiness: async () => { calls.push('readiness'); return { allowed: !paused }; } },
+      recoverFailedOperatorArtistReconciliations: async ({ operationTypes }) => {
+        assert.deepEqual(operationTypes, ['operator_artist_reconciliation']);
+        calls.push('recovery');
+      },
+      operationQueueStore: { claimNextRunnableRun: async () => { calls.push('claim'); return null; } },
+    });
+    await dispatcher.tick();
+    assert.deepEqual(calls, paused ? ['readiness'] : ['readiness', 'recovery', 'claim']);
+  });
+}
+
+test('artist recovery failures are reported without blocking unrelated queue claims', async () => {
+  const error = new Error('recovery database unavailable');
+  const calls = [];
+  const dispatcher = createOperationQueueDispatcher({
+    createIntervalHeartbeatRunnerFn: ({ onTick }) => ({ tick: onTick }),
+    handlers: { library_scan: async () => {} },
+    recoverFailedOperatorArtistReconciliations: async () => { throw error; },
+    onError: async (failure, context) => {
+      assert.equal(failure, error);
+      assert.equal(context.phase, 'artist_reconciliation_recovery');
+      calls.push('error');
+    },
+    operationQueueStore: { claimNextRunnableRun: async () => { calls.push('claim'); return null; } },
+  });
+  await dispatcher.tick();
+  assert.deepEqual(calls, ['error', 'claim']);
+});

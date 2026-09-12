@@ -178,7 +178,7 @@ test('getOperatorArtistProjection overlays explicit selections, track overrides,
   });
 });
 
-test('getOperatorArtistProjection self-heals a failed reconciliation by queueing one recovery run', async (t) => {
+test('getOperatorArtistProjection keeps failed reconciliation reads side-effect free across repeated and concurrent projections', async (t) => {
   const recoverFailedOperatorArtistReconciliation = t.mock.fn(async () => ({
     attempted: true,
     errorMessage: null,
@@ -214,26 +214,11 @@ test('getOperatorArtistProjection self-heals a failed reconciliation by queueing
     },
   });
 
-  const result = await service.getOperatorArtistProjection({
-    appUserId: 'user-1',
-    metadataArtistId: 'artist-1',
-  });
-
-  assert.deepEqual(recoverFailedOperatorArtistReconciliation.mock.calls[0].arguments[0], {
-    appUserId: 'user-1',
-    latestRun: {
-      id: 'run-failed',
-      status: 'failed',
-      triggerSource: 'save',
-    },
-    latestSnapshot: {
-      id: 'snapshot-7',
-      snapshotRevision: 7,
-    },
-    metadataArtistId: 'artist-1',
-    pendingRun: null,
-    runningRun: null,
-  });
+  const input = { appUserId: 'user-1', metadataArtistId: 'artist-1' };
+  const result = await service.getOperatorArtistProjection(input);
+  const concurrent = await Promise.all(Array.from({ length: 4 }, () => service.getOperatorArtistProjection(input)));
+  assert.equal(recoverFailedOperatorArtistReconciliation.mock.callCount(), 0);
+  for (const projection of concurrent) assert.deepEqual(projection, result);
   assert.deepEqual(result.operator.reconciliation, {
     latestRun: {
       id: 'run-failed',
@@ -246,15 +231,10 @@ test('getOperatorArtistProjection self-heals a failed reconciliation by queueing
       snapshotRevision: 7,
       updatedAt: null,
     },
-    pendingRun: { id: 'run-recovery', status: 'pending', triggerSource: 'failure_recovery' },
-    recovery: {
-      attempted: true,
-      errorMessage: null,
-      run: { id: 'run-recovery', status: 'pending', triggerSource: 'failure_recovery' },
-      status: 'queued',
-    },
+    pendingRun: null,
+    recovery: null,
     runningRun: null,
-    status: 'queued',
+    status: 'failed',
   });
 });
 

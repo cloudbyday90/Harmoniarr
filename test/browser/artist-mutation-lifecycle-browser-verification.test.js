@@ -162,4 +162,64 @@ suite('Artist mutation lifecycle browser verification', () => {
     }, { scenarioName: 'artist_save_conflict_keeps_draft' });
   });
 
+  test('failed artist state waits for keyboard Retry update before posting reconciliation', {
+    timeout: config.scenarioTimeoutMs,
+  }, async (t) => {
+    if (unavailableReason) return t.skip(unavailableReason);
+    await runtime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      await installMetadataBrowserFixtures(browserContext);
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      await markBoardsOfCanadaAddedInMetadataBrowserFixture(page);
+      await page.goto(`${baseUrl}/app/artists/mb-artist-autechre`, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('heading', { name: 'Autechre', exact: true }).waitFor();
+      await page.evaluate(() => {
+        const originalFetch = globalThis.fetch.bind(globalThis);
+        globalThis.artistRetryEvidence = { reads: 0, posts: 0, csrfPresent: false, queued: false };
+        globalThis.fetch = async (input, init) => {
+          const url = new URL(typeof input === 'string' ? input : input.url, globalThis.location.href);
+          const endpoint = '/api/v1/metadata/artists/metadata-artist-boards/operator';
+          const method = (init?.method ?? 'GET').toUpperCase();
+          const state = globalThis.artistRetryEvidence;
+          if (url.pathname === `${endpoint}/reconciliation` && method === 'POST') {
+            state.posts += 1;
+            state.csrfPresent = Boolean(new Headers(init.headers).get('X-CSRF-Token'));
+            state.queued = true;
+            return new Response(JSON.stringify({ ok: true, reconciliation: { accepted: true,
+              run: { id: 'manual-retry', status: 'pending', triggerSource: 'manual_retry' } } }),
+            { status: 202, headers: { 'content-type': 'application/json' } });
+          }
+          const response = await originalFetch(input, init);
+          if (url.pathname !== endpoint || method !== 'GET') return response;
+          state.reads += 1;
+          const payload = await response.json();
+          payload.operator.reconciliation = { ...payload.operator.reconciliation,
+            latestRun: { id: 'failed-run', status: 'failed', triggerSource: 'save' },
+            pendingRun: state.queued ? { id: 'manual-retry', status: 'pending', triggerSource: 'manual_retry' } : null,
+            runningRun: null, recovery: null, status: state.queued ? 'queued' : 'failed' };
+          return new Response(JSON.stringify(payload), { headers: { 'content-type': 'application/json' } });
+        };
+      });
+      await navigateWithinArtistView(page, 'mb-artist-boards');
+      const retry = page.getByRole('button', { name: 'Retry update', exact: true });
+      await retry.waitFor();
+      const beforeRetry = await page.evaluate(() => globalThis.artistRetryEvidence);
+      assert.ok(beforeRetry.reads > 0);
+      assert.equal(beforeRetry.posts, 0, 'Loading failed state must not post recovery work');
+      assert.equal(await retry.evaluate((button) => button.tagName), 'BUTTON');
+      await retry.focus();
+      await page.keyboard.press('Enter');
+      const status = page.getByRole('status').filter({ hasText: 'Release plan update queued.' });
+      await status.waitFor();
+      await page.waitForFunction(() => globalThis.artistRetryEvidence.reads >= 2);
+      const afterRetry = await page.evaluate(() => globalThis.artistRetryEvidence);
+      assert.equal(afterRetry.posts, 1);
+      assert.equal(afterRetry.csrfPresent, true);
+      assert.equal(afterRetry.queued, true);
+      assert.equal(await retry.count(), 0);
+      assert.equal(await status.textContent(), 'Release plan update queued.');
+      assert.doesNotMatch(await status.textContent(), /acquired|downloaded|completed/i);
+      await page.goto('about:blank', { waitUntil: 'load' });
+    }, { scenarioName: 'artist_retry_requires_explicit_activation' });
+  });
+
 });

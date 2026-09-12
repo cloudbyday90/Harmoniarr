@@ -169,11 +169,13 @@ As of 2026-06-27, the backend and primary operator client surfaces have moved pa
   browser-visible diagnostic panel without exposing provider secrets; see
   [DOCKER_PROVIDER_ACCEPTANCE_EVIDENCE_DESIGN.md](DOCKER_PROVIDER_ACCEPTANCE_EVIDENCE_DESIGN.md)
 - failed operator artist reconciliation now has a bounded recovery path:
-  monitored-artist projections queue one `failure_recovery` run when the latest
-  run failed and no active run exists, Artist Detail exposes a protected
+  the dispatcher can queue one `failure_recovery` run for an eligible failed
+  chain without any artist page read; Artist Detail exposes a protected
   `Retry reconciliation` action, and `Activity > Imports` no longer blanks due
   missing formatter imports; see
-  [ACTIVITY_IMPORTS_AND_RECONCILIATION_RECOVERY_DESIGN.md](ACTIVITY_IMPORTS_AND_RECONCILIATION_RECOVERY_DESIGN.md)
+  [ACTIVITY_IMPORTS_AND_RECONCILIATION_RECOVERY_DESIGN.md](ACTIVITY_IMPORTS_AND_RECONCILIATION_RECOVERY_DESIGN.md); the read-only
+  boundary and current worker policy are recorded in
+  [ARTIST_READ_RECOVERY_DESIGN.md](ARTIST_READ_RECOVERY_DESIGN.md)
 
 The remaining work is no longer core implementation. It is a follow-up backlog
 for usability depth and edge-case workflow coverage:
