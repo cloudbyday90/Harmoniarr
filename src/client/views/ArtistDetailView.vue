@@ -564,6 +564,13 @@ function repairDraftTrackOverride({ action, trackOverride }) {
   }
 }
 
+function applyOperatorProjection(nextProjection) {
+  const openGroupId = detailRelease.value?.sourceReleaseGroup?.id;
+  const savedGroup = nextProjection?.releaseGroups?.find((group) => group.id === openGroupId);
+  if (savedGroup) detailRelease.value = { ...detailRelease.value, sourceReleaseGroup: savedGroup };
+  setOperatorProjection(nextProjection);
+}
+
 async function savePolicyDraft() {
   if (!canEditOperatorPolicy.value || !isPolicyFormValid.value || isSavingPolicy.value) return;
   const draft = buildOperatorArtistSaveDraft(policyDraft.value);
@@ -578,8 +585,8 @@ async function savePolicyDraft() {
       }
     },
     async (payload, scope) => {
-      if (payload?.projection) setOperatorProjection(payload.projection);
-      else if (payload?.artist && payload?.operator) setOperatorProjection(payload);
+      if (payload?.projection) applyOperatorProjection(payload.projection);
+      else if (payload?.artist && payload?.operator) applyOperatorProjection(payload);
       else await loadArtistDetail(scope.mbid);
     },
   );
@@ -596,7 +603,7 @@ async function selectManualEdition({ release }) {
     return result;
   }, (result) => {
     if (result.ok && result.projection) {
-      setOperatorProjection(result.projection);
+      applyOperatorProjection(result.projection);
       void loadMusicQueue();
       toast.success(`Saved ${selection.title || 'this edition'} as your selected edition.`);
     }
@@ -893,7 +900,7 @@ watch(projection, () => {
           <div>
             <h2 class="hx-card-title">Discography</h2>
             <p class="hx-card-subtitle">
-              {{ isLoading ? 'The release catalog is loading.' : hasDiscography ? `${discographyReleaseCount} release groups across ${discographySectionCount} sections.` : 'Release groups appear here when they are available.' }}
+              {{ isLoading ? 'The release catalog is loading.' : hasDiscography ? `${discographyReleaseCount} ${discographyPagination ? 'loaded ' : ''}release groups across ${discographySectionCount} sections.` : 'Release groups appear here when they are available.' }}
             </p>
           </div>
         </header>
@@ -916,7 +923,7 @@ watch(projection, () => {
           </p>
 
           <EmptyState
-            v-else-if="!hasDiscography"
+            v-else-if="!hasDiscography && !discographyPageError"
             title="No releases found"
             :body="buildNoDiscographyBody()"
           />

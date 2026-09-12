@@ -9,6 +9,7 @@ import {
   fetchMetadataReleaseGroup,
   fetchMusicBrainzReleaseGroupReleases,
   fetchOperatorArtistProjection,
+  fetchOperatorArtistDiscography,
   fetchOperatorMonitoredArtistProjections,
   fetchReleaseGroupTracklist,
   fetchSimilarArtists,
@@ -324,4 +325,20 @@ test('artist local summary is opt-in and forwards cancellation', async (t) => {
   assert.equal(options.signal, controller.signal);
   await resolveMusicBrainzArtistLocal('mb-artist-1');
   assert.equal(globalThis.fetch.mock.calls[1].arguments[0], '/api/v1/metadata/musicbrainz/artists/mb-artist-1/local');
+});
+
+
+test('operator summary is opt-in and local pages forward bounded cursor requests and cancellation', async (t) => {
+  globalThis.document = { cookie: '' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse());
+  const signal = new AbortController().signal;
+  await fetchOperatorArtistProjection('artist', { signal, view: 'summary' });
+  await fetchOperatorArtistProjection('artist');
+  await fetchOperatorArtistDiscography('artist', { signal, limit: 25, cursor: 'next-page' });
+  assert.deepEqual(globalThis.fetch.mock.calls.map(({ arguments: args }) => args[0]), [
+    '/api/v1/metadata/artists/artist/operator?view=summary',
+    '/api/v1/metadata/artists/artist/operator',
+    '/api/v1/metadata/artists/artist/operator/discography?limit=25&cursor=next-page',
+  ]);
+  assert.equal(globalThis.fetch.mock.calls[2].arguments[1].signal, signal);
 });

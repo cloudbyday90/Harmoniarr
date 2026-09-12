@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { normalizeMetadataArtistReadView } from './metadata-artist-read-view.js';
 import { createMetadataReadService } from './metadata-read-service.js';
 import { defaultOperatorArtistMonitoringPolicy } from './operator-artist-monitoring-policy.js';
 import { createLibraryReleaseReconciliationStore } from '../library/library-release-reconciliation-store.js';
@@ -143,7 +144,8 @@ export function createOperatorArtistProjectionService({
   const readTrackOverrides = listOperatorTrackOverrides
     ?? resolvedOperatorTrackOverrideStore.listOperatorTrackOverrides;
 
-  async function getOperatorArtistProjection({ appUserId, metadataArtistId }) {
+  async function getOperatorArtistProjection({ appUserId, metadataArtistId, view }) {
+    const readView = normalizeMetadataArtistReadView(view);
     const [
       artistPayload,
       monitoring,
@@ -194,7 +196,7 @@ export function createOperatorArtistProjectionService({
       ? await readLibraryReleaseReconciliations({ metadataReleaseIds: desiredReleaseIds })
       : [];
 
-    return {
+    const result = {
       aliases: artistAliases,
       artist: artistPayload.artist,
       detectionEvents: artistDetectionEvents,
@@ -233,6 +235,11 @@ export function createOperatorArtistProjectionService({
       releaseGroups,
       releases: artistReleases,
     };
+    if (readView === 'summary') {
+      const { releaseGroups: _groups, releases: _releases, ...summary } = result;
+      return summary;
+    }
+    return result;
   }
 
   return {

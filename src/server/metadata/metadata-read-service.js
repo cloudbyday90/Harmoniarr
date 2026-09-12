@@ -17,6 +17,7 @@
  */
 
 import { mapMetadataReleaseGroup as mapReleaseGroup } from './metadata-release-group-presentation.js';
+import { mapMetadataRelease as mapRelease } from './metadata-release-presentation.js';
 import { normalizeMetadataArtistReadView } from './metadata-artist-read-view.js';
 import { getPool } from '../database.js';
 import { createMetadataMonitoredArtistStore } from './metadata-monitored-artist-store.js';
@@ -72,31 +73,6 @@ function mapAlias(row) {
   };
 }
 
-
-function mapRelease(row) {
-  return {
-    id: row.id,
-    releaseGroupId: row.metadata_release_group_id,
-    releaseGroupTitle: row.release_group_title ?? null,
-    releaseGroupMusicBrainzId: row.release_group_musicbrainz_release_group_id ?? null,
-    title: row.title,
-    status: row.status,
-    releaseDate: row.release_date,
-    country: row.country,
-    barcode: row.barcode,
-    disambiguation: row.disambiguation,
-    trackCount: row.track_count,
-    mediumCount: row.medium_count,
-    isCanonical: row.is_canonical ?? false,
-    source: {
-      provider: row.source_provider,
-      sourceReleaseId: row.source_release_id,
-      musicbrainzReleaseId: row.musicbrainz_release_id,
-    },
-    fetchedAt: row.fetched_at,
-    updatedAt: row.updated_at,
-  };
-}
 
 function mapMedium(row, tracks) {
   return {

@@ -25,6 +25,7 @@ import {
   fetchOperatorArtistProjection,
   resolveMusicBrainzArtistLocal,
 } from '../lib/metadata-api.js';
+import { useLocalArtistDiscographyPages } from './useLocalArtistDiscographyPages.js';
 import { useArtistDiscographyPages } from './useArtistDiscographyPages.js';
 import { useArtistDetailRelatedArtists } from './useArtistDetailRelatedArtists.js';
 
@@ -63,6 +64,7 @@ export function useArtistDetail({
   fetchOperatorProjection = fetchOperatorArtistProjection,
   browseReleaseGroups = browseMusicBrainzArtistReleaseGroups,
   fetchSimilar,
+  fetchLocalPage,
   releaseGroupLimit = 25,
   similarLimit = 8,
 } = {}) {
@@ -72,10 +74,12 @@ export function useArtistDetail({
   const monitoring = ref(null);
   const localReleaseGroups = ref([]);
   const usesCatalogPages = ref(false);
+  const usesLocalPages = ref(false);
+  const localPages = useLocalArtistDiscographyPages({ fetchPage: fetchLocalPage, limit: releaseGroupLimit });
   const catalogPages = useArtistDiscographyPages({ browseReleaseGroups, limit: releaseGroupLimit });
-  const releaseGroups = computed(() => usesCatalogPages.value ? catalogPages.results.value : localReleaseGroups.value);
+  const releaseGroups = computed(() => usesLocalPages.value ? localPages.results.value : usesCatalogPages.value ? catalogPages.results.value : localReleaseGroups.value);
   const discographyCache = computed(() => usesCatalogPages.value ? catalogPages.cache.value : null);
-  const discographyPagination = computed(() => usesCatalogPages.value ? catalogPages.pagination.value : null);
+  const discographyPagination = computed(() => usesLocalPages.value ? localPages.pagination.value : usesCatalogPages.value ? catalogPages.pagination.value : null);
   const isLoading = ref(false);
   const artistError = ref(null);
   const discographyError = ref(null);
@@ -108,6 +112,7 @@ export function useArtistDetail({
    */
   async function loadArtistDetail(mbid, { signal } = {}) {
     catalogPages.reset();
+    localPages.reset();
     if (!mbid) {
       artistDetailRequestGate.invalidate();
       invalidateRelatedArtists();
@@ -126,6 +131,7 @@ export function useArtistDetail({
     projection.value = null;
     localReleaseGroups.value = [];
     usesCatalogPages.value = false;
+    usesLocalPages.value = false;
     let localPayload = null;
     try {
       localPayload = await resolveLocal(mbid, { signal: requestSignal, view: 'summary' });
@@ -158,7 +164,7 @@ export function useArtistDetail({
 
         if (localArtistId) {
           try {
-            const operatorPayload = await fetchOperatorProjection(localArtistId, { signal: requestSignal });
+            const operatorPayload = await fetchOperatorProjection(localArtistId, { signal: requestSignal, view: 'summary' });
             if (!request.isCurrent()) {
               return;
             }
@@ -171,7 +177,14 @@ export function useArtistDetail({
             artist.value = operatorPayload?.artist ?? artist.value;
             monitoring.value = operatorPayload?.operator?.monitoring ?? monitoring.value;
             localReleaseGroups.value = projectedReleaseGroups;
-            shouldBrowseDiscography = projectedReleaseGroups.length === 0;
+            const isSummary = !Array.isArray(operatorPayload?.releaseGroups);
+            shouldBrowseDiscography = isSummary
+              ? operatorPayload?.operator?.overview?.releaseGroupCount === 0
+              : projectedReleaseGroups.length === 0;
+            if (isSummary && !shouldBrowseDiscography) {
+              usesLocalPages.value = true;
+              await localPages.start(localArtistId, { signal: requestSignal, isCurrent: request.isCurrent });
+            }
           } catch (error) {
             if (!request.isCurrent() || isAbortError(error)) {
               return;
@@ -225,6 +238,7 @@ export function useArtistDetail({
 
   function cancelArtistDetailLoad() {
     catalogPages.reset();
+    localPages.reset();
     artistDetailRequestGate.invalidate();
     invalidateRelatedArtists();
     isLoading.value = false;
@@ -241,14 +255,25 @@ export function useArtistDetail({
   }
 
   function setOperatorProjection(nextProjection) {
-    projection.value = nextProjection ?? null;
+    const paged = usesLocalPages.value;
+    const { releaseGroups: nextGroups, releases: _releases, ...summary } = nextProjection ?? {};
+    projection.value = paged && nextProjection ? summary : nextProjection ?? null;
     operator.value = nextProjection?.operator ?? null;
     artist.value = nextProjection?.artist ?? artist.value;
     monitoring.value = nextProjection?.operator?.monitoring ?? monitoring.value;
-    if (Array.isArray(nextProjection?.releaseGroups)) {
+    if (paged) {
+      const artistId = nextProjection?.artist?.id;
+      catalogPages.reset();
+      if (artistId) {
+        // Keep saved rows visible during refresh; old page reads lose ownership in start().
+        const savedById = new Map((Array.isArray(nextGroups) ? nextGroups : []).map((group) => [group.id, group]));
+        const seed = localPages.results.value.map((group) => savedById.get(group.id)).filter(Boolean);
+        void localPages.start(artistId, { seed });
+      } else localPages.reset();
+    } else if (Array.isArray(nextGroups)) {
       catalogPages.reset();
       usesCatalogPages.value = false;
-      localReleaseGroups.value = nextProjection.releaseGroups;
+      localReleaseGroups.value = nextGroups;
     }
   }
 
@@ -260,9 +285,9 @@ export function useArtistDetail({
     releaseGroups: readonly(releaseGroups),
     discographyCache: readonly(discographyCache),
     discographyPagination,
-    isLoadingMoreDiscography: catalogPages.isLoadingMore,
-    discographyPageError: catalogPages.error,
-    loadMoreDiscography: catalogPages.loadMore,
+    isLoadingMoreDiscography: computed(() => usesLocalPages.value ? localPages.loading.value : catalogPages.isLoadingMore.value),
+    discographyPageError: computed(() => usesLocalPages.value ? localPages.error.value : catalogPages.error.value),
+    loadMoreDiscography: () => usesLocalPages.value ? localPages.loadMore() : catalogPages.loadMore(),
     relatedArtists: readonly(relatedArtists),
     relatedArtistsCache,
     isLoading: readonly(isLoading),

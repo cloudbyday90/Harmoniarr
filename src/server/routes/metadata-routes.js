@@ -70,6 +70,7 @@ export function registerMetadataRoutes(app, {
   getMetadataArtistDiscography,
   getMetadataArtistByMusicBrainzId,
   getMetadataProviderCacheObservability = () => ({ namespaces: [], observedSinceAt: null, updatedAt: null }),
+  getOperatorArtistDiscography,
   getOperatorArtistProjection,
   includeOperatorArtistReleaseManually,
   selectOperatorArtistReleaseEditionManually,
@@ -247,9 +248,22 @@ export function registerMetadataRoutes(app, {
     return { releaseGroups: result.releaseGroups, pageInfo: result.pageInfo };
   });
 
+  app.get('/api/v1/metadata/artists/:artistId/operator/discography', metadataRoute(async (request, response) => {
+    const session = await requireSessionFn(request);
+    const result = await getOperatorArtistDiscography({
+      appUserId: session.appUserId,
+      metadataArtistId: request.params.artistId,
+      limit: request.query.limit,
+      cursor: request.query.cursor,
+    });
+    response.json({ ok: true, releaseGroups: result.releaseGroups, pageInfo: result.pageInfo });
+  }));
+
   app.get('/api/v1/metadata/artists/:artistId/operator', metadataRoute(async (request, response) => {
     const session = await requireSessionFn(request);
+    const view = normalizeMetadataArtistReadView(request.query.view);
     const result = await getOperatorArtistProjection({
+      ...(view === 'summary' ? { view } : {}),
       appUserId: session.appUserId,
       metadataArtistId: request.params.artistId,
     });
@@ -261,8 +275,7 @@ export function registerMetadataRoutes(app, {
       detectionEvents: result.detectionEvents,
       detectionEventsPageInfo: result.detectionEventsPageInfo,
       operator: result.operator,
-      releaseGroups: result.releaseGroups,
-      releases: result.releases,
+      ...(view === 'full' ? { releaseGroups: result.releaseGroups, releases: result.releases } : {}),
     });
   }));
 

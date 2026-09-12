@@ -18,6 +18,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     getSummary: () => {},
   };
   const metadataProviderResponseCacheStore = {};
+  const operatorArtistDiscographyService = { getOperatorArtistDiscography: () => {} };
   const operatorArtistProjectionService = {
     getOperatorArtistProjection: () => {},
   };
@@ -91,6 +92,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     metadataProviderCacheService,
     metadataProviderCacheObservabilityService,
     metadataProviderResponseCacheStore,
+    operatorArtistDiscographyService,
     operatorArtistProjectionService,
     operatorMonitoredArtistProjectionService,
     operatorArtistSaveService,
@@ -120,6 +122,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
   assert.equal(metadataModule.metadataProviderCacheObservabilityService, metadataProviderCacheObservabilityService);
   assert.equal(metadataModule.metadataProviderResponseCacheStore, metadataProviderResponseCacheStore);
   assert.equal(metadataModule.operatorMonitoredArtistProjectionService, operatorMonitoredArtistProjectionService);
+  assert.equal(metadataModule.operatorArtistDiscographyService, operatorArtistDiscographyService);
   assert.equal(metadataModule.operatorArtistProjectionService, operatorArtistProjectionService);
   assert.equal(metadataModule.operatorArtistSaveService, operatorArtistSaveService);
   assert.equal(metadataModule.operatorArtistManualInclusionService, operatorArtistManualInclusionService);
@@ -141,6 +144,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     getMetadataArtistDetectionEvents: metadataReadService.getArtistDetectionEvents,
     getMetadataProviderCacheObservability: metadataProviderCacheObservabilityService.getSummary,
     listOperatorMonitoredArtistProjections: operatorMonitoredArtistProjectionService.listOperatorMonitoredArtistProjections,
+    getOperatorArtistDiscography: operatorArtistDiscographyService.getOperatorArtistDiscography,
     getOperatorArtistProjection: operatorArtistProjectionService.getOperatorArtistProjection,
     includeOperatorArtistReleaseManually: operatorArtistManualInclusionService.includeOperatorArtistReleaseManually,
     selectOperatorArtistReleaseEditionManually: operatorArtistManualEditionSelectionService.selectOperatorArtistReleaseEditionManually,

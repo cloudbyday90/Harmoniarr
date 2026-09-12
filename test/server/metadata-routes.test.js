@@ -1477,3 +1477,42 @@ test('metadata similar artists route returns shared similar payload with sanitiz
     assert.equal(callArgs.limit, 20);
   });
 });
+
+test('operator summary route preserves complete operator data but omits display arrays and validates view', async (t) => {
+  const operator = { releaseGroupSelections: [{ metadataReleaseGroupId: 'off-page' }], trackOverrides: [{ trackMbid: 'saved' }],
+    coverage: { desiredReleaseCount: 80 }, reconciliation: { latestSnapshot: { snapshotRevision: 7 } } };
+  const getOperatorArtistProjection = t.mock.fn(async () => ({ artist: { id: 'artist' }, operator,
+    aliases: [], detectionEvents: [], releaseGroups: [{ id: 'group' }], releases: [{ id: 'edition' }] }));
+  const app = createMetadataRouteTestApp({ getOperatorArtistProjection });
+  await withServer(app, async (baseUrl) => {
+    const endpoint = `${baseUrl}/api/v1/metadata/artists/artist/operator`;
+    const response = await fetch(`${endpoint}?view=summary`);
+    assert.equal(response.status, 200);
+    const payload = await response.json();
+    assert.deepEqual(payload.operator, operator);
+    assert.equal(Object.hasOwn(payload, 'releaseGroups'), false);
+    assert.equal(Object.hasOwn(payload, 'releases'), false);
+    assert.deepEqual(getOperatorArtistProjection.mock.calls[0].arguments[0], { appUserId: 'user-1', metadataArtistId: 'artist', view: 'summary' });
+    for (const query of ['view=invalid', 'view=summary&view=full']) {
+      assert.equal((await fetch(`${endpoint}?${query}`)).status, 400);
+    }
+    assert.equal(getOperatorArtistProjection.mock.callCount(), 1);
+  });
+});
+
+test('operator discography route uses the session actor and returns only effective page rows', async (t) => {
+  const getOperatorArtistDiscography = t.mock.fn(async () => ({ releaseGroups: [{ id: 'group', operatorState: { selectionState: 'partial' } }],
+    pageInfo: { hasMore: false, nextCursor: null }, operator: { shouldNotLeak: true } }));
+  const app = createMetadataRouteTestApp({ getOperatorArtistDiscography });
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/metadata/artists/artist/operator/discography?limit=5&cursor=page&appUserId=someone-else`);
+    assert.equal(response.status, 200);
+    assert.deepEqual(getOperatorArtistDiscography.mock.calls[0].arguments[0], { appUserId: 'user-1', metadataArtistId: 'artist', limit: '5', cursor: 'page' });
+    assert.deepEqual(Object.keys(await response.json()).sort(), ['ok', 'pageInfo', 'releaseGroups']);
+  });
+  const denied = createMetadataRouteTestApp({ getOperatorArtistDiscography, requireSession: async () => { throw Object.assign(new Error('Session required'), { status: 401 }); } });
+  await withServer(denied, async (baseUrl) => {
+    assert.equal((await fetch(`${baseUrl}/api/v1/metadata/artists/artist/operator/discography`)).status, 401);
+  });
+  assert.equal(getOperatorArtistDiscography.mock.callCount(), 1);
+});

@@ -30,6 +30,7 @@ import { createOperatorArtistMonitoringService } from './operator-artist-monitor
 import { createOperatorMonitoredArtistProjectionService } from './operator-monitored-artist-projection-service.js';
 import { createOperatorArtistManualInclusionService } from './operator-artist-manual-inclusion-service.js';
 import { createOperatorArtistManualEditionSelectionService } from './operator-artist-manual-edition-selection-service.js';
+import { createOperatorArtistDiscographyService } from './operator-artist-discography-service.js';
 import { createOperatorArtistProjectionService } from './operator-artist-projection-service.js';
 import { createOperatorArtistSaveService } from './operator-artist-save-service.js';
 import { createOperatorArtistMonitoringStore } from './operator-artist-monitoring-store.js';
@@ -85,6 +86,7 @@ export function createMetadataModule({
   operatorArtistManualInclusionService = null,
   operatorArtistManualEditionSelectionService = null,
   operatorMonitoredArtistProjectionService = null,
+  operatorArtistDiscographyService = null,
   operatorArtistProjectionService = null,
   operatorArtistSaveService = null,
   operatorArtistReconciliationRunStore = null,
@@ -122,6 +124,8 @@ export function createMetadataModule({
     ?? createMetadataArtistRefreshStateStore();
   const resolvedMetadataReleaseDetectionService = metadataReleaseDetectionService ?? createMetadataReleaseDetectionService();
   const resolvedMetadataArtistDiscographyService = metadataArtistDiscographyService ?? createMetadataArtistDiscographyService();
+  const resolvedOperatorArtistDiscographyService = operatorArtistDiscographyService
+    ?? createOperatorArtistDiscographyService({ catalogService: resolvedMetadataArtistDiscographyService });
   const resolvedMetadataReadService = metadataReadService ?? createMetadataReadService({
     metadataMonitoredArtistStore: resolvedMetadataMonitoredArtistStore,
     metadataReleaseDetectionService: resolvedMetadataReleaseDetectionService,
@@ -349,6 +353,7 @@ export function createMetadataModule({
     operatorArtistManualInclusionService: resolvedOperatorArtistManualInclusionService,
     operatorArtistManualEditionSelectionService: resolvedOperatorArtistManualEditionSelectionService,
     operatorMonitoredArtistProjectionService: resolvedOperatorMonitoredArtistProjectionService,
+    operatorArtistDiscographyService: resolvedOperatorArtistDiscographyService,
     operatorArtistProjectionService: resolvedOperatorArtistProjectionService,
     operatorArtistSaveService: resolvedOperatorArtistSaveService,
     operatorArtistReconciliationExecutionService: resolvedOperatorArtistReconciliationExecutionService,
@@ -378,6 +383,7 @@ export function createMetadataModule({
       getMetadataArtistDetectionEvents: resolvedMetadataReadService.getArtistDetectionEvents,
       getMetadataProviderCacheObservability: resolvedMetadataProviderCacheObservabilityService.getSummary,
       listOperatorMonitoredArtistProjections: resolvedOperatorMonitoredArtistProjectionService.listOperatorMonitoredArtistProjections,
+      getOperatorArtistDiscography: resolvedOperatorArtistDiscographyService.getOperatorArtistDiscography,
       getOperatorArtistProjection: resolvedOperatorArtistProjectionService.getOperatorArtistProjection,
       includeOperatorArtistReleaseManually: resolvedOperatorArtistManualInclusionService.includeOperatorArtistReleaseManually,
       selectOperatorArtistReleaseEditionManually: resolvedOperatorArtistManualEditionSelectionService.selectOperatorArtistReleaseEditionManually,

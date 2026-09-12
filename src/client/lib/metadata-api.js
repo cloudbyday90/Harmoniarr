@@ -47,8 +47,12 @@ export function fetchOperatorMonitoredArtistProjections({ limit, signal } = {}) 
   return apiRequest(`/api/v1/metadata/artists/monitored/operator${buildQueryString({ limit })}`, { signal });
 }
 
-export function fetchOperatorArtistProjection(artistId, { signal } = {}) {
-  return apiRequest(`/api/v1/metadata/artists/${encodeURIComponent(artistId)}/operator`, { signal });
+export function fetchOperatorArtistProjection(artistId, { signal, view } = {}) {
+  return apiRequest(`/api/v1/metadata/artists/${encodeURIComponent(artistId)}/operator${buildQueryString({ view })}`, { signal });
+}
+
+export function fetchOperatorArtistDiscography(artistId, { signal, limit = 25, cursor } = {}) {
+  return apiRequest(`/api/v1/metadata/artists/${encodeURIComponent(artistId)}/operator/discography${buildQueryString({ limit, cursor })}`, { signal });
 }
 
 export function searchLocalMetadataReleaseGroups({ query, limit } = {}) {

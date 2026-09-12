@@ -1,5 +1,7 @@
 # Local artist discography page outcome
 
+Follow-up: [display-state separation](LOCAL_ARTIST_DISPLAY_STATE_OUTCOME.md) records the subsequent editor integration; the measurements below describe the original read foundation.
+
 ## Delivered
 
 The new authenticated local discography endpoint returns up to 25 release groups with exact edition counts and artist-bound keyset continuation. Implementation uses separate ESM policy, store, service, and presentation modules. Existing full metadata responses reuse the extracted mapper unchanged. Route inventory and dependency wiring include the new read.

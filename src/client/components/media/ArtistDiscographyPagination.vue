@@ -25,7 +25,8 @@ const props = defineProps({
 });
 const emit = defineEmits(['load-more']);
 const summary = computed(() => {
-  const { loaded, total, complete } = props.pagination;
+  const { loaded, total, complete, source, hasMore } = props.pagination;
+  if (source === 'local') return `${loaded} local release groups loaded. ${hasMore ? 'More groups may be available.' : 'End of the current local catalog traversal.'}`;
   if (total !== null) return `${loaded} of ${total} catalog release groups loaded${complete ? '.' : ' so far.'}`;
   return `${loaded} catalog release groups loaded. The catalog total is unavailable.`;
 });
@@ -38,14 +39,15 @@ function loadMore() {
   <div class="artist-discography-pagination">
     <p role="status" aria-atomic="true">{{ loading ? 'Loading more release groups…' : summary }}</p>
     <p v-if="error" role="alert">{{ error }}</p>
-    <p v-if="!pagination.complete">Filters apply to loaded release groups.</p>
+    <p v-if="pagination.source === 'local'">Filters, sorting, and bulk changes apply to loaded release groups.</p>
+    <p v-else-if="!pagination.complete">Filters apply to loaded release groups.</p>
     <button
       type="button"
       class="hx-btn"
       :aria-disabled="loading || !pagination.hasMore"
       :aria-busy="loading"
       @click="loadMore"
-    >{{ loading ? 'Loading…' : pagination.hasMore ? (error ? 'Retry loading release groups' : 'Load more release groups') : pagination.complete ? 'All catalog release groups loaded' : 'No further catalog page available' }}</button>
+    >{{ loading ? 'Loading…' : pagination.hasMore ? (error ? 'Retry loading release groups' : 'Load more release groups') : pagination.source === 'local' ? 'No further local release groups' : pagination.complete ? 'All catalog release groups loaded' : 'No further catalog page available' }}</button>
   </div>
 </template>
 

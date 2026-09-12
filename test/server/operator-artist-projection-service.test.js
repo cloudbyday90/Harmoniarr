@@ -72,6 +72,12 @@ test('getOperatorArtistProjection overlays explicit selections, track overrides,
     metadataArtistId: 'artist-1',
   });
 
+  const summary = await service.getOperatorArtistProjection({ appUserId: 'user-1', metadataArtistId: 'artist-1', view: 'summary' });
+  const { releaseGroups: _groups, releases: _releases, ...expectedSummary } = result;
+  assert.deepEqual(summary, expectedSummary, 'Summary must retain all overrides, global coverage, orphan totals, and revision');
+  assert.equal(Object.hasOwn(summary, 'releaseGroups'), false);
+  assert.equal(Object.hasOwn(summary, 'releases'), false);
+
   assert.deepEqual(result, {
     aliases: [{ id: 'alias-1', alias: 'AFX' }],
     artist: { id: 'artist-1', name: 'Aphex Twin' },
@@ -358,4 +364,13 @@ test('getOperatorArtistProjection derives policy-backed release-group defaults a
       title: 'Anti',
     },
   ]);
+});
+
+test('operator projection rejects invalid summary views before any state read', async () => {
+  let reads = 0;
+  const service = createOperatorArtistProjectionService({ getMetadataArtist: async () => { reads += 1; } });
+  for (const view of [null, 'invalid', ['summary'], { mode: 'summary' }]) {
+    await assert.rejects(service.getOperatorArtistProjection({ appUserId: 'user', metadataArtistId: 'artist', view }), { status: 400 });
+  }
+  assert.equal(reads, 0);
 });
