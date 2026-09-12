@@ -44,7 +44,7 @@ function createStubStore(overrides = {}) {
 test('recordActivityEvent: resolves without throwing for valid eventType', async () => {
   const store = createStubStore();
   const service = createActivityEventService({ activityEventStore: store });
-  await assert.doesNotReject(() => service.recordActivityEvent({ eventType: 'request_created' }));
+  assert.deepEqual(await service.recordActivityEvent({ eventType: 'request_created' }), { recorded: true });
 });
 
 test('recordActivityEvent: calls insertActivityEvent with provided fields', async (t) => {
@@ -75,10 +75,10 @@ test('recordActivityEvent: skips insert and logs for unknown eventType', async (
   const store = createStubStore({ insertActivityEvent });
   const service = createActivityEventService({ activityEventStore: store, stderr });
 
-  await service.recordActivityEvent({ eventType: 'not_a_real_event' });
+  assert.deepEqual(await service.recordActivityEvent({ eventType: 'not_a_real_event' }), { recorded: false });
 
   assert.equal(insertActivityEvent.mock.callCount(), 0);
-  assert.ok(stderr.lines.some((l) => l.includes('not_a_real_event')), 'should log unknown event type');
+  assert.deepEqual(JSON.parse(stderr.lines[0]), { event: 'activity_event_recording_failed', reason: 'unsupported_event_type', eventType: null });
 });
 
 test('recordActivityEvent: catches store errors and logs them, never throws', async () => {
@@ -88,8 +88,8 @@ test('recordActivityEvent: catches store errors and logs them, never throws', as
   });
   const service = createActivityEventService({ activityEventStore: store, stderr });
 
-  await assert.doesNotReject(() => service.recordActivityEvent({ eventType: 'download_completed' }));
-  assert.ok(stderr.lines.some((l) => l.includes('DB is down')), 'should log the error message');
+  assert.deepEqual(await service.recordActivityEvent({ eventType: 'download_completed' }), { recorded: false });
+  assert.deepEqual(JSON.parse(stderr.lines[0]), { event: 'activity_event_recording_failed', reason: 'recording_failed', eventType: 'download_completed' });
 });
 
 test('recordActivityEvent: handles each allowed event type without throwing', async () => {
@@ -226,4 +226,42 @@ test('buildActivityFeed: forwards actorUserId when provided', async (t) => {
 
   const [{ actorUserId }] = listActivityEvents.mock.calls[0].arguments;
   assert.equal(actorUserId, 'user-42');
+});
+
+test('recordActivityEvent logs no raw exception, identifier, payload or unknown event text', async () => {
+  const stderr = createTestStderr();
+  const hostileError = new Error('token=secret database://user:password@host');
+  Object.defineProperty(hostileError, 'message', { get() { throw new Error('Must never inspect exception messages'); } });
+  const service = createActivityEventService({ stderr, activityEventStore: createStubStore({ insertActivityEvent: async () => { throw hostileError; } }) });
+  assert.deepEqual(await service.recordActivityEvent({ eventType: 'artist_policy_saved', actorUserId: 'private-actor',
+    entityTitle: 'private-title', extraPayload: { accessToken: 'private-token' } }), { recorded: false });
+  assert.deepEqual(await service.recordActivityEvent({ eventType: 'secret\nforged-log-line' }), { recorded: false });
+  assert.equal(stderr.lines.length, 2);
+  for (const line of stderr.lines) {
+    assert.doesNotMatch(line, /private|secret|password|forged|database/u);
+    assert.equal(line.split('\n').length, 2, 'Each diagnostic occupies one JSON line');
+  }
+});
+
+test('recordActivityEvent remains nonthrowing when diagnostic writers throw or reject', async () => {
+  for (const write of [() => { throw new Error('closed sink'); }, async () => { throw new Error('failed async sink'); }]) {
+    const service = createActivityEventService({ stderr: { write }, activityEventStore: createStubStore({
+      insertActivityEvent: async () => { throw new Error('insert failed'); },
+    }) });
+    assert.deepEqual(await service.recordActivityEvent({ eventType: 'artist_monitored' }), { recorded: false });
+    assert.deepEqual(await service.recordActivityEvent({ eventType: 'invalid' }), { recorded: false });
+  }
+  await new Promise((resolve) => { setImmediate(resolve); });
+});
+
+test('recordActivityEvent rejects malformed inputs safely without attempting persistence', async () => {
+  let inserts = 0;
+  const service = createActivityEventService({ stderr: createTestStderr(), activityEventStore: createStubStore({
+    insertActivityEvent: async () => { inserts += 1; },
+  }) });
+  const throwingInput = Object.defineProperty({}, 'eventType', { get() { throw new Error('private input'); } });
+  for (const input of [undefined, null, {}, throwingInput]) {
+    assert.deepEqual(await service.recordActivityEvent(input), { recorded: false });
+  }
+  assert.equal(inserts, 0);
 });

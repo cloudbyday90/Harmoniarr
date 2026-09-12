@@ -88,9 +88,23 @@ export function createActivityEventService({
   getNow = () => new Date(),
   stderr = process.stderr,
 } = {}) {
+  function reportRecordingFailure(reason, eventType) {
+    try {
+      const line = JSON.stringify({
+        event: 'activity_event_recording_failed',
+        reason,
+        eventType: allowedEventTypes.has(eventType) ? eventType : null,
+      });
+      // Diagnostics are best effort too; never turn a committed operation into a failure.
+      void Promise.resolve(stderr.write(`${line}\n`)).catch(() => {});
+    } catch {
+      // A failing log sink must not escape the activity recording boundary.
+    }
+  }
+
   /**
    * Records a single household activity event. Fire-and-forget: never throws.
-   * Callers should invoke without `await` and `.catch()` is implicit.
+   * Callers may observe the result outside their critical path; failures never reject.
    *
    * @param {object} params
    * @param {string} params.eventType
@@ -100,21 +114,24 @@ export function createActivityEventService({
    * @param {string|null} [params.entityTitle]
    * @param {string|null} [params.entityArtist]
    * @param {object|null} [params.extraPayload]
-   * @returns {Promise<void>}
+   * @returns {Promise<{recorded: boolean}>}
    */
-  async function recordActivityEvent({
-    eventType,
-    actorUserId = null,
-    entityType = null,
-    entityId = null,
-    entityTitle = null,
-    entityArtist = null,
-    extraPayload = null,
-  }) {
+  async function recordActivityEvent(params) {
+    let eventType;
     try {
+      const {
+        eventType: requestedType,
+        actorUserId = null,
+        entityType = null,
+        entityId = null,
+        entityTitle = null,
+        entityArtist = null,
+        extraPayload = null,
+      } = params ?? {};
+      eventType = requestedType;
       if (!allowedEventTypes.has(eventType)) {
-        stderr.write(`[harmoniarr] activity event skipped: unknown eventType "${eventType}"\n`);
-        return;
+        reportRecordingFailure('unsupported_event_type', eventType);
+        return { recorded: false };
       }
 
       await activityEventStore.insertActivityEvent(projectRequestLifecycleActivity({
@@ -126,8 +143,10 @@ export function createActivityEventService({
         entityArtist,
         extraPayload,
       }));
-    } catch (error) {
-      stderr.write(`[harmoniarr] activity event recording failed (${eventType}): ${error?.message ?? error}\n`);
+      return { recorded: true };
+    } catch {
+      reportRecordingFailure('recording_failed', eventType);
+      return { recorded: false };
     }
   }
 

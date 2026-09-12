@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { setImmediate as settlePostSave } from 'node:timers/promises';
+import { createActivityEventService } from '../../src/server/activity/activity-event-service.js';
 import { createOperatorArtistSaveService } from '../../src/server/metadata/operator-artist-save-service.js';
 
 test('saveOperatorArtist rejects a stale snapshot revision before replacing user selections', async (t) => {
@@ -810,3 +812,47 @@ for (const revision of [undefined, null, -1, 1.2, '0', false, Number.MAX_SAFE_IN
     assert.equal(connected, false);
   });
 }
+
+
+test('committed save reports actual activity and follow-up failures without rollback or mutation retry', async () => {
+  const harness = createMonitoringSaveHarness();
+  const sql = [];
+  const pool = harness.getPoolFn();
+  const connect = pool.connect;
+  pool.connect = async () => {
+    const client = await connect();
+    return { ...client, query: async (statement, values) => { sql.push(statement); return client.query(statement, values); } };
+  };
+  const evidence = [];
+  const activity = createActivityEventService({
+    activityEventStore: { insertActivityEvent: async () => { throw new Error('token=secret'); } },
+    stderr: { write: () => {} },
+  });
+  const service = createOperatorArtistSaveService({
+    ...harness, getPoolFn: () => pool,
+    recordActivityEventFn: activity.recordActivityEvent,
+    startMetadataArtistRefresh: async () => { throw new Error('provider-secret'); },
+    onArtistMonitoredFn: async () => ({ failed: 1 }),
+    getOperatorArtistProjection: async () => { throw Object.assign(new Error('db-secret'), { code: '23505' }); },
+    postSaveReporter: { writeWarning: (message) => {
+      assert.ok(sql.includes('COMMIT'));
+      evidence.push(JSON.parse(message));
+    } },
+  });
+  const result = await service.saveOperatorArtist({
+    appUserId: 'user-1', metadataArtistId: 'artist-1', expectedSnapshotRevision: 0,
+    draft: { monitoring: { isMonitored: true }, releaseGroupSelections: [], trackOverrides: [] },
+  });
+  await settlePostSave();
+  assert.equal(result.snapshot.snapshotRevision, 1);
+  assert.equal(result.projection, null);
+  assert.equal(result.reconciliation.accepted, true);
+  assert.equal(result.reconciliation.run.id, 'run-9');
+  assert.equal(sql.filter((statement) => statement === 'COMMIT').length, 1);
+  assert.equal(sql.filter((statement) => statement === 'BEGIN').length, 1);
+  assert.equal(sql.includes('ROLLBACK'), false);
+  assert.deepEqual(evidence.map((entry) => entry.phase).sort(),
+    ['metadata_refresh', 'monitored_activity', 'notification', 'policy_activity', 'projection']);
+  assert.ok(evidence.every((entry) => entry.saveCommitted && entry.snapshotRevision === 1));
+  assert.ok(!JSON.stringify(evidence).includes('secret'));
+});

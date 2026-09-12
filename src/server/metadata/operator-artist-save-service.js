@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createOperatorArtistPostSaveService } from './operator-artist-post-save-service.js';
 import { getPool } from '../database.js';
 import { normalizeExpectedSnapshotRevision } from './operator-artist-snapshot-revision.js';
 import { createOperatorArtistSaveStateStore } from './operator-artist-save-state-store.js';
@@ -387,7 +388,9 @@ export function createOperatorArtistSaveService({
   operatorTrackOverrideStore = createOperatorTrackOverrideStore(),
   recordActivityEventFn = null,
   startMetadataArtistRefresh = null,
+  postSaveReporter,
 } = {}) {
+  const postSave = createOperatorArtistPostSaveService({ reporter: postSaveReporter });
   const resolvedOperatorArtistProjectionService = operatorArtistProjectionService
     ?? createOperatorArtistProjectionService();
   const readOperatorArtistProjection = getOperatorArtistProjection
@@ -578,23 +581,22 @@ export function createOperatorArtistSaveService({
         });
 
         await client.query('COMMIT');
+        const followUpContext = { snapshotId: snapshot.id, snapshotRevision: snapshot.snapshotRevision };
 
         if (policyChangeSummary.hasChanges && typeof recordActivityEventFn === 'function') {
           const actorUserId = triggeredByUserId ?? appUserId;
-          void Promise.resolve()
-            .then(() => recordActivityEventFn({
-              actorUserId,
-              entityId: metadataArtistId,
-              entityTitle: artist.name ?? null,
-              entityType: 'artist',
-              eventType: 'artist_policy_saved',
-              extraPayload: {
-                ...policyChangeSummary,
-                artistMusicBrainzId: artist.musicBrainzArtistId,
-                triggerSource,
-              },
-            }))
-            .catch(() => {});
+          void postSave.run('policy_activity', () => recordActivityEventFn({
+            actorUserId,
+            entityId: metadataArtistId,
+            entityTitle: artist.name ?? null,
+            entityType: 'artist',
+            eventType: 'artist_policy_saved',
+            extraPayload: {
+              ...policyChangeSummary,
+              artistMusicBrainzId: artist.musicBrainzArtistId,
+              triggerSource,
+            },
+          }), followUpContext);
         }
 
         if (normalizedMonitoringPatch.isMonitored === true && typeof startMetadataArtistRefresh === 'function') {
@@ -602,19 +604,11 @@ export function createOperatorArtistSaveService({
           // fetched as soon as they are monitored. Each artist queues its own
           // run; successive adds are independent. A run that is already queued
           // or running for this artist surfaces as a 409 which we ignore.
-          void Promise.resolve()
-            .then(() => startMetadataArtistRefresh({
-              metadataArtistId,
-              triggerSource: 'monitor_added',
-              triggeredByUserId,
-            }))
-            .catch((error) => {
-              if (error?.code === 'metadata_artist_refresh_in_progress') {
-                return;
-              }
-              // Swallow remaining errors: the scheduled heartbeat refresh
-              // remains the durable fallback, so add must not fail on this.
-            });
+          void postSave.run('metadata_refresh', () => startMetadataArtistRefresh({
+            metadataArtistId,
+            triggerSource: 'monitor_added',
+            triggeredByUserId,
+          }), followUpContext);
         }
 
         // Fire "artist newly monitored" side effects exactly once, only on the
@@ -627,33 +621,25 @@ export function createOperatorArtistSaveService({
         if (becameMonitored) {
           const actorUserId = triggeredByUserId ?? appUserId;
           if (typeof recordActivityEventFn === 'function') {
-            void Promise.resolve()
-              .then(() => recordActivityEventFn({
-                actorUserId,
-                entityId: metadataArtistId,
-                entityTitle: artist.name ?? null,
-                entityType: 'artist',
-                eventType: 'artist_monitored',
-              }))
-              .catch(() => {});
+            void postSave.run('monitored_activity', () => recordActivityEventFn({
+              actorUserId,
+              entityId: metadataArtistId,
+              entityTitle: artist.name ?? null,
+              entityType: 'artist',
+              eventType: 'artist_monitored',
+            }), followUpContext);
           }
           if (typeof onArtistMonitoredFn === 'function') {
-            void Promise.resolve()
-              .then(() => onArtistMonitoredFn({
-                actorUserId,
-                artistName: artist.name ?? null,
-                metadataArtistId,
-              }))
-              .catch(() => {});
+            void postSave.run('notification', () => onArtistMonitoredFn({
+              actorUserId,
+              artistName: artist.name ?? null,
+              metadataArtistId,
+            }), followUpContext);
           }
         }
 
-        let projection = null;
-        try {
-          projection = await readOperatorArtistProjection({ appUserId, metadataArtistId });
-        } catch {
-          projection = null;
-        }
+        const projection = await postSave.run('projection',
+          () => readOperatorArtistProjection({ appUserId, metadataArtistId }), followUpContext);
 
         return {
           artistId: metadataArtistId,

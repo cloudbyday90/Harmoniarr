@@ -22,8 +22,8 @@ import { shouldSendNotification } from './notification-preference-service.js';
  * Broadcast a push notification to every matching user with the given category
  * enabled in their preferences.
  *
- * Fire-and-forget friendly: list and send failures are swallowed so
- * notification delivery never blocks the originating domain operation.
+ * Fire-and-forget friendly: list and send failures become an aggregate result
+ * so those failures do not reject the originating domain operation.
  *
  * @param {object} options
  * @param {string} options.category
@@ -32,6 +32,8 @@ import { shouldSendNotification } from './notification-preference-service.js';
  * @param {function} options.getUserPreferences
  * @param {function} options.sendNotificationToUser
  * @param {function} [options.recipientFilter]
+ * @returns {Promise<{failed: number}>} Failed or degraded recipient attempts,
+ *   counted once per recipient; a failed recipient-list read counts as one.
  */
 export async function broadcastNotification({
   category,
@@ -49,7 +51,7 @@ export async function broadcastNotification({
   try {
     users = await listAppUsers();
   } catch {
-    return;
+    return { failed: 1 };
   }
 
   const recipients = Array.isArray(users)
@@ -62,15 +64,23 @@ export async function broadcastNotification({
       : [],
   );
 
-  await Promise.allSettled(
+  const outcomes = await Promise.allSettled(
     recipients.map(async (recipient) => {
       if (suppressedUserIdSet.has(recipient.id)) {
         return;
       }
 
+      let preferenceReadFailed = false;
       const allowed = await shouldSendNotification({
         category,
-        getUserPreferences,
+        getUserPreferences: async (input) => {
+          try {
+            return await getUserPreferences(input);
+          } catch (error) {
+            preferenceReadFailed = true;
+            throw error;
+          }
+        },
         userId: recipient.id,
       });
       if (!allowed) return;
@@ -81,7 +91,7 @@ export async function broadcastNotification({
         cooldownMs,
         userId: recipient.id,
       })) {
-        return;
+        return { failed: preferenceReadFailed };
       }
 
       const result = await sendNotificationToUser({
@@ -97,7 +107,11 @@ export async function broadcastNotification({
         payload,
         userId: recipient.id,
       });
-      return result;
+      return { failed: preferenceReadFailed || (Number.isFinite(result?.failed) && result.failed > 0) };
     }),
   );
+
+  return {
+    failed: outcomes.filter((outcome) => outcome.status === 'rejected' || outcome.value?.failed === true).length,
+  };
 }

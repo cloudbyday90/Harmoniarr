@@ -67,20 +67,21 @@ test('broadcastHouseholdNotification skips users with category disabled', async 
   assert.equal(sent.length, 0);
 });
 
-test('broadcastHouseholdNotification swallows listAppUsers errors', async () => {
-  await broadcastHouseholdNotification({
+test('broadcastHouseholdNotification reports listAppUsers errors without rejecting', async () => {
+  const result = await broadcastHouseholdNotification({
     category: 'artistMonitored',
     getUserPreferences: async () => ({}),
     listAppUsers: async () => { throw new Error('db down'); },
     payload: { body: 'Artist monitored', title: 'Artist monitored', url: '/app/activity/releases' },
     sendNotificationToUser: async () => { throw new Error('should not be called'); },
   });
+  assert.deepEqual(result, { failed: 1 });
 });
 
-test('broadcastHouseholdNotification swallows per-user send failures', async () => {
+test('broadcastHouseholdNotification reports per-user send failures without rejecting', async () => {
   const sent = [];
 
-  await broadcastHouseholdNotification({
+  const result = await broadcastHouseholdNotification({
     category: 'requestCreated',
     getUserPreferences: async () => ({ notificationPreferences: ALL_ENABLED }),
     listAppUsers: async () => [
@@ -96,6 +97,7 @@ test('broadcastHouseholdNotification swallows per-user send failures', async () 
   });
 
   assert.deepEqual(sent, ['user-2']);
+  assert.deepEqual(result, { failed: 1 });
 });
 
 test('broadcastHouseholdNotification handles empty user lists', async () => {
