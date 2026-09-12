@@ -153,7 +153,7 @@ Preferred final path:
 
 1. Update `package.json` and any surfaced version strings or operator-facing version references.
 2. Update release-facing documentation that must ship with the cut, including README or operator deployment notes when behavior or assets changed.
-3. Prepare release notes in a markdown file such as `.tmp/release-notes-vX.Y.Z-beta.md`, or use `gh release create --generate-notes` if generated notes are sufficient.
+3. Review the [draft release design](docs/DRAFT_RELEASE_LIFECYCLE_DESIGN.md), enable immutable releases through repository administration, and configure `RELEASE_POLICY_READ_TOKEN` with read-only Administration access to this repository. The workflow checks the setting but never changes it.
 4. Run the local preflight above.
 5. Commit the final release-prep changes.
 
@@ -161,20 +161,22 @@ Preferred final path:
    git commit -m "release: vX.Y.Z-beta"
    ```
 
-6. Create and publish the GitHub Release.
+6. Push the source commit and precreate a protected release tag at that exact commit. Do not publish a GitHub Release first. The tag must resolve to the full source SHA used by the dispatched workflow.
 
    ```bash
-   gh release create vX.Y.Z-beta --title "vX.Y.Z-beta" --notes-file .tmp/release-notes-vX.Y.Z-beta.md --target main
+   git tag vX.Y.Z-beta <full-reviewed-source-sha>
+   git push origin vX.Y.Z-beta
    ```
 
-7. Publishing the GitHub Release triggers `Release Image` on `release.published`.
-8. Wait for both `Supply Chain` and `Release Image` to finish successfully on the release commit.
+7. Dispatch `Release Image` with `release_tag` set to that tag and select the same source ref. The workflow creates an owned draft, builds and verifies the candidate, then attaches verified assets and publishes only after all required jobs succeed.
+8. Require successful source CI for the release commit and the complete `Release Image` graph, including immutable publication evidence. GitHub-token publication does not trigger another `Supply Chain` release-event run; the image workflow owns its required SBOM and image provenance directly.
 
-Optional operator path:
+Baseline and retry behavior:
 
-- `Release Image` also supports `workflow_dispatch` with `release_tag` and optional paired `baseline_image` and `baseline_revision` inputs. Supply both when overriding; otherwise the pair comes from `DOCKER_UPGRADE_BASELINE_IMAGE` and `DOCKER_UPGRADE_BASELINE_REVISION`. Incomplete pairs fail closed.
-- Use that path for reruns or operator-driven image publication when needed.
-- Do not treat `workflow_dispatch` as equivalent to the final GitHub Release publication path, because the steps that upload assets to the GitHub Release only run on the real `release` event.
+- `workflow_dispatch` is the publication entry point. Optional `baseline_image` and `baseline_revision` inputs must be supplied together; otherwise the pair comes from `DOCKER_UPGRADE_BASELINE_IMAGE` and `DOCKER_UPGRADE_BASELINE_REVISION`. Incomplete pairs fail closed.
+- Failures before publication leave an owned draft. Identical assets may be reused; differing or unexpected assets are refused without replacement. A rebuilt image or SBOM can differ, so a full rerun is not guaranteed to reuse earlier uploaded bytes.
+- Preserve the required ownership marker when adding notes to an owned draft. Finalization keeps the notes and derives prerelease status from the tag. The workflow does not automatically mark a GitHub Release as latest.
+- Published releases are refused as new build targets. If publication succeeded but a later verification or evidence write failed, investigate and verify the existing immutable release; do not delete, overwrite, or rebuild it as automatic recovery. See the [outcome](docs/DRAFT_RELEASE_LIFECYCLE_OUTCOME.md).
 
 ## What A Successful Release Produces
 
@@ -198,14 +200,17 @@ Expected `Release Image` workflow artifacts:
 - `harmoniarr-docker-deployment-summary.json`
 - `harmoniarr-image-attestation.json`: sanitized provenance result from the mandatory pre-runtime gate
 - `harmoniarr-baseline-image-attestation.json`: corresponding baseline result when configured
+- `harmoniarr-release-publication.json`: successful immutable publication and release verification evidence
 
 Expected `Release Image` verification stages:
 
-- `publish-image`: build and push multi-arch image, generate SBOM release asset, write metadata assets, and attach provenance when supported
+- `prepare-release`: verify immutable-release policy and exact tag/source binding, then create or reuse an owned draft
+- `publish-image`: after draft preflight, build and push multi-arch image, generate SBOM release asset, write metadata assets, and attach provenance when supported
 - `verify-image-provenance`: verify candidate origin against the exact repository, release workflow, source and signer SHA before runtime; verify any configured baseline with its explicit full revision. See the [design](docs/RELEASE_PROVENANCE_GATE_DESIGN.md).
 - `verify-published-image`: pull the immutable image, run `npm run validate:docker-released-image`, verify the emitted smoke evidence contract, and upload the archived evidence
 - `verify-upgrade-path`: after provenance passes, when a complete baseline pair is configured, run `npm run validate:docker-upgrade`, verify the emitted upgrade evidence contract, and upload the archived evidence
-- `verify-release-contract`: download release assets, download archived smoke evidence, re-verify the evidence contracts, validate the metadata and Compose override assets, verify mirror behavior, and require the earlier provenance gate to have succeeded
+- `verify-release-contract`: download the four build artifacts and archived smoke evidence from this run, re-verify their contracts, verify mirror behavior, and require the earlier provenance gate to have succeeded
+- `publish-release`: recheck policy/tag/draft, validate and attach the four assets, publish, then require immutable state and successful release attestation verification
 
 ## Post-Publish Verification
 

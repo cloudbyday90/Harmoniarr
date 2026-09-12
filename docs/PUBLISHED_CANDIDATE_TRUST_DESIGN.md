@@ -26,6 +26,8 @@ Docker stores attestations alongside platform manifests in image indexes. An ima
 
 GitHub immutable releases protect tags and assets after publication, while release notes remain editable. The recommended lifecycle is draft, attach assets, then publish. The current repository uploads assets after publication, so immutable-release publishing needs separate work. [GitHub immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases).
 
+Follow-up: the publishing lifecycle described above has now been replaced by the [draft-first release design](DRAFT_RELEASE_LIFECYCLE_DESIGN.md). Actual immutable publication still requires a successful live run; this source change alone does not establish release approval.
+
 | Option | Pros | Cons | Decision |
 | --- | --- | --- | --- |
 | Verify origin before runtime execution | Rejects wrong repository/workflow/source before running image code | Requires working GitHub and registry access | Recommended |

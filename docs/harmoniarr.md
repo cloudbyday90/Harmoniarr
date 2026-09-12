@@ -5311,8 +5311,8 @@ The release process should include:
 3. Bump package and UI version references.
 4. Run the full local quality checklist.
 5. Commit with `release: vX.Y.Z-beta`.
-6. Create the GitHub Release and tag with `gh release create`.
-7. Let the release pipeline build and publish the Docker image from the tag.
+6. Precreate a protected tag at the reviewed source commit and configure immutable releases plus the read-only release-policy token.
+7. Dispatch the draft-first release pipeline at that source ref. It prepares an owned draft, builds and verifies the image, attaches verified assets, and publishes only after its required gates pass. See [release.md](../release.md) and the [draft lifecycle design](DRAFT_RELEASE_LIFECYCLE_DESIGN.md).
 
 Post-release verification should include:
 

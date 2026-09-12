@@ -45,3 +45,7 @@ All three open heads and full patches were refreshed through GitHub MCP. None wa
 | 5 | Exercise representative library size and queue load. | Measures release behavior beyond fixture-scale correctness. | Requires bounded workloads and defensible budgets. |
 
 Recommended stack: retain Node 24 native ESM and modular policy/service/CLI files, PostgreSQL, immutable GHCR references, live GitHub certificate verification, least-privilege mandatory job dependencies, isolated runtime checks, and sanitized evidence. Keep provenance, publication, runtime success, accessibility, and release approval separate. The next code item is draft-first release publication; the next operational gate is a reviewed baseline and live published-artifact run. See the [design and official sources](RELEASE_PROVENANCE_GATE_DESIGN.md).
+
+## Follow-up implementation
+
+The draft-first recommendation is implemented in the [draft release lifecycle outcome](DRAFT_RELEASE_LIFECYCLE_OUTCOME.md). Actual immutable publication and live accepted-baseline evidence remain separate operational gates.

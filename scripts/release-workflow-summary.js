@@ -78,7 +78,7 @@ export function renderReleaseContractVerificationSummaryLines({
     '## Release Contract Verification',
     '',
     `- Release tag: ${releaseTag}`,
-    '- Release manifest checked against GitHub release assets',
+    '- Release manifest checked from build artifacts of the current workflow run before publication',
     '- Compose override asset checked against the immutable image reference',
     ...(smokeEvidenceStatus ? [`- Archived smoke evidence verification: ${smokeEvidenceStatus}`] : []),
     ...(browserSmokeEvidenceStatus ? [`- Archived browser smoke evidence verification: ${browserSmokeEvidenceStatus}`] : []),

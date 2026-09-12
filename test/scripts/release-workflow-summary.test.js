@@ -72,7 +72,7 @@ test('renderReleaseContractVerificationSummaryLines formats the contract summary
     '## Release Contract Verification',
     '',
     '- Release tag: v0.1.0-beta',
-    '- Release manifest checked against GitHub release assets',
+    '- Release manifest checked from build artifacts of the current workflow run before publication',
     '- Compose override asset checked against the immutable image reference',
     '- Archived smoke evidence verification: published-image artifact passed',
     '- Archived browser smoke evidence verification: published-image browser-smoke artifact passed',
