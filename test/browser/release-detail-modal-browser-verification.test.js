@@ -174,23 +174,17 @@ suite('Release Detail modal browser verification', () => {
       await page.keyboard.press('Tab');
       await assertFocusWithin(dialog, 'Tab after repair should re-enter the modal dialog');
 
-      const gbEdition = dialog.getByRole('radio', {
-        name: 'Preview edition, GB, 1998, 3 tracks',
-      });
-      const usEdition = dialog.getByRole('radio', {
-        name: 'Preview edition, US, 1998, 4 tracks',
-      });
-      await gbEdition.waitFor();
-      await usEdition.waitFor();
-      assert.equal(await gbEdition.isChecked(), true);
-      assert.equal(await usEdition.isChecked(), false);
-
-      await usEdition.focus();
-      await assertVisibleFocusOutline(usEdition, 'Edition preview radio should have a visible focus ring');
-      await usEdition.check();
+      const editionPicker = dialog.getByRole('combobox', { name: 'Preview an edition', exact: true });
+      await editionPicker.waitFor();
+      assert.match(await editionPicker.locator('option:checked').innerText(), /GB/u);
+      const usEditionValue = await editionPicker.getByRole('option', { name: /US/u }).getAttribute('value');
+      await editionPicker.focus();
+      await assertVisibleFocusOutline(editionPicker, 'Edition preview selector should have a visible focus ring');
+      await editionPicker.selectOption(usEditionValue);
+      await dialog.getByRole('button', { name: 'Preview edition', exact: true }).click();
       await dialog.getByText('Left Side Drive').waitFor();
       await dialog.locator('.rdm-hero .rdm-meta-line').getByText('4 tracks', { exact: true }).waitFor();
-      assert.equal(await usEdition.isChecked(), true);
+      assert.equal(await editionPicker.inputValue(), usEditionValue);
 
       const editionActions = dialog.getByRole('button', { name: 'Edition actions' });
       await editionActions.click();
@@ -236,10 +230,10 @@ suite('Release Detail modal browser verification', () => {
       await markBoardsOfCanadaAddedInMetadataBrowserFixture(page);
 
       const { dialog } = await openMusicHasTheRightToChildrenDialog({ baseUrl, page });
-      const usEdition = dialog.getByRole('radio', {
-        name: 'Preview edition, US, 1998, 4 tracks',
-      });
-      await usEdition.check();
+      const editionPicker = dialog.getByRole('combobox', { name: 'Preview an edition', exact: true });
+      const usEditionValue = await editionPicker.getByRole('option', { name: /US/u }).getAttribute('value');
+      await editionPicker.selectOption(usEditionValue);
+      await dialog.getByRole('button', { name: 'Preview edition', exact: true }).click();
       await dialog.getByText('Edition for this artist', { exact: true }).waitFor();
       await dialog.getByText('Country').waitFor();
       await dialog.locator('.rdm-edition-facts').getByText('US', { exact: true }).waitFor();

@@ -161,7 +161,7 @@ suite('Release detail retry browser verification', () => {
       await page.evaluate(() => { globalThis.releaseDetailRetryFixture.next = 'success'; });
       await opener.click();
       await dialog.getByText('Roygbiv', { exact: true }).waitFor();
-      const edition = dialog.getByRole('radio', { name: 'Preview edition, GB, 1998, 3 tracks' });
+      const edition = dialog.getByRole('combobox', { name: 'Preview an edition', exact: true });
       await edition.focus();
       await releasePendingRead(page, 'success');
       await settleRendering(page);
