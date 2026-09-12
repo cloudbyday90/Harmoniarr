@@ -36,6 +36,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
   const operatorArtistReconciliationService = {
     queueOperatorArtistReconciliation: async () => {},
   };
+  const metadataArtistDiscographyService = { getArtistDiscography: () => {} };
   const metadataReadService = {
     getArtist: () => {},
     getArtistByMusicBrainzId: () => {},
@@ -96,6 +97,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     operatorArtistManualInclusionService,
     operatorArtistManualEditionSelectionService,
     operatorArtistReconciliationService,
+    metadataArtistDiscographyService,
     metadataReadService,
     metadataRefreshService,
     metadataReleaseMaterializationService,
@@ -133,6 +135,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
   assert.deepEqual(metadataModule.routeDependencies, {
     browseMusicBrainzArtistReleaseGroups: musicBrainzCatalogService.browseArtistReleaseGroups,
     getMusicBrainzReleaseGroupReleases: musicBrainzCatalogService.getReleaseGroupReleases,
+    getMetadataArtistDiscography: metadataArtistDiscographyService.getArtistDiscography,
     getMetadataArtist: metadataReadService.getArtist,
     getMetadataArtistByMusicBrainzId: metadataReadService.getArtistByMusicBrainzId,
     getMetadataArtistDetectionEvents: metadataReadService.getArtistDetectionEvents,

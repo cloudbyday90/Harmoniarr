@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { mapMetadataReleaseGroup as mapReleaseGroup } from './metadata-release-group-presentation.js';
 import { normalizeMetadataArtistReadView } from './metadata-artist-read-view.js';
 import { getPool } from '../database.js';
 import { createMetadataMonitoredArtistStore } from './metadata-monitored-artist-store.js';
@@ -71,25 +72,6 @@ function mapAlias(row) {
   };
 }
 
-function mapReleaseGroup(row) {
-  return {
-    id: row.id,
-    artistId: row.metadata_artist_id,
-    title: row.title,
-    primaryType: row.primary_type,
-    secondaryTypes: row.secondary_types,
-    firstReleaseDate: row.first_release_date,
-    disambiguation: row.disambiguation,
-    releaseCount: row.release_count ?? 0,
-    source: {
-      provider: row.source_provider,
-      sourceReleaseGroupId: row.source_release_group_id,
-      musicbrainzReleaseGroupId: row.musicbrainz_release_group_id,
-    },
-    fetchedAt: row.fetched_at,
-    updatedAt: row.updated_at,
-  };
-}
 
 function mapRelease(row) {
   return {

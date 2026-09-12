@@ -46,6 +46,7 @@ import { createOperatorTrackOverrideService } from './operator-track-override-se
 import { createOperatorTrackOverrideStore } from './operator-track-override-store.js';
 import { createMetadataRefreshSchedulerService } from './metadata-refresh-scheduler-service.js';
 import { createMetadataRefreshSchedulingPolicyService } from './metadata-refresh-scheduling-policy-service.js';
+import { createMetadataArtistDiscographyService } from './metadata-artist-discography-service.js';
 import { createMetadataReadService } from './metadata-read-service.js';
 import { createMetadataRefreshService } from './metadata-refresh-service.js';
 import { createMetadataReleaseMaterializationService } from './metadata-release-materialization-service.js';
@@ -97,6 +98,7 @@ export function createMetadataModule({
   operatorReleaseGroupSelectionService = null,
   operatorTrackOverrideStore = null,
   operatorTrackOverrideService = null,
+  metadataArtistDiscographyService = null,
   metadataReadService = null,
   metadataRefreshService = null,
   metadataReleaseMaterializationService = null,
@@ -119,6 +121,7 @@ export function createMetadataModule({
   const resolvedMetadataArtistRefreshStateStore = metadataArtistRefreshStateStore
     ?? createMetadataArtistRefreshStateStore();
   const resolvedMetadataReleaseDetectionService = metadataReleaseDetectionService ?? createMetadataReleaseDetectionService();
+  const resolvedMetadataArtistDiscographyService = metadataArtistDiscographyService ?? createMetadataArtistDiscographyService();
   const resolvedMetadataReadService = metadataReadService ?? createMetadataReadService({
     metadataMonitoredArtistStore: resolvedMetadataMonitoredArtistStore,
     metadataReleaseDetectionService: resolvedMetadataReleaseDetectionService,
@@ -335,6 +338,7 @@ export function createMetadataModule({
     metadataRefreshHeartbeatState: resolvedMetadataRefreshHeartbeatState,
     metadataRefreshSchedulerService: resolvedMetadataRefreshSchedulerService,
     metadataRefreshSchedulingPolicyService: resolvedMetadataRefreshSchedulingPolicyService,
+    metadataArtistDiscographyService: resolvedMetadataArtistDiscographyService,
     metadataReadService: resolvedMetadataReadService,
     metadataMonitoredArtistStore: resolvedMetadataMonitoredArtistStore,
     metadataProviderCacheService: resolvedMetadataProviderCacheService,
@@ -370,6 +374,7 @@ export function createMetadataModule({
     operatorArtistReconciliationRecoverySweepService: createOperatorArtistReconciliationRecoverySweepService(),
     routeDependencies: {
       browseMusicBrainzArtistReleaseGroups: resolvedMusicBrainzCatalogService.browseArtistReleaseGroups,
+      getMetadataArtistDiscography: resolvedMetadataArtistDiscographyService.getArtistDiscography,
       getMetadataArtistDetectionEvents: resolvedMetadataReadService.getArtistDetectionEvents,
       getMetadataProviderCacheObservability: resolvedMetadataProviderCacheObservabilityService.getSummary,
       listOperatorMonitoredArtistProjections: resolvedOperatorMonitoredArtistProjectionService.listOperatorMonitoredArtistProjections,

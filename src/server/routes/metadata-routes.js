@@ -67,6 +67,7 @@ export function registerMetadataRoutes(app, {
   getMusicBrainzReleaseGroupReleases,
   getMetadataArtist,
   getMetadataArtistDetectionEvents,
+  getMetadataArtistDiscography,
   getMetadataArtistByMusicBrainzId,
   getMetadataProviderCacheObservability = () => ({ namespaces: [], observedSinceAt: null, updatedAt: null }),
   getOperatorArtistProjection,
@@ -235,6 +236,15 @@ export function registerMetadataRoutes(app, {
       releaseGroups: result.releaseGroups,
       releases: result.releases,
     };
+  });
+
+  registerSessionGetJsonRoute('/api/v1/metadata/artists/:artistId/discography', async (request) => {
+    const result = await getMetadataArtistDiscography({
+      metadataArtistId: request.params.artistId,
+      limit: request.query.limit,
+      cursor: request.query.cursor,
+    });
+    return { releaseGroups: result.releaseGroups, pageInfo: result.pageInfo };
   });
 
   app.get('/api/v1/metadata/artists/:artistId/operator', metadataRoute(async (request, response) => {
