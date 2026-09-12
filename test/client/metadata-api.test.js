@@ -205,13 +205,14 @@ test('metadata-api saveOperatorArtistDraft sends PUT with CSRF and body', async 
     monitoring: { isMonitored: true },
     releaseGroupSelections: [],
     trackOverrides: [],
-  });
+  }, { expectedSnapshotRevision: 0 });
 
   assert.equal(globalThis.fetch.mock.calls[0].arguments[0], '/api/v1/metadata/artists/artist%2Foperator/operator');
   assert.equal(globalThis.fetch.mock.calls[0].arguments[1].method, 'PUT');
   assert.equal(globalThis.fetch.mock.calls[0].arguments[1].headers.get('X-CSRF-Token'), 'csrf-meta');
 
   const body = JSON.parse(globalThis.fetch.mock.calls[0].arguments[1].body);
+  assert.equal(body.expectedSnapshotRevision, 0);
   assert.deepEqual(body.releaseGroupSelections, []);
   assert.equal(body.monitoring.isMonitored, true);
 });
@@ -303,4 +304,12 @@ test('metadata-api encodes IDs with special characters', async (t) => {
 
   await fetchMetadataArtist('artist/slash');
   assert.ok(globalThis.fetch.mock.calls[0].arguments[0].includes('artist%2Fslash'));
+});
+
+test('operator draft saves reject missing and invalid revisions without a network write', (t) => {
+  globalThis.fetch = t.mock.fn();
+  for (const revision of [undefined, null, -1, 0.5, '0', Number.MAX_SAFE_INTEGER + 1]) {
+    assert.throws(() => saveOperatorArtistDraft('artist', {}, { expectedSnapshotRevision: revision }), /Reload the artist/);
+  }
+  assert.equal(globalThis.fetch.mock.callCount(), 0);
 });

@@ -108,3 +108,19 @@ test('invalidating during a follow-up reload prevents obsolete finally updates',
   next.resolve();
   await current;
 });
+
+test('artist save conflict keeps the draft and does not apply a projection or retry', async (t) => {
+  const { task } = setup(t);
+  const draft = { monitoring: { isMonitored: true }, trackOverrides: [{ state: 'included' }] };
+  const originalDraft = structuredClone(draft);
+  const submit = t.mock.fn(async () => { throw Object.assign(new Error('Artist changed; review the latest version.'), { status: 409 }); });
+  const apply = t.mock.fn(() => { draft.trackOverrides = []; });
+  const result = await task.run(submit, apply);
+  assert.equal(result.ok, false);
+  assert.equal(result.error.status, 409);
+  assert.deepEqual(draft, originalDraft);
+  assert.equal(submit.mock.callCount(), 1);
+  assert.equal(apply.mock.callCount(), 0);
+  assert.equal(task.isPending.value, false);
+  assert.match(task.error.value, /review the latest version/);
+});

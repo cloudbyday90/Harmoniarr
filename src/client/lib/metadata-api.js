@@ -18,6 +18,8 @@
 
 import { apiRequest, buildQueryString } from './api.js';
 
+import { isOperatorArtistRevision } from './operator-artist-revision.js';
+
 export function fetchMetadataArtist(artistId, { signal } = {}) {
   return apiRequest(`/api/v1/metadata/artists/${encodeURIComponent(artistId)}`, { signal });
 }
@@ -118,14 +120,15 @@ export function importMusicBrainzArtist(artistId) {
 export function saveOperatorArtistDraft(
   artistId,
   draft,
-  { expectedSnapshotRevision = null } = {},
+  { expectedSnapshotRevision } = {},
 ) {
+  if (!isOperatorArtistRevision(expectedSnapshotRevision)) {
+    throw new Error('Reload the artist before saving; its saved revision is unavailable.');
+  }
   return apiRequest(`/api/v1/metadata/artists/${encodeURIComponent(artistId)}/operator`, {
     method: 'PUT',
     includeCsrf: true,
-    body: expectedSnapshotRevision === null
-      ? draft
-      : { ...draft, expectedSnapshotRevision },
+    body: { ...draft, expectedSnapshotRevision },
   });
 }
 

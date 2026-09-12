@@ -17,6 +17,7 @@
 -->
 
 <script setup>
+import { getOperatorArtistRevision } from '../lib/operator-artist-revision.js';
 import { computed, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
@@ -249,10 +250,7 @@ const operatorCoverage = computed(() => operator.value?.coverage ?? {});
 const operatorOverview = computed(() => operator.value?.overview ?? {});
 const operatorReconciliation = computed(() => operator.value?.reconciliation ?? {});
 const musicQueueMetadataArtistId = computed(() => projection.value?.artist?.id ?? null);
-const latestSnapshotRevision = computed(() => {
-  const snapshotRevision = operatorReconciliation.value?.latestSnapshot?.snapshotRevision;
-  return Number.isSafeInteger(snapshotRevision) && snapshotRevision >= 0 ? snapshotRevision : 0;
-});
+const latestSnapshotRevision = computed(() => getOperatorArtistRevision(projection.value));
 const detailOperatorReleaseGroup = computed(() => {
   const releaseGroupId = detailRelease.value?.sourceReleaseGroup?.id;
   if (!releaseGroupId) return null;
@@ -286,12 +284,14 @@ const canRetryOperatorReconciliation = computed(() =>
 );
 const canSelectManualEdition = computed(() =>
   canEditOperatorPolicy.value
+  && latestSnapshotRevision.value !== null
   && policyDraft.value.monitoring.isMonitored
   && !detailReleaseGroupRequiresTrackReview.value
   && !isPolicyDirty.value
   && !isSavingPolicy.value,
 );
 const manualEditionSelectionDisabledReason = computed(() => {
+  if (latestSnapshotRevision.value === null) return 'Reload the artist before choosing an edition; its saved revision is unavailable.';
   if (!canEditOperatorPolicy.value) {
     return 'Only operators can choose an edition.';
   }
@@ -564,7 +564,14 @@ async function savePolicyDraft() {
   const draft = buildOperatorArtistSaveDraft(policyDraft.value);
   const expectedSnapshotRevision = latestSnapshotRevision.value;
   await policySaveTask.run(
-    ({ artistId }) => saveOperatorArtistDraft(artistId, draft, { expectedSnapshotRevision }),
+    async ({ artistId }) => {
+      try {
+        return await saveOperatorArtistDraft(artistId, draft, { expectedSnapshotRevision });
+      } catch (cause) {
+        if (cause?.status !== 409) throw cause;
+        throw Object.assign(new Error('Artist policy changed elsewhere. Your unsaved edits are kept. Review or copy your changes before reloading Artist Detail to see the latest saved policy.'), { status: 409, cause });
+      }
+    },
     async (payload, scope) => {
       if (payload?.projection) setOperatorProjection(payload.projection);
       else if (payload?.artist && payload?.operator) setOperatorProjection(payload);

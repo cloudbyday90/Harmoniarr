@@ -262,7 +262,7 @@ export function registerMetadataRoutes(app, {
     const result = await saveOperatorArtist({
       appUserId: session.appUserId,
       draft: request.body,
-      expectedSnapshotRevision: request.body?.expectedSnapshotRevision ?? null,
+      expectedSnapshotRevision: request.body?.expectedSnapshotRevision,
       metadataArtistId: request.params.artistId,
       triggeredByUserId: session.appUserId,
     });

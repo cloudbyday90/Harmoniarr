@@ -109,4 +109,57 @@ suite('Artist mutation lifecycle browser verification', () => {
       await page.goto('about:blank', { waitUntil: 'load' });
     }, { scenarioName: 'artist_save_response_preserves_new_navigation_draft' });
   });
+  test('a save conflict keeps unsaved policy and its original revision without automatic refresh or retry', {
+    timeout: config.scenarioTimeoutMs,
+  }, async (t) => {
+    if (unavailableReason) return t.skip(unavailableReason);
+    await runtime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      await installMetadataBrowserFixtures(browserContext);
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      await markBoardsOfCanadaAddedInMetadataBrowserFixture(page);
+      await page.goto(`${baseUrl}/app/artists/mb-artist-boards`, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('heading', { name: 'Boards of Canada', exact: true }).waitFor();
+      const initialRevision = await page.evaluate(async () => {
+        const response = await fetch('/api/v1/metadata/artists/metadata-artist-boards/operator');
+        const projection = await response.json();
+        return projection.operator.reconciliation.latestSnapshot?.snapshotRevision ?? 0;
+      });
+      await page.evaluate(() => {
+        const originalFetch = globalThis.fetch.bind(globalThis);
+        globalThis.artistConflictEvidence = { reads: 0, saves: [] };
+        globalThis.fetch = async (input, init) => {
+          const url = new URL(typeof input === 'string' ? input : input.url, globalThis.location.href);
+          if (url.pathname === '/api/v1/metadata/artists/metadata-artist-boards/operator') {
+            if ((init?.method ?? 'GET').toUpperCase() === 'PUT') {
+              const body = JSON.parse(init.body);
+              globalThis.artistConflictEvidence.saves.push(body);
+              return new Response(JSON.stringify({ error: {
+                code: 'operator_artist_snapshot_conflict',
+                message: `Artist Policy changed since it was loaded: expected snapshot revision ${body.expectedSnapshotRevision}, received ${body.expectedSnapshotRevision + 1}`,
+              } }), { status: 409, headers: { 'content-type': 'application/json' } });
+            }
+            globalThis.artistConflictEvidence.reads += 1;
+          }
+          return originalFetch(input, init);
+        };
+      });
+      const releaseScope = page.getByLabel(/Release scope/u);
+      const initialScope = await releaseScope.inputValue();
+      const editedScope = await releaseScope.locator('option').evaluateAll((options, current) => (
+        options.find((option) => option.value !== current).value
+      ), initialScope);
+      await releaseScope.selectOption(editedScope);
+      await page.getByRole('button', { name: 'Save policy', exact: true }).click();
+      await page.getByRole('alert').filter({ hasText: /reload|review/i }).waitFor();
+      await page.getByText('Unsaved changes', { exact: true }).waitFor();
+      assert.equal(await releaseScope.inputValue(), editedScope);
+      assert.equal(await page.getByRole('button', { name: 'Save policy', exact: true }).isEnabled(), true);
+      const evidence = await page.evaluate(() => globalThis.artistConflictEvidence);
+      assert.equal(evidence.reads, 0, 'Conflict must not refresh the saved projection over the draft');
+      assert.equal(evidence.saves.length, 1, 'Conflict must not automatically resubmit');
+      assert.equal(evidence.saves[0].expectedSnapshotRevision, initialRevision);
+      await page.goto('about:blank', { waitUntil: 'load' });
+    }, { scenarioName: 'artist_save_conflict_keeps_draft' });
+  });
+
 });

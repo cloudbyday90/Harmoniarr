@@ -384,3 +384,19 @@ test('useArtistMonitoring isMonitoring reflects in-progress Set membership', asy
   assert.equal(inProgressChecked.value, true);
   assert.equal(isMonitoring('mb-check'), false);
 });
+
+test('add artist uses create-only revision zero and preserves conflict without retrying', async (t) => {
+  const saveOperatorArtist = t.mock.fn(async () => { throw Object.assign(new Error('Conflict'), { status: 409 }); });
+  const monitor = useArtistMonitoring({ importArtist: createImportDouble(), saveOperatorArtist, showToasts: false });
+  const policy = { releaseScope: 'all' };
+  const before = structuredClone(policy);
+  const result = await monitor.addArtistWithPolicy({ id: 'artist', name: 'Artist' }, policy);
+  assert.equal(result.success, false);
+  assert.equal(result.error.status, 409);
+  assert.match(result.error.message, /Open Artist Detail/);
+  assert.equal(saveOperatorArtist.mock.callCount(), 1);
+  assert.deepEqual(saveOperatorArtist.mock.calls[0].arguments[2], { expectedSnapshotRevision: 0 });
+  assert.deepEqual(policy, before);
+  assert.equal(monitor.isMonitored('artist'), false);
+  assert.equal(monitor.isMonitoring('artist'), false);
+});

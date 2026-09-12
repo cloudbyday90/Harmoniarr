@@ -16,6 +16,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { normalizeExpectedSnapshotRevision } from './operator-artist-snapshot-revision.js';
+
 import { createOperatorArtistProjectionService } from './operator-artist-projection-service.js';
 import { createOperatorArtistSaveService } from './operator-artist-save-service.js';
 import {
@@ -43,14 +45,6 @@ function normalizeRequiredIdentifier(value, field) {
   }
 
   return value.trim();
-}
-
-function normalizeExpectedSnapshotRevision(value) {
-  if (!Number.isSafeInteger(value) || value < 0) {
-    throw createValidationError('expectedSnapshotRevision must be a non-negative integer');
-  }
-
-  return value;
 }
 
 /**

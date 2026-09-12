@@ -11,6 +11,7 @@ test('saveOperatorArtist rejects a stale snapshot revision before replacing user
     if (sql.includes('FROM operator_artist_reconciliation_snapshot')) {
       return { rows: [{ snapshot_revision: 4 }] };
     }
+    if (sql.includes('pg_advisory_xact_lock')) return { rows: [] };
     throw new Error(`Unexpected SQL: ${sql}`);
   });
   const replaceOperatorArtistReleaseGroupSelections = t.mock.fn();
@@ -95,6 +96,7 @@ test('saveOperatorArtist persists normalized state, snapshots it, and queues rec
       };
     }
 
+    if (sql.includes('pg_advisory_xact_lock')) return { rows: [] };
     throw new Error(`Unexpected SQL: ${sql}`);
   });
   const release = t.mock.fn(() => {});
@@ -316,6 +318,7 @@ test('saveOperatorArtist rejects overrides when selectionSourceMode is policy_on
 
   await assert.rejects(
     service.saveOperatorArtist({
+      expectedSnapshotRevision: 0,
       appUserId: 'user-1',
       draft: {
         monitoring: {
@@ -363,6 +366,8 @@ test('saveOperatorArtist retries the transaction once on unique constraint races
       return { rows: [] };
     }
 
+    if (sql.includes('pg_advisory_xact_lock')) return { rows: [] };
+    if (sql.includes('FROM operator_artist_reconciliation_snapshot')) return { rows: [] };
     throw new Error(`Unexpected SQL: ${sql}`);
   });
   const release = t.mock.fn(() => {});
@@ -408,6 +413,7 @@ test('saveOperatorArtist retries the transaction once on unique constraint races
   });
 
   const result = await service.saveOperatorArtist({
+    expectedSnapshotRevision: 0,
     appUserId: 'user-1',
     draft: {
       monitoring: {
@@ -444,6 +450,8 @@ function createMonitoringSaveHarness() {
     if (sql.includes('FROM metadata_releases')) {
       return { rows: [] };
     }
+    if (sql.includes('pg_advisory_xact_lock')) return { rows: [] };
+    if (sql.includes('FROM operator_artist_reconciliation_snapshot')) return { rows: [] };
     throw new Error(`Unexpected SQL: ${sql}`);
   };
   const connect = async () => ({ query, release: () => {} });
@@ -486,6 +494,7 @@ test('saveOperatorArtist queues a metadata discography refresh when an artist is
   });
 
   await service.saveOperatorArtist({
+    expectedSnapshotRevision: 0,
     appUserId: 'user-1',
     draft: {
       monitoring: { isMonitored: true },
@@ -516,6 +525,7 @@ test('saveOperatorArtist does not queue a metadata refresh when the artist is no
   });
 
   await service.saveOperatorArtist({
+    expectedSnapshotRevision: 0,
     appUserId: 'user-1',
     draft: {
       monitoring: { isMonitored: false },
@@ -542,6 +552,7 @@ test('saveOperatorArtist still resolves when a queued discography refresh is alr
   });
 
   const result = await service.saveOperatorArtist({
+    expectedSnapshotRevision: 0,
     appUserId: 'user-1',
     draft: {
       monitoring: { isMonitored: true },
@@ -641,6 +652,7 @@ test('saveOperatorArtist records an artist_policy_saved activity event with boun
   });
 
   await service.saveOperatorArtist({
+    expectedSnapshotRevision: 0,
     appUserId: 'user-1',
     draft: {
       monitoring: {
@@ -730,6 +742,7 @@ test('saveOperatorArtist fires monitor side effects only on the unmonitored -> m
   });
 
   await service.saveOperatorArtist({
+    expectedSnapshotRevision: 0,
     appUserId: 'user-1',
     metadataArtistId: 'artist-1',
     triggeredByUserId: 'user-1',
@@ -769,6 +782,7 @@ test('saveOperatorArtist does not fire monitor side effects when the artist was 
   });
 
   await service.saveOperatorArtist({
+    expectedSnapshotRevision: 0,
     appUserId: 'user-1',
     metadataArtistId: 'artist-1',
     triggeredByUserId: 'user-1',
@@ -781,3 +795,18 @@ test('saveOperatorArtist does not fire monitor side effects when the artist was 
   assert.equal(notifications.length, 0);
   assert.equal(activityEvents.some((event) => event.eventType === 'artist_monitored'), false);
 });
+
+for (const revision of [undefined, null, -1, 1.2, '0', false, Number.MAX_SAFE_INTEGER + 1]) {
+  test(`artist save rejects invalid expected revision ${String(revision)} before connecting`, async () => {
+    let connected = false;
+    const service = createOperatorArtistSaveService({
+      getPoolFn: () => { connected = true; throw new Error('must not connect'); },
+    });
+    await assert.rejects(service.saveOperatorArtist({
+      appUserId: 'user', metadataArtistId: 'artist',
+      draft: { monitoring: { isMonitored: true } },
+      expectedSnapshotRevision: revision,
+    }), { status: 400, code: 'validation_error' });
+    assert.equal(connected, false);
+  });
+}

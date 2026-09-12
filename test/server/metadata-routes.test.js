@@ -628,6 +628,7 @@ test('metadata operator artist save route persists the operator draft payload', 
         'x-csrf-token': 'csrf-token',
       },
       body: JSON.stringify({
+        expectedSnapshotRevision: 0,
         monitoring: {
           isMonitored: true,
           selectionSourceMode: 'policy_plus_overrides',
@@ -645,6 +646,7 @@ test('metadata operator artist save route persists the operator draft payload', 
     assert.deepEqual(saveOperatorArtist.mock.calls[0].arguments[0], {
       appUserId: 'user-1',
       draft: {
+        expectedSnapshotRevision: 0,
         monitoring: {
           isMonitored: true,
           selectionSourceMode: 'policy_plus_overrides',
@@ -655,7 +657,7 @@ test('metadata operator artist save route persists the operator draft payload', 
         }],
         trackOverrides: [],
       },
-      expectedSnapshotRevision: null,
+      expectedSnapshotRevision: 0,
       metadataArtistId: 'local-artist-1',
       triggeredByUserId: 'user-1',
     });

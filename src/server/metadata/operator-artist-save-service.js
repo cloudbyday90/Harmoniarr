@@ -17,6 +17,8 @@
  */
 
 import { getPool } from '../database.js';
+import { normalizeExpectedSnapshotRevision } from './operator-artist-snapshot-revision.js';
+import { createOperatorArtistSaveStateStore } from './operator-artist-save-state-store.js';
 import { buildOperatorArtistPolicyChangeSummary } from './operator-artist-policy-change-summary.js';
 import { normalizeOperatorArtistMonitoringPatch } from './operator-artist-monitoring-service.js';
 import { createOperatorArtistMonitoringStore } from './operator-artist-monitoring-store.js';
@@ -252,49 +254,6 @@ async function fetchExistingMonitoringTimestamps({ appUserId, client, metadataAr
   };
 }
 
-function normalizeExpectedSnapshotRevision(value) {
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  if (!Number.isSafeInteger(value) || value < 0) {
-    throw createValidationError('expectedSnapshotRevision must be a non-negative integer');
-  }
-
-  return value;
-}
-
-async function assertExpectedSnapshotRevision({
-  appUserId,
-  client,
-  expectedSnapshotRevision,
-  metadataArtistId,
-}) {
-  if (expectedSnapshotRevision === null) {
-    return;
-  }
-
-  const result = await client.query(
-    `
-      SELECT snapshot_revision
-      FROM operator_artist_reconciliation_snapshot
-      WHERE app_user_id = $1
-        AND metadata_artist_id = $2
-      ORDER BY snapshot_revision DESC
-      LIMIT 1
-      FOR UPDATE
-    `,
-    [appUserId, metadataArtistId],
-  );
-  const snapshotRevision = Number.isSafeInteger(result.rows[0]?.snapshot_revision)
-    ? result.rows[0].snapshot_revision
-    : 0;
-
-  if (snapshotRevision !== expectedSnapshotRevision) {
-    throw createSnapshotConflictError({ expectedSnapshotRevision, snapshotRevision });
-  }
-}
-
 async function getPreviousMonitoringPolicy({
   appUserId,
   client,
@@ -417,6 +376,7 @@ async function ensureResolvedReleasesBelongToGroups({ client, resolvedReleaseRef
 export function createOperatorArtistSaveService({
   getPoolFn = getPool,
   maxSaveRetries = 3,
+  operatorArtistSaveStateStore = createOperatorArtistSaveStateStore(),
   getOperatorArtistProjection = null,
   onArtistMonitoredFn = null,
   operatorArtistMonitoringStore = createOperatorArtistMonitoringStore(),
@@ -436,7 +396,7 @@ export function createOperatorArtistSaveService({
   async function saveOperatorArtist({
     appUserId,
     draft,
-    expectedSnapshotRevision = null,
+    expectedSnapshotRevision,
     metadataArtistId,
     triggerSource = 'save',
     triggeredByUserId = null,
@@ -497,6 +457,7 @@ export function createOperatorArtistSaveService({
 
       try {
         await client.query('BEGIN');
+        await operatorArtistSaveStateStore.lockOperatorArtistSave({ appUserId, metadataArtistId, client });
 
         await ensureUserExists({ appUserId, client });
         const artist = await fetchArtistRow({ client, metadataArtistId });
@@ -505,12 +466,14 @@ export function createOperatorArtistSaveService({
           client,
           metadataArtistId,
         });
-        await assertExpectedSnapshotRevision({
-          appUserId,
-          client,
-          expectedSnapshotRevision: normalizedExpectedSnapshotRevision,
-          metadataArtistId,
+        const snapshotRevision = await operatorArtistSaveStateStore.getSnapshotRevision({
+          appUserId, client, metadataArtistId,
         });
+        if (snapshotRevision !== normalizedExpectedSnapshotRevision) {
+          throw createSnapshotConflictError({
+            expectedSnapshotRevision: normalizedExpectedSnapshotRevision, snapshotRevision,
+          });
+        }
         const [
           previousMonitoring,
           previousReleaseGroupSelections,

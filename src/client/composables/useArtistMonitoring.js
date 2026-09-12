@@ -98,7 +98,7 @@ export function useArtistMonitoring({
    * 1. Adds the artist ID to `monitoringIds`.
    * 2. Calls `importArtist(mbid)` to upsert the artist locally.
    * 3. Builds an operator draft from the normalized policy and calls
-   *    `saveOperatorArtist(localId, draft)`.
+   *    `saveOperatorArtist(localId, draft, { expectedSnapshotRevision: 0 })`.
    * 4. Moves the ID from `monitoringIds` to `monitoredIds`.
    * 5. Optionally shows a success/error toast.
    *
@@ -127,7 +127,8 @@ export function useArtistMonitoring({
       }
 
       const draft = buildOperatorArtistDraftFromAddPolicy(normalizedPolicy);
-      const saveResult = await saveOperatorArtist(localArtistId, draft);
+      // Adding is create-only: never replace policy saved in another tab or session.
+      const saveResult = await saveOperatorArtist(localArtistId, draft, { expectedSnapshotRevision: 0 });
 
       const nextMonitoring = new Set(monitoringIds.value);
       nextMonitoring.delete(id);
@@ -146,7 +147,10 @@ export function useArtistMonitoring({
         saveResult,
         success: true,
       };
-    } catch (error) {
+    } catch (cause) {
+      const error = cause?.status === 409
+        ? Object.assign(new Error('This artist already has saved changes. Open Artist Detail to review its policy before changing it.'), { status: 409, cause })
+        : cause;
       const nextMonitoring = new Set(monitoringIds.value);
       nextMonitoring.delete(id);
       monitoringIds.value = nextMonitoring;
