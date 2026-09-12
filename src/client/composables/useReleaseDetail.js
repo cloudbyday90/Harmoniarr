@@ -46,18 +46,36 @@ export function useReleaseDetail({
   const isSavingCanonical = ref(false);
 
   let abortController = null;
+  let generation = 0;
+
+  function clearData() {
+    release.value = null;
+    media.value = [];
+    ownership.value = null;
+    allReleases.value = [];
+    requestState.value = null;
+    source.value = null;
+  }
+
+  // Invalidates presentation work; it does not undo a canonical mutation on the server.
+  function cancel() {
+    generation += 1;
+    abortController?.abort();
+    abortController = null;
+    clearData();
+    loading.value = false;
+    error.value = null;
+    canonicalError.value = null;
+    isSavingCanonical.value = false;
+  }
 
   async function load(releaseGroupMbid, { preferReleaseMbid = null, preferReleaseId = null } = {}) {
-    if (!releaseGroupMbid) return;
-
-    if (abortController) {
-      abortController.abort();
-    }
+    cancel();
+    if (typeof releaseGroupMbid !== 'string' || !releaseGroupMbid.trim()) return;
+    const token = generation;
     abortController = new AbortController();
     const { signal } = abortController;
-
     loading.value = true;
-    error.value = null;
 
     try {
       const data = await fetchTracklist(releaseGroupMbid, {
@@ -65,18 +83,21 @@ export function useReleaseDetail({
         preferReleaseId,
         signal,
       });
-
-      release.value = data.release ?? null;
-      media.value = Array.isArray(data.media) ? data.media : [];
-      ownership.value = data.ownership ?? null;
-      allReleases.value = Array.isArray(data.allReleases) ? data.allReleases : [];
-      requestState.value = data.requestState ?? null;
-      source.value = data.source ?? null;
+      if (token !== generation || signal.aborted) return;
+      release.value = data?.release ?? null;
+      media.value = Array.isArray(data?.media) ? data.media : [];
+      ownership.value = data?.ownership ?? null;
+      allReleases.value = Array.isArray(data?.allReleases) ? data.allReleases : [];
+      requestState.value = data?.requestState ?? null;
+      source.value = data?.source ?? null;
     } catch (err) {
-      if (err?.name === 'AbortError') return;
+      if (token !== generation || signal.aborted || err?.name === 'AbortError') return;
       error.value = getErrorMessage(err, 'Could not load release details.');
     } finally {
-      loading.value = false;
+      if (token === generation) {
+        loading.value = false;
+        abortController = null;
+      }
     }
   }
 
@@ -85,17 +106,19 @@ export function useReleaseDetail({
   }
 
   async function setDefaultEdition(releaseGroupMbid, releaseId) {
-    if (!releaseId) return;
+    if (!releaseId || !releaseGroupMbid || isSavingCanonical.value) return;
+    const token = generation;
     canonicalError.value = null;
     isSavingCanonical.value = true;
     try {
       await setCanonical(releaseId);
-      // Reload with the newly-canonical release selected.
+      if (token !== generation) return;
+      // Reload only while the initiating dialog context is still current.
       await load(releaseGroupMbid, { preferReleaseId: releaseId });
     } catch (err) {
-      canonicalError.value = getErrorMessage(err, 'Could not update default edition.');
+      if (token === generation) canonicalError.value = getErrorMessage(err, 'Could not update default edition.');
     } finally {
-      isSavingCanonical.value = false;
+      if (token === generation) isSavingCanonical.value = false;
     }
   }
 
@@ -110,6 +133,7 @@ export function useReleaseDetail({
     error: readonly(error),
     canonicalError: readonly(canonicalError),
     isSavingCanonical: readonly(isSavingCanonical),
+    cancel,
     load,
     switchEdition,
     setDefaultEdition,

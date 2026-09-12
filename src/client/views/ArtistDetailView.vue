@@ -28,6 +28,8 @@ import ArtistReleaseSectionGrid from '../components/media/ArtistReleaseSectionGr
 import EmptyState from '../components/EmptyState.vue';
 import MissingMusicProgressStrip from '../components/missing-music/MissingMusicProgressStrip.vue';
 import ReleaseCard from '../components/media/ReleaseCard.vue';
+import { useArtistMutationTask } from '../composables/useArtistMutationTask.js';
+import { useToast } from '../composables/useToast.js';
 import { useArtistDetail } from '../composables/useArtistDetail.js';
 import { useArtistDetailArtwork } from '../composables/useArtistDetailArtwork.js';
 import { useManualEditionSelection } from '../composables/useManualEditionSelection.js';
@@ -201,13 +203,19 @@ async function handleConfirmRequest({ requestedForUserId = null } = {}) {
 
 const detailModalOpen = ref(false);
 const detailRelease = ref(null);
-const manualEditionSelectionError = ref('');
+const mutationScope = () => ({ mbid: mbid.value, artistId: projection.value?.artist?.id ?? null,
+  actorId: sessionStore.state.user?.id ?? null });
+const policySaveTask = useArtistMutationTask({ getScope: mutationScope, fallbackMessage: 'Saving artist policy failed.' });
+const editionTask = useArtistMutationTask({ getScope: () => ({ ...mutationScope(),
+  dialogOpen: detailModalOpen.value, releaseGroupId: detailRelease.value?.releaseGroupId ?? detailRelease.value?.releaseGroup?.id ?? null }),
+  fallbackMessage: 'Saving the selected edition failed.' });
+const retryTask = useArtistMutationTask({ getScope: mutationScope, fallbackMessage: 'Retrying the release plan update failed.' });
+const { error: manualEditionSelectionError, isPending: isSelectingManualEdition } = editionTask;
+const toast = useToast();
 const policyDraft = ref(createOperatorArtistDetailDraft());
 const savedDraftFingerprint = ref(fingerprintOperatorArtistDraft(policyDraft.value));
-const isSavingPolicy = ref(false);
-const isRetryingReconciliation = ref(false);
-const policySaveError = ref('');
-const reconciliationActionError = ref('');
+const { isPending: isSavingPolicy, error: policySaveError } = policySaveTask;
+const { isPending: isRetryingReconciliation, error: reconciliationActionError } = retryTask;
 const reconciliationActionStatus = ref('');
 const pendingBulkSelectionOperation = ref(null);
 const bulkSelectionStatusMessage = ref('');
@@ -313,7 +321,7 @@ const {
   pollIntervalMs: 30000,
 });
 
-const manualEditionSelection = useManualEditionSelection();
+const manualEditionSelection = useManualEditionSelection({ showToasts: false });
 
 const discographySections = computed(() =>
   groupReleaseGroupsByType(releaseGroups.value).map((section) => ({
@@ -552,81 +560,60 @@ function repairDraftTrackOverride({ action, trackOverride }) {
 }
 
 async function savePolicyDraft() {
-  if (!canEditOperatorPolicy.value || !isPolicyFormValid.value || isSavingPolicy.value) {
-    return;
-  }
-
-  isSavingPolicy.value = true;
-  policySaveError.value = '';
-
-  try {
-    const payload = await saveOperatorArtistDraft(
-      projection.value.artist.id,
-      buildOperatorArtistSaveDraft(policyDraft.value),
-      { expectedSnapshotRevision: latestSnapshotRevision.value },
-    );
-    if (payload?.projection) {
-      setOperatorProjection(payload.projection);
-    } else if (payload?.artist && payload?.operator) {
-      setOperatorProjection(payload);
-    } else {
-      await loadArtistDetail(mbid.value);
-    }
-  } catch (error) {
-    policySaveError.value = getErrorMessage(error, 'Saving artist policy failed.');
-  } finally {
-    isSavingPolicy.value = false;
-  }
+  if (!canEditOperatorPolicy.value || !isPolicyFormValid.value || isSavingPolicy.value) return;
+  const draft = buildOperatorArtistSaveDraft(policyDraft.value);
+  const expectedSnapshotRevision = latestSnapshotRevision.value;
+  await policySaveTask.run(
+    ({ artistId }) => saveOperatorArtistDraft(artistId, draft, { expectedSnapshotRevision }),
+    async (payload, scope) => {
+      if (payload?.projection) setOperatorProjection(payload.projection);
+      else if (payload?.artist && payload?.operator) setOperatorProjection(payload);
+      else await loadArtistDetail(scope.mbid);
+    },
+  );
 }
 
 async function selectManualEdition({ release }) {
   const releaseGroup = detailOperatorReleaseGroup.value;
-  if (!canSelectManualEdition.value || !releaseGroup?.id || !release?.id) {
-    return;
-  }
-
-  manualEditionSelectionError.value = '';
-  const result = await manualEditionSelection.selectEdition({
-    expectedSnapshotRevision: latestSnapshotRevision.value,
-    metadataArtistId: projection.value.artist.id,
-    metadataReleaseGroupId: releaseGroup.id,
-    metadataReleaseId: release.id,
-    title: release.title,
+  if (!canSelectManualEdition.value || !releaseGroup?.id || !release?.id) return;
+  const selection = { expectedSnapshotRevision: latestSnapshotRevision.value,
+    metadataReleaseGroupId: releaseGroup.id, metadataReleaseId: release.id, title: release.title };
+  await editionTask.run(async ({ artistId }) => {
+    const result = await manualEditionSelection.selectEdition({ ...selection, metadataArtistId: artistId });
+    if (!result.ok && !result.skipped) throw result.error;
+    return result;
+  }, (result) => {
+    if (result.ok && result.projection) {
+      setOperatorProjection(result.projection);
+      void loadMusicQueue();
+      toast.success(`Saved ${selection.title || 'this edition'} as your selected edition.`);
+    }
   });
-
-  if (result.ok && result.projection) {
-    setOperatorProjection(result.projection);
-    void loadMusicQueue();
-  } else if (!result.ok && !result.skipped) {
-    manualEditionSelectionError.value = getErrorMessage(
-      result.error,
-      'Saving the selected edition failed.',
-    );
-  }
 }
 
 async function retryReconciliation() {
-  if (!canRetryOperatorReconciliation.value) {
-    return;
-  }
-
-  isRetryingReconciliation.value = true;
-  reconciliationActionError.value = '';
+  if (!canRetryOperatorReconciliation.value) return;
   reconciliationActionStatus.value = '';
-
-  try {
-    await retryOperatorArtistReconciliation(projection.value.artist.id);
+  await retryTask.run(({ artistId }) => retryOperatorArtistReconciliation(artistId), async (_result, scope) => {
     reconciliationActionStatus.value = 'Release plan update queued.';
-    await loadArtistDetail(mbid.value);
-  } catch (error) {
-    reconciliationActionStatus.value = '';
-    reconciliationActionError.value = getErrorMessage(error, 'Retrying the release plan update failed.');
-  } finally {
-    isRetryingReconciliation.value = false;
-  }
+    await loadArtistDetail(scope.mbid);
+  });
 }
 
-watch(mbid, (nextMbid, _previousMbid, onCleanup) => {
+// Synchronous invalidation also distinguishes A -> B -> A in one render cycle.
+watch([mbid, () => sessionStore.state.user?.id], () => {
+  cancelArtistDetailLoad();
+  policySaveTask.invalidate();
+  editionTask.invalidate();
+  retryTask.invalidate();
+  reconciliationActionStatus.value = '';
+  closeDetailModal();
+  confirmModalOpen.value = false;
+  confirmRelease.value = null;
+  pendingBulkSelectionOperation.value = null;
+}, { flush: 'sync' });
+
+watch([mbid, () => sessionStore.state.user?.id], ([nextMbid], _previousScope, onCleanup) => {
   if (nextMbid) {
     void loadArtistDetail(nextMbid);
   }
@@ -1183,7 +1170,7 @@ watch(projection, () => {
       :operator-edition-selection-enabled="canSelectManualEdition"
       :operator-edition-selection-disabled-reason="manualEditionSelectionDisabledReason"
       :operator-edition-selection-error="manualEditionSelectionError"
-      :operator-edition-selection-saving="manualEditionSelection.selectingKeys.size > 0"
+      :operator-edition-selection-saving="isSelectingManualEdition"
       :operator-selected-release-id="detailOperatorReleaseGroup?.operatorState?.resolvedMetadataReleaseId ?? null"
       :release-title="detailRelease?.title ?? null"
       :artist-name="artist?.name ?? null"

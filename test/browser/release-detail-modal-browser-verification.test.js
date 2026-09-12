@@ -265,4 +265,45 @@ suite('Release Detail modal browser verification', () => {
       scenarioName: 'release_detail_manual_edition_selection_browser_verification',
     });
   });
+  test('closing a loading release dialog aborts its read and reopening ignores its late response', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) { t.skip(runtimeUnavailableReason); return; }
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      await installMetadataBrowserFixtures(browserContext);
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      await markBoardsOfCanadaAddedInMetadataBrowserFixture(page);
+      await page.goto(`${baseUrl}/app/artists/mb-artist-boards`, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('heading', { exact: true, name: 'Albums' }).waitFor();
+      await page.evaluate(() => {
+        const originalFetch = globalThis.fetch.bind(globalThis);
+        let intercepted = false;
+        globalThis.fetch = async (input, init) => {
+          const url = typeof input === 'string' ? input : input.url;
+          if (!intercepted && url.includes('/tracklist')) {
+            intercepted = true;
+            globalThis.__oldReleaseSignal = init?.signal;
+            await new Promise((resolve) => { globalThis.__finishOldRelease = resolve; });
+            return new Response(JSON.stringify({ release: { id: 'old', title: 'Obsolete response' }, media: [] }), {
+              headers: { 'content-type': 'application/json' },
+            });
+          }
+          return originalFetch(input, init);
+        };
+      });
+      const card = page.getByRole('button', { name: 'View details for Music Has the Right to Children', exact: true });
+      await card.click();
+      const dialog = page.getByRole('dialog', { name: 'Release detail', exact: true });
+      await page.waitForFunction(() => Boolean(globalThis.__finishOldRelease));
+      await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+      assert.equal(await page.evaluate(() => globalThis.__oldReleaseSignal?.aborted), true);
+      await card.click();
+      await dialog.getByRole('list', { name: 'Disc 1 tracklist', exact: true }).waitFor();
+      await page.evaluate(() => globalThis.__finishOldRelease());
+      await page.evaluate(() => new Promise((resolve) => { globalThis.requestAnimationFrame(resolve); }));
+      assert.equal(await dialog.getByText('Obsolete response', { exact: true }).count(), 0);
+      await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+    }, { scenarioName: 'release_detail_close_reopen' });
+  });
+
 });

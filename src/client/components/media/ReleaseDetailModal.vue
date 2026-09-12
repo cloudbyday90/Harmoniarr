@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import ArtworkImage from '../ArtworkImage.vue';
 import { useReleaseDetail } from '../../composables/useReleaseDetail.js';
 import { useReleaseRequest } from '../../composables/useReleaseRequest.js';
@@ -174,6 +174,7 @@ const {
   load,
   switchEdition,
   setDefaultEdition,
+  cancel: cancelReleaseDetail,
 } = useReleaseDetail();
 
 const {
@@ -345,6 +346,7 @@ function openDialogSession() {
 }
 
 function closeDialogSession() {
+  cancelReleaseDetail();
   if (dialogRef.value?.open) {
     dialogRef.value.close();
   }
@@ -368,6 +370,21 @@ watch(
       openDialogSession();
     } else {
       closeDialogSession();
+    }
+  },
+);
+
+onBeforeUnmount(cancelReleaseDetail);
+
+watch(
+  () => [props.releaseGroupMbid, props.preferReleaseMbid],
+  () => {
+    if (props.open) {
+      editionMenuOpen.value = false;
+      requestError.value = null;
+      void load(props.releaseGroupMbid, { preferReleaseMbid: props.preferReleaseMbid });
+    } else {
+      cancelReleaseDetail();
     }
   },
 );

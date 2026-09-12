@@ -163,3 +163,73 @@ test('useReleaseDetail load aborts in-flight request when called again', async (
   // The first signal should have been aborted
   assert.equal(capturedSignal?.aborted, false); // last signal (from second call) is not aborted
 });
+
+function deferred() {
+  const result = {};
+  result.promise = new Promise((resolve, reject) => { Object.assign(result, { resolve, reject }); });
+  return result;
+}
+
+for (const outcome of ['resolve', 'reject']) {
+  test(`release detail ignores stale ${outcome} and its finalizer while newer load is pending`, async () => {
+    const old = deferred();
+    const current = deferred();
+    const signals = [];
+    const detail = useReleaseDetail({ fetchTracklist: (_group, { signal }) => {
+      signals.push(signal);
+      return signals.length === 1 ? old.promise : current.promise;
+    } });
+    const first = detail.load('old');
+    const second = detail.load('current');
+    assert.equal(signals[0].aborted, true);
+    old[outcome](outcome === 'resolve' ? makeTracklistResponse() : new Error('stale failure'));
+    await first;
+    assert.equal(detail.loading.value, true);
+    assert.equal(detail.error.value, null);
+    assert.equal(detail.release.value, null);
+    current.resolve(makeTracklistResponse({ release: { id: 'current' } }));
+    await second;
+    assert.equal(detail.release.value.id, 'current');
+  });
+}
+
+test('closing and reopening ignores an abort-ignoring old response and invalid identifiers clear data', async () => {
+  const old = deferred();
+  let calls = 0;
+  const detail = useReleaseDetail({ fetchTracklist: () => ++calls === 1 ? old.promise : Promise.resolve(makeTracklistResponse()) });
+  const first = detail.load('old');
+  detail.cancel();
+  assert.equal(detail.loading.value, false);
+  await detail.load('new');
+  old.resolve(makeTracklistResponse({ release: { id: 'stale' } }));
+  await first;
+  assert.equal(detail.release.value.id, 'release-1');
+  await detail.load('');
+  assert.equal(detail.release.value, null);
+  assert.deepEqual(detail.media.value, []);
+  assert.deepEqual(detail.allReleases.value, []);
+  assert.equal(detail.source.value, null);
+});
+
+for (const transition of ['close', 'edition']) {
+  for (const outcome of ['resolve', 'reject']) {
+    test(`canonical ${outcome} after ${transition} cannot reload or change current state`, async () => {
+      const mutation = deferred();
+      const reads = [];
+      const detail = useReleaseDetail({
+        fetchTracklist: async (group) => { reads.push(group); return makeTracklistResponse({ release: { id: group } }); },
+        setCanonical: () => mutation.promise,
+      });
+      await detail.load('old');
+      const saving = detail.setDefaultEdition('old', 'release-old');
+      if (transition === 'close') detail.cancel();
+      else await detail.switchEdition('new', 'release-new');
+      mutation[outcome](outcome === 'resolve' ? {} : new Error('stale canonical failure'));
+      await saving;
+      assert.deepEqual(reads, transition === 'close' ? ['old'] : ['old', 'new']);
+      assert.equal(detail.canonicalError.value, null);
+      assert.equal(detail.isSavingCanonical.value, false);
+      assert.equal(detail.release.value?.id ?? null, transition === 'close' ? null : 'new');
+    });
+  }
+}
