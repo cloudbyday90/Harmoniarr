@@ -61,3 +61,15 @@ test('promoteReleaseMirrorTrust copies the canonical digest to mirror tags', asy
   assert.equal(result.toReference, 'cloudbyday90/harmoniarr:0.1.0-beta,v0.1.0-beta');
   assert.equal(calls[0].fromReference, metadata.immutableImageRef);
 });
+test('staged mirror referrer copying writes only a run-specific candidate tag', async () => {
+  const stagingTag = `candidate-${'a'.repeat(40)}-123-2`;
+  const calls = [];
+  await promoteReleaseMirrorTrust({ metadata, plan, stagingTag,
+    copyOrasArtifactGraphFn: async (options) => { calls.push(options); return {}; } });
+  assert.equal(calls[0].toReference, `cloudbyday90/harmoniarr:${stagingTag}`);
+  assert.equal(calls[0].fromReference, metadata.immutableImageRef);
+  for (const invalidTag of ['', 'latest', 'v0.1.0-beta', `${stagingTag},latest`, `candidate-${'a'.repeat(40)}-0-2`]) {
+    await assert.rejects(promoteReleaseMirrorTrust({ metadata, plan, stagingTag: invalidTag,
+      copyOrasArtifactGraphFn: async () => { assert.fail('Invalid staging tag must prevent copying'); } }), /candidate tag/);
+  }
+});

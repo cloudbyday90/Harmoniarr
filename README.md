@@ -39,6 +39,8 @@ Harmoniarr is being planned as a self-hosted FOSS application with no SLA or ope
 - [Release provenance gate outcome and next priorities](docs/RELEASE_PROVENANCE_GATE_OUTCOME.md)
 - [Draft-first release lifecycle design](docs/DRAFT_RELEASE_LIFECYCLE_DESIGN.md)
 - [Draft-first release lifecycle outcome](docs/DRAFT_RELEASE_LIFECYCLE_OUTCOME.md)
+- [Candidate staging and tag promotion design](docs/RELEASE_TAG_PROMOTION_DESIGN.md)
+- [Candidate staging and tag promotion outcome](docs/RELEASE_TAG_PROMOTION_OUTCOME.md)
 - [Local workflow-script replay](docs/WORKFLOW_SCRIPT_LOCAL_REPLAY.md)
 
 ## Current Direction

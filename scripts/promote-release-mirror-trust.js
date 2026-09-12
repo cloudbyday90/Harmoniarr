@@ -9,6 +9,7 @@
 import { readFile } from 'node:fs/promises';
 import { copyOrasArtifactGraph } from './oras-registry.js';
 import { getReleaseMirror, parseReleaseMetadata } from './release-contract.js';
+import { assertReleaseCandidateTag } from './release-image-tag-plan.js';
 import {
   imageRegistryPlanCliOptions,
   parseReleaseScriptOptions,
@@ -44,6 +45,7 @@ export async function promoteReleaseMirrorTrust({
   metadata,
   mirrorName = 'dockerHub',
   plan,
+  stagingTag = null,
 } = {}) {
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
     throw new Error('metadata must be an object');
@@ -73,12 +75,15 @@ export async function promoteReleaseMirrorTrust({
     throw new Error(`Mirror registry binding ${targetRegistryBinding.imageName} does not match release metadata mirror ${mirror.imageName}`);
   }
 
+  if (stagingTag !== null) assertReleaseCandidateTag(stagingTag);
+
   return copyOrasArtifactGraphFn({
     env,
     fromReference: metadata.immutableImageRef,
     sourceRegistryBinding,
     targetRegistryBinding,
-    toReference: createMirrorTagCopyReference(mirror.imageName, mirror.tags),
+    toReference: stagingTag === null ? createMirrorTagCopyReference(mirror.imageName, mirror.tags)
+      : `${mirror.imageName}:${stagingTag}`,
   });
 }
 
@@ -93,6 +98,7 @@ export async function promoteReleaseMirrorTrustFromEnvironment(env = process.env
     env,
     metadata: parseReleaseMetadata(metadataText),
     mirrorName,
+    stagingTag: env.HARMONIARR_RELEASE_MIRROR_STAGING_TAG ?? null,
     plan: resolveImageRegistryPlanFromInputs(resolveImageRegistryPlanInputs({ env, values })),
   });
 }

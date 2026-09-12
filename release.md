@@ -201,16 +201,20 @@ Expected `Release Image` workflow artifacts:
 - `harmoniarr-image-attestation.json`: sanitized provenance result from the mandatory pre-runtime gate
 - `harmoniarr-baseline-image-attestation.json`: corresponding baseline result when configured
 - `harmoniarr-release-publication.json`: successful immutable publication and release verification evidence
+- `harmoniarr-release-tag-promotion.json`: verified final alias bindings to the accepted digest
 
 Expected `Release Image` verification stages:
 
 - `prepare-release`: verify immutable-release policy and exact tag/source binding, then create or reuse an owned draft
-- `publish-image`: after draft preflight, build and push multi-arch image, generate SBOM release asset, write metadata assets, and attach provenance when supported
+- `publish-image`: after draft preflight, build and push only run-specific candidate tags, generate SBOM and intended release metadata, and attach provenance when supported
 - `verify-image-provenance`: verify candidate origin against the exact repository, release workflow, source and signer SHA before runtime; verify any configured baseline with its explicit full revision. See the [design](docs/RELEASE_PROVENANCE_GATE_DESIGN.md).
 - `verify-published-image`: pull the immutable image, run `npm run validate:docker-released-image`, verify the emitted smoke evidence contract, and upload the archived evidence
 - `verify-upgrade-path`: after provenance passes, when a complete baseline pair is configured, run `npm run validate:docker-upgrade`, verify the emitted upgrade evidence contract, and upload the archived evidence
-- `verify-release-contract`: download the four build artifacts and archived smoke evidence from this run, re-verify their contracts, verify mirror behavior, and require the earlier provenance gate to have succeeded
+- `verify-release-contract`: download the four build artifacts and archived smoke evidence from this run, re-verify contracts, stage trusted mirror referrers under the candidate tag, and verify mirror digest/parity without requiring final aliases
+- `promote-release-tags`: verify every immutable source, promote planned version/release aliases (latest for stable releases only) without rebuilding, and verify every alias against the original manifest bytes
 - `publish-release`: recheck policy/tag/draft, validate and attach the four assets, publish, then require immutable state and successful release attestation verification
+
+Final GitHub publication requires the tag-promotion job to succeed. Registry alias updates are mutable and are not atomic across tags or registries. A partial failure may leave some aliases changed; inspect against the accepted digest instead of deleting or blindly rolling back. Candidate tags remain available. See the [promotion design](docs/RELEASE_TAG_PROMOTION_DESIGN.md) and [outcome](docs/RELEASE_TAG_PROMOTION_OUTCOME.md).
 
 ## Post-Publish Verification
 

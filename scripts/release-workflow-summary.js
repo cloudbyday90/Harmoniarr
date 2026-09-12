@@ -33,7 +33,7 @@ export function renderReleaseImageSummaryLines({
     `- Release tag: ${releaseTag}`,
     `- Immutable image reference: ${imageRef}`,
     ...(dockerHubImageName ? [`- Docker Hub mirror: ${dockerHubImageName}`] : []),
-    '- Tags:',
+    '- Planned release aliases (promotion pending):',
     createMarkdownBulletList(tags),
     `- SBOM artifact: ${sbomAssetName}`,
     `- Compose override: ${composeAssetName}`,

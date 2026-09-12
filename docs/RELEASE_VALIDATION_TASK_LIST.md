@@ -190,3 +190,5 @@ Issue #4 platform evidence map: `docs/ISSUE_4_RELEASE_VALIDATION_EVIDENCE.md`
 - [ ] Complete a live published-image run through that gate with reviewed baseline acceptance evidence.
 - [x] Implement draft-first release publication after provenance, runtime, and artifact gates. See [design](DRAFT_RELEASE_LIFECYCLE_DESIGN.md) and [outcome](DRAFT_RELEASE_LIFECYCLE_OUTCOME.md).
 - [ ] Confirm repository immutability, provision the read-only policy token, and complete an authorized live draft-to-immutable release run.
+- [x] Stage candidate-only images and mirror referrers, then promote release aliases after acceptance. See [design](RELEASE_TAG_PROMOTION_DESIGN.md) and [outcome](RELEASE_TAG_PROMOTION_OUTCOME.md).
+- [ ] Complete a live multi-registry tag-promotion run and review version-conflict/channel-ordering behavior.

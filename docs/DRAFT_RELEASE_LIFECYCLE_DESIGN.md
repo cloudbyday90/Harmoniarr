@@ -55,3 +55,5 @@ Retain Node 24 native ESM, small service/policy/CLI modules, canonical GHCR dige
 No DOM, ARIA, focus, or application UI behavior changes. Existing browser smoke remains a separate gate; provenance and publication are not accessibility conformance results. Machine evidence exposes sanitized facts and no credentials. The operator guide distinguishes draft state, failed/uncertain publication, verified immutable publication, and runtime acceptance.
 
 See the separate [outcome](DRAFT_RELEASE_LIFECYCLE_OUTCOME.md) for measured validation and remaining release prerequisites.
+
+Follow-up: [candidate staging and tag promotion](RELEASE_TAG_PROMOTION_DESIGN.md) now replaces the early registry-tag publication retained by this initial design. Live release acceptance remains separate.

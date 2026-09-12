@@ -27,7 +27,7 @@ test('renderReleaseImageSummaryLines formats release assets and tags', () => {
     '- Release tag: v0.1.0-beta',
     '- Immutable image reference: ghcr.io/cloudbyday90/harmoniarr@sha256:abc',
     '- Docker Hub mirror: cloudbyday90/harmoniarr',
-    '- Tags:',
+    '- Planned release aliases (promotion pending):',
     '- ghcr.io/cloudbyday90/harmoniarr:0.1.0-beta\n- cloudbyday90/harmoniarr:0.1.0-beta',
     '- SBOM artifact: harmoniarr-release.spdx.json',
     '- Compose override: harmoniarr-release-compose.override.yaml',

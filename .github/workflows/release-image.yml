@@ -57,6 +57,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 75
     outputs:
+      candidate_tag: ${{ steps.candidate.outputs.candidate_tag }}
       compose_asset_name: ${{ steps.metadata.outputs.compose_asset_name }}
       digest: ${{ steps.build.outputs.digest }}
       dockerhub_enabled: ${{ steps.release.outputs.dockerhub_enabled }}
@@ -96,6 +97,15 @@ jobs:
           HARMONIARR_REPOSITORY_NAME: ${{ github.event.repository.name }}
           HARMONIARR_REPOSITORY_OWNER: ${{ github.repository_owner }}
         run: node scripts/write-image-registry-config.js
+
+      - name: Plan run-specific candidate tags
+        id: candidate
+        env:
+          HARMONIARR_REPOSITORY: ${{ github.repository }}
+          HARMONIARR_RELEASE_TAG: ${{ inputs.release_tag }}
+          HARMONIARR_RELEASE_REVISION: ${{ github.sha }}
+          HARMONIARR_DOCKERHUB_IMAGE_NAME: ${{ steps.release.outputs.dockerhub_image_name }}
+        run: node scripts/write-release-candidate-tags.js
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
@@ -149,7 +159,7 @@ jobs:
           sbom: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ steps.candidate.outputs.candidate_tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
       - name: Prepare supply-chain workspace
@@ -586,6 +596,7 @@ jobs:
           HARMONIARR_RELEASE_EXPECTED_DIGEST: ${{ needs.publish-image.outputs.digest }}
           HARMONIARR_RELEASE_METADATA_PATH: supply-chain/${{ needs.publish-image.outputs.metadata_asset_name }}
           HARMONIARR_RELEASE_MIRROR_KEY: dockerHub
+          HARMONIARR_RELEASE_MIRROR_STAGING_TAG: ${{ needs.publish-image.outputs.candidate_tag }}
           HARMONIARR_REPOSITORY_NAME: ${{ github.event.repository.name }}
           HARMONIARR_REPOSITORY_OWNER: ${{ github.repository_owner }}
         run: npm run probe:release-mirror-capabilities
@@ -601,7 +612,7 @@ jobs:
           HARMONIARR_RELEASE_EXPECTED_DIGEST: ${{ needs.publish-image.outputs.digest }}
           HARMONIARR_RELEASE_METADATA_PATH: supply-chain/${{ needs.publish-image.outputs.metadata_asset_name }}
           HARMONIARR_RELEASE_MIRROR_KEY: dockerHub
-        run: node scripts/verify-release-mirror.js
+        run: node scripts/verify-staged-release-mirror.js
 
       - name: Verify Docker Hub trusted mirror referrers
         if: ${{ needs.publish-image.outputs.dockerhub_enabled == 'true' && needs.publish-image.outputs.trusted_dockerhub_mirror_enabled == 'true' }}
@@ -620,7 +631,7 @@ jobs:
           HARMONIARR_SUMMARY_ATTESTATION_STATUS: provenance verified before runtime
           HARMONIARR_SUMMARY_BROWSER_SMOKE_EVIDENCE_STATUS: published-image browser-smoke artifact passed
           HARMONIARR_SUMMARY_DEPLOYMENT_SUMMARY_ARTIFACT_NAME: harmoniarr-docker-deployment-summary.json
-          HARMONIARR_SUMMARY_DOCKERHUB_MIRROR_STATUS: ${{ needs.publish-image.outputs.dockerhub_enabled == 'true' && 'passed' || 'skipped' }}
+          HARMONIARR_SUMMARY_DOCKERHUB_MIRROR_STATUS: ${{ needs.publish-image.outputs.dockerhub_enabled == 'true' && 'staged digest passed; aliases pending promotion' || 'skipped' }}
           HARMONIARR_SUMMARY_RELEASE_TAG: ${{ needs.publish-image.outputs.release_tag }}
           HARMONIARR_SUMMARY_SMOKE_EVIDENCE_STATUS: published-image artifact passed
           HARMONIARR_SUMMARY_UPGRADE_SMOKE_EVIDENCE_STATUS: ${{ needs.verify-upgrade-path.result == 'success' && 'upgrade-path artifact passed' || 'skipped' }}
@@ -628,12 +639,66 @@ jobs:
           HARMONIARR_SUMMARY_TRUSTED_MIRROR_REFERRER_STATUS: ${{ needs.publish-image.outputs.dockerhub_enabled == 'true' && needs.publish-image.outputs.trusted_dockerhub_mirror_enabled == 'true' && 'passed' || 'skipped' }}
         run: node scripts/release-workflow-summary.js verify-release-contract
 
+  promote-release-tags:
+    name: Promote Accepted Image Tags
+    needs:
+      - publish-image
+      - verify-release-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        if: ${{ needs.publish-image.outputs.dockerhub_enabled == 'true' }}
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          username: ${{ secrets['DOCKERHUB_USERNAME'] }}
+          password: ${{ secrets['DOCKERHUB_TOKEN'] }}
+
+      - name: Promote and verify accepted digest aliases
+        env:
+          HARMONIARR_REPOSITORY: ${{ github.repository }}
+          HARMONIARR_RELEASE_TAG: ${{ inputs.release_tag }}
+          HARMONIARR_RELEASE_REVISION: ${{ github.sha }}
+          HARMONIARR_DOCKERHUB_IMAGE_NAME: ${{ needs.publish-image.outputs.dockerhub_image_name }}
+          HARMONIARR_IMAGE: ${{ needs.publish-image.outputs.image_ref }}
+          HARMONIARR_TAG_PROMOTION_EVIDENCE_PATH: supply-chain/release-tag-promotion.json
+        run: node scripts/promote-release-image-tags.js
+
+      - name: Upload verified tag promotion evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: harmoniarr-release-tag-promotion.json
+          path: supply-chain/release-tag-promotion.json
+          if-no-files-found: error
+
   publish-release:
     name: Publish Verified Immutable Release
     needs:
       - prepare-release
       - publish-image
       - verify-release-contract
+      - promote-release-tags
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

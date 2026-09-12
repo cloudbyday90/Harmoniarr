@@ -49,3 +49,7 @@ All open heads and full patches were refreshed through GitHub MCP. None was appl
 | 5 | Exercise representative library/queue workloads. | Establishes practical performance budgets. | Requires bounded realistic fixtures and measurements. |
 
 Retain Node 24 native ESM, modular services, PostgreSQL, GHCR digest identity, live certificate/release verification, read-only policy checks, gated draft publication, and separate sanitized runtime evidence. See the [design](DRAFT_RELEASE_LIFECYCLE_DESIGN.md) for official September 2026 sources and alternatives.
+
+## Follow-up implementation
+
+The early registry-tag publication described above is replaced by [candidate staging and gated promotion](RELEASE_TAG_PROMOTION_OUTCOME.md). Mutable-alias conflict/channel policy and actual live release acceptance remain separate work.
