@@ -41,9 +41,7 @@ function normalizeNullableString(value) {
 }
 
 function normalizeNullablePositiveInteger(value) {
-  if (value == null || value === '') return null;
-  const parsed = Number.parseInt(value, 10);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  return Number.isSafeInteger(value) && value > 0 && value <= 2147483647 ? value : null;
 }
 
 function normalizeMonitoring(monitoring = {}) {

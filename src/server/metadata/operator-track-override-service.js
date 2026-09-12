@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { normalizeNullableTrackInteger, normalizeNullableTrackUuid } from './operator-track-override-validation.js';
 import { getPool } from '../database.js';
 import {
   defaultOperatorTrackOverridePolicy,
@@ -44,41 +45,6 @@ function createValidationError(message) {
   return error;
 }
 
-function normalizeNullablePositiveInteger(value, field) {
-  if (value == null) {
-    return null;
-  }
-
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isInteger(parsed) || parsed < 1) {
-    throw createValidationError(`${field} must be a positive integer when provided`);
-  }
-
-  return parsed;
-}
-
-function normalizeNullableNonNegativeInteger(value, field) {
-  if (value == null) {
-    return null;
-  }
-
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isInteger(parsed) || parsed < 0) {
-    throw createValidationError(`${field} must be a non-negative integer when provided`);
-  }
-
-  return parsed;
-}
-
-function normalizeNullableUuidLike(value) {
-  if (typeof value !== 'string') {
-    return null;
-  }
-
-  const trimmed = value.trim().toLowerCase();
-  return trimmed.length > 0 ? trimmed : null;
-}
-
 export function normalizeOperatorTrackOverridePatch(patch = {}) {
   const {
     isDesired,
@@ -96,11 +62,11 @@ export function normalizeOperatorTrackOverridePatch(patch = {}) {
     throw createValidationError('isDesired must be a boolean');
   }
 
-  const normalizedTrackMbid = normalizeNullableUuidLike(trackMbid);
-  const normalizedRecordingMbid = normalizeNullableUuidLike(recordingMbid);
-  const normalizedMediumPosition = normalizeNullablePositiveInteger(mediumPosition, 'mediumPosition');
-  const normalizedTrackPosition = normalizeNullablePositiveInteger(trackPosition, 'trackPosition');
-  const normalizedMetadataReleaseId = normalizeNullableUuidLike(metadataReleaseId);
+  const normalizedTrackMbid = normalizeNullableTrackUuid(trackMbid, 'trackMbid');
+  const normalizedRecordingMbid = normalizeNullableTrackUuid(recordingMbid, 'recordingMbid');
+  const normalizedMediumPosition = normalizeNullableTrackInteger(mediumPosition, 'mediumPosition');
+  const normalizedTrackPosition = normalizeNullableTrackInteger(trackPosition, 'trackPosition');
+  const normalizedMetadataReleaseId = normalizeNullableTrackUuid(metadataReleaseId, 'metadataReleaseId');
   const normalizedTrackTitleSnapshot = typeof trackTitleSnapshot === 'string'
     ? trackTitleSnapshot.trim()
     : null;
@@ -134,9 +100,10 @@ export function normalizeOperatorTrackOverridePatch(patch = {}) {
     metadataReleaseId: normalizedMetadataReleaseId,
     recordingMbid: normalizedRecordingMbid,
     remapStatus: normalizedRemapStatus,
-    trackLengthMsSnapshot: normalizeNullableNonNegativeInteger(
+    trackLengthMsSnapshot: normalizeNullableTrackInteger(
       trackLengthMsSnapshot,
       'trackLengthMsSnapshot',
+      0,
     ),
     trackMbid: normalizedTrackMbid,
     trackPosition: normalizedTrackPosition,
@@ -248,6 +215,7 @@ export function createOperatorTrackOverrideService({
     metadataReleaseGroupId,
     patch,
   }) {
+    const normalizedPatch = normalizeOperatorTrackOverridePatch(patch ?? {});
     await Promise.all([
       ensureUserExists(appUserId),
       ensureArtistExists(metadataArtistId),
@@ -259,7 +227,6 @@ export function createOperatorTrackOverrideService({
       );
     }
 
-    const normalizedPatch = normalizeOperatorTrackOverridePatch(patch ?? {});
     await ensureResolvedReleaseBelongsToGroup({
       metadataReleaseGroupId,
       metadataReleaseId: normalizedPatch.metadataReleaseId,

@@ -9,7 +9,7 @@ test('normalizeOperatorTrackOverridePatch validates track-mbid based overrides',
   const result = normalizeOperatorTrackOverridePatch({
     isDesired: true,
     mediumPosition: 1,
-    metadataReleaseId: 'release-1',
+    metadataReleaseId: '33333333-3333-4333-8333-333333333333',
     recordingMbid: '11111111-1111-4111-8111-111111111111',
     remapStatus: 'REVIEW_NEEDED',
     trackLengthMsSnapshot: 215000,
@@ -21,7 +21,7 @@ test('normalizeOperatorTrackOverridePatch validates track-mbid based overrides',
   assert.deepEqual(result, {
     isDesired: true,
     mediumPosition: 1,
-    metadataReleaseId: 'release-1',
+    metadataReleaseId: '33333333-3333-4333-8333-333333333333',
     recordingMbid: '11111111-1111-4111-8111-111111111111',
     remapStatus: 'review_needed',
     trackLengthMsSnapshot: 215000,
@@ -61,8 +61,8 @@ test('updateOperatorTrackOverride validates release-group and release membership
     }
 
     if (sql.includes('FROM metadata_releases')) {
-      assert.deepEqual(params, ['release-1', 'release-group-1']);
-      return { rows: [{ id: 'release-1' }] };
+      assert.deepEqual(params, ['33333333-3333-4333-8333-333333333333', 'release-group-1']);
+      return { rows: [{ id: '33333333-3333-4333-8333-333333333333' }] };
     }
 
     return { rows: [] };
@@ -83,7 +83,7 @@ test('updateOperatorTrackOverride validates release-group and release membership
     patch: {
       isDesired: true,
       mediumPosition: 1,
-      metadataReleaseId: 'release-1',
+      metadataReleaseId: '33333333-3333-4333-8333-333333333333',
       recordingMbid: '11111111-1111-4111-8111-111111111111',
       trackLengthMsSnapshot: 215000,
       trackMbid: '22222222-2222-4222-8222-222222222222',
@@ -98,7 +98,7 @@ test('updateOperatorTrackOverride validates release-group and release membership
     mediumPosition: 1,
     metadataArtistId: 'artist-1',
     metadataReleaseGroupId: 'release-group-1',
-    metadataReleaseId: 'release-1',
+    metadataReleaseId: '33333333-3333-4333-8333-333333333333',
     recordingMbid: '11111111-1111-4111-8111-111111111111',
     remapStatus: 'resolved',
     trackLengthMsSnapshot: 215000,
@@ -113,7 +113,7 @@ test('updateOperatorTrackOverride validates release-group and release membership
     override: {
       isDesired: true,
       mediumPosition: 1,
-      metadataReleaseId: 'release-1',
+      metadataReleaseId: '33333333-3333-4333-8333-333333333333',
       recordingMbid: '11111111-1111-4111-8111-111111111111',
       remapStatus: 'resolved',
       trackLengthMsSnapshot: 215000,
@@ -206,14 +206,14 @@ test('updateOperatorTrackOverride rejects resolved releases outside the release 
       patch: {
         isDesired: true,
         mediumPosition: 1,
-        metadataReleaseId: 'release-9',
+        metadataReleaseId: '99999999-9999-4999-8999-999999999999',
         recordingMbid: '11111111-1111-4111-8111-111111111111',
         trackPosition: 4,
       },
     }),
     {
       code: 'validation_error',
-      message: 'Resolved release release-9 does not belong to release group release-group-1',
+      message: 'Resolved release 99999999-9999-4999-8999-999999999999 does not belong to release group release-group-1',
       status: 400,
     },
   );

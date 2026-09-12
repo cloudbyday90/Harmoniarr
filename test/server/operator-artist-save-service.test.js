@@ -87,10 +87,10 @@ test('saveOperatorArtist persists normalized state, snapshots it, and queues rec
     }
 
     if (sql.includes('FROM metadata_releases')) {
-      assert.deepEqual(params, [['release-1']]);
+      assert.deepEqual(params, [['33333333-3333-4333-8333-333333333333']]);
       return {
         rows: [{
-          id: 'release-1',
+          id: '33333333-3333-4333-8333-333333333333',
           metadata_release_group_id: 'release-group-1',
         }],
       };
@@ -120,7 +120,7 @@ test('saveOperatorArtist persists normalized state, snapshots it, and queues rec
       monitoring: { isMonitored: true },
     },
     releaseGroups: [{ id: 'release-group-1' }],
-    releases: [{ id: 'release-1' }],
+    releases: [{ id: '33333333-3333-4333-8333-333333333333' }],
   }));
   const service = createOperatorArtistSaveService({
     getOperatorArtistProjection,
@@ -156,7 +156,7 @@ test('saveOperatorArtist persists normalized state, snapshots it, and queues rec
       },
       releaseGroupSelections: [{
         metadataReleaseGroupId: 'release-group-1',
-        resolvedMetadataReleaseId: 'release-1',
+        resolvedMetadataReleaseId: '33333333-3333-4333-8333-333333333333',
         selectionSource: 'manual',
         selectionState: 'partial',
       }],
@@ -164,7 +164,7 @@ test('saveOperatorArtist persists normalized state, snapshots it, and queues rec
         isDesired: false,
         mediumPosition: 1,
         metadataReleaseGroupId: 'release-group-1',
-        metadataReleaseId: 'release-1',
+        metadataReleaseId: '33333333-3333-4333-8333-333333333333',
         recordingMbid: '11111111-1111-4111-8111-111111111111',
         remapStatus: 'review_needed',
         trackLengthMsSnapshot: 215000,
@@ -198,7 +198,7 @@ test('saveOperatorArtist persists normalized state, snapshots it, and queues rec
     metadataArtistId: 'artist-1',
     operatorReleaseGroupSelections: [{
       metadataReleaseGroupId: 'release-group-1',
-      resolvedMetadataReleaseId: 'release-1',
+      resolvedMetadataReleaseId: '33333333-3333-4333-8333-333333333333',
       selectionOrigin: null,
       selectionSource: 'manual',
       selectionState: 'partial',
@@ -212,7 +212,7 @@ test('saveOperatorArtist persists normalized state, snapshots it, and queues rec
       isDesired: false,
       mediumPosition: 1,
       metadataReleaseGroupId: 'release-group-1',
-      metadataReleaseId: 'release-1',
+      metadataReleaseId: '33333333-3333-4333-8333-333333333333',
       recordingMbid: '11111111-1111-4111-8111-111111111111',
       remapStatus: 'review_needed',
       trackLengthMsSnapshot: 215000,
@@ -242,7 +242,7 @@ test('saveOperatorArtist persists normalized state, snapshots it, and queues rec
         },
         releaseGroupSelections: [{
           metadataReleaseGroupId: 'release-group-1',
-          resolvedMetadataReleaseId: 'release-1',
+          resolvedMetadataReleaseId: '33333333-3333-4333-8333-333333333333',
           selectionOrigin: null,
           selectionSource: 'manual',
           selectionState: 'partial',
@@ -252,7 +252,7 @@ test('saveOperatorArtist persists normalized state, snapshots it, and queues rec
           isDesired: false,
           mediumPosition: 1,
           metadataReleaseGroupId: 'release-group-1',
-          metadataReleaseId: 'release-1',
+          metadataReleaseId: '33333333-3333-4333-8333-333333333333',
           recordingMbid: '11111111-1111-4111-8111-111111111111',
           remapStatus: 'review_needed',
           trackLengthMsSnapshot: 215000,
@@ -287,7 +287,7 @@ test('saveOperatorArtist persists normalized state, snapshots it, and queues rec
         monitoring: { isMonitored: true },
       },
       releaseGroups: [{ id: 'release-group-1' }],
-      releases: [{ id: 'release-1' }],
+      releases: [{ id: '33333333-3333-4333-8333-333333333333' }],
     },
     reconciliation: {
       accepted: true,
@@ -644,7 +644,7 @@ test('saveOperatorArtist records an artist_policy_saved activity event with boun
         isDesired: false,
         metadataReleaseGroupId: 'release-group-1',
         remapStatus: 'review_needed',
-        trackMbid: 'track-1',
+        trackMbid: '22222222-2222-4222-8222-222222222222',
       }],
       replaceOperatorArtistTrackOverrides: async () => {},
     },
@@ -674,7 +674,7 @@ test('saveOperatorArtist records an artist_policy_saved activity event with boun
         isDesired: false,
         metadataReleaseGroupId: 'release-group-1',
         remapStatus: 'resolved',
-        trackMbid: 'track-1',
+        trackMbid: '22222222-2222-4222-8222-222222222222',
       }],
     },
     metadataArtistId: 'artist-1',

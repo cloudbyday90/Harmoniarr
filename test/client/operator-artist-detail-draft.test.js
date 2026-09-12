@@ -300,3 +300,31 @@ test('removeDraftTrackOverride clears the selected override by saved identity', 
   assert.equal(draft.trackOverrides.length, 1);
   assert.equal(draft.trackOverrides[0].recordingMbid, 'mb-recording-other');
 });
+
+test('track fallback drafts do not coerce malformed positions into a different identity', () => {
+  const releaseGroup = { id: '11111111-2222-4333-8444-555555555555' };
+  const track = { recordingMbid: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee', position: 1, lengthMs: 0 };
+  for (const invalid of ['1', '1x', 1.5, 0, -1, 2147483648, Number.MAX_SAFE_INTEGER + 1]) {
+    for (const field of ['mediumPosition', 'trackPosition']) {
+      const draft = createOperatorArtistDetailDraft();
+      setDraftTrackOverrideState(draft, releaseGroup, track, 'desired', { mediumPosition: 1, trackPosition: 1, [field]: invalid });
+      assert.deepEqual(draft.trackOverrides, [], `${field}=${invalid} must not become a different valid identity`);
+    }
+  }
+});
+
+test('valid track and fallback drafts send numeric positions and retain zero duration', () => {
+  const draft = createOperatorArtistDetailDraft();
+  const releaseGroup = { id: '11111111-2222-4333-8444-555555555555' };
+  const context = { mediumPosition: 1, metadataReleaseId: '22222222-3333-4444-8555-666666666666' };
+  const track = { recordingMbid: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee', position: 1, lengthMs: 0 };
+  setDraftTrackOverrideState(draft, releaseGroup, track, 'desired', context);
+  setDraftTrackOverrideState(draft, releaseGroup, { ...track, trackMbid: 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff' }, 'suppressed', context);
+  const payload = buildOperatorArtistSaveDraft(draft);
+  assert.equal(payload.trackOverrides.length, 2);
+  for (const override of payload.trackOverrides) {
+    assert.equal(override.mediumPosition, 1);
+    assert.equal(override.trackPosition, 1);
+    assert.equal(override.trackLengthMsSnapshot, 0);
+  }
+});
