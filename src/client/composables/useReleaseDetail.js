@@ -18,6 +18,7 @@
 
 import { computed, readonly, ref } from 'vue';
 import { fetchReleaseGroupTracklist, markReleaseCanonical } from '../lib/metadata-api.js';
+import { useReleaseEditionPages } from './useReleaseEditionPages.js';
 import { getErrorMessage } from '../lib/error-utils.js';
 
 /**
@@ -33,11 +34,14 @@ import { getErrorMessage } from '../lib/error-utils.js';
 export function useReleaseDetail({
   fetchTracklist = fetchReleaseGroupTracklist,
   setCanonical = markReleaseCanonical,
+  fetchEditions,
 } = {}) {
   const release = ref(null);
   const media = ref([]);
   const ownership = ref(null);
-  const allReleases = ref([]);
+  const editionPages = useReleaseEditionPages({ fetchEditions });
+  const allReleases = editionPages.results;
+  let activeGroup = null;
   const requestState = ref(null);
   const source = ref(null);
   const loading = ref(false);
@@ -55,13 +59,18 @@ export function useReleaseDetail({
     release.value = null;
     media.value = [];
     ownership.value = null;
-    allReleases.value = [];
+
     requestState.value = null;
     source.value = null;
   }
 
   // Invalidates presentation work; it does not undo a canonical mutation on the server.
-  function cancel() {
+  function cancel({ preserveEditions = false } = {}) {
+    if (preserveEditions) editionPages.pause();
+    else {
+      editionPages.reset();
+      activeGroup = null;
+    }
     generation += 1;
     abortController?.abort();
     abortController = null;
@@ -74,8 +83,9 @@ export function useReleaseDetail({
   }
 
   async function load(releaseGroupMbid, { preferReleaseMbid = null, preferReleaseId = null } = {}) {
-    cancel();
+    cancel({ preserveEditions: activeGroup === releaseGroupMbid });
     if (typeof releaseGroupMbid !== 'string' || !releaseGroupMbid.trim()) return;
+    activeGroup = releaseGroupMbid;
     const token = generation;
     abortController = new AbortController();
     const { signal } = abortController;
@@ -91,7 +101,8 @@ export function useReleaseDetail({
       release.value = data?.release ?? null;
       media.value = Array.isArray(data?.media) ? data.media : [];
       ownership.value = data?.ownership ?? null;
-      allReleases.value = Array.isArray(data?.allReleases) ? data.allReleases : [];
+      editionPages.accept(releaseGroupMbid, Array.isArray(data?.allReleases) ? data.allReleases : [], data?.editionPage);
+      if (data?.release) editionPages.merge([data.release]);
       requestState.value = data?.requestState ?? null;
       source.value = data?.source ?? null;
     } catch (err) {
@@ -138,7 +149,13 @@ export function useReleaseDetail({
     release: readonly(release),
     media: readonly(media),
     ownership: readonly(ownership),
-    allReleases: readonly(allReleases),
+    allReleases,
+    editionsLoading: editionPages.loading,
+    editionsError: editionPages.error,
+    editionsLoadedCount: editionPages.loadedCount,
+    canLoadMoreEditions: editionPages.hasMore,
+    loadMoreEditions: () => !loading.value && !isSavingCanonical.value && !error.value
+      ? editionPages.loadMore() : Promise.resolve(false),
     requestState: readonly(requestState),
     source: readonly(source),
     loading: readonly(loading),

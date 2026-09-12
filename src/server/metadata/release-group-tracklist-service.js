@@ -24,6 +24,10 @@ import {
   listMetadataTracksByReleaseId,
 } from './metadata-repository.js';
 import { createMusicBrainzCatalogService } from './musicbrainz-catalog-service.js';
+import {
+  normalizeMusicBrainzEditionLookup,
+  normalizeMusicBrainzEditionTotal,
+} from './musicbrainz-release-edition-policy.js';
 
 function mapTracklistRelease(row) {
   return {
@@ -39,6 +43,22 @@ function mapTracklistRelease(row) {
     disambiguation: row.disambiguation ?? null,
     isCanonical: row.is_canonical ?? false,
   };
+}
+
+function mapRemoteTracklistRelease(release) {
+  return mapTracklistRelease({
+    id: null,
+    musicbrainz_release_id: release.musicbrainzReleaseId,
+    title: release.title,
+    release_date: release.releaseDate,
+    country: release.country,
+    status: release.status,
+    track_count: release.trackCount,
+    medium_count: release.mediumCount,
+    barcode: release.barcode,
+    disambiguation: release.disambiguation,
+    is_canonical: false,
+  });
 }
 
 function mapTrack(row, ownedRecordingIds) {
@@ -157,7 +177,9 @@ async function getRequestState(releaseGroupId, sessionUserId, pool) {
  */
 function selectTargetRelease(rows, { preferReleaseMbid, preferReleaseId } = {}) {
   if (preferReleaseMbid) {
-    const found = rows.find((r) => r.musicbrainz_release_id === preferReleaseMbid);
+    const found = typeof preferReleaseMbid === 'string'
+      ? rows.find((r) => r.musicbrainz_release_id?.toLowerCase() === preferReleaseMbid.toLowerCase())
+      : null;
     if (found) return found;
   }
   if (preferReleaseId) {
@@ -191,8 +213,10 @@ export function createReleaseGroupTracklistService({
     if (releaseGroup) {
       const releaseRows = await listReleasesWithCanonicalByReleaseGroupId(releaseGroup.id, pool);
 
-      if (releaseRows.length === 0) {
-        // Group imported but no releases yet — fall through to MB fallback.
+      if (releaseRows.length === 0 || (preferReleaseMbid
+        && (typeof preferReleaseMbid !== 'string'
+          || !releaseRows.some((row) => row.musicbrainz_release_id?.toLowerCase() === preferReleaseMbid.toLowerCase())))) {
+        // A partial import must not replace a selected remote edition with the local canonical one.
         return buildMusicBrainzFallback({
           releaseGroupMbid,
           preferReleaseMbid,
@@ -243,25 +267,33 @@ export function createReleaseGroupTracklistService({
   }
 
   async function buildMusicBrainzFallback({ releaseGroupMbid, preferReleaseMbid, pool: _pool }) {
+    const preferredIdentity = preferReleaseMbid
+      ? normalizeMusicBrainzEditionLookup({ releaseGroupId: releaseGroupMbid, releaseId: preferReleaseMbid })
+      : null;
     const mbData = await musicBrainzCatalogService.getReleaseGroupReleases({
       releaseGroupId: releaseGroupMbid,
       limit: 25,
     });
+
+    const mbReleases = mbData.results ?? [];
+    let targetRelease = mbReleases[0] ?? null;
+    if (preferredIdentity) {
+      targetRelease = mbReleases.find((release) => release.musicbrainzReleaseId?.toLowerCase() === preferredIdentity.releaseId)
+        ?? await musicBrainzCatalogService.getReleaseGroupRelease(preferredIdentity);
+    }
+
+    const editionPage = {
+      releaseGroupId: releaseGroupMbid,
+      limit: mbData.limit ?? 25,
+      offset: mbData.offset ?? 0,
+      total: normalizeMusicBrainzEditionTotal(mbData.total),
+    };
 
     // Fire-and-forget import so the release group is available next time.
     if (importMusicBrainzReleaseGroup) {
       importMusicBrainzReleaseGroup({ releaseGroupId: releaseGroupMbid }).catch(() => {
         // Intentionally swallowed — background import failure is non-fatal.
       });
-    }
-
-    const mbReleases = mbData.results ?? [];
-
-    // Select a target release from MB results.
-    let targetRelease = mbReleases[0] ?? null;
-    if (preferReleaseMbid) {
-      const found = mbReleases.find((r) => r.musicbrainzReleaseId === preferReleaseMbid);
-      if (found) targetRelease = found;
     }
 
     if (!targetRelease) {
@@ -272,40 +304,18 @@ export function createReleaseGroupTracklistService({
         allReleases: [],
         requestState: null,
         source: 'musicbrainz',
+        editionPage,
       };
     }
 
     return {
-      release: {
-        id: null,
-        musicbrainzReleaseId: targetRelease.musicbrainzReleaseId,
-        title: targetRelease.title,
-        releaseDate: targetRelease.releaseDate ?? null,
-        country: targetRelease.country ?? null,
-        status: targetRelease.status ?? null,
-        trackCount: targetRelease.trackCount ?? null,
-        mediumCount: targetRelease.mediumCount ?? null,
-        barcode: targetRelease.barcode ?? null,
-        disambiguation: targetRelease.disambiguation ?? null,
-        isCanonical: false,
-      },
+      release: mapRemoteTracklistRelease(targetRelease),
       media: [],
       ownership: null,
-      allReleases: mbReleases.map((r) => ({
-        id: null,
-        musicbrainzReleaseId: r.musicbrainzReleaseId,
-        title: r.title,
-        releaseDate: r.releaseDate ?? null,
-        country: r.country ?? null,
-        status: r.status ?? null,
-        trackCount: r.trackCount ?? null,
-        mediumCount: r.mediumCount ?? null,
-        barcode: r.barcode ?? null,
-        disambiguation: r.disambiguation ?? null,
-        isCanonical: false,
-      })),
+      allReleases: mbReleases.map(mapRemoteTracklistRelease),
       requestState: null,
       source: 'musicbrainz',
+      editionPage,
     };
   }
 

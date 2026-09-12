@@ -24,8 +24,13 @@ const props = defineProps({
   editions: { type: Array, default: () => [] },
   currentEdition: { type: Object, default: null },
   disabled: { type: Boolean, default: false },
+  canLoadMore: Boolean,
+  loadingMore: Boolean,
+  loadError: { type: String, default: null },
+  loadedCount: { type: Number, default: 0 },
+  showContinuation: Boolean,
 });
-const emit = defineEmits(['preview']);
+const emit = defineEmits(['preview', 'load-more']);
 const options = computed(() => buildReleaseEditionOptions(props.editions));
 const currentKey = computed(() => getAvailableReleaseEditionKey(options.value, props.currentEdition));
 const selectedKey = ref('');
@@ -37,6 +42,9 @@ function preview() {
   if (!canPreview.value) return;
   const { preferReleaseId, preferReleaseMbid } = selected.value.target;
   emit('preview', { preferReleaseId, preferReleaseMbid });
+}
+function loadMore() {
+  if (!props.disabled && !props.loadingMore && props.canLoadMore) emit('load-more');
 }
 </script>
 
@@ -53,6 +61,17 @@ function preview() {
     </label>
     <button type="button" class="hx-btn" :disabled="!canPreview" @click="preview">Preview edition</button>
     <p>Previewing an edition does not save your selection.</p>
+    <div v-if="showContinuation" class="hx-release-edition-pagination">
+      <p role="status" aria-atomic="true">{{ loadingMore ? 'Loading more editions…' : `${loadedCount} editions loaded.` }}</p>
+      <p v-if="loadError" role="alert">Could not load more editions. Try again.</p>
+      <button
+        type="button"
+        class="hx-btn"
+        :aria-disabled="disabled || loadingMore || !canLoadMore"
+        :aria-busy="loadingMore"
+        @click="loadMore"
+      >{{ loadingMore ? 'Loading editions…' : canLoadMore ? (loadError ? 'Retry loading editions' : 'Load more editions') : 'End of edition pages' }}</button>
+    </div>
   </div>
 </template>
 
@@ -62,6 +81,10 @@ function preview() {
   gap: var(--hx-space-2);
   flex: 1;
   min-width: 0;
+}
+.hx-release-edition-pagination {
+  display: grid;
+  gap: var(--hx-space-2);
 }
 .hx-release-edition-picker .hx-select {
   width: 100%;

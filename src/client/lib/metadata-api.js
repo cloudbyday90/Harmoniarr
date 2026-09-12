@@ -110,8 +110,8 @@ export function browseMusicBrainzArtistReleaseGroups({ artistId, limit, offset, 
   );
 }
 
-export function fetchMusicBrainzReleaseGroupReleases(releaseGroupId, { signal } = {}) {
-  return apiRequest(`/api/v1/metadata/musicbrainz/release-groups/${encodeURIComponent(releaseGroupId)}/releases`, { signal });
+export function fetchMusicBrainzReleaseGroupReleases(releaseGroupId, { limit, offset, signal } = {}) {
+  return apiRequest(`/api/v1/metadata/musicbrainz/release-groups/${encodeURIComponent(releaseGroupId)}/releases${buildQueryString({ limit, offset })}`, { signal });
 }
 
 export function importMusicBrainzArtist(artistId) {

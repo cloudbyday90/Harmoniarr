@@ -168,6 +168,11 @@ const {
   media,
   ownership,
   allReleases,
+  editionsLoading,
+  editionsError,
+  editionsLoadedCount,
+  canLoadMoreEditions,
+  loadMoreEditions,
   source,
   loading,
   error,
@@ -212,7 +217,7 @@ const artworkMbidType = computed(() => {
 
 const totalRuntime = computed(() => formatAlbumRuntime(computeMediaTotalMs(media.value)));
 
-const hasMultipleEditions = computed(() => allReleases.value.length > 1);
+const showEditionPicker = computed(() => allReleases.value.length > 0 || canLoadMoreEditions.value);
 
 const showOwnershipCallout = computed(() => {
   const o = ownership.value;
@@ -444,6 +449,11 @@ async function handleRequest() {
   }
 }
 
+function handleLoadMoreEditions() {
+  if (loading.value || editionsLoading.value || isCurrentlyRequesting.value || isSavingCanonical.value || props.operatorEditionSelectionSaving) return;
+  return loadMoreEditions();
+}
+
 async function handleSwitchEdition(target) {
   editionMenuOpen.value = false;
   // The selector unmounts while loading; keep focus on the persistent dialog close action.
@@ -638,10 +648,16 @@ function handleTrackOverrideRepair(action, trackOverride) {
           <p v-if="requestError" class="rdm-error" role="alert">{{ requestError }}</p>
 
           <!-- ── Edition switcher ────────────────────────────────────── -->
-          <div v-if="hasMultipleEditions" class="rdm-editions">
+          <div v-if="showEditionPicker" class="rdm-editions">
             <ReleaseEditionPicker
               :editions="allReleases"
               :current-edition="currentRelease"
+              show-continuation
+              :can-load-more="canLoadMoreEditions"
+              :loading-more="editionsLoading"
+              :load-error="editionsError"
+              :loaded-count="editionsLoadedCount"
+              @load-more="handleLoadMoreEditions"
               :disabled="isCurrentlyRequesting || isSavingCanonical || operatorEditionSelectionSaving"
               @preview="handleSwitchEdition"
             />

@@ -64,3 +64,13 @@ test('a current edition missing from supplied choices yields a usable placeholde
   assert.equal(getAvailableReleaseEditionKey(options, { id: null, musicbrainzReleaseId: 'remote' }), 'musicbrainz:remote');
   assert.equal(getAvailableReleaseEditionKey(options, null), '');
 });
+
+test('a remote option keeps its key when imported locally but previews the local release', () => {
+  const [remote] = buildReleaseEditionOptions([{ id: null, musicbrainzReleaseId: 'remote' }]);
+  const hydrated = { id: 'local', musicbrainzReleaseId: 'remote' };
+  const [local] = buildReleaseEditionOptions([hydrated]);
+  assert.equal(remote.key, local.key);
+  assert.equal(local.target.preferReleaseId, 'local');
+  assert.equal(getAvailableReleaseEditionKey([local], hydrated), remote.key);
+  assert.equal(getAvailableReleaseEditionKey([local], { id: null, musicbrainzReleaseId: 'remote' }), remote.key);
+});

@@ -600,6 +600,7 @@ export function registerMetadataRoutes(app, {
       allReleases: result.allReleases,
       requestState: result.requestState,
       source: result.source,
+      ...(result.editionPage ? { editionPage: result.editionPage } : {}),
     });
   }));
 

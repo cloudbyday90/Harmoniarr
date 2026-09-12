@@ -178,6 +178,22 @@ test('getReleaseGroupTracklist selects release matching preferReleaseMbid', asyn
   assert.equal(result.release.id, 'r-b');
 });
 
+test('getReleaseGroupTracklist preserves an uppercase preferred MBID for a noncanonical local edition', async () => {
+  const pool = makePool({ releaseGroup: { id: 'rg-1' }, releases: [
+    makeReleaseRow({ id: 'r-a', musicbrainz_release_id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee', is_canonical: true }),
+    makeReleaseRow({ id: 'r-b', musicbrainz_release_id: 'ffffffff-bbbb-4ccc-8ddd-eeeeeeeeeeee', is_canonical: false }),
+  ] });
+  const service = createReleaseGroupTracklistService({ getPoolFn: () => pool, musicBrainzCatalogService: noMbCatalogService });
+  const result = await service.getReleaseGroupTracklist({
+    releaseGroupMbid: 'mb-rg-1',
+    preferReleaseMbid: 'FFFFFFFF-BBBB-4CCC-8DDD-EEEEEEEEEEEE',
+  });
+  assert.equal(result.source, 'local');
+  assert.equal(result.release.id, 'r-b');
+  assert.equal(result.allReleases.length, 2);
+  assert.equal(Object.hasOwn(result, 'editionPage'), false);
+});
+
 test('getReleaseGroupTracklist falls through to MB when release group not in local DB', async () => {
   const pool = makePool({ releaseGroup: null });
   const mbReleases = [

@@ -93,7 +93,7 @@ suite('Release edition selector browser verification', () => {
         await picker.waitFor();
         await page.getByRole('dialog', { name: 'Edition 1', exact: true }).waitFor();
         assert.equal(await dialog.getByRole('heading', { level: 2, name: 'Edition 1', exact: true }).count(), 1);
-        const prefix = remote ? 'musicbrainz:mb-edition-' : 'local:local-edition-';
+        const prefix = 'musicbrainz:mb-edition-';
         assert.equal(await picker.locator('option').count(), 9);
         assert.equal(await picker.inputValue(), `${prefix}1`);
         assert.equal(await picker.locator('option:checked').count(), 1);
@@ -158,4 +158,112 @@ suite('Release edition selector browser verification', () => {
       }, { scenarioName: `release_edition_selector_${remote ? 'remote' : 'local'}_keyboard` });
     });
   }
+  test('remote continuation retains preview and selection, retries exact page and keeps terminal focus', {
+    timeout: config.scenarioTimeoutMs,
+  }, async (t) => {
+    if (unavailableReason) return t.skip(unavailableReason);
+    await runtime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      await installMetadataBrowserFixtures(browserContext);
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      await markBoardsOfCanadaAddedInMetadataBrowserFixture(page);
+      await page.goto(`${baseUrl}/app/artists/mb-artist-boards`, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('heading', { name: 'Boards of Canada', exact: true }).waitFor();
+      await page.evaluate(() => {
+        const originalFetch = globalThis.fetch.bind(globalThis);
+        const editions = Array.from({ length: 52 }, (_, index) => ({
+          id: null, musicbrainzReleaseId: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`, title: `Remote edition ${index + 1}`,
+          country: 'GB', releaseDate: '2020-01-01', trackCount: 10, mediumCount: 1,
+        }));
+        const state = { reads: [], tracklistReads: [], mutations: [], finish: null };
+        globalThis.editionContinuationFixture = state;
+        globalThis.fetch = async (input, init) => {
+          const url = new URL(typeof input === 'string' ? input : input.url, globalThis.location.href);
+          const method = (init?.method ?? input?.method ?? 'GET').toUpperCase();
+          if (!['GET', 'HEAD'].includes(method)) state.mutations.push({ method, path: url.pathname });
+          if (url.pathname.endsWith('/tracklist')) {
+            state.tracklistReads.push(Object.fromEntries(url.searchParams));
+            const releaseGroupId = url.pathname.split('/').at(-2);
+            const selected = editions.find((edition) => edition.musicbrainzReleaseId === url.searchParams.get('preferReleaseMbid')) ?? editions[0];
+            return new Response(JSON.stringify({ ok: true, release: selected, allReleases: editions.slice(0, 25),
+              editionPage: { releaseGroupId, limit: 25, offset: 0, total: 52 },
+              source: 'musicbrainz', media: [], ownership: null, requestState: null,
+            }), { headers: { 'Content-Type': 'application/json' } });
+          }
+          if (/musicbrainz\/release-groups\/[^/]+\/releases$/u.test(url.pathname)) {
+            const offset = Number(url.searchParams.get('offset'));
+            state.reads.push({ offset, limit: Number(url.searchParams.get('limit')) });
+            const outcome = await new Promise((resolve) => { state.finish = resolve; });
+            if (outcome === 'failure') return new Response(JSON.stringify({ ok: false, error: { message: 'private-provider-diagnostic' } }), {
+              status: 502, headers: { 'Content-Type': 'application/json' },
+            });
+            return new Response(JSON.stringify({ ok: true, releases: { releaseGroupId: url.pathname.split('/').at(-2),
+              offset, limit: 25, total: 52, results: editions.slice(offset, offset + 25) } }), {
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
+          return originalFetch(input, init);
+        };
+      });
+      const opener = page.getByRole('button', { name: 'View details for Music Has the Right to Children', exact: true });
+      await opener.click();
+      const dialog = page.getByRole('dialog').filter({ has: page.locator('h2.rdm-release-title') });
+      const picker = dialog.getByRole('combobox', { name: 'Preview an edition', exact: true });
+      await picker.waitFor();
+      assert.equal(await picker.locator('option').count(), 25);
+      await picker.selectOption('musicbrainz:00000000-0000-4000-8000-000000000008');
+      const pager = dialog.locator('.hx-release-edition-pagination button');
+      await pager.focus();
+      await page.keyboard.press('Enter');
+      await page.waitForFunction(() => globalThis.editionContinuationFixture.reads.length === 1);
+      assert.equal(await pager.getAttribute('aria-disabled'), 'true');
+      await pager.evaluate((button) => { button.click(); button.click(); });
+      assert.equal(await page.evaluate(() => globalThis.editionContinuationFixture.reads.length), 1);
+      await page.getByRole('dialog', { name: 'Remote edition 1', exact: true }).waitFor();
+      await page.evaluate(() => globalThis.editionContinuationFixture.finish('failure'));
+      await dialog.getByRole('alert').filter({ hasText: 'Could not load more editions. Try again.' }).waitFor();
+      assert.doesNotMatch(await dialog.innerText(), /private-provider-diagnostic/u);
+      assert.equal(await picker.inputValue(), 'musicbrainz:00000000-0000-4000-8000-000000000008');
+      assert.equal(await picker.locator('option').count(), 25);
+      assert.equal(await pager.innerText(), 'Retry loading editions');
+      await page.keyboard.press('Enter');
+      await page.waitForFunction(() => globalThis.editionContinuationFixture.reads.length === 2);
+      await page.evaluate(() => globalThis.editionContinuationFixture.finish('success'));
+      await dialog.getByRole('status').filter({ hasText: '50 editions loaded.' }).waitFor();
+      assert.equal(await picker.inputValue(), 'musicbrainz:00000000-0000-4000-8000-000000000008');
+      assert.equal(await picker.locator('option').count(), 50);
+      await page.keyboard.press('Enter');
+      await page.waitForFunction(() => globalThis.editionContinuationFixture.reads.length === 3);
+      await page.evaluate(() => globalThis.editionContinuationFixture.finish('success'));
+      await dialog.getByRole('status').filter({ hasText: '52 editions loaded.' }).waitFor();
+      assert.equal(await pager.getAttribute('aria-disabled'), 'true');
+      assert.equal(await pager.evaluate((button) => button === globalThis.document.activeElement), true);
+      assert.deepEqual(await page.evaluate(() => globalThis.editionContinuationFixture.reads), [
+        { offset: 25, limit: 25 }, { offset: 25, limit: 25 }, { offset: 50, limit: 25 },
+      ]);
+      await picker.focus();
+      await page.keyboard.press('End');
+      await dialog.getByRole('button', { name: 'Preview edition', exact: true }).click();
+      await page.getByRole('dialog', { name: 'Remote edition 52', exact: true }).waitFor();
+      assert.equal(await picker.locator('option').count(), 52, 'Preview keeps already loaded edition choices');
+      assert.equal(await picker.inputValue(), 'musicbrainz:00000000-0000-4000-8000-000000000052');
+      assert.equal(await page.evaluate(() => globalThis.editionContinuationFixture.tracklistReads.at(-1).preferReleaseMbid), '00000000-0000-4000-8000-000000000052');
+      assert.deepEqual(await page.evaluate(() => globalThis.editionContinuationFixture.mutations), []);
+      await page.keyboard.press('Escape');
+      await dialog.waitFor({ state: 'hidden' });
+      await opener.click();
+      await picker.waitFor();
+      assert.equal(await picker.locator('option').count(), 25, 'Reopening starts a fresh catalog session');
+      await pager.click();
+      await page.waitForFunction(() => globalThis.editionContinuationFixture.reads.length === 4);
+      await page.keyboard.press('Escape');
+      await dialog.waitFor({ state: 'hidden' });
+      await opener.click();
+      await picker.waitFor();
+      await page.evaluate(() => globalThis.editionContinuationFixture.finish('success'));
+      await page.evaluate(() => new Promise((resolve) => { globalThis.requestAnimationFrame(() => globalThis.requestAnimationFrame(resolve)); }));
+      assert.equal(await picker.locator('option').count(), 25, 'Obsolete continuation cannot populate a reopened dialog');
+      await page.goto('about:blank');
+    }, { scenarioName: 'release_edition_continuation_retry_preview_lifecycle' });
+  });
+
 });

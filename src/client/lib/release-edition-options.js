@@ -38,11 +38,12 @@ export function buildReleaseEditionOptions(editions = []) {
     if (Number.isInteger(edition?.trackCount) && edition.trackCount > 0) facts.push(`${edition.trackCount} tracks`);
     if (nonempty(edition?.disambiguation)) facts.push(edition.disambiguation.trim());
     if (!target) facts.push('Preview unavailable');
-    return { key: target?.key ?? `unavailable:${index}`, label: facts.join(' · '), target };
+    return { key: nonempty(edition?.musicbrainzReleaseId) ? `musicbrainz:${edition.musicbrainzReleaseId.trim()}` : target?.key ?? `unavailable:${index}`, label: facts.join(' · '), target };
   });
 }
 
 export function getAvailableReleaseEditionKey(options, edition) {
-  const key = getReleaseEditionTarget(edition)?.key;
+  const mbid = nonempty(edition?.musicbrainzReleaseId);
+  const key = mbid ? `musicbrainz:${mbid}` : getReleaseEditionTarget(edition)?.key;
   return options.some((option) => option.key === key) ? key : '';
 }

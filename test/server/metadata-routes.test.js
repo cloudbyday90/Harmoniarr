@@ -1403,6 +1403,27 @@ test('metadata release-group tracklist route returns the shared tracklist payloa
   });
 });
 
+test('metadata remote tracklist route forwards edition pagination independently of the selected release', async (t) => {
+  const editionPage = { releaseGroupId: 'mb-rg-1', limit: 25, offset: 0, total: 42 };
+  const getReleaseGroupTracklist = t.mock.fn(async () => ({
+    release: { id: null, musicbrainzReleaseId: 'off-page-release', title: 'Selected edition' },
+    media: [],
+    ownership: null,
+    allReleases: [{ id: null, musicbrainzReleaseId: 'first-page-release', title: 'First edition' }],
+    requestState: null,
+    source: 'musicbrainz',
+    editionPage,
+  }));
+  await withServer(createMetadataRouteTestApp({ getReleaseGroupTracklist }), async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/metadata/musicbrainz/release-groups/mb-rg-1/tracklist`);
+    const payload = await response.json();
+    assert.equal(response.status, 200);
+    assert.deepEqual(payload.editionPage, editionPage);
+    assert.equal(payload.release.musicbrainzReleaseId, 'off-page-release');
+    assert.equal(payload.allReleases.length, 1);
+  });
+});
+
 test('metadata canonical release patch route returns the shared canonical selection payload', async (t) => {
   const markCanonicalRelease = t.mock.fn(async (releaseId) => ({
     releaseGroupId: 'rg-1',

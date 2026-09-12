@@ -179,6 +179,16 @@ test('metadata-api fetchMusicBrainzReleaseGroupReleases sends GET', async (t) =>
   assert.equal(globalThis.fetch.mock.calls[0].arguments[0], '/api/v1/metadata/musicbrainz/release-groups/rg-1/releases');
 });
 
+test('remote edition browse forwards the raw offset, bounded limit and cancellation', async (t) => {
+  globalThis.document = { cookie: '' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse());
+  const controller = new AbortController();
+  await fetchMusicBrainzReleaseGroupReleases('rg-1', { limit: 25, offset: 17, signal: controller.signal });
+  const [url, options] = globalThis.fetch.mock.calls[0].arguments;
+  assert.equal(url, '/api/v1/metadata/musicbrainz/release-groups/rg-1/releases?limit=25&offset=17');
+  assert.equal(options.signal, controller.signal);
+});
+
 test('metadata-api import endpoints send POST with CSRF', async (t) => {
   globalThis.document = { cookie: 'harmoniarr_csrf=csrf-meta' };
   globalThis.fetch = t.mock.fn(async () => createJsonResponse());

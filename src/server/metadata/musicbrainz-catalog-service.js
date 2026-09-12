@@ -25,6 +25,11 @@ import {
 } from '../validators/metadata-search-validator.js';
 import { observeMusicBrainzProviderCall } from './musicbrainz-provider-health.js';
 import {
+  assertMusicBrainzEditionMembership,
+  normalizeMusicBrainzEditionLookup,
+  normalizeMusicBrainzEditionTotal,
+} from './musicbrainz-release-edition-policy.js';
+import {
   metadataProviderCacheNamespaces,
   metadataProviderCachePolicies,
 } from './metadata-provider-cache-policy.js';
@@ -54,6 +59,16 @@ function normalizeReleaseSummary(release) {
     barcode: release.barcode ?? null,
     disambiguation: release.disambiguation ?? null,
     artistCredit: buildArtistCredit(release['artist-credit']),
+  };
+}
+
+function normalizeReleaseEditionSummary(release) {
+  return {
+    ...normalizeReleaseSummary(release),
+    mediumCount: Array.isArray(release.media) ? release.media.length : null,
+    trackCount: Array.isArray(release.media)
+      ? release.media.reduce((total, medium) => total + (medium['track-count'] ?? 0), 0)
+      : null,
   };
 }
 
@@ -166,21 +181,26 @@ export function createMusicBrainzCatalogService({
       releaseGroupId,
       limit: normalizedLimit,
       offset: payload.offset ?? normalizedOffset,
-      total: payload['release-count'] ?? payload.count ?? 0,
+      total: normalizeMusicBrainzEditionTotal(payload['release-count'] ?? payload.count),
       results: Array.isArray(payload.releases)
-        ? payload.releases.map((release) => ({
-            ...normalizeReleaseSummary(release),
-            mediumCount: Array.isArray(release.media) ? release.media.length : null,
-            trackCount: Array.isArray(release.media)
-              ? release.media.reduce((total, medium) => total + (medium['track-count'] ?? 0), 0)
-              : null,
-          }))
+        ? payload.releases.map(normalizeReleaseEditionSummary)
         : [],
     };
   }
 
+  async function getReleaseGroupRelease(input) {
+    const identity = normalizeMusicBrainzEditionLookup(input);
+    const payload = await observeMusicBrainzProviderCall(providerHealthRecorder, async () => {
+      const release = await musicBrainzClient.lookupRelease({ releaseId: identity.releaseId });
+      assertMusicBrainzEditionMembership(release, identity);
+      return release;
+    });
+    return normalizeReleaseEditionSummary({ ...payload, id: identity.releaseId });
+  }
+
   return {
     browseArtistReleaseGroups,
+    getReleaseGroupRelease,
     getReleaseGroupReleases,
   };
 }
