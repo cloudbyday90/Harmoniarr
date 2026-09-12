@@ -19,6 +19,7 @@
 import { createApiError } from './auth.js';
 import { recordAuditEvent } from './audit.js';
 import { getPool } from './database.js';
+import { lockAppUserEligibility } from './app-user-eligibility-lock-store.js';
 import { mapDatabaseErrorWithConstraints } from './database-error-mapper.js';
 import { buildMediaRequestTargetEligibility } from './media-request-target-eligibility.js';
 import { createAppUserPermissionService } from './app-user-permission-service.js';
@@ -243,7 +244,8 @@ export function createAppUserService({
 
   async function getAppUserById({ userId, queryable = null }) {
     const normalizedUserId = normalizeUserId(userId);
-    const result = await (queryable ?? getPoolFn()).query(`${appUserSelectSql} WHERE app_users.id = $1 LIMIT 1${queryable ? ' FOR SHARE OF app_users' : ''}`, [normalizedUserId]);
+    if (queryable) await lockAppUserEligibility({ userIds: [normalizedUserId], queryable });
+    const result = await (queryable ?? getPoolFn()).query(`${appUserSelectSql} WHERE app_users.id = $1 LIMIT 1`, [normalizedUserId]);
 
     if ((result.rowCount ?? result.rows.length ?? 0) === 0) {
       return null;

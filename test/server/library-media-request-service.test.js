@@ -5,12 +5,13 @@ import { createLibraryMediaRequestFulfillmentService } from '../../src/server/li
 import { createLibraryMediaRequestNotificationService } from '../../src/server/library/library-media-request-notification-service.js';
 import { createLibraryMediaRequestService as createRealLibraryMediaRequestService } from '../../src/server/library/library-media-request-service.js';
 
-const requestTransactionClient = Object.freeze({ transactionScope: 'media-request-service-test' });
+const requestTransactionClient = Object.freeze({ transactionScope: 'media-request-service-test', query: async () => ({ rows: [] }) });
 
 function createLibraryMediaRequestService(options) {
   return createRealLibraryMediaRequestService({
     withRequestTransaction: async (work) => work(requestTransactionClient),
     activityEventStore: { insertActivityEvent: async () => {} },
+    getAppUserById: async ({ userId }) => ({ id: userId, isDisabled: false }),
     ...options,
     mediaRequestStore: { lockMediaRequest: async () => {}, lockFanOutChildren: async () => [], ...options.mediaRequestStore },
   });

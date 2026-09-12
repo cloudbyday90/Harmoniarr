@@ -5,6 +5,35 @@ import { buildDefaultNotificationPreferences } from '../../src/server/notificati
 
 const DEFAULT_NOTIF_PREFS = buildDefaultNotificationPreferences();
 
+test('transactional user eligibility reads wait for the parent guard before taking the joined snapshot', async () => {
+  const statements = [];
+  let unlock;
+  const guardWait = new Promise((resolve) => { unlock = resolve; });
+  const queryable = {
+    async query(sql) {
+      statements.push(sql);
+      if (sql.includes('FOR SHARE')) {
+        await guardWait;
+        return { rows: [{ id: 'user-1' }] };
+      }
+      return { rows: [{ id: 'user-1', role: 'requester', is_disabled: false,
+        plex_user_id: 'plex-1', plex_home_role: 'home_member', plex_library_access_state: 'unknown' }] };
+    },
+  };
+  const service = createAppUserService({ getPoolFn: () => { throw new Error('Unexpected pool access'); } });
+  const pending = service.getAppUserById({ userId: 'user-1', queryable });
+
+  assert.equal(statements.length, 1);
+  assert.doesNotMatch(statements[0], /JOIN/u);
+  unlock();
+  const user = await pending;
+
+  assert.equal(statements.length, 2);
+  assert.match(statements[1], /LEFT JOIN app_user_plex_profiles/u);
+  assert.doesNotMatch(statements[1], /FOR SHARE/u);
+  assert.equal(user.mediaRequestTarget.eligible, false);
+});
+
 test('createAppUserService lists users with resolved permission sets', async (t) => {
   const getPoolFn = t.mock.fn(() => ({
     query: t.mock.fn(async () => ({

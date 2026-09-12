@@ -7,6 +7,10 @@
  */
 
 import { recordAuditEvent } from '../audit.js';
+import { createApiError } from '../auth.js';
+import { createAppUserService } from '../app-user-service.js';
+import { lockAppUserEligibility } from '../app-user-eligibility-lock-store.js';
+import { buildMediaRequestTargetEligibility } from '../media-request-target-eligibility.js';
 import { createDatabaseTransactionRunner } from '../database-transaction-service.js';
 import { normalizeExternalMediaSource } from './external-media-source-parser.js';
 import { createLibraryMediaRequestStore } from './library-media-request-store.js';
@@ -22,6 +26,7 @@ function publishOptionalEffect(callback, payload) {
 
 export function createLibraryMediaRequestCreationService({
   externalIntakeService = null,
+  getAppUserById = createAppUserService().getAppUserById,
   mediaRequestStore = createLibraryMediaRequestStore(),
   onRequestCreatedFn = null,
   recordActivityEventFn = null,
@@ -35,6 +40,16 @@ export function createLibraryMediaRequestCreationService({
       : null;
 
     const committed = await withRequestTransaction(async (queryable) => {
+      // Previews can become stale while metadata is prepared. Hold every chosen
+      // recipient guard in canonical UUID order, then recheck the whole family
+      // before creating requests, history, audit records, or provider jobs.
+      await lockAppUserEligibility({ userIds: targetUserIds, queryable });
+      for (const userId of targetUserIds) {
+        const target = await getAppUserById({ userId, queryable });
+        if (!buildMediaRequestTargetEligibility(target).eligible) {
+          throw createApiError(409, 'media_request_target_ineligible', 'A selected request target is no longer eligible. Refresh users before trying again.');
+        }
+      }
       let linkedRequestId = null;
       let evidence = request.evidence;
       if (request.requestState !== 'already_exists' && request.requestKind !== 'external_url') {

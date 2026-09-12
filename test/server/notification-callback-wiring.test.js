@@ -13,7 +13,8 @@ test('library-media-request-service calls onRequestCreatedFn after creating a re
   const metadataSearchService = { searchReleases: async () => ({ results: [] }) };
 
   const service = createLibraryMediaRequestService({
-    withRequestTransaction: async (work) => work({}),
+    withRequestTransaction: async (work) => work({ query: async () => ({ rows: [] }) }),
+    getAppUserById: async ({ userId }) => ({ id: userId, isDisabled: false }),
     mediaRequestStore,
     metadataSearchService,
     recordAuditEventFn: async () => {},
@@ -44,7 +45,8 @@ test('library-media-request-service does not call onRequestCreatedFn when null',
   const metadataSearchService = { searchReleases: async () => ({ results: [] }) };
 
   const service = createLibraryMediaRequestService({
-    withRequestTransaction: async (work) => work({}),
+    withRequestTransaction: async (work) => work({ query: async () => ({ rows: [] }) }),
+    getAppUserById: async ({ userId }) => ({ id: userId, isDisabled: false }),
     mediaRequestStore,
     metadataSearchService,
     recordAuditEventFn: async () => {},
@@ -69,7 +71,8 @@ test('library-media-request-service swallows onRequestCreatedFn errors', async (
   const metadataSearchService = { searchReleases: async () => ({ results: [] }) };
 
   const service = createLibraryMediaRequestService({
-    withRequestTransaction: async (work) => work({}),
+    withRequestTransaction: async (work) => work({ query: async () => ({ rows: [] }) }),
+    getAppUserById: async ({ userId }) => ({ id: userId, isDisabled: false }),
     mediaRequestStore,
     metadataSearchService,
     recordAuditEventFn: async () => {},

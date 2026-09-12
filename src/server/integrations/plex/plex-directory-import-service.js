@@ -19,12 +19,14 @@
 import { createApiError } from '../../auth.js';
 import { recordAuditEvent } from '../../audit.js';
 import { getPool } from '../../database.js';
+import { lockAppUserEligibility } from '../../app-user-eligibility-lock-store.js';
 import { buildLocalAuthStatus, isLocalAuthReadyForPlexUnlink } from '../../local-auth-readiness.js';
 import { buildPlexLibraryAccessPolicy } from '../../plex-library-access-policy.js';
 import { hashPassword } from '../../security.js';
 import { normalizeOptionalEmail } from '../../validators/auth-validator.js';
 import { createPlexHttpClient } from './plex-http-client.js';
 import { createPlexOwnerLinkService } from './plex-owner-link-service.js';
+import { listPlexDirectoryUserIdentities } from './plex-directory-import-store.js';
 
 function normalizePlexString(value) {
   if (typeof value !== 'string') {
@@ -338,6 +340,24 @@ function resolvePlexSubject(profile) {
   return profile.uuid ?? profile.id ?? null;
 }
 
+async function assertPreviewIdentitiesCurrent(profiles, queryable) {
+  const users = await listPlexDirectoryUserIdentities({
+    userIds: profiles.map((profile) => profile.existingUser.id),
+    queryable,
+  });
+  const currentById = new Map(users.map((user) => [user.id, user]));
+  for (const profile of profiles) {
+    const expected = profile.existingUser;
+    const current = currentById.get(expected.id);
+    if (!current || current.auth_provider !== expected.authProvider
+      || (current.auth_subject ?? null) !== (expected.authSubject ?? null)
+      || (current.plex_user_id ?? null) !== (expected.plexProfile?.plexUserId ?? null)
+      || (current.plex_uuid ?? null) !== (expected.plexProfile?.plexUuid ?? null)) {
+      throw createApiError(409, 'plex_directory_preview_stale', 'A linked account changed after the directory preview. Refresh the preview before trying again.');
+    }
+  }
+}
+
 function normalizeUserId(value) {
   if (typeof value !== 'string' || value.trim().length === 0) {
     throw createApiError(400, 'validation_error', 'User id must be provided');
@@ -420,6 +440,9 @@ export function createPlexDirectoryImportService({
     try {
       await client.query('BEGIN');
 
+      await lockAppUserEligibility({ userIds: refreshProfiles.map((profile) => profile.existingUser.id), mode: 'write', queryable: client });
+      await assertPreviewIdentitiesCurrent(refreshProfiles, client);
+
       for (const profile of importableProfiles) {
         const placeholderPasswordHash = await hashPasswordFn(`plex:${profile.id}:${getNow().toISOString()}`);
         const createdResult = await client.query(
@@ -440,6 +463,8 @@ export function createPlexDirectoryImportService({
           [profile.suggestedUsername, profile.email, placeholderPasswordHash, profile.uuid ?? profile.id],
         );
         const user = createdResult.rows[0];
+
+        await lockAppUserEligibility({ userIds: [user.id], mode: 'write', queryable: client });
 
         await client.query(
           `
@@ -581,6 +606,8 @@ export function createPlexDirectoryImportService({
 
     try {
       await client.query('BEGIN');
+      await lockAppUserEligibility({ userIds: [targetUserId], mode: 'write', queryable: client });
+      await assertPreviewIdentitiesCurrent([profile], client);
 
       const updatedUserResult = await client.query(
         `
@@ -735,6 +762,7 @@ export function createPlexDirectoryImportService({
 
     try {
       await client.query('BEGIN');
+      await lockAppUserEligibility({ userIds: [normalizedUserId], mode: 'write', queryable: client });
 
       const currentUserResult = await client.query(
         `
@@ -759,7 +787,6 @@ export function createPlexDirectoryImportService({
             ON app_user_plex_profiles.app_user_id = app_users.id
           WHERE app_users.id = $1
           LIMIT 1
-          FOR UPDATE OF app_users
         `,
         [normalizedUserId],
       );

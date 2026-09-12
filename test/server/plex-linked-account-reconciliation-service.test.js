@@ -83,6 +83,10 @@ test('reconcileUser refresh_profile repairs a missing synced Plex profile from t
   assert.equal(recordAuditEventFn.mock.callCount(), 1);
   assert.equal(recordAuditEventFn.mock.calls[0].arguments[0].eventType, 'plex_linked_account_profile_refreshed');
   assert.equal(query.mock.calls.some((call) => String(call.arguments[0]).includes('INSERT INTO app_user_plex_profiles')), true);
+  assert.equal(getAppUserById.mock.calls[1].arguments[0].queryable, client);
+  const statements = query.mock.calls.map(({ arguments: [sql] }) => String(sql));
+  assert.ok(statements.findIndex((sql) => sql.includes('FOR NO KEY UPDATE'))
+    < statements.findIndex((sql) => sql.includes('UPDATE app_user_plex_profiles')));
 });
 
 test('reconcileUser safe_relink restores Plex as the primary sign-in provider', async (t) => {
@@ -147,6 +151,29 @@ test('reconcileUser safe_relink restores Plex as the primary sign-in provider', 
   assert.equal(recordAuditEventFn.mock.callCount(), 1);
   assert.equal(recordAuditEventFn.mock.calls[0].arguments[0].eventType, 'plex_linked_account_safely_relinked');
   assert.equal(query.mock.calls.some((call) => String(call.arguments[0]).includes('UPDATE app_users')), true);
+  assert.equal(getAppUserById.mock.calls[1].arguments[0].queryable, client);
+  const statements = query.mock.calls.map(({ arguments: [sql] }) => String(sql));
+  assert.ok(statements.findIndex((sql) => sql.includes('FOR NO KEY UPDATE'))
+    < statements.findIndex((sql) => sql.includes('UPDATE app_users')));
+});
+
+test('reconciliation rejects an account unlinked while waiting for its eligibility guard', async () => {
+  const statements = [];
+  const client = { async query(sql) { statements.push(sql); return { rows: [] }; }, release() {} };
+  const service = createPlexLinkedAccountReconciliationService({
+    buildPlexDirectoryImportPreview: async () => ({ profiles: [{ id: 'plex-1', uuid: 'plex-uuid-1' }] }),
+    getAppUserById: async ({ queryable }) => queryable
+      ? { id: 'user-1', authProvider: 'local', authSubject: null, plexProfile: null }
+      : { id: 'user-1', authProvider: 'plex', authSubject: 'plex-uuid-1', plexProfile: null },
+    getPoolFn: () => ({ connect: async () => client }),
+    recordAuditEventFn: async () => { assert.fail('A rejected refresh must not publish audit'); },
+  });
+
+  await assert.rejects(service.reconcileUser({ action: 'refresh_profile', userId: 'user-1', actorUserId: 'admin-1' }),
+    (error) => error.status === 409 && error.code === 'plex_linked_account_not_managed');
+
+  assert.equal(statements.at(-1), 'ROLLBACK');
+  assert.equal(statements.some((sql) => /UPDATE app_|INSERT INTO app_/u.test(sql)), false);
 });
 
 test('reconcileUser mark_stale records an auditable stale acknowledgement', async (t) => {

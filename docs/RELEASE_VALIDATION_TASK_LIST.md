@@ -55,8 +55,9 @@ Issue #4 platform evidence map: `docs/ISSUE_4_RELEASE_VALIDATION_EVIDENCE.md`
 - [x] Commit cancellation/reassignment, private history/audit, and public Activity
   together with request locks and PostgreSQL rollback/concurrency proof. See the
   [transactional lifecycle outcome](TRANSACTIONAL_REQUEST_LIFECYCLE_OUTCOME.md).
-- [ ] Align transactional recipient eligibility with concurrent Plex profile
-  refresh. Local account disable locking does not cover the separate profile row.
+- [x] Align transactional recipient eligibility with concurrent Plex profile
+  refresh, including absent profiles, stale relink previews, and ordered batch
+  locking. See [recipient eligibility outcome](RECIPIENT_ELIGIBILITY_CONSISTENCY_OUTCOME.md).
 
 - Atomic multi-user request creation now has PostgreSQL failure-injection proof
   for child, audit, and durable external-planning failures, plus Chromium proof

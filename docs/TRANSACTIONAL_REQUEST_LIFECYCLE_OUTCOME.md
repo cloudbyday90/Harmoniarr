@@ -2,6 +2,8 @@
 
 Recorded September 12, 2026. The separate [design document](TRANSACTIONAL_REQUEST_LIFECYCLE_DESIGN.md) contains official-source research, alternatives, and the commit/locking model.
 
+Follow-up: the [recipient eligibility consistency outcome](RECIPIENT_ELIGIBILITY_CONSISTENCY_OUTCOME.md) addresses the separate Plex profile race identified here. The historical validation and priority list below describe the lifecycle slice before that follow-up.
+
 ## Result
 
 Cancellation and reassignment now use a dedicated ESM lifecycle service. The existing transaction runner passes one client through request locks, state changes, private history, required audit records, generic household Activity, and the final request read. The API returns success after commit. Any required persistence failure rolls back all these records, and unexpected errors use a fixed safe message in individual and bulk responses.

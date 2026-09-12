@@ -87,6 +87,10 @@ test('createPlexDirectoryImportService applyImport creates new Plex users and re
       return { rows: [] };
     }
 
+    if (String(sql).includes('LEFT JOIN app_user_plex_profiles')) {
+      return { rows: [{ id: 'user-linked', auth_provider: 'plex', auth_subject: 'plex-linked-uuid' }] };
+    }
+
     if (String(sql).includes('INSERT INTO app_users')) {
       return {
         rows: [{
@@ -166,6 +170,13 @@ test('createPlexDirectoryImportService applyImport creates new Plex users and re
   assert.equal(result.importedUsers[0].localAuth.unlinkPlexReady, false);
   assert.equal(client.release.mock.callCount(), 1);
   assert.equal(recordAuditEventFn.mock.callCount(), 1);
+  const statements = query.mock.calls.map(({ arguments: [sql] }) => String(sql));
+  const guardIndex = statements.findIndex((sql) => sql.includes('FOR NO KEY UPDATE'));
+  const readIndex = statements.findIndex((sql) => sql.includes('LEFT JOIN app_user_plex_profiles'));
+  const insertIndex = statements.findIndex((sql) => sql.includes('INSERT INTO app_users'));
+  assert.deepEqual(query.mock.calls[guardIndex].arguments[1], [['user-linked']]);
+  assert.ok(guardIndex < readIndex && readIndex < insertIndex);
+  assert.match(statements[insertIndex + 1], /FOR NO KEY UPDATE/u);
   assert.equal(
     query.mock.calls.some((call) => String(call.arguments[0]).includes('INSERT INTO app_user_plex_profiles')),
     true,
@@ -180,6 +191,10 @@ test('createPlexDirectoryImportService relinkConflict links a conflicting local 
   const query = t.mock.fn(async (sql, values) => {
     if (sql === 'BEGIN' || sql === 'COMMIT') {
       return { rowCount: 0, rows: [] };
+    }
+
+    if (String(sql).includes('LEFT JOIN app_user_plex_profiles')) {
+      return { rows: [{ id: 'user-conflict', auth_provider: 'local', auth_subject: null }] };
     }
 
     if (String(sql).includes('UPDATE app_users')) {
@@ -262,6 +277,11 @@ test('createPlexDirectoryImportService relinkConflict links a conflicting local 
   });
 
   assert.equal(result.user.id, 'user-conflict');
+  const statements = query.mock.calls.map(({ arguments: [sql] }) => String(sql));
+  assert.ok(statements.findIndex((sql) => sql.includes('FOR NO KEY UPDATE'))
+    < statements.findIndex((sql) => sql.includes('LEFT JOIN app_user_plex_profiles')));
+  assert.ok(statements.findIndex((sql) => sql.includes('LEFT JOIN app_user_plex_profiles'))
+    < statements.findIndex((sql) => sql.includes('UPDATE app_users')));
   assert.equal(result.user.authProvider, 'plex');
   assert.equal(result.user.authSubject, 'plex-conflict-uuid');
   assert.equal(result.user.localAuth.unlinkPlexReady, true);
@@ -323,7 +343,7 @@ test('createPlexDirectoryImportService unlinkUser clears the Plex identity when 
       return { rowCount: 0, rows: [] };
     }
 
-    if (String(sql).includes('FOR UPDATE OF app_users')) {
+    if (String(sql).includes('LEFT JOIN app_user_plex_profiles')) {
       return {
         rowCount: 1,
         rows: [{
@@ -388,6 +408,11 @@ test('createPlexDirectoryImportService unlinkUser clears the Plex identity when 
 
   assert.equal(result.user.id, 'user-conflict');
   assert.equal(result.user.authProvider, 'local');
+  const statements = query.mock.calls.map(({ arguments: [sql] }) => String(sql));
+  assert.ok(statements.findIndex((sql) => sql.includes('FOR NO KEY UPDATE'))
+    < statements.findIndex((sql) => sql.includes('LEFT JOIN app_user_plex_profiles')));
+  assert.ok(statements.findIndex((sql) => sql.includes('LEFT JOIN app_user_plex_profiles'))
+    < statements.findIndex((sql) => sql.includes('DELETE FROM app_user_plex_profiles')));
   assert.equal(result.user.authSubject, null);
   assert.equal(result.user.localAuth.unlinkPlexReady, true);
   assert.equal(client.release.mock.callCount(), 1);
@@ -401,7 +426,7 @@ test('createPlexDirectoryImportService unlinkUser rejects Plex unlink when no lo
       return { rowCount: 0, rows: [] };
     }
 
-    if (String(sql).includes('FOR UPDATE OF app_users')) {
+    if (String(sql).includes('LEFT JOIN app_user_plex_profiles')) {
       return {
         rowCount: 1,
         rows: [{
@@ -439,3 +464,42 @@ test('createPlexDirectoryImportService unlinkUser rejects Plex unlink when no lo
   );
   assert.equal(client.release.mock.callCount(), 1);
 });
+
+for (const scenario of [
+  { action: 'applyImport', current: { auth_provider: 'plex', auth_subject: 'new-subject' }, label: 'relinked identity' },
+  { action: 'applyImport', current: { auth_provider: 'plex', auth_subject: 'plex-uuid', plex_user_id: 'new-profile' }, label: 'changed profile attachment' },
+  { action: 'relinkConflict', current: { auth_provider: 'plex', auth_subject: 'new-subject' }, label: 'changed conflict target' },
+]) {
+  test(`directory ${scenario.action} rejects a ${scenario.label} after its guard without any import writes`, async () => {
+    const statements = [];
+    const client = {
+      async query(sql) {
+        statements.push(sql);
+        return { rows: sql.includes('LEFT JOIN app_user_plex_profiles')
+          ? [{ id: 'user-1', ...scenario.current }] : [] };
+      },
+      release() {},
+    };
+    const service = createPlexDirectoryImportService({
+      getPoolFn: () => ({ connect: async () => client }),
+      listAppUsers: async () => [{
+        id: 'user-1', authProvider: scenario.action === 'applyImport' ? 'plex' : 'local',
+        authSubject: scenario.action === 'applyImport' ? 'plex-uuid' : null,
+        email: 'linked@example.test', username: 'listener', plexProfile: null,
+      }],
+      plexOwnerLinkService: { resolveLinkedAccessToken: async () => ({ accessToken: 'test-token', clientIdentifier: 'test-client', linkedUser: { id: 'owner-1' } }) },
+      plexHttpClient: { fetchHomeUsers: async () => [
+        { id: 'plex-1', uuid: 'plex-uuid', username: 'listener', email: 'linked@example.test' },
+        { id: 'plex-new', uuid: 'plex-new-uuid', username: 'new-listener' },
+      ] },
+      hashPasswordFn: async () => { assert.fail('Stale previews must reject before creating another user'); },
+      recordAuditEventFn: async () => { assert.fail('Rejected previews must not publish an import audit'); },
+    });
+
+    await assert.rejects(service[scenario.action]({ actorUserId: 'admin-1', userId: 'user-1', plexUserId: 'plex-1' }),
+      (error) => error.status === 409 && error.code === 'plex_directory_preview_stale');
+
+    assert.equal(statements.at(-1), 'ROLLBACK');
+    assert.equal(statements.some((sql) => /UPDATE app_|INSERT INTO app_/u.test(sql)), false);
+  });
+}

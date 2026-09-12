@@ -29,13 +29,13 @@ function createRequestInput(overrides = {}) {
   };
 }
 
-function createCreationFixture({ failAt = null, returnedChildCount = null, duplicate = null, effectFailure = null } = {}) {
+function createCreationFixture({ failAt = null, returnedChildCount = null, duplicate = null, effectFailure = null, ineligibleTargetId = null } = {}) {
   const calls = [];
   const failure = new Error(`Failed ${failAt ?? 'optional publication'}`);
   let committed = false;
   const client = {
-    async query(statement) {
-      calls.push({ kind: statement });
+    async query(statement, parameters) {
+      calls.push({ kind: statement, parameters });
       if (failAt === statement) throw failure;
       if (statement === 'COMMIT') committed = true;
       return { rows: [] };
@@ -57,6 +57,10 @@ function createCreationFixture({ failAt = null, returnedChildCount = null, dupli
     return undefined;
   }
   const service = createLibraryMediaRequestCreationService({
+    async getAppUserById(payload) {
+      recordPersistence('eligibility', payload);
+      return { id: payload.userId, isDisabled: payload.userId === ineligibleTargetId };
+    },
     externalIntakeService: {
       async queueExternalMediaRequestPlanning(payload) {
         recordPersistence('queue', payload);
@@ -117,6 +121,12 @@ test('request creation commits every target and audit before publishing one noti
     totalTargets: 3,
   });
   const parentCall = fixture.calls.find(({ kind }) => kind === 'parent');
+  const guardIndex = fixture.calls.findIndex(({ kind }) => kind.includes('FOR SHARE'));
+  assert.deepEqual(fixture.calls[guardIndex].parameters, [input.targetUserIds]);
+  const targetChecks = fixture.calls.filter(({ kind }) => kind === 'eligibility');
+  assert.deepEqual(targetChecks.map(({ payload }) => payload.userId), input.targetUserIds);
+  assert.ok(targetChecks.every((call) => guardIndex < fixture.calls.indexOf(call)
+    && fixture.calls.indexOf(call) < fixture.calls.indexOf(parentCall)));
   assert.equal(parentCall.payload.requestedForUserId, 'user-1');
   assert.equal(parentCall.payload.evidence.dedupLinkedToRequestId, 'existing-request');
   assert.deepEqual(fixture.calls.find(({ kind }) => kind === 'children').payload.targetUserIds, ['user-2', 'user-3']);
@@ -134,6 +144,17 @@ test('request creation commits every target and audit before publishing one noti
     ['parent-1', 'child-1', 'child-2']);
   assert.equal(publications.filter(({ kind }) => kind === 'notification').length, 1);
   assert.ok(fixture.calls.findIndex(({ kind }) => kind === 'COMMIT') < fixture.calls.findIndex(({ kind }) => kind === 'activity'));
+});
+
+test('request creation rejects the whole chosen family when one recipient became ineligible', async () => {
+  const fixture = createCreationFixture({ ineligibleTargetId: 'user-2' });
+
+  await assert.rejects(fixture.service.createRequestFamily(createRequestInput()),
+    (error) => error.status === 409 && error.code === 'media_request_target_ineligible');
+
+  assert.equal(fixture.calls.some(({ kind }) => ['parent', 'children', 'queue', 'duplicate'].includes(kind)), false);
+  assert.deepEqual(getPublications(fixture.calls), []);
+  assert.deepEqual(fixture.calls.slice(-2).map(({ kind }) => kind), ['ROLLBACK', 'release']);
 });
 
 test('external request creation queues normalized planning for every target on the same client before commit', async () => {

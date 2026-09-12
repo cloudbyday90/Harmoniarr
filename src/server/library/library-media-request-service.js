@@ -17,6 +17,7 @@
  */
 
 import { createApiError } from '../auth.js';
+import { createAppUserService } from '../app-user-service.js';
 import { recordAuditEvent } from '../audit.js';
 import { createLibraryMediaRequestLifecycleService } from './library-media-request-lifecycle-service.js';
 import { buildMediaRequestTargetEligibility } from '../media-request-target-eligibility.js';
@@ -337,7 +338,7 @@ function normalizeOptionalUserIdList(value, fieldName) {
 
 export function createLibraryMediaRequestService({
   externalIntakeService = null,
-  getAppUserById = null,
+  getAppUserById = createAppUserService().getAppUserById,
   mediaRequestStore = createLibraryMediaRequestStore(),
   mediaRequestFulfillmentService = createLibraryMediaRequestFulfillmentService(),
   mediaRequestNotificationService = createLibraryMediaRequestNotificationService(),
@@ -351,6 +352,7 @@ export function createLibraryMediaRequestService({
 } = {}) {
   const requestCreationService = createLibraryMediaRequestCreationService({
     externalIntakeService,
+    getAppUserById,
     mediaRequestStore,
     onRequestCreatedFn,
     recordActivityEventFn,

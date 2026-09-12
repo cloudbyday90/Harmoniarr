@@ -19,6 +19,7 @@
 import { createApiError } from '../../auth.js';
 import { recordAuditEvent } from '../../audit.js';
 import { getPool } from '../../database.js';
+import { lockAppUserEligibility } from '../../app-user-eligibility-lock-store.js';
 import { mapDatabaseErrorWithConstraints } from '../../database-error-mapper.js';
 
 const VALID_ACTIONS = new Set(['mark_stale', 'refresh_profile', 'safe_relink']);
@@ -208,15 +209,16 @@ export function createPlexLinkedAccountReconciliationService({
   async function reconcileUser({ action, actorUserId, requestMetadata, userId }) {
     const normalizedAction = normalizeAction(action);
     const normalizedUserId = normalizeUserId(userId);
-    const [preview, currentUser] = await Promise.all([
+    const [preview, initialUser] = await Promise.all([
       buildPlexDirectoryImportPreview(),
       getAppUserById({ userId: normalizedUserId }),
     ]);
+    let currentUser = initialUser;
 
     assertManagedUser(currentUser);
 
     const previewProfiles = Array.isArray(preview?.profiles) ? preview.profiles : [];
-    const previewProfile = findMatchingPreviewProfile(currentUser, previewProfiles);
+    let previewProfile = findMatchingPreviewProfile(currentUser, previewProfiles);
     const reconciledAt = getNow().toISOString();
 
     if (normalizedAction === 'mark_stale') {
@@ -260,6 +262,12 @@ export function createPlexLinkedAccountReconciliationService({
 
     try {
       await client.query('BEGIN');
+      await lockAppUserEligibility({ userIds: [normalizedUserId], mode: 'write', queryable: client });
+      currentUser = await getAppUserById({ userId: normalizedUserId, queryable: client });
+      assertManagedUser(currentUser);
+      previewProfile = findMatchingPreviewProfile(currentUser, previewProfiles);
+      assertPreviewProfile(previewProfile);
+      if (normalizedAction === 'safe_relink') assertSafeRelinkTarget(currentUser, previewProfile);
 
       if (normalizedAction === 'safe_relink') {
         const subject = resolvePlexSubject(previewProfile);
