@@ -884,6 +884,11 @@ function handleTrackOverrideRepair(action, trackOverride) {
   color: var(--hx-text);
 }
 
+.rdm-dialog :deep(:focus-visible) {
+  outline: 2px solid var(--hx-accent-strong);
+  outline-offset: 2px;
+}
+
 .rdm-dialog::backdrop {
   background: var(--hx-bg-overlay);
   backdrop-filter: blur(2px);
@@ -927,7 +932,7 @@ function handleTrackOverrideRepair(action, trackOverride) {
   flex-shrink: 0;
   border-radius: var(--hx-radius-md);
   overflow: hidden;
-  background: var(--hx-bg-muted);
+  background: var(--hx-bg-surface-muted);
 }
 
 .rdm-hero-info {
@@ -958,7 +963,7 @@ function handleTrackOverrideRepair(action, trackOverride) {
 }
 
 .rdm-meta-sep {
-  color: var(--hx-text-subtle);
+  color: var(--hx-text-muted);
 }
 
 /* ── Ownership callout ─────────────────────────────────────────────────── */
@@ -970,7 +975,7 @@ function handleTrackOverrideRepair(action, trackOverride) {
   font-size: var(--hx-text-sm);
   color: var(--hx-text-muted);
   padding: var(--hx-space-2) var(--hx-space-3);
-  background: var(--hx-bg-muted);
+  background: var(--hx-bg-surface-muted);
   border-radius: var(--hx-radius-md);
 }
 
@@ -1073,7 +1078,7 @@ function handleTrackOverrideRepair(action, trackOverride) {
 }
 
 .rdm-edition-menu__item:focus-visible {
-  outline: 2px solid var(--hx-accent);
+  outline: 2px solid var(--hx-accent-strong);
   outline-offset: 2px;
 }
 
@@ -1109,7 +1114,7 @@ function handleTrackOverrideRepair(action, trackOverride) {
 }
 
 .rdm-edition-menu__item:hover:not(:disabled) {
-  background: var(--hx-bg-muted);
+  background: var(--hx-bg-surface-muted);
 }
 
 .rdm-edition-menu__item:disabled {
@@ -1222,17 +1227,17 @@ function handleTrackOverrideRepair(action, trackOverride) {
 }
 
 .rdm-track.is-owned {
-  background: var(--hx-bg-muted);
+  background: var(--hx-bg-surface-muted);
 }
 
 .rdm-track-owned {
   font-size: 0.5rem;
-  color: var(--hx-text-subtle);
+  color: var(--hx-text-muted);
   text-align: center;
 }
 
 .rdm-track.is-owned .rdm-track-owned {
-  color: var(--hx-color-success, #22c55e);
+  color: color-mix(in srgb, var(--hx-success) 80%, var(--hx-text));
 }
 
 .rdm-track-num {
@@ -1298,7 +1303,7 @@ function handleTrackOverrideRepair(action, trackOverride) {
 }
 
 .rdm-error {
-  color: var(--hx-text-danger, var(--hx-text-muted));
+  color: color-mix(in srgb, var(--hx-danger) 50%, var(--hx-text));
   font-size: var(--hx-text-sm);
   margin: 0;
 }

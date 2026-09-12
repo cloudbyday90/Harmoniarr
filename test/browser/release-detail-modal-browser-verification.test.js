@@ -25,6 +25,7 @@ import {
   assertTabFocusContained,
   assertVisibleFocusOutline,
 } from '../../testing/browser/keyboard-accessibility-helpers.js';
+import { assertComputedColorContrast } from '../../testing/browser/color-contrast-helpers.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 
 const integrationRuntimeConfig = resolveIntegrationTestRuntimeConfig();
@@ -168,6 +169,36 @@ suite('Release Detail modal browser verification', () => {
       assert.doesNotMatch(await unmatchedRow.ariaSnapshot(), /[●○]/u);
       assert.equal(await ownedRow.locator('.rdm-track-owned').getAttribute('title'), 'In library');
       assert.equal(await unmatchedRow.locator('.rdm-track-owned').getAttribute('title'), 'Not matched in library');
+      const previousTheme = await page.evaluate(() => globalThis.document.documentElement.getAttribute('data-theme'));
+      async function checkContrast(locator, options) {
+        const result = await assertComputedColorContrast(locator, options);
+        t.diagnostic(`${options.label}: ${result.ratio.toFixed(2)}:1`);
+      }
+      for (const theme of ['light', 'dark']) {
+        await page.evaluate((value) => globalThis.document.documentElement.setAttribute('data-theme', value), theme);
+        for (const selector of ['.rdm-release-title', '.rdm-artist-name', '.rdm-meta-sep', '.rdm-track-title', '.rdm-track-duration', '.rdm-track-num']) {
+          await checkContrast(dialog.locator(selector).first(), { label: `${theme} ${selector}` });
+        }
+        for (const [label, row] of [['owned', ownedRow], ['unmatched', unmatchedRow]]) {
+          await checkContrast(row.locator('.rdm-track-owned'), { minimumRatio: 3, label: `${theme} ${label} indicator` });
+        }
+        await dialog.getByRole('button', { name: 'Close', exact: true }).focus();
+        await assertVisibleFocusOutline(dialog.getByRole('button', { name: 'Close', exact: true }));
+        await checkContrast(dialog.getByRole('button', { name: 'Close', exact: true }), {
+          minimumRatio: 3, kind: 'outline', label: `${theme} close focus outline`,
+        });
+        const picker = dialog.getByRole('combobox', { name: 'Preview an edition', exact: true });
+        await picker.focus();
+        await assertVisibleFocusOutline(picker);
+        await checkContrast(picker, { minimumRatio: 3, kind: 'outline', label: `${theme} edition focus outline` });
+        await page.screenshot({ path: `.tmp/theme-modal-${theme}.png` });
+        await ownedRow.scrollIntoViewIfNeeded();
+        await page.screenshot({ path: `.tmp/theme-tracks-${theme}.png` });
+      }
+      await page.evaluate((value) => {
+        if (value === null) globalThis.document.documentElement.removeAttribute('data-theme');
+        else globalThis.document.documentElement.setAttribute('data-theme', value);
+      }, previousTheme);
 
       await dialog.getByText('1 track override needs review before saving Artist Policy.').waitFor();
       await dialog.getByText('Needs review', { exact: true }).waitFor();
