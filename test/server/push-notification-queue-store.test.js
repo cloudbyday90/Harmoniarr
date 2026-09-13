@@ -68,6 +68,7 @@ test('enqueueNotification stringifies payload and maps queue row fields', async 
     payload: { title: 'Release added' },
     sentAt: null,
     status: 'pending',
+    terminalAt: null,
     subscriptionId: 'sub-1',
     ttlSeconds: 90,
     userId: 'user-1',
@@ -160,20 +161,6 @@ test('listPendingNotificationsForCoalesce and updatePendingNotificationPayload u
   assert.equal(pending[0].id, 'queue-3');
   assert.equal(updated[0].ttlSeconds, 240);
 });
-
-test('deleteSentNotificationHistory deletes only aged sent history rows and returns deleted count', async (t) => {
-  const query = t.mock.fn(async () => ({ rowCount: 3 }));
-  const store = createPushNotificationQueueStore({
-    getPoolFn: () => ({ query }),
-  });
-
-  const result = await store.deleteSentNotificationHistory({ olderThan: '2026-05-01T00:00:00.000Z' });
-
-  assert.deepEqual(result, { deletedCount: 3 });
-  assert.match(query.mock.calls[0].arguments[0], /status = 'sent'/);
-  assert.deepEqual(query.mock.calls[0].arguments[1], ['2026-05-01T00:00:00.000Z']);
-});
-
 
 test('missing or malformed claim tokens cannot perform a queue lookup or completion', async () => {
   const store = createPushNotificationQueueStore({ getPoolFn: () => { assert.fail('invalid claims must not reach SQL'); } });

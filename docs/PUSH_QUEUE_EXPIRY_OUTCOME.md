@@ -33,3 +33,5 @@ Full `npm run validate` passed repository policy checks, lint, test hygiene, all
 Add bounded retention for terminal notification history. The current periodic cleanup deletes only sent records older than seven days. Failed and expired rows retain their payloads indefinitely. Introduce a trustworthy terminal timestamp, explicit retention policy, and bounded deletion that excludes pending and actively claimed work. Test transitions, interrupted cleanup, and age boundaries before considering separate invalidated-subscription pruning.
 
 The benefit is controlled storage growth and less unnecessary payload retention. The cost is a schema/retention decision that trades historical troubleshooting detail against storage and privacy; preserve enough recent terminal evidence for operators.
+
+The terminal-history follow-up is implemented in the separate [notification retention outcome](PUSH_NOTIFICATION_RETENTION_OUTCOME.md), with its design, validation, and next release item.

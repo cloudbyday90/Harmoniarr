@@ -25,8 +25,8 @@ test('PostgreSQL queue freshness expires stale work without reviving payloads or
     // This exercises its backfill, not migration-ledger bookkeeping (already verified by applyPendingMigrations).
     await pool.query('ALTER TABLE notification_queue DROP COLUMN expires_at');
     const legacy = (await pool.query(`INSERT INTO notification_queue
-      (user_id, subscription_id, event_type, payload, ttl_seconds, status, created_at)
-      VALUES ($1, $2, 'releaseAdded', '{}', 120, 'sent', '2026-01-01T00:00:00Z') RETURNING id`, [userId, subscriptionId])).rows[0];
+      (user_id, subscription_id, event_type, payload, ttl_seconds, status, created_at, terminal_at)
+      VALUES ($1, $2, 'releaseAdded', '{}', 120, 'sent', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z') RETURNING id`, [userId, subscriptionId])).rows[0];
     await pool.query(await readFile(new URL('../../src/server/migrations/20260913_103213_add_push_notification_expiry.sql', import.meta.url), 'utf8'));
     const backfilled = (await pool.query(`SELECT expires_at = created_at + ttl_seconds * INTERVAL '1 second' AS exact,
       expires_at < clock_timestamp() AS already_expired FROM notification_queue WHERE id = $1`, [legacy.id])).rows[0];

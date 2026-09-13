@@ -21,6 +21,7 @@ import { createPushNotificationDispatchService } from './push-notification-dispa
 import { createPushNotificationService } from './push-notification-service.js';
 import { createPushNotificationHistoryCleanupHeartbeat } from './push-notification-history-cleanup-heartbeat.js';
 import { createPushNotificationQueueStore } from './push-notification-queue-store.js';
+import { createPushNotificationRetentionStore } from './push-notification-retention-store.js';
 import { createPushSubscriptionStore } from './push-subscription-store.js';
 import { createPushNotificationDeliveryPolicyStore } from './push-notification-delivery-policy-store.js';
 import { createPushNotificationDeliveryPolicyService } from './push-notification-delivery-policy-service.js';
@@ -41,6 +42,7 @@ export function createPushModule({
   pushNotificationDeliveryPolicyStore = createPushNotificationDeliveryPolicyStore(),
   pushNotificationDeliveryPolicyService = createPushNotificationDeliveryPolicyService({ pushNotificationDeliveryPolicyStore }),
   pushNotificationQueueStore = createPushNotificationQueueStore(),
+  pushNotificationRetentionStore = createPushNotificationRetentionStore(),
   pushSubscriptionStore = createPushSubscriptionStore(),
   pushNotificationService = createPushNotificationService({ pushSubscriptionStore }),
 } = {}) {
@@ -57,7 +59,7 @@ export function createPushModule({
     });
   const resolvedPushNotificationHistoryCleanupHeartbeat = pushNotificationHistoryCleanupHeartbeat
     ?? createPushNotificationHistoryCleanupHeartbeat({
-      deleteSentNotificationHistory: pushNotificationQueueStore.deleteSentNotificationHistory,
+      deleteTerminalNotificationHistory: pushNotificationRetentionStore.deleteTerminalNotificationHistory,
     });
 
   return {
@@ -67,6 +69,7 @@ export function createPushModule({
     pushNotificationDispatchService: resolvedPushNotificationDispatchService,
     pushNotificationHistoryCleanupHeartbeat: resolvedPushNotificationHistoryCleanupHeartbeat,
     pushNotificationQueueStore,
+    pushNotificationRetentionStore,
     pushSubscriptionStore,
     pushNotificationService,
     routeDependencies: {

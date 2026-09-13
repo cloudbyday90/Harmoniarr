@@ -7379,3 +7379,55 @@ SET migration_key = EXCLUDED.migration_key,
     error_message = NULL,
     application_version = NULL,
     updated_at = NOW();
+
+-- Migration: 20260913_104834_add_notification_terminal_retention.sql
+-- Checksum: 98d1e459d2d8525ba45ba1beeff9b8afabfc8ff539a1bc6a31dec7f157687beb
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+-- This program is free software: licensed under GPL-3.0
+-- See LICENSE file for details.
+
+BEGIN;
+
+ALTER TABLE notification_queue ADD COLUMN terminal_at TIMESTAMPTZ;
+-- Unknown historical completion times receive a conservative retention baseline,
+-- not an invented failure time. No rows are deleted during migration.
+WITH baseline AS MATERIALIZED (SELECT clock_timestamp() AS recorded_at)
+UPDATE notification_queue SET terminal_at =
+  CASE WHEN status = 'sent' AND sent_at IS NOT NULL THEN sent_at ELSE baseline.recorded_at END
+FROM baseline WHERE status IN ('sent', 'failed', 'expired');
+
+ALTER TABLE notification_queue ADD CONSTRAINT notification_queue_terminal_state_check CHECK (
+  (status = 'pending' AND terminal_at IS NULL)
+  OR (status IN ('sent', 'failed', 'expired') AND terminal_at IS NOT NULL AND isfinite(terminal_at))
+);
+CREATE INDEX notification_queue_terminal_retention_idx ON notification_queue (terminal_at, id)
+  WHERE status IN ('sent', 'failed', 'expired') AND claim_token IS NULL;
+
+COMMIT;
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260913_104834',
+  '20260913_104834_add_notification_terminal_retention.sql',
+  'add_notification_terminal_retention',
+  '98d1e459d2d8525ba45ba1beeff9b8afabfc8ff539a1bc6a31dec7f157687beb',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();

@@ -32,6 +32,7 @@ function mapNotificationQueueRow(row) {
     payload: row.payload ?? null,
     sentAt: row.sent_at instanceof Date ? row.sent_at.toISOString() : row.sent_at,
     status: row.status,
+    terminalAt: row.terminal_at instanceof Date ? row.terminal_at.toISOString() : row.terminal_at ?? null,
     subscriptionId: row.subscription_id ?? null,
     ttlSeconds: row.ttl_seconds,
     userId: row.user_id,
@@ -121,10 +122,12 @@ export function createPushNotificationQueueStore({ getPoolFn = getPool } = {}) {
       `WITH owned AS MATERIALIZED (
          SELECT id, next_attempt_at FROM notification_queue
          WHERE id = $1 AND claim_token = $2::uuid AND status = 'pending' FOR UPDATE
+       ), completed AS MATERIALIZED (
+         SELECT id, clock_timestamp() AS completed_at FROM owned
        )
        UPDATE notification_queue AS queue
-       SET status = 'sent', sent_at = clock_timestamp(), claim_token = NULL
-       FROM owned
+       SET status = 'sent', sent_at = completed.completed_at, terminal_at = completed.completed_at, claim_token = NULL
+       FROM owned JOIN completed USING (id)
        WHERE queue.id = owned.id AND queue.claim_token = $2::uuid AND queue.status = 'pending'
          AND owned.next_attempt_at > clock_timestamp()
        RETURNING queue.id`,
@@ -142,7 +145,8 @@ export function createPushNotificationQueueStore({ getPoolFn = getPool } = {}) {
          WHERE id = $1 AND claim_token = $2::uuid AND status = 'pending' FOR UPDATE
        )
        UPDATE notification_queue AS queue
-       SET status = $3, next_attempt_at = COALESCE($4::timestamptz, queue.next_attempt_at), claim_token = NULL
+       SET status = $3, next_attempt_at = COALESCE($4::timestamptz, queue.next_attempt_at), claim_token = NULL,
+           terminal_at = CASE WHEN $3 = 'pending' THEN NULL ELSE clock_timestamp() END
        FROM owned
        WHERE queue.id = owned.id AND queue.claim_token = $2::uuid AND queue.status = 'pending'
          AND owned.next_attempt_at > clock_timestamp()
@@ -228,6 +232,7 @@ export function createPushNotificationQueueStore({ getPoolFn = getPool } = {}) {
     const pool = getPoolFn();
     const result = await pool.query(
       `
+        WITH completed AS MATERIALIZED (SELECT clock_timestamp() AS completed_at)
         INSERT INTO notification_queue (
           user_id,
           subscription_id,
@@ -237,9 +242,11 @@ export function createPushNotificationQueueStore({ getPoolFn = getPool } = {}) {
           ttl_seconds,
           status,
           sent_at,
+          terminal_at,
           expires_at
         )
-        VALUES ($1, $2, $3, $4, $5::jsonb, $6, 'sent', clock_timestamp(), clock_timestamp() + ($6::integer * INTERVAL '1 second'))
+        SELECT $1, $2, $3, $4, $5::jsonb, $6, 'sent', completed_at, completed_at,
+          completed_at + ($6::integer * INTERVAL '1 second') FROM completed
         RETURNING *
       `,
       [userId, subscriptionId, eventType, coalesceKey, JSON.stringify(payload), ttlSeconds],
@@ -248,24 +255,7 @@ export function createPushNotificationQueueStore({ getPoolFn = getPool } = {}) {
     return mapNotificationQueueRow(result.rows[0]);
   }
 
-  async function deleteSentNotificationHistory({ olderThan } = {}) {
-    const pool = getPoolFn();
-    const result = await pool.query(
-      `
-        DELETE FROM notification_queue
-        WHERE status = 'sent'
-          AND ($1::timestamptz IS NULL OR COALESCE(sent_at, created_at) < $1::timestamptz)
-      `,
-      [olderThan ?? null],
-    );
-
-    return {
-      deletedCount: result.rowCount ?? 0,
-    };
-  }
-
   return {
-    deleteSentNotificationHistory,
     enqueueNotification,
     getLatestSentNotificationAt,
     claimPendingNotifications,

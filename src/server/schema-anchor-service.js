@@ -20,6 +20,7 @@ const publicSchema = 'public';
 
 export const criticalSchemaAnchors = Object.freeze({
   columns: Object.freeze([
+    { table: 'notification_queue', column: 'terminal_at' },
     { table: 'user_push_subscriptions', column: 'registration_token' },
     { table: 'notification_queue', column: 'expires_at' },
     { table: 'notification_queue', column: 'claim_token' },
@@ -67,6 +68,7 @@ export const criticalSchemaAnchors = Object.freeze({
     { table: 'library_files', column: 'tag_extracted_modified_at' },
   ]),
   constraints: Object.freeze([
+    { table: 'notification_queue', constraint: 'notification_queue_terminal_state_check' },
     { table: 'notification_queue', constraint: 'notification_queue_claim_pending_check' },
     { table: 'library_external_request_release_intents', constraint: 'external_request_release_intents_release_unique' },
     { table: 'library_external_request_release_intents', constraint: 'external_request_release_intents_provider_unique' },
@@ -100,6 +102,7 @@ export const criticalSchemaAnchors = Object.freeze({
     { table: 'operator_artist_reconciliation_snapshot', constraint: 'operator_artist_reconciliation_snapshot_payload_object_check' },
   ]),
   indexes: Object.freeze([
+    { index: 'notification_queue_terminal_retention_idx' },
     { index: 'provider_ingest_requests_identity_unique' },
     { index: 'external_collection_items_page_idx' },
     { index: 'operation_runs_pending_dispatch_idx' },
