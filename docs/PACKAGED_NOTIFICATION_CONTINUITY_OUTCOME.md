@@ -61,3 +61,5 @@ All three open PRs were refreshed through GitHub MCP and their complete patches 
 ## Next release item
 
 Run the existing published-candidate acceptance path against registry digest references with verified build provenance and an explicitly reviewed release baseline. This local rehearsal refreshes packaged behavior evidence to 104 migrations; it cannot establish artifact origin or release acceptance. ARM64 execution and live provider/browser delivery remain separately scoped evidence.
+
+September 13 published-gate follow-up: [readiness outcome](PUBLISHED_ACCEPTANCE_READINESS_OUTCOME.md) records the live CLI/registry access failures, empty accessible release list, and exact inputs required before published acceptance can proceed.

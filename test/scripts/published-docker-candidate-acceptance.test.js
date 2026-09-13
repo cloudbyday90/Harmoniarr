@@ -19,7 +19,7 @@ const inputs = Object.freeze({
   candidateRevision: 'c'.repeat(40), baselineRevision: 'd'.repeat(40), baselineReleaseTag: 'v1.2.3',
 });
 
-function createFixture({ changeAttestations, changeRelease, changeMetadata, tagObject, changeTag, failCommand } = {}) {
+function createFixture({ changeAttestations, changeRelease, changeMetadata, tagObject, changeTag, failCommand, legacyBaseline = false } = {}) {
   const calls = [];
   const metadata = createReleaseMetadata({ digest: `sha256:${'b'.repeat(64)}`, imageName,
     releaseTag: inputs.baselineReleaseTag, repository: inputs.repository,
@@ -55,20 +55,40 @@ function createFixture({ changeAttestations, changeRelease, changeMetadata, tagO
     }
     return { exitCode: 0, stdout: JSON.stringify(result) };
   };
+  const candidate = { kind: 'registry-digest', reference: inputs.candidateImageRef, revision: inputs.candidateRevision,
+    imageId: `sha256:${'e'.repeat(64)}`, platform: 'linux/amd64', platformManifestDigest: `sha256:${'1'.repeat(64)}` };
+  const baseline = { kind: 'registry-digest', reference: inputs.baselineImageRef, revision: inputs.baselineRevision,
+    imageId: `sha256:${'f'.repeat(64)}`, platform: 'linux/amd64', platformManifestDigest: `sha256:${'2'.repeat(64)}` };
+  const phase = ({ baselinePhase = false, continuity = false, migrationsAdded = 0 } = {}) => {
+    const image = baselinePhase ? baseline : candidate;
+    return {
+      imageId: image.imageId, containerImageId: image.imageId, platformManifestDigest: image.platformManifestDigest,
+      imageVerified: true, hardeningVerified: true, loopbackBindingVerified: true,
+      migrationCount: baselinePhase && legacyBaseline ? 98 : 104, migrationChecksumsVerified: true,
+      indexesVerified: !baselinePhase, packagedToolsVerified: true, nodeVersion: 'v24.19.0',
+      postgresVersion: 180006, pgDumpVersion: '18.6', pgRestoreVersion: '18.6',
+      continuityVerified: continuity, requestContinuityVerified: continuity,
+      notificationSchemaVerified: !baselinePhase || !legacyBaseline, notificationContinuityVerified: continuity,
+      continuityNotificationCount: 4, continuitySubscriptionCount: 1, migrationsAdded, pendingMigrations: 0,
+    };
+  };
   const runtime = {
     status: 'passed', schemaVersion: 1, validationKind: 'immutable-candidate-acceptance',
-    artifactScope: 'registry-digest-runtime', cleanupVerified: true,
-    candidate: { kind: 'registry-digest', reference: inputs.candidateImageRef, revision: inputs.candidateRevision,
-      imageId: `sha256:${'e'.repeat(64)}` },
-    baseline: { kind: 'registry-digest', reference: inputs.baselineImageRef, revision: inputs.baselineRevision,
-      imageId: `sha256:${'f'.repeat(64)}` },
-    checks: { upgraded: { migrationsAdded: 0 } },
+    generatedAt: '2026-09-13T18:00:00.000Z', artifactScope: 'registry-digest-runtime', cleanupVerified: true,
+    provenanceVerified: false, acceptedReleaseBaselineVerified: false, candidate, baseline,
+    checks: {
+      freshInstall: phase(), existingDataRestart: phase({ continuity: true }),
+      baseline: phase({ baselinePhase: true }), upgraded: phase({ continuity: true, migrationsAdded: legacyBaseline ? 6 : 0 }),
+      settingsPersistence: true, backupRestoreFlow: true, maintenanceConflictRefused: true,
+      delegatedRequestScope: true, startupFailureRefused: true,
+    },
   };
   return { calls, runTrustCommandFn, runtime };
 }
 
 test('published acceptance executes pinned live verification before runtime and accepts same-schema upgrade evidence', async () => {
   const fixture = createFixture();
+  const originalRuntime = structuredClone(fixture.runtime);
   const env = { GH_TOKEN: 'test-token' };
   const result = await validatePublishedDockerCandidateAcceptance({ ...inputs, env,
     runTrustCommandFn: fixture.runTrustCommandFn,
@@ -86,6 +106,18 @@ test('published acceptance executes pinned live verification before runtime and 
   assert.equal(result.publishedBaselineVerified, true);
   assert.equal(result.acceptedReleaseBaselineVerified, false);
   assert.equal(result.baselinePolicy, 'operator-selected-published-release');
+  assert.deepEqual(result.checks, originalRuntime.checks, 'Publishing preserves every runtime phase and its evidence');
+  assert.deepEqual(fixture.runtime, originalRuntime, 'The publication overlay must not mutate runtime evidence');
+  assert.equal(originalRuntime.provenanceVerified, false);
+  assert.equal(result.checks.upgraded.migrationsAdded, 0);
+  for (const name of ['freshInstall', 'existingDataRestart', 'baseline', 'upgraded']) {
+    assert.equal(result.checks[name].continuityNotificationCount, 4);
+    assert.equal(result.checks[name].continuitySubscriptionCount, 1);
+    assert.equal(result.checks[name].notificationSchemaVerified, true);
+    const continuity = ['existingDataRestart', 'upgraded'].includes(name);
+    assert.equal(result.checks[name].notificationContinuityVerified, continuity);
+    assert.equal(result.checks[name].requestContinuityVerified, continuity);
+  }
   assert.equal(result.trust.baselineRelease.sourceRevision, inputs.baselineRevision);
   assert.match(result.trust.baselineRelease.metadataSha256, /^[a-f0-9]{64}$/u);
   for (const [index, revision] of [[0, inputs.candidateRevision], [1, inputs.baselineRevision]]) {
@@ -100,6 +132,27 @@ test('published acceptance executes pinned live verification before runtime and 
     assert.equal(args[args.indexOf('--limit') + 1], '10');
   }
   assert.equal(JSON.stringify(result).includes('test-token'), false);
+});
+
+test('published acceptance preserves legacy baseline schema limits and current upgrade continuity separately', async () => {
+  const fixture = createFixture({ legacyBaseline: true });
+  const originalChecks = structuredClone(fixture.runtime.checks);
+  const result = await validatePublishedDockerCandidateAcceptance({ ...inputs,
+    runTrustCommandFn: fixture.runTrustCommandFn, validateRuntimeFn: async () => fixture.runtime,
+  });
+  assert.deepEqual(result.checks, originalChecks);
+  assert.equal(result.checks.baseline.migrationCount, 98);
+  assert.equal(result.checks.baseline.notificationSchemaVerified, false);
+  assert.equal(result.checks.baseline.notificationContinuityVerified, false);
+  assert.equal(result.checks.upgraded.migrationCount, 104);
+  assert.equal(result.checks.upgraded.migrationsAdded, 6);
+  assert.equal(result.checks.upgraded.notificationSchemaVerified, true);
+  assert.equal(result.checks.upgraded.notificationContinuityVerified, true);
+  assert.equal(result.checks.upgraded.continuityNotificationCount, 4);
+  assert.equal(result.checks.upgraded.continuitySubscriptionCount, 1);
+  assert.equal(result.provenanceVerified, true);
+  assert.equal(result.publishedBaselineVerified, true);
+  assert.equal(result.acceptedReleaseBaselineVerified, false);
 });
 
 for (const [label, override] of [
