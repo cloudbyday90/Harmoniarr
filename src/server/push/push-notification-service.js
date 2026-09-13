@@ -20,6 +20,7 @@ import webPush from 'web-push';
 import { performance } from 'node:perf_hooks';
 import { createPushSubscriptionStore } from './push-subscription-store.js';
 import { resolveOrGenerateVapidKeys, resolveVapidContactFromEnv } from './vapid-keys.js';
+import { validatePushSubscription } from './push-subscription-validation.js';
 import { createPushHttpTransport, createPushTransportError } from './push-http-transport.js';
 import { PUSH_TRANSPORT_TIMEOUT_MS } from './push-delivery-budget.js';
 
@@ -172,6 +173,7 @@ export function createPushNotificationService({
       // Capture primitive identity before preparation or I/O can mutate the caller's row.
       registration = Object.freeze({ id: subscription.id, userId: subscription.userId,
         endpoint: subscription.endpoint, registrationToken: subscription.registrationToken });
+      validatePushSubscription(subscription);
       const requestDetails = webPushLib.generateRequestDetails(
         buildWebPushSubscription({ endpoint: registration.endpoint, p256dh: subscription.p256dh, auth: subscription.auth }),
         serialisePayload(payload),
@@ -182,6 +184,10 @@ export function createPushNotificationService({
       if (Number.isInteger(response?.statusCode) && response.statusCode >= 200 && response.statusCode < 300) return { status: 'sent' };
       return failedDelivery(response ?? {}, registration);
     } catch (error) {
+      if (['push_subscription_invalid', 'push_transport_invalid_request', 'push_transport_destination_blocked'].includes(error?.code)) {
+        reportFailure('[harmoniarr-push] Push delivery failed.\n');
+        return { retryAt: null, retryable: false, status: 'failed', statusCode: null };
+      }
       return failedDelivery({ statusCode: error?.statusCode ?? error?.status, headers: error?.headers }, registration);
     }
   }
@@ -198,7 +204,8 @@ export function createPushNotificationService({
    * @returns {Promise<object>} The stored subscription row.
    */
   async function subscribe({ userId, endpoint, p256dh, auth, userAgent = null }) {
-    return pushSubscriptionStore.upsertSubscription({ userId, endpoint, p256dh, auth, userAgent });
+    const validated = validatePushSubscription({ endpoint, p256dh, auth });
+    return pushSubscriptionStore.upsertSubscription({ userId, ...validated, userAgent });
   }
 
   /**

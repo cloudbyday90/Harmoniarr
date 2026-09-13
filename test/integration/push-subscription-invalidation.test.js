@@ -7,6 +7,9 @@
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createPushSubscriptionKeys } from '../../testing/push-subscription-fixtures.js';
+
+const subscriptionKeys = createPushSubscriptionKeys();
 import { randomUUID } from 'node:crypto';
 import { setImmediate } from 'node:timers/promises';
 import { createPushNotificationService } from '../../src/server/push/push-notification-service.js';
@@ -32,11 +35,11 @@ test('PostgreSQL registration tokens protect refreshed subscriptions from delaye
     const [owner, other] = users.map(({ id }) => id);
     const store = createPushSubscriptionStore({ getPoolFn });
     const register = (endpoint, overrides = {}) => store.upsertSubscription({
-      userId: owner, endpoint, p256dh: 'test-public-key', auth: 'test-auth', ...overrides,
+      userId: owner, endpoint, ...subscriptionKeys, ...overrides,
     });
 
     for (const scenario of ['identical', 'keys', 'owner', 'recreated', 'matching']) {
-      const endpoint = `https://push.example.test/registration-${scenario}`;
+      const endpoint = `https://push.example.com/registration-${scenario}`;
       const original = await register(endpoint);
       assert.equal(typeof original.registrationToken, 'string');
       const originalIdentity = identity(original);
@@ -83,7 +86,7 @@ test('PostgreSQL registration tokens protect refreshed subscriptions from delaye
     }
 
     // Hold the actual upsert uncommitted so old cleanup must reconsider its predicate after waiting.
-    const contested = await register('https://push.example.test/registration-concurrent');
+    const contested = await register('https://push.example.com/registration-concurrent');
     const refreshingClient = await pool.connect();
     let cleanupClient;
     let completion;
@@ -119,7 +122,7 @@ test('PostgreSQL registration tokens protect refreshed subscriptions from delaye
       }
     }
 
-    const endpoint = 'https://push.example.test/registration-matches';
+    const endpoint = 'https://push.example.com/registration-matches';
     const original = await register(endpoint);
     const originalIdentity = identity(original);
     for (const mismatch of [

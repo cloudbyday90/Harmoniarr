@@ -6,6 +6,8 @@ import { readFile } from 'node:fs/promises';
 import { createServer, request } from 'node:https';
 import { performance } from 'node:perf_hooks';
 import test from 'node:test';
+import { setImmediate as nextTurn } from 'node:timers/promises';
+import { createPushDestinationResolver } from '../../src/server/push/push-destination-resolver.js';
 import webPush from 'web-push';
 import { createPushHttpTransport } from '../../src/server/push/push-http-transport.js';
 import { createPushNotificationService } from '../../src/server/push/push-notification-service.js';
@@ -13,7 +15,8 @@ import { createPushNotificationService } from '../../src/server/push/push-notifi
 // Public synthetic fixture credentials, trusted only by this loopback test adapter.
 const cert = await readFile(new URL('../../testing/fixtures/push-https/localhost-cert.pem', import.meta.url));
 const key = await readFile(new URL('../../testing/fixtures/push-https/localhost-key.pem', import.meta.url));
-const trustedRequest = (url, options, callback) => request(url, { ...options, ca: cert }, callback);
+const publicDestination = { resolveDestination: async () => ({ address: '8.8.8.8', family: 4 }) };
+const createTransport = (options = {}) => createPushHttpTransport({ destinationResolver: publicDestination, ...options });
 const requestDetails = (endpoint) => ({ endpoint, method: 'POST', headers: { TTL: '60' }, body: Buffer.from('encrypted fixture') });
 const errorCode = (code) => (error) => {
   assert.equal(error.code, `push_transport_${code}`);
@@ -39,34 +42,35 @@ async function fixture(t, handler) {
   });
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
-  return { endpoint: `https://127.0.0.1:${server.address().port}/private-capability`, server };
+  return { endpoint: 'https://push-fixture.example.com/private-capability', server,
+    requestFn: (url, options, callback) => request(url, { ...options, ca: cert, port: server.address().port,
+      lookup: (hostname, input, done) => done(null, '127.0.0.1', 4) }, callback) };
 }
 
-test('absolute deadline destroys the native request while DNS lookup remains unresolved', { timeout: 5_000 }, async () => {
-  let outgoing;
-  let lookupStarted = false;
-  const closed = deferred();
-  const transport = createPushHttpTransport({ requestFn: (url, options, callback) => {
-    outgoing = request(url, { ...options, lookup: () => { lookupStarted = true; } }, callback);
-    outgoing.once('close', closed.resolve);
-    return outgoing;
-  } });
-  await assert.rejects(transport.sendRequest({ requestDetails: requestDetails('https://dns-fixture.invalid/private-capability'),
-    deadlineAt: performance.now() + 100 }), errorCode('timeout'));
-  await closed.promise;
-  assert.equal(lookupStarted, true);
-  assert.equal(outgoing.destroyed, true);
+test('absolute deadline cancels both DNS queries and late results cannot start a native request', { timeout: 5_000 }, async () => {
+  const a = deferred(), aaaa = deferred();
+  let cancelled = 0, requests = 0;
+  const destinationResolver = createPushDestinationResolver({ createResolverFn: () => ({
+    resolve4: () => a.promise, resolve6: () => aaaa.promise, cancel: () => { cancelled++; },
+  }) });
+  const transport = createTransport({ destinationResolver, requestFn: () => { requests++; } });
+  await assert.rejects(transport.sendRequest({ requestDetails: requestDetails('https://push.example.com/private-capability'),
+    deadlineAt: performance.now() + 50 }), errorCode('timeout'));
+  assert.equal(cancelled, 1);
+  a.resolve(['8.8.8.8']); aaaa.resolve(['2606:4700:4700::1111']);
+  await nextTurn();
+  assert.equal(requests, 0);
 });
 
 test('invalid endpoint shapes and expired deadlines never construct a request', async () => {
   let calls = 0;
-  const transport = createPushHttpTransport({ nowFn: () => 100, requestFn: () => { calls++; } });
+  const transport = createTransport({ nowFn: () => 100, requestFn: () => { calls++; } });
   for (const endpoint of ['http://fixture.invalid', 'https://user:password@fixture.invalid', 'https://fixture.invalid/#fragment', 'not-a-url']) {
     await assert.rejects(transport.sendRequest({ requestDetails: requestDetails(endpoint), deadlineAt: 200 }), errorCode('invalid_request'));
   }
-  await assert.rejects(transport.sendRequest({ requestDetails: { ...requestDetails('https://fixture.invalid'), body: 'plaintext' }, deadlineAt: 200 }), errorCode('invalid_request'));
-  await assert.rejects(transport.sendRequest({ requestDetails: requestDetails('https://fixture.invalid'), deadlineAt: 100 }), errorCode('timeout'));
-  await assert.rejects(transport.sendRequest({ requestDetails: requestDetails('https://fixture.invalid'), deadlineAt: Infinity }), errorCode('invalid_request'));
+  await assert.rejects(transport.sendRequest({ requestDetails: { ...requestDetails('https://push.example.com'), body: 'plaintext' }, deadlineAt: 200 }), errorCode('invalid_request'));
+  await assert.rejects(transport.sendRequest({ requestDetails: requestDetails('https://push.example.com'), deadlineAt: 100 }), errorCode('timeout'));
+  await assert.rejects(transport.sendRequest({ requestDetails: requestDetails('https://push.example.com'), deadlineAt: Infinity }), errorCode('invalid_request'));
   assert.equal(calls, 0);
 });
 
@@ -78,18 +82,22 @@ test('deadline cleanup settles once, caps the timer, and handles late request an
   const outgoing = new EventEmitter();
   outgoing.end = () => {};
   outgoing.destroy = () => { destroyed++; outgoing.emit('error', new Error('private request')); };
-  const transport = createPushHttpTransport({ nowFn: () => 0,
+  const transport = createTransport({ nowFn: () => 0,
     setTimeoutFn: (callback, milliseconds) => { timerCallback = callback; assert.equal(milliseconds, 15_000); return 'timer'; },
     clearTimeoutFn: (timer) => { assert.equal(timer, 'timer'); cleared++; },
     requestFn: (url, options, callback) => {
       assert.equal(url.protocol, 'https:');
-      assert.deepEqual(options, { method: 'POST', headers: { TTL: '60' }, agent: false, rejectUnauthorized: true, maxHeaderSize: 16_384 });
+      const { lookup, ...fixedOptions } = options;
+      assert.equal(typeof lookup, 'function');
+      assert.deepEqual(fixedOptions, { method: 'POST', headers: { TTL: '60', Host: 'push.example.com' }, agent: false,
+        rejectUnauthorized: true, maxHeaderSize: 16_384, servername: 'push.example.com', family: 4, autoSelectFamily: false });
       responseCallback = callback; return outgoing;
     },
   });
-  const delivery = transport.sendRequest({ requestDetails: { ...requestDetails('https://fixture.invalid'),
+  const delivery = transport.sendRequest({ requestDetails: { ...requestDetails('https://push.example.com'),
     proxy: 'http://private.invalid', rejectUnauthorized: false, agent: {} }, deadlineAt: 50_000 });
   const rejected = assert.rejects(delivery, errorCode('timeout'));
+  await nextTurn();
   timerCallback();
   await rejected;
   const incoming = new EventEmitter();
@@ -113,11 +121,11 @@ test('successful completion removes the deadline timer and ignores its late call
     incoming.statusCode = 201; incoming.complete = true; incoming.headers = {};
     responseCallback(incoming); incoming.emit('end'); incoming.emit('close');
   };
-  const transport = createPushHttpTransport({ nowFn: () => 0,
+  const transport = createTransport({ nowFn: () => 0,
     setTimeoutFn: (callback) => { timerCallback = callback; return 'timer'; }, clearTimeoutFn: () => { cleared++; },
     requestFn: (url, options, callback) => { responseCallback = callback; return outgoing; },
   });
-  assert.deepEqual(await transport.sendRequest({ requestDetails: requestDetails('https://fixture.invalid'), deadlineAt: 100 }), { statusCode: 201, headers: {} });
+  assert.deepEqual(await transport.sendRequest({ requestDetails: requestDetails('https://push.example.com'), deadlineAt: 100 }), { statusCode: 201, headers: {} });
   timerCallback();
   assert.equal(cleared, 1);
   assert.equal(destroyed, 0);
@@ -125,16 +133,84 @@ test('successful completion removes the deadline timer and ignores its late call
 
 test('request construction failures are fixed and release their timer', async () => {
   let cleared = 0;
-  const transport = createPushHttpTransport({ requestFn: () => { throw new Error('private credentials'); },
+  const transport = createTransport({ requestFn: () => { throw new Error('private credentials'); },
     setTimeoutFn: () => 'timer', clearTimeoutFn: () => { cleared++; } });
-  await assert.rejects(transport.sendRequest({ requestDetails: requestDetails('https://fixture.invalid'), deadlineAt: performance.now() + 100 }), errorCode('request_failed'));
+  await assert.rejects(transport.sendRequest({ requestDetails: requestDetails('https://push.example.com'), deadlineAt: performance.now() + 100 }), errorCode('request_failed'));
   assert.equal(cleared, 1);
+});
+
+test('repeated native lookup uses only the original pinned address and original TLS/Host identity', async () => {
+  let lookups = 0;
+  const destination = { address: '8.8.8.8', family: 4 };
+  const destinationResolver = { resolveDestination: async () => { lookups++; return destination; } };
+  const transport = createTransport({ destinationResolver, requestFn: (url, options, callback) => {
+    assert.equal(url.hostname, 'push.example.com');
+    assert.equal(options.servername, 'push.example.com');
+    assert.equal(options.headers.Host, 'push.example.com');
+    assert.equal(options.headers.host, undefined);
+    assert.equal(options.rejectUnauthorized, true);
+    assert.equal(options.agent, false);
+    assert.equal(options.autoSelectFamily, false);
+    destination.address = '127.0.0.1';
+    options.lookup(url.hostname, {}, (error, address, family) => {
+      assert.equal(error, null); assert.equal(address, '8.8.8.8'); assert.equal(family, 4);
+    });
+    options.lookup(url.hostname, { all: true }, (error, addresses) => {
+      assert.equal(error, null); assert.deepEqual(addresses, [{ address: '8.8.8.8', family: 4 }]);
+    });
+    options.lookup('other.example.com', {}, (error, address) => {
+      assert.equal(error.code, 'push_transport_request_failed'); assert.equal(address, undefined);
+    });
+    const outgoing = new EventEmitter();
+    outgoing.destroy = () => {};
+    outgoing.end = () => {
+      const incoming = new EventEmitter();
+      incoming.statusCode = 201; incoming.headers = {}; incoming.complete = true;
+      callback(incoming); incoming.emit('end');
+    };
+    return outgoing;
+  } });
+  assert.deepEqual(await transport.sendRequest({ requestDetails: { ...requestDetails('https://push.example.com'),
+    headers: { host: 'forged.example.com', Host: 'also-forged.example.com' } }, deadlineAt: performance.now() + 1_000 }), { statusCode: 201, headers: {} });
+  assert.equal(lookups, 1, 'changing the DNS answer cannot cause a second resolution during this attempt');
+});
+
+test('native lookup delayed beyond the deadline refuses to authorize a connection before the timer runs', async () => {
+  let now = 0, destroyed = 0, callbackError;
+  const transport = createTransport({ nowFn: () => now, setTimeoutFn: () => 'timer', clearTimeoutFn: () => {},
+    requestFn: (url, options) => {
+      const outgoing = new EventEmitter();
+      outgoing.destroy = () => { destroyed++; };
+      outgoing.end = () => {
+        now = 101;
+        options.lookup(url.hostname, {}, (error, address) => { callbackError = error; assert.equal(address, undefined); });
+      };
+      return outgoing;
+    },
+  });
+  await assert.rejects(transport.sendRequest({ requestDetails: requestDetails('https://push.example.com'), deadlineAt: 100 }), errorCode('timeout'));
+  assert.equal(callbackError.code, 'push_transport_request_failed');
+  assert.equal(destroyed, 1);
+});
+
+test('destination policy failures are distinct from resolver outages and never create native requests', async () => {
+  for (const [resolution, expected] of [
+    [async () => ({ address: '127.0.0.1', family: 4 }), 'destination_blocked'],
+    [async () => ({ address: '8.8.8.8', family: 6 }), 'destination_blocked'],
+    [async () => { throw Object.assign(new Error('private destination'), { code: 'push_destination_blocked' }); }, 'destination_blocked'],
+    [async () => { throw new Error('private DNS outage'); }, 'request_failed'],
+  ]) {
+    let requests = 0;
+    const transport = createTransport({ destinationResolver: { resolveDestination: resolution }, requestFn: () => { requests++; } });
+    await assert.rejects(transport.sendRequest({ requestDetails: requestDetails('https://push.example.com'), deadlineAt: performance.now() + 1_000 }), errorCode(expected));
+    assert.equal(requests, 0);
+  }
 });
 
 test('real web-push generation preserves encrypted bytes and VAPID headers through the native HTTPS adapter', { timeout: 5_000 }, async (t) => {
   let received;
   let generated;
-  const { endpoint } = await fixture(t, (incoming, response) => {
+  const { endpoint, requestFn } = await fixture(t, (incoming, response) => {
     const chunks = [];
     incoming.on('data', (chunk) => chunks.push(chunk));
     incoming.on('end', () => { received = { headers: incoming.headers, body: Buffer.concat(chunks) }; response.writeHead(201); response.end(); });
@@ -143,7 +219,7 @@ test('real web-push generation preserves encrypted bytes and VAPID headers throu
   const vapidKeys = webPush.generateVAPIDKeys();
   const payload = { title: 'Synthetic local delivery', body: 'No external push service is contacted.' };
   const service = createPushNotificationService({ vapidKeys, vapidContact: 'mailto:fixture@example.invalid', pushSubscriptionStore: {},
-    pushHttpTransport: createPushHttpTransport({ requestFn: trustedRequest }),
+    pushHttpTransport: createTransport({ requestFn }),
     webPushLib: { setVapidDetails: (...args) => webPush.setVapidDetails(...args),
       generateRequestDetails: (...args) => { generated = webPush.generateRequestDetails(...args); return generated; } },
     stderr: { write: () => assert.fail('local encrypted delivery should succeed') },

@@ -1,13 +1,16 @@
 /* Harmoniarr - GPL-3.0; see LICENSE. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createPushSubscriptionKeys } from '../../testing/push-subscription-fixtures.js';
+
+const subscriptionKeys = createPushSubscriptionKeys();
 import { setImmediate as nextTurn } from 'node:timers/promises';
 import { createPushNotificationService } from '../../src/server/push/push-notification-service.js';
 
 const keys = { publicKey: 'test-public', privateKey: 'test-private' };
 const contact = 'mailto:fixture@example.invalid';
 const subscription = { id: 'sub-1', userId: 'user-1', registrationToken: 'e4e7be1c-1fb1-454c-ae3c-bfbf0e7bca10',
-  endpoint: 'https://push.example.invalid/private-capability', p256dh: 'test-p256dh', auth: 'test-auth' };
+  endpoint: 'https://push.example.com/private-capability', ...subscriptionKeys };
 const registrationIdentity = ({ id, userId, endpoint, registrationToken }) => ({ id, userId, endpoint, registrationToken });
 function deferred() {
   let resolve;
@@ -120,7 +123,7 @@ test('expired cleanup retains the frozen original identity when the caller chang
   } } });
   const delivery = context.service.sendNotificationToSubscription({ subscription: mutableSubscription, payload: {} });
   Object.assign(mutableSubscription, { id: 'replacement-id', userId: 'replacement-owner',
-    endpoint: 'https://push.example.invalid/replacement-endpoint', registrationToken: 'cd55cb14-3dda-405f-bf2f-56efef9581f8',
+    endpoint: 'https://push.example.com/replacement-endpoint', registrationToken: 'cd55cb14-3dda-405f-bf2f-56efef9581f8',
     p256dh: 'replacement-key', auth: 'replacement-auth' });
   pending.resolve({ statusCode: 410 });
   assert.equal((await delivery).status, 'expired');
@@ -136,7 +139,7 @@ test('registration identity and endpoint are captured before request generation 
   const mutableSubscription = { ...subscription };
   const originalIdentity = registrationIdentity(mutableSubscription);
   const context = harness({ webPushLib: { generateRequestDetails: (input) => {
-    mutableSubscription.endpoint = 'https://push.example.invalid/replacement-endpoint';
+    mutableSubscription.endpoint = 'https://push.example.com/replacement-endpoint';
     mutableSubscription.registrationToken = 'cd55cb14-3dda-405f-bf2f-56efef9581f8';
     return { endpoint: input.endpoint, method: 'POST', body: Buffer.from('fixture'), headers: {} };
   } }, transport: { sendRequest: async (input) => {
@@ -173,7 +176,7 @@ test('incomplete or non-string registration identity cannot invoke cleanup or a 
   let legacyCalls = 0;
   const context = harness({ store: { deleteSubscriptionByEndpoint: () => { legacyCalls++; } },
     transport: { sendRequest: async () => ({ statusCode: 410 }) } });
-  for (const field of ['id', 'userId', 'endpoint', 'registrationToken']) {
+  for (const field of ['id', 'userId', 'registrationToken']) {
     for (const value of [undefined, null, '', {}, 42]) {
       assert.equal((await context.service.sendNotificationToSubscription({ subscription: { ...subscription, [field]: value }, payload: {} })).status, 'expired');
     }
@@ -257,4 +260,32 @@ test('Retry-After accepts bounded delta seconds and future HTTP dates while reje
   const before = Date.now();
   const retryAt = Date.parse((await delta.service.sendNotificationToSubscription({ subscription, payload: {} })).retryAt);
   assert.ok(retryAt >= before + 120_000 && retryAt <= Date.now() + 120_000);
+});
+
+
+test('registration service rejects invalid input and persisted invalid subscriptions never reach encryption or transport', async () => {
+  let writes = 0;
+  const context = harness({ store: { upsertSubscription: async () => { writes++; } } });
+  for (const overrides of [{ endpoint: 'https://127.0.0.1/private' }, { auth: 'invalid' }]) {
+    const invalid = { ...subscription, ...overrides };
+    await assert.rejects(context.service.subscribe(invalid), { code: 'push_subscription_invalid' });
+    assert.deepEqual(await context.service.sendNotificationToSubscription({ subscription: invalid, payload: {} }), {
+      retryAt: null, retryable: false, status: 'failed', statusCode: null,
+    });
+  }
+  assert.equal(writes, 0);
+  assert.deepEqual(context.generated, []);
+  assert.deepEqual(context.sent, []);
+  assert.deepEqual(context.invalidated, []);
+});
+
+test('blocked destinations fail permanently while DNS infrastructure failures retain bounded retries', async () => {
+  for (const code of ['push_transport_destination_blocked', 'push_transport_invalid_request', 'push_transport_request_failed']) {
+    const context = harness({ transport: { sendRequest: async () => { throw Object.assign(new Error('private-address'), { code }); } } });
+    const result = await context.service.sendNotificationToSubscription({ subscription, payload: {} });
+    assert.equal(result.status, 'failed');
+    assert.equal(result.retryable, code === 'push_transport_request_failed');
+    assert.deepEqual(context.invalidated, []);
+    assert.doesNotMatch(context.logs.join(''), /private-address/);
+  }
 });

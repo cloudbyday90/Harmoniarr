@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { validatePushSubscription } from '../push/push-subscription-validation.js';
 import { createApiError } from '../auth.js';
 import { createRequestAuthDependencies } from '../auth-module.js';
 import { asyncRoute } from '../http.js';
@@ -31,23 +32,11 @@ const defaultRequestAuthDependencies = createRequestAuthDependencies();
  * @returns {{ endpoint: string, p256dh: string, auth: string }}
  */
 function validateSubscriptionBody(body) {
-  const endpoint = typeof body?.endpoint === 'string' ? body.endpoint.trim() : '';
-  const p256dh = typeof body?.keys?.p256dh === 'string' ? body.keys.p256dh.trim() : '';
-  const auth = typeof body?.keys?.auth === 'string' ? body.keys.auth.trim() : '';
-
-  if (!endpoint) {
-    throw createApiError(400, 'push_subscription_invalid', 'endpoint is required');
+  try {
+    return validatePushSubscription({ endpoint: body?.endpoint, p256dh: body?.keys?.p256dh, auth: body?.keys?.auth });
+  } catch {
+    throw createApiError(400, 'push_subscription_invalid', 'Push subscription endpoint or encryption keys are invalid');
   }
-
-  if (!p256dh) {
-    throw createApiError(400, 'push_subscription_invalid', 'keys.p256dh is required');
-  }
-
-  if (!auth) {
-    throw createApiError(400, 'push_subscription_invalid', 'keys.auth is required');
-  }
-
-  return { endpoint, p256dh, auth };
 }
 
 /**

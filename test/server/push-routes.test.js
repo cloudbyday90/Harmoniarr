@@ -18,6 +18,9 @@
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createPushSubscriptionKeys } from '../../testing/push-subscription-fixtures.js';
+
+const subscriptionKeys = createPushSubscriptionKeys();
 import { createApiError } from '../../src/server/auth.js';
 import { registerPushRoutes } from '../../src/server/routes/push-routes.js';
 import { createJsonTestApp, withServer } from '../../testing/server/http-test-helpers.js';
@@ -78,8 +81,8 @@ test('subscribe route: 201 and subscription id on valid input', async (t) => {
     id: 'sub-abc',
     userId: TEST_SESSION.appUserId,
     endpoint: 'https://push.example.com/sub',
-    p256dh: 'p256dh-value',
-    auth: 'auth-value',
+    p256dh: subscriptionKeys.p256dh,
+    auth: subscriptionKeys.auth,
     userAgent: null,
     createdAt: '2026-06-02T00:00:00.000Z',
   }));
@@ -91,7 +94,7 @@ test('subscribe route: 201 and subscription id on valid input', async (t) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         endpoint: 'https://push.example.com/sub',
-        keys: { p256dh: 'p256dh-value', auth: 'auth-value' },
+        keys: { p256dh: subscriptionKeys.p256dh, auth: subscriptionKeys.auth },
       }),
     });
     const payload = await response.json();
@@ -121,7 +124,7 @@ test('subscribe route: passes userId from session to subscribe', async (t) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         endpoint: 'https://push.example.com/sub',
-        keys: { p256dh: 'p256dh-value', auth: 'auth-value' },
+        keys: { p256dh: subscriptionKeys.p256dh, auth: subscriptionKeys.auth },
       }),
     });
 
@@ -156,7 +159,7 @@ test('subscribe route: 400 when p256dh is missing', async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         endpoint: 'https://push.example.com/sub',
-        keys: { auth: 'auth-value' },
+        keys: { auth: subscriptionKeys.auth },
       }),
     });
     const payload = await response.json();
@@ -175,7 +178,7 @@ test('subscribe route: 400 when auth is missing', async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         endpoint: 'https://push.example.com/sub',
-        keys: { p256dh: 'p256dh-value' },
+        keys: { p256dh: subscriptionKeys.p256dh },
       }),
     });
     const payload = await response.json();
@@ -196,7 +199,7 @@ test('subscribe route: 401 when session is not authenticated', async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         endpoint: 'https://push.example.com/sub',
-        keys: { p256dh: 'p256dh-value', auth: 'auth-value' },
+        keys: { p256dh: subscriptionKeys.p256dh, auth: subscriptionKeys.auth },
       }),
     });
 
@@ -258,4 +261,25 @@ test('unsubscribe route: 401 when session is not authenticated', async () => {
 
     assert.equal(response.status, 401);
   });
+});
+
+
+test('subscribe rejects unsafe destinations and malformed keys before persistence without echoing secrets', async () => {
+  let calls = 0;
+  const app = createPushRouteTestApp({ subscribe: async () => { calls++; return { id: 'unexpected' }; } });
+  await withServer(app, async (baseUrl) => {
+    for (const body of [
+      { endpoint: 'https://127.0.0.1/private-capability', keys: subscriptionKeys },
+      { endpoint: 'https://push.example.com/private-capability', keys: { ...subscriptionKeys, auth: 'private-secret' } },
+    ]) {
+      const response = await fetch(`${baseUrl}/api/v1/push/subscribe`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      });
+      assert.equal(response.status, 400);
+      const payload = await response.json();
+      assert.equal(payload.error.code, 'push_subscription_invalid');
+      assert.doesNotMatch(JSON.stringify(payload), /private-capability|private-secret/);
+    }
+  });
+  assert.equal(calls, 0);
 });
