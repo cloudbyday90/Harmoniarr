@@ -6,12 +6,20 @@ import { createPushNotificationService } from '../../src/server/push/push-notifi
 
 const keys = { publicKey: 'test-public', privateKey: 'test-private' };
 const contact = 'mailto:fixture@example.invalid';
-const subscription = { id: 'sub-1', endpoint: 'https://push.example.invalid/private-capability', p256dh: 'test-p256dh', auth: 'test-auth' };
+const subscription = { id: 'sub-1', userId: 'user-1', registrationToken: 'e4e7be1c-1fb1-454c-ae3c-bfbf0e7bca10',
+  endpoint: 'https://push.example.invalid/private-capability', p256dh: 'test-p256dh', auth: 'test-auth' };
+const registrationIdentity = ({ id, userId, endpoint, registrationToken }) => ({ id, userId, endpoint, registrationToken });
+function deferred() {
+  let resolve;
+  const promise = new Promise((done) => { resolve = done; });
+  return { promise, resolve };
+}
 function harness({ store = {}, webPushLib = {}, transport = {}, stderr, nowFn } = {}) {
-  const generated = [], sent = [], logs = [], vapidCalls = [];
+  const generated = [], sent = [], logs = [], vapidCalls = [], invalidated = [];
   const service = createPushNotificationService({ nowFn, vapidKeys: keys, vapidContact: contact,
     pushSubscriptionStore: { upsertSubscription: async (input) => ({ id: 'new-id', ...input }),
-      deleteSubscription: async () => {}, deleteSubscriptionByEndpoint: async () => {},
+      deleteSubscription: async () => {},
+      invalidateSubscriptionRegistration: async (identity) => { invalidated.push(identity); return true; },
       listSubscriptionsForUser: async () => [subscription], ...store },
     webPushLib: { setVapidDetails: (...args) => vapidCalls.push(args),
       generateRequestDetails: (...args) => { generated.push(args); return { endpoint: args[0].endpoint,
@@ -19,7 +27,7 @@ function harness({ store = {}, webPushLib = {}, transport = {}, stderr, nowFn } 
     pushHttpTransport: { sendRequest: async (input) => { sent.push(input); return { statusCode: 201, headers: {} }; }, ...transport },
     stderr: stderr ?? { write: (line) => logs.push(line) },
   });
-  return { service, generated, sent, logs, vapidCalls };
+  return { service, generated, sent, logs, vapidCalls, invalidated };
 }
 
 test('push service registers VAPID details and returns its public key', () => {
@@ -78,28 +86,144 @@ test('user delivery aggregates empty and multiple subscription sets', async () =
   assert.equal(multiple.sent.length, 2);
 });
 
-for (const statusCode of [404, 410, 412]) {
-  test(`HTTP ${statusCode} permanently expires delivery and removes the invalid subscription`, async () => {
-    const removed = [];
-    const context = harness({ store: { deleteSubscriptionByEndpoint: async (endpoint) => removed.push(endpoint) },
-      transport: { sendRequest: async () => ({ statusCode, headers: {} }) } });
+for (const statusCode of [404, 410]) {
+  test(`HTTP ${statusCode} expires the original attempt and conditionally invalidates its registration`, async () => {
+    const context = harness({ transport: { sendRequest: async () => ({ statusCode, headers: {} }) } });
     assert.deepEqual(await context.service.sendNotificationToSubscription({ subscription, payload: {} }),
       { status: 'expired', statusCode, retryable: false, retryAt: null });
     await nextTurn();
-    assert.deepEqual(removed, [subscription.endpoint]);
+    assert.deepEqual(context.invalidated, [registrationIdentity(subscription)]);
+    assert.equal(Object.isFrozen(context.invalidated[0]), true);
     assert.deepEqual(context.logs, []);
   });
 }
 
-for (const statusCode of [408, 425, 429, 500, 502, 503, 504, 301, 400, 401, 403]) {
-  test(`HTTP ${statusCode} keeps the existing retry classification without provider diagnostics`, async () => {
+for (const statusCode of [408, 425, 429, 500, 502, 503, 504, 301, 400, 401, 403, 412]) {
+  test(`HTTP ${statusCode} classifies delivery failure without invalidating the registration or exposing provider diagnostics`, async () => {
     const context = harness({ transport: { sendRequest: async () => ({ statusCode,
       headers: { location: subscription.endpoint, 'private-provider-message': 'secret' } }) } });
     assert.deepEqual(await context.service.sendNotificationToSubscription({ subscription, payload: {} }),
       { status: 'failed', statusCode, retryable: [408, 425, 429, 500, 502, 503, 504].includes(statusCode), retryAt: null });
     assert.deepEqual(context.logs, ['[harmoniarr-push] Push delivery failed.\n']);
+    assert.deepEqual(context.invalidated, [], 'only HTTP 404/410 authorizes registration cleanup');
   });
 }
+
+test('expired cleanup retains the frozen original identity when the caller changes its row during transport', async () => {
+  const pending = deferred();
+  const mutableSubscription = { ...subscription };
+  const originalIdentity = registrationIdentity(mutableSubscription);
+  let sentEndpoint;
+  const context = harness({ transport: { sendRequest: (input) => {
+    sentEndpoint = input.requestDetails.endpoint;
+    return pending.promise;
+  } } });
+  const delivery = context.service.sendNotificationToSubscription({ subscription: mutableSubscription, payload: {} });
+  Object.assign(mutableSubscription, { id: 'replacement-id', userId: 'replacement-owner',
+    endpoint: 'https://push.example.invalid/replacement-endpoint', registrationToken: 'cd55cb14-3dda-405f-bf2f-56efef9581f8',
+    p256dh: 'replacement-key', auth: 'replacement-auth' });
+  pending.resolve({ statusCode: 410 });
+  assert.equal((await delivery).status, 'expired');
+  await nextTurn();
+  assert.equal(sentEndpoint, originalIdentity.endpoint);
+  assert.deepEqual(context.invalidated, [originalIdentity]);
+  assert.equal(Object.isFrozen(context.invalidated[0]), true);
+  assert.equal(Object.hasOwn(context.invalidated[0], 'p256dh'), false);
+  assert.equal(Object.hasOwn(context.invalidated[0], 'auth'), false);
+});
+
+test('registration identity and endpoint are captured before request generation can change the caller row', async () => {
+  const mutableSubscription = { ...subscription };
+  const originalIdentity = registrationIdentity(mutableSubscription);
+  const context = harness({ webPushLib: { generateRequestDetails: (input) => {
+    mutableSubscription.endpoint = 'https://push.example.invalid/replacement-endpoint';
+    mutableSubscription.registrationToken = 'cd55cb14-3dda-405f-bf2f-56efef9581f8';
+    return { endpoint: input.endpoint, method: 'POST', body: Buffer.from('fixture'), headers: {} };
+  } }, transport: { sendRequest: async (input) => {
+    assert.equal(input.requestDetails.endpoint, originalIdentity.endpoint);
+    return { statusCode: 404 };
+  } } });
+  assert.equal((await context.service.sendNotificationToSubscription({ subscription: mutableSubscription, payload: {} })).status, 'expired');
+  await nextTurn();
+  assert.deepEqual(context.invalidated, [originalIdentity]);
+});
+
+test('stale cleanup is benign and does not invalidate a refreshed registration with identical keys', async () => {
+  const pending = deferred();
+  const active = { ...subscription, invalidated: false };
+  const identities = [];
+  const context = harness({ transport: { sendRequest: () => pending.promise },
+    store: { invalidateSubscriptionRegistration: async (identity) => {
+      identities.push(identity);
+      if (identity.registrationToken !== active.registrationToken) return false;
+      active.invalidated = true;
+      return true;
+    } } });
+  const delivery = context.service.sendNotificationToSubscription({ subscription: { ...active }, payload: {} });
+  active.registrationToken = 'cd55cb14-3dda-405f-bf2f-56efef9581f8';
+  pending.resolve({ statusCode: 410 });
+  assert.equal((await delivery).status, 'expired');
+  await nextTurn();
+  assert.equal(active.invalidated, false);
+  assert.deepEqual(identities, [registrationIdentity(subscription)]);
+  assert.deepEqual(context.logs, []);
+});
+
+test('incomplete or non-string registration identity cannot invoke cleanup or a legacy endpoint fallback', async () => {
+  let legacyCalls = 0;
+  const context = harness({ store: { deleteSubscriptionByEndpoint: () => { legacyCalls++; } },
+    transport: { sendRequest: async () => ({ statusCode: 410 }) } });
+  for (const field of ['id', 'userId', 'endpoint', 'registrationToken']) {
+    for (const value of [undefined, null, '', {}, 42]) {
+      assert.equal((await context.service.sendNotificationToSubscription({ subscription: { ...subscription, [field]: value }, payload: {} })).status, 'expired');
+    }
+  }
+  await nextTurn();
+  assert.deepEqual(context.invalidated, []);
+  assert.equal(legacyCalls, 0);
+  assert.deepEqual(context.logs, []);
+});
+
+test('missing conditional cleanup implementation never falls back to endpoint-only invalidation', async () => {
+  let legacyCalls = 0;
+  const context = harness({ store: { invalidateSubscriptionRegistration: undefined,
+    deleteSubscriptionByEndpoint: () => { legacyCalls++; } }, transport: { sendRequest: async () => ({ statusCode: 410 }) } });
+  assert.equal((await context.service.sendNotificationToSubscription({ subscription, payload: {} })).status, 'expired');
+  await nextTurn();
+  assert.equal(legacyCalls, 0);
+  assert.deepEqual(context.logs, ['[harmoniarr-push] Expired subscription invalidation failed.\n']);
+});
+
+test('expired delivery finishes independently of cleanup and legacy removed counts attempts rather than mutations', async () => {
+  const cleanup = deferred();
+  let cleanupStarted = false;
+  let cleanupFinished = false;
+  const context = harness({ store: { invalidateSubscriptionRegistration: async () => {
+    cleanupStarted = true;
+    await cleanup.promise;
+    cleanupFinished = true;
+    return false;
+  } }, transport: { sendRequest: async () => ({ statusCode: 404 }) } });
+  assert.deepEqual(await context.service.sendNotificationToUser({ userId: subscription.userId, payload: {} }), { sent: 0, failed: 0, removed: 1 });
+  assert.equal(cleanupStarted, true);
+  assert.equal(cleanupFinished, false);
+  cleanup.resolve();
+  await nextTurn();
+  assert.equal(cleanupFinished, true);
+  assert.deepEqual(context.logs, []);
+});
+
+test('synchronous and rejected cleanup failures preserve the result and expose only fixed diagnostics', async () => {
+  for (const invalidateSubscriptionRegistration of [
+    () => { throw new Error(`private ${subscription.endpoint} ${subscription.registrationToken} ${subscription.auth}`); },
+    async () => { throw new Error(`private ${subscription.endpoint} ${subscription.registrationToken} ${subscription.p256dh}`); },
+  ]) {
+    const context = harness({ store: { invalidateSubscriptionRegistration }, transport: { sendRequest: async () => ({ statusCode: 410 }) } });
+    assert.equal((await context.service.sendNotificationToSubscription({ subscription, payload: {} })).status, 'expired');
+    await nextTurn();
+    assert.deepEqual(context.logs, ['[harmoniarr-push] Expired subscription invalidation failed.\n']);
+  }
+});
 
 test('network and generation errors are redacted and do not prevent another subscription delivery', async () => {
   let calls = 0;
@@ -115,7 +239,7 @@ test('network and generation errors are redacted and do not prevent another subs
 
 test('failed invalidation and throwing or rejecting diagnostics cannot alter delivery results', async () => {
   for (const write of [() => { throw new Error('sink'); }, () => Promise.reject(new Error('sink'))]) {
-    const { service } = harness({ stderr: { write }, store: { deleteSubscriptionByEndpoint: async () => { throw new Error('private storage error'); } },
+    const { service } = harness({ stderr: { write }, store: { invalidateSubscriptionRegistration: async () => { throw new Error('private storage error'); } },
       transport: { sendRequest: async () => ({ statusCode: 410 }) } });
     assert.equal((await service.sendNotificationToSubscription({ subscription, payload: {} })).status, 'expired');
     await nextTurn();

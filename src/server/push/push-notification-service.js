@@ -31,10 +31,9 @@ const DEFAULT_TTL_SECONDS = 86400;
 
 /**
  * HTTP status codes returned by push services that signal an expired or
- * invalid subscription. On receiving these the subscription should be removed.
+ * invalid subscription. Only the unchanged original registration can be invalidated.
  */
 const EXPIRED_SUBSCRIPTION_STATUSES = new Set([404, 410]);
-const INVALID_SUBSCRIPTION_STATUSES = new Set([404, 410, 412]);
 const RETRYABLE_DELIVERY_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
 
 function normalizeHeaders(headers) {
@@ -126,12 +125,16 @@ export function createPushNotificationService({
     } catch { /* Diagnostics cannot affect delivery classification. */ }
   }
 
-  function failedDelivery({ statusCode = null, headers = {} }, subscription) {
+  function failedDelivery({ statusCode = null, headers = {} }, registration) {
     const validStatus = Number.isInteger(statusCode) && statusCode >= 100 && statusCode <= 599 ? statusCode : null;
-    if (INVALID_SUBSCRIPTION_STATUSES.has(validStatus)) {
-      Promise.resolve().then(() => pushSubscriptionStore.deleteSubscriptionByEndpoint(subscription.endpoint)).catch(() => {
-        reportFailure('[harmoniarr-push] Expired subscription invalidation failed.\n');
-      });
+    if (EXPIRED_SUBSCRIPTION_STATUSES.has(validStatus)) {
+      if (registration && Object.values(registration).every((value) => typeof value === 'string' && value.length > 0)) {
+        // A false CAS result means this registration changed or already expired.
+        // Cleanup stays outside the transport budget and never falls back to endpoint-only invalidation.
+        Promise.resolve().then(() => pushSubscriptionStore.invalidateSubscriptionRegistration(registration)).catch(() => {
+          reportFailure('[harmoniarr-push] Expired subscription invalidation failed.\n');
+        });
+      }
       return { retryAt: null, retryable: false, status: 'expired', statusCode: validStatus };
     }
     reportFailure('[harmoniarr-push] Push delivery failed.\n');
@@ -164,18 +167,22 @@ export function createPushNotificationService({
       throw new RangeError('Push transport timeout must be greater than zero and at most 15000 milliseconds');
     }
     const deadlineAt = nowFn() + timeoutMs;
+    let registration = null;
     try {
+      // Capture primitive identity before preparation or I/O can mutate the caller's row.
+      registration = Object.freeze({ id: subscription.id, userId: subscription.userId,
+        endpoint: subscription.endpoint, registrationToken: subscription.registrationToken });
       const requestDetails = webPushLib.generateRequestDetails(
-        buildWebPushSubscription(subscription),
+        buildWebPushSubscription({ endpoint: registration.endpoint, p256dh: subscription.p256dh, auth: subscription.auth }),
         serialisePayload(payload),
         { TTL: ttl, vapidDetails: { subject: vapidContact, publicKey: vapidKeys.publicKey, privateKey: vapidKeys.privateKey } },
       );
       if (nowFn() >= deadlineAt) throw createPushTransportError('timeout');
       const response = await pushHttpTransport.sendRequest({ requestDetails, deadlineAt });
       if (Number.isInteger(response?.statusCode) && response.statusCode >= 200 && response.statusCode < 300) return { status: 'sent' };
-      return failedDelivery(response ?? {}, subscription);
+      return failedDelivery(response ?? {}, registration);
     } catch (error) {
-      return failedDelivery({ statusCode: error?.statusCode ?? error?.status, headers: error?.headers }, subscription);
+      return failedDelivery({ statusCode: error?.statusCode ?? error?.status, headers: error?.headers }, registration);
     }
   }
 
@@ -208,8 +215,9 @@ export function createPushNotificationService({
   /**
    * Sends a push notification to every active subscription for a user.
    *
-   * Delivery is best-effort: individual failures are caught and logged. Expired
-   * subscriptions (HTTP 404/410) are removed automatically.
+   * Delivery is best-effort: individual failures are caught and logged. HTTP
+   * 404/410 schedules conditional invalidation of the original registration.
+   * The legacy `removed` counter counts expired attempts, not confirmed database mutations.
    *
    * @param {object} params
    * @param {string} params.userId

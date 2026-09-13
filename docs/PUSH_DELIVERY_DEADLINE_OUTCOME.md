@@ -33,3 +33,5 @@ No database lock spans HTTP I/O. Process suspension, ambiguous provider acceptan
 Make expired-subscription cleanup conditional on the original subscription identity, owner, and key revision. The current endpoint-only invalidation can disable a subscription that was reassigned or refreshed while an older request was in flight and later returned an expired response. Test that race using controlled in-flight delivery and preserve the new registration.
 
 See the separate [design, official September 2026 sources, alternatives, and PR disposition](PUSH_DELIVERY_DEADLINE_DESIGN.md).
+
+The conditional cleanup follow-up is now implemented; see [subscription invalidation outcome](PUSH_SUBSCRIPTION_INVALIDATION_OUTCOME.md) for its separate design, evidence, and next release item.

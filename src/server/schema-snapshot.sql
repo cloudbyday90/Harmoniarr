@@ -7294,3 +7294,43 @@ SET migration_key = EXCLUDED.migration_key,
     error_message = NULL,
     application_version = NULL,
     updated_at = NOW();
+
+-- Migration: 20260913_012028_add_push_subscription_registration_tokens.sql
+-- Checksum: 1d0c944b0765acf8c4386c78187714bfc845f292ac6d1d9a51206c4d1a22558a
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+-- This program is free software: licensed under GPL-3.0
+-- See LICENSE file for details.
+
+BEGIN;
+
+ALTER TABLE user_push_subscriptions
+  ADD COLUMN registration_token UUID NOT NULL DEFAULT harmoniarr_generate_uuid();
+
+COMMIT;
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260913_012028',
+  '20260913_012028_add_push_subscription_registration_tokens.sql',
+  'add_push_subscription_registration_tokens',
+  '1d0c944b0765acf8c4386c78187714bfc845f292ac6d1d9a51206c4d1a22558a',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
