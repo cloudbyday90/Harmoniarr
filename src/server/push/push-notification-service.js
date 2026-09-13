@@ -17,8 +17,11 @@
  */
 
 import webPush from 'web-push';
+import { performance } from 'node:perf_hooks';
 import { createPushSubscriptionStore } from './push-subscription-store.js';
 import { resolveOrGenerateVapidKeys, resolveVapidContactFromEnv } from './vapid-keys.js';
+import { createPushHttpTransport, createPushTransportError } from './push-http-transport.js';
+import { PUSH_TRANSPORT_TIMEOUT_MS } from './push-delivery-budget.js';
 
 /**
  * Default TTL for push messages in seconds (24 hours).
@@ -45,22 +48,25 @@ function normalizeHeaders(headers) {
 }
 
 function parseRetryAfterHeader(value, now = new Date()) {
-  if (typeof value !== 'string' || value.trim().length === 0) {
+  if (typeof value !== 'string' || value.length > 256 || value.trim().length === 0) {
     return null;
   }
 
   const trimmed = value.trim();
-  const seconds = Number.parseInt(trimmed, 10);
-  if (Number.isInteger(seconds) && seconds >= 0) {
-    return new Date(now.getTime() + (seconds * 1000)).toISOString();
+  if (/^\d+$/.test(trimmed)) {
+    const seconds = Number(trimmed);
+    const next = new Date(now.getTime() + seconds * 1000);
+    return Number.isSafeInteger(seconds) && Number.isFinite(next.getTime()) ? next.toISOString() : null;
   }
-
+  // HTTP-date permits IMF-fixdate and the two obsolete HTTP date forms.
+  if (!/^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)(?:day)?(?:,| )/.test(trimmed)
+    && !/^(?:Tuesday|Wednesday|Thursday|Saturday),/.test(trimmed)) return null;
   const retryAt = new Date(trimmed);
-  return Number.isNaN(retryAt.getTime()) ? null : retryAt.toISOString();
+  return Number.isFinite(retryAt.getTime()) && retryAt.getTime() > now.getTime() ? retryAt.toISOString() : null;
 }
 
 /**
- * Builds the `PushSubscription`-shaped object that `web-push.sendNotification`
+ * Builds the `PushSubscription`-shaped object that `web-push.generateRequestDetails`
  * expects from a stored subscription row.
  *
  * @param {object} subscription - Row from `push-subscription-store`.
@@ -102,6 +108,8 @@ function serialisePayload(payload) {
  * @returns {{ getVapidPublicKey, subscribe, unsubscribe, sendNotificationToSubscription, sendNotificationToUser }}
  */
 export function createPushNotificationService({
+  nowFn = () => performance.now(),
+  pushHttpTransport = createPushHttpTransport({ nowFn }),
   pushSubscriptionStore = createPushSubscriptionStore(),
   vapidKeys = resolveOrGenerateVapidKeys(),
   vapidContact = resolveVapidContactFromEnv(),
@@ -110,6 +118,26 @@ export function createPushNotificationService({
 } = {}) {
   // Configure VAPID details once at construction time.
   webPushLib.setVapidDetails(vapidContact, vapidKeys.publicKey, vapidKeys.privateKey);
+
+  function reportFailure(message) {
+    try {
+      const result = stderr.write(message);
+      if (typeof result?.catch === 'function') result.catch(() => {});
+    } catch { /* Diagnostics cannot affect delivery classification. */ }
+  }
+
+  function failedDelivery({ statusCode = null, headers = {} }, subscription) {
+    const validStatus = Number.isInteger(statusCode) && statusCode >= 100 && statusCode <= 599 ? statusCode : null;
+    if (INVALID_SUBSCRIPTION_STATUSES.has(validStatus)) {
+      Promise.resolve().then(() => pushSubscriptionStore.deleteSubscriptionByEndpoint(subscription.endpoint)).catch(() => {
+        reportFailure('[harmoniarr-push] Expired subscription invalidation failed.\n');
+      });
+      return { retryAt: null, retryable: false, status: 'expired', statusCode: validStatus };
+    }
+    reportFailure('[harmoniarr-push] Push delivery failed.\n');
+    return { retryAt: parseRetryAfterHeader(normalizeHeaders(headers)['retry-after']),
+      retryable: validStatus == null || RETRYABLE_DELIVERY_STATUSES.has(validStatus), status: 'failed', statusCode: validStatus };
+  }
 
   /**
    * Returns the VAPID public key so the client can subscribe using the same
@@ -128,46 +156,26 @@ export function createPushNotificationService({
    * @param {object} params.subscription
    * @param {object} params.payload
    * @param {number} [params.ttl]
-   * @param {string|null} [params.userId]
+   * @param {number} [params.timeoutMs] Whole-operation budget, capped at 15 seconds.
    * @returns {Promise<object>}
    */
-  async function sendNotificationToSubscription({ subscription, payload, ttl = DEFAULT_TTL_SECONDS, userId = null }) {
+  async function sendNotificationToSubscription({ subscription, payload, ttl = DEFAULT_TTL_SECONDS, timeoutMs = PUSH_TRANSPORT_TIMEOUT_MS }) {
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > PUSH_TRANSPORT_TIMEOUT_MS) {
+      throw new RangeError('Push transport timeout must be greater than zero and at most 15000 milliseconds');
+    }
+    const deadlineAt = nowFn() + timeoutMs;
     try {
-      await webPushLib.sendNotification(
+      const requestDetails = webPushLib.generateRequestDetails(
         buildWebPushSubscription(subscription),
         serialisePayload(payload),
-        { TTL: ttl },
+        { TTL: ttl, vapidDetails: { subject: vapidContact, publicKey: vapidKeys.publicKey, privateKey: vapidKeys.privateKey } },
       );
-      return {
-        status: 'sent',
-      };
+      if (nowFn() >= deadlineAt) throw createPushTransportError('timeout');
+      const response = await pushHttpTransport.sendRequest({ requestDetails, deadlineAt });
+      if (Number.isInteger(response?.statusCode) && response.statusCode >= 200 && response.statusCode < 300) return { status: 'sent' };
+      return failedDelivery(response ?? {}, subscription);
     } catch (error) {
-      const statusCode = error?.statusCode ?? error?.status ?? null;
-
-      if (INVALID_SUBSCRIPTION_STATUSES.has(statusCode)) {
-        pushSubscriptionStore.deleteSubscriptionByEndpoint(subscription.endpoint).catch((deleteError) => {
-          stderr.write(
-            `[harmoniarr-push] Failed to remove expired subscription endpoint=${subscription.endpoint}: ${deleteError?.message}\n`,
-          );
-        });
-        return {
-          retryAt: null,
-          retryable: false,
-          status: 'expired',
-          statusCode,
-        };
-      }
-
-      const headers = normalizeHeaders(error?.headers);
-      stderr.write(
-        `[harmoniarr-push] Push delivery failed for userId=${userId ?? subscription.userId ?? 'unknown'} endpoint=${subscription.endpoint} status=${statusCode ?? 'unknown'}: ${error?.message}\n`,
-      );
-      return {
-        retryAt: parseRetryAfterHeader(headers['retry-after']),
-        retryable: statusCode == null || RETRYABLE_DELIVERY_STATUSES.has(statusCode),
-        status: 'failed',
-        statusCode,
-      };
+      return failedDelivery({ statusCode: error?.statusCode ?? error?.status, headers: error?.headers }, subscription);
     }
   }
 

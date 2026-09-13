@@ -22,16 +22,17 @@ import { createPushSubscriptionStore } from './push-subscription-store.js';
 import { createPushNotificationDeliveryPolicyService } from './push-notification-delivery-policy-service.js';
 import { createPushNotificationDeliveryWorker } from './push-notification-delivery-worker.js';
 
-const DEFAULT_CLAIM_WINDOW_MS = 60000;
+import { PUSH_CLAIM_WINDOW_MS, PUSH_DELIVERY_BATCH_LIMIT, PUSH_TRANSPORT_TIMEOUT_MS, PUSH_COMPLETION_RESERVE_MS } from './push-delivery-budget.js';
 const DEFAULT_COALESCE_WINDOW_MS = 2 * 60 * 1000;
 const DEFAULT_MAX_ATTEMPTS = 3;
 const DEFAULT_RETRY_BASE_MS = 30000;
 
 export function createPushNotificationDispatchService({
-  claimWindowMs = DEFAULT_CLAIM_WINDOW_MS,
+  claimWindowMs = PUSH_CLAIM_WINDOW_MS,
   coalesceWindowMs = DEFAULT_COALESCE_WINDOW_MS,
   maxAttempts = DEFAULT_MAX_ATTEMPTS,
   nowFn = () => new Date(),
+  monotonicNowFn = () => performance.now(),
   pushNotificationDeliveryPolicyService = createPushNotificationDeliveryPolicyService(),
   pushNotificationQueueStore = createPushNotificationQueueStore(),
   pushNotificationService = createPushNotificationService(),
@@ -39,7 +40,10 @@ export function createPushNotificationDispatchService({
   retryBaseMs = DEFAULT_RETRY_BASE_MS,
   stderr = process.stderr,
 } = {}) {
-  const deliveryWorker = createPushNotificationDeliveryWorker({ maxAttempts, nowFn, pushNotificationDeliveryPolicyService,
+  if (!Number.isSafeInteger(claimWindowMs) || claimWindowMs <= PUSH_TRANSPORT_TIMEOUT_MS + PUSH_COMPLETION_RESERVE_MS) {
+    throw new RangeError('Push claim window must exceed the transport and completion budget');
+  }
+  const deliveryWorker = createPushNotificationDeliveryWorker({ maxAttempts, nowFn, monotonicNowFn, pushNotificationDeliveryPolicyService,
     pushNotificationQueueStore, pushNotificationService, pushSubscriptionStore, retryBaseMs, stderr });
 
   async function sendNotificationToUser({
@@ -158,16 +162,19 @@ export function createPushNotificationDispatchService({
     };
   }
 
-  async function deliverPendingNotifications({ limit = 50 } = {}) {
-    const claimedNotifications = await pushNotificationQueueStore.claimPendingNotifications({
-      claimWindowMs,
-      limit,
-    });
-
-    const rows = Array.isArray(claimedNotifications) ? claimedNotifications : [];
-    const summary = { claimedCount: rows.length, claimLostCount: 0, deliveredCount: 0,
+  async function deliverPendingNotifications({ limit = PUSH_DELIVERY_BATCH_LIMIT } = {}) {
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > PUSH_DELIVERY_BATCH_LIMIT) {
+      throw new RangeError('Push delivery limit must be an integer between 1 and 50');
+    }
+    const summary = { claimedCount: 0, claimLostCount: 0, deliveredCount: 0,
       expiredCount: 0, failedCount: 0, retriedCount: 0 };
-    for (const notification of rows) summary[await deliveryWorker.deliverNotification(notification)] += 1;
+    for (let index = 0; index < limit; index += 1) {
+      const rows = await pushNotificationQueueStore.claimPendingNotifications({ claimWindowMs, limit: 1 });
+      if (!Array.isArray(rows) || rows.length > 1) throw new Error('Push queue returned an invalid claim batch');
+      if (rows.length === 0) break;
+      summary.claimedCount += 1;
+      summary[await deliveryWorker.deliverNotification(rows[0])] += 1;
+    }
     return summary;
   }
 

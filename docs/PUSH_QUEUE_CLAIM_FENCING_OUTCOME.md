@@ -34,6 +34,6 @@ Use additive tokens, short conditional store writes, a separate per-row worker, 
 
 This does not make external delivery exactly once. A provider can accept a message before a lease expires or persistence fails, and another attempt may resend it. No database lock spans network I/O. Local queue age, claim renewal, transport cancellation, and a strict lifetime attempt ceiling remain separate concerns.
 
-Next coordinate transport deadlines and claim duration, preferably claiming work only when it is ready to send instead of aging a sequential batch of 50 claims. Keep provider acceptance and browser delivery distinct, and preserve ambiguity when a timed-out request might already have been accepted.
+Follow-up implemented: [push delivery deadlines and scheduling](PUSH_DELIVERY_DEADLINE_OUTCOME.md). The original recommendation was to coordinate transport deadlines and claim duration, preferably claiming work only when it is ready to send instead of aging a sequential batch of 50 claims. Keep provider acceptance and browser delivery distinct, and preserve ambiguity when a timed-out request might already have been accepted.
 
 See the separate [design, official September 2026 sources, alternatives, and PR disposition](PUSH_QUEUE_CLAIM_FENCING_DESIGN.md).

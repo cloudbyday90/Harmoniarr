@@ -5,6 +5,8 @@
  * See LICENSE file for details.
  */
 
+import { PUSH_TRANSPORT_TIMEOUT_MS, PUSH_COMPLETION_RESERVE_MS } from './push-delivery-budget.js';
+
 function hasClaimToken(notification) {
   return typeof notification.claimToken === 'string'
     && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(notification.claimToken);
@@ -12,7 +14,7 @@ function hasClaimToken(notification) {
 
 /** One claimed delivery, with outcome accounting owned by the successful queue update. */
 export function createPushNotificationDeliveryWorker({
-  maxAttempts, nowFn, pushNotificationDeliveryPolicyService, pushNotificationQueueStore,
+  maxAttempts, nowFn, monotonicNowFn = () => performance.now(), pushNotificationDeliveryPolicyService, pushNotificationQueueStore,
   pushNotificationService, pushSubscriptionStore, retryBaseMs, stderr,
 }) {
   function reportQueueFailure() {
@@ -72,19 +74,28 @@ export function createPushNotificationDeliveryWorker({
     if (prepared.subscription) {
       // Use the database's current clock immediately before entering transport.
       // A read failure is infrastructure failure, not proof of a lost claim.
-      let active;
+      let remainingMs;
+      const preflightStarted = monotonicNowFn();
       try {
-        active = await pushNotificationQueueStore.isNotificationClaimActive(notification.id, { claimToken: notification.claimToken });
+        remainingMs = await pushNotificationQueueStore.getNotificationClaimRemainingMs(notification.id, { claimToken: notification.claimToken });
       } catch {
         throw new Error('Notification queue claim could not be verified');
       }
-      if (active !== true) return 'claimLostCount';
-      try {
-        result = await pushNotificationService.sendNotificationToSubscription({ payload: notification.payload,
-          subscription: prepared.subscription, ttl: notification.ttlSeconds, userId: notification.userId });
-      } catch {
-        reportQueueFailure();
-        result = { status: 'failed' };
+      if (remainingMs === null) return 'claimLostCount';
+      if (typeof remainingMs !== 'number' || !Number.isFinite(remainingMs)) {
+        throw new Error('Notification queue claim could not be verified');
+      }
+      const usableMs = remainingMs - Math.max(0, monotonicNowFn() - preflightStarted);
+      if (usableMs < PUSH_TRANSPORT_TIMEOUT_MS + PUSH_COMPLETION_RESERVE_MS) {
+        result = { status: 'failed', retryable: true };
+      } else {
+        try {
+          result = await pushNotificationService.sendNotificationToSubscription({ payload: notification.payload,
+            subscription: prepared.subscription, timeoutMs: PUSH_TRANSPORT_TIMEOUT_MS, ttl: notification.ttlSeconds, userId: notification.userId });
+        } catch {
+          reportQueueFailure();
+          result = { status: 'failed' };
+        }
       }
     }
     const outcome = getOutcome(result, notification);

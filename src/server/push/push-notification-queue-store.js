@@ -74,6 +74,18 @@ export function createPushNotificationQueueStore({ getPoolFn = getPool } = {}) {
       && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(claimToken);
   }
 
+  async function getNotificationClaimRemainingMs(id, { claimToken } = {}) {
+    if (!validClaimToken(claimToken)) return null;
+    const result = await getPoolFn().query(
+      `SELECT (EXTRACT(EPOCH FROM (next_attempt_at - clock_timestamp())) * 1000)::double precision AS remaining_ms
+       FROM notification_queue
+       WHERE id = $1 AND claim_token = $2::uuid AND status = 'pending'
+         AND next_attempt_at > clock_timestamp()`,
+      [id, claimToken],
+    );
+    return result.rows[0]?.remaining_ms ?? null;
+  }
+
   async function isNotificationClaimActive(id, { claimToken } = {}) {
     if (!validClaimToken(claimToken)) return false;
     const result = await getPoolFn().query(
@@ -230,6 +242,7 @@ export function createPushNotificationQueueStore({ getPoolFn = getPool } = {}) {
     getLatestSentNotificationAt,
     claimPendingNotifications,
     listPendingNotificationsForCoalesce,
+    getNotificationClaimRemainingMs,
     isNotificationClaimActive,
     markNotificationSent,
     markNotificationFailed,

@@ -30,15 +30,25 @@ function createDeliveryPolicyService(getDeliveryAccount = async ({ userId }) => 
 }
 
 function createQueueStore(overrides = {}) {
+  const claimBatch = overrides.claimPendingNotifications ?? (async () => []);
+  let pending = [];
+  let batchLoaded = false;
   return {
-    claimPendingNotifications: async () => [],
     enqueueNotification: async () => ({}),
-    isNotificationClaimActive: async () => true,
+    getNotificationClaimRemainingMs: async () => 60_000,
     listPendingNotificationsForCoalesce: async () => [],
     markNotificationFailed: async () => true,
     markNotificationSent: async () => true,
     updatePendingNotificationPayload: async () => [],
     ...overrides,
+    // Existing scenarios describe one logical tick per array. Expose one row per database claim.
+    claimPendingNotifications: async (input) => {
+      assert.equal(input.limit, 1);
+      if (!batchLoaded) { pending = [...await claimBatch(input)]; batchLoaded = true; }
+      if (pending.length) return [pending.shift()];
+      batchLoaded = false;
+      return [];
+    },
   };
 }
 
@@ -259,13 +269,13 @@ function queuedNotification(overrides = {}) {
 
 function createDeliveryHarness({ claims = [[queuedNotification()]], getDeliveryAccount, policy,
   getSubscriptionById = async (id) => ({ id, userId: 'user-1', endpoint: 'https://push.example.invalid/private' }),
-  send = async () => ({ status: 'sent' }), stderr = { write() {} }, queueOverrides = {},
+  send = async () => ({ status: 'sent' }), stderr = { write() {} }, queueOverrides = {}, monotonicNowFn = () => 0,
 } = {}) {
   const marked = [];
   const sent = [];
   const completionCalls = [];
   const service = createPushNotificationDispatchService({
-    nowFn: () => new Date('2026-09-12T12:00:00.000Z'), stderr,
+    nowFn: () => new Date('2026-09-12T12:00:00.000Z'), stderr, monotonicNowFn,
     pushNotificationDeliveryPolicyService: policy ?? createDeliveryPolicyService(getDeliveryAccount),
     pushSubscriptionStore: createSubscriptionStore({ getSubscriptionById }),
     pushNotificationQueueStore: createQueueStore({
@@ -452,9 +462,9 @@ test('final preflight observes ownership lost during a slow policy read and leav
       if (userId === 'user-1') { resolveReadStarted(); await blockedRead; }
       return { allowed: true, retryable: false };
     } },
-    queueOverrides: { isNotificationClaimActive: async (id, { claimToken }) => {
+    queueOverrides: { getNotificationClaimRemainingMs: async (id, { claimToken }) => {
       calls.push(`preflight:${id}`); assert.equal(claimToken, CLAIM_TOKEN);
-      return id === 'queued-1' ? firstClaimActive : true;
+      return id === 'queued-1' && !firstClaimActive ? null : 60_000;
     } },
   });
   const delivery = harness.deliverPendingNotifications();
@@ -481,8 +491,8 @@ test('every transport outcome counts only a strict true completion and passes th
       const harness = createDeliveryHarness({ claims: [[queuedNotification({ claimToken: token })]],
         send: async () => transportResult,
         queueOverrides: {
-          isNotificationClaimActive: async (id, options) => {
-            assert.equal(id, 'queued-1'); assert.deepEqual(options, { claimToken: token }); return true;
+          getNotificationClaimRemainingMs: async (id, options) => {
+            assert.equal(id, 'queued-1'); assert.deepEqual(options, { claimToken: token }); return 60_000;
           },
           markNotificationSent: async (id, options) => { writes.push({ id, ...options, sent: true }); return persisted; },
           markNotificationFailed: async (id, options) => { writes.push({ id, ...options }); return persisted; },
@@ -501,7 +511,7 @@ test('suppression and unavailable-policy retries also lose cleanly when conditio
     const writes = [];
     const harness = createDeliveryHarness({ policy: { getDeliveryDecision: async () => decision },
       queueOverrides: {
-        isNotificationClaimActive: async () => { assert.fail('no transport preflight is needed for a suppressed send'); },
+        getNotificationClaimRemainingMs: async () => { assert.fail('no transport preflight is needed for a suppressed send'); },
         markNotificationFailed: async (id, options) => { writes.push({ id, ...options }); return false; },
       },
     });
@@ -528,7 +538,7 @@ test('an ambiguous sent completion failure never issues a second failure update 
 
 test('preflight database outages stop before network and do not manufacture lost-claim or failed-completion outcomes', async () => {
   const harness = createDeliveryHarness({ queueOverrides: {
-    isNotificationClaimActive: async () => { throw new Error('private database connection state'); },
+    getNotificationClaimRemainingMs: async () => { throw new Error('private database connection state'); },
     markNotificationFailed: async () => { assert.fail('a claim read outage cannot authorize an unrelated status write'); },
   } });
   await assert.rejects(harness.deliverPendingNotifications(), (error) => {
@@ -586,4 +596,55 @@ test('partially successful coalescing counts actual rows and enqueues only once 
     coalesceKey: 'same-release', payload: { title: 'Newest message' } }),
   { failed: 0, queued: 2, removed: 0, sent: 0, updated: 2 });
   assert.deepEqual(enqueued.map((row) => row.subscriptionId).sort(), ['sub-1', 'sub-3']);
+});
+
+
+test('insufficient remaining lease budget defers without network and uses bounded existing retries', async () => {
+  for (const attempts of [1, 3]) {
+    const harness = createDeliveryHarness({ claims: [[queuedNotification({ attempts })]],
+      queueOverrides: { getNotificationClaimRemainingMs: async () => 19_999 } });
+    const result = await harness.deliverPendingNotifications();
+    assert.equal(attempts === 1 ? result.retriedCount : result.failedCount, 1);
+    assert.equal(harness.sent.length, 0);
+    assert.equal(harness.completionCalls[0].claimToken, CLAIM_TOKEN);
+  }
+  const enough = createDeliveryHarness({ queueOverrides: { getNotificationClaimRemainingMs: async () => 20_000 } });
+  assert.equal((await enough.deliverPendingNotifications()).deliveredCount, 1);
+  assert.equal(enough.sent[0].timeoutMs, 15_000);
+});
+
+test('preflight latency is deducted using monotonic elapsed time before transport', async () => {
+  let clock = 0;
+  const harness = createDeliveryHarness({ monotonicNowFn: () => clock,
+    queueOverrides: { getNotificationClaimRemainingMs: async () => { clock = 11_000; return 30_000; } } });
+  assert.equal((await harness.deliverPendingNotifications()).retriedCount, 1);
+  assert.equal(harness.sent.length, 0);
+});
+
+test('delivery claims one row only after the previous attempt completes and stops at tick limit', async () => {
+  let finish;
+  let started;
+  const waiting = new Promise((resolve) => { finish = resolve; });
+  const entered = new Promise((resolve) => { started = resolve; });
+  let claims = 0;
+  const service = createPushNotificationDispatchService({
+    pushNotificationQueueStore: { ...createQueueStore(), claimPendingNotifications: async ({ limit }) => {
+      assert.equal(limit, 1); claims++; return [queuedNotification({ id: `queued-${claims}` })];
+    } },
+    pushSubscriptionStore: createSubscriptionStore({ getSubscriptionById: async (id) => ({ id, userId: 'user-1' }) }),
+    pushNotificationDeliveryPolicyService: createDeliveryPolicyService(),
+    pushNotificationService: createPushService({ sendNotificationToSubscription: async () => {
+      if (claims === 1) { started(); await waiting; } return { status: 'sent' };
+    } }),
+  });
+  const delivery = service.deliverPendingNotifications({ limit: 2 });
+  await entered;
+  assert.equal(claims, 1, 'Later work must remain unclaimed while transport is pending');
+  finish();
+  assert.equal((await delivery).deliveredCount, 2);
+  assert.equal(claims, 2);
+  for (const limit of [0, -1, 1.2, 51, Infinity]) {
+    await assert.rejects(service.deliverPendingNotifications({ limit }), /limit must be an integer/);
+  }
+  assert.equal(claims, 2);
 });
