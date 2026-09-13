@@ -1041,3 +1041,20 @@ test('strict smoke scenarios return cleanup proof only after actual owned worksp
     await assert.rejects(stat(workspaceRoot), { code: 'ENOENT' });
   }
 });
+
+
+test('fresh continuity seeding follows admin bootstrap and precedes backup and restore', async () => {
+  const api = createSmokeApiFetchStub();
+  let checked = false;
+  await validateDockerFreshInstall({ ...createHookTestOptions({ fetchFn: api.fetchFn }),
+    verifyBackupRestoreFlow: true,
+    verifyRuntimeFn: async ({ phase }) => {
+      assert.equal(phase, 'fresh-install');
+      assert.ok(api.calls.some((call) => call.method === 'POST' && call.path === '/api/v1/bootstrap/admin'));
+      assert.equal(api.calls.some((call) => call.path.includes('/backup')), false);
+      checked = true;
+      return { checked: true };
+    },
+  });
+  assert.equal(checked, true);
+});

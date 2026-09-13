@@ -5,14 +5,15 @@
  * See LICENSE file for details.
  */
 
+import { candidateNotificationColumns, candidateNotificationConstraints } from '../../scripts/docker-candidate-notification-continuity.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { candidatePaginationMigration, createCandidateSchemaChecks } from '../../scripts/docker-candidate-schema-checks.js';
+import { candidateNotificationMigration, candidateIndexDefinitions, createCandidateSchemaChecks } from '../../scripts/docker-candidate-schema-checks.js';
 
 const composeArgs = ['compose', '-f', 'isolated-compose.yaml', '-p', 'candidate-schema-test'];
 const firstMigration = '20260901_000001_baseline.sql';
 const dates = { created_at: '2026-09-11T00:00:00.000Z', updated_at: '2026-09-11T00:00:00.000Z' };
-const indexNames = ['library_wanted_releases_created_id_idx', 'library_wanted_releases_user_created_id_idx'];
+const indexNames = Object.keys(candidateIndexDefinitions);
 
 function createPackagedCommandFixture({ candidate = false } = {}) {
   const calls = [];
@@ -43,7 +44,7 @@ function createPackagedCommandFixture({ candidate = false } = {}) {
       savedFixture = payload.fixture;
     }
     if (payload.fixture) assert.deepEqual(payload.fixture, savedFixture);
-    const filenames = [firstMigration, ...(candidate ? [candidatePaginationMigration] : [])];
+    const filenames = [firstMigration, ...(candidate ? [candidateNotificationMigration] : [])];
     const manifest = filenames.map((filename, index) => ({ filename, migrationKey: filename.slice(0, 15), checksum: String(index + 1).repeat(64) }));
     const ledger = manifest.map((row, index) => ({ ...row, id: `10000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`, status: 'applied' }));
     const fixture = payload.fixture;
@@ -55,8 +56,27 @@ function createPackagedCommandFixture({ candidate = false } = {}) {
         request_kind: 'release', request_state: 'needs_review', artist_name: 'Candidate continuity artist',
         release_title: 'Candidate continuity release', normalized_query: `candidate-continuity-${fixture.requestId}`,
         notes: 'Generated packaged upgrade continuity fixture', evidence: { fixture: 'docker-candidate-continuity', version: 1 }, ...dates } : null,
-      indexes: candidate ? indexNames.map((name, index) => ({ name, tableName: 'library_wanted_releases', valid: true, ready: true,
-        definition: `CREATE INDEX ${name} ON public.library_wanted_releases USING btree (${index ? 'app_user_id, ' : ''}created_at DESC, id DESC)` })) : [],
+      indexes: candidate ? indexNames.map((name) => ({ name, tableName: / ON public\.([a-z_]+)/.exec(candidateIndexDefinitions[name])[1], valid: true, ready: true,
+        definition: candidateIndexDefinitions[name] })) : [],
+      notificationSchema: { columns: candidate ? structuredClone(candidateNotificationColumns) : [], constraints: candidate ? structuredClone(candidateNotificationConstraints) : [] },
+      notificationContinuity: {
+        columns: { registrationToken: candidate, claimToken: candidate, expiresAt: candidate, terminalAt: candidate },
+        observedAt: '2026-09-12T00:00:00.000Z',
+        subscription: { id: fixture.subscriptionId, user_id: fixture.userId,
+          endpoint_hash: 'a'.repeat(64), p256dh_hash: 'b'.repeat(64), auth_hash: 'c'.repeat(64),
+          user_agent: 'candidate-continuity', created_at: dates.created_at, invalidated_at: dates.created_at,
+          ...(candidate ? { registration_token: '10000000-0000-4000-8000-000000000009' } : {}),
+        },
+        notifications: Object.entries(fixture.notificationIds).map(([status, id]) => ({
+          id, user_id: fixture.userId, subscription_id: fixture.subscriptionId, event_type: 'releaseAdded', coalesce_key: null,
+          payload_hash: 'd'.repeat(64), ttl_seconds: 31536000, status, attempts: 0,
+          created_at: dates.created_at, next_attempt_at: '2027-09-11T00:00:00.000Z',
+          sent_at: status === 'sent' ? dates.created_at : null,
+          expected_expires_at: '2027-09-11T00:00:00.000Z',
+          ...(candidate ? { claim_token: null, expires_at: '2027-09-11T00:00:00.000Z',
+            terminal_at: status === 'pending' ? null : status === 'sent' ? dates.created_at : '2026-09-12T00:00:00.000Z' } : {}),
+        })),
+      },
       identity: { database: 'harmoniarr', username: 'harmoniarr', postgresVersion: '180006' }, nodeVersion: 'v24.19.0',
     };
     return { exitCode: 0, stdout: JSON.stringify(mutate(probe)), stderr: '' };
@@ -77,9 +97,10 @@ test('packaged baseline and upgrade preserve a generated request and immutable o
   runtime.upgrade();
   const upgraded = await checks.checkPhase({ composeArgs, env, phase: 'upgraded' });
   assert.deepEqual(upgraded, {
-    phase: 'upgraded', migrationCount: 2, migrationChecksumsVerified: true, indexesVerified: true, indexCount: 2,
+    phase: 'upgraded', migrationCount: 2, migrationChecksumsVerified: true, indexesVerified: true, indexCount: 6,
     packagedToolsVerified: true, nodeVersion: 'v24.19.0', postgresVersion: 180006, pgDumpVersion: '18.6', pgRestoreVersion: '18.6',
-    continuityVerified: true, requestContinuityVerified: true, continuityRequestCount: 1, migrationsAdded: 1,
+    continuityVerified: true, requestContinuityVerified: true, continuityRequestCount: 1, notificationSchemaVerified: true, notificationContinuityVerified: true,
+    continuityNotificationCount: 4, continuitySubscriptionCount: 1, migrationsAdded: 1,
   });
   assert.equal(runtime.calls.length, 8);
   assert.equal(runtime.calls.every((call) => call.env === env), true);
@@ -98,20 +119,22 @@ test('a patch release upgrade can retain the existing ledger while proving reque
   assert.equal(upgraded.indexesVerified, true);
 });
 
-test('fresh install and restart remain read-only and verify unchanged migration records without creating users', async () => {
+test('fresh install seeds disabled continuity fixtures and restart verifies their unchanged data', async () => {
   const runtime = createPackagedCommandFixture({ candidate: true });
   const checks = createCandidateSchemaChecks();
   const context = { composeArgs, runCommandFn: runtime.runCommandFn };
   const fresh = await checks.checkPhase({ ...context, phase: 'fresh-install' });
   const restart = await checks.checkPhase({ ...context, phase: 'existing-data-restart' });
-  assert.equal(fresh.continuityRequestCount, 0);
+  assert.equal(fresh.continuityRequestCount, 1);
+  assert.equal(fresh.continuityNotificationCount, 4);
   assert.equal(restart.continuityVerified, true);
-  assert.equal(restart.requestContinuityVerified, false);
+  assert.equal(restart.requestContinuityVerified, true);
+  assert.equal(restart.notificationContinuityVerified, true);
   assert.equal(restart.migrationsAdded, 0);
-  for (const call of runtime.calls.filter((entry) => entry.args.includes('--eval'))) {
+  for (const [index, call] of runtime.calls.filter((entry) => entry.args.includes('--eval')).entries()) {
     const payload = JSON.parse(call.args.at(-1));
-    assert.equal(payload.fixture, null);
-    assert.equal(payload.seed, false);
+    assert.ok(payload.fixture.subscriptionId);
+    assert.equal(payload.seed, index === 0);
   }
 });
 
@@ -195,4 +218,64 @@ test('same-major acceptance requires Node 24 and PostgreSQL 18 with patched cand
   runtime.upgrade();
   runtime.mutate((probe) => probe);
   await assert.rejects(checks.checkPhase({ composeArgs, phase: 'upgraded' }), /schema checks failed/);
+});
+
+
+test('notification continuity rejects missing rows, ownership changes, lost hashes, and rewritten lifecycle state', async () => {
+  for (const change of [
+    (state) => { state.notifications.pop(); },
+    (state) => { state.notifications[0].user_id = state.subscription.id; },
+    (state) => { state.notifications[0].subscription_id = state.notifications[0].id; },
+    (state) => { state.notifications[0].payload_hash = 'e'.repeat(64); },
+    (state) => { state.notifications[0].attempts = 1; },
+    (state) => { state.notifications[1].status = 'failed'; },
+    (state) => { state.notifications[0].expires_at = '2030-01-01T00:00:00Z'; },
+    (state) => { state.notifications[2].terminal_at = '2030-01-01T00:00:00Z'; },
+    (state) => { state.subscription.registration_token = '20000000-0000-4000-8000-000000000099'; },
+    (state) => { state.subscription.endpoint_hash = 'e'.repeat(64); },
+    (state) => { state.subscription.p256dh_hash = 'e'.repeat(64); },
+    (state) => { state.subscription.auth_hash = 'e'.repeat(64); },
+    (state) => { state.columns.terminalAt = false; },
+  ]) {
+    const runtime = createPackagedCommandFixture({ candidate: true });
+    const checks = createCandidateSchemaChecks({ runCommandFn: runtime.runCommandFn });
+    await checks.checkPhase({ composeArgs, phase: 'fresh-install' });
+    runtime.mutate((probe) => { change(probe.notificationContinuity); return probe; });
+    await assert.rejects(checks.checkPhase({ composeArgs, phase: 'existing-data-restart' }), { code: 'docker_candidate_schema_check_failed' });
+  }
+});
+
+test('legacy notification upgrade requires expiry backfill, sent timestamps, and a bounded shared terminal baseline', async () => {
+  for (const change of [
+    (state) => { state.notifications[0].expires_at = '2030-01-01T00:00:00Z'; },
+    (state) => { state.notifications[1].terminal_at = state.observedAt; },
+    (state) => { state.notifications[2].terminal_at = '2020-01-01T00:00:00Z'; },
+    (state) => { state.notifications[3].terminal_at = '2030-01-01T00:00:00Z'; },
+    (state) => { delete state.subscription.registration_token; },
+  ]) {
+    const runtime = createPackagedCommandFixture();
+    const checks = createCandidateSchemaChecks({ runCommandFn: runtime.runCommandFn });
+    await checks.checkPhase({ composeArgs, phase: 'baseline' });
+    runtime.upgrade();
+    runtime.mutate((probe) => { change(probe.notificationContinuity); return probe; });
+    await assert.rejects(checks.checkPhase({ composeArgs, phase: 'upgraded' }), { code: 'docker_candidate_schema_check_failed' });
+  }
+});
+
+test('candidate notification schema requires exact column policy, lifecycle constraints, and retention indexes', async () => {
+  for (const change of [
+    (probe) => { probe.notificationSchema.columns[0].isNullable = true; },
+    (probe) => { probe.notificationSchema.columns[0].defaultExpression = null; },
+    (probe) => { probe.notificationSchema.columns[1].dataType = 'text'; },
+    (probe) => { probe.notificationSchema.constraints[0].validated = false; },
+    (probe) => { probe.notificationSchema.constraints[1].definition = 'CHECK (true)'; },
+    (probe) => { probe.notificationSchema.constraints[2].deferrable = true; },
+    (probe) => { probe.indexes = probe.indexes.filter((row) => row.name !== 'notification_queue_terminal_retention_idx'); },
+    (probe) => { probe.indexes.find((row) => row.name === 'user_push_subscriptions_invalidated_pruning_idx').ready = false; },
+  ]) {
+    const runtime = createPackagedCommandFixture({ candidate: true });
+    runtime.mutate((probe) => { change(probe); return probe; });
+    const checks = createCandidateSchemaChecks({ runCommandFn: runtime.runCommandFn });
+    await assert.rejects(checks.checkPhase({ composeArgs, phase: 'fresh-install' }), { code: 'docker_candidate_schema_check_failed' });
+  }
 });

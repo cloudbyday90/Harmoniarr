@@ -24,8 +24,10 @@ function summarizeRuntime(runtime, expectedImage, { continuity = false, candidat
   requireCheck(schema?.migrationChecksumsVerified === true && schema.packagedToolsVerified === true);
   requireCheck(Number.isSafeInteger(schema.migrationCount) && schema.migrationCount > 0);
   requireCheck(Number.isSafeInteger(schema.migrationsAdded) && schema.migrationsAdded >= 0);
-  if (candidate) requireCheck(schema.indexesVerified === true);
-  if (continuity) requireCheck(schema.continuityVerified === true);
+  if (candidate) requireCheck(schema.indexesVerified === true && schema.notificationSchemaVerified === true);
+  requireCheck(schema.continuityNotificationCount === 4 && schema.continuitySubscriptionCount === 1);
+  if (continuity) requireCheck(schema.continuityVerified === true
+    && schema.requestContinuityVerified === true && schema.notificationContinuityVerified === true);
   requireCheck(runtime.healthBody?.pendingMigrations === 0);
   return {
     imageId: image.imageId,
@@ -44,6 +46,10 @@ function summarizeRuntime(runtime, expectedImage, { continuity = false, candidat
     pgRestoreVersion: schema.pgRestoreVersion ?? null,
     continuityVerified: schema.continuityVerified === true,
     requestContinuityVerified: schema.requestContinuityVerified === true,
+    notificationSchemaVerified: schema.notificationSchemaVerified === true,
+    notificationContinuityVerified: schema.notificationContinuityVerified === true,
+    continuityNotificationCount: schema.continuityNotificationCount,
+    continuitySubscriptionCount: schema.continuitySubscriptionCount,
     migrationsAdded: schema.migrationsAdded,
     pendingMigrations: 0,
   };

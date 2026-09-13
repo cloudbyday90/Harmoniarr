@@ -92,3 +92,5 @@ Recommended stack: Node 24 LTS, small native ESM factories, PostgreSQL 18 with i
 The next implementable code slice is **cancellation/reassignment Activity event continuity** from the [pagination findings](MUSIC_QUEUE_PAGINATION_OUTCOME.md). Preserve household privacy: do not add private notes, cancellation reasons, provider URLs, or old/new recipient identities to the household feed by default. Published-image and live-provider acceptance remain release gates alongside that code work.
 
 September 12 follow-up: [request lifecycle Activity](REQUEST_LIFECYCLE_ACTIVITY_OUTCOME.md) restores these two event types with a shared public projection, safe native navigation, and real database/route coverage. Its migration increases the source schema to 99; the immutable image evidence above remains tied to its recorded 98-migration candidate.
+
+September 13 follow-up: [packaged notification continuity](PACKAGED_NOTIFICATION_CONTINUITY_OUTCOME.md) refreshes local immutable runtime acceptance to 104 migrations and verifies generated notification/subscription data across restart and upgrade. Published provenance and baseline acceptance remain separate gates.

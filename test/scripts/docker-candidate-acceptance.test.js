@@ -32,7 +32,10 @@ function acceptanceHarness({ cleanupFailure = false, missingProof = false, migra
     createSchemaChecksFn: () => ({ checkPhase: async ({ phase }) => ({ migrationChecksumsVerified: true,
       migrationCount: phase === 'baseline' ? 97 : 98, indexesVerified: phase !== 'baseline',
       packagedToolsVerified: true, continuityVerified: ['upgraded', 'existing-data-restart'].includes(phase),
-      requestContinuityVerified: phase === 'upgraded', migrationsAdded: phase === 'upgraded' ? migrationsAdded : 0 }) }),
+      requestContinuityVerified: ['upgraded', 'existing-data-restart'].includes(phase),
+      notificationSchemaVerified: phase !== 'baseline',
+      notificationContinuityVerified: ['upgraded', 'existing-data-restart'].includes(phase),
+      continuityNotificationCount: 4, continuitySubscriptionCount: 1, migrationsAdded: phase === 'upgraded' ? migrationsAdded : 0 }) }),
     validateFreshFn: async (settings) => {
       assert.equal(settings.buildImage, false);
       assert.equal(settings.imageRef, candidateImageRef);
@@ -122,4 +125,32 @@ test('candidate CLI reserves a new file, never overwrites old proof and leaves f
     await runDockerCandidateCommand({ args: [...args, '--evidence-path', passedPath], validate: async () => evidence });
     assert.deepEqual(JSON.parse(await readFile(passedPath, 'utf8')), evidence);
   } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+
+test('acceptance rejects missing notification schema, continuity, or fixture counts in each phase', async () => {
+  for (const phase of ['fresh-install', 'existing-data-restart', 'baseline', 'upgraded']) {
+    const mutations = [
+      (schema) => { delete schema.continuityNotificationCount; },
+      (schema) => { schema.continuitySubscriptionCount = 0; },
+    ];
+    if (phase !== 'baseline') mutations.push((schema) => { schema.notificationSchemaVerified = false; });
+    if (['existing-data-restart', 'upgraded'].includes(phase)) {
+      mutations.push((schema) => { schema.notificationContinuityVerified = false; });
+      mutations.push((schema) => { schema.requestContinuityVerified = false; });
+    }
+    for (const mutate of mutations) {
+      const { options } = acceptanceHarness();
+      const factory = options.createSchemaChecksFn;
+      options.createSchemaChecksFn = () => {
+        const checks = factory();
+        return { checkPhase: async (context) => {
+          const schema = await checks.checkPhase(context);
+          if (context.phase === phase) mutate(schema);
+          return schema;
+        } };
+      };
+      await assert.rejects(validateDockerCandidateAcceptance(options), { code: 'candidate_acceptance_failed' });
+    }
+  }
 });

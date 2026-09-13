@@ -5,10 +5,12 @@
  * See LICENSE file for details.
  */
 
+import { runPackagedCandidateNotificationProbe } from './docker-candidate-notification-probe.js';
+
 // This function is serialized into `node --input-type=module --eval` inside the
 // image. Keep its imports and dependencies local: host source is never loaded
 // as the packaged migration manifest or used to connect to PostgreSQL.
-export async function runPackagedCandidateSchemaProbe({ fixture, seed, indexNames }) {
+export async function runPackagedCandidateSchemaProbe({ fixture, seed, indexNames }, notificationProbe = runPackagedCandidateNotificationProbe) {
   let client;
   try {
     const { default: pg } = await import('pg');
@@ -40,6 +42,7 @@ export async function runPackagedCandidateSchemaProbe({ fixture, seed, indexName
     const request = fixture ? (await client.query(`SELECT id, requested_by_user_id,
       ${targetColumn ? 'requested_for_user_id,' : ''} request_kind, request_state, artist_name, release_title,
       normalized_query, notes, evidence, created_at, updated_at FROM media_requests WHERE id = $1`, [fixture.requestId])).rows[0] ?? null : null;
+    const { notificationContinuity, notificationSchema } = await notificationProbe({ client, fixture, seed });
     const indexes = (await client.query(`SELECT index_class.relname AS name, table_class.relname AS "tableName",
       index_state.indisvalid AS valid, index_state.indisready AS ready, pg_get_indexdef(index_class.oid) AS definition
       FROM pg_index index_state JOIN pg_class index_class ON index_class.oid = index_state.indexrelid
@@ -49,11 +52,17 @@ export async function runPackagedCandidateSchemaProbe({ fixture, seed, indexName
     const identity = (await client.query(`SELECT current_database() AS database, current_user AS username,
       current_setting('server_version_num') AS "postgresVersion"`)).rows[0];
     await client.query('COMMIT');
-    process.stdout.write(JSON.stringify({ manifest, ledger, user, request, indexes, identity, nodeVersion: process.version }));
+    process.stdout.write(JSON.stringify({ manifest, ledger, user, request, indexes, identity,
+      notificationContinuity, notificationSchema, nodeVersion: process.version }));
   } catch {
     process.stderr.write('Packaged candidate schema probe failed\n');
     process.exitCode = 1;
   } finally {
     await client?.end().catch(() => {});
   }
+}
+
+export function createPackagedCandidateSchemaProbeSource() {
+  return `const runPackagedCandidateNotificationProbe = (${runPackagedCandidateNotificationProbe.toString()});
+    await (${runPackagedCandidateSchemaProbe.toString()})(JSON.parse(process.argv[1]), runPackagedCandidateNotificationProbe);`;
 }

@@ -1344,9 +1344,6 @@ export async function validateDockerFreshInstall({
       port,
       runCommandFn,
     });
-    if (verifyRuntimeFn) {
-      freshInstall.acceptance = await verifyRuntimeFn({ composeArgs, env, runCommandFn, phase: 'fresh-install' });
-    }
 
     let backupRestoreFlow = null;
     let embeddedPostgresPersistence = null;
@@ -1366,6 +1363,11 @@ export async function validateDockerFreshInstall({
         client: adminClient,
         credentials: smokeAdminCredentials,
       });
+    }
+
+    // Seed continuity fixtures only after the optional first-admin bootstrap.
+    if (verifyRuntimeFn) {
+      freshInstall.acceptance = await verifyRuntimeFn({ composeArgs, env, runCommandFn, phase: 'fresh-install' });
     }
 
     if (verifyBackupRestoreFlow) {

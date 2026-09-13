@@ -5,15 +5,22 @@
  * See LICENSE file for details.
  */
 
+import { verifyNotificationContinuity } from './docker-candidate-notification-continuity.js';
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { runBufferedCommand } from './process-runtime.js';
-import { runPackagedCandidateSchemaProbe } from './docker-candidate-schema-probe.js';
+import { createPackagedCandidateSchemaProbeSource } from './docker-candidate-schema-probe.js';
 
 export const candidatePaginationMigration = '20260911_103324_missing_music_keyset_paging_indexes.sql';
-const paginationIndexes = Object.freeze({
+export const candidateNotificationMigration = '20260913_111021_index_invalidated_push_subscription_pruning.sql';
+export const candidateIndexDefinitions = Object.freeze({
   library_wanted_releases_created_id_idx: 'CREATE INDEX library_wanted_releases_created_id_idx ON public.library_wanted_releases USING btree (created_at DESC, id DESC)',
   library_wanted_releases_user_created_id_idx: 'CREATE INDEX library_wanted_releases_user_created_id_idx ON public.library_wanted_releases USING btree (app_user_id, created_at DESC, id DESC)',
+  notification_queue_pending_expiry_idx: "CREATE INDEX notification_queue_pending_expiry_idx ON public.notification_queue USING btree (expires_at, id) WHERE ((status = 'pending'::text) AND (claim_token IS NULL))",
+  notification_queue_subscription_reference_idx: 'CREATE INDEX notification_queue_subscription_reference_idx ON public.notification_queue USING btree (subscription_id) WHERE (subscription_id IS NOT NULL)',
+  notification_queue_terminal_retention_idx: "CREATE INDEX notification_queue_terminal_retention_idx ON public.notification_queue USING btree (terminal_at, id) WHERE ((status = ANY (ARRAY['sent'::text, 'failed'::text, 'expired'::text])) AND (claim_token IS NULL))",
+  user_push_subscriptions_invalidated_pruning_idx: 'CREATE INDEX user_push_subscriptions_invalidated_pruning_idx ON public.user_push_subscriptions USING btree (invalidated_at, id) WHERE (invalidated_at IS NOT NULL)',
+
 });
 const phases = new Set(['fresh-install', 'existing-data-restart', 'baseline', 'upgraded']);
 const uuidPattern = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
@@ -73,8 +80,8 @@ function toolVersion(stdout, tool) {
 
 export function createCandidateSchemaChecks({
   runCommandFn = runBufferedCommand,
-  expectedMigrationFilename = candidatePaginationMigration,
-  expectedIndexDefinitions = paginationIndexes,
+  expectedMigrationFilename = candidateNotificationMigration,
+  expectedIndexDefinitions = candidateIndexDefinitions,
 } = {}) {
   check(migrationPattern.test(expectedMigrationFilename));
   const indexNames = Object.keys(expectedIndexDefinitions);
@@ -96,8 +103,9 @@ export function createCandidateSchemaChecks({
       check(seed ? !previous : Boolean(previous));
       const composeIdentity = JSON.stringify(composeArgs);
       check(seed || previous.composeIdentity === composeIdentity);
-      const fixture = phase === 'baseline'
-        ? { userId: randomUUID(), requestId: randomUUID(), username: `candidate-${randomUUID()}` }
+      const fixture = seed
+        ? { userId: randomUUID(), requestId: randomUUID(), username: `candidate-${randomUUID()}`, subscriptionId: randomUUID(),
+          notificationIds: Object.fromEntries(['pending', 'sent', 'failed', 'expired'].map((status) => [status, randomUUID()])) }
         : previous?.fixture ?? null;
       const execute = async (args) => {
         const result = await (suppliedRunCommandFn ?? runCommandFn)({ command: 'docker',
@@ -106,11 +114,12 @@ export function createCandidateSchemaChecks({
         check(result.exitCode === 0 && typeof result.stdout === 'string' && result.stdout.length <= 2_000_000);
         return result.stdout;
       };
-      const source = `await (${runPackagedCandidateSchemaProbe.toString()})(JSON.parse(process.argv[1]));`;
+      const source = createPackagedCandidateSchemaProbeSource();
       const probe = JSON.parse(await execute(['node', '--input-type=module', '--eval', source,
-        JSON.stringify({ fixture, seed: phase === 'baseline', indexNames })]));
+        JSON.stringify({ fixture, seed, indexNames })]));
       verifyManifest(probe);
       if (fixture) verifyFixture(probe, fixture);
+      const notificationSchemaVerified = verifyNotificationContinuity({ probe, previous: previous?.probe, fixture, requireCurrent: phase !== 'baseline' });
       check(/^v\d+\.\d+\.\d+$/.test(probe.nodeVersion) && /^\d{6}$/.test(probe.identity?.postgresVersion));
       const postgresVersion = Number(probe.identity.postgresVersion);
       check(Number(probe.nodeVersion.slice(1).split('.')[0]) === platformNodeMajor
@@ -127,7 +136,8 @@ export function createCandidateSchemaChecks({
         check(Array.isArray(probe.indexes) && probe.indexes.length === indexNames.length
           && new Set(probe.indexes.map((index) => index.name)).size === indexNames.length);
         for (const index of probe.indexes) check(index.valid === true && index.ready === true
-          && index.tableName === 'library_wanted_releases' && index.definition === expectedIndexDefinitions[index.name]);
+          && index.tableName === / ON public\.([a-z_]+)/.exec(expectedIndexDefinitions[index.name])?.[1]
+          && index.definition === expectedIndexDefinitions[index.name]);
       }
       const dumpVersion = toolVersion(await execute(['pg_dump', '--version']), 'pg_dump');
       const restoreVersion = toolVersion(await execute(['pg_restore', '--version']), 'pg_restore');
@@ -140,8 +150,9 @@ export function createCandidateSchemaChecks({
         indexesVerified: phase !== 'baseline', indexCount: phase === 'baseline' ? 0 : indexNames.length,
         packagedToolsVerified: true, nodeVersion: probe.nodeVersion, postgresVersion,
         pgDumpVersion: dumpVersion, pgRestoreVersion: restoreVersion,
-        continuityVerified: !seed, requestContinuityVerified: phase === 'upgraded',
-        continuityRequestCount: fixture ? 1 : 0, migrationsAdded: added };
+        continuityVerified: !seed, requestContinuityVerified: !seed,
+        continuityRequestCount: 1, notificationSchemaVerified, notificationContinuityVerified: !seed,
+        continuityNotificationCount: 4, continuitySubscriptionCount: 1, migrationsAdded: added };
     } catch {
       throw Object.assign(new Error('Packaged candidate schema checks failed; no successful schema evidence was produced'),
         { code: 'docker_candidate_schema_check_failed', phase: phases.has(phase) ? phase : 'invalid' });

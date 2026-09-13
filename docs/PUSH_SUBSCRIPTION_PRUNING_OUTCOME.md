@@ -35,3 +35,5 @@ All three open PRs were inspected through GitHub MCP. PRs #23 and #24 propose ac
 ## Next release item
 
 Refresh immutable packaged-image acceptance for the current schema. Extend the existing fresh-install, restart, and upgrade data probe to verify notification/subscription continuity and the new indexes. The prior recorded candidate used 98 migrations; this source change now includes 104. Reuse the existing candidate-validation tooling with isolated generated data. Published provenance and an accepted upgrade baseline require their own evidence; a local image label cannot supply that assurance.
+
+The packaged-image follow-up is complete; see [packaged notification continuity](PACKAGED_NOTIFICATION_CONTINUITY_OUTCOME.md) for the 98-to-104 migration rehearsal and retained notification/subscription evidence.
