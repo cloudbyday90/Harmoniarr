@@ -7431,3 +7431,45 @@ SET migration_key = EXCLUDED.migration_key,
     error_message = NULL,
     application_version = NULL,
     updated_at = NOW();
+
+-- Migration: 20260913_111021_index_invalidated_push_subscription_pruning.sql
+-- Checksum: f01e660c6155ae9aa8f0761f46f1f88dfa3d9c1e9100227886c200bf4be08a82
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+-- This program is free software: licensed under GPL-3.0
+-- See LICENSE file for details.
+
+BEGIN;
+
+CREATE INDEX user_push_subscriptions_invalidated_pruning_idx ON user_push_subscriptions (invalidated_at, id)
+  WHERE invalidated_at IS NOT NULL;
+CREATE INDEX notification_queue_subscription_reference_idx ON notification_queue (subscription_id)
+  WHERE subscription_id IS NOT NULL;
+
+COMMIT;
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260913_111021',
+  '20260913_111021_index_invalidated_push_subscription_pruning.sql',
+  'index_invalidated_push_subscription_pruning',
+  'f01e660c6155ae9aa8f0761f46f1f88dfa3d9c1e9100227886c200bf4be08a82',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();

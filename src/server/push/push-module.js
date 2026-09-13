@@ -22,6 +22,7 @@ import { createPushNotificationService } from './push-notification-service.js';
 import { createPushNotificationHistoryCleanupHeartbeat } from './push-notification-history-cleanup-heartbeat.js';
 import { createPushNotificationQueueStore } from './push-notification-queue-store.js';
 import { createPushNotificationRetentionStore } from './push-notification-retention-store.js';
+import { createPushSubscriptionPruningStore } from './push-subscription-pruning-store.js';
 import { createPushSubscriptionStore } from './push-subscription-store.js';
 import { createPushNotificationDeliveryPolicyStore } from './push-notification-delivery-policy-store.js';
 import { createPushNotificationDeliveryPolicyService } from './push-notification-delivery-policy-service.js';
@@ -43,6 +44,7 @@ export function createPushModule({
   pushNotificationDeliveryPolicyService = createPushNotificationDeliveryPolicyService({ pushNotificationDeliveryPolicyStore }),
   pushNotificationQueueStore = createPushNotificationQueueStore(),
   pushNotificationRetentionStore = createPushNotificationRetentionStore(),
+  pushSubscriptionPruningStore = createPushSubscriptionPruningStore(),
   pushSubscriptionStore = createPushSubscriptionStore(),
   pushNotificationService = createPushNotificationService({ pushSubscriptionStore }),
 } = {}) {
@@ -60,6 +62,7 @@ export function createPushModule({
   const resolvedPushNotificationHistoryCleanupHeartbeat = pushNotificationHistoryCleanupHeartbeat
     ?? createPushNotificationHistoryCleanupHeartbeat({
       deleteTerminalNotificationHistory: pushNotificationRetentionStore.deleteTerminalNotificationHistory,
+      pruneInvalidatedSubscriptions: pushSubscriptionPruningStore.pruneInvalidatedSubscriptions,
     });
 
   return {
@@ -70,6 +73,7 @@ export function createPushModule({
     pushNotificationHistoryCleanupHeartbeat: resolvedPushNotificationHistoryCleanupHeartbeat,
     pushNotificationQueueStore,
     pushNotificationRetentionStore,
+    pushSubscriptionPruningStore,
     pushSubscriptionStore,
     pushNotificationService,
     routeDependencies: {

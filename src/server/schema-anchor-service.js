@@ -102,6 +102,8 @@ export const criticalSchemaAnchors = Object.freeze({
     { table: 'operator_artist_reconciliation_snapshot', constraint: 'operator_artist_reconciliation_snapshot_payload_object_check' },
   ]),
   indexes: Object.freeze([
+    { index: 'user_push_subscriptions_invalidated_pruning_idx' },
+    { index: 'notification_queue_subscription_reference_idx' },
     { index: 'notification_queue_terminal_retention_idx' },
     { index: 'provider_ingest_requests_identity_unique' },
     { index: 'external_collection_items_page_idx' },

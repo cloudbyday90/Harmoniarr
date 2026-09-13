@@ -33,3 +33,5 @@ Full `npm run validate` passed repository policy checks, lint, test hygiene, all
 Prune long-invalidated push subscriptions in bounded batches. Invalidated registrations currently retain endpoint capabilities, authentication material, and user-agent information without a pruning path. Use an explicit age policy, recheck current invalidation and registration identity under locking, and retain any subscription still referenced by notification_queue. The foreign key cascades on deletion, so checking only pending references would bypass terminal-history retention.
 
 The benefit is less unnecessary storage of obsolete subscription material. The cost is careful coordination with re-registration and foreign-key races; prove those cases against PostgreSQL before rollout. Keep this separate from explicit authenticated user unsubscribe behavior.
+
+The subscription-pruning follow-up is now implemented; see [its outcome](PUSH_SUBSCRIPTION_PRUNING_OUTCOME.md) for the concurrency protocol, validation, and next release item.
