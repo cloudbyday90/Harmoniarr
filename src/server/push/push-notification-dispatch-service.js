@@ -21,6 +21,7 @@ import { createPushNotificationService, DEFAULT_TTL_SECONDS } from './push-notif
 import { createPushSubscriptionStore } from './push-subscription-store.js';
 import { createPushNotificationDeliveryPolicyService } from './push-notification-delivery-policy-service.js';
 import { createPushNotificationDeliveryWorker } from './push-notification-delivery-worker.js';
+import { validateQueueTtlSeconds } from './push-queue-ttl-policy.js';
 
 import { PUSH_CLAIM_WINDOW_MS, PUSH_DELIVERY_BATCH_LIMIT, PUSH_TRANSPORT_TIMEOUT_MS, PUSH_COMPLETION_RESERVE_MS } from './push-delivery-budget.js';
 const DEFAULT_COALESCE_WINDOW_MS = 2 * 60 * 1000;
@@ -53,6 +54,7 @@ export function createPushNotificationDispatchService({
     ttl = DEFAULT_TTL_SECONDS,
     userId,
   }) {
+    const ttlSeconds = validateQueueTtlSeconds(ttl);
     const subscriptions = await pushSubscriptionStore.listSubscriptionsForUser(userId);
 
     if (!Array.isArray(subscriptions) || subscriptions.length < 1) {
@@ -64,8 +66,6 @@ export function createPushNotificationDispatchService({
         updated: 0,
       };
     }
-
-    const ttlSeconds = Math.max(1, Number.parseInt(String(ttl ?? DEFAULT_TTL_SECONDS), 10) || DEFAULT_TTL_SECONDS);
 
     if (typeof coalesceKey !== 'string' || coalesceKey.trim().length < 1) {
       await Promise.all(subscriptions.map((subscription) =>

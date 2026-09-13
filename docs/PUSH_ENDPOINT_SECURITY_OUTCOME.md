@@ -31,3 +31,5 @@ The documented local Docker build/up/bootstrap sequence completed with existing 
 Enforce a local queued-notification freshness deadline. Current claims consider pending status and next attempt time; each send passes the full stored provider TTL without checking how long the item waited locally. After extended downtime, stale notifications can still be sent with a fresh provider lifetime.
 
 Define persisted expiry and coalescing semantics, check eligibility using database time before external I/O, and use existing claim-fenced terminal writes. The benefit is preventing obsolete notifications after delays; the cost is explicit expiry policy and migration/test coverage. Keep local queue age distinct from provider TTL and browser display guarantees.
+
+The local freshness follow-up is implemented in the separate [push queue expiry outcome](PUSH_QUEUE_EXPIRY_OUTCOME.md), including its design, validation, and next release item.

@@ -6,6 +6,7 @@
  */
 
 import { PUSH_TRANSPORT_TIMEOUT_MS, PUSH_COMPLETION_RESERVE_MS } from './push-delivery-budget.js';
+import { validateQueueTtlSeconds } from './push-queue-ttl-policy.js';
 
 function hasClaimToken(notification) {
   return typeof notification.claimToken === 'string'
@@ -71,27 +72,37 @@ export function createPushNotificationDeliveryWorker({
     if (!hasClaimToken(notification)) return 'claimLostCount';
     const prepared = await prepareDelivery(notification);
     let result = prepared.result;
-    if (prepared.subscription) {
-      // Use the database's current clock immediately before entering transport.
-      // A read failure is infrastructure failure, not proof of a lost claim.
-      let remainingMs;
-      const preflightStarted = monotonicNowFn();
-      try {
-        remainingMs = await pushNotificationQueueStore.getNotificationClaimRemainingMs(notification.id, { claimToken: notification.claimToken });
-      } catch {
-        throw new Error('Notification queue claim could not be verified');
-      }
-      if (remainingMs === null) return 'claimLostCount';
-      if (typeof remainingMs !== 'number' || !Number.isFinite(remainingMs)) {
-        throw new Error('Notification queue claim could not be verified');
-      }
-      const usableMs = remainingMs - Math.max(0, monotonicNowFn() - preflightStarted);
-      if (usableMs < PUSH_TRANSPORT_TIMEOUT_MS + PUSH_COMPLETION_RESERVE_MS) {
+    // Check every claimed row, including denied/unavailable recipient policies:
+    // expired work must not acquire a new retry lifetime through another failure.
+    let budget;
+    const preflightStarted = monotonicNowFn();
+    try {
+      budget = await pushNotificationQueueStore.getNotificationDeliveryBudget(notification.id, { claimToken: notification.claimToken });
+    } catch {
+      throw new Error('Notification queue delivery budget could not be verified');
+    }
+    if (budget === null) return 'claimLostCount';
+    const elapsedMs = Math.max(0, monotonicNowFn() - preflightStarted);
+    if (typeof budget?.claimRemainingMs !== 'number' || !Number.isFinite(budget.claimRemainingMs)
+      || typeof budget?.freshnessRemainingMs !== 'number' || !Number.isFinite(budget.freshnessRemainingMs)
+      || !Number.isFinite(elapsedMs)) {
+      throw new Error('Notification queue delivery budget could not be verified');
+    }
+    const usableClaimMs = budget.claimRemainingMs - elapsedMs;
+    const usableFreshnessMs = budget.freshnessRemainingMs - elapsedMs;
+    // Reserve one whole provider TTL second after the worst-case network send.
+    // Never turn local expiry into Web Push TTL 0 (immediate-delivery semantics).
+    const timeoutMs = Math.min(PUSH_TRANSPORT_TIMEOUT_MS, Math.floor(usableFreshnessMs) - 1000);
+    if (timeoutMs <= 0) {
+      result = { status: 'expired' };
+    } else if (prepared.subscription) {
+      if (usableClaimMs < PUSH_TRANSPORT_TIMEOUT_MS + PUSH_COMPLETION_RESERVE_MS) {
         result = { status: 'failed', retryable: true };
       } else {
         try {
+          const ttl = Math.min(validateQueueTtlSeconds(notification.ttlSeconds), Math.floor((usableFreshnessMs - timeoutMs) / 1000));
           result = await pushNotificationService.sendNotificationToSubscription({ payload: notification.payload,
-            subscription: prepared.subscription, timeoutMs: PUSH_TRANSPORT_TIMEOUT_MS, ttl: notification.ttlSeconds, userId: notification.userId });
+            subscription: prepared.subscription, timeoutMs, ttl, userId: notification.userId });
         } catch {
           reportQueueFailure();
           result = { status: 'failed' };

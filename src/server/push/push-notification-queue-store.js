@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { validateQueueTtlSeconds } from './push-queue-ttl-policy.js';
 import { getPool } from '../database.js';
 
 function mapNotificationQueueRow(row) {
@@ -25,6 +26,7 @@ function mapNotificationQueueRow(row) {
     coalesceKey: row.coalesce_key ?? null,
     createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
     eventType: row.event_type,
+    expiresAt: row.expires_at instanceof Date ? row.expires_at.toISOString() : row.expires_at ?? null,
     id: row.id,
     nextAttemptAt: row.next_attempt_at instanceof Date ? row.next_attempt_at.toISOString() : row.next_attempt_at,
     payload: row.payload ?? null,
@@ -38,10 +40,11 @@ function mapNotificationQueueRow(row) {
 
 export function createPushNotificationQueueStore({ getPoolFn = getPool } = {}) {
   async function enqueueNotification({ userId, subscriptionId = null, eventType, coalesceKey = null, payload, ttlSeconds }) {
+    validateQueueTtlSeconds(ttlSeconds);
     const pool = getPoolFn();
     const result = await pool.query(
-      `INSERT INTO notification_queue (user_id, subscription_id, event_type, coalesce_key, payload, ttl_seconds, status)
-        VALUES ($1, $2, $3, $4, $5, $6, 'pending')
+      `INSERT INTO notification_queue (user_id, subscription_id, event_type, coalesce_key, payload, ttl_seconds, status, expires_at)
+        VALUES ($1, $2, $3, $4, $5, $6, 'pending', clock_timestamp() + ($6::integer * INTERVAL '1 second'))
         RETURNING *`,
       [userId, subscriptionId, eventType, coalesceKey, JSON.stringify(payload ?? {}), ttlSeconds]
     );
@@ -58,7 +61,8 @@ export function createPushNotificationQueueStore({ getPoolFn = getPool } = {}) {
            next_attempt_at = clock_timestamp() + ($2 * INTERVAL '1 millisecond')
        WHERE id IN (
           SELECT id FROM notification_queue
-          WHERE status = 'pending' AND next_attempt_at <= clock_timestamp()
+          WHERE status = 'pending' AND (next_attempt_at <= clock_timestamp()
+            OR (claim_token IS NULL AND expires_at <= clock_timestamp()))
           ORDER BY next_attempt_at ASC, id ASC
           LIMIT $1
           FOR UPDATE SKIP LOCKED
@@ -72,6 +76,20 @@ export function createPushNotificationQueueStore({ getPoolFn = getPool } = {}) {
   function validClaimToken(claimToken) {
     return typeof claimToken === 'string'
       && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(claimToken);
+  }
+
+  async function getNotificationDeliveryBudget(id, { claimToken } = {}) {
+    if (!validClaimToken(claimToken)) return null;
+    const result = await getPoolFn().query(
+      `WITH current_clock AS MATERIALIZED (SELECT clock_timestamp() AS checked_at)
+       SELECT (EXTRACT(EPOCH FROM (next_attempt_at - checked_at)) * 1000)::double precision AS claim_remaining_ms,
+              (EXTRACT(EPOCH FROM (expires_at - checked_at)) * 1000)::double precision AS freshness_remaining_ms
+       FROM notification_queue CROSS JOIN current_clock
+       WHERE id = $1 AND claim_token = $2::uuid AND status = 'pending' AND next_attempt_at > checked_at`,
+      [id, claimToken],
+    );
+    const row = result.rows[0];
+    return row ? { claimRemainingMs: row.claim_remaining_ms, freshnessRemainingMs: row.freshness_remaining_ms } : null;
   }
 
   async function getNotificationClaimRemainingMs(id, { claimToken } = {}) {
@@ -166,6 +184,7 @@ export function createPushNotificationQueueStore({ getPoolFn = getPool } = {}) {
           AND event_type = $2
           AND coalesce_key = $3
           AND status = 'pending' AND claim_token IS NULL AND attempts = 0
+          AND expires_at > clock_timestamp()
           AND ($4::timestamptz IS NULL OR created_at >= $4::timestamptz)
         ORDER BY created_at DESC`,
       [userId, eventType, coalesceKey, since ?? null],
@@ -183,14 +202,21 @@ export function createPushNotificationQueueStore({ getPoolFn = getPool } = {}) {
       return [];
     }
 
+    validateQueueTtlSeconds(ttlSeconds);
     const pool = getPoolFn();
     const result = await pool.query(
-      `UPDATE notification_queue
-          SET payload = $2::jsonb,
-              ttl_seconds = $3
-        WHERE id = ANY($1::uuid[])
-          AND status = 'pending' AND claim_token IS NULL AND attempts = 0
-        RETURNING *`,
+      `WITH eligible AS MATERIALIZED (
+         SELECT id, expires_at FROM notification_queue
+         WHERE id = ANY($1::uuid[]) AND status = 'pending' AND claim_token IS NULL AND attempts = 0
+         FOR UPDATE
+       )
+       UPDATE notification_queue AS queue
+       SET payload = $2::jsonb, ttl_seconds = $3,
+           expires_at = clock_timestamp() + ($3::integer * INTERVAL '1 second')
+       FROM eligible
+       WHERE queue.id = eligible.id AND queue.status = 'pending' AND queue.claim_token IS NULL AND queue.attempts = 0
+         AND eligible.expires_at > clock_timestamp()
+       RETURNING queue.*`,
       [normalizedIds, JSON.stringify(payload), ttlSeconds],
     );
 
@@ -198,6 +224,7 @@ export function createPushNotificationQueueStore({ getPoolFn = getPool } = {}) {
   }
 
   async function recordSentNotification({ userId, subscriptionId = null, eventType, coalesceKey = null, payload = {}, ttlSeconds }) {
+    validateQueueTtlSeconds(ttlSeconds);
     const pool = getPoolFn();
     const result = await pool.query(
       `
@@ -209,9 +236,10 @@ export function createPushNotificationQueueStore({ getPoolFn = getPool } = {}) {
           payload,
           ttl_seconds,
           status,
-          sent_at
+          sent_at,
+          expires_at
         )
-        VALUES ($1, $2, $3, $4, $5::jsonb, $6, 'sent', NOW())
+        VALUES ($1, $2, $3, $4, $5::jsonb, $6, 'sent', clock_timestamp(), clock_timestamp() + ($6::integer * INTERVAL '1 second'))
         RETURNING *
       `,
       [userId, subscriptionId, eventType, coalesceKey, JSON.stringify(payload), ttlSeconds],
@@ -243,6 +271,7 @@ export function createPushNotificationQueueStore({ getPoolFn = getPool } = {}) {
     claimPendingNotifications,
     listPendingNotificationsForCoalesce,
     getNotificationClaimRemainingMs,
+    getNotificationDeliveryBudget,
     isNotificationClaimActive,
     markNotificationSent,
     markNotificationFailed,

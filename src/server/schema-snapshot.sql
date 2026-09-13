@@ -7334,3 +7334,48 @@ SET migration_key = EXCLUDED.migration_key,
     error_message = NULL,
     application_version = NULL,
     updated_at = NOW();
+
+-- Migration: 20260913_103213_add_push_notification_expiry.sql
+-- Checksum: dcdd829810bb8ba285743b4a412f7e9cdf2bf0c5bbc0f29b3d674cb355d9acaf
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+-- This program is free software: licensed under GPL-3.0
+-- See LICENSE file for details.
+
+BEGIN;
+
+ALTER TABLE notification_queue ADD COLUMN expires_at TIMESTAMPTZ;
+UPDATE notification_queue
+  SET expires_at = created_at + (ttl_seconds * INTERVAL '1 second');
+ALTER TABLE notification_queue ALTER COLUMN expires_at SET NOT NULL;
+
+CREATE INDEX notification_queue_pending_expiry_idx ON notification_queue (expires_at, id)
+  WHERE status = 'pending' AND claim_token IS NULL;
+
+COMMIT;
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260913_103213',
+  '20260913_103213_add_push_notification_expiry.sql',
+  'add_push_notification_expiry',
+  'dcdd829810bb8ba285743b4a412f7e9cdf2bf0c5bbc0f29b3d674cb355d9acaf',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();

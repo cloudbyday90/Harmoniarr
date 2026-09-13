@@ -62,6 +62,7 @@ test('enqueueNotification stringifies payload and maps queue row fields', async 
     coalesceKey: 'releaseAdded:radiohead:kid-a',
     createdAt: '2026-05-22T12:00:00.000Z',
     eventType: 'releaseAdded',
+    expiresAt: null,
     id: 'queue-1',
     nextAttemptAt: '2026-05-22T12:00:00.000Z',
     payload: { title: 'Release added' },
@@ -180,5 +181,22 @@ test('missing or malformed claim tokens cannot perform a queue lookup or complet
     assert.equal(await store.isNotificationClaimActive('queue-1', { claimToken }), false);
     assert.equal(await store.markNotificationSent('queue-1', { claimToken }), false);
     assert.equal(await store.markNotificationFailed('queue-1', { claimToken, failed: true }), false);
+  }
+});
+
+
+test('queue writers reject invalid TTLs before acquiring a database connection', async () => {
+  const store = createPushNotificationQueueStore({ getPoolFn: () => assert.fail('Invalid TTL must not reach PostgreSQL') });
+  for (const ttlSeconds of [undefined, null, 0, -1, 1.5, '60', '60seconds', NaN, Infinity, 2147483648]) {
+    await assert.rejects(store.enqueueNotification({ ttlSeconds }), RangeError);
+    await assert.rejects(store.recordSentNotification({ ttlSeconds }), RangeError);
+    await assert.rejects(store.updatePendingNotificationPayload({ ids: ['queue-1'], ttlSeconds }), RangeError);
+  }
+});
+
+test('delivery budget with invalid claim identity cannot acquire a database connection', async () => {
+  const store = createPushNotificationQueueStore({ getPoolFn: () => assert.fail('Missing claim must not reach PostgreSQL') });
+  for (const claimToken of [undefined, null, '', 'bad-token', 42]) {
+    assert.equal(await store.getNotificationDeliveryBudget('queue-1', { claimToken }), null);
   }
 });
