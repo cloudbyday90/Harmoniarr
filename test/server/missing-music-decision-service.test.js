@@ -98,6 +98,35 @@ test('Missing Music detail exposes Search again only for current stopped states 
   }
 });
 
+test('initial Find matches uses the same eligibility for permission, action filtering and bounded next step', async () => {
+  const initial = {
+    ...createRelease({ appUserId: 'user-1', id: 'decision-initial', statusCode: 'queued_for_search' }),
+    discoveryLinkExists: true,
+    hasPriorDiscoveryCandidates: false,
+    discoveryRequest: { searchMode: 'automatic', requestStatus: 'ready', searchAttemptCount: 0,
+      researchAttemptCount: 0, evidence: {} },
+  };
+  const actorUser = { id: 'user-1', role: 'requester', username: 'listener' };
+  for (const savedIntent of [false, true]) {
+    const release = { ...initial, discoveryInitialSearch: savedIntent
+      ? { wantedReleaseId: initial.id, requestedAt: '2026-08-26T16:00:00.000Z' } : null };
+    const { service } = createService({
+      listWantedReleaseIdentityPage: async () => ({ rows: [{ id: release.id,
+        createdAtKey: '2026-08-26T00:00:00.000000Z' }], hasMore: false }),
+      listWantedReleasesWithMetadata: async () => [release],
+      projectMusicQueueReleaseFn: (value) => ({ ...projectRelease(value),
+        status: { code: 'queued_for_search', nextAction: 'search_now' } }),
+    });
+    const detail = await service.getMissingMusicDecisionDetail({ actorUser, decisionId: release.id });
+    const actions = await service.listMissingMusicDecisions({ actorUser, state: 'action' });
+    assert.equal(detail.permissions.canFindMatches, !savedIntent);
+    assert.equal(detail.decision.state, savedIntent ? 'searching' : 'action');
+    assert.equal(detail.decision.status.nextAction, savedIntent ? null : 'search_now');
+    assert.equal(actions.decisions.length, savedIntent ? 0 : 1);
+    assert.doesNotMatch(JSON.stringify(detail), /requestedAt|wantedReleaseId/u);
+  }
+});
+
 test('admins receive active users by default with release-only decision facts', async () => {
   const { listWantedReleasesWithMetadata, service } = createService();
 

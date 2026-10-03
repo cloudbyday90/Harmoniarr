@@ -147,3 +147,21 @@ test('an eligible quality choice remains the next step while Search again stays 
   detail.permissions.isReadOnly = true;
   assert.equal(buildMissingMusicDecisionDetailPresentation(detail).canAllowFallbackQuality, false);
 });
+
+test('Find matches requires the exact server permission, even when the status label suggests an initial search', () => {
+  const detail = { decision: { status: { code: 'queued_for_search', nextAction: 'search_now' } }, permissions: {} };
+  assert.equal(buildMissingMusicDecisionDetailPresentation(detail).canFindMatches, false);
+  assert.equal(buildMissingMusicDecisionDetailPresentation(detail).nextStep, 'Check the current release status.');
+  detail.permissions.canFindMatches = 'true';
+  assert.equal(buildMissingMusicDecisionDetailPresentation(detail).canFindMatches, false);
+  detail.permissions.canFindMatches = true;
+  const presentation = buildMissingMusicDecisionDetailPresentation(detail);
+  assert.equal(presentation.canFindMatches, true);
+  assert.equal(presentation.canSearchAgain, false);
+  assert.equal(presentation.nextStep, 'Find matches');
+  detail.permissions.isReadOnly = true;
+  assert.equal(buildMissingMusicDecisionDetailPresentation(detail).canFindMatches, false);
+  detail.permissions.isReadOnly = false;
+  detail.decision.requestedFor = { accountStatus: 'disabled' };
+  assert.equal(buildMissingMusicDecisionDetailPresentation(detail).canFindMatches, false);
+});

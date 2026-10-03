@@ -23,6 +23,7 @@ import {
   fetchMissingMusicDecisionDetail,
   fetchMissingMusicDecisions,
   fetchMissingMusicDownloaderHandoff,
+  findMissingMusicDecisionMatches,
   selectMissingMusicDecisionMatch,
   searchMissingMusicDecisionAgain,
   startMissingMusicDecisionDownload,
@@ -136,6 +137,23 @@ test('fallback quality submits a target-free decision command with CSRF and dura
   assert.throws(() => allowMissingMusicDecisionFallbackQuality({ decisionId: ' ' }), /requires a decisionId/u);
   await allowMissingMusicDecisionFallbackQuality({ decisionId: 'wanted-amber' });
   assert.match(fetchMock.mock.calls[1].arguments[1].headers.get('Idempotency-Key'), /^missing-music-decisions-allow-fallback-quality-/u);
+});
+
+test('Find matches sends an initial decision command without target or policy inputs and retains the caller retry key', async (t) => {
+  const fetchMock = installFetchMock(t, { action: { code: 'find_matches' } });
+  const originalDocument = globalThis.document;
+  globalThis.document = { cookie: 'harmoniarr_csrf=csrf-token' };
+  t.after(() => { globalThis.document = originalDocument; });
+  await findMissingMusicDecisionMatches({ decisionId: ' wanted/amber ', idempotencyKey: 'find-retry', targetUserId: 'untrusted', reset: true });
+  const [url, options] = fetchMock.mock.calls[0].arguments;
+  assert.equal(url, '/api/v1/missing-music/decisions/wanted%2Famber/find-matches');
+  assert.equal(options.method, 'POST');
+  assert.equal(options.headers.get('X-CSRF-Token'), 'csrf-token');
+  assert.equal(options.headers.get('Idempotency-Key'), 'find-retry');
+  assert.equal(options.body, '{}');
+  assert.throws(() => findMissingMusicDecisionMatches({ decisionId: ' ' }), /requires a decisionId/u);
+  await findMissingMusicDecisionMatches({ decisionId: 'wanted-amber' });
+  assert.match(fetchMock.mock.calls[1].arguments[1].headers.get('Idempotency-Key'), /^missing-music-decisions-find-matches-/u);
 });
 
 test('fetchMissingMusicDownloaderHandoff sends only the opaque decision identifier', async (t) => {

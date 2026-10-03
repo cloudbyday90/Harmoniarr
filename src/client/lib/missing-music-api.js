@@ -122,6 +122,24 @@ export function searchMissingMusicDecisionAgain({ decisionId, idempotencyKey = n
   );
 }
 
+export function findMissingMusicDecisionMatches({ decisionId, idempotencyKey = null } = {}) {
+  const normalizedDecisionId = typeof decisionId === 'string' ? decisionId.trim() : '';
+  if (!normalizedDecisionId) {
+    throw new TypeError('findMissingMusicDecisionMatches requires a decisionId');
+  }
+  return apiRequest(
+    `/api/v1/missing-music/decisions/${encodeURIComponent(normalizedDecisionId)}/find-matches`,
+    {
+      body: {},
+      headers: idempotencyKey
+        ? { 'Idempotency-Key': idempotencyKey }
+        : createControlPlaneIdempotencyHeaders('missing-music.decisions.find-matches'),
+      includeCsrf: true,
+      method: 'POST',
+    },
+  );
+}
+
 export function allowMissingMusicDecisionFallbackQuality({ decisionId, idempotencyKey = null } = {}) {
   const normalizedDecisionId = typeof decisionId === 'string' ? decisionId.trim() : '';
   if (!normalizedDecisionId) {

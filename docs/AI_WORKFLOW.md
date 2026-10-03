@@ -29,6 +29,10 @@ Current skill areas include:
   [.agents/skills/harmoniarr-scoped-overrides/SKILL.md](../.agents/skills/harmoniarr-scoped-overrides/SKILL.md)
   when changing policy exceptions; ordinary styling and unrelated settings are
   outside its scope.
+- Harmoniarr web standards: connect applicable W3C, WHATWG, OWASP, IETF, and
+  official implementation guidance to a concrete web journey and its evidence.
+  Use [the standards skill](../.agents/skills/harmoniarr-web-standards/SKILL.md)
+  for standards-oriented command/form work and review.
 
 ## Tooling Scope
 
@@ -54,6 +58,11 @@ The scoped-overrides skill uses the same maintained-source/local-install
 arrangement. Its [design](SCOPED_POLICY_OVERRIDES_SKILL_DESIGN.md) and
 [outcome](SCOPED_POLICY_OVERRIDES_SKILL_OUTCOME.md) record the consumer boundaries
 and independent behavioral evaluation.
+
+The web-standards skill is also maintained in the repository and installed
+locally with Codex metadata. Its [design](WEB_STANDARDS_SKILL_DESIGN.md) and
+[outcome](WEB_STANDARDS_SKILL_OUTCOME.md) document applicable practice families,
+source status, structural validation, and independent bounded evaluation.
 
 ## Repository Rules
 

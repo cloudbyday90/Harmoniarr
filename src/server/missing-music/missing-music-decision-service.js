@@ -26,6 +26,7 @@ import { buildMissingMusicMatchChoices } from './missing-music-match-choice-proj
 import { canStartMissingMusicDownload } from './missing-music-download-start-policy.js';
 import { canViewMissingMusicDownloader } from './missing-music-downloader-handoff-policy.js';
 import { canSearchMissingMusicAgain } from './missing-music-search-again-policy.js';
+import { canFindInitialMusicMatches } from '../acquisition/acquisition-initial-search-policy.js';
 import { canAllowMissingMusicFallbackQuality } from './missing-music-fallback-quality-policy.js';
 import { buildPublicQualityEvidence } from '../acquisition/acquisition-quality-evidence-policy.js';
 import { createMissingMusicDecisionTargetService } from './missing-music-decision-target-service.js';
@@ -92,9 +93,11 @@ function projectMissingMusicStatus(status) {
   };
 }
 
-function projectDecision(release, requestedFor, projectMusicQueueReleaseFn) {
+function projectDecision(release, requestedFor, projectMusicQueueReleaseFn, now = new Date()) {
   const projectedRelease = projectMusicQueueReleaseFn(release);
   const status = projectMissingMusicStatus(projectedRelease.status);
+  const canFindMatches = canFindInitialMusicMatches({ release, targetUser: requestedFor, now, projectedRelease });
+  if (status.nextAction === 'search_now' && !canFindMatches) status.nextAction = null;
 
   return {
     decisionId: projectedRelease.id,
@@ -112,7 +115,7 @@ function projectDecision(release, requestedFor, projectMusicQueueReleaseFn) {
       wantedStatus: projectedRelease.wantedStatus,
     },
     requestedFor,
-    state: deriveMissingMusicDecisionState(status.code, status.nextAction),
+    state: canFindMatches ? 'action' : deriveMissingMusicDecisionState(status.code, status.nextAction),
     status,
   };
 }
@@ -262,7 +265,7 @@ export function createMissingMusicDecisionService({
     const page = await decisionPageService.readDecisionPage({
       appUserIds: targetUserIds,
       after, limit: pageLimit, search, state,
-      projectDecision: (release) => projectDecision(release, buildRequestedFor(usersById.get(release.appUserId)), projectMusicQueueReleaseFn),
+      projectDecision: (release) => projectDecision(release, buildRequestedFor(usersById.get(release.appUserId)), projectMusicQueueReleaseFn, now()),
     });
 
     return {
@@ -305,6 +308,7 @@ export function createMissingMusicDecisionService({
       target.release,
       target.targetUser,
       () => projectedRelease,
+      now(),
     );
     const matchChoices = decision.status.nextAction === 'review_matches'
       ? buildMissingMusicMatchChoices(target.release)
@@ -316,6 +320,7 @@ export function createMissingMusicDecisionService({
       matchChoices,
       qualityEvidence: buildPublicQualityEvidence(projectedRelease.quality),
       permissions: {
+        canFindMatches: canFindInitialMusicMatches({ release: target.release, targetUser: target.targetUser, now: now(), projectedRelease }),
         canAllowFallbackQuality: canAllowMissingMusicFallbackQuality({ projectedRelease, targetUser: target.targetUser }),
         canSearchAgain: canSearchMissingMusicAgain({ statusCode: decision.status.code, targetUser: target.targetUser }),
         canStartDownload: canStartMissingMusicDownload({

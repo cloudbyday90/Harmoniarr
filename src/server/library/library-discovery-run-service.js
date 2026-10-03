@@ -19,6 +19,8 @@
 import { createApiError } from '../auth.js';
 import { recordAuditEvent } from '../audit.js';
 import { operationRunRegistry } from '../../shared/operation-run-descriptors.js';
+import { createDatabaseTransactionRunner } from '../database-transaction-service.js';
+import { lockLibraryDiscoveryRunCreation } from './library-discovery-run-lock-store.js';
 
 export function createLibraryDiscoveryRunService({
   assertMaintenanceWriteAllowed = async () => {},
@@ -27,6 +29,8 @@ export function createLibraryDiscoveryRunService({
   },
   getActiveRun = async () => null,
   recordAuditEventFn = recordAuditEvent,
+  withTransaction = createDatabaseTransactionRunner(),
+  lockRunCreation = lockLibraryDiscoveryRunCreation,
 } = {}) {
   const operationDescriptor = operationRunRegistry.libraryDiscoveryDispatch;
 
@@ -35,38 +39,42 @@ export function createLibraryDiscoveryRunService({
     triggerSource = 'manual',
     triggeredByUserId = null,
   } = {}) {
-    await assertMaintenanceWriteAllowed();
+    return withTransaction(async (queryable) => {
+      await assertMaintenanceWriteAllowed({ queryable });
+      await lockRunCreation({ queryable });
 
-    const activeRun = await getActiveRun();
-    if (activeRun) {
-      throw createApiError(409, 'library_discovery_in_progress', 'A library discovery dispatch is already running or queued');
-    }
+      const activeRun = await getActiveRun({ queryable });
+      if (activeRun) {
+        throw createApiError(409, 'library_discovery_in_progress', 'A library discovery dispatch is already running or queued');
+      }
 
-    const run = await createOperationRun({
-      status: 'pending',
-      triggerSource,
-      triggeredByUserId,
-    });
-
-    await recordAuditEventFn({
-      actorType: triggeredByUserId ? 'user' : 'system',
-      actorUserId: triggeredByUserId,
-      details: {
-        runId: run.id,
+      const run = await createOperationRun({
+        queryable,
+        status: 'pending',
         triggerSource,
-      },
-      entityId: run.id,
-      entityType: 'operation_run',
-      eventType: operationDescriptor.startedEventType,
-      ipAddress: requestMetadata?.ipAddress ?? null,
-      summary: 'Library discovery dispatch started',
-      userAgent: requestMetadata?.userAgent ?? null,
-    });
+        triggeredByUserId,
+      });
 
-    return {
-      accepted: true,
-      run,
-    };
+      await recordAuditEventFn({
+        actorType: triggeredByUserId ? 'user' : 'system',
+        actorUserId: triggeredByUserId,
+        details: {
+          runId: run.id,
+          triggerSource,
+        },
+        entityId: run.id,
+        entityType: 'operation_run',
+        eventType: operationDescriptor.startedEventType,
+        ipAddress: requestMetadata?.ipAddress ?? null,
+        summary: 'Library discovery dispatch started',
+        userAgent: requestMetadata?.userAgent ?? null,
+      }, queryable);
+
+      return {
+        accepted: true,
+        run,
+      };
+    });
   }
 
   return {

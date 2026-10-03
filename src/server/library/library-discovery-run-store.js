@@ -19,6 +19,8 @@
 import { createOperationRunStore } from '../operation-run-store.js';
 import { getPool } from '../database.js';
 import { operationRunRegistry } from '../../shared/operation-run-descriptors.js';
+import { createDatabaseTransactionRunner } from '../database-transaction-service.js';
+import { lockLibraryDiscoveryRunCreation } from './library-discovery-run-lock-store.js';
 
 function toNumberOrNull(value) {
   return Number.isFinite(value) ? value : null;
@@ -49,6 +51,7 @@ export function createLibraryDiscoveryRunStore({
   getPoolFn = getPool,
 } = {}) {
   const operationDescriptor = operationRunRegistry.libraryDiscoveryDispatch;
+  const withTransaction = createDatabaseTransactionRunner({ getPoolFn });
   const operationRunStore = createOperationRunStore({
     getPoolFn,
     leaseJobType: operationDescriptor.leaseJobType,
@@ -56,27 +59,33 @@ export function createLibraryDiscoveryRunStore({
   });
 
   async function createOperationRun({
+    queryable = null,
     nextAttemptAt = null,
     status = 'pending',
     summary = {},
     triggerSource = 'manual',
     triggeredByUserId = null,
   }) {
-    const run = await operationRunStore.createOperationRun({
-      nextAttemptAt,
-      status,
-      summary: {
-        ...summary,
-        triggerSource,
-      },
-      triggeredByUserId,
-    });
+    const createRun = async (client) => {
+      await lockLibraryDiscoveryRunCreation({ queryable: client });
+      const run = await operationRunStore.createOperationRun({
+        queryable: client,
+        nextAttemptAt,
+        status,
+        summary: {
+          ...summary,
+          triggerSource,
+        },
+        triggeredByUserId,
+      });
 
-    return normalizeRun(run);
+      return normalizeRun(run);
+    };
+    return queryable ? createRun(queryable) : withTransaction(createRun);
   }
 
-  async function getActiveRun() {
-    return normalizeRun(await operationRunStore.getActiveRun());
+  async function getActiveRun({ queryable = null } = {}) {
+    return normalizeRun(await operationRunStore.getActiveRun({ queryable }));
   }
 
   async function getLatestRun() {

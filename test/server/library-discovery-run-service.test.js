@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createApiError } from '../../src/server/auth.js';
-import { createLibraryDiscoveryRunService } from '../../src/server/library/library-discovery-run-service.js';
+import { createLibraryDiscoveryRunService as createService } from '../../src/server/library/library-discovery-run-service.js';
+
+const queryable = { query: async () => ({ rows: [] }) };
+const createLibraryDiscoveryRunService = (options) => createService({ withTransaction: (work) => work(queryable),
+  lockRunCreation: async () => {}, ...options });
 
 test('startLibraryDiscoveryRun records a pending run for durable dispatch', async (t) => {
   const createOperationRun = t.mock.fn(async () => ({
@@ -26,6 +30,7 @@ test('startLibraryDiscoveryRun records a pending run for durable dispatch', asyn
 
   assert.equal(getActiveRun.mock.callCount(), 1);
   assert.deepEqual(createOperationRun.mock.calls[0].arguments[0], {
+    queryable,
     status: 'pending',
     triggerSource: 'manual',
     triggeredByUserId: 'user-7',
@@ -69,4 +74,23 @@ test('startLibraryDiscoveryRun rejects when maintenance lock blocks unsafe write
     () => service.startLibraryDiscoveryRun(),
     (error) => error.code === 'recovery_lock_conflict',
   );
+});
+
+test('dispatch creation checks maintenance and active work under the same transaction lock as its required audit', async () => {
+  const events = [];
+  const service = createService({
+    withTransaction: async (work) => {
+      events.push('transaction');
+      const result = await work(queryable);
+      events.push('commit');
+      return result;
+    },
+    assertMaintenanceWriteAllowed: async (input) => { assert.equal(input.queryable, queryable); events.push('maintenance'); },
+    lockRunCreation: async (input) => { assert.equal(input.queryable, queryable); events.push('lock'); },
+    getActiveRun: async (input) => { assert.equal(input.queryable, queryable); events.push('active'); return null; },
+    createOperationRun: async (input) => { assert.equal(input.queryable, queryable); events.push('create'); return { id: 'run-locked' }; },
+    recordAuditEventFn: async (_event, client) => { assert.equal(client, queryable); events.push('audit'); },
+  });
+  await service.startLibraryDiscoveryRun();
+  assert.deepEqual(events, ['transaction', 'maintenance', 'lock', 'active', 'create', 'audit', 'commit']);
 });

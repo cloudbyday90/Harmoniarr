@@ -1,0 +1,4 @@
+interface:
+  display_name: "Harmoniarr Web Standards"
+  short_description: "Trace web standards into implementation and evidence"
+  default_prompt: "Use $harmoniarr-web-standards to implement or review this web journey with applicable official practices and concrete evidence."

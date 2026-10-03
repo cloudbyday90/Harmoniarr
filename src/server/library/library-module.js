@@ -92,6 +92,7 @@ import { createOperationRunInterruptionGate } from '../operation-run-cancellatio
 import { createMaintenanceLockService } from '../recovery/maintenance-lock-service.js';
 import { createMaintenanceLockWriteGuardService } from '../recovery/maintenance-lock-write-guard-service.js';
 import { createLibraryMusicQueueRediscoveryService } from './library-music-queue-rediscovery-service.js';
+import { createLibraryInitialSearchService } from './library-initial-search-service.js';
 import { createLibraryFallbackQualityService } from './library-fallback-quality-service.js';
 
 export function createLibraryModule({
@@ -334,8 +335,8 @@ export function createLibraryModule({
     renewLease: libraryDiscoveryRunStore.renewLease,
   }),
   libraryDiscoveryRunService = createLibraryDiscoveryRunService({
-    assertMaintenanceWriteAllowed: () => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
-      operationLabel: 'library discovery dispatch',
+    assertMaintenanceWriteAllowed: ({ queryable }) => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+      operationLabel: 'library discovery dispatch', queryable,
     }),
     createOperationRun: libraryDiscoveryRunStore.createOperationRun,
     getActiveRun: libraryDiscoveryRunStore.getActiveRun,
@@ -377,6 +378,12 @@ export function createLibraryModule({
     getAppUserById,
     listWantedReleasesWithMetadata: libraryWantedReleaseStore.listWantedReleasesWithMetadata,
     requestMusicQueueRediscovery: libraryDiscoveryRequestStore.requestMusicQueueRediscovery,
+  }) : null,
+  libraryInitialSearchService = getAppUserById ? createLibraryInitialSearchService({ getAppUserById,
+    listWantedReleasesWithMetadata: libraryWantedReleaseStore.listWantedReleasesWithMetadata,
+    assertMaintenanceWriteAllowed: ({ queryable }) => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+      operationLabel: 'Missing Music initial search', queryable,
+    }),
   }) : null,
   libraryWantedSummaryService = createLibraryWantedSummaryService({
     libraryWantedReleaseStore,
@@ -510,6 +517,7 @@ export function createLibraryModule({
     libraryMediaRequestPipelineStore,
     libraryMediaRequestStore,
     libraryMusicQueueRediscoveryService,
+    libraryInitialSearchService,
     libraryFallbackQualityService,
     libraryOrganizeApplyRunStore,
     libraryOrganizeApplyService,

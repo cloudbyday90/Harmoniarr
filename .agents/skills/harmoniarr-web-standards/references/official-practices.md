@@ -1,0 +1,43 @@
+# Official practices by boundary
+
+Consulted October 3, 2026. URLs were discovered through web search, official
+navigation, and GitHub MCP and opened for review. Revalidate changing guidance
+when applying this reference. Read only the rows relevant to the requested work.
+This is an applicability map, not a compliance catalog.
+
+## Browser controls and feedback
+
+| Source | Status | Decision it informs |
+| --- | --- | --- |
+| [WCAG 2.2](https://www.w3.org/TR/WCAG22/) and [WAI-ARIA 1.2](https://www.w3.org/TR/wai-aria-1.2/) | Normative W3C Recommendations | Consult the applicable criterion/role/state for precise requirements; busy state can defer updates and status implies polite/atomic semantics. These URLs were independently opened during the skill trial. |
+| [WHATWG HTML form elements](https://html.spec.whatwg.org/multipage/form-elements.html) | Living specification | Native command buttons use an explicit non-submit type; avoid accidental form submission or custom keyboard emulation. |
+| [W3C keyboard](https://www.w3.org/WAI/WCAG22/Understanding/keyboard) and [focus visible](https://www.w3.org/WAI/WCAG22/Understanding/focus-visible) | Informative explanation of WCAG criteria | Test actual keyboard activation and the rendered focus indicator. |
+| [W3C focus not obscured](https://www.w3.org/WAI/WCAG22/Understanding/focus-not-obscured-minimum) | Informative explanation of WCAG 2.2 AA | Test controls/focus destinations in the actual scrolling shell, including sticky chrome and narrow layouts. |
+| [W3C status messages](https://www.w3.org/WAI/WCAG22/Understanding/status-messages) and [ARIA22 technique](https://www.w3.org/WAI/WCAG22/Techniques/aria/ARIA22) | Informative explanation/optional sufficient technique | Establish a status container before updates; explicit atomic semantics are useful. A DOM role alone does not prove announcement. |
+| [W3C button pattern, official mirror](https://w3c.github.io/wai-website/ARIA/apg/patterns/button/) | Informative APG | Enter/Space activation, accessible names/descriptions, and action-appropriate focus. The mirror was readable when the canonical host rate-limited. |
+| [W3C target size minimum](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum) | Informative explanation of WCAG 2.2 AA | The criterion uses 24 CSS pixels with exceptions. Harmoniarr's 44-pixel mobile target is a stronger local convention, not the AA requirement. |
+| [Vue accessibility](https://vuejs.org/guide/best-practices/accessibility) | Framework guidance | Use semantic structure and deliberate focus across rendered route/state changes. |
+| [Playwright accessibility testing](https://playwright.dev/docs/accessibility-testing) | Testing guidance | Combine automation with manual/inclusive checks; do not infer full conformance from an automated pass. |
+
+WCAG Understanding pages, techniques, and APG are guidance, not the normative
+standard themselves. Follow their official links to the applicable normative
+criterion/specification when a precise conformance interpretation is needed.
+Do not require every documented technique or attach a full conformance claim to
+a small feature's passing tests.
+
+## HTTP, authority, and durable work
+
+| Source | Status | Decision it informs |
+| --- | --- | --- |
+| [IETF RFC 9110 HTTP semantics](https://www.rfc-editor.org/rfc/rfc9110.html) | Standards-track RFC | Separate reads from commands; do not assume a non-idempotent method can be retried safely. Application durable replay and response shapes are explicit project contracts. |
+| [OWASP authorization](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html) | Security practice guidance | Authorize the selected object/recipient using current server-side authority; UI visibility is insufficient. |
+| [OWASP CSRF prevention](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html) | Security practice guidance | Preserve session-bound mutation protections; a new UI command does not justify bypassing CSRF. |
+| [PostgreSQL 18 explicit locking](https://www.postgresql.org/docs/18/explicit-locking.html) | Versioned database guidance | Row/advisory locks and consistent acquisition order support transaction-owned concurrency; all relevant writers must participate for a coordination claim. |
+| [PostgreSQL 18 SELECT](https://www.postgresql.org/docs/18/sql-select.html) | Versioned database guidance | Queue-oriented skipping has a different consistency purpose from an authoritative command read. |
+| [Node 24 ESM](https://nodejs.org/download/release/latest-v24.x/docs/api/esm.html) | Versioned runtime guidance | Keep explicit imports/exports and module-compatible file specifiers; third-party examples may use a different module format. |
+
+These sources do not require a new queue, database isolation migration, UI
+framework, idempotency-header protocol, or security-scanner installation. Choose
+the narrow existing boundary that satisfies the requested behavior. General
+security review and dependency hygiene complement these practices but do not
+constitute a security certification.

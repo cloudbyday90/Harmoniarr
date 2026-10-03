@@ -479,11 +479,21 @@ export function createLibraryWantedReleaseStore({
           lwr.evidence AS wanted_evidence,
           owner.user_preferences AS quality_preferences,
           wanted_link.evidence->'musicQueueQualityOverride' AS discovery_quality_override,
+          wanted_link.evidence->'musicQueueInitialSearch' AS discovery_initial_search,
+          wanted_link.wanted_release_id IS NOT NULL AS discovery_link_exists,
+          CASE WHEN ldr.request_status = 'ready' AND ldr.search_attempt_count = 0 AND ldr.last_search_at IS NULL THEN EXISTS (
+            SELECT 1 FROM import_candidates prior_candidate
+            WHERE prior_candidate.normalized_payload #>> '{discoveryScope,metadataReleaseId}' = lwr.metadata_release_id::text
+              OR prior_candidate.normalized_payload #>> '{requestOwnership,metadataReleaseId}' = lwr.metadata_release_id::text
+              OR prior_candidate.normalized_payload #>> '{musicQueue,wantedReleaseId}' = lwr.id::text
+              OR COALESCE(prior_candidate.normalized_payload #> '{musicQueue,wantedReleaseIds}', '[]'::jsonb) ? lwr.id::text
+          ) ELSE TRUE END AS has_prior_discovery_candidates,
           ldr.request_status AS discovery_request_status,
           ldr.search_mode AS discovery_search_mode,
           ldr.blocked_reason AS discovery_blocked_reason,
           ldr.last_search_at AS discovery_last_search_at,
           ldr.next_search_after AS discovery_next_search_after,
+          ldr.manual_requested_at AS discovery_manual_requested_at,
           ldr.search_attempt_count AS discovery_search_attempt_count,
           ldr.research_attempt_count AS discovery_research_attempt_count,
           ldr.evidence AS discovery_evidence,
@@ -851,6 +861,9 @@ export function createLibraryWantedReleaseStore({
       evidence: row.wanted_evidence ?? {},
       qualityPreferences: row.quality_preferences ?? null,
       discoveryQualityOverride: row.discovery_quality_override ?? null,
+      discoveryInitialSearch: row.discovery_initial_search ?? null,
+      discoveryLinkExists: row.discovery_link_exists === true,
+      hasPriorDiscoveryCandidates: row.has_prior_discovery_candidates !== false,
       discoveryRequest: row.discovery_request_status
         ? {
             blockedReason: row.discovery_blocked_reason ?? null,
@@ -858,6 +871,7 @@ export function createLibraryWantedReleaseStore({
             importReviewSummary: buildImportReviewSummary(row),
             lastSearchAt: row.discovery_last_search_at ?? null,
             nextSearchAfter: row.discovery_next_search_after ?? null,
+            ...(row.discovery_manual_requested_at != null ? { manualRequestedAt: row.discovery_manual_requested_at } : {}),
             requestStatus: row.discovery_request_status,
             researchAttemptCount: Number.parseInt(String(row.discovery_research_attempt_count ?? 0), 10) || 0,
             searchAttemptCount: Number.parseInt(String(row.discovery_search_attempt_count ?? 0), 10) || 0,

@@ -58,6 +58,7 @@ export function buildMissingMusicDecisionDetailPresentation(detail) {
   const accountIsDisabled = detail?.permissions?.isReadOnly === true
     || requestedFor.accountStatus === 'disabled';
   const canStartDownload = detail?.permissions?.canStartDownload === true;
+  const canFindMatches = !accountIsDisabled && detail?.permissions?.canFindMatches === true;
   const canSearchAgain = !accountIsDisabled && detail?.permissions?.canSearchAgain === true;
   const canAllowFallbackQuality = !accountIsDisabled && detail?.permissions?.canAllowFallbackQuality === true;
   const canViewDownloader = detail?.permissions?.canViewDownloader === true;
@@ -74,6 +75,7 @@ export function buildMissingMusicDecisionDetailPresentation(detail) {
     coverage: formatTrackCoverage(matchedTrackCount, expectedTrackCount),
     isReadOnly: accountIsDisabled,
     canStartDownload,
+    canFindMatches,
     canSearchAgain,
     canAllowFallbackQuality,
     canViewDownloader,
@@ -83,10 +85,14 @@ export function buildMissingMusicDecisionDetailPresentation(detail) {
       ? 'This account is disabled; no changes can be made.'
       : canAllowFallbackQuality
         ? 'Review the quality choice'
+      : canFindMatches
+        ? 'Find matches'
       : canSearchAgain
         ? 'Search again'
       : selectedMatchNeedsAdministrator
         ? 'A household administrator can start the download.'
+      : decision.status?.nextAction === 'search_now'
+        ? 'Check the current release status.'
       : getMissingMusicNextStep(decision.status?.nextAction),
     releaseMeta: [formatReleaseType(release.releaseGroupType), normalizeText(release.releaseDate)]
       .filter(Boolean)

@@ -1,0 +1,108 @@
+# Practical web standards skill outcome
+
+Status: Created, installed, structurally validated, and independently trialed
+Recorded: October 3, 2026
+Design: [WEB_STANDARDS_SKILL_DESIGN.md](WEB_STANDARDS_SKILL_DESIGN.md)
+
+## Delivered capability
+
+The new [harmoniarr-web-standards skill](../.agents/skills/harmoniarr-web-standards/SKILL.md)
+turns relevant official practices into implementation owners, adverse cases,
+and observable evidence for a web journey. It covers W3C WCAG/WAI-ARIA, WHATWG
+HTML, OWASP object authorization/CSRF, IETF HTTP semantics, PostgreSQL
+transactions/locking, and official Vue/Playwright/Node guidance. These families
+have different authority: specifications, informative guidance, vendor/framework
+documentation, and local conventions are explicitly distinguished.
+
+Invoke `$harmoniarr-web-standards` for standards-oriented command/form
+implementation or review. Ordinary automatic selection remains enabled.
+Copy-only work does not need the workflow. The skill selects relevant practices
+instead of requiring a blanket accessibility/security audit, new queue, or
+framework migration.
+
+The structure has four maintained files: `SKILL.md`, `agents/openai.yaml`,
+`references/official-practices.md`, and `references/project-evidence-map.md`.
+References are loaded only for relevant boundaries. There are no generated
+scaffold placeholders, executable helpers, assets, additional dependencies, or
+duplicated implementation instructions. Canonical-actions and scoped-overrides
+retain their domain responsibilities.
+
+## Sources and practical method
+
+The [official-practice reference](../.agents/skills/harmoniarr-web-standards/references/official-practices.md)
+records URLs discovered/opened through web search, official navigation, and
+GitHub MCP on October 3. Independent evaluation also opened normative WCAG 2.2
+and WAI-ARIA 1.2. The method requires rechecking changing guidance and actual host
+versions, without treating consultation date as publication date or a saved
+documentation version as the deployed version.
+
+Trace one journey from its rendered control through actor/recipient authority,
+HTTP intent, owning write/worker, and refreshed facts. Select applicable practice
+families, connect each to a failure case and code owner, implement at that
+boundary, then choose evidence that can support the claim. Restricted-source
+reviews must disclose uninspected contracts. Native browser behavior, stable
+retry intent, server object authority, transaction-owned audit, and writer
+coordination are practical implementation decisions; they grant no additional
+permission for external actions.
+
+## Independent forward trial
+
+A fresh subagent received only the finished skill/references, an isolated
+Find matches proposal and a realistic review request. It received no expected
+findings, suspected bugs, proposed solution, or application history. The request
+allowed read-only official research and writing one ignored review artifact;
+it prohibited tracked application inspection, proposal execution, provider calls,
+and external mutations.
+
+The evaluator independently identified the proposal's mutating GET, omitted
+visible actor/object/CSRF checks, fresh retry keys, destructive shared state reset,
+absent-row dispatch race and unaudited acceptance, custom control without keyboard
+behavior, late/busy-contained feedback, unconditional focus movement, inaccurate
+completion claims, and missing reactive/selection-scoped refresh integration.
+It proposed narrow owners and real SQL/browser evidence while distinguishing
+visible omissions from reproduced application vulnerabilities.
+
+Its actual usage exposed small clarification opportunities. The final skill
+explicitly handles proposal-only source restrictions, verifies host versions,
+and discovers existing retry resolution/expiry rules. The evidence map adds a
+concrete focus case: removal can leave focus on the document body, whereas an
+explicit move to another control revokes interaction ownership. These clarify
+existing invariants without introducing an unrelated checklist.
+
+The ignored request/proposal/review are retained under
+`.tmp/web-standards-skill-evaluation/`. This is a successful bounded usability
+trial, not executed application acceptance. The independent trial preceded the
+small clarifications; final structure and installed identity were checked after
+them. No claim of a second fresh behavioral trial is made.
+
+## Validation and actual application
+
+The bundled skill-creator initializer produced the metadata and structure.
+Its `quick_validate.py` accepted both the final repository source and the local
+installation at `C:/Users/Moreland/.codex/skills/harmoniarr-web-standards`.
+Per-file SHA-256 comparison confirmed the four installed files are identical to
+their maintained source. Structural validation checks naming/frontmatter and
+unfinished scaffolding; it does not establish behavioral quality by itself.
+
+The ongoing [Find matches implementation](MISSING_MUSIC_FIND_MATCHES_OUTCOME.md)
+used the skill's standards layer for typed native controls, persistent status
+outside busy ancestors, focus ownership, bounded queued feedback, durable retry,
+server target authority, and transactional dispatch coordination. Its outcome
+records the separate real PostgreSQL and browser evidence. Automated DOM roles
+and screenshots do not establish actual screen-reader announcements or full
+WCAG conformance.
+
+## Recommendation and tradeoffs
+
+Adopt this narrow skill alongside canonical-actions for complete web command
+journeys and scoped-overrides for recipient policy exceptions. Keep source
+discovery, authority/version checks, and evidence selection conditional on the
+actual change. This makes standards useful in everyday implementation without
+duplicating workers or replacing domain skills.
+
+The benefit is a repeatable connection between official practice, code ownership,
+and verification. The cost is maintaining dated references and inspecting current
+contracts/versions. The skill cannot substitute for assistive-technology testing,
+production-scale performance measurements, or a dedicated security assessment.
+Add further practice families only when real project work demonstrates their
+value; no full compliance catalog is recommended this round.

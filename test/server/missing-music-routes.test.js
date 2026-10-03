@@ -21,6 +21,7 @@ function createMissingMusicRouteTestApp(overrides = {}) {
       }),
       selectMissingMusicDecisionMatch: async () => ({ action: {} }),
       allowMissingMusicDecisionFallbackQuality: async () => ({ action: {} }),
+      findMissingMusicDecisionMatches: async () => ({ action: {} }),
       searchMissingMusicDecisionAgain: async () => ({ action: {} }),
       startMissingMusicDecisionDownload: async () => ({ action: {} }),
       limitMissingMusicDecisionRead: (_request, _response, next) => next(),
@@ -44,6 +45,28 @@ function createMissingMusicRouteTestApp(overrides = {}) {
     });
   });
 }
+
+test('Find matches requires fresh session and CSRF with an empty-body decision-only durable command', async (t) => {
+  const actorUser = { id: 'requester', isDisabled: false, role: 'requester', username: 'listener' };
+  const findMissingMusicDecisionMatches = t.mock.fn(async () => ({ action: { code: 'find_matches' } }));
+  const requireFreshSession = t.mock.fn(async () => ({ appUserId: actorUser.id, user: actorUser }));
+  const requireCsrf = t.mock.fn();
+  const executeIdempotentMutation = t.mock.fn(async ({ executeMutation }) => executeMutation());
+  const app = createMissingMusicRouteTestApp({ findMissingMusicDecisionMatches, requireFreshSession, requireCsrf, executeIdempotentMutation,
+    getRequestMetadata: () => ({ ipAddress: '127.0.0.1' }) });
+  await withServer(app, async (baseUrl) => {
+    const path = `${baseUrl}/api/v1/missing-music/decisions/wanted/find-matches`;
+    const response = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json', 'idempotency-key': 'initial-key' }, body: '{}' });
+    assert.equal(response.status, 200);
+    assert.deepEqual(findMissingMusicDecisionMatches.mock.calls[0].arguments[0], { actorUser, decisionId: 'wanted', requestMetadata: { ipAddress: '127.0.0.1' } });
+    assert.equal(executeIdempotentMutation.mock.calls[0].arguments[0].operationScope, 'missing-music.decisions.find-matches');
+    assert.deepEqual(executeIdempotentMutation.mock.calls[0].arguments[0].requestPayload, { decisionId: 'wanted' });
+    assert.equal(requireFreshSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.equal((await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"targetUserId":"other"}' })).status, 400);
+    assert.equal(findMissingMusicDecisionMatches.mock.callCount(), 1);
+  });
+});
 
 test('Missing Music Search again uses fresh authenticated CSRF and a decision-only idempotency fingerprint', async (t) => {
   const actorUser = { id: 'requester', isDisabled: false, role: 'requester', username: 'listener' };

@@ -8,6 +8,7 @@
 <script setup>
 import { computed } from 'vue';
 import { buildMissingMusicQualityEvidencePresentation } from '../../lib/missing-music-quality-evidence-presentation.js';
+import MissingMusicCommandFeedback from './MissingMusicCommandFeedback.vue';
 
 const props = defineProps({
   busy: { default: false, type: Boolean },
@@ -36,8 +37,7 @@ const presentation = computed(() => buildMissingMusicQualityEvidencePresentation
         {{ pending ? 'Saving…' : 'Allow fallback quality' }}
       </button>
     </div>
-    <p v-if="statusMessage" role="status" aria-atomic="true">{{ statusMessage }}</p>
-    <p v-if="errorMessage" class="hx-alert" data-tone="danger" role="alert">{{ errorMessage }}</p>
+    <MissingMusicCommandFeedback :status-message="statusMessage" :error-message="errorMessage" />
   </section>
 </template>
 

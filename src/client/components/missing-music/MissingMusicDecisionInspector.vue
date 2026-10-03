@@ -21,13 +21,16 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { buildMissingMusicDecisionDetailPresentation } from '../../lib/missing-music-decision-detail-presentation.js';
 import { buildMissingMusicMatchChoicePresentation } from '../../lib/missing-music-match-selection-presentation.js';
 import { trapModalTabFocus } from '../../lib/modal-focus-trap.js';
+import { createUserCommandFocusTracker } from '../../lib/user-command-focus.js';
 import { useMissingMusicDecisionDetail } from '../../composables/useMissingMusicDecisionDetail.js';
 import { useMissingMusicDownloadStart } from '../../composables/useMissingMusicDownloadStart.js';
 import { useMissingMusicMatchSelection } from '../../composables/useMissingMusicMatchSelection.js';
 import { useMissingMusicSearchAgain } from '../../composables/useMissingMusicSearchAgain.js';
+import { useMissingMusicFindMatches } from '../../composables/useMissingMusicFindMatches.js';
 import { useMissingMusicQualityFallback } from '../../composables/useMissingMusicQualityFallback.js';
 import { createMissingMusicReleaseMutationGate } from '../../lib/missing-music-release-mutation-gate.js';
 import MissingMusicQualityEvidence from './MissingMusicQualityEvidence.vue';
+import MissingMusicCommandFeedback from './MissingMusicCommandFeedback.vue';
 
 const props = defineProps({
   decisionId: {
@@ -42,15 +45,17 @@ const focusedDecisionId = ref('');
 const statusHeadingElement = ref(null);
 const downloadDialogElement = ref(null);
 const downloadConfirmationOpen = ref(false);
+const downloadConfirmationInvoker = ref(null);
 const currentDecisionId = computed(() => props.decisionId);
 const mutationGate = createMissingMusicReleaseMutationGate();
 const mutationOptions = { decisionId: currentDecisionId, mutationGate, retryIntentState: {} };
 const matchSelection = useMissingMusicMatchSelection(mutationOptions);
 const downloadStart = useMissingMusicDownloadStart(mutationOptions);
 const searchAgain = useMissingMusicSearchAgain(mutationOptions);
+const findMatches = useMissingMusicFindMatches(mutationOptions);
 const qualityFallback = useMissingMusicQualityFallback(mutationOptions);
 const mutationBusy = computed(() => matchSelection.isPending.value
-  || downloadStart.isStarting.value || searchAgain.isPending.value || qualityFallback.isPending.value);
+  || downloadStart.isStarting.value || searchAgain.isPending.value || findMatches.isPending.value || qualityFallback.isPending.value);
 const decisionDetail = useMissingMusicDecisionDetail({
   decisionId: currentDecisionId,
 });
@@ -58,6 +63,12 @@ const presentation = computed(() => buildMissingMusicDecisionDetailPresentation(
 const matchChoicePresentation = computed(() => buildMissingMusicMatchChoicePresentation(decisionDetail.detail.value));
 const busy = computed(() => mutationBusy.value || decisionDetail.isLoading.value || decisionDetail.isRevalidating.value);
 let disposed = false;
+const commandFocusTrackers = new Set();
+
+function disposeCommandFocusTrackers() {
+  for (const tracker of commandFocusTrackers) tracker.dispose();
+  commandFocusTrackers.clear();
+}
 
 watch([mutationBusy, downloadConfirmationOpen], ([mutationPending, dialogOpen]) => {
   decisionDetail.setPaused(mutationPending || dialogOpen);
@@ -83,16 +94,27 @@ watch(
   { flush: 'post' },
 );
 
-async function completeUserCommand(command) {
+async function completeUserCommand(command, returnTarget = null) {
   const decisionId = props.decisionId;
-  const result = await command(decisionId);
-  if (!result || disposed || props.decisionId !== decisionId) return;
-
-  await decisionDetail.refresh();
-  if (disposed || props.decisionId !== decisionId) return;
-  emit('changed');
-  await nextTick();
-  if (!disposed && props.decisionId === decisionId) statusHeadingElement.value?.focus({ preventScroll: true });
+  const focus = createUserCommandFocusTracker({ document: globalThis.document, returnTarget });
+  commandFocusTrackers.add(focus);
+  try {
+    const result = await command(decisionId);
+    if (disposed || props.decisionId !== decisionId) return;
+    if (!result) {
+      await nextTick();
+      if (!disposed && props.decisionId === decisionId) focus.restoreAfterFailure();
+      return;
+    }
+    await decisionDetail.refresh();
+    if (disposed || props.decisionId !== decisionId) return;
+    emit('changed');
+    await nextTick();
+    if (!disposed && props.decisionId === decisionId && focus.ownsFocus()) statusHeadingElement.value?.focus({ preventScroll: true });
+  } finally {
+    focus.dispose();
+    commandFocusTrackers.delete(focus);
+  }
 }
 
 function selectMatch(matchId) {
@@ -103,14 +125,19 @@ function queueSearchAgain() {
   return completeUserCommand((decisionId) => searchAgain.searchAgain({ decisionId }));
 }
 
+function requestMatches() {
+  return completeUserCommand((decisionId) => findMatches.findMatches({ decisionId }));
+}
+
 function allowFallbackQuality() {
   return completeUserCommand((decisionId) => qualityFallback.allowFallbackQuality({ decisionId }));
 }
 
-function openDownloadConfirmation() {
+function openDownloadConfirmation(event) {
   if (mutationBusy.value) return;
   downloadStart.clearFeedback();
   if (downloadDialogElement.value && !downloadDialogElement.value.open) {
+    downloadConfirmationInvoker.value = event.currentTarget;
     downloadDialogElement.value.showModal();
     downloadConfirmationOpen.value = true;
   }
@@ -126,13 +153,17 @@ async function startDownload() {
     const result = await downloadStart.startDownload({ decisionId });
     if (result && !disposed && props.decisionId === decisionId) closeDownloadConfirmation();
     return result;
-  });
+  }, downloadConfirmationInvoker.value);
 }
 
-watch(() => props.decisionId, closeDownloadConfirmation, { flush: 'sync' });
+watch(() => props.decisionId, () => {
+  disposeCommandFocusTrackers();
+  closeDownloadConfirmation();
+}, { flush: 'sync' });
 
 onBeforeUnmount(() => {
   disposed = true;
+  disposeCommandFocusTrackers();
   closeDownloadConfirmation();
 });
 
@@ -142,7 +173,6 @@ defineExpose({ busy, refresh: decisionDetail.refresh });
 <template>
   <article
     class="hx-card missing-music-inspector"
-    :aria-busy="busy ? 'true' : undefined"
   >
     <header class="hx-card-header">
       <div>
@@ -179,21 +209,25 @@ defineExpose({ busy, refresh: decisionDetail.refresh });
 
       <section class="missing-music-inspector__section" aria-labelledby="missing-music-inspector-current-status">
         <h3 id="missing-music-inspector-current-status" ref="statusHeadingElement" tabindex="-1">Current status</h3>
-        <span class="hx-pill" :data-tone="presentation.statusTone">{{ presentation.statusLabel }}</span>
-        <p>{{ presentation.statusMessage }}</p>
-        <p class="missing-music-inspector__next-step"><strong>Next step:</strong> {{ presentation.nextStep }}</p>
+        <div class="hx-missing-status-snapshot" :aria-busy="busy ? 'true' : undefined">
+          <span class="hx-pill" :data-tone="presentation.statusTone">{{ presentation.statusLabel }}</span>
+          <p>{{ presentation.statusMessage }}</p>
+          <p class="missing-music-inspector__next-step"><strong>Next step:</strong> {{ presentation.nextStep }}</p>
+        </div>
+        <div v-if="presentation.canFindMatches" class="missing-music-inspector__start-download">
+          <button type="button" class="hx-btn" data-variant="primary" aria-describedby="missing-music-find-matches-help" :disabled="mutationBusy" @click="requestMatches">
+            {{ findMatches.isPending.value ? 'Requesting…' : 'Find matches' }}
+          </button>
+          <p id="missing-music-find-matches-help">Request matches for this release for {{ presentation.username }}. Acquisition will follow the saved automation policy.</p>
+        </div>
+        <MissingMusicCommandFeedback :status-message="findMatches.statusMessage.value" :error-message="findMatches.errorMessage.value" />
         <div v-if="presentation.canSearchAgain" class="missing-music-inspector__start-download">
           <button type="button" class="hx-btn" :data-variant="presentation.canAllowFallbackQuality ? undefined : 'primary'" :disabled="mutationBusy" @click="queueSearchAgain">
             {{ searchAgain.isPending.value ? 'Queueing…' : 'Search again' }}
           </button>
           <p>Queue a new search for this release using its saved automation policy.<template v-if="presentation.canAllowFallbackQuality"> This keeps the current quality choice.</template></p>
         </div>
-        <p v-if="searchAgain.statusMessage.value" class="missing-music-inspector__selection-feedback" role="status" aria-atomic="true">
-          {{ searchAgain.statusMessage.value }}
-        </p>
-        <p v-if="searchAgain.errorMessage.value" class="missing-music-inspector__selection-feedback" data-tone="danger" role="alert">
-          {{ searchAgain.errorMessage.value }}
-        </p>
+        <MissingMusicCommandFeedback :status-message="searchAgain.statusMessage.value" :error-message="searchAgain.errorMessage.value" />
         <div v-if="presentation.canStartDownload" class="missing-music-inspector__start-download">
           <button
             type="button"
@@ -220,22 +254,8 @@ defineExpose({ busy, refresh: decisionDetail.refresh });
           </RouterLink>
           <p>Monitor the submitted transfer separately from this release decision.</p>
         </div>
-        <p
-          v-if="downloadStart.statusMessage.value"
-          class="missing-music-inspector__selection-feedback"
-          role="status"
-          aria-atomic="true"
-        >
-          {{ downloadStart.statusMessage.value }}
-        </p>
-        <p
-          v-if="downloadStart.errorMessage.value"
-          class="missing-music-inspector__selection-feedback"
-          data-tone="danger"
-          role="alert"
-        >
-          {{ downloadStart.errorMessage.value }}
-        </p>
+        <MissingMusicCommandFeedback :status-message="downloadStart.statusMessage.value" :error-message="downloadStart.errorMessage.value" />
+        <MissingMusicCommandFeedback :status-message="matchSelection.statusMessage.value" :error-message="matchSelection.errorMessage.value" />
       </section>
 
       <dl class="missing-music-inspector__facts">
@@ -282,23 +302,6 @@ defineExpose({ busy, refresh: decisionDetail.refresh });
             <template v-if="matchChoicePresentation.canSelect">Selecting a match does not start a download.</template>
           </p>
         </div>
-
-        <p
-          v-if="matchSelection.statusMessage.value"
-          class="missing-music-inspector__selection-feedback"
-          role="status"
-          aria-atomic="true"
-        >
-          {{ matchSelection.statusMessage.value }}
-        </p>
-        <p
-          v-if="matchSelection.errorMessage.value"
-          class="missing-music-inspector__selection-feedback"
-          data-tone="danger"
-          role="alert"
-        >
-          {{ matchSelection.errorMessage.value }}
-        </p>
 
         <ul class="missing-music-inspector__match-list" aria-label="Available matches">
           <li v-for="match in matchChoicePresentation.choices" :key="match.id">
@@ -403,6 +406,8 @@ defineExpose({ busy, refresh: decisionDetail.refresh });
   color: var(--hx-text-strong);
   font-size: var(--hx-text-base);
 }
+
+.hx-missing-status-snapshot { display: grid; justify-items: start; gap: var(--hx-space-2); }
 
 .missing-music-inspector__section h3:focus {
   outline: 2px solid var(--hx-accent);

@@ -23,6 +23,7 @@ import { createMissingMusicDecisionTargetService } from './missing-music-decisio
 import { createMissingMusicDownloaderHandoffService } from './missing-music-downloader-handoff-service.js';
 import { createMissingMusicSearchAgainService } from './missing-music-search-again-service.js';
 import { createMissingMusicFallbackQualityService } from './missing-music-fallback-quality-service.js';
+import { createMissingMusicFindMatchesService } from './missing-music-find-matches-service.js';
 
 export function createMissingMusicModule({
   allowMusicQueueReleaseFallbackQuality,
@@ -32,6 +33,8 @@ export function createMissingMusicModule({
   listWantedReleasesWithMetadata,
   recordActivityEventFn = null,
   requestMusicQueueReleaseRediscovery,
+  requestInitialMusicSearch,
+  startLibraryDiscoveryRun,
   selectImportCandidate,
   startImportCandidateExecutionRun,
 } = {}) {
@@ -66,6 +69,8 @@ export function createMissingMusicModule({
     allowMusicQueueReleaseFallbackQuality,
     resolveMissingMusicDecisionTarget: missingMusicDecisionTargetService.resolveMissingMusicDecisionTarget,
   });
+  const missingMusicFindMatchesService = createMissingMusicFindMatchesService({ requestInitialMusicSearch, startLibraryDiscoveryRun,
+    resolveMissingMusicDecisionTarget: missingMusicDecisionTargetService.resolveMissingMusicDecisionTarget });
 
   return {
     missingMusicDecisionCommandService,
@@ -75,7 +80,9 @@ export function createMissingMusicModule({
     missingMusicDownloaderHandoffService,
     missingMusicSearchAgainService,
     missingMusicFallbackQualityService,
+    missingMusicFindMatchesService,
     routeDependencies: {
+      findMissingMusicDecisionMatches: missingMusicFindMatchesService.findMissingMusicDecisionMatches,
       allowMissingMusicDecisionFallbackQuality: missingMusicFallbackQualityService.allowMissingMusicDecisionFallbackQuality,
       executeIdempotentMutation,
       getMissingMusicDecisionDetail: missingMusicDecisionService.getMissingMusicDecisionDetail,

@@ -601,6 +601,8 @@ export function createApp({
     startLibraryDiscoveryRun: libraryModule.routeDependencies.startLibraryDiscoveryRun,
   });
   const missingMusicModule = buildMissingMusicModule({
+    requestInitialMusicSearch: libraryModule.libraryInitialSearchService.requestInitialMusicSearch,
+    startLibraryDiscoveryRun: libraryModule.routeDependencies.startLibraryDiscoveryRun,
     allowMusicQueueReleaseFallbackQuality: acquisitionModule.acquisitionPipelineService.allowMusicQueueReleaseFallbackQuality,
     executeIdempotentMutation: controlPlaneIdempotencyService.executeIdempotentMutation,
     listAppUsers: appUserModule.appUserService.listAppUsers,

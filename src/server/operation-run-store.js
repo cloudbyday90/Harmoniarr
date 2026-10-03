@@ -212,8 +212,8 @@ export function createOperationRunStore({
     return normalizeOperationRun(result.rows[0]);
   }
 
-  async function getActiveRun() {
-    const pool = getPoolFn();
+  async function getActiveRun({ queryable = null } = {}) {
+    const pool = queryable ?? getPoolFn();
     const result = await pool.query(
       `
         SELECT id, operation_type, status, started_at, finished_at, summary, error_message, cancel_requested_at, cancel_requested_by_user_id, cancelled_at, next_attempt_at, attempt_count, max_attempts, claimed_at, claimed_by_instance_id

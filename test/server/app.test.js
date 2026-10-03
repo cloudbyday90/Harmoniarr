@@ -28,6 +28,7 @@ suite('createApp', () => {
   const missingMusicModule = { routeDependencies: { missingMusic: 'deps' } };
   const libraryModule = {
     libraryMusicQueueRediscoveryService: { requestGuardedMusicQueueRediscovery: async () => null },
+    libraryInitialSearchService: { requestInitialMusicSearch: async () => null },
     libraryFallbackQualityService: { allowGuardedMusicQueueFallbackQuality: async () => null },
     libraryDiscoveryRequestService: {
       reconcileDiscoveryRequests: t.mock.fn(async () => {}),
@@ -596,6 +597,7 @@ suite('createApp', () => {
     createImportCandidateModule: () => ({ routeDependencies: {} }),
     createLibraryModule: () => ({
       libraryMusicQueueRediscoveryService: { requestGuardedMusicQueueRediscovery: async () => null },
+      libraryInitialSearchService: { requestInitialMusicSearch: async () => null },
       libraryFallbackQualityService: { allowGuardedMusicQueueFallbackQuality: async () => null },
       libraryDiscoveryRequestService: {
         reconcileDiscoveryRequests: async () => {},

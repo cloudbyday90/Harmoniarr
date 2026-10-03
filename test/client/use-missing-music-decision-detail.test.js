@@ -122,6 +122,23 @@ test('decision detail retains the bounded quality projection and server fallback
   assert.equal(decisionDetail.detail.value.permissions.canAllowFallbackQuality, true);
 });
 
+test('decision detail normalizes initial search permission strictly without deriving it from a status', async (t) => {
+  let permission = true;
+  const { app, decisionDetail } = mountDecisionDetail({
+    decisionId: 'wanted-amber',
+    fetchMissingMusicDecisionDetail: async () => ({ ...createDetail(), permissions: { canFindMatches: permission } }),
+  });
+  t.after(() => app.unmount());
+  await decisionDetail.load();
+  assert.equal(decisionDetail.detail.value.permissions.canFindMatches, true);
+  permission = 'true';
+  await decisionDetail.load();
+  assert.equal(decisionDetail.detail.value.permissions.canFindMatches, false);
+  permission = undefined;
+  await decisionDetail.load();
+  assert.equal(decisionDetail.detail.value.permissions.canFindMatches, false);
+});
+
 function deferred() {
   let resolve;
   let reject;
