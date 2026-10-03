@@ -67,6 +67,19 @@ function createDetail(decisionId = 'wanted-amber') {
   };
 }
 
+test('decision detail retains only the strict server prepared-add permission', async (t) => {
+  const payload = createDetail();
+  payload.permissions.canAddToLibrary = 'true';
+  payload.decision.status = { nextAction: 'add_to_library' };
+  const { app, decisionDetail } = mountDecisionDetail({ decisionId: 'wanted-amber', fetchMissingMusicDecisionDetail: async () => payload });
+  t.after(() => app.unmount());
+  await decisionDetail.load();
+  assert.equal(decisionDetail.detail.value.permissions.canAddToLibrary, false);
+  payload.permissions.canAddToLibrary = true;
+  await decisionDetail.refresh();
+  assert.equal(decisionDetail.detail.value.permissions.canAddToLibrary, true);
+});
+
 test('useMissingMusicDecisionDetail reads a scoped release projection by route identifier', async (t) => {
   const decisionId = ref('wanted-amber');
   const fetchMissingMusicDecisionDetail = t.mock.fn(async (id) => createDetail(id));

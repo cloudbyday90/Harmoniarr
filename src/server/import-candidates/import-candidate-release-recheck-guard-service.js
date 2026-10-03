@@ -9,7 +9,8 @@ import { isDeepStrictEqual } from 'node:util';
 import { createApiError } from '../auth.js';
 import { lockAppUserEligibility } from '../app-user-eligibility-lock-store.js';
 import { createDatabaseTransactionRunner } from '../database-transaction-service.js';
-import { canRecheckLibraryAdd, hasQueuedLibraryAddRecheck } from '../acquisition/acquisition-library-add-recheck-policy.js';
+import { canRecheckLibraryAdd } from '../acquisition/acquisition-library-add-recheck-policy.js';
+import { hasQueuedGuardedLibraryAdd, isPreparedReleaseLibraryAddEligible } from '../acquisition/acquisition-library-add-policy.js';
 import { lockImportCandidateApplyCreation } from './import-candidate-apply-queue-store.js';
 import { getRecheckWantedReleaseIds } from './import-candidate-release-recheck-quality-policy.js';
 
@@ -25,7 +26,7 @@ export function createImportCandidateReleaseRecheckGuardService({ assertMaintena
     saveQualityContext: recheckStore?.saveQualityContext })) {
     if (typeof dependency !== 'function') throw new TypeError(`createImportCandidateReleaseRecheckGuardService requires ${name}`);
   }
-  async function commitPreparedReleaseRecheck({ prepared, appUserId, wantedReleaseId, actorUserId, requestMetadata }) {
+  async function commitPreparedSafeAdd({ prepared, appUserId, wantedReleaseId, actorUserId, requestMetadata }, isPreparedAdd) {
     return withTransaction(async (queryable) => {
       await assertMaintenanceWriteAllowed({ queryable });
       const wantedReleaseIds = getRecheckWantedReleaseIds(prepared.candidate);
@@ -37,28 +38,35 @@ export function createImportCandidateReleaseRecheckGuardService({ assertMaintena
       const release = await recheckStore.readOwnedRelease({ appUserId, wantedReleaseId, queryable });
       if (!release) throw createApiError(404, 'missing_music_decision_not_found', 'Missing Music release was not found');
       if (release.targetUser.isDisabled) throw createApiError(409, 'missing_music_decision_read_only', 'This Missing Music history is read-only');
-      const facts = release.libraryAddRecoveryFacts;
+      const facts = isPreparedAdd ? release.libraryAddFacts : release.libraryAddRecoveryFacts;
       if (facts?.candidateId !== prepared.candidate.id) return { outcome: 'not_available' };
-      if (hasQueuedLibraryAddRecheck(facts)) return { outcome: 'already_queued', runId: facts.activeRunId };
-      if (!canRecheckLibraryAdd({ release, targetUser: release.targetUser })) return { outcome: 'not_available' };
+      if (hasQueuedGuardedLibraryAdd(facts)) return { outcome: 'already_queued', runId: facts.activeRunId };
       if (facts.activeRunId) return { outcome: 'deferred' };
+      const eligible = isPreparedAdd ? isPreparedReleaseLibraryAddEligible : canRecheckLibraryAdd;
+      if (!eligible({ release, targetUser: release.targetUser })) return { outcome: 'not_available' };
       const candidate = await getImportCandidate({ importCandidateId: prepared.candidate.id, queryable });
       const participants = await recheckStore.readParticipantPolicies({ wantedReleaseIds, queryable });
       const decisions = await listFileDecisions({ importCandidateId: prepared.candidate.id }, queryable);
       if (!isDeepStrictEqual(candidate, prepared.candidate) || !isDeepStrictEqual(participants, prepared.participants)
         || !isDeepStrictEqual(decisions, prepared.decisions)
-        || !isDeepStrictEqual({ addBlockerCode: facts.addBlockerCode, recoveryReasonCode: facts.recoveryReasonCode }, prepared.stop)) {
+        || (!isPreparedAdd && !isDeepStrictEqual({ addBlockerCode: facts.addBlockerCode, recoveryReasonCode: facts.recoveryReasonCode }, prepared.stop))) {
         return { outcome: 'not_available' };
       }
-      await recheckStore.saveQualityContext({ importCandidateId: candidate.id, musicQueueContext: prepared.qualityContext, queryable });
-      await resumeImportCandidateForSafeAdd({ actorUserId, importCandidateId: candidate.id, queryable,
-        reason: 'Automatic library add resumed after prerequisite repair', requestMetadata });
+      if (!prepared.qualityContext) return { outcome: 'not_available' };
+      const marker = isPreparedAdd ? 'libraryAddRequestedForWantedReleaseId' : 'recheckRequestedForWantedReleaseId';
+      await recheckStore.saveQualityContext({ importCandidateId: candidate.id, musicQueueContext: { ...prepared.qualityContext, [marker]: wantedReleaseId },
+        candidateStatus: isPreparedAdd ? 'import_pending' : 'failed', queryable });
+      if (!isPreparedAdd) {
+        await resumeImportCandidateForSafeAdd({ actorUserId, importCandidateId: candidate.id, queryable,
+          reason: 'Automatic library add resumed after prerequisite repair', requestMetadata });
+      }
       const started = await queuePreparedImportCandidateApply({ applySafetyMode: 'safe_auto', importCandidateIds: [candidate.id],
         preparedSummary: { counts: { blocked: 0, ready: 1, readyWithWarnings: 0, totalImportPending: 1 },
           importPendingCandidates: [{ id: candidate.id }] }, queryable, requestMetadata, triggeredByUserId: actorUserId,
-        triggerSource: 'music_queue_prerequisite_recheck' });
+        triggerSource: isPreparedAdd ? 'music_queue_manual_add' : 'music_queue_prerequisite_recheck' });
       return { outcome: 'queued', runId: started.run.id };
     });
   }
-  return { commitPreparedReleaseRecheck };
+  return { commitPreparedReleaseRecheck: (input) => commitPreparedSafeAdd(input, false),
+    commitPreparedReleaseLibraryAdd: (input) => commitPreparedSafeAdd(input, true) };
 }

@@ -8,6 +8,37 @@ Database model source: `docs/DATABASE_MODEL.md`
 
 ## Current development slice (2026-10-03)
 
+- Canonical guarded **Add to library** is complete for one
+  prepared eligible download, with strict permission and default action-worklist
+  discovery, recipient-aware native confirmation, durable replay and truthful
+  queued status. Shared preparation, acceptance and worker policy owners preserve
+  quality/file safeguards. See the separate
+  [design](MISSING_MUSIC_ADD_TO_LIBRARY_DESIGN.md) and
+  [outcome](MISSING_MUSIC_ADD_TO_LIBRARY_OUTCOME.md) for alternatives, stack,
+  results and limits.
+- Complete `npm run validate` passes 8,776 tests: 3,731 server, 4,348 client,
+  513 script and 184 integration, with zero failures/skips, all policy/lint
+  checks and both builds. Nineteen rebuilt browser scenarios and fourteen
+  focused PostgreSQL/media scenarios pass; focused database totals overlap the
+  complete run. Six confirmation captures were reviewed. Dependency audit
+  reports zero vulnerabilities. Older unmarked manual-add jobs refuse before
+  file work; strict spectral acceptance and actual queued consent revocation
+  are not claimed.
+- Fresh PR applicability again found no eligible unreplayed patch; an explicit
+  empty second page corroborates the observed collection boundary. See its
+  [design](OPEN_PR_APPLICABILITY_ADD_TO_LIBRARY_2026_10_DESIGN.md) and
+  [outcome](OPEN_PR_APPLICABILITY_ADD_TO_LIBRARY_2026_10_OUTCOME.md).
+- The [web-standards skill](../.agents/skills/harmoniarr-web-standards/SKILL.md)
+  now maps native confirmation/inert feedback and intentional form-submit
+  behavior, plus provenance capture before awaited preview. Repository/installed
+  validation and four-file identity pass.
+- Next recommendation: extend the shared current-recipient/policy worker guard
+  to automatic completed-download Music Queue adds, with consent/quality and
+  durable queue evidence. Current work defers unguarded automatic jobs.
+- Development remains on main without a release, tag, new branch or PR merge.
+
+## Prior development slice: Library-add recheck (2026-10-03)
+
 - Missing Music completes canonical **Check the files again** after prerequisite
   repair. Settings returns to the same recipient without automatic acquisition;
   explicit recheck uses server scope, durable retry, fresh safe planning and
@@ -35,10 +66,8 @@ Database model source: `docs/DATABASE_MODEL.md`
   checks, and both builds. Eight focused PostgreSQL/media scenarios and 15 rebuilt
   browser scenarios pass; focused totals overlap the complete run. Six responsive
   panel captures were reviewed. Dependency audit reports zero vulnerabilities.
-- Next: canonical guarded **Add to library** for an already prepared eligible
-  download. Reuse the atomic queue and final-input safeguards; extend current
-  recipient/policy checks and prove confirmation, permission, replay, and refresh
-  before exposing the command.
+- Its recommended canonical guarded **Add to library** is completed in the
+  current slice above, reusing the atomic queue and final-input safeguards.
 - Development remains on main. No release, tag, PR merge, workflow dispatch, or
   image publication is performed by this slice. Screen-reader speech, live
   provider acceptance, strict-lossless spectral acceptance, and production-scale
@@ -73,9 +102,9 @@ Database model source: `docs/DATABASE_MODEL.md`
   checks, and both builds. Final browser/test lint passed after aligning the
   controlled fixture with production status. Dependency audit reports zero
   vulnerabilities. Focused totals overlap broader validation.
-- Its recommended **library-add recheck** and Settings return handoff are now
-  implemented in the current slice above. Guarded manual **Add to library** remains
-  the next separate command.
+- Its recommended **library-add recheck** and Settings return handoff are
+  implemented in the prior recheck slice above; canonical **Add to library** is
+  completed in the current slice.
 - This is development on main; no release or published-artifact acceptance is
   claimed. Actual assistive-technology announcements, live-provider acceptance,
   and production-scale candidate-history latency remain unverified.

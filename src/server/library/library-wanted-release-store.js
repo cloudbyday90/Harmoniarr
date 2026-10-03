@@ -22,6 +22,7 @@ import { normalizeMetadataReleaseDateForDateColumn } from '../metadata/metadata-
 import { createLibraryDiscoveryRequestWantedReleaseLinkStore } from './library-discovery-request-wanted-release-link-store.js';
 import { createLibraryWantedReleasePageStore } from './library-wanted-release-page-store.js';
 import { RELEASE_RECHECK_FACTS_LATERAL_SQL, RELEASE_RECHECK_FACTS_SELECT_SQL, mapReleaseRecheckFacts } from '../import-candidates/import-candidate-release-recheck-store.js';
+import { RELEASE_PREPARED_ADD_FACTS_LATERAL_SQL, RELEASE_PREPARED_ADD_FACTS_SELECT_SQL, mapReleasePreparedAddFacts } from '../import-candidates/import-candidate-release-prepared-add-facts.js';
 
 function toInteger(value) {
   return Number.parseInt(String(value ?? 0), 10) || 0;
@@ -528,7 +529,8 @@ export function createLibraryWantedReleaseStore({
           import_apply_summary.latest_quality_blocked_message AS import_apply_latest_quality_blocked_message,
           import_apply_summary.latest_quality_gate AS import_apply_latest_quality_gate,
           import_apply_summary.latest_recovery_reason_code AS import_apply_latest_recovery_reason_code,
-          ${RELEASE_RECHECK_FACTS_SELECT_SQL}
+          ${RELEASE_RECHECK_FACTS_SELECT_SQL},
+          ${RELEASE_PREPARED_ADD_FACTS_SELECT_SQL}
         FROM library_wanted_releases lwr
         JOIN metadata_artists ma ON ma.id = lwr.metadata_artist_id
         JOIN metadata_release_groups mrg ON mrg.id = lwr.metadata_release_group_id
@@ -849,6 +851,7 @@ export function createLibraryWantedReleaseStore({
           FROM latest_items
         ) import_apply_summary ON TRUE
         ${RELEASE_RECHECK_FACTS_LATERAL_SQL}
+        ${RELEASE_PREPARED_ADD_FACTS_LATERAL_SQL}
         ${whereClause}
         ORDER BY ma.sort_name ASC NULLS LAST, ma.name ASC, mrg.first_release_date ASC NULLS LAST, mr.release_date ASC NULLS LAST
         ${limitClause}
@@ -868,6 +871,7 @@ export function createLibraryWantedReleaseStore({
       discoveryLinkExists: row.discovery_link_exists === true,
       hasPriorDiscoveryCandidates: row.has_prior_discovery_candidates !== false,
       libraryAddRecoveryFacts: mapReleaseRecheckFacts(row),
+      libraryAddFacts: mapReleasePreparedAddFacts(row),
       discoveryRequest: row.discovery_request_status
         ? {
             blockedReason: row.discovery_blocked_reason ?? null,

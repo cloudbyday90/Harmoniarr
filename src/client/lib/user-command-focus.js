@@ -17,8 +17,9 @@ export function createUserCommandFocusTracker({ document, returnTarget = null } 
   return {
     ownsFocus: () => ownsFocus && (document.activeElement === document.body || isOwnedTarget(document.activeElement)),
     restoreAfterFailure() {
-      if (ownsFocus && document.activeElement === document.body && initiator?.isConnected && !initiator.disabled) {
-        initiator.focus({ preventScroll: true });
+      const failureTarget = initiator?.closest?.('dialog')?.open === false && returnTarget ? returnTarget : initiator;
+      if (ownsFocus && document.activeElement === document.body && failureTarget?.isConnected && !failureTarget.disabled) {
+        failureTarget.focus({ preventScroll: true });
       }
     },
     dispose: () => document?.removeEventListener('focusin', onFocus),

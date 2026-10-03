@@ -5,6 +5,8 @@
  * See LICENSE file for details.
  */
 
+import { hasQueuedGuardedLibraryAdd } from './acquisition-library-add-policy.js';
+
 export function getLibraryAddRecheckReason(facts) {
   if (facts?.addBlockerCode === 'source_path_unavailable') return 'source_path_unavailable';
   return facts?.addBlockerCode === 'media_verification' && facts.recoveryReasonCode === 'audio_check_failed'
@@ -12,8 +14,7 @@ export function getLibraryAddRecheckReason(facts) {
 }
 
 export function hasQueuedLibraryAddRecheck(facts) {
-  return facts?.candidateStatus === 'import_pending' && facts.runMatchesCandidate === true
-    && ['pending', 'running'].includes(facts.activeRunStatus) && facts.activeRunSafetyMode === 'safe_auto';
+  return hasQueuedGuardedLibraryAdd(facts);
 }
 
 export function canRecheckLibraryAdd({ release, targetUser, facts = release?.libraryAddRecoveryFacts } = {}) {

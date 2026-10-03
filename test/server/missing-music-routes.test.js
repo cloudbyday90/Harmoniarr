@@ -22,6 +22,7 @@ function createMissingMusicRouteTestApp(overrides = {}) {
       selectMissingMusicDecisionMatch: async () => ({ action: {} }),
       allowMissingMusicDecisionFallbackQuality: async () => ({ action: {} }),
       findMissingMusicDecisionMatches: async () => ({ action: {} }),
+      addMissingMusicDecisionToLibrary: async () => ({ action: {} }),
       recheckMissingMusicDecisionLibraryAdd: async () => ({ action: {} }),
       searchMissingMusicDecisionAgain: async () => ({ action: {} }),
       startMissingMusicDecisionDownload: async () => ({ action: {} }),
@@ -46,6 +47,72 @@ function createMissingMusicRouteTestApp(overrides = {}) {
     });
   });
 }
+
+test('prepared Add to library authenticates, rejects body overrides, and preserves its exact durable decision contract', async (t) => {
+  const order = [];
+  const actorUser = { id: 'admin-1', isDisabled: false, role: 'admin', username: 'admin' };
+  const action = { code: 'add_to_library', decisionId: 'wanted-amber', targetUserId: 'listener-1', outcome: 'queued', runId: 'run-add' };
+  const addMissingMusicDecisionToLibrary = t.mock.fn(async () => { order.push('add'); return { action }; });
+  const executeIdempotentMutation = t.mock.fn(async ({ executeMutation }) => { order.push('durable'); return executeMutation(); });
+  const app = createMissingMusicRouteTestApp({ addMissingMusicDecisionToLibrary, executeIdempotentMutation,
+    requireFreshSession: async () => { order.push('fresh'); return { appUserId: actorUser.id, user: actorUser }; },
+    requireCsrf: () => { order.push('csrf'); }, getRequestMetadata: () => ({ ipAddress: '127.0.0.1' }) });
+  await withServer(app, async (baseUrl) => {
+    const request = (body) => fetch(`${baseUrl}/api/v1/missing-music/decisions/wanted-amber/add-to-library?targetUserId=untrusted`, {
+      method: 'POST', headers: { 'content-type': 'application/json', 'idempotency-key': 'prepared-add-1' }, body: JSON.stringify(body),
+    });
+    const response = await request({});
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { ok: true, action });
+    assert.deepEqual(order, ['fresh', 'csrf', 'durable', 'add']);
+    assert.deepEqual(addMissingMusicDecisionToLibrary.mock.calls[0].arguments[0], {
+      actorUser, decisionId: 'wanted-amber', requestMetadata: { ipAddress: '127.0.0.1' },
+    });
+    const reservation = executeIdempotentMutation.mock.calls[0].arguments[0];
+    assert.equal(reservation.actorUserId, actorUser.id);
+    assert.equal(reservation.operationScope, 'missing-music.decisions.add-to-library');
+    assert.equal(reservation.idempotencyKey, 'prepared-add-1');
+    assert.deepEqual(reservation.requestPayload, { decisionId: 'wanted-amber' });
+    for (const body of [{ targetUserId: 'other' }, { candidateId: 'candidate' }, { sourcePath: '/private/download' },
+      { applySafetyMode: 'manual' }, { minimumBitrateKbps: 128 }, []]) {
+      assert.equal((await request(body)).status, 400);
+    }
+    assert.equal(executeIdempotentMutation.mock.callCount(), 1);
+    assert.equal(addMissingMusicDecisionToLibrary.mock.callCount(), 1);
+  });
+});
+
+test('prepared Add to library blocks stale session and invalid CSRF before durable or filesystem work', async (t) => {
+  for (const [status, overrides] of [[401, { requireFreshSession: async () => { throw createApiError(401, 'reauth_required', 'Sign in again'); } }],
+    [403, { requireFreshSession: async () => ({ appUserId: 'requester', user: { role: 'requester' } }),
+      requireCsrf: () => { throw createApiError(403, 'csrf_invalid', 'Invalid token'); } }]]) {
+    const addMissingMusicDecisionToLibrary = t.mock.fn();
+    const executeIdempotentMutation = t.mock.fn();
+    await withServer(createMissingMusicRouteTestApp({ addMissingMusicDecisionToLibrary, executeIdempotentMutation, ...overrides }), async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/v1/missing-music/decisions/wanted-amber/add-to-library`, { method: 'POST' });
+      assert.equal(response.status, status);
+      assert.equal(executeIdempotentMutation.mock.callCount(), 0);
+      assert.equal(addMissingMusicDecisionToLibrary.mock.callCount(), 0);
+    });
+  }
+});
+
+test('prepared Add to library preserves each persisted bounded outcome on replay without repeating preparation', async (t) => {
+  for (const outcome of ['queued', 'already_queued', 'still_needs_review', 'not_available', 'deferred']) {
+    const addMissingMusicDecisionToLibrary = t.mock.fn();
+    const action = { code: 'add_to_library', decisionId: 'wanted-amber', targetUserId: 'listener-1', outcome,
+      runId: ['queued', 'already_queued'].includes(outcome) ? 'run-add' : null };
+    await withServer(createMissingMusicRouteTestApp({ addMissingMusicDecisionToLibrary,
+      requireFreshSession: async () => ({ appUserId: 'admin-1', user: { role: 'admin' } }), requireCsrf: () => {},
+      executeIdempotentMutation: async () => ({ body: { action }, statusCode: 200, replayed: true }),
+    }), async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/v1/missing-music/decisions/wanted-amber/add-to-library`, { method: 'POST' });
+      assert.equal(response.status, 200);
+      assert.deepEqual(await response.json(), { ok: true, action });
+      assert.equal(addMissingMusicDecisionToLibrary.mock.callCount(), 0);
+    });
+  }
+});
 
 test('library-add recheck authenticates a fresh actor before CSRF and executes a decision-only durable command', async (t) => {
   const actorUser = { id: 'admin-1', isDisabled: false, role: 'admin', username: 'admin' };

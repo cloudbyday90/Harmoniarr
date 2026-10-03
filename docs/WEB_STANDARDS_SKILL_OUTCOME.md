@@ -121,3 +121,25 @@ reference-only update. All four installed files still match their maintained
 source by SHA-256. The review supported this narrow maintenance edit; no new
 blind behavioral trial of the skill is claimed. Application execution and its
 limits belong in the [recheck outcome](MISSING_MUSIC_LIBRARY_ADD_RECHECK_OUTCOME.md).
+
+## Add to library confirmation maintenance, October 3
+
+The next [Add to library journey](MISSING_MUSIC_ADD_TO_LIBRARY_DESIGN.md) uses
+native modal confirmation. Its reference now distinguishes normative WHATWG
+dialog behavior from informative APG and the product's chosen timing. Outside
+content is inert while a native modal stays open; pending feedback must remain
+exposed inside it or after closure. The project evidence map locates this
+confirmation/focus boundary. Button guidance also distinguishes ordinary
+non-submit commands from intentional typed form submission.
+
+Independent application review found that capturing provenance after awaited
+preview preparation could compare changed state with itself. The queued-file
+evidence row now calls for capture before that await, comparison before mutation,
+and a delayed-preview drift case. This records the observed timing defect and
+its bounded correction alongside the existing alternate-input evidence.
+
+The repository and installed skills both pass `quick_validate.py`; all four
+files match by SHA-256 after the two-reference update. The entry point and
+invocation policy are unchanged. No new blind behavioral trial is claimed.
+Application evidence and its limits are recorded in the separate
+[Add to library outcome](MISSING_MUSIC_ADD_TO_LIBRARY_OUTCOME.md).

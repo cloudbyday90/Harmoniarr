@@ -18,6 +18,7 @@
 
 import { getMissingMusicNextStep } from './missing-music-worklist-presentation.js';
 import { buildMissingMusicLibraryAddRecoveryPresentation } from './missing-music-library-add-recheck-presentation.js';
+import { buildMissingMusicLibraryAddPresentation } from './missing-music-library-add-presentation.js';
 
 function normalizeText(value, fallback = '') {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : fallback;
@@ -64,6 +65,7 @@ export function buildMissingMusicDecisionDetailPresentation(detail) {
   const canAllowFallbackQuality = !accountIsDisabled && detail?.permissions?.canAllowFallbackQuality === true;
   const canViewDownloader = detail?.permissions?.canViewDownloader === true;
   const canRecheckLibraryAdd = buildMissingMusicLibraryAddRecoveryPresentation(detail).canRecheck;
+  const canAddToLibrary = buildMissingMusicLibraryAddPresentation(detail).canAdd;
   const selectedMatchNeedsAdministrator = !accountIsDisabled
     && decision.status?.nextAction === 'download_now'
     && !canStartDownload;
@@ -82,6 +84,7 @@ export function buildMissingMusicDecisionDetailPresentation(detail) {
     canAllowFallbackQuality,
     canViewDownloader,
     canRecheckLibraryAdd,
+    canAddToLibrary,
     downloaderLinkAccessibleLabel: `View ${normalizeText(release.title, 'this release')} downloads for ${normalizeText(requestedFor.username, 'the selected user')} in Downloader`,
     lastCheckedAt: formatMissingMusicDecisionCheckedAt(decision.lastReconciledAt),
     nextStep: accountIsDisabled
@@ -94,11 +97,15 @@ export function buildMissingMusicDecisionDetailPresentation(detail) {
         ? 'Search again'
       : canRecheckLibraryAdd
         ? 'Check the files again'
+      : canAddToLibrary
+        ? 'Add to library'
       : selectedMatchNeedsAdministrator
         ? 'A household administrator can start the download.'
       : decision.status?.nextAction === 'search_now'
         ? 'Check the current release status.'
       : decision.status?.nextAction === 'recheck_library_add'
+        ? 'Check the current release status.'
+      : decision.status?.nextAction === 'add_to_library'
         ? 'Check the current release status.'
       : getMissingMusicNextStep(decision.status?.nextAction),
     releaseMeta: [formatReleaseType(release.releaseGroupType), normalizeText(release.releaseDate)]

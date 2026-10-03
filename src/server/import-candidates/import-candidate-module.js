@@ -374,10 +374,12 @@ export function createImportCandidateModule({
     }),
   importCandidateReleaseManualSafeAdd = importCandidateReleaseManualSafeAddService
     ?? createImportCandidateReleaseManualSafeAddService({
+      recheckStore: importCandidateReleaseRecheckStore,
       getImportCandidate: importCandidateService.getImportCandidate,
+      listFileDecisions: listImportCandidateFileDecisions,
       previewImportCandidateApply: importCandidateApplyPreviewService.previewImportCandidateApply,
       safeAutoAddQualityGateService: importCandidateSafeAutoAddQualityGateService,
-      startImportCandidateApplyRun: importCandidateApplyService.startImportCandidateApplyRun,
+      commitPreparedReleaseLibraryAdd: importCandidateReleaseRecheckGuardService.commitPreparedReleaseLibraryAdd,
     }),
   importCandidateAutoApplyRunService = createImportCandidateAutoApplyRunService({
     handleImportCandidateImportBlocker: importCandidateRecoveryService.handleImportCandidateImportBlocker,

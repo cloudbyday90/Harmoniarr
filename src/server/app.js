@@ -601,6 +601,7 @@ export function createApp({
     startLibraryDiscoveryRun: libraryModule.routeDependencies.startLibraryDiscoveryRun,
   });
   const missingMusicModule = buildMissingMusicModule({
+    startReleaseManualSafeAdd: importCandidateModule.importCandidateReleaseManualSafeAddService?.startReleaseManualSafeAdd,
     recheckReleaseSafeAdd: importCandidateModule.importCandidateReleaseSafeAddRecheckService?.recheckReleaseSafeAdd,
     requestInitialMusicSearch: libraryModule.libraryInitialSearchService.requestInitialMusicSearch,
     startLibraryDiscoveryRun: libraryModule.routeDependencies.startLibraryDiscoveryRun,

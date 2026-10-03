@@ -18,7 +18,8 @@ test('recheck permits only current prerequisite failures on active owned missing
 });
 test('public recovery projects only allowed category and exact active safe-auto membership', () => {
   const facts = { ...release.libraryAddRecoveryFacts, candidateStatus: 'import_pending', activeRunId: 'run-1',
-    activeRunStatus: 'pending', activeRunSafetyMode: 'safe_auto', runMatchesCandidate: true, rawPath: '/private/path' };
+    activeRunStatus: 'pending', activeRunSafetyMode: 'safe_auto', runMatchesCandidate: true,
+    activeRunTriggerSource: 'music_queue_prerequisite_recheck', owningTargetMarkerValid: true, rawPath: '/private/path' };
   assert.deepEqual(buildPublicLibraryAddRecovery(facts), { reasonCode: 'source_path_unavailable', queued: true, runId: 'run-1' });
   assert.deepEqual(buildPublicLibraryAddRecovery({ ...facts, activeRunSafetyMode: 'manual' }), { reasonCode: 'source_path_unavailable', queued: false, runId: null });
 });

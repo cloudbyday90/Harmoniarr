@@ -594,12 +594,7 @@ export function createAcquisitionPipelineService({
       throw createApiError(404, 'music_queue_release_not_found', 'Music Queue release was not found');
     }
 
-    const projectedRelease = projectMusicQueueRelease(release, { qualityPolicyService, statusService });
-    if (projectedRelease.status?.code !== 'ready_to_add') {
-      throw createApiError(409, 'music_queue_manual_add_not_available', 'This release is not ready to add to the library');
-    }
-
-    const importCandidateId = findReleaseImportPendingCandidateId(release);
+    const importCandidateId = release.libraryAddFacts?.candidateId ?? findReleaseImportPendingCandidateId(release);
     if (!importCandidateId) {
       throw createApiError(409, 'music_queue_manual_add_not_available', 'This release does not have one ready completed download to add');
     }

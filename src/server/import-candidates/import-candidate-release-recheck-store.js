@@ -6,41 +6,15 @@
  */
 
 import { getPool } from '../database.js';
+import { RELEASE_SAFE_ADD_ACTIVE_RUN_SQL, RELEASE_SAFE_ADD_CONFLICT_SQL, RELEASE_SAFE_ADD_OWNED_CANDIDATE_SQL, RELEASE_SAFE_ADD_RUN_FACTS_SQL } from './import-candidate-release-safe-add-facts-sql.js';
+import { RELEASE_PREPARED_ADD_FACTS_LATERAL_SQL, RELEASE_PREPARED_ADD_FACTS_SELECT_SQL, mapReleasePreparedAddFacts } from './import-candidate-release-prepared-add-facts.js';
 
 // Both the worklist and the guarded command read the same live candidate scope.
 export const RELEASE_RECHECK_FACTS_LATERAL_SQL = `LEFT JOIN LATERAL (
   SELECT candidate.id AS candidate_id, candidate.status AS candidate_status,
     stop.add_blocker_code, stop.recovery_reason_code,
-    EXISTS (SELECT 1 FROM import_candidates other WHERE other.id <> candidate.id
-      AND other.status IN ('selected', 'downloading', 'import_pending')
-      AND (other.source_search_id = candidate.source_search_id
-        OR other.normalized_payload #>> '{discoveryScope,metadataReleaseId}' = lwr.metadata_release_id::text
-        OR other.normalized_payload #>> '{requestOwnership,metadataReleaseId}' = lwr.metadata_release_id::text))
-      OR EXISTS (SELECT 1 FROM library_discovery_request_wanted_release_links current_link
-        WHERE current_link.discovery_request_id = ldr.id
-          AND NOT COALESCE((candidate.normalized_payload #>> '{musicQueue,wantedReleaseId}' = current_link.wanted_release_id::text
-            OR COALESCE(candidate.normalized_payload #> '{musicQueue,wantedReleaseIds}', '[]'::jsonb) ? current_link.wanted_release_id::text
-            OR candidate.normalized_payload #>> '{musicQueueContext,wantedReleaseId}' = current_link.wanted_release_id::text
-            OR COALESCE(candidate.normalized_payload #> '{musicQueueContext,wantedReleaseIds}', '[]'::jsonb) ? current_link.wanted_release_id::text), FALSE))
-      OR EXISTS (SELECT 1 FROM library_discovery_request_wanted_release_links current_link
-        JOIN library_wanted_releases participant ON participant.id = current_link.wanted_release_id
-        JOIN app_users participant_owner ON participant_owner.id = participant.app_user_id
-        WHERE current_link.discovery_request_id = ldr.id AND (participant_owner.is_disabled
-          OR participant.wanted_status NOT IN ('missing', 'partial') OR participant.missing_track_count <= 0
-          OR participant.evidence->>'visibilityState' = 'ignored'))
-      OR EXISTS (SELECT 1 FROM (
-        SELECT candidate.normalized_payload #>> '{musicQueue,wantedReleaseId}' AS wanted_id
-        UNION ALL SELECT candidate.normalized_payload #>> '{musicQueueContext,wantedReleaseId}'
-        UNION ALL SELECT jsonb_array_elements_text(CASE WHEN jsonb_typeof(candidate.normalized_payload #> '{musicQueue,wantedReleaseIds}') = 'array'
-          THEN candidate.normalized_payload #> '{musicQueue,wantedReleaseIds}' ELSE '[]'::jsonb END)
-        UNION ALL SELECT jsonb_array_elements_text(CASE WHEN jsonb_typeof(candidate.normalized_payload #> '{musicQueueContext,wantedReleaseIds}') = 'array'
-          THEN candidate.normalized_payload #> '{musicQueueContext,wantedReleaseIds}' ELSE '[]'::jsonb END)
-      ) original WHERE original.wanted_id IS NOT NULL AND NOT EXISTS (
-        SELECT 1 FROM library_discovery_request_wanted_release_links current_link
-        WHERE current_link.discovery_request_id = ldr.id AND current_link.wanted_release_id::text = original.wanted_id)) AS has_conflicting_candidate,
-    active.id AS active_run_id, active.status AS active_run_status,
-    active.summary->>'applySafetyMode' AS active_run_safety_mode,
-    COALESCE(active.summary->'importCandidateIds' ? candidate.id::text, FALSE) AS run_matches_candidate
+    (${RELEASE_SAFE_ADD_CONFLICT_SQL}) AS has_conflicting_candidate,
+    ${RELEASE_SAFE_ADD_RUN_FACTS_SQL}
   FROM (
     SELECT items.import_candidate_id, items.updated_at AS observed_at,
       CASE WHEN items.apply_snapshot #>> '{apply,outcome}' = 'quality_blocked' THEN 'media_verification'
@@ -54,13 +28,8 @@ export const RELEASE_RECHECK_FACTS_LATERAL_SQL = `LEFT JOIN LATERAL (
     FROM import_candidate_events events WHERE events.event_type = 'import_candidate_import_blocked'
   ) stop
   JOIN import_candidates candidate ON candidate.id = stop.import_candidate_id
-  LEFT JOIN LATERAL (SELECT runs.id, runs.status, runs.summary FROM operation_runs runs
-    WHERE runs.operation_type = 'import_candidate_apply' AND runs.status IN ('pending', 'running')
-    ORDER BY runs.created_at ASC, runs.id ASC LIMIT 1) active ON TRUE
-  WHERE (candidate.normalized_payload #>> '{musicQueue,wantedReleaseId}' = lwr.id::text
-    OR COALESCE(candidate.normalized_payload #> '{musicQueue,wantedReleaseIds}', '[]'::jsonb) ? lwr.id::text
-    OR candidate.normalized_payload #>> '{musicQueueContext,wantedReleaseId}' = lwr.id::text
-    OR COALESCE(candidate.normalized_payload #> '{musicQueueContext,wantedReleaseIds}', '[]'::jsonb) ? lwr.id::text)
+  ${RELEASE_SAFE_ADD_ACTIVE_RUN_SQL}
+  WHERE ${RELEASE_SAFE_ADD_OWNED_CANDIDATE_SQL}
     AND candidate.source_search_id = NULLIF(ldr.evidence->>'lastSearchId', '')
   ORDER BY stop.observed_at DESC, candidate.id ASC LIMIT 1
 ) release_recheck ON TRUE`;
@@ -71,31 +40,35 @@ export const RELEASE_RECHECK_FACTS_SELECT_SQL = `release_recheck.candidate_id AS
   release_recheck.has_conflicting_candidate AS recheck_has_conflicting_candidate,
   release_recheck.active_run_id AS recheck_active_run_id, release_recheck.active_run_status AS recheck_active_run_status,
   release_recheck.active_run_safety_mode AS recheck_active_run_safety_mode,
-  release_recheck.run_matches_candidate AS recheck_run_matches_candidate`;
+  release_recheck.run_matches_candidate AS recheck_run_matches_candidate,
+  release_recheck.active_run_trigger_source AS recheck_active_run_trigger_source,
+  release_recheck.owning_target_marker_valid AS recheck_owning_target_marker_valid`;
 
 export function mapReleaseRecheckFacts(row) {
   return row?.recheck_candidate_id ? { candidateId: row.recheck_candidate_id, candidateStatus: row.recheck_candidate_status,
     addBlockerCode: row.recheck_add_blocker_code ?? null, recoveryReasonCode: row.recheck_recovery_reason_code ?? null,
     hasConflictingCandidate: row.recheck_has_conflicting_candidate !== false, activeRunId: row.recheck_active_run_id ?? null,
     activeRunStatus: row.recheck_active_run_status ?? null, activeRunSafetyMode: row.recheck_active_run_safety_mode ?? null,
-    runMatchesCandidate: row.recheck_run_matches_candidate === true } : null;
+    runMatchesCandidate: row.recheck_run_matches_candidate === true,
+    activeRunTriggerSource: row.recheck_active_run_trigger_source ?? null, owningTargetMarkerValid: row.recheck_owning_target_marker_valid === true } : null;
 }
 
 export function createImportCandidateReleaseRecheckStore({ getPoolFn = getPool } = {}) {
   async function readOwnedRelease({ appUserId, wantedReleaseId, queryable = null }) {
     const result = await (queryable ?? getPoolFn()).query(`SELECT lwr.id, lwr.app_user_id, lwr.metadata_release_id,
       lwr.wanted_status, lwr.missing_track_count, lwr.evidence, owner.is_disabled,
-      wanted_link.wanted_release_id IS NOT NULL AS link_exists, ${RELEASE_RECHECK_FACTS_SELECT_SQL}
+      wanted_link.wanted_release_id IS NOT NULL AS link_exists, ${RELEASE_RECHECK_FACTS_SELECT_SQL}, ${RELEASE_PREPARED_ADD_FACTS_SELECT_SQL}
       FROM library_wanted_releases lwr JOIN app_users owner ON owner.id = lwr.app_user_id
       LEFT JOIN library_discovery_requests ldr ON ldr.metadata_release_id = lwr.metadata_release_id
       LEFT JOIN library_discovery_request_wanted_release_links wanted_link
         ON wanted_link.wanted_release_id = lwr.id AND wanted_link.discovery_request_id = ldr.id
       ${RELEASE_RECHECK_FACTS_LATERAL_SQL}
+      ${RELEASE_PREPARED_ADD_FACTS_LATERAL_SQL}
       WHERE lwr.id = $1::uuid AND lwr.app_user_id = $2::uuid`, [wantedReleaseId, appUserId]);
     const row = result.rows[0];
     return row ? { id: row.id, appUserId: row.app_user_id, metadataReleaseId: row.metadata_release_id,
       wantedStatus: row.wanted_status, missingTrackCount: row.missing_track_count, evidence: row.evidence,
-      discoveryLinkExists: row.link_exists === true, libraryAddRecoveryFacts: mapReleaseRecheckFacts(row),
+      discoveryLinkExists: row.link_exists === true, libraryAddRecoveryFacts: mapReleaseRecheckFacts(row), libraryAddFacts: mapReleasePreparedAddFacts(row),
       targetUser: { id: row.app_user_id, isDisabled: row.is_disabled } } : null;
   }
   async function readParticipantPolicies({ wantedReleaseIds, queryable = null }) {
@@ -129,9 +102,9 @@ export function createImportCandidateReleaseRecheckStore({ getPoolFn = getPool }
     await queryable.query('SELECT id FROM import_candidate_files WHERE import_candidate_id = $1::uuid ORDER BY id FOR UPDATE', [importCandidateId]);
     await queryable.query('SELECT id FROM import_candidate_file_decisions WHERE import_candidate_id = $1::uuid ORDER BY id FOR UPDATE', [importCandidateId]);
   }
-  async function saveQualityContext({ importCandidateId, musicQueueContext, queryable }) {
+  async function saveQualityContext({ importCandidateId, musicQueueContext, candidateStatus = 'failed', queryable }) {
     await queryable.query(`UPDATE import_candidates SET normalized_payload = jsonb_set(normalized_payload,
-      '{musicQueue}', $2::jsonb), updated_at = NOW() WHERE id = $1::uuid AND status = 'failed'`, [importCandidateId, JSON.stringify(musicQueueContext)]);
+      '{musicQueue}', $2::jsonb), updated_at = NOW() WHERE id = $1::uuid AND status = $3`, [importCandidateId, JSON.stringify(musicQueueContext), candidateStatus]);
   }
   return { readOwnedRelease, readParticipantPolicies, lockParticipantReleases, lockCandidate, saveQualityContext };
 }

@@ -43,7 +43,8 @@ test('Missing Music module composes canonical target resolution, recheck delegat
   assert.deepEqual(command, { action: { code: 'recheck_library_add', decisionId: release.id,
     targetUserId: 'listener-1', outcome: 'queued', runId: 'run-add' } });
   release.libraryAddRecoveryFacts = { ...release.libraryAddRecoveryFacts, candidateStatus: 'import_pending',
-    activeRunId: 'run-add', runMatchesCandidate: true, activeRunStatus: 'pending', activeRunSafetyMode: 'safe_auto' };
+    activeRunId: 'run-add', runMatchesCandidate: true, activeRunStatus: 'pending', activeRunSafetyMode: 'safe_auto',
+    activeRunTriggerSource: 'music_queue_prerequisite_recheck', owningTargetMarkerValid: true };
   const after = await module.routeDependencies.getMissingMusicDecisionDetail({ actorUser, decisionId: release.id });
   assert.equal(after.permissions.canRecheckLibraryAdd, false);
   assert.equal(after.permissions.canRepairFolders, false);
@@ -70,4 +71,39 @@ test('Missing Music module prevents cross-account and disabled-target recheck be
   await assert.rejects(() => module.routeDependencies.recheckMissingMusicDecisionLibraryAdd({ actorUser, decisionId: release.id }),
     (error) => error.status === 409 && error.code === 'missing_music_decision_read_only');
   assert.equal(recheckReleaseSafeAdd.mock.callCount(), 0);
+});
+
+test('Missing Music module wires prepared Add to library to target-owned guarded work and refreshes current progress', async (t) => {
+  const startReleaseManualSafeAdd = t.mock.fn(async () => ({ outcome: 'queued', runId: 'run-add', candidateId: 'private-candidate', sourcePath: '/private/download' }));
+  const { module, release } = createModule({ startReleaseManualSafeAdd });
+  release.libraryAddRecoveryFacts = null;
+  release.libraryAddFacts = { candidateId: 'private-candidate', candidateStatus: 'import_pending', fileCount: 10, hasConflictingCandidate: false };
+  const actorUser = { id: 'admin-1', role: 'admin' };
+  const before = await module.routeDependencies.getMissingMusicDecisionDetail({ actorUser, decisionId: release.id });
+  assert.equal(before.permissions.canAddToLibrary, true);
+  assert.equal(before.decision.state, 'action');
+  const action = await module.routeDependencies.addMissingMusicDecisionToLibrary({ actorUser, decisionId: release.id,
+    targetUserId: 'untrusted', importCandidateId: 'untrusted', requestMetadata: { ipAddress: '127.0.0.1' } });
+  assert.deepEqual(startReleaseManualSafeAdd.mock.calls[0].arguments[0], {
+    actorUserId: 'admin-1', appUserId: 'listener-1', wantedReleaseId: release.id, requestMetadata: { ipAddress: '127.0.0.1' },
+  });
+  assert.deepEqual(action, { action: { code: 'add_to_library', decisionId: release.id, targetUserId: 'listener-1', outcome: 'queued', runId: 'run-add' } });
+  release.libraryAddFacts = { ...release.libraryAddFacts, activeRunId: 'run-add', activeRunStatus: 'pending', activeRunSafetyMode: 'safe_auto',
+    activeRunTriggerSource: 'music_queue_manual_add', owningTargetMarkerValid: true, runMatchesCandidate: true };
+  const after = await module.routeDependencies.getMissingMusicDecisionDetail({ actorUser, decisionId: release.id });
+  assert.equal(after.permissions.canAddToLibrary, false);
+  assert.equal(after.decision.status.code, 'adding_to_library');
+  assert.equal(after.decision.status.nextAction, null);
+  assert.doesNotMatch(JSON.stringify({ action, after }), /private-candidate|private\/download|owningTargetMarkerValid/u);
+});
+
+test('Missing Music module rejects other-account and disabled prepared-add targets before its owning worker command', async (t) => {
+  const startReleaseManualSafeAdd = t.mock.fn();
+  const { module, release } = createModule({ startReleaseManualSafeAdd });
+  await assert.rejects(() => module.routeDependencies.addMissingMusicDecisionToLibrary({ actorUser: { id: 'other', role: 'requester' }, decisionId: release.id }),
+    (error) => error.status === 404 && error.code === 'missing_music_decision_not_found');
+  release.appUserId = 'disabled-1';
+  await assert.rejects(() => module.routeDependencies.addMissingMusicDecisionToLibrary({ actorUser: { id: 'admin-1', role: 'admin' }, decisionId: release.id }),
+    (error) => error.status === 409 && error.code === 'missing_music_decision_read_only');
+  assert.equal(startReleaseManualSafeAdd.mock.callCount(), 0);
 });

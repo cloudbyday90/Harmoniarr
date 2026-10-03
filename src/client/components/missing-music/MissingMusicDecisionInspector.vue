@@ -29,10 +29,12 @@ import { useMissingMusicSearchAgain } from '../../composables/useMissingMusicSea
 import { useMissingMusicFindMatches } from '../../composables/useMissingMusicFindMatches.js';
 import { useMissingMusicQualityFallback } from '../../composables/useMissingMusicQualityFallback.js';
 import { useMissingMusicLibraryAddRecheck } from '../../composables/useMissingMusicLibraryAddRecheck.js';
+import { useMissingMusicLibraryAdd } from '../../composables/useMissingMusicLibraryAdd.js';
 import { createMissingMusicReleaseMutationGate } from '../../lib/missing-music-release-mutation-gate.js';
 import MissingMusicQualityEvidence from './MissingMusicQualityEvidence.vue';
 import MissingMusicCommandFeedback from './MissingMusicCommandFeedback.vue';
 import MissingMusicLibraryAddRecovery from './MissingMusicLibraryAddRecovery.vue';
+import MissingMusicLibraryAddAction from './MissingMusicLibraryAddAction.vue';
 
 const props = defineProps({
   decisionId: {
@@ -48,6 +50,7 @@ const statusHeadingElement = ref(null);
 const downloadDialogElement = ref(null);
 const downloadConfirmationOpen = ref(false);
 const downloadConfirmationInvoker = ref(null);
+const libraryAddConfirmationOpen = ref(false);
 const currentDecisionId = computed(() => props.decisionId);
 const mutationGate = createMissingMusicReleaseMutationGate();
 const mutationOptions = { decisionId: currentDecisionId, mutationGate, retryIntentState: {} };
@@ -57,8 +60,9 @@ const searchAgain = useMissingMusicSearchAgain(mutationOptions);
 const findMatches = useMissingMusicFindMatches(mutationOptions);
 const qualityFallback = useMissingMusicQualityFallback(mutationOptions);
 const libraryAddRecheck = useMissingMusicLibraryAddRecheck(mutationOptions);
+const libraryAdd = useMissingMusicLibraryAdd(mutationOptions);
 const mutationBusy = computed(() => matchSelection.isPending.value
-  || downloadStart.isStarting.value || searchAgain.isPending.value || findMatches.isPending.value || qualityFallback.isPending.value || libraryAddRecheck.isPending.value);
+  || downloadStart.isStarting.value || searchAgain.isPending.value || findMatches.isPending.value || qualityFallback.isPending.value || libraryAddRecheck.isPending.value || libraryAdd.isPending.value);
 const decisionDetail = useMissingMusicDecisionDetail({
   decisionId: currentDecisionId,
 });
@@ -73,8 +77,8 @@ function disposeCommandFocusTrackers() {
   commandFocusTrackers.clear();
 }
 
-watch([mutationBusy, downloadConfirmationOpen], ([mutationPending, dialogOpen]) => {
-  decisionDetail.setPaused(mutationPending || dialogOpen);
+watch([mutationBusy, downloadConfirmationOpen, libraryAddConfirmationOpen], ([mutationPending, dialogOpen, addDialogOpen]) => {
+  decisionDetail.setPaused(mutationPending || dialogOpen || addDialogOpen);
 }, { flush: 'sync' });
 
 async function focusInspectorHeading() {
@@ -138,6 +142,14 @@ function allowFallbackQuality() {
 
 function recheckLibraryAdd() {
   return completeUserCommand((decisionId) => libraryAddRecheck.recheckLibraryAdd({ decisionId }));
+}
+
+function addToLibrary({ invoker, closeConfirmation }) {
+  return completeUserCommand((decisionId) => {
+    const result = libraryAdd.addToLibrary({ decisionId });
+    closeConfirmation();
+    return result;
+  }, invoker);
 }
 
 function openDownloadConfirmation(event) {
@@ -263,6 +275,18 @@ defineExpose({ busy, refresh: decisionDetail.refresh });
         </div>
         <MissingMusicCommandFeedback :status-message="downloadStart.statusMessage.value" :error-message="downloadStart.errorMessage.value" />
         <MissingMusicCommandFeedback :status-message="matchSelection.statusMessage.value" :error-message="matchSelection.errorMessage.value" />
+        <MissingMusicLibraryAddAction
+          :decision-id="props.decisionId"
+          :detail="decisionDetail.detail.value"
+          :busy="mutationBusy"
+          :pending="libraryAdd.isPending.value"
+          :status-message="libraryAdd.statusMessage.value"
+          :status-tone="libraryAdd.statusTone.value"
+          :error-message="libraryAdd.errorMessage.value"
+          @clear-feedback="libraryAdd.clearFeedback"
+          @confirmation-open="libraryAddConfirmationOpen = $event"
+          @confirm="addToLibrary"
+        />
       </section>
 
       <dl class="missing-music-inspector__facts">

@@ -67,3 +67,24 @@ test('native dialog return focus remains owned while user movement within the di
   assert.equal(tracker.ownsFocus(), false);
   tracker.dispose();
 });
+
+test('a failed command from a closed confirmation restores its meaningful invoker only while focus remains owned', () => {
+  const { document, initiator } = createDocument();
+  const dialog = { open: true };
+  initiator.closest = () => dialog;
+  const opener = { isConnected: true, disabled: false, focus: () => document.focus(opener) };
+  const tracker = createUserCommandFocusTracker({ document, returnTarget: opener });
+  document.focus(document.body);
+  tracker.restoreAfterFailure();
+  assert.equal(document.activeElement, initiator, 'an open confirmation retains its submit control');
+  dialog.open = false;
+  document.focus(document.body);
+  tracker.restoreAfterFailure();
+  assert.equal(document.activeElement, opener, 'a closed confirmation returns to the visible invoker');
+  const filter = {};
+  document.focus(filter);
+  document.focus(document.body);
+  tracker.restoreAfterFailure();
+  assert.equal(document.activeElement, document.body, 'explicit movement permanently revokes restoration');
+  tracker.dispose();
+});

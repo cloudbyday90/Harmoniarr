@@ -438,6 +438,8 @@ export function createImportCandidateApplyWorker({
         }
 
         try {
+          const currentQualityCandidate = applySafetyMode === 'safe_auto'
+            ? await resolveCurrentSafeAutoAddCandidate({ summaryCandidate, triggerSource, runId }) : summaryCandidate;
           const pendingMutation = baseSnapshot.apply?.pendingMutation;
           let applyPreview = null;
           if (pendingMutation) {
@@ -489,9 +491,7 @@ export function createImportCandidateApplyWorker({
           if (!applyPreview) {
             applyPreview = await previewImportCandidateApply({ importCandidateId: summaryCandidate.id });
           }
-          let currentQualityCandidate = summaryCandidate;
           if (applySafetyMode === 'safe_auto') {
-            currentQualityCandidate = await resolveCurrentSafeAutoAddCandidate({ summaryCandidate, triggerSource });
             const qualityGate = await safeAutoAddQualityGateService.evaluateSafeAutoAddQuality({
               applyPreview,
               summaryCandidate: currentQualityCandidate,
@@ -568,7 +568,7 @@ export function createImportCandidateApplyWorker({
             applyPreview,
             applySafetyMode,
             ...(applySafetyMode === 'safe_auto' ? { assertSafeAutoPolicyCurrent: () => assertCurrentSafeAutoAddCandidate({
-              summaryCandidate: currentQualityCandidate, triggerSource,
+              summaryCandidate: currentQualityCandidate, triggerSource, runId,
             }) } : {}),
             executionMode: 'move',
             importCandidateId: summaryCandidate.id,

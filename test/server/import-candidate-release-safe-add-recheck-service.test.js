@@ -64,7 +64,8 @@ test('queued worker snapshots current eligibility and refuses policy changes aft
   const { service, candidate, release, participants } = fixture();
   candidate.status = 'import_pending';
   Object.assign(release.libraryAddRecoveryFacts, { candidateStatus: 'import_pending', runMatchesCandidate: true,
-    activeRunStatus: 'pending', activeRunSafetyMode: 'safe_auto', activeRunId: 'run-1' });
+    activeRunStatus: 'pending', activeRunSafetyMode: 'safe_auto', activeRunId: 'run-1',
+    activeRunTriggerSource: 'music_queue_prerequisite_recheck', owningTargetMarkerValid: true });
   const input = { summaryCandidate: { id: candidate.id }, triggerSource: 'music_queue_prerequisite_recheck' };
   const current = await service.resolveCurrentQueuedRecheckCandidate(input);
   // Database readers return fresh objects; a changed policy cannot mutate the saved snapshot.

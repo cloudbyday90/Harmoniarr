@@ -51,6 +51,41 @@ function createVerifiedApplyPreview() {
   };
 }
 
+test('guarded worker captures current provenance before delayed media preview and refuses drift before mutation', async (t) => {
+  const calls = [];
+  let candidateVersion = 1;
+  let mutations = 0;
+  let completedSummary;
+  let complete;
+  const completed = new Promise((resolve) => { complete = resolve; });
+  const candidate = createReadyImportCandidate();
+  const worker = createImportCandidateApplyWorker({ acquireLease: async () => {}, releaseLease: async () => {},
+    buildImportPendingCandidateSummary: async () => ({ importPendingCandidates: [candidate] }),
+    resolveCurrentSafeAutoAddCandidate: async ({ summaryCandidate, runId }) => {
+      calls.push('snapshot'); assert.equal(runId, 'guarded-run'); return { ...summaryCandidate, candidateVersion };
+    },
+    previewImportCandidateApply: async () => { calls.push('preview'); await Promise.resolve(); candidateVersion = 2; return createVerifiedApplyPreview(); },
+    safeAutoAddQualityGateService: { evaluateSafeAutoAddQuality: async () => ({ eligible: true }) },
+    assertCurrentSafeAutoAddCandidate: async ({ summaryCandidate }) => {
+      if (summaryCandidate.candidateVersion !== candidateVersion) {
+        const error = new Error('Candidate changed during media preparation'); error.code = 'import_candidate_apply_not_ready'; throw error;
+      }
+    },
+    applyImportCandidatePreview: async ({ assertSafeAutoPolicyCurrent }) => {
+      await assertSafeAutoPolicyCurrent(); mutations += 1; return {};
+    },
+    markImportCandidateApplied: async () => assert.fail('changed provenance cannot apply'),
+    markRunStarted: async () => {}, markRunFailed: async () => complete(),
+    markRunCompleted: async ({ summary }) => { completedSummary = summary; complete(); },
+    replaceImportApplyRunItems: async () => [], updateImportApplyRunItem: t.mock.fn(async () => {}),
+  });
+  worker.startWorkerRun({ runId: 'guarded-run', applySafetyMode: 'safe_auto', triggerSource: 'music_queue_manual_add', requestedCandidateCount: 1, executableCandidateCount: 1 });
+  await completed;
+  assert.deepEqual(calls, ['snapshot', 'preview']);
+  assert.equal(mutations, 0);
+  assert.equal(completedSummary.applyFailedCount, 1);
+});
+
 test('import apply worker applies ready candidates and persists per-item outcomes', async (t) => {
   const markImportCandidateApplied = t.mock.fn(async () => ({}));
   const replaceImportApplyRunItems = t.mock.fn(async () => []);

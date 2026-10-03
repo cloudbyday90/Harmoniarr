@@ -7,10 +7,8 @@
 
 import assert from 'node:assert/strict';
 import { after, before, suite, test } from 'node:test';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { copyFile, mkdir, readFile, stat } from 'node:fs/promises';
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { createApp } from '../../src/server/app.js';
 import { createImportCandidateModule } from '../../src/server/import-candidates/import-candidate-module.js';
 import { createImportCandidateService } from '../../src/server/import-candidates/import-candidate-service.js';
@@ -23,17 +21,15 @@ import { createImportCandidateSafeAutoAddQualityGateService } from '../../src/se
 import { getRecheckWantedReleaseIds } from '../../src/server/import-candidates/import-candidate-release-recheck-quality-policy.js';
 import { listImportCandidateFileDecisions, upsertImportCandidateFileDecision } from '../../src/server/import-candidates/import-candidate-file-decision-repository.js';
 import { createMediaInspectionService } from '../../src/server/media/media-inspection-service.js';
-import { createOperationQueueStore } from '../../src/server/operation-queue-store.js';
 import { persistSettings } from '../../src/server/settings.js';
 import { createIntegrationAppRuntime } from '../../testing/integration/app-runtime.js';
 import { bootstrapAdminSession, loginWithPassword } from '../../testing/integration/auth-helpers.js';
 import { seedImportCandidateFixture } from '../../testing/integration/import-candidate-fixtures.js';
-import { seedMetadataReleaseFixture } from '../../testing/integration/metadata-fixtures.js';
+import { createLibraryAddMediaFixture, createLibraryAddFixtureUser as createUser, seedOwnedLibraryAddFixture, runLibraryAddFixtureWorker, libraryAddRuntimePath as runtimePath } from '../../testing/integration/library-add-media-fixtures.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 import { isSkippableIntegrationRuntimeError, toIntegrationRuntimeUnavailableReason } from '../../testing/integration/runtime-availability.js';
 import { createSessionHttpClient } from '../../testing/server/http-session-client.js';
 
-const executeFile = promisify(execFile);
 const config = resolveIntegrationTestRuntimeConfig();
 const mediaImage = process.env.HARMONIARR_INTEGRATION_MEDIA_IMAGE;
 const actionPath = (id) => `/api/v1/missing-music/decisions/${id}/recheck-library-add`;
@@ -45,68 +41,14 @@ let module;
 let fixtureRoot;
 let toolingReady;
 
-const getTooling = async () => ({ status: toolingReady ? 'healthy' : 'degraded',
-  details: { ffprobeAvailable: toolingReady, ffmpegAvailable: toolingReady } });
-
-const runtimePath = (value) => process.platform === 'win32' ? value.replace(/^[a-z]:/iu, '').replaceAll('\\', '/') : value;
-
-function mountedPath(pathValue) {
-  const scoped = relative(resolve(fixtureRoot), resolve(pathValue));
-  assert.ok(scoped && scoped !== '..' && !scoped.startsWith(`..${sep}`) && !isAbsolute(scoped), 'media fixture must stay in the test-owned workspace');
-  return `/fixtures/${scoped.split(sep).join('/')}`;
-}
-
-async function mediaCommand(binary, args, { readonly = true } = {}) {
-  const mappedArgs = args.map((value) => typeof value === 'string' && isAbsolute(value) ? mountedPath(value) : value);
-  if (!mediaImage) return executeFile(binary, args, { timeout: 20_000, maxBuffer: 2 * 1024 * 1024 });
-  return executeFile('docker', ['run', '--rm', '--network', 'none', '--entrypoint', binary, '--mount',
-    `type=bind,source=${resolve(fixtureRoot)},target=/fixtures${readonly ? ',readonly' : ''}`, mediaImage, ...mappedArgs],
-  { timeout: 30_000, maxBuffer: 2 * 1024 * 1024 });
-}
-
-async function generateAudio(pathValue, bitrate = null) {
-  await mkdir(dirname(pathValue), { recursive: true });
-  await mediaCommand('ffmpeg', ['-v', 'error', '-nostdin', '-y', '-f', 'lavfi', '-i', 'sine=frequency=1000:sample_rate=44100',
-    '-t', '2', '-ac', '2', '-metadata', 'artist=Controlled fixture', '-metadata', 'album=Controlled release',
-    '-metadata', 'title=Controlled song', '-metadata', 'track=1', ...(bitrate ? ['-c:a', 'libmp3lame', '-b:a', `${bitrate}k`] : ['-c:a', 'pcm_s16le']), pathValue], { readonly: false });
-}
-
-async function createUser(client, pool, username) {
-  const response = await client.requestJson('/api/v1/users', { method: 'POST', json: { username, password: 'InitialPass123!', role: 'requester' } });
-  assert.equal(response.response.status, 201);
-  await pool.query("UPDATE app_users SET must_change_password = false, user_preferences = '{\"minimumQuality\":\"high\",\"preferredFormat\":\"any\"}'::jsonb WHERE id = $1", [response.payload.user.id]);
-  return response.payload.user;
-}
+const mediaFixture = createLibraryAddMediaFixture({ getFixtureRoot: () => fixtureRoot, isToolingReady: () => toolingReady, mediaImage });
+const { getTooling, mediaCommand, generateAudio } = mediaFixture;
 
 async function seedStopped(pool, owner, workspaceDir, { audio = true, reasonCode = 'source_path_unavailable', extension = 'wav', bitrate = null } = {}) {
   fixtureRoot = workspaceDir;
   toolingReady = true;
-  const metadata = await seedMetadataReleaseFixture({ queryable: pool, artistName: `Controlled ${owner.id}`, trackTitle: 'Controlled song', trackLengthMs: 2000 });
-  const wanted = (await pool.query(`INSERT INTO library_wanted_releases
-    (app_user_id,metadata_artist_id,metadata_release_group_id,metadata_release_id,wanted_status,expected_track_count,matched_track_count,missing_track_count)
-    VALUES ($1,$2,$3,$4,'missing',1,0,1) RETURNING id`, [owner.id, metadata.metadataArtistId, metadata.metadataReleaseGroupId, metadata.metadataReleaseId])).rows[0];
-  const searchId = `controlled-recheck-${wanted.id}`;
-  const discovery = await pool.query(`INSERT INTO library_discovery_requests
-    (metadata_artist_id, metadata_release_group_id, metadata_release_id, wanted_status, search_mode, request_status, evidence)
-    SELECT metadata_artist_id, metadata_release_group_id, metadata_release_id, 'missing', 'automatic', 'blocked', jsonb_build_object('lastSearchId',$2::text)
-    FROM library_wanted_releases WHERE id = $1 RETURNING id`, [wanted.id, searchId]);
-  await pool.query('INSERT INTO library_discovery_request_wanted_release_links (discovery_request_id, wanted_release_id) VALUES ($1,$2)', [discovery.rows[0].id, wanted.id]);
-  const folderPath = `Controlled-${wanted.id}`;
-  const sourcePath = join(workspaceDir, 'downloads', folderPath, `01 Controlled.${extension}`);
-  if (audio) await generateAudio(sourcePath, bitrate);
-  const candidate = await seedImportCandidateFixture({ queryable: pool, candidateOverrides: {
-    status: 'failed', sourceSearchId: searchId, folderPath,
-    normalizedPayload: { musicQueue: { profileCode: 'high_quality', minimumBitrateKbps: 320, wantedReleaseId: wanted.id } },
-  }, files: [{ filename: `01 Controlled.${extension}`, extension, sizeBytes: audio ? (await stat(sourcePath)).size : 1,
-    bitRateKbps: 320, sampleRateHz: 44_100, bitDepth: extension === 'wav' ? 16 : null, lengthSeconds: 2, isLocked: false }] });
-  await pool.query(`INSERT INTO import_candidate_events (import_candidate_id,event_type,details,occurred_at)
-    VALUES ($1,'import_candidate_import_blocked',$2::jsonb,NOW())`, [candidate.id,
-  JSON.stringify({ addBlockerCode: reasonCode === 'audio_check_failed' ? 'media_verification' : 'source_path_unavailable', recoveryReasonCode: reasonCode })]);
-  const paths = { downloads: join(workspaceDir, 'wrong-downloads'), staging: join(workspaceDir, 'staging'), music: join(workspaceDir, 'music') };
-  await Promise.all(Object.values(paths).map((pathValue) => mkdir(pathValue, { recursive: true })));
-  await persistSettings(Object.entries(paths).map(([settingKey, value]) => ({ namespace: 'paths', settingKey, value: runtimePath(value) })), null, pool);
-  await persistSettings([{ namespace: 'paths', settingKey: 'downloadMappings', value: [{ slskdPrefix: '/controlled-downloads', harmoniarrPrefix: runtimePath(paths.downloads) }] }], null, pool);
-  return { wantedId: wanted.id, candidateId: candidate.id, discoveryId: discovery.rows[0].id, sourcePath, paths };
+  return seedOwnedLibraryAddFixture({ pool, owner, workspaceDir, mediaFixture, audio, extension, bitrate, status: 'failed',
+    stoppedReasonCode: reasonCode, repairPaths: false });
 }
 
 async function repairFolders(pool, fixture) {
@@ -127,28 +69,12 @@ async function preparedGuardInput(fixture, owner, admin) {
   } };
 }
 
-async function runQueuedWorker(pool, runId) {
-  const claimed = await createOperationQueueStore({ getPoolFn: () => pool }).claimNextRunnableRun({ operationTypes: ['import_candidate_apply'] });
-  assert.equal(claimed.id, runId);
-  module.importCandidateApplyWorker.startWorkerRun({ ...claimed.summary, runId });
-  for (let attempt = 0; attempt < 120; attempt += 1) {
-    const run = await module.importCandidateApplyRunStore.getRunById(runId);
-    if (['completed', 'failed', 'paused', 'cancelled'].includes(run.status)) return run;
-    await new Promise((complete) => { setTimeout(complete, 100); });
-  }
-  assert.fail('The real apply worker did not persist a terminal result');
-}
+const runQueuedWorker = (pool, runId) => runLibraryAddFixtureWorker({ pool, module, runId });
 
 suite('Missing Music library-add recheck through PostgreSQL and local measured file application', () => {
   before(async () => {
     toolingReady = true;
-    try {
-      if (mediaImage) {
-        const identity = await executeFile('docker', ['image', 'inspect', mediaImage, '--format', '{{.Id}}']);
-        const version = await executeFile('docker', ['run', '--rm', '--network', 'none', '--entrypoint', 'ffprobe', mediaImage, '-version']);
-        console.log(`Local media fixture: ${mediaImage} ${identity.stdout.trim()}; ${version.stdout.split('\n')[0]}`);
-      } else await executeFile('ffprobe', ['-version']);
-    } catch { mediaUnavailableReason = 'Local ffmpeg/ffprobe fixture unavailable; configure HARMONIARR_INTEGRATION_MEDIA_IMAGE or install local tools'; }
+    mediaUnavailableReason = await mediaFixture.verifyTooling();
     try {
       runtime = await createIntegrationAppRuntime({ config, createAppFn: (options) => createApp({ ...options,
         createImportCandidateModule: (dependencies) => {

@@ -35,6 +35,7 @@ function normalizeDetail(payload) {
     qualityEvidence: payload.qualityEvidence ?? null,
     libraryAddRecovery: payload.libraryAddRecovery ?? null,
     permissions: {
+      canAddToLibrary: payload.permissions?.canAddToLibrary === true,
       canAllowFallbackQuality: payload.permissions?.canAllowFallbackQuality === true,
       canFindMatches: payload.permissions?.canFindMatches === true,
       canRecheckLibraryAdd: payload.permissions?.canRecheckLibraryAdd === true,

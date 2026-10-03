@@ -19,6 +19,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  addMissingMusicDecisionToLibrary,
   allowMissingMusicDecisionFallbackQuality,
   fetchMissingMusicDecisionDetail,
   fetchMissingMusicDecisions,
@@ -41,6 +42,24 @@ function installFetchMock(t, payload = { decisions: [] }) {
   });
   return fetchMock;
 }
+
+test('Add to library sends only an empty canonical decision command with CSRF and stable retry identity', async (t) => {
+  const fetchMock = installFetchMock(t, { action: { code: 'add_to_library', outcome: 'queued' } });
+  const previousDocument = globalThis.document;
+  globalThis.document = { cookie: 'harmoniarr_csrf=csrf-token' };
+  t.after(() => { globalThis.document = previousDocument; });
+  await addMissingMusicDecisionToLibrary({ decisionId: ' wanted/amber ', idempotencyKey: 'add-retry',
+    targetUserId: 'other', importCandidateId: 'candidate', path: '/private/download', applySafetyMode: 'manual', minimumBitrateKbps: 128 });
+  const [url, options] = fetchMock.mock.calls[0].arguments;
+  assert.equal(url, '/api/v1/missing-music/decisions/wanted%2Famber/add-to-library');
+  assert.equal(options.method, 'POST');
+  assert.equal(options.headers.get('X-CSRF-Token'), 'csrf-token');
+  assert.equal(options.headers.get('Idempotency-Key'), 'add-retry');
+  assert.equal(options.body, '{}');
+  assert.throws(() => addMissingMusicDecisionToLibrary({ decisionId: ' ' }), /requires a decisionId/u);
+  await addMissingMusicDecisionToLibrary({ decisionId: 'wanted-amber' });
+  assert.match(fetchMock.mock.calls[1].arguments[1].headers.get('Idempotency-Key'), /^missing-music-decisions-add-to-library-/u);
+});
 
 test('fetchMissingMusicDecisions sends only bounded worklist filter values', async (t) => {
   const fetchMock = installFetchMock(t);

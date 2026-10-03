@@ -25,6 +25,7 @@ import { createMissingMusicSearchAgainService } from './missing-music-search-aga
 import { createMissingMusicFallbackQualityService } from './missing-music-fallback-quality-service.js';
 import { createMissingMusicFindMatchesService } from './missing-music-find-matches-service.js';
 import { createMissingMusicLibraryAddRecheckService } from './missing-music-library-add-recheck-service.js';
+import { createMissingMusicLibraryAddService } from './missing-music-library-add-service.js';
 import { createApiError } from '../auth.js';
 
 export function createMissingMusicModule({
@@ -37,6 +38,7 @@ export function createMissingMusicModule({
   requestMusicQueueReleaseRediscovery,
   requestInitialMusicSearch,
   recheckReleaseSafeAdd = async () => { throw createApiError(503, 'missing_music_recheck_unavailable', 'Library-add recheck is unavailable'); },
+  startReleaseManualSafeAdd = async () => { throw createApiError(503, 'missing_music_library_add_unavailable', 'Library add is unavailable'); },
   startLibraryDiscoveryRun,
   selectImportCandidate,
   startImportCandidateExecutionRun,
@@ -76,6 +78,8 @@ export function createMissingMusicModule({
     resolveMissingMusicDecisionTarget: missingMusicDecisionTargetService.resolveMissingMusicDecisionTarget });
   const missingMusicLibraryAddRecheckService = createMissingMusicLibraryAddRecheckService({ recheckReleaseSafeAdd,
     resolveMissingMusicDecisionTarget: missingMusicDecisionTargetService.resolveMissingMusicDecisionTarget });
+  const missingMusicLibraryAddService = createMissingMusicLibraryAddService({ startReleaseManualSafeAdd,
+    resolveMissingMusicDecisionTarget: missingMusicDecisionTargetService.resolveMissingMusicDecisionTarget });
 
   return {
     missingMusicDecisionCommandService,
@@ -87,7 +91,9 @@ export function createMissingMusicModule({
     missingMusicFallbackQualityService,
     missingMusicFindMatchesService,
     missingMusicLibraryAddRecheckService,
+    missingMusicLibraryAddService,
     routeDependencies: {
+      addMissingMusicDecisionToLibrary: missingMusicLibraryAddService.addMissingMusicDecisionToLibrary,
       findMissingMusicDecisionMatches: missingMusicFindMatchesService.findMissingMusicDecisionMatches,
       recheckMissingMusicDecisionLibraryAdd: missingMusicLibraryAddRecheckService.recheckMissingMusicDecisionLibraryAdd,
       allowMissingMusicDecisionFallbackQuality: missingMusicFallbackQualityService.allowMissingMusicDecisionFallbackQuality,
