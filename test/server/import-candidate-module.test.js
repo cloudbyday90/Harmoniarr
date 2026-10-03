@@ -95,6 +95,10 @@ test('createImportCandidateModule exposes shared import candidate route dependen
   };
 
   const importCandidateModule = createImportCandidateModule({
+    importCandidateApplyQueueService: { queuePreparedImportCandidateApply: async () => {} },
+    importCandidateReleaseRecheckGuardService: { commitPreparedReleaseRecheck: async () => {} },
+    importCandidateReleaseSafeAddRecheckService: { recheckReleaseSafeAdd: async () => {},
+      resolveCurrentQueuedRecheckCandidate: async () => {}, assertQueuedRecheckCandidateCurrent: async () => {} },
     importCandidateApplyOperationService,
     importCandidateApplyRunStore,
     importCandidateApplyService,

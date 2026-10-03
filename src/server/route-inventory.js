@@ -36,6 +36,7 @@ export const serverRouteInventory = Object.freeze([
   { method: 'POST', path: '/api/v1/acquisition/releases/:wantedReleaseId/allow-fallback-quality', access: 'authenticated', area: 'music-queue', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/missing-music/decisions/:decisionId/allow-fallback-quality', access: 'authenticated', area: 'missing-music', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/missing-music/decisions/:decisionId/find-matches', access: 'authenticated', area: 'missing-music', kind: 'mutation' },
+  { method: 'POST', path: '/api/v1/missing-music/decisions/:decisionId/recheck-library-add', access: 'authenticated', area: 'missing-music', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/acquisition/releases/:wantedReleaseId/recheck-library-add', access: 'authenticated', area: 'music-queue', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/acquisition/releases/:wantedReleaseId/search-again', access: 'authenticated', area: 'music-queue', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/acquisition/releases/:wantedReleaseId/matches/:matchId/use', access: 'authenticated', area: 'music-queue', kind: 'mutation' },

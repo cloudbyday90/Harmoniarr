@@ -24,6 +24,7 @@ import {
   fetchMissingMusicDecisions,
   fetchMissingMusicDownloaderHandoff,
   findMissingMusicDecisionMatches,
+  recheckMissingMusicDecisionLibraryAdd,
   selectMissingMusicDecisionMatch,
   searchMissingMusicDecisionAgain,
   startMissingMusicDecisionDownload,
@@ -166,6 +167,23 @@ test('fetchMissingMusicDownloaderHandoff sends only the opaque decision identifi
     '/api/v1/missing-music/decisions/wanted%2Famber/downloader-handoff',
   );
   assert.equal(fetchMock.mock.calls[0].arguments[1].method, 'GET');
+});
+
+test('library-add recheck sends only the canonical decision command with CSRF and stable retry identity', async (t) => {
+  const fetchMock = installFetchMock(t, { action: { code: 'recheck_library_add', outcome: 'queued' } });
+  const originalDocument = globalThis.document;
+  globalThis.document = { cookie: 'harmoniarr_csrf=csrf-token' };
+  t.after(() => { globalThis.document = originalDocument; });
+  await recheckMissingMusicDecisionLibraryAdd({ decisionId: ' wanted/amber ', idempotencyKey: 'recheck-retry', targetUserId: 'untrusted', importCandidateId: 'untrusted', path: '/untrusted', applySafetyMode: 'manual' });
+  const [url, options] = fetchMock.mock.calls[0].arguments;
+  assert.equal(url, '/api/v1/missing-music/decisions/wanted%2Famber/recheck-library-add');
+  assert.equal(options.method, 'POST');
+  assert.equal(options.headers.get('X-CSRF-Token'), 'csrf-token');
+  assert.equal(options.headers.get('Idempotency-Key'), 'recheck-retry');
+  assert.equal(options.body, '{}');
+  assert.throws(() => recheckMissingMusicDecisionLibraryAdd({ decisionId: ' ' }), /requires a decisionId/u);
+  await recheckMissingMusicDecisionLibraryAdd({ decisionId: 'wanted-amber' });
+  assert.match(fetchMock.mock.calls[1].arguments[1].headers.get('Idempotency-Key'), /^missing-music-decisions-recheck-library-add-/u);
 });
 
 test('fetchMissingMusicDownloaderHandoff requires a non-empty decision identifier', () => {

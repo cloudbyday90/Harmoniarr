@@ -106,3 +106,18 @@ contracts/versions. The skill cannot substitute for assistive-technology testing
 production-scale performance measurements, or a dedicated security assessment.
 Add further practice families only when real project work demonstrates their
 value; no full compliance catalog is recommended this round.
+
+## Library-add recovery maintenance, October 3
+
+Independent review during the next [library-add recheck slice](MISSING_MUSIC_LIBRARY_ADD_RECHECK_DESIGN.md)
+found that measuring a preview source did not cover an older staging file or a
+reusable library file selected later by the apply operation. The project evidence
+map now locates that worker/operation boundary and calls for actual final-input
+refusal or verification with test-owned files. This is one observed failure case,
+not a new general filesystem audit requirement.
+
+The repository and installed skills both passed `quick_validate.py` after this
+reference-only update. All four installed files still match their maintained
+source by SHA-256. The review supported this narrow maintenance edit; no new
+blind behavioral trial of the skill is claimed. Application execution and its
+limits belong in the [recheck outcome](MISSING_MUSIC_LIBRARY_ADD_RECHECK_OUTCOME.md).

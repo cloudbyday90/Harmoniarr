@@ -33,9 +33,12 @@ function normalizeDetail(payload) {
     checkedAt: payload.checkedAt ?? null,
     decision: payload.decision,
     qualityEvidence: payload.qualityEvidence ?? null,
+    libraryAddRecovery: payload.libraryAddRecovery ?? null,
     permissions: {
       canAllowFallbackQuality: payload.permissions?.canAllowFallbackQuality === true,
       canFindMatches: payload.permissions?.canFindMatches === true,
+      canRecheckLibraryAdd: payload.permissions?.canRecheckLibraryAdd === true,
+      canRepairFolders: payload.permissions?.canRepairFolders === true,
       canStartDownload: payload.permissions?.canStartDownload === true,
       canSearchAgain: payload.permissions?.canSearchAgain === true,
       canSelectMatch: payload.permissions?.canSelectMatch === true,

@@ -40,7 +40,7 @@ import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/r
 
 const integrationRuntimeConfig = resolveIntegrationTestRuntimeConfig();
 
-function buildDecision({ accountStatus = 'active', downloadStarted = false, matchSelected = false, qualityChoiceCode = null, searchInitial = false, findMatchesAvailable = searchInitial, searchQueued = false, searchStopped = false } = {}) {
+function buildDecision({ accountStatus = 'active', downloadStarted = false, libraryRecoveryReason = null, libraryAddQueued = false, recheckAvailable = true, matchSelected = false, qualityChoiceCode = null, searchInitial = false, findMatchesAvailable = searchInitial, searchQueued = false, searchStopped = false } = {}) {
   return {
     decisionId: 'wanted-amber',
     expectedTrackCount: 10,
@@ -57,7 +57,12 @@ function buildDecision({ accountStatus = 'active', downloadStarted = false, matc
       id: 'listener-1',
       username: 'Jamie',
     },
-    status: searchInitial
+    status: libraryAddQueued
+      ? { code: 'adding_to_library', label: 'Adding to library', message: 'Harmoniarr has queued a safe library add and will check the files again before changing the library.', nextAction: null, tone: 'info' }
+      : libraryRecoveryReason
+      ? { code: 'needs_help_adding', label: 'Needs help', message: 'This release needs a safe decision before Harmoniarr can add it to your library.',
+        nextAction: !recheckAvailable || accountStatus === 'disabled' ? null : libraryRecoveryReason === 'source_path_unavailable' ? 'set_up_folders' : 'recheck_library_add', tone: 'warning' }
+      : searchInitial
       ? { code: 'queued_for_search', label: 'Queued for search', message: 'This release is waiting for the next search pass.',
         nextAction: !searchQueued && findMatchesAvailable && accountStatus !== 'disabled' ? 'search_now' : null, tone: 'neutral' }
       : searchQueued
@@ -115,6 +120,7 @@ function buildWorklistPayload() {
 async function installMissingMusicFixture(browserContext, requests, {
   accountStatus = 'active',
   downloadStarted = false,
+  libraryRecoveryReason = null,
   matchSelected = false,
   minimumBitrateKbps = null,
   qualityChoiceCode = null,
@@ -124,6 +130,15 @@ async function installMissingMusicFixture(browserContext, requests, {
   const state = {
     downloadStartRequest: null,
     downloadStarted,
+    libraryRecoveryReason,
+    libraryAddQueued: false,
+    recheckAvailable: ['source_path_unavailable', 'audio_check_failed'].includes(libraryRecoveryReason),
+    repairFoldersAvailable: libraryRecoveryReason === 'source_path_unavailable',
+    recheckOutcome: 'queued',
+    recheckFailure: false,
+    recheckRequest: null,
+    recheckRequestCount: 0,
+    recheckResponseWait: null,
     matchSelected,
     minimumBitrateKbps,
     selectionRequest: null,
@@ -160,6 +175,25 @@ async function installMissingMusicFixture(browserContext, requests, {
     const searchAgainPath = `${detailPath}/search-again`;
     const findMatchesPath = `${detailPath}/find-matches`;
     const qualityFallbackPath = `${detailPath}/allow-fallback-quality`;
+    const recheckPath = `${detailPath}/recheck-library-add`;
+
+    if (route.request().method() === 'POST' && requestUrl.pathname === recheckPath) {
+      const headers = route.request().headers();
+      state.recheckRequestCount += 1;
+      state.recheckRequest = { body: route.request().postDataJSON(), csrfToken: headers['x-csrf-token'] ?? null, idempotencyKey: headers['idempotency-key'] ?? null };
+      if (state.recheckResponseWait) await state.recheckResponseWait;
+      if (state.recheckFailure) {
+        await route.fulfill({ status: Number(state.recheckFailure), contentType: 'application/json',
+          body: JSON.stringify({ ok: false, error: { code: 'unexpected_error', message: 'Private candidate /mnt/library probe output' } }) });
+        return;
+      }
+      if (['queued', 'already_queued'].includes(state.recheckOutcome)) { state.libraryAddQueued = true; state.recheckAvailable = false; }
+      if (state.recheckOutcome === 'not_available') state.recheckAvailable = false;
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true,
+        action: { code: 'recheck_library_add', decisionId: 'wanted-amber', targetUserId: 'listener-1', outcome: state.recheckOutcome, runId: state.libraryAddQueued ? 'run-add' : null },
+      }) });
+      return;
+    }
 
     if (route.request().method() === 'POST' && requestUrl.pathname === findMatchesPath) {
       const headers = route.request().headers();
@@ -310,6 +344,9 @@ async function installMissingMusicFixture(browserContext, requests, {
         decision: buildDecision({
           accountStatus: state.accountStatus,
           downloadStarted: state.downloadStarted,
+          libraryRecoveryReason: state.libraryRecoveryReason,
+          libraryAddQueued: state.libraryAddQueued,
+          recheckAvailable: state.recheckAvailable,
           matchSelected: state.matchSelected,
           qualityChoiceCode: state.qualityChoiceCode,
           searchInitial: state.searchInitial,
@@ -317,7 +354,7 @@ async function installMissingMusicFixture(browserContext, requests, {
           searchQueued: state.searchQueued,
           searchStopped: state.searchStopped,
         }),
-        matchChoices: state.matchSelected || state.searchStopped || state.qualityChoiceCode || state.searchInitial
+        matchChoices: state.matchSelected || state.searchStopped || state.qualityChoiceCode || state.searchInitial || state.libraryRecoveryReason
           ? []
           : [{
             fileCount: 10,
@@ -328,7 +365,9 @@ async function installMissingMusicFixture(browserContext, requests, {
         permissions: {
           canAllowFallbackQuality: state.qualityFallbackAvailable && state.accountStatus !== 'disabled',
           canFindMatches: state.findMatchesAvailable && state.accountStatus !== 'disabled',
-          canSelectMatch: !state.matchSelected && !state.searchStopped && !state.qualityChoiceCode && !state.searchInitial,
+          canRecheckLibraryAdd: state.recheckAvailable && !state.libraryAddQueued && state.accountStatus !== 'disabled',
+          canRepairFolders: state.repairFoldersAvailable && !state.libraryAddQueued && state.accountStatus !== 'disabled',
+          canSelectMatch: !state.matchSelected && !state.searchStopped && !state.qualityChoiceCode && !state.searchInitial && !state.libraryRecoveryReason,
           canSearchAgain: state.searchAgainAvailable && state.accountStatus !== 'disabled',
           canStartDownload: state.matchSelected && !state.downloadStarted,
           canViewDownloader: state.downloadStarted,
@@ -347,6 +386,7 @@ async function installMissingMusicFixture(browserContext, requests, {
           fallbackAllowed: state.qualityFallbackAllowed,
           fallbackOverrideActive: state.qualityFallbackAllowed,
         } : null,
+        libraryAddRecovery: { reasonCode: state.libraryRecoveryReason, queued: state.libraryAddQueued, runId: state.libraryAddQueued ? 'run-add' : null },
         scope: 'all',
       }
       : { ...buildWorklistPayload(),
@@ -523,7 +563,7 @@ suite('Missing Music decision detail browser acceptance', () => {
       assert.equal(await find.getAttribute('type'), 'button');
       assert.equal(await inspector.getByRole('button', { name: 'Search again', exact: true }).count(), 0);
       const statuses = inspector.locator('.hx-missing-command-feedback');
-      assert.equal(await statuses.count(), 5);
+      assert.equal(await statuses.count(), 6);
       assert.equal(await statuses.first().getAttribute('role'), 'status');
       assert.equal(await statuses.first().getAttribute('aria-atomic'), 'true');
       assert.equal(await statuses.first().innerText(), '');
@@ -685,6 +725,220 @@ suite('Missing Music decision detail browser acceptance', () => {
       assert.equal(await inspector.getByRole('button', { exact: true, name: 'Search again' }).count(), 0);
       assert.equal(fixture.searchAgainRequestCount, 2);
     }, { scenarioName: 'missing_music_search_again_safe_failures' });
+  });
+
+  test('checks completed files by keyboard, reports durable acceptance, refreshes both surfaces, and shows recovery in both themes', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) { t.skip(runtimeUnavailableReason); return; }
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      const requests = [];
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      const fixture = await installMissingMusicFixture(browserContext, requests, { libraryRecoveryReason: 'audio_check_failed' });
+      await page.goto(baseUrl + '/app/missing', { waitUntil: 'domcontentloaded' });
+      await page.locator('.missing-music-worklist').getByText('Next step: Check the files again', { exact: true }).waitFor();
+      await page.getByRole('link', { name: 'Open status details for Autechre — Amber' }).click();
+      const inspector = page.locator('.missing-music-inspector');
+      const recovery = inspector.getByRole('region', { name: 'Audio check could not finish', exact: true });
+      const check = recovery.getByRole('button', { name: 'Check the files again', exact: true });
+      await check.waitFor();
+      assert.equal(await check.getAttribute('type'), 'button');
+      assert.equal(await recovery.getByRole('link', { name: 'Set up folders', exact: true }).count(), 0);
+      await recovery.getByText('Check the same completed download for Jamie.', { exact: false }).waitFor();
+      const statusNode = await inspector.locator('.hx-missing-command-feedback').last().elementHandle();
+      assert.equal(await statusNode.evaluate((element) => element.getAttribute('role') === 'status' && element.textContent.trim() === ''), true);
+      const screenshotDirectory = resolve('.tmp/missing-music-library-add-recheck');
+      await mkdir(screenshotDirectory, { recursive: true });
+      await page.keyboard.press('Tab');
+      for (const width of [390, 800, 1280]) {
+        await page.setViewportSize({ width, height: 1000 });
+        for (const theme of ['light', 'dark']) {
+          await page.evaluate((value) => globalThis.document.documentElement.setAttribute('data-theme', value), theme);
+          await recovery.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+          await check.focus();
+          await assertVisibleFocusOutline(check, 'the file recheck should expose keyboard focus');
+          assert.equal(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth), true);
+          assert.equal(await recovery.evaluate((element) => element.scrollWidth <= element.clientWidth), true);
+          if (width === 390) assert.ok((await check.boundingBox()).height >= 44);
+          assert.equal(await recovery.evaluate((element) => {
+            const bounds = element.getBoundingClientRect();
+            return bounds.top >= 56 && bounds.bottom <= globalThis.innerHeight - (globalThis.innerWidth <= 640 ? 60 : 0);
+          }), true, 'recovery control and explanation should clear fixed navigation');
+          await recovery.screenshot({ path: resolve(screenshotDirectory, `recheck-${width}-${theme}.png`), animations: 'disabled' });
+        }
+      }
+      let finishResponse;
+      fixture.recheckResponseWait = new Promise((resolveResponse) => { finishResponse = resolveResponse; });
+      const detailPath = '/api/v1/missing-music/decisions/wanted-amber';
+      const worklistPath = '/api/v1/missing-music/decisions';
+      const detailCount = requests.filter((path) => path === detailPath).length;
+      const worklistCount = requests.filter((path) => path === worklistPath).length;
+      await check.focus();
+      await check.press('Space');
+      await inspector.getByRole('status').getByText('Checking the completed files again…', { exact: true }).waitFor();
+      assert.equal(await recovery.getByRole('button', { name: 'Checking…', exact: true }).isDisabled(), true);
+      assert.equal(await statusNode.evaluate((element) => element.isConnected && !element.closest('[aria-busy="true"]')), true);
+      assert.deepEqual(fixture.recheckRequest.body, {});
+      assert.match(fixture.recheckRequest.csrfToken, /.+/u);
+      assert.match(fixture.recheckRequest.idempotencyKey, /^missing-music-decisions-recheck-library-add-/u);
+      await Promise.all([
+        page.waitForResponse((response) => new URL(response.url()).pathname === detailPath),
+        page.waitForResponse((response) => new URL(response.url()).pathname === worklistPath),
+        Promise.resolve().then(() => finishResponse()),
+      ]);
+      await inspector.getByText('Adding to library', { exact: true }).waitFor();
+      await inspector.getByRole('status').getByText('Harmoniarr queued this release for library-add checks. The files will be added only if the plan remains safe.', { exact: true }).waitFor();
+      await page.locator('.missing-music-worklist').getByText('Adding to library', { exact: true }).waitFor();
+      const currentStatus = inspector.getByRole('heading', { name: 'Current status', exact: true });
+      await assertLocatorFocused(currentStatus, 'accepted recovery should focus the refreshed state while the interaction owns focus');
+      assert.equal(await currentStatus.evaluate((element) => {
+        const bounds = element.getBoundingClientRect();
+        return bounds.top >= 56 && bounds.bottom <= globalThis.innerHeight;
+      }), true, 'the command focus destination should be visible below the topbar');
+      assert.equal(requests.filter((path) => path === detailPath).length, detailCount + 1);
+      assert.equal(requests.filter((path) => path === worklistPath).length, worklistCount + 1);
+      assert.equal(await check.count(), 0);
+      assert.equal(await statusNode.evaluate((element) => element.isConnected), true);
+      assert.equal(fixture.recheckRequestCount, 1);
+      assert.equal(fixture.downloadStartRequest, null);
+      assert.equal(fixture.searchAgainRequestCount, 0);
+    }, { scenarioName: 'missing_music_library_add_recheck_keyboard_and_layouts' });
+  });
+
+  test('library recheck renders six bounded outcomes with distinct waiting and review feedback', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) { t.skip(runtimeUnavailableReason); return; }
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      const fixture = await installMissingMusicFixture(browserContext, [], { libraryRecoveryReason: 'audio_check_failed' });
+      for (const [outcome, message, tone] of [
+        ['queued', 'Harmoniarr queued this release for library-add checks. The files will be added only if the plan remains safe.', 'success'],
+        ['already_queued', 'Library-add checks are already queued for this release. No additional work was started.', 'info'],
+        ['deferred', 'Another library add is active. This release was left unchanged; check its files again after that work finishes.', 'warning'],
+        ['prerequisite_not_ready', 'The required folders or media tools are not ready. Repair the prerequisite, then check these files again.', 'warning'],
+        ['still_needs_review', 'These completed files still need review before Harmoniarr can add them safely.', 'warning'],
+        ['not_available', 'This release is no longer eligible for this file recheck. Review its current status.', 'warning'],
+      ]) {
+        fixture.recheckOutcome = outcome;
+        fixture.recheckAvailable = true;
+        fixture.libraryAddQueued = false;
+        await page.goto(baseUrl + '/app/missing/wanted-amber', { waitUntil: 'domcontentloaded' });
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        const inspector = page.locator('.missing-music-inspector');
+        await inspector.getByRole('button', { name: 'Check the files again', exact: true }).click();
+        const feedback = inspector.getByRole('status').filter({ hasText: message });
+        await feedback.waitFor();
+        assert.equal(await feedback.getAttribute('data-tone'), tone);
+        if (['queued', 'already_queued'].includes(outcome)) await inspector.getByText('Adding to library', { exact: true }).waitFor();
+        else await inspector.getByText('Needs help', { exact: true }).waitFor();
+        assert.doesNotMatch(await inspector.innerText(), /Private|\/mnt|run-add/u);
+      }
+      assert.equal(fixture.recheckRequestCount, 6);
+    }, { scenarioName: 'missing_music_library_add_recheck_bounded_outcomes' });
+  });
+
+  test('library recheck retains uncertain retry identity and respects moved focus, denied permission, and disabled history', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) { t.skip(runtimeUnavailableReason); return; }
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      const fixture = await installMissingMusicFixture(browserContext, [], { libraryRecoveryReason: 'audio_check_failed' });
+      fixture.recheckFailure = 500;
+      await page.goto(baseUrl + '/app/missing/wanted-amber', { waitUntil: 'domcontentloaded' });
+      const inspector = page.locator('.missing-music-inspector');
+      const check = inspector.getByRole('button', { name: 'Check the files again', exact: true });
+      await check.focus();
+      await check.press('Enter');
+      await inspector.getByRole('alert').getByText('The files could not be rechecked. Refresh this release and try again.', { exact: true }).waitFor();
+      await assertLocatorFocused(check, 'safe recheck failure should preserve the invoker');
+      const previousKey = fixture.recheckRequest.idempotencyKey;
+      await check.press('Space');
+      await inspector.getByRole('alert').getByText('The files could not be rechecked. Refresh this release and try again.', { exact: true }).waitFor();
+      assert.equal(fixture.recheckRequest.idempotencyKey, previousKey);
+      assert.doesNotMatch(await inspector.innerText(), /Private|\/mnt/u);
+      fixture.recheckFailure = false;
+      let finishResponse;
+      fixture.recheckResponseWait = new Promise((resolveResponse) => { finishResponse = resolveResponse; });
+      await check.press('Enter');
+      await inspector.getByRole('status').getByText('Checking the completed files again…', { exact: true }).waitFor();
+      const filter = page.getByLabel('Search releases', { exact: true });
+      await filter.focus();
+      const userScrollPosition = await page.locator('.hx-main').evaluate((element) => element.scrollTop);
+      finishResponse();
+      await inspector.getByText('Adding to library', { exact: true }).waitFor();
+      await assertLocatorFocused(filter, 'recheck completion must respect user-moved focus');
+      assert.equal(await page.locator('.hx-main').evaluate((element) => element.scrollTop), userScrollPosition, 'recheck completion must preserve the user scroll position');
+      await Promise.all([
+        page.waitForResponse((response) => new URL(response.url()).pathname === '/api/v1/missing-music/decisions/wanted-amber'),
+        page.evaluate(() => globalThis.window.dispatchEvent(new Event('focus'))),
+      ]);
+      await assertLocatorFocused(filter, 'background revalidation should preserve user focus');
+      assert.equal(await page.locator('.hx-main').evaluate((element) => element.scrollTop), userScrollPosition, 'background revalidation should preserve the user scroll position');
+      fixture.libraryAddQueued = false;
+      fixture.recheckAvailable = false;
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await inspector.getByText('Needs help', { exact: true }).waitFor();
+      assert.equal(await check.count(), 0);
+      fixture.recheckAvailable = true;
+      fixture.accountStatus = 'disabled';
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await inspector.getByText('This account is disabled. Its history is read-only.', { exact: true }).waitFor();
+      assert.equal(await check.count(), 0);
+      assert.equal(await inspector.getByRole('link', { name: 'Set up folders', exact: true }).count(), 0);
+      assert.equal(fixture.recheckRequestCount, 3);
+    }, { scenarioName: 'missing_music_library_add_recheck_safe_retry_and_focus' });
+  });
+
+  test('folder repair saves Settings, returns to the same recipient decision, and requires an explicit canonical recheck', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) { t.skip(runtimeUnavailableReason); return; }
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      const mutations = [];
+      page.on('request', (request) => { if (request.method() === 'POST') mutations.push(new URL(request.url()).pathname); });
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      const fixture = await installMissingMusicFixture(browserContext, [], { libraryRecoveryReason: 'source_path_unavailable' });
+      let settingsPayload;
+      await browserContext.route('**/api/v1/settings', async (route) => {
+        if (route.request().method() === 'GET') {
+          const response = await route.fetch();
+          settingsPayload = await response.json();
+          await route.fulfill({ response, body: JSON.stringify(settingsPayload) });
+          return;
+        }
+        settingsPayload = { ...settingsPayload, settings: { ...settingsPayload.settings, ...route.request().postDataJSON() },
+          pathValidation: { ...settingsPayload.pathValidation, summary: { status: 'healthy' } } };
+        await route.fulfill({ contentType: 'application/json', body: JSON.stringify(settingsPayload) });
+      });
+      await page.goto(baseUrl + '/app/missing/wanted-amber', { waitUntil: 'domcontentloaded' });
+      const repair = page.getByRole('region', { name: 'Completed files are not reachable', exact: true });
+      const settingsLink = repair.getByRole('link', { name: 'Set up folders', exact: true });
+      assert.equal(await settingsLink.getAttribute('href'), '/app/settings/media-storage?returnTo=missing_music_decision&returnReleaseId=wanted-amber');
+      await settingsLink.click();
+      await page.getByRole('heading', { name: 'Media folders', exact: true }).waitFor();
+      await page.getByLabel('Downloads folder', { exact: true }).fill('/configured/downloads');
+      await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+      await page.getByRole('heading', { name: 'Folders are ready', exact: true }).waitFor();
+      const returnLink = page.getByRole('link', { name: 'Return to Missing Music', exact: true });
+      assert.equal(await returnLink.getAttribute('href'), '/app/missing/wanted-amber');
+      assert.equal(fixture.recheckRequestCount, 0, 'saving folders must not implicitly start a release mutation');
+      assert.equal(mutations.some((path) => path.includes('/acquisition/') && path.endsWith('/recheck-library-add')), false);
+      assert.equal(mutations.some((path) => path.endsWith('/recheck-library-add')), false);
+      await returnLink.click();
+      const inspector = page.locator('.missing-music-inspector');
+      await inspector.getByText('Jamie', { exact: true }).waitFor();
+      await assertLocatorFocused(inspector.getByRole('heading', { name: 'Amber', exact: true }), 'returning from Settings should focus the current decision');
+      const check = inspector.getByRole('button', { name: 'Check the files again', exact: true });
+      await check.focus();
+      await check.press('Enter');
+      await inspector.getByText('Adding to library', { exact: true }).waitFor();
+      assert.equal(fixture.recheckRequestCount, 1);
+      assert.deepEqual(fixture.recheckRequest.body, {});
+      assert.equal(mutations.filter((path) => path === '/api/v1/missing-music/decisions/wanted-amber/recheck-library-add').length, 1);
+      assert.equal(mutations.some((path) => path.includes('/acquisition/') && path.endsWith('/recheck-library-add')), false);
+    }, { scenarioName: 'missing_music_folder_repair_explicit_recheck_return' });
   });
 
   test('saves recipient quality consent by keyboard, refreshes both surfaces, and renders in light and dark layouts', {

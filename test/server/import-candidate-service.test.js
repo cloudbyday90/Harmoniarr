@@ -366,7 +366,9 @@ test('createImportCandidateService ingests slskd responses in one transaction an
   assert.equal(slskdService.getSearchResponses.mock.callCount(), 1);
   assert.deepEqual(slskdService.getSearchResponses.mock.calls[0].arguments, [{ searchId: 'search-1' }]);
   assert.equal(pool.connect.mock.callCount(), 1);
-  assert.deepEqual(client.query.mock.calls.map((call) => call.arguments[0]), ['BEGIN', 'COMMIT']);
+  assert.equal(client.query.mock.calls[0].arguments[0], 'BEGIN');
+  assert.match(client.query.mock.calls[1].arguments[0], /ORDER BY candidate.id FOR UPDATE OF candidate/u);
+  assert.equal(client.query.mock.calls.at(-1).arguments[0], 'COMMIT');
   assert.equal(client.release.mock.callCount(), 1);
   assert.equal(upsertImportCandidateFn.mock.callCount(), 1);
   assert.equal(replaceImportCandidateFilesFn.mock.callCount(), 1);
@@ -1154,7 +1156,9 @@ test('createImportCandidateService rolls back candidate ingestion failures', asy
     },
   );
 
-  assert.deepEqual(client.query.mock.calls.map((call) => call.arguments[0]), ['BEGIN', 'ROLLBACK']);
+  assert.equal(client.query.mock.calls[0].arguments[0], 'BEGIN');
+  assert.match(client.query.mock.calls[1].arguments[0], /ORDER BY candidate.id FOR UPDATE OF candidate/u);
+  assert.equal(client.query.mock.calls.at(-1).arguments[0], 'ROLLBACK');
   assert.equal(client.release.mock.callCount(), 1);
 });
 

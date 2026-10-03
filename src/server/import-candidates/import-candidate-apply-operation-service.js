@@ -20,6 +20,7 @@ import { copyFile, link, mkdir, rm, stat } from 'node:fs/promises';
 import { posix as path } from 'node:path';
 import { createMediaFilesystemService } from '../media/media-filesystem-service.js';
 import { recordImportOperation } from './import-candidate-operation-repository.js';
+import { assertSafeAutoApplyInputs } from './import-candidate-safe-auto-apply-input-policy.js';
 
 function buildBlockedError(message) {
   const error = new Error(message);
@@ -223,6 +224,8 @@ export function createImportCandidateApplyOperationService({
 
   async function applyImportCandidatePreview({
     applyPreview,
+    applySafetyMode = 'manual',
+    assertSafeAutoPolicyCurrent = async () => {},
     executionMode = 'move',
     importCandidateId = null,
     onMutationIntent: onMutationIntentFn = onMutationIntent,
@@ -290,6 +293,7 @@ export function createImportCandidateApplyOperationService({
       });
 
       await onMutationIntentFn(intent);
+      if (applySafetyMode === 'safe_auto') await assertSafeAutoPolicyCurrent();
 
       const result = await resolvedMediaFilesystemService.applyExclusiveFileMutationPlan(
         resolvedMediaFilesystemService.createExclusiveFileMutationPlan({
@@ -375,6 +379,10 @@ export function createImportCandidateApplyOperationService({
         stepType,
         transport,
       });
+    }
+
+    if (applySafetyMode === 'safe_auto') {
+      await assertSafeAutoApplyInputs({ applyPreview, statFn, resolveReusableSourcePath });
     }
 
     for (let index = 0; index < applyPreview.files.length; index += 1) {
@@ -485,6 +493,12 @@ export function createImportCandidateApplyOperationService({
 
         if (!file.stagingTarget?.exists) {
           const reusableSourcePath = await resolveReusableSourcePath(file);
+
+          if (applySafetyMode === 'safe_auto' && reusableSourcePath) {
+            const error = new Error('Reusable files need their own audio verification before a safe library add.');
+            error.code = 'safe_auto_alternate_input_requires_verification';
+            throw error;
+          }
 
           if (reusableSourcePath) {
             currentStep = {

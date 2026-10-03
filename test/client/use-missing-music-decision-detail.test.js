@@ -139,6 +139,23 @@ test('decision detail normalizes initial search permission strictly without deri
   assert.equal(decisionDetail.detail.value.permissions.canFindMatches, false);
 });
 
+test('decision detail retains current bounded library recovery and requires boolean permissions', async (t) => {
+  const recovery = { reasonCode: 'audio_check_failed', queued: false, runId: null };
+  let permissions = { canRecheckLibraryAdd: true, canRepairFolders: true };
+  const { app, decisionDetail } = mountDecisionDetail({ decisionId: 'wanted-amber',
+    fetchMissingMusicDecisionDetail: async () => ({ ...createDetail(), libraryAddRecovery: recovery, permissions }),
+  });
+  t.after(() => app.unmount());
+  await decisionDetail.load();
+  assert.deepEqual(decisionDetail.detail.value.libraryAddRecovery, recovery);
+  assert.equal(decisionDetail.detail.value.permissions.canRecheckLibraryAdd, true);
+  assert.equal(decisionDetail.detail.value.permissions.canRepairFolders, true);
+  permissions = { canRecheckLibraryAdd: 'true', canRepairFolders: 1 };
+  await decisionDetail.load();
+  assert.equal(decisionDetail.detail.value.permissions.canRecheckLibraryAdd, false);
+  assert.equal(decisionDetail.detail.value.permissions.canRepairFolders, false);
+});
+
 function deferred() {
   let resolve;
   let reject;

@@ -87,6 +87,109 @@ function createService(overrides = {}) {
   return { listAppUsers, listWantedReleasesWithMetadata, service };
 }
 
+function createLibraryAddRecoveryService({ releaseChanges = {}, factsChanges = {}, nextAction = 'recheck_library_add', statusCode = 'needs_help_adding' } = {}) {
+  const release = { ...createRelease({ appUserId: 'user-1', id: 'decision-add', statusCode }),
+    discoveryLinkExists: true,
+    libraryAddRecoveryFacts: { candidateStatus: 'failed', hasConflictingCandidate: false,
+      addBlockerCode: 'media_verification', recoveryReasonCode: 'audio_check_failed',
+      candidateId: 'private-candidate', sourcePath: '/private/download',
+      verificationError: 'private-probe-error', ...factsChanges }, ...releaseChanges };
+  return { release, ...createService({
+    listWantedReleaseIdentityPage: async () => ({ rows: [{ id: release.id, createdAtKey: '2026-09-11T00:00:00.000000Z' }], hasMore: false }),
+    listWantedReleasesWithMetadata: async ({ appUserIds }) => appUserIds.includes(release.appUserId) ? [release] : [],
+    projectMusicQueueReleaseFn: (value) => ({ ...projectRelease(value), status: { code: statusCode, label: 'Needs help',
+      message: 'This release needs a safe decision before Harmoniarr can add it to your library.', nextAction, tone: 'warning' } }),
+  }) };
+}
+
+test('library-add recovery permissions, next step and action worklist agree for current bounded audio and source interruptions', async () => {
+  for (const reasonCode of ['source_path_unavailable', 'audio_check_failed']) {
+    const { release, service } = createLibraryAddRecoveryService({
+      nextAction: reasonCode === 'source_path_unavailable' ? 'set_up_folders' : 'recheck_library_add',
+      factsChanges: { addBlockerCode: reasonCode === 'source_path_unavailable' ? reasonCode : 'media_verification' },
+    });
+    for (const actorUser of [{ id: 'admin-1', role: 'admin' }, { id: 'user-1', role: 'requester' }]) {
+      const detail = await service.getMissingMusicDecisionDetail({ actorUser, decisionId: release.id });
+      const actions = await service.listMissingMusicDecisions({ actorUser, state: 'action' });
+      assert.equal(detail.permissions.canRecheckLibraryAdd, true);
+      assert.equal(detail.permissions.canRepairFolders, reasonCode === 'source_path_unavailable' && actorUser.role === 'admin');
+      assert.equal(detail.permissions.isReadOnly, false);
+      assert.equal(detail.decision.state, 'action');
+      assert.equal(detail.decision.status.nextAction, reasonCode === 'source_path_unavailable' ? 'set_up_folders' : 'recheck_library_add');
+      assert.deepEqual(detail.libraryAddRecovery, { reasonCode, queued: false, runId: null });
+      assert.equal(actions.decisions[0].decisionId, release.id);
+      assert.deepEqual(actions.decisions[0].status, detail.decision.status);
+      assert.doesNotMatch(JSON.stringify(detail), /private-candidate|private\/download|private-probe-error|candidateStatus|hasConflictingCandidate/u);
+    }
+  }
+});
+
+test('current ineligible recovery facts suppress broad legacy file-recheck and folder-repair next steps', async () => {
+  const cases = [
+    { factsChanges: { candidateStatus: 'selected' } },
+    { factsChanges: { hasConflictingCandidate: true } },
+    { factsChanges: { addBlockerCode: 'destination_collision' } },
+    { factsChanges: { recoveryReasonCode: 'lossy_source' } },
+    { factsChanges: { recoveryReasonCode: 'suspicious_lossless' } },
+    { releaseChanges: { wantedStatus: 'downloaded' } },
+    { releaseChanges: { missingTrackCount: 0 } },
+    { releaseChanges: { discoveryLinkExists: false } },
+    { releaseChanges: { visibilityState: 'ignored' } },
+    { releaseChanges: { evidence: { visibilityState: 'ignored' } } },
+    { releaseChanges: { appUserId: 'user-2' } },
+  ];
+  for (const input of cases) {
+    const { release, service } = createLibraryAddRecoveryService(input);
+    const detail = await service.getMissingMusicDecisionDetail({ actorUser: { id: 'admin-1', role: 'admin' }, decisionId: release.id });
+    assert.equal(detail.permissions.canRecheckLibraryAdd, false, JSON.stringify(input));
+    assert.equal(detail.permissions.canRepairFolders, false);
+    assert.equal(detail.decision.status.nextAction, null);
+  }
+  for (const factsChanges of [{ candidateStatus: 'selected' }, { hasConflictingCandidate: true }]) {
+    const { release, service } = createLibraryAddRecoveryService({ nextAction: 'set_up_folders',
+      factsChanges: { addBlockerCode: 'source_path_unavailable', ...factsChanges } });
+    const detail = await service.getMissingMusicDecisionDetail({ actorUser: { id: 'admin-1', role: 'admin' }, decisionId: release.id });
+    const worklist = await service.listMissingMusicDecisions({ actorUser: { id: 'admin-1', role: 'admin' } });
+    assert.equal(detail.permissions.canRepairFolders, false);
+    assert.equal(detail.decision.status.nextAction, null);
+    assert.equal(worklist.decisions[0].status.nextAction, null);
+  }
+  const { release, service } = createLibraryAddRecoveryService({ statusCode: 'needs_setup', nextAction: 'set_up_folders',
+    factsChanges: { candidateStatus: 'selected' } });
+  const setup = await service.getMissingMusicDecisionDetail({ actorUser: { id: 'admin-1', role: 'admin' }, decisionId: release.id });
+  assert.equal(setup.decision.status.nextAction, 'set_up_folders', 'general setup guidance must remain independent of completed-file recovery');
+});
+
+test('only a matching safe-auto pending or running add publishes queued progress and its bounded run ID', async () => {
+  const queuedFacts = { candidateStatus: 'import_pending', runMatchesCandidate: true, activeRunStatus: 'pending',
+    activeRunSafetyMode: 'safe_auto', activeRunId: 'run-add', addBlockerCode: null, recoveryReasonCode: null };
+  for (const [factsChanges, queued] of [[{}, true], [{ activeRunStatus: 'running' }, true],
+    [{ runMatchesCandidate: false }, false], [{ activeRunSafetyMode: 'manual' }, false],
+    [{ activeRunStatus: 'completed' }, false], [{ candidateStatus: 'selected' }, false]]) {
+    const { release, service } = createLibraryAddRecoveryService({ factsChanges: { ...queuedFacts, ...factsChanges } });
+    const actorUser = { id: 'admin-1', role: 'admin' };
+    const detail = await service.getMissingMusicDecisionDetail({ actorUser, decisionId: release.id });
+    const actionPage = await service.listMissingMusicDecisions({ actorUser, state: 'action' });
+    assert.deepEqual(detail.libraryAddRecovery, { reasonCode: null, queued, runId: queued ? 'run-add' : null });
+    assert.equal(detail.permissions.canRecheckLibraryAdd, false);
+    assert.equal(detail.permissions.canRepairFolders, false);
+    assert.equal(detail.decision.status.nextAction, null);
+    if (queued) {
+      assert.deepEqual(detail.decision.status, { code: 'adding_to_library', label: 'Adding to library',
+        message: 'Harmoniarr has queued a safe library add and will check the files again before changing the library.',
+        nextAction: null, tone: 'info' });
+      assert.equal(detail.decision.state, 'downloading');
+      assert.equal(actionPage.decisions.length, 0);
+      const progress = await service.listMissingMusicDecisions({ actorUser, state: 'downloading' });
+      assert.deepEqual(progress.decisions[0].status, detail.decision.status);
+    } else {
+      assert.equal(detail.decision.status.code, 'needs_help_adding');
+      assert.equal(actionPage.decisions.length, 1, 'the underlying unsafe add still belongs in the review worklist');
+    }
+    assert.doesNotMatch(JSON.stringify(detail), /private-candidate|private\/download|private-probe-error/u);
+  }
+});
+
 test('Missing Music detail exposes Search again only for current stopped states and active target history', async () => {
   for (const statusCode of ['failed', 'no_matches_left', 'quality_choice_needed', 'downloading', 'pick_match']) {
     const { service } = createService({ projectMusicQueueReleaseFn: (release) => ({ ...projectRelease(release),

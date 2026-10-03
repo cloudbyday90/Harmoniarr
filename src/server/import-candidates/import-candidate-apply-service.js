@@ -18,7 +18,7 @@
 
 import { createApiError } from '../auth.js';
 import { recordAuditEvent } from '../audit.js';
-import { operationRunRegistry } from '../../shared/operation-run-descriptors.js';
+import { createImportCandidateApplyQueueService } from './import-candidate-apply-queue-service.js';
 import { normalizeImportCandidateApplyScope } from './import-candidate-apply-scope.js';
 
 export function createImportCandidateApplyService({
@@ -35,8 +35,13 @@ export function createImportCandidateApplyService({
   },
   getActiveRun = async () => null,
   recordAuditEventFn = recordAuditEvent,
+  applyQueueService = null,
+  withTransaction,
+  lockRunCreation,
+  lockPendingCandidates,
 } = {}) {
-  const operationDescriptor = operationRunRegistry.importCandidateApply;
+  const queueService = applyQueueService ?? createImportCandidateApplyQueueService({ assertMaintenanceWriteAllowed,
+    createOperationRun, getActiveRun, recordAuditEventFn, withTransaction, lockRunCreation, lockPendingCandidates });
 
   async function startImportCandidateApplyRun({
     applySafetyMode = 'manual',
@@ -72,42 +77,8 @@ export function createImportCandidateApplyService({
       throw createApiError(409, 'import_candidate_apply_not_ready', 'Resolve blocked import-pending candidates before starting import apply');
     }
 
-    const run = await createOperationRun({
-      applySafetyMode,
-      executableCandidateCount,
-      executionMode: 'move',
-      ...(scopedCandidateIds ? { importCandidateIds: scopedCandidateIds } : {}),
-      requestedCandidateCount,
-      status: 'pending',
-      triggeredByUserId,
-      triggerSource,
-    });
-
-    await recordAuditEventFn({
-      actorType: triggeredByUserId ? 'user' : 'system',
-      actorUserId: triggeredByUserId,
-      details: {
-        blockedCandidateCount: importPendingSummary.counts?.blocked ?? 0,
-        applySafetyMode,
-        executableCandidateCount,
-        ...(scopedCandidateIds ? { scopedCandidateCount: scopedCandidateIds.length } : {}),
-        requestedCandidateCount,
-        runId: run.id,
-        triggerSource,
-        warningCandidateCount,
-      },
-      entityId: run.id,
-      entityType: 'operation_run',
-      eventType: operationDescriptor.startedEventType,
-      ipAddress: requestMetadata?.ipAddress ?? null,
-      summary: 'Import candidate library apply started',
-      userAgent: requestMetadata?.userAgent ?? null,
-    });
-
-    return {
-      accepted: true,
-      run,
-    };
+    return queueService.queuePreparedImportCandidateApply({ applySafetyMode, importCandidateIds: scopedCandidateIds,
+      preparedSummary: importPendingSummary, requestMetadata, triggeredByUserId, triggerSource });
   }
 
   return {

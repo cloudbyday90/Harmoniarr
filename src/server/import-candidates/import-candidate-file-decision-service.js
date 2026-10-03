@@ -110,6 +110,7 @@ export function createImportCandidateFileDecisionService({
   }
 
   async function validateCandidateFile({ client, importCandidateFileId, importCandidateId }) {
+    await client.query('SELECT id FROM import_candidates WHERE id = $1::uuid FOR UPDATE', [importCandidateId]);
     const candidate = await getImportCandidateByIdFn(importCandidateId, client);
     if (!candidate) {
       throw createApiError(404, 'import_candidate_not_found', 'Import candidate not found');

@@ -57,6 +57,67 @@ function createMissingPathError(pathValue) {
   return error;
 }
 
+test('safe automatic add refuses unverified staging and recovered inputs before any file changes', async (t) => {
+  const original = createReadyApplyPreview().files[0];
+  for (const file of [original, { ...original, stagingTarget: { ...original.stagingTarget, exists: true } },
+    { ...original, recovery: { confirmedStageIntent: { sourcePath: original.sourceFile.path } } },
+    { ...original, recovery: { confirmedFinalizeIntent: { sourcePath: original.stagingTarget.path } } }]) {
+    const deps = createSimulatedFilesystemDeps(t, { additionalPaths: file.recovery ? [] : [[original.stagingTarget.path, { dev: 7, ino: 90, size: 12 }]] });
+    const service = createImportCandidateApplyOperationService(deps);
+    await assert.rejects(service.applyImportCandidatePreview({ applySafetyMode: 'safe_auto',
+      applyPreview: createReadyApplyPreview({ files: [file] }) }), { code: 'safe_auto_alternate_input_requires_verification' });
+    assert.equal(deps.copyFileFn.mock.callCount(), 0);
+    assert.equal(deps.linkFn.mock.callCount(), 0);
+    assert.equal(deps.removeFileFn.mock.callCount(), 0);
+  }
+});
+
+test('safe automatic add checks live policy after checkpoint persistence and before file mutation', async (t) => {
+  const deps = createSimulatedFilesystemDeps(t);
+  let policyAllowed = true;
+  const result = await createImportCandidateApplyOperationService(deps).applyImportCandidatePreview({
+    applySafetyMode: 'safe_auto', applyPreview: createReadyApplyPreview(),
+    onMutationIntent: async () => { policyAllowed = false; },
+    assertSafeAutoPolicyCurrent: async () => { if (!policyAllowed) throw new Error('Current recipient policy changed'); },
+  });
+  assert.equal(result.summary.failedFileCount, 1);
+  assert.equal(deps.copyFileFn.mock.callCount(), 0);
+  assert.equal(deps.linkFn.mock.callCount(), 0);
+  assert.equal(deps.removeFileFn.mock.callCount(), 0);
+});
+
+test('safe automatic add verifies current policy for source staging and finalization', async (t) => {
+  const deps = createSimulatedFilesystemDeps(t);
+  const check = t.mock.fn(async () => {});
+  const result = await createImportCandidateApplyOperationService(deps).applyImportCandidatePreview({
+    applySafetyMode: 'safe_auto', applyPreview: createReadyApplyPreview(), assertSafeAutoPolicyCurrent: check,
+  });
+  assert.equal(result.summary.appliedFileCount, 1);
+  assert.equal(check.mock.callCount(), 2);
+  assert.equal(deps.removeFileFn.mock.callCount(), 2);
+});
+
+test('safe automatic add refuses reusable bytes appearing after the initial input scan', async (t) => {
+  const deps = createSimulatedFilesystemDeps(t);
+  const reusablePath = '/library/users/bob/Autechre/Amber/01 Foil.flac';
+  const originalStat = deps.statFn;
+  let reuseReads = 0;
+  deps.statFn = async (pathValue) => {
+    if (pathValue === reusablePath && ++reuseReads > 1) return { size: 12, dev: 7, ino: 91 };
+    return originalStat(pathValue);
+  };
+  const preview = createReadyApplyPreview();
+  preview.files[0].libraryTarget.path = '/library/users/alice/Autechre/Amber/01 Foil.flac';
+  preview.preview.library.configuredUserRootPaths = ['/library/users/alice', '/library/users/bob'];
+  preview.preview.library.targetUser = { configured: true, userRootPath: '/library/users/alice' };
+  preview.preview.library.reusePolicy.duplicateLosslessPolicy = 'reuse_existing_lossless_by_default';
+  const result = await createImportCandidateApplyOperationService(deps).applyImportCandidatePreview({ applySafetyMode: 'safe_auto', applyPreview: preview });
+  assert.equal(result.summary.failedFileCount, 1);
+  assert.equal(deps.copyFileFn.mock.callCount(), 0);
+  assert.equal(deps.linkFn.mock.callCount(), 0);
+  assert.equal(deps.removeFileFn.mock.callCount(), 0);
+});
+
 function createSimulatedFilesystemDeps(t, {
   additionalPaths = [],
   failLibraryCopy = false,

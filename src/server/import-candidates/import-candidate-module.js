@@ -28,6 +28,9 @@ import {
 import { listImportOperations } from './import-candidate-operation-repository.js';
 import { createImportCandidateApplyRunStore } from './import-candidate-apply-run-store.js';
 import { createImportCandidateApplyService } from './import-candidate-apply-service.js';
+import { createImportCandidateApplyQueueService } from './import-candidate-apply-queue-service.js';
+import { createImportCandidateReleaseRecheckStore } from './import-candidate-release-recheck-store.js';
+import { createImportCandidateReleaseRecheckGuardService } from './import-candidate-release-recheck-guard-service.js';
 import { createImportCandidateApplySummaryService } from './import-candidate-apply-summary-service.js';
 import { createImportCandidateApplyWorker } from './import-candidate-apply-worker.js';
 import { createImportCandidateReleaseHintService } from './import-candidate-release-hint-service.js';
@@ -194,6 +197,7 @@ export function createImportCandidateModule({
   importCandidateExecutionRunStore = createImportCandidateExecutionRunStore(),
   importExecutionTransferLinkStore = createImportExecutionTransferLinkStore(),
   importCandidateApplyRunStore = createImportCandidateApplyRunStore(),
+  importCandidateReleaseRecheckStore = createImportCandidateReleaseRecheckStore(),
   importCandidateSafeAutoAddQualityGateService = createImportCandidateSafeAutoAddQualityGateService({
     preAddSpectralProofService: createMediaSpectralProofService({
       analyzeSpectralCutoffFn,
@@ -269,6 +273,8 @@ export function createImportCandidateModule({
     listImportOperations,
     previewImportCandidateApply: importCandidateApplyPreviewService.previewImportCandidateApply,
     safeAutoAddQualityGateService: importCandidateSafeAutoAddQualityGateService,
+    resolveCurrentSafeAutoAddCandidate: (input) => importCandidateReleaseSafeAddRecheck.resolveCurrentQueuedRecheckCandidate(input),
+    assertCurrentSafeAutoAddCandidate: (input) => importCandidateReleaseSafeAddRecheck.assertQueuedRecheckCandidateCurrent(input),
     releaseLease: importCandidateApplyRunStore.releaseLease,
     renewLease: importCandidateApplyRunStore.renewLease,
     replaceImportApplyRunItems,
@@ -329,23 +335,42 @@ export function createImportCandidateModule({
     getActiveRun: importCandidateExecutionRunStore.getActiveRun,
     listImportCandidates: importCandidateService.listImportCandidates,
   }),
-  importCandidateApplyService = createImportCandidateApplyService({
-    assertMaintenanceWriteAllowed: () => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+  importCandidateApplyQueueService = createImportCandidateApplyQueueService({
+    assertMaintenanceWriteAllowed: ({ queryable } = {}) => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
       operationLabel: 'import candidate apply',
+      queryable,
+    }),
+    createOperationRun: importCandidateApplyRunStore.createOperationRun,
+    getActiveRun: importCandidateApplyRunStore.getActiveRun,
+  }),
+  importCandidateApplyService = createImportCandidateApplyService({
+    assertMaintenanceWriteAllowed: ({ queryable } = {}) => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+      operationLabel: 'import candidate apply', queryable,
     }),
     buildImportPendingCandidateSummary: importCandidateImportPendingSummaryService.buildImportPendingCandidateSummary,
     createOperationRun: importCandidateApplyRunStore.createOperationRun,
     getActiveRun: importCandidateApplyRunStore.getActiveRun,
+    applyQueueService: importCandidateApplyQueueService,
+  }),
+  importCandidateReleaseRecheckGuardService = createImportCandidateReleaseRecheckGuardService({
+    assertMaintenanceWriteAllowed: ({ queryable }) => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+      operationLabel: 'library-add prerequisite recheck', queryable,
+    }),
+    recheckStore: importCandidateReleaseRecheckStore,
+    getImportCandidate: importCandidateService.getImportCandidate,
+    listFileDecisions: listImportCandidateFileDecisions,
+    resumeImportCandidateForSafeAdd: importCandidateService.resumeImportCandidateForSafeAdd,
+    queuePreparedImportCandidateApply: importCandidateApplyQueueService.queuePreparedImportCandidateApply,
   }),
   importCandidateReleaseSafeAddRecheck = importCandidateReleaseSafeAddRecheckService
     ?? createImportCandidateReleaseSafeAddRecheckService({
-      findLatestReleaseAddRecoveryCandidate: importCandidateReleaseAddDiagnosticsService.findLatestReleaseAddRecoveryCandidate,
+      recheckStore: importCandidateReleaseRecheckStore,
       getImportCandidate: importCandidateService.getImportCandidate,
       getMediaToolingStatus,
       previewImportCandidateApply: importCandidateApplyPreviewService.previewImportCandidateApply,
-      resumeImportCandidateForSafeAdd: importCandidateService.resumeImportCandidateForSafeAdd,
+      listFileDecisions: listImportCandidateFileDecisions,
+      commitPreparedReleaseRecheck: importCandidateReleaseRecheckGuardService.commitPreparedReleaseRecheck,
       safeAutoAddQualityGateService: importCandidateSafeAutoAddQualityGateService,
-      startImportCandidateApplyRun: importCandidateApplyService.startImportCandidateApplyRun,
     }),
   importCandidateReleaseManualSafeAdd = importCandidateReleaseManualSafeAddService
     ?? createImportCandidateReleaseManualSafeAddService({
@@ -450,6 +475,9 @@ export function createImportCandidateModule({
     importCandidateReleaseAddDiagnosticsService,
     importCandidateReleaseManualSafeAddService: importCandidateReleaseManualSafeAdd,
     importCandidateReleaseSafeAddRecheckService: importCandidateReleaseSafeAddRecheck,
+    importCandidateReleaseRecheckGuardService,
+    importCandidateReleaseRecheckStore,
+    importCandidateApplyQueueService,
     importCandidateApplyPreviewService,
     importCandidatePreviewService,
     postApplyScanService,

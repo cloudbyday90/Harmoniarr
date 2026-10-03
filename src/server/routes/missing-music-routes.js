@@ -39,6 +39,7 @@ function buildActorUser(session) {
 export function registerMissingMusicRoutes(app, {
   allowMissingMusicDecisionFallbackQuality,
   findMissingMusicDecisionMatches,
+  recheckMissingMusicDecisionLibraryAdd,
   executeIdempotentMutation = async ({ executeMutation }) => executeMutation(),
   getMissingMusicDecisionDetail,
   getMissingMusicDownloaderHandoff,
@@ -177,6 +178,22 @@ export function registerMissingMusicRoutes(app, {
       ok: true,
       ...(result?.body ?? {}),
     });
+  }));
+
+  app.post('/api/v1/missing-music/decisions/:decisionId/recheck-library-add', limitMissingMusicDecisionMutation, asyncRoute(async (request, response) => {
+    const session = await requireFreshSession(request);
+    requireCsrf(request, session);
+    if (request.body != null && (typeof request.body !== 'object' || Array.isArray(request.body) || Object.keys(request.body).length > 0)) {
+      throw createApiError(400, 'validation_error', 'Library-add recheck does not accept additional fields');
+    }
+    const actorUser = buildActorUser(session);
+    const result = await executeIdempotentMutation({ actorUserId: actorUser.id,
+      executeMutation: async () => ({ body: await recheckMissingMusicDecisionLibraryAdd({ actorUser,
+        decisionId: request.params.decisionId, requestMetadata: getRequestMetadata(request) }), statusCode: 200 }),
+      idempotencyKey: request.headers['idempotency-key'], operationScope: 'missing-music.decisions.recheck-library-add',
+      requestPayload: { decisionId: request.params.decisionId },
+    });
+    response.status(result?.statusCode ?? 200).json({ ok: true, ...(result?.body ?? {}) });
   }));
 
   app.post('/api/v1/missing-music/decisions/:decisionId/find-matches', limitMissingMusicDecisionMutation, asyncRoute(async (request, response) => {

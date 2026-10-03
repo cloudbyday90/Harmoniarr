@@ -8,6 +8,44 @@ Database model source: `docs/DATABASE_MODEL.md`
 
 ## Current development slice (2026-10-03)
 
+- Missing Music completes canonical **Check the files again** after prerequisite
+  repair. Settings returns to the same recipient without automatic acquisition;
+  explicit recheck uses server scope, durable retry, fresh safe planning and
+  measured quality, and atomic resume/queue/required audits. See the separate
+  [design](MISSING_MUSIC_LIBRARY_ADD_RECHECK_DESIGN.md) and
+  [outcome](MISSING_MUSIC_LIBRARY_ADD_RECHECK_OUTCOME.md) for the recommendation
+  stack, alternatives, implementation owners, and actual validation limits.
+- Shared apply starters now use one owning transaction. Decision writers and
+  existing-parent ingestion retain compatible candidate lock order. Default
+  recovery promotion joins discovery selection coordination, including older
+  searches for the same metadata release. Workers refresh current participant
+  policy before measured checks and verify no drift immediately before each
+  filesystem mutation. Safe-auto refuses unverified older staging/reuse inputs.
+- Fresh GitHub MCP assessment found no eligible unreplayed PR: all three observed
+  open heads and file scopes match their earlier local replays. See the
+  [applicability design](OPEN_PR_APPLICABILITY_2026_10_DESIGN.md) and
+  [outcome](OPEN_PR_APPLICABILITY_2026_10_OUTCOME.md). No random draw, redundant
+  implementation, downgrade, or merge was made.
+- The [web-standards skill](../.agents/skills/harmoniarr-web-standards/SKILL.md)
+  gained one observed worker/final-input evidence case. Source and installed
+  structure validate and all four files match; its [outcome](WEB_STANDARDS_SKILL_OUTCOME.md)
+  distinguishes this maintenance from the earlier independent forward trial.
+- Complete `npm run validate` passes 8,745 tests: 3,714 server, 4,340 client,
+  513 script, and 178 integration, with zero failures/skips, all policy/lint
+  checks, and both builds. Eight focused PostgreSQL/media scenarios and 15 rebuilt
+  browser scenarios pass; focused totals overlap the complete run. Six responsive
+  panel captures were reviewed. Dependency audit reports zero vulnerabilities.
+- Next: canonical guarded **Add to library** for an already prepared eligible
+  download. Reuse the atomic queue and final-input safeguards; extend current
+  recipient/policy checks and prove confirmation, permission, replay, and refresh
+  before exposing the command.
+- Development remains on main. No release, tag, PR merge, workflow dispatch, or
+  image publication is performed by this slice. Screen-reader speech, live
+  provider acceptance, strict-lossless spectral acceptance, and production-scale
+  history latency remain outside its executed evidence.
+
+## Prior development slice: Find matches (2026-10-03)
+
 - Missing Music completes canonical **Find matches** for due, untouched initial
   releases. One policy owns eligibility, detail permission, action-worklist
   filtering, and guarded intent; shared queue history and quality remain intact.
@@ -35,11 +73,9 @@ Database model source: `docs/DATABASE_MODEL.md`
   checks, and both builds. Final browser/test lint passed after aligning the
   controlled fixture with production status. Dependency audit reports zero
   vulnerabilities. Focused totals overlap broader validation.
-- Next: canonical **library-add recovery**, starting with safe-add recheck after
-  repair, then guarded manual add and a Settings return handoff. The worklist
-  advertises these actions and acquisition owns their services, but the canonical
-  inspector/module has no command. Preserve recipient authority, current measured
-  quality/filesystem checks, durable replay, required audit, and truthful refresh.
+- Its recommended **library-add recheck** and Settings return handoff are now
+  implemented in the current slice above. Guarded manual **Add to library** remains
+  the next separate command.
 - This is development on main; no release or published-artifact acceptance is
   claimed. Actual assistive-technology announcements, live-provider acceptance,
   and production-scale candidate-history latency remain unverified.

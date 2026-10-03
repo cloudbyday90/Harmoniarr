@@ -72,3 +72,21 @@ test('Music Queue selection guard leaves candidates outside a current shared dis
   assert.equal(activeCandidate, null);
   assert.equal(client.query.mock.callCount(), 1);
 });
+
+test('explicit canonical recovery scope guards the current metadata discovery and active candidates across older searches', async (t) => {
+  const client = { query: t.mock.fn(async () => ({ rows: [{ id: 'current-discovery' }] })) };
+  await createImportCandidateMusicQueueSelectionGuard().findActiveSelection({ client, metadataReleaseId: 'metadata-1',
+    candidate: { id: 'older-candidate', sourceSearchId: 'older-search' } });
+  assert.match(client.query.mock.calls[0].arguments[0], /metadata_release_id::text = \$2/u);
+  assert.deepEqual(client.query.mock.calls[0].arguments[1], ['older-search', 'metadata-1']);
+  assert.match(client.query.mock.calls[1].arguments[0], /discoveryScope,metadataReleaseId/u);
+  assert.match(client.query.mock.calls[1].arguments[0], /source_search_id IN \(SELECT evidence->>'lastSearchId'/u);
+  assert.deepEqual(client.query.mock.calls[1].arguments[1], ['older-search', 'older-candidate', ['selected', 'downloading', 'import_pending'], 'metadata-1']);
+});
+
+test('trusted metadata-only recovery still guards current discovery when a legacy candidate has no search ID', async (t) => {
+  const client = { query: t.mock.fn(async () => ({ rows: [{ id: 'current-discovery' }] })) };
+  await createImportCandidateMusicQueueSelectionGuard().findActiveSelection({ client, metadataReleaseId: 'metadata-1', candidate: { id: 'legacy-candidate' } });
+  assert.equal(client.query.mock.callCount(), 2);
+  assert.deepEqual(client.query.mock.calls[0].arguments[1], [null, 'metadata-1']);
+});

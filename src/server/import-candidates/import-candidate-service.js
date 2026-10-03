@@ -19,6 +19,7 @@
 import { createHash } from 'node:crypto';
 import { createApiError } from '../auth.js';
 import { recordAuditEvent } from '../audit.js';
+import { lockExistingImportCandidateIngestionParents } from './import-candidate-ingestion-lock-store.js';
 import { filterSlskdResponsesForCandidates } from '../library/candidate-source-filter.js';
 import { resolveScoringSettings, scoreDownloadResult } from '../library/download-result-scoring.js';
 import { loadSettings } from '../settings.js';
@@ -508,6 +509,7 @@ export function createImportCandidateService({
   sleepFn = sleep,
   transitionImportCandidateStatusFn = transitionImportCandidateStatus,
   upsertImportCandidateFn = upsertImportCandidate,
+  lockExistingIngestionParentsFn = lockExistingImportCandidateIngestionParents,
 } = {}) {
   async function withTransaction(work) {
     const client = await pool.connect();
@@ -657,19 +659,21 @@ export function createImportCandidateService({
 
   async function getImportCandidate({
     importCandidateId,
+    queryable = null,
   }) {
     const normalizedImportCandidateId = normalizeRequiredString(importCandidateId, {
       fieldName: 'importCandidateId',
       maxLength: 100,
     });
-    const candidate = await getImportCandidateByIdFn(normalizedImportCandidateId);
+    const candidate = queryable ? await getImportCandidateByIdFn(normalizedImportCandidateId, queryable)
+      : await getImportCandidateByIdFn(normalizedImportCandidateId);
     if (!candidate) {
       throw createApiError(404, 'import_candidate_not_found', 'Import candidate not found');
     }
 
     return {
       ...candidate,
-      files: await listImportCandidateFilesFn(candidate.id),
+      files: queryable ? await listImportCandidateFilesFn(candidate.id, queryable) : await listImportCandidateFilesFn(candidate.id),
     };
   }
 
@@ -683,6 +687,7 @@ export function createImportCandidateService({
     requestMetadata = null,
     summary,
     toStatus,
+    queryable = null,
   }) {
     const normalizedImportCandidateId = normalizeRequiredString(importCandidateId, {
       fieldName: 'importCandidateId',
@@ -690,7 +695,7 @@ export function createImportCandidateService({
     });
     const normalizedReason = normalizeReason(reason);
 
-    const transitionResult = await withTransaction(async (client) => {
+    const transitionWork = async (client) => {
       const currentCandidate = await getImportCandidateByIdFn(normalizedImportCandidateId, client);
       if (!currentCandidate) {
         throw createApiError(404, 'import_candidate_not_found', 'Import candidate not found');
@@ -743,9 +748,10 @@ export function createImportCandidateService({
         candidate: transitionedCandidate,
         event,
       };
-    });
+    };
+    const transitionResult = queryable ? await transitionWork(queryable) : await withTransaction(transitionWork);
 
-    await recordAuditEventFn({
+    const auditEvent = {
       actorUserId,
       actorType: actorUserId ? 'user' : 'system',
       eventType,
@@ -763,7 +769,9 @@ export function createImportCandidateService({
       },
       ipAddress: requestMetadata?.ipAddress ?? null,
       userAgent: requestMetadata?.userAgent ?? null,
-    });
+    };
+    if (queryable) await recordAuditEventFn(auditEvent, queryable);
+    else await recordAuditEventFn(auditEvent);
 
     return transitionResult;
   }
@@ -1060,6 +1068,7 @@ export function createImportCandidateService({
     importCandidateId,
     reason = null,
     requestMetadata = null,
+    queryable = null,
   }) {
     return transitionCandidateReviewStatus({
       actorUserId,
@@ -1069,6 +1078,7 @@ export function createImportCandidateService({
       importCandidateId,
       reason,
       requestMetadata,
+      queryable,
       summary: 'Completed download reopened for a safe library-add recheck',
       toStatus: 'import_pending',
     });
@@ -1180,6 +1190,7 @@ export function createImportCandidateService({
       if (beforePersistCandidates) {
         await beforePersistCandidates({ queryable: client });
       }
+      await lockExistingIngestionParentsFn({ candidates: enrichedCandidates, queryable: client });
       const stored = [];
 
       for (const candidate of enrichedCandidates) {

@@ -24,6 +24,8 @@ import { createMissingMusicDownloaderHandoffService } from './missing-music-down
 import { createMissingMusicSearchAgainService } from './missing-music-search-again-service.js';
 import { createMissingMusicFallbackQualityService } from './missing-music-fallback-quality-service.js';
 import { createMissingMusicFindMatchesService } from './missing-music-find-matches-service.js';
+import { createMissingMusicLibraryAddRecheckService } from './missing-music-library-add-recheck-service.js';
+import { createApiError } from '../auth.js';
 
 export function createMissingMusicModule({
   allowMusicQueueReleaseFallbackQuality,
@@ -34,6 +36,7 @@ export function createMissingMusicModule({
   recordActivityEventFn = null,
   requestMusicQueueReleaseRediscovery,
   requestInitialMusicSearch,
+  recheckReleaseSafeAdd = async () => { throw createApiError(503, 'missing_music_recheck_unavailable', 'Library-add recheck is unavailable'); },
   startLibraryDiscoveryRun,
   selectImportCandidate,
   startImportCandidateExecutionRun,
@@ -71,6 +74,8 @@ export function createMissingMusicModule({
   });
   const missingMusicFindMatchesService = createMissingMusicFindMatchesService({ requestInitialMusicSearch, startLibraryDiscoveryRun,
     resolveMissingMusicDecisionTarget: missingMusicDecisionTargetService.resolveMissingMusicDecisionTarget });
+  const missingMusicLibraryAddRecheckService = createMissingMusicLibraryAddRecheckService({ recheckReleaseSafeAdd,
+    resolveMissingMusicDecisionTarget: missingMusicDecisionTargetService.resolveMissingMusicDecisionTarget });
 
   return {
     missingMusicDecisionCommandService,
@@ -81,8 +86,10 @@ export function createMissingMusicModule({
     missingMusicSearchAgainService,
     missingMusicFallbackQualityService,
     missingMusicFindMatchesService,
+    missingMusicLibraryAddRecheckService,
     routeDependencies: {
       findMissingMusicDecisionMatches: missingMusicFindMatchesService.findMissingMusicDecisionMatches,
+      recheckMissingMusicDecisionLibraryAdd: missingMusicLibraryAddRecheckService.recheckMissingMusicDecisionLibraryAdd,
       allowMissingMusicDecisionFallbackQuality: missingMusicFallbackQualityService.allowMissingMusicDecisionFallbackQuality,
       executeIdempotentMutation,
       getMissingMusicDecisionDetail: missingMusicDecisionService.getMissingMusicDecisionDetail,

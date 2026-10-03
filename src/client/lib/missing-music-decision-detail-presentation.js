@@ -17,6 +17,7 @@
  */
 
 import { getMissingMusicNextStep } from './missing-music-worklist-presentation.js';
+import { buildMissingMusicLibraryAddRecoveryPresentation } from './missing-music-library-add-recheck-presentation.js';
 
 function normalizeText(value, fallback = '') {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : fallback;
@@ -62,6 +63,7 @@ export function buildMissingMusicDecisionDetailPresentation(detail) {
   const canSearchAgain = !accountIsDisabled && detail?.permissions?.canSearchAgain === true;
   const canAllowFallbackQuality = !accountIsDisabled && detail?.permissions?.canAllowFallbackQuality === true;
   const canViewDownloader = detail?.permissions?.canViewDownloader === true;
+  const canRecheckLibraryAdd = buildMissingMusicLibraryAddRecoveryPresentation(detail).canRecheck;
   const selectedMatchNeedsAdministrator = !accountIsDisabled
     && decision.status?.nextAction === 'download_now'
     && !canStartDownload;
@@ -79,6 +81,7 @@ export function buildMissingMusicDecisionDetailPresentation(detail) {
     canSearchAgain,
     canAllowFallbackQuality,
     canViewDownloader,
+    canRecheckLibraryAdd,
     downloaderLinkAccessibleLabel: `View ${normalizeText(release.title, 'this release')} downloads for ${normalizeText(requestedFor.username, 'the selected user')} in Downloader`,
     lastCheckedAt: formatMissingMusicDecisionCheckedAt(decision.lastReconciledAt),
     nextStep: accountIsDisabled
@@ -89,9 +92,13 @@ export function buildMissingMusicDecisionDetailPresentation(detail) {
         ? 'Find matches'
       : canSearchAgain
         ? 'Search again'
+      : canRecheckLibraryAdd
+        ? 'Check the files again'
       : selectedMatchNeedsAdministrator
         ? 'A household administrator can start the download.'
       : decision.status?.nextAction === 'search_now'
+        ? 'Check the current release status.'
+      : decision.status?.nextAction === 'recheck_library_add'
         ? 'Check the current release status.'
       : getMissingMusicNextStep(decision.status?.nextAction),
     releaseMeta: [formatReleaseType(release.releaseGroupType), normalizeText(release.releaseDate)]

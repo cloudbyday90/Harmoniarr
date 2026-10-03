@@ -19,8 +19,8 @@
 import {
   findNextCandidateForRecovery,
   incrementImportCandidateDownloadAttemptCount,
-  promoteImportCandidateForRecovery,
 } from './import-candidate-repository.js';
+import { createImportCandidateRecoveryPromotionService } from './import-candidate-recovery-promotion-service.js';
 import {
   deriveImportCandidateAddRecoveryReasonCode,
   normalizeImportCandidateAddBlockerCode,
@@ -151,7 +151,7 @@ export function createImportCandidateRecoveryService({
   markImportCandidateImportBlocked = async () => null,
   markImportCandidateQualityFailed = async () => null,
   maxCandidateDownloadAttempts = MAX_CANDIDATE_DOWNLOAD_ATTEMPTS,
-  promoteImportCandidateForRecoveryFn = promoteImportCandidateForRecovery,
+  promoteImportCandidateForRecoveryFn = createImportCandidateRecoveryPromotionService().promoteRecoveryCandidate,
   qualityPolicyService = null,
   retryImportCandidateDownload = async () => null,
   retryRejectedTransferDelayMs = RETRY_REJECTED_TRANSFER_DELAY_MS,

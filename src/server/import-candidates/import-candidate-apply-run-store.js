@@ -19,6 +19,8 @@
 import { getPool } from '../database.js';
 import { createOperationRunStore } from '../operation-run-store.js';
 import { operationRunRegistry } from '../../shared/operation-run-descriptors.js';
+import { createDatabaseTransactionRunner } from '../database-transaction-service.js';
+import { lockImportCandidateApplyCreation } from './import-candidate-apply-queue-store.js';
 
 function toNumberOrNull(value) {
   return Number.isFinite(value) ? value : null;
@@ -34,6 +36,7 @@ function normalizeRun(run) {
     appliedWithWarningsCount: toNumberOrNull(run.summary.appliedWithWarningsCount),
     applyFailedCount: toNumberOrNull(run.summary.applyFailedCount),
     applySafetyMode: run.summary.applySafetyMode ?? 'manual',
+    ...(Array.isArray(run.summary.importCandidateIds) ? { importCandidateIds: run.summary.importCandidateIds } : {}),
     awaitingConfirmationCount: toNumberOrNull(run.summary.awaitingConfirmationCount),
     blockedCount: toNumberOrNull(run.summary.blockedCount),
     currentStep: run.summary.currentStep ?? null,
@@ -62,6 +65,7 @@ export function createImportCandidateApplyRunStore({
   getPoolFn = getPool,
 } = {}) {
   const operationDescriptor = operationRunRegistry.importCandidateApply;
+  const withTransaction = createDatabaseTransactionRunner({ getPoolFn });
   const operationRunStore = createOperationRunStore({
     getPoolFn,
     leaseJobType: operationDescriptor.leaseJobType,
@@ -69,6 +73,7 @@ export function createImportCandidateApplyRunStore({
   });
 
   async function createOperationRun({
+    queryable = null,
     applySafetyMode = 'manual',
     executableCandidateCount = null,
     executionMode = 'move',
@@ -78,26 +83,31 @@ export function createImportCandidateApplyRunStore({
     triggeredByUserId = null,
     triggerSource = 'manual',
   }) {
-    const run = await operationRunStore.createOperationRun({
-      status,
-      summary: {
-        applySafetyMode,
-        currentStep: 'queued',
-        executableCandidateCount,
-        executionMode,
-        ...(Array.isArray(importCandidateIds) ? { importCandidateIds } : {}),
-        requestedCandidateCount,
-        ...(Array.isArray(importCandidateIds) ? { scopedCandidateCount: importCandidateIds.length } : {}),
-        triggerSource,
-      },
-      triggeredByUserId,
-    });
+    const createRun = async (client) => {
+      await lockImportCandidateApplyCreation({ queryable: client });
+      const run = await operationRunStore.createOperationRun({
+        queryable: client,
+        status,
+        summary: {
+          applySafetyMode,
+          currentStep: 'queued',
+          executableCandidateCount,
+          executionMode,
+          ...(Array.isArray(importCandidateIds) ? { importCandidateIds } : {}),
+          requestedCandidateCount,
+          ...(Array.isArray(importCandidateIds) ? { scopedCandidateCount: importCandidateIds.length } : {}),
+          triggerSource,
+        },
+        triggeredByUserId,
+      });
 
-    return normalizeRun(run);
+      return normalizeRun(run);
+    };
+    return queryable ? createRun(queryable) : withTransaction(createRun);
   }
 
-  async function getActiveRun() {
-    return normalizeRun(await operationRunStore.getActiveRun());
+  async function getActiveRun({ queryable = null } = {}) {
+    return normalizeRun(await operationRunStore.getActiveRun({ queryable }));
   }
 
   async function getLatestRun() {

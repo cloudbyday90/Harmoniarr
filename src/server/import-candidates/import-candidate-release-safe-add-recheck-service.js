@@ -1,153 +1,98 @@
 /*
  * Harmoniarr - Soulseek-native music library management
  * Copyright (C) 2026 Harmoniarr Contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ * This program is free software: licensed under GPL-3.0
+ * See LICENSE file for details.
  */
 
-import { IMPORT_CANDIDATE_ADD_BLOCKER_CODES } from './import-candidate-add-blocker.js';
+import { createApiError } from '../auth.js';
+import { isDeepStrictEqual } from 'node:util';
+import { canRecheckLibraryAdd, getLibraryAddRecheckReason, hasQueuedLibraryAddRecheck } from '../acquisition/acquisition-library-add-recheck-policy.js';
+import { buildRecheckQualityContext, getRecheckMusicQueueContext, getRecheckWantedReleaseIds } from './import-candidate-release-recheck-quality-policy.js';
 
-const RECHECKABLE_MEDIA_REASON_CODE = 'audio_check_failed';
-
-function isRecoverablePrerequisite(candidate) {
-  if (candidate?.addBlockerCode === IMPORT_CANDIDATE_ADD_BLOCKER_CODES.SOURCE_PATH_UNAVAILABLE) {
-    return 'folders';
-  }
-
-  if (candidate?.addBlockerCode === IMPORT_CANDIDATE_ADD_BLOCKER_CODES.MEDIA_VERIFICATION
-    && candidate?.recoveryReasonCode === RECHECKABLE_MEDIA_REASON_CODE) {
-    return 'media_tooling';
-  }
-
-  return null;
+function hasCurrentParticipants(participants, wantedReleaseIds) {
+  return participants.length === wantedReleaseIds.length && new Set(participants.map((participant) => participant.wantedReleaseId)).size === wantedReleaseIds.length
+    && participants.every((participant) => wantedReleaseIds.includes(participant.wantedReleaseId)
+      && participant.discoveryLinkExists === true && !participant.isDisabled && ['missing', 'partial'].includes(participant.wantedStatus)
+      && participant.missingTrackCount > 0 && participant.visibilityState !== 'ignored');
 }
 
-function buildResult({
-  outcome,
-  runId = null,
+/** Prepare expensive media/file evidence outside locks; acceptance belongs to the guarded transaction. */
+export function createImportCandidateReleaseSafeAddRecheckService({ recheckStore, getImportCandidate, listFileDecisions,
+  getMediaToolingStatus, previewImportCandidateApply, safeAutoAddQualityGateService, commitPreparedReleaseRecheck,
 } = {}) {
-  return {
-    outcome,
-    ...(runId ? { runId } : {}),
-  };
-}
-
-function isExpectedApplyStartError(error) {
-  return [
-    'import_candidate_apply_in_progress',
-    'import_candidate_apply_not_ready',
-    'recovery_lock_conflict',
-  ].includes(error?.code);
-}
-
-/**
- * Rechecks one release after an environmental prerequisite changes. This is
- * deliberately narrower than normal import apply: it never accepts a client
- * candidate id, it previews before reopening the candidate, and it reuses the
- * safe-auto quality gate before queueing a one-candidate operation run.
- */
-export function createImportCandidateReleaseSafeAddRecheckService({
-  findLatestReleaseAddRecoveryCandidate = async () => null,
-  getImportCandidate = async () => null,
-  getMediaToolingStatus = async () => ({ status: 'healthy' }),
-  previewImportCandidateApply = async () => null,
-  resumeImportCandidateForSafeAdd = async () => null,
-  safeAutoAddQualityGateService = null,
-  startImportCandidateApplyRun = async () => {
-    throw new Error('startImportCandidateApplyRun dependency is required');
-  },
-} = {}) {
-  if (typeof safeAutoAddQualityGateService?.evaluateSafeAutoAddQuality !== 'function') {
-    throw new TypeError('createImportCandidateReleaseSafeAddRecheckService requires safeAutoAddQualityGateService');
+  for (const [name, dependency] of Object.entries({ readOwnedRelease: recheckStore?.readOwnedRelease,
+    readParticipantPolicies: recheckStore?.readParticipantPolicies, getImportCandidate, listFileDecisions,
+    getMediaToolingStatus, previewImportCandidateApply, commitPreparedReleaseRecheck,
+    evaluateSafeAutoAddQuality: safeAutoAddQualityGateService?.evaluateSafeAutoAddQuality })) {
+    if (typeof dependency !== 'function') throw new TypeError(`createImportCandidateReleaseSafeAddRecheckService requires ${name}`);
   }
-
-  async function recheckReleaseSafeAdd({
-    actorUserId = null,
-    appUserId,
-    requestMetadata = null,
-    wantedReleaseId,
-  } = {}) {
-    const recoveryCandidate = await findLatestReleaseAddRecoveryCandidate({
-      appUserId,
-      wantedReleaseId,
-    });
-    const prerequisite = isRecoverablePrerequisite(recoveryCandidate);
-    if (!recoveryCandidate || !prerequisite) {
-      return buildResult({ outcome: 'not_available' });
+  async function recheckReleaseSafeAdd({ actorUserId = null, appUserId, requestMetadata = null, wantedReleaseId } = {}) {
+    const release = await recheckStore.readOwnedRelease({ appUserId, wantedReleaseId });
+    if (!release) return { outcome: 'not_available' };
+    if (release.targetUser.isDisabled) throw createApiError(409, 'missing_music_decision_read_only', 'This Missing Music history is read-only');
+    const facts = release.libraryAddRecoveryFacts;
+    const queued = hasQueuedLibraryAddRecheck(facts);
+    if (!queued && !canRecheckLibraryAdd({ release, targetUser: release.targetUser })) return { outcome: 'not_available' };
+    const candidate = await getImportCandidate({ importCandidateId: facts.candidateId });
+    const wantedReleaseIds = getRecheckWantedReleaseIds(candidate);
+    if (!candidate || !wantedReleaseIds.includes(wantedReleaseId)) return { outcome: 'not_available' };
+    const [participants, decisions] = await Promise.all([
+      recheckStore.readParticipantPolicies({ wantedReleaseIds }), listFileDecisions({ importCandidateId: candidate.id }),
+    ]);
+    if (!hasCurrentParticipants(participants, wantedReleaseIds)
+      || participants.some((participant) => participant.metadataReleaseId !== release.metadataReleaseId)) {
+      return { outcome: 'not_available' };
     }
-
-    if (prerequisite === 'media_tooling') {
-      const mediaTooling = await getMediaToolingStatus();
-      if (mediaTooling?.status !== 'healthy') {
-        return buildResult({ outcome: 'prerequisite_not_ready' });
-      }
+    const prepared = { candidate, participants, decisions,
+      stop: { addBlockerCode: facts.addBlockerCode, recoveryReasonCode: facts.recoveryReasonCode } };
+    if (queued) return commitPreparedReleaseRecheck({ prepared, actorUserId, appUserId, requestMetadata, wantedReleaseId });
+    if (facts.activeRunId) return { outcome: 'deferred' };
+    if (getLibraryAddRecheckReason(facts) === 'audio_check_failed' && (await getMediaToolingStatus())?.status !== 'healthy') {
+      return { outcome: 'prerequisite_not_ready' };
     }
-
-    const importCandidate = await getImportCandidate({
-      importCandidateId: recoveryCandidate.importCandidateId,
-    });
-    if (!importCandidate || importCandidate.status !== 'failed') {
-      return buildResult({ outcome: 'not_available' });
+    const applyPreview = await previewImportCandidateApply({ importCandidateId: candidate.id });
+    if (applyPreview?.summary?.status !== 'ready' || !applyPreview.files?.length
+      || !(applyPreview.counts?.readyCount > 0) || applyPreview.files.some((file) => file.status?.code !== 'ready')) {
+      return { outcome: 'still_needs_review' };
     }
-
-    const applyPreview = await previewImportCandidateApply({
-      importCandidateId: importCandidate.id,
-    });
-    if (applyPreview?.summary?.status !== 'ready') {
-      return buildResult({ outcome: 'still_needs_review' });
+    prepared.qualityContext = await buildRecheckQualityContext({ candidate, participants });
+    prepared.qualityContext.recheckRequestedForWantedReleaseId = wantedReleaseId;
+    const qualityGate = await safeAutoAddQualityGateService.evaluateSafeAutoAddQuality({ applyPreview,
+      summaryCandidate: { ...candidate, normalizedPayload: { ...candidate.normalizedPayload, musicQueue: prepared.qualityContext } } });
+    if (!qualityGate?.eligible) return { outcome: 'still_needs_review' };
+    return commitPreparedReleaseRecheck({ prepared, actorUserId, appUserId, requestMetadata, wantedReleaseId });
+  }
+  async function resolveCurrentQueuedRecheckCandidate({ summaryCandidate, triggerSource }) {
+    if (triggerSource !== 'music_queue_prerequisite_recheck') return summaryCandidate;
+    const candidate = await getImportCandidate({ importCandidateId: summaryCandidate.id });
+    const wantedReleaseIds = getRecheckWantedReleaseIds(candidate);
+    if (candidate.status !== 'import_pending' || !wantedReleaseIds.length) {
+      throw createApiError(409, 'import_candidate_apply_not_ready', 'The queued completed download is no longer available');
     }
-
-    const qualityGate = await safeAutoAddQualityGateService.evaluateSafeAutoAddQuality({
-      applyPreview,
-      summaryCandidate: importCandidate,
-    });
-    if (!qualityGate?.eligible) {
-      return buildResult({ outcome: 'still_needs_review' });
+    const participants = await recheckStore.readParticipantPolicies({ wantedReleaseIds });
+    if (!hasCurrentParticipants(participants, wantedReleaseIds)) {
+      throw createApiError(409, 'import_candidate_apply_not_ready', 'The shared release recipients have changed');
     }
-
-    const resumed = await resumeImportCandidateForSafeAdd({
-      actorUserId,
-      importCandidateId: importCandidate.id,
-      reason: 'Automatic library add resumed after prerequisite repair',
-      requestMetadata,
-    });
-    if (!resumed?.candidate) {
-      return buildResult({ outcome: 'not_available' });
+    const requestedForId = getRecheckMusicQueueContext(candidate)?.recheckRequestedForWantedReleaseId;
+    const requestedFor = participants.find((participant) => participant.wantedReleaseId === requestedForId);
+    const release = requestedFor ? await recheckStore.readOwnedRelease({ appUserId: requestedFor.appUserId, wantedReleaseId: requestedForId }) : null;
+    if (!release || release.targetUser.isDisabled || !release.discoveryLinkExists || !['missing', 'partial'].includes(release.wantedStatus)
+      || !(release.missingTrackCount > 0) || release.evidence?.visibilityState === 'ignored'
+      || release.libraryAddRecoveryFacts?.candidateId !== candidate.id
+      || release.libraryAddRecoveryFacts?.hasConflictingCandidate !== false
+      || !hasQueuedLibraryAddRecheck(release.libraryAddRecoveryFacts)) {
+      throw createApiError(409, 'import_candidate_apply_not_ready', 'The queued release recipient is no longer eligible');
     }
-
-    try {
-      const started = await startImportCandidateApplyRun({
-        applySafetyMode: 'safe_auto',
-        importCandidateIds: [importCandidate.id],
-        requestMetadata,
-        triggeredByUserId: actorUserId,
-        triggerSource: 'music_queue_prerequisite_recheck',
-      });
-
-      return buildResult({
-        outcome: 'queued',
-        runId: started?.run?.id ?? null,
-      });
-    } catch (error) {
-      if (isExpectedApplyStartError(error)) {
-        return buildResult({ outcome: 'deferred' });
-      }
-      throw error;
+    const musicQueueContext = await buildRecheckQualityContext({ candidate, participants });
+    return { ...summaryCandidate, musicQueueContext, recheckPolicySnapshot: { candidate, participants } };
+  }
+  async function assertQueuedRecheckCandidateCurrent({ summaryCandidate, triggerSource }) {
+    if (triggerSource !== 'music_queue_prerequisite_recheck') return;
+    const fresh = await resolveCurrentQueuedRecheckCandidate({ summaryCandidate, triggerSource });
+    if (!isDeepStrictEqual(fresh.recheckPolicySnapshot, summaryCandidate.recheckPolicySnapshot)) {
+      throw createApiError(409, 'import_candidate_apply_not_ready', 'The queued release or its quality policy changed during the audio check');
     }
   }
-
-  return {
-    recheckReleaseSafeAdd,
-  };
+  return { recheckReleaseSafeAdd, resolveCurrentQueuedRecheckCandidate, assertQueuedRecheckCandidateCurrent };
 }

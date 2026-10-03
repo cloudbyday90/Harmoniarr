@@ -52,12 +52,13 @@ function mapActiveCandidate(row) {
  * the subsequent candidate transition one short transaction-scoped decision.
  */
 export function createImportCandidateMusicQueueSelectionGuard() {
-  async function findActiveSelection({ candidate, client } = {}) {
+  async function findActiveSelection({ candidate, client, metadataReleaseId = null } = {}) {
     requireTransactionClient(client);
 
     const importCandidateId = normalizeIdentifier(candidate?.id);
     const sourceSearchId = normalizeIdentifier(candidate?.sourceSearchId);
-    if (!importCandidateId || !sourceSearchId) {
+    const scopedMetadataReleaseId = normalizeIdentifier(metadataReleaseId);
+    if (!importCandidateId || (!sourceSearchId && !scopedMetadataReleaseId)) {
       return null;
     }
 
@@ -66,10 +67,11 @@ export function createImportCandidateMusicQueueSelectionGuard() {
         SELECT library_discovery_requests.id
         FROM library_discovery_requests
         WHERE library_discovery_requests.evidence ->> 'lastSearchId' = $1
+          ${scopedMetadataReleaseId ? 'OR library_discovery_requests.metadata_release_id::text = $2' : ''}
         ORDER BY library_discovery_requests.id ASC
         FOR UPDATE
       `,
-      [sourceSearchId],
+      [sourceSearchId, ...(scopedMetadataReleaseId ? [scopedMetadataReleaseId] : [])],
     );
 
     if (discoveryRequestResult.rows.length === 0) {
@@ -80,13 +82,14 @@ export function createImportCandidateMusicQueueSelectionGuard() {
       `
         SELECT id, status
         FROM import_candidates
-        WHERE source_search_id = $1
+        WHERE (source_search_id = $1
+          ${scopedMetadataReleaseId ? "OR source_search_id IN (SELECT evidence->>'lastSearchId' FROM library_discovery_requests WHERE metadata_release_id::text = $4) OR normalized_payload #>> '{discoveryScope,metadataReleaseId}' = $4 OR normalized_payload #>> '{requestOwnership,metadataReleaseId}' = $4" : ''})
           AND id <> $2::uuid
           AND status = ANY($3::text[])
         ORDER BY updated_at DESC, id ASC
         LIMIT 1
       `,
-      [sourceSearchId, importCandidateId, ACTIVE_MUSIC_QUEUE_CANDIDATE_STATUSES],
+      [sourceSearchId, importCandidateId, ACTIVE_MUSIC_QUEUE_CANDIDATE_STATUSES, ...(scopedMetadataReleaseId ? [scopedMetadataReleaseId] : [])],
     );
 
     return mapActiveCandidate(activeCandidateResult.rows[0]);

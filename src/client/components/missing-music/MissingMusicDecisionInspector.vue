@@ -28,9 +28,11 @@ import { useMissingMusicMatchSelection } from '../../composables/useMissingMusic
 import { useMissingMusicSearchAgain } from '../../composables/useMissingMusicSearchAgain.js';
 import { useMissingMusicFindMatches } from '../../composables/useMissingMusicFindMatches.js';
 import { useMissingMusicQualityFallback } from '../../composables/useMissingMusicQualityFallback.js';
+import { useMissingMusicLibraryAddRecheck } from '../../composables/useMissingMusicLibraryAddRecheck.js';
 import { createMissingMusicReleaseMutationGate } from '../../lib/missing-music-release-mutation-gate.js';
 import MissingMusicQualityEvidence from './MissingMusicQualityEvidence.vue';
 import MissingMusicCommandFeedback from './MissingMusicCommandFeedback.vue';
+import MissingMusicLibraryAddRecovery from './MissingMusicLibraryAddRecovery.vue';
 
 const props = defineProps({
   decisionId: {
@@ -54,8 +56,9 @@ const downloadStart = useMissingMusicDownloadStart(mutationOptions);
 const searchAgain = useMissingMusicSearchAgain(mutationOptions);
 const findMatches = useMissingMusicFindMatches(mutationOptions);
 const qualityFallback = useMissingMusicQualityFallback(mutationOptions);
+const libraryAddRecheck = useMissingMusicLibraryAddRecheck(mutationOptions);
 const mutationBusy = computed(() => matchSelection.isPending.value
-  || downloadStart.isStarting.value || searchAgain.isPending.value || findMatches.isPending.value || qualityFallback.isPending.value);
+  || downloadStart.isStarting.value || searchAgain.isPending.value || findMatches.isPending.value || qualityFallback.isPending.value || libraryAddRecheck.isPending.value);
 const decisionDetail = useMissingMusicDecisionDetail({
   decisionId: currentDecisionId,
 });
@@ -110,7 +113,7 @@ async function completeUserCommand(command, returnTarget = null) {
     if (disposed || props.decisionId !== decisionId) return;
     emit('changed');
     await nextTick();
-    if (!disposed && props.decisionId === decisionId && focus.ownsFocus()) statusHeadingElement.value?.focus({ preventScroll: true });
+    if (!disposed && props.decisionId === decisionId && focus.ownsFocus()) statusHeadingElement.value?.focus();
   } finally {
     focus.dispose();
     commandFocusTrackers.delete(focus);
@@ -131,6 +134,10 @@ function requestMatches() {
 
 function allowFallbackQuality() {
   return completeUserCommand((decisionId) => qualityFallback.allowFallbackQuality({ decisionId }));
+}
+
+function recheckLibraryAdd() {
+  return completeUserCommand((decisionId) => libraryAddRecheck.recheckLibraryAdd({ decisionId }));
 }
 
 function openDownloadConfirmation(event) {
@@ -288,6 +295,16 @@ defineExpose({ busy, refresh: decisionDetail.refresh });
         :status-message="qualityFallback.statusMessage.value"
         :error-message="qualityFallback.errorMessage.value"
         @allow-fallback-quality="allowFallbackQuality"
+      />
+
+      <MissingMusicLibraryAddRecovery
+        :detail="decisionDetail.detail.value"
+        :busy="mutationBusy"
+        :pending="libraryAddRecheck.isPending.value"
+        :status-message="libraryAddRecheck.statusMessage.value"
+        :status-tone="libraryAddRecheck.statusTone.value"
+        :error-message="libraryAddRecheck.errorMessage.value"
+        @recheck-library-add="recheckLibraryAdd"
       />
 
       <section

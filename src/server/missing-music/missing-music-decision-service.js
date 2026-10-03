@@ -27,6 +27,7 @@ import { canStartMissingMusicDownload } from './missing-music-download-start-pol
 import { canViewMissingMusicDownloader } from './missing-music-downloader-handoff-policy.js';
 import { canSearchMissingMusicAgain } from './missing-music-search-again-policy.js';
 import { canFindInitialMusicMatches } from '../acquisition/acquisition-initial-search-policy.js';
+import { canRecheckLibraryAdd, buildPublicLibraryAddRecovery, hasQueuedLibraryAddRecheck, getLibraryAddRecheckReason } from '../acquisition/acquisition-library-add-recheck-policy.js';
 import { canAllowMissingMusicFallbackQuality } from './missing-music-fallback-quality-policy.js';
 import { buildPublicQualityEvidence } from '../acquisition/acquisition-quality-evidence-policy.js';
 import { createMissingMusicDecisionTargetService } from './missing-music-decision-target-service.js';
@@ -95,9 +96,17 @@ function projectMissingMusicStatus(status) {
 
 function projectDecision(release, requestedFor, projectMusicQueueReleaseFn, now = new Date()) {
   const projectedRelease = projectMusicQueueReleaseFn(release);
-  const status = projectMissingMusicStatus(projectedRelease.status);
+  let status = projectMissingMusicStatus(projectedRelease.status);
   const canFindMatches = canFindInitialMusicMatches({ release, targetUser: requestedFor, now, projectedRelease });
+  const canRecheck = canRecheckLibraryAdd({ release, targetUser: requestedFor });
   if (status.nextAction === 'search_now' && !canFindMatches) status.nextAction = null;
+  if (status.nextAction === 'recheck_library_add' && !canRecheck) status.nextAction = null;
+  if (status.code === 'needs_help_adding' && status.nextAction === 'set_up_folders' && !canRecheck) status.nextAction = null;
+  if (hasQueuedLibraryAddRecheck(release.libraryAddRecoveryFacts)) {
+    status = { code: 'adding_to_library', label: 'Adding to library',
+      message: 'Harmoniarr has queued a safe library add and will check the files again before changing the library.',
+      nextAction: null, tone: 'info' };
+  }
 
   return {
     decisionId: projectedRelease.id,
@@ -115,7 +124,7 @@ function projectDecision(release, requestedFor, projectMusicQueueReleaseFn, now 
       wantedStatus: projectedRelease.wantedStatus,
     },
     requestedFor,
-    state: canFindMatches ? 'action' : deriveMissingMusicDecisionState(status.code, status.nextAction),
+    state: canFindMatches || canRecheck ? 'action' : deriveMissingMusicDecisionState(status.code, status.nextAction),
     status,
   };
 }
@@ -319,7 +328,11 @@ export function createMissingMusicDecisionService({
       decision,
       matchChoices,
       qualityEvidence: buildPublicQualityEvidence(projectedRelease.quality),
+      libraryAddRecovery: buildPublicLibraryAddRecovery(target.release.libraryAddRecoveryFacts),
       permissions: {
+        canRecheckLibraryAdd: canRecheckLibraryAdd({ release: target.release, targetUser: target.targetUser }),
+        canRepairFolders: actorUser?.role === 'admin' && canRecheckLibraryAdd({ release: target.release, targetUser: target.targetUser })
+          && getLibraryAddRecheckReason(target.release.libraryAddRecoveryFacts) === 'source_path_unavailable',
         canFindMatches: canFindInitialMusicMatches({ release: target.release, targetUser: target.targetUser, now: now(), projectedRelease }),
         canAllowFallbackQuality: canAllowMissingMusicFallbackQuality({ projectedRelease, targetUser: target.targetUser }),
         canSearchAgain: canSearchMissingMusicAgain({ statusCode: decision.status.code, targetUser: target.targetUser }),

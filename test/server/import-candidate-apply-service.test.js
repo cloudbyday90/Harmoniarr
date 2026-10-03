@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createApiError } from '../../src/server/auth.js';
-import { createImportCandidateApplyService } from '../../src/server/import-candidates/import-candidate-apply-service.js';
+import { createImportCandidateApplyService as createService } from '../../src/server/import-candidates/import-candidate-apply-service.js';
+
+const queryable = { query: async () => ({ rows: [] }) };
+const createImportCandidateApplyService = (options) => createService({ withTransaction: (work) => work(queryable),
+  lockRunCreation: async () => {}, lockPendingCandidates: async () => true, ...options });
 
 test('startImportCandidateApplyRun queues a run for ready import-pending candidates', async (t) => {
   const createOperationRun = t.mock.fn(async () => ({
@@ -34,6 +38,7 @@ test('startImportCandidateApplyRun queues a run for ready import-pending candida
   assert.equal(result.accepted, true);
   assert.deepEqual(buildImportPendingCandidateSummary.mock.calls[0].arguments, [{ limit: 1000 }]);
   assert.deepEqual(createOperationRun.mock.calls[0].arguments, [{
+    queryable,
     applySafetyMode: 'manual',
     executableCandidateCount: 2,
     executionMode: 'move',
@@ -71,6 +76,7 @@ test('startImportCandidateApplyRun queues safe-auto runs for ready candidates on
 
   assert.equal(result.accepted, true);
   assert.deepEqual(createOperationRun.mock.calls[0].arguments, [{
+    queryable,
     applySafetyMode: 'safe_auto',
     executableCandidateCount: 1,
     executionMode: 'move',
@@ -110,6 +116,7 @@ test('startImportCandidateApplyRun persists a validated candidate scope for a re
     limit: 1000,
   }]);
   assert.deepEqual(createOperationRun.mock.calls[0].arguments, [{
+    queryable,
     applySafetyMode: 'safe_auto',
     executableCandidateCount: 1,
     executionMode: 'move',

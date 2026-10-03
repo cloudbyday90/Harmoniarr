@@ -305,6 +305,8 @@ export function createImportCandidateApplyWorker({
   markRunStarted,
   handleImportCandidateQualityFailure = null,
   safeAutoAddQualityGateService = createImportCandidateSafeAutoAddQualityGateService(),
+  resolveCurrentSafeAutoAddCandidate = async ({ summaryCandidate }) => summaryCandidate,
+  assertCurrentSafeAutoAddCandidate = async () => {},
   previewImportCandidateApply = async () => ({
     files: [],
     preview: null,
@@ -487,10 +489,12 @@ export function createImportCandidateApplyWorker({
           if (!applyPreview) {
             applyPreview = await previewImportCandidateApply({ importCandidateId: summaryCandidate.id });
           }
+          let currentQualityCandidate = summaryCandidate;
           if (applySafetyMode === 'safe_auto') {
+            currentQualityCandidate = await resolveCurrentSafeAutoAddCandidate({ summaryCandidate, triggerSource });
             const qualityGate = await safeAutoAddQualityGateService.evaluateSafeAutoAddQuality({
               applyPreview,
-              summaryCandidate,
+              summaryCandidate: currentQualityCandidate,
             });
             if (!qualityGate.eligible) {
               const recoveryReasonCode = deriveImportCandidateAddRecoveryReasonCode({
@@ -562,6 +566,10 @@ export function createImportCandidateApplyWorker({
           );
           const applyResult = await applyImportCandidatePreview({
             applyPreview,
+            applySafetyMode,
+            ...(applySafetyMode === 'safe_auto' ? { assertSafeAutoPolicyCurrent: () => assertCurrentSafeAutoAddCandidate({
+              summaryCandidate: currentQualityCandidate, triggerSource,
+            }) } : {}),
             executionMode: 'move',
             importCandidateId: summaryCandidate.id,
             onMutationIntent: async (mutationIntent) => updateImportApplyRunItem({
@@ -709,6 +717,8 @@ export function createImportCandidateApplyWorker({
               apply: {
                 ...baseSnapshot.apply,
                 errorMessage: error instanceof Error ? error.message : String(error),
+                ...(error?.code === 'safe_auto_alternate_input_requires_verification'
+                  ? { addBlockerCode: IMPORT_CANDIDATE_ADD_BLOCKER_CODES.UNSAFE_ADD_PLAN } : {}),
                 outcome: 'apply_failed',
               },
             },
