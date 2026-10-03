@@ -11,7 +11,7 @@ services:
       - "./testing/docker/controlled-provider-pipeline-verifier.mjs:/validation/controlled-provider-pipeline-verifier.mjs:ro"
 
   controlled-provider:
-    image: node:24.19.0-alpine
+    image: node:26.7.0-alpine
     init: true
     user: "${PUID:-1000}:${PGID:-1000}"
     read_only: true
