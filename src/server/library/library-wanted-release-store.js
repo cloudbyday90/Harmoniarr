@@ -392,6 +392,7 @@ export function createLibraryWantedReleaseStore({
     wantedReleaseIds = null,
     wantedStatus = null,
     limit = 500,
+    queryable = null,
   } = {}) {
     const params = [];
     const conditions = [];
@@ -451,7 +452,7 @@ export function createLibraryWantedReleaseStore({
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    const result = await getPoolFn().query(
+    const result = await (queryable ?? getPoolFn()).query(
       `
         SELECT
           lwr.id,
@@ -477,6 +478,7 @@ export function createLibraryWantedReleaseStore({
           mr.musicbrainz_release_id AS musicbrainz_release_id,
           lwr.evidence AS wanted_evidence,
           ldr.request_status AS discovery_request_status,
+          ldr.search_mode AS discovery_search_mode,
           ldr.blocked_reason AS discovery_blocked_reason,
           ldr.last_search_at AS discovery_last_search_at,
           ldr.next_search_after AS discovery_next_search_after,
@@ -852,6 +854,7 @@ export function createLibraryWantedReleaseStore({
             requestStatus: row.discovery_request_status,
             researchAttemptCount: Number.parseInt(String(row.discovery_research_attempt_count ?? 0), 10) || 0,
             searchAttemptCount: Number.parseInt(String(row.discovery_search_attempt_count ?? 0), 10) || 0,
+            searchMode: row.discovery_search_mode ?? null,
           }
         : null,
       expectedTrackCount: Number.parseInt(String(row.expected_track_count ?? 0), 10) || 0,

@@ -20,6 +20,7 @@ function createMissingMusicRouteTestApp(overrides = {}) {
         wantedReleaseId: 'wanted-amber',
       }),
       selectMissingMusicDecisionMatch: async () => ({ action: {} }),
+      searchMissingMusicDecisionAgain: async () => ({ action: {} }),
       startMissingMusicDecisionDownload: async () => ({ action: {} }),
       limitMissingMusicDecisionRead: (_request, _response, next) => next(),
       listMissingMusicDecisions: async () => ({
@@ -42,6 +43,58 @@ function createMissingMusicRouteTestApp(overrides = {}) {
     });
   });
 }
+
+test('Missing Music Search again uses fresh authenticated CSRF and a decision-only idempotency fingerprint', async (t) => {
+  const actorUser = { id: 'requester', isDisabled: false, role: 'requester', username: 'listener' };
+  const searchMissingMusicDecisionAgain = t.mock.fn(async () => ({ action: { code: 'search_again', targetUserId: 'requester' } }));
+  const requireFreshSession = t.mock.fn(async () => ({ appUserId: actorUser.id, user: actorUser }));
+  const requireCsrf = t.mock.fn();
+  const executeIdempotentMutation = t.mock.fn(async ({ executeMutation }) => executeMutation());
+  const getRequestMetadata = () => ({ ipAddress: '127.0.0.1' });
+  const app = createMissingMusicRouteTestApp({ searchMissingMusicDecisionAgain, requireFreshSession, requireCsrf, executeIdempotentMutation, getRequestMetadata });
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/missing-music/decisions/wanted/search-again`, {
+      method: 'POST', headers: { 'content-type': 'application/json', 'idempotency-key': 'retry-key' },
+      body: JSON.stringify({ targetUserId: 'untrusted-recipient' }),
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(searchMissingMusicDecisionAgain.mock.calls[0].arguments[0], { actorUser, decisionId: 'wanted', requestMetadata: { ipAddress: '127.0.0.1' } });
+    const options = executeIdempotentMutation.mock.calls[0].arguments[0];
+    assert.equal(options.operationScope, 'missing-music.decisions.search-again');
+    assert.equal(options.idempotencyKey, 'retry-key');
+    assert.deepEqual(options.requestPayload, { decisionId: 'wanted' });
+    assert.equal(requireFreshSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+  });
+});
+
+test('Missing Music Search again refuses stale sessions and missing CSRF before command execution', async (t) => {
+  for (const overrides of [
+    { requireFreshSession: async () => { throw createApiError(401, 'reauth_required', 'Sign in again'); } },
+    { requireFreshSession: async () => ({ appUserId: 'requester', user: { role: 'requester' } }),
+      requireCsrf: () => { throw createApiError(403, 'csrf_invalid', 'Invalid CSRF'); } },
+  ]) {
+    const searchMissingMusicDecisionAgain = t.mock.fn(async () => ({}));
+    await withServer(createMissingMusicRouteTestApp({ searchMissingMusicDecisionAgain, ...overrides }), async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/v1/missing-music/decisions/wanted/search-again`, { method: 'POST' });
+      assert.ok([401, 403].includes(response.status));
+      assert.equal(searchMissingMusicDecisionAgain.mock.callCount(), 0);
+    });
+  }
+});
+
+test('Missing Music Search again returns the persisted replay without reexecuting its command', async (t) => {
+  const searchMissingMusicDecisionAgain = t.mock.fn(async () => ({}));
+  const action = { code: 'search_again', decisionId: 'wanted', searchPreparationStarted: true };
+  await withServer(createMissingMusicRouteTestApp({ searchMissingMusicDecisionAgain,
+    requireFreshSession: async () => ({ appUserId: 'requester', user: { role: 'requester' } }), requireCsrf: () => {},
+    executeIdempotentMutation: async () => ({ body: { action }, statusCode: 200, replayed: true }),
+  }), async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/missing-music/decisions/wanted/search-again`, { method: 'POST' });
+    assert.deepEqual(await response.json(), { ok: true, action });
+    assert.equal(searchMissingMusicDecisionAgain.mock.callCount(), 0);
+  });
+});
 
 test('Missing Music decisions route forwards bounded, labelled filter values with the authenticated actor', async (t) => {
   const listMissingMusicDecisions = t.mock.fn(async () => ({

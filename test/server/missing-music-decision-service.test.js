@@ -87,6 +87,17 @@ function createService(overrides = {}) {
   return { listAppUsers, listWantedReleasesWithMetadata, service };
 }
 
+test('Missing Music detail exposes Search again only for current stopped states and active target history', async () => {
+  for (const statusCode of ['failed', 'no_matches_left', 'quality_choice_needed', 'downloading', 'pick_match']) {
+    const { service } = createService({ projectMusicQueueReleaseFn: (release) => ({ ...projectRelease(release),
+      status: { code: statusCode, nextAction: 'try_again' } }) });
+    const active = await service.getMissingMusicDecisionDetail({ actorUser: { id: 'user-1', role: 'requester' }, decisionId: 'decision-active' });
+    const disabled = await service.getMissingMusicDecisionDetail({ actorUser: { id: 'admin-1', role: 'admin' }, decisionId: 'decision-disabled' });
+    assert.equal(active.permissions.canSearchAgain, ['failed', 'no_matches_left', 'quality_choice_needed'].includes(statusCode));
+    assert.equal(disabled.permissions.canSearchAgain, false);
+  }
+});
+
 test('admins receive active users by default with release-only decision facts', async () => {
   const { listWantedReleasesWithMetadata, service } = createService();
 

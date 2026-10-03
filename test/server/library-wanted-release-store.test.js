@@ -29,6 +29,7 @@ test('listWantedReleasesWithMetadata maps discovery request recovery evidence', 
             discovery_request_status: 'blocked',
             discovery_research_attempt_count: 3,
             discovery_search_attempt_count: 2,
+            discovery_search_mode: 'automatic',
             expected_track_count: 10,
             id: 'wanted-1',
             import_candidate_latest_status: 'selected',
@@ -260,6 +261,7 @@ test('listWantedReleasesWithMetadata maps discovery request recovery evidence', 
     requestStatus: 'blocked',
     researchAttemptCount: 3,
     searchAttemptCount: 2,
+    searchMode: 'automatic',
   });
 });
 

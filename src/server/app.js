@@ -581,22 +581,11 @@ export function createApp({
     slskdService: slskdModule.slskdService,
   });
   const controlPlaneIdempotencyService = createControlPlaneIdempotencyService();
-  const missingMusicModule = buildMissingMusicModule({
-    listAppUsers: appUserModule.appUserService.listAppUsers,
-    listWantedReleaseIdentityPage: libraryModule.libraryWantedReleaseStore.listWantedReleaseIdentityPage,
-    listWantedReleasesWithMetadata: libraryModule.libraryWantedReleaseStore.listWantedReleasesWithMetadata,
-    recordActivityEventFn: activityModule.activityEventService.recordActivityEvent,
-    selectImportCandidate: importCandidateModule.importCandidateService?.selectImportCandidate
-      ?? importCandidateModule.routeDependencies?.selectImportCandidate
-      ?? null,
-    startImportCandidateExecutionRun: importCandidateModule.importCandidateExecutionService?.startImportCandidateExecutionRun
-      ?? importCandidateModule.routeDependencies?.startImportCandidateExecutionRun
-      ?? null,
-  });
   const acquisitionModule = buildAcquisitionModule({
     allowMusicQueueFallbackQuality: libraryModule.libraryDiscoveryRequestStore?.allowMusicQueueFallbackQuality,
     buildLibraryWantedReleases: libraryModule.routeDependencies.buildLibraryWantedReleases,
     executeIdempotentMutation: controlPlaneIdempotencyService.executeIdempotentMutation,
+    listWantedReleasesWithMetadata: libraryModule.libraryWantedReleaseStore.listWantedReleasesWithMetadata,
     recheckReleaseSafeAdd: importCandidateModule.importCandidateReleaseSafeAddRecheckService?.recheckReleaseSafeAdd
       ?? null,
     startReleaseManualSafeAdd: importCandidateModule.importCandidateReleaseManualSafeAddService?.startReleaseManualSafeAdd
@@ -604,12 +593,26 @@ export function createApp({
     rejectImportCandidate: importCandidateModule.importCandidateService?.rejectImportCandidate
       ?? importCandidateModule.routeDependencies?.rejectImportCandidate
       ?? null,
-    requestMusicQueueRediscovery: libraryModule.libraryDiscoveryRequestStore?.requestMusicQueueRediscovery,
+    requestMusicQueueRediscovery: libraryModule.libraryMusicQueueRediscoveryService.requestGuardedMusicQueueRediscovery,
     recordActivityEventFn: activityModule.activityEventService.recordActivityEvent,
     selectImportCandidate: importCandidateModule.importCandidateService?.selectImportCandidate
       ?? importCandidateModule.routeDependencies?.selectImportCandidate
       ?? null,
     startLibraryDiscoveryRun: libraryModule.routeDependencies.startLibraryDiscoveryRun,
+  });
+  const missingMusicModule = buildMissingMusicModule({
+    executeIdempotentMutation: controlPlaneIdempotencyService.executeIdempotentMutation,
+    listAppUsers: appUserModule.appUserService.listAppUsers,
+    listWantedReleaseIdentityPage: libraryModule.libraryWantedReleaseStore.listWantedReleaseIdentityPage,
+    listWantedReleasesWithMetadata: libraryModule.libraryWantedReleaseStore.listWantedReleasesWithMetadata,
+    recordActivityEventFn: activityModule.activityEventService.recordActivityEvent,
+    requestMusicQueueReleaseRediscovery: acquisitionModule.acquisitionPipelineService.requestMusicQueueReleaseRediscovery,
+    selectImportCandidate: importCandidateModule.importCandidateService?.selectImportCandidate
+      ?? importCandidateModule.routeDependencies?.selectImportCandidate
+      ?? null,
+    startImportCandidateExecutionRun: importCandidateModule.importCandidateExecutionService?.startImportCandidateExecutionRun
+      ?? importCandidateModule.routeDependencies?.startImportCandidateExecutionRun
+      ?? null,
   });
   const metadataModule = buildMetadataModule({
     libraryMediaRequestStore: libraryModule.libraryMediaRequestStore,

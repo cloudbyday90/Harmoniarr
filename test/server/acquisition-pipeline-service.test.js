@@ -317,10 +317,12 @@ test('requestMusicQueueReleaseRediscovery verifies release scope before queuing 
   assert.equal(result.action.code, 'search_again');
   assert.equal(result.action.discoveryRunId, 'run-1');
   assert.deepEqual(requestMusicQueueRediscovery.mock.calls[0].arguments, [{
+    appUserId: 'user-1',
     metadataReleaseId: 'release-1',
     reasonCode: 'quality_choice_search_again',
     requestedAt: '2026-06-29T12:00:00.000Z',
     requestedByUserId: 'user-1',
+    requestMetadata: { ipAddress: '127.0.0.1' },
     wantedReleaseId: 'wanted-1',
   }]);
   assert.deepEqual(startLibraryDiscoveryRun.mock.calls[0].arguments, [{
@@ -545,6 +547,17 @@ test('requestMusicQueueReleaseRediscovery succeeds when discovery dispatch is al
 
   assert.equal(result.action.dispatchAlreadyActive, true);
   assert.equal(result.action.discoveryRunId, null);
+});
+
+test('committed rediscovery remains accepted when its immediate dispatch fails', async () => {
+  const service = createService({ statusService: stoppedStatusService,
+    startLibraryDiscoveryRun: async () => { throw new Error('Synthetic dispatch failure'); } });
+  const result = await service.requestMusicQueueReleaseRediscovery({ appUserId: 'user-1', actorUserId: 'user-1',
+    wantedReleaseId: 'wanted-1', includeRelease: false });
+  assert.equal(result.action.code, 'search_again');
+  assert.equal(result.action.discoveryRunId, null);
+  assert.equal(result.action.dispatchAlreadyActive, false);
+  assert.equal(Object.hasOwn(result, 'release'), false);
 });
 
 test('requestMusicQueueReleaseRediscovery does not start duplicate shared work when a restart is already queued', async (t) => {

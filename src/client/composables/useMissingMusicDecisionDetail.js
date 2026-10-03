@@ -16,9 +16,9 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { computed, onBeforeUnmount, ref, toValue, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, toValue, watch } from 'vue';
 import { fetchMissingMusicDecisionDetail as defaultFetchMissingMusicDecisionDetail } from '../lib/missing-music-api.js';
-import { getErrorMessage } from '../lib/error-utils.js';
+import { createLatestRequestGate } from '../lib/latest-request-gate.js';
 
 function normalizeDecisionId(value) {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
@@ -34,6 +34,7 @@ function normalizeDetail(payload) {
     decision: payload.decision,
     permissions: {
       canStartDownload: payload.permissions?.canStartDownload === true,
+      canSearchAgain: payload.permissions?.canSearchAgain === true,
       canSelectMatch: payload.permissions?.canSelectMatch === true,
       canViewDownloader: payload.permissions?.canViewDownloader === true,
       isReadOnly: payload.permissions?.isReadOnly === true,
@@ -56,88 +57,154 @@ export function useMissingMusicDecisionDetail({
   fetchMissingMusicDecisionDetail = defaultFetchMissingMusicDecisionDetail,
   immediate = true,
   decisionId = null,
+  pollIntervalMs = 30000,
+  revalidateOnFocus = true,
 } = {}) {
   const detail = ref(null);
   const detailDecisionId = ref(null);
   const errorMessage = ref('');
   const isLoading = ref(false);
+  const isRevalidating = ref(false);
   const isNotFound = ref(false);
   const resolvedDecisionId = computed(() => normalizeDecisionId(toValue(decisionId)));
   let disposed = false;
-  let requestSequence = 0;
+  const gate = createLatestRequestGate();
+  let pendingRead = null;
+  let pollTimer = null;
+  let paused = false;
   let isInitialLoad = true;
+
+  function clearPoll() {
+    clearTimeout(pollTimer);
+    pollTimer = null;
+  }
+
+  function isHidden() {
+    return typeof document !== 'undefined' && document.hidden;
+  }
+
+  function schedulePoll() {
+    clearPoll();
+    if (disposed || paused || isHidden() || !resolvedDecisionId.value || pollIntervalMs <= 0) return;
+    pollTimer = setTimeout(() => { void load(); }, pollIntervalMs);
+  }
+
+  function invalidateRead() {
+    gate.invalidate();
+    pendingRead = null;
+    clearPoll();
+    isLoading.value = false;
+    isRevalidating.value = false;
+  }
 
   function applyDetail(payload, { invalidatePending = true } = {}) {
     const normalizedDetail = normalizeDetail(payload);
-    if (!normalizedDetail) {
+    if (disposed || !normalizedDetail
+      || normalizedDetail.decision.decisionId !== resolvedDecisionId.value) {
       return null;
     }
 
     if (invalidatePending) {
-      requestSequence += 1;
-      isLoading.value = false;
+      invalidateRead();
     }
 
     detail.value = normalizedDetail;
     detailDecisionId.value = normalizedDetail.decision.decisionId ?? null;
     errorMessage.value = '';
     isNotFound.value = false;
+    if (invalidatePending) schedulePoll();
     return normalizedDetail;
   }
 
-  async function load() {
-    const requestId = ++requestSequence;
-    const currentDecisionId = resolvedDecisionId.value;
+  function load() {
+    if (disposed || paused || !resolvedDecisionId.value) return Promise.resolve(null);
+    if (pendingRead) return pendingRead;
 
-    detail.value = null;
+    clearPoll();
+    const request = gate.begin();
+    const currentDecisionId = resolvedDecisionId.value;
+    const hasDetail = detail.value?.decision.decisionId === currentDecisionId;
     errorMessage.value = '';
     isNotFound.value = false;
-
-    if (!currentDecisionId) {
-      detailDecisionId.value = null;
-      isLoading.value = false;
-      return null;
-    }
-
     detailDecisionId.value = currentDecisionId;
-    isLoading.value = true;
+    isLoading.value = !hasDetail;
+    isRevalidating.value = hasDetail;
 
-    try {
-      const payload = await fetchMissingMusicDecisionDetail(currentDecisionId);
-      if (disposed || requestId !== requestSequence) return null;
+    const read = (async () => {
+      // Keep synchronous fetcher failures on the same asynchronous lifecycle.
+      await Promise.resolve();
+      try {
+        const payload = await fetchMissingMusicDecisionDetail(currentDecisionId, { signal: request.signal });
+        if (disposed || !request.isCurrent()) return null;
 
-      if (!payload?.decision || typeof payload.decision !== 'object') {
-        throw new Error('Missing Music release details failed to load');
-      }
-
-      return applyDetail(payload, { invalidatePending: false });
-    } catch (error) {
-      if (disposed || requestId !== requestSequence) return null;
-
-      if (isMissingMusicDecisionNotFoundError(error)) {
-        isNotFound.value = true;
+        if (!payload?.decision || payload.decision.decisionId !== currentDecisionId) {
+          throw new Error('Missing Music release details failed to load');
+        }
+        return applyDetail(payload, { invalidatePending: false });
+      } catch (error) {
+        if (disposed || !request.isCurrent()) return null;
+        if (isMissingMusicDecisionNotFoundError(error)) {
+          detail.value = null;
+          isNotFound.value = true;
+          return null;
+        }
+        if (error?.status === 401 || error?.status === 403) detail.value = null;
+        errorMessage.value = 'Missing Music release details could not be refreshed. Try again.';
         return null;
+      } finally {
+        if (!disposed && request.isCurrent()) {
+          pendingRead = null;
+          isLoading.value = false;
+          isRevalidating.value = false;
+          schedulePoll();
+        }
       }
+    })();
+    pendingRead = read;
+    return read;
+  }
 
-      errorMessage.value = getErrorMessage(error, 'Missing Music release details failed to load');
-      return null;
-    } finally {
-      if (!disposed && requestId === requestSequence) {
-        isLoading.value = false;
-      }
+  function setPaused(value) {
+    paused = value === true;
+    if (paused) invalidateRead();
+    else if (!detail.value && !isHidden()) void load();
+    else schedulePoll();
+  }
+
+  function handleVisibilityChange() {
+    if (isHidden()) {
+      invalidateRead();
+    } else if (!disposed && revalidateOnFocus) {
+      void load();
     }
   }
 
+  function handleWindowFocus() {
+    if (!disposed && !isHidden() && revalidateOnFocus) void load();
+  }
+
   watch(resolvedDecisionId, () => {
+    invalidateRead();
+    detail.value = null;
+    detailDecisionId.value = resolvedDecisionId.value;
+    errorMessage.value = '';
+    isNotFound.value = false;
     if (immediate || !isInitialLoad) {
       void load();
     }
     isInitialLoad = false;
-  }, { immediate: true });
+  }, { immediate: true, flush: 'sync' });
+
+  onMounted(() => {
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', handleVisibilityChange);
+    if (typeof window !== 'undefined' && revalidateOnFocus) window.addEventListener('focus', handleWindowFocus);
+  });
 
   onBeforeUnmount(() => {
     disposed = true;
-    requestSequence += 1;
+    invalidateRead();
+    if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', handleVisibilityChange);
+    if (typeof window !== 'undefined' && revalidateOnFocus) window.removeEventListener('focus', handleWindowFocus);
   });
 
   return {
@@ -146,7 +213,10 @@ export function useMissingMusicDecisionDetail({
     detailDecisionId,
     errorMessage,
     isLoading,
+    isRevalidating,
     isNotFound,
     load,
+    refresh: load,
+    setPaused,
   };
 }

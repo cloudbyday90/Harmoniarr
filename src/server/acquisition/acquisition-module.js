@@ -29,6 +29,7 @@ export function createAcquisitionModule({
   createPipelineStore = createAcquisitionPipelineStore,
   createQualityPolicyService = createAcquisitionQualityPolicyService,
   executeIdempotentMutation = async ({ executeMutation }) => executeMutation(),
+  listWantedReleasesWithMetadata = null,
   recheckReleaseSafeAdd = null,
   rejectImportCandidate = null,
   recordActivityEventFn = null,
@@ -39,7 +40,7 @@ export function createAcquisitionModule({
 } = {}) {
   const qualityPolicyService = createQualityPolicyService();
   const statusService = createPipelineStatusService();
-  const acquisitionPipelineStore = createPipelineStore({ buildLibraryWantedReleases });
+  const acquisitionPipelineStore = createPipelineStore({ buildLibraryWantedReleases, listWantedReleasesWithMetadata });
   const acquisitionPipelineService = createPipelineService({
     acquisitionPipelineStore,
     allowMusicQueueFallbackQuality,

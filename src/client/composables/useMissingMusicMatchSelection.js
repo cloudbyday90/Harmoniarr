@@ -16,64 +16,38 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { ref } from 'vue';
+import { computed } from 'vue';
 import { selectMissingMusicDecisionMatch as defaultSelectMissingMusicDecisionMatch } from '../lib/missing-music-api.js';
-import { getErrorMessage } from '../lib/error-utils.js';
-import { createRetryIdempotencyKeyStore } from '../lib/retry-idempotency-key-store.js';
+import { useMissingMusicDecisionMutation } from './useMissingMusicDecisionMutation.js';
 
 function normalizeId(value) {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 }
 
-export function useMissingMusicMatchSelection({
-  retryIdempotencyKeyStore = createRetryIdempotencyKeyStore(),
-  selectMissingMusicDecisionMatch = defaultSelectMissingMusicDecisionMatch,
-} = {}) {
-  const activeMatchId = ref('');
-  const errorMessage = ref('');
-  const statusMessage = ref('');
+export function useMissingMusicMatchSelection(options = {}) {
+  const mutation = useMissingMusicDecisionMutation({
+    ...options,
+    actionKey: ({ decisionId, matchId }) => `${decisionId}:${matchId}:select`,
+    executeMutation: options.selectMissingMusicDecisionMatch ?? defaultSelectMissingMusicDecisionMatch,
+    fallbackErrorMessage: 'The match could not be selected. Refresh this release and try again.',
+    pendingMessage: 'Selecting this match…',
+    scope: 'missing-music.decisions.matches.select',
+    successMessage: 'Match selected. Download has not started.',
+  });
+  const activeMatchId = computed(() => mutation.activePayload.value?.matchId ?? '');
 
-  async function selectMatch({ decisionId, matchId } = {}) {
-    const normalizedDecisionId = normalizeId(decisionId);
+  function selectMatch({ decisionId, matchId } = {}) {
     const normalizedMatchId = normalizeId(matchId);
-    if (!normalizedDecisionId || !normalizedMatchId || activeMatchId.value) {
-      return null;
-    }
-
-    const actionKey = `${normalizedDecisionId}:${normalizedMatchId}:select`;
-    const idempotencyKey = retryIdempotencyKeyStore.getOrCreate({
-      actionKey,
-      scope: 'missing-music.decisions.matches.select',
-    });
-    activeMatchId.value = normalizedMatchId;
-    errorMessage.value = '';
-    statusMessage.value = 'Selecting this match…';
-
-    try {
-      const payload = await selectMissingMusicDecisionMatch({
-        decisionId: normalizedDecisionId,
-        idempotencyKey,
-        matchId: normalizedMatchId,
-      });
-      retryIdempotencyKeyStore.clear(actionKey);
-      statusMessage.value = 'Match selected. Download has not started.';
-      return payload;
-    } catch (error) {
-      if (Number.isInteger(error?.status)) {
-        retryIdempotencyKeyStore.clear(actionKey);
-      }
-      errorMessage.value = getErrorMessage(error, 'The match could not be selected.');
-      statusMessage.value = '';
-      return null;
-    } finally {
-      activeMatchId.value = '';
-    }
+    if (!normalizedMatchId) return Promise.resolve(null);
+    return mutation.run({ decisionId, matchId: normalizedMatchId });
   }
 
   return {
     activeMatchId,
-    errorMessage,
+    clearFeedback: mutation.clearFeedback,
+    errorMessage: mutation.errorMessage,
+    isPending: mutation.isPending,
     selectMatch,
-    statusMessage,
+    statusMessage: mutation.statusMessage,
   };
 }

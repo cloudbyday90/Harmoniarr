@@ -123,3 +123,14 @@ test('Missing Music exposes a purpose-specific Downloader link only when the ser
   assert.equal(presentation.canViewDownloader, true);
   assert.equal(presentation.downloaderLinkAccessibleLabel, 'View Amber downloads for Jamie in Downloader');
 });
+
+test('Search again is a server-permitted action and disabled account history stays read-only', () => {
+  const detail = { decision: { status: { nextAction: 'try_again' } }, permissions: { canSearchAgain: true } };
+  assert.equal(buildMissingMusicDecisionDetailPresentation(detail).canSearchAgain, true);
+  assert.equal(buildMissingMusicDecisionDetailPresentation(detail).nextStep, 'Search again');
+  detail.permissions.canSearchAgain = false;
+  assert.equal(buildMissingMusicDecisionDetailPresentation(detail).canSearchAgain, false);
+  detail.permissions.canSearchAgain = true;
+  detail.decision.requestedFor = { accountStatus: 'disabled' };
+  assert.equal(buildMissingMusicDecisionDetailPresentation(detail).canSearchAgain, false);
+});

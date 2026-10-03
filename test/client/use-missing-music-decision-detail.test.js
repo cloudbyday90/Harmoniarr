@@ -45,7 +45,7 @@ function mountDecisionDetail(options) {
   let decisionDetail;
   const app = createApp({
     setup() {
-      decisionDetail = useMissingMusicDecisionDetail({ immediate: false, ...options });
+      decisionDetail = useMissingMusicDecisionDetail({ immediate: false, pollIntervalMs: 0, revalidateOnFocus: false, ...options });
       return () => h('div');
     },
   });
@@ -109,4 +109,189 @@ test('useMissingMusicDecisionDetail turns a scoped not-found response into an un
     true,
   );
   app.unmount();
+});
+
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+}
+
+test('refresh deduplicates reads and keeps the previous snapshot through a transient safe error', async (t) => {
+  const pending = deferred();
+  let count = 0;
+  const { app, decisionDetail } = mountDecisionDetail({ decisionId: 'wanted-amber', fetchMissingMusicDecisionDetail: () => {
+    count += 1;
+    return count === 1 ? createDetail() : pending.promise;
+  } });
+  t.after(() => app.unmount());
+  await decisionDetail.load();
+  const originalSnapshot = decisionDetail.detail.value;
+  const refreshing = decisionDetail.refresh();
+  assert.equal(decisionDetail.refresh(), refreshing);
+  assert.equal(decisionDetail.isLoading.value, false);
+  assert.equal(decisionDetail.isRevalidating.value, true);
+  assert.equal(decisionDetail.detail.value, originalSnapshot);
+  pending.reject(new Error('Private source path /mnt/music'));
+  await refreshing;
+  assert.equal(count, 2);
+  assert.equal(decisionDetail.detail.value, originalSnapshot);
+  assert.equal(decisionDetail.detail.value.checkedAt, '2026-08-26T16:30:00.000Z');
+  assert.equal(decisionDetail.errorMessage.value, 'Missing Music release details could not be refreshed. Try again.');
+  assert.equal(decisionDetail.isRevalidating.value, false);
+});
+
+test('navigation aborts old reads and neither late success nor late failure changes the newer decision', async (t) => {
+  const decisionId = ref('wanted-amber');
+  const requests = [];
+  const { app, decisionDetail } = mountDecisionDetail({ decisionId, fetchMissingMusicDecisionDetail: (id, { signal }) => {
+    const pending = deferred();
+    requests.push({ id, signal, ...pending });
+    return pending.promise;
+  } });
+  t.after(() => app.unmount());
+  const first = decisionDetail.load();
+  await Promise.resolve();
+  decisionId.value = 'wanted-tri-repetae';
+  const second = decisionDetail.refresh();
+  await Promise.resolve();
+  assert.equal(requests[0].signal.aborted, true);
+  assert.equal(decisionDetail.detail.value, null);
+  requests[0].resolve(createDetail('wanted-amber'));
+  await first;
+  assert.equal(decisionDetail.isLoading.value, true);
+  requests[1].resolve(createDetail('wanted-tri-repetae'));
+  await second;
+  const oldRefresh = decisionDetail.refresh();
+  await Promise.resolve();
+  decisionId.value = 'wanted-confield';
+  const third = decisionDetail.refresh();
+  await Promise.resolve();
+  requests[3].resolve(createDetail('wanted-confield'));
+  await third;
+  requests[2].reject(new Error('Private stale failure'));
+  await oldRefresh;
+  assert.equal(decisionDetail.errorMessage.value, '');
+  assert.equal(decisionDetail.detail.value.decision.decisionId, 'wanted-confield');
+  assert.equal(decisionDetail.isLoading.value, false);
+});
+
+test('permission loss and unavailable responses remove retained detail instead of leaving editable stale history', async (t) => {
+  for (const error of [Object.assign(new Error('private identity'), { status: 403 }),
+    Object.assign(new Error('private identity'), { status: 404, code: 'missing_music_decision_not_found' })]) {
+    let fail = false;
+    const { app, decisionDetail } = mountDecisionDetail({ decisionId: 'wanted-amber', fetchMissingMusicDecisionDetail: async () => {
+      if (fail) throw error;
+      return createDetail();
+    } });
+    t.after(() => app.unmount());
+    await decisionDetail.load();
+    fail = true;
+    await decisionDetail.refresh();
+    assert.equal(decisionDetail.detail.value, null);
+    assert.equal(decisionDetail.isNotFound.value, error.status === 404);
+    assert.doesNotMatch(decisionDetail.errorMessage.value, /private/u);
+  }
+});
+
+test('mutation pauses abort reads and prevent stale data from replacing the command refresh', async (t) => {
+  const pending = deferred();
+  let count = 0;
+  let signal;
+  const { app, decisionDetail } = mountDecisionDetail({ decisionId: 'wanted-amber', fetchMissingMusicDecisionDetail: (_id, options) => {
+    count += 1;
+    signal = options.signal;
+    return count === 1 ? pending.promise : { ...createDetail(), permissions: { canSearchAgain: true } };
+  } });
+  t.after(() => app.unmount());
+  const first = decisionDetail.load();
+  await Promise.resolve();
+  decisionDetail.setPaused(true);
+  assert.equal(signal.aborted, true);
+  assert.equal(await decisionDetail.refresh(), null);
+  decisionDetail.setPaused(false);
+  await decisionDetail.refresh();
+  pending.resolve(createDetail());
+  await first;
+  assert.equal(decisionDetail.detail.value.permissions.canSearchAgain, true);
+  assert.equal(count, 2);
+});
+
+test('polls schedule after completion, hidden tabs pause, focus deduplicates, and disposal removes all work', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const originalDocument = globalThis.document;
+  const originalWindow = globalThis.window;
+  const documentTarget = new EventTarget();
+  documentTarget.hidden = false;
+  globalThis.document = documentTarget;
+  globalThis.window = new EventTarget();
+  t.after(() => { globalThis.document = originalDocument; globalThis.window = originalWindow; });
+  let count = 0;
+  let pending = null;
+  let signal;
+  const { app, decisionDetail } = mountDecisionDetail({ decisionId: 'wanted-amber', pollIntervalMs: 100,
+    revalidateOnFocus: true, fetchMissingMusicDecisionDetail: (_id, options) => {
+      count += 1;
+      signal = options.signal;
+      return pending ? pending.promise : createDetail();
+    } });
+  t.after(() => app.unmount());
+  await decisionDetail.load();
+  pending = deferred();
+  t.mock.timers.tick(100);
+  await Promise.resolve();
+  assert.equal(count, 2);
+  t.mock.timers.tick(1000);
+  globalThis.window.dispatchEvent(new Event('focus'));
+  documentTarget.dispatchEvent(new Event('visibilitychange'));
+  assert.equal(count, 2, 'An in-flight poll owns the only read');
+  const refreshed = decisionDetail.refresh();
+  pending.resolve(createDetail());
+  await refreshed;
+  pending = null;
+  documentTarget.hidden = true;
+  documentTarget.dispatchEvent(new Event('visibilitychange'));
+  t.mock.timers.tick(1000);
+  globalThis.window.dispatchEvent(new Event('focus'));
+  assert.equal(count, 2);
+  documentTarget.hidden = false;
+  documentTarget.dispatchEvent(new Event('visibilitychange'));
+  globalThis.window.dispatchEvent(new Event('focus'));
+  await decisionDetail.refresh();
+  assert.equal(count, 3);
+  pending = deferred();
+  t.mock.timers.tick(100);
+  await Promise.resolve();
+  const finishing = decisionDetail.refresh();
+  const snapshot = decisionDetail.detail.value;
+  app.unmount();
+  assert.equal(signal.aborted, true);
+  pending.resolve({ ...createDetail(), checkedAt: '2026-10-03T12:00:00.000Z' });
+  await finishing;
+  t.mock.timers.tick(1000);
+  documentTarget.dispatchEvent(new Event('visibilitychange'));
+  globalThis.window.dispatchEvent(new Event('focus'));
+  assert.equal(count, 4);
+  assert.equal(decisionDetail.detail.value, snapshot);
+});
+
+test('navigation during a paused command immediately loads the new decision when the command finishes', async (t) => {
+  const decisionId = ref('wanted-amber');
+  const calls = [];
+  const { app, decisionDetail } = mountDecisionDetail({ decisionId, fetchMissingMusicDecisionDetail: async (id) => {
+    calls.push(id);
+    return createDetail(id);
+  } });
+  t.after(() => app.unmount());
+  await decisionDetail.load();
+  decisionDetail.setPaused(true);
+  decisionId.value = 'wanted-tri-repetae';
+  assert.equal(decisionDetail.detail.value, null);
+  assert.equal(calls.length, 1);
+  decisionDetail.setPaused(false);
+  assert.equal(decisionDetail.isLoading.value, true);
+  await decisionDetail.refresh();
+  assert.deepEqual(calls, ['wanted-amber', 'wanted-tri-repetae']);
+  assert.equal(decisionDetail.detail.value.decision.decisionId, 'wanted-tri-repetae');
 });

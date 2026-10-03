@@ -24,6 +24,8 @@ import { trapModalTabFocus } from '../../lib/modal-focus-trap.js';
 import { useMissingMusicDecisionDetail } from '../../composables/useMissingMusicDecisionDetail.js';
 import { useMissingMusicDownloadStart } from '../../composables/useMissingMusicDownloadStart.js';
 import { useMissingMusicMatchSelection } from '../../composables/useMissingMusicMatchSelection.js';
+import { useMissingMusicSearchAgain } from '../../composables/useMissingMusicSearchAgain.js';
+import { createMissingMusicReleaseMutationGate } from '../../lib/missing-music-release-mutation-gate.js';
 
 const props = defineProps({
   decisionId: {
@@ -31,18 +33,32 @@ const props = defineProps({
     type: String,
   },
 });
+const emit = defineEmits(['changed']);
 
 const headingElement = ref(null);
 const focusedDecisionId = ref('');
 const statusHeadingElement = ref(null);
 const downloadDialogElement = ref(null);
+const downloadConfirmationOpen = ref(false);
+const currentDecisionId = computed(() => props.decisionId);
+const mutationGate = createMissingMusicReleaseMutationGate();
+const mutationOptions = { decisionId: currentDecisionId, mutationGate, retryIntentState: {} };
+const matchSelection = useMissingMusicMatchSelection(mutationOptions);
+const downloadStart = useMissingMusicDownloadStart(mutationOptions);
+const searchAgain = useMissingMusicSearchAgain(mutationOptions);
+const mutationBusy = computed(() => matchSelection.isPending.value
+  || downloadStart.isStarting.value || searchAgain.isPending.value);
 const decisionDetail = useMissingMusicDecisionDetail({
-  decisionId: computed(() => props.decisionId),
+  decisionId: currentDecisionId,
 });
 const presentation = computed(() => buildMissingMusicDecisionDetailPresentation(decisionDetail.detail.value));
 const matchChoicePresentation = computed(() => buildMissingMusicMatchChoicePresentation(decisionDetail.detail.value));
-const matchSelection = useMissingMusicMatchSelection();
-const downloadStart = useMissingMusicDownloadStart();
+const busy = computed(() => mutationBusy.value || decisionDetail.isLoading.value || decisionDetail.isRevalidating.value);
+let disposed = false;
+
+watch([mutationBusy, downloadConfirmationOpen], ([mutationPending, dialogOpen]) => {
+  decisionDetail.setPaused(mutationPending || dialogOpen);
+}, { flush: 'sync' });
 
 async function focusInspectorHeading() {
   if (decisionDetail.isLoading.value || focusedDecisionId.value === props.decisionId) {
@@ -64,48 +80,62 @@ watch(
   { flush: 'post' },
 );
 
-async function selectMatch(matchId) {
-  const result = await matchSelection.selectMatch({
-    decisionId: props.decisionId,
-    matchId,
-  });
-  if (!result) return;
+async function completeUserCommand(command) {
+  const decisionId = props.decisionId;
+  const result = await command(decisionId);
+  if (!result || disposed || props.decisionId !== decisionId) return;
 
-  await decisionDetail.load();
+  await decisionDetail.refresh();
+  if (disposed || props.decisionId !== decisionId) return;
+  emit('changed');
   await nextTick();
-  statusHeadingElement.value?.focus({ preventScroll: true });
+  if (!disposed && props.decisionId === decisionId) statusHeadingElement.value?.focus({ preventScroll: true });
+}
+
+function selectMatch(matchId) {
+  return completeUserCommand((decisionId) => matchSelection.selectMatch({ decisionId, matchId }));
+}
+
+function queueSearchAgain() {
+  return completeUserCommand((decisionId) => searchAgain.searchAgain({ decisionId }));
 }
 
 function openDownloadConfirmation() {
+  if (mutationBusy.value) return;
   downloadStart.clearFeedback();
   if (downloadDialogElement.value && !downloadDialogElement.value.open) {
     downloadDialogElement.value.showModal();
+    downloadConfirmationOpen.value = true;
   }
 }
 
 function closeDownloadConfirmation() {
   downloadDialogElement.value?.close();
+  downloadConfirmationOpen.value = false;
 }
 
 async function startDownload() {
-  const result = await downloadStart.startDownload({ decisionId: props.decisionId });
-  if (!result) return;
-
-  closeDownloadConfirmation();
-  await decisionDetail.load();
-  await nextTick();
-  statusHeadingElement.value?.focus({ preventScroll: true });
+  await completeUserCommand(async (decisionId) => {
+    const result = await downloadStart.startDownload({ decisionId });
+    if (result && !disposed && props.decisionId === decisionId) closeDownloadConfirmation();
+    return result;
+  });
 }
 
+watch(() => props.decisionId, closeDownloadConfirmation, { flush: 'sync' });
+
 onBeforeUnmount(() => {
+  disposed = true;
   closeDownloadConfirmation();
 });
+
+defineExpose({ busy, refresh: decisionDetail.refresh });
 </script>
 
 <template>
   <article
     class="hx-card missing-music-inspector"
-    :aria-busy="decisionDetail.isLoading.value ? 'true' : undefined"
+    :aria-busy="busy ? 'true' : undefined"
   >
     <header class="hx-card-header">
       <div>
@@ -125,17 +155,17 @@ onBeforeUnmount(() => {
       Loading the latest release status…
     </div>
 
-    <div v-else-if="decisionDetail.errorMessage.value" class="hx-card-body">
+    <div v-if="decisionDetail.errorMessage.value" class="hx-card-body">
       <div class="hx-alert" data-tone="danger" role="alert">
         {{ decisionDetail.errorMessage.value }}
       </div>
     </div>
 
-    <div v-else-if="decisionDetail.isNotFound.value" class="hx-card-body missing-music-inspector__state">
+    <div v-if="decisionDetail.isNotFound.value" class="hx-card-body missing-music-inspector__state">
       <p>The requested release is unavailable or you do not have access to it.</p>
     </div>
 
-    <div v-else-if="decisionDetail.detail.value" class="hx-card-body missing-music-inspector__content">
+    <div v-if="decisionDetail.detail.value" class="hx-card-body missing-music-inspector__content">
       <p class="missing-music-inspector__artist">
         {{ presentation.artistName }}<template v-if="presentation.releaseMeta"> · {{ presentation.releaseMeta }}</template>
       </p>
@@ -145,11 +175,24 @@ onBeforeUnmount(() => {
         <span class="hx-pill" :data-tone="presentation.statusTone">{{ presentation.statusLabel }}</span>
         <p>{{ presentation.statusMessage }}</p>
         <p class="missing-music-inspector__next-step"><strong>Next step:</strong> {{ presentation.nextStep }}</p>
+        <div v-if="presentation.canSearchAgain" class="missing-music-inspector__start-download">
+          <button type="button" class="hx-btn" data-variant="primary" :disabled="mutationBusy" @click="queueSearchAgain">
+            {{ searchAgain.isPending.value ? 'Queueing…' : 'Search again' }}
+          </button>
+          <p>Queue a new search for this release using its saved automation policy.</p>
+        </div>
+        <p v-if="searchAgain.statusMessage.value" class="missing-music-inspector__selection-feedback" role="status" aria-atomic="true">
+          {{ searchAgain.statusMessage.value }}
+        </p>
+        <p v-if="searchAgain.errorMessage.value" class="missing-music-inspector__selection-feedback" data-tone="danger" role="alert">
+          {{ searchAgain.errorMessage.value }}
+        </p>
         <div v-if="presentation.canStartDownload" class="missing-music-inspector__start-download">
           <button
             type="button"
             class="hx-btn"
             data-variant="primary"
+            :disabled="mutationBusy"
             @click="openDownloadConfirmation"
           >
             Start download
@@ -258,7 +301,7 @@ onBeforeUnmount(() => {
                 data-variant="primary"
                 :aria-label="match.accessibleActionLabel"
                 :aria-describedby="'missing-music-inspector-match-choice-help'"
-                :disabled="Boolean(matchSelection.activeMatchId.value)"
+                :disabled="mutationBusy"
                 @click="selectMatch(match.id)"
               >
                 {{ matchSelection.activeMatchId.value === match.id ? 'Selecting…' : 'Use this match' }}
@@ -275,6 +318,7 @@ onBeforeUnmount(() => {
     class="missing-music-download-dialog"
     aria-labelledby="missing-music-download-dialog-title"
     @keydown="trapModalTabFocus"
+    @close="downloadConfirmationOpen = false"
   >
     <form method="dialog" class="missing-music-download-dialog__content" @submit.prevent="startDownload">
       <h2 id="missing-music-download-dialog-title">Start download?</h2>
@@ -292,7 +336,7 @@ onBeforeUnmount(() => {
       </p>
       <div class="missing-music-download-dialog__actions">
         <button type="button" class="hx-btn" @click="closeDownloadConfirmation">Cancel</button>
-        <button type="submit" class="hx-btn" data-variant="primary" :disabled="downloadStart.isStarting.value">
+        <button type="submit" class="hx-btn" data-variant="primary" :disabled="mutationBusy">
           {{ downloadStart.isStarting.value ? 'Starting…' : 'Start download' }}
         </button>
       </div>

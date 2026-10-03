@@ -21,6 +21,9 @@ Current skill areas include:
 - Scroll animation guidance
 - Penpot UI/UX design guidance
 - Optional image-generation workflow guidance
+- Harmoniarr canonical actions: complete a visible music workflow through its
+  ownership policy, durable command, and refreshed UI. The shared entrypoint is
+  [.agents/skills/harmoniarr-canonical-actions/SKILL.md](../.agents/skills/harmoniarr-canonical-actions/SKILL.md).
 
 ## Tooling Scope
 
@@ -33,6 +36,14 @@ It should not be treated as a universal prompt standard across all AI tools:
 - Non-Copilot tooling: should treat this directory as project documentation unless an integration explicitly supports it.
 
 If equivalent behavior is needed in another tool, copy or adapt the relevant guidance from `.agents/` into that tool's prompt or workflow configuration.
+
+The canonical-action skill also has Codex UI metadata and can be copied into
+the configured Codex skills directory for local discovery. Its repository copy
+is the maintained source; installing it does not make all `.agents/` content
+automatically active in other tools. The separate
+[skill design](CANONICAL_ACTION_SKILL_DESIGN.md) and
+[validation outcome](CANONICAL_ACTION_SKILL_OUTCOME.md) record its scope and
+verification.
 
 ## Repository Rules
 

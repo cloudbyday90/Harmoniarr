@@ -42,6 +42,12 @@ Harmoniarr is being planned as a self-hosted FOSS application with no SLA or ope
 - [Candidate staging and tag promotion design](docs/RELEASE_TAG_PROMOTION_DESIGN.md)
 - [Candidate staging and tag promotion outcome](docs/RELEASE_TAG_PROMOTION_OUTCOME.md)
 - [Local workflow-script replay](docs/WORKFLOW_SCRIPT_LOCAL_REPLAY.md)
+- [Missing Music Search again design](docs/MISSING_MUSIC_SEARCH_AGAIN_DESIGN.md)
+- [Missing Music Search again outcome](docs/MISSING_MUSIC_SEARCH_AGAIN_OUTCOME.md)
+- [Random PR #23 local replay design](docs/RANDOM_PR_23_LOCAL_REPLAY_DESIGN.md)
+- [Random PR #23 local replay outcome](docs/RANDOM_PR_23_LOCAL_REPLAY_OUTCOME.md)
+- [October dependency security design](docs/DEPENDENCY_SECURITY_UPDATE_2026_10_DESIGN.md)
+- [October dependency security outcome](docs/DEPENDENCY_SECURITY_UPDATE_2026_10_OUTCOME.md)
 
 ## Current Direction
 

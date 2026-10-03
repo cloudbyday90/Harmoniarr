@@ -19,6 +19,7 @@
 import { getPool } from '../database.js';
 import { normalizeMetadataReleaseDateForDateColumn } from '../metadata/metadata-release-date-normalization.js';
 import { createLibraryDiscoveryRequestWantedReleaseLinkStore } from './library-discovery-request-wanted-release-link-store.js';
+import { isMusicQueueRediscoveryInProgress } from '../acquisition/acquisition-rediscovery-policy.js';
 
 function normalizeLinkedWantedReleaseIds(value) {
   if (!Array.isArray(value)) {
@@ -113,20 +114,6 @@ const FOLDER_SETUP_RECOVERY_REASONS = Object.freeze([
   'missing_download_folder',
   'download_folder_unavailable',
 ]);
-
-const ACTIVE_MUSIC_QUEUE_REDISCOVERY_STATUSES = new Set([
-  'cooldown',
-  'ready',
-  'running',
-  'searching',
-]);
-
-function isMusicQueueRediscoveryInProgress(discoveryRequest) {
-  return discoveryRequest?.searchMode === 'automatic'
-    && discoveryRequest?.blockedReason == null
-    && ACTIVE_MUSIC_QUEUE_REDISCOVERY_STATUSES.has(discoveryRequest?.requestStatus)
-    && discoveryRequest?.evidence?.musicQueueRediscovery != null;
-}
 
 export function createLibraryDiscoveryRequestStore({
   getPoolFn = getPool,
@@ -541,8 +528,8 @@ export function createLibraryDiscoveryRequestStore({
     return mapDiscoveryRequestStateRow(result.rows[0]);
   }
 
-  async function getDownloadRecoveryRediscoveryState({ metadataReleaseId }) {
-    const pool = getPoolFn();
+  async function getDownloadRecoveryRediscoveryState({ metadataReleaseId, queryable = null }) {
+    const pool = queryable ?? getPoolFn();
     const result = await pool.query(
       `
         SELECT
@@ -733,8 +720,9 @@ export function createLibraryDiscoveryRequestStore({
     requestedAt,
     requestedByUserId = null,
     wantedReleaseId = null,
+    queryable = null,
   }) {
-    const pool = getPoolFn();
+    const pool = queryable ?? getPoolFn();
     const result = await pool.query(
       `
         WITH reset AS (
@@ -828,7 +816,7 @@ export function createLibraryDiscoveryRequestStore({
       };
     }
 
-    const currentRequest = await getDownloadRecoveryRediscoveryState({ metadataReleaseId });
+    const currentRequest = await getDownloadRecoveryRediscoveryState({ metadataReleaseId, queryable });
     if (!isMusicQueueRediscoveryInProgress(currentRequest)) {
       return null;
     }

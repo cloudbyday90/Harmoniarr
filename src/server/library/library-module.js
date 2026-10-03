@@ -91,6 +91,7 @@ import { createMediaFilesystemService } from '../media/media-filesystem-service.
 import { createOperationRunInterruptionGate } from '../operation-run-cancellation.js';
 import { createMaintenanceLockService } from '../recovery/maintenance-lock-service.js';
 import { createMaintenanceLockWriteGuardService } from '../recovery/maintenance-lock-write-guard-service.js';
+import { createLibraryMusicQueueRediscoveryService } from './library-music-queue-rediscovery-service.js';
 
 export function createLibraryModule({
   artworkAssignmentService = null,
@@ -361,6 +362,14 @@ export function createLibraryModule({
     libraryDiscoverySummaryStore,
   }),
   libraryWantedSummaryStore = createLibraryWantedSummaryStore(),
+  libraryMusicQueueRediscoveryService = getAppUserById ? createLibraryMusicQueueRediscoveryService({
+    assertMaintenanceWriteAllowed: ({ queryable }) => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+      operationLabel: 'another Missing Music search', queryable,
+    }),
+    getAppUserById,
+    listWantedReleasesWithMetadata: libraryWantedReleaseStore.listWantedReleasesWithMetadata,
+    requestMusicQueueRediscovery: libraryDiscoveryRequestStore.requestMusicQueueRediscovery,
+  }) : null,
   libraryWantedSummaryService = createLibraryWantedSummaryService({
     libraryWantedReleaseStore,
     libraryWantedSummaryStore,
@@ -492,6 +501,7 @@ export function createLibraryModule({
     libraryMediaRequestPipelineService: resolvedLibraryMediaRequestPipelineService,
     libraryMediaRequestPipelineStore,
     libraryMediaRequestStore,
+    libraryMusicQueueRediscoveryService,
     libraryOrganizeApplyRunStore,
     libraryOrganizeApplyService,
     libraryOrganizeApplyWorker,

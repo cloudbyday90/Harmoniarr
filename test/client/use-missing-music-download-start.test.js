@@ -93,6 +93,6 @@ test('useMissingMusicDownloadStart retains its key for an unconfirmed transport 
   await downloadStart.startDownload({ decisionId: 'wanted-amber' });
 
   assert.equal(retryIdempotencyKeyStore.clear.mock.callCount(), 0);
-  assert.equal(downloadStart.errorMessage.value, 'Connection closed');
+  assert.equal(downloadStart.errorMessage.value, 'The download could not be started. Refresh this release and try again.');
   app.unmount();
 });

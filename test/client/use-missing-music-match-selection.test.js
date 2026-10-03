@@ -92,6 +92,6 @@ test('useMissingMusicMatchSelection retains its key for an unconfirmed transport
   await selection.selectMatch({ decisionId: 'wanted-amber', matchId: 'candidate-amber' });
 
   assert.equal(retryIdempotencyKeyStore.clear.mock.callCount(), 0);
-  assert.equal(selection.errorMessage.value, 'Connection closed');
+  assert.equal(selection.errorMessage.value, 'The match could not be selected. Refresh this release and try again.');
   app.unmount();
 });

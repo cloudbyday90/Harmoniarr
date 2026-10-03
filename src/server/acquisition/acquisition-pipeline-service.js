@@ -17,6 +17,8 @@
  */
 
 import { createApiError } from '../auth.js';
+import { createRuntimeReporter } from '../runtime-reporter.js';
+import { canRequestMusicQueueRediscovery, isMusicQueueRediscoveryInProgress } from './acquisition-rediscovery-policy.js';
 import { buildMusicQueueOperatorSelectionEvidence } from './acquisition-operator-selection-evidence.js';
 import {
   createAcquisitionQualityPolicyService,
@@ -262,12 +264,6 @@ function normalizeMusicQueueRediscoveryResult(result) {
   };
 }
 
-const REDISCOVERY_ALLOWED_STATUS_CODES = new Set([
-  'failed',
-  'no_matches_left',
-  'quality_choice_needed',
-]);
-
 export function createAcquisitionPipelineService({
   acquisitionPipelineStore,
   allowMusicQueueFallbackQuality = null,
@@ -342,6 +338,7 @@ export function createAcquisitionPipelineService({
   async function requestMusicQueueReleaseRediscovery({
     appUserId,
     actorUserId = null,
+    includeRelease = true,
     requestMetadata = null,
     wantedReleaseId,
   } = {}) {
@@ -360,7 +357,8 @@ export function createAcquisitionPipelineService({
     }
 
     const projectedRelease = projectMusicQueueRelease(release, { qualityPolicyService, statusService });
-    if (!REDISCOVERY_ALLOWED_STATUS_CODES.has(projectedRelease.status?.code)) {
+    if (!canRequestMusicQueueRediscovery(projectedRelease.status?.code)
+      && !isMusicQueueRediscoveryInProgress(release.discoveryRequest)) {
       throw createApiError(409, 'music_queue_retry_not_available', 'This release is not stopped in a state that can be searched again');
     }
 
@@ -371,12 +369,14 @@ export function createAcquisitionPipelineService({
 
     const requestedAt = getNow().toISOString();
     const restart = normalizeMusicQueueRediscoveryResult(await requestMusicQueueRediscovery({
+      appUserId: scopedAppUserId,
       metadataReleaseId,
       reasonCode: projectedRelease.status?.code === 'quality_choice_needed'
         ? 'quality_choice_search_again'
         : 'music_queue_try_again',
       requestedAt,
       requestedByUserId: actorUserId,
+      requestMetadata,
       wantedReleaseId: scopedWantedReleaseId,
     }));
     if (!restart) {
@@ -386,13 +386,21 @@ export function createAcquisitionPipelineService({
     const rediscovery = restart.discoveryRequest;
     const restartAlreadyQueued = restart.restartDisposition === 'already_queued';
 
-    const { dispatchAlreadyActive, run } = restartAlreadyQueued
-      ? { dispatchAlreadyActive: false, run: null }
-      : await startDiscoveryRunIfAvailable({
-        actorUserId,
-        requestMetadata,
-        triggerSource: 'music_queue_try_again',
-      });
+    let dispatchAlreadyActive = false;
+    let run = null;
+    if (!restartAlreadyQueued) {
+      try {
+        ({ dispatchAlreadyActive, run } = await startDiscoveryRunIfAvailable({
+          actorUserId,
+          requestMetadata,
+          triggerSource: 'music_queue_try_again',
+        }));
+      } catch (error) {
+        // The ready intent is committed. The discovery heartbeat can dispatch
+        // it later; reporting a rolled-back action would encourage duplicates.
+        createRuntimeReporter({ prefix: 'harmoniarr' }).writeError(error, { label: 'rediscovery dispatch deferred' });
+      }
+    }
 
     if (!restartAlreadyQueued) {
       recordActivityEventSafely(
@@ -408,10 +416,10 @@ export function createAcquisitionPipelineService({
       );
     }
 
-    const refreshed = await getMusicQueueRelease({
+    const refreshed = includeRelease ? await getMusicQueueRelease({
       appUserId: scopedAppUserId,
       wantedReleaseId: scopedWantedReleaseId,
-    });
+    }) : null;
 
     return {
       action: {
@@ -422,7 +430,7 @@ export function createAcquisitionPipelineService({
         wantedReleaseId: scopedWantedReleaseId,
       },
       rediscovery,
-      release: refreshed.release,
+      ...(refreshed ? { release: refreshed.release } : {}),
       run,
     };
   }

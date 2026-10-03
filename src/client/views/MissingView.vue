@@ -41,6 +41,9 @@ const selectedDecisionId = computed(() => (
     : null
 ));
 const pageHeadingElement = ref(null);
+const decisionInspector = ref(null);
+const decisionWorklist = ref(null);
+const isRefreshingDecisions = ref(false);
 
 async function focusPageHeadingAfterInspectorClose() {
   await nextTick();
@@ -58,7 +61,10 @@ watch(selectedDecisionId, (decisionId, previousDecisionId) => {
 const isLoading = computed(() => wanted.isLoading.value || reconciliation.isLoading.value);
 const isRefreshing = computed(() =>
   wanted.isRevalidating.value
-  || reconciliation.isRevalidating.value,
+  || reconciliation.isRevalidating.value
+  || isRefreshingDecisions.value
+  || decisionInspector.value?.busy
+  || decisionWorklist.value?.busy,
 );
 
 const statCards = computed(() =>
@@ -70,9 +76,33 @@ const statCards = computed(() =>
   ),
 );
 
-function refreshAll() {
-  wanted.loadLibraryWantedSummary();
-  reconciliation.loadLibraryReconciliationSummary();
+async function refreshAll(event) {
+  if (isRefreshingDecisions.value) return;
+  const refreshButton = event?.currentTarget;
+  const shouldRestoreFocus = refreshButton === globalThis.document?.activeElement;
+  isRefreshingDecisions.value = true;
+  try {
+    await Promise.allSettled([
+      wanted.loadLibraryWantedSummary(),
+      reconciliation.loadLibraryReconciliationSummary(),
+      decisionInspector.value?.refresh(),
+      decisionWorklist.value?.refresh(),
+    ]);
+  } finally {
+    isRefreshingDecisions.value = false;
+    await nextTick();
+    if (
+      shouldRestoreFocus
+      && refreshButton?.isConnected
+      && !refreshButton.disabled
+      && (
+        globalThis.document?.activeElement === globalThis.document?.body
+        || globalThis.document?.activeElement === refreshButton
+      )
+    ) {
+      refreshButton.focus({ preventScroll: true });
+    }
+  }
 }
 
 onMounted(() => {
@@ -147,9 +177,9 @@ onBeforeUnmount(() => {
       </div>
     </article>
 
-    <MissingMusicDecisionInspector v-if="selectedDecisionId" :decision-id="selectedDecisionId" />
+    <MissingMusicDecisionInspector v-if="selectedDecisionId" :decision-id="selectedDecisionId" ref="decisionInspector" @changed="decisionWorklist?.refresh()" />
 
-    <MissingMusicDecisionWorklist />
+    <MissingMusicDecisionWorklist ref="decisionWorklist" />
 
     <article class="hx-card" v-if="reconciliation.libraryReconciliationSummary.value">
       <header class="hx-card-header">

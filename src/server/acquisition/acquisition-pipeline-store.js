@@ -37,6 +37,7 @@ function normalizePagination({ limit = 100, offset = 0 } = {}) {
 
 export function createAcquisitionPipelineStore({
   buildLibraryWantedReleases,
+  listWantedReleasesWithMetadata = null,
 } = {}) {
   const listWantedReleases = normalizeRequiredFunction(buildLibraryWantedReleases, 'buildLibraryWantedReleases');
 
@@ -64,6 +65,10 @@ export function createAcquisitionPipelineStore({
   async function getWantedReleaseEvidence({ appUserId, wantedReleaseId } = {}) {
     const normalizedWantedReleaseId = normalizeWantedReleaseId(wantedReleaseId);
     if (!normalizedWantedReleaseId) return null;
+    if (typeof listWantedReleasesWithMetadata === 'function') {
+      const releases = await listWantedReleasesWithMetadata({ appUserId, limit: 1, wantedReleaseId: normalizedWantedReleaseId });
+      return releases.find((release) => release.id === normalizedWantedReleaseId) ?? null;
+    }
     const payload = await listWantedReleaseEvidence({ appUserId, limit: 500, offset: 0 });
     return payload.releases.find((release) => release.id === normalizedWantedReleaseId) ?? null;
   }

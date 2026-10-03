@@ -38,7 +38,7 @@ import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/r
 
 const integrationRuntimeConfig = resolveIntegrationTestRuntimeConfig();
 
-function buildDecision({ downloadStarted = false, matchSelected = false } = {}) {
+function buildDecision({ accountStatus = 'active', downloadStarted = false, matchSelected = false, searchQueued = false, searchStopped = false } = {}) {
   return {
     decisionId: 'wanted-amber',
     expectedTrackCount: 10,
@@ -51,11 +51,15 @@ function buildDecision({ downloadStarted = false, matchSelected = false } = {}) 
       title: 'Amber',
     },
     requestedFor: {
-      accountStatus: 'active',
+      accountStatus,
       id: 'listener-1',
       username: 'Jamie',
     },
-    status: downloadStarted
+    status: searchQueued
+      ? { code: 'searching', label: 'Search queued', message: 'Harmoniarr will evaluate this release again.', nextAction: null, tone: 'info' }
+      : searchStopped
+      ? { code: 'no_matches_left', label: 'Search stopped', message: 'No acceptable matches remain.', nextAction: 'try_again', tone: 'warning' }
+      : downloadStarted
       ? {
         label: 'Download preparation started',
         message: 'The selected match is queued for download preparation.',
@@ -102,14 +106,24 @@ function buildWorklistPayload() {
 }
 
 async function installMissingMusicFixture(browserContext, requests, {
+  accountStatus = 'active',
   downloadStarted = false,
   matchSelected = false,
+  searchStopped = false,
 } = {}) {
   const state = {
     downloadStartRequest: null,
     downloadStarted,
     matchSelected,
     selectionRequest: null,
+    accountStatus,
+    detailReadFailure: false,
+    searchAgainAvailable: searchStopped,
+    searchAgainFailure: false,
+    searchAgainRequest: null,
+    searchAgainRequestCount: 0,
+    searchQueued: false,
+    searchStopped,
   };
 
   await browserContext.route('**/api/v1/missing-music/decisions**', async (route) => {
@@ -119,6 +133,35 @@ async function installMissingMusicFixture(browserContext, requests, {
     const selectionPath = `${detailPath}/matches/candidate-amber/select`;
     const downloadStartPath = `${detailPath}/start-download`;
     const downloaderHandoffPath = `${detailPath}/downloader-handoff`;
+    const searchAgainPath = `${detailPath}/search-again`;
+
+    if (route.request().method() === 'POST' && requestUrl.pathname === searchAgainPath) {
+      const headers = route.request().headers();
+      state.searchAgainRequestCount += 1;
+      state.searchAgainRequest = {
+        body: route.request().postDataJSON(),
+        csrfToken: headers['x-csrf-token'] ?? null,
+        idempotencyKey: headers['idempotency-key'] ?? null,
+      };
+      if (state.searchAgainFailure) {
+        await route.fulfill({ status: 500, contentType: 'application/json',
+          body: JSON.stringify({ ok: false, error: { code: 'unexpected_error', message: 'Private provider /mnt/downloads source identity' } }) });
+        return;
+      }
+      state.searchQueued = true;
+      state.searchAgainAvailable = false;
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true,
+        action: { code: 'search_again', decisionId: 'wanted-amber', targetUserId: 'listener-1',
+          searchPreparationStarted: true, restartAlreadyQueued: false, dispatchAlreadyActive: false, discoveryRunId: 'run-search' },
+      }) });
+      return;
+    }
+
+    if (route.request().method() === 'GET' && requestUrl.pathname === detailPath && state.detailReadFailure) {
+      await route.fulfill({ status: 503, contentType: 'application/json',
+        body: JSON.stringify({ ok: false, error: { code: 'unexpected_error', message: 'Private database host' } }) });
+      return;
+    }
 
     if (route.request().method() === 'GET' && requestUrl.pathname === downloaderHandoffPath) {
       await route.fulfill({
@@ -190,10 +233,13 @@ async function installMissingMusicFixture(browserContext, requests, {
       ? {
         checkedAt: '2026-08-26T16:31:00.000Z',
         decision: buildDecision({
+          accountStatus: state.accountStatus,
           downloadStarted: state.downloadStarted,
           matchSelected: state.matchSelected,
+          searchQueued: state.searchQueued,
+          searchStopped: state.searchStopped,
         }),
-        matchChoices: state.matchSelected
+        matchChoices: state.matchSelected || state.searchStopped
           ? []
           : [{
             fileCount: 10,
@@ -202,10 +248,11 @@ async function installMissingMusicFixture(browserContext, requests, {
             totalSizeBytes: 358000000,
           }],
         permissions: {
-          canSelectMatch: !state.matchSelected,
+          canSelectMatch: !state.matchSelected && !state.searchStopped,
+          canSearchAgain: state.searchAgainAvailable && state.accountStatus !== 'disabled',
           canStartDownload: state.matchSelected && !state.downloadStarted,
           canViewDownloader: state.downloadStarted,
-          isReadOnly: false,
+          isReadOnly: state.accountStatus === 'disabled',
         },
         scope: 'all',
       }
@@ -301,6 +348,93 @@ suite('Missing Music decision detail browser acceptance', () => {
     }, {
       scenarioName: 'missing_music_decision_detail_navigation',
     });
+  });
+
+  test('queues Search again, refreshes both decision surfaces, and retains the snapshot on safe refresh failure', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) { t.skip(runtimeUnavailableReason); return; }
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      const requests = [];
+      const pageErrors = [];
+      page.on('pageerror', (error) => pageErrors.push(error.message));
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      const fixture = await installMissingMusicFixture(browserContext, requests, { searchStopped: true });
+      await page.goto(baseUrl + '/app/missing/wanted-amber', { waitUntil: 'domcontentloaded' });
+      const inspector = page.locator('.missing-music-inspector');
+      const searchButton = inspector.getByRole('button', { exact: true, name: 'Search again' });
+      await searchButton.focus();
+      await assertVisibleFocusOutline(searchButton, 'Search again should expose its keyboard focus');
+      await searchButton.press('Enter');
+      await inspector.getByText('Search queued', { exact: true }).waitFor();
+      await inspector.getByText('A new search is queued. Acquisition will follow the saved automation policy.', { exact: true }).waitFor();
+      await assertLocatorFocused(inspector.getByRole('heading', { exact: true, name: 'Current status' }), 'the completed command should focus the updated state');
+      assert.equal(fixture.searchAgainRequestCount, 1);
+      assert.deepEqual(fixture.searchAgainRequest.body, {});
+      assert.match(fixture.searchAgainRequest.csrfToken, /.+/u);
+      assert.match(fixture.searchAgainRequest.idempotencyKey, /.+/u);
+      assert.equal(fixture.downloadStartRequest, null);
+      assert.equal(fixture.selectionRequest, null);
+
+      const detailPath = '/api/v1/missing-music/decisions/wanted-amber';
+      const worklistPath = '/api/v1/missing-music/decisions';
+      const detailCount = requests.filter((path) => path === detailPath).length;
+      const worklistCount = requests.filter((path) => path === worklistPath).length;
+      const pageRefresh = page.locator('.hx-page-header').getByRole('button', { exact: true, name: 'Refresh' });
+      await Promise.all([
+        page.waitForResponse((response) => new URL(response.url()).pathname === detailPath),
+        page.waitForResponse((response) => new URL(response.url()).pathname === worklistPath),
+        pageRefresh.click(),
+      ]);
+      await pageRefresh.waitFor();
+      assert.equal(requests.filter((path) => path === detailPath).length, detailCount + 1);
+      assert.equal(requests.filter((path) => path === worklistPath).length, worklistCount + 1);
+      await assertLocatorFocused(pageRefresh, 'Refresh should retain its invoker focus');
+
+      const filterInput = page.getByLabel('Search releases', { exact: true });
+      await filterInput.focus();
+      fixture.detailReadFailure = true;
+      await Promise.all([
+        page.waitForResponse((response) => new URL(response.url()).pathname === detailPath && response.status() === 503),
+        page.evaluate(() => globalThis.window.dispatchEvent(new Event('focus'))),
+      ]);
+      await inspector.getByRole('alert').getByText('Missing Music release details could not be refreshed. Try again.', { exact: true }).waitFor();
+      await inspector.getByText('Search queued', { exact: true }).waitFor();
+      await assertLocatorFocused(filterInput, 'a failed background refresh should retain keyboard focus');
+      assert.doesNotMatch(await inspector.innerText(), /Private database|Private provider|\/mnt/u);
+      assert.deepEqual(pageErrors, []);
+    }, { scenarioName: 'missing_music_search_again_and_freshness' });
+  });
+
+  test('Search again failures use public feedback and unsupported or disabled decisions expose no retry button', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) { t.skip(runtimeUnavailableReason); return; }
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      const fixture = await installMissingMusicFixture(browserContext, [], { searchStopped: true });
+      fixture.searchAgainFailure = true;
+      await page.goto(baseUrl + '/app/missing/wanted-amber', { waitUntil: 'domcontentloaded' });
+      const inspector = page.locator('.missing-music-inspector');
+      await inspector.getByRole('button', { exact: true, name: 'Search again' }).click();
+      await inspector.getByRole('alert').getByText('The search could not be queued. Refresh this release and try again.', { exact: true }).waitFor();
+      assert.doesNotMatch(await inspector.innerText(), /Private|\/mnt/u);
+      const previousKey = fixture.searchAgainRequest.idempotencyKey;
+      await inspector.getByRole('button', { exact: true, name: 'Search again' }).click();
+      assert.equal(fixture.searchAgainRequest.idempotencyKey, previousKey);
+      assert.equal(fixture.searchAgainRequestCount, 2);
+
+      fixture.searchAgainAvailable = false;
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await inspector.getByText('Search stopped', { exact: true }).waitFor();
+      assert.equal(await inspector.getByRole('button', { exact: true, name: 'Search again' }).count(), 0);
+      fixture.searchAgainAvailable = true;
+      fixture.accountStatus = 'disabled';
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await inspector.getByText('This account is disabled. Its history is read-only.', { exact: true }).waitFor();
+      assert.equal(await inspector.getByRole('button', { exact: true, name: 'Search again' }).count(), 0);
+      assert.equal(fixture.searchAgainRequestCount, 2);
+    }, { scenarioName: 'missing_music_search_again_safe_failures' });
   });
 
   test('selects one visible match without starting a download and returns focus to the updated state', {

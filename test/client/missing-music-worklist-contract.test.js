@@ -48,7 +48,7 @@ test('MissingView uses the authorized worklist instead of a parallel client-side
   const source = await readFile(MISSING_VIEW_PATH, 'utf8');
 
   assert.match(source, /import MissingMusicDecisionWorklist/);
-  assert.match(source, /<MissingMusicDecisionWorklist \/>/);
+  assert.match(source, /<MissingMusicDecisionWorklist\b[^>]*\/>/);
   assert.doesNotMatch(source, /MissingReleaseDecisionActions/);
   assert.doesNotMatch(source, /useLibraryWantedReleases/);
 });

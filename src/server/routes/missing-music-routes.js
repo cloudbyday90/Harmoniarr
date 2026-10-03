@@ -51,6 +51,7 @@ export function registerMissingMusicRoutes(app, {
   requireFreshSession = defaultRequestAuthDependencies.requireFreshSession,
   requireSession = defaultRequestAuthDependencies.requireSession,
   selectMissingMusicDecisionMatch,
+  searchMissingMusicDecisionAgain,
   startMissingMusicDecisionDownload,
 } = {}) {
   if (typeof getMissingMusicDecisionDetail !== 'function') {
@@ -173,5 +174,22 @@ export function registerMissingMusicRoutes(app, {
       ok: true,
       ...(result?.body ?? {}),
     });
+  }));
+
+  app.post('/api/v1/missing-music/decisions/:decisionId/search-again', limitMissingMusicDecisionMutation, asyncRoute(async (request, response) => {
+    const session = await requireFreshSession(request);
+    requireCsrf(request, session);
+    const actorUser = buildActorUser(session);
+    const result = await executeIdempotentMutation({
+      actorUserId: actorUser.id,
+      executeMutation: async () => ({
+        body: await searchMissingMusicDecisionAgain({ actorUser, decisionId: request.params.decisionId, requestMetadata: getRequestMetadata(request) }),
+        statusCode: 200,
+      }),
+      idempotencyKey: request.headers['idempotency-key'],
+      operationScope: 'missing-music.decisions.search-again',
+      requestPayload: { decisionId: request.params.decisionId },
+    });
+    response.status(result?.statusCode ?? 200).json({ ok: true, ...(result?.body ?? {}) });
   }));
 }

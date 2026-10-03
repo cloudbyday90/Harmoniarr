@@ -46,13 +46,13 @@ export function fetchMissingMusicDecisions({
  })}`, { signal });
 }
 
-export function fetchMissingMusicDecisionDetail(decisionId) {
+export function fetchMissingMusicDecisionDetail(decisionId, { signal } = {}) {
   const normalizedDecisionId = typeof decisionId === 'string' ? decisionId.trim() : '';
   if (!normalizedDecisionId) {
     throw new TypeError('fetchMissingMusicDecisionDetail requires a decisionId');
   }
 
-  return apiRequest(`/api/v1/missing-music/decisions/${encodeURIComponent(normalizedDecisionId)}`);
+  return apiRequest(`/api/v1/missing-music/decisions/${encodeURIComponent(normalizedDecisionId)}`, { signal });
 }
 
 export function fetchMissingMusicDownloaderHandoff(decisionId) {
@@ -97,6 +97,25 @@ export function startMissingMusicDecisionDownload({ decisionId, idempotencyKey =
       headers: idempotencyKey
         ? { 'Idempotency-Key': idempotencyKey }
         : createControlPlaneIdempotencyHeaders('missing-music.decisions.download.start'),
+      includeCsrf: true,
+      method: 'POST',
+    },
+  );
+}
+
+export function searchMissingMusicDecisionAgain({ decisionId, idempotencyKey = null } = {}) {
+  const normalizedDecisionId = typeof decisionId === 'string' ? decisionId.trim() : '';
+  if (!normalizedDecisionId) {
+    throw new TypeError('searchMissingMusicDecisionAgain requires a decisionId');
+  }
+
+  return apiRequest(
+    `/api/v1/missing-music/decisions/${encodeURIComponent(normalizedDecisionId)}/search-again`,
+    {
+      body: {},
+      headers: idempotencyKey
+        ? { 'Idempotency-Key': idempotencyKey }
+        : createControlPlaneIdempotencyHeaders('missing-music.decisions.search-again'),
       includeCsrf: true,
       method: 'POST',
     },

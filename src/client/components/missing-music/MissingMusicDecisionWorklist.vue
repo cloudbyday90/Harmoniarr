@@ -91,6 +91,7 @@ async function navigatePage(action) {
 }
 
 defineExpose({
+  busy,
   refresh: decisionResource.refresh,
 });
 </script>

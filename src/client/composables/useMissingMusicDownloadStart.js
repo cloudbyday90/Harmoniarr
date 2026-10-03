@@ -16,68 +16,24 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { ref } from 'vue';
 import { startMissingMusicDecisionDownload as defaultStartMissingMusicDecisionDownload } from '../lib/missing-music-api.js';
-import { getErrorMessage } from '../lib/error-utils.js';
-import { createRetryIdempotencyKeyStore } from '../lib/retry-idempotency-key-store.js';
+import { useMissingMusicDecisionMutation } from './useMissingMusicDecisionMutation.js';
 
-function normalizeDecisionId(value) {
-  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
-}
-
-export function useMissingMusicDownloadStart({
-  retryIdempotencyKeyStore = createRetryIdempotencyKeyStore(),
-  startMissingMusicDecisionDownload = defaultStartMissingMusicDecisionDownload,
-} = {}) {
-  const errorMessage = ref('');
-  const isStarting = ref(false);
-  const statusMessage = ref('');
-
-  async function startDownload({ decisionId } = {}) {
-    const normalizedDecisionId = normalizeDecisionId(decisionId);
-    if (!normalizedDecisionId || isStarting.value) {
-      return null;
-    }
-
-    const actionKey = `${normalizedDecisionId}:start-download`;
-    const idempotencyKey = retryIdempotencyKeyStore.getOrCreate({
-      actionKey,
-      scope: 'missing-music.decisions.download.start',
-    });
-    errorMessage.value = '';
-    isStarting.value = true;
-    statusMessage.value = 'Starting download preparation…';
-
-    try {
-      const payload = await startMissingMusicDecisionDownload({
-        decisionId: normalizedDecisionId,
-        idempotencyKey,
-      });
-      retryIdempotencyKeyStore.clear(actionKey);
-      statusMessage.value = 'Download preparation started. Transfer progress will appear in Downloader after it is submitted.';
-      return payload;
-    } catch (error) {
-      if (Number.isInteger(error?.status)) {
-        retryIdempotencyKeyStore.clear(actionKey);
-      }
-      errorMessage.value = getErrorMessage(error, 'The download could not be started.');
-      statusMessage.value = '';
-      return null;
-    } finally {
-      isStarting.value = false;
-    }
-  }
-
-  function clearFeedback() {
-    errorMessage.value = '';
-    statusMessage.value = '';
-  }
-
+export function useMissingMusicDownloadStart(options = {}) {
+  const mutation = useMissingMusicDecisionMutation({
+    ...options,
+    actionKey: ({ decisionId }) => `${decisionId}:start-download`,
+    executeMutation: options.startMissingMusicDecisionDownload ?? defaultStartMissingMusicDecisionDownload,
+    fallbackErrorMessage: 'The download could not be started. Refresh this release and try again.',
+    pendingMessage: 'Starting download preparation…',
+    scope: 'missing-music.decisions.download.start',
+    successMessage: 'Download preparation started. Transfer progress will appear in Downloader after it is submitted.',
+  });
   return {
-    clearFeedback,
-    errorMessage,
-    isStarting,
-    startDownload,
-    statusMessage,
+    clearFeedback: mutation.clearFeedback,
+    errorMessage: mutation.errorMessage,
+    isStarting: mutation.isPending,
+    startDownload: mutation.run,
+    statusMessage: mutation.statusMessage,
   };
 }

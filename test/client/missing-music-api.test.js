@@ -23,6 +23,7 @@ import {
   fetchMissingMusicDecisions,
   fetchMissingMusicDownloaderHandoff,
   selectMissingMusicDecisionMatch,
+  searchMissingMusicDecisionAgain,
   startMissingMusicDecisionDownload,
 } from '../../src/client/lib/missing-music-api.js';
 
@@ -95,6 +96,28 @@ test('fetchMissingMusicDecisionDetail requires a non-empty decision identifier',
     () => fetchMissingMusicDecisionDetail('  '),
     /requires a decisionId/u,
   );
+});
+
+test('decision detail reads pass cancellation outside the URL', async (t) => {
+  const fetchMock = installFetchMock(t, { decision: {} });
+  const controller = new AbortController();
+  await fetchMissingMusicDecisionDetail('wanted-amber', { signal: controller.signal });
+  assert.equal(fetchMock.mock.calls[0].arguments[1].signal, controller.signal);
+});
+
+test('Search again submits only the decision identifier with CSRF and a stable retry key', async (t) => {
+  const fetchMock = installFetchMock(t, { action: { searchPreparationStarted: true } });
+  const originalDocument = globalThis.document;
+  globalThis.document = { cookie: 'harmoniarr_csrf=csrf-token' };
+  t.after(() => { globalThis.document = originalDocument; });
+  await searchMissingMusicDecisionAgain({ decisionId: 'wanted/amber', idempotencyKey: 'retry-key' });
+  const [url, options] = fetchMock.mock.calls[0].arguments;
+  assert.equal(url, '/api/v1/missing-music/decisions/wanted%2Famber/search-again');
+  assert.equal(options.method, 'POST');
+  assert.equal(options.headers.get('X-CSRF-Token'), 'csrf-token');
+  assert.equal(options.headers.get('Idempotency-Key'), 'retry-key');
+  assert.equal(options.body, '{}');
+  assert.throws(() => searchMissingMusicDecisionAgain({ decisionId: ' ' }), /requires a decisionId/u);
 });
 
 test('fetchMissingMusicDownloaderHandoff sends only the opaque decision identifier', async (t) => {

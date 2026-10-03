@@ -21,12 +21,15 @@ import { createMissingMusicDecisionCommandService } from './missing-music-decisi
 import { createMissingMusicDownloadStartService } from './missing-music-download-start-service.js';
 import { createMissingMusicDecisionTargetService } from './missing-music-decision-target-service.js';
 import { createMissingMusicDownloaderHandoffService } from './missing-music-downloader-handoff-service.js';
+import { createMissingMusicSearchAgainService } from './missing-music-search-again-service.js';
 
 export function createMissingMusicModule({
+  executeIdempotentMutation = async ({ executeMutation }) => executeMutation(),
   listAppUsers,
   listWantedReleaseIdentityPage,
   listWantedReleasesWithMetadata,
   recordActivityEventFn = null,
+  requestMusicQueueReleaseRediscovery,
   selectImportCandidate,
   startImportCandidateExecutionRun,
 } = {}) {
@@ -53,6 +56,10 @@ export function createMissingMusicModule({
   const missingMusicDownloaderHandoffService = createMissingMusicDownloaderHandoffService({
     resolveMissingMusicDecisionTarget: missingMusicDecisionTargetService.resolveMissingMusicDecisionTarget,
   });
+  const missingMusicSearchAgainService = createMissingMusicSearchAgainService({
+    requestMusicQueueReleaseRediscovery,
+    resolveMissingMusicDecisionTarget: missingMusicDecisionTargetService.resolveMissingMusicDecisionTarget,
+  });
 
   return {
     missingMusicDecisionCommandService,
@@ -60,11 +67,14 @@ export function createMissingMusicModule({
     missingMusicDecisionTargetService,
     missingMusicDownloadStartService,
     missingMusicDownloaderHandoffService,
+    missingMusicSearchAgainService,
     routeDependencies: {
+      executeIdempotentMutation,
       getMissingMusicDecisionDetail: missingMusicDecisionService.getMissingMusicDecisionDetail,
       getMissingMusicDownloaderHandoff: missingMusicDownloaderHandoffService.getMissingMusicDownloaderHandoff,
       listMissingMusicDecisions: missingMusicDecisionService.listMissingMusicDecisions,
       selectMissingMusicDecisionMatch: missingMusicDecisionCommandService.selectMissingMusicDecisionMatch,
+      searchMissingMusicDecisionAgain: missingMusicSearchAgainService.searchMissingMusicDecisionAgain,
       startMissingMusicDecisionDownload: missingMusicDownloadStartService.startMissingMusicDecisionDownload,
     },
   };

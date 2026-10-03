@@ -6,6 +6,34 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Current development slice (2026-10-03)
+
+- Missing Music now completes Search again for existing stopped retry states
+  through a target-safe canonical command. Inspector background revalidation,
+  page Refresh, competing-command gating, and uncertain retry keys are covered
+  by focused tests. See the [design](MISSING_MUSIC_SEARCH_AGAIN_DESIGN.md) and
+  [outcome](MISSING_MUSIC_SEARCH_AGAIN_OUTCOME.md) for the architecture,
+  recommendation stack, evidence, and remaining scope.
+- A new [canonical-actions skill](../.agents/skills/harmoniarr-canonical-actions/SKILL.md)
+  carries ownership, durable command, refresh, and validation boundaries into
+  the next workflow slice. Its [design](CANONICAL_ACTION_SKILL_DESIGN.md) and
+  [outcome](CANONICAL_ACTION_SKILL_OUTCOME.md) separate intent from evaluation.
+- Randomly selected [PR #23](https://github.com/cloudbyday90/Harmoniarr/pull/23)
+  was executed locally and compared against the already newer production pin;
+  no downgrade or merge occurred. See the [replay outcome](RANDOM_PR_23_LOCAL_REPLAY_OUTCOME.md).
+- The current security gate identified new development-dependency advisories.
+  Three compatible package changes now produce zero reported vulnerabilities;
+  see the [October dependency design](DEPENDENCY_SECURITY_UPDATE_2026_10_DESIGN.md)
+  and [outcome](DEPENDENCY_SECURITY_UPDATE_2026_10_OUTCOME.md).
+- Next: canonical quality-choice/fallback, starting with guarded target-owned
+  persistence and bounded quality evidence. The retained shared-discovery
+  fallback store needs eligibility/link checks before exposing that action.
+- This is development on main; no release or published-artifact acceptance is
+  claimed. Earlier dated validation entries below retain their original scope.
+- Final `npm run validate` passed 8,623 tests with zero failures or skips,
+  all policy/lint checks, and both builds. The six targeted browser scenarios
+  and the dependency-security gate also passed.
+
 ## Release preparation (2026-09-10)
 
 - Atomic music request creation now uses one transaction for the eligible

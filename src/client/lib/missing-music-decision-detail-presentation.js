@@ -58,6 +58,7 @@ export function buildMissingMusicDecisionDetailPresentation(detail) {
   const accountIsDisabled = detail?.permissions?.isReadOnly === true
     || requestedFor.accountStatus === 'disabled';
   const canStartDownload = detail?.permissions?.canStartDownload === true;
+  const canSearchAgain = !accountIsDisabled && detail?.permissions?.canSearchAgain === true;
   const canViewDownloader = detail?.permissions?.canViewDownloader === true;
   const selectedMatchNeedsAdministrator = !accountIsDisabled
     && decision.status?.nextAction === 'download_now'
@@ -72,11 +73,14 @@ export function buildMissingMusicDecisionDetailPresentation(detail) {
     coverage: formatTrackCoverage(matchedTrackCount, expectedTrackCount),
     isReadOnly: accountIsDisabled,
     canStartDownload,
+    canSearchAgain,
     canViewDownloader,
     downloaderLinkAccessibleLabel: `View ${normalizeText(release.title, 'this release')} downloads for ${normalizeText(requestedFor.username, 'the selected user')} in Downloader`,
     lastCheckedAt: formatMissingMusicDecisionCheckedAt(decision.lastReconciledAt),
     nextStep: accountIsDisabled
       ? 'This account is disabled; no changes can be made.'
+      : canSearchAgain
+        ? 'Search again'
       : selectedMatchNeedsAdministrator
         ? 'A household administrator can start the download.'
       : getMissingMusicNextStep(decision.status?.nextAction),

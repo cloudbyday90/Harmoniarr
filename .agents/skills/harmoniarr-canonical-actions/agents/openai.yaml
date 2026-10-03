@@ -1,0 +1,4 @@
+interface:
+  display_name: "Harmoniarr Canonical Actions"
+  short_description: "Complete target-safe music workflow actions"
+  default_prompt: "Use $harmoniarr-canonical-actions to complete a Missing Music action through its UI, command, ownership policy, and validation."

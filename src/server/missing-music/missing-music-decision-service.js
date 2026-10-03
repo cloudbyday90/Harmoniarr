@@ -25,6 +25,7 @@ import {
 import { buildMissingMusicMatchChoices } from './missing-music-match-choice-projection.js';
 import { canStartMissingMusicDownload } from './missing-music-download-start-policy.js';
 import { canViewMissingMusicDownloader } from './missing-music-downloader-handoff-policy.js';
+import { canSearchMissingMusicAgain } from './missing-music-search-again-policy.js';
 import { createMissingMusicDecisionTargetService } from './missing-music-decision-target-service.js';
 import { createMissingMusicDecisionPageService } from './missing-music-decision-page-service.js';
 import {
@@ -311,6 +312,7 @@ export function createMissingMusicDecisionService({
       decision,
       matchChoices,
       permissions: {
+        canSearchAgain: canSearchMissingMusicAgain({ statusCode: decision.status.code, targetUser: target.targetUser }),
         canStartDownload: canStartMissingMusicDownload({
           actorUser,
           nextAction: decision.status.nextAction,
