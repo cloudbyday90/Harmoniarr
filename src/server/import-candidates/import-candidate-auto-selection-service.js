@@ -93,6 +93,7 @@ function evaluateCandidateQuality({
   candidate,
   profileCode,
   qualityOverride,
+  minimumBitrateKbps,
   qualityPolicyService,
 }) {
   if (typeof qualityPolicyService?.evaluateQualityEvidence !== 'function') {
@@ -103,12 +104,14 @@ function evaluateCandidateQuality({
     candidate,
     profileCode,
     qualityOverride,
+    ...(minimumBitrateKbps ? { minimumBitrateKbps } : {}),
   });
 }
 
 function buildQualityEligibleCandidates({
   profileCode,
   qualityOverride,
+  minimumBitrateKbps,
   qualityPolicyService,
   scoredCandidates,
 }) {
@@ -129,6 +132,7 @@ function buildQualityEligibleCandidates({
       candidate: entry.candidate,
       profileCode,
       qualityOverride,
+      minimumBitrateKbps,
       qualityPolicyService,
     });
     return {
@@ -154,6 +158,7 @@ export function buildImportCandidateAutoSelectionEvaluation({
   policy = DEFAULT_SELECTION_READINESS_POLICY,
   profileCode = null,
   qualityOverride = null,
+  minimumBitrateKbps = null,
   qualityPolicyService = null,
 } = {}) {
   const candidateList = Array.isArray(candidates) ? candidates : [];
@@ -161,6 +166,7 @@ export function buildImportCandidateAutoSelectionEvaluation({
   const qualityGate = buildQualityEligibleCandidates({
     profileCode,
     qualityOverride,
+    minimumBitrateKbps,
     qualityPolicyService,
     scoredCandidates,
   });
@@ -197,6 +203,7 @@ export function createImportCandidateAutoSelectionService({
     actorUserId = null,
     profileCode = null,
     qualityOverride = null,
+    minimumBitrateKbps = null,
     requestMetadata = null,
     sourceSearchId,
   } = {}) {
@@ -229,6 +236,7 @@ export function createImportCandidateAutoSelectionService({
       policy,
       profileCode,
       qualityOverride,
+      minimumBitrateKbps,
       qualityPolicyService,
     });
     const readiness = evaluation.readiness;

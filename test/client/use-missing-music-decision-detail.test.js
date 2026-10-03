@@ -111,6 +111,17 @@ test('useMissingMusicDecisionDetail turns a scoped not-found response into an un
   app.unmount();
 });
 
+test('decision detail retains the bounded quality projection and server fallback permission', async (t) => {
+  const payload = createDetail();
+  payload.qualityEvidence = { code: 'below_minimum', profileCode: 'lossless_archive', formats: ['mp3'], bitrateKbps: 128 };
+  payload.permissions.canAllowFallbackQuality = true;
+  const { app, decisionDetail } = mountDecisionDetail({ decisionId: 'wanted-amber', fetchMissingMusicDecisionDetail: async () => payload });
+  t.after(() => app.unmount());
+  await decisionDetail.load();
+  assert.deepEqual(decisionDetail.detail.value.qualityEvidence, payload.qualityEvidence);
+  assert.equal(decisionDetail.detail.value.permissions.canAllowFallbackQuality, true);
+});
+
 function deferred() {
   let resolve;
   let reject;

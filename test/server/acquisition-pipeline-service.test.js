@@ -56,6 +56,8 @@ function createRelease({ matchId = 'candidate-1', status = 'pending' } = {}) {
   return {
     artistName: 'Forest Frank',
     discoveryRequest: {
+      searchMode: 'automatic',
+      requestStatus: 'cooldown',
       importReviewSummary: {
         matches: [{
           fileCount: 12,
@@ -634,11 +636,13 @@ test('allowMusicQueueReleaseFallbackQuality verifies release scope and records a
   assert.equal(result.action.code, 'allow_fallback_quality');
   assert.equal(result.action.discoveryRunId, 'run-1');
   assert.deepEqual(allowMusicQueueFallbackQuality.mock.calls[0].arguments, [{
+    appUserId: 'user-1',
     allowedAt: '2026-06-29T12:00:00.000Z',
     allowedByUserId: 'user-1',
     metadataReleaseId: 'release-1',
     priorQualityProfile: 'lossless_archive',
     reasonCode: 'operator_allowed_fallback_quality',
+    requestMetadata: { ipAddress: '127.0.0.1' },
     wantedReleaseId: 'wanted-1',
   }]);
   assert.equal(recordActivityEventFn.mock.calls[0].arguments[0].eventType, 'quality_fallback_allowed');
@@ -670,4 +674,20 @@ test('allowMusicQueueReleaseFallbackQuality rejects unverified lossless states b
     },
   );
   assert.equal(allowMusicQueueFallbackQuality.mock.callCount(), 0);
+});
+
+test('fallback accepts committed intent after dispatch failure and performs no repeated consent dispatch', async (t) => {
+  const startLibraryDiscoveryRun = t.mock.fn(async () => { throw new Error('Controlled fallback dispatch failure'); });
+  const allowMusicQueueFallbackQuality = t.mock.fn(async () => ({ discoveryRequest: { requestStatus: 'ready' }, overrideAlreadyAllowed: false }));
+  const service = createService({ allowMusicQueueFallbackQuality, startLibraryDiscoveryRun,
+    qualityPolicyService: fallbackBlockedQualityPolicyService, statusService: stoppedStatusService });
+  const result = await service.allowMusicQueueReleaseFallbackQuality({ appUserId: 'user-1', wantedReleaseId: 'wanted-1', includeRelease: false });
+  assert.equal(result.action.discoveryRunId, null);
+  assert.equal(result.action.overrideAlreadyAllowed, false);
+  assert.equal(startLibraryDiscoveryRun.mock.callCount(), 1);
+  const existing = createRelease();
+  existing.discoveryQualityOverride = { mode: 'allow_fallback_quality', wantedReleaseId: 'wanted-1' };
+  const repeated = createService({ release: existing, allowMusicQueueFallbackQuality: async () => ({ overrideAlreadyAllowed: true, restartAlreadyQueued: false }), startLibraryDiscoveryRun });
+  assert.equal((await repeated.allowMusicQueueReleaseFallbackQuality({ appUserId: 'user-1', wantedReleaseId: 'wanted-1', includeRelease: false })).action.overrideAlreadyAllowed, true);
+  assert.equal(startLibraryDiscoveryRun.mock.callCount(), 1);
 });

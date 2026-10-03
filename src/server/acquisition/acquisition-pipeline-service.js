@@ -19,10 +19,10 @@
 import { createApiError } from '../auth.js';
 import { createRuntimeReporter } from '../runtime-reporter.js';
 import { canRequestMusicQueueRediscovery, isMusicQueueRediscoveryInProgress } from './acquisition-rediscovery-policy.js';
+import { canAllowAcquisitionFallbackQuality, evaluateReleaseQualityEvidence, isAwaitingRediscoveryQualityEvidence, isScopedQualityFallbackOverride } from './acquisition-quality-evidence-policy.js';
 import { buildMusicQueueOperatorSelectionEvidence } from './acquisition-operator-selection-evidence.js';
 import {
   createAcquisitionQualityPolicyService,
-  QUALITY_DECISION_CODES,
 } from './acquisition-quality-policy-service.js';
 import { createAcquisitionPipelineStatusService } from './acquisition-pipeline-status-service.js';
 import { deriveImportCandidateAddRecoveryReasonCode } from '../import-candidates/import-candidate-add-blocker.js';
@@ -162,6 +162,7 @@ function buildSearchEvidence(release) {
     lastSearchAt: discoveryRequest.lastSearchAt ?? null,
     nextSearchAfter: discoveryRequest.nextSearchAfter ?? null,
     searchAttemptCount: discoveryRequest.searchAttemptCount ?? 0,
+    searchMode: discoveryRequest.searchMode ?? null,
     status: discoveryRequest.requestStatus ?? null,
   };
 }
@@ -175,16 +176,7 @@ function buildReleaseEvidence(release) {
 }
 
 function buildQualityEvidence(release, qualityPolicyService) {
-  const profileCode = release.evidence?.qualityProfile
-    ?? release.discoveryRequest?.evidence?.qualityProfile
-    ?? release.acquisitionProfile
-    ?? 'lossless_archive';
-  return qualityPolicyService.evaluateQualityEvidence({
-    candidate: release.discoveryRequest?.evidence?.bestCandidate ?? {},
-    mediaVerification: release.discoveryRequest?.evidence?.mediaVerification ?? {},
-    profileCode,
-    qualityOverride: release.discoveryRequest?.evidence?.musicQueueQualityOverride ?? null,
-  });
+  return evaluateReleaseQualityEvidence(release, qualityPolicyService);
 }
 
 export function projectMusicQueueRelease(
@@ -197,7 +189,9 @@ export function projectMusicQueueRelease(
   const quality = buildQualityEvidence(release, qualityPolicyService);
   const evidence = {
     add: buildAddEvidence(release),
-    match: buildMatchEvidence(release),
+    match: isAwaitingRediscoveryQualityEvidence(release)
+      && !['selected', 'held', 'downloading', 'import_pending', 'applied'].some((status) => getCount(release.discoveryRequest?.importReviewSummary?.statusCounts?.[status]) > 0)
+      ? {} : buildMatchEvidence(release),
     operatorSelection: buildMusicQueueOperatorSelectionEvidence(release),
     quality,
     release: buildReleaseEvidence(release),
@@ -438,6 +432,7 @@ export function createAcquisitionPipelineService({
   async function allowMusicQueueReleaseFallbackQuality({
     appUserId,
     actorUserId = null,
+    includeRelease = true,
     requestMetadata = null,
     wantedReleaseId,
   } = {}) {
@@ -456,11 +451,9 @@ export function createAcquisitionPipelineService({
     }
 
     const projectedRelease = projectMusicQueueRelease(release, { qualityPolicyService, statusService });
-    if (projectedRelease.status?.code !== 'quality_choice_needed') {
-      throw createApiError(409, 'music_queue_fallback_not_available', 'This release is not waiting for a quality choice');
-    }
-    if (projectedRelease.quality?.code !== QUALITY_DECISION_CODES.BELOW_MINIMUM) {
-      throw createApiError(409, 'music_queue_fallback_not_available', 'Fallback quality can only be allowed when matches are below the selected preference');
+    if (!isScopedQualityFallbackOverride(release.discoveryQualityOverride, scopedWantedReleaseId)
+      && !canAllowAcquisitionFallbackQuality(projectedRelease)) {
+      throw createApiError(409, 'music_queue_fallback_not_available', 'This release is not waiting for an eligible fallback quality choice');
     }
 
     const metadataReleaseId = normalizeString(release.metadataReleaseId);
@@ -470,19 +463,24 @@ export function createAcquisitionPipelineService({
 
     const allowedAt = getNow().toISOString();
     const profileCode = projectedRelease.quality?.profile?.code ?? 'lossless_archive';
-    const override = await allowMusicQueueFallbackQuality({
+    const saved = await allowMusicQueueFallbackQuality({
+      appUserId: scopedAppUserId,
       allowedAt,
       allowedByUserId: actorUserId,
       metadataReleaseId,
       priorQualityProfile: profileCode,
       reasonCode: 'operator_allowed_fallback_quality',
+      requestMetadata,
       wantedReleaseId: scopedWantedReleaseId,
     });
-    if (!override) {
+    if (!saved) {
       throw createApiError(409, 'music_queue_fallback_not_available', 'Fallback quality could not be saved for this release');
     }
 
-    if (typeof recordActivityEventFn === 'function') {
+    const overrideAlreadyAllowed = saved.overrideAlreadyAllowed === true;
+    const restartAlreadyQueued = saved.restartAlreadyQueued === true;
+    const override = saved.discoveryRequest ?? saved;
+    if (!overrideAlreadyAllowed && typeof recordActivityEventFn === 'function') {
       try {
         Promise.resolve(recordActivityEventFn({
           actorUserId,
@@ -503,26 +501,33 @@ export function createAcquisitionPipelineService({
       }
     }
 
-    const { dispatchAlreadyActive, run } = await startDiscoveryRunIfAvailable({
-      actorUserId,
-      requestMetadata,
-      triggerSource: 'music_queue_quality_fallback',
-    });
+    let dispatchAlreadyActive = false;
+    let run = null;
+    if (!overrideAlreadyAllowed && !restartAlreadyQueued) {
+      try {
+        ({ dispatchAlreadyActive, run } = await startDiscoveryRunIfAvailable({ actorUserId, requestMetadata,
+          triggerSource: 'music_queue_quality_fallback' }));
+      } catch (error) {
+        createRuntimeReporter({ prefix: 'harmoniarr' }).writeError(error, { label: 'fallback discovery dispatch deferred' });
+      }
+    }
 
-    const refreshed = await getMusicQueueRelease({
+    const refreshed = includeRelease ? await getMusicQueueRelease({
       appUserId: scopedAppUserId,
       wantedReleaseId: scopedWantedReleaseId,
-    });
+    }) : null;
 
     return {
       action: {
         code: 'allow_fallback_quality',
         dispatchAlreadyActive,
         discoveryRunId: run?.id ?? null,
+        overrideAlreadyAllowed,
+        restartAlreadyQueued,
         wantedReleaseId: scopedWantedReleaseId,
       },
       override,
-      release: refreshed.release,
+      ...(refreshed ? { release: refreshed.release } : {}),
       run,
     };
   }

@@ -32,7 +32,7 @@ export function buildFormatSearchTerm(preferredFormat) {
   return FORMAT_SEARCH_TERMS[preferredFormat] ?? null;
 }
 
-export function isQualityAboveMinimum({ minimumQuality, extension, bitRateKbps }) {
+export function isQualityAboveMinimum({ minimumQuality, minimumBitrateKbps = 320, extension, bitRateKbps }) {
   if (!minimumQuality || minimumQuality === 'any') {
     return true;
   }
@@ -48,7 +48,7 @@ export function isQualityAboveMinimum({ minimumQuality, extension, bitRateKbps }
       return true;
     }
     const bitrate = typeof bitRateKbps === 'number' ? bitRateKbps : 0;
-    return bitrate >= 320;
+    return bitrate >= minimumBitrateKbps;
   }
 
   return true;
@@ -57,6 +57,7 @@ export function isQualityAboveMinimum({ minimumQuality, extension, bitRateKbps }
 export function scoreCandidateFormatMatch({
   preferredFormat,
   minimumQuality,
+  minimumBitrateKbps = 320,
   extensions = [],
   files = [],
 }) {
@@ -73,12 +74,13 @@ export function scoreCandidateFormatMatch({
   );
 
   const meetsMinimum = files.length === 0
-    ? normalizedExtensions.some((ext) => isQualityAboveMinimum({ extension: ext, minimumQuality, bitRateKbps: null }))
+    ? normalizedExtensions.some((ext) => isQualityAboveMinimum({ extension: ext, minimumQuality, minimumBitrateKbps, bitRateKbps: null }))
     : files.some((file) =>
       isQualityAboveMinimum({
         bitRateKbps: file.bitRateKbps ?? null,
         extension: file.extension ?? null,
         minimumQuality,
+        minimumBitrateKbps,
       }),
     );
 

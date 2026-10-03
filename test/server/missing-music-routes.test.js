@@ -20,6 +20,7 @@ function createMissingMusicRouteTestApp(overrides = {}) {
         wantedReleaseId: 'wanted-amber',
       }),
       selectMissingMusicDecisionMatch: async () => ({ action: {} }),
+      allowMissingMusicDecisionFallbackQuality: async () => ({ action: {} }),
       searchMissingMusicDecisionAgain: async () => ({ action: {} }),
       startMissingMusicDecisionDownload: async () => ({ action: {} }),
       limitMissingMusicDecisionRead: (_request, _response, next) => next(),
@@ -66,6 +67,37 @@ test('Missing Music Search again uses fresh authenticated CSRF and a decision-on
     assert.equal(requireFreshSession.mock.callCount(), 1);
     assert.equal(requireCsrf.mock.callCount(), 1);
   });
+});
+
+test('Missing Music fallback requires fresh authenticated CSRF, accepts no user authority and persists a decision-only replay contract', async (t) => {
+  const allowMissingMusicDecisionFallbackQuality = t.mock.fn(async () => ({ action: { code: 'allow_fallback_quality' } }));
+  const requireCsrf = t.mock.fn();
+  const executeIdempotentMutation = t.mock.fn(async ({ executeMutation }) => executeMutation());
+  const app = createMissingMusicRouteTestApp({ allowMissingMusicDecisionFallbackQuality, requireCsrf, executeIdempotentMutation,
+    requireFreshSession: async () => ({ appUserId: 'admin', user: { role: 'admin', username: 'admin' } }), getRequestMetadata: () => null });
+  await withServer(app, async (baseUrl) => {
+    const request = (body) => fetch(`${baseUrl}/api/v1/missing-music/decisions/wanted/allow-fallback-quality`, {
+      method: 'POST', headers: { 'content-type': 'application/json', 'idempotency-key': 'quality-choice' }, body: JSON.stringify(body) });
+    assert.equal((await request({ targetUserId: 'untrusted', minimumBitrateKbps: 128 })).status, 400);
+    assert.equal(allowMissingMusicDecisionFallbackQuality.mock.callCount(), 0);
+    assert.equal((await request({})).status, 200);
+    const options = executeIdempotentMutation.mock.calls[0].arguments[0];
+    assert.equal(options.operationScope, 'missing-music.decisions.allow-fallback-quality');
+    assert.deepEqual(options.requestPayload, { decisionId: 'wanted' });
+    assert.equal(allowMissingMusicDecisionFallbackQuality.mock.calls[0].arguments[0].actorUser.id, 'admin');
+    assert.equal(requireCsrf.mock.callCount(), 2);
+  });
+});
+
+test('Missing Music fallback rejects stale session or failed CSRF before executing a choice', async (t) => {
+  for (const overrides of [{ requireFreshSession: async () => { throw createApiError(401, 'reauth_required', 'Sign in again'); } },
+    { requireFreshSession: async () => ({ appUserId: 'requester', user: { role: 'requester' } }), requireCsrf: () => { throw createApiError(403, 'csrf_invalid', 'Invalid token'); } }]) {
+    const allowMissingMusicDecisionFallbackQuality = t.mock.fn(async () => ({}));
+    await withServer(createMissingMusicRouteTestApp({ allowMissingMusicDecisionFallbackQuality, ...overrides }), async (baseUrl) => {
+      assert.ok([401, 403].includes((await fetch(`${baseUrl}/api/v1/missing-music/decisions/wanted/allow-fallback-quality`, { method: 'POST' })).status));
+      assert.equal(allowMissingMusicDecisionFallbackQuality.mock.callCount(), 0);
+    });
+  }
 });
 
 test('Missing Music Search again refuses stale sessions and missing CSRF before command execution', async (t) => {

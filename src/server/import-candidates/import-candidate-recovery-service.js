@@ -26,6 +26,7 @@ import {
   normalizeImportCandidateAddBlockerCode,
 } from './import-candidate-add-blocker.js';
 import { TERMINAL_MATCH_OUTCOME_CODES } from './import-candidate-terminal-recovery-policy.js';
+import { canRetainRecoveryQualityContext, requiresRecoveryQualityContextGuard } from './import-candidate-recovery-quality-policy.js';
 
 export const MAX_CANDIDATE_DOWNLOAD_ATTEMPTS = 3;
 export const RETRY_REJECTED_TRANSFER_DELAY_MS = 10 * 60 * 1000;
@@ -50,6 +51,9 @@ function normalizeMusicQueueContext(candidate, {
   return {
     profileCode: resolvedProfileCode,
     qualityOverride: resolvedQualityOverride,
+    ...(typeof candidateContext.minimumBitrateKbps === 'number' && Number.isFinite(candidateContext.minimumBitrateKbps)
+      && candidateContext.minimumBitrateKbps >= 256 && candidateContext.minimumBitrateKbps <= 10_000
+      ? { minimumBitrateKbps: candidateContext.minimumBitrateKbps } : {}),
   };
 }
 
@@ -232,11 +236,23 @@ export function createImportCandidateRecoveryService({
         break;
       }
 
+      if (!canRetainRecoveryQualityContext({ candidate, failedCandidate, requiredContext: musicQueueContext })) {
+        skippedCandidates.push(buildSkippedRecoveryCandidate(candidate, {
+          quality: null,
+          reason: 'recovery_quality_context_incompatible',
+        }));
+        excludedCandidateIds.push(candidate.id);
+        continue;
+      }
+
+      const candidateQualityContext = requiresRecoveryQualityContextGuard(musicQueueContext)
+        ? normalizeMusicQueueContext(candidate, { profileCode: candidate.normalizedPayload?.musicQueue?.profileCode ?? musicQueueContext.profileCode }) : musicQueueContext;
       const quality = typeof qualityPolicyService?.evaluateQualityEvidence === 'function'
         ? qualityPolicyService.evaluateQualityEvidence({
           candidate,
-          profileCode: musicQueueContext.profileCode ?? undefined,
-          qualityOverride: musicQueueContext.qualityOverride,
+          profileCode: candidateQualityContext.profileCode ?? undefined,
+          qualityOverride: candidateQualityContext.qualityOverride,
+          ...(candidateQualityContext.minimumBitrateKbps ? { minimumBitrateKbps: candidateQualityContext.minimumBitrateKbps } : {}),
         })
         : null;
       const qualitySkippedReason = resolveQualitySkippedReason(quality);
@@ -291,6 +307,8 @@ export function createImportCandidateRecoveryService({
       maxDownloadAttemptCount: maxCandidateDownloadAttempts,
       reason: failureReason,
       triggeredByFailedCandidateId: failedCandidateId,
+      ...(requiresRecoveryQualityContextGuard(musicQueueContext)
+        ? { expectedMusicQueueContext: nextCandidate.normalizedPayload?.musicQueue ?? null } : {}),
     });
 
     if (!promotedCandidate) {

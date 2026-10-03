@@ -121,3 +121,21 @@ export function searchMissingMusicDecisionAgain({ decisionId, idempotencyKey = n
     },
   );
 }
+
+export function allowMissingMusicDecisionFallbackQuality({ decisionId, idempotencyKey = null } = {}) {
+  const normalizedDecisionId = typeof decisionId === 'string' ? decisionId.trim() : '';
+  if (!normalizedDecisionId) {
+    throw new TypeError('allowMissingMusicDecisionFallbackQuality requires a decisionId');
+  }
+  return apiRequest(
+    `/api/v1/missing-music/decisions/${encodeURIComponent(normalizedDecisionId)}/allow-fallback-quality`,
+    {
+      body: {},
+      headers: idempotencyKey
+        ? { 'Idempotency-Key': idempotencyKey }
+        : createControlPlaneIdempotencyHeaders('missing-music.decisions.allow-fallback-quality'),
+      includeCsrf: true,
+      method: 'POST',
+    },
+  );
+}

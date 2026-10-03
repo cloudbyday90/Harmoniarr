@@ -25,7 +25,9 @@ import { useMissingMusicDecisionDetail } from '../../composables/useMissingMusic
 import { useMissingMusicDownloadStart } from '../../composables/useMissingMusicDownloadStart.js';
 import { useMissingMusicMatchSelection } from '../../composables/useMissingMusicMatchSelection.js';
 import { useMissingMusicSearchAgain } from '../../composables/useMissingMusicSearchAgain.js';
+import { useMissingMusicQualityFallback } from '../../composables/useMissingMusicQualityFallback.js';
 import { createMissingMusicReleaseMutationGate } from '../../lib/missing-music-release-mutation-gate.js';
+import MissingMusicQualityEvidence from './MissingMusicQualityEvidence.vue';
 
 const props = defineProps({
   decisionId: {
@@ -46,8 +48,9 @@ const mutationOptions = { decisionId: currentDecisionId, mutationGate, retryInte
 const matchSelection = useMissingMusicMatchSelection(mutationOptions);
 const downloadStart = useMissingMusicDownloadStart(mutationOptions);
 const searchAgain = useMissingMusicSearchAgain(mutationOptions);
+const qualityFallback = useMissingMusicQualityFallback(mutationOptions);
 const mutationBusy = computed(() => matchSelection.isPending.value
-  || downloadStart.isStarting.value || searchAgain.isPending.value);
+  || downloadStart.isStarting.value || searchAgain.isPending.value || qualityFallback.isPending.value);
 const decisionDetail = useMissingMusicDecisionDetail({
   decisionId: currentDecisionId,
 });
@@ -98,6 +101,10 @@ function selectMatch(matchId) {
 
 function queueSearchAgain() {
   return completeUserCommand((decisionId) => searchAgain.searchAgain({ decisionId }));
+}
+
+function allowFallbackQuality() {
+  return completeUserCommand((decisionId) => qualityFallback.allowFallbackQuality({ decisionId }));
 }
 
 function openDownloadConfirmation() {
@@ -176,10 +183,10 @@ defineExpose({ busy, refresh: decisionDetail.refresh });
         <p>{{ presentation.statusMessage }}</p>
         <p class="missing-music-inspector__next-step"><strong>Next step:</strong> {{ presentation.nextStep }}</p>
         <div v-if="presentation.canSearchAgain" class="missing-music-inspector__start-download">
-          <button type="button" class="hx-btn" data-variant="primary" :disabled="mutationBusy" @click="queueSearchAgain">
+          <button type="button" class="hx-btn" :data-variant="presentation.canAllowFallbackQuality ? undefined : 'primary'" :disabled="mutationBusy" @click="queueSearchAgain">
             {{ searchAgain.isPending.value ? 'Queueing…' : 'Search again' }}
           </button>
-          <p>Queue a new search for this release using its saved automation policy.</p>
+          <p>Queue a new search for this release using its saved automation policy.<template v-if="presentation.canAllowFallbackQuality"> This keeps the current quality choice.</template></p>
         </div>
         <p v-if="searchAgain.statusMessage.value" class="missing-music-inspector__selection-feedback" role="status" aria-atomic="true">
           {{ searchAgain.statusMessage.value }}
@@ -253,6 +260,15 @@ defineExpose({ busy, refresh: decisionDetail.refresh });
       <p v-if="presentation.isReadOnly" class="missing-music-inspector__account-note">
         {{ presentation.accountNote }}
       </p>
+
+      <MissingMusicQualityEvidence
+        :detail="decisionDetail.detail.value"
+        :busy="mutationBusy"
+        :pending="qualityFallback.isPending.value"
+        :status-message="qualityFallback.statusMessage.value"
+        :error-message="qualityFallback.errorMessage.value"
+        @allow-fallback-quality="allowFallbackQuality"
+      />
 
       <section
         v-if="matchChoicePresentation.choices.length"

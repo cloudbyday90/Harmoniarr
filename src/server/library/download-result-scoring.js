@@ -25,7 +25,7 @@ import {
 const LOSSLESS_EXTENSIONS = new Set(['flac', 'wav', 'aiff', 'alac', 'ape', 'wv']);
 const LOSSY_EXTENSIONS = new Set(['mp3', 'aac', 'ogg', 'opus', 'wma', 'm4a']);
 
-export function scoreFormatTier({ preferredFormat, minimumQuality, extensions = [], files = [] }) {
+export function scoreFormatTier({ preferredFormat, minimumQuality, minimumBitrateKbps = 320, extensions = [], files = [] }) {
   if (!Array.isArray(extensions) || extensions.length === 0) {
     return { name: 'formatTier', score: 0 };
   }
@@ -59,7 +59,7 @@ export function scoreFormatTier({ preferredFormat, minimumQuality, extensions = 
   if (minimumQuality === 'high') {
     if (losslessCount > 0) return { name: 'formatTier', score: 100 };
     const hasHighBitrate = files.some(
-      (f) => LOSSY_EXTENSIONS.has(typeof f.extension === 'string' ? f.extension.toLowerCase() : '') && (f.bitRateKbps ?? 0) >= 320,
+      (f) => LOSSY_EXTENSIONS.has(typeof f.extension === 'string' ? f.extension.toLowerCase() : '') && (f.bitRateKbps ?? 0) >= minimumBitrateKbps,
     );
     if (hasHighBitrate) return { name: 'formatTier', score: 80 };
     if (lossyCount > 0) return { name: 'formatTier', score: 50 };
@@ -305,6 +305,7 @@ export function scoreDownloadResult({
     ? {
       preferredFormat: formatPreferences.preferredFormat,
       minimumQuality: formatPreferences.minimumQuality,
+      minimumBitrateKbps: formatPreferences.minimumBitrateKbps,
       extensions,
       files,
     }

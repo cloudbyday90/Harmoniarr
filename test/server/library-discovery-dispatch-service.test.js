@@ -2,8 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   buildDiscoverySearchQuery,
-  createLibraryDiscoveryDispatchService,
+  createLibraryDiscoveryDispatchService as buildLibraryDiscoveryDispatchService,
 } from '../../src/server/library/library-discovery-dispatch-service.js';
+
+function createLibraryDiscoveryDispatchService(options = {}) {
+  return buildLibraryDiscoveryDispatchService({ loadSettingsFn: async () => ({}), ...options });
+}
 
 test('buildDiscoverySearchQuery uses canonical artist, release title, and year', () => {
   assert.equal(buildDiscoverySearchQuery({
@@ -248,7 +252,7 @@ test('dispatchReadyDiscoveryRequests carries the claimed wanted release into aut
   });
 });
 
-test('dispatchReadyDiscoveryRequests shares one conservative discovery search across linked operator releases', async (t) => {
+test('dispatchReadyDiscoveryRequests honors scoped consent when every lossless requirement permits fallback', async (t) => {
   const claimedRequests = [{
     artistName: 'Autechre',
     evidence: {},
@@ -302,23 +306,24 @@ test('dispatchReadyDiscoveryRequests shares one conservative discovery search ac
   await service.dispatchReadyDiscoveryRequests();
 
   assert.deepEqual(startSearch.mock.calls[0].arguments[0], {
-    query: 'Autechre Confield 2001 FLAC',
+    query: 'Autechre Confield 2001',
   });
   assert.equal(getUserPreferencesFn.mock.callCount(), 2);
   assert.deepEqual(ingestSlskdSearchResponses.mock.calls[0].arguments[0].formatPreferences, {
-    minimumQuality: 'lossless',
-    preferredFormat: 'flac',
+    minimumQuality: 'high',
+    preferredFormat: 'any',
+    minimumBitrateKbps: 256,
   });
   assert.deepEqual(ingestSlskdSearchResponses.mock.calls[0].arguments[0].musicQueueContext, {
     profileCode: 'lossless_archive',
-    qualityOverride: null,
+    qualityOverride: { mode: 'allow_fallback_quality', wantedReleaseId: 'wanted-lossless' },
     wantedReleaseId: 'wanted-any',
     wantedReleaseIds: ['wanted-any', 'wanted-lossless'],
   });
   assert.deepEqual(selectHighConfidenceCandidate.mock.calls[0].arguments[0], {
     actorUserId: null,
     profileCode: 'lossless_archive',
-    qualityOverride: null,
+    qualityOverride: { mode: 'allow_fallback_quality', wantedReleaseId: 'wanted-lossless' },
     requestMetadata: null,
     sourceSearchId: 'search-1',
   });

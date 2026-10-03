@@ -1,6 +1,76 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createImportCandidateRecoveryService } from '../../src/server/import-candidates/import-candidate-recovery-service.js';
+import { createAcquisitionQualityPolicyService } from '../../src/server/acquisition/acquisition-quality-policy-service.js';
+import { buildStageCandidateBase } from '../../src/server/import-candidates/import-candidate-stage-summary.js';
+import { createImportCandidateSafeAutoAddQualityGateService } from '../../src/server/import-candidates/import-candidate-safe-auto-add-quality-gate.js';
+
+test('recovery skips older weaker or differently scoped context and retains the effective floor through staging and measured add', async (t) => {
+  const context = { profileCode: 'high_quality', minimumBitrateKbps: 320, wantedReleaseId: 'wanted' };
+  const failed = { id: 'failed', sourceSearchId: 'new-search', normalizedPayload: {
+    musicQueue: context, discoveryScope: { metadataReleaseId: 'release' },
+  } };
+  const candidates = [
+    { id: 'older', normalizedPayload: { extensions: ['mp3'], bitrateKbps: 320, musicQueue: { profileCode: 'high_quality', wantedReleaseId: 'wanted' } } },
+    { id: 'other-target', normalizedPayload: { extensions: ['mp3'], bitrateKbps: 320, musicQueue: { ...context, wantedReleaseId: 'other' } } },
+    { id: 'current', normalizedPayload: { extensions: ['mp3'], bitrateKbps: 320, musicQueue: context } },
+  ];
+  const promote = t.mock.fn(async ({ importCandidateId }) => candidates.find((candidate) => candidate.id === importCandidateId));
+  const service = createImportCandidateRecoveryService({ getImportCandidate: async () => failed,
+    incrementImportCandidateDownloadAttemptCountFn: async () => failed,
+    findNextCandidateForRecoveryFn: async ({ excludeCandidateIds = [] }) => candidates.find((candidate) => !excludeCandidateIds.includes(candidate.id)) ?? null,
+    promoteImportCandidateForRecoveryFn: promote, qualityPolicyService: createAcquisitionQualityPolicyService() });
+  const result = await service.handleImportCandidateDownloadFailure({ failedCandidateId: 'failed' });
+  assert.equal(result.nextCandidateId, 'current');
+  assert.equal(result.skippedCandidateCount, 2);
+  assert.ok(result.skippedCandidates.every((candidate) => candidate.reason === 'recovery_quality_context_incompatible'));
+  assert.deepEqual(promote.mock.calls[0].arguments[0].expectedMusicQueueContext, context);
+  const staged = buildStageCandidateBase(candidates[2]);
+  assert.equal(staged.musicQueueContext.minimumBitrateKbps, 320);
+  const gate = createImportCandidateSafeAutoAddQualityGateService();
+  const measured = await gate.evaluateSafeAutoAddQuality({ summaryCandidate: staged, applyPreview: { files: [{
+    filename: 'Track.mp3', status: { code: 'ready' }, inspection: { metadata: {
+      primaryAudioCodec: 'mp3', containerFormatName: 'mp3', bitRate: 256000,
+    }, warnings: [] },
+  }] } });
+  assert.equal(measured.eligible, false);
+  assert.equal(measured.checkedFileCount, 1);
+});
+
+test('recovery never grafts saved fallback consent onto an older candidate for another recipient', async (t) => {
+  const context = { profileCode: 'lossless_archive', wantedReleaseId: 'wanted',
+    qualityOverride: { mode: 'allow_fallback_quality', wantedReleaseId: 'wanted' } };
+  const failed = { id: 'failed', sourceSearchId: 'search', normalizedPayload: { musicQueue: context } };
+  const older = { id: 'older', normalizedPayload: { extensions: ['mp3'], bitrateKbps: 320, musicQueue: {
+    ...context, wantedReleaseId: 'other', qualityOverride: { mode: 'allow_fallback_quality', wantedReleaseId: 'other' },
+  } } };
+  const promote = t.mock.fn(async () => older);
+  const service = createImportCandidateRecoveryService({ getImportCandidate: async () => failed,
+    incrementImportCandidateDownloadAttemptCountFn: async () => failed,
+    findNextCandidateForRecoveryFn: async ({ excludeCandidateIds = [] }) => excludeCandidateIds.includes('older') ? null : older,
+    promoteImportCandidateForRecoveryFn: promote, qualityPolicyService: createAcquisitionQualityPolicyService() });
+  const result = await service.handleImportCandidateDownloadFailure({ failedCandidateId: 'failed' });
+  assert.equal(result.recovered, false);
+  assert.equal(promote.mock.callCount(), 0);
+  assert.equal(older.normalizedPayload.musicQueue.qualityOverride.wantedReleaseId, 'other');
+});
+
+test('intrinsic High floor cannot recover into an older Any available policy', async (t) => {
+  const failed = { id: 'failed', sourceSearchId: 'search', normalizedPayload: {
+    musicQueue: { profileCode: 'high_quality', wantedReleaseId: 'wanted' },
+  } };
+  const older = { id: 'older', normalizedPayload: { extensions: ['mp3'], bitrateKbps: 320,
+    musicQueue: { profileCode: 'any_available', wantedReleaseId: 'wanted' } } };
+  const promote = t.mock.fn(async () => older);
+  const service = createImportCandidateRecoveryService({ getImportCandidate: async () => failed,
+    incrementImportCandidateDownloadAttemptCountFn: async () => failed,
+    findNextCandidateForRecoveryFn: async ({ excludeCandidateIds = [] }) => excludeCandidateIds.includes('older') ? null : older,
+    promoteImportCandidateForRecoveryFn: promote, qualityPolicyService: createAcquisitionQualityPolicyService() });
+  const result = await service.handleImportCandidateDownloadFailure({ failedCandidateId: 'failed' });
+  assert.equal(result.recovered, false);
+  assert.equal(promote.mock.callCount(), 0);
+  assert.equal(result.skippedCandidates[0].reason, 'recovery_quality_context_incompatible');
+});
 
 test('import candidate recovery promotes the next scoped candidate and records a follow-up run when requested', async (t) => {
   const incrementImportCandidateDownloadAttemptCountFn = t.mock.fn(async () => ({
@@ -57,6 +127,7 @@ test('import candidate recovery promotes the next scoped candidate and records a
     maxDownloadAttemptCount: 3,
     reason: 'Download enqueue failed.',
     triggeredByFailedCandidateId: 'failed-candidate',
+    expectedMusicQueueContext: null,
   });
   assert.equal(createRecoveryExecutionRun.mock.callCount(), 1);
   assert.equal(createRecoveryExecutionRun.mock.calls[0].arguments[0].requestedCandidateCount, 1);
@@ -150,6 +221,7 @@ test('import candidate recovery skips below-profile matches before promoting nex
     maxDownloadAttemptCount: 3,
     reason: 'Download enqueue failed.',
     triggeredByFailedCandidateId: 'failed-candidate',
+    expectedMusicQueueContext: null,
   });
   assert.equal(result.recovered, true);
   assert.equal(result.nextCandidateId, 'candidate-flac');

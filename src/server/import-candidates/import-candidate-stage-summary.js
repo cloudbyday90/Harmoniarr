@@ -78,6 +78,8 @@ function buildMusicQueueContext(candidate) {
 
   return {
     profileCode,
+    ...(typeof context.minimumBitrateKbps === 'number' && Number.isFinite(context.minimumBitrateKbps)
+      && context.minimumBitrateKbps >= 256 && context.minimumBitrateKbps <= 10_000 ? { minimumBitrateKbps: context.minimumBitrateKbps } : {}),
     ...(qualityOverride ? { qualityOverride } : {}),
     ...(wantedReleaseIds[0] ? { wantedReleaseId: wantedReleaseIds[0] } : {}),
     ...(wantedReleaseIds.length > 1 ? { wantedReleaseIds } : {}),

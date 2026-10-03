@@ -582,7 +582,7 @@ export function createApp({
   });
   const controlPlaneIdempotencyService = createControlPlaneIdempotencyService();
   const acquisitionModule = buildAcquisitionModule({
-    allowMusicQueueFallbackQuality: libraryModule.libraryDiscoveryRequestStore?.allowMusicQueueFallbackQuality,
+    allowMusicQueueFallbackQuality: libraryModule.libraryFallbackQualityService.allowGuardedMusicQueueFallbackQuality,
     buildLibraryWantedReleases: libraryModule.routeDependencies.buildLibraryWantedReleases,
     executeIdempotentMutation: controlPlaneIdempotencyService.executeIdempotentMutation,
     listWantedReleasesWithMetadata: libraryModule.libraryWantedReleaseStore.listWantedReleasesWithMetadata,
@@ -601,6 +601,7 @@ export function createApp({
     startLibraryDiscoveryRun: libraryModule.routeDependencies.startLibraryDiscoveryRun,
   });
   const missingMusicModule = buildMissingMusicModule({
+    allowMusicQueueReleaseFallbackQuality: acquisitionModule.acquisitionPipelineService.allowMusicQueueReleaseFallbackQuality,
     executeIdempotentMutation: controlPlaneIdempotencyService.executeIdempotentMutation,
     listAppUsers: appUserModule.appUserService.listAppUsers,
     listWantedReleaseIdentityPage: libraryModule.libraryWantedReleaseStore.listWantedReleaseIdentityPage,

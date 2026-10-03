@@ -17,6 +17,7 @@
  */
 
 import { createRequestAuthDependencies } from '../auth-module.js';
+import { createApiError } from '../auth.js';
 import { asyncRoute, sanitizePageLimit, sanitizePageOffset } from '../http.js';
 import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
 
@@ -36,6 +37,7 @@ function buildActorUser(session) {
 }
 
 export function registerMissingMusicRoutes(app, {
+  allowMissingMusicDecisionFallbackQuality,
   executeIdempotentMutation = async ({ executeMutation }) => executeMutation(),
   getMissingMusicDecisionDetail,
   getMissingMusicDownloaderHandoff,
@@ -174,6 +176,22 @@ export function registerMissingMusicRoutes(app, {
       ok: true,
       ...(result?.body ?? {}),
     });
+  }));
+
+  app.post('/api/v1/missing-music/decisions/:decisionId/allow-fallback-quality', limitMissingMusicDecisionMutation, asyncRoute(async (request, response) => {
+    const session = await requireFreshSession(request);
+    requireCsrf(request, session);
+    if (request.body != null && (typeof request.body !== 'object' || Array.isArray(request.body) || Object.keys(request.body).length > 0)) {
+      throw createApiError(400, 'validation_error', 'This quality choice does not accept additional fields');
+    }
+    const actorUser = buildActorUser(session);
+    const result = await executeIdempotentMutation({ actorUserId: actorUser.id,
+      executeMutation: async () => ({ body: await allowMissingMusicDecisionFallbackQuality({ actorUser,
+        decisionId: request.params.decisionId, requestMetadata: getRequestMetadata(request) }), statusCode: 200 }),
+      idempotencyKey: request.headers['idempotency-key'], operationScope: 'missing-music.decisions.allow-fallback-quality',
+      requestPayload: { decisionId: request.params.decisionId },
+    });
+    response.status(result?.statusCode ?? 200).json({ ok: true, ...(result?.body ?? {}) });
   }));
 
   app.post('/api/v1/missing-music/decisions/:decisionId/search-again', limitMissingMusicDecisionMutation, asyncRoute(async (request, response) => {

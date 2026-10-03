@@ -8,31 +8,43 @@ Database model source: `docs/DATABASE_MODEL.md`
 
 ## Current development slice (2026-10-03)
 
-- Missing Music now completes Search again for existing stopped retry states
-  through a target-safe canonical command. Inspector background revalidation,
-  page Refresh, competing-command gating, and uncertain retry keys are covered
-  by focused tests. See the [design](MISSING_MUSIC_SEARCH_AGAIN_DESIGN.md) and
-  [outcome](MISSING_MUSIC_SEARCH_AGAIN_OUTCOME.md) for the architecture,
-  recommendation stack, evidence, and remaining scope.
-- A new [canonical-actions skill](../.agents/skills/harmoniarr-canonical-actions/SKILL.md)
-  carries ownership, durable command, refresh, and validation boundaries into
-  the next workflow slice. Its [design](CANONICAL_ACTION_SKILL_DESIGN.md) and
-  [outcome](CANONICAL_ACTION_SKILL_OUTCOME.md) separate intent from evaluation.
-- Randomly selected [PR #23](https://github.com/cloudbyday90/Harmoniarr/pull/23)
-  was executed locally and compared against the already newer production pin;
-  no downgrade or merge occurred. See the [replay outcome](RANDOM_PR_23_LOCAL_REPLAY_OUTCOME.md).
-- The current security gate identified new development-dependency advisories.
-  Three compatible package changes now produce zero reported vulnerabilities;
-  see the [October dependency design](DEPENDENCY_SECURITY_UPDATE_2026_10_DESIGN.md)
-  and [outcome](DEPENDENCY_SECURITY_UPDATE_2026_10_OUTCOME.md).
-- Next: canonical quality-choice/fallback, starting with guarded target-owned
-  persistence and bounded quality evidence. The retained shared-discovery
-  fallback store needs eligibility/link checks before exposing that action.
+- Missing Music now completes target-owned quality fallback with bounded current
+  evidence, a guarded audited command, durable replay, and truthful inspector
+  feedback. Shared discovery preserves recipient consent and saved numeric
+  minimums through actual selection, recovery, and measured media. See the
+  [design](MISSING_MUSIC_QUALITY_FALLBACK_DESIGN.md) and
+  [outcome](MISSING_MUSIC_QUALITY_FALLBACK_OUTCOME.md) for the architecture,
+  research, tradeoffs, recommended stack, and evidence limits.
+- The new [scoped-overrides skill](../.agents/skills/harmoniarr-scoped-overrides/SKILL.md)
+  is installed locally and independently evaluated. Its
+  [design](SCOPED_POLICY_OVERRIDES_SKILL_DESIGN.md) and
+  [outcome](SCOPED_POLICY_OVERRIDES_SKILL_OUTCOME.md) document the capability
+  and evaluation. Use it with the existing canonical-actions skill.
+- Randomly selected [PR #40](https://github.com/cloudbyday90/Harmoniarr/pull/40)
+  was implemented and tested locally, alongside previous/current LTS controls.
+  All three fixture executions and both semantic comparisons passed; the
+  maintained pin is the compatible Node 24.21 LTS successor. See the separate
+  [replay outcome](RANDOM_PR_40_LOCAL_REPLAY_OUTCOME.md).
+- The application Dockerfile and `.nvmrc` now select Node 24.21 LTS. Actual
+  packaged fresh-install/restart, native Sharp, PostgreSQL, backup/restore,
+  quality-media controls, and strict cleanup passed. See the
+  [runtime outcome](NODE_RUNTIME_PATCH_2026_10_OUTCOME.md).
+- Next: canonical **Find matches** for initial search eligibility, owned durable
+  command handling, queued-work coalescing, and inspector refresh. The worklist
+  already advertises this action; active work must remain protected.
 - This is development on main; no release or published-artifact acceptance is
   claimed. Earlier dated validation entries below retain their original scope.
-- Final `npm run validate` passed 8,623 tests with zero failures or skips,
-  all policy/lint checks, and both builds. The six targeted browser scenarios
-  and the dependency-security gate also passed.
+- Complete `npm run validate` passed 8,656 tests before final review corrections.
+  Final-source server/client reruns passed 3,677/4,317 tests, and the final seven
+  real PostgreSQL quality/recovery scenarios and eight targeted browser scenarios
+  passed, all with zero failures/skips. Final lint, policy checks and both builds
+  passed; npm audit reports zero vulnerabilities. The outcome distinguishes
+  overlapping runs and precise package/media evidence.
+- The preceding Search again work, PR #23 replay, and compatible dependency fixes
+  remain documented in their separate
+  [action](MISSING_MUSIC_SEARCH_AGAIN_OUTCOME.md),
+  [replay](RANDOM_PR_23_LOCAL_REPLAY_OUTCOME.md), and
+  [dependency](DEPENDENCY_SECURITY_UPDATE_2026_10_OUTCOME.md) outcomes.
 
 ## Release preparation (2026-09-10)
 

@@ -477,6 +477,8 @@ export function createLibraryWantedReleaseStore({
           mr.country AS release_country,
           mr.musicbrainz_release_id AS musicbrainz_release_id,
           lwr.evidence AS wanted_evidence,
+          owner.user_preferences AS quality_preferences,
+          wanted_link.evidence->'musicQueueQualityOverride' AS discovery_quality_override,
           ldr.request_status AS discovery_request_status,
           ldr.search_mode AS discovery_search_mode,
           ldr.blocked_reason AS discovery_blocked_reason,
@@ -520,6 +522,9 @@ export function createLibraryWantedReleaseStore({
         JOIN metadata_release_groups mrg ON mrg.id = lwr.metadata_release_group_id
         JOIN metadata_releases mr ON mr.id = lwr.metadata_release_id
         LEFT JOIN library_discovery_requests ldr ON ldr.metadata_release_id = lwr.metadata_release_id
+        LEFT JOIN app_users owner ON owner.id = lwr.app_user_id
+        LEFT JOIN library_discovery_request_wanted_release_links wanted_link
+          ON wanted_link.discovery_request_id = ldr.id AND wanted_link.wanted_release_id = lwr.id
         LEFT JOIN LATERAL (
           WITH candidate_rows AS (
             SELECT
@@ -844,6 +849,8 @@ export function createLibraryWantedReleaseStore({
       artistName: row.artist_name,
       artistSortName: row.artist_sort_name ?? row.artist_name,
       evidence: row.wanted_evidence ?? {},
+      qualityPreferences: row.quality_preferences ?? null,
+      discoveryQualityOverride: row.discovery_quality_override ?? null,
       discoveryRequest: row.discovery_request_status
         ? {
             blockedReason: row.discovery_blocked_reason ?? null,

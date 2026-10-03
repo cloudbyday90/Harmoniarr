@@ -1,0 +1,4 @@
+interface:
+  display_name: "Harmoniarr Scoped Overrides"
+  short_description: "Trace target consent through shared acquisition policy"
+  default_prompt: "Use $harmoniarr-scoped-overrides to implement or review a scoped acquisition policy exception and its shared consumers."

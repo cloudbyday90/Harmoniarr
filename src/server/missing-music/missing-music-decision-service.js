@@ -26,6 +26,8 @@ import { buildMissingMusicMatchChoices } from './missing-music-match-choice-proj
 import { canStartMissingMusicDownload } from './missing-music-download-start-policy.js';
 import { canViewMissingMusicDownloader } from './missing-music-downloader-handoff-policy.js';
 import { canSearchMissingMusicAgain } from './missing-music-search-again-policy.js';
+import { canAllowMissingMusicFallbackQuality } from './missing-music-fallback-quality-policy.js';
+import { buildPublicQualityEvidence } from '../acquisition/acquisition-quality-evidence-policy.js';
 import { createMissingMusicDecisionTargetService } from './missing-music-decision-target-service.js';
 import { createMissingMusicDecisionPageService } from './missing-music-decision-page-service.js';
 import {
@@ -298,10 +300,11 @@ export function createMissingMusicDecisionService({
     decisionId,
   } = {}) {
     const target = await resolveDecisionTarget({ actorUser, decisionId });
+    const projectedRelease = projectMusicQueueReleaseFn(target.release);
     const decision = projectDecision(
       target.release,
       target.targetUser,
-      projectMusicQueueReleaseFn,
+      () => projectedRelease,
     );
     const matchChoices = decision.status.nextAction === 'review_matches'
       ? buildMissingMusicMatchChoices(target.release)
@@ -311,7 +314,9 @@ export function createMissingMusicDecisionService({
       checkedAt: now().toISOString(),
       decision,
       matchChoices,
+      qualityEvidence: buildPublicQualityEvidence(projectedRelease.quality),
       permissions: {
+        canAllowFallbackQuality: canAllowMissingMusicFallbackQuality({ projectedRelease, targetUser: target.targetUser }),
         canSearchAgain: canSearchMissingMusicAgain({ statusCode: decision.status.code, targetUser: target.targetUser }),
         canStartDownload: canStartMissingMusicDownload({
           actorUser,

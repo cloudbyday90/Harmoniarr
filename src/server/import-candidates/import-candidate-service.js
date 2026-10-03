@@ -183,6 +183,8 @@ function normalizeMusicQueueContext(value) {
 
   return {
     profileCode,
+    ...(typeof value.minimumBitrateKbps === 'number' && Number.isFinite(value.minimumBitrateKbps)
+      && value.minimumBitrateKbps >= 256 && value.minimumBitrateKbps <= 10_000 ? { minimumBitrateKbps: value.minimumBitrateKbps } : {}),
     ...(qualityOverride ? { qualityOverride } : {}),
     ...(wantedReleaseIds[0] ? { wantedReleaseId: wantedReleaseIds[0] } : {}),
     ...(wantedReleaseIds.length > 1 ? { wantedReleaseIds } : {}),
@@ -388,11 +390,15 @@ export function normalizeSlskdResponsesToImportCandidatesWithDiagnostics({
     const totalSizeBytes = group.files.reduce((total, file) => total + (file.sizeBytes ?? 0), 0);
     const lockedFileCount = group.files.filter((file) => file.isLocked).length;
     const extensions = Array.from(new Set(group.files.map((file) => file.extension).filter(Boolean))).sort();
+    const audioFiles = group.files.filter((file) => ['aac', 'alac', 'ape', 'flac', 'mp3', 'ogg', 'opus', 'wav', 'wave'].includes(file.extension));
+    const bitrateKbps = audioFiles.length > 0 && audioFiles.every((file) => file.bitRateKbps > 0)
+      ? Math.min(...audioFiles.map((file) => file.bitRateKbps)) : null;
 
     const formatScore = formatPreferences
       ? scoreCandidateFormatMatch({
         preferredFormat: formatPreferences.preferredFormat,
         minimumQuality: formatPreferences.minimumQuality,
+        minimumBitrateKbps: formatPreferences.minimumBitrateKbps,
         extensions,
         files: group.files,
       })
@@ -432,6 +438,7 @@ export function normalizeSlskdResponsesToImportCandidatesWithDiagnostics({
         lockedFileCount,
         totalSizeBytes,
         extensions,
+        bitrateKbps,
         ...(normalizedMusicQueueContext ? {
           musicQueue: normalizedMusicQueueContext,
         } : {}),

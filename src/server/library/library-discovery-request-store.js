@@ -49,6 +49,9 @@ function normalizeOperatorLinks(value) {
     linkedWantedReleaseIds.add(wantedReleaseId);
     return [{
       appUserId,
+      isDisabled: link.isDisabled === true,
+      qualityPreferences: link.qualityPreferences,
+      qualityProfile: typeof link.qualityProfile === 'string' ? link.qualityProfile : null,
       qualityOverride: link.qualityOverride && typeof link.qualityOverride === 'object'
         ? link.qualityOverride
         : null,
@@ -203,6 +206,9 @@ export function createLibraryDiscoveryRequestStore({
               JSONB_AGG(
                 JSONB_BUILD_OBJECT(
                   'appUserId', library_wanted_releases.app_user_id,
+                  'isDisabled', app_users.is_disabled,
+                  'qualityPreferences', app_users.user_preferences,
+                  'qualityProfile', library_wanted_releases.evidence->>'qualityProfile',
                   'qualityOverride', library_discovery_request_wanted_release_links.evidence->'musicQueueQualityOverride',
                   'wantedReleaseId', library_wanted_releases.id
                 )
@@ -211,6 +217,7 @@ export function createLibraryDiscoveryRequestStore({
             FROM library_discovery_request_wanted_release_links
             JOIN library_wanted_releases
               ON library_wanted_releases.id = library_discovery_request_wanted_release_links.wanted_release_id
+            JOIN app_users ON app_users.id = library_wanted_releases.app_user_id
             WHERE library_discovery_request_wanted_release_links.discovery_request_id = library_discovery_requests.id
               AND library_wanted_releases.wanted_status IN ('missing', 'partial')
           ) AS operator_wanted_releases
@@ -427,6 +434,7 @@ export function createLibraryDiscoveryRequestStore({
             'lastSearchId', $1::text,
             'lastSearchQuery', $2::text,
             'lastSearchResult', jsonb_strip_nulls(jsonb_build_object(
+              'observedAt', NOW(),
               'autoDownloadReadiness', $10::jsonb,
               'candidateCount', $3::integer,
               'autoSelection', $9::jsonb,
@@ -834,8 +842,9 @@ export function createLibraryDiscoveryRequestStore({
     priorQualityProfile = null,
     reasonCode = 'operator_allowed_fallback_quality',
     wantedReleaseId = null,
+    queryable = null,
   }) {
-    const pool = getPoolFn();
+    const pool = queryable ?? getPoolFn();
     const result = await pool.query(
       `
         WITH updated AS (
@@ -844,6 +853,7 @@ export function createLibraryDiscoveryRequestStore({
             search_mode = 'automatic',
             request_status = 'ready',
             blocked_reason = NULL,
+            last_search_at = NULL,
             next_search_after = $2::timestamptz,
             search_attempt_count = 0,
             evidence = (
@@ -862,12 +872,15 @@ export function createLibraryDiscoveryRequestStore({
             updated_at = NOW()
           WHERE metadata_release_id = $1
             AND search_mode = 'automatic'
+            AND request_status IN ('blocked', 'cooldown')
+            AND EXISTS (SELECT 1 FROM library_discovery_request_wanted_release_links
+              WHERE discovery_request_id = library_discovery_requests.id AND wanted_release_id = $4::uuid)
           RETURNING *
         ),
         link_intent AS (
           UPDATE library_discovery_request_wanted_release_links
           SET
-            evidence = COALESCE(evidence, '{}'::jsonb) || jsonb_build_object(
+            evidence = COALESCE(library_discovery_request_wanted_release_links.evidence, '{}'::jsonb) || jsonb_build_object(
               'musicQueueQualityOverride',
               jsonb_build_object(
                 'allowedAt', $2::timestamptz,

@@ -134,3 +134,16 @@ test('Search again is a server-permitted action and disabled account history sta
   detail.decision.requestedFor = { accountStatus: 'disabled' };
   assert.equal(buildMissingMusicDecisionDetailPresentation(detail).canSearchAgain, false);
 });
+
+test('an eligible quality choice remains the next step while Search again stays available', () => {
+  const detail = {
+    decision: { status: { nextAction: 'review_quality_choice' } },
+    permissions: { canAllowFallbackQuality: true, canSearchAgain: true },
+  };
+  const presentation = buildMissingMusicDecisionDetailPresentation(detail);
+  assert.equal(presentation.nextStep, 'Review the quality choice');
+  assert.equal(presentation.canAllowFallbackQuality, true);
+  assert.equal(presentation.canSearchAgain, true);
+  detail.permissions.isReadOnly = true;
+  assert.equal(buildMissingMusicDecisionDetailPresentation(detail).canAllowFallbackQuality, false);
+});

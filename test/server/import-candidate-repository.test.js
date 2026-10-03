@@ -322,6 +322,17 @@ test('promoteImportCandidateForRecovery selects a recovery candidate with observ
   assert.equal(candidate.selectionReason, 'recovery_cascade');
 });
 
+test('recovery promotion refuses a quality context changed after eligibility was evaluated', async (t) => {
+  const queryable = { query: t.mock.fn(async () => ({ rows: [] })) };
+  const context = { profileCode: 'high_quality', minimumBitrateKbps: 320, wantedReleaseId: 'wanted' };
+  const result = await promoteImportCandidateForRecovery({ importCandidateId: 'candidate', maxDownloadAttemptCount: 3,
+    triggeredByFailedCandidateId: 'failed', expectedMusicQueueContext: context }, queryable);
+  assert.equal(result, null);
+  const [sql, values] = queryable.query.mock.calls[0].arguments;
+  assert.match(sql, /COALESCE\(normalized_payload->'musicQueue', 'null'::jsonb\) = \$5::jsonb/);
+  assert.deepEqual(JSON.parse(values[4]), context);
+});
+
 test('insertImportCandidateEvent writes append-only review history', async (t) => {
   const queryable = {
     query: t.mock.fn(async (_sql, values) => ({

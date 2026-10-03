@@ -257,7 +257,8 @@ export async function findNextCandidateForRecovery({
     `
       SELECT *
       FROM import_candidates
-      WHERE ${hasExcludedIdArray ? 'id <> ALL($5::text[])' : 'id <> $1'}
+      WHERE id <> $1::uuid
+        ${hasExcludedIdArray ? 'AND id <> ALL($5::uuid[])' : ''}
         AND status IN ('pending', 'held')
         AND normalized_payload #>> '{requestOwnership,externalRequestReleaseIntentId}' IS NULL
         AND download_attempt_count < $4
@@ -292,6 +293,7 @@ export async function findNextCandidateForRecovery({
 }
 
 export async function promoteImportCandidateForRecovery({
+  expectedMusicQueueContext = undefined,
   importCandidateId,
   maxDownloadAttemptCount,
   reason = null,
@@ -315,6 +317,7 @@ export async function promoteImportCandidateForRecovery({
       WHERE id = $1
         AND status IN ('pending', 'held')
         AND download_attempt_count < $4
+        ${expectedMusicQueueContext !== undefined ? "AND COALESCE(normalized_payload->'musicQueue', 'null'::jsonb) = $5::jsonb" : ''}
       RETURNING *
     `,
     [
@@ -322,6 +325,7 @@ export async function promoteImportCandidateForRecovery({
       triggeredByFailedCandidateId,
       reason,
       maxDownloadAttemptCount,
+      ...(expectedMusicQueueContext !== undefined ? [JSON.stringify(expectedMusicQueueContext)] : []),
     ],
   );
 

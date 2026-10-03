@@ -92,6 +92,7 @@ import { createOperationRunInterruptionGate } from '../operation-run-cancellatio
 import { createMaintenanceLockService } from '../recovery/maintenance-lock-service.js';
 import { createMaintenanceLockWriteGuardService } from '../recovery/maintenance-lock-write-guard-service.js';
 import { createLibraryMusicQueueRediscoveryService } from './library-music-queue-rediscovery-service.js';
+import { createLibraryFallbackQualityService } from './library-fallback-quality-service.js';
 
 export function createLibraryModule({
   artworkAssignmentService = null,
@@ -362,6 +363,13 @@ export function createLibraryModule({
     libraryDiscoverySummaryStore,
   }),
   libraryWantedSummaryStore = createLibraryWantedSummaryStore(),
+  libraryFallbackQualityService = getAppUserById ? createLibraryFallbackQualityService({
+    allowMusicQueueFallbackQuality: libraryDiscoveryRequestStore.allowMusicQueueFallbackQuality,
+    assertMaintenanceWriteAllowed: ({ queryable }) => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+      operationLabel: 'Missing Music fallback quality choice', queryable,
+    }),
+    getAppUserById, listWantedReleasesWithMetadata: libraryWantedReleaseStore.listWantedReleasesWithMetadata,
+  }) : null,
   libraryMusicQueueRediscoveryService = getAppUserById ? createLibraryMusicQueueRediscoveryService({
     assertMaintenanceWriteAllowed: ({ queryable }) => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
       operationLabel: 'another Missing Music search', queryable,
@@ -502,6 +510,7 @@ export function createLibraryModule({
     libraryMediaRequestPipelineStore,
     libraryMediaRequestStore,
     libraryMusicQueueRediscoveryService,
+    libraryFallbackQualityService,
     libraryOrganizeApplyRunStore,
     libraryOrganizeApplyService,
     libraryOrganizeApplyWorker,

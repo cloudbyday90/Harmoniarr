@@ -24,6 +24,11 @@ Current skill areas include:
 - Harmoniarr canonical actions: complete a visible music workflow through its
   ownership policy, durable command, and refreshed UI. The shared entrypoint is
   [.agents/skills/harmoniarr-canonical-actions/SKILL.md](../.agents/skills/harmoniarr-canonical-actions/SKILL.md).
+- Harmoniarr scoped overrides: trace a recipient's acquisition exception through
+  shared search and downstream verification. Use
+  [.agents/skills/harmoniarr-scoped-overrides/SKILL.md](../.agents/skills/harmoniarr-scoped-overrides/SKILL.md)
+  when changing policy exceptions; ordinary styling and unrelated settings are
+  outside its scope.
 
 ## Tooling Scope
 
@@ -44,6 +49,11 @@ automatically active in other tools. The separate
 [skill design](CANONICAL_ACTION_SKILL_DESIGN.md) and
 [validation outcome](CANONICAL_ACTION_SKILL_OUTCOME.md) record its scope and
 verification.
+
+The scoped-overrides skill uses the same maintained-source/local-install
+arrangement. Its [design](SCOPED_POLICY_OVERRIDES_SKILL_DESIGN.md) and
+[outcome](SCOPED_POLICY_OVERRIDES_SKILL_OUTCOME.md) record the consumer boundaries
+and independent behavioral evaluation.
 
 ## Repository Rules
 

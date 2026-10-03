@@ -93,8 +93,8 @@ test('claimNextReadyAutomaticDiscoveryRequest locks only the discovery request a
   assert.equal(request.wantedReleaseId, 'wanted-1');
   assert.deepEqual(request.wantedReleaseIds, ['wanted-1', 'wanted-2']);
   assert.deepEqual(request.operatorLinks, [
-    { appUserId: 'operator-1', qualityOverride: null, wantedReleaseId: 'wanted-1' },
-    { appUserId: 'operator-2', qualityOverride: null, wantedReleaseId: 'wanted-2' },
+    { appUserId: 'operator-1', isDisabled: false, qualityPreferences: undefined, qualityProfile: null, qualityOverride: null, wantedReleaseId: 'wanted-1' },
+    { appUserId: 'operator-2', isDisabled: false, qualityPreferences: undefined, qualityProfile: null, qualityOverride: null, wantedReleaseId: 'wanted-2' },
   ]);
 });
 

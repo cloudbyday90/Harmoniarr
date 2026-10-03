@@ -4,6 +4,11 @@ Status: Implemented and validated
 Date: 2026-08-22
 Owner: Platform engineering
 
+October successor: the exact runtime target is now Node 24.21.0. See
+[Node runtime patch design](NODE_RUNTIME_PATCH_2026_10_DESIGN.md) and
+[outcome](NODE_RUNTIME_PATCH_2026_10_OUTCOME.md). The evidence below records the
+August decision and is retained as historical context.
+
 ## Purpose
 
 Harmoniarr previously constrained local and container development to Node

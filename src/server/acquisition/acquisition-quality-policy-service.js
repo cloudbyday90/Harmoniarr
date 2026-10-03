@@ -52,7 +52,7 @@ const QUALITY_PROFILES = Object.freeze({
     fallbackAllowed: true,
     preferredFormats: Object.freeze(['flac', 'alac', 'mp3', 'aac', 'opus']),
     minimumBitrateKbps: 256,
-    minimumFormats: Object.freeze(['flac', 'alac', 'mp3', 'aac', 'opus', 'ogg']),
+    minimumFormats: Object.freeze(['flac', 'alac', 'mp3', 'aac', 'opus', 'ogg', 'wav']),
     manualReviewBelowPreferred: false,
     requiresVerification: false,
     upgradeAllowed: true,
@@ -94,6 +94,9 @@ function normalizeFallbackOverride(value) {
     mode,
     reasonCode: value.reasonCode ?? null,
     wantedReleaseId: value.wantedReleaseId ?? null,
+    ...(typeof value.minimumBitrateKbps === 'number' && Number.isFinite(value.minimumBitrateKbps)
+      && value.minimumBitrateKbps >= FALLBACK_MINIMUM_BITRATE_KBPS && value.minimumBitrateKbps <= 10_000
+      ? { minimumBitrateKbps: value.minimumBitrateKbps } : {}),
   };
 }
 
@@ -117,7 +120,8 @@ function withFallbackOverride(profile, qualityOverride) {
       fallbackAllowed: true,
       fallbackOverrideActive: true,
       fallbackTargetFormats: FALLBACK_MINIMUM_FORMATS,
-      minimumBitrateKbps: profile.minimumBitrateKbps ?? FALLBACK_MINIMUM_BITRATE_KBPS,
+      minimumBitrateKbps: Math.max(profile.minimumBitrateKbps ?? FALLBACK_MINIMUM_BITRATE_KBPS,
+        fallbackOverride.minimumBitrateKbps ?? FALLBACK_MINIMUM_BITRATE_KBPS),
       minimumFormats,
       upgradeAllowed: true,
     },
@@ -178,8 +182,13 @@ export function evaluateQualityEvidence({
   mediaVerification = {},
   profileCode = QUALITY_PROFILE_CODES.LOSSLESS_ARCHIVE,
   qualityOverride = null,
+  minimumBitrateKbps = null,
 } = {}) {
-  const { fallbackOverride, profile } = withFallbackOverride(resolveQualityProfile(profileCode), qualityOverride);
+  const baseProfile = resolveQualityProfile(profileCode);
+  const effectiveProfile = typeof minimumBitrateKbps === 'number' && Number.isFinite(minimumBitrateKbps)
+    && minimumBitrateKbps >= 256 && minimumBitrateKbps <= 10_000
+    ? { ...baseProfile, minimumBitrateKbps: Math.max(baseProfile.minimumBitrateKbps ?? 0, minimumBitrateKbps) } : baseProfile;
+  const { fallbackOverride, profile } = withFallbackOverride(effectiveProfile, qualityOverride);
   const formats = collectFormatTokens({ candidate, mediaVerification });
   const normalizedPayload = candidate.normalizedPayload ?? candidate.normalized_payload ?? {};
   const bitrateKbps = toNumberOrNull(

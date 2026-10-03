@@ -59,6 +59,7 @@ export function buildMissingMusicDecisionDetailPresentation(detail) {
     || requestedFor.accountStatus === 'disabled';
   const canStartDownload = detail?.permissions?.canStartDownload === true;
   const canSearchAgain = !accountIsDisabled && detail?.permissions?.canSearchAgain === true;
+  const canAllowFallbackQuality = !accountIsDisabled && detail?.permissions?.canAllowFallbackQuality === true;
   const canViewDownloader = detail?.permissions?.canViewDownloader === true;
   const selectedMatchNeedsAdministrator = !accountIsDisabled
     && decision.status?.nextAction === 'download_now'
@@ -74,11 +75,14 @@ export function buildMissingMusicDecisionDetailPresentation(detail) {
     isReadOnly: accountIsDisabled,
     canStartDownload,
     canSearchAgain,
+    canAllowFallbackQuality,
     canViewDownloader,
     downloaderLinkAccessibleLabel: `View ${normalizeText(release.title, 'this release')} downloads for ${normalizeText(requestedFor.username, 'the selected user')} in Downloader`,
     lastCheckedAt: formatMissingMusicDecisionCheckedAt(decision.lastReconciledAt),
     nextStep: accountIsDisabled
       ? 'This account is disabled; no changes can be made.'
+      : canAllowFallbackQuality
+        ? 'Review the quality choice'
       : canSearchAgain
         ? 'Search again'
       : selectedMatchNeedsAdministrator
