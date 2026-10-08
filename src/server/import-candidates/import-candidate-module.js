@@ -52,6 +52,7 @@ import { createImportCandidateExecutionSummaryService } from './import-candidate
 import { createImportCandidateExecutionWorker } from './import-candidate-execution-worker.js';
 import { createImportExecutionTransferLinkStore } from './import-execution-transfer-link-store.js';
 import { createImportCandidateAutoApplyRunService } from './import-candidate-auto-apply-run-service.js';
+import { createImportCandidateMusicQueueAutoSafeAddService } from './import-candidate-music-queue-auto-safe-add-service.js';
 import { createImportCandidateAutoDownloadRunService } from './import-candidate-auto-download-run-service.js';
 import { createImportCandidateAutoSelectionService } from './import-candidate-auto-selection-service.js';
 import { createImportCandidateSafeAutoAddQualityGateService } from './import-candidate-safe-auto-add-quality-gate.js';
@@ -381,7 +382,18 @@ export function createImportCandidateModule({
       safeAutoAddQualityGateService: importCandidateSafeAutoAddQualityGateService,
       commitPreparedReleaseLibraryAdd: importCandidateReleaseRecheckGuardService.commitPreparedReleaseLibraryAdd,
     }),
+  importCandidateMusicQueueAutoSafeAddService = createImportCandidateMusicQueueAutoSafeAddService({
+    recheckStore: importCandidateReleaseRecheckStore,
+    getImportCandidate: importCandidateService.getImportCandidate,
+    listFileDecisions: listImportCandidateFileDecisions,
+    previewImportCandidateApply: importCandidateApplyPreviewService.previewImportCandidateApply,
+    safeAutoAddQualityGateService: importCandidateSafeAutoAddQualityGateService,
+    commitPreparedAutomaticLibraryAdd: importCandidateReleaseRecheckGuardService.commitPreparedAutomaticLibraryAdd,
+    handleImportCandidateImportBlocker: importCandidateRecoveryService.handleImportCandidateImportBlocker,
+  }),
   importCandidateAutoApplyRunService = createImportCandidateAutoApplyRunService({
+    getImportCandidate: importCandidateService.getImportCandidate,
+    musicQueueAutoSafeAddService: importCandidateMusicQueueAutoSafeAddService,
     handleImportCandidateImportBlocker: importCandidateRecoveryService.handleImportCandidateImportBlocker,
     previewImportCandidateApply: importCandidateApplyPreviewService.previewImportCandidateApply,
     startImportCandidateApplyRun: importCandidateApplyService.startImportCandidateApplyRun,
@@ -458,6 +470,7 @@ export function createImportCandidateModule({
     importCandidateApplyRunStore,
     importCandidateApplyService,
     importCandidateAutoApplyRunService,
+    importCandidateMusicQueueAutoSafeAddService,
     importCandidateApplySummaryService,
     importCandidateApplyWorker,
     importCandidateReleaseHintService,

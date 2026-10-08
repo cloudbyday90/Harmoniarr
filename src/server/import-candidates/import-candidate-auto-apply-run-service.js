@@ -17,6 +17,7 @@
  */
 
 import { evaluateImportBlockerRecovery } from './import-candidate-terminal-recovery-policy.js';
+import { hasPersistedMusicQueueOwnership } from './import-candidate-music-queue-auto-safe-add-policy.js';
 
 const skippedReasonByErrorCode = Object.freeze({
   import_candidate_apply_in_progress: 'apply_run_already_active',
@@ -42,6 +43,8 @@ function normalizeSkippedApplyRunResult({ error, importCandidateId }) {
 
 export function createImportCandidateAutoApplyRunService({
   handleImportCandidateImportBlocker = null,
+  getImportCandidate = null,
+  musicQueueAutoSafeAddService = null,
   previewImportCandidateApply = null,
   startImportCandidateApplyRun = async () => {
     throw new Error('startImportCandidateApplyRun dependency is required');
@@ -84,6 +87,22 @@ export function createImportCandidateAutoApplyRunService({
     importCandidateId,
     requestMetadata = null,
   } = {}) {
+    const candidate = typeof getImportCandidate === 'function' ? await getImportCandidate({ importCandidateId }) : null;
+    if (hasPersistedMusicQueueOwnership(candidate)) {
+      if (typeof musicQueueAutoSafeAddService?.startAutomaticMusicQueueLibraryAdd !== 'function') {
+        throw new TypeError('Music Queue automatic library-add service is required');
+      }
+      try {
+        const result = await musicQueueAutoSafeAddService.startAutomaticMusicQueueLibraryAdd({ candidate, requestMetadata });
+        return { attempted: true, importCandidateId, started: result.outcome === 'queued', triggerSource: 'download_completed',
+          ...(['queued', 'already_queued'].includes(result.outcome) ? { runId: result.runId ?? null } : {}),
+          ...(result.outcome === 'already_queued' ? { alreadyQueued: true } : {}),
+          ...(result.recovery ? { recovery: result.recovery } : {}),
+          ...(result.outcome === 'queued' ? {} : { skippedReason: result.skippedReason
+            ?? ({ already_queued: 'apply_run_already_active', deferred: 'apply_run_already_active',
+              not_available: 'music_queue_scope_not_current', still_needs_review: 'no_safe_import_pending_candidate' })[result.outcome] }) };
+      } catch (error) { return normalizeSkippedApplyRunResult({ error, importCandidateId }); }
+    }
     const importBlockerRecovery = await recoverImportBlocker({
       importCandidateId,
     });

@@ -185,3 +185,28 @@ test('startSafeApplyRunAfterDownloadCompleted rethrows unexpected errors', async
     /database unavailable/,
   );
 });
+
+test('persisted Music Queue presence dispatches only to its owning adapter before generic recovery', async () => {
+  for (const context of [{ wantedReleaseId: 'saved-primary' }, null, [], {}, 'malformed']) {
+    const candidate = { normalizedPayload: { musicQueue: context } };
+    const calls = [];
+    const service = createImportCandidateAutoApplyRunService({ getImportCandidate: async () => candidate,
+      musicQueueAutoSafeAddService: { startAutomaticMusicQueueLibraryAdd: async (input) => { calls.push(input); return { outcome: 'not_available' }; } },
+      previewImportCandidateApply: async () => { assert.fail('generic recovery must not inspect owned files'); },
+      startImportCandidateApplyRun: async () => { assert.fail('owned scope must not fall through'); } });
+    const result = await service.startSafeApplyRunAfterDownloadCompleted({ importCandidateId: 'candidate-owned' });
+    assert.equal(calls.length, 1); assert.equal(calls[0].candidate, candidate);
+    assert.equal(result.started, false); assert.equal(result.skippedReason, 'music_queue_scope_not_current');
+  }
+});
+
+test('new automatic guarded queue keeps completion result source and distinguishes existing work without claiming another start', async () => {
+  for (const outcome of ['queued', 'already_queued', 'deferred']) {
+    const service = createImportCandidateAutoApplyRunService({ getImportCandidate: async () => ({ normalizedPayload: { musicQueueContext: {} } }),
+      musicQueueAutoSafeAddService: { startAutomaticMusicQueueLibraryAdd: async () => ({ outcome, runId: 'guarded-run' }) } });
+    const result = await service.startSafeApplyRunAfterDownloadCompleted({ importCandidateId: 'owned' });
+    assert.equal(result.triggerSource, 'download_completed'); assert.equal(result.started, outcome === 'queued');
+    assert.equal(result.alreadyQueued, outcome === 'already_queued' ? true : undefined);
+    assert.equal(result.runId, outcome === 'deferred' ? undefined : 'guarded-run');
+  }
+});

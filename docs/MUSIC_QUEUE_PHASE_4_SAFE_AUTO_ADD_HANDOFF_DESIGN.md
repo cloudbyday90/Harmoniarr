@@ -4,6 +4,13 @@ Status: **Implemented.**
 
 Date: 2026-06-29.
 
+October 8 extension: automatic Music Queue work now shares current recipient/
+quality guards and a private accepted-identity record with explicit Add/recheck.
+See the separate [guard design](MUSIC_QUEUE_AUTOMATIC_LIBRARY_ADD_GUARD_DESIGN.md)
+and [outcome](MUSIC_QUEUE_AUTOMATIC_LIBRARY_ADD_GUARD_OUTCOME.md) for current
+behavior, official research, validation and compatibility limits. This document
+retains the original Phase 4 handoff record below.
+
 This document records the first Phase 4 implementation slice for the Music Queue
 pipeline: when Downloader reports a selected match as complete, Harmoniarr
 should automatically queue a safe add-to-library operation instead of requiring

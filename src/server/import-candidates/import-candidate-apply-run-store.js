@@ -74,6 +74,7 @@ export function createImportCandidateApplyRunStore({
 
   async function createOperationRun({
     queryable = null,
+    automaticLibraryAddAuthority = null,
     applySafetyMode = 'manual',
     executableCandidateCount = null,
     executionMode = 'move',
@@ -90,6 +91,7 @@ export function createImportCandidateApplyRunStore({
         status,
         summary: {
           applySafetyMode,
+          ...(automaticLibraryAddAuthority ? { automaticLibraryAddAuthority } : {}),
           currentStep: 'queued',
           executableCandidateCount,
           executionMode,

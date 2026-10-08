@@ -106,5 +106,13 @@ export function createImportCandidateReleaseRecheckStore({ getPoolFn = getPool }
     await queryable.query(`UPDATE import_candidates SET normalized_payload = jsonb_set(normalized_payload,
       '{musicQueue}', $2::jsonb), updated_at = NOW() WHERE id = $1::uuid AND status = $3`, [importCandidateId, JSON.stringify(musicQueueContext), candidateStatus]);
   }
-  return { readOwnedRelease, readParticipantPolicies, lockParticipantReleases, lockCandidate, saveQualityContext };
+  async function readAutomaticLibraryAddAuthority({ runId, importCandidateId }) {
+    if (!runId) return null;
+    const result = await getPoolFn().query(`SELECT summary->'automaticLibraryAddAuthority' AS authority FROM operation_runs
+      WHERE id=$1::uuid AND operation_type='import_candidate_apply' AND status IN ('pending','running')
+        AND summary->>'triggerSource'='music_queue_download_completed' AND summary->>'applySafetyMode'='safe_auto'
+        AND jsonb_typeof(summary->'importCandidateIds')='array' AND summary->'importCandidateIds' ? $2::text`, [runId, importCandidateId]);
+    return result.rows[0]?.authority ?? null;
+  }
+  return { readOwnedRelease, readParticipantPolicies, lockParticipantReleases, lockCandidate, saveQualityContext, readAutomaticLibraryAddAuthority };
 }

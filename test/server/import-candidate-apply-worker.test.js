@@ -51,6 +51,36 @@ function createVerifiedApplyPreview() {
   };
 }
 
+test('automatic quality recovery refuses drift during the measured gate and incompatible saved consent or floor', async () => {
+  const wantedReleaseId = '00000000-0000-4000-8000-000000000001';
+  const consent = { mode: 'allow_fallback_quality', wantedReleaseId };
+  for (const variant of ['gate_drift', 'revoked_consent', 'higher_floor', 'unchanged']) {
+    let changed = false; let recoveryCalls = 0; let finish; let summary;
+    const done = new Promise((resolve) => { finish = resolve; });
+    const saved = { profileCode: 'lossless_archive', wantedReleaseId, ...(variant === 'revoked_consent' ? { qualityOverride: consent } : {}) };
+    const current = { ...saved, ...(variant === 'revoked_consent' ? { qualityOverride: null } : {}),
+      ...(variant === 'higher_floor' ? { minimumBitrateKbps: 320 } : {}) };
+    const worker = createImportCandidateApplyWorker({ acquireLease: async () => {}, releaseLease: async () => {},
+      buildImportPendingCandidateSummary: async () => ({ importPendingCandidates: [createReadyImportCandidate()] }),
+      resolveCurrentSafeAutoAddCandidate: async ({ summaryCandidate }) => ({ ...summaryCandidate, musicQueueContext: current,
+        recheckPolicySnapshot: { candidate: { normalizedPayload: { musicQueue: saved } } } }),
+      assertCurrentSafeAutoAddCandidate: async () => { if (changed) { const error = new Error('policy changed'); error.code = 'import_candidate_apply_not_ready'; throw error; } },
+      previewImportCandidateApply: async () => createVerifiedApplyPreview(),
+      safeAutoAddQualityGateService: { evaluateSafeAutoAddQuality: async () => {
+        await Promise.resolve(); changed = variant === 'gate_drift'; return { eligible: false, profileCode: 'lossless_archive', message: 'blocked' };
+      } },
+      handleImportCandidateQualityFailure: async () => { recoveryCalls += 1; return { recovered: false }; },
+      applyImportCandidatePreview: async () => assert.fail('blocked audio cannot apply'),
+      markRunStarted: async () => {}, markRunFailed: async () => finish(), markRunCompleted: async (input) => { summary = input.summary; finish(); },
+      replaceImportApplyRunItems: async () => [], updateImportApplyRunItem: async () => {},
+    });
+    worker.startWorkerRun({ runId: 'automatic-quality-run', triggerSource: 'music_queue_download_completed', applySafetyMode: 'safe_auto',
+      requestedCandidateCount: 1, executableCandidateCount: 1 });
+    await done;
+    assert.equal(summary.qualityBlockedCount, 1); assert.equal(recoveryCalls, variant === 'unchanged' ? 1 : 0);
+  }
+});
+
 test('guarded worker captures current provenance before delayed media preview and refuses drift before mutation', async (t) => {
   const calls = [];
   let candidateVersion = 1;

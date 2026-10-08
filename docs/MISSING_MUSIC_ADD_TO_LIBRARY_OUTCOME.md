@@ -152,5 +152,11 @@ before extending automatic acceptance.
 3. Prove stale-search, disabled/unlinked participant, revoked-policy, concurrent
    queue and actual-file refusal cases before enabling that broader guarantee.
 
+October 8 follow-through: this recommendation is implemented by the separate
+[automatic-add design](MUSIC_QUEUE_AUTOMATIC_LIBRARY_ADD_GUARD_DESIGN.md) and
+[outcome](MUSIC_QUEUE_AUTOMATIC_LIBRARY_ADD_GUARD_OUTCOME.md). Their current
+evidence and next recovery-policy task do not replace this slice's historical
+October 3 results.
+
 Development remains on main. No branch, tag, release, PR merge, hosted workflow
 dispatch or image publication is performed by this slice.

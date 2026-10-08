@@ -5,7 +5,7 @@
  * See LICENSE file for details.
  */
 
-export const GUARDED_LIBRARY_ADD_TRIGGER_SOURCES = Object.freeze(['music_queue_manual_add', 'music_queue_prerequisite_recheck']);
+export const GUARDED_LIBRARY_ADD_TRIGGER_SOURCES = Object.freeze(['music_queue_manual_add', 'music_queue_prerequisite_recheck', 'music_queue_download_completed']);
 
 export function hasQueuedGuardedLibraryAdd(facts) {
   return facts?.candidateStatus === 'import_pending' && facts.hasConflictingCandidate === false && facts.runMatchesCandidate === true

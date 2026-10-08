@@ -25,6 +25,7 @@ import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lea
 import { assessDeliveredQuality } from '../media/media-delivery-quality.js';
 import { createImportCandidateSafeAutoAddQualityGateService } from './import-candidate-safe-auto-add-quality-gate.js';
 import { readImportCandidateApplyScope } from './import-candidate-apply-scope.js';
+import { hasCompatibleAutomaticRecoveryRequirement } from './import-candidate-music-queue-auto-safe-add-policy.js';
 import {
   IMPORT_CANDIDATE_ADD_BLOCKER_CODES,
   deriveImportCandidateAddRecoveryReasonCode,
@@ -533,6 +534,14 @@ export function createImportCandidateApplyWorker({
               }
               if (typeof handleImportCandidateQualityFailure === 'function') {
                 try {
+                  if (triggerSource === 'music_queue_download_completed') {
+                    await assertCurrentSafeAutoAddCandidate({ summaryCandidate: currentQualityCandidate, triggerSource, runId });
+                    if (!hasCompatibleAutomaticRecoveryRequirement(currentQualityCandidate.recheckPolicySnapshot?.candidate, currentQualityCandidate.musicQueueContext)) {
+                      const error = new Error('Current automatic recovery requirements differ from the saved download policy');
+                      error.code = 'automatic_library_add_recovery_policy_changed';
+                      throw error;
+                    }
+                  }
                   qualityRecoveries.push(await handleImportCandidateQualityFailure({
                     failedCandidateId: summaryCandidate.id,
                     failureReason: qualityGate.message,

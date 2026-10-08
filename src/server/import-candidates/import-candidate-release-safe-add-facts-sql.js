@@ -5,6 +5,8 @@
  * See LICENSE file for details.
  */
 
+import { AUTOMATIC_LIBRARY_ADD_AUTHORITY_MATCH_SQL } from './import-candidate-automatic-library-add-authority-sql.js';
+
 // These fragments use the owning wanted release (lwr), current discovery (ldr), and candidate aliases.
 export const RELEASE_SAFE_ADD_OWNED_CANDIDATE_SQL = `(candidate.normalized_payload #>> '{musicQueue,wantedReleaseId}' = lwr.id::text
     OR COALESCE(candidate.normalized_payload #> '{musicQueue,wantedReleaseIds}', '[]'::jsonb) ? lwr.id::text
@@ -52,4 +54,11 @@ export const RELEASE_SAFE_ADD_RUN_FACTS_SQL = `active.id AS active_run_id, activ
           WHEN 'music_queue_prerequisite_recheck' THEN COALESCE(candidate.normalized_payload #>> '{musicQueue,recheckRequestedForWantedReleaseId}',
             candidate.normalized_payload #>> '{musicQueueContext,recheckRequestedForWantedReleaseId}')
           WHEN 'music_queue_manual_add' THEN COALESCE(candidate.normalized_payload #>> '{musicQueue,libraryAddRequestedForWantedReleaseId}',
-            candidate.normalized_payload #>> '{musicQueueContext,libraryAddRequestedForWantedReleaseId}') END) AS owning_target_marker_valid`;
+            candidate.normalized_payload #>> '{musicQueueContext,libraryAddRequestedForWantedReleaseId}')
+          WHEN 'music_queue_download_completed' THEN CASE WHEN
+            COALESCE(candidate.normalized_payload #>> '{musicQueue,automaticLibraryAddForWantedReleaseId}',
+              candidate.normalized_payload #>> '{musicQueueContext,automaticLibraryAddForWantedReleaseId}') =
+            COALESCE(candidate.normalized_payload #>> '{musicQueue,wantedReleaseId}', candidate.normalized_payload #>> '{musicQueueContext,wantedReleaseId}')
+            AND (${AUTOMATIC_LIBRARY_ADD_AUTHORITY_MATCH_SQL})
+            THEN COALESCE(candidate.normalized_payload #>> '{musicQueue,automaticLibraryAddForWantedReleaseId}',
+              candidate.normalized_payload #>> '{musicQueueContext,automaticLibraryAddForWantedReleaseId}') END END) AS owning_target_marker_valid`;

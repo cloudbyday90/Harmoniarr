@@ -126,6 +126,7 @@ async function installMissingMusicFixture(browserContext, requests, {
   accountStatus = 'active',
   downloadStarted = false,
   preparedDownload = false,
+  automaticLibraryAddQueued = false,
   libraryRecoveryReason = null,
   matchSelected = false,
   minimumBitrateKbps = null,
@@ -137,6 +138,7 @@ async function installMissingMusicFixture(browserContext, requests, {
     downloadStartRequest: null,
     downloadStarted,
     preparedDownload,
+    automaticLibraryAddQueued,
     addAvailable: preparedDownload,
     addOutcome: 'queued',
     addFailure: false,
@@ -144,7 +146,7 @@ async function installMissingMusicFixture(browserContext, requests, {
     addRequestCount: 0,
     addResponseWait: null,
     libraryRecoveryReason,
-    libraryAddQueued: false,
+    libraryAddQueued: automaticLibraryAddQueued,
     recheckAvailable: ['source_path_unavailable', 'audio_check_failed'].includes(libraryRecoveryReason),
     repairFoldersAvailable: libraryRecoveryReason === 'source_path_unavailable',
     recheckOutcome: 'queued',
@@ -157,6 +159,7 @@ async function installMissingMusicFixture(browserContext, requests, {
     selectionRequest: null,
     accountStatus,
     detailReadFailure: false,
+    detailResponseWait: null,
     searchInitial,
     findMatchesAvailable: searchInitial,
     findMatchesFailure: false,
@@ -296,6 +299,8 @@ async function installMissingMusicFixture(browserContext, requests, {
       return;
     }
 
+    if (route.request().method() === 'GET' && requestUrl.pathname === detailPath && state.detailResponseWait) await state.detailResponseWait;
+
     if (route.request().method() === 'GET' && requestUrl.pathname === detailPath && state.detailReadFailure) {
       await route.fulfill({ status: 503, contentType: 'application/json',
         body: JSON.stringify({ ok: false, error: { code: 'unexpected_error', message: 'Private database host' } }) });
@@ -419,12 +424,13 @@ async function installMissingMusicFixture(browserContext, requests, {
           fallbackAllowed: state.qualityFallbackAllowed,
           fallbackOverrideActive: state.qualityFallbackAllowed,
         } : null,
-        libraryAddRecovery: { reasonCode: state.libraryRecoveryReason, queued: state.libraryAddQueued, runId: state.libraryAddQueued ? 'run-add' : null },
+        libraryAddRecovery: { reasonCode: state.libraryRecoveryReason, queued: state.libraryAddQueued && !state.automaticLibraryAddQueued,
+          runId: state.libraryAddQueued && !state.automaticLibraryAddQueued ? 'run-add' : null },
         scope: 'all',
       }
       : { ...buildWorklistPayload(),
         decisions: ((state.searchInitial && state.searchQueued) || (state.preparedDownload && (state.libraryAddQueued || !state.addAvailable))) && requestUrl.searchParams.get('state') === 'action' ? [] : [buildDecision(state)],
-        page: { ...buildWorklistPayload().page, total: state.searchInitial && state.searchQueued ? 0 : 1 },
+        page: { ...buildWorklistPayload().page, total: ((state.searchInitial && state.searchQueued) || (state.preparedDownload && (state.libraryAddQueued || !state.addAvailable))) && requestUrl.searchParams.get('state') === 'action' ? 0 : 1 },
       };
 
     await route.fulfill({
@@ -758,6 +764,133 @@ suite('Missing Music decision detail browser acceptance', () => {
       assert.equal(await inspector.getByRole('button', { exact: true, name: 'Search again' }).count(), 0);
       assert.equal(fixture.searchAgainRequestCount, 2);
     }, { scenarioName: 'missing_music_search_again_safe_failures' });
+  });
+
+  test('guarded automatic adding refreshes into current prepared Add recovery without private facts, focus theft or identical-text churn', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) { t.skip(runtimeUnavailableReason); return; }
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      const requests = [];
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      const fixture = await installMissingMusicFixture(browserContext, requests, { preparedDownload: true, automaticLibraryAddQueued: true });
+      await page.goto(baseUrl + '/app/missing/wanted-amber', { waitUntil: 'domcontentloaded' });
+      const inspector = page.locator('.missing-music-inspector');
+      const snapshot = inspector.locator('.hx-missing-status-snapshot');
+      const status = snapshot.getByRole('status');
+      const queuedMessage = 'Harmoniarr has queued a safe library add and will check the files again before changing the library.';
+      await status.filter({ hasText: queuedMessage }).waitFor();
+      assert.equal(await status.innerText(), queuedMessage);
+      assert.equal(await status.getAttribute('aria-live'), 'polite');
+      assert.equal(await status.getAttribute('aria-atomic'), 'true');
+      assert.equal(await inspector.getByRole('button', { name: 'Add to library', exact: true }).count(), 0);
+      assert.equal(fixture.addRequestCount, 0);
+      const statusNode = await status.elementHandle();
+      await statusNode.evaluate((element) => {
+        const observation = { textChanges: 0 };
+        observation.observer = new globalThis.MutationObserver((records) => {
+          observation.textChanges += records.filter((record) => ['childList', 'characterData'].includes(record.type)).length;
+        });
+        observation.observer.observe(element, { childList: true, characterData: true, subtree: true });
+        element.automaticStatusObservation = observation;
+      });
+      const screenshotDirectory = resolve('.tmp/automatic-library-add-2026-10');
+      await mkdir(screenshotDirectory, { recursive: true });
+      for (const width of [390, 800, 1280]) {
+        await page.setViewportSize({ width, height: 1000 });
+        for (const theme of ['light', 'dark']) {
+          await page.evaluate((value) => globalThis.document.documentElement.setAttribute('data-theme', value), theme);
+          assert.equal(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth), true);
+          assert.equal(await inspector.evaluate((element) => element.scrollWidth <= element.clientWidth), true);
+          const currentStatus = inspector.getByRole('region', { name: 'Current status', exact: true });
+          await currentStatus.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+          assert.equal(await currentStatus.evaluate((element) => {
+            const bounds = element.getBoundingClientRect();
+            return bounds.top >= 56 && bounds.bottom <= globalThis.innerHeight - (globalThis.innerWidth <= 640 ? 60 : 0);
+          }), true, 'automatic status evidence should remain clear of fixed navigation');
+          await currentStatus.screenshot({
+            path: resolve(screenshotDirectory, `automatic-${width}-${theme}.png`), animations: 'disabled',
+          });
+        }
+      }
+      const filter = page.getByLabel('Search releases', { exact: true });
+      await filter.focus();
+      const main = page.locator('.hx-main');
+      await main.evaluate((element) => { element.scrollTop = 0; });
+      const userScroll = await main.evaluate((element) => element.scrollTop);
+      const detailPath = '/api/v1/missing-music/decisions/wanted-amber';
+      const privateFacts = /music_queue_download_completed|automaticLibraryAddForWantedReleaseId|libraryAddRequestedForWantedReleaseId|recheckRequestedForWantedReleaseId|participantPolicies|\/private|\/mnt/u;
+      async function revalidateDetail() {
+        const [response] = await Promise.all([
+          page.waitForResponse((value) => new URL(value.url()).pathname === detailPath),
+          page.evaluate(() => globalThis.window.dispatchEvent(new Event('focus'))),
+        ]);
+        await inspector.locator('.hx-missing-status-snapshot:not([aria-busy="true"])').waitFor();
+        const payload = await response.json();
+        assert.doesNotMatch(JSON.stringify(payload), privateFacts);
+        return payload;
+      }
+      for (let poll = 0; poll < 3; poll += 1) {
+        const payload = await revalidateDetail();
+        assert.equal(payload.permissions.canAddToLibrary, false);
+        assert.equal(payload.decision.state, 'downloading');
+      }
+      assert.equal(await statusNode.evaluate((element) => element.automaticStatusObservation.textChanges), 0,
+        'identical snapshots should not replace or mutate the existing status text');
+      await assertLocatorFocused(filter, 'unchanged automatic progress must preserve user focus');
+      assert.equal(await main.evaluate((element) => element.scrollTop), userScroll);
+
+      // Model the public projection after a worker refuses changed authority;
+      // PostgreSQL/file tests prove that worker boundary independently.
+      fixture.automaticLibraryAddQueued = false;
+      fixture.libraryAddQueued = false;
+      fixture.addAvailable = true;
+      let finishRefresh;
+      fixture.detailResponseWait = new Promise((resolveResponse) => { finishRefresh = resolveResponse; });
+      const refusalRefresh = revalidateDetail();
+      await inspector.locator('.hx-missing-status-snapshot[aria-busy="true"]').waitFor();
+      assert.equal(await status.innerText(), queuedMessage, 'keep the prior snapshot while the new decision is still being read');
+      finishRefresh();
+      const refused = await refusalRefresh;
+      fixture.detailResponseWait = null;
+      assert.equal(refused.permissions.canAddToLibrary, true);
+      assert.equal(refused.decision.state, 'action');
+      assert.equal(refused.decision.status.nextAction, 'add_to_library');
+      await status.filter({ hasText: 'A completed download is available. Harmoniarr will check its audio and file plan before adding it.' }).waitFor();
+      assert.equal(await statusNode.evaluate((element) => element.isConnected), true);
+      const changedTextCount = await statusNode.evaluate((element) => element.automaticStatusObservation.textChanges);
+      assert.ok(changedTextCount > 0, 'a changed public status should update the existing live text');
+      await assertLocatorFocused(filter, 'automatic refusal recovery must not steal focus');
+      assert.equal(await main.evaluate((element, position) => position <= element.scrollHeight - element.clientHeight, userScroll), true);
+      assert.equal(await main.evaluate((element) => element.scrollTop), userScroll);
+      await revalidateDetail();
+      assert.equal(await statusNode.evaluate((element) => element.automaticStatusObservation.textChanges), changedTextCount);
+      await assertLocatorFocused(filter, 'an identical recovery snapshot must preserve user focus');
+      assert.equal(await main.evaluate((element) => element.scrollTop), userScroll);
+      assert.doesNotMatch(await inspector.innerText(), privateFacts);
+
+      const add = inspector.getByRole('button', { name: 'Add to library', exact: true });
+      await add.focus();
+      await add.press('Enter');
+      const dialog = page.getByRole('dialog', { name: 'Add to library?', exact: true });
+      await assertLocatorFocused(dialog.getByRole('button', { name: 'Cancel', exact: true }), 'automatic refusal uses the existing deliberate confirmation');
+      await dialog.getByText('Quality requirements and file-conflict checks still apply.', { exact: false }).waitFor();
+      assert.equal(fixture.addRequestCount, 0, 'background refusal and opening confirmation do not request another add');
+      const worklistPath = '/api/v1/missing-music/decisions';
+      await Promise.all([
+        page.waitForResponse((response) => new URL(response.url()).pathname === detailPath),
+        page.waitForResponse((response) => new URL(response.url()).pathname === worklistPath),
+        dialog.getByRole('button', { name: 'Add to library', exact: true }).press('Space'),
+      ]);
+      await dialog.waitFor({ state: 'hidden' });
+      await status.filter({ hasText: queuedMessage }).waitFor();
+      assert.equal(fixture.addRequestCount, 1);
+      assert.deepEqual(fixture.addRequest.body, {});
+      assert.match(fixture.addRequest.idempotencyKey, /^missing-music-decisions-add-to-library-/u);
+      await assertLocatorFocused(inspector.getByRole('heading', { name: 'Current status', exact: true }), 'the explicit guarded recovery retains command-owned focus');
+      assert.doesNotMatch(await inspector.innerText(), privateFacts);
+      await statusNode.evaluate((element) => element.automaticStatusObservation.observer.disconnect());
+    }, { scenarioName: 'missing_music_automatic_add_current_recovery' });
   });
 
   test('prepared Add to library is found in the default worklist, confirms by keyboard, and exposes pending after modal closure', {

@@ -20,6 +20,7 @@ export function createImportCandidateApplyQueueService({ assertMaintenanceWriteA
     if (typeof dependency !== 'function') throw new TypeError(`createImportCandidateApplyQueueService requires ${name}`);
   }
   async function queuePreparedImportCandidateApply({ applySafetyMode, importCandidateIds, preparedSummary,
+    automaticLibraryAddAuthority = null,
     queryable = null, requestMetadata = null, triggeredByUserId = null, triggerSource = 'manual' }) {
     const work = async (client) => {
       await assertMaintenanceWriteAllowed({ queryable: client });
@@ -39,6 +40,7 @@ export function createImportCandidateApplyQueueService({ assertMaintenanceWriteA
         throw createApiError(409, 'import_candidate_apply_not_ready', 'No prepared import-pending candidates are executable');
       }
       const run = await createOperationRun({ queryable: client, applySafetyMode, executableCandidateCount,
+        ...(automaticLibraryAddAuthority ? { automaticLibraryAddAuthority } : {}),
         executionMode: 'move', ...(importCandidateIds ? { importCandidateIds } : {}), requestedCandidateCount,
         status: 'pending', triggeredByUserId, triggerSource });
       await recordAuditEventFn({ actorType: triggeredByUserId ? 'user' : 'system', actorUserId: triggeredByUserId,

@@ -6,7 +6,43 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
-## Current development slice (2026-10-03)
+## Current development slice (2026-10-08)
+
+- Automatic Music Queue library-add guards are complete through a
+  narrow system-authority adapter and shared preparation, transaction and worker
+  owners. New jobs retain a distinct persisted source even if candidate context
+  is removed. See the separate [design](MUSIC_QUEUE_AUTOMATIC_LIBRARY_ADD_GUARD_DESIGN.md)
+  and [outcome](MUSIC_QUEUE_AUTOMATIC_LIBRARY_ADD_GUARD_OUTCOME.md) for official
+  research, alternatives, final stack, execution results and evidence limits.
+  Full validation passes 8,799 tests (3,746 server, 4,348 client, 513 script and
+  192 integration), zero failures/skips, all policy/lint checks and both builds.
+  Focused backend 115, canonical projection 19, client 44, browser 20 and
+  PostgreSQL/media 22 (8 new + 14 existing) pass. Focused totals overlap broader
+  validation. Six queued-status captures were reviewed. An existing lifecycle
+  lock-observation failure passed isolated/file/final complete reruns unchanged;
+  its original failure and limits remain recorded in the outcome.
+- Fresh dependency advisories required compatible Vue, sharp, proxy-addr,
+  source-map-js and selector-parser updates. Clean install/security audit and
+  Windows/Linux musl x64 native controls pass; final audit reports zero
+  vulnerabilities at every severity. See the separate dependency
+  [design](DEPENDENCY_SECURITY_UPDATE_2026_10_08_DESIGN.md) and
+  [outcome](DEPENDENCY_SECURITY_UPDATE_2026_10_08_OUTCOME.md) for exact closure,
+  permitted transitive changes, functional evidence and limits.
+- Fresh MCP PR applicability found no eligible unreplayed patch; the three open
+  heads/bases/scopes are unchanged, with an explicit empty second page. See the
+  [PR design](OPEN_PR_APPLICABILITY_AUTOMATIC_ADD_2026_10_DESIGN.md) and
+  [PR outcome](OPEN_PR_APPLICABILITY_AUTOMATIC_ADD_2026_10_OUTCOME.md).
+- The practical [web-standards skill](../.agents/skills/harmoniarr-web-standards/SKILL.md)
+  now maps durable automatic classification/accepted physical identity to its
+  owning run and adverse file evidence. Repository/installed structure and
+  four-file SHA-256 identity pass; no new blind skill trial is claimed.
+- Next recommendation: current-policy handoff for fallback recovery, including
+  explicit exception removal, stricter numeric floors and coordinated delayed
+  failure/promotion/rediscovery writes. This slice does not claim whole-recovery
+  atomicity or automatic retries of skipped prepared downloads.
+- Development remains on main without a release, tag, branch or PR merge.
+
+## Prior development slice: Add to library (2026-10-03)
 
 - Canonical guarded **Add to library** is complete for one
   prepared eligible download, with strict permission and default action-worklist
@@ -34,7 +70,8 @@ Database model source: `docs/DATABASE_MODEL.md`
   validation and four-file identity pass.
 - Next recommendation: extend the shared current-recipient/policy worker guard
   to automatic completed-download Music Queue adds, with consent/quality and
-  durable queue evidence. Current work defers unguarded automatic jobs.
+  durable queue evidence. That recommendation is completed in the
+  current October 8 slice. The October 3 work deferred unguarded automatic jobs.
 - Development remains on main without a release, tag, new branch or PR merge.
 
 ## Prior development slice: Library-add recheck (2026-10-03)

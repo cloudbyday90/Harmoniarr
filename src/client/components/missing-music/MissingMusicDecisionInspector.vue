@@ -230,7 +230,7 @@ defineExpose({ busy, refresh: decisionDetail.refresh });
         <h3 id="missing-music-inspector-current-status" ref="statusHeadingElement" tabindex="-1">Current status</h3>
         <div class="hx-missing-status-snapshot" :aria-busy="busy ? 'true' : undefined">
           <span class="hx-pill" :data-tone="presentation.statusTone">{{ presentation.statusLabel }}</span>
-          <p>{{ presentation.statusMessage }}</p>
+          <p role="status" aria-live="polite" aria-atomic="true">{{ presentation.statusMessage }}</p>
           <p class="missing-music-inspector__next-step"><strong>Next step:</strong> {{ presentation.nextStep }}</p>
         </div>
         <div v-if="presentation.canFindMatches" class="missing-music-inspector__start-download">

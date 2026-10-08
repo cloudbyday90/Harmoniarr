@@ -143,3 +143,22 @@ files match by SHA-256 after the two-reference update. The entry point and
 invocation policy are unchanged. No new blind behavioral trial is claimed.
 Application evidence and its limits are recorded in the separate
 [Add to library outcome](MISSING_MUSIC_ADD_TO_LIBRARY_OUTCOME.md).
+
+## Automatic authority maintenance, October 8
+
+The [automatic library-add design](MUSIC_QUEUE_AUTOMATIC_LIBRARY_ADD_GUARD_DESIGN.md)
+traces delayed system work separately from an explicit command. Independent
+review found two classification/identity boundaries: removing mutable candidate
+context must not turn a guarded job into generic work, and current participant
+membership alone does not retain the accepted physical recipient before worker
+snapshot capture. The project evidence map now locates the owning automatic
+adapter/run/worker boundary and calls for durable classification, bounded
+accepted identity, and actual adverse file evidence.
+
+This is one observed project boundary, not a new broad compliance workflow.
+The entry point and invocation policy are unchanged. Repository and installed
+structure both pass `quick_validate.py`; all four installed files match their
+maintained source by SHA-256 after the reference sync. Application results
+and their limits belong in the separate
+[automatic-add outcome](MUSIC_QUEUE_AUTOMATIC_LIBRARY_ADD_GUARD_OUTCOME.md).
+No new blind behavioral skill trial is claimed.

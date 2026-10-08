@@ -32,8 +32,8 @@ export function createImportCandidateReleaseSafeAddPreparationService({ recheckS
       || participants.some((participant) => participant.metadataReleaseId !== release.metadataReleaseId)) return null;
     return { candidate, participants, decisions };
   }
-  async function verifyPreparedFiles({ prepared, wantedReleaseId, marker }) {
-    const applyPreview = await previewImportCandidateApply({ importCandidateId: prepared.candidate.id });
+  async function verifyPreparedFiles({ prepared, wantedReleaseId, marker, applyPreview: preparedPreview = null }) {
+    const applyPreview = preparedPreview ?? await previewImportCandidateApply({ importCandidateId: prepared.candidate.id });
     if (applyPreview?.summary?.status !== 'ready' || !applyPreview.files?.length
       || !(applyPreview.counts?.readyCount > 0) || applyPreview.files.some((file) => file.status?.code !== 'ready')) return false;
     prepared.qualityContext = await buildRecheckQualityContext(prepared);

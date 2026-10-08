@@ -13,6 +13,7 @@ import { canRecheckLibraryAdd } from '../acquisition/acquisition-library-add-rec
 import { hasQueuedGuardedLibraryAdd, isPreparedReleaseLibraryAddEligible } from '../acquisition/acquisition-library-add-policy.js';
 import { lockImportCandidateApplyCreation } from './import-candidate-apply-queue-store.js';
 import { getRecheckWantedReleaseIds } from './import-candidate-release-recheck-quality-policy.js';
+import { buildAutomaticLibraryAddAuthority } from './import-candidate-music-queue-auto-safe-add-policy.js';
 
 export function createImportCandidateReleaseRecheckGuardService({ assertMaintenanceWriteAllowed, recheckStore, getImportCandidate,
   listFileDecisions, resumeImportCandidateForSafeAdd, queuePreparedImportCandidateApply,
@@ -26,7 +27,9 @@ export function createImportCandidateReleaseRecheckGuardService({ assertMaintena
     saveQualityContext: recheckStore?.saveQualityContext })) {
     if (typeof dependency !== 'function') throw new TypeError(`createImportCandidateReleaseRecheckGuardService requires ${name}`);
   }
-  async function commitPreparedSafeAdd({ prepared, appUserId, wantedReleaseId, actorUserId, requestMetadata }, isPreparedAdd) {
+  async function commitPreparedSafeAdd({ prepared, appUserId, wantedReleaseId, actorUserId, requestMetadata }, mode) {
+    const isPreparedAdd = mode !== 'recheck';
+    const automatic = mode === 'automatic';
     return withTransaction(async (queryable) => {
       await assertMaintenanceWriteAllowed({ queryable });
       const wantedReleaseIds = getRecheckWantedReleaseIds(prepared.candidate);
@@ -53,7 +56,10 @@ export function createImportCandidateReleaseRecheckGuardService({ assertMaintena
         return { outcome: 'not_available' };
       }
       if (!prepared.qualityContext) return { outcome: 'not_available' };
-      const marker = isPreparedAdd ? 'libraryAddRequestedForWantedReleaseId' : 'recheckRequestedForWantedReleaseId';
+      const automaticLibraryAddAuthority = automatic ? buildAutomaticLibraryAddAuthority(candidate) : null;
+      if (automatic && !automaticLibraryAddAuthority) return { outcome: 'not_available' };
+      const marker = automatic ? 'automaticLibraryAddForWantedReleaseId'
+        : isPreparedAdd ? 'libraryAddRequestedForWantedReleaseId' : 'recheckRequestedForWantedReleaseId';
       await recheckStore.saveQualityContext({ importCandidateId: candidate.id, musicQueueContext: { ...prepared.qualityContext, [marker]: wantedReleaseId },
         candidateStatus: isPreparedAdd ? 'import_pending' : 'failed', queryable });
       if (!isPreparedAdd) {
@@ -61,12 +67,15 @@ export function createImportCandidateReleaseRecheckGuardService({ assertMaintena
           reason: 'Automatic library add resumed after prerequisite repair', requestMetadata });
       }
       const started = await queuePreparedImportCandidateApply({ applySafetyMode: 'safe_auto', importCandidateIds: [candidate.id],
+        ...(automatic ? { automaticLibraryAddAuthority } : {}),
         preparedSummary: { counts: { blocked: 0, ready: 1, readyWithWarnings: 0, totalImportPending: 1 },
-          importPendingCandidates: [{ id: candidate.id }] }, queryable, requestMetadata, triggeredByUserId: actorUserId,
-        triggerSource: isPreparedAdd ? 'music_queue_manual_add' : 'music_queue_prerequisite_recheck' });
+          importPendingCandidates: [{ id: candidate.id }] }, queryable, requestMetadata, triggeredByUserId: automatic ? null : actorUserId,
+        triggerSource: automatic ? 'music_queue_download_completed'
+          : isPreparedAdd ? 'music_queue_manual_add' : 'music_queue_prerequisite_recheck' });
       return { outcome: 'queued', runId: started.run.id };
     });
   }
-  return { commitPreparedReleaseRecheck: (input) => commitPreparedSafeAdd(input, false),
-    commitPreparedReleaseLibraryAdd: (input) => commitPreparedSafeAdd(input, true) };
+  return { commitPreparedReleaseRecheck: (input) => commitPreparedSafeAdd(input, 'recheck'),
+    commitPreparedReleaseLibraryAdd: (input) => commitPreparedSafeAdd(input, 'manual'),
+    commitPreparedAutomaticLibraryAdd: (input) => commitPreparedSafeAdd(input, 'automatic') };
 }
