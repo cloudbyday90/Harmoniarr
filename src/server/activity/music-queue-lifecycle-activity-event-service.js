@@ -125,6 +125,8 @@ export function buildMusicQueueRecoveryActivityEvent({
   operationRunId = null,
   recovery = null,
 } = {}) {
+  if (recovery?.episodeReplayed) return null;
+  if (recovery?.scopedRecovery && !recovery.terminalObservationRecorded && !recovery.scopedRecoveryQueued && !recovery.rediscovery?.scheduled) return null;
   if (!candidate || !recovery || typeof recovery !== 'object') {
     return null;
   }

@@ -154,6 +154,7 @@ test('reconcileImportCandidateExecutionState starts safe auto apply after comple
   assert.equal(startSafeApplyRunAfterDownloadCompleted.mock.callCount(), 1);
   assert.deepEqual(startSafeApplyRunAfterDownloadCompleted.mock.calls[0].arguments, [{
     importCandidateId: 'candidate-complete-1',
+    operationRunId: 'run-completed-auto-apply',
     requestMetadata: { ipAddress: '127.0.0.1', userAgent: 'test-agent' },
   }]);
   assert.equal(result.summary.autoApplyStarted, 1);

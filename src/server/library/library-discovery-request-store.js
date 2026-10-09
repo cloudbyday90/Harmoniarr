@@ -20,6 +20,8 @@ import { getPool } from '../database.js';
 import { normalizeMetadataReleaseDateForDateColumn } from '../metadata/metadata-release-date-normalization.js';
 import { createLibraryDiscoveryRequestWantedReleaseLinkStore } from './library-discovery-request-wanted-release-link-store.js';
 import { isMusicQueueRediscoveryInProgress } from '../acquisition/acquisition-rediscovery-policy.js';
+import { createDatabaseTransactionRunner } from '../database-transaction-service.js';
+import { createMusicQueueRecoveryStore } from '../import-candidates/music-queue-recovery-store.js';
 
 function normalizeLinkedWantedReleaseIds(value) {
   if (!Array.isArray(value)) {
@@ -121,6 +123,8 @@ const FOLDER_SETUP_RECOVERY_REASONS = Object.freeze([
 export function createLibraryDiscoveryRequestStore({
   getPoolFn = getPool,
   libraryDiscoveryRequestWantedReleaseLinkStore = createLibraryDiscoveryRequestWantedReleaseLinkStore(),
+  withTransaction = createDatabaseTransactionRunner({ getPoolFn }),
+  recoveryStore = createMusicQueueRecoveryStore({ getPoolFn }),
 } = {}) {
   async function listDiscoveryRequestsByMetadataReleaseIds({ metadataReleaseIds } = {}) {
     if (!Array.isArray(metadataReleaseIds) || metadataReleaseIds.length < 1) {
@@ -170,8 +174,12 @@ export function createLibraryDiscoveryRequestStore({
   async function claimNextReadyAutomaticDiscoveryRequest({
     dispatchedAt,
     nextSearchAfter,
+    metadataReleaseId = null,
+    runId = null,
+    queryable = null,
   }) {
-    const pool = getPoolFn();
+    const pool = queryable ?? getPoolFn();
+    const scoped = metadataReleaseId != null && runId != null;
     const result = await pool.query(
       `
         WITH candidate AS (
@@ -224,6 +232,24 @@ export function createLibraryDiscoveryRequestStore({
             ON TRUE
           WHERE library_discovery_requests.search_mode = 'automatic'
             AND library_discovery_requests.request_status = 'ready'
+            AND library_discovery_requests.evidence #>> '{downloadRecoveryRediscovery,state}' IS DISTINCT FROM 'guard_refused'
+            ${scoped ? `AND library_discovery_requests.metadata_release_id = $3::uuid
+              AND library_discovery_requests.evidence #>> '{downloadRecoveryRediscovery,owningRunId}' = $4::text
+              AND EXISTS (SELECT 1 FROM operation_runs reservation
+                WHERE reservation.id = $4::uuid AND reservation.status IN ('pending','running')
+                  AND reservation.operation_type = 'library_discovery_dispatch'
+                  AND reservation.summary->>'triggerSource' = 'music_queue_fallback_rediscovery'
+                  AND reservation.summary #>> '{musicQueueRecovery,metadataReleaseId}' = $3::text
+                  AND reservation.summary #>> '{musicQueueRecovery,superseded}' IS DISTINCT FROM 'true'
+                  AND reservation.summary #>> '{musicQueueRecovery,retired}' IS DISTINCT FROM 'true')`
+    : `AND (library_discovery_requests.evidence #>> '{downloadRecoveryRediscovery,owningRunId}' IS NULL
+                OR library_discovery_requests.evidence #>> '{downloadRecoveryRediscovery,state}' = 'completed')
+              AND NOT EXISTS (SELECT 1 FROM operation_runs reservation
+                WHERE reservation.status IN ('pending','running') AND reservation.operation_type = 'library_discovery_dispatch'
+                  AND reservation.summary->>'triggerSource' = 'music_queue_fallback_rediscovery'
+                  AND reservation.summary #>> '{musicQueueRecovery,metadataReleaseId}' = library_discovery_requests.metadata_release_id::text
+                  AND reservation.summary #>> '{musicQueueRecovery,superseded}' IS DISTINCT FROM 'true'
+                  AND reservation.summary #>> '{musicQueueRecovery,retired}' IS DISTINCT FROM 'true')`}
             AND COALESCE(library_discovery_requests.next_search_after, $1::timestamptz) <= $1::timestamptz
           ORDER BY
             library_discovery_requests.next_search_after ASC NULLS FIRST,
@@ -242,6 +268,7 @@ export function createLibraryDiscoveryRequestStore({
             evidence = COALESCE(candidate.evidence, '{}'::jsonb) || jsonb_build_object(
               'dispatchStrategy', 'slskd_search_dispatch',
               'lastDispatchAttemptedAt', $1
+              ${scoped ? ", 'lastDispatchRunId', $4::text" : ''}
             ),
             updated_at = NOW()
           FROM candidate
@@ -272,7 +299,7 @@ export function createLibraryDiscoveryRequestStore({
         JOIN candidate
           ON candidate.id = claimed.id
       `,
-      [dispatchedAt, nextSearchAfter],
+      [dispatchedAt, nextSearchAfter, ...(scoped ? [metadataReleaseId, runId] : [])],
     );
 
     return mapDiscoveryDispatchRow(result.rows[0]);
@@ -390,6 +417,7 @@ export function createLibraryDiscoveryRequestStore({
     errorMessage,
     metadataReleaseId,
     searchQuery,
+    recoveryRunId = null,
   }) {
     const pool = getPoolFn();
     await pool.query(
@@ -406,13 +434,15 @@ export function createLibraryDiscoveryRequestStore({
           ),
           updated_at = NOW()
         WHERE metadata_release_id = $4
+          ${recoveryRunId ? "AND evidence #>> '{downloadRecoveryRediscovery,owningRunId}' = $5::text AND evidence->>'lastDispatchRunId' = $5::text" : ''}
       `,
-      [errorCode, errorMessage, searchQuery, metadataReleaseId],
+      [errorCode, errorMessage, searchQuery, metadataReleaseId, ...(recoveryRunId ? [recoveryRunId] : [])],
     );
   }
 
   async function recordDiscoverySearchSuccess({
     autoDownloadReadiness = null,
+    autoDownloadStart = null,
     autoSelection = null,
     candidateCount,
     fileCount,
@@ -422,13 +452,16 @@ export function createLibraryDiscoveryRequestStore({
     searchId,
     searchAttemptCount = undefined,
     searchQuery,
+    recoveryRunId = null,
+    queryable = null,
   }) {
-    const pool = getPoolFn();
+    const pool = queryable ?? getPoolFn();
+    const startParameter = recoveryRunId ? 12 : 11;
     await pool.query(
       `
         UPDATE library_discovery_requests
         SET
-          evidence = COALESCE(evidence, '{}'::jsonb) || jsonb_build_object(
+          evidence = ${recoveryRunId ? "jsonb_set(COALESCE(evidence, '{}'::jsonb),'{downloadRecoveryRediscovery,state}','\"completed\"'::jsonb)" : "COALESCE(evidence, '{}'::jsonb)"} || jsonb_build_object(
             'dispatchStrategy', 'slskd_search_dispatch',
             'lastDispatchFailure', NULL,
             'lastSearchId', $1::text,
@@ -438,6 +471,7 @@ export function createLibraryDiscoveryRequestStore({
               'autoDownloadReadiness', $10::jsonb,
               'candidateCount', $3::integer,
               'autoSelection', $9::jsonb,
+              ${autoDownloadStart != null ? `'autoDownloadStart', $${startParameter}::jsonb,` : ''}
               'fileCount', $4::integer,
               'ingestionDiagnostics', $8::jsonb,
               'sourceProvider', 'slskd'
@@ -448,6 +482,7 @@ export function createLibraryDiscoveryRequestStore({
           search_attempt_count = COALESCE($6::integer, search_attempt_count),
           updated_at = NOW()
         WHERE metadata_release_id = $5
+          ${recoveryRunId ? "AND evidence #>> '{downloadRecoveryRediscovery,owningRunId}' = $11::text AND evidence->>'lastDispatchRunId' = $11::text" : ''}
       `,
       [
         searchId,
@@ -460,6 +495,8 @@ export function createLibraryDiscoveryRequestStore({
         ingestionDiagnostics ? JSON.stringify(ingestionDiagnostics) : null,
         autoSelection ? JSON.stringify(autoSelection) : null,
         autoDownloadReadiness ? JSON.stringify(autoDownloadReadiness) : null,
+        ...(recoveryRunId ? [recoveryRunId] : []),
+        ...(autoDownloadStart != null ? [JSON.stringify(autoDownloadStart)] : []),
       ],
     );
   }
@@ -730,6 +767,8 @@ export function createLibraryDiscoveryRequestStore({
     wantedReleaseId = null,
     queryable = null,
   }) {
+    if (!queryable) return withTransaction((client) => requestMusicQueueRediscovery({ metadataReleaseId, reasonCode,
+      requestedAt, requestedByUserId, wantedReleaseId, queryable: client }));
     const pool = queryable ?? getPoolFn();
     const result = await pool.query(
       `
@@ -818,6 +857,7 @@ export function createLibraryDiscoveryRequestStore({
 
     const discoveryRequest = mapDiscoveryRequestStateRow(result.rows[0]);
     if (discoveryRequest) {
+      await recoveryStore.supersedeDiscoveryReservations({ metadataReleaseId, queryable });
       return {
         discoveryRequest,
         restartDisposition: 'started',
@@ -844,6 +884,8 @@ export function createLibraryDiscoveryRequestStore({
     wantedReleaseId = null,
     queryable = null,
   }) {
+    if (!queryable) return withTransaction((client) => allowMusicQueueFallbackQuality({ allowedAt, allowedByUserId,
+      metadataReleaseId, priorQualityProfile, reasonCode, wantedReleaseId, queryable: client }));
     const pool = queryable ?? getPoolFn();
     const result = await pool.query(
       `
@@ -859,6 +901,7 @@ export function createLibraryDiscoveryRequestStore({
             evidence = (
               COALESCE(evidence, '{}'::jsonb)
                 - 'searchExhausted'
+                - 'downloadRecoveryRediscovery'
             ) || jsonb_build_object(
               'musicQueueRediscovery',
               jsonb_build_object(
@@ -939,7 +982,9 @@ export function createLibraryDiscoveryRequestStore({
       ],
     );
 
-    return mapDiscoveryRequestStateRow(result.rows[0]);
+    const updated = mapDiscoveryRequestStateRow(result.rows[0]);
+    if (updated) await recoveryStore.supersedeDiscoveryReservations({ metadataReleaseId, queryable });
+    return updated;
   }
 
   async function markDiscoveryRequestExhausted({
@@ -947,6 +992,7 @@ export function createLibraryDiscoveryRequestStore({
     reasonCode = 'discovery_search_attempts_exhausted',
     searchAttemptCount,
     searchQuery,
+    recoveryRunId = null,
   }) {
     const pool = getPoolFn();
     await pool.query(
@@ -968,8 +1014,9 @@ export function createLibraryDiscoveryRequestStore({
           ),
           updated_at = NOW()
         WHERE metadata_release_id = $1
+          ${recoveryRunId ? "AND evidence #>> '{downloadRecoveryRediscovery,owningRunId}' = $5::text AND evidence->>'lastDispatchRunId' = $5::text" : ''}
       `,
-      [metadataReleaseId, searchQuery, searchAttemptCount, reasonCode],
+      [metadataReleaseId, searchQuery, searchAttemptCount, reasonCode, ...(recoveryRunId ? [recoveryRunId] : [])],
     );
   }
 
@@ -1041,17 +1088,23 @@ export function createLibraryDiscoveryRequestStore({
               metadata_release_group_id = EXCLUDED.metadata_release_group_id,
               wanted_status = EXCLUDED.wanted_status,
               search_mode = EXCLUDED.search_mode,
-              request_status = EXCLUDED.request_status,
-              blocked_reason = EXCLUDED.blocked_reason,
+              request_status = CASE WHEN library_discovery_requests.blocked_reason = 'recovery_scope_changed'
+                THEN 'blocked' ELSE EXCLUDED.request_status END,
+              blocked_reason = CASE WHEN library_discovery_requests.blocked_reason = 'recovery_scope_changed'
+                THEN library_discovery_requests.blocked_reason ELSE EXCLUDED.blocked_reason END,
               release_date = EXCLUDED.release_date,
               last_search_at = EXCLUDED.last_search_at,
-              next_search_after = EXCLUDED.next_search_after,
+              next_search_after = CASE WHEN library_discovery_requests.blocked_reason = 'recovery_scope_changed'
+                THEN NULL ELSE EXCLUDED.next_search_after END,
               manual_requested_at = EXCLUDED.manual_requested_at,
               search_attempt_count = EXCLUDED.search_attempt_count,
               research_attempt_count = EXCLUDED.research_attempt_count,
-              evidence = EXCLUDED.evidence,
+              evidence = CASE WHEN library_discovery_requests.blocked_reason = 'recovery_scope_changed'
+                THEN library_discovery_requests.evidence ELSE EXCLUDED.evidence END,
               last_evaluated_at = EXCLUDED.last_evaluated_at,
               updated_at = EXCLUDED.updated_at
+            WHERE library_discovery_requests.evidence #>> '{downloadRecoveryRediscovery,owningRunId}'
+              IS NOT DISTINCT FROM EXCLUDED.evidence #>> '{downloadRecoveryRediscovery,owningRunId}'
           `,
           [
             discoveryRequest.metadataArtistId,

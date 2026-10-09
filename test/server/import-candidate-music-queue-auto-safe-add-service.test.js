@@ -30,7 +30,7 @@ function fixture(overrides = {}) {
     safeAutoAddQualityGateService: { evaluateSafeAutoAddQuality: async (input) => { gates.push(input); return { eligible: true }; } },
     commitPreparedAutomaticLibraryAdd: async (input) => { commits.push(input); return { outcome: 'queued', runId: 'run-1' }; },
     handleImportCandidateImportBlocker: async (input) => { recoveries.push(input); return { recovered: true }; }, ...overrides });
-  const start = () => service.startAutomaticMusicQueueLibraryAdd({ candidate: structuredClone(candidate) });
+  const start = () => service.startAutomaticMusicQueueLibraryAdd({ candidate: structuredClone(candidate), operationRunId: 'execution-origin-1' });
   return { start, service, candidate, participants, release, commits, recoveries, gates, previews: () => previews };
 }
 
@@ -99,20 +99,37 @@ test('only exact guarded sources and markers coalesce; generic or unmarked activ
 });
 
 const missingPreview = { summary: { status: 'blocked', message: 'missing source' }, counts: { missingSourceCount: 1 }, preview: { validation: { blockers: [] } } };
-test('legitimate unchanged missing-source recovery retains its separate owner; newly stricter requirements refuse delegation', async () => {
+test('missing-source blocker forwards its original execution attempt to owning recovery even when current policy is stricter', async () => {
   const f = fixture({ previewImportCandidateApply: async () => missingPreview });
   assert.equal((await f.start()).skippedReason, 'completed_source_unavailable'); assert.equal(f.recoveries.length, 1);
   assert.equal(f.recoveries[0].canRecover, true); assert.equal(f.commits.length, 0);
+  assert.equal(f.recoveries[0].operationRunId, 'execution-origin-1');
+  assert.equal(f.recoveries[0].observation.candidateId, 'candidate-1');
+  assert.equal(f.recoveries[0].observation.sourceSearchId, 'current-search');
   const changed = fixture({ previewImportCandidateApply: async () => missingPreview });
   changed.candidate.normalizedPayload.musicQueue.minimumBitrateKbps = 256;
-  assert.deepEqual(await changed.start(), { outcome: 'not_available', skippedReason: 'current_policy_changed' });
-  assert.equal(changed.recoveries.length, 0);
+  assert.equal((await changed.start()).outcome, 'still_needs_review');
+  assert.equal(changed.recoveries.length, 1);
+  assert.equal(changed.recoveries[0].operationRunId, 'execution-origin-1');
+  assert.equal(changed.recoveries[0].canRecover, true);
+  assert.equal(changed.commits.length, 0);
+  assert.equal(Object.hasOwn(changed.recoveries[0], 'qualityOverride'), false);
 });
 
-test('candidate or consent drift while blocker preview awaits refuses legacy recovery handoff', async () => {
+test('blocker preview drift forwards the pre-await observation rather than treating changed provenance as current', async () => {
   let f;
-  f = fixture({ previewImportCandidateApply: async () => { f.candidate.folderPath = 'changed'; return missingPreview; } });
-  assert.deepEqual(await f.start(), { outcome: 'not_available' }); assert.equal(f.recoveries.length, 0);
+  f = fixture({ previewImportCandidateApply: async () => { await Promise.resolve(); f.candidate.folderPath = 'changed';
+    f.candidate.sourceSearchId = 'newer-search'; return missingPreview; } });
+  f.candidate.folderPath = 'original-folder';
+  assert.equal((await f.start()).outcome, 'still_needs_review');
+  assert.equal(f.recoveries.length, 1);
+  assert.equal(f.recoveries[0].observation.folderPath, 'original-folder');
+  assert.equal(f.recoveries[0].observation.sourceSearchId, 'current-search');
+  assert.equal(f.recoveries[0].operationRunId, 'execution-origin-1');
+  assert.equal(f.commits.length, 0);
+});
+
+test('legacy compatibility policy does not infer revoked or malformed fallback consent', () => {
   const consent = { mode: 'allow_fallback_quality', wantedReleaseId: wantedId };
   const candidate = { normalizedPayload: { musicQueue: { wantedReleaseId: wantedId, profileCode: 'lossless_archive', qualityOverride: consent } } };
   assert.equal(hasCompatibleAutomaticRecoveryRequirement(candidate, { profileCode: 'lossless_archive', qualityOverride: null }), false);

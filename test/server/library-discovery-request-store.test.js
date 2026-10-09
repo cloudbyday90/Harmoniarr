@@ -1,6 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+test('owned recovery success uses its supplied transaction and retains typed-child diagnostics', async () => {
+  const writes = [];
+  const store = createLibraryDiscoveryRequestStore({ getPoolFn: () => assert.fail('Owned success cannot leave its transaction') });
+  await store.recordDiscoverySearchSuccess({ metadataReleaseId: 'release', searchId: 'new-search', searchQuery: 'Artist Release',
+    candidateCount: 1, fileCount: 1, recoveryRunId: 'own-search', autoDownloadStart: { started: true, runId: 'typed-child' },
+    queryable: { query: async (sql, params) => { writes.push({ sql, params }); return { rows: [], rowCount: 1 }; } },
+  });
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].params[10], 'own-search');
+  assert.deepEqual(JSON.parse(writes[0].params[11]), { started: true, runId: 'typed-child' });
+});
+
 import { createLibraryDiscoveryRequestStore } from '../../src/server/library/library-discovery-request-store.js';
 
 test('listDiscoveryRequestsByMetadataReleaseIds returns current request state for targeted releases', async (t) => {
@@ -289,6 +301,7 @@ test('consumeProviderRecoveryPending atomically clears one durable provider-reco
 });
 
 test('requestMusicQueueRediscovery resets one release into ready automatic search state', async (t) => {
+  const superseded = [];
   const query = t.mock.fn(async (sql, params) => {
     assert.match(sql, /request_status = 'ready'/);
     assert.match(sql, /last_search_at = NULL/);
@@ -334,9 +347,9 @@ test('requestMusicQueueRediscovery resets one release into ready automatic searc
       }],
     };
   });
-  const store = createLibraryDiscoveryRequestStore({
-    getPoolFn: () => ({ query }),
-  });
+  const store = createLibraryDiscoveryRequestStore({ getPoolFn: () => ({ query }),
+    withTransaction: async (run) => run({ query }),
+    recoveryStore: { supersedeDiscoveryReservations: async (input) => superseded.push(input.metadataReleaseId) } });
 
   const result = await store.requestMusicQueueRediscovery({
     metadataReleaseId: 'release-1',
@@ -350,6 +363,7 @@ test('requestMusicQueueRediscovery resets one release into ready automatic searc
   assert.equal(result.discoveryRequest.requestStatus, 'ready');
   assert.equal(result.discoveryRequest.blockedReason, null);
   assert.equal(result.discoveryRequest.nextSearchAfter, '2026-06-29T12:00:00.000Z');
+  assert.deepEqual(superseded, ['release-1']);
 });
 
 test('requestMusicQueueRediscovery reports an already queued restart without rewriting shared state', async (t) => {
@@ -385,9 +399,9 @@ test('requestMusicQueueRediscovery reports an already queued restart without rew
       }],
     };
   });
-  const store = createLibraryDiscoveryRequestStore({
-    getPoolFn: () => ({ query }),
-  });
+  const store = createLibraryDiscoveryRequestStore({ getPoolFn: () => ({ query }),
+    withTransaction: async (run) => run({ query }),
+    recoveryStore: { supersedeDiscoveryReservations: async () => assert.fail('Replay cannot supersede an existing intent') } });
 
   const result = await store.requestMusicQueueRediscovery({
     metadataReleaseId: 'release-1',
@@ -403,6 +417,7 @@ test('requestMusicQueueRediscovery reports an already queued restart without rew
 });
 
 test('allowMusicQueueFallbackQuality records override and queues rediscovery', async (t) => {
+  const superseded = [];
   const query = t.mock.fn(async (sql, params) => {
     assert.match(sql, /'musicQueueQualityOverride'/);
     assert.match(sql, /'mode', 'allow_fallback_quality'/);
@@ -443,9 +458,9 @@ test('allowMusicQueueFallbackQuality records override and queues rediscovery', a
       }],
     };
   });
-  const store = createLibraryDiscoveryRequestStore({
-    getPoolFn: () => ({ query }),
-  });
+  const store = createLibraryDiscoveryRequestStore({ getPoolFn: () => ({ query }),
+    withTransaction: async (run) => run({ query }),
+    recoveryStore: { supersedeDiscoveryReservations: async (input) => superseded.push(input.metadataReleaseId) } });
 
   const result = await store.allowMusicQueueFallbackQuality({
     allowedAt: '2026-06-29T13:00:00.000Z',
@@ -459,6 +474,7 @@ test('allowMusicQueueFallbackQuality records override and queues rediscovery', a
   assert.equal(result.requestStatus, 'ready');
   assert.equal(result.blockedReason, null);
   assert.equal(result.evidence.musicQueueQualityOverride.mode, 'allow_fallback_quality');
+  assert.deepEqual(superseded, ['release-1']);
 });
 
 test('scheduleDownloadRecoveryRediscovery records delayed automatic rediscovery state', async (t) => {

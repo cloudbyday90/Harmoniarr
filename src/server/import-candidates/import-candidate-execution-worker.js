@@ -16,6 +16,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { captureRecoveryObservation, matchesAcceptedRecoveryProvenance } from './music-queue-recovery-policy.js';
+import { hasPersistedMusicQueueOwnership } from './import-candidate-music-queue-auto-safe-add-policy.js';
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
 import {
   isOperationRunCancellationError,
@@ -81,7 +83,8 @@ function buildRunTriggerSummary({
 
 function hasUnconfirmedDownloadHandoff(item) {
   const state = item?.planningSnapshot?.execution?.handoff?.state;
-  return state === 'dispatching' || state === 'awaiting_confirmation';
+  return state === 'dispatching' || state === 'awaiting_confirmation'
+    || (state === 'confirmed' && item?.planningSnapshot?.execution?.enqueuedTransfers?.length > 0);
 }
 
 function buildDownloadHandoffSnapshot({
@@ -135,6 +138,13 @@ export function createImportCandidateExecutionWorker({
     requestedFileCount: 0,
   }),
   getImportCandidate = async () => null,
+  ownsRecoveryCandidate = ({ candidate }) => hasPersistedMusicQueueOwnership(candidate),
+  resolveRecoveryExecution = async () => null,
+  assertRecoveryExecutionCurrent = async () => {},
+  retireRecoveryExecution = async () => {},
+  isCurrentExecutionObservation = async () => true,
+  recordAcceptedCandidateObservation = async () => {},
+  transitionOwnedExecutionCandidate = null,
   handleImportCandidateDownloadFailure = async () => ({ recovered: false }),
   isCancellationRequested,
   markRunPaused,
@@ -259,7 +269,7 @@ export function createImportCandidateExecutionWorker({
       const processedCandidateIds = new Set();
 
       async function appendRecoveryCandidate(recoveryResult) {
-        if (!recoveryResult?.recovered || !recoveryResult.nextCandidateId) {
+        if (recoveryResult?.scopedRecoveryQueued || recoveryResult?.episodeReplayed || !recoveryResult?.recovered || !recoveryResult.nextCandidateId) {
           return null;
         }
 
@@ -344,6 +354,7 @@ export function createImportCandidateExecutionWorker({
         }
 
         const candidate = await getImportCandidate({ importCandidateId: summaryCandidate.id });
+        const sourceObservation = captureRecoveryObservation(candidate);
         const requestedFiles = buildEnqueueRequests((candidate?.files ?? []).filter((file) => !file.isLocked));
 
         if (requestedFiles.length === 0) {
@@ -372,9 +383,11 @@ export function createImportCandidateExecutionWorker({
         }
 
         if (hasUnconfirmedDownloadHandoff(persistedItem)) {
+          const earlierObservation = baseSnapshot.execution?.acceptedCandidateObservation ?? baseSnapshot.execution?.sourceObservation;
+          const earlierFiles = baseSnapshot.execution?.requestedFiles ?? requestedFiles;
           const confirmation = await findMatchingTransfers({
-            requestedFiles,
-            username: summaryCandidate.username,
+            requestedFiles: earlierFiles,
+            username: earlierObservation?.username ?? summaryCandidate.username,
           });
 
           if (!confirmation.allRequestedFilesMatched) {
@@ -433,10 +446,19 @@ export function createImportCandidateExecutionWorker({
             },
             statusMessage,
           });
-          await markImportCandidateDownloading({
+          const ownedConfirmation = await ownsRecoveryCandidate({ candidate, operationRunId: runId });
+          const canConfirmCandidate = !ownedConfirmation || (matchesAcceptedRecoveryProvenance(candidate, earlierObservation)
+            && await isCurrentExecutionObservation({ candidateId: candidate.id, operationRunId: runId }));
+          const confirmedTransition = canConfirmCandidate ? ownedConfirmation && typeof transitionOwnedExecutionCandidate === 'function'
+            ? await transitionOwnedExecutionCandidate({ candidateId: candidate.id, operationRunId: runId,
+              observation: earlierObservation, targetStatus: 'downloading', reason: statusMessage })
+            : await markImportCandidateDownloading({
             importCandidateId: summaryCandidate.id,
             reason: statusMessage,
-          });
+          }) : null;
+          if (confirmedTransition?.candidate) await recordAcceptedCandidateObservation({ importCandidateId: candidate.id,
+            operationRunId: runId, observation: { ...(earlierObservation ?? sourceObservation), status: confirmedTransition.candidate.status,
+              updatedAt: confirmedTransition.candidate.updatedAt?.toISOString?.() ?? confirmedTransition.candidate.updatedAt } });
           recordActivityEventSafely(
             recordActivityEventFn,
             buildMusicQueueDownloadStartedActivityEvent({
@@ -448,6 +470,13 @@ export function createImportCandidateExecutionWorker({
           continue;
         }
 
+        let preparedRecovery;
+        try {
+          preparedRecovery = await resolveRecoveryExecution({ candidate, runId, triggerSource });
+        } catch (error) {
+          if (error?.code === 'music_queue_recovery_not_current') await retireRecoveryExecution({ runId, candidateId: candidate.id, sourceObservation });
+          throw error;
+        }
         const handoffStartedAt = new Date().toISOString();
         await updateImportExecutionRunItem({
           importCandidateId: summaryCandidate.id,
@@ -469,11 +498,19 @@ export function createImportCandidateExecutionWorker({
                 state: 'dispatching',
               },
               requestedFiles,
+              sourceObservation,
             },
           },
           statusMessage: 'Sending the download request to slskd and recording its confirmation.',
         });
 
+        try {
+          await assertRecoveryExecutionCurrent({ candidateId: candidate.id, runId, triggerSource, prepared: preparedRecovery });
+        } catch (error) {
+          if (error?.code === 'music_queue_recovery_not_current') await retireRecoveryExecution({ runId, candidateId: candidate.id,
+            sourceObservation, knownDispatchStartedAt: handoffStartedAt });
+          throw error;
+        }
         const enqueueResult = await enqueueDownloads({
           files: requestedFiles,
           username: summaryCandidate.username,
@@ -531,6 +568,7 @@ export function createImportCandidateExecutionWorker({
                 downloadAcceptance: diagnostic,
               },
               enqueuedTransfers: enqueueResult.enqueued,
+              sourceObservation,
               failedFilenames: enqueueResult.failed,
               handoff: {
                 dispatchStartedAt: handoffStartedAt,
@@ -546,15 +584,14 @@ export function createImportCandidateExecutionWorker({
         });
 
         if (itemStatus === 'queue_failed') {
-          await markImportCandidateDownloadFailed({
-            importCandidateId: summaryCandidate.id,
-            reason: statusMessage,
-          });
+          const scopedObservation = await ownsRecoveryCandidate({ candidate, operationRunId: runId });
+          if (!scopedObservation) await markImportCandidateDownloadFailed({ importCandidateId: summaryCandidate.id, reason: statusMessage });
           const recoveryResult = await handleImportCandidateDownloadFailure({
             failedCandidateId: summaryCandidate.id,
             failureReason: statusMessage,
             operationRunId: runId,
             scheduleFollowUpRun: false,
+            ...(scopedObservation ? { observation: sourceObservation } : {}),
           });
           recordActivityEventSafely(
             recordActivityEventFn,
@@ -564,7 +601,7 @@ export function createImportCandidateExecutionWorker({
               recovery: recoveryResult,
             }),
           );
-          if (recoveryResult?.recovered) {
+          if (recoveryResult?.recovered && !recoveryResult.episodeReplayed) {
             const recoveryMessage = `Recovery cascade promoted candidate ${recoveryResult.nextCandidateId}.`;
             await updateImportExecutionRunItem({
               importCandidateId: summaryCandidate.id,
@@ -596,10 +633,17 @@ export function createImportCandidateExecutionWorker({
             await appendRecoveryCandidate(recoveryResult);
           }
         } else {
-          await markImportCandidateDownloading({
+          const ownedAcceptance = await ownsRecoveryCandidate({ candidate, operationRunId: runId });
+          const acceptedTransition = ownedAcceptance && typeof transitionOwnedExecutionCandidate === 'function'
+            ? await transitionOwnedExecutionCandidate({ candidateId: candidate.id, operationRunId: runId,
+              observation: sourceObservation, targetStatus: 'downloading', reason: statusMessage })
+            : await markImportCandidateDownloading({
             importCandidateId: summaryCandidate.id,
             reason: statusMessage,
           });
+          if (acceptedTransition?.candidate) await recordAcceptedCandidateObservation({ importCandidateId: candidate.id,
+            operationRunId: runId, observation: { ...sourceObservation, status: acceptedTransition.candidate.status,
+              updatedAt: acceptedTransition.candidate.updatedAt?.toISOString?.() ?? acceptedTransition.candidate.updatedAt } });
           recordActivityEventSafely(
             recordActivityEventFn,
             buildMusicQueueDownloadStartedActivityEvent({

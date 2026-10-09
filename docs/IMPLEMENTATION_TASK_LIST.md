@@ -8,6 +8,45 @@ Database model source: `docs/DATABASE_MODEL.md`
 
 ## Current development slice (2026-10-08)
 
+- Scoped Music Queue fallback recovery is implemented through fresh
+  consent/floor/format requirements, a source-attempt ledger, atomic durable
+  intent and delayed worker/provider guards. See the separate
+  [design](MUSIC_QUEUE_FALLBACK_RECOVERY_DESIGN.md) and
+  [outcome](MUSIC_QUEUE_FALLBACK_RECOVERY_OUTCOME.md) for official research,
+  alternatives, stack and actual validation limits. Complete validation passes
+  8,880 tests (3,788 server, 4,348 client, 513 script and 231 integration), zero
+  failures/skips, all policy/lint checks and both builds. Separate checks pass
+  21 browser scenarios, 83 public server tests, 30 client tests and 39 PostgreSQL
+  scenarios across the new boundaries. Audit reports zero vulnerabilities.
+  Focused totals overlap the broad run. Original legacy
+  fixture/setup failures and corrected complete rerun are recorded separately.
+- The compatible music-metadata 11.16.0 update removes a newly reported moderate
+  package finding covering two parser advisories. Clean install, all-severity
+  audit, six focused consumer tests and real/bounded parser controls pass. See its
+  [design](MUSIC_METADATA_SECURITY_UPDATE_2026_10_DESIGN.md) and
+  [outcome](MUSIC_METADATA_SECURITY_UPDATE_2026_10_OUTCOME.md) for exact limits.
+- Fresh MCP PR applicability found no eligible unreplayed patch; all three
+  observed heads/bases/file scopes are unchanged, with an explicit empty second
+  page. See its [design](OPEN_PR_APPLICABILITY_RECOVERY_2026_10_DESIGN.md) and
+  [outcome](OPEN_PR_APPLICABILITY_RECOVERY_2026_10_OUTCOME.md).
+- Next recommendation: bind lost-response transfer confirmation to the accepted
+  provider attempt. Current filename/size matching over retained history cannot
+  distinguish an old identical transfer. Preserve uncertain dispatch; inspect
+  actual provider identity/time contracts and test partial acceptance without
+  assuming external exactly-once execution. This follow-up remains unimplemented.
+- The [scoped-overrides skill](../.agents/skills/harmoniarr-scoped-overrides/SKILL.md)
+  now maps explicit null, all valid participant floors and durable recovery
+  attempts to their owning consumers. Source/installed validation and three-file
+  identity pass; no new blind behavioral trial is claimed.
+- The practical [web-standards skill](../.agents/skills/harmoniarr-web-standards/SKILL.md)
+  now maps delayed recovery, conditional refusal retirement, truthful current
+  progress and positive post-ingest handoff. Source/installed validation and
+  four-file identity pass; invocation
+  policy is unchanged and no new blind behavioral trial is claimed.
+- Development remains on main without a release, tag, branch or PR merge.
+
+## Prior development slice: Automatic library-add guards (2026-10-08)
+
 - Automatic Music Queue library-add guards are complete through a
   narrow system-authority adapter and shared preparation, transaction and worker
   owners. New jobs retain a distinct persisted source even if candidate context
@@ -38,7 +77,8 @@ Database model source: `docs/DATABASE_MODEL.md`
   four-file SHA-256 identity pass; no new blind skill trial is claimed.
 - Next recommendation: current-policy handoff for fallback recovery, including
   explicit exception removal, stricter numeric floors and coordinated delayed
-  failure/promotion/rediscovery writes. This slice does not claim whole-recovery
+  failure/promotion/rediscovery writes. It is being implemented in the current
+  recovery slice above. The automatic-add slice does not claim whole-recovery
   atomicity or automatic retries of skipped prepared downloads.
 - Development remains on main without a release, tag, branch or PR merge.
 

@@ -162,3 +162,28 @@ maintained source by SHA-256 after the reference sync. Application results
 and their limits belong in the separate
 [automatic-add outcome](MUSIC_QUEUE_AUTOMATIC_LIBRARY_ADD_GUARD_OUTCOME.md).
 No new blind behavioral skill trial is claimed.
+
+## Fallback recovery maintenance, October 8
+
+The [fallback recovery design](MUSIC_QUEUE_FALLBACK_RECOVERY_DESIGN.md) exposed
+two related standards/evidence boundaries: competing terminal observations must
+share one durable attempt, and a refused delayed intent must leave a usable
+stopped state without releasing uncertain provider work. The project evidence
+map now locates the owning recovery transaction and delayed provider guards,
+with conditional retirement, newer-intent preservation and truthful progress
+counterexamples. Pending matches, historical transfer evidence and a refused
+child's old search deadline are insufficient evidence of work in progress.
+The positive search-result handoff also maps each later side effect to its owner:
+pre-search or zero-result controls cannot prove an automatic download after
+awaited ingestion/readiness. The reference now locates actual persisted
+ingestion/scoring and the atomic typed-child boundary for that positive case.
+The official-practices reference also records fresh October 8 discovery/review
+for authorization patterns, business logic, short PostgreSQL transactions and
+status-message guidance. Earlier rows retain their separate consultation date.
+
+This reference maintenance keeps the entry point and invocation policy unchanged.
+Repository and installed structure both pass `quick_validate.py`; all four
+installed files match their maintained source by SHA-256 after synchronization.
+These checks validate skill structure and identity, not application behavior or
+a fresh blind skill trial. Executed recovery evidence and limits belong in the
+separate [recovery outcome](MUSIC_QUEUE_FALLBACK_RECOVERY_OUTCOME.md).

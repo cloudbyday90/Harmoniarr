@@ -181,3 +181,19 @@ before broadening automatic retry guarantees.
 
 Development remains on main. No separate branch, tag, release, PR merge,
 workflow dispatch or image publication is performed by this slice.
+
+## Scoped recovery follow-through, October 8
+
+The next recommendation above is implemented in the separate
+[fallback recovery design](MUSIC_QUEUE_FALLBACK_RECOVERY_DESIGN.md) and
+[outcome](MUSIC_QUEUE_FALLBACK_RECOVERY_OUTCOME.md). Its owning transaction now
+consumes current scope/requirements and coordinates stopped history, one attempt
+and an exact execution/discovery child. Positive search results continue through
+an atomic scoped selection/child handoff. Delayed consumers preserve uncertainty
+and recheck before provider work.
+
+The automatic-add adapter now forwards captured originating observations to that
+owner, including genuine quality stops under changed requirements. The earlier
+unchanged-requirement refusal described here is historical behavior. Its original
+validation totals remain this slice's evidence; final combined results and legacy
+compatibility limits belong in the recovery outcome.

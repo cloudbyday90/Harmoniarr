@@ -2,6 +2,23 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createLibraryDiscoveryWorker } from '../../src/server/library/library-discovery-worker.js';
 
+test('a scoped recovery child forwards its owning run and skips unrelated reconciliation and artwork', async () => {
+  const calls = [];
+  let released;
+  const done = new Promise((resolve) => { released = resolve; });
+  const worker = createLibraryDiscoveryWorker({ acquireLease: async () => {},
+    markRunStarted: async () => {}, markRunCompleted: async () => {}, markRunFailed: async () => assert.fail('Scoped dispatch should finish'),
+    releaseLease: async () => released(),
+    reconcileWantedReleases: async () => assert.fail('A scoped child cannot reconcile unrelated wanted releases'),
+    reconcileDiscoveryRequests: async () => assert.fail('A scoped child cannot reconcile unrelated discovery requests'),
+    prefetchMonitoredArtistArtwork: async () => assert.fail('A scoped child cannot prefetch unrelated artwork'),
+    dispatchDiscoveryRequests: async (input) => { calls.push(input); return { attemptedCount: 1, dispatchedCount: 1 }; },
+  });
+  await worker.startWorkerRun({ runId: 'scoped-run', triggerSource: 'music_queue_fallback_rediscovery' });
+  await done;
+  assert.deepEqual(calls, [{ actorUserId: null, requestMetadata: null, runId: 'scoped-run', triggerSource: 'music_queue_fallback_rediscovery' }]);
+});
+
 test('createLibraryDiscoveryWorker reconciles and dispatches a protected discovery run', async (t) => {
   const acquireLease = t.mock.fn(async () => {});
   const dispatchDiscoveryRequests = t.mock.fn(async () => ({

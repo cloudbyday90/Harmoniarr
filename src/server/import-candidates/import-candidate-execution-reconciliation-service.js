@@ -16,6 +16,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { hasPersistedMusicQueueOwnership } from './import-candidate-music-queue-auto-safe-add-policy.js';
+import { matchesAcceptedRecoveryProvenance } from './music-queue-recovery-policy.js';
 import {
   buildPersistedExecutionMissingTransferState,
   buildPersistedExecutionTransferSnapshot,
@@ -131,6 +133,10 @@ function buildUpdatedPlanningSnapshot(item, checkedAt) {
 export function createImportCandidateExecutionReconciliationService({
   buildImportCandidateExecutionSummary = async () => ({ currentRun: null }),
   getImportCandidate = async () => null,
+  ownsRecoveryCandidate = ({ candidate }) => hasPersistedMusicQueueOwnership(candidate),
+  isCurrentExecutionObservation = async () => true,
+  recordAcceptedCandidateObservation = async () => {},
+  transitionOwnedExecutionCandidate = null,
   markImportCandidateDownloadFailed = async () => null,
   markImportCandidateDownloading = async () => null,
   markImportCandidateImportPending = async () => null,
@@ -181,14 +187,24 @@ export function createImportCandidateExecutionReconciliationService({
 
         if (confirmed && importCandidateId) {
           const candidate = await getImportCandidate({ importCandidateId });
+          const scoped = await ownsRecoveryCandidate({ candidate, operationRunId: run?.id ?? null });
+          const accepted = item.planningSnapshot?.execution?.acceptedCandidateObservation ?? item.planningSnapshot?.execution?.sourceObservation;
+          if (scoped && (!matchesAcceptedRecoveryProvenance(candidate, accepted)
+            || !await isCurrentExecutionObservation({ candidateId: importCandidateId, operationRunId: run?.id ?? null }))) continue;
           if (candidate?.status === 'selected') {
-            const result = await markImportCandidateDownloading({
+            const result = scoped && typeof transitionOwnedExecutionCandidate === 'function'
+              ? await transitionOwnedExecutionCandidate({ candidateId: importCandidateId, operationRunId: run.id,
+                observation: accepted, targetStatus: 'downloading', reason: handoffMessage })
+              : await markImportCandidateDownloading({
               actorUserId,
               importCandidateId,
               reason: handoffMessage,
               requestMetadata,
             });
             if (result?.candidate) {
+              await recordAcceptedCandidateObservation({ importCandidateId, operationRunId: run.id,
+                observation: { ...accepted, status: result.candidate.status,
+                  updatedAt: result.candidate.updatedAt?.toISOString?.() ?? result.candidate.updatedAt } });
               transitions.push({
                 fromStatus: candidate.status,
                 importCandidateId,
@@ -223,23 +239,36 @@ export function createImportCandidateExecutionReconciliationService({
         continue;
       }
 
+      const scopedObservation = await ownsRecoveryCandidate({ candidate, operationRunId: run?.id ?? null });
+      const observation = item.planningSnapshot?.execution?.acceptedCandidateObservation
+        ?? item.planningSnapshot?.execution?.sourceObservation ?? null;
+      if (scopedObservation && ['import_pending','downloading'].includes(targetStatus)
+        && (!matchesAcceptedRecoveryProvenance(candidate, observation)
+          || !await isCurrentExecutionObservation({ candidateId: importCandidateId, operationRunId: run?.id ?? null }))) continue;
       const reason = item.liveTransferSummary?.message ?? item.statusMessage ?? null;
       let result = null;
 
       if (targetStatus === 'downloading') {
-        result = await markImportCandidateDownloading({
+        result = scopedObservation && typeof transitionOwnedExecutionCandidate === 'function'
+          ? await transitionOwnedExecutionCandidate({ candidateId: importCandidateId, operationRunId: run.id,
+            observation, targetStatus, reason }) : await markImportCandidateDownloading({
           actorUserId,
           importCandidateId,
           reason,
           requestMetadata,
         });
+        if (scopedObservation && result?.candidate) await recordAcceptedCandidateObservation({ importCandidateId, operationRunId: run.id,
+          observation: { ...observation, status: result.candidate.status,
+            updatedAt: result.candidate.updatedAt?.toISOString?.() ?? result.candidate.updatedAt } });
       } else if (targetStatus === 'retry_rejected') {
         result = await handleImportCandidateRejectedTransfer({
           failedCandidateId: importCandidateId,
           failureReason: reason,
           operationRunId: run?.id ?? null,
           scheduleFollowUpRun: true,
+          ...(scopedObservation ? { observation } : {}),
         });
+        if (result?.episodeReplayed) continue;
         if (result?.retrySameCandidate) {
           retries.push(result);
         } else if (result?.recovered) {
@@ -256,7 +285,9 @@ export function createImportCandidateExecutionReconciliationService({
           }),
         );
       } else if (targetStatus === 'import_pending') {
-        result = await markImportCandidateImportPending({
+        result = scopedObservation && typeof transitionOwnedExecutionCandidate === 'function'
+          ? await transitionOwnedExecutionCandidate({ candidateId: importCandidateId, operationRunId: run.id,
+            observation, targetStatus, reason }) : await markImportCandidateImportPending({
           actorUserId,
           importCandidateId,
           reason,
@@ -283,6 +314,7 @@ export function createImportCandidateExecutionReconciliationService({
           const autoApplyRun = await startSafeApplyRunAfterDownloadCompleted({
             importCandidateId,
             requestMetadata,
+            ...(run?.id ? { operationRunId: run.id } : {}),
           });
           autoApplyRuns.push(autoApplyRun);
 
@@ -304,19 +336,16 @@ export function createImportCandidateExecutionReconciliationService({
           }
         }
       } else if (targetStatus === 'failed') {
-        result = await markImportCandidateDownloadFailed({
-          actorUserId,
-          importCandidateId,
-          reason,
-          requestMetadata,
-        });
+        if (!scopedObservation) result = await markImportCandidateDownloadFailed({ actorUserId, importCandidateId, reason, requestMetadata });
         const recovery = await handleImportCandidateDownloadFailure({
           failedCandidateId: importCandidateId,
           failureReason: reason,
           operationRunId: run?.id ?? null,
           scheduleFollowUpRun: run?.status !== 'pending' && run?.status !== 'running',
           terminalOutcome: item.liveTransferSummary?.terminalOutcome ?? undefined,
+          ...(scopedObservation ? { observation } : {}),
         });
+        if (recovery?.episodeReplayed) continue;
         if (recovery?.recovered) {
           recoveries.push(recovery);
         } else if (recovery?.rediscovery?.scheduled) {

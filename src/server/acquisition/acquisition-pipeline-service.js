@@ -116,6 +116,8 @@ function buildMatchEvidence(release) {
     addBlockerCode: importReviewSummary.latestAddBlockerCode ?? null,
     confirmedTransferCandidateCount: getCount(confirmedTransferSummary.candidateCount),
     confirmedTransferCount: getCount(confirmedTransferSummary.transferCount),
+    currentConfirmedTransferCount: getCount(importReviewSummary.currentConfirmedTransferCount),
+    currentExecutionStatusCounts: importReviewSummary.currentExecutionStatusCounts ?? {},
     executionStatusCounts: executionSummary.itemStatusCounts ?? {},
     latestEventType: importReviewSummary.latestEventType ?? null,
     latestConfirmedTransferAt: confirmedTransferSummary.latestConfirmedAt ?? null,
@@ -124,6 +126,9 @@ function buildMatchEvidence(release) {
     matches: Array.isArray(importReviewSummary.matches) ? importReviewSummary.matches : [],
     pendingCount: getStatusCount(statusCounts, 'pending') + getStatusCount(statusCounts, 'held'),
     recoverySelectedCount: getCount(importReviewSummary.recoverySelectedCount),
+    recoveryExecution: importReviewSummary.recoveryExecution ?? null,
+    legacyRecoverySelection: importReviewSummary.legacyRecoverySelection === true,
+    recoverySelectionNeedsReview: importReviewSummary.recoverySelectionNeedsReview === true,
     readiness: importReviewSummary.selectionReadiness ?? null,
     scoredCount: importReviewSummary.selectionReadiness?.scoredCandidateCount ?? 0,
     secondBestCompositeScore: importReviewSummary.secondBestCompositeScore ?? null,
@@ -163,6 +168,7 @@ function buildSearchEvidence(release) {
     nextSearchAfter: discoveryRequest.nextSearchAfter ?? null,
     searchAttemptCount: discoveryRequest.searchAttemptCount ?? 0,
     searchMode: discoveryRequest.searchMode ?? null,
+    recoveryDiscovery: discoveryRequest.recoveryDiscovery ?? null,
     status: discoveryRequest.requestStatus ?? null,
   };
 }
@@ -177,6 +183,16 @@ function buildReleaseEvidence(release) {
 
 function buildQualityEvidence(release, qualityPolicyService) {
   return evaluateReleaseQualityEvidence(release, qualityPolicyService);
+}
+
+const privateMatchReadFields = new Set(['currentConfirmedTransferCount', 'currentExecutionStatusCounts', 'legacyRecoverySelection',
+  'recoveryExecution', 'recoverySelectionNeedsReview']);
+
+function buildPublicProjectionEvidence(evidence) {
+  return { ...evidence,
+    match: Object.fromEntries(Object.entries(evidence.match).filter(([field]) => !privateMatchReadFields.has(field))),
+    search: Object.fromEntries(Object.entries(evidence.search).filter(([field]) => field !== 'recoveryDiscovery')),
+  };
 }
 
 export function projectMusicQueueRelease(
@@ -202,7 +218,7 @@ export function projectMusicQueueRelease(
 
   return {
     artistName: release.artistName,
-    evidence,
+    evidence: buildPublicProjectionEvidence(evidence),
     expectedTrackCount: release.expectedTrackCount ?? 0,
     id: release.id,
     lastReconciledAt: release.lastReconciledAt ?? null,

@@ -37,7 +37,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
   const libraryDiscoveryRunService = { startLibraryDiscoveryRun };
   const libraryDiscoveryRunStore = {};
   const libraryDiscoveryRequestService = { reconcileDiscoveryRequests };
-  const libraryDiscoveryRequestStore = {};
+  const libraryDiscoveryRequestStore = { recordDiscoverySearchSuccess: async () => {} };
   const retryDownloadRecoveryDiscoveryRequest = () => {};
   const libraryDiscoveryRecoveryRetryService = { retryDownloadRecoveryDiscoveryRequest };
   const libraryDiscoveryRediscoveryService = {};
@@ -242,7 +242,7 @@ test('createLibraryModule initializes the default discovery worker after pause s
     libraryDiscoveryRequestService: {
       reconcileDiscoveryRequests: async () => {},
     },
-    libraryDiscoveryRequestStore: {},
+    libraryDiscoveryRequestStore: { recordDiscoverySearchSuccess: async () => {} },
     libraryDiscoveryRediscoveryService: {},
     libraryDiscoveryFolderSetupRecoveryService: {},
     libraryDiscoveryRunService: {

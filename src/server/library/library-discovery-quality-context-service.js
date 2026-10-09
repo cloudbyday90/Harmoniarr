@@ -57,7 +57,11 @@ export function createLibraryDiscoveryQualityContextService({ getUserPreferences
       const explicitProfile = link.qualityProfile ?? null;
       const profileCode = link.isDisabled === true ? 'lossless_archive'
         : resolveAcquisitionQualityProfileCode({ explicitProfile, userPreferences: preferences });
-      return { link, profileCode, minimumBitrateKbps: preferences?.minimumQuality === 'high' ? 320 : 256,
+      const scopedFloor = isScopedQualityFallbackOverride(link.qualityOverride, link.wantedReleaseId)
+        && typeof link.qualityOverride.minimumBitrateKbps === 'number' && Number.isFinite(link.qualityOverride.minimumBitrateKbps)
+        && link.qualityOverride.minimumBitrateKbps >= 256 && link.qualityOverride.minimumBitrateKbps <= 10_000
+        ? link.qualityOverride.minimumBitrateKbps : 0;
+      return { link, profileCode, minimumBitrateKbps: Math.max(preferences?.minimumQuality === 'high' ? 320 : 256, scopedFloor),
         known: hasKnownRequirement(explicitProfile, preferences),
         hasConsent: link.isDisabled !== true && isScopedQualityFallbackOverride(link.qualityOverride, link.wantedReleaseId) };
     }));

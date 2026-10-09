@@ -14,6 +14,8 @@ import { createImportCandidateModule } from '../../src/server/import-candidates/
 import { createMediaInspectionService } from '../../src/server/media/media-inspection-service.js';
 import { createImportCandidateSafeAutoAddQualityGateService } from '../../src/server/import-candidates/import-candidate-safe-auto-add-quality-gate.js';
 import { buildRecheckQualityContext, getRecheckWantedReleaseIds } from '../../src/server/import-candidates/import-candidate-release-recheck-quality-policy.js';
+import { captureRecoveryObservation } from '../../src/server/import-candidates/music-queue-recovery-policy.js';
+import { replaceImportExecutionRunItems } from '../../src/server/import-candidates/import-candidate-execution-repository.js';
 import { listImportCandidateFileDecisions, upsertImportCandidateFileDecision } from '../../src/server/import-candidates/import-candidate-file-decision-repository.js';
 import { createIntegrationAppRuntime } from '../../testing/integration/app-runtime.js';
 import { bootstrapAdminSession } from '../../testing/integration/auth-helpers.js';
@@ -24,11 +26,11 @@ import { isSkippableIntegrationRuntimeError, toIntegrationRuntimeUnavailableReas
 
 const config = resolveIntegrationTestRuntimeConfig();
 let runtime; let module; let fixtureRoot; let unavailableReason; let mediaUnavailableReason;
-let inspectionHook; let gateHook; let controlledGate = false; let recoveryCalls = [];
+let inspectionHook; let gateHook; let controlledGate = false; let recoveryCalls = []; let recoveryDecisions = [];
 const mediaFixture = createLibraryAddMediaFixture({ getFixtureRoot: () => fixtureRoot });
 const actualGate = createImportCandidateSafeAutoAddQualityGateService();
 async function seed(pool, owner, workspaceDir, options = {}) {
-  fixtureRoot = workspaceDir; inspectionHook = null; gateHook = null; controlledGate = false; recoveryCalls = [];
+  fixtureRoot = workspaceDir; inspectionHook = null; gateHook = null; controlledGate = false; recoveryCalls = []; recoveryDecisions = [];
   return seedOwnedLibraryAddFixture({ pool, owner, workspaceDir, mediaFixture, ...options });
 }
 const start = (fixture) => module.importCandidateAutoApplyRunService.startSafeApplyRunAfterDownloadCompleted({ importCandidateId: fixture.candidateId });
@@ -65,7 +67,11 @@ suite('Automatic Music Queue library addition with PostgreSQL and test-owned mea
               // Only the explicitly labelled revocation timing case substitutes the completed proof result.
               return controlledGate ? { eligible: true, profileCode: input.summaryCandidate.musicQueueContext?.profileCode } : result;
             } },
-            importCandidateRecoveryService: { handleImportCandidateQualityFailure: async (input) => { recoveryCalls.push(input); return { recovered: false }; },
+            importCandidateRecoveryService: { handleImportCandidateQualityFailure: async (input) => {
+              recoveryCalls.push(input);
+              const result = await module.musicQueueRecoveryService.handleMusicQueueRecovery({ ...input, kind: 'quality' });
+              recoveryDecisions.push(result); return result;
+            },
               handleImportCandidateDownloadFailure: async () => ({ recovered: false }), handleImportCandidateImportBlocker: async (input) => { recoveryCalls.push(input); return { recovered: false }; },
               handleImportCandidateRejectedTransfer: async () => ({ recovered: false }) },
           }); return module;
@@ -86,8 +92,17 @@ suite('Automatic Music Queue library addition with PostgreSQL and test-owned mea
       await pool.query("UPDATE import_candidates SET normalized_payload=jsonb_set(normalized_payload,'{requestOwnership}',$2::jsonb) WHERE id=$1", [fixture.candidateId, JSON.stringify(ownership)]);
       const preview = await module.importCandidateApplyPreviewService.previewImportCandidateApply({ importCandidateId: fixture.candidateId });
       const bytes = await readFile(fixture.sourcePath); assert.equal(preview.files[0].inspection.metadata.primaryAudioCodec, 'pcm_s16le');
+      const observed = captureRecoveryObservation(await module.importCandidateService.getImportCandidate({ importCandidateId: fixture.candidateId }));
+      const origin = await module.importCandidateExecutionRunStore.createOperationRun({ status: 'completed', requestedCandidateCount: 1,
+        summary: { triggerSource: 'missing_music_manual', selectedCandidateId: fixture.candidateId,
+          sourceWantedReleaseId: fixture.wantedId, sourceSearchId: observed.sourceSearchId } });
+      const planningSnapshot = { execution: { acceptedCandidateObservation: observed, handoff: { state: 'confirmed' } } };
+      await replaceImportExecutionRunItems(origin.id, [{ importCandidateId: fixture.candidateId, position: 1,
+        itemStatus: 'queued', statusMessage: 'Controlled accepted download completed', planningSnapshot }], pool);
       const reconciled = await module.importCandidateExecutionReconciliationService.reconcileImportCandidateExecutionSummary({
-        executionSummary: { currentRun: { items: [{ importCandidateId: fixture.candidateId, liveTransferSummary: { status: 'completed', message: 'Controlled files complete' } }] } } });
+        executionSummary: { currentRun: { id: origin.id, items: [{ importCandidateId: fixture.candidateId, planningSnapshot,
+          statusMessage: 'Controlled accepted download completed',
+          liveTransferSummary: { status: 'completed', message: 'Controlled files complete' } }] } } });
       assert.equal(reconciled.summary.autoApplyStarted, 1, JSON.stringify(reconciled));
       const accepted = reconciled.autoApplyRuns[0]; assert.equal(accepted.triggerSource, 'download_completed');
       const runBefore = (await pool.query('SELECT summary,triggered_by_user_id FROM operation_runs WHERE id=$1', [accepted.runId])).rows[0];
@@ -234,7 +249,7 @@ suite('Automatic Music Queue library addition with PostgreSQL and test-owned mea
     }, { scenarioName: 'automatic_library_add_worker_provenance' });
   });
 
-  test('queued current strict policy and actual consent revocation after a controlled proof result refuse mutation and stale recovery', { timeout: config.scenarioTimeoutMs }, async (t) => {
+  test('queued current strict policy and consent revocation refuse mutation while genuine quality stops reach the owning recovery', { timeout: config.scenarioTimeoutMs }, async (t) => {
     if (unavailableReason || mediaUnavailableReason) { t.skip(unavailableReason || mediaUnavailableReason); return; }
     await runtime.runScenario(async ({ client, getPoolFn, workspaceDir }) => {
       await bootstrapAdminSession(client); const pool = getPoolFn();
@@ -243,7 +258,12 @@ suite('Automatic Music Queue library addition with PostgreSQL and test-owned mea
       const accepted = await start(fixture); assert.equal(accepted.started, true);
       await pool.query("UPDATE app_users SET user_preferences='{\"minimumQuality\":\"lossless\",\"preferredFormat\":\"flac\"}' WHERE id=$1", [owner.id]);
       const strictRun = await runWorker(pool, accepted.runId); assert.equal(strictRun.appliedCount, 0); assert.equal(strictRun.qualityBlockedCount, 1);
-      assert.equal(recoveryCalls.length, 0); await assert.rejects(stat(preview.files[0].libraryTarget.path), { code: 'ENOENT' });
+      assert.equal(recoveryCalls.length, 1); assert.equal(recoveryCalls[0].operationRunId, accepted.runId);
+      assert.equal(recoveryCalls[0].observation.candidateId, fixture.candidateId);
+      assert.equal(recoveryDecisions[0].scopedRecovery, true); assert.equal(recoveryDecisions[0].terminalObservationRecorded, true);
+      assert.equal(recoveryDecisions[0].recovered, false);
+      assert.equal((await module.importCandidateService.getImportCandidate({ importCandidateId: fixture.candidateId })).downloadAttemptCount, 0);
+      await assert.rejects(stat(preview.files[0].libraryTarget.path), { code: 'ENOENT' });
       for (const [variant, username] of [['mutation', 'auto-revoke-mutation'], ['quality_recovery', 'auto-revoke-recovery']]) {
         const recipient = await createLibraryAddFixtureUser(client, pool, username, { minimumQuality: 'lossless', preferredFormat: 'flac' });
         const current = await seed(pool, recipient, workspaceDir, { profileCode: 'lossless_archive' });
@@ -256,7 +276,13 @@ suite('Automatic Music Queue library addition with PostgreSQL and test-owned mea
         if (variant === 'quality_recovery') controlledGate = false;
         gateHook = async () => { await pool.query("UPDATE library_discovery_request_wanted_release_links SET evidence=evidence-'musicQueueQualityOverride' WHERE wanted_release_id=$1", [current.wantedId]); };
         const completed = await runWorker(pool, queued.runId); gateHook = null; controlledGate = false;
-        assert.equal(completed.appliedCount, 0); assert.equal(recoveryCalls.length, 0);
+        assert.equal(completed.appliedCount, 0); assert.equal(recoveryCalls.length, variant === 'quality_recovery' ? 1 : 0);
+        if (variant === 'quality_recovery') {
+          assert.equal(recoveryCalls[0].operationRunId, queued.runId);
+          assert.equal(recoveryDecisions[0].recovered, false); assert.equal(recoveryDecisions[0].scopedRecovery, true);
+          assert.equal(recoveryDecisions[0].terminalObservationRecorded, true);
+          assert.equal((await module.importCandidateService.getImportCandidate({ importCandidateId: current.candidateId })).downloadAttemptCount, 0);
+        }
         assert.ok((completed.applyFailedCount ?? 0) + (completed.qualityBlockedCount ?? 0) > 0);
         await assert.rejects(stat(plan.files[0].libraryTarget.path), { code: 'ENOENT' }); assert.ok((await stat(current.sourcePath)).isFile());
       }

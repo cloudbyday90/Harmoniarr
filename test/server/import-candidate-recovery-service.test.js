@@ -2,74 +2,83 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createImportCandidateRecoveryService } from '../../src/server/import-candidates/import-candidate-recovery-service.js';
 import { createAcquisitionQualityPolicyService } from '../../src/server/acquisition/acquisition-quality-policy-service.js';
-import { buildStageCandidateBase } from '../../src/server/import-candidates/import-candidate-stage-summary.js';
-import { createImportCandidateSafeAutoAddQualityGateService } from '../../src/server/import-candidates/import-candidate-safe-auto-add-quality-gate.js';
 
-test('recovery skips older weaker or differently scoped context and retains the effective floor through staging and measured add', async (t) => {
-  const context = { profileCode: 'high_quality', minimumBitrateKbps: 320, wantedReleaseId: 'wanted' };
-  const failed = { id: 'failed', sourceSearchId: 'new-search', normalizedPayload: {
-    musicQueue: context, discoveryScope: { metadataReleaseId: 'release' },
-  } };
-  const candidates = [
-    { id: 'older', normalizedPayload: { extensions: ['mp3'], bitrateKbps: 320, musicQueue: { profileCode: 'high_quality', wantedReleaseId: 'wanted' } } },
-    { id: 'other-target', normalizedPayload: { extensions: ['mp3'], bitrateKbps: 320, musicQueue: { ...context, wantedReleaseId: 'other' } } },
-    { id: 'current', normalizedPayload: { extensions: ['mp3'], bitrateKbps: 320, musicQueue: context } },
-  ];
-  const promote = t.mock.fn(async ({ importCandidateId }) => candidates.find((candidate) => candidate.id === importCandidateId));
+test('all four owned recovery adapters forward captured attempt identity and use the coordinator decision', async () => {
+  const failed = { id: 'failed', sourceSearchId: 'search', normalizedPayload: { musicQueue: null } };
+  const observation = { candidateId: 'failed', sourceSearchId: 'search', status: 'downloading' };
+  const delegated = [];
+  const decision = { recovered: true, scopedRecovery: true, scopedRecoveryQueued: true, recoveryRunId: 'child-run' };
+  const noGeneric = () => assert.fail('owned recovery must not invoke generic writes or selection');
   const service = createImportCandidateRecoveryService({ getImportCandidate: async () => failed,
-    incrementImportCandidateDownloadAttemptCountFn: async () => failed,
-    findNextCandidateForRecoveryFn: async ({ excludeCandidateIds = [] }) => candidates.find((candidate) => !excludeCandidateIds.includes(candidate.id)) ?? null,
-    promoteImportCandidateForRecoveryFn: promote, qualityPolicyService: createAcquisitionQualityPolicyService() });
-  const result = await service.handleImportCandidateDownloadFailure({ failedCandidateId: 'failed' });
-  assert.equal(result.nextCandidateId, 'current');
-  assert.equal(result.skippedCandidateCount, 2);
-  assert.ok(result.skippedCandidates.every((candidate) => candidate.reason === 'recovery_quality_context_incompatible'));
-  assert.deepEqual(promote.mock.calls[0].arguments[0].expectedMusicQueueContext, context);
-  const staged = buildStageCandidateBase(candidates[2]);
-  assert.equal(staged.musicQueueContext.minimumBitrateKbps, 320);
-  const gate = createImportCandidateSafeAutoAddQualityGateService();
-  const measured = await gate.evaluateSafeAutoAddQuality({ summaryCandidate: staged, applyPreview: { files: [{
-    filename: 'Track.mp3', status: { code: 'ready' }, inspection: { metadata: {
-      primaryAudioCodec: 'mp3', containerFormatName: 'mp3', bitRate: 256000,
-    }, warnings: [] },
-  }] } });
-  assert.equal(measured.eligible, false);
-  assert.equal(measured.checkedFileCount, 1);
+    musicQueueRecoveryService: {
+      ownsRecoveryCandidate: async ({ candidate, operationRunId }) => candidate === failed && operationRunId === 'origin-run',
+      handleMusicQueueRecovery: async (input) => { delegated.push(input); return decision; },
+    },
+    incrementImportCandidateDownloadAttemptCountFn: noGeneric, markImportCandidateDownloadFailed: noGeneric,
+    markImportCandidateQualityFailed: noGeneric, markImportCandidateImportBlocked: noGeneric,
+    findNextCandidateForRecoveryFn: noGeneric, promoteImportCandidateForRecoveryFn: noGeneric,
+    retryImportCandidateDownload: noGeneric, createRecoveryExecutionRun: noGeneric,
+  });
+  for (const [method, kind] of [['handleImportCandidateDownloadFailure', 'download'], ['handleImportCandidateQualityFailure', 'quality'],
+    ['handleImportCandidateImportBlocker', 'import'], ['handleImportCandidateRejectedTransfer', 'rejected']]) {
+    const result = await service[method]({ failedCandidateId: 'failed', operationRunId: 'origin-run', observation,
+      failureReason: 'observed failure', profileCode: 'any_available', qualityOverride: null, scheduleFollowUpRun: false, canRecover: true });
+    assert.equal(result, decision);
+    assert.equal(delegated.at(-1).kind, kind);
+    assert.equal(delegated.at(-1).observation, observation);
+    assert.equal(delegated.at(-1).operationRunId, 'origin-run');
+    assert.equal(Object.hasOwn(delegated.at(-1), 'qualityOverride'), false);
+    assert.equal(Object.hasOwn(delegated.at(-1), 'profileCode'), false);
+  }
+  assert.equal(delegated.length, 4);
 });
 
-test('recovery never grafts saved fallback consent onto an older candidate for another recipient', async (t) => {
-  const context = { profileCode: 'lossless_archive', wantedReleaseId: 'wanted',
-    qualityOverride: { mode: 'allow_fallback_quality', wantedReleaseId: 'wanted' } };
-  const failed = { id: 'failed', sourceSearchId: 'search', normalizedPayload: { musicQueue: context } };
-  const older = { id: 'older', normalizedPayload: { extensions: ['mp3'], bitrateKbps: 320, musicQueue: {
-    ...context, wantedReleaseId: 'other', qualityOverride: { mode: 'allow_fallback_quality', wantedReleaseId: 'other' },
-  } } };
-  const promote = t.mock.fn(async () => older);
+test('a known owned source without mutable context still delegates instead of using a generic recovery loop', async () => {
+  const failed = { id: 'failed', sourceSearchId: 'search', normalizedPayload: {} };
+  const decision = { recovered: false, scopedRecovery: true, reason: 'recovery_scope_not_current' };
   const service = createImportCandidateRecoveryService({ getImportCandidate: async () => failed,
-    incrementImportCandidateDownloadAttemptCountFn: async () => failed,
-    findNextCandidateForRecoveryFn: async ({ excludeCandidateIds = [] }) => excludeCandidateIds.includes('older') ? null : older,
-    promoteImportCandidateForRecoveryFn: promote, qualityPolicyService: createAcquisitionQualityPolicyService() });
-  const result = await service.handleImportCandidateDownloadFailure({ failedCandidateId: 'failed' });
-  assert.equal(result.recovered, false);
-  assert.equal(promote.mock.callCount(), 0);
-  assert.equal(older.normalizedPayload.musicQueue.qualityOverride.wantedReleaseId, 'other');
+    musicQueueRecoveryService: { ownsRecoveryCandidate: async ({ operationRunId }) => operationRunId === 'known-owned-run',
+      handleMusicQueueRecovery: async () => decision },
+    incrementImportCandidateDownloadAttemptCountFn: () => assert.fail('context loss cannot increment generic attempts'),
+    findNextCandidateForRecoveryFn: () => assert.fail('context loss cannot select generic replacements'),
+  });
+  assert.equal(await service.handleImportCandidateDownloadFailure({ failedCandidateId: 'failed', operationRunId: 'known-owned-run' }), decision);
 });
 
-test('intrinsic High floor cannot recover into an older Any available policy', async (t) => {
-  const failed = { id: 'failed', sourceSearchId: 'search', normalizedPayload: {
-    musicQueue: { profileCode: 'high_quality', wantedReleaseId: 'wanted' },
-  } };
-  const older = { id: 'older', normalizedPayload: { extensions: ['mp3'], bitrateKbps: 320,
-    musicQueue: { profileCode: 'any_available', wantedReleaseId: 'wanted' } } };
-  const promote = t.mock.fn(async () => older);
-  const service = createImportCandidateRecoveryService({ getImportCandidate: async () => failed,
-    incrementImportCandidateDownloadAttemptCountFn: async () => failed,
-    findNextCandidateForRecoveryFn: async ({ excludeCandidateIds = [] }) => excludeCandidateIds.includes('older') ? null : older,
-    promoteImportCandidateForRecoveryFn: promote, qualityPolicyService: createAcquisitionQualityPolicyService() });
-  const result = await service.handleImportCandidateDownloadFailure({ failedCandidateId: 'failed' });
-  assert.equal(result.recovered, false);
-  assert.equal(promote.mock.callCount(), 0);
-  assert.equal(result.skippedCandidates[0].reason, 'recovery_quality_context_incompatible');
+test('owned presence with a missing coordinator fails before every generic recovery side effect', async () => {
+  const noGeneric = () => assert.fail('missing owning service cannot authorize generic recovery');
+  for (const normalizedPayload of [{ musicQueue: null }, { musicQueue: {} }, { musicQueueContext: 'malformed' }]) {
+    const service = createImportCandidateRecoveryService({ getImportCandidate: async () => ({ id: 'failed', normalizedPayload }),
+      incrementImportCandidateDownloadAttemptCountFn: noGeneric, markImportCandidateDownloadFailed: noGeneric,
+      markImportCandidateQualityFailed: noGeneric, markImportCandidateImportBlocked: noGeneric,
+      findNextCandidateForRecoveryFn: noGeneric, promoteImportCandidateForRecoveryFn: noGeneric,
+      retryImportCandidateDownload: noGeneric, createRecoveryExecutionRun: noGeneric,
+      scheduleDownloadRecoveryRediscovery: noGeneric,
+    });
+    for (const method of ['handleImportCandidateDownloadFailure', 'handleImportCandidateQualityFailure',
+      'handleImportCandidateImportBlocker', 'handleImportCandidateRejectedTransfer']) {
+      await assert.rejects(service[method]({ failedCandidateId: 'failed', canRecover: true }),
+        { name: 'TypeError', message: 'Music Queue recovery owner is required' });
+    }
+  }
+});
+
+test('unowned generic recovery cannot graft caller consent while explicit null or omission retains strict evaluation', async () => {
+  const failed = { id: 'failed', sourceSearchId: 'search', normalizedPayload: {} };
+  const successor = { id: 'successor', normalizedPayload: { extensions: ['mp3'], bitrateKbps: 320 } };
+  for (const qualityOverride of [{ mode: 'allow_fallback_quality', wantedReleaseId: 'generic-target' }, null, undefined]) {
+    let promoted = 0;
+    const service = createImportCandidateRecoveryService({ getImportCandidate: async () => failed,
+      incrementImportCandidateDownloadAttemptCountFn: async () => ({ ...failed, downloadAttemptCount: 1 }),
+      findNextCandidateForRecoveryFn: async ({ excludeCandidateIds = [] }) => excludeCandidateIds.includes('successor') ? null : successor,
+      promoteImportCandidateForRecoveryFn: async () => { promoted += 1; return successor; },
+      qualityPolicyService: createAcquisitionQualityPolicyService(),
+    });
+    const result = await service.handleImportCandidateDownloadFailure({ failedCandidateId: 'failed', profileCode: 'lossless_archive', qualityOverride });
+    assert.equal(result.recovered, false);
+    assert.equal(promoted, 0);
+    assert.equal(result.skippedCandidates[0].reason, qualityOverride ? 'recovery_quality_context_incompatible' : 'quality_below_minimum');
+  }
 });
 
 test('import candidate recovery promotes the next scoped candidate and records a follow-up run when requested', async (t) => {
@@ -176,9 +185,6 @@ test('import candidate recovery skips below-profile matches before promoting nex
     getImportCandidate: async () => ({
       id: 'failed-candidate',
       normalizedPayload: {
-        musicQueue: {
-          profileCode: 'lossless_archive',
-        },
         discoveryScope: {
           metadataReleaseId: 'release-1',
         },
@@ -189,9 +195,6 @@ test('import candidate recovery skips below-profile matches before promoting nex
       id: 'failed-candidate',
       downloadAttemptCount: 1,
       normalizedPayload: {
-        musicQueue: {
-          profileCode: 'lossless_archive',
-        },
         requestOwnership: {
           metadataReleaseId: 'release-1',
         },
@@ -208,6 +211,7 @@ test('import candidate recovery skips below-profile matches before promoting nex
 
   const result = await service.handleImportCandidateDownloadFailure({
     failedCandidateId: 'failed-candidate',
+    profileCode: 'lossless_archive',
     failureReason: 'Download enqueue failed.',
   });
 
@@ -240,9 +244,6 @@ test('import candidate recovery fails quality-blocked downloads and promotes the
       id: importCandidateId,
       downloadAttemptCount: 0,
       normalizedPayload: {
-        musicQueue: {
-          profileCode: 'lossless_archive',
-        },
         requestOwnership: {
           metadataReleaseId: 'release-1',
         },
@@ -254,9 +255,6 @@ test('import candidate recovery fails quality-blocked downloads and promotes the
     id: 'failed-candidate',
     downloadAttemptCount: 1,
     normalizedPayload: {
-      musicQueue: {
-        profileCode: 'lossless_archive',
-      },
       requestOwnership: {
         metadataReleaseId: 'release-1',
       },
@@ -282,9 +280,6 @@ test('import candidate recovery fails quality-blocked downloads and promotes the
     getImportCandidate: async () => ({
       id: 'failed-candidate',
       normalizedPayload: {
-        musicQueue: {
-          profileCode: 'lossless_archive',
-        },
         requestOwnership: {
           metadataReleaseId: 'release-1',
         },
@@ -301,6 +296,7 @@ test('import candidate recovery fails quality-blocked downloads and promotes the
 
   const result = await service.handleImportCandidateQualityFailure({
     failedCandidateId: 'failed-candidate',
+    profileCode: 'lossless_archive',
     failureReason: '1 file did not pass verified lossless checks before automatic add.',
     operationRunId: 'apply-run-1',
     scheduleFollowUpRun: true,
@@ -331,7 +327,6 @@ test('import candidate quality recovery keeps the release stopped when no qualit
       id: importCandidateId,
       downloadAttemptCount: 0,
       normalizedPayload: {
-        musicQueue: { profileCode: 'lossless_archive' },
         requestOwnership: { metadataReleaseId: 'release-1' },
       },
       sourceSearchId: 'search-1',
@@ -341,7 +336,6 @@ test('import candidate quality recovery keeps the release stopped when no qualit
     id: 'failed-candidate',
     downloadAttemptCount: 1,
     normalizedPayload: {
-      musicQueue: { profileCode: 'lossless_archive' },
       requestOwnership: { metadataReleaseId: 'release-1' },
     },
     sourceSearchId: 'search-1',
@@ -356,7 +350,6 @@ test('import candidate quality recovery keeps the release stopped when no qualit
     getImportCandidate: async () => ({
       id: 'failed-candidate',
       normalizedPayload: {
-        musicQueue: { profileCode: 'lossless_archive' },
         requestOwnership: { metadataReleaseId: 'release-1' },
       },
       sourceSearchId: 'search-1',
@@ -368,6 +361,7 @@ test('import candidate quality recovery keeps the release stopped when no qualit
 
   const result = await service.handleImportCandidateQualityFailure({
     failedCandidateId: 'failed-candidate',
+    profileCode: 'lossless_archive',
     failureReason: 'Downloaded audio did not pass verified lossless checks.',
     operationRunId: 'apply-run-1',
   });

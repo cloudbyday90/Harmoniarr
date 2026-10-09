@@ -15,8 +15,8 @@ import { createAppUserService } from '../../src/server/app-user-service.js';
 import { createImportCandidateService } from '../../src/server/import-candidates/import-candidate-service.js';
 import { createImportCandidateAutoSelectionService } from '../../src/server/import-candidates/import-candidate-auto-selection-service.js';
 import { createImportCandidateRecoveryService } from '../../src/server/import-candidates/import-candidate-recovery-service.js';
-import { findNextCandidateForRecovery, getImportCandidateById, incrementImportCandidateDownloadAttemptCount,
-  promoteImportCandidateForRecovery } from '../../src/server/import-candidates/import-candidate-repository.js';
+import { replaceImportExecutionRunItems } from '../../src/server/import-candidates/import-candidate-execution-repository.js';
+import { captureRecoveryObservation } from '../../src/server/import-candidates/music-queue-recovery-policy.js';
 import { buildStageCandidateBase } from '../../src/server/import-candidates/import-candidate-stage-summary.js';
 import { createImportCandidateSafeAutoAddQualityGateService } from '../../src/server/import-candidates/import-candidate-safe-auto-add-quality-gate.js';
 import { createLibraryDiscoveryDispatchService } from '../../src/server/library/library-discovery-dispatch-service.js';
@@ -31,6 +31,8 @@ import { seedMissingMusicPaginationRows } from '../../testing/integration/missin
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 import { isSkippableIntegrationRuntimeError, toIntegrationRuntimeUnavailableReason } from '../../testing/integration/runtime-availability.js';
 import { createSessionHttpClient } from '../../testing/server/http-session-client.js';
+import { createMusicQueueRecoveryFixtureContext } from '../../testing/integration/music-queue-recovery-fixtures.js';
+import { seedImportCandidateFixture } from '../../testing/integration/import-candidate-fixtures.js';
 
 const config = resolveIntegrationTestRuntimeConfig();
 const strictPreferences = { minimumQuality: 'lossless', preferredFormat: 'flac' };
@@ -298,30 +300,38 @@ suite('Missing Music quality fallback through PostgreSQL ownership and actual wo
       await pool.query("UPDATE library_discovery_requests SET request_status = 'ready', next_search_after = NULL WHERE id = $1", [original.discoveryId]);
       const newSearch = await runWorkerSearch(pool, { bitrate: 320 });
       const failed = (await pool.query('SELECT id FROM import_candidates WHERE source_search_id = $1', [newSearch.searchId])).rows[0];
+      const context = createMusicQueueRecoveryFixtureContext({ getPoolFn });
       const recovery = createImportCandidateRecoveryService({
-        getImportCandidate: ({ importCandidateId }) => getImportCandidateById(importCandidateId, pool),
-        findNextCandidateForRecoveryFn: (input) => findNextCandidateForRecovery(input, pool),
-        incrementImportCandidateDownloadAttemptCountFn: (input) => incrementImportCandidateDownloadAttemptCount(input, pool),
-        promoteImportCandidateForRecoveryFn: (input) => promoteImportCandidateForRecovery(input, pool),
-        qualityPolicyService: createAcquisitionQualityPolicyService(),
+        musicQueueRecoveryService: context.service,
+        getImportCandidate: ({ importCandidateId }) => context.store.getCandidate(importCandidateId),
       });
-      const weak = await recovery.handleImportCandidateDownloadFailure({ failedCandidateId: failed.id });
-      assert.equal(weak.recovered, false);
-      assert.equal(weak.skippedCandidates[0].reason, 'recovery_quality_context_incompatible');
-      await pool.query("UPDATE import_candidates SET normalized_payload = jsonb_set(normalized_payload, '{musicQueue}', $2::jsonb) WHERE id = $1", [failed.id,
-        JSON.stringify({ profileCode: 'lossless_archive', wantedReleaseId: original.wantedReleaseId })]);
-      await pool.query("UPDATE import_candidates SET normalized_payload = jsonb_set(normalized_payload, '{extensions}', '[\"flac\"]'::jsonb) WHERE id = $1", [old.id]);
-      const strict = await recovery.handleImportCandidateDownloadFailure({ failedCandidateId: failed.id });
-      assert.equal(strict.recovered, false);
-      assert.equal(strict.skippedCandidates[0].reason, 'recovery_quality_context_incompatible');
-      await pool.query("UPDATE import_candidates SET normalized_payload = jsonb_set(normalized_payload, '{musicQueue}', $2::jsonb) WHERE id = ANY($1::uuid[])", [[old.id, failed.id], JSON.stringify(currentContext)]);
-      const changed = await promoteImportCandidateForRecovery({ importCandidateId: old.id, maxDownloadAttemptCount: 3,
-        triggeredByFailedCandidateId: failed.id, expectedMusicQueueContext: weakContext }, pool);
-      assert.equal(changed, null);
-      const compatible = await recovery.handleImportCandidateDownloadFailure({ failedCandidateId: failed.id });
+      async function observeFailedCandidate(importCandidateId) {
+        const candidate = await context.store.getCandidate(importCandidateId);
+        const observation = captureRecoveryObservation(candidate);
+        const origin = await context.executionRuns.createOperationRun({ status: 'running', requestedCandidateCount: 1,
+          summary: { triggerSource: 'missing_music_manual', selectedCandidateId: candidate.id,
+            sourceSearchId: candidate.sourceSearchId, sourceWantedReleaseId: original.wantedReleaseId } });
+        await replaceImportExecutionRunItems(origin.id, [{ importCandidateId: candidate.id, position: 1,
+          itemStatus: 'queue_failed', statusMessage: 'Controlled stopped download attempt',
+          planningSnapshot: { execution: { sourceObservation: observation, handoff: { state: 'confirmed' } } } }], pool);
+        return recovery.handleImportCandidateDownloadFailure({ failedCandidateId: candidate.id, operationRunId: origin.id,
+          observation, failureReason: 'Controlled stopped download attempt' });
+      }
+      const mismatch = await seedImportCandidateFixture({ queryable: pool,
+        candidateOverrides: { sourceSearchId: oldSearch.searchId, folderPath: 'Different recipient scope', normalizedPayload: {
+          ...old.normalized_payload, compositeScore: 100, musicQueue: { ...weakContext, wantedReleaseId: randomUUID() } } },
+        files: [{ filename: '01 Track.mp3', extension: 'mp3', bitRateKbps: 320, sizeBytes: 5000, isLocked: false }] });
+      const compatible = await observeFailedCandidate(failed.id);
       assert.equal(compatible.recovered, true);
       assert.equal(compatible.nextCandidateId, old.id);
-      const staged = buildStageCandidateBase(await getImportCandidateById(old.id, pool));
+      assert.equal(compatible.scopedRecoveryQueued, true);
+      assert.equal((await context.store.getCandidate(mismatch.id)).status, 'pending', 'A higher-scored different recipient must not be adopted');
+      const promoted = await context.store.getCandidate(old.id);
+      assert.equal(promoted.normalizedPayload.musicQueue.wantedReleaseId, original.wantedReleaseId);
+      assert.equal(promoted.normalizedPayload.musicQueue.minimumBitrateKbps, 320, 'Current owning policy can safely rebase an older weaker saved context');
+      const child = await context.store.getOrigin(compatible.recoveryRunId, null);
+      assert.equal(child.summary.musicQueueRecovery.failedSourceSearchId, newSearch.searchId);
+      const staged = buildStageCandidateBase(promoted);
       assert.equal(staged.musicQueueContext.minimumBitrateKbps, 320);
       const measured = await createImportCandidateSafeAutoAddQualityGateService().evaluateSafeAutoAddQuality({ summaryCandidate: staged,
         applyPreview: { files: [{ filename: 'Track.mp3', status: { code: 'ready' }, inspection: { warnings: [], metadata: {
@@ -329,6 +339,42 @@ suite('Missing Music quality fallback through PostgreSQL ownership and actual wo
         } } }] } });
       assert.equal(measured.eligible, false);
       assert.equal(measured.checkedFileCount, 1);
+
+      // A later stopped episode uses current strict authority, even when an older match only advertised FLAC.
+      await pool.query("UPDATE import_candidates SET status='held' WHERE id=$1", [old.id]);
+      await pool.query('UPDATE app_users SET user_preferences=$2::jsonb WHERE id=$1', [owner.id, JSON.stringify(strictPreferences)]);
+      await pool.query("UPDATE library_discovery_requests SET request_status='ready',blocked_reason=NULL,next_search_after=NULL WHERE id=$1", [original.discoveryId]);
+      const strictSearch = await runWorkerSearch(pool, { bitrate: 320 });
+      const strictFailed = (await pool.query('SELECT id FROM import_candidates WHERE source_search_id=$1', [strictSearch.searchId])).rows[0];
+      await pool.query("UPDATE import_candidates SET status='selected' WHERE id=$1", [strictFailed.id]);
+      const claimedFlac = await seedImportCandidateFixture({ queryable: pool,
+        candidateOverrides: { sourceSearchId: oldSearch.searchId, folderPath: 'Claimed FLAC recovery', normalizedPayload: {
+          ...old.normalized_payload, compositeScore: 100, extensions: ['flac'], bitrateKbps: 900, musicQueue: currentContext } },
+        files: [{ filename: '01 Track.flac', extension: 'flac', bitRateKbps: 900, sizeBytes: 9000, isLocked: false }] });
+      const strict = await observeFailedCandidate(strictFailed.id);
+      assert.equal(strict.recovered, true, JSON.stringify(strict));
+      assert.equal(strict.nextCandidateId, claimedFlac.id);
+      const strictPromoted = await context.store.getCandidate(claimedFlac.id);
+      assert.equal(strictPromoted.normalizedPayload.musicQueue.qualityOverride, null);
+      const strictStaged = buildStageCandidateBase(strictPromoted);
+      assert.equal(strictStaged.musicQueueContext.profileCode, 'lossless_archive');
+      assert.equal(strictStaged.musicQueueContext.qualityOverride ?? null, null);
+      assert.equal(strictStaged.musicQueueContext.minimumBitrateKbps, 320);
+      const policy = createAcquisitionQualityPolicyService();
+      assert.equal(policy.resolveQualityProfile(strictStaged.musicQueueContext.profileCode).requiresVerification, true);
+      const gate = createImportCandidateSafeAutoAddQualityGateService();
+      const renamedLossy = await gate.evaluateSafeAutoAddQuality({ summaryCandidate: strictStaged,
+        applyPreview: { files: [{ filename: 'Track.flac', status: { code: 'ready' }, inspection: { warnings: [], metadata: {
+          primaryAudioCodec: 'mp3', containerFormatName: 'mp3', bitRate: 256000,
+        } } }] } });
+      assert.equal(renamedLossy.eligible, false);
+      assert.equal(renamedLossy.checkedFileCount, 1);
+      const unprovedLossless = await gate.evaluateSafeAutoAddQuality({ summaryCandidate: strictStaged,
+        applyPreview: { files: [{ filename: 'Track.flac', status: { code: 'ready' }, inspection: { warnings: [], metadata: {
+          primaryAudioCodec: 'flac', containerFormatName: 'flac', bitRate: 900000,
+        } } }] } });
+      assert.equal(unprovedLossless.eligible, false);
+      assert.equal(unprovedLossless.blockers[0].code, 'safe_auto_spectral_proof_unavailable');
     }, { scenarioName: 'missing_music_fallback_recovery' });
   });
 

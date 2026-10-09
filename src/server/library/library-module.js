@@ -38,6 +38,8 @@ import { createLibraryProviderIngestRequestStore } from './library-provider-inge
 import { createLibraryDiscoveryRequestService } from './library-discovery-request-service.js';
 import { createLibraryDiscoveryRequestStore } from './library-discovery-request-store.js';
 import { createLibraryDiscoveryDispatchService } from './library-discovery-dispatch-service.js';
+import { createLibraryMusicQueueRecoveryDiscoveryService } from './library-music-queue-recovery-discovery-service.js';
+import { createMusicQueueRecoveryDiscoveryHandoffService } from '../import-candidates/music-queue-recovery-discovery-handoff-service.js';
 import { buildReleaseTracklistExpectations } from './candidate-track-matcher.js';
 import { listMetadataTracksByReleaseId } from '../metadata/metadata-repository.js';
 import { createLibraryDiscoveryRediscoveryService } from './library-discovery-rediscovery-service.js';
@@ -117,6 +119,23 @@ export function createLibraryModule({
   libraryDiscoveryRequestService = createLibraryDiscoveryRequestService({
     libraryDiscoveryRequestStore,
   }),
+  maintenanceLockService = createMaintenanceLockService(),
+  maintenanceLockOperationPauseService = null,
+  maintenanceLockWriteGuardService = createMaintenanceLockWriteGuardService({
+    listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks,
+  }),
+  libraryMusicQueueRecoveryDiscoveryService = createLibraryMusicQueueRecoveryDiscoveryService({
+    assertMaintenanceWriteAllowed: ({ queryable } = {}) => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+      operationLabel: 'guarded recovery discovery', queryable,
+    }),
+  }),
+  musicQueueRecoveryDiscoveryHandoffService = createMusicQueueRecoveryDiscoveryHandoffService({
+    scopedDiscoveryService: libraryMusicQueueRecoveryDiscoveryService,
+    recordDiscoverySearchSuccess: libraryDiscoveryRequestStore.recordDiscoverySearchSuccess,
+    assertMaintenanceWriteAllowed: ({ queryable } = {}) => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+      operationLabel: 'guarded recovery search handoff', queryable,
+    }),
+  }),
   libraryDiscoveryDispatchService = createLibraryDiscoveryDispatchService({
     enableTrackFallback,
     getReleaseTracklistExpectationsFn: async ({ metadataReleaseId }) => {
@@ -128,6 +147,8 @@ export function createLibraryModule({
     importCandidateAutoSelectionService,
     importCandidateService,
     libraryDiscoveryRequestStore,
+    musicQueueRecoveryDiscoveryService: libraryMusicQueueRecoveryDiscoveryService,
+    musicQueueRecoveryDiscoveryHandoffService,
     loadSettingsFn: loadSettings,
     onDiscoveryRequestExhaustedFn,
     recordActivityEventFn,
@@ -150,11 +171,6 @@ export function createLibraryModule({
   libraryMediaRequestPipelineStore = createLibraryMediaRequestPipelineStore(),
   providerClientResolverService = createProviderClientResolverService(),
   libraryProviderIngestRequestStore = createLibraryProviderIngestRequestStore(),
-  maintenanceLockService = createMaintenanceLockService(),
-  maintenanceLockOperationPauseService = null,
-  maintenanceLockWriteGuardService = createMaintenanceLockWriteGuardService({
-    listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks,
-  }),
   libraryExternalIntakeRunStore = createLibraryExternalIntakeRunStore(),
   collectionIntakeStore = createLibraryExternalRequestCollectionIntakeStore(),
   collectionIntakeService = createLibraryExternalRequestCollectionIntakeService({
@@ -494,6 +510,8 @@ export function createLibraryModule({
     externalRequestReviewStore,
     libraryCatalogStore,
     libraryDiscoveryDispatchService,
+    libraryMusicQueueRecoveryDiscoveryService,
+    musicQueueRecoveryDiscoveryHandoffService,
     libraryDiscoveryFolderSetupRecoveryService,
     libraryDiscoveryHeartbeatState,
     libraryDiscoveryRunService,

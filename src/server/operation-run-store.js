@@ -41,6 +41,11 @@ const unreferencedByExternalRequestIntentSql = `NOT EXISTS (
   SELECT 1 FROM library_external_request_release_intents retained_intent
   WHERE retained_intent.operation_run_id = operation_runs.id
 )`;
+// An unretired recovery reservation may still own an uncertain or accepted provider handoff.
+const unreservedMusicQueueRecoverySql = `NOT (
+  summary->>'triggerSource' IS NOT DISTINCT FROM 'music_queue_fallback_recovery'
+  AND summary #>> '{musicQueueRecovery,retired}' IS DISTINCT FROM 'true'
+)`;
 
 /**
  * Global, cross-operation-type retention sweep for the operation-run ledger.
@@ -66,6 +71,7 @@ export async function pruneOperationRunsLedger({
       DELETE FROM operation_runs
       WHERE status IN ('completed', 'failed', 'cancelled')
         AND ${unreferencedByExternalRequestIntentSql}
+        AND ${unreservedMusicQueueRecoverySql}
         AND COALESCE(finished_at, cancelled_at, started_at, created_at) < $1
         AND id NOT IN (
           SELECT id
@@ -107,6 +113,7 @@ export async function countPrunableOperationRuns({
       FROM operation_runs
       WHERE status IN ('completed', 'failed', 'cancelled')
         AND ${unreferencedByExternalRequestIntentSql}
+        AND ${unreservedMusicQueueRecoverySql}
         AND COALESCE(finished_at, cancelled_at, started_at, created_at) < $1
         AND id NOT IN (
           SELECT id
@@ -301,7 +308,8 @@ export function createOperationRunStore({
         UPDATE operation_runs
         SET status = 'completed',
             finished_at = NOW(),
-            summary = $2::jsonb,
+            summary = CASE WHEN summary ? 'musicQueueRecovery' OR summary->>'triggerSource'='missing_music_manual'
+              THEN COALESCE(summary, '{}'::jsonb) || $2::jsonb ELSE $2::jsonb END,
           claimed_at = NULL,
           claimed_by_instance_id = NULL,
             error_message = NULL
@@ -352,7 +360,8 @@ export function createOperationRunStore({
         UPDATE operation_runs
         SET status = 'failed',
             finished_at = NOW(),
-            summary = $2::jsonb,
+            summary = CASE WHEN summary ? 'musicQueueRecovery' OR summary->>'triggerSource'='missing_music_manual'
+              THEN COALESCE(summary, '{}'::jsonb) || $2::jsonb ELSE $2::jsonb END,
           claimed_at = NULL,
           claimed_by_instance_id = NULL,
             error_message = $3
@@ -370,6 +379,7 @@ export function createOperationRunStore({
         DELETE FROM operation_runs
         WHERE operation_type = $1
           AND status IN ('completed', 'failed', 'cancelled')
+          AND ${unreservedMusicQueueRecoverySql}
           AND ${unreferencedByExternalRequestIntentSql}
           AND id NOT IN (
             SELECT id
@@ -409,7 +419,8 @@ export function createOperationRunStore({
         SET status = 'cancelled',
             finished_at = NOW(),
             cancelled_at = NOW(),
-            summary = $2::jsonb,
+            summary = CASE WHEN summary ? 'musicQueueRecovery' OR summary->>'triggerSource'='missing_music_manual'
+              THEN COALESCE(summary, '{}'::jsonb) || $2::jsonb ELSE $2::jsonb END,
           claimed_at = NULL,
           claimed_by_instance_id = NULL,
             error_message = NULL

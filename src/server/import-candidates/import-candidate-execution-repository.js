@@ -64,6 +64,12 @@ export async function updateImportExecutionRunItem({
   } : null;
 }
 
+export async function recordImportExecutionAcceptedObservation({ importCandidateId, operationRunId, observation }, queryable) {
+  await (queryable ?? getPool()).query(`UPDATE import_execution_run_items SET planning_snapshot=jsonb_set(planning_snapshot,
+    '{execution,acceptedCandidateObservation}',$3::jsonb),updated_at=NOW() WHERE operation_run_id=$1::uuid AND import_candidate_id=$2::uuid`,
+  [operationRunId, importCandidateId, JSON.stringify(observation)]);
+}
+
 /**
  * Finds the latest selected candidate whose prior slskd enqueue POST reached
  * the durable handoff checkpoint but never reached a durable confirmation.

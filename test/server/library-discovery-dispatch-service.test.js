@@ -9,6 +9,41 @@ function createLibraryDiscoveryDispatchService(options = {}) {
   return buildLibraryDiscoveryDispatchService({ loadSettingsFn: async () => ({}), ...options });
 }
 
+test('positive scoped discovery uses the owning atomic handoff after awaited readiness and bypasses ordinary selection', async () => {
+  for (const ready of [true, false]) {
+    const calls = [];
+    const prepared = { metadataReleaseId: 'release', context: { profileCode: 'high_quality', qualityOverride: null,
+      formatPreferences: { minimumQuality: 'high', preferredFormat: 'any' } }, dispatchedAt: '2026-10-08T12:00:00Z' };
+    const service = createLibraryDiscoveryDispatchService({
+      musicQueueRecoveryDiscoveryService: {
+        claimScopedDiscovery: async () => ({ claimed: { artistName: 'Artist', releaseTitle: 'Release', metadataReleaseId: 'release' }, prepared }),
+        assertScopedDiscoveryCurrent: async () => calls.push('guard'), retireScopedDiscovery: async () => assert.fail('Valid scoped handoff cannot retire'),
+      },
+      getReleaseTracklistExpectationsFn: async () => { calls.push('prepare'); return null; },
+      slskdService: { startSearch: async () => { calls.push('search'); return { id: 'new-search' }; } },
+      importCandidateService: { ingestSlskdSearchResponses: async () => { calls.push('ingest'); return { candidateCount: 1, fileCount: 1 }; } },
+      importCandidateAutoSelectionService: { selectHighConfidenceCandidate: async () => assert.fail('Scoped matches cannot use ordinary selection') },
+      importCandidateAutoDownloadRunService: {
+        prepareAutomaticDownloadStart: async () => { await Promise.resolve(); calls.push('readiness'); return { ready }; },
+        checkAutomaticDownloadReadiness: async () => assert.fail('Scoped readiness must include settings/provider proposal'),
+        startDownloadRunAfterAutoSelection: async () => assert.fail('Scoped matches cannot queue an ordinary child'),
+      },
+      musicQueueRecoveryDiscoveryHandoffService: { finishScopedDiscovery: async (input) => {
+        calls.push('handoff'); assert.equal(input.runId, 'own-run'); assert.equal(input.prepared, prepared);
+        assert.equal(input.readiness.ready, ready); assert.equal(input.ingestionResult.candidateCount, 1);
+        assert.equal(input.successPayload.searchId, 'new-search'); assert.equal(input.successPayload.recoveryRunId, 'own-run');
+        return { autoSelection: { selected: ready }, autoDownloadStart: { started: ready, runId: ready ? 'typed-child' : null } };
+      } },
+      libraryDiscoveryRequestStore: { recordDiscoverySearchSuccess: async () => assert.fail('The scoped owner alone persists success'),
+        recordDiscoverySearchFailure: async () => assert.fail('Valid scoped handoff cannot record failure') },
+    });
+    const result = await service.dispatchReadyDiscoveryRequests({ runId: 'own-run', triggerSource: 'music_queue_fallback_rediscovery' });
+    assert.deepEqual(calls, ['prepare', 'guard', 'search', 'ingest', 'readiness', 'handoff']);
+    assert.equal(result.dispatchedCount, 1); assert.equal(result.dispatchedSearches[0].autoSelection.selected, ready);
+    assert.equal(result.dispatchedSearches[0].autoDownloadStart.started, ready);
+  }
+});
+
 test('buildDiscoverySearchQuery uses canonical artist, release title, and year', () => {
   assert.equal(buildDiscoverySearchQuery({
     artistName: '  Boards   of Canada ',

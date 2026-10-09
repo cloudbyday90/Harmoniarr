@@ -23,6 +23,8 @@ import { createLibraryDiscoveryRequestWantedReleaseLinkStore } from './library-d
 import { createLibraryWantedReleasePageStore } from './library-wanted-release-page-store.js';
 import { RELEASE_RECHECK_FACTS_LATERAL_SQL, RELEASE_RECHECK_FACTS_SELECT_SQL, mapReleaseRecheckFacts } from '../import-candidates/import-candidate-release-recheck-store.js';
 import { RELEASE_PREPARED_ADD_FACTS_LATERAL_SQL, RELEASE_PREPARED_ADD_FACTS_SELECT_SQL, mapReleasePreparedAddFacts } from '../import-candidates/import-candidate-release-prepared-add-facts.js';
+import { WANTED_RECOVERY_PROGRESS_JOIN_SQL, WANTED_RECOVERY_PROGRESS_SELECT_SQL } from './library-wanted-recovery-progress-store.js';
+import { deriveWantedRecoveryDiscovery, deriveWantedRecoveryProgress } from './library-wanted-recovery-progress-policy.js';
 
 function toInteger(value) {
   return Number.parseInt(String(value ?? 0), 10) || 0;
@@ -119,9 +121,16 @@ function buildLibraryAddSummary(row) {
   return summary;
 }
 
-function buildImportReviewSummary(row) {
+function hasCurrentRecoveryProgress(progress) {
+  return progress?.recoveryExecution.status != null || progress?.recoveryExecution.reservationRetained === true
+    || progress?.legacyRecoverySelection === true
+    || progress?.recoverySelectionNeedsReview === true
+    || progress?.currentConfirmedTransferCount > 0 || Object.keys(progress?.currentExecutionStatusCounts ?? {}).length > 0;
+}
+
+function buildImportReviewSummary(row, progress = null) {
   const totalCount = toInteger(row.import_candidate_total_count);
-  if (totalCount < 1) {
+  if (totalCount < 1 && !hasCurrentRecoveryProgress(progress)) {
     return null;
   }
 
@@ -131,6 +140,7 @@ function buildImportReviewSummary(row) {
     matches: normalizeMatchRows(row.import_candidate_matches),
     statusCounts: normalizeStatusCounts(row.import_candidate_status_counts),
     totalCount,
+    ...(progress ?? {}),
   };
 
   if (typeof row.import_candidate_latest_event_type === 'string'
@@ -530,7 +540,8 @@ export function createLibraryWantedReleaseStore({
           import_apply_summary.latest_quality_gate AS import_apply_latest_quality_gate,
           import_apply_summary.latest_recovery_reason_code AS import_apply_latest_recovery_reason_code,
           ${RELEASE_RECHECK_FACTS_SELECT_SQL},
-          ${RELEASE_PREPARED_ADD_FACTS_SELECT_SQL}
+          ${RELEASE_PREPARED_ADD_FACTS_SELECT_SQL},
+          ${WANTED_RECOVERY_PROGRESS_SELECT_SQL}
         FROM library_wanted_releases lwr
         JOIN metadata_artists ma ON ma.id = lwr.metadata_artist_id
         JOIN metadata_release_groups mrg ON mrg.id = lwr.metadata_release_group_id
@@ -852,6 +863,7 @@ export function createLibraryWantedReleaseStore({
         ) import_apply_summary ON TRUE
         ${RELEASE_RECHECK_FACTS_LATERAL_SQL}
         ${RELEASE_PREPARED_ADD_FACTS_LATERAL_SQL}
+        ${WANTED_RECOVERY_PROGRESS_JOIN_SQL}
         ${whereClause}
         ORDER BY ma.sort_name ASC NULLS LAST, ma.name ASC, mrg.first_release_date ASC NULLS LAST, mr.release_date ASC NULLS LAST
         ${limitClause}
@@ -859,7 +871,10 @@ export function createLibraryWantedReleaseStore({
       params,
     );
 
-    return result.rows.map((row) => ({
+    const recoveryProgress = await Promise.all(result.rows.map((row) => deriveWantedRecoveryProgress({
+      entries: row.recovery_progress_entries, wantedReleaseId: row.id, metadataReleaseId: row.metadata_release_id,
+    })));
+    return result.rows.map((row, index) => ({
       id: row.id,
       appUserId: row.app_user_id,
       artistName: row.artist_name,
@@ -872,16 +887,18 @@ export function createLibraryWantedReleaseStore({
       hasPriorDiscoveryCandidates: row.has_prior_discovery_candidates !== false,
       libraryAddRecoveryFacts: mapReleaseRecheckFacts(row),
       libraryAddFacts: mapReleasePreparedAddFacts(row),
-      discoveryRequest: row.discovery_request_status
+      discoveryRequest: row.discovery_request_status || hasCurrentRecoveryProgress(recoveryProgress[index])
         ? {
             blockedReason: row.discovery_blocked_reason ?? null,
             evidence: row.discovery_evidence ?? {},
-            importReviewSummary: buildImportReviewSummary(row),
+            importReviewSummary: buildImportReviewSummary(row, recoveryProgress[index]),
             lastSearchAt: row.discovery_last_search_at ?? null,
             nextSearchAfter: row.discovery_next_search_after ?? null,
             ...(row.discovery_manual_requested_at != null ? { manualRequestedAt: row.discovery_manual_requested_at } : {}),
             requestStatus: row.discovery_request_status,
             researchAttemptCount: Number.parseInt(String(row.discovery_research_attempt_count ?? 0), 10) || 0,
+            ...(row.recovery_discovery_entry != null ? { recoveryDiscovery: deriveWantedRecoveryDiscovery({ entry: row.recovery_discovery_entry,
+              wantedReleaseId: row.id, metadataReleaseId: row.metadata_release_id }) } : {}),
             searchAttemptCount: Number.parseInt(String(row.discovery_search_attempt_count ?? 0), 10) || 0,
             searchMode: row.discovery_search_mode ?? null,
           }

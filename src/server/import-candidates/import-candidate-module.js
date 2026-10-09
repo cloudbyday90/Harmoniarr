@@ -46,6 +46,10 @@ import { createImportCandidateExecutionRunStore } from './import-candidate-execu
 import { resolveImportCandidateExecutionHeartbeatConfig } from './import-candidate-execution-heartbeat-config.js';
 import { createImportCandidateExecutionHeartbeatState } from './import-candidate-execution-heartbeat-state.js';
 import { createImportCandidateExecutionReconciliationService } from './import-candidate-execution-reconciliation-service.js';
+import { createMusicQueueRecoveryService } from './music-queue-recovery-service.js';
+import { createMusicQueueRecoveryExecutionPolicyService } from './music-queue-recovery-execution-policy-service.js';
+import { createMusicQueueRecoveryLifecycleService } from './music-queue-recovery-lifecycle-service.js';
+import { createMusicQueueExecutionObservationService } from './music-queue-execution-observation-service.js';
 import { createImportCandidateRecoveryService } from './import-candidate-recovery-service.js';
 import { createImportCandidateExecutionService } from './import-candidate-execution-service.js';
 import { createImportCandidateExecutionSummaryService } from './import-candidate-execution-summary-service.js';
@@ -64,6 +68,7 @@ import { listImportCandidateFileDecisions } from './import-candidate-file-decisi
 import {
   findUnconfirmedImportExecutionHandoff,
   listImportExecutionRunItems,
+  recordImportExecutionAcceptedObservation,
   replaceImportExecutionRunItems,
   updateImportExecutionRunItem,
   upsertImportExecutionRunItem,
@@ -207,7 +212,19 @@ export function createImportCandidateModule({
     }),
     qualityPolicyService: createAcquisitionQualityPolicyService(),
   }),
+  musicQueueRecoveryService = createMusicQueueRecoveryService({
+    assertMaintenanceWriteAllowed: ({ queryable } = {}) => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({ operationLabel: 'Music Queue recovery', queryable }),
+    createExecutionRun: importCandidateExecutionRunStore.createOperationRun,
+    recordSourceOutcome: recordSourceUserOutcomeEvidenceFn,
+  }),
+  musicQueueRecoveryExecutionPolicyService = createMusicQueueRecoveryExecutionPolicyService({
+    store: musicQueueRecoveryService.store,
+    assertMaintenanceWriteAllowed: () => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({ operationLabel: 'Music Queue recovery download' }),
+  }),
+  musicQueueRecoveryLifecycleService = createMusicQueueRecoveryLifecycleService({ store: musicQueueRecoveryService.store }),
+  musicQueueExecutionObservationService = createMusicQueueExecutionObservationService({ store: musicQueueRecoveryService.store }),
   importCandidateRecoveryService = createImportCandidateRecoveryService({
+    musicQueueRecoveryService,
     createRecoveryExecutionRun: importCandidateExecutionRunStore.createOperationRun,
     getImportCandidate: importCandidateService.getImportCandidate,
     markImportCandidateDownloadFailed: importCandidateService.markImportCandidateDownloadFailed,
@@ -226,6 +243,12 @@ export function createImportCandidateModule({
     enqueueDownloads: slskdService.enqueueDownloads,
     findMatchingTransfers: slskdDownloadHandoffReconciliationService.findMatchingTransfers,
     getImportCandidate: importCandidateService.getImportCandidate,
+    ownsRecoveryCandidate: importCandidateRecoveryService.ownsRecoveryCandidate,
+    resolveRecoveryExecution: musicQueueRecoveryExecutionPolicyService.resolveRecoveryExecution,
+    assertRecoveryExecutionCurrent: musicQueueRecoveryExecutionPolicyService.assertRecoveryExecutionCurrent,
+    retireRecoveryExecution: musicQueueRecoveryLifecycleService.retireExecution,
+    isCurrentExecutionObservation: musicQueueRecoveryService.isCurrentExecutionObservation,
+    transitionOwnedExecutionCandidate: musicQueueExecutionObservationService.transitionOwnedExecutionCandidate,
     handleImportCandidateDownloadFailure: importCandidateRecoveryService.handleImportCandidateDownloadFailure,
     isCancellationRequested: maintenanceLockOperationPauseService
       ? createOperationRunInterruptionGate({
@@ -242,6 +265,7 @@ export function createImportCandidateModule({
     markRunPaused: importCandidateExecutionRunStore.markRunPaused,
     markRunStarted: importCandidateExecutionRunStore.markRunStarted,
     recordActivityEventFn,
+    recordAcceptedCandidateObservation: recordImportExecutionAcceptedObservation,
     recordConfirmedTransfers: importExecutionTransferLinkStore.recordConfirmedTransfers,
     releaseLease: importCandidateExecutionRunStore.releaseLease,
     listImportExecutionRunItems,
@@ -392,6 +416,7 @@ export function createImportCandidateModule({
     handleImportCandidateImportBlocker: importCandidateRecoveryService.handleImportCandidateImportBlocker,
   }),
   importCandidateAutoApplyRunService = createImportCandidateAutoApplyRunService({
+    ownsRecoveryCandidate: importCandidateRecoveryService.ownsRecoveryCandidate,
     getImportCandidate: importCandidateService.getImportCandidate,
     musicQueueAutoSafeAddService: importCandidateMusicQueueAutoSafeAddService,
     handleImportCandidateImportBlocker: importCandidateRecoveryService.handleImportCandidateImportBlocker,
@@ -439,6 +464,10 @@ export function createImportCandidateModule({
     importCandidateApplyRunStore,
   }),
   importCandidateExecutionReconciliationService = createImportCandidateExecutionReconciliationService({
+    ownsRecoveryCandidate: importCandidateRecoveryService.ownsRecoveryCandidate,
+    isCurrentExecutionObservation: musicQueueRecoveryService.isCurrentExecutionObservation,
+    recordAcceptedCandidateObservation: recordImportExecutionAcceptedObservation,
+    transitionOwnedExecutionCandidate: musicQueueExecutionObservationService.transitionOwnedExecutionCandidate,
     buildImportCandidateExecutionSummary: importCandidateExecutionSummaryService.buildImportCandidateExecutionSummary,
     getImportCandidate: importCandidateService.getImportCandidate,
     handleImportCandidateDownloadFailure: importCandidateRecoveryService.handleImportCandidateDownloadFailure,
@@ -484,6 +513,8 @@ export function createImportCandidateModule({
     importCandidateExecutionSummaryService,
     importCandidateExecutionWorker,
     importCandidateRecoveryService,
+    musicQueueRecoveryService,
+    musicQueueRecoveryExecutionPolicyService,
     importCandidateAutoDownloadRunService,
     importCandidateAutoSelectionService,
     importCandidateImportPendingSummaryService,

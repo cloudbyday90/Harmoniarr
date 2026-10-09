@@ -56,3 +56,24 @@ next target-owned exception. Update the consumer map when actual module boundari
 change; add instructions only when observed use demonstrates a missing invariant.
 The skill grants no release, branch, merge, publication, or external-action
 authorization.
+
+## Fallback recovery maintenance, October 8
+
+The [fallback recovery design](MUSIC_QUEUE_FALLBACK_RECOVERY_DESIGN.md) exposed
+three downstream boundaries: explicit null could re-inherit saved consent,
+representative shared context could miss another link's valid numeric floor,
+and competing terminal kinds could describe one provider attempt. The consumer
+map now locates the recovery owner and requires explicit removal, every valid
+participant floor, one durable attempt decision and a fresh delayed handoff.
+Positive-result review exposed another handoff: a guarded search could still
+send results through an ordinary automatic download job after awaited ingestion.
+The map now locates the atomic scoped continuation and requires positive
+persisted-result evidence, current requirements and one exact child without
+double-counting the original failure/research budget.
+
+This is narrow reference maintenance; the skill entry point and invocation
+policy remain unchanged. Repository and installed structure pass
+`quick_validate.py`; all three installed files match maintained source by
+SHA-256 after reference sync. Application evidence and its limits
+belong in the separate [recovery outcome](MUSIC_QUEUE_FALLBACK_RECOVERY_OUTCOME.md).
+No new blind behavioral skill trial is claimed.

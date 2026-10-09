@@ -29,6 +29,8 @@ import {
   recordActivityEventSafely,
 } from '../activity/music-queue-lifecycle-activity-event-service.js';
 import { loadSettings } from '../settings.js';
+import { createApiError } from '../auth.js';
+import { MUSIC_QUEUE_RECOVERY_DISCOVERY_SOURCE } from '../import-candidates/music-queue-recovery-policy.js';
 import { buildSharedFormatPreferences, createLibraryDiscoveryQualityContextService } from './library-discovery-quality-context-service.js';
 
 export const DEFAULT_DISCOVERY_SETTINGS = Object.freeze({
@@ -77,6 +79,8 @@ export function createLibraryDiscoveryDispatchService({
   importCandidateAutoSelectionService = null,
   importCandidateService = null,
   libraryDiscoveryRequestStore = createLibraryDiscoveryRequestStore(),
+  musicQueueRecoveryDiscoveryService = null,
+  musicQueueRecoveryDiscoveryHandoffService = null,
   loadSettingsFn = loadSettings,
   onDiscoveryRequestExhaustedFn = null,
   recordActivityEventFn = null,
@@ -360,8 +364,18 @@ export function createLibraryDiscoveryDispatchService({
   async function dispatchReadyDiscoveryRequests({
     actorUserId = null,
     requestMetadata = null,
+    runId = null,
+    triggerSource = null,
   } = {}) {
+    const scopedRecovery = triggerSource === MUSIC_QUEUE_RECOVERY_DISCOVERY_SOURCE;
+    if (scopedRecovery && (!runId || !musicQueueRecoveryDiscoveryService)) {
+      throw createApiError(409, 'music_queue_recovery_not_current', 'The delayed recovery search has no owning guard');
+    }
     if (!importCandidateService?.ingestSlskdSearchResponses || !slskdService?.startSearch) {
+      if (scopedRecovery) {
+        await musicQueueRecoveryDiscoveryService.retireScopedDiscovery({ runId });
+        throw createApiError(409, 'music_queue_recovery_not_current', 'The guarded recovery search cannot prepare its provider handoff');
+      }
       return {
         attemptedCount: 0,
         candidateCount: 0,
@@ -390,14 +404,27 @@ export function createLibraryDiscoveryDispatchService({
     let candidateCount = 0;
     let fileCount = 0;
 
-    for (let index = 0; index < effectiveDispatchBatchSize; index += 1) {
+    for (let index = 0; index < (scopedRecovery ? 1 : effectiveDispatchBatchSize); index += 1) {
       const dispatchedAt = getNow();
       const dispatchedAtIso = dispatchedAt.toISOString();
       const nextSearchAfter = new Date(dispatchedAt.getTime() + effectiveAutomaticCooldownMs).toISOString();
-      const claimedRequest = await libraryDiscoveryRequestStore.claimNextReadyAutomaticDiscoveryRequest({
-        dispatchedAt: dispatchedAtIso,
-        nextSearchAfter,
-      });
+      let recoveryPrepared = null;
+      let claimedRequest;
+      try {
+        if (scopedRecovery) {
+          const claim = await musicQueueRecoveryDiscoveryService.claimScopedDiscovery({ runId, dispatchedAt: dispatchedAtIso, nextSearchAfter,
+            claimDiscoveryRequest: libraryDiscoveryRequestStore.claimNextReadyAutomaticDiscoveryRequest });
+          claimedRequest = claim.claimed;
+          recoveryPrepared = claim.prepared;
+        } else {
+          claimedRequest = await libraryDiscoveryRequestStore.claimNextReadyAutomaticDiscoveryRequest({ dispatchedAt: dispatchedAtIso, nextSearchAfter });
+        }
+      } catch (error) {
+        if (scopedRecovery && error?.code === 'music_queue_recovery_not_current') {
+          await musicQueueRecoveryDiscoveryService.retireScopedDiscovery({ runId });
+        }
+        throw error;
+      }
 
       if (!claimedRequest) {
         break;
@@ -405,9 +432,9 @@ export function createLibraryDiscoveryDispatchService({
 
       attemptedCount += 1;
 
-      const ownership = buildRequestOwnershipContext(claimedRequest);
+      const ownership = recoveryPrepared ? recoveryPrepared.requestOwnership : buildRequestOwnershipContext(claimedRequest);
       const discoveryScope = buildDiscoveryScope(claimedRequest);
-      const sharedQualityContext = await resolveSharedDiscoveryQualityContext(claimedRequest);
+      const sharedQualityContext = recoveryPrepared ? recoveryPrepared.context : await resolveSharedDiscoveryQualityContext(claimedRequest);
       const {
         formatPreferences,
         preferredFormat,
@@ -436,6 +463,7 @@ export function createLibraryDiscoveryDispatchService({
         failures.push(failure);
         await libraryDiscoveryRequestStore.markDiscoveryRequestExhausted({
           metadataReleaseId: claimedRequest.metadataReleaseId,
+          ...(scopedRecovery ? { recoveryRunId: runId } : {}),
           reasonCode: failure.code,
           searchAttemptCount: terminalSearchAttemptCount,
           searchQuery: null,
@@ -450,15 +478,22 @@ export function createLibraryDiscoveryDispatchService({
         continue;
       }
 
+      let searchAttempted = false;
       try {
+        let tracklistExpectations = null;
+        if (scopedRecovery && getReleaseTracklistExpectationsFn) {
+          try { tracklistExpectations = await getReleaseTracklistExpectationsFn({ metadataReleaseId: claimedRequest.metadataReleaseId }); }
+          catch { tracklistExpectations = null; }
+        }
+        if (scopedRecovery) await musicQueueRecoveryDiscoveryService.assertScopedDiscoveryCurrent({ runId, prepared: recoveryPrepared });
+        searchAttempted = true;
         const search = await slskdService.startSearch({
           query: searchQuery,
         });
         await recordProviderRecoverySearchStarted({ claimedRequest });
         const requestOwnership = ownership;
 
-        let tracklistExpectations = null;
-        if (getReleaseTracklistExpectationsFn && claimedRequest.metadataReleaseId) {
+        if (!scopedRecovery && getReleaseTracklistExpectationsFn && claimedRequest.metadataReleaseId) {
           try {
             tracklistExpectations = await getReleaseTracklistExpectationsFn({
               metadataReleaseId: claimedRequest.metadataReleaseId,
@@ -485,9 +520,13 @@ export function createLibraryDiscoveryDispatchService({
           searchId: search.id,
         });
         const autoDownloadReadiness = ingestionResult.candidateCount > 0
-          ? await checkAutomaticDownloadReadiness()
+          ? scopedRecovery
+            ? typeof importCandidateAutoDownloadRunService?.prepareAutomaticDownloadStart === 'function'
+              ? await importCandidateAutoDownloadRunService.prepareAutomaticDownloadStart()
+              : { ready: false, skippedReason: 'download_start_unavailable' }
+            : await checkAutomaticDownloadReadiness()
           : null;
-        const autoSelectionResult = ingestionResult.candidateCount > 0 && autoDownloadReadiness?.ready !== false
+        let autoSelectionResult = !scopedRecovery && ingestionResult.candidateCount > 0 && autoDownloadReadiness?.ready !== false
           ? await selectHighConfidenceCandidateAfterIngestion({
             actorUserId,
             ...qualityContext,
@@ -495,7 +534,7 @@ export function createLibraryDiscoveryDispatchService({
             sourceSearchId: search.id,
           })
           : null;
-        const autoDownloadStartResult = autoSelectionResult?.selected
+        let autoDownloadStartResult = !scopedRecovery && autoSelectionResult?.selected
           ? await startDownloadRunAfterAutoSelection({
             actorUserId,
             autoSelectionResult,
@@ -538,6 +577,7 @@ export function createLibraryDiscoveryDispatchService({
           metadataReleaseId: claimedRequest.metadataReleaseId,
           searchId: search.id,
           searchQuery,
+          ...(scopedRecovery ? { recoveryRunId: runId } : {}),
         };
         if (ingestionResult.ingestionDiagnostics) {
           successPayload.ingestionDiagnostics = ingestionResult.ingestionDiagnostics;
@@ -556,10 +596,22 @@ export function createLibraryDiscoveryDispatchService({
           successPayload.searchAttemptCount = zeroCandidateSchedule.searchAttemptCount;
         }
 
-        await libraryDiscoveryRequestStore.recordDiscoverySearchSuccess(successPayload);
+        if (scopedRecovery && ingestionResult.candidateCount > 0) {
+          if (typeof musicQueueRecoveryDiscoveryHandoffService?.finishScopedDiscovery !== 'function') {
+            throw createApiError(409, 'music_queue_recovery_not_current', 'The recovery search result has no owning download handoff');
+          }
+          const handoff = await musicQueueRecoveryDiscoveryHandoffService.finishScopedDiscovery({ runId, prepared: recoveryPrepared,
+            ingestionResult, successPayload, readiness: autoDownloadReadiness });
+          autoSelectionResult = handoff.autoSelection;
+          autoDownloadStartResult = handoff.autoDownloadStart;
+          if (autoSelectionResult) dispatchedSearch.autoSelection = autoSelectionResult;
+          if (autoDownloadStartResult) dispatchedSearch.autoDownloadStart = autoDownloadStartResult;
+        } else {
+          await libraryDiscoveryRequestStore.recordDiscoverySearchSuccess(successPayload);
+        }
 
         if (zeroCandidateSchedule?.exhausted) {
-          const trackFallbackSummary = await dispatchTrackFallbackSearches({
+          const trackFallbackSummary = scopedRecovery ? { queryCount: 0 } : await dispatchTrackFallbackSearches({
             actorUserId,
             claimedRequest,
             formatPreferences: effectiveFormatPreferences,
@@ -584,6 +636,7 @@ export function createLibraryDiscoveryDispatchService({
 
           await libraryDiscoveryRequestStore.markDiscoveryRequestExhausted({
             metadataReleaseId: claimedRequest.metadataReleaseId,
+            ...(scopedRecovery ? { recoveryRunId: runId } : {}),
             reasonCode: exhaustionReasonCode,
             searchAttemptCount: zeroCandidateSchedule.searchAttemptCount,
             searchQuery,
@@ -597,6 +650,10 @@ export function createLibraryDiscoveryDispatchService({
           });
         }
       } catch (error) {
+        if (scopedRecovery && !searchAttempted && error?.code === 'music_queue_recovery_not_current') {
+          await musicQueueRecoveryDiscoveryService.retireScopedDiscovery({ runId, knownDispatchAttemptedAt: recoveryPrepared.dispatchedAt });
+          throw error;
+        }
         const failure = {
           code: error?.code ?? 'discovery_dispatch_failed',
           message: error?.message ?? 'Discovery dispatch failed',
@@ -608,6 +665,7 @@ export function createLibraryDiscoveryDispatchService({
           errorMessage: failure.message,
           metadataReleaseId: claimedRequest.metadataReleaseId,
           searchQuery,
+          ...(scopedRecovery ? { recoveryRunId: runId } : {}),
         });
       }
     }

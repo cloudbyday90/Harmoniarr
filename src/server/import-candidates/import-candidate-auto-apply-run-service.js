@@ -44,6 +44,7 @@ function normalizeSkippedApplyRunResult({ error, importCandidateId }) {
 export function createImportCandidateAutoApplyRunService({
   handleImportCandidateImportBlocker = null,
   getImportCandidate = null,
+  ownsRecoveryCandidate = ({ candidate }) => hasPersistedMusicQueueOwnership(candidate),
   musicQueueAutoSafeAddService = null,
   previewImportCandidateApply = null,
   startImportCandidateApplyRun = async () => {
@@ -85,15 +86,16 @@ export function createImportCandidateAutoApplyRunService({
 
   async function startSafeApplyRunAfterDownloadCompleted({
     importCandidateId,
+    operationRunId = null,
     requestMetadata = null,
   } = {}) {
     const candidate = typeof getImportCandidate === 'function' ? await getImportCandidate({ importCandidateId }) : null;
-    if (hasPersistedMusicQueueOwnership(candidate)) {
+    if (candidate && await ownsRecoveryCandidate({ candidate, operationRunId })) {
       if (typeof musicQueueAutoSafeAddService?.startAutomaticMusicQueueLibraryAdd !== 'function') {
         throw new TypeError('Music Queue automatic library-add service is required');
       }
       try {
-        const result = await musicQueueAutoSafeAddService.startAutomaticMusicQueueLibraryAdd({ candidate, requestMetadata });
+        const result = await musicQueueAutoSafeAddService.startAutomaticMusicQueueLibraryAdd({ candidate, requestMetadata, operationRunId });
         return { attempted: true, importCandidateId, started: result.outcome === 'queued', triggerSource: 'download_completed',
           ...(['queued', 'already_queued'].includes(result.outcome) ? { runId: result.runId ?? null } : {}),
           ...(result.outcome === 'already_queued' ? { alreadyQueued: true } : {}),

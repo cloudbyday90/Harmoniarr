@@ -5,11 +5,11 @@
  * See LICENSE file for details.
  */
 
-import { isDeepStrictEqual } from 'node:util';
+import { captureRecoveryObservation } from './music-queue-recovery-policy.js';
 import { hasQueuedGuardedLibraryAdd, isPreparedReleaseLibraryAddEligible } from '../acquisition/acquisition-library-add-policy.js';
 import { createImportCandidateReleaseSafeAddPreparationService, hasCurrentSafeAddParticipants } from './import-candidate-release-safe-add-preparation-service.js';
-import { buildRecheckQualityContext, getRecheckMusicQueueContext, getRecheckWantedReleaseIds } from './import-candidate-release-recheck-quality-policy.js';
-import { hasCompatibleAutomaticRecoveryRequirement, hasCompatibleMusicQueuePhysicalOwnership } from './import-candidate-music-queue-auto-safe-add-policy.js';
+import { getRecheckMusicQueueContext, getRecheckWantedReleaseIds } from './import-candidate-release-recheck-quality-policy.js';
+import { hasCompatibleMusicQueuePhysicalOwnership } from './import-candidate-music-queue-auto-safe-add-policy.js';
 import { evaluateImportBlockerRecovery } from './import-candidate-terminal-recovery-policy.js';
 
 /** System authority is the acquired release scope, independent of any explicit-add marker. */
@@ -39,24 +39,18 @@ export function createImportCandidateMusicQueueAutoSafeAddService({ recheckStore
     return prepared ? { prepared, release, appUserId: primary.appUserId, wantedReleaseId: primary.wantedReleaseId } : null;
   }
 
-  async function startAutomaticMusicQueueLibraryAdd({ candidate, requestMetadata = null }) {
+  async function startAutomaticMusicQueueLibraryAdd({ candidate, requestMetadata = null, operationRunId = null }) {
     const scope = await readCurrentScope(candidate);
     if (!scope) return { outcome: 'not_available' };
     const commit = () => commitPreparedAutomaticLibraryAdd({ ...scope, actorUserId: null, requestMetadata });
     if (hasQueuedGuardedLibraryAdd(scope.release.libraryAddFacts)) return commit();
     if (scope.release.libraryAddFacts.activeRunId) return { outcome: 'deferred' };
+    const observation = captureRecoveryObservation(candidate);
     const applyPreview = await previewImportCandidateApply({ importCandidateId: candidate.id });
     const policy = evaluateImportBlockerRecovery(applyPreview);
     if (policy.outcomeCode) {
-      const fresh = await readCurrentScope(await getImportCandidate({ importCandidateId: candidate.id }));
-      if (!fresh || !isDeepStrictEqual(fresh.prepared, scope.prepared)) return { outcome: 'not_available' };
-      if (hasQueuedGuardedLibraryAdd(fresh.release.libraryAddFacts)) return commit();
-      if (fresh.release.libraryAddFacts.activeRunId) return { outcome: 'deferred' };
-      const context = await buildRecheckQualityContext(scope.prepared);
-      if (!hasCompatibleAutomaticRecoveryRequirement(candidate, context)) return { outcome: 'not_available', skippedReason: 'current_policy_changed' };
-      // Existing recovery owns its separate transitions/promotion/scheduling; this is not one atomic cascade.
       const recovery = await handleImportCandidateImportBlocker({ addBlockerCode: policy.addBlockerCode, canRecover: policy.canRecover,
-        failedCandidateId: candidate.id, failureReason: applyPreview?.summary?.message ?? null,
+        failedCandidateId: candidate.id, operationRunId, observation, failureReason: applyPreview?.summary?.message ?? null,
         ...(policy.recoveryReasonCode ? { recoveryReasonCode: policy.recoveryReasonCode } : {}), scheduleFollowUpRun: true });
       return { outcome: 'still_needs_review', recovery, skippedReason: policy.skippedReason
         ?? (policy.canRecover ? 'completed_source_unavailable' : 'import_blocker_requires_operator') };

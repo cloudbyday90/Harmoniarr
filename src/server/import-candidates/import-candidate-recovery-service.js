@@ -26,6 +26,7 @@ import {
   normalizeImportCandidateAddBlockerCode,
 } from './import-candidate-add-blocker.js';
 import { TERMINAL_MATCH_OUTCOME_CODES } from './import-candidate-terminal-recovery-policy.js';
+import { hasPersistedMusicQueueOwnership } from './import-candidate-music-queue-auto-safe-add-policy.js';
 import { canRetainRecoveryQualityContext, requiresRecoveryQualityContextGuard } from './import-candidate-recovery-quality-policy.js';
 
 export const MAX_CANDIDATE_DOWNLOAD_ATTEMPTS = 3;
@@ -37,16 +38,16 @@ function normalizeOptionalString(value) {
 
 function normalizeMusicQueueContext(candidate, {
   profileCode = null,
-  qualityOverride = null,
+  qualityOverride = undefined,
 } = {}) {
   const candidateContext = candidate?.normalizedPayload?.musicQueue ?? {};
   const resolvedProfileCode = normalizeOptionalString(profileCode)
     ?? normalizeOptionalString(candidateContext.profileCode)
     ?? null;
-  const resolvedQualityOverride = qualityOverride
-    ?? (candidateContext.qualityOverride && typeof candidateContext.qualityOverride === 'object'
+  const resolvedQualityOverride = qualityOverride === undefined
+    ? (candidateContext.qualityOverride && typeof candidateContext.qualityOverride === 'object'
       ? candidateContext.qualityOverride
-      : null);
+      : null) : qualityOverride;
 
   return {
     profileCode: resolvedProfileCode,
@@ -143,6 +144,7 @@ function buildRecoveryResult({
 
 export function createImportCandidateRecoveryService({
   createRecoveryExecutionRun = null,
+  musicQueueRecoveryService = null,
   findNextCandidateForRecoveryFn = findNextCandidateForRecovery,
   getNow = () => new Date(),
   getImportCandidate = async () => null,
@@ -157,6 +159,18 @@ export function createImportCandidateRecoveryService({
   retryRejectedTransferDelayMs = RETRY_REJECTED_TRANSFER_DELAY_MS,
   scheduleDownloadRecoveryRediscovery = null,
 } = {}) {
+  async function ownsRecoveryCandidate(input) {
+    return musicQueueRecoveryService ? musicQueueRecoveryService.ownsRecoveryCandidate(input) : hasPersistedMusicQueueOwnership(input.candidate);
+  }
+  async function delegateScoped(kind, input) {
+    const candidate = await getImportCandidate({ importCandidateId: input.failedCandidateId });
+    if (!musicQueueRecoveryService) {
+      if (hasPersistedMusicQueueOwnership(candidate)) throw new TypeError('Music Queue recovery owner is required');
+      return null;
+    }
+    if (!candidate || !await ownsRecoveryCandidate({ candidate, operationRunId: input.operationRunId })) return null;
+    return musicQueueRecoveryService.handleMusicQueueRecovery({ kind, ...input });
+  }
   async function scheduleRecoveryExecutionRun({
     nextCandidate,
     nextAttemptAt = null,
@@ -198,7 +212,7 @@ export function createImportCandidateRecoveryService({
     failedCandidateId,
     operationRunId = null,
     profileCode = null,
-    qualityOverride = null,
+    qualityOverride = undefined,
     recoverySummaryReason = 'transfer_recovery_cascade',
     scheduleFollowUpRun = false,
     terminalOutcome = null,
@@ -343,13 +357,16 @@ export function createImportCandidateRecoveryService({
 
   async function handleImportCandidateDownloadFailure({
     failedCandidateId,
+    observation = null,
     failureReason = null,
     operationRunId = null,
     profileCode = null,
-    qualityOverride = null,
+    qualityOverride = undefined,
     scheduleFollowUpRun = false,
     terminalOutcome = TERMINAL_MATCH_OUTCOME_CODES.DOWNLOAD_FAILED,
   } = {}) {
+    const scoped = await delegateScoped('download', { failedCandidateId, observation, operationRunId, failureReason });
+    if (scoped) return scoped;
     const failedBeforeAttempt = await getImportCandidate({ importCandidateId: failedCandidateId });
     if (!failedBeforeAttempt) {
       return buildRecoveryResult({
@@ -378,14 +395,17 @@ export function createImportCandidateRecoveryService({
 
   async function handleImportCandidateQualityFailure({
     failedCandidateId,
+    observation = null,
     failureReason = null,
     operationRunId = null,
     profileCode = null,
     qualityLabel = 'quality_blocked',
-    qualityOverride = null,
+    qualityOverride = undefined,
     qualityWeight = 0,
     scheduleFollowUpRun = true,
   } = {}) {
+    const scoped = await delegateScoped('quality', { failedCandidateId, observation, operationRunId, failureReason });
+    if (scoped) return scoped;
     const failedBeforeAttempt = await getImportCandidate({ importCandidateId: failedCandidateId });
     if (!failedBeforeAttempt) {
       return buildRecoveryResult({
@@ -425,13 +445,16 @@ export function createImportCandidateRecoveryService({
     addBlockerCode = null,
     canRecover = false,
     failedCandidateId,
+    observation = null,
     failureReason = null,
     operationRunId = null,
     profileCode = null,
-    qualityOverride = null,
+    qualityOverride = undefined,
     recoveryReasonCode = null,
     scheduleFollowUpRun = true,
   } = {}) {
+    const scoped = await delegateScoped('import', { failedCandidateId, observation, operationRunId, failureReason, addBlockerCode, recoveryReasonCode, canRecover });
+    if (scoped) return scoped;
     const failedBeforeAttempt = await getImportCandidate({ importCandidateId: failedCandidateId });
     if (!failedBeforeAttempt) {
       return buildRecoveryResult({
@@ -495,12 +518,15 @@ export function createImportCandidateRecoveryService({
 
   async function handleImportCandidateRejectedTransfer({
     failedCandidateId,
+    observation = null,
     failureReason = null,
     operationRunId = null,
     profileCode = null,
-    qualityOverride = null,
+    qualityOverride = undefined,
     scheduleFollowUpRun = true,
   } = {}) {
+    const scoped = await delegateScoped('rejected', { failedCandidateId, observation, operationRunId, failureReason });
+    if (scoped) return scoped;
     const failedBeforeAttempt = await getImportCandidate({ importCandidateId: failedCandidateId });
     if (!failedBeforeAttempt) {
       return buildRecoveryResult({
@@ -562,6 +588,8 @@ export function createImportCandidateRecoveryService({
   }
 
   return {
+    ownsRecoveryCandidate,
+    isCurrentExecutionObservation: (input) => musicQueueRecoveryService?.isCurrentExecutionObservation(input) ?? true,
     handleImportCandidateDownloadFailure,
     handleImportCandidateImportBlocker,
     handleImportCandidateQualityFailure,

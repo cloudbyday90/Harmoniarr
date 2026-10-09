@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createMissingMusicDecisionService } from '../../src/server/missing-music/missing-music-decision-service.js';
+import { projectMusicQueueRelease } from '../../src/server/acquisition/acquisition-pipeline-service.js';
 
 function createRelease({ appUserId, id, statusCode = 'pick_match' }) {
   return {
@@ -306,6 +307,79 @@ test('automatic authority refusal retains only a current guarded prepared Add re
     const unavailableDetail = await unavailableService.getMissingMusicDecisionDetail({ actorUser, decisionId: unavailable.id });
     assert.equal(unavailableDetail.permissions.canAddToLibrary, false);
     assert.notEqual(unavailableDetail.decision.status.nextAction, 'add_to_library');
+  }
+});
+
+test('canonical fallback recovery preserves exact older-search child progress and bounded list/detail facts', async () => {
+  const release = createRelease({ appUserId: 'user-1', id: 'decision-fallback' });
+  const summary = { totalCount: 3, statusCounts: { failed: 1, pending: 2 }, latestStatus: 'failed',
+    downloadExecutionSummary: { itemStatusCounts: { pending: 1, queued: 1 } },
+    confirmedTransferSummary: { transferCount: 2, candidateCount: 1 },
+    matches: [{ matchId: 'private-old-candidate', sourceUsername: 'private-provider', sourceSearchId: 'private-old-search', status: 'pending', formats: ['flac'] }],
+    musicQueueRecovery: { episode: 'private-episode', authority: { participants: ['private-member'], primaryWantedReleaseId: release.id },
+      acceptedBaseline: { qualityOverride: { wantedReleaseId: release.id }, minimumBitrateKbps: 320 }, path: '/private/download' } };
+  release.discoveryRequest = { searchMode: 'automatic', requestStatus: 'blocked', blockedReason: 'download_recovery_exhausted',
+    searchAttemptCount: 3, evidence: { lastSearchId: 'private-current-failed-search' }, importReviewSummary: summary };
+  const { service } = createService({
+    listWantedReleaseIdentityPage: async () => ({ rows: [{ id: release.id, createdAtKey: '2026-10-08T00:00:00.000000Z' }], hasMore: false }),
+    listWantedReleasesWithMetadata: async ({ appUserIds }) => appUserIds.includes(release.appUserId) ? [release] : [],
+    projectMusicQueueReleaseFn: projectMusicQueueRelease,
+  });
+  for (const [executionStatus, confirmed, code, state, message] of [
+    ['pending', 0, 'trying_next_match', 'searching', 'A previous match did not work. The next eligible match is queued for download preparation.'],
+    ['running', 0, 'trying_next_match', 'searching', 'Harmoniarr is preparing the next eligible match for download.'],
+    [null, 1, 'downloading', 'downloading', 'A selected match is downloading.'],
+    [null, 0, 'no_matches_left', 'action', 'Harmoniarr has tried every acceptable match and stopped automatic recovery.'],
+  ]) {
+    summary.recoveryExecution = { status: executionStatus, candidateMatches: executionStatus != null, authorityReserved: executionStatus != null };
+    summary.currentConfirmedTransferCount = confirmed;
+    summary.currentExecutionStatusCounts = {};
+    for (const actorUser of [{ id: 'admin-1', role: 'admin' }, { id: 'user-1', role: 'requester' }]) {
+      const detail = await service.getMissingMusicDecisionDetail({ actorUser, decisionId: release.id });
+      const list = await service.listMissingMusicDecisions({ actorUser, state });
+      assert.equal(detail.decision.status.code, code);
+      assert.equal(detail.decision.status.message, message);
+      assert.equal(detail.decision.state, state);
+      assert.deepEqual(list.decisions[0].status, detail.decision.status);
+      assert.equal(detail.permissions.canSearchAgain, code === 'no_matches_left');
+      assert.equal(detail.permissions.canStartDownload, false);
+      assert.equal(detail.permissions.canViewDownloader, code === 'downloading' && actorUser.role === 'admin');
+      assert.doesNotMatch(JSON.stringify({ detail, list }), /private-|musicQueueRecovery|episode|authority|participants|acceptedBaseline|qualityOverride|sourceSearchId|sourceUsername|recoveryExecution|recoveryDiscovery|reservationRetained|legacyRecoverySelection|recoverySelectionNeedsReview|currentConfirmedTransferCount|currentExecutionStatusCounts|\/private/u);
+    }
+    assert.equal(release.discoveryRequest.evidence.lastSearchId, 'private-current-failed-search', 'projection must not rewrite current discovery to the older selected search');
+  }
+});
+
+test('canonical stopped or selected recovery cannot inherit activity from stale items or invalid reservations', async () => {
+  const actorUser = { id: 'admin-1', role: 'admin' };
+  for (const [summaryChanges, expectedCode, canStartDownload] of [
+    [{}, 'no_matches_left', false],
+    [{ recoveryExecution: { status: 'pending', candidateMatches: false, authorityReserved: true } }, 'needs_help_adding', false],
+    [{ recoveryExecution: { status: 'running', candidateMatches: true, authorityReserved: false } }, 'needs_help_adding', false],
+    [{ recoveryExecution: { status: null, candidateMatches: true, authorityReserved: false, reservationRetained: true } }, 'needs_help_adding', false],
+    [{ statusCounts: { selected: 1 }, legacyRecoverySelection: true }, 'needs_help_adding', false],
+    [{ statusCounts: { selected: 1 }, recoverySelectionNeedsReview: true }, 'needs_help_adding', false],
+    [{ statusCounts: { failed: 1, selected: 1 }, recoverySelectedCount: 1 }, 'match_selected', true],
+    [{ statusCounts: { failed: 1, selected: 1 }, recoverySelectedCount: 1,
+      downloadExecutionSummary: { itemStatusCounts: { blocked: 1 } } }, 'needs_help_adding', false],
+    [{ libraryAddSummary: { latestOutcome: 'quality_blocked', qualityBlockedCount: 1 } }, 'needs_help_adding', false],
+  ]) {
+    const release = createRelease({ appUserId: 'user-1', id: 'decision-fallback' });
+    release.discoveryRequest = { searchMode: 'automatic', requestStatus: 'blocked', blockedReason: 'download_recovery_exhausted', searchAttemptCount: 3,
+      importReviewSummary: { statusCounts: { failed: 1, pending: 2 }, totalCount: 3,
+        downloadExecutionSummary: { itemStatusCounts: { pending: 1, queued: 1 } },
+        confirmedTransferSummary: { transferCount: 2 }, ...summaryChanges } };
+    const { service } = createService({
+      listWantedReleaseIdentityPage: async () => ({ rows: [{ id: release.id, createdAtKey: '2026-10-08T00:00:00.000000Z' }], hasMore: false }),
+      listWantedReleasesWithMetadata: async () => [release], projectMusicQueueReleaseFn: projectMusicQueueRelease,
+    });
+    const detail = await service.getMissingMusicDecisionDetail({ actorUser, decisionId: release.id });
+    const list = await service.listMissingMusicDecisions({ actorUser, state: 'action' });
+    assert.equal(detail.decision.status.code, expectedCode);
+    assert.equal(detail.decision.state, 'action');
+    assert.deepEqual(list.decisions[0].status, detail.decision.status);
+    assert.equal(detail.permissions.canStartDownload, canStartDownload);
+    assert.equal(detail.permissions.canViewDownloader, false);
   }
 });
 

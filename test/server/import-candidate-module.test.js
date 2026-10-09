@@ -75,7 +75,7 @@ test('createImportCandidateModule exposes shared import candidate route dependen
   const importCandidateReleaseAddDiagnosticsService = {
     buildReleaseAddDiagnostics: () => {},
   };
-  const importCandidateExecutionRunStore = {};
+  const importCandidateExecutionRunStore = { createOperationRun: async () => ({ id: 'scoped-recovery-run' }) };
   const importCandidateExecutionWorker = {};
   const importCandidateService = {
     getImportCandidate: () => {},

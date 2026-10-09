@@ -153,6 +153,16 @@ function mapDiscoveryRow(row, { automaticCooldownMs, now }) {
   const releaseDateDeadline = parseMetadataReleaseDateInstant(row.release_date);
   const cooldownDeadline = buildCooldownDeadline(row.last_search_at, automaticCooldownMs);
 
+  if (row.blocked_reason === 'recovery_scope_changed' || priorEvidence.downloadRecoveryRediscovery?.state === 'guard_refused') {
+    return {
+      blockedReason: 'recovery_scope_changed', evidence: priorEvidence,
+      lastSearchAt: toIsoStringOrNull(row.last_search_at), manualRequestedAt: toIsoStringOrNull(row.manual_requested_at),
+      metadataArtistId: row.metadata_artist_id, metadataReleaseGroupId: row.metadata_release_group_id,
+      metadataReleaseId: row.metadata_release_id, releaseDate, wantedStatus: row.wanted_status, searchMode,
+      nextSearchAfter: null, requestStatus: 'blocked', researchAttemptCount, searchAttemptCount,
+    };
+  }
+
   if (searchMode === 'manual') {
     return {
       blockedReason: null,

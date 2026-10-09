@@ -1,5 +1,21 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+
+test('ordinary reconciliation preserves a scoped refusal even after its deadline and manual mode', async () => {
+  const requests = [];
+  const service = createLibraryDiscoveryRequestService({ getNow: () => new Date('2026-10-09T12:00:00.000Z'),
+    getPoolFn: () => ({ query: async () => ({ rows: [{ metadata_artist_id: 'artist', metadata_release_group_id: 'group',
+      metadata_release_id: 'release', wanted_status: 'missing', search_mode: 'manual', blocked_reason: 'recovery_scope_changed',
+      last_search_at: '2026-10-08T12:00:00.000Z', search_attempt_count: 1, research_attempt_count: 1,
+      prior_evidence: { downloadRecoveryRediscovery: { owningRunId: 'old-run', nextSearchAfter: '2026-10-08T14:00:00.000Z', state: 'guard_refused' } },
+    }] }) }),
+    libraryDiscoveryRequestStore: { replaceLibraryDiscoveryRequests: async (input) => requests.push(input) },
+  });
+  await service.reconcileDiscoveryRequests();
+  const [request] = requests[0].discoveryRequests;
+  assert.equal(request.requestStatus, 'blocked'); assert.equal(request.blockedReason, 'recovery_scope_changed');
+  assert.equal(request.nextSearchAfter, null); assert.equal(request.evidence.downloadRecoveryRediscovery.state, 'guard_refused');
+});
 import { createLibraryDiscoveryRequestService } from '../../src/server/library/library-discovery-request-service.js';
 
 test('reconcileDiscoveryRequests records ready, cooldown, and blocked automatic requests from wanted releases', async (t) => {

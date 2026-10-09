@@ -17,6 +17,7 @@
  */
 
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
+import { MUSIC_QUEUE_RECOVERY_DISCOVERY_SOURCE } from '../import-candidates/music-queue-recovery-policy.js';
 import {
   isOperationRunCancellationError,
   isOperationRunPauseError,
@@ -78,6 +79,7 @@ export function createLibraryDiscoveryWorker({
   }) {
     let finalLeaseStatus = 'completed';
     let leaseHeartbeat = null;
+    const scopedRecovery = triggerSource === MUSIC_QUEUE_RECOVERY_DISCOVERY_SOURCE;
 
     try {
       await acquireLease({ runId });
@@ -93,18 +95,18 @@ export function createLibraryDiscoveryWorker({
         },
       });
 
-      if (reconcileWantedReleases) {
+      if (!scopedRecovery && reconcileWantedReleases) {
         await reconcileWantedReleases();
       }
 
-      if (reconcileDiscoveryRequests) {
+      if (!scopedRecovery && reconcileDiscoveryRequests) {
         await reconcileDiscoveryRequests();
       }
 
       await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
 
       let monitoredArtistArtwork = null;
-      if (prefetchMonitoredArtistArtwork) {
+      if (!scopedRecovery && prefetchMonitoredArtistArtwork) {
         try {
           monitoredArtistArtwork = await prefetchMonitoredArtistArtwork();
         } catch (error) {
@@ -120,6 +122,7 @@ export function createLibraryDiscoveryWorker({
       const summary = await dispatchDiscoveryRequests({
         actorUserId: triggeredByUserId,
         requestMetadata,
+        ...(scopedRecovery ? { runId, triggerSource } : {}),
       });
 
       const dispatchBreakdown = buildDispatchBreakdown(summary);

@@ -210,10 +210,11 @@ test('deriveMusicQueueStatus keeps manually selected matches distinct from autom
   assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.DOWNLOAD_NOW);
 });
 
-test('deriveMusicQueueStatus shows the active download when automatic execution is queued for a selected match', () => {
+test('deriveMusicQueueStatus distinguishes current queued preparation from a confirmed download', () => {
   const status = deriveMusicQueueStatus({
     match: {
       executionStatusCounts: { pending: 1 },
+      currentExecutionStatusCounts: { pending: 1 },
       statusCounts: { selected: 1 },
     },
     release: { missingTrackCount: 10, wantedStatus: 'missing' },
@@ -221,9 +222,11 @@ test('deriveMusicQueueStatus shows the active download when automatic execution 
 
   assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.DOWNLOADING);
   assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.OPEN_DOWNLOADER);
+  assert.equal(status.label, 'Download queued');
+  assert.equal(status.message, 'The selected match is queued for download preparation.');
 });
 
-test('deriveMusicQueueStatus surfaces an automatically promoted fallback as trying another match', () => {
+test('deriveMusicQueueStatus requires a committed recovery child before an automatic selection claims progress', () => {
   const status = deriveMusicQueueStatus({
     match: {
       recoverySelectedCount: 1,
@@ -236,11 +239,11 @@ test('deriveMusicQueueStatus surfaces an automatically promoted fallback as tryi
     release: { missingTrackCount: 10, wantedStatus: 'missing' },
   });
 
-  assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.TRYING_NEXT_MATCH);
-  assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.VIEW_RECOVERY);
+  assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.CHECKING_MATCHES);
+  assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.DOWNLOAD_NOW);
 });
 
-test('deriveMusicQueueStatus shows trying next match when quality recovery leaves pending options', () => {
+test('deriveMusicQueueStatus keeps quality recovery stopped when only unevaluated pending options remain', () => {
   const status = deriveMusicQueueStatus({
     add: {
       latestOutcome: 'quality_blocked',
@@ -258,8 +261,107 @@ test('deriveMusicQueueStatus shows trying next match when quality recovery leave
     release: { missingTrackCount: 10, wantedStatus: 'missing' },
   });
 
-  assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.TRYING_NEXT_MATCH);
-  assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.VIEW_RECOVERY);
+  assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.NEEDS_HELP_ADDING);
+  assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.REVIEW_ADD_PLAN);
+});
+
+test('exact queued or running recovery reservations carry truthful preparation progress even for an older selected search', () => {
+  for (const [executionStatus, message] of [
+    ['pending', 'A previous match did not work. The next eligible match is queued for download preparation.'],
+    ['running', 'Harmoniarr is preparing the next eligible match for download.'],
+  ]) {
+    const status = deriveMusicQueueStatus({
+      add: { latestOutcome: 'quality_blocked', qualityBlockedCount: 1 },
+      match: { statusCounts: { failed: 1, pending: 2 }, pendingCount: 2,
+        recoveryExecution: { status: executionStatus, candidateMatches: true, authorityReserved: true } },
+      release: { wantedStatus: 'missing', missingTrackCount: 10 },
+    });
+    assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.TRYING_NEXT_MATCH);
+    assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.VIEW_RECOVERY);
+    assert.equal(status.message, message);
+    assert.equal(status.tone, 'info');
+  }
+});
+
+test('missing, stale, mismatched and refused recovery reservations cannot turn remaining candidates into automatic work', () => {
+  for (const recoveryExecution of [null, {}, { status: 'pending', candidateMatches: true, authorityReserved: false },
+    { status: 'running', candidateMatches: false, authorityReserved: true }, { status: 'pending', candidateMatches: 'true', authorityReserved: true },
+    { status: 'completed', candidateMatches: true, authorityReserved: true }, { status: 'failed', candidateMatches: true, authorityReserved: true }]) {
+    const status = deriveMusicQueueStatus({ match: { statusCounts: { failed: 1, pending: 2 }, pendingCount: 2,
+      recoveryExecution, executionStatusCounts: { pending: 1, queued: 1 }, confirmedTransferCount: 3 },
+    release: { wantedStatus: 'missing', missingTrackCount: 10 },
+    search: { status: 'blocked', blockedReason: 'download_recovery_exhausted', searchAttemptCount: 3 } });
+    const knownActive = ['pending', 'running'].includes(recoveryExecution?.status);
+    assert.equal(status.code, knownActive ? MUSIC_QUEUE_STATUS_CODES.NEEDS_HELP_ADDING : MUSIC_QUEUE_STATUS_CODES.NO_MATCHES_LEFT);
+    assert.equal(status.nextAction, knownActive ? MUSIC_QUEUE_ACTION_CODES.VIEW_RECOVERY : MUSIC_QUEUE_ACTION_CODES.TRY_AGAIN);
+  }
+});
+
+test('current provider acceptance outranks preparation and historical stops through the selected-parent update gap', () => {
+  for (const queuedStatus of ['queued', 'queued_with_warnings']) {
+    const status = deriveMusicQueueStatus({ add: { latestOutcome: 'quality_blocked', qualityBlockedCount: 1 },
+      match: { statusCounts: { failed: 1, selected: 1 }, currentConfirmedTransferCount: 1,
+        executionStatusCounts: { [queuedStatus]: 1 }, recoveryExecution: { status: 'running', candidateMatches: true, authorityReserved: true } },
+      release: { wantedStatus: 'missing', missingTrackCount: 10 } });
+    assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.DOWNLOADING);
+    assert.equal(status.label, 'Downloading');
+    assert.equal(status.message, 'A selected match is downloading.');
+  }
+});
+
+test('stale sibling execution items do not start a new selected match and refused recovery remains stopped', () => {
+  const release = { wantedStatus: 'missing', missingTrackCount: 10 };
+  const selected = deriveMusicQueueStatus({ release,
+    match: { statusCounts: { failed: 1, selected: 1 }, executionStatusCounts: { pending: 1, queued: 1 }, confirmedTransferCount: 2 } });
+  assert.equal(selected.code, MUSIC_QUEUE_STATUS_CODES.CHECKING_MATCHES);
+  assert.equal(selected.nextAction, MUSIC_QUEUE_ACTION_CODES.DOWNLOAD_NOW);
+  const preparing = deriveMusicQueueStatus({ release,
+    add: { latestOutcome: 'quality_blocked', qualityBlockedCount: 1 },
+    match: { statusCounts: { selected: 1 }, currentExecutionStatusCounts: { running: 1 },
+      latestEventType: 'import_candidate_import_blocked', addBlockerCode: 'library_collision' } });
+  assert.equal(preparing.label, 'Preparing download');
+  assert.equal(preparing.message, 'Harmoniarr is preparing the selected match for download.');
+  const refused = deriveMusicQueueStatus({ release,
+    match: { statusCounts: { failed: 1, selected: 1 }, recoverySelectedCount: 1,
+      recoveryExecution: { status: null, candidateMatches: true, authorityReserved: false }, executionStatusCounts: { blocked: 1 } } });
+  assert.equal(refused.code, MUSIC_QUEUE_STATUS_CODES.NEEDS_HELP_ADDING);
+  assert.notEqual(refused.nextAction, MUSIC_QUEUE_ACTION_CODES.DOWNLOAD_NOW);
+});
+
+test('held retirement is reviewable rather than selected and a retained terminal reservation cannot advertise Start download', () => {
+  const release = { wantedStatus: 'missing', missingTrackCount: 10 };
+  const search = { status: 'blocked', blockedReason: 'download_recovery_exhausted', searchAttemptCount: 3 };
+  const retired = deriveMusicQueueStatus({ release, search, match: { statusCounts: { failed: 1, held: 1 },
+    executionStatusCounts: { queued: 1 }, confirmedTransferCount: 2 } });
+  assert.equal(retired.code, MUSIC_QUEUE_STATUS_CODES.NO_MATCHES_LEFT);
+  assert.equal(retired.nextAction, MUSIC_QUEUE_ACTION_CODES.TRY_AGAIN);
+  const retained = deriveMusicQueueStatus({ release, search, match: { statusCounts: { failed: 1, selected: 1 },
+    recoveryExecution: { status: null, candidateMatches: true, authorityReserved: false, reservationRetained: true } } });
+  assert.equal(retained.code, MUSIC_QUEUE_STATUS_CODES.NEEDS_HELP_ADDING);
+  assert.equal(retained.nextAction, MUSIC_QUEUE_ACTION_CODES.VIEW_RECOVERY);
+  assert.equal(retained.message, 'Automatic recovery needs review before another download can start.');
+});
+
+test('retired selections and legacy automatic intents remain reviewable without claiming an active reservation', () => {
+  for (const guard of ['legacyRecoverySelection', 'recoverySelectionNeedsReview']) {
+    const status = deriveMusicQueueStatus({ release: { wantedStatus: 'missing', missingTrackCount: 10 },
+      match: { statusCounts: { selected: 1 }, [guard]: true, currentExecutionStatusCounts: { pending: 1 } } });
+    assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.NEEDS_HELP_ADDING);
+    assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.VIEW_RECOVERY);
+  }
+});
+
+test('durable delayed search evidence distinguishes waiting, actual search and unresolved terminal ownership', () => {
+  for (const [stage, code] of [['pending', MUSIC_QUEUE_STATUS_CODES.RETRYING_SEARCH], ['running', MUSIC_QUEUE_STATUS_CODES.SEARCHING],
+    [null, MUSIC_QUEUE_STATUS_CODES.NEEDS_HELP_ADDING]]) {
+    const status = deriveMusicQueueStatus({ release: { wantedStatus: 'missing', missingTrackCount: 10 },
+      match: { statusCounts: { failed: 1, pending: 2 }, totalCount: 3, executionStatusCounts: { queued: 1 } },
+      search: { status: 'cooldown', nextSearchAfter: '2030-10-08T00:00:00Z', searchAttemptCount: 3,
+        recoveryDiscovery: { status: stage, reservationRetained: true } } });
+    assert.equal(status.code, code);
+    assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.VIEW_RECOVERY);
+    if (stage === null) assert.equal(status.message, 'Automatic recovery needs review before another search can start.');
+  }
 });
 
 test('deriveMusicQueueStatus keeps scheduled cooldown retries automatic', () => {

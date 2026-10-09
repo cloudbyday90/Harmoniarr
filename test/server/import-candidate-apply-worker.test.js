@@ -51,25 +51,29 @@ function createVerifiedApplyPreview() {
   };
 }
 
-test('automatic quality recovery refuses drift during the measured gate and incompatible saved consent or floor', async () => {
+test('automatic quality failure forwards the original pre-gate candidate to owning recovery without applying blocked media', async () => {
   const wantedReleaseId = '00000000-0000-4000-8000-000000000001';
   const consent = { mode: 'allow_fallback_quality', wantedReleaseId };
   for (const variant of ['gate_drift', 'revoked_consent', 'higher_floor', 'unchanged']) {
-    let changed = false; let recoveryCalls = 0; let finish; let summary;
+    let changed = false; let finish; let summary;
+    const recoveries = [];
     const done = new Promise((resolve) => { finish = resolve; });
     const saved = { profileCode: 'lossless_archive', wantedReleaseId, ...(variant === 'revoked_consent' ? { qualityOverride: consent } : {}) };
     const current = { ...saved, ...(variant === 'revoked_consent' ? { qualityOverride: null } : {}),
       ...(variant === 'higher_floor' ? { minimumBitrateKbps: 320 } : {}) };
+    const acceptedCandidate = { id: 'candidate-ready-1', status: 'import_pending', sourceSearchId: 'accepted-search',
+      updatedAt: '2026-10-08T20:00:00.000Z', files: [{ id: 'accepted-file', filename: '01.mp3', sizeBytes: 1000 }],
+      normalizedPayload: { musicQueue: saved } };
     const worker = createImportCandidateApplyWorker({ acquireLease: async () => {}, releaseLease: async () => {},
       buildImportPendingCandidateSummary: async () => ({ importPendingCandidates: [createReadyImportCandidate()] }),
       resolveCurrentSafeAutoAddCandidate: async ({ summaryCandidate }) => ({ ...summaryCandidate, musicQueueContext: current,
-        recheckPolicySnapshot: { candidate: { normalizedPayload: { musicQueue: saved } } } }),
+        recheckPolicySnapshot: { candidate: structuredClone(acceptedCandidate) } }),
       assertCurrentSafeAutoAddCandidate: async () => { if (changed) { const error = new Error('policy changed'); error.code = 'import_candidate_apply_not_ready'; throw error; } },
       previewImportCandidateApply: async () => createVerifiedApplyPreview(),
       safeAutoAddQualityGateService: { evaluateSafeAutoAddQuality: async () => {
         await Promise.resolve(); changed = variant === 'gate_drift'; return { eligible: false, profileCode: 'lossless_archive', message: 'blocked' };
       } },
-      handleImportCandidateQualityFailure: async () => { recoveryCalls += 1; return { recovered: false }; },
+      handleImportCandidateQualityFailure: async (input) => { recoveries.push(input); return { recovered: false }; },
       applyImportCandidatePreview: async () => assert.fail('blocked audio cannot apply'),
       markRunStarted: async () => {}, markRunFailed: async () => finish(), markRunCompleted: async (input) => { summary = input.summary; finish(); },
       replaceImportApplyRunItems: async () => [], updateImportApplyRunItem: async () => {},
@@ -77,7 +81,13 @@ test('automatic quality recovery refuses drift during the measured gate and inco
     worker.startWorkerRun({ runId: 'automatic-quality-run', triggerSource: 'music_queue_download_completed', applySafetyMode: 'safe_auto',
       requestedCandidateCount: 1, executableCandidateCount: 1 });
     await done;
-    assert.equal(summary.qualityBlockedCount, 1); assert.equal(recoveryCalls, variant === 'unchanged' ? 1 : 0);
+    assert.equal(summary.qualityBlockedCount, 1);
+    assert.equal(recoveries.length, 1);
+    assert.equal(recoveries[0].operationRunId, 'automatic-quality-run');
+    assert.equal(recoveries[0].observation.candidateId, 'candidate-ready-1');
+    assert.equal(recoveries[0].observation.sourceSearchId, 'accepted-search');
+    assert.equal(recoveries[0].observation.updatedAt, '2026-10-08T20:00:00.000Z');
+    assert.equal(recoveries[0].observation.files[0].id, 'accepted-file');
   }
 });
 
@@ -114,6 +124,44 @@ test('guarded worker captures current provenance before delayed media preview an
   assert.deepEqual(calls, ['snapshot', 'preview']);
   assert.equal(mutations, 0);
   assert.equal(completedSummary.applyFailedCount, 1);
+});
+
+test('owned quality-block Activity waits for committed terminal history and omits a stale recovery observation', async () => {
+  const wantedReleaseId = '00000000-0000-4000-8000-000000000001';
+  for (const terminalObservationRecorded of [false, true]) {
+    const events = [];
+    let recoveryReturned = false;
+    let complete;
+    const done = new Promise((resolve) => { complete = resolve; });
+    const owned = createReadyImportCandidate({ musicQueueContext: { wantedReleaseId, profileCode: 'lossless_archive' },
+      releaseIdentity: { artistName: 'Artist', releaseTitle: 'Release' } });
+    const worker = createImportCandidateApplyWorker({ acquireLease: async () => {}, releaseLease: async () => {},
+      buildImportPendingCandidateSummary: async () => ({ importPendingCandidates: [owned] }),
+      previewImportCandidateApply: async () => { await Promise.resolve(); return createVerifiedApplyPreview(); },
+      safeAutoAddQualityGateService: { evaluateSafeAutoAddQuality: async () => ({ eligible: false,
+        profileCode: 'lossless_archive', status: 'blocked', message: 'Measured media is below the required quality' }) },
+      handleImportCandidateQualityFailure: async () => {
+        await Promise.resolve(); recoveryReturned = true;
+        return { recovered: false, scopedRecovery: true,
+          ...(terminalObservationRecorded ? { terminalObservationRecorded: true, reason: 'recovery_scope_not_current' }
+            : { reason: 'recovery_observation_stale' }) };
+      },
+      recordActivityEventFn: async (event) => { events.push({ event, recoveryReturned }); },
+      applyImportCandidatePreview: async () => assert.fail('quality-blocked media cannot mutate files'),
+      markRunStarted: async () => {}, markRunFailed: async () => complete(), markRunCompleted: async () => complete(),
+      replaceImportApplyRunItems: async () => [], updateImportApplyRunItem: async () => {},
+    });
+    await worker.startWorkerRun({ runId: 'owned-quality-run', applySafetyMode: 'safe_auto',
+      triggerSource: 'music_queue_download_completed', requestedCandidateCount: 1, executableCandidateCount: 1 });
+    await done;
+    assert.equal(recoveryReturned, true);
+    assert.equal(events.length, terminalObservationRecorded ? 1 : 0);
+    if (terminalObservationRecorded) {
+      assert.equal(events[0].event.eventType, 'music_queue_import_blocked');
+      assert.equal(events[0].event.entityId, wantedReleaseId);
+      assert.equal(events[0].recoveryReturned, true);
+    }
+  }
 });
 
 test('import apply worker applies ready candidates and persists per-item outcomes', async (t) => {

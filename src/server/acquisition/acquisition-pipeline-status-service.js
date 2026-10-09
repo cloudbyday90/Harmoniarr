@@ -195,6 +195,23 @@ function buildAddBlockerRepair(blockerCode, recoveryReasonCode) {
   return buildAcquisitionAddBlockerRepair(blockerCode, recoveryReasonCode);
 }
 
+function getActiveRecoveryExecutionStatus(recoveryExecution) {
+  if (recoveryExecution?.candidateMatches !== true || recoveryExecution.authorityReserved !== true) return null;
+  return ['pending', 'running'].includes(recoveryExecution.status) ? recoveryExecution.status : null;
+}
+
+function buildRecoveryProgressStatus(executionStatus) {
+  return {
+    ...buildStatus(MUSIC_QUEUE_STATUS_CODES.TRYING_NEXT_MATCH, {
+      nextAction: MUSIC_QUEUE_ACTION_CODES.VIEW_RECOVERY,
+      progressStep: 'download',
+    }),
+    message: executionStatus === 'pending'
+      ? 'A previous match did not work. The next eligible match is queued for download preparation.'
+      : 'Harmoniarr is preparing the next eligible match for download.',
+  };
+}
+
 function buildNeedsHelpAddingStatus({ blockerCode = null, recoveryReasonCode = null } = {}) {
   const repair = buildAddBlockerRepair(blockerCode, recoveryReasonCode);
   return buildStatus(MUSIC_QUEUE_STATUS_CODES.NEEDS_HELP_ADDING, {
@@ -237,35 +254,55 @@ export function deriveMusicQueueStatus({
   }
 
   const executionStatusCounts = match.executionStatusCounts ?? {};
+  const currentExecutionStatusCounts = match.currentExecutionStatusCounts ?? {};
   const hasSafeAutoQualityStop = getCount(add.qualityBlockedCount) > 0 || add.latestOutcome === 'quality_blocked';
-  if (hasAnyStatus(match.statusCounts, ['downloading'])) {
+  const selectedCount = getCount(match.statusCounts?.selected);
+  if (hasAnyStatus(match.statusCounts, ['downloading']) || getCount(match.currentConfirmedTransferCount) > 0) {
     return buildStatus(MUSIC_QUEUE_STATUS_CODES.DOWNLOADING, {
       nextAction: MUSIC_QUEUE_ACTION_CODES.OPEN_DOWNLOADER,
       progressStep: 'download',
     });
+  }
+
+  const recoveryExecutionStatus = getActiveRecoveryExecutionStatus(match.recoveryExecution);
+  if (recoveryExecutionStatus) return buildRecoveryProgressStatus(recoveryExecutionStatus);
+  if (['pending', 'running'].includes(match.recoveryExecution?.status) || match.recoveryExecution?.reservationRetained === true
+    || match.legacyRecoverySelection === true || match.recoverySelectionNeedsReview === true) {
+    return {
+      ...buildStatus(MUSIC_QUEUE_STATUS_CODES.NEEDS_HELP_ADDING, {
+        nextAction: MUSIC_QUEUE_ACTION_CODES.VIEW_RECOVERY,
+        progressStep: 'download',
+      }),
+      message: 'Automatic recovery needs review before another download can start.',
+    };
+  }
+
+  const hasAutomaticRecoverySelection = getCount(match.recoverySelectedCount) > 0;
+  if (!hasAutomaticRecoverySelection && hasAnyStatus(currentExecutionStatusCounts, ['running', 'pending'])) {
+    const running = getCount(currentExecutionStatusCounts.running) > 0;
+    return {
+      ...buildStatus(MUSIC_QUEUE_STATUS_CODES.DOWNLOADING, {
+        nextAction: MUSIC_QUEUE_ACTION_CODES.OPEN_DOWNLOADER,
+        progressStep: 'download',
+      }),
+      label: running ? 'Preparing download' : 'Download queued',
+      message: running ? 'Harmoniarr is preparing the selected match for download.'
+        : 'The selected match is queued for download preparation.',
+    };
   }
 
   if (match.latestEventType === 'import_candidate_import_blocked') {
     return buildNeedsHelpAddingStatus({ blockerCode: match.addBlockerCode });
   }
 
-  const hasAutomaticRecoverySelection = getCount(match.recoverySelectedCount) > 0;
-  if (hasAnyStatus(match.statusCounts, ['failed', 'rejected'])
-    && (getCount(match.pendingCount) > 0 || hasAutomaticRecoverySelection)) {
-    return buildStatus(MUSIC_QUEUE_STATUS_CODES.TRYING_NEXT_MATCH, {
-      nextAction: MUSIC_QUEUE_ACTION_CODES.VIEW_RECOVERY,
-      progressStep: 'download',
+  if (hasAutomaticRecoverySelection && (hasSafeAutoQualityStop
+    || hasAnyStatus(executionStatusCounts, ['blocked', 'apply_failed']))) {
+    return buildNeedsHelpAddingStatus({
+      blockerCode: add.blockerCode ?? (hasSafeAutoQualityStop ? IMPORT_CANDIDATE_ADD_BLOCKER_CODES.MEDIA_VERIFICATION : null),
+      recoveryReasonCode: add.recoveryReasonCode,
     });
   }
 
-  if (!hasSafeAutoQualityStop && hasAnyStatus(executionStatusCounts, ['running', 'pending', 'queued'])) {
-    return buildStatus(MUSIC_QUEUE_STATUS_CODES.DOWNLOADING, {
-      nextAction: MUSIC_QUEUE_ACTION_CODES.OPEN_DOWNLOADER,
-      progressStep: 'download',
-    });
-  }
-
-  const selectedCount = getCount(match.statusCounts?.selected) + getCount(match.statusCounts?.held);
   if (selectedCount > 0) {
     return buildStatus(MUSIC_QUEUE_STATUS_CODES.CHECKING_MATCHES, {
       nextAction: MUSIC_QUEUE_ACTION_CODES.DOWNLOAD_NOW,
@@ -278,6 +315,25 @@ export function deriveMusicQueueStatus({
       blockerCode: add.blockerCode ?? IMPORT_CANDIDATE_ADD_BLOCKER_CODES.MEDIA_VERIFICATION,
       recoveryReasonCode: add.recoveryReasonCode,
     });
+  }
+
+  if (search.recoveryDiscovery?.reservationRetained === true) {
+    if (search.recoveryDiscovery.status === 'running') {
+      return buildStatus(MUSIC_QUEUE_STATUS_CODES.SEARCHING, {
+        nextAction: MUSIC_QUEUE_ACTION_CODES.VIEW_RECOVERY, progressStep: 'search',
+      });
+    }
+    if (search.recoveryDiscovery.status === 'pending') {
+      return buildStatus(MUSIC_QUEUE_STATUS_CODES.RETRYING_SEARCH, {
+        nextAction: MUSIC_QUEUE_ACTION_CODES.VIEW_RECOVERY, progressStep: 'search',
+      });
+    }
+    return {
+      ...buildStatus(MUSIC_QUEUE_STATUS_CODES.NEEDS_HELP_ADDING, {
+        nextAction: MUSIC_QUEUE_ACTION_CODES.VIEW_RECOVERY, progressStep: 'search',
+      }),
+      message: 'Automatic recovery needs review before another search can start.',
+    };
   }
 
   if (hasAnyStatus(add.itemStatusCounts, ['blocked', 'apply_failed'])

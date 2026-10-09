@@ -73,3 +73,19 @@ test('legacy High and consenting FLAC preference retain the saved 320 kbps minim
   assert.equal(legacy.minimumBitrateKbps, 320);
   assert.equal(evaluateQualityEvidence({ candidate: { formats: ['mp3'], bitrateKbps: 256 }, ...legacy }).autoDownloadEligible, false);
 });
+
+test('a second consenting Lossless recipient keeps its 320 exception floor across shared selection and format scoring', async () => {
+  const context = await createLibraryDiscoveryQualityContextService().resolveSharedDiscoveryQualityContext({
+    operatorLinks: [link('first', true), link('second', true, {
+      qualityOverride: { mode: 'allow_fallback_quality', wantedReleaseId: 'second', minimumBitrateKbps: 320 },
+    })],
+  });
+  assert.equal(context.profileCode, 'lossless_archive');
+  assert.equal(context.minimumBitrateKbps, 320);
+  assert.equal(context.qualityOverride.minimumBitrateKbps, 320);
+  assert.equal(context.formatPreferences.minimumBitrateKbps, 320);
+  assert.equal(evaluateQualityEvidence({ candidate: { formats: ['mp3'], bitrateKbps: 256 }, ...context }).autoDownloadEligible, false);
+  assert.equal(evaluateQualityEvidence({ candidate: { formats: ['mp3'], bitrateKbps: 320 }, ...context }).autoDownloadEligible, true);
+  assert.equal(scoreCandidateFormatMatch({ ...context.formatPreferences, extensions: ['mp3'], files: [{ extension: 'mp3', bitRateKbps: 256 }] }).score, 0);
+  assert.equal(scoreCandidateFormatMatch({ ...context.formatPreferences, extensions: ['mp3'], files: [{ extension: 'mp3', bitRateKbps: 320 }] }).score, 100);
+});

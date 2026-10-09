@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createAcquisitionPipelineService } from '../../src/server/acquisition/acquisition-pipeline-service.js';
+import { createAcquisitionPipelineService, projectMusicQueueRelease } from '../../src/server/acquisition/acquisition-pipeline-service.js';
+import { deriveMusicQueueStatus } from '../../src/server/acquisition/acquisition-pipeline-status-service.js';
 
 const statusService = {
   deriveMusicQueueStatus: () => ({
@@ -119,6 +120,27 @@ function createService({
     statusService: serviceStatusService,
   });
 }
+
+test('legacy acquisition list and detail derive status privately while preserving their existing public evidence', async () => {
+  const release = createRelease();
+  const summary = release.discoveryRequest.importReviewSummary;
+  Object.assign(summary, { statusCounts: { failed: 1, pending: 1 },
+    currentConfirmedTransferCount: 0, currentExecutionStatusCounts: {}, legacyRecoverySelection: false, recoverySelectionNeedsReview: false,
+    recoveryExecution: { status: 'pending', candidateMatches: true, authorityReserved: true, reservationRetained: true },
+    downloadExecutionSummary: { itemStatusCounts: { queued: 1 } } });
+  release.discoveryRequest.recoveryDiscovery = { status: 'pending', reservationRetained: true };
+  const projectorOptions = { qualityPolicyService };
+  const projected = projectMusicQueueRelease(release, projectorOptions);
+  const service = createService({ release, statusService: { deriveMusicQueueStatus } });
+  const list = await service.listMusicQueueReleases({ appUserId: 'user-1' });
+  const detail = await service.getMusicQueueRelease({ appUserId: 'user-1', wantedReleaseId: 'wanted-1' });
+  assert.equal(projected.status.code, 'trying_next_match');
+  for (const row of [projected, list.releases[0], detail.release]) {
+    assert.deepEqual(row.status, projected.status);
+    assert.deepEqual(row.evidence.match.executionStatusCounts, { queued: 1 }, 'existing public diagnostics remain available');
+    assert.doesNotMatch(JSON.stringify(row.evidence), /recoveryExecution|recoveryDiscovery|reservationRetained|authorityReserved|candidateMatches|legacyRecoverySelection|recoverySelectionNeedsReview|currentConfirmedTransferCount|currentExecutionStatusCounts/u);
+  }
+});
 
 test('recheckMusicQueueReleaseSafeAdd verifies release ownership before delegating the release-scoped repair', async (t) => {
   const recheckReleaseSafeAdd = t.mock.fn(async () => ({ outcome: 'queued', runId: 'apply-run-1' }));

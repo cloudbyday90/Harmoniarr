@@ -88,6 +88,23 @@ export function createImportCandidateAutoDownloadRunService({
     }
   }
 
+  // Read-only proposal for a scoped owner that will commit selection and its job together.
+  async function prepareAutomaticDownloadStart() {
+    let settings;
+    try { settings = await loadSettingsFn(); }
+    catch (error) { return { ready: false, skippedReason: 'settings_unavailable', errorCode: error?.code ?? 'settings_unavailable' }; }
+    if (!resolveAutoStartEnabled(settings)) return { ready: false, skippedReason: 'automatic_download_start_disabled' };
+    const readiness = await checkAutomaticDownloadReadiness({ settings });
+    if (!readiness.ready) return { ...readiness, skippedReason: readiness.setupReason };
+    if (typeof getProviderStatus !== 'function') return { ready: false, provider: 'slskd', skippedReason: 'provider_status_unavailable' };
+    try {
+      const providerStatus = await getProviderStatus();
+      if (providerStatus?.status !== 'healthy') return { ready: false, provider: 'slskd', providerStatus: providerStatus?.status ?? 'unknown',
+        message: providerStatus?.message ?? null, skippedReason: 'provider_not_healthy' };
+    } catch (error) { return { ready: false, provider: 'slskd', skippedReason: 'provider_status_unavailable', errorCode: error?.code ?? 'provider_status_unavailable' }; }
+    return { ready: true };
+  }
+
   async function startDownloadRunAfterAutoSelection({
     actorUserId = null,
     autoSelectionResult = null,
@@ -208,6 +225,7 @@ export function createImportCandidateAutoDownloadRunService({
 
   return {
     checkAutomaticDownloadReadiness,
+    prepareAutomaticDownloadStart,
     startDownloadRunAfterAutoSelection,
   };
 }

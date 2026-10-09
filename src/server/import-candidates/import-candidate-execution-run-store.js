@@ -65,6 +65,7 @@ export function createImportCandidateExecutionRunStore({
   });
 
   async function createOperationRun({
+    queryable = null,
     executionMode = 'download_enqueue',
     nextAttemptAt = null,
     requestedCandidateCount,
@@ -73,6 +74,7 @@ export function createImportCandidateExecutionRunStore({
     triggeredByUserId = null,
   }) {
     const run = await operationRunStore.createOperationRun({
+      queryable,
       status,
       summary: summary ?? {
         currentStep: 'queued',
