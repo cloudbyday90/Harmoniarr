@@ -81,3 +81,36 @@ test('retirement authority requires the exact typed reciprocal pair and saved so
   assert.equal(hasReciprocalExecutionOriginResolution({ record, sourceItem, newerRun: { ...newerRun,
     summary: { ...newerRun.summary, downloadOriginSupersession: { ...record, actorUserId: randomUUID() } } }, importCandidateId: f.importCandidateId }), false);
 });
+
+test('a leased future refusal can prove unused work only with its exact protocol and complete epoch', () => {
+  const f = fixture(); const now = new Date().toISOString();
+  f.run.status = 'failed'; f.run.attemptCount = 1;
+  f.run.summary.downloadPreparationProtocol = { version: 1 };
+  f.leases = [{ ownerInstanceId: 'worker', acquiredAt: now, expiresAt: now, releasedAt: now }];
+  const epoch = { version: 1, epochId: randomUUID(), operationRunId: f.run.id, importCandidateId: f.importCandidateId,
+    generation: 1, lease: { leaseKey: `import_candidate_execution_planning:${f.run.id}`, ownerInstanceId: 'worker', acquiredAt: now },
+    sourceObservation: { candidateId: f.importCandidateId, username: 'peer' }, requestedFiles: [], preparedAt: now,
+    phase: 'refused', refusal: { reasonCode: 'no_unlocked_files', refusedAt: now } };
+  f.items = [item(f, 'blocked', { requestedFiles: [], outcome: 'pre_provider_refused',
+    handoff: { state: 'pre_provider_refused', preProviderEpoch: epoch } })];
+  assert.equal(evaluateUnusedExecutionAllocation(f).eligible, true);
+  const withoutProtocol = structuredClone(f); delete withoutProtocol.run.summary.downloadPreparationProtocol;
+  assert.equal(evaluateUnusedExecutionAllocation(withoutProtocol).eligible, false);
+  for (const phase of ['preparing', 'may_have_dispatched', 'invalid']) {
+    const changed = structuredClone(f); changed.items[0].planningSnapshot.execution.handoff.preProviderEpoch.phase = phase;
+    assert.equal(evaluateUnusedExecutionAllocation(changed).eligible, false, phase);
+  }
+  const late = structuredClone(f); late.items[0].planningSnapshot.execution.latestTransferSnapshot = {};
+  assert.equal(evaluateUnusedExecutionAllocation(late).eligible, false);
+});
+
+test('a malformed or crossed epoch cannot fall back to older typed non-dispatch proof', () => {
+  const f = fixture(); f.run.status = 'failed';
+  const requestedFiles = [{ filename: 'Album\\One.flac', size: 123 }];
+  const attempt = createDownloadAttempt({ importCandidateId: f.importCandidateId, operationRunId: f.run.id,
+    requestedFiles, username: 'peer', sourceObservation: { candidateId: f.importCandidateId } });
+  for (const preProviderEpoch of [null, {}, { phase: 'refused' }, { phase: 'may_have_dispatched' }]) {
+    f.items = [item(f, 'blocked', { requestedFiles, outcome: 'not_dispatched', handoff: { state: 'not_dispatched', attempt, preProviderEpoch } })];
+    assert.equal(evaluateUnusedExecutionAllocation(f).eligible, false);
+  }
+});

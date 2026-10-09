@@ -130,8 +130,13 @@ suite('Caller-owned batch handoffs through real PostgreSQL and a controlled HTTP
   test('a required confirmation audit failure rolls back batch receipt links, phase and checkpoint; source drift can retain no phase', { timeout: config.scenarioTimeoutMs }, async (t) => scenario(t, async (context) => {
     const f = await seedImportExecutionHandoffFixture(context); const remote = await provider(t);
     const dispatch = await remote.service.prepareDownloadDispatch();
-    const prepared = await context.handoff.prepareDownloadHandoff({ ...f, providerBinding: dispatch.binding });
-    const result = await dispatch.enqueue({ attempt: prepared.attempt });
+    const lease = await context.runs.acquireLease({ runId: f.operationRunId });
+    const preparation = await context.preparation.beginPreparation({ ...f, runId: f.operationRunId, lease });
+    const prepared = await context.handoff.prepareDownloadHandoff({ ...f, providerBinding: dispatch.binding, lease,
+      preProviderEpochId: preparation.epochId });
+    const result = await dispatch.enqueue({ attempt: prepared.attempt, beforeSend: () => context.preparation.markDispatchPossible({
+      runId: f.operationRunId, importCandidateId: f.importCandidateId, epochId: preparation.epochId, lease,
+      attemptId: prepared.attempt.attemptId, assertProviderCurrent: dispatch.assertCurrent }) });
     await context.pool.query(`CREATE FUNCTION reject_batch_confirmation_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
       IF NEW.event_type='import_execution_handoff_confirmed' THEN RAISE EXCEPTION 'Controlled required audit failure'; END IF; RETURN NEW; END $$;
       CREATE TRIGGER reject_batch_confirmation_audit BEFORE INSERT ON audit_events FOR EACH ROW EXECUTE FUNCTION reject_batch_confirmation_audit()`);

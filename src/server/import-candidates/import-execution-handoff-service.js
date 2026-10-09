@@ -18,6 +18,8 @@ import { createImportExecutionTransferLinkStore } from './import-execution-trans
 import { evaluateBatchDownloadEvidence } from '../slskd/slskd-download-batch-policy.js';
 import { createImportExecutionDownloadAdoptionService } from './import-execution-download-adoption-service.js';
 import { hasDownloadAdoptionMarker } from './import-execution-adoption-evidence-policy.js';
+import { createImportExecutionPreProviderService } from './import-execution-pre-provider-service.js';
+import { hasPreProviderProtocol, validatePreProviderEpoch } from './import-execution-pre-provider-policy.js';
 
 const stale = () => ({ confirmed: false, disposition: 'unknown', stale: true, dispatchAllowed: false });
 const attemptIdentity = (attempt) => attempt && ({ version: attempt.version, attemptId: attempt.attemptId,
@@ -27,7 +29,8 @@ const attemptIdentity = (attempt) => attempt && ({ version: attempt.version, att
 /** One row-locked owner controls immutable dispatch checkpoints and their causal receipts. */
 export function createImportExecutionHandoffService({ store = createImportExecutionHandoffStore(),
   transferLinkStore = createImportExecutionTransferLinkStore(), withTransaction = createDatabaseTransactionRunner(),
-  recordAuditEventFn = recordAuditEvent, getNow = () => new Date() } = {}) {
+  recordAuditEventFn = recordAuditEvent, getNow = () => new Date(), preProviderService = null } = {}) {
+  const preparation = preProviderService ?? createImportExecutionPreProviderService({ withTransaction, recordAuditEventFn, getNow });
   for (const [name, fn] of Object.entries({ lockEvidence: store.lockEvidence, getCandidate: store.getCandidate,
     isCurrentOrigin: store.isCurrentOrigin, updateCheckpoint: store.updateCheckpoint,
     findUnresolvedOtherHandoff: store.findUnresolvedOtherHandoff, transitionDownloading: store.transitionDownloading,
@@ -36,7 +39,8 @@ export function createImportExecutionHandoffService({ store = createImportExecut
     recordConfirmedTransfers: transferLinkStore.recordConfirmedTransfers, withTransaction, recordAuditEventFn })) {
     if (typeof fn !== 'function') throw new TypeError(`createImportExecutionHandoffService requires ${name}`);
   }
-  async function prepareDownloadHandoff({ importCandidateId, operationRunId, requestedFiles, username, sourceObservation, providerBinding = null }) {
+  async function prepareDownloadHandoff({ importCandidateId, operationRunId, requestedFiles, username, sourceObservation, providerBinding = null,
+    preProviderEpochId = null, lease = null }) {
     return withTransaction(async (queryable) => {
       const owner = { importCandidateId, operationRunId };
       const item = await store.lockEvidence(owner, queryable);
@@ -49,12 +53,17 @@ export function createImportExecutionHandoffService({ store = createImportExecut
       if (candidate?.status !== 'selected' || !matchesRecoveryObservation(candidate, sourceObservation)
         || !await store.isCurrentOrigin(owner, queryable) || await store.findUnresolvedOtherHandoff(owner, queryable)) return stale();
       const proposal = createDownloadAttempt({ importCandidateId, operationRunId, requestedFiles, username, sourceObservation, providerBinding });
+      const run = typeof store.getRun === 'function' ? await store.getRun(operationRunId, queryable) : null;
+      const tracked = Object.hasOwn(execution.handoff ?? {}, 'preProviderEpoch') || hasPreProviderProtocol(run);
+      const epoch = tracked ? await preparation.stagePreparationAttempt({ runId: operationRunId, importCandidateId,
+        epochId: preProviderEpochId, lease, attempt: proposal, queryable }) : null;
       const dispatchStartedAt = getNow().toISOString();
       const saved = await store.updateCheckpoint({ item, expectedAttemptId: null, itemStatus: 'awaiting_confirmation',
         statusMessage: 'Sending the download request and recording its receipt.', execution: {
           ...execution, sourceObservation: proposal.sourceObservation, requestedFiles: proposal.requestedFiles,
           diagnostics: { ...execution.diagnostics, downloadAcceptance: buildDownloadHandoffConfirmationDiagnostic({ requestedFileCount: requestedFiles.length }) },
-          handoff: { ...execution.handoff, state: 'dispatching', dispatchStartedAt, retryPolicy: 'confirm_before_retry', attempt: proposal },
+          handoff: { ...execution.handoff, ...(epoch ? { preProviderEpoch: epoch } : {}), state: 'dispatching', dispatchStartedAt,
+            retryPolicy: 'confirm_before_retry', attempt: proposal },
         } }, queryable);
       if (!saved) throw createApiError(409, 'import_execution_handoff_stale', 'The download attempt changed before dispatch');
       return { dispatchAllowed: true, attempt: proposal, dispatchStartedAt, item: saved };
@@ -68,6 +77,13 @@ export function createImportExecutionHandoffService({ store = createImportExecut
       const execution = item?.planningSnapshot?.execution ?? {};
       const stored = execution.handoff?.attempt;
       if (!item || hasDownloadAdoptionMarker(execution) || execution.handoff?.state === 'not_dispatched' || (stored?.attemptId ?? null) !== (attemptId ?? null)) return stale();
+      if (Object.hasOwn(execution.handoff ?? {}, 'preProviderEpoch')) {
+        const epoch = validatePreProviderEpoch(execution.handoff.preProviderEpoch, { runId: operationRunId, importCandidateId });
+        if (!epoch || epoch.phase !== 'may_have_dispatched' || epoch.attemptId !== stored?.attemptId) {
+          await store.recordPendingCheck({ item, attemptId, checkedAt: getNow().toISOString() }, queryable);
+          return stale();
+        }
+      }
       const pending = async () => {
         await store.recordPendingCheck({ item, attemptId, checkedAt: getNow().toISOString() }, queryable);
         return stale();
@@ -147,6 +163,7 @@ export function createImportExecutionHandoffService({ store = createImportExecut
     return withTransaction(async (queryable) => {
       const item = await store.lockEvidence({ importCandidateId, operationRunId }, queryable);
       const execution = item?.planningSnapshot?.execution;
+      if (Object.hasOwn(execution?.handoff ?? {}, 'preProviderEpoch')) return false;
       if (execution?.handoff?.attempt?.attemptId !== attemptId || execution.handoff.attempt.receipts?.length
         || !['dispatching','awaiting_confirmation','not_dispatched'].includes(execution.handoff.state)) return false;
       return Boolean(await store.updateCheckpoint({ item, expectedAttemptId: attemptId, itemStatus: 'blocked',

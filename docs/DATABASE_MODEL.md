@@ -3260,6 +3260,25 @@ links, phase and required audits together. See the separate
 [design](DOWNLOAD_ORIGIN_RESOLUTION_DESIGN.md) and
 [outcome](DOWNLOAD_ORIGIN_RESOLUTION_OUTCOME.md) for executed evidence and limits.
 
+## Current implementation: explicit pre-provider refusal
+
+New download jobs carry private `summary.downloadPreparationProtocol.version=1`.
+Their per-item `execution.handoff.preProviderEpoch` binds a generation/UUID,
+run/candidate, captured lease/source/manifest and preparation time. It changes
+only from preparing to explicitly refused or may_have_dispatched. A refusal
+certificate cannot be created after crossing, from old absence, or from a
+different lease/epoch. Staging correlates only its own receipt-free attempt.
+Required audit and each transition share the owning transaction.
+
+All ordinary snapshot comparisons include the complete epoch, so a same-ID
+stale preparing record cannot erase a refusal or crossing. Lifecycle/retry and
+retention preserve the protocol and uncertain preparation. Public output omits
+the private marker/epoch and the raw repository snapshot alias. The existing
+guarded origin command consumes only a valid current certificate plus its prior
+authority/positive batch checks. No new table, migration or schema snapshot is
+needed; see [design](PRE_PROVIDER_REFUSAL_DESIGN.md) and
+[outcome](PRE_PROVIDER_REFUSAL_OUTCOME.md) for exact evidence and limits.
+
 ## Sources Reviewed
 
 PostgreSQL 18 official sources:

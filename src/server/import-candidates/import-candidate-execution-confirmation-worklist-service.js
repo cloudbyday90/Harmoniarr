@@ -25,11 +25,11 @@ export function createImportCandidateExecutionConfirmationWorklistService({
       const run = await getRunById(id);
       if (run?.executionMode === 'download_enqueue') {
         const hydrated = await buildRunWithItems(run);
-        const items = (hydrated?.items ?? []).filter(isUnconfirmedExecutionItem);
+        const items = (hydrated?.items ?? []).filter((item) => isUnconfirmedExecutionItem(item, hydrated));
         if (items.length > 0) unconfirmedRuns.push({ ...hydrated, items });
       }
     }
-    const currentCount = (currentRun?.items ?? []).filter(isUnconfirmedExecutionItem).length;
+    const currentCount = (currentRun?.items ?? []).filter((item) => isUnconfirmedExecutionItem(item, currentRun)).length;
     const observedOlderCount = unconfirmedRuns.reduce((total, run) => total + run.items.length, 0);
     const pendingConfirmationCount = count(Math.max(count(result.pendingConfirmationCount), observedOlderCount) + currentCount);
     const restored = await listRestoredExecutionRuns({ excludeRunId: currentRun?.id ?? null, limit: MAX_UNCONFIRMED_EXECUTION_RUNS });

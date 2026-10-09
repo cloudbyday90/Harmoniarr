@@ -234,3 +234,110 @@ test('a pinned local configuration assertion uses its caller-owned transaction w
   assert.equal(observedContexts.at(-1), owningClient);
   assert.equal(providerReads, readsBefore);
 });
+
+for (const version of ['0.25.1', '0.26.0']) {
+  test(`native ${version} dispatch awaits final configuration and beforeSend before its single POST`, async () => {
+    const events = [];
+    let reads = 0;
+    let finishConfig;
+    let finishBoundary;
+    const configurationGate = new Promise((resolve) => { finishConfig = resolve; });
+    const boundaryGate = new Promise((resolve) => { finishBoundary = resolve; });
+    const service = createSlskdService({ getClientConfig: async () => {
+      reads += 1;
+      if (reads === 3) {
+        events.push('configuration_started');
+        await configurationGate;
+        events.push('configuration_checked');
+      }
+      return { baseUrl: 'http://localhost:5030', apiKey: 'test-key', providerMode: 'external' };
+    }, createSlskdClientFn: (options) => createSlskdClient({ ...options, fetchImpl: async (url, request) => {
+      if (new URL(url).pathname.endsWith('/application/version')) return Response.json(version);
+      assert.equal(request.method, 'POST');
+      events.push('post');
+      const body = JSON.parse(request.body);
+      const files = version === '0.26.0' ? body.files : body;
+      const transfers = files.map((file) => ({ ...file, id: randomUUID(), username: 'peer', direction: 'Download',
+        state: 'Queued, Locally', removed: false, ...(version === '0.26.0' ? { batchId: body.id } : {}) }));
+      return version === '0.26.0'
+        ? Response.json({ batch: { id: body.id, username: 'peer', direction: 'Download', transfers }, failures: [] }, { status: 201 })
+        : Response.json({ Enqueued: transfers, Failed: [] }, { status: 201 });
+    } }) });
+    const dispatch = await service.prepareDownloadDispatch();
+    assert.equal(dispatch.supportsBeforeSend, true);
+    const attempt = createDownloadAttempt({ providerBinding: dispatch.binding, operationRunId: randomUUID(),
+      importCandidateId: randomUUID(), username: 'peer', sourceObservation: { username: 'peer' },
+      requestedFiles: [{ filename: 'Album/01.flac', size: 1000 }] });
+    const pending = dispatch.enqueue({ attempt, beforeSend: async () => {
+      events.push('boundary_started');
+      await boundaryGate;
+      events.push('boundary_committed');
+    } });
+    await new Promise((resolve) => { setImmediate(resolve); });
+    assert.deepEqual(events, ['configuration_started']);
+    finishConfig();
+    await new Promise((resolve) => { setImmediate(resolve); });
+    assert.deepEqual(events, ['configuration_started', 'configuration_checked', 'boundary_started']);
+    finishBoundary();
+    const result = await pending;
+    assert.deepEqual(events, ['configuration_started', 'configuration_checked', 'boundary_started', 'boundary_committed', 'post']);
+    assert.equal(evaluateDownloadReceipt({ attempt, enqueueResult: result }).disposition, 'confirmed');
+    assert.equal(events.filter((event) => event === 'post').length, 1);
+  });
+
+  test(`native ${version} beforeSend rejection sends no POST and preserves the original receipt-free attempt`, async () => {
+    const h = harness({ version });
+    const dispatch = await h.service.prepareDownloadDispatch();
+    const attempt = h.attempt(dispatch.binding);
+    const original = structuredClone(attempt);
+    const refusal = new Error('The exact preparation epoch is no longer current');
+    let boundaries = 0;
+    await assert.rejects(dispatch.enqueue({ attempt, beforeSend: async () => {
+      boundaries += 1;
+      await new Promise((resolve) => { setImmediate(resolve); });
+      throw refusal;
+    } }), (error) => error === refusal);
+    assert.equal(boundaries, 1);
+    assert.equal(h.calls.filter((call) => call.request.method === 'POST').length, 0);
+    assert.deepEqual(attempt, original);
+    assert.deepEqual(attempt.receipts, []);
+  });
+
+  test(`native ${version} final configuration refusal never calls beforeSend or POST`, async () => {
+    const h = harness({ version });
+    const dispatch = await h.service.prepareDownloadDispatch();
+    const attempt = h.attempt(dispatch.binding);
+    h.config.apiKey = 'rotated-key';
+    let boundaries = 0;
+    await assert.rejects(dispatch.enqueue({ attempt, beforeSend: async () => { boundaries += 1; } }),
+      { code: 'slskd_download_provider_changed' });
+    assert.equal(boundaries, 0);
+    assert.equal(h.calls.filter((call) => call.request.method === 'POST').length, 0);
+    assert.deepEqual(attempt.receipts, []);
+  });
+
+  test(`native ${version} a lost response after beforeSend retains uncertainty without a receipt or another POST`, async () => {
+    const events = [];
+    const h = harness({ version, respond: async (call) => {
+      if (call.request.method === 'POST') {
+        events.push('post_invoked');
+        throw new Error('Controlled response loss after request acceptance was possible');
+      }
+    } });
+    const dispatch = await h.service.prepareDownloadDispatch();
+    const attempt = h.attempt(dispatch.binding);
+    const original = structuredClone(attempt);
+    let phase = 'preparing';
+    await assert.rejects(dispatch.enqueue({ attempt, beforeSend: async () => {
+      phase = 'may_have_dispatched';
+      events.push('boundary_committed');
+    } }), { code: 'slskd_unavailable' });
+    assert.deepEqual(events, ['boundary_committed', 'post_invoked']);
+    assert.equal(phase, 'may_have_dispatched');
+    assert.equal(h.calls.filter((call) => call.request.method === 'POST').length, 1);
+    assert.deepEqual(attempt, original);
+    assert.equal(Object.hasOwn(attempt, 'receiptDisposition'), false);
+    assert.deepEqual(evaluateDownloadReceipt({ attempt, enqueueResult: { enqueued: [], failed: [] } }).attempt.receipts, []);
+    assert.equal(evaluateDownloadReceipt({ attempt, enqueueResult: { enqueued: [], failed: [] } }).disposition, 'unknown');
+  });
+}

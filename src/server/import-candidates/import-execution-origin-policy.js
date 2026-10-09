@@ -7,6 +7,7 @@
 
 import { isDeepStrictEqual } from 'node:util';
 import { normalizeDownloadTransferId, validateDownloadAttempt } from '../slskd/slskd-download-attempt-policy.js';
+import { hasCertifiedPreProviderRefusal } from './import-execution-pre-provider-policy.js';
 
 const plain = (value) => value != null && typeof value === 'object' && !Array.isArray(value);
 const refusal = (reasonCode) => ({ eligible: false, reasonCode });
@@ -49,7 +50,9 @@ export function evaluateUnusedExecutionAllocation({ run, items, leases, transfer
   if (items.length && (!plain(snapshot) || (Object.hasOwn(snapshot, 'execution') && !plain(snapshot.execution)))) return refusal('newer_allocation_has_work');
   const execution = snapshot?.execution ?? {};
   if (hasProviderEvidence(execution)) return refusal('newer_allocation_has_work');
+  if (hasCertifiedPreProviderRefusal({ run, item: items[0] })) return { eligible: true, reasonCode: null };
   const handoff = execution.handoff;
+  if (Object.hasOwn(handoff ?? {}, 'preProviderEpoch')) return refusal('newer_allocation_dispatch_not_proven');
   if (run.status === 'pending' && run.attemptCount === 0 && leases.length === 0
     && (!items.length || ['ready', 'ready_with_warnings', 'blocked'].includes(items[0].itemStatus))
     && (!Object.hasOwn(execution, 'outcome') || ['ready', 'ready_with_warnings', 'blocked'].includes(execution.outcome))

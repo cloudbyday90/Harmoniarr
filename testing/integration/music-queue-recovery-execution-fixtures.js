@@ -13,6 +13,8 @@ import { createMusicQueueRecoveryExecutionPolicyService } from '../../src/server
 import { createMusicQueueRecoveryLifecycleService } from '../../src/server/import-candidates/music-queue-recovery-lifecycle-service.js';
 import { createMusicQueueExecutionObservationService } from '../../src/server/import-candidates/music-queue-execution-observation-service.js';
 import { createImportCandidateExecutionWorker } from '../../src/server/import-candidates/import-candidate-execution-worker.js';
+import { createImportExecutionPreProviderService } from '../../src/server/import-candidates/import-execution-pre-provider-service.js';
+import { createImportExecutionPreProviderStore } from '../../src/server/import-candidates/import-execution-pre-provider-store.js';
 import { createImportCandidateRecoveryService } from '../../src/server/import-candidates/import-candidate-recovery-service.js';
 import { listImportExecutionRunItems, initializeImportExecutionRunItems, updateImportExecutionRunItem,
   upsertImportExecutionRunItem, recordImportExecutionAcceptedObservation } from '../../src/server/import-candidates/import-candidate-execution-repository.js';
@@ -32,13 +34,16 @@ export async function runMusicQueueRecoveryExecutionWorker(context, runId, candi
   const finished = new Promise((resolve) => { finish = resolve; });
   const calls = { enqueue: 0, confirmed: 0, genericFailure: 0 };
   const linkStore = createImportExecutionTransferLinkStore({ getPoolFn: context.getPoolFn });
+  const preparation = createImportExecutionPreProviderService({ store: createImportExecutionPreProviderStore({ getPoolFn: context.getPoolFn }),
+    withTransaction: context.withTransaction });
   const handoff = createImportExecutionHandoffService({ store: createImportExecutionHandoffStore({ getPoolFn: context.getPoolFn }),
-    withTransaction: context.withTransaction, transferLinkStore: { recordConfirmedTransfers: async (input) => {
+    withTransaction: context.withTransaction, preProviderService: preparation, transferLinkStore: { recordConfirmedTransfers: async (input) => {
       if (input.transfers.length) calls.confirmed += 1;
       return linkStore.recordConfirmedTransfers(input);
     } } });
   const worker = createImportCandidateExecutionWorker({
     ...handoff,
+    ...preparation,
     prepareDownloadHandoff: async (input) => {
       const prepared = await handoff.prepareDownloadHandoff(input);
       if (prepared.dispatchAllowed && overrides.updateImportExecutionRunItem) await overrides.updateImportExecutionRunItem({

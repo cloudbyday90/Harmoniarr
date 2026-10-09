@@ -110,27 +110,28 @@ export const WANTED_RECOVERY_PROGRESS_JOIN_SQL = `LEFT JOIN LATERAL (
     ORDER BY runs.created_at DESC, runs.id DESC LIMIT 1
   ) recovery_run ON TRUE
   LEFT JOIN LATERAL (
-    SELECT jsonb_build_object('runId', runs.id, 'candidateId', candidate.id, 'summary', runs.summary,
+    SELECT jsonb_agg(jsonb_build_object('runId', runs.id, 'createdAt', runs.created_at, 'candidateId', candidate.id, 'summary', runs.summary,
       'itemStatus', item.item_status, 'handoff', item.planning_snapshot #> '{execution,handoff}',
       'requestedFiles', item.planning_snapshot #> '{execution,requestedFiles}',
+      'execution', item.planning_snapshot->'execution',
       'downloadReviewRequired', item.planning_snapshot #> '{execution,downloadReviewRequired}',
       'physicalObservation', COALESCE(item.planning_snapshot #> '{execution,acceptedCandidateObservation}',
         item.planning_snapshot #> '{execution,handoff,attempt,sourceObservation}', item.planning_snapshot #> '{execution,sourceObservation}'),
       'confirmedTransferCount', (SELECT COUNT(*)::integer FROM import_execution_transfer_links current_links
-        WHERE current_links.operation_run_id = runs.id AND current_links.import_candidate_id = candidate.id)) AS value
+        WHERE current_links.operation_run_id = runs.id AND current_links.import_candidate_id = candidate.id)) ORDER BY runs.created_at DESC,runs.id DESC) AS value
     FROM operation_runs runs
     LEFT JOIN import_execution_run_items item ON item.operation_run_id = runs.id AND item.import_candidate_id = candidate.id
     WHERE runs.operation_type = 'import_candidate_execution_planning'
       AND (runs.summary->>'selectedCandidateId' = candidate.id::text OR item.import_candidate_id IS NOT NULL)
       AND NOT (${validExecutionOriginSupersessionSql({ runAlias: 'runs', importCandidateIdSql: 'candidate.id' })})
-      AND COALESCE(item.planning_snapshot #>> '{execution,handoff,state}', '') <> 'not_dispatched'
+      AND ((COALESCE(item.planning_snapshot #>> '{execution,handoff,state}', '') <> 'not_dispatched'
       AND (item.item_status = 'awaiting_confirmation'
         OR item.planning_snapshot #>> '{execution,handoff,state}' IN ('dispatching','awaiting_confirmation')
         OR jsonb_typeof(item.planning_snapshot #> '{execution,handoff,attempt}') = 'object'
         OR (item.item_status IN ('queued','queued_with_warnings','downloading','completed')
           AND CASE WHEN jsonb_typeof(item.planning_snapshot #> '{execution,enqueuedTransfers}') = 'array'
-            THEN jsonb_array_length(item.planning_snapshot #> '{execution,enqueuedTransfers}') > 0 ELSE FALSE END))
-    ORDER BY runs.created_at DESC, runs.id DESC LIMIT 1
+            THEN jsonb_array_length(item.planning_snapshot #> '{execution,enqueuedTransfers}') > 0 ELSE FALSE END)))
+        OR COALESCE(item.planning_snapshot #> '{execution,handoff}','{}'::jsonb) ? 'preProviderEpoch')
   ) current_handoff ON TRUE
   WHERE candidate.status IN ('selected', 'downloading')
     AND (candidate.source_search_id = NULLIF(ldr.evidence->>'lastSearchId', '')
@@ -138,7 +139,8 @@ export const WANTED_RECOVERY_PROGRESS_JOIN_SQL = `LEFT JOIN LATERAL (
         AND (recovery_run.value #>> '{summary,musicQueueRecovery,authority,wantedReleaseId}' = lwr.id::text
           OR COALESCE(recovery_run.value #> '{summary,musicQueueRecovery,authority,wantedReleaseIds}', '[]'::jsonb) ? lwr.id::text))
       OR recovery_run.value #>> '{summary,sourceWantedReleaseId}' = lwr.id::text
-      OR current_handoff.value #>> '{summary,sourceWantedReleaseId}' = lwr.id::text)
+      OR EXISTS(SELECT 1 FROM jsonb_array_elements(COALESCE(current_handoff.value,'[]'::jsonb)) handoff
+        WHERE handoff #>> '{summary,sourceWantedReleaseId}' = lwr.id::text))
 ) recovery_progress ON TRUE
 LEFT JOIN LATERAL (
   SELECT jsonb_build_object(

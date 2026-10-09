@@ -191,6 +191,7 @@ async function reconcileItemTransfers(item, {
   transferSnapshot,
   buildTransferSnapshot,
   operationRunId,
+  run,
 }) {
   const execution = item?.planningSnapshot?.execution ?? {};
   const requestedFiles = Array.isArray(execution.requestedFiles) ? execution.requestedFiles : [];
@@ -198,7 +199,7 @@ async function reconcileItemTransfers(item, {
     ?? execution.acceptedCandidateObservation?.username ?? execution.sourceObservation?.username
     ?? item?.planningSnapshot?.candidate?.username ?? null;
 
-  if (isUnconfirmedExecutionItem(item)) {
+  if (isUnconfirmedExecutionItem(item, run)) {
     let handoffConfirmation;
     try {
       handoffConfirmation = await findMatchingTransfers({
@@ -383,7 +384,7 @@ function buildDisplayRunSummary(run) {
       status: 'blocked',
     };
   }
-  const unresolved = (run.items ?? []).filter(isUnconfirmedExecutionItem).length;
+  const unresolved = (run.items ?? []).filter((item) => isUnconfirmedExecutionItem(item, run)).length;
   if (run.executionMode === 'download_enqueue' && unresolved > 0) {
     return { status: 'attention', message: `${unresolved} download request${unresolved === 1 ? ' is' : 's are'} being confirmed with Downloader; Harmoniarr will not send ${unresolved === 1 ? 'it' : 'them'} again automatically.` };
   }
@@ -450,6 +451,7 @@ export function createImportCandidateExecutionSummaryService({
         transferSnapshot,
         buildTransferSnapshot,
         operationRunId: run.id,
+        run,
       }))),
       transferSnapshotUnavailable: providerState.transferSnapshotUnavailable,
     };

@@ -22,9 +22,9 @@ import { isUnconfirmedExecutionItem } from './import-candidate-execution-handoff
 
 const defaultHeartbeatIntervalMs = 60 * 1000;
 
-function hasActionableTransfers(items) {
+function hasActionableTransfers(items, run) {
   return items.some((item) => {
-    if (isUnconfirmedExecutionItem(item) || item?.transferObservationPending) {
+    if (isUnconfirmedExecutionItem(item, run) || item?.transferObservationPending) {
       return true;
     }
 
@@ -41,7 +41,7 @@ function hasActionableTransfers(items) {
 export function shouldRunImportCandidateExecutionHeartbeat({ executionSummary }) {
   const run = executionSummary?.currentRun ?? null;
   return [run, ...(executionSummary?.unconfirmedRuns ?? []), ...(executionSummary?.restoredRuns ?? [])].filter(Boolean)
-    .some((entry) => entry.executionMode === 'download_enqueue' && hasActionableTransfers(entry.items ?? []));
+    .some((entry) => entry.executionMode === 'download_enqueue' && hasActionableTransfers(entry.items ?? [], entry));
 }
 
 export function createImportCandidateExecutionHeartbeat({

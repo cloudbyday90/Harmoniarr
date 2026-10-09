@@ -4,17 +4,13 @@ import { createImportCandidateExecutionConfirmationWorklistStore } from '../../s
 import { createImportCandidateExecutionConfirmationWorklistService } from '../../src/server/import-candidates/import-candidate-execution-confirmation-worklist-service.js';
 
 test('older confirmation worklist bounds hydration while counting all current unresolved requests', async () => {
-  const calls = [];
-  const store = createImportCandidateExecutionConfirmationWorklistStore({ getPoolFn: () => ({ query: async (sql, params) => {
-    calls.push({ sql, params }); return { rows: [{ run_ids: ['older'], pending_confirmation_count: 24 }] };
+  const rows = Array.from({ length: 24 }, (_, index) => ({ operation_run_id: `older-${index}`,
+    import_candidate_id: `candidate-${index}`, item_status: 'awaiting_confirmation', planning_snapshot: { execution: {} }, summary: {} }));
+  const store = createImportCandidateExecutionConfirmationWorklistStore({ getPoolFn: () => ({ query: async (_sql, params) => {
+    assert.deepEqual(params, ['current']); return { rows };
   } }) });
-  assert.deepEqual(await store.listUnconfirmedExecutionRuns({ excludeRunId: 'current', limit: 1000 }), { runIds: ['older'], pendingConfirmationCount: 24 });
-  assert.deepEqual(calls[0].params, ['current', 20]);
-  assert.match(calls[0].sql, /candidates.status = 'selected'/u);
-  assert.equal(calls[0].sql.includes("<> 'not_dispatched'"), true);
-  assert.equal(calls[0].sql.includes("handoff,state}' IN ('dispatching','awaiting_confirmation')"), true);
-  assert.match(calls[0].sql, /MIN\(updated_at\)/u, 'pending updates rotate the least recently checked runs');
-  assert.match(calls[0].sql, /LIMIT \$2/u);
+  assert.deepEqual(await store.listUnconfirmedExecutionRuns({ excludeRunId: 'current', limit: 1000 }), {
+    runIds: rows.slice(0, 20).map((row) => row.operation_run_id), pendingConfirmationCount: 24 });
 });
 
 test('older confirmation hydration dedupes current and old jobs and reconciles only unresolved items', async () => {

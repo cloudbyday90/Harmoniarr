@@ -6,7 +6,35 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
-## Current development slice: Guarded download origin resolution (2026-10-09)
+## Current development slice: Explicit pre-provider refusal (2026-10-09)
+
+- Future-only private run protocol and per-item preparation epoch record an
+  explicit local refusal or an irreversible possible-dispatch boundary. Existing
+  unknown attempts and historical absence are never certified retroactively.
+  Narrow ESM policy/service/store owners reuse ordered PostgreSQL locks and
+  required audits. See the separate [design](PRE_PROVIDER_REFUSAL_DESIGN.md),
+  [outcome](PRE_PROVIDER_REFUSAL_OUTCOME.md) and
+  [official research](PRE_PROVIDER_REFUSAL_RESEARCH_2026_10.md) for alternatives,
+  pros/cons, final stack, actual evidence and limits.
+- The existing administrator origin-resolution flow accepts only the current
+  valid refused epoch after lease/claim and provider/source/authority checks.
+  Epoch presence alone grants no permission. Ordinary writes compare complete
+  epoch content, and retry/retention/read paths preserve uncertainty.
+- Fresh MCP PR checks found no eligible unreplayed patch; see separate
+  [PR design](OPEN_PR_APPLICABILITY_PRE_PROVIDER_REFUSAL_2026_10_DESIGN.md) and
+  [outcome](OPEN_PR_APPLICABILITY_PRE_PROVIDER_REFUSAL_2026_10_OUTCOME.md).
+- Full validation passes 9,160 tests (4,002 server, 4,375 client, 513 script
+  and 270 integration), zero failures/skips, all policy/lint checks and both
+  builds. Separate 31 browser scenarios and 58 focused PostgreSQL checks pass;
+  focused totals overlap the complete run. Six responsive captures were inspected;
+  fresh npm audit reports zero vulnerabilities. Skill structure and installed
+  four-file identity pass. See the outcome for original failures and corrections.
+- Next: close abandoned preparing epochs only through an explicit future-protocol
+  command under fresh lease and cancellation fences. A delayed expired worker must
+  send no POST; possible dispatch and historical absence remain unresolved.
+- Work remains on main, without a release, tag, branch, provider upgrade or PR merge.
+
+## Prior development slice: Guarded download origin resolution (2026-10-09)
 
 - Resolve one provably unused newer allocation that blocks a source-owned older
   complete batch. Preserve both histories and use fresh administrator, session,

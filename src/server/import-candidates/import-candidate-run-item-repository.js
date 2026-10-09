@@ -78,7 +78,8 @@ export function createImportCandidateRunItemRepository({
       await db.query('SELECT id FROM import_candidates WHERE id=ANY($1::uuid[]) ORDER BY id FOR UPDATE', [ids]);
       const guard = await db.query(`SELECT id FROM operation_runs WHERE id=$1::uuid AND ${writableExecutionRunSql('operation_runs')}
         AND NOT EXISTS(SELECT 1 FROM import_execution_run_items source_item WHERE source_item.operation_run_id=$1::uuid
-          AND COALESCE(source_item.planning_snapshot #> '{execution,handoff}','{}'::jsonb) ? 'originResolution') FOR UPDATE`, [operationRunId]);
+          AND (COALESCE(source_item.planning_snapshot #> '{execution,handoff}','{}'::jsonb) ? 'originResolution'
+            OR COALESCE(source_item.planning_snapshot #> '{execution,handoff}','{}'::jsonb) ? 'preProviderEpoch')) FOR UPDATE`, [operationRunId]);
       if (!guard.rowCount) throw createApiError(409, 'import_execution_origin_resolution_stale', 'The execution history is protected');
     }
     await db.query(
@@ -127,8 +128,17 @@ export function createImportCandidateRunItemRepository({
     expectedAttemptId = undefined,
     expectedAdoptionId = undefined,
     expectedOriginResolutionId = undefined,
+    expectedPreProviderEpoch = undefined,
   }, queryable) {
     const db = resolveQueryable(queryable);
+    if (tableName === 'import_execution_run_items') {
+      const handoff = snapshot?.execution?.handoff ?? {};
+      if (expectedAttemptId === undefined) expectedAttemptId = handoff.attempt?.attemptId ?? null;
+      if (expectedAdoptionId === undefined) expectedAdoptionId = handoff.adoption?.adoptionId ?? null;
+      if (expectedOriginResolutionId === undefined) expectedOriginResolutionId = handoff.originResolution?.resolutionId ?? null;
+      if (expectedPreProviderEpoch === undefined) expectedPreProviderEpoch = Object.hasOwn(handoff, 'preProviderEpoch')
+        ? JSON.stringify(handoff.preProviderEpoch) : null;
+    }
     const result = await db.query(
       `${tableName === 'import_execution_run_items' ? `WITH candidate_guard AS MATERIALIZED (
         SELECT id FROM import_candidates WHERE id=$2::uuid FOR UPDATE),
@@ -144,6 +154,7 @@ export function createImportCandidateRunItemRepository({
           ${expectedAttemptId !== undefined ? `AND ${snapshotColumn} #>> '{execution,handoff,attempt,attemptId}' IS NOT DISTINCT FROM $6::text` : ''}
           ${expectedAdoptionId !== undefined ? `AND ${snapshotColumn} #>> '{execution,handoff,adoption,adoptionId}' IS NOT DISTINCT FROM $7::text` : ''}
           ${expectedOriginResolutionId !== undefined ? `AND ${snapshotColumn} #>> '{execution,handoff,originResolution,resolutionId}' IS NOT DISTINCT FROM $8::text` : ''}
+          ${expectedPreProviderEpoch !== undefined ? `AND ${snapshotColumn} #> '{execution,handoff,preProviderEpoch}' IS NOT DISTINCT FROM $9::jsonb` : ''}
           ${tableName === 'import_execution_run_items' ? 'AND EXISTS(SELECT 1 FROM run_guard)' : ''}
         RETURNING *
       `,
@@ -156,6 +167,7 @@ export function createImportCandidateRunItemRepository({
         ...(expectedAttemptId !== undefined ? [expectedAttemptId] : []),
         ...(expectedAdoptionId !== undefined ? [expectedAdoptionId] : []),
         ...(expectedOriginResolutionId !== undefined ? [expectedOriginResolutionId] : []),
+        ...(expectedPreProviderEpoch !== undefined ? [expectedPreProviderEpoch] : []),
       ],
     );
 
@@ -196,7 +208,8 @@ export function createImportCandidateRunItemRepository({
             item_status = EXCLUDED.item_status,
             status_message = EXCLUDED.status_message,
             ${snapshotColumn} = EXCLUDED.${snapshotColumn},
-            updated_at = NOW()`}
+            updated_at = NOW()${tableName === 'import_execution_run_items' ? `
+          WHERE NOT(COALESCE(${tableName}.${snapshotColumn} #> '{execution,handoff}','{}'::jsonb) ? 'preProviderEpoch')` : ''}`}
         RETURNING *
       `,
       [

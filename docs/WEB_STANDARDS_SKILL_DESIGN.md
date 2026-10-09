@@ -93,3 +93,13 @@ alone does not fence a future allocation. Map reciprocal ownership, current
 authority, late source and newer snapshots, actual module exports, retention and
 private polling to meaningful adverse tests. Keep the entry point and invocation
 policy unchanged; no duplicate skill or new blanket compliance workflow is needed.
+
+## Explicit refusal maintenance, October 9
+
+Map the observed future-only preparation protocol from the
+[refusal design](PRE_PROVIDER_REFUSAL_DESIGN.md) to the final native send,
+irreversible crossing, complete epoch comparisons, retry leases, audit and
+retention. Distinguish a local negative certificate from historical absence or
+provider admission. Include raw snapshot aliases in privacy evidence instead of
+assuming canonical-field sanitization is sufficient. Preserve entry point and
+invocation policy; the maintenance teaches actual ownership and evidence choices.

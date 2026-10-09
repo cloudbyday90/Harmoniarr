@@ -61,7 +61,9 @@ function normalizeRunSummary(summary) {
     return {};
   }
 
-  return summary;
+  const normalized = { ...summary };
+  delete normalized.downloadPreparationProtocol;
+  return normalized;
 }
 
 function toNumberOrNull(value) {

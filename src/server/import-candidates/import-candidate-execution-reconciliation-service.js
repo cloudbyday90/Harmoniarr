@@ -172,7 +172,7 @@ export function createImportCandidateExecutionReconciliationService({
     for (const { run, item } of runItems) {
       const importCandidateId = item?.planningSnapshot?.candidate?.id ?? item?.importCandidateId ?? null;
 
-      if (isUnconfirmedExecutionItem(item)) {
+      if (isUnconfirmedExecutionItem(item, run)) {
         if (typeof confirmDownloadHandoff !== 'function') throw new TypeError('The download confirmation owner is required');
         const attempt = item.planningSnapshot?.execution?.handoff?.attempt;
         const receipt = await confirmDownloadHandoff({ importCandidateId, operationRunId: run.id,

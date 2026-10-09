@@ -63,3 +63,25 @@ test('origin lineage stays private in every run projection without mutating its 
   assert.equal(output.run.summary.currentStep, 'Tracking downloads');
   assert.equal(run.summary.downloadOriginSupersession.requestHash, 'private-hash');
 });
+
+test('future preparation protocol and refused epoch stay private in every execution response while public refusal state remains intact', () => {
+  const epoch = { version: 1, epochId: 'private-epoch', generation: 2, phase: 'refused',
+    lease: { leaseKey: 'private-lease-key', ownerInstanceId: 'private-worker', acquiredAt: '2026-10-09T10:00:00Z' },
+    sourceObservation: { username: 'private-peer', folderPath: '/private/source' },
+    requestedFiles: [{ filename: 'private-folder/Track.flac', size: 1000 }], refusalReason: 'private-preparation-reason' };
+  const run = { id: 'future-run', status: 'failed', blockedCount: 1,
+    summary: { currentStep: 'Download preparation stopped', downloadPreparationProtocol: { version: 1 } },
+    items: [{ importCandidateId: 'candidate', itemStatus: 'blocked', planningSnapshot: { execution: { handoff: { state: 'not_dispatched', preProviderEpoch: epoch } } } }] };
+  run.items[0].snapshot = run.items[0].planningSnapshot;
+  run.items[0].snapshot = structuredClone(run.items[0].planningSnapshot);
+  const original = structuredClone(run);
+  const output = buildPublicImportCandidateExecution({ activeRun: run, currentRun: run, latestRun: run, run, recentRuns: [run],
+    unconfirmedRuns: [run], restoredRuns: [run] });
+  assert.doesNotMatch(JSON.stringify(output), /"snapshot"|preProviderEpoch|downloadPreparationProtocol|private-|\/private|unconfirmedRuns|restoredRuns/u);
+  for (const projected of [output.activeRun, output.currentRun, output.latestRun, output.run, ...output.recentRuns]) {
+    assert.equal(projected.status, 'failed'); assert.equal(projected.blockedCount, 1); assert.equal(projected.summary.currentStep, 'Download preparation stopped');
+    assert.deepEqual(projected.items[0].planningSnapshot.execution.handoff, { state: 'not_dispatched' });
+    assert.equal(Object.hasOwn(projected.items[0], 'snapshot'), false);
+  }
+  assert.deepEqual(run, original, 'the internal epoch must remain unchanged');
+});

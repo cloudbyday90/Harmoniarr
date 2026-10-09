@@ -20,12 +20,12 @@ import { createMusicQueueRecoveryFixtureContext, seedMusicQueueRecoveryFixture }
 export async function seedImportExecutionOriginFixture(t, { getPoolFn, createProvider = null }) {
   const context = createMusicQueueRecoveryFixtureContext({ getPoolFn });
   const f = await seedMusicQueueRecoveryFixture(context, { shared: true, fallback: true });
-  const state = { evidence: null, posts: 0, reads: 0 };
+  const state = { evidence: null, posts: 0, reads: 0, version: '0.26.0' };
   const server = createServer((request, response) => {
     if (request.method !== 'GET') { state.posts += 1; response.writeHead(405); response.end(); return; }
     state.reads += 1;
     response.writeHead(200, { 'Content-Type': 'application/json' });
-    response.end(JSON.stringify(request.url === '/api/v0/application/version' ? '0.26.0' : state.evidence));
+    response.end(JSON.stringify(request.url === '/api/v0/application/version' ? state.version : state.evidence));
   });
   await new Promise((resolve) => { server.listen(0, '127.0.0.1', resolve); });
   t.after(() => new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); }));
@@ -36,6 +36,9 @@ export async function seedImportExecutionOriginFixture(t, { getPoolFn, createPro
     withTransaction: context.withTransaction });
   await context.pool.query("UPDATE import_candidates SET status='selected',updated_at=NOW() WHERE id=$1", [f.candidate.id]);
   const candidate = await evidenceStore.getCandidate(f.candidate.id);
+  // This fixture represents a persisted uncertain episode from before the
+  // future-only preparation protocol, rather than retroactively certifying it.
+  await context.pool.query("UPDATE operation_runs SET summary=summary-'downloadPreparationProtocol' WHERE id=$1", [f.originRunId]);
   await replaceImportExecutionRunItems(f.originRunId, [{ importCandidateId: candidate.id, position: 1, itemStatus: 'ready',
     statusMessage: 'Controlled unused planning', planningSnapshot: { candidate: { id: candidate.id }, execution: {} } }], context.pool);
   const dispatch = await provider.prepareDownloadDispatch();

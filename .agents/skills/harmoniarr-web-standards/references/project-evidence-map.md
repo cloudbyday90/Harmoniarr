@@ -44,3 +44,11 @@ Inside an owning transaction, local settings/credential assertions must use its
 client instead of reentering the pool; include a real one-connection control.
 When private observation slices share a run, merge their distinct item identities:
 deduplicating by run alone can silently drop pending or restored work.
+
+For negative dispatch evidence, trace the final native send rather than assuming
+an earlier guard is the boundary. New preparation epochs can seal only while
+still preparing; a durable crossing/commit-ack loss stays unknown even if a POST
+never began. Compare complete epoch state across stale writers and retry leases,
+preserve it through retention, and never backfill old absence as proof. Check raw
+repository snapshot aliases as well as the canonical projected field: a sanitized
+planningSnapshot does not remove a sibling snapshot carrying the same private data.

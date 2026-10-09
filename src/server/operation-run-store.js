@@ -39,6 +39,12 @@ function clampRetainCountPerType(retainCountPerType) {
   return Math.max(1, Math.min(Number.isInteger(retainCountPerType) ? retainCountPerType : 50, 1000));
 }
 
+function normalizeLifecycleSummary(summary) {
+  const normalized = { ...normalizeRunSummary(summary) };
+  delete normalized.downloadPreparationProtocol;
+  return normalized;
+}
+
 // Referenced discovery runs are part of the approved request's durable retry state.
 const unreferencedByExternalRequestIntentSql = `NOT EXISTS (
   SELECT 1 FROM library_external_request_release_intents retained_intent
@@ -58,7 +64,8 @@ const withoutUnresolvedDownloadHandoffSql = `${writableExecutionRunSql('operatio
       AND retained_handoff.planning_snapshot #>> '{execution,handoff,state}' IS DISTINCT FROM 'not_dispatched')
       OR retained_handoff.planning_snapshot #>> '{execution,handoff,state}' IN ('dispatching', 'awaiting_confirmation')
       OR retained_handoff.planning_snapshot #> '{execution,handoff,adoption,originalUncertainty}'='true'::jsonb
-      OR COALESCE(retained_handoff.planning_snapshot #> '{execution,handoff}','{}'::jsonb) ? 'originResolution')
+      OR COALESCE(retained_handoff.planning_snapshot #> '{execution,handoff}','{}'::jsonb) ? 'originResolution'
+      OR COALESCE(retained_handoff.planning_snapshot #> '{execution,handoff}','{}'::jsonb) ? 'preProviderEpoch')
 )`;
 
 /**
@@ -318,7 +325,7 @@ export function createOperationRunStore({
         WHERE id = $1
           AND ${writableExecutionRunSql('operation_runs')}
       `,
-      [runId, JSON.stringify(normalizeRunSummary(summary))],
+      [runId, JSON.stringify(normalizeLifecycleSummary(summary))],
     );
   }
 
@@ -329,7 +336,7 @@ export function createOperationRunStore({
         UPDATE operation_runs
         SET status = 'completed',
             finished_at = NOW(),
-            summary = CASE WHEN summary ? 'musicQueueRecovery' OR summary->>'triggerSource'='missing_music_manual'
+            summary = CASE WHEN summary ? 'musicQueueRecovery' OR summary ? 'downloadPreparationProtocol' OR summary->>'triggerSource'='missing_music_manual'
               THEN COALESCE(summary, '{}'::jsonb) || $2::jsonb ELSE $2::jsonb END,
           claimed_at = NULL,
           claimed_by_instance_id = NULL,
@@ -337,7 +344,7 @@ export function createOperationRunStore({
         WHERE id = $1
           AND ${writableExecutionRunSql('operation_runs')}
       `,
-      [runId, JSON.stringify(normalizeRunSummary(summary))],
+      [runId, JSON.stringify(normalizeLifecycleSummary(summary))],
     );
   }
 
@@ -367,7 +374,7 @@ export function createOperationRunStore({
         [
           runId,
           JSON.stringify({
-            ...normalizeRunSummary(summary),
+            ...normalizeLifecycleSummary(summary),
             currentStep: 'Automatic retry scheduled after failed attempt',
             lastFailureMessage: errorMessage,
             retryScheduledAt: retrySchedule.nextAttemptAt,
@@ -383,7 +390,7 @@ export function createOperationRunStore({
         UPDATE operation_runs
         SET status = 'failed',
             finished_at = NOW(),
-            summary = CASE WHEN summary ? 'musicQueueRecovery' OR summary->>'triggerSource'='missing_music_manual'
+            summary = CASE WHEN summary ? 'musicQueueRecovery' OR summary ? 'downloadPreparationProtocol' OR summary->>'triggerSource'='missing_music_manual'
               THEN COALESCE(summary, '{}'::jsonb) || $2::jsonb ELSE $2::jsonb END,
           claimed_at = NULL,
           claimed_by_instance_id = NULL,
@@ -391,7 +398,7 @@ export function createOperationRunStore({
         WHERE id = $1
           AND ${writableExecutionRunSql('operation_runs')}
       `,
-      [runId, JSON.stringify(normalizeRunSummary(summary)), errorMessage],
+      [runId, JSON.stringify(normalizeLifecycleSummary(summary)), errorMessage],
     );
   }
 
@@ -444,7 +451,7 @@ export function createOperationRunStore({
         SET status = 'cancelled',
             finished_at = NOW(),
             cancelled_at = NOW(),
-            summary = CASE WHEN summary ? 'musicQueueRecovery' OR summary->>'triggerSource'='missing_music_manual'
+            summary = CASE WHEN summary ? 'musicQueueRecovery' OR summary ? 'downloadPreparationProtocol' OR summary->>'triggerSource'='missing_music_manual'
               THEN COALESCE(summary, '{}'::jsonb) || $2::jsonb ELSE $2::jsonb END,
           claimed_at = NULL,
           claimed_by_instance_id = NULL,
@@ -452,7 +459,7 @@ export function createOperationRunStore({
         WHERE id = $1
           AND ${writableExecutionRunSql('operation_runs')}
       `,
-      [runId, JSON.stringify(normalizeRunSummary(summary))],
+      [runId, JSON.stringify(normalizeLifecycleSummary(summary))],
     );
   }
 
@@ -473,7 +480,7 @@ export function createOperationRunStore({
           AND status IN ('pending', 'running')
           AND ${writableExecutionRunSql('operation_runs')}
       `,
-      [runId, JSON.stringify(normalizeRunSummary(summary)), nextAttemptAt],
+      [runId, JSON.stringify(normalizeLifecycleSummary(summary)), nextAttemptAt],
     );
   }
 

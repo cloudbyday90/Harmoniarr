@@ -5,7 +5,10 @@
  * See LICENSE file for details.
  */
 
-export function isUnconfirmedExecutionItem(item) {
+import { isUnresolvedPreProviderPreparation } from './import-execution-pre-provider-policy.js';
+
+export function isUnconfirmedExecutionItem(item, run) {
+  if (isUnresolvedPreProviderPreparation({ run: run && typeof run === 'object' ? run : { id: item?.operationRunId }, item })) return true;
   if (item?.planningSnapshot?.execution?.handoff?.state === 'not_dispatched') return false;
   return item?.itemStatus === 'awaiting_confirmation'
     || ['dispatching', 'awaiting_confirmation'].includes(item?.planningSnapshot?.execution?.handoff?.state);

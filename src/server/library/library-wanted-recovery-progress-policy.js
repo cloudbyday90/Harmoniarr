@@ -6,6 +6,7 @@
  */
 
 import { isDeepStrictEqual } from 'node:util';
+import { hasCertifiedPreProviderRefusal, isUnresolvedPreProviderPreparation } from '../import-candidates/import-execution-pre-provider-policy.js';
 import { createAcquisitionQualityPolicyService } from '../acquisition/acquisition-quality-policy-service.js';
 import { evaluateStoredDownloadReceipt } from '../slskd/slskd-download-attempt-policy.js';
 import { evaluateStoredDownloadAdoption } from '../import-candidates/import-execution-adoption-evidence-policy.js';
@@ -34,7 +35,11 @@ export async function deriveWantedRecoveryProgress({ entries, wantedReleaseId, m
     const authority = buildAutomaticLibraryAddAuthority(candidate);
     const belongs = record?.metadataReleaseId === metadataReleaseId
       && Array.isArray(record.authority?.wantedReleaseIds) && record.authority.wantedReleaseIds.includes(wantedReleaseId);
-    const handoff = entry.currentHandoff;
+    const handoffOwner = (value) => ({ run: { id: value.runId, summary: value.summary },
+      item: { operationRunId: value.runId, importCandidateId: value.candidateId, itemStatus: value.itemStatus,
+        planningSnapshot: { execution: value.execution ?? { handoff: value.handoff, requestedFiles: value.requestedFiles } } } });
+    const handoffs = Array.isArray(entry.currentHandoff) ? entry.currentHandoff : entry.currentHandoff ? [entry.currentHandoff] : [];
+    const handoff = handoffs.find((value) => !hasCertifiedPreProviderRefusal(handoffOwner(value))) ?? null;
     const adoption = handoff?.handoff?.adoption;
     const receipt = adoption != null ? evaluateStoredDownloadAdoption({ adoption,
       importCandidateId: candidate.id, operationRunId: handoff.runId, requestedFiles: handoff.requestedFiles,
@@ -42,11 +47,12 @@ export async function deriveWantedRecoveryProgress({ entries, wantedReleaseId, m
       importCandidateId: candidate.id, operationRunId: handoff.runId,
       requestedFiles: handoff.requestedFiles, username: handoff.handoff.attempt.username }) : null;
     const currentPending = handoff?.candidateId === candidate.id
-      && handoff.handoff?.state !== 'not_dispatched'
+      && (isUnresolvedPreProviderPreparation(handoffOwner(handoff))
+        || (handoff.handoff?.state !== 'not_dispatched'
       && (handoff.itemStatus === 'awaiting_confirmation' || ['dispatching', 'awaiting_confirmation'].includes(handoff.handoff?.state)
         || handoff.downloadReviewRequired === true
         || (candidate.status === 'selected' && adoption?.originalUncertainty === true)
-        || (handoff.handoff?.attempt != null && !['confirmed', 'operator_adopted', 'rejected'].includes(receipt?.disposition)));
+        || (handoff.handoff?.attempt != null && !['confirmed', 'operator_adopted', 'rejected'].includes(receipt?.disposition)))));
     const handoffBelongs = belongs || handoff?.summary?.sourceWantedReleaseId === wantedReleaseId
       || candidate.sourceSearchId === entry.discovery?.evidence?.lastSearchId
       || authority?.wantedReleaseIds.includes(wantedReleaseId) === true;

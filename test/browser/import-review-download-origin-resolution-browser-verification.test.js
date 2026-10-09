@@ -10,6 +10,7 @@ import { bootstrapAdminThroughUi } from '../../testing/browser/operator-browser-
 import { assertLocatorFocused, assertTabFocusContained, assertVisibleFocusOutline } from '../../testing/browser/keyboard-accessibility-helpers.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 import { buildPublicImportCandidateExecution } from '../../src/server/import-candidates/import-candidate-execution-public-projection.js';
+import { hasCertifiedPreProviderRefusal } from '../../src/server/import-candidates/import-execution-pre-provider-policy.js';
 
 const config = resolveIntegrationTestRuntimeConfig();
 const operationRunId = '10000000-0000-4000-8000-000000000001';
@@ -21,9 +22,12 @@ function deferred() { let resolvePromise; const promise = new Promise((done) => 
 function createControl(overrides = {}) { return { adoptionReads: 0, originReads: 0, adoptionWrites: 0, writes: [], ...overrides }; }
 function originReview(overrides = {}) { return { operationRunId, importCandidateId, canRestore: true, reasonCode: null, reviewDigest,
   verifiedFileCount: 10, retiredRequestCount: 1, ...overrides }; }
-function workspace({ restored = false } = {}) {
-  const candidate = buildImportReviewCandidate({ id: importCandidateId, status: restored ? 'downloading' : 'selected', fileCount: 10 });
-  const original = buildImportReviewExecutionRun({ id: operationRunId, status: 'failed', executionMode: 'download_enqueue', downloadOriginResolved: restored, queuedCount: 0, startedAt: '2026-10-08T00:00:00.000Z',
+function workspace({ restored = false, certifiedRefusal = true } = {}) {
+  const candidate = buildImportReviewCandidate({ id: importCandidateId, status: restored ? 'downloading' : 'selected', fileCount: 10, folderPath: '/private/staging/Album',
+    files: Array.from({ length: 10 }, (_, index) => ({ id: `file-${index}`, filename: `Track ${index + 1}.flac`, folderPath: '/private/staging/Album',
+      sizeBytes: 10_000_000, extension: 'flac', isLocked: false, bitRateKbps: 921 })), totalSizeBytes: 100_000_000 });
+  const original = buildImportReviewExecutionRun({ id: operationRunId, status: 'failed', executionMode: 'download_enqueue',
+    ...(restored ? { downloadOriginResolved: true } : {}), queuedCount: 0, startedAt: '2026-10-08T00:00:00.000Z',
     items: [{ id: 'earlier-item', importCandidateId, itemStatus: restored ? 'queued' : 'awaiting_confirmation',
       statusMessage: restored ? '10 transfers are actively progressing.' : 'The earlier download request still needs review.',
       planningSnapshot: { candidate: { id: importCandidateId }, execution: { handoff: { state: restored ? 'confirmed' : 'awaiting_confirmation',
@@ -31,16 +35,28 @@ function workspace({ restored = false } = {}) {
         ...(restored ? { originResolution: { actorUserId: 'private-actor', requestHash: 'private-hash' } } : {}) } } },
       ...(restored ? { liveTransferSummary: { status: 'active', total: 10, active: 10, queued: 0, completed: 0, failed: 0,
         totalBytes: 100_000_000, bytesTransferred: 20_000_000, percentComplete: 20, message: '10 transfers are actively progressing.' } } : {}) }] });
-  const latest = buildImportReviewExecutionRun({ id: newerRunId, status: restored ? 'cancelled' : 'pending', executionMode: 'download_enqueue', queuedCount: 0, readyCount: 0, startedAt: '2026-10-08T01:00:00.000Z',
+  const epoch = { version: 1, epochId: '40000000-0000-4000-8000-000000000001', operationRunId: newerRunId, importCandidateId,
+    generation: 1, phase: 'refused', preparedAt: '2026-10-08T01:00:00.000Z',
+    sourceObservation: { candidateId: importCandidateId, username: candidate.username, folderPath: candidate.folderPath },
+    requestedFiles: candidate.files.map((file) => ({ filename: `${file.folderPath.replaceAll('/', '\\')}\\${file.filename}`, size: file.sizeBytes })),
+    lease: { leaseKey: `import_candidate_execution_planning:${newerRunId}`, ownerInstanceId: 'private-preparation-worker', acquiredAt: '2026-10-08T00:59:59.000Z' },
+    refusal: { reasonCode: 'provider_version_unsupported', refusedAt: '2026-10-08T01:00:01.000Z' } };
+  const latest = buildImportReviewExecutionRun({ id: newerRunId, status: restored ? 'cancelled' : 'failed', executionMode: 'download_enqueue', queuedCount: 0, readyCount: 0, startedAt: '2026-10-08T01:00:00.000Z',
     summary: { selectedCandidateId: importCandidateId, requestedCandidateCount: 1, executionMode: 'download_enqueue', triggerSource: 'missing_music_manual',
-      ...(restored ? { downloadOriginSupersession: { actorUserId: 'private-actor', requestHash: 'private-hash' } } : {}) }, items: [] });
+      ...(certifiedRefusal ? { downloadPreparationProtocol: { version: 1 } } : {}),
+      ...(restored ? { downloadOriginSupersession: { actorUserId: 'private-actor', requestHash: 'private-hash' } } : {}) },
+    items: [{ id: 'newer-item', operationRunId: newerRunId, importCandidateId, itemStatus: 'blocked', planningSnapshot: { execution: {
+      outcome: certifiedRefusal ? 'pre_provider_refused' : 'blocked', ...(certifiedRefusal ? { requestedFiles: epoch.requestedFiles } : {}),
+      handoff: certifiedRefusal ? { state: 'pre_provider_refused', preProviderEpoch: epoch } : {} } } }] });
+  assert.equal(hasCertifiedPreProviderRefusal({ run: latest, item: latest.items[0] }), certifiedRefusal,
+    'the controlled private fixture follows the source-owned certificate shape; durable issuance is proved by backend tests');
   const recentRuns = [latest, original];
   const value = buildImportReviewRunSummary({ currentRun: restored ? original : latest, recentRuns,
     summary: { status: restored ? 'ready' : 'attention', confirmationPending: !restored, pendingConfirmationCount: restored ? 0 : 1,
       message: restored ? 'The original request was restored. Harmoniarr is tracking its verified downloads.' : 'A download request is still being confirmed with Downloader. Harmoniarr will not send it again automatically.' } });
   const executionSummary = buildPublicImportCandidateExecution({ ...value, confirmationPending: !restored, pendingConfirmationCount: restored ? 0 : 1,
     unconfirmedRuns: restored ? [] : [original], restoredRuns: restored ? [original] : [] });
-  assert.doesNotMatch(JSON.stringify(executionSummary), /private-|unconfirmedRuns|restoredRuns|attemptId|downloadOriginSupersession|originResolution/u);
+  assert.doesNotMatch(JSON.stringify(executionSummary), /private-|preProviderEpoch|downloadPreparationProtocol|unconfirmedRuns|restoredRuns|attemptId|downloadOriginSupersession|originResolution/u);
   return { candidates: [candidate], previewById: { [importCandidateId]: buildImportReviewPreview(candidate) }, executionSummary };
 }
 function panel(page) { return page.locator('.review-panel').filter({ has: page.getByRole('heading', { name: 'Send selected matches to downloads', exact: true }) }); }
@@ -89,7 +105,7 @@ suite('Import Review guarded download-origin resolution browser verification', (
       await cancel.click(); await assertLocatorFocused(opened.invoker); assert.equal(control.writes.length, 0); assert.equal(control.adoptionWrites, 0);
       opened = await openOriginReview(page, executionPanel); await page.keyboard.press('Escape'); await assertLocatorFocused(opened.invoker); assert.equal(control.writes.length, 0);
       opened = await openOriginReview(page, executionPanel); await opened.dialog.getByText('10', { exact: true }).waitFor();
-      const directory = resolve('.tmp/download-origin-resolution-2026-10'); await mkdir(directory, { recursive: true });
+      const directory = resolve('.tmp/pre-provider-refusal-2026-10'); await mkdir(directory, { recursive: true });
       for (const width of [390, 800, 1280]) {
         await page.setViewportSize({ width, height: 980 });
         for (const theme of ['light', 'dark']) {
@@ -141,14 +157,20 @@ suite('Import Review guarded download-origin resolution browser verification', (
     }, { scenarioName: 'import_review_origin_resolution_uncertain_retry' });
   });
 
-  test('server refusal shows no Continue command and keeps private reasons and evidence out of the review', { timeout: config.scenarioTimeoutMs }, async (t) => {
+  test('certificate presence and legacy absence cannot grant Continue without server permission or expose private evidence', { timeout: config.scenarioTimeoutMs }, async (t) => {
     if (unavailable) { t.skip(unavailable); return; }
     await runtime.runScenario(async (context) => {
       const { page, browserContext } = context; const control = createControl({ review: originReview({ canRestore: false, reasonCode: 'private-reserved-job', reviewDigest: null, verifiedFileCount: 0, retiredRequestCount: 0 }) });
       await installReview(browserContext, control); const executionPanel = await openWorkspace(context); const { dialog, invoker } = await openOriginReview(page, executionPanel);
       await dialog.getByText('This download request cannot be resolved safely here. Review its current status before continuing.', { exact: true }).waitFor();
       assert.equal(await dialog.getByRole('button', { name: 'Continue verified downloads', exact: true }).count(), 0); assert.doesNotMatch(await dialog.innerText(), /private|attemptId|providerBinding|requestHash|transferId|\/mnt/u);
-      await page.keyboard.press('Escape'); await assertLocatorFocused(invoker); assert.equal(control.writes.length, 0); assert.equal(control.adoptionWrites, 0); await page.goto('about:blank');
+      await page.keyboard.press('Escape'); await assertLocatorFocused(invoker); assert.equal(control.writes.length, 0);
+      await seedMetadataImportReviewWorkspace(page, workspace({ certifiedRefusal: false }));
+      control.review = originReview({ canRestore: false, reasonCode: 'newer_allocation_dispatch_not_proven', reviewDigest: null, verifiedFileCount: 0, retiredRequestCount: 0 });
+      const legacy = await openOriginReview(page, executionPanel);
+      await legacy.dialog.getByText('This download request cannot be resolved safely here. Review its current status before continuing.', { exact: true }).waitFor();
+      assert.equal(await legacy.dialog.getByRole('button', { name: 'Continue verified downloads', exact: true }).count(), 0);
+      await page.keyboard.press('Escape'); await assertLocatorFocused(legacy.invoker); assert.equal(control.writes.length, 0); assert.equal(control.adoptionWrites, 0); await page.goto('about:blank');
     }, { scenarioName: 'import_review_origin_resolution_refusal' });
   });
 

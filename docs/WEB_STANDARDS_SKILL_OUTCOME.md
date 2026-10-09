@@ -239,3 +239,18 @@ policy are unchanged; no fresh blind behavioral trial or full conformance claim
 is made. Repository and installed copies pass structural validation, and all four
 files match by SHA-256 after final synchronization. Application evidence is separate in the
 [resolution outcome](DOWNLOAD_ORIGIN_RESOLUTION_OUTCOME.md).
+
+## Explicit refusal maintenance, October 9
+
+The [refusal design](PRE_PROVIDER_REFUSAL_DESIGN.md) and actual worker/provider
+tests exposed the need to trace the final native send, preserve irreversible
+crossing through commit/network uncertainty, and compare complete epoch state
+across lease generations and ordinary writes. The references now map those
+owners, audits, retention and final-stage evidence. Actual PostgreSQL also found
+a raw snapshot alias carrying private data beside its sanitized canonical field;
+the evidence map now calls for both representations.
+
+This maintains the existing practical skill. Entry point, UI metadata and
+invocation policy are unchanged. Repository and installed structural validation
+pass, and all four files match by SHA-256 after synchronization. No new blind behavioral trial or conformance
+claim is made; [application evidence](PRE_PROVIDER_REFUSAL_OUTCOME.md) remains separate.

@@ -6,6 +6,7 @@
  */
 
 import { getPool } from '../database.js';
+import { isUnresolvedPreProviderPreparation } from './import-execution-pre-provider-policy.js';
 import { effectiveExecutionOriginSql, writableExecutionRunSql } from './import-execution-origin-sql.js';
 import { getImportCandidateById, listImportCandidateFiles, insertImportCandidateEvent, transitionImportCandidateStatus }
   from './import-candidate-repository.js';
@@ -19,6 +20,7 @@ export function createImportExecutionHandoffStore({ getPoolFn = getPool } = {}) 
   async function lockEvidence({ importCandidateId, operationRunId }, queryable) {
     await queryable.query('SELECT id FROM import_candidates WHERE id=$1::uuid FOR UPDATE', [importCandidateId]);
     await queryable.query('SELECT id FROM import_candidate_files WHERE import_candidate_id=$1::uuid ORDER BY id FOR UPDATE', [importCandidateId]);
+    await queryable.query('SELECT id FROM operation_runs WHERE id=$1::uuid FOR UPDATE', [operationRunId]);
     return getItem({ importCandidateId, operationRunId, lock: true }, queryable);
   }
   async function getItem({ importCandidateId, operationRunId, lock = false }, queryable = null) {
@@ -35,12 +37,14 @@ export function createImportExecutionHandoffStore({ getPoolFn = getPool } = {}) 
     return result.rows[0]?.id === operationRunId;
   }
   async function findUnresolvedOtherHandoff({ importCandidateId, operationRunId }, queryable) {
-    const result = await db(queryable).query(`SELECT id FROM import_execution_run_items WHERE import_candidate_id=$1::uuid
-      AND operation_run_id<>$2::uuid AND ((item_status='awaiting_confirmation'
-        AND planning_snapshot #>> '{execution,handoff,state}' IS DISTINCT FROM 'not_dispatched')
-        OR planning_snapshot #>> '{execution,handoff,state}' IN ('dispatching','awaiting_confirmation')
-        OR planning_snapshot #> '{execution,handoff,adoption,originalUncertainty}'='true'::jsonb) LIMIT 1`, [importCandidateId, operationRunId]);
-    return result.rows[0] ?? null;
+    const result = await db(queryable).query(`SELECT items.*,runs.summary,
+      ((items.item_status='awaiting_confirmation' AND items.planning_snapshot #>> '{execution,handoff,state}' IS DISTINCT FROM 'not_dispatched')
+        OR items.planning_snapshot #>> '{execution,handoff,state}' IN ('dispatching','awaiting_confirmation')
+        OR items.planning_snapshot #> '{execution,handoff,adoption,originalUncertainty}'='true'::jsonb) AS legacy_unresolved
+      FROM import_execution_run_items items JOIN operation_runs runs ON runs.id=items.operation_run_id
+      WHERE items.import_candidate_id=$1::uuid AND items.operation_run_id<>$2::uuid`, [importCandidateId, operationRunId]);
+    return result.rows.find((row) => row.legacy_unresolved === true || isUnresolvedPreProviderPreparation({
+      run: { id: row.operation_run_id, summary: row.summary }, item: mapItem(row) })) ?? null;
   }
   async function isDispatchRunActive({ operationRunId }, queryable) {
     const result = await db(queryable).query(`SELECT id FROM operation_runs WHERE id=$1::uuid
@@ -49,7 +53,7 @@ export function createImportExecutionHandoffStore({ getPoolFn = getPool } = {}) 
     return result.rowCount > 0;
   }
   async function getRun(operationRunId, queryable) {
-    const result = await db(queryable).query('SELECT id,status,operation_type FROM operation_runs WHERE id=$1::uuid', [operationRunId]);
+    const result = await db(queryable).query('SELECT id,status,operation_type,summary FROM operation_runs WHERE id=$1::uuid', [operationRunId]);
     return result.rows[0] ? { ...result.rows[0], operationType: result.rows[0].operation_type } : null;
   }
   async function hasForeignBatchAttempt({ importCandidateId, operationRunId, providerBinding, receipts, transfers = [] }, queryable) {
@@ -74,10 +78,12 @@ export function createImportExecutionHandoffStore({ getPoolFn = getPool } = {}) 
       WHERE id=$1::uuid AND planning_snapshot #>> '{execution,handoff,attempt,attemptId}' IS NOT DISTINCT FROM $5::text
       AND planning_snapshot #>> '{execution,handoff,adoption,adoptionId}' IS NOT DISTINCT FROM $6::text
       AND planning_snapshot #>> '{execution,handoff,originResolution,resolutionId}' IS NOT DISTINCT FROM $7::text
+      AND planning_snapshot #> '{execution,handoff,preProviderEpoch}' IS NOT DISTINCT FROM $8::jsonb
       AND EXISTS(SELECT 1 FROM operation_runs parent WHERE parent.id=operation_run_id AND ${writableExecutionRunSql('parent')}) RETURNING *`,
     [item.id, itemStatus, statusMessage, JSON.stringify(execution), expectedAttemptId,
       item.planningSnapshot?.execution?.handoff?.adoption?.adoptionId ?? null,
-      item.planningSnapshot?.execution?.handoff?.originResolution?.resolutionId ?? null]);
+      item.planningSnapshot?.execution?.handoff?.originResolution?.resolutionId ?? null,
+      item.planningSnapshot?.execution?.handoff?.preProviderEpoch === undefined ? null : JSON.stringify(item.planningSnapshot.execution.handoff.preProviderEpoch)]);
     return mapItem(result.rows[0]);
   }
   async function transitionDownloading({ candidate, actorUserId, reason }, queryable) {
@@ -92,7 +98,8 @@ export function createImportExecutionHandoffStore({ getPoolFn = getPool } = {}) 
       '{execution}',COALESCE(planning_snapshot->'execution','{}'::jsonb)||jsonb_build_object('confirmationCheckedAt',$3::text))
       WHERE id=$1::uuid AND ((item_status='awaiting_confirmation'
           AND planning_snapshot #>> '{execution,handoff,state}' IS DISTINCT FROM 'not_dispatched')
-        OR planning_snapshot #>> '{execution,handoff,state}' IN ('dispatching','awaiting_confirmation'))
+        OR planning_snapshot #>> '{execution,handoff,state}' IN ('dispatching','awaiting_confirmation')
+        OR COALESCE(planning_snapshot #> '{execution,handoff}','{}'::jsonb) ? 'preProviderEpoch')
         AND planning_snapshot #>> '{execution,handoff,attempt,attemptId}' IS NOT DISTINCT FROM $2::text
         AND EXISTS(SELECT 1 FROM operation_runs parent WHERE parent.id=operation_run_id AND ${writableExecutionRunSql('parent')})`, [item.id, attemptId ?? null, checkedAt]);
   }

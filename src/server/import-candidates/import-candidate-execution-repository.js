@@ -18,6 +18,7 @@
 
 import { createImportCandidateRunItemRepository } from './import-candidate-run-item-repository.js';
 import { getPool } from '../database.js';
+import { isUnresolvedPreProviderPreparation } from './import-execution-pre-provider-policy.js';
 import { writableExecutionRunSql } from './import-execution-origin-sql.js';
 
 const importExecutionRunItemRepository = createImportCandidateRunItemRepository({
@@ -60,6 +61,8 @@ export async function updateImportExecutionRunItem({
     expectedAttemptId: planningSnapshot?.execution?.handoff?.attempt?.attemptId ?? null,
     expectedAdoptionId: planningSnapshot?.execution?.handoff?.adoption?.adoptionId ?? null,
     expectedOriginResolutionId: planningSnapshot?.execution?.handoff?.originResolution?.resolutionId ?? null,
+    expectedPreProviderEpoch: Object.hasOwn(planningSnapshot?.execution?.handoff ?? {}, 'preProviderEpoch')
+      ? JSON.stringify(planningSnapshot.execution.handoff.preProviderEpoch) : null,
   }, queryable);
 
   return item ? {
@@ -88,21 +91,30 @@ export async function findUnconfirmedImportExecutionHandoff(queryable) {
       SELECT
         items.import_candidate_id,
         items.operation_run_id,
-        items.updated_at
+        items.updated_at,items.item_status,items.planning_snapshot,runs.summary
       FROM import_execution_run_items AS items
+      INNER JOIN operation_runs runs ON runs.id=items.operation_run_id
       INNER JOIN import_candidates AS candidates
         ON candidates.id = items.import_candidate_id
       WHERE candidates.status = 'selected'
         AND ((items.item_status = 'awaiting_confirmation'
           AND items.planning_snapshot #>> '{execution,handoff,state}' IS DISTINCT FROM 'not_dispatched')
           OR items.planning_snapshot #>> '{execution,handoff,state}' IN ('dispatching','awaiting_confirmation')
-          OR items.planning_snapshot #> '{execution,handoff,adoption,originalUncertainty}'='true'::jsonb)
+          OR items.planning_snapshot #> '{execution,handoff,adoption,originalUncertainty}'='true'::jsonb
+          OR COALESCE(items.planning_snapshot #> '{execution,handoff}','{}'::jsonb) ? 'preProviderEpoch')
       ORDER BY items.updated_at DESC, items.id DESC
-      LIMIT 1
     `,
   );
 
-  const row = result.rows[0] ?? null;
+  const row = result.rows.find((entry) => {
+    const execution = entry.planning_snapshot?.execution;
+    return isUnresolvedPreProviderPreparation({ run: { id: entry.operation_run_id, summary: entry.summary },
+      item: { operationRunId: entry.operation_run_id, importCandidateId: entry.import_candidate_id,
+        itemStatus: entry.item_status, planningSnapshot: entry.planning_snapshot } })
+      || (entry.item_status === 'awaiting_confirmation' && execution?.handoff?.state !== 'not_dispatched')
+      || ['dispatching', 'awaiting_confirmation'].includes(execution?.handoff?.state)
+      || execution?.handoff?.adoption?.originalUncertainty === true;
+  }) ?? null;
   return row ? {
     importCandidateId: row.import_candidate_id,
     operationRunId: row.operation_run_id,

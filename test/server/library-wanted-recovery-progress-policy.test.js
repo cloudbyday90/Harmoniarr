@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { randomUUID } from 'node:crypto';
 import { deriveWantedRecoveryDiscovery, deriveWantedRecoveryProgress } from '../../src/server/library/library-wanted-recovery-progress-policy.js';
 import { buildAutomaticLibraryAddAuthority } from '../../src/server/import-candidates/import-candidate-music-queue-auto-safe-add-policy.js';
 import { captureRecoveryObservation } from '../../src/server/import-candidates/music-queue-recovery-policy.js';
@@ -194,4 +195,26 @@ test('positive operator tracking resolves current review while retained uncertai
   assert.equal((await read()).currentDownloadHandoff.confirmationPending, true);
   entry.candidate.status = 'downloading'; entry.currentHandoff.downloadReviewRequired = true;
   assert.equal((await read()).currentDownloadHandoff.confirmationPending, true);
+});
+
+test('preparing and malformed future epochs require review while a valid refusal preserves the older unresolved reference', async () => {
+  const { entry, read } = fixture();
+  entry.recoveryRun = null; entry.candidate.id = randomUUID();
+  const oldRunId = randomUUID(); const runId = randomUUID(); const now = new Date().toISOString();
+  const epoch = { version: 1, epochId: randomUUID(), operationRunId: runId, importCandidateId: entry.candidate.id,
+    generation: 1, lease: { leaseKey: `import_candidate_execution_planning:${runId}`, ownerInstanceId: 'reader-worker', acquiredAt: now },
+    sourceObservation: captureRecoveryObservation(entry.candidate), requestedFiles: [{ filename: 'Track.mp3', size: 1000 }],
+    preparedAt: now, phase: 'refused', refusal: { reasonCode: 'planning_blocked', refusedAt: now } };
+  const execution = { outcome: 'pre_provider_refused', requestedFiles: epoch.requestedFiles,
+    handoff: { state: 'pre_provider_refused', preProviderEpoch: epoch } };
+  const newer = { runId, candidateId: entry.candidate.id, itemStatus: 'blocked', execution,
+    summary: { sourceWantedReleaseId: wantedId, downloadPreparationProtocol: { version: 1 } }, handoff: execution.handoff };
+  entry.currentHandoff = [newer, { runId: oldRunId, candidateId: entry.candidate.id, itemStatus: 'awaiting_confirmation',
+    summary: { sourceWantedReleaseId: wantedId }, handoff: { state: 'awaiting_confirmation' } }];
+  assert.equal((await read()).currentDownloadHandoff.operationRunId, oldRunId);
+  for (const raw of [null, {}, { ...epoch, phase: 'preparing', refusal: undefined }]) {
+    newer.execution.handoff.preProviderEpoch = raw;
+    assert.equal((await read()).currentDownloadHandoff.operationRunId, runId);
+  }
+  assert.doesNotMatch(JSON.stringify(await read()), /preProviderEpoch|generation|leaseKey|epochId|preparedAt/u);
 });

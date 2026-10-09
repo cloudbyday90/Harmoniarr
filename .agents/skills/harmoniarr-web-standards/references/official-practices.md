@@ -102,3 +102,19 @@ from older positive provider evidence, preserve paired authority across all
 writers/readers and recheck current significant data before commit. Verify native
 sequential modal focus and expose pending results after closure; a DOM pass is
 not evidence of assistive-technology speech.
+
+## Explicit refusal maintenance, October 9
+
+Fresh MCP research in `docs/PRE_PROVIDER_REFUSAL_RESEARCH_2026_10.md` rechecked
+OWASP authority/transaction/business logic, RFC 9110, PostgreSQL 18 locking and
+consistency, the frozen WCAG Recommendation/status/H102 and WHATWG dialog.
+Provider contracts remain explicitly inherited from prior immutable release
+ledgers; this is no new upgrade/capability certification.
+
+The application inference is an explicit future-only local preparation protocol.
+Refusal proof must come from its exact conditional pre-dispatch state; provider
+absence, an old version-read failure or a missing historical checkpoint cannot
+substitute. After the irreversible crossing, even commit-ack loss or zero-POST
+local failure remains unknown. Keep complete state comparisons, required audits,
+current lease and bounded public feedback at their actual owners, and validate
+real transaction races rather than source wording.

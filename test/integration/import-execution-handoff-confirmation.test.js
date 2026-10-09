@@ -46,6 +46,9 @@ async function seed(context, { files = 1, candidate = null } = {}) {
     files: Array.from({ length: files }, (_, index) => ({ filename: `${index + 1}.flac`, extension: 'flac', sizeBytes: 1000 + index, isLocked: false })) });
   const run = await context.runs.createOperationRun({ status: 'running', requestedCandidateCount: 1,
     summary: { executionMode: 'download_enqueue', selectedCandidateId: stored.id, triggerSource: 'manual', sourceSearchId: stored.sourceSearchId } });
+  // Existing causal confirmation scenarios model historical checkpoints;
+  // future leased preparation is exercised by the dedicated epoch suite.
+  await context.pool.query("UPDATE operation_runs SET summary=summary-'downloadPreparationProtocol' WHERE id=$1", [run.id]);
   await initializeImportExecutionRunItems(run.id, [{ importCandidateId: stored.id, itemStatus: 'ready', position: 1,
     statusMessage: 'Controlled initial download planning', planningSnapshot: { candidate: { id: stored.id, username: 'handoff-peer' } } }], context.pool);
   const current = await context.store.getCandidate(stored.id);

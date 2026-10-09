@@ -54,6 +54,8 @@ function normalizeRun(run) {
     status: run.status,
     totalSelected: toNumberOrNull(run.summary.totalSelected),
     triggerSource: run.summary.triggerSource ?? 'manual',
+    ...(Object.hasOwn(run.summary, 'downloadPreparationProtocol')
+      ? { summary: { downloadPreparationProtocol: run.summary.downloadPreparationProtocol } } : {}),
     ...(run.downloadOriginResolved === true ? { downloadOriginResolved: true } : {}),
   };
 }
@@ -84,11 +86,12 @@ export function createImportCandidateExecutionRunStore({
     const run = await operationRunStore.createOperationRun({
       queryable,
       status,
-      summary: summary ?? {
+      summary: { ...(summary ?? {
         currentStep: 'queued',
         executionMode,
         requestedCandidateCount,
-      },
+      }), ...((summary?.executionMode ?? executionMode) === 'download_enqueue'
+        ? { downloadPreparationProtocol: { version: 1 } } : {}) },
       nextAttemptAt,
       triggeredByUserId,
     });

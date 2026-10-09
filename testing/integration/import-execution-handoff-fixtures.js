@@ -11,6 +11,8 @@ import { createImportExecutionHandoffStore } from '../../src/server/import-candi
 import { createImportExecutionTransferLinkStore } from '../../src/server/import-candidates/import-execution-transfer-link-store.js';
 import { createImportCandidateExecutionRunStore } from '../../src/server/import-candidates/import-candidate-execution-run-store.js';
 import { createImportCandidateExecutionWorker } from '../../src/server/import-candidates/import-candidate-execution-worker.js';
+import { createImportExecutionPreProviderService } from '../../src/server/import-candidates/import-execution-pre-provider-service.js';
+import { createImportExecutionPreProviderStore } from '../../src/server/import-candidates/import-execution-pre-provider-store.js';
 import { captureRecoveryObservation } from '../../src/server/import-candidates/music-queue-recovery-policy.js';
 import { initializeImportExecutionRunItems, upsertImportExecutionRunItem, listImportExecutionRunItems,
   updateImportExecutionRunItem } from '../../src/server/import-candidates/import-candidate-execution-repository.js';
@@ -21,9 +23,10 @@ export function createImportExecutionHandoffFixtureContext({ getPoolFn }) {
   const links = createImportExecutionTransferLinkStore({ getPoolFn });
   const runs = createImportCandidateExecutionRunStore({ getPoolFn });
   const withTransaction = createDatabaseTransactionRunner({ getPoolFn });
+  const preparation = createImportExecutionPreProviderService({ store: createImportExecutionPreProviderStore({ getPoolFn }), withTransaction });
   const handoff = createImportExecutionHandoffService({ store, transferLinkStore: links,
-    withTransaction });
-  return { pool: getPoolFn(), getPoolFn, store, links, runs, handoff, withTransaction };
+    withTransaction, preProviderService: preparation });
+  return { pool: getPoolFn(), getPoolFn, store, links, runs, handoff, preparation, withTransaction };
 }
 
 export async function seedImportExecutionHandoffFixture(context, { files = 1 } = {}) {
@@ -43,7 +46,7 @@ export async function seedImportExecutionHandoffFixture(context, { files = 1 } =
 export async function runImportExecutionHandoffFixtureWorker(context, fixture, overrides = {}) {
   let finish;
   const done = new Promise((resolve) => { finish = resolve; });
-  const worker = createImportCandidateExecutionWorker({ ...context.runs, ...context.handoff,
+  const worker = createImportCandidateExecutionWorker({ ...context.runs, ...context.handoff, ...context.preparation,
     getImportCandidate: ({ importCandidateId }) => context.store.getCandidate(importCandidateId),
     buildSelectedImportCandidateSummary: async () => ({ selectedCandidates: [{ ...(await context.store.getCandidate(fixture.importCandidateId)),
       executionStatus: { code: 'ready', message: 'Controlled valid planning' } }], counts: { totalSelected: 1, ready: 1 } }),

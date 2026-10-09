@@ -50,11 +50,16 @@ export function createSlskdDownloadDispatchService({ captureProvider, normalizeL
     await pinned.assertCurrent(binding, { requireCredentials: true });
     return {
       binding,
+      supportsBeforeSend: true,
       assertCurrent: ({ queryable } = {}) => pinned.assertCurrent(binding, { requireCredentials: true, queryable }),
-      enqueue: async ({ attempt }) => {
+      enqueue: async ({ attempt, beforeSend = null }) => {
         if (attempt?.providerBinding?.protocol !== binding.protocol || attempt.providerBinding.version !== binding.version
           || attempt.providerBinding.endpointFingerprint !== binding.endpointFingerprint) throw createApiError(409, 'slskd_download_attempt_binding_invalid', 'The saved download transport changed');
         await pinned.assertCurrent(binding, { requireCredentials: true });
+        if (beforeSend != null) {
+          if (typeof beforeSend !== 'function') throw new TypeError('The dispatch boundary must be a trusted callback');
+          await beforeSend();
+        }
         if (binding.protocol === 'legacy') return normalizeLegacyReceipt(await observe(() => pinned.client.enqueueDownloads({
           files: attempt.requestedFiles, username: attempt.username,
         })));

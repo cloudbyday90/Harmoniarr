@@ -18,7 +18,7 @@
 
 import { captureRecoveryObservation } from './music-queue-recovery-policy.js';
 import { createApiError } from '../auth.js';
-import { isUnconfirmedExecutionItem } from './import-candidate-execution-handoff-state.js';
+import { preProviderRefusalReason } from './import-execution-pre-provider-policy.js';
 import { hasPersistedMusicQueueOwnership } from './import-candidate-music-queue-auto-safe-add-policy.js';
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
 import {
@@ -118,6 +118,9 @@ export function createImportCandidateExecutionWorker({
   confirmDownloadHandoff = null,
   assertDownloadHandoffCurrent = null,
   recordDownloadHandoffNotDispatched = null,
+  beginPreparation = null,
+  refusePreparation = null,
+  markDispatchPossible = null,
   getLease = null,
   ownsRecoveryCandidate = ({ candidate }) => hasPersistedMusicQueueOwnership(candidate),
   resolveRecoveryExecution = async () => null,
@@ -139,6 +142,9 @@ export function createImportCandidateExecutionWorker({
   updateImportExecutionRunItem = async () => null,
   upsertImportExecutionRunItem = async () => null,
 } = {}) {
+  if (beginPreparation != null && [refusePreparation, markDispatchPossible].some((fn) => typeof fn !== 'function')) {
+    throw new TypeError('Tracked download preparation requires its refusal and dispatch owners');
+  }
   const activeRunIds = new Set();
 
   function buildRunItems(selectedCandidates, { startPosition = 1 } = {}) {
@@ -336,7 +342,7 @@ export function createImportCandidateExecutionWorker({
           counts.blocked += 1;
           continue;
         }
-        if (savedAttempt || isUnconfirmedExecutionItem(persistedItem) || hasUnconfirmedDownloadHandoff(persistedItem)) {
+        if (savedAttempt || persistedItem?.itemStatus === 'awaiting_confirmation' || hasUnconfirmedDownloadHandoff(persistedItem)) {
           if (typeof confirmDownloadHandoff !== 'function') throw new TypeError('The download confirmation owner is required');
           const evidence = typeof findMatchingTransfers === 'function' ? await findMatchingTransfers({ attempt: savedAttempt,
             importCandidateId: summaryCandidate.id, operationRunId: runId, requestedFiles: baseSnapshot.execution?.requestedFiles,
@@ -349,105 +355,146 @@ export function createImportCandidateExecutionWorker({
           continue;
         }
 
-        if (summaryCandidate.executionStatus.code === 'blocked') {
-          const diagnostic = buildPlanningBlockedDiagnostic({
-            candidate: summaryCandidate,
-            message: summaryCandidate.executionStatus.message,
-          });
-          counts.blocked += 1;
-          await updateImportExecutionRunItem({
-            importCandidateId: summaryCandidate.id,
-            itemStatus: 'blocked',
-            operationRunId: runId,
-            planningSnapshot: {
-              ...baseSnapshot,
-              execution: {
-                ...baseSnapshot.execution,
-                diagnostics: {
-                  downloadAcceptance: diagnostic,
-                },
-                outcome: 'blocked',
-              },
-            },
-            statusMessage: summaryCandidate.executionStatus.message,
-          });
-          continue;
-        }
-
         const sourceObservation = captureRecoveryObservation(candidate);
         const requestedFiles = buildEnqueueRequests((candidate?.files ?? []).filter((file) => !file.isLocked));
-
-        if (requestedFiles.length === 0) {
-          const diagnostic = buildNoUnlockedFilesDiagnostic({
-            candidate: summaryCandidate,
-          });
-          counts.blocked += 1;
-          await updateImportExecutionRunItem({
-            importCandidateId: summaryCandidate.id,
-            itemStatus: 'blocked',
-            operationRunId: runId,
-            planningSnapshot: {
-              ...baseSnapshot,
-              execution: {
-                ...baseSnapshot.execution,
-                diagnostics: {
-                  downloadAcceptance: diagnostic,
-                },
-                outcome: 'blocked',
-                requestedFiles: [],
-              },
-            },
-            statusMessage: diagnostic.message,
-          });
+        const preparation = beginPreparation ? await beginPreparation({ runId, importCandidateId: summaryCandidate.id,
+          requestedFiles, sourceObservation, lease: acquiredLease }) : { tracked: false, allowPreparation: true };
+        if (!preparation.allowPreparation) {
+          if (preparation.epoch?.phase === 'may_have_dispatched' || preparation.epoch?.phase === 'preparing') counts.awaitingConfirmation += 1;
+          else counts.blocked += 1;
           continue;
         }
-
-        for (const fn of [prepareDownloadHandoff, confirmDownloadHandoff, assertDownloadHandoffCurrent, recordDownloadHandoffNotDispatched, getLease]) {
-          if (typeof fn !== 'function') throw new TypeError('The download handoff owner and lease reader are required');
-        }
-        let preparedRecovery;
-        try { preparedRecovery = await resolveRecoveryExecution({ candidate, runId, triggerSource }); }
-        catch (error) {
-          if (error?.code === 'music_queue_recovery_not_current') await retireRecoveryExecution({ runId, candidateId: candidate.id, sourceObservation });
-          throw error;
-        }
-        const dispatch = typeof prepareDownloadDispatch === 'function' ? await prepareDownloadDispatch() : null;
-        const prepared = await prepareDownloadHandoff({ importCandidateId: candidate.id, operationRunId: runId,
-          requestedFiles, username: candidate.username, sourceObservation, providerBinding: dispatch?.binding ?? null });
-        if (!prepared.dispatchAllowed) {
-          if (prepared.stale && !prepared.attempt) {
+        let refusalAttempted = false;
+        const seal = async (reasonCode) => {
+          if (!preparation.tracked) return;
+          refusalAttempted = true;
+          if (!await refusePreparation({ runId, importCandidateId: summaryCandidate.id, epochId: preparation.epochId,
+            lease: acquiredLease, reasonCode })) throw createApiError(409, 'import_execution_preparation_stale', 'The preparation changed before its refusal could be recorded');
+        };
+        let prepared; let preparedRecovery; let dispatchBoundaryReached = false; let finalGuardFailed = false;
+        try {
+          if (summaryCandidate.executionStatus.code === 'blocked') {
+            const diagnostic = buildPlanningBlockedDiagnostic({
+              candidate: summaryCandidate,
+              message: summaryCandidate.executionStatus.message,
+            });
             counts.blocked += 1;
+            if (preparation.tracked) await seal('planning_blocked');
+            else await updateImportExecutionRunItem({
+              importCandidateId: summaryCandidate.id,
+              itemStatus: 'blocked',
+              operationRunId: runId,
+              planningSnapshot: {
+                ...baseSnapshot,
+                execution: {
+                  ...baseSnapshot.execution,
+                  diagnostics: {
+                    downloadAcceptance: diagnostic,
+                  },
+                  outcome: 'blocked',
+                },
+              },
+              statusMessage: summaryCandidate.executionStatus.message,
+            });
             continue;
           }
+
+          if (requestedFiles.length === 0) {
+            const diagnostic = buildNoUnlockedFilesDiagnostic({
+              candidate: summaryCandidate,
+            });
+            counts.blocked += 1;
+            if (preparation.tracked) await seal('no_unlocked_files');
+            else await updateImportExecutionRunItem({
+              importCandidateId: summaryCandidate.id,
+              itemStatus: 'blocked',
+              operationRunId: runId,
+              planningSnapshot: {
+                ...baseSnapshot,
+                execution: {
+                  ...baseSnapshot.execution,
+                  diagnostics: {
+                    downloadAcceptance: diagnostic,
+                  },
+                  outcome: 'blocked',
+                  requestedFiles: [],
+                },
+              },
+              statusMessage: diagnostic.message,
+            });
+            continue;
+          }
+
+          for (const fn of [prepareDownloadHandoff, confirmDownloadHandoff, assertDownloadHandoffCurrent, recordDownloadHandoffNotDispatched, getLease]) {
+            if (typeof fn !== 'function') throw new TypeError('The download handoff owner and lease reader are required');
+          }
+          try { preparedRecovery = await resolveRecoveryExecution({ candidate, runId, triggerSource }); }
+          catch (error) {
+            if (error?.code === 'music_queue_recovery_not_current') await retireRecoveryExecution({ runId, candidateId: candidate.id, sourceObservation });
+            throw error;
+          }
+          const dispatch = typeof prepareDownloadDispatch === 'function' ? await prepareDownloadDispatch() : null;
+          prepared = await prepareDownloadHandoff({ importCandidateId: candidate.id, operationRunId: runId,
+            requestedFiles, username: candidate.username, sourceObservation, providerBinding: dispatch?.binding ?? null,
+            ...(preparation.tracked ? { preProviderEpochId: preparation.epochId, lease: acquiredLease } : {}) });
+          if (!prepared.dispatchAllowed) {
+            if (prepared.stale && !prepared.attempt) {
+              await seal('prior_handoff_unresolved');
+              counts.blocked += 1;
+              continue;
+            }
+            const receipt = await confirmDownloadHandoff({ importCandidateId: candidate.id, operationRunId: runId,
+              attemptId: prepared.attempt?.attemptId ?? null, expectedAttempt: prepared.attempt });
+            await consumeReceipt({ receipt, candidate, summaryCandidate, sourceObservation: prepared.attempt?.sourceObservation ?? sourceObservation });
+            continue;
+          }
+          const beforeSend = async () => {
+            try {
+              const currentLease = await getLease({ runId });
+              if (!hasCurrentWorkerLease(currentLease, acquiredLease)) {
+                throw createApiError(409, 'import_execution_lease_not_current', 'The worker lease changed before provider dispatch');
+              }
+              await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
+              await assertRecoveryExecutionCurrent({ candidateId: candidate.id, runId, triggerSource, prepared: preparedRecovery });
+              await assertDownloadHandoffCurrent({ importCandidateId: candidate.id, operationRunId: runId,
+                attemptId: prepared.attempt.attemptId, expectedAttempt: prepared.attempt });
+              if (dispatch) await dispatch.assertCurrent();
+              if (!hasCurrentWorkerLease(await getLease({ runId }), acquiredLease)) {
+                throw createApiError(409, 'import_execution_lease_not_current', 'The worker lease changed before provider dispatch');
+              }
+              if (preparation.tracked) await markDispatchPossible({ runId, importCandidateId: candidate.id,
+                epochId: preparation.epochId, lease: acquiredLease, attemptId: prepared.attempt.attemptId,
+                assertProviderCurrent: dispatch?.assertCurrent });
+              dispatchBoundaryReached = true;
+            } catch (error) { finalGuardFailed = true; throw error; }
+          };
+          let enqueueResult;
+          if (dispatch?.supportsBeforeSend === true) enqueueResult = await dispatch.enqueue({ attempt: prepared.attempt, beforeSend });
+          else {
+            await beforeSend();
+            enqueueResult = dispatch ? await dispatch.enqueue({ attempt: prepared.attempt })
+              : await enqueueDownloads({ files: prepared.attempt.requestedFiles, username: prepared.attempt.username });
+          }
           const receipt = await confirmDownloadHandoff({ importCandidateId: candidate.id, operationRunId: runId,
-            attemptId: prepared.attempt?.attemptId ?? null, expectedAttempt: prepared.attempt });
-          await consumeReceipt({ receipt, candidate, summaryCandidate, sourceObservation: prepared.attempt?.sourceObservation ?? sourceObservation });
-          continue;
-        }
-        try {
-          const currentLease = await getLease({ runId });
-          if (!hasCurrentWorkerLease(currentLease, acquiredLease)) {
-            throw createApiError(409, 'import_execution_lease_not_current', 'The worker lease changed before provider dispatch');
-          }
-          await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
-          await assertRecoveryExecutionCurrent({ candidateId: candidate.id, runId, triggerSource, prepared: preparedRecovery });
-          await assertDownloadHandoffCurrent({ importCandidateId: candidate.id, operationRunId: runId,
-            attemptId: prepared.attempt.attemptId, expectedAttempt: prepared.attempt });
-          if (dispatch) await dispatch.assertCurrent();
-          if (!hasCurrentWorkerLease(await getLease({ runId }), acquiredLease)) {
-            throw createApiError(409, 'import_execution_lease_not_current', 'The worker lease changed before provider dispatch');
-          }
+            attemptId: prepared.attempt.attemptId, expectedAttempt: prepared.attempt, enqueueResult,
+            warningMessage: summaryCandidate.executionStatus.code === 'ready_with_warnings' ? summaryCandidate.executionStatus.message : null });
+          await consumeReceipt({ receipt, candidate, summaryCandidate, sourceObservation: prepared.attempt.sourceObservation });
         } catch (error) {
-          await retireRecoveryExecution({ runId, candidateId: candidate.id, sourceObservation, knownDispatchStartedAt: prepared.dispatchStartedAt });
-          await recordDownloadHandoffNotDispatched({ importCandidateId: candidate.id, operationRunId: runId, attemptId: prepared.attempt.attemptId });
+          if (!dispatchBoundaryReached) {
+            if (preparation.tracked) {
+              if (!refusalAttempted) {
+                const refused = await refusePreparation({ runId, importCandidateId: summaryCandidate.id,
+                  epochId: preparation.epochId, lease: acquiredLease, reasonCode: preProviderRefusalReason(error) });
+                if (refused && prepared?.dispatchAllowed && finalGuardFailed) await retireRecoveryExecution({ runId,
+                  candidateId: candidate.id, sourceObservation });
+              }
+            } else if (prepared?.dispatchAllowed && finalGuardFailed) {
+              await retireRecoveryExecution({ runId, candidateId: candidate.id, sourceObservation, knownDispatchStartedAt: prepared.dispatchStartedAt });
+              await recordDownloadHandoffNotDispatched({ importCandidateId: candidate.id, operationRunId: runId, attemptId: prepared.attempt.attemptId });
+            }
+          }
           throw error;
         }
-        const enqueueResult = dispatch ? await dispatch.enqueue({ attempt: prepared.attempt })
-          : await enqueueDownloads({ files: prepared.attempt.requestedFiles, username: prepared.attempt.username });
-        const receipt = await confirmDownloadHandoff({ importCandidateId: candidate.id, operationRunId: runId,
-          attemptId: prepared.attempt.attemptId, expectedAttempt: prepared.attempt, enqueueResult,
-          warningMessage: summaryCandidate.executionStatus.code === 'ready_with_warnings' ? summaryCandidate.executionStatus.message : null });
-        await consumeReceipt({ receipt, candidate, summaryCandidate, sourceObservation: prepared.attempt.sourceObservation });
       }
 
       await markRunCompleted({

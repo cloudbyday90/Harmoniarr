@@ -18,6 +18,7 @@ function projectConfirmation(confirmation) {
 
 function projectItem(item) {
   const projected = { ...item };
+  delete projected.snapshot;
   delete projected.transferObservationPending;
   if (item.handoffConfirmation) projected.handoffConfirmation = projectConfirmation(item.handoffConfirmation);
   if (item.planningSnapshot?.execution?.handoff) {
@@ -30,7 +31,10 @@ function projectItem(item) {
 function projectRun(run) {
   if (!run) return run;
   const summary = run.summary && typeof run.summary === 'object' ? { ...run.summary } : run.summary;
-  if (summary) delete summary.downloadOriginSupersession;
+  if (summary) {
+    delete summary.downloadOriginSupersession;
+    delete summary.downloadPreparationProtocol;
+  }
   return { ...run, ...(Object.hasOwn(run, 'summary') ? { summary } : {}),
     ...(Array.isArray(run.items) ? { items: run.items.map(projectItem) } : {}) };
 }

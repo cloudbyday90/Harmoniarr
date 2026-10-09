@@ -53,6 +53,7 @@ import { createMusicQueueExecutionObservationService } from './music-queue-execu
 import { createImportExecutionHandoffService } from './import-execution-handoff-service.js';
 import { createImportCandidateDownloadAdoptionService } from './import-candidate-download-adoption-service.js';
 import { createImportCandidateDownloadOriginService } from './import-candidate-download-origin-service.js';
+import { createImportExecutionPreProviderService } from './import-execution-pre-provider-service.js';
 import { createImportCandidateRecoveryService } from './import-candidate-recovery-service.js';
 import { createImportCandidateExecutionService } from './import-candidate-execution-service.js';
 import { createImportCandidateExecutionSummaryService } from './import-candidate-execution-summary-service.js';
@@ -204,7 +205,9 @@ export function createImportCandidateModule({
   importCandidateTranscodeRunStore = createImportCandidateTranscodeRunStore(),
   importCandidateExecutionRunStore = createImportCandidateExecutionRunStore(),
   importExecutionTransferLinkStore = createImportExecutionTransferLinkStore(),
-  importExecutionHandoffService = createImportExecutionHandoffService({ transferLinkStore: importExecutionTransferLinkStore }),
+  importExecutionPreProviderService = createImportExecutionPreProviderService(),
+  importExecutionHandoffService = createImportExecutionHandoffService({ transferLinkStore: importExecutionTransferLinkStore,
+    preProviderService: importExecutionPreProviderService }),
   importCandidateDownloadAdoptionService = createImportCandidateDownloadAdoptionService({
     adoptDownloadHandoff: importExecutionHandoffService.adoptDownloadHandoff,
     listAdoptionTransfers: (...args) => slskdService.listAdoptionTransfers(...args),
@@ -261,6 +264,9 @@ export function createImportCandidateModule({
     findMatchingTransfers: slskdDownloadHandoffReconciliationService.findMatchingTransfers,
     getImportCandidate: importCandidateService.getImportCandidate,
     prepareDownloadHandoff: importExecutionHandoffService.prepareDownloadHandoff,
+    beginPreparation: importExecutionPreProviderService.beginPreparation,
+    refusePreparation: importExecutionPreProviderService.refusePreparation,
+    markDispatchPossible: importExecutionPreProviderService.markDispatchPossible,
     confirmDownloadHandoff: importExecutionHandoffService.confirmDownloadHandoff,
     assertDownloadHandoffCurrent: importExecutionHandoffService.assertDownloadHandoffCurrent,
     recordDownloadHandoffNotDispatched: importExecutionHandoffService.recordDownloadHandoffNotDispatched,
@@ -531,6 +537,7 @@ export function createImportCandidateModule({
     importCandidateExecutionSummaryService,
     importCandidateExecutionWorker,
     importExecutionHandoffService,
+    importExecutionPreProviderService,
     importCandidateDownloadAdoptionService,
     importCandidateDownloadOriginService,
     importCandidateRecoveryService,
