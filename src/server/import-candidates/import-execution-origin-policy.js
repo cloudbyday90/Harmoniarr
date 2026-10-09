@@ -51,6 +51,7 @@ export function evaluateUnusedExecutionAllocation({ run, items, leases, transfer
   const execution = snapshot?.execution ?? {};
   if (hasProviderEvidence(execution)) return refusal('newer_allocation_has_work');
   if (hasCertifiedPreProviderRefusal({ run, item: items[0] })) return { eligible: true, reasonCode: null };
+  if (Object.hasOwn(run.summary, 'downloadPreparationClosure')) return refusal('newer_allocation_dispatch_not_proven');
   const handoff = execution.handoff;
   if (Object.hasOwn(handoff ?? {}, 'preProviderEpoch')) return refusal('newer_allocation_dispatch_not_proven');
   if (run.status === 'pending' && run.attemptCount === 0 && leases.length === 0

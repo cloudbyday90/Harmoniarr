@@ -118,3 +118,24 @@ substitute. After the irreversible crossing, even commit-ack loss or zero-POST
 local failure remains unknown. Keep complete state comparisons, required audits,
 current lease and bounded public feedback at their actual owners, and validate
 real transaction races rather than source wording.
+
+## Abandoned preparation maintenance, October 9
+
+The root's fresh primary-source ledger in
+`docs/ABANDONED_PREPARATION_RESEARCH_2026_10.md` records PostgreSQL 18
+locking/consistency and time functions, OWASP authority/workflow, RFC 9110 and
+W3C/WHATWG feedback guidance. Documentation version and consultation are
+separate from the running database/provider version; earlier provider ledgers
+remain inherited. This maintenance does not independently re-verify those URLs.
+
+The application inference is a distinct system closure owner for an exact idle
+future preparing epoch, followed separately by any authorized restoration.
+Cancellation requests and cancelled status do not certify non-dispatch or cancel
+a remote transfer. Recheck current state and fresh authoritative time after lock
+waits; transaction-start NOW is not a final expiry clock. Preserve the original
+captured lease and require reciprocal parent/epoch closure plus permanent writer
+fences. Closure-first must stop the old final native callback; crossing-first
+retains uncertainty. Required audit failure rolls back closure. A public closed
+flag can inhibit retry without exposing the private proof or granting permission
+to restore. These are bounded project decisions, not a standardized lease
+algorithm, new operator screen or whole-platform conformance claim.

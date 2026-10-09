@@ -80,3 +80,13 @@ test('control plane redaction service redacts sensitive parameter values inside 
     '/api/v1/recovery/bootstrap-admin/complete?recovery_code=[REDACTED]&token=[REDACTED]&email=[REDACTED_EMAIL]',
   );
 });
+
+test('control plane summaries and audit details omit raw preparation ownership while retaining safe fields', () => {
+  const service = createControlPlaneRedactionService();
+  const input = { currentStep: 'Preparation stopped', blockedCount: 1, downloadPreparationClosure: { lease: 'private-lease', epochId: 'private-epoch' },
+    nested: { download_preparation_closure: null, preProviderEpoch: { sourceObservation: 'private-source' }, downloadPreparationProtocol: { version: 1 }, safe: true } };
+  const original = structuredClone(input);
+  const expected = { currentStep: 'Preparation stopped', blockedCount: 1, nested: { safe: true } };
+  assert.deepEqual(service.redactOperationSummary(input), expected); assert.deepEqual(service.redactAuditDetails(input), expected);
+  assert.deepEqual(input, original);
+});

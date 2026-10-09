@@ -37,14 +37,14 @@ export function createImportExecutionHandoffStore({ getPoolFn = getPool } = {}) 
     return result.rows[0]?.id === operationRunId;
   }
   async function findUnresolvedOtherHandoff({ importCandidateId, operationRunId }, queryable) {
-    const result = await db(queryable).query(`SELECT items.*,runs.summary,
+    const result = await db(queryable).query(`SELECT items.*,runs.summary,runs.status AS run_status,
       ((items.item_status='awaiting_confirmation' AND items.planning_snapshot #>> '{execution,handoff,state}' IS DISTINCT FROM 'not_dispatched')
         OR items.planning_snapshot #>> '{execution,handoff,state}' IN ('dispatching','awaiting_confirmation')
         OR items.planning_snapshot #> '{execution,handoff,adoption,originalUncertainty}'='true'::jsonb) AS legacy_unresolved
       FROM import_execution_run_items items JOIN operation_runs runs ON runs.id=items.operation_run_id
       WHERE items.import_candidate_id=$1::uuid AND items.operation_run_id<>$2::uuid`, [importCandidateId, operationRunId]);
     return result.rows.find((row) => row.legacy_unresolved === true || isUnresolvedPreProviderPreparation({
-      run: { id: row.operation_run_id, summary: row.summary }, item: mapItem(row) })) ?? null;
+      run: { id: row.operation_run_id, summary: row.summary, status: row.run_status }, item: mapItem(row) })) ?? null;
   }
   async function isDispatchRunActive({ operationRunId }, queryable) {
     const result = await db(queryable).query(`SELECT id FROM operation_runs WHERE id=$1::uuid

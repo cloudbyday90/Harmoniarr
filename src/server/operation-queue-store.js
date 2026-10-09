@@ -63,6 +63,7 @@ function normalizeRunSummary(summary) {
 
   const normalized = { ...summary };
   delete normalized.downloadPreparationProtocol;
+  delete normalized.downloadPreparationClosure;
   return normalized;
 }
 

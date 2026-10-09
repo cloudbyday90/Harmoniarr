@@ -35,7 +35,7 @@ export async function deriveWantedRecoveryProgress({ entries, wantedReleaseId, m
     const authority = buildAutomaticLibraryAddAuthority(candidate);
     const belongs = record?.metadataReleaseId === metadataReleaseId
       && Array.isArray(record.authority?.wantedReleaseIds) && record.authority.wantedReleaseIds.includes(wantedReleaseId);
-    const handoffOwner = (value) => ({ run: { id: value.runId, summary: value.summary },
+    const handoffOwner = (value) => ({ run: { id: value.runId, summary: value.summary, status: value.runStatus },
       item: { operationRunId: value.runId, importCandidateId: value.candidateId, itemStatus: value.itemStatus,
         planningSnapshot: { execution: value.execution ?? { handoff: value.handoff, requestedFiles: value.requestedFiles } } } });
     const handoffs = Array.isArray(entry.currentHandoff) ? entry.currentHandoff : entry.currentHandoff ? [entry.currentHandoff] : [];

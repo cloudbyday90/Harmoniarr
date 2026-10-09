@@ -169,6 +169,7 @@ export function canRequestOperationRunCancellation(run) {
 }
 
 export function canRequestOperationRunRetry(run) {
+  if (run?.preparationClosed === true || Object.hasOwn(run?.summary ?? {}, 'downloadPreparationClosure')) return false;
   if (run?.originSuperseded === true || Object.hasOwn(run?.summary ?? {}, 'downloadOriginSupersession')) return false;
   const descriptor = getOperationRunDescriptorDefinition(run?.operationType);
 

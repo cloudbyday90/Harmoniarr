@@ -36,6 +36,7 @@ export function createImportExecutionPreProviderService({ store = createImportEx
   function owns(context, input, { active = false } = {}) {
     return context.run?.id === input.runId && context.run.operationType === 'import_candidate_execution_planning' && hasPreProviderProtocol(context.run)
       && !Object.hasOwn(context.run.summary, 'downloadOriginSupersession')
+      && !Object.hasOwn(context.run.summary, 'downloadPreparationClosure')
       && context.item?.operationRunId === input.runId && context.item.importCandidateId === input.importCandidateId
       && context.transferLinkCount === 0 && hasCurrentPreparationLease(context.lease, input.lease, input.runId, getNow().getTime())
       && (!active || (context.run.status === 'running' && context.run.cancelRequestedAt == null && context.run.cancelledAt == null));

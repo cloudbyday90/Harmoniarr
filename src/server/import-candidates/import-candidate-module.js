@@ -54,6 +54,7 @@ import { createImportExecutionHandoffService } from './import-execution-handoff-
 import { createImportCandidateDownloadAdoptionService } from './import-candidate-download-adoption-service.js';
 import { createImportCandidateDownloadOriginService } from './import-candidate-download-origin-service.js';
 import { createImportExecutionPreProviderService } from './import-execution-pre-provider-service.js';
+import { createImportExecutionPreparationClosureService } from './import-execution-preparation-closure-service.js';
 import { createImportCandidateRecoveryService } from './import-candidate-recovery-service.js';
 import { createImportCandidateExecutionService } from './import-candidate-execution-service.js';
 import { createImportCandidateExecutionSummaryService } from './import-candidate-execution-summary-service.js';
@@ -206,6 +207,7 @@ export function createImportCandidateModule({
   importCandidateExecutionRunStore = createImportCandidateExecutionRunStore(),
   importExecutionTransferLinkStore = createImportExecutionTransferLinkStore(),
   importExecutionPreProviderService = createImportExecutionPreProviderService(),
+  importExecutionPreparationClosureService = createImportExecutionPreparationClosureService(),
   importExecutionHandoffService = createImportExecutionHandoffService({ transferLinkStore: importExecutionTransferLinkStore,
     preProviderService: importExecutionPreProviderService }),
   importCandidateDownloadAdoptionService = createImportCandidateDownloadAdoptionService({
@@ -487,6 +489,7 @@ export function createImportCandidateModule({
     importCandidateApplyRunStore,
   }),
   importCandidateExecutionReconciliationService = createImportCandidateExecutionReconciliationService({
+    closeAbandonedPreparation: importExecutionPreparationClosureService.closeAbandonedPreparation,
     confirmDownloadHandoff: importExecutionHandoffService.confirmDownloadHandoff,
     ownsRecoveryCandidate: importCandidateRecoveryService.ownsRecoveryCandidate,
     isCurrentExecutionObservation: musicQueueRecoveryService.isCurrentExecutionObservation,
@@ -538,6 +541,7 @@ export function createImportCandidateModule({
     importCandidateExecutionWorker,
     importExecutionHandoffService,
     importExecutionPreProviderService,
+    importExecutionPreparationClosureService,
     importCandidateDownloadAdoptionService,
     importCandidateDownloadOriginService,
     importCandidateRecoveryService,

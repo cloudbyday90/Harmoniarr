@@ -254,3 +254,21 @@ This maintains the existing practical skill. Entry point, UI metadata and
 invocation policy are unchanged. Repository and installed structural validation
 pass, and all four files match by SHA-256 after synchronization. No new blind behavioral trial or conformance
 claim is made; [application evidence](PRE_PROVIDER_REFUSAL_OUTCOME.md) remains separate.
+
+## Abandoned preparation closure maintenance, October 9
+
+The [closure design](ABANDONED_PREPARATION_DESIGN.md) exposed a distinct system
+owner and evidence boundary: cancelled status or expiry alone cannot certify
+non-dispatch, and transaction-start time cannot validate a lease after lock
+waits. The references now locate the closure owner and bounded reconciliation,
+retain original captured identity, require reciprocal parent/epoch fences, and
+map closure-first versus crossing-first, stale callbacks, audit rollback and
+permanent retry inhibition to their actual owners. The public closed flag is a
+retry guard; it does not expose proof or grant restoration authority.
+
+This is narrow reference maintenance. Entry point, UI metadata and invocation
+policy are unchanged. Repository and installed copies passed quick_validate.py;
+the four maintained files match by SHA-256 after synchronization, and both
+entry-point reference links resolve. These checks establish structure and byte
+identity, not a new behavioral skill trial or standards conformance. Application
+validation and its limits remain separate in the closure outcome.

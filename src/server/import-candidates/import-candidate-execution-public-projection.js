@@ -34,6 +34,7 @@ function projectRun(run) {
   if (summary) {
     delete summary.downloadOriginSupersession;
     delete summary.downloadPreparationProtocol;
+    delete summary.downloadPreparationClosure;
   }
   return { ...run, ...(Object.hasOwn(run, 'summary') ? { summary } : {}),
     ...(Array.isArray(run.items) ? { items: run.items.map(projectItem) } : {}) };

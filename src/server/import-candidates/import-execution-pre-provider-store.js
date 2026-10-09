@@ -19,7 +19,8 @@ export function createImportExecutionPreProviderStore({ getPoolFn = getPool } = 
     const result = await queryable.query(`SELECT * FROM operation_runs WHERE id=$1::uuid FOR UPDATE`, [runId]);
     const row = result.rows[0];
     const run = row ? { id: row.id, operationType: row.operation_type, status: row.status, summary: row.summary,
-      cancelRequestedAt: row.cancel_requested_at, cancelledAt: row.cancelled_at } : null;
+      cancelRequestedAt: row.cancel_requested_at, cancelledAt: row.cancelled_at,
+      claimedAt: row.claimed_at, claimedByInstanceId: row.claimed_by_instance_id } : null;
     const item = await handoff.getItem({ importCandidateId, operationRunId: runId, lock: true }, queryable);
     const leaseResult = await queryable.query('SELECT * FROM job_leases WHERE lease_key=$1 FOR UPDATE', [`import_candidate_execution_planning:${runId}`]);
     const links = await queryable.query(`SELECT COUNT(*)::integer count FROM import_execution_transfer_links

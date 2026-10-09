@@ -6,7 +6,33 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
-## Current development slice: Explicit pre-provider refusal (2026-10-09)
+## Current development slice: Guarded abandoned preparation closure (2026-10-09)
+
+- Close only exact idle future preparing epochs through existing bounded
+  reconciliation. Distinct fresh lease, item refusal, reciprocal parent
+  cancellation fence and required audit share one transaction. Historical and
+  possible-dispatch uncertainty remain unresolved. Reserved work retains its
+  current owners. See separate [design](ABANDONED_PREPARATION_DESIGN.md),
+  [outcome](ABANDONED_PREPARATION_OUTCOME.md) and
+  [official research](ABANDONED_PREPARATION_RESEARCH_2026_10.md).
+- Existing administrator origin restoration retains its current authorization
+  and complete positive batch checks. Private closure provenance is not client
+  permission; ordinary retry/start/claim/item paths must honor the parent fence.
+- Fresh PR checks found no eligible unreplayed patch; see separate
+  [PR design](OPEN_PR_APPLICABILITY_ABANDONED_PREPARATION_2026_10_DESIGN.md) and
+  [outcome](OPEN_PR_APPLICABILITY_ABANDONED_PREPARATION_2026_10_OUTCOME.md).
+- Full validation passes 9,201 tests (4,034 server, 4,377 client, 513 script
+  and 277 PostgreSQL integration), zero failures/skips, all lint/policy checks
+  and both builds. Final focused PostgreSQL checks pass 65; focused groups
+  overlap the complete run. Fresh npm audit reports zero vulnerabilities.
+  Skill structure and final installed four-file identity pass; no new UI or
+  browser interaction changed. See the outcome for original test calibrations.
+- Next: exact acquisition-token fences for generic lease renewal/release,
+  heartbeat/finalizer callbacks and stranded recovery. Prove an old owner
+  cannot mutate a replacement lease or run while current-token calls succeed.
+- Work remains on main, without a branch, release, tag, provider upgrade or PR merge.
+
+## Prior development slice: Explicit pre-provider refusal (2026-10-09)
 
 - Future-only private run protocol and per-item preparation epoch record an
   explicit local refusal or an irreversible possible-dispatch boundary. Existing

@@ -10,7 +10,7 @@ import { normalizeDownloadFileManifest, normalizeDownloadTransferId, validateDow
 
 export const PRE_PROVIDER_REFUSAL_REASONS = new Set(['planning_blocked', 'no_unlocked_files', 'preparation_refused',
   'provider_version_unsupported', 'provider_unavailable', 'provider_changed', 'prior_handoff_unresolved',
-  'source_changed', 'operation_paused', 'operation_cancelled', 'authority_refused', 'lease_changed']);
+  'source_changed', 'operation_paused', 'operation_cancelled', 'authority_refused', 'lease_changed', 'preparation_abandoned']);
 const plain = (value) => value != null && typeof value === 'object' && !Array.isArray(value);
 const guid = (value) => typeof value === 'string' && normalizeDownloadTransferId(value) === value;
 const iso = (value) => typeof value === 'string' && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
@@ -51,6 +51,20 @@ export function validatePreProviderEpoch(epoch, { runId, importCandidateId } = {
     if (!guid(epoch.attemptId) || !iso(epoch.dispatchPossibleAt)
       || Date.parse(epoch.dispatchPossibleAt) < Date.parse(epoch.preparedAt)) return null;
   } else if (Object.hasOwn(epoch, 'dispatchPossibleAt')) return null;
+  if (Object.hasOwn(epoch, 'closure')) {
+    const closure = epoch.closure;
+    if (epoch.phase !== 'refused' || !plain(closure) || closure.version !== 1
+      || closure.operationRunId !== runId || closure.importCandidateId !== importCandidateId
+      || closure.epochId !== epoch.epochId || closure.generation !== epoch.generation
+      || closure.closedAt !== epoch.refusal.refusedAt || closure.reasonCode !== epoch.refusal.reasonCode
+      || !['preparation_abandoned', 'operation_cancelled'].includes(closure.reasonCode)
+      || !isDeepStrictEqual(closure.lease, preparationLeaseIdentity(closure.lease, runId)) || closure.lease == null
+      || isDeepStrictEqual(closure.lease, epoch.lease)
+      || Date.parse(closure.lease.acquiredAt) < Date.parse(epoch.preparedAt)
+      || Date.parse(closure.lease.acquiredAt) > Date.parse(closure.closedAt)
+      || !Object.hasOwn(closure, 'cancelRequestedAt') || !Object.hasOwn(closure, 'cancelledAt')
+      || [closure.cancelRequestedAt, closure.cancelledAt].some((time) => time != null && !iso(time))) return null;
+  } else if (epoch.refusal?.reasonCode === 'preparation_abandoned') return null;
   return epoch;
 }
 
@@ -79,6 +93,10 @@ export function hasCertifiedPreProviderRefusal({ run, item }) {
     || item.itemStatus !== 'blocked' || execution.outcome !== 'pre_provider_refused'
     || !isDeepStrictEqual(execution.requestedFiles, epoch.requestedFiles)
     || hasPreparationProviderEvidence(execution, { stagedAttemptId: epoch.attemptId ?? null })) return false;
+  if (epoch.closure || Object.hasOwn(run.summary, 'downloadPreparationClosure')) {
+    if (!epoch.closure || run.status !== 'cancelled'
+      || !isDeepStrictEqual(epoch.closure, run.summary.downloadPreparationClosure)) return false;
+  }
   const expectedState = epoch.attemptId ? 'not_dispatched' : 'pre_provider_refused';
   if (epoch.attemptId) {
     const attempt = validateDownloadAttempt({ attempt: execution.handoff.attempt, operationRunId: run.id,
@@ -90,6 +108,7 @@ export function hasCertifiedPreProviderRefusal({ run, item }) {
 
 export function isUnresolvedPreProviderPreparation({ run, item }) {
   const execution = item?.planningSnapshot?.execution;
+  if (Object.hasOwn(run?.summary ?? {}, 'downloadPreparationClosure')) return !hasCertifiedPreProviderRefusal({ run, item });
   if (!Object.hasOwn(execution?.handoff ?? {}, 'preProviderEpoch')) return false;
   if (hasCertifiedPreProviderRefusal({ run, item })) return false;
   const epoch = validatePreProviderEpoch(execution.handoff.preProviderEpoch, { runId: run?.id, importCandidateId: item.importCandidateId });

@@ -126,3 +126,14 @@ test('operation run descriptor helpers centralize cancel and retry capability ch
     status: 'failed',
   }), false);
 });
+
+test('Background Jobs retry remains denied for a closed preparation flag or any raw parent fence', () => {
+  const run = { operationType: 'import_candidate_execution_planning', status: 'cancelled' };
+  assert.equal(canRequestOperationRunRetry(run), true);
+  assert.equal(canRequestOperationRunRetry({ ...run, preparationClosed: true }), false);
+  for (const value of [{ version: 1 }, null, false, 0, 'malformed', undefined]) {
+    assert.equal(canRequestOperationRunRetry({ ...run, preparationClosed: false, summary: { downloadPreparationClosure: value } }), false);
+  }
+  assert.equal(canRequestOperationRunRetry({ ...run, status: 'failed', preparationClosed: true }), false);
+  assert.equal(canRequestOperationRunRetry({ ...run, preparationClosed: false }), true);
+});

@@ -3279,6 +3279,24 @@ authority/positive batch checks. No new table, migration or schema snapshot is
 needed; see [design](PRE_PROVIDER_REFUSAL_DESIGN.md) and
 [outcome](PRE_PROVIDER_REFUSAL_OUTCOME.md) for exact evidence and limits.
 
+## Current implementation: guarded abandoned preparation closure
+
+Idle manual single-candidate future preparation can be closed by its narrow
+reconciliation owner. The old epoch retains its captured lease/source/manifest;
+`preProviderEpoch.closure` records distinct new lease ownership and observed
+cancellation. The same typed object is saved in private
+`operation_runs.summary.downloadPreparationClosure`, and the parent is cancelled.
+Refusal, both records, required audit and released fresh lease commit together.
+
+Whole-epoch comparison prevents stale callbacks or snapshots from erasing closure.
+Parent marker presence blocks ordinary retry, start, claim and item writers;
+reciprocal validity is required before restoration can consume the certificate.
+An irreversible possible-dispatch epoch remains unresolved. Existing retention
+preserves the protocol/epoch, while public projections omit private provenance.
+No table, migration or schema snapshot is added. See separate
+[design](ABANDONED_PREPARATION_DESIGN.md) and
+[outcome](ABANDONED_PREPARATION_OUTCOME.md) for scope, evidence and limits.
+
 ## Sources Reviewed
 
 PostgreSQL 18 official sources:

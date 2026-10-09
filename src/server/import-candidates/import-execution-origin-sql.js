@@ -48,7 +48,8 @@ export function effectiveExecutionOriginSql({ importCandidateIdSql }) {
 }
 
 /** Even an invalid retirement marker cannot be erased or reactivated by ordinary writers. */
-export const writableExecutionRunSql = (runAlias) => `NOT (COALESCE(${runAlias}.summary,'{}'::jsonb) ? 'downloadOriginSupersession')`;
+export const writableExecutionRunSql = (runAlias) => `NOT (COALESCE(${runAlias}.summary,'{}'::jsonb) ? 'downloadOriginSupersession')
+  AND NOT (COALESCE(${runAlias}.summary,'{}'::jsonb) ? 'downloadPreparationClosure')`;
 
 export const resolvedExecutionRunSql = (runAlias) => `EXISTS(SELECT 1 FROM operation_runs retired_origin
   WHERE retired_origin.summary #>> '{downloadOriginSupersession,sourceRunId}'=${runAlias}.id::text

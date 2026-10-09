@@ -67,6 +67,7 @@ function toOperationRun(row, controlPlaneRedactionService) {
     status: row.status,
     summary: controlPlaneRedactionService.redactOperationSummary(normalizeRunSummary(row.summary)),
     ...(Object.hasOwn(row.summary ?? {}, 'downloadOriginSupersession') ? { originSuperseded: true } : {}),
+    ...(Object.hasOwn(row.summary ?? {}, 'downloadPreparationClosure') ? { preparationClosed: true } : {}),
     triggeredByUserId: row.triggered_by_user_id ?? null,
   };
 }

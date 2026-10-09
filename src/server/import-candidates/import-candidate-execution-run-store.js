@@ -54,8 +54,9 @@ function normalizeRun(run) {
     status: run.status,
     totalSelected: toNumberOrNull(run.summary.totalSelected),
     triggerSource: run.summary.triggerSource ?? 'manual',
-    ...(Object.hasOwn(run.summary, 'downloadPreparationProtocol')
-      ? { summary: { downloadPreparationProtocol: run.summary.downloadPreparationProtocol } } : {}),
+    ...(['downloadPreparationProtocol', 'downloadPreparationClosure'].some((key) => Object.hasOwn(run.summary, key))
+      ? { summary: Object.fromEntries(['downloadPreparationProtocol', 'downloadPreparationClosure']
+        .filter((key) => Object.hasOwn(run.summary, key)).map((key) => [key, run.summary[key]])) } : {}),
     ...(run.downloadOriginResolved === true ? { downloadOriginResolved: true } : {}),
   };
 }

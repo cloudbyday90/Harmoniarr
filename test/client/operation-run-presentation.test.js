@@ -23,6 +23,12 @@ import {
   groupOperationRunsForDisplay,
 } from '../../src/client/lib/operation-run-presentation.js';
 
+test('closed preparation next steps use the owning workflow without advertising a same-run retry', () => {
+  const run = { operationType: 'import_candidate_execution_planning', preparationClosed: true };
+  assert.equal(getOperationRunNextStep({ ...run, status: 'cancelled' }), 'No immediate action is required unless this work still needs to happen through its owning workflow.');
+  assert.equal(getOperationRunNextStep({ ...run, status: 'failed' }), 'Review the failure details and owning workflow before rerunning this work through another path.');
+});
+
 test('operation run presentation summarizes high-attention failures in operator language', () => {
   const run = {
     operationType: 'library_scan',

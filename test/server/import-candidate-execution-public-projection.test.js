@@ -85,3 +85,17 @@ test('future preparation protocol and refused epoch stay private in every execut
   }
   assert.deepEqual(run, original, 'the internal epoch must remain unchanged');
 });
+
+test('execution projections omit the abandoned preparation parent fence and reciprocal epoch closure without changing recorded status', () => {
+  const record = { closureId: 'private-closure', epochId: 'private-epoch', lease: { ownerInstanceId: 'private-owner' } };
+  const run = { id: 'closed-run', status: 'cancelled', summary: { currentStep: 'Preparation stopped', downloadPreparationClosure: record },
+    items: [{ itemStatus: 'blocked', planningSnapshot: { execution: { handoff: { state: 'pre_provider_refused', preProviderEpoch: { closure: record } } } } }] };
+  const original = structuredClone(run);
+  const output = buildPublicImportCandidateExecution({ activeRun: run, currentRun: run, latestRun: run, run, recentRuns: [run] });
+  assert.doesNotMatch(JSON.stringify(output), /private-|downloadPreparationClosure|preProviderEpoch|closureId/u);
+  for (const value of [output.activeRun, output.currentRun, output.latestRun, output.run, ...output.recentRuns]) {
+    assert.equal(value.status, 'cancelled'); assert.deepEqual(value.summary, { currentStep: 'Preparation stopped' });
+    assert.deepEqual(value.items[0].planningSnapshot.execution.handoff, { state: 'pre_provider_refused' });
+  }
+  assert.deepEqual(run, original);
+});

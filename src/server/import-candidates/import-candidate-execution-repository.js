@@ -91,7 +91,7 @@ export async function findUnconfirmedImportExecutionHandoff(queryable) {
       SELECT
         items.import_candidate_id,
         items.operation_run_id,
-        items.updated_at,items.item_status,items.planning_snapshot,runs.summary
+        items.updated_at,items.item_status,items.planning_snapshot,runs.summary,runs.status
       FROM import_execution_run_items AS items
       INNER JOIN operation_runs runs ON runs.id=items.operation_run_id
       INNER JOIN import_candidates AS candidates
@@ -101,14 +101,15 @@ export async function findUnconfirmedImportExecutionHandoff(queryable) {
           AND items.planning_snapshot #>> '{execution,handoff,state}' IS DISTINCT FROM 'not_dispatched')
           OR items.planning_snapshot #>> '{execution,handoff,state}' IN ('dispatching','awaiting_confirmation')
           OR items.planning_snapshot #> '{execution,handoff,adoption,originalUncertainty}'='true'::jsonb
-          OR COALESCE(items.planning_snapshot #> '{execution,handoff}','{}'::jsonb) ? 'preProviderEpoch')
+          OR COALESCE(items.planning_snapshot #> '{execution,handoff}','{}'::jsonb) ? 'preProviderEpoch'
+          OR runs.summary ? 'downloadPreparationClosure')
       ORDER BY items.updated_at DESC, items.id DESC
     `,
   );
 
   const row = result.rows.find((entry) => {
     const execution = entry.planning_snapshot?.execution;
-    return isUnresolvedPreProviderPreparation({ run: { id: entry.operation_run_id, summary: entry.summary },
+    return isUnresolvedPreProviderPreparation({ run: { id: entry.operation_run_id, summary: entry.summary, status: entry.status },
       item: { operationRunId: entry.operation_run_id, importCandidateId: entry.import_candidate_id,
         itemStatus: entry.item_status, planningSnapshot: entry.planning_snapshot } })
       || (entry.item_status === 'awaiting_confirmation' && execution?.handoff?.state !== 'not_dispatched')

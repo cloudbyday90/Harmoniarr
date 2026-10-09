@@ -103,3 +103,16 @@ retention. Distinguish a local negative certificate from historical absence or
 provider admission. Include raw snapshot aliases in privacy evidence instead of
 assuming canonical-field sanitization is sufficient. Preserve entry point and
 invocation policy; the maintenance teaches actual ownership and evidence choices.
+
+## Abandoned preparation closure maintenance, October 9
+
+Maintain the two references around the distinct system owner in
+[the closure design](ABANDONED_PREPARATION_DESIGN.md). Cancellation and expiry
+permit inspection, not certification. Map exact future preparing state, a fresh
+closure lease, time after lock waits, reciprocal parent/epoch records, immutable
+captured identity and permanent reactivation fences to their actual owners and
+adverse evidence. Keep administrator restoration and its authorization separate.
+The public closed flag only inhibits retry; private proof and snapshot aliases
+remain hidden. Preserve entry point, UI metadata and invocation policy. Validate
+structure and synchronize the existing four installed files; do not describe
+reference maintenance as a new behavioral skill trial.

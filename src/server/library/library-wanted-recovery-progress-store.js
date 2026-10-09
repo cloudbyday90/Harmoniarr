@@ -110,7 +110,7 @@ export const WANTED_RECOVERY_PROGRESS_JOIN_SQL = `LEFT JOIN LATERAL (
     ORDER BY runs.created_at DESC, runs.id DESC LIMIT 1
   ) recovery_run ON TRUE
   LEFT JOIN LATERAL (
-    SELECT jsonb_agg(jsonb_build_object('runId', runs.id, 'createdAt', runs.created_at, 'candidateId', candidate.id, 'summary', runs.summary,
+    SELECT jsonb_agg(jsonb_build_object('runId', runs.id, 'createdAt', runs.created_at, 'candidateId', candidate.id, 'summary', runs.summary, 'runStatus', runs.status,
       'itemStatus', item.item_status, 'handoff', item.planning_snapshot #> '{execution,handoff}',
       'requestedFiles', item.planning_snapshot #> '{execution,requestedFiles}',
       'execution', item.planning_snapshot->'execution',
@@ -131,7 +131,8 @@ export const WANTED_RECOVERY_PROGRESS_JOIN_SQL = `LEFT JOIN LATERAL (
         OR (item.item_status IN ('queued','queued_with_warnings','downloading','completed')
           AND CASE WHEN jsonb_typeof(item.planning_snapshot #> '{execution,enqueuedTransfers}') = 'array'
             THEN jsonb_array_length(item.planning_snapshot #> '{execution,enqueuedTransfers}') > 0 ELSE FALSE END)))
-        OR COALESCE(item.planning_snapshot #> '{execution,handoff}','{}'::jsonb) ? 'preProviderEpoch')
+        OR COALESCE(item.planning_snapshot #> '{execution,handoff}','{}'::jsonb) ? 'preProviderEpoch'
+        OR runs.summary ? 'downloadPreparationClosure')
   ) current_handoff ON TRUE
   WHERE candidate.status IN ('selected', 'downloading')
     AND (candidate.source_search_id = NULLIF(ldr.evidence->>'lastSearchId', '')

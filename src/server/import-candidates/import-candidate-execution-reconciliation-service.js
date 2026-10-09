@@ -139,6 +139,7 @@ export function createImportCandidateExecutionReconciliationService({
   buildImportCandidateExecutionSummary = async () => ({ currentRun: null }),
   getImportCandidate = async () => null,
   confirmDownloadHandoff = null,
+  closeAbandonedPreparation = async () => ({ closed: false }),
   ownsRecoveryCandidate = ({ candidate }) => hasPersistedMusicQueueOwnership(candidate),
   isCurrentExecutionObservation = async () => true,
   recordAcceptedCandidateObservation = async () => {},
@@ -162,6 +163,7 @@ export function createImportCandidateExecutionReconciliationService({
     const currentRun = executionSummary.currentRun;
     const runs = mergeExecutionObservationRuns([currentRun, ...(executionSummary.unconfirmedRuns ?? []), ...(executionSummary.restoredRuns ?? [])]);
     let snapshotsUpdated = 0;
+    let preparationsClosed = 0;
     const retries = [];
     const transitions = [];
     const recoveries = [];
@@ -172,6 +174,11 @@ export function createImportCandidateExecutionReconciliationService({
     for (const { run, item } of runItems) {
       const importCandidateId = item?.planningSnapshot?.candidate?.id ?? item?.importCandidateId ?? null;
 
+      const epoch = item.planningSnapshot?.execution?.handoff?.preProviderEpoch;
+      if (epoch?.phase === 'preparing') {
+        const closure = await closeAbandonedPreparation({ operationRunId: run.id, importCandidateId, expectedEpoch: epoch });
+        if (closure.closed === true) { preparationsClosed += 1; continue; }
+      }
       if (isUnconfirmedExecutionItem(item, run)) {
         if (typeof confirmDownloadHandoff !== 'function') throw new TypeError('The download confirmation owner is required');
         const attempt = item.planningSnapshot?.execution?.handoff?.attempt;
@@ -374,6 +381,7 @@ export function createImportCandidateExecutionReconciliationService({
         rediscovered: rediscoveries.length,
         retried: retries.length,
         snapshotsUpdated,
+        ...(preparationsClosed > 0 ? { preparationsClosed } : {}),
         transitioned: transitions.length,
       },
       transitions,

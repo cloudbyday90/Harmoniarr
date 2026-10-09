@@ -1,6 +1,25 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createOperationHistoryService } from '../../src/server/operation-history-service.js';
+import { canRequestOperationRunRetry } from '../../src/shared/operation-run-descriptors.js';
+
+test('operation history preserves a fail-closed public retry flag while omitting private preparation closure records', async () => {
+  for (const marker of [{ version: 1, closureId: 'private-closure', epochId: 'private-epoch', lease: 'private-lease' }, null, false, 'malformed', 0]) {
+    const row = { id: 'closed-run', operation_type: 'import_candidate_execution_planning', status: 'cancelled',
+      summary: { currentStep: 'Download preparation stopped', downloadPreparationClosure: marker,
+        downloadPreparationProtocol: { version: 1 } } };
+    const original = structuredClone(row);
+    const service = createOperationHistoryService({ getPoolFn: () => ({ query: async () => ({ rows: [row] }) }),
+      jobLeaseStore: { listLeases: async () => [] }, auditReadService: { listAuditEventsForEntity: async () => [] } });
+    const history = await service.buildOperationHistory({ limit: 1 }); const detail = await service.buildOperationRunDetail({ runId: row.id });
+    for (const run of [history.runs[0], detail.run]) {
+      assert.equal(run.preparationClosed, true); assert.equal(run.status, 'cancelled'); assert.equal(canRequestOperationRunRetry(run), false);
+      assert.deepEqual(run.summary, { currentStep: 'Download preparation stopped' });
+      assert.doesNotMatch(JSON.stringify(run), /downloadPreparationClosure|downloadPreparationProtocol|private-/u);
+    }
+    assert.deepEqual(row, original, 'history reads preserve internal closure ownership');
+  }
+});
 
 test('operation history service lists recent runs across operation types', async (t) => {
   const query = t.mock.fn(async () => ({

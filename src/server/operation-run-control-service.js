@@ -140,7 +140,8 @@ export function createOperationRunControlService({
     if (!canRequestOperationRunRetry(existingRun)) {
       throw createApiError(409, 'operation_run_not_retryable', 'Operation run is not retryable');
     }
-    if (Object.hasOwn(existingRun.summary ?? {}, 'downloadOriginSupersession')) {
+    if (Object.hasOwn(existingRun.summary ?? {}, 'downloadOriginSupersession')
+      || Object.hasOwn(existingRun.summary ?? {}, 'downloadPreparationClosure')) {
       throw createApiError(409, 'operation_run_not_retryable', 'A retired download request cannot be restarted');
     }
 

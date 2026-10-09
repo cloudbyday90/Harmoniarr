@@ -18,7 +18,7 @@ export function createImportCandidateExecutionConfirmationWorklistStore({ getPoo
     // Filter with the owning typed policy before limiting: a malformed epoch must
     // never hide an older unresolved request behind a database page boundary.
     const result = await getPoolFn().query(`SELECT items.operation_run_id,items.import_candidate_id,
-      items.item_status,items.planning_snapshot,items.updated_at,runs.summary
+      items.item_status,items.planning_snapshot,items.updated_at,runs.summary,runs.status
       FROM import_execution_run_items items
       JOIN import_candidates candidates ON candidates.id=items.import_candidate_id
       JOIN operation_runs runs ON runs.id=items.operation_run_id
@@ -26,13 +26,14 @@ export function createImportCandidateExecutionConfirmationWorklistStore({ getPoo
         AND ((items.item_status='awaiting_confirmation'
           AND items.planning_snapshot #>> '{execution,handoff,state}' IS DISTINCT FROM 'not_dispatched')
           OR items.planning_snapshot #>> '{execution,handoff,state}' IN ('dispatching','awaiting_confirmation')
-          OR COALESCE(items.planning_snapshot #> '{execution,handoff}','{}'::jsonb) ? 'preProviderEpoch')
+          OR COALESCE(items.planning_snapshot #> '{execution,handoff}','{}'::jsonb) ? 'preProviderEpoch'
+          OR runs.summary ? 'downloadPreparationClosure')
         AND runs.operation_type='import_candidate_execution_planning'
         AND ($1::text IS NULL OR items.operation_run_id::text<>$1::text)
       ORDER BY items.updated_at,items.operation_run_id,items.id`, [typeof excludeRunId === 'string' ? excludeRunId : null]);
     const waiting = result.rows.filter((row) => isUnconfirmedExecutionItem({ operationRunId: row.operation_run_id,
       importCandidateId: row.import_candidate_id, itemStatus: row.item_status, planningSnapshot: row.planning_snapshot },
-    { id: row.operation_run_id, summary: row.summary }));
+    { id: row.operation_run_id, summary: row.summary, status: row.status }));
     return { runIds: [...new Set(waiting.map((row) => row.operation_run_id))].slice(0, boundedLimit),
       pendingConfirmationCount: waiting.length };
   }

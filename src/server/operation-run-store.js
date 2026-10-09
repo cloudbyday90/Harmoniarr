@@ -42,6 +42,7 @@ function clampRetainCountPerType(retainCountPerType) {
 function normalizeLifecycleSummary(summary) {
   const normalized = { ...normalizeRunSummary(summary) };
   delete normalized.downloadPreparationProtocol;
+  delete normalized.downloadPreparationClosure;
   return normalized;
 }
 
