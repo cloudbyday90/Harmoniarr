@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { isOperationRunLeaseLostError } from '../operation-run-lease-error.js';
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
 import {
   isOperationRunCancellationError,
@@ -64,22 +65,23 @@ export function createImportCandidateMediaInspectionWorker({
   async function runInspection({ requestedCandidateCount, runId }) {
     let finalLeaseStatus = 'completed';
     let leaseHeartbeat = null;
+    let acquiredLease = null;
 
     try {
-      await acquireLease({ runId });
+      acquiredLease = await acquireLease({ runId });
       if (renewLease) {
-        leaseHeartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId });
+        leaseHeartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId, expectedLease: acquiredLease });
         leaseHeartbeat.start();
       }
 
       await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
-      await markRunStarted({
+      if (await markRunStarted({ expectedLease: acquiredLease,
         runId,
         summary: {
           currentStep: 'Inspecting selected import candidate media',
           requestedCandidateCount,
         },
-      });
+      }) === false) return;
 
       const selectedSummary = await buildSelectedImportCandidateSummary({ limit: 1000 });
       const counters = {
@@ -125,7 +127,7 @@ export function createImportCandidateMediaInspectionWorker({
         );
       }
 
-      await markRunCompleted({
+      if (await markRunCompleted({ expectedLease: acquiredLease,
         runId,
         summary: {
           blockedCandidateCount: counters.blockedCandidateCount,
@@ -137,11 +139,12 @@ export function createImportCandidateMediaInspectionWorker({
           requestedCandidateCount,
           warningCount: counters.warningCount,
         },
-      });
+      }) === false) return;
     } catch (error) {
+      if (!acquiredLease || isOperationRunLeaseLostError(error)) return;
       if (isOperationRunPauseError(error)) {
         finalLeaseStatus = 'paused';
-        await markRunPaused({
+        await markRunPaused({ expectedLease: acquiredLease,
           nextAttemptAt: error.nextRetryAt ?? null,
           runId,
           summary: {
@@ -157,7 +160,7 @@ export function createImportCandidateMediaInspectionWorker({
 
       if (isOperationRunCancellationError(error)) {
         finalLeaseStatus = 'cancelled';
-        await markRunCancelled({
+        await markRunCancelled({ expectedLease: acquiredLease,
           runId,
           summary: {
             currentStep: 'Media inspection cancelled',
@@ -168,7 +171,7 @@ export function createImportCandidateMediaInspectionWorker({
       }
 
       finalLeaseStatus = 'failed';
-      await markRunFailed({
+      await markRunFailed({ expectedLease: acquiredLease,
         errorMessage: error.message,
         runId,
         summary: {
@@ -179,7 +182,7 @@ export function createImportCandidateMediaInspectionWorker({
     } finally {
       leaseHeartbeat?.stop();
       activeRunIds.delete(runId);
-      await releaseLease({ runId, status: finalLeaseStatus });
+      if (acquiredLease) await releaseLease({ runId, status: finalLeaseStatus, expectedLease: acquiredLease });
     }
   }
 

@@ -12,6 +12,7 @@ import { createDatabaseTransactionRunner } from '../database-transaction-service
 import { createImportExecutionPreparationClosureStore } from './import-execution-preparation-closure-store.js';
 import { evaluateAbandonedPreparation } from './import-execution-preparation-closure-policy.js';
 import { validatePreProviderEpoch, preparationLeaseIdentity, hasCurrentPreparationLease } from './import-execution-pre-provider-policy.js';
+import { normalizeExpectedJobLease } from '../job-lease-policy.js';
 
 const stale = () => createApiError(409, 'import_execution_preparation_closure_stale', 'The preparation changed before it could be closed');
 const iso = (value) => value?.toISOString?.() ?? value ?? null;
@@ -34,7 +35,8 @@ export function createImportExecutionPreparationClosureService({ store = createI
       if (!decision.eligible) return { closed: false, reasonCode: decision.reasonCode };
       const lease = await store.acquireClosureLease({ runId: operationRunId, ownerInstanceId: `preparation-closure:${randomUUID()}`, queryable });
       const closedAt = await store.readClock(queryable);
-      if (!hasCurrentPreparationLease(lease, lease, operationRunId, Date.parse(closedAt))) throw stale();
+      if (!normalizeExpectedJobLease(lease, { leaseKey: `import_candidate_execution_planning:${operationRunId}` })
+        || !hasCurrentPreparationLease(lease, lease, operationRunId, Date.parse(closedAt))) throw stale();
       const closure = { version: 1, operationRunId, importCandidateId, epochId: decision.epoch.epochId,
         generation: decision.epoch.generation, closedAt, reasonCode: decision.reasonCode,
         lease: preparationLeaseIdentity(lease, operationRunId), cancelRequestedAt: iso(context.run.cancelRequestedAt),

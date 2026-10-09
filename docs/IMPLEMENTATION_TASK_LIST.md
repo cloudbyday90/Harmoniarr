@@ -6,7 +6,36 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
-## Current development slice: Guarded abandoned preparation closure (2026-10-09)
+## Current development slice: Lease acquisition fencing (2026-10-09)
+
+- Mint a private acquisition UUID on every successful absent/released/expired
+  lease acquisition. Retain stable diagnostic row IDs; renewal/release require
+  the exact captured token and refreshed current state. All fourteen workers,
+  heartbeat, lifecycle and stranded recovery share the contract. See separate
+  [design](LEASE_ACQUISITION_DESIGN.md), [outcome](LEASE_ACQUISITION_OUTCOME.md)
+  and [official research](LEASE_ACQUISITION_RESEARCH_2026_10.md).
+- Additive migration, schema snapshot and anchors use repository workflows.
+  Saved historical preparation/closure frames remain immutable evidence and
+  receive no authority from backfilled tokens. Public lease diagnostics omit
+  the token; existing server-side command authorization remains in place.
+- Fresh PR checks found no eligible unreplayed patch; see separate
+  [PR design](OPEN_PR_APPLICABILITY_LEASE_ACQUISITION_2026_10_DESIGN.md) and
+  [outcome](OPEN_PR_APPLICABILITY_LEASE_ACQUISITION_2026_10_OUTCOME.md).
+- Complete validation passes 9,327 tests (4,152 server, 4,377 client, 513 script
+  and 285 PostgreSQL integration), zero failures/skips, all lint/policy checks
+  and both builds. Focused PostgreSQL passes 89; final recovery-continuity
+  corrections pass eight. Focused groups overlap the complete run. Schema
+  bootstrap passes 105/105 and anchors pass 116; fresh npm audit reports zero
+  vulnerabilities. Skill structure and final four-file installed identity pass.
+  See the outcome for original failures and preserved assertions.
+- Next: verify the captured acquisition at the library-organize mutation owner
+  before file movement/canonical-path update. Hold an old body after preview,
+  replace its lease, then release it: no new move/update/notification while
+  the replacement can complete. Existing in-flight effects remain outside that
+  pre-mutation guarantee.
+- Work remains on main, without a branch, release, tag, provider upgrade or PR merge.
+
+## Prior development slice: Guarded abandoned preparation closure (2026-10-09)
 
 - Close only exact idle future preparing epochs through existing bounded
   reconciliation. Distinct fresh lease, item refusal, reciprocal parent

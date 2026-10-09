@@ -1,3 +1,4 @@
+import { createOperationRunLeaseFixture } from '../../testing/operation-run-lease-fixtures.js';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -7,6 +8,8 @@ import {
   createLibraryScanWorker,
   shouldExtractLibraryFileTags,
 } from '../../src/server/library/library-scan-worker.js';
+
+const leaseForTest = (runId) => createOperationRunLeaseFixture({ runId, jobType: 'library_scan' });
 
 test('shouldExtractLibraryFileTags skips observed files with unchanged tag extraction stamps', () => {
   assert.equal(shouldExtractLibraryFileTags({
@@ -57,7 +60,7 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
   const markRunCompleted = t.mock.fn(async () => {});
   const markRunFailed = t.mock.fn(async () => {});
   const releaseLease = t.mock.fn(async () => {});
-  const acquireLease = t.mock.fn(async () => {});
+  const acquireLease = t.mock.fn(async ({ runId }) => leaseForTest(runId));
   const renewLease = t.mock.fn(async () => {});
   const startLeaseHeartbeat = t.mock.fn(() => {});
   const stopLeaseHeartbeat = t.mock.fn(() => {});
@@ -137,11 +140,13 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
 
   assert.equal(acquireLease.mock.callCount(), 1);
   assert.deepEqual(createOperationRunLeaseHeartbeatFn.mock.calls[0].arguments, [{
+    expectedLease: leaseForTest('run-1'),
     renewLease,
     runId: 'run-1',
   }]);
   assert.equal(startLeaseHeartbeat.mock.callCount(), 1);
   assert.deepEqual(markRunStarted.mock.calls[0].arguments, [{
+    expectedLease: leaseForTest('run-1'),
     runId: 'run-1',
     summary: {
       libraryRoot: rootDir,
@@ -245,6 +250,7 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
   assert.equal(releaseLease.mock.callCount(), 1);
   assert.equal(stopLeaseHeartbeat.mock.callCount(), 1);
   assert.deepEqual(releasedLeaseArgs, {
+    expectedLease: leaseForTest('run-1'),
     runId: 'run-1',
     status: 'completed',
   });
@@ -261,7 +267,7 @@ test('createLibraryScanWorker ignores sidecar artwork failures and still complet
   const markRunCompleted = t.mock.fn(async () => {});
   const markRunFailed = t.mock.fn(async () => {});
   const releaseLease = t.mock.fn(async () => {});
-  const acquireLease = t.mock.fn(async () => {});
+  const acquireLease = t.mock.fn(async ({ runId }) => leaseForTest(runId));
   const recordLibraryFiles = t.mock.fn(async () => ({
     files: [{
       canonicalPath: '/library/Artist/cover.jpg',
@@ -313,7 +319,7 @@ test('createLibraryScanWorker ignores sidecar artwork failures and still complet
 });
 
 test('createLibraryScanWorker requeues the run when a maintenance pause is requested', async (t) => {
-  const acquireLease = t.mock.fn(async () => {});
+  const acquireLease = t.mock.fn(async ({ runId }) => leaseForTest(runId));
   const createOperationRunLeaseHeartbeatFn = t.mock.fn(() => ({
     start: t.mock.fn(() => {}),
     stop: t.mock.fn(() => {}),
@@ -369,6 +375,7 @@ test('createLibraryScanWorker requeues the run when a maintenance pause is reque
   assert.equal(markRunFailed.mock.callCount(), 0);
   assert.equal(markRunCancelled.mock.callCount(), 0);
   assert.deepEqual(pausedArgs, {
+    expectedLease: leaseForTest('run-paused'),
     nextAttemptAt: '2026-05-04T12:30:00.000Z',
     runId: 'run-paused',
     summary: {
@@ -380,6 +387,7 @@ test('createLibraryScanWorker requeues the run when a maintenance pause is reque
     },
   });
   assert.deepEqual(releasedLeaseArgs, {
+    expectedLease: leaseForTest('run-paused'),
     runId: 'run-paused',
     status: 'paused',
   });
@@ -397,7 +405,7 @@ test('createLibraryScanWorker skips extraction and matching for unchanged files'
   const markRunCompleted = t.mock.fn(async () => {});
   const releaseLease = t.mock.fn(async () => {});
   const worker = createLibraryScanWorker({
-    acquireLease: async () => {},
+    acquireLease: async ({ runId }) => leaseForTest(runId),
     executeScan,
     extractLibraryFileTags,
     markRunCompleted,
@@ -449,7 +457,7 @@ test('createLibraryScanWorker matches freshly extracted tag payloads in the same
   const matchLibraryFiles = t.mock.fn(async () => {});
   const markRunCompleted = t.mock.fn(async () => {});
   const worker = createLibraryScanWorker({
-    acquireLease: async () => {},
+    acquireLease: async ({ runId }) => leaseForTest(runId),
     executeScan: async () => ({
       filesMatched: 1,
       filesSeen: 1,

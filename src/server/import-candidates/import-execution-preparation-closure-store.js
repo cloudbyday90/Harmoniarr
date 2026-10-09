@@ -21,9 +21,10 @@ export function createImportExecutionPreparationClosureStore({ getPoolFn = getPo
       runItemCount: result.rows[0].item_count, runTransferLinkCount: result.rows[0].link_count };
   }
   async function acquireClosureLease({ runId, ownerInstanceId, queryable }) {
-    const result = await queryable.query(`INSERT INTO job_leases(job_type,lease_key,owner_instance_id,acquired_at,heartbeat_at,expires_at,status)
-      VALUES('import_candidate_execution_planning',$1,$2,date_trunc('milliseconds',clock_timestamp()),clock_timestamp(),clock_timestamp()+INTERVAL '1 minute','active')
+    const result = await queryable.query(`INSERT INTO job_leases(job_type,lease_key,owner_instance_id,acquisition_id,acquired_at,heartbeat_at,expires_at,status)
+      VALUES('import_candidate_execution_planning',$1,$2,gen_random_uuid(),date_trunc('milliseconds',clock_timestamp()),clock_timestamp(),clock_timestamp()+INTERVAL '1 minute','active')
       ON CONFLICT(lease_key) DO UPDATE SET owner_instance_id=EXCLUDED.owner_instance_id,acquired_at=EXCLUDED.acquired_at,
+        acquisition_id=EXCLUDED.acquisition_id,
         heartbeat_at=EXCLUDED.heartbeat_at,expires_at=EXCLUDED.expires_at,released_at=NULL,status='active'
       WHERE job_leases.released_at IS NOT NULL OR job_leases.expires_at<=clock_timestamp() RETURNING *`,
     [`import_candidate_execution_planning:${runId}`, ownerInstanceId]);
@@ -46,8 +47,9 @@ export function createImportExecutionPreparationClosureStore({ getPoolFn = getPo
   async function releaseClosureLease({ runId, lease, queryable }) {
     const result = await queryable.query(`UPDATE job_leases SET released_at=clock_timestamp(),heartbeat_at=clock_timestamp(),status='cancelled'
       WHERE lease_key=$1 AND owner_instance_id=$2 AND acquired_at=$3::timestamptz AND released_at IS NULL
+        AND acquisition_id=$4::uuid
         AND expires_at>clock_timestamp() RETURNING id`,
-    [`import_candidate_execution_planning:${runId}`, lease.ownerInstanceId, lease.acquiredAt]);
+    [`import_candidate_execution_planning:${runId}`, lease.ownerInstanceId, lease.acquiredAt, lease.acquisitionId]);
     return result.rowCount === 1;
   }
   return { lockContext, acquireClosureLease, readClock, saveEpoch: preparation.saveEpoch, saveClosureFence, releaseClosureLease };

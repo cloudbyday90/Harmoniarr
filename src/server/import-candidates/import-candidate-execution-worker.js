@@ -16,6 +16,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { isOperationRunLeaseLostError } from '../operation-run-lease-error.js';
+import { isCurrentJobLeaseAcquisition } from '../job-lease-policy.js';
 import { captureRecoveryObservation } from './music-queue-recovery-policy.js';
 import { createApiError } from '../auth.js';
 import { preProviderRefusalReason } from './import-execution-pre-provider-policy.js';
@@ -88,11 +90,7 @@ function hasUnconfirmedDownloadHandoff(item) {
 }
 
 function hasCurrentWorkerLease(current, acquired) {
-  return typeof acquired?.ownerInstanceId === 'string' && Boolean(acquired.ownerInstanceId.trim())
-    && typeof acquired.acquiredAt === 'string' && Number.isFinite(Date.parse(acquired.acquiredAt))
-    && current?.ownerInstanceId === acquired.ownerInstanceId && current.acquiredAt === acquired.acquiredAt
-    && !current.releasedAt && current.state === 'active' && current.status === 'active'
-    && Number.isFinite(Date.parse(current.expiresAt)) && Date.parse(current.expiresAt) > Date.now();
+  return isCurrentJobLeaseAcquisition(current, acquired);
 }
 
 export function createImportCandidateExecutionWorker({
@@ -193,11 +191,11 @@ export function createImportCandidateExecutionWorker({
       acquiredLease = await acquireLease({ runId });
       leaseAcquired = true;
       if (renewLease) {
-        leaseHeartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId });
+        leaseHeartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId, expectedLease: acquiredLease });
         leaseHeartbeat.start();
       }
       await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
-      await markRunStarted({
+      if (await markRunStarted({ expectedLease: acquiredLease,
         runId,
         summary: {
           currentStep: 'Resolving selected candidate download requests',
@@ -205,7 +203,7 @@ export function createImportCandidateExecutionWorker({
           requestedCandidateCount,
           ...triggerSummary,
         },
-      });
+      }) === false) return;
 
       const selectedSummary = await buildSelectedImportCandidateSummary({
         ...(selectedCandidateId ? { candidateIds: [selectedCandidateId] } : {}),
@@ -497,7 +495,7 @@ export function createImportCandidateExecutionWorker({
         }
       }
 
-      await markRunCompleted({
+      if (await markRunCompleted({ expectedLease: acquiredLease,
         runId,
         summary: {
           blockedCount: counts.blocked,
@@ -515,15 +513,16 @@ export function createImportCandidateExecutionWorker({
           ...triggerSummary,
           totalSelected: (selectedSummary.counts?.totalSelected ?? runItems.length) + counts.recovered,
         },
-      });
+      }) === false) return;
     } catch (error) {
+      if (!acquiredLease || isOperationRunLeaseLostError(error)) return;
       if (error?.code === 'operation_run_lease_unavailable') {
         return;
       }
 
       if (isOperationRunPauseError(error)) {
         finalLeaseStatus = 'paused';
-        await markRunPaused({
+        await markRunPaused({ expectedLease: acquiredLease,
           nextAttemptAt: error.nextRetryAt ?? null,
           runId,
           summary: {
@@ -541,7 +540,7 @@ export function createImportCandidateExecutionWorker({
 
       if (isOperationRunCancellationError(error)) {
         finalLeaseStatus = 'cancelled';
-        await markRunCancelled({
+        await markRunCancelled({ expectedLease: acquiredLease,
           runId,
           summary: {
             currentStep: 'Download enqueue cancelled',
@@ -554,7 +553,7 @@ export function createImportCandidateExecutionWorker({
       }
 
       finalLeaseStatus = 'failed';
-      await markRunFailed({
+      await markRunFailed({ expectedLease: acquiredLease,
         errorMessage: error.message,
         runId,
         summary: {
@@ -568,7 +567,7 @@ export function createImportCandidateExecutionWorker({
       leaseHeartbeat?.stop();
       activeRunIds.delete(runId);
       if (leaseAcquired) {
-        await releaseLease({ runId, status: finalLeaseStatus });
+        if (acquiredLease) await releaseLease({ runId, status: finalLeaseStatus, expectedLease: acquiredLease });
       }
     }
   }

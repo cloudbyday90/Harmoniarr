@@ -1,8 +1,11 @@
+import { createOperationRunLeaseFixture } from '../../testing/operation-run-lease-fixtures.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createOperationRunCancellationError } from '../../src/server/operation-run-cancellation.js';
 import { createLibraryExternalIntakeWorker } from '../../src/server/library/library-external-intake-worker.js';
 import { createLibraryProviderIngestExecutionWorker } from '../../src/server/library/library-provider-ingest-execution-worker.js';
+
+const leaseForTest = (runId) => createOperationRunLeaseFixture({ runId, jobType: 'library_external_intake_planning' });
 
 const run = {
   canonicalUrl: 'https://open.spotify.com/album/album-1',
@@ -20,7 +23,7 @@ function createWorkerFixture(t, factory, options) {
   let resolveReleased;
   const released = new Promise((resolve) => { resolveReleased = resolve; });
   const worker = factory({
-    acquireLease: async () => {},
+    acquireLease: async ({ runId }) => createOperationRunLeaseFixture({ runId, jobType: factory === createLibraryExternalIntakeWorker ? 'library_external_intake_planning' : 'library_external_intake_execution' }),
     isCancellationRequested: async () => false,
     markRunCancelled,
     markRunCompleted,
@@ -44,7 +47,7 @@ test('planning worker marks cancellation before execution queueing as cancelled,
     queueExternalMediaRequestExecution: async () => { throw createOperationRunCancellationError({ runId: 'run-1' }); },
   });
   await fixture.worker.startWorkerRun(run);
-  assert.deepEqual(await fixture.released, { runId: 'run-1', status: 'cancelled' });
+  assert.deepEqual(await fixture.released, { expectedLease: leaseForTest('run-1'), runId: 'run-1', status: 'cancelled' });
   assert.equal(fixture.markRunCancelled.mock.callCount(), 1);
   assert.equal(fixture.markRunCompleted.mock.callCount(), 0);
   assert.equal(fixture.markRunFailed.mock.callCount(), 0);

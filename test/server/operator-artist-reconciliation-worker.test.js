@@ -1,9 +1,12 @@
+import { createOperationRunLeaseFixture } from '../../testing/operation-run-lease-fixtures.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createOperatorArtistReconciliationWorker } from '../../src/server/metadata/operator-artist-reconciliation-worker.js';
 
+const leaseForTest = (runId) => createOperationRunLeaseFixture({ runId, jobType: 'operator_artist_reconciliation' });
+
 test('createOperatorArtistReconciliationWorker executes the snapshot-driven reconciliation run', async (t) => {
-  const acquireLease = t.mock.fn(async () => {});
+  const acquireLease = t.mock.fn(async ({ runId }) => leaseForTest(runId));
   const executeOperatorArtistReconciliation = t.mock.fn(async () => ({
     completedAt: '2026-05-25T13:10:00.000Z',
     desiredReleaseGroupCount: 2,
@@ -60,6 +63,7 @@ test('createOperatorArtistReconciliationWorker executes the snapshot-driven reco
 
   assert.equal(acquireLease.mock.callCount(), 1);
   assert.deepEqual(markRunStarted.mock.calls[0].arguments[0], {
+    expectedLease: leaseForTest('run-1'),
     runId: 'run-1',
     summary: {
       appUserId: 'user-1',
@@ -75,13 +79,14 @@ test('createOperatorArtistReconciliationWorker executes the snapshot-driven reco
   assert.equal(markRunFailed.mock.callCount(), 0);
   assert.equal(completionArgs.summary.currentStep, 'Artist reconciliation completed');
   assert.deepEqual(releasedLeaseArgs, {
+    expectedLease: leaseForTest('run-1'),
     runId: 'run-1',
     status: 'completed',
   });
 });
 
 test('createOperatorArtistReconciliationWorker marks the run cancelled before execution when requested', async (t) => {
-  const acquireLease = t.mock.fn(async () => {});
+  const acquireLease = t.mock.fn(async ({ runId }) => leaseForTest(runId));
   const executeOperatorArtistReconciliation = t.mock.fn(async () => ({
     completedAt: '2026-05-25T13:10:00.000Z',
   }));
@@ -128,6 +133,7 @@ test('createOperatorArtistReconciliationWorker marks the run cancelled before ex
   assert.equal(markRunStarted.mock.callCount(), 0);
   assert.equal(executeOperatorArtistReconciliation.mock.callCount(), 0);
   assert.deepEqual(cancelledArgs, {
+    expectedLease: leaseForTest('run-cancelled'),
     runId: 'run-cancelled',
     summary: {
       appUserId: 'user-1',
@@ -140,13 +146,14 @@ test('createOperatorArtistReconciliationWorker marks the run cancelled before ex
     },
   });
   assert.deepEqual(releasedLeaseArgs, {
+    expectedLease: leaseForTest('run-cancelled'),
     runId: 'run-cancelled',
     status: 'cancelled',
   });
 });
 
 test('createOperatorArtistReconciliationWorker requeues the run when a maintenance pause is requested', async (t) => {
-  const acquireLease = t.mock.fn(async () => {});
+  const acquireLease = t.mock.fn(async ({ runId }) => leaseForTest(runId));
   const executeOperatorArtistReconciliation = t.mock.fn(async () => ({
     completedAt: '2026-05-25T13:10:00.000Z',
   }));
@@ -202,6 +209,7 @@ test('createOperatorArtistReconciliationWorker requeues the run when a maintenan
   assert.equal(executeOperatorArtistReconciliation.mock.callCount(), 0);
   assert.equal(markRunCancelled.mock.callCount(), 0);
   assert.deepEqual(pausedArgs, {
+    expectedLease: leaseForTest('run-paused'),
     nextAttemptAt: '2026-05-25T13:30:00.000Z',
     runId: 'run-paused',
     summary: {
@@ -218,6 +226,7 @@ test('createOperatorArtistReconciliationWorker requeues the run when a maintenan
     },
   });
   assert.deepEqual(releasedLeaseArgs, {
+    expectedLease: leaseForTest('run-paused'),
     runId: 'run-paused',
     status: 'paused',
   });

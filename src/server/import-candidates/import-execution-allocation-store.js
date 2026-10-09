@@ -16,8 +16,8 @@ export async function lockExecutionCandidateAllocation({ importCandidateId, requ
 }
 
 /** The short run-row lock serializes lease acquisition with retirement, without holding candidate/IO locks. */
-export async function lockExecutionRunLeaseAdmission({ runId, queryable }) {
+export async function lockExecutionRunLeaseAdmission({ runId, operationType = 'import_candidate_execution_planning', queryable }) {
   const result = await queryable.query(`SELECT id FROM operation_runs WHERE id=$1::uuid
-    AND operation_type='import_candidate_execution_planning' AND ${writableExecutionRunSql('operation_runs')} FOR UPDATE`, [runId]);
+    AND operation_type=$2::text AND ${writableExecutionRunSql('operation_runs')} FOR UPDATE`, [runId, operationType]);
   return result.rowCount > 0;
 }

@@ -139,3 +139,25 @@ retains uncertainty. Required audit failure rolls back closure. A public closed
 flag can inhibit retry without exposing the private proof or granting permission
 to restore. These are bounded project decisions, not a standardized lease
 algorithm, new operator screen or whole-platform conformance claim.
+
+## Lease acquisition maintenance, October 9
+
+The root's fresh ledger in `docs/LEASE_ACQUISITION_RESEARCH_2026_10.md` records
+official locking, conditional-update, UUID/time/migration and workflow guidance.
+The exact captured-token contract is an application inference. Preserve the
+stable diagnostic row ID while minting a private UUID for each successful
+acquisition; same-owner live reacquisition and timestamp-only comparison are
+insufficient. A stale callback must use its original captured identity, never
+the newest token read from storage. Compare current ownership and fresh time
+under the owning locks; treat a missing renewal or false lifecycle write as
+ownership loss rather than successful work.
+
+Rollout requires all producers, bridges, heartbeats, finalizers and cleanup SQL
+to participate. Historical captured frames remain evidence and receive no
+retroactive authority from migration backfill. Additive default/backfill work
+still takes a migration lock; stop old key-only worker processes before rollout.
+Keep tokens out of public diagnostics and nested records. Existing final
+side-effect guards remain necessary: a local token cannot atomically cancel
+provider or filesystem work already in progress. This reference maintenance
+does not independently re-open the ledger's URLs or certify distributed
+exactly-once behavior.

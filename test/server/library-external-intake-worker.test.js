@@ -1,9 +1,12 @@
+import { createOperationRunLeaseFixture } from '../../testing/operation-run-lease-fixtures.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createLibraryExternalIntakeWorker } from '../../src/server/library/library-external-intake-worker.js';
 
+const leaseForTest = (runId) => createOperationRunLeaseFixture({ runId, jobType: 'library_external_intake_planning' });
+
 test('startWorkerRun requeues the run when a maintenance pause is requested', async (t) => {
-  const acquireLease = t.mock.fn(async () => {});
+  const acquireLease = t.mock.fn(async ({ runId }) => leaseForTest(runId));
   const releaseLease = t.mock.fn(async () => {});
   const markRunStarted = t.mock.fn(async () => {});
   const markRunCompleted = t.mock.fn(async () => {});
@@ -62,6 +65,7 @@ test('startWorkerRun requeues the run when a maintenance pause is requested', as
   assert.equal(markRunFailed.mock.callCount(), 0);
   assert.equal(markRunCancelled.mock.callCount(), 0);
   assert.deepEqual(pausedArgs, {
+    expectedLease: leaseForTest('run-paused'),
     nextAttemptAt: '2026-05-04T12:30:00.000Z',
     runId: 'run-paused',
     summary: {
@@ -78,13 +82,14 @@ test('startWorkerRun requeues the run when a maintenance pause is requested', as
     },
   });
   assert.deepEqual(releasedLeaseArgs, {
+    expectedLease: leaseForTest('run-paused'),
     runId: 'run-paused',
     status: 'paused',
   });
 });
 
 test('startWorkerRun queues planning via microtask and completes run on success', async (t) => {
-  const acquireLease = t.mock.fn(async () => {});
+  const acquireLease = t.mock.fn(async ({ runId }) => leaseForTest(runId));
   const releaseLease = t.mock.fn(async () => {});
   const markRunStarted = t.mock.fn(async () => {});
   const markRunCompleted = t.mock.fn(async () => {});
@@ -139,7 +144,7 @@ test('startWorkerRun queues planning via microtask and completes run on success'
 });
 
 test('startWorkerRun marks run failed on planning error', async (t) => {
-  const acquireLease = t.mock.fn(async () => {});
+  const acquireLease = t.mock.fn(async ({ runId }) => leaseForTest(runId));
   const releaseLease = t.mock.fn(async () => {});
   const markRunStarted = t.mock.fn(async () => {});
   const markRunCompleted = t.mock.fn(async () => {});
@@ -178,7 +183,7 @@ test('startWorkerRun marks run failed on planning error', async (t) => {
 });
 
 test('startWorkerRun is idempotent for the same runId', async (t) => {
-  const acquireLease = t.mock.fn(async () => {});
+  const acquireLease = t.mock.fn(async ({ runId }) => leaseForTest(runId));
   const markRunCompleted = t.mock.fn(async () => {});
 
   const worker = createLibraryExternalIntakeWorker({

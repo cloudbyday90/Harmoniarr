@@ -1,9 +1,12 @@
+import { createOperationRunLeaseFixture } from '../../testing/operation-run-lease-fixtures.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createArtworkCleanupWorker } from '../../src/server/artwork/artwork-cleanup-worker.js';
 
+const leaseForTest = (runId) => createOperationRunLeaseFixture({ runId, jobType: 'artwork_cleanup' });
+
 test('createArtworkCleanupWorker requeues the run when a maintenance pause is requested', async (t) => {
-  const acquireLease = t.mock.fn(async () => {});
+  const acquireLease = t.mock.fn(async ({ runId }) => leaseForTest(runId));
   const releaseLease = t.mock.fn(async () => {});
   const markRunStarted = t.mock.fn(async () => {});
   const markRunCompleted = t.mock.fn(async () => {});
@@ -59,6 +62,7 @@ test('createArtworkCleanupWorker requeues the run when a maintenance pause is re
   assert.equal(markRunFailed.mock.callCount(), 0);
   assert.equal(markRunCancelled.mock.callCount(), 0);
   assert.deepEqual(pausedArgs, {
+    expectedLease: leaseForTest('run-paused'),
     nextAttemptAt: '2026-05-04T12:30:00.000Z',
     runId: 'run-paused',
     summary: {
@@ -71,13 +75,14 @@ test('createArtworkCleanupWorker requeues the run when a maintenance pause is re
     },
   });
   assert.deepEqual(releasedLeaseArgs, {
+    expectedLease: leaseForTest('run-paused'),
     runId: 'run-paused',
     status: 'paused',
   });
 });
 
 test('createArtworkCleanupWorker executes cleanup and records completion summary', async (t) => {
-  const acquireLease = t.mock.fn(async () => {});
+  const acquireLease = t.mock.fn(async ({ runId }) => leaseForTest(runId));
   const markRunCompleted = t.mock.fn(async () => {});
   const markRunFailed = t.mock.fn(async () => {});
   const markRunStarted = t.mock.fn(async () => {});
@@ -118,6 +123,7 @@ test('createArtworkCleanupWorker executes cleanup and records completion summary
 
   assert.equal(acquireLease.mock.callCount(), 1);
   assert.deepEqual(markRunStarted.mock.calls[0].arguments, [{
+    expectedLease: leaseForTest('run-1'),
     runId: 'run-1',
     summary: {
       requestedAssetCount: 2,

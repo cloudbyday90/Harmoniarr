@@ -116,3 +116,15 @@ The public closed flag only inhibits retry; private proof and snapshot aliases
 remain hidden. Preserve entry point, UI metadata and invocation policy. Validate
 structure and synchronize the existing four installed files; do not describe
 reference maintenance as a new behavioral skill trial.
+
+## Lease acquisition maintenance, October 9
+
+Extend the two references around the [lease design](LEASE_ACQUISITION_DESIGN.md).
+Map stable diagnostic identity versus private acquisition authority, captured
+callback inputs, complete worker/bridge/heartbeat/cleanup participation, false
+lifecycle outcomes, authoritative time and historical evidence compatibility to
+their actual owners. Include migrated/fresh snapshot and anchor checks, private
+DTO allowlists, mixed-binary rollout limits and external-effect boundaries.
+Keep the entry point, metadata and invocation policy unchanged. Validate and
+sync the existing four installed files; structural checks and focused application
+tests do not constitute a new blind behavioral skill trial or conformance claim.

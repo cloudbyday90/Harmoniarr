@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createOperationRunLeaseFixture } from '../../testing/operation-run-lease-fixtures.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createLibraryOrganizeApplyWorker } from '../../src/server/library/library-organize-apply-worker.js';
@@ -26,13 +27,15 @@ function waitForWorkerTick() {
   });
 }
 
+const leaseForTest = (runId) => createOperationRunLeaseFixture({ runId, jobType: 'library_organize_apply' });
+
 test('library organize apply worker records release activity and notifications after full success', async () => {
   const releaseNotifications = [];
   const activityEvents = [];
   let completedSummary = null;
 
   const worker = createLibraryOrganizeApplyWorker({
-    acquireLease: async () => {},
+    acquireLease: async ({ runId }) => leaseForTest(runId),
     applyExclusiveFileMutationPlan: async () => ({ transport: 'rename' }),
     buildLibraryOrganizePreview: async () => ({
       counts: { totalFiles: 2 },
@@ -106,7 +109,7 @@ test('library organize apply worker still records release activity when some fil
 
   let callCount = 0;
   const worker = createLibraryOrganizeApplyWorker({
-    acquireLease: async () => {},
+    acquireLease: async ({ runId }) => leaseForTest(runId),
     applyExclusiveFileMutationPlan: async () => {
       callCount += 1;
       if (callCount === 2) {
@@ -177,7 +180,7 @@ test('library organize apply worker records multi-release summaries in activity 
   const activityEvents = [];
 
   const worker = createLibraryOrganizeApplyWorker({
-    acquireLease: async () => {},
+    acquireLease: async ({ runId }) => leaseForTest(runId),
     applyExclusiveFileMutationPlan: async () => ({ transport: 'rename' }),
     buildLibraryOrganizePreview: async () => ({
       counts: { totalFiles: 2 },
@@ -240,7 +243,7 @@ test('library organize apply worker records multi-release summaries in activity 
 });
 
 test('library organize apply worker requeues the run when a maintenance pause is requested', async (t) => {
-  const acquireLease = t.mock.fn(async () => {});
+  const acquireLease = t.mock.fn(async ({ runId }) => leaseForTest(runId));
   const releaseLease = t.mock.fn(async () => {});
   const markRunStarted = t.mock.fn(async () => {});
   const markRunCompleted = t.mock.fn(async () => {});
@@ -291,6 +294,7 @@ test('library organize apply worker requeues the run when a maintenance pause is
   assert.equal(markRunFailed.mock.callCount(), 0);
   assert.equal(markRunCancelled.mock.callCount(), 0);
   assert.deepEqual(pausedArgs, {
+    expectedLease: leaseForTest('run-paused'),
     nextAttemptAt: '2026-05-04T12:30:00.000Z',
     runId: 'run-paused',
     summary: {
@@ -302,6 +306,7 @@ test('library organize apply worker requeues the run when a maintenance pause is
     },
   });
   assert.deepEqual(releasedLeaseArgs, {
+    expectedLease: leaseForTest('run-paused'),
     runId: 'run-paused',
     status: 'paused',
   });
@@ -312,7 +317,7 @@ test('library organize apply worker does not emit release activity when no files
   const activityEvents = [];
 
   const worker = createLibraryOrganizeApplyWorker({
-    acquireLease: async () => {},
+    acquireLease: async ({ runId }) => leaseForTest(runId),
     applyExclusiveFileMutationPlan: async () => {
       throw new Error('disk rename failed');
     },

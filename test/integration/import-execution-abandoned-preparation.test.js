@@ -55,7 +55,7 @@ const close = (c, epoch, closer = c.closer) => closer.closeAbandonedPreparation(
 async function prepare(c, { staged = false, keepOlder = false } = {}) {
   if (!keepOlder) await c.pool.query('DELETE FROM import_execution_run_items WHERE operation_run_id=$1', [c.sourceRunId]);
   const lease = await c.executionRuns.acquireLease({ runId: c.newerRunId });
-  await c.executionRuns.markRunStarted({ runId: c.newerRunId });
+  await c.executionRuns.markRunStarted({ runId: c.newerRunId, expectedLease: lease });
   const requestedFiles = c.candidate.files.map((file) => ({ filename: file.rawPayload.filename, size: file.sizeBytes }));
   const started = await c.execution.preparation.beginPreparation({ runId: c.newerRunId, importCandidateId: c.candidate.id,
     requestedFiles, sourceObservation: captureRecoveryObservation(c.candidate), lease });

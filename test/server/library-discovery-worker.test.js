@@ -1,12 +1,15 @@
+import { createOperationRunLeaseFixture } from '../../testing/operation-run-lease-fixtures.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createLibraryDiscoveryWorker } from '../../src/server/library/library-discovery-worker.js';
+
+const leaseForTest = (runId) => createOperationRunLeaseFixture({ runId, jobType: 'library_discovery_dispatch' });
 
 test('a scoped recovery child forwards its owning run and skips unrelated reconciliation and artwork', async () => {
   const calls = [];
   let released;
   const done = new Promise((resolve) => { released = resolve; });
-  const worker = createLibraryDiscoveryWorker({ acquireLease: async () => {},
+  const worker = createLibraryDiscoveryWorker({ acquireLease: async ({ runId }) => leaseForTest(runId),
     markRunStarted: async () => {}, markRunCompleted: async () => {}, markRunFailed: async () => assert.fail('Scoped dispatch should finish'),
     releaseLease: async () => released(),
     reconcileWantedReleases: async () => assert.fail('A scoped child cannot reconcile unrelated wanted releases'),
@@ -20,7 +23,7 @@ test('a scoped recovery child forwards its owning run and skips unrelated reconc
 });
 
 test('createLibraryDiscoveryWorker reconciles and dispatches a protected discovery run', async (t) => {
-  const acquireLease = t.mock.fn(async () => {});
+  const acquireLease = t.mock.fn(async ({ runId }) => leaseForTest(runId));
   const dispatchDiscoveryRequests = t.mock.fn(async () => ({
     attemptedCount: 3,
     candidateCount: 8,
@@ -77,6 +80,7 @@ test('createLibraryDiscoveryWorker reconciles and dispatches a protected discove
   assert.equal(acquireLease.mock.callCount(), 1);
   assert.equal(markRunStarted.mock.callCount(), 1);
   assert.deepEqual(markRunStarted.mock.calls[0].arguments[0], {
+    expectedLease: leaseForTest('run-3'),
     runId: 'run-3',
     summary: {
       triggerSource: 'manual',
@@ -95,6 +99,7 @@ test('createLibraryDiscoveryWorker reconciles and dispatches a protected discove
   });
   assert.equal(markRunFailed.mock.callCount(), 0);
   assert.deepEqual(completionArgs, {
+    expectedLease: leaseForTest('run-3'),
     runId: 'run-3',
     summary: {
       attemptedCount: 3,
@@ -112,13 +117,14 @@ test('createLibraryDiscoveryWorker reconciles and dispatches a protected discove
     },
   });
   assert.deepEqual(releasedLeaseArgs, {
+    expectedLease: leaseForTest('run-3'),
     runId: 'run-3',
     status: 'completed',
   });
 });
 
 test('createLibraryDiscoveryWorker marks the run cancelled before dispatch when an operator cancellation is requested', async (t) => {
-  const acquireLease = t.mock.fn(async () => {});
+  const acquireLease = t.mock.fn(async ({ runId }) => leaseForTest(runId));
   const dispatchDiscoveryRequests = t.mock.fn(async () => ({
     attemptedCount: 1,
     candidateCount: 2,
@@ -164,6 +170,7 @@ test('createLibraryDiscoveryWorker marks the run cancelled before dispatch when 
   assert.equal(markRunCompleted.mock.callCount(), 0);
   assert.equal(markRunFailed.mock.callCount(), 0);
   assert.deepEqual(cancelledArgs, {
+    expectedLease: leaseForTest('run-cancelled'),
     runId: 'run-cancelled',
     summary: {
       currentStep: 'Library discovery cancelled',
@@ -171,13 +178,14 @@ test('createLibraryDiscoveryWorker marks the run cancelled before dispatch when 
     },
   });
   assert.deepEqual(releasedLeaseArgs, {
+    expectedLease: leaseForTest('run-cancelled'),
     runId: 'run-cancelled',
     status: 'cancelled',
   });
 });
 
 test('createLibraryDiscoveryWorker requeues the run when a maintenance pause is requested', async (t) => {
-  const acquireLease = t.mock.fn(async () => {});
+  const acquireLease = t.mock.fn(async ({ runId }) => leaseForTest(runId));
   const dispatchDiscoveryRequests = t.mock.fn(async () => ({
     attemptedCount: 1,
     candidateCount: 2,
@@ -232,6 +240,7 @@ test('createLibraryDiscoveryWorker requeues the run when a maintenance pause is 
   assert.equal(markRunFailed.mock.callCount(), 0);
   assert.equal(markRunCancelled.mock.callCount(), 0);
   assert.deepEqual(pausedArgs, {
+    expectedLease: leaseForTest('run-paused'),
     nextAttemptAt: '2026-05-04T12:30:00.000Z',
     runId: 'run-paused',
     summary: {
@@ -243,13 +252,14 @@ test('createLibraryDiscoveryWorker requeues the run when a maintenance pause is 
     },
   });
   assert.deepEqual(releasedLeaseArgs, {
+    expectedLease: leaseForTest('run-paused'),
     runId: 'run-paused',
     status: 'paused',
   });
 });
 
 test('createLibraryDiscoveryWorker calls pruneOldRuns after a completed run', async (t) => {
-  const acquireLease = t.mock.fn(async () => {});
+  const acquireLease = t.mock.fn(async ({ runId }) => leaseForTest(runId));
   const dispatchDiscoveryRequests = t.mock.fn(async () => ({
     attemptedCount: 0,
     candidateCount: 0,
@@ -286,7 +296,7 @@ test('createLibraryDiscoveryWorker calls pruneOldRuns after a completed run', as
 });
 
 test('createLibraryDiscoveryWorker calls pruneOldRuns even when a run fails', async (t) => {
-  const acquireLease = t.mock.fn(async () => {});
+  const acquireLease = t.mock.fn(async ({ runId }) => leaseForTest(runId));
   const dispatchDiscoveryRequests = t.mock.fn(async () => {
     throw new Error('dispatch blew up');
   });
@@ -320,7 +330,7 @@ test('createLibraryDiscoveryWorker calls pruneOldRuns even when a run fails', as
 });
 
 test('createLibraryDiscoveryWorker records monitored artist artwork prefetch failures without failing discovery dispatch', async (t) => {
-  const acquireLease = t.mock.fn(async () => {});
+  const acquireLease = t.mock.fn(async ({ runId }) => leaseForTest(runId));
   const dispatchDiscoveryRequests = t.mock.fn(async () => ({
     attemptedCount: 1,
     candidateCount: 1,
@@ -358,6 +368,7 @@ test('createLibraryDiscoveryWorker records monitored artist artwork prefetch fai
   assert.equal(dispatchDiscoveryRequests.mock.callCount(), 1);
   assert.equal(markRunFailed.mock.callCount(), 0);
   assert.deepEqual(completionArgs, {
+    expectedLease: leaseForTest('run-prefetch-warning'),
     runId: 'run-prefetch-warning',
     summary: {
       attemptedCount: 1,

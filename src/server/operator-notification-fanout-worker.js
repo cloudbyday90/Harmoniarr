@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { isOperationRunLeaseLostError } from './operation-run-lease-error.js';
 import { createOperationRunLeaseHeartbeat } from './heartbeat/operation-run-lease-heartbeat.js';
 import {
   isOperationRunCancellationError,
@@ -40,35 +41,41 @@ export function createOperatorNotificationFanoutWorker({
 
   async function runFanout({ notificationDedupeKeys = null, runId }) {
     let finalLeaseStatus = 'completed';
+    let acquiredLease = null;
     let leaseHeartbeat = null;
 
     try {
-      await acquireLease({ runId });
+      acquiredLease = await acquireLease({ runId });
+      if (!acquiredLease) return;
       if (renewLease) {
-        leaseHeartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId });
+        leaseHeartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId, expectedLease: acquiredLease });
         leaseHeartbeat.start();
       }
       await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
-      await markRunStarted({
+      if (await markRunStarted({
+        expectedLease: acquiredLease,
         runId,
         summary: {
           currentStep: 'Collecting operator notifications',
         },
-      });
+      }) === false) { finalLeaseStatus = 'failed'; return; }
 
       const fanoutSummary = await fanOutOperatorNotifications({
         limit: 50,
         notificationDedupeKeys,
       });
 
-      await markRunCompleted({
+      if (await markRunCompleted({
+        expectedLease: acquiredLease,
         runId,
         summary: fanoutSummary,
-      });
+      }) === false) { finalLeaseStatus = 'failed'; return; }
     } catch (error) {
+      if (!acquiredLease || isOperationRunLeaseLostError(error)) { finalLeaseStatus = 'failed'; return; }
       if (isOperationRunPauseError(error)) {
         finalLeaseStatus = 'paused';
-        await markRunPaused({
+        if (await markRunPaused({
+          expectedLease: acquiredLease,
           nextAttemptAt: error.nextRetryAt ?? null,
           runId,
           summary: {
@@ -77,30 +84,32 @@ export function createOperatorNotificationFanoutWorker({
             pauseMessage: error.message,
             pauseProvider: error.pauseProvider ?? null,
           },
-        });
+        }) === false) { finalLeaseStatus = 'failed'; return; }
         return;
       }
 
       if (isOperationRunCancellationError(error)) {
         finalLeaseStatus = 'cancelled';
-        await markRunCancelled({
+        if (await markRunCancelled({
+          expectedLease: acquiredLease,
           runId,
           summary: {
             currentStep: 'Operator notification fan-out cancelled',
           },
-        });
+        }) === false) { finalLeaseStatus = 'failed'; return; }
         return;
       }
 
       finalLeaseStatus = 'failed';
-      await markRunFailed({
+      if (await markRunFailed({
+        expectedLease: acquiredLease,
         runId,
         errorMessage: error.message,
-      });
+      }) === false) { finalLeaseStatus = 'failed'; return; }
     } finally {
       leaseHeartbeat?.stop();
       activeRunIds.delete(runId);
-      await releaseLease({ runId, status: finalLeaseStatus });
+      if (acquiredLease) await releaseLease({ runId, status: finalLeaseStatus, expectedLease: acquiredLease });
     }
   }
 

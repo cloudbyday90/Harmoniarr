@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { isOperationRunLeaseLostError } from '../operation-run-lease-error.js';
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
 import { MUSIC_QUEUE_RECOVERY_DISCOVERY_SOURCE } from '../import-candidates/music-queue-recovery-policy.js';
 import {
@@ -78,22 +79,26 @@ export function createLibraryDiscoveryWorker({
     triggeredByUserId = null,
   }) {
     let finalLeaseStatus = 'completed';
+    let acquiredLease = null;
+    let leaseLost = false;
     let leaseHeartbeat = null;
     const scopedRecovery = triggerSource === MUSIC_QUEUE_RECOVERY_DISCOVERY_SOURCE;
 
     try {
-      await acquireLease({ runId });
+      acquiredLease = await acquireLease({ runId });
+      if (!acquiredLease) return;
       if (renewLease) {
-        leaseHeartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId });
+        leaseHeartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId, expectedLease: acquiredLease });
         leaseHeartbeat.start();
       }
       await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
-      await markRunStarted({
+      if (await markRunStarted({
+        expectedLease: acquiredLease,
         runId,
         summary: {
           triggerSource,
         },
-      });
+      }) === false) { leaseLost = true; finalLeaseStatus = 'failed'; return; }
 
       if (!scopedRecovery && reconcileWantedReleases) {
         await reconcileWantedReleases();
@@ -110,6 +115,7 @@ export function createLibraryDiscoveryWorker({
         try {
           monitoredArtistArtwork = await prefetchMonitoredArtistArtwork();
         } catch (error) {
+          if (isOperationRunLeaseLostError(error)) throw error;
           monitoredArtistArtwork = {
             errorMessage: error.message,
             status: 'failed',
@@ -127,7 +133,8 @@ export function createLibraryDiscoveryWorker({
 
       const dispatchBreakdown = buildDispatchBreakdown(summary);
 
-      await markRunCompleted({
+      if (await markRunCompleted({
+        expectedLease: acquiredLease,
         runId,
         summary: {
           ...(monitoredArtistArtwork ? { monitoredArtistArtwork } : {}),
@@ -135,11 +142,13 @@ export function createLibraryDiscoveryWorker({
           ...dispatchBreakdown,
           triggerSource,
         },
-      });
+      }) === false) { leaseLost = true; finalLeaseStatus = 'failed'; return; }
     } catch (error) {
+      if (!acquiredLease || isOperationRunLeaseLostError(error)) { leaseLost = true; finalLeaseStatus = 'failed'; return; }
       if (isOperationRunPauseError(error)) {
         finalLeaseStatus = 'paused';
-        await markRunPaused?.({
+        if (await markRunPaused?.({
+          expectedLease: acquiredLease,
           nextAttemptAt: error.nextRetryAt ?? null,
           runId,
           summary: {
@@ -149,35 +158,37 @@ export function createLibraryDiscoveryWorker({
             pauseProvider: error.pauseProvider ?? null,
             triggerSource,
           },
-        });
+        }) === false) { leaseLost = true; finalLeaseStatus = 'failed'; return; }
         return;
       }
 
       if (isOperationRunCancellationError(error)) {
         finalLeaseStatus = 'cancelled';
-        await markRunCancelled({
+        if (await markRunCancelled({
+          expectedLease: acquiredLease,
           runId,
           summary: {
             currentStep: 'Library discovery cancelled',
             triggerSource,
           },
-        });
+        }) === false) { leaseLost = true; finalLeaseStatus = 'failed'; return; }
         return;
       }
 
       finalLeaseStatus = 'failed';
-      await markRunFailed({
+      if (await markRunFailed({
+        expectedLease: acquiredLease,
         errorMessage: error.message,
         runId,
         summary: {
           triggerSource,
         },
-      });
+      }) === false) { leaseLost = true; finalLeaseStatus = 'failed'; return; }
     } finally {
       leaseHeartbeat?.stop();
       activeRunIds.delete(runId);
-      await releaseLease({ runId, status: finalLeaseStatus });
-      await pruneOldRuns();
+      if (acquiredLease) await releaseLease({ runId, status: finalLeaseStatus, expectedLease: acquiredLease });
+      if (acquiredLease && !leaseLost) await pruneOldRuns();
     }
   }
 

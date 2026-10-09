@@ -17,6 +17,8 @@
  */
 
 import { getPool } from './database.js';
+import { createOperationRunOwnedLifecycleStore } from './operation-run-owned-lifecycle-store.js';
+import { createOperationRunOwnedLifecycleService } from './operation-run-owned-lifecycle-service.js';
 import { buildJobLeaseKey, createJobLeaseStore } from './job-lease-store.js';
 import { createOperationRetryPolicyService } from './operation-retry-policy-service.js';
 import { createDatabaseTransactionRunner } from './database-transaction-service.js';
@@ -312,7 +314,11 @@ export function createOperationRunStore({
     return result.rows.map(normalizeOperationRun);
   }
 
-  async function markRunStarted({ runId, summary = {} }) {
+  const ownedLifecycle = createOperationRunOwnedLifecycleService({
+    store: createOperationRunOwnedLifecycleStore({ getPoolFn, operationType, leaseJobType: resolvedLeaseJobType }), retryPolicyService });
+
+  async function markRunStarted({ runId, summary = {}, expectedLease }) {
+    if (operationType !== 'backup_restore_apply') return ownedLifecycle.markRunStarted({ runId, summary, expectedLease });
     const pool = getPoolFn();
     await pool.query(
       `
@@ -324,13 +330,15 @@ export function createOperationRunStore({
           claimed_by_instance_id = NULL,
             error_message = NULL
         WHERE id = $1
+          AND operation_type='backup_restore_apply'
           AND ${writableExecutionRunSql('operation_runs')}
       `,
       [runId, JSON.stringify(normalizeLifecycleSummary(summary))],
     );
   }
 
-  async function markRunCompleted({ runId, summary = {} }) {
+  async function markRunCompleted({ runId, summary = {}, expectedLease }) {
+    if (operationType !== 'backup_restore_apply') return ownedLifecycle.markRunCompleted({ runId, summary, expectedLease });
     const pool = getPoolFn();
     await pool.query(
       `
@@ -343,13 +351,15 @@ export function createOperationRunStore({
           claimed_by_instance_id = NULL,
             error_message = NULL
         WHERE id = $1
+          AND operation_type='backup_restore_apply'
           AND ${writableExecutionRunSql('operation_runs')}
       `,
       [runId, JSON.stringify(normalizeLifecycleSummary(summary))],
     );
   }
 
-  async function markRunFailed({ runId, summary = {}, errorMessage }) {
+  async function markRunFailed({ runId, summary = {}, errorMessage, expectedLease }) {
+    if (operationType !== 'backup_restore_apply') return ownedLifecycle.markRunFailed({ runId, summary, errorMessage, expectedLease });
     const pool = getPoolFn();
 
     const existingRun = await getRunById(runId);
@@ -370,7 +380,8 @@ export function createOperationRunStore({
               error_message = NULL,
               next_attempt_at = $3::timestamptz
           WHERE id = $1
-            AND ${writableExecutionRunSql('operation_runs')}
+            AND operation_type='backup_restore_apply'
+          AND ${writableExecutionRunSql('operation_runs')}
         `,
         [
           runId,
@@ -397,6 +408,7 @@ export function createOperationRunStore({
           claimed_by_instance_id = NULL,
             error_message = $3
         WHERE id = $1
+          AND operation_type='backup_restore_apply'
           AND ${writableExecutionRunSql('operation_runs')}
       `,
       [runId, JSON.stringify(normalizeLifecycleSummary(summary)), errorMessage],
@@ -444,7 +456,8 @@ export function createOperationRunStore({
     return Boolean(result.rows[0]?.cancel_requested_at);
   }
 
-  async function markRunCancelled({ runId, summary = {} }) {
+  async function markRunCancelled({ runId, summary = {}, expectedLease }) {
+    if (operationType !== 'backup_restore_apply') return ownedLifecycle.markRunCancelled({ runId, summary, expectedLease });
     const pool = getPoolFn();
     await pool.query(
       `
@@ -458,13 +471,15 @@ export function createOperationRunStore({
           claimed_by_instance_id = NULL,
             error_message = NULL
         WHERE id = $1
+          AND operation_type='backup_restore_apply'
           AND ${writableExecutionRunSql('operation_runs')}
       `,
       [runId, JSON.stringify(normalizeLifecycleSummary(summary))],
     );
   }
 
-  async function markRunPaused({ nextAttemptAt = null, runId, summary = {} }) {
+  async function markRunPaused({ nextAttemptAt = null, runId, summary = {}, expectedLease }) {
+    if (operationType !== 'backup_restore_apply') return ownedLifecycle.markRunPaused({ nextAttemptAt, runId, summary, expectedLease });
     const pool = getPoolFn();
     await pool.query(
       `
@@ -479,6 +494,7 @@ export function createOperationRunStore({
             attempt_count = GREATEST(attempt_count - 1, 0)
         WHERE id = $1
           AND status IN ('pending', 'running')
+          AND operation_type='backup_restore_apply'
           AND ${writableExecutionRunSql('operation_runs')}
       `,
       [runId, JSON.stringify(normalizeLifecycleSummary(summary)), nextAttemptAt],
@@ -491,11 +507,10 @@ export function createOperationRunStore({
       leaseKey: buildLeaseKey(runId),
       ...(queryable ? { queryable } : {}),
     });
-    const lease = operationType === 'import_candidate_execution_planning'
-      ? await createDatabaseTransactionRunner({ getPoolFn })(async (queryable) => {
-        if (!await lockExecutionRunLeaseAdmission({ runId, queryable })) return null;
-        return acquire(queryable);
-      }) : await acquire();
+    const lease = await createDatabaseTransactionRunner({ getPoolFn })(async (queryable) => {
+      if (!await lockExecutionRunLeaseAdmission({ runId, operationType, queryable })) return null;
+      return acquire(queryable);
+    });
 
     if (!lease) {
       throw createOperationRunLeaseUnavailableError({ runId });
@@ -510,16 +525,18 @@ export function createOperationRunStore({
     });
   }
 
-  async function renewLease({ runId, status = 'active' } = {}) {
+  async function renewLease({ runId, status = 'active', expectedLease } = {}) {
     return jobLeaseStore.renewLease({
       leaseKey: buildLeaseKey(runId),
+      expectedLease,
       status,
     });
   }
 
-  async function releaseLease({ runId, status }) {
+  async function releaseLease({ runId, status, expectedLease }) {
     return jobLeaseStore.releaseLease({
       leaseKey: buildLeaseKey(runId),
+      expectedLease,
       status,
     });
   }

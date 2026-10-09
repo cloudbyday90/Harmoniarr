@@ -19,6 +19,8 @@
 import assert from 'node:assert/strict';
 import { after, before, suite, test } from 'node:test';
 import { createOperationQueueStore } from '../../src/server/operation-queue-store.js';
+import { createJobLeaseStore } from '../../src/server/job-lease-store.js';
+import { createOperationRetryPolicyService } from '../../src/server/operation-retry-policy-service.js';
 import { operationRunRegistry } from '../../src/shared/operation-run-descriptors.js';
 import { createIntegrationAppRuntime } from '../../testing/integration/app-runtime.js';
 import { bootstrapAdminSession } from '../../testing/integration/auth-helpers.js';
@@ -32,6 +34,16 @@ import {
 const integrationRuntimeConfig = resolveIntegrationTestRuntimeConfig();
 let integrationRuntime;
 let runtimeUnavailableReason = null;
+
+// Observe authority before recovery, then let the owning transaction recheck it.
+async function observeRecovery(queue, getPoolFn, runId) {
+  const observedRun = (await queue.listRecoverableRuns()).find((run) => run.id === runId);
+  assert.ok(observedRun, 'The original running recovery episode must be observed');
+  const expectedLease = await createJobLeaseStore({ getPoolFn }).getLease({ leaseKey: `${observedRun.operationType}:${runId}` });
+  return { observedRun, expectedLease };
+}
+const immediateRetryPolicy = createOperationRetryPolicyService({ initialBackoffMs: 1, jitterRatio: 0,
+  nowFn: () => new Date(Date.now() - 1000) });
 
 suite('integration operation stranded-run recovery', () => {
   before(async () => {
@@ -103,17 +115,14 @@ suite('integration operation stranded-run recovery', () => {
       assert.equal(found.status, 'running');
       assert.equal(found.claimedByInstanceId, 'dead-worker-instance');
 
-      const retryResult = await recoveryQueueStore.recoverRunForRetry({
-        maxAttempts: 3,
-        nextAttemptAt: new Date().toISOString(),
-        runId: strandedRun.id,
-        summary: {
-          currentStep: 'Library scan recovered from stranded run',
-          lastFailureMessage: 'Worker instance lost; run recovered by stranded-run detection',
-        },
+      const observation = await observeRecovery(recoveryQueueStore, getPoolFn, strandedRun.id);
+      const retryResult = await recoveryQueueStore.recoverStrandedRun({ ...observation,
+        errorMessage: 'Worker instance lost; run recovered by stranded-run detection',
+        recoverySummary: { currentStep: 'Library scan recovered from stranded run' },
+        buildRetrySchedule: immediateRetryPolicy.buildRetrySchedule,
       });
 
-      assert.ok(retryResult, 'recoverRunForRetry should return the updated run');
+      assert.ok(retryResult, 'Guarded recovery should return the updated run');
       assert.equal(retryResult.status, 'pending');
       assert.equal(retryResult.attemptCount, 1);
       assert.equal(retryResult.claimedByInstanceId, null);
@@ -181,16 +190,14 @@ suite('integration operation stranded-run recovery', () => {
         getPoolFn,
       });
 
-      const failedResult = await recoveryQueueStore.markStrandedRunFailed({
+      const observation = await observeRecovery(recoveryQueueStore, getPoolFn, exhaustedRun.id);
+      const failedResult = await recoveryQueueStore.recoverStrandedRun({ ...observation,
         errorMessage: 'Worker instance lost after exhausting retry budget; stranded run marked failed',
-        runId: exhaustedRun.id,
-        summary: {
-          currentStep: 'Library organize apply failed',
-          plannedRenameCount: 10,
-        },
+        recoverySummary: { currentStep: 'Library organize apply failed', plannedRenameCount: 10 },
+        buildRetrySchedule: immediateRetryPolicy.buildRetrySchedule,
       });
 
-      assert.ok(failedResult, 'markStrandedRunFailed should return the updated run');
+      assert.ok(failedResult, 'Guarded exhausted recovery should return the updated run');
       assert.equal(failedResult.status, 'failed');
       assert.equal(failedResult.claimedByInstanceId, null);
       assert.equal(failedResult.claimedAt, null);
@@ -256,20 +263,13 @@ suite('integration operation stranded-run recovery', () => {
         getPoolFn,
       });
 
-      const firstRecovery = await recoveryQueueStore.recoverRunForRetry({
-        maxAttempts: 2,
-        nextAttemptAt: new Date().toISOString(),
-        runId: strandedRun.id,
-      });
-
+      const observation = await observeRecovery(recoveryQueueStore, getPoolFn, strandedRun.id);
+      const command = { ...observation, recoverySummary: {}, errorMessage: 'Original worker was lost',
+        buildRetrySchedule: immediateRetryPolicy.buildRetrySchedule };
+      const firstRecovery = await recoveryQueueStore.recoverStrandedRun(command);
       assert.ok(firstRecovery, 'first recovery should succeed');
       assert.equal(firstRecovery.status, 'pending');
-
-      const secondRecovery = await recoveryQueueStore.recoverRunForRetry({
-        maxAttempts: 2,
-        nextAttemptAt: new Date().toISOString(),
-        runId: strandedRun.id,
-      });
+      const secondRecovery = await recoveryQueueStore.recoverStrandedRun(command);
 
       assert.equal(secondRecovery, null, 'double recovery should return null because status is no longer running');
     }, {

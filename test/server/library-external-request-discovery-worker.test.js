@@ -1,15 +1,18 @@
+import { createOperationRunLeaseFixture } from '../../testing/operation-run-lease-fixtures.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createLibraryExternalRequestDiscoveryWorker } from '../../src/server/library/library-external-request-discovery-worker.js';
 import { createOperationRunCancellationError, createOperationRunPauseError } from '../../src/server/operation-run-cancellation.js';
 import { canRequestOperationRunRetry } from '../../src/shared/operation-run-descriptors.js';
 
+const leaseForTest = (runId) => createOperationRunLeaseFixture({ runId, jobType: 'library_external_request_discovery' });
+
 function createFixture(t, discoverExternalRequestRelease) {
   let releaseDone;
   const released = new Promise((resolve) => { releaseDone = resolve; });
   const heartbeat = { start: t.mock.fn(), stop: t.mock.fn() };
   const dependencies = {
-    acquireLease: t.mock.fn(async () => {}),
+    acquireLease: t.mock.fn(async ({ runId }) => leaseForTest(runId)),
     createOperationRunLeaseHeartbeatFn: () => heartbeat,
     discoverExternalRequestRelease: t.mock.fn(discoverExternalRequestRelease),
     isCancellationRequested: async () => false,
@@ -29,7 +32,7 @@ const args = { intentId: 'intent', mediaRequestId: 'request', runId: 'run', trig
 test('external discovery worker completes search as import review without auto-download', async (t) => {
   const fixture = createFixture(t, async () => ({ candidateCount: 2, fileCount: 8, searchId: 'search' }));
   await fixture.worker.startWorkerRun(args);
-  assert.deepEqual(await fixture.released, { runId: 'run', status: 'completed' });
+  assert.deepEqual(await fixture.released, { expectedLease: leaseForTest('run'), runId: 'run', status: 'completed' });
   assert.deepEqual(fixture.dependencies.discoverExternalRequestRelease.mock.calls[0].arguments[0], { intentId: 'intent', mediaRequestId: 'request', operationRunId: 'run', triggeredByUserId: 'admin' });
   assert.equal(fixture.dependencies.markRunCompleted.mock.calls[0].arguments[0].summary.currentStep, 'Candidates ready for import review');
   assert.equal(fixture.heartbeat.start.mock.callCount(), 1);
@@ -43,7 +46,7 @@ for (const scenario of ['cancelled', 'paused', 'failed']) {
         : new Error('Provider details with confidential data');
     const fixture = createFixture(t, async () => { throw error; });
     await fixture.worker.startWorkerRun(args);
-    assert.deepEqual(await fixture.released, { runId: 'run', status: scenario });
+    assert.deepEqual(await fixture.released, { expectedLease: leaseForTest('run'), runId: 'run', status: scenario });
     assert.equal(fixture.dependencies.markRunCompleted.mock.callCount(), 0);
     assert.equal(fixture.dependencies.markRunCancelled.mock.callCount(), scenario === 'cancelled' ? 1 : 0);
     assert.equal(fixture.dependencies.markRunPaused.mock.callCount(), scenario === 'paused' ? 1 : 0);
@@ -69,7 +72,7 @@ test('duplicate in-process starts execute one discovery run', async (t) => {
 test('an empty discovery result remains actionable through explicit background-job retry', async (t) => {
   const fixture = createFixture(t, async () => ({ candidateCount: 0, fileCount: 0 }));
   await fixture.worker.startWorkerRun(args);
-  assert.deepEqual(await fixture.released, { runId: 'run', status: 'failed' });
+  assert.deepEqual(await fixture.released, { expectedLease: leaseForTest('run'), runId: 'run', status: 'failed' });
   const failure = fixture.dependencies.markRunFailed.mock.calls[0].arguments[0];
   assert.match(failure.summary.currentStep, /No candidates found/);
   assert.equal(failure.summary.failureCode, 'external_request_discovery_no_candidates');

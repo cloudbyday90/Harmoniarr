@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { isOperationRunLeaseLostError } from '../operation-run-lease-error.js';
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
 import {
   isOperationRunCancellationError,
@@ -41,17 +42,20 @@ export function createLibraryExternalIntakeWorker({
 
   async function runPlanning({ canonicalUrl, mediaRequestId, resourceType, runId, sourceIdentifier, sourceProvider, triggerSource = 'request_submit', triggeredByUserId = null }) {
     let finalLeaseStatus = 'completed';
+    let acquiredLease = null;
     let leaseHeartbeat = null;
 
     try {
-      await acquireLease({ runId });
+      acquiredLease = await acquireLease({ runId });
+      if (!acquiredLease) return;
       if (renewLease) {
-        leaseHeartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId });
+        leaseHeartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId, expectedLease: acquiredLease });
         leaseHeartbeat.start();
       }
 
       await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
-      await markRunStarted({
+      if (await markRunStarted({
+        expectedLease: acquiredLease,
         runId,
         summary: {
           canonicalUrl,
@@ -62,7 +66,7 @@ export function createLibraryExternalIntakeWorker({
           sourceProvider,
           triggerSource,
         },
-      });
+      }) === false) { finalLeaseStatus = 'failed'; return; }
 
       const result = await planExternalMediaRequest({
         mediaRequestId,
@@ -84,7 +88,8 @@ export function createLibraryExternalIntakeWorker({
         });
       }
       await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
-      await markRunCompleted({
+      if (await markRunCompleted({
+        expectedLease: acquiredLease,
         runId,
         summary: {
           canonicalUrl: result.normalizedSource.canonicalUrl,
@@ -97,12 +102,14 @@ export function createLibraryExternalIntakeWorker({
           sourceProvider: result.normalizedSource.provider,
           triggerSource,
         },
-      });
+      }) === false) { finalLeaseStatus = 'failed'; return; }
 
     } catch (error) {
+      if (!acquiredLease || isOperationRunLeaseLostError(error)) { finalLeaseStatus = 'failed'; return; }
       if (isOperationRunPauseError(error)) {
         finalLeaseStatus = 'paused';
-        await markRunPaused({
+        if (await markRunPaused({
+          expectedLease: acquiredLease,
           nextAttemptAt: error.nextRetryAt ?? null,
           runId,
           summary: {
@@ -117,13 +124,14 @@ export function createLibraryExternalIntakeWorker({
             sourceProvider,
             triggerSource,
           },
-        });
+        }) === false) { finalLeaseStatus = 'failed'; return; }
         return;
       }
 
       if (isOperationRunCancellationError(error)) {
         finalLeaseStatus = 'cancelled';
-        await markRunCancelled({
+        if (await markRunCancelled({
+          expectedLease: acquiredLease,
           runId,
           summary: {
             currentStep: 'External provider ingest planning cancelled',
@@ -133,12 +141,13 @@ export function createLibraryExternalIntakeWorker({
             sourceProvider,
             triggerSource,
           },
-        });
+        }) === false) { finalLeaseStatus = 'failed'; return; }
         return;
       }
 
       finalLeaseStatus = 'failed';
-      await markRunFailed({
+      if (await markRunFailed({
+        expectedLease: acquiredLease,
         errorMessage: error.message,
         runId,
         summary: {
@@ -149,11 +158,11 @@ export function createLibraryExternalIntakeWorker({
           sourceProvider,
           triggerSource,
         },
-      });
+      }) === false) { finalLeaseStatus = 'failed'; return; }
     } finally {
       leaseHeartbeat?.stop();
       activeRunIds.delete(runId);
-      await releaseLease({ runId, status: finalLeaseStatus });
+      if (acquiredLease) await releaseLease({ runId, status: finalLeaseStatus, expectedLease: acquiredLease });
     }
   }
 

@@ -105,56 +105,13 @@ export function createOperationStrandedRunRecoveryService({
       const recoveryReason = buildRecoveryReason(lease);
       const recoveryDetectedAt = nowFn().toISOString();
 
-      if (lease?.state === 'expired') {
-        await jobLeaseStore.releaseLease({
-          leaseKey,
-          status: 'expired',
-        });
-      }
+      const recoveredRun = await operationQueueStore.recoverStrandedRun({ observedRun: run, expectedLease: lease,
+        recoverySummary: { recoveryDetectedAt, recoveryReason }, errorMessage: buildRecoveryErrorMessage(recoveryReason),
+        buildRetrySchedule: retryPolicyService.buildRetrySchedule });
+      if (recoveredRun?.status === 'cancelled') cancelledCount += 1;
+      else if (recoveredRun?.status === 'pending') retriedCount += 1;
+      else if (recoveredRun?.status === 'failed') failedCount += 1;
 
-      const retrySchedule = retryPolicyService.buildRetrySchedule({
-        attemptCount: run.attemptCount,
-        maxAttempts: run.maxAttempts,
-      });
-
-      if (retrySchedule) {
-        const recoveredRun = await operationQueueStore.recoverRunForRetry({
-          maxAttempts: run.maxAttempts,
-          nextAttemptAt: retrySchedule.nextAttemptAt,
-          runId: run.id,
-          summary: {
-            currentStep: 'Automatic retry scheduled after stranded run recovery',
-            lastFailureMessage: buildRecoveryErrorMessage(recoveryReason),
-            recoveryDetectedAt,
-            recoveryReason,
-            retryScheduledAt: retrySchedule.nextAttemptAt,
-          },
-        });
-
-        if (recoveredRun?.status === 'cancelled') {
-          cancelledCount += 1;
-        } else if (recoveredRun) {
-          retriedCount += 1;
-        }
-
-        continue;
-      }
-
-      const failedRun = await operationQueueStore.markStrandedRunFailed({
-        errorMessage: buildRecoveryErrorMessage(recoveryReason),
-        runId: run.id,
-        summary: {
-          currentStep: 'Stranded run recovery marked the run as failed',
-          recoveryDetectedAt,
-          recoveryReason,
-        },
-      });
-
-      if (failedRun?.status === 'cancelled') {
-        cancelledCount += 1;
-      } else if (failedRun) {
-        failedCount += 1;
-      }
     }
 
     return {

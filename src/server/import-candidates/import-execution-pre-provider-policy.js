@@ -7,6 +7,7 @@
 
 import { isDeepStrictEqual } from 'node:util';
 import { normalizeDownloadFileManifest, normalizeDownloadTransferId, validateDownloadAttempt, evaluateStoredDownloadReceipt } from '../slskd/slskd-download-attempt-policy.js';
+import { normalizeExpectedJobLease } from '../job-lease-policy.js';
 
 export const PRE_PROVIDER_REFUSAL_REASONS = new Set(['planning_blocked', 'no_unlocked_files', 'preparation_refused',
   'provider_version_unsupported', 'provider_unavailable', 'provider_changed', 'prior_handoff_unresolved',
@@ -25,13 +26,16 @@ export function normalizePreparationFiles(files) {
 export function preparationLeaseIdentity(lease, runId) {
   if (!plain(lease) || lease.leaseKey !== `import_candidate_execution_planning:${runId}`
     || typeof lease.ownerInstanceId !== 'string' || !lease.ownerInstanceId || lease.ownerInstanceId.length > 512
-    || lease.ownerInstanceId.includes('\u0000') || !iso(lease.acquiredAt)) return null;
-  return { leaseKey: lease.leaseKey, ownerInstanceId: lease.ownerInstanceId, acquiredAt: lease.acquiredAt };
+    || lease.ownerInstanceId.includes('\u0000') || !iso(lease.acquiredAt)
+    || (Object.hasOwn(lease, 'acquisitionId') && !guid(lease.acquisitionId))) return null;
+  return { leaseKey: lease.leaseKey, ownerInstanceId: lease.ownerInstanceId, acquiredAt: lease.acquiredAt,
+    ...(Object.hasOwn(lease, 'acquisitionId') ? { acquisitionId: lease.acquisitionId } : {}) };
 }
 export function hasCurrentPreparationLease(current, expected, runId, now = Date.now()) {
   const identity = preparationLeaseIdentity(expected, runId);
-  return identity != null && isDeepStrictEqual(identity, preparationLeaseIdentity(current, runId))
-    && current.releasedAt == null && iso(current.expiresAt) && Date.parse(current.expiresAt) > Number(now);
+  return identity != null && normalizeExpectedJobLease(expected) != null && normalizeExpectedJobLease(current) != null
+    && isDeepStrictEqual(identity, preparationLeaseIdentity(current, runId))
+    && current.releasedAt == null && iso(current.expiresAt) && Number.isFinite(now) && Date.parse(current.expiresAt) > now;
 }
 export function validatePreProviderEpoch(epoch, { runId, importCandidateId } = {}) {
   if (!plain(epoch) || epoch.version !== 1 || !guid(epoch.epochId) || epoch.operationRunId !== runId

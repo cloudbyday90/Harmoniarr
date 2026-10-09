@@ -90,3 +90,10 @@ test('control plane summaries and audit details omit raw preparation ownership w
   assert.deepEqual(service.redactOperationSummary(input), expected); assert.deepEqual(service.redactAuditDetails(input), expected);
   assert.deepEqual(input, original);
 });
+
+test('acquisition tokens are omitted from nested public summaries and audits without hiding stable diagnostic IDs', () => {
+  const service = createControlPlaneRedactionService(); const input = { id: 'stable-row', state: 'expired',
+    lease: { acquisitionId: 'private-token', ownerInstanceId: 'worker' }, items: [{ acquisition_id: 'private-token', leaseAcquisitionId: 'private-token', safe: true }] };
+  const expected = { id: 'stable-row', state: 'expired', lease: { ownerInstanceId: 'worker' }, items: [{ safe: true }] };
+  assert.deepEqual(service.redactOperationSummary(input), expected); assert.deepEqual(service.redactAuditDetails(input), expected);
+});

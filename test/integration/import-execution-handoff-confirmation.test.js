@@ -172,7 +172,8 @@ suite('Attempt-owned download checkpoint and confirmation transactions in Postgr
   test('paused jobs and changed physical evidence refuse the last pre-provider guard without advancing a newer source', { timeout: config.scenarioTimeoutMs }, async (t) => {
     await scenario(t, async (context) => {
       const f = await seed(context); const prepared = await context.handoff.prepareDownloadHandoff(f);
-      await context.runs.markRunPaused({ runId: f.operationRunId, summary: { pauseCode: 'controlled_pause' } });
+      const pauseLease = await context.runs.acquireLease({ runId: f.operationRunId });
+      await context.runs.markRunPaused({ runId: f.operationRunId, expectedLease: pauseLease, summary: { pauseCode: 'controlled_pause' } });
       assert.equal((await context.runs.getRunById(f.operationRunId)).status, 'pending');
       await assert.rejects(context.handoff.assertDownloadHandoffCurrent({ ...f, attemptId: prepared.attempt.attemptId }), { code: 'import_execution_handoff_stale' });
       await context.pool.query("UPDATE operation_runs SET status='running' WHERE id=$1", [f.operationRunId]);

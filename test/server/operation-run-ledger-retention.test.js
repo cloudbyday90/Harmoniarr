@@ -24,6 +24,36 @@ import {
   pruneOperationRunsLedger,
 } from '../../src/server/operation-run-store.js';
 
+import { createOperationRunLeaseFixture } from '../../testing/operation-run-lease-fixtures.js';
+
+function createOwnedLedgerPool({ replacement = false } = {}) {
+  const runId = '20000000-0000-4000-8000-000000000001';
+  const expectedLease = createOperationRunLeaseFixture({ runId, jobType: 'artwork_cleanup' });
+  const calls = [];
+  const leaseRow = { id: expectedLease.id, job_type: expectedLease.jobType, lease_key: expectedLease.leaseKey,
+    owner_instance_id: expectedLease.ownerInstanceId,
+    acquisition_id: replacement ? '10000000-0000-4000-8000-000000000002' : expectedLease.acquisitionId,
+    acquired_at: expectedLease.acquiredAt, expires_at: expectedLease.expiresAt, released_at: null };
+  const client = { release: () => {}, query: async (text, params) => {
+    calls.push({ text, params });
+    if (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(text) || text.includes('SELECT pg_advisory_xact_lock')) return { rows: [] };
+    if (text.includes('SELECT clock_timestamp()')) return { rows: [{ observed_at: new Date('2026-10-09T21:00:00.000Z') }] };
+    if (text.includes('FROM job_leases') && text.includes('FOR UPDATE')) return { rows: [leaseRow] };
+    if (text.includes('FROM operation_runs') && text.includes('FOR UPDATE')) return { rows: [{
+      id: runId, operation_type: 'artwork_cleanup', status: 'running', attempt_count: 1, max_attempts: 1, summary: {},
+    }] };
+    if (text.includes('UPDATE operation_runs')) return { rows: [{ id: runId }], rowCount: 1 };
+    assert.fail('Unexpected owned lifecycle query: ' + text);
+  } };
+  const pool = { connect: async () => client,
+    query: () => assert.fail('Terminal lifecycle and retry-budget reads must remain on their transaction client') };
+  return { calls, expectedLease, runId, getPoolFn: () => pool };
+}
+function assertNoInlinePrune(pool) {
+  assert.equal(pool.calls.some(({ text }) => /DELETE FROM operation_runs/u.test(text)), false);
+  assert.equal(pool.calls.some(({ text }) => /\bprune\b/iu.test(text)), false);
+}
+
 function createFakePool(queryImpl) {
   const calls = [];
   return {
@@ -38,39 +68,51 @@ function createFakePool(queryImpl) {
 }
 
 test('markRunCompleted no longer prunes the ledger inline', async () => {
-  const pool = createFakePool();
+  const pool = createOwnedLedgerPool();
   const store = createOperationRunStore({ getPoolFn: pool.getPoolFn, operationType: 'artwork_cleanup' });
 
-  await store.markRunCompleted({ runId: 'run-1', summary: { done: true } });
+  assert.equal(await store.markRunCompleted({ runId: pool.runId, expectedLease: pool.expectedLease, summary: { done: true } }), true);
 
-  assert.equal(pool.calls.length, 1);
-  assert.match(pool.calls[0].text, /UPDATE operation_runs/);
-  assert.ok(!pool.calls.some((call) => /DELETE FROM operation_runs/.test(call.text)));
+  const updates = pool.calls.filter(({ text }) => text.includes('UPDATE operation_runs'));
+  assert.equal(updates.length, 1);
+  assert.match(updates[0].text, /status='completed'/u);
+  assert.deepEqual(JSON.parse(updates[0].params[1]), { done: true });
+  assertNoInlinePrune(pool);
 });
 
 test('markRunCancelled no longer prunes the ledger inline', async () => {
-  const pool = createFakePool();
+  const pool = createOwnedLedgerPool();
   const store = createOperationRunStore({ getPoolFn: pool.getPoolFn, operationType: 'artwork_cleanup' });
 
-  await store.markRunCancelled({ runId: 'run-1' });
+  assert.equal(await store.markRunCancelled({ runId: pool.runId, expectedLease: pool.expectedLease }), true);
 
-  assert.equal(pool.calls.length, 1);
-  assert.match(pool.calls[0].text, /status = 'cancelled'/);
-  assert.ok(!pool.calls.some((call) => /DELETE FROM operation_runs/.test(call.text)));
+  const updates = pool.calls.filter(({ text }) => text.includes('UPDATE operation_runs'));
+  assert.equal(updates.length, 1);
+  assert.match(updates[0].text, /status='cancelled'/u);
+  assertNoInlinePrune(pool);
 });
 
 test('markRunFailed (terminal) no longer prunes the ledger inline', async () => {
-  const pool = createFakePool((text) => {
-    if (/SELECT/.test(text)) {
-      return { rows: [{ id: 'run-1', attempt_count: 1, max_attempts: 1, status: 'running' }] };
-    }
-    return { rows: [], rowCount: 0 };
-  });
+  const pool = createOwnedLedgerPool();
   const store = createOperationRunStore({ getPoolFn: pool.getPoolFn, operationType: 'artwork_cleanup' });
 
-  await store.markRunFailed({ runId: 'run-1', errorMessage: 'boom' });
+  assert.equal(await store.markRunFailed({ runId: pool.runId, expectedLease: pool.expectedLease, errorMessage: 'boom' }), true);
 
-  assert.ok(!pool.calls.some((call) => /DELETE FROM operation_runs/.test(call.text)));
+  const updates = pool.calls.filter(({ text }) => text.includes('UPDATE operation_runs'));
+  assert.equal(updates.length, 1);
+  assert.match(updates[0].text, /status='failed'/u);
+  assert.equal(updates[0].params[2], 'boom');
+  assertNoInlinePrune(pool);
+});
+
+test('a replaced acquisition cannot finalize or prune any terminal ledger state', async () => {
+  for (const action of ['markRunCompleted', 'markRunCancelled', 'markRunFailed']) {
+    const pool = createOwnedLedgerPool({ replacement: true });
+    const store = createOperationRunStore({ getPoolFn: pool.getPoolFn, operationType: 'artwork_cleanup' });
+    assert.equal(await store[action]({ runId: pool.runId, expectedLease: pool.expectedLease, errorMessage: 'stale failure' }), false, action);
+    assert.equal(pool.calls.some(({ text }) => text.includes('UPDATE operation_runs')), false, action);
+    assertNoInlinePrune(pool);
+  }
 });
 
 test('pruneOperationRunsLedger deletes terminal runs older than the cutoff with a per-type floor', async () => {

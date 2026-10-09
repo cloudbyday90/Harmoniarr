@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { isOperationRunLeaseLostError } from '../operation-run-lease-error.js';
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
 import {
   isOperationRunCancellationError,
@@ -40,23 +41,24 @@ export function createLibraryExternalRequestDiscoveryWorker({
 
   async function runDiscovery({ intentId, mediaRequestId, runId, triggerSource = 'operator_review', triggeredByUserId = null }) {
     let finalLeaseStatus = 'completed';
-    let leaseAcquired = false;
+    let acquiredLease = null;
     let heartbeat = null;
     const summary = { intentId, mediaRequestId, triggerSource };
     try {
-      await acquireLease({ runId });
-      leaseAcquired = true;
+      acquiredLease = await acquireLease({ runId });
+      if (!acquiredLease) return;
       if (renewLease) {
-        heartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId });
+        heartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId, expectedLease: acquiredLease });
         heartbeat.start();
       }
       await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
-      await markRunStarted({ runId, summary: { ...summary, currentStep: 'Searching for the approved release' } });
+      if (await markRunStarted({ expectedLease: acquiredLease, runId, summary: { ...summary, currentStep: 'Searching for the approved release' } }) === false) { finalLeaseStatus = 'failed'; return; }
       const result = await discoverExternalRequestRelease({ intentId, mediaRequestId, operationRunId: runId, triggeredByUserId });
       await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
       if (result.candidateCount === 0) {
         finalLeaseStatus = 'failed';
-        await markRunFailed({
+        if (await markRunFailed({
+          expectedLease: acquiredLease,
           errorMessage: 'No candidates were found. Review the approved release and retry this background job when ready.',
           runId,
           summary: {
@@ -65,22 +67,25 @@ export function createLibraryExternalRequestDiscoveryWorker({
             currentStep: 'No candidates found; review and retry discovery',
             failureCode: 'external_request_discovery_no_candidates',
           },
-        });
+        }) === false) { finalLeaseStatus = 'failed'; return; }
         return;
       }
-      await markRunCompleted({
+      if (await markRunCompleted({
+        expectedLease: acquiredLease,
         runId,
         summary: {
           ...summary,
           ...result,
           currentStep: 'Candidates ready for import review',
         },
-      });
+      }) === false) { finalLeaseStatus = 'failed'; return; }
     } catch (error) {
+      if (!acquiredLease || isOperationRunLeaseLostError(error)) { finalLeaseStatus = 'failed'; return; }
       if (error?.code === 'operation_run_lease_unavailable') return;
       if (isOperationRunPauseError(error)) {
         finalLeaseStatus = 'paused';
-        await markRunPaused({
+        if (await markRunPaused({
+          expectedLease: acquiredLease,
           nextAttemptAt: error.nextRetryAt ?? null,
           runId,
           summary: {
@@ -89,22 +94,23 @@ export function createLibraryExternalRequestDiscoveryWorker({
             pauseCode: error.pauseCode ?? null,
             pauseProvider: error.pauseProvider ?? null,
           },
-        });
+        }) === false) { finalLeaseStatus = 'failed'; return; }
       } else if (isOperationRunCancellationError(error)) {
         finalLeaseStatus = 'cancelled';
-        await markRunCancelled({ runId, summary: { ...summary, currentStep: 'External request discovery cancelled' } });
+        if (await markRunCancelled({ expectedLease: acquiredLease, runId, summary: { ...summary, currentStep: 'External request discovery cancelled' } }) === false) { finalLeaseStatus = 'failed'; return; }
       } else {
         finalLeaseStatus = 'failed';
-        await markRunFailed({
+        if (await markRunFailed({
+          expectedLease: acquiredLease,
           errorMessage: 'External request discovery failed. Review provider health and retry the background job.',
           runId,
           summary: { ...summary, currentStep: 'External request discovery failed' },
-        });
+        }) === false) { finalLeaseStatus = 'failed'; return; }
       }
     } finally {
       heartbeat?.stop();
       activeRunIds.delete(runId);
-      if (leaseAcquired) await releaseLease({ runId, status: finalLeaseStatus });
+      if (acquiredLease) await releaseLease({ runId, status: finalLeaseStatus, expectedLease: acquiredLease });
     }
   }
 

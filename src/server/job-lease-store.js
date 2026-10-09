@@ -17,6 +17,9 @@
  */
 
 import { getPool } from './database.js';
+import { normalizeExpectedJobLease } from './job-lease-policy.js';
+import { createDatabaseTransactionRunner } from './database-transaction-service.js';
+import { lockJobLeaseKey } from './job-lease-lock-store.js';
 
 const defaultLeaseDurationMs = 30 * 60 * 1000;
 
@@ -54,6 +57,7 @@ export function normalizeJobLease(row, { now = new Date() } = {}) {
     : Boolean(!releasedAt && expiresAt && new Date(expiresAt).getTime() <= now.getTime());
 
   return {
+    ...(row.acquisition_id != null ? { acquisitionId: row.acquisition_id } : {}),
     acquiredAt: toIsoString(row.acquired_at),
     createdAt: toIsoString(row.created_at),
     expiresAt: toIsoString(expiresAt),
@@ -73,16 +77,20 @@ export function createJobLeaseStore({
   leaseDurationMs = defaultLeaseDurationMs,
   nowFn = () => new Date(),
   ownerInstanceId = buildDefaultOwnerInstanceId(),
+  withTransaction = createDatabaseTransactionRunner({ getPoolFn }),
 } = {}) {
   const resolvedLeaseDurationMs = normalizeLeaseDurationMs(leaseDurationMs);
 
   async function acquireLease({ jobType, leaseKey, queryable = null }) {
-    const result = await (queryable ?? getPoolFn()).query(
-      `
+    const write = async (client) => {
+      await lockJobLeaseKey({ leaseKey, queryable: client });
+      const result = await client.query(
+        `
         INSERT INTO job_leases (
           job_type,
           lease_key,
           owner_instance_id,
+          acquisition_id,
           acquired_at,
           heartbeat_at,
           expires_at,
@@ -92,33 +100,36 @@ export function createJobLeaseStore({
           $1,
           $2,
           $3,
-          NOW(),
-          NOW(),
-          NOW() + ($4 * INTERVAL '1 millisecond'),
+          gen_random_uuid(),
+          clock_timestamp(),
+          clock_timestamp(),
+          clock_timestamp() + ($4 * INTERVAL '1 millisecond'),
           'active'
         )
         ON CONFLICT (lease_key) DO UPDATE
         SET owner_instance_id = EXCLUDED.owner_instance_id,
-            acquired_at = EXCLUDED.acquired_at,
-            heartbeat_at = EXCLUDED.heartbeat_at,
-            expires_at = EXCLUDED.expires_at,
+            acquisition_id = EXCLUDED.acquisition_id,
+            acquired_at = clock_timestamp(),
+            heartbeat_at = clock_timestamp(),
+            expires_at = clock_timestamp() + ($4 * INTERVAL '1 millisecond'),
             released_at = NULL,
             status = 'active'
         WHERE job_leases.released_at IS NOT NULL
-           OR job_leases.expires_at <= NOW()
-           OR job_leases.owner_instance_id = EXCLUDED.owner_instance_id
-        RETURNING id, job_type, lease_key, owner_instance_id, acquired_at, heartbeat_at, expires_at, released_at, status, created_at
+           OR job_leases.expires_at <= clock_timestamp()
+        RETURNING id, job_type, lease_key, owner_instance_id, acquisition_id, acquired_at, heartbeat_at, expires_at, released_at, status, created_at
       `,
-      [jobType, leaseKey, ownerInstanceId, resolvedLeaseDurationMs],
-    );
+        [jobType, leaseKey, ownerInstanceId, resolvedLeaseDurationMs],
+      );
 
-    return normalizeJobLease(result.rows[0], { now: nowFn() });
+      return normalizeJobLease(result.rows[0], { now: nowFn() });
+    };
+    return queryable ? write(queryable) : withTransaction(write);
   }
 
   async function getLease({ leaseKey }) {
     const result = await getPoolFn().query(
       `
-        SELECT id, job_type, lease_key, owner_instance_id, acquired_at, heartbeat_at, expires_at, released_at, status, created_at
+        SELECT id, job_type, lease_key, owner_instance_id, acquisition_id, acquired_at, heartbeat_at, expires_at, released_at, status, created_at
         FROM job_leases
         WHERE lease_key = $1
         LIMIT 1
@@ -136,7 +147,7 @@ export function createJobLeaseStore({
 
     const result = await getPoolFn().query(
       `
-        SELECT id, job_type, lease_key, owner_instance_id, acquired_at, heartbeat_at, expires_at, released_at, status, created_at
+        SELECT id, job_type, lease_key, owner_instance_id, acquisition_id, acquired_at, heartbeat_at, expires_at, released_at, status, created_at
         FROM job_leases
         WHERE lease_key = ANY($1::text[])
       `,
@@ -146,38 +157,53 @@ export function createJobLeaseStore({
     return result.rows.map((row) => normalizeJobLease(row, { now: nowFn() }));
   }
 
-  async function renewLease({ leaseKey, status = 'active' }) {
-    const result = await getPoolFn().query(
-      `
+  async function renewLease({ leaseKey, expectedLease, status = 'active', queryable = null }) {
+    const expected = normalizeExpectedJobLease(expectedLease, { leaseKey });
+    if (!expected) return null;
+    const write = async (client) => {
+      await lockJobLeaseKey({ leaseKey, queryable: client });
+      const result = await client.query(
+        `
         UPDATE job_leases
-        SET heartbeat_at = NOW(),
-            expires_at = NOW() + ($2 * INTERVAL '1 millisecond'),
+        SET heartbeat_at = clock_timestamp(),
+            expires_at = clock_timestamp() + ($2 * INTERVAL '1 millisecond'),
             status = $3
         WHERE lease_key = $1
           AND released_at IS NULL
-        RETURNING id, job_type, lease_key, owner_instance_id, acquired_at, heartbeat_at, expires_at, released_at, status, created_at
+          AND owner_instance_id = $4 AND acquisition_id = $5::uuid
+          AND expires_at > clock_timestamp()
+        RETURNING id, job_type, lease_key, owner_instance_id, acquisition_id, acquired_at, heartbeat_at, expires_at, released_at, status, created_at
       `,
-      [leaseKey, resolvedLeaseDurationMs, status],
-    );
+        [leaseKey, resolvedLeaseDurationMs, status, expected.ownerInstanceId, expected.acquisitionId],
+      );
 
-    return normalizeJobLease(result.rows[0], { now: nowFn() });
+      return normalizeJobLease(result.rows[0], { now: nowFn() });
+    };
+    return queryable ? write(queryable) : withTransaction(write);
   }
 
-  async function releaseLease({ leaseKey, status }) {
-    const result = await getPoolFn().query(
-      `
+  async function releaseLease({ leaseKey, expectedLease, status, queryable = null }) {
+    const expected = normalizeExpectedJobLease(expectedLease, { leaseKey });
+    if (!expected) return null;
+    const write = async (client) => {
+      await lockJobLeaseKey({ leaseKey, queryable: client });
+      const result = await client.query(
+        `
         UPDATE job_leases
-        SET released_at = NOW(),
-            heartbeat_at = NOW(),
+        SET released_at = clock_timestamp(),
+            heartbeat_at = clock_timestamp(),
             status = $2
         WHERE lease_key = $1
           AND released_at IS NULL
-        RETURNING id, job_type, lease_key, owner_instance_id, acquired_at, heartbeat_at, expires_at, released_at, status, created_at
+          AND owner_instance_id = $3 AND acquisition_id = $4::uuid
+        RETURNING id, job_type, lease_key, owner_instance_id, acquisition_id, acquired_at, heartbeat_at, expires_at, released_at, status, created_at
       `,
-      [leaseKey, status],
-    );
+        [leaseKey, status, expected.ownerInstanceId, expected.acquisitionId],
+      );
 
-    return normalizeJobLease(result.rows[0], { now: nowFn() });
+      return normalizeJobLease(result.rows[0], { now: nowFn() });
+    };
+    return queryable ? write(queryable) : withTransaction(write);
   }
 
   return {

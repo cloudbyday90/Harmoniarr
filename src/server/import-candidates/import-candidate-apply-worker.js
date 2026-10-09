@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { isOperationRunLeaseLostError } from '../operation-run-lease-error.js';
 import { buildMusicQueueAddBlockedActivityEvent } from '../activity/music-queue-add-blocked-activity-event-service.js';
 import { recordActivityEventSafely } from '../activity/music-queue-lifecycle-activity-event-service.js';
 import { buildReleaseAddedActivityEvent } from '../activity/release-added-activity-presentation-service.js';
@@ -355,16 +356,17 @@ export function createImportCandidateApplyWorker({
   }) {
     let finalLeaseStatus = 'completed';
     let leaseHeartbeat = null;
+    let acquiredLease = null;
     const scopedCandidateIds = readImportCandidateApplyScope(importCandidateIds);
 
     try {
-      await acquireLease({ runId });
+      acquiredLease = await acquireLease({ runId });
       if (renewLease) {
-        leaseHeartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId });
+        leaseHeartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId, expectedLease: acquiredLease });
         leaseHeartbeat.start();
       }
       await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
-      await markRunStarted({
+      if (await markRunStarted({ expectedLease: acquiredLease,
         runId,
         summary: {
           currentStep: 'Resolving import-pending candidate apply plans',
@@ -373,7 +375,7 @@ export function createImportCandidateApplyWorker({
           requestedCandidateCount,
           ...buildApplyTriggerSummary({ applySafetyMode, importCandidateIds: scopedCandidateIds, triggerSource }),
         },
-      });
+      }) === false) return;
 
       const importPendingSummary = await buildImportPendingCandidateSummary({
         ...(Array.isArray(scopedCandidateIds) ? { candidateIds: scopedCandidateIds } : {}),
@@ -733,7 +735,7 @@ export function createImportCandidateApplyWorker({
         }
       }
 
-      await markRunCompleted({
+      if (await markRunCompleted({ expectedLease: acquiredLease,
         runId,
         summary: {
           appliedCount: counts.applied,
@@ -753,7 +755,7 @@ export function createImportCandidateApplyWorker({
           ...buildSkippedUnsafeCandidateCount(importPendingSummary, runItems, applySafetyMode),
           totalImportPending: importPendingSummary.counts?.totalImportPending ?? runItems.length,
         },
-      });
+      }) === false) return;
 
       if (typeof scheduleLibraryScan === 'function' && (counts.applied + counts.appliedWithWarnings) > 0) {
         try {
@@ -779,9 +781,10 @@ export function createImportCandidateApplyWorker({
         }
       }
     } catch (error) {
+      if (!acquiredLease || isOperationRunLeaseLostError(error)) return;
       if (isOperationRunPauseError(error)) {
         finalLeaseStatus = 'paused';
-        await markRunPaused({
+        await markRunPaused({ expectedLease: acquiredLease,
           nextAttemptAt: error.nextRetryAt ?? null,
           runId,
           summary: {
@@ -800,7 +803,7 @@ export function createImportCandidateApplyWorker({
 
       if (isOperationRunCancellationError(error)) {
         finalLeaseStatus = 'cancelled';
-        await markRunCancelled({
+        await markRunCancelled({ expectedLease: acquiredLease,
           runId,
           summary: {
             currentStep: 'Import apply cancelled',
@@ -814,7 +817,7 @@ export function createImportCandidateApplyWorker({
       }
 
       finalLeaseStatus = 'failed';
-      await markRunFailed({
+      await markRunFailed({ expectedLease: acquiredLease,
         errorMessage: error.message,
         runId,
         summary: {
@@ -828,7 +831,7 @@ export function createImportCandidateApplyWorker({
     } finally {
       leaseHeartbeat?.stop();
       activeRunIds.delete(runId);
-      await releaseLease({ runId, status: finalLeaseStatus });
+      if (acquiredLease) await releaseLease({ runId, status: finalLeaseStatus, expectedLease: acquiredLease });
     }
   }
 

@@ -7473,3 +7473,45 @@ SET migration_key = EXCLUDED.migration_key,
     error_message = NULL,
     application_version = NULL,
     updated_at = NOW();
+
+-- Migration: 20261009_205425_job_lease_acquisition_fencing.sql
+-- Checksum: e7eaab8987a28cbacf8e68b3db388babb7a3e5e6243750346152716289ec4b8a
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+-- This program is free software: licensed under GPL-3.0-or-later.
+-- See LICENSE for details.
+
+-- forward-only migration
+BEGIN;
+
+-- Keep the surrogate row ID stable; this UUID identifies one acquisition only.
+ALTER TABLE job_leases
+  ADD COLUMN acquisition_id UUID NOT NULL DEFAULT gen_random_uuid();
+
+COMMIT;
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20261009_205425',
+  '20261009_205425_job_lease_acquisition_fencing.sql',
+  'job_lease_acquisition_fencing',
+  'e7eaab8987a28cbacf8e68b3db388babb7a3e5e6243750346152716289ec4b8a',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();

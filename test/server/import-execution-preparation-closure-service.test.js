@@ -85,7 +85,7 @@ function harness(options = {}) {
     acquireClosureLease: async ({ runId, ownerInstanceId, queryable: supplied }) => {
       mark('acquire', supplied);
       assert.equal(runId, f.operationRunId);
-      const lease = { leaseKey: 'import_candidate_execution_planning:' + runId, ownerInstanceId,
+      const lease = { leaseKey: 'import_candidate_execution_planning:' + runId, ownerInstanceId, acquisitionId: randomUUID(),
         acquiredAt: '2026-10-09T20:10:01.000Z', expiresAt: '2026-10-09T20:11:01.000Z',
         releasedAt: null, jobType: 'import_candidate_execution_planning' };
       working.context.lease = options.leaseOverride ? options.leaseOverride(lease, f) : lease;
@@ -150,6 +150,8 @@ test('closure commits the blocked item, reciprocal cancelled parent, fresh relea
     assert.deepEqual(epoch.lease, before.context.item.planningSnapshot.execution.handoff.preProviderEpoch.lease);
     assert.notDeepEqual(epoch.closure.lease, epoch.lease);
     assert.equal(epoch.closure.lease.ownerInstanceId, state.context.lease.ownerInstanceId);
+    assert.equal(epoch.closure.lease.acquisitionId, state.context.lease.acquisitionId);
+    assert.equal(Object.hasOwn(epoch.lease, 'acquisitionId'), false);
     assert.equal(state.context.lease.releasedAt, closedAt);
     assert.deepEqual(state.context.item.planningSnapshot.execution.handoff.attempt,
       before.context.item.planningSnapshot.execution.handoff.attempt);
@@ -223,7 +225,11 @@ test('missing, expired, released, malformed or reused acquired closure lease can
     () => null, () => ({}), (lease) => ({ ...lease, expiresAt: closedAt }),
     (lease) => ({ ...lease, releasedAt: closedAt }),
     (lease) => ({ ...lease, ownerInstanceId: '' }),
-    (lease, f) => ({ ...lease, ...f.expectedEpoch.lease }),
+    (lease, f) => {
+      const historical = { ...lease, ...f.expectedEpoch.lease };
+      delete historical.acquisitionId;
+      return historical;
+    },
     (lease) => ({ ...lease, acquiredAt: '2026-10-09T20:11:00.000Z' }),
   ]) {
     const h = harness({ leaseOverride });

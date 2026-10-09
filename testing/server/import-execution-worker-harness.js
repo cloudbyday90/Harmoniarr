@@ -34,7 +34,7 @@ export function createExecutionWorkerHarness(t, { candidates = [executionCandida
   const marks = { completed: null, failed: null, paused: null, cancelled: null };
   let finish;
   const finished = new Promise((resolve) => { finish = resolve; });
-  const lease = { ownerInstanceId: 'unit-worker', acquiredAt: new Date().toISOString(),
+  const lease = { leaseKey: 'import_candidate_execution_planning:run-1', acquisitionId: randomUUID(), ownerInstanceId: 'unit-worker', acquiredAt: new Date().toISOString(),
     expiresAt: new Date(Date.now() + 60_000).toISOString(), state: 'active', releasedAt: null, status: 'active' };
   const recordConfirmedTransfers = t.mock.fn(async () => []);
   const transitionDownloading = t.mock.fn(async ({ candidate }) => {

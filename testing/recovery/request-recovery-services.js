@@ -89,9 +89,18 @@ export function createRequestRecoveryServices({ getPoolFn, allowFirstPage = true
   });
 
   async function completePreparationRun({ runId, mediaRequestId }) {
-    await executionRunStore.markRunCompleted({
-      runId, summary: { mediaRequestId, sourceProvider: source.provider, triggerSource: 'recovery_rehearsal' },
-    });
+    const expectedLease = await executionRunStore.acquireLease({ runId });
+    try {
+      const summary = { mediaRequestId, sourceProvider: source.provider, triggerSource: 'recovery_rehearsal' };
+      if (await executionRunStore.markRunStarted({ runId, expectedLease, summary }) !== true) {
+        throw new Error('Recovery preparation no longer owns its start');
+      }
+      if (await executionRunStore.markRunCompleted({ runId, expectedLease, summary }) !== true) {
+        throw new Error('Recovery preparation no longer owns its completion');
+      }
+    } finally {
+      await executionRunStore.releaseLease({ runId, expectedLease, status: 'completed' });
+    }
   }
 
   return {

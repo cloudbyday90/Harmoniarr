@@ -10,6 +10,7 @@ import { after, before, suite, test } from 'node:test';
 import { createJobLeaseStore } from '../../src/server/job-lease-store.js';
 import { createOperationQueueStore } from '../../src/server/operation-queue-store.js';
 import { createOperationStrandedRunRecoveryService } from '../../src/server/operation-stranded-run-recovery-service.js';
+import { createOperationRetryPolicyService } from '../../src/server/operation-retry-policy-service.js';
 import { bootstrapDatabaseSchemaFromSnapshot } from '../../src/server/schema-bootstrap.js';
 import { operationRunRegistry } from '../../src/shared/operation-run-descriptors.js';
 import { seedOperationRunFixture } from '../../testing/integration/operation-run-fixtures.js';
@@ -64,13 +65,17 @@ suite('operational recovery continuity without worker dispatch', () => {
           status: 'running', attemptCount: exhausted ? 3 : 1, maxAttempts: 3,
         } });
         const queue = createOperationQueueStore({ getPoolFn });
+        let observedRun;
+        const leaseStore = createJobLeaseStore({ getPoolFn });
+        const expectedLease = await leaseStore.getLease({ leaseKey: `${run.operationType}:${run.id}` });
         const service = createOperationStrandedRunRecoveryService({
-          jobLeaseStore: createJobLeaseStore({ getPoolFn }),
+          jobLeaseStore: leaseStore,
           operationQueueStore: {
             ...queue,
             async listRecoverableRuns(options) {
               const runs = await queue.listRecoverableRuns(options);
-              assert.equal(runs[0].cancelRequestedAt, null);
+              observedRun = runs.find((candidate) => candidate.id === run.id);
+              assert.equal(observedRun.cancelRequestedAt, null);
               await queryable.query('UPDATE operation_runs SET cancel_requested_at = NOW(), cancel_requested_by_user_id = $2 WHERE id = $1', [run.id, actor.id]);
               return runs;
             },
@@ -86,7 +91,8 @@ suite('operational recovery continuity without worker dispatch', () => {
         assert.ok(persisted.cancel_requested_at && persisted.cancelled_at && persisted.finished_at);
         assert.equal(persisted.summary.retryScheduledAt, null);
         assert.equal(await queue.claimNextRunnableRun({ operationTypes: [run.operationType] }), null);
-        assert.equal(await queue.recoverRunForRetry({ runId: run.id, nextAttemptAt: new Date().toISOString() }), null);
+        assert.equal(await queue.recoverStrandedRun({ observedRun, expectedLease, recoverySummary: {},
+          errorMessage: 'Original observed worker was lost', buildRetrySchedule: createOperationRetryPolicyService().buildRetrySchedule }), null);
         const retried = await queue.scheduleRetry({ runId: run.id, maxAttempts: persisted.attempt_count + 1 });
         assert.equal(retried.status, 'pending', 'Only explicit operator retry clears the terminal cancellation');
         assert.equal(retried.cancelRequestedAt, null);

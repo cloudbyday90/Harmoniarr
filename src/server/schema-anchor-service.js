@@ -20,6 +20,7 @@ const publicSchema = 'public';
 
 export const criticalSchemaAnchors = Object.freeze({
   columns: Object.freeze([
+    { table: 'job_leases', column: 'acquisition_id' },
     { table: 'notification_queue', column: 'terminal_at' },
     { table: 'user_push_subscriptions', column: 'registration_token' },
     { table: 'notification_queue', column: 'expires_at' },

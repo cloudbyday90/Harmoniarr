@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createTestJobLease } from '../../testing/server/job-lease-fixtures.js';
 import test from 'node:test';
 import { createImportCandidateApplyWorker } from '../../src/server/import-candidates/import-candidate-apply-worker.js';
 
@@ -64,7 +65,7 @@ test('automatic quality failure forwards the original pre-gate candidate to owni
     const acceptedCandidate = { id: 'candidate-ready-1', status: 'import_pending', sourceSearchId: 'accepted-search',
       updatedAt: '2026-10-08T20:00:00.000Z', files: [{ id: 'accepted-file', filename: '01.mp3', sizeBytes: 1000 }],
       normalizedPayload: { musicQueue: saved } };
-    const worker = createImportCandidateApplyWorker({ acquireLease: async () => {}, releaseLease: async () => {},
+    const worker = createImportCandidateApplyWorker({ acquireLease: async ({ runId }) => createTestJobLease('import_candidate_apply', runId), releaseLease: async () => {},
       buildImportPendingCandidateSummary: async () => ({ importPendingCandidates: [createReadyImportCandidate()] }),
       resolveCurrentSafeAutoAddCandidate: async ({ summaryCandidate }) => ({ ...summaryCandidate, musicQueueContext: current,
         recheckPolicySnapshot: { candidate: structuredClone(acceptedCandidate) } }),
@@ -92,6 +93,7 @@ test('automatic quality failure forwards the original pre-gate candidate to owni
 });
 
 test('guarded worker captures current provenance before delayed media preview and refuses drift before mutation', async (t) => {
+  const acquireLease = t.mock.fn(async ({ runId }) => createTestJobLease('import_candidate_apply', runId));
   const calls = [];
   let candidateVersion = 1;
   let mutations = 0;
@@ -99,7 +101,7 @@ test('guarded worker captures current provenance before delayed media preview an
   let complete;
   const completed = new Promise((resolve) => { complete = resolve; });
   const candidate = createReadyImportCandidate();
-  const worker = createImportCandidateApplyWorker({ acquireLease: async () => {}, releaseLease: async () => {},
+  const worker = createImportCandidateApplyWorker({ acquireLease, releaseLease: async () => {},
     buildImportPendingCandidateSummary: async () => ({ importPendingCandidates: [candidate] }),
     resolveCurrentSafeAutoAddCandidate: async ({ summaryCandidate, runId }) => {
       calls.push('snapshot'); assert.equal(runId, 'guarded-run'); return { ...summaryCandidate, candidateVersion };
@@ -135,7 +137,7 @@ test('owned quality-block Activity waits for committed terminal history and omit
     const done = new Promise((resolve) => { complete = resolve; });
     const owned = createReadyImportCandidate({ musicQueueContext: { wantedReleaseId, profileCode: 'lossless_archive' },
       releaseIdentity: { artistName: 'Artist', releaseTitle: 'Release' } });
-    const worker = createImportCandidateApplyWorker({ acquireLease: async () => {}, releaseLease: async () => {},
+    const worker = createImportCandidateApplyWorker({ acquireLease: async ({ runId }) => createTestJobLease('import_candidate_apply', runId), releaseLease: async () => {},
       buildImportPendingCandidateSummary: async () => ({ importPendingCandidates: [owned] }),
       previewImportCandidateApply: async () => { await Promise.resolve(); return createVerifiedApplyPreview(); },
       safeAutoAddQualityGateService: { evaluateSafeAutoAddQuality: async () => ({ eligible: false,
@@ -165,6 +167,7 @@ test('owned quality-block Activity waits for committed terminal history and omit
 });
 
 test('import apply worker applies ready candidates and persists per-item outcomes', async (t) => {
+  const acquireLease = t.mock.fn(async ({ runId }) => createTestJobLease('import_candidate_apply', runId));
   const markImportCandidateApplied = t.mock.fn(async () => ({}));
   const replaceImportApplyRunItems = t.mock.fn(async () => []);
   const updateImportApplyRunItem = t.mock.fn(async () => null);
@@ -177,7 +180,7 @@ test('import apply worker applies ready candidates and persists per-item outcome
     resolveCompleted();
   });
   const worker = createImportCandidateApplyWorker({
-    acquireLease: async () => {},
+    acquireLease,
     applyImportCandidatePreview: t.mock.fn(async () => ({
       executionMode: 'move',
       fileOperations: [{ status: 'applied' }],
@@ -282,6 +285,7 @@ test('import apply worker applies ready candidates and persists per-item outcome
   assert.equal(markRunStarted.mock.callCount(), 1);
   assert.equal(markRunCompleted.mock.callCount(), 1);
   assert.deepEqual(markRunCompleted.mock.calls[0].arguments, [{
+    expectedLease: await acquireLease.mock.calls.at(-1).result,
     runId: 'run-apply-1',
     summary: {
       appliedCount: 1,
@@ -300,6 +304,7 @@ test('import apply worker applies ready candidates and persists per-item outcome
 });
 
 test('import apply worker safe-auto mode skips warning and blocked candidates', async (t) => {
+  const acquireLease = t.mock.fn(async ({ runId }) => createTestJobLease('import_candidate_apply', runId));
   const markImportCandidateApplied = t.mock.fn(async () => ({}));
   const replaceImportApplyRunItems = t.mock.fn(async () => []);
   const updateImportApplyRunItem = t.mock.fn(async () => null);
@@ -320,7 +325,7 @@ test('import apply worker safe-auto mode skips warning and blocked candidates', 
     importStatus: { code: 'blocked', message: 'Collision review is required.' },
   });
   const worker = createImportCandidateApplyWorker({
-    acquireLease: async () => {},
+    acquireLease,
     applyImportCandidatePreview: async () => ({
       executionMode: 'move',
       fileOperations: [{ status: 'applied' }],
@@ -378,6 +383,7 @@ test('import apply worker safe-auto mode skips warning and blocked candidates', 
   assert.equal(updateImportApplyRunItem.mock.calls[0].arguments[0].importCandidateId, 'candidate-ready-auto');
   assert.equal(markImportCandidateApplied.mock.callCount(), 1);
   assert.deepEqual(markRunCompleted.mock.calls[0].arguments, [{
+    expectedLease: await acquireLease.mock.calls.at(-1).result,
     runId: 'run-safe-auto-1',
     summary: {
       appliedCount: 1,
@@ -399,6 +405,7 @@ test('import apply worker safe-auto mode skips warning and blocked candidates', 
 });
 
 test('import apply worker keeps the Music Queue release correlation when it records a library add', async (t) => {
+  const acquireLease = t.mock.fn(async ({ runId }) => createTestJobLease('import_candidate_apply', runId));
   const activityEvents = [];
   let resolveCompleted;
   const completed = new Promise((resolve) => {
@@ -408,7 +415,7 @@ test('import apply worker keeps the Music Queue release correlation when it reco
     resolveCompleted();
   });
   const worker = createImportCandidateApplyWorker({
-    acquireLease: async () => {},
+    acquireLease,
     applyImportCandidatePreview: async () => ({
       executionMode: 'move',
       fileOperations: [{ status: 'applied' }],
@@ -456,6 +463,7 @@ test('import apply worker keeps the Music Queue release correlation when it reco
 });
 
 test('import apply worker safe-auto mode blocks strict lossless candidates without verified quality evidence', async (t) => {
+  const acquireLease = t.mock.fn(async ({ runId }) => createTestJobLease('import_candidate_apply', runId));
   const applyImportCandidatePreview = t.mock.fn(async () => ({
     executionMode: 'move',
     fileOperations: [{ status: 'applied' }],
@@ -485,7 +493,7 @@ test('import apply worker safe-auto mode blocks strict lossless candidates witho
   });
 
   const worker = createImportCandidateApplyWorker({
-    acquireLease: async () => {},
+    acquireLease,
     applyImportCandidatePreview,
     buildImportPendingCandidateSummary: async () => ({
       counts: { blocked: 0, ready: 1, readyWithWarnings: 0, totalImportPending: 1 },
@@ -576,6 +584,7 @@ test('import apply worker safe-auto mode blocks strict lossless candidates witho
   );
   assert.match(updateImportApplyRunItem.mock.calls[0].arguments[0].statusMessage, /verified lossless checks/);
   assert.deepEqual(markRunCompleted.mock.calls[0].arguments, [{
+    expectedLease: await acquireLease.mock.calls.at(-1).result,
     runId: 'run-safe-auto-quality-block',
     summary: {
       appliedCount: 0,
@@ -601,6 +610,7 @@ test('import apply worker safe-auto mode blocks strict lossless candidates witho
 });
 
 test('import apply worker schedules one library scan after a completed run with applied candidates', async (t) => {
+  const acquireLease = t.mock.fn(async ({ runId }) => createTestJobLease('import_candidate_apply', runId));
   const callOrder = [];
   let resolveScheduled;
   const scheduled = new Promise((resolve) => {
@@ -612,7 +622,7 @@ test('import apply worker schedules one library scan after a completed run with 
   });
 
   const worker = createImportCandidateApplyWorker({
-    acquireLease: async () => {},
+    acquireLease,
     applyImportCandidatePreview: async () => ({
       executionMode: 'move',
       fileOperations: [{ status: 'applied' }],
@@ -671,6 +681,7 @@ test('import apply worker schedules one library scan after a completed run with 
 });
 
 test('import apply worker does not schedule a library scan when every candidate fails or is blocked', async (t) => {
+  const acquireLease = t.mock.fn(async ({ runId }) => createTestJobLease('import_candidate_apply', runId));
   const scheduleLibraryScan = t.mock.fn(async () => {});
   let resolveCompleted;
   const completed = new Promise((resolve) => {
@@ -678,7 +689,7 @@ test('import apply worker does not schedule a library scan when every candidate 
   });
 
   const worker = createImportCandidateApplyWorker({
-    acquireLease: async () => {},
+    acquireLease,
     applyImportCandidatePreview: async () => ({
       executionMode: 'move',
       fileOperations: [{ status: 'failed' }],
@@ -729,6 +740,7 @@ test('import apply worker does not schedule a library scan when every candidate 
 });
 
 test('import apply worker swallows library scan scheduling errors after successful apply', async (t) => {
+  const acquireLease = t.mock.fn(async ({ runId }) => createTestJobLease('import_candidate_apply', runId));
   const markRunFailed = t.mock.fn(async () => {});
   const scheduleLibraryScan = t.mock.fn(async () => {
     const error = new Error('A library scan is already running or queued');
@@ -742,7 +754,7 @@ test('import apply worker swallows library scan scheduling errors after successf
   });
 
   const worker = createImportCandidateApplyWorker({
-    acquireLease: async () => {},
+    acquireLease,
     applyImportCandidatePreview: async () => ({
       executionMode: 'move',
       fileOperations: [{ status: 'applied' }],
@@ -782,6 +794,7 @@ test('import apply worker swallows library scan scheduling errors after successf
   });
 
   assert.deepEqual(await released, {
+    expectedLease: await acquireLease.mock.calls.at(-1).result,
     runId: 'run-auto-scan-error',
     status: 'completed',
   });
@@ -790,6 +803,7 @@ test('import apply worker swallows library scan scheduling errors after successf
 });
 
 test('import apply worker does not schedule a library scan after cancellation', async (t) => {
+  const acquireLease = t.mock.fn(async ({ runId }) => createTestJobLease('import_candidate_apply', runId));
   const markRunCancelled = t.mock.fn(async () => {});
   const markRunCompleted = t.mock.fn(async () => {});
   const scheduleLibraryScan = t.mock.fn(async () => {});
@@ -799,7 +813,7 @@ test('import apply worker does not schedule a library scan after cancellation', 
   });
 
   const worker = createImportCandidateApplyWorker({
-    acquireLease: async () => {},
+    acquireLease,
     isCancellationRequested: async () => true,
     markRunCancelled,
     markRunCompleted,
@@ -819,6 +833,7 @@ test('import apply worker does not schedule a library scan after cancellation', 
   });
 
   assert.deepEqual(await released, {
+    expectedLease: await acquireLease.mock.calls.at(-1).result,
     runId: 'run-auto-scan-cancelled',
     status: 'cancelled',
   });
@@ -828,13 +843,14 @@ test('import apply worker does not schedule a library scan after cancellation', 
 });
 
 test('import apply worker upgrades skipped-file applies to applied_with_warnings', async (t) => {
+  const acquireLease = t.mock.fn(async ({ runId }) => createTestJobLease('import_candidate_apply', runId));
   const updateImportApplyRunItem = t.mock.fn(async () => null);
   let resolveCompleted;
   const completed = new Promise((resolve) => {
     resolveCompleted = resolve;
   });
   const worker = createImportCandidateApplyWorker({
-    acquireLease: async () => {},
+    acquireLease,
     applyImportCandidatePreview: async () => ({
       executionMode: 'move',
       fileOperations: [{ status: 'skipped' }],
@@ -908,6 +924,7 @@ test('import apply worker upgrades skipped-file applies to applied_with_warnings
 });
 
 test('import apply worker fires sendFulfillmentNotificationFn fire-and-forget when candidate has requestOwnership', async (t) => {
+  const acquireLease = t.mock.fn(async ({ runId }) => createTestJobLease('import_candidate_apply', runId));
   let notifiedUserId = null;
   let resolveCompleted;
   const completed = new Promise((resolve) => {
@@ -915,7 +932,7 @@ test('import apply worker fires sendFulfillmentNotificationFn fire-and-forget wh
   });
 
   const worker = createImportCandidateApplyWorker({
-    acquireLease: async () => {},
+    acquireLease,
     applyImportCandidatePreview: async () => ({
       executionMode: 'move',
       fileOperations: [{ status: 'applied' }],
@@ -982,7 +999,7 @@ test('import apply worker fires sendFulfillmentNotificationFn fire-and-forget wh
 });
 
 test('import apply worker requeues the run when a maintenance pause is requested', async (t) => {
-  const acquireLease = t.mock.fn(async () => {});
+  const acquireLease = t.mock.fn(async ({ runId }) => createTestJobLease('import_candidate_apply', runId));
   const releaseLease = t.mock.fn(async () => {});
   const markRunStarted = t.mock.fn(async () => {});
   const markRunCompleted = t.mock.fn(async () => {});
@@ -1033,6 +1050,7 @@ test('import apply worker requeues the run when a maintenance pause is requested
   assert.equal(markRunFailed.mock.callCount(), 0);
   assert.equal(markRunCancelled.mock.callCount(), 0);
   assert.deepEqual(pausedArgs, {
+    expectedLease: await acquireLease.mock.calls[0].result,
     nextAttemptAt: '2026-05-04T12:30:00.000Z',
     runId: 'run-paused',
     summary: {
@@ -1046,12 +1064,14 @@ test('import apply worker requeues the run when a maintenance pause is requested
     },
   });
   assert.deepEqual(releasedLeaseArgs, {
+    expectedLease: await acquireLease.mock.calls[0].result,
     runId: 'run-paused',
     status: 'paused',
   });
 });
 
 test('import apply worker does not call sendFulfillmentNotificationFn when candidate has no requestOwnership', async (t) => {
+  const acquireLease = t.mock.fn(async ({ runId }) => createTestJobLease('import_candidate_apply', runId));
   let notifyCallCount = 0;
   let resolveCompleted;
   const completed = new Promise((resolve) => {
@@ -1059,7 +1079,7 @@ test('import apply worker does not call sendFulfillmentNotificationFn when candi
   });
 
   const worker = createImportCandidateApplyWorker({
-    acquireLease: async () => {},
+    acquireLease,
     applyImportCandidatePreview: async () => ({
       executionMode: 'move',
       fileOperations: [{ status: 'applied' }],
@@ -1118,6 +1138,7 @@ test('import apply worker does not call sendFulfillmentNotificationFn when candi
 });
 
 test('import apply worker holds an ambiguous filesystem checkpoint without invoking another file mutation', async (t) => {
+  const acquireLease = t.mock.fn(async ({ runId }) => createTestJobLease('import_candidate_apply', runId));
   const updateImportApplyRunItem = t.mock.fn(async () => null);
   const applyImportCandidatePreview = t.mock.fn(async () => {
     throw new Error('The filesystem mutator must not run for an ambiguous checkpoint.');
@@ -1141,7 +1162,7 @@ test('import apply worker holds an ambiguous filesystem checkpoint without invok
     stepType: 'stage',
   };
   const worker = createImportCandidateApplyWorker({
-    acquireLease: async () => {},
+    acquireLease,
     applyImportCandidatePreview,
     buildImportPendingCandidateSummary: async () => ({
       counts: { blocked: 0, ready: 1, readyWithWarnings: 0, totalImportPending: 1 },

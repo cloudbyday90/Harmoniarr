@@ -1,135 +1,107 @@
+/*
+ * Harmoniarr - Soulseek-native music library management
+ * Copyright (C) 2026 Harmoniarr Contributors
+ * This program is free software: licensed under GPL-3.0-or-later.
+ * See LICENSE for details.
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { randomUUID } from 'node:crypto';
 import { createOperationStrandedRunRecoveryService } from '../../src/server/operation-stranded-run-recovery-service.js';
 
-test('operation stranded run recovery retries running work whose lease has expired', async (t) => {
-  const releaseLease = t.mock.fn(async () => ({}));
-  const recoverRunForRetry = t.mock.fn(async () => ({
-    id: 'run-81',
-    status: 'pending',
-  }));
+const detectedAt = '2026-10-09T21:00:00.000Z';
+function harness(t, { missingLease = false, exhausted = false, active = false, outcome = null, stale = false,
+  failure = null, empty = false } = {}) {
+  const run = { id: randomUUID(), status: 'running', operationType: 'library_scan', attemptCount: exhausted ? 3 : 1,
+    maxAttempts: 3, claimedAt: null, claimedByInstanceId: null };
+  const lease = { leaseKey: run.operationType + ':' + run.id, ownerInstanceId: 'pid:44', acquisitionId: randomUUID(),
+    acquiredAt: '2026-10-09T20:59:00.000Z', expiresAt: '2026-10-09T20:59:59.000Z',
+    releasedAt: null, state: active ? 'active' : 'expired' };
+  const buildRetrySchedule = t.mock.fn(({ attemptCount, maxAttempts }) => attemptCount < maxAttempts
+    ? { delayMs: 30000, nextAttemptAt: '2026-10-09T21:00:30.000Z', scheduledAt: detectedAt } : null);
+  const recoverStrandedRun = t.mock.fn(async (input) => {
+    if (failure) throw failure;
+    if (stale) return null;
+    const schedule = input.buildRetrySchedule({ attemptCount: run.attemptCount, maxAttempts: run.maxAttempts });
+    return { id: run.id, status: outcome ?? (schedule ? 'pending' : 'failed') };
+  });
+  const releaseLease = t.mock.fn(() => assert.fail('The atomic owner must release its captured lease'));
+  const getLease = t.mock.fn(() => assert.fail('A delayed observation must not acquire the newest token'));
+  const listLeases = t.mock.fn(async () => missingLease ? [] : [lease]);
   const service = createOperationStrandedRunRecoveryService({
-    jobLeaseStore: {
-      listLeases: t.mock.fn(async () => [{
-        leaseKey: 'library_scan:run-81',
-        state: 'expired',
-      }]),
-      releaseLease,
-    },
-    nowFn: () => new Date('2026-05-01T04:00:00.000Z'),
-    operationQueueStore: {
-      listRecoverableRuns: t.mock.fn(async () => [{
-        attemptCount: 1,
-        id: 'run-81',
-        maxAttempts: 3,
-        operationType: 'library_scan',
-      }]),
-      markStrandedRunFailed: t.mock.fn(async () => null),
-      recoverRunForRetry,
-    },
-    retryPolicyService: {
-      buildRetrySchedule: t.mock.fn(() => ({
-        delayMs: 30000,
-        nextAttemptAt: '2026-05-01T04:00:30.000Z',
-        scheduledAt: '2026-05-01T04:00:00.000Z',
-      })),
-    },
+    jobLeaseStore: { listLeases, releaseLease, getLease },
+    operationQueueStore: { listRecoverableRuns: async () => empty ? [] : [run], recoverStrandedRun },
+    retryPolicyService: { buildRetrySchedule }, nowFn: () => new Date(detectedAt),
   });
+  return { service, run, lease, recoverStrandedRun, listLeases, releaseLease, getLease, buildRetrySchedule };
+}
+const counts = (overrides = {}) => ({ activeLeaseCount: 0, cancelledCount: 0, failedCount: 0,
+  retriedCount: 0, scannedCount: 1, skipped: false, ...overrides });
 
-  const result = await service.recoverStrandedRuns({
-    operationTypes: ['library_scan'],
-  });
-
-  assert.deepEqual(releaseLease.mock.calls[0].arguments[0], {
-    leaseKey: 'library_scan:run-81',
-    status: 'expired',
-  });
-  assert.deepEqual(recoverRunForRetry.mock.calls[0].arguments[0], {
-    maxAttempts: 3,
-    nextAttemptAt: '2026-05-01T04:00:30.000Z',
-    runId: 'run-81',
-    summary: {
-      currentStep: 'Automatic retry scheduled after stranded run recovery',
-      lastFailureMessage: 'Worker lease expired during stranded run recovery',
-      recoveryDetectedAt: '2026-05-01T04:00:00.000Z',
-      recoveryReason: 'lease_expired',
-      retryScheduledAt: '2026-05-01T04:00:30.000Z',
-    },
-  });
-  assert.deepEqual(result, {
-    activeLeaseCount: 0,
-    cancelledCount: 0,
-    failedCount: 0,
-    retriedCount: 1,
-    scannedCount: 1,
-    skipped: false,
-  });
+test('operation stranded recovery forwards the exact expired observation to one atomic retry owner', async (t) => {
+  const h = harness(t);
+  assert.deepEqual(await h.service.recoverStrandedRuns({ operationTypes: ['library_scan'] }), counts({ retriedCount: 1 }));
+  assert.deepEqual(h.recoverStrandedRun.mock.calls[0].arguments[0], {
+    observedRun: h.run, expectedLease: h.lease, recoverySummary: { recoveryDetectedAt: detectedAt, recoveryReason: 'lease_expired' },
+    errorMessage: 'Worker lease expired during stranded run recovery', buildRetrySchedule: h.buildRetrySchedule });
+  assert.equal(h.recoverStrandedRun.mock.callCount(), 1);
+  assert.equal(h.releaseLease.mock.callCount(), 0);
+  assert.equal(h.getLease.mock.callCount(), 0);
+  assert.deepEqual(h.buildRetrySchedule.mock.calls[0].arguments[0], { attemptCount: 1, maxAttempts: 3 });
 });
 
-test('operation stranded run recovery fails exhausted running work with a missing lease', async (t) => {
-  const markStrandedRunFailed = t.mock.fn(async () => ({
-    id: 'run-82',
-    status: 'failed',
-  }));
-  const service = createOperationStrandedRunRecoveryService({
-    jobLeaseStore: {
-      listLeases: t.mock.fn(async () => []),
-      releaseLease: t.mock.fn(async () => ({})),
-    },
-    nowFn: () => new Date('2026-05-01T04:05:00.000Z'),
-    operationQueueStore: {
-      listRecoverableRuns: t.mock.fn(async () => [{
-        attemptCount: 3,
-        id: 'run-82',
-        maxAttempts: 3,
-        operationType: 'artwork_cleanup',
-      }]),
-      markStrandedRunFailed,
-      recoverRunForRetry: t.mock.fn(async () => null),
-    },
-    retryPolicyService: {
-      buildRetrySchedule: t.mock.fn(() => null),
-    },
-  });
-
-  const result = await service.recoverStrandedRuns();
-
-  assert.deepEqual(markStrandedRunFailed.mock.calls[0].arguments[0], {
-    errorMessage: 'Worker lease was missing during stranded run recovery',
-    runId: 'run-82',
-    summary: {
-      currentStep: 'Stranded run recovery marked the run as failed',
-      recoveryDetectedAt: '2026-05-01T04:05:00.000Z',
-      recoveryReason: 'lease_missing',
-    },
-  });
-  assert.deepEqual(result, {
-    activeLeaseCount: 0,
-    cancelledCount: 0,
-    failedCount: 1,
-    retriedCount: 0,
-    scannedCount: 1,
-    skipped: false,
-  });
+test('operation stranded recovery reports the atomic exhausted missing-lease failure', async (t) => {
+  const h = harness(t, { missingLease: true, exhausted: true });
+  assert.deepEqual(await h.service.recoverStrandedRuns(), counts({ failedCount: 1 }));
+  const input = h.recoverStrandedRun.mock.calls[0].arguments[0];
+  assert.equal(input.expectedLease, null);
+  assert.equal(input.errorMessage, 'Worker lease was missing during stranded run recovery');
+  assert.deepEqual(input.recoverySummary, { recoveryDetectedAt: detectedAt, recoveryReason: 'lease_missing' });
+  assert.deepEqual(h.buildRetrySchedule.mock.calls[0].arguments[0], { attemptCount: 3, maxAttempts: 3 });
+  assert.equal(h.releaseLease.mock.callCount(), 0);
 });
+
 for (const exhausted of [false, true]) {
-  test(`stranded recovery reports persisted cancellation when ${exhausted ? 'the retry budget is exhausted' : 'a retry was otherwise available'}`, async (t) => {
-    const cancelled = { id: 'run-cancelled', status: 'cancelled' };
-    const recoverRunForRetry = t.mock.fn(async () => cancelled);
-    const markStrandedRunFailed = t.mock.fn(async () => cancelled);
-    const service = createOperationStrandedRunRecoveryService({
-      jobLeaseStore: { listLeases: async () => [], releaseLease: async () => {} },
-      operationQueueStore: {
-        listRecoverableRuns: async () => [{ id: cancelled.id, operationType: 'library_scan', attemptCount: 1, maxAttempts: 3 }],
-        recoverRunForRetry, markStrandedRunFailed,
-      },
-      retryPolicyService: { buildRetrySchedule: () => exhausted ? null : { nextAttemptAt: '2026-09-11T12:00:00.000Z' } },
-    });
-    const result = await service.recoverStrandedRuns();
-    assert.equal(result.cancelledCount, 1);
-    assert.equal(result.retriedCount, 0);
-    assert.equal(result.failedCount, 0);
-    assert.equal(recoverRunForRetry.mock.callCount(), exhausted ? 0 : 1);
-    assert.equal(markStrandedRunFailed.mock.callCount(), exhausted ? 1 : 0);
+  test('stranded recovery counts persisted cancellation when retry budget ' + (exhausted ? 'is exhausted' : 'remains'), async (t) => {
+    const h = harness(t, { missingLease: true, exhausted, outcome: 'cancelled' });
+    assert.deepEqual(await h.service.recoverStrandedRuns(), counts({ cancelledCount: 1 }));
+    assert.equal(h.recoverStrandedRun.mock.callCount(), 1);
+    assert.equal(h.releaseLease.mock.callCount(), 0);
+    assert.equal(h.buildRetrySchedule.mock.callCount(), 1);
   });
 }
+
+test('an active observed lease is skipped without invoking any recovery mutation', async (t) => {
+  const h = harness(t, { active: true });
+  assert.deepEqual(await h.service.recoverStrandedRuns(), counts({ activeLeaseCount: 1 }));
+  assert.equal(h.recoverStrandedRun.mock.callCount(), 0);
+  assert.equal(h.releaseLease.mock.callCount(), 0);
+});
+
+test('a stale atomic refusal is not reported as retry/failure/cancellation or retried using a latest token', async (t) => {
+  const h = harness(t, { stale: true });
+  const original = structuredClone(h.lease);
+  assert.deepEqual(await h.service.recoverStrandedRuns(), counts());
+  assert.deepEqual(h.recoverStrandedRun.mock.calls[0].arguments[0].expectedLease, original);
+  assert.equal(h.recoverStrandedRun.mock.callCount(), 1);
+  assert.equal(h.buildRetrySchedule.mock.callCount(), 0);
+  assert.equal(h.getLease.mock.callCount(), 0);
+  assert.equal(h.releaseLease.mock.callCount(), 0);
+});
+
+test('empty recovery inventory performs no lease read or mutation', async (t) => {
+  const h = harness(t, { empty: true });
+  assert.deepEqual(await h.service.recoverStrandedRuns(), counts({ scannedCount: 0, skipped: true }));
+  assert.equal(h.listLeases.mock.callCount(), 0);
+  assert.equal(h.recoverStrandedRun.mock.callCount(), 0);
+});
+
+test('atomic owner errors propagate without key-only cleanup or false success reporting', async (t) => {
+  const failure = new Error('Controlled atomic owner failure');
+  const h = harness(t, { failure });
+  await assert.rejects(h.service.recoverStrandedRuns(), (error) => error === failure);
+  assert.equal(h.recoverStrandedRun.mock.callCount(), 1);
+  assert.equal(h.releaseLease.mock.callCount(), 0);
+  assert.equal(h.getLease.mock.callCount(), 0);
+});

@@ -9,6 +9,7 @@ import { getPool } from '../database.js';
 import { normalizeJobLease } from '../job-lease-store.js';
 import { createImportExecutionHandoffStore } from './import-execution-handoff-store.js';
 import { writableExecutionRunSql } from './import-execution-origin-sql.js';
+import { lockJobLeaseKey } from '../job-lease-lock-store.js';
 
 /** One candidate/run/item/lease owner controls the private local preparation protocol. */
 export function createImportExecutionPreProviderStore({ getPoolFn = getPool } = {}) {
@@ -22,10 +23,10 @@ export function createImportExecutionPreProviderStore({ getPoolFn = getPool } = 
       cancelRequestedAt: row.cancel_requested_at, cancelledAt: row.cancelled_at,
       claimedAt: row.claimed_at, claimedByInstanceId: row.claimed_by_instance_id } : null;
     const item = await handoff.getItem({ importCandidateId, operationRunId: runId, lock: true }, queryable);
-    const leaseResult = await queryable.query('SELECT * FROM job_leases WHERE lease_key=$1 FOR UPDATE', [`import_candidate_execution_planning:${runId}`]);
+    const leaseRow = await lockJobLeaseKey({ leaseKey: `import_candidate_execution_planning:${runId}`, queryable });
     const links = await queryable.query(`SELECT COUNT(*)::integer count FROM import_execution_transfer_links
       WHERE operation_run_id=$1::uuid AND import_candidate_id=$2::uuid`, [runId, importCandidateId]);
-    return { run, item, lease: normalizeJobLease(leaseResult.rows[0]), candidate: await handoff.getCandidate(importCandidateId, queryable),
+    return { run, item, lease: normalizeJobLease(leaseRow), candidate: await handoff.getCandidate(importCandidateId, queryable),
       transferLinkCount: links.rows[0].count };
   }
   async function saveEpoch({ context, epoch, itemStatus, statusMessage, handoffState, outcome, queryable }) {

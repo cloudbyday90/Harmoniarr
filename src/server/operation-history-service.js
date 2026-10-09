@@ -45,6 +45,14 @@ function normalizeRunSummary(summary) {
   return summary;
 }
 
+const publicLeaseFields = new Set(['acquiredAt', 'createdAt', 'expiresAt', 'heartbeatAt', 'id', 'jobType',
+  'leaseKey', 'ownerInstanceId', 'releasedAt', 'state', 'status']);
+function toPublicLease(lease) {
+  if (!lease) return null;
+  return Object.fromEntries(Object.entries(lease).filter(([key, value]) => publicLeaseFields.has(key)
+    && (value == null || typeof value === 'string')));
+}
+
 function toOperationRun(row, controlPlaneRedactionService) {
   if (!row) {
     return null;
@@ -105,7 +113,7 @@ export function createOperationHistoryService({
 
     return runs.map((run) => ({
       ...run,
-      lease: leaseMap.get(buildOperationRunLeaseKey(run)) ?? null,
+      lease: toPublicLease(leaseMap.get(buildOperationRunLeaseKey(run))),
     }));
   }
 

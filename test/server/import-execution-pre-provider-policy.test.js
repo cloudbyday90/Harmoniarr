@@ -1,3 +1,10 @@
+/*
+ * Harmoniarr - Soulseek-native music library management
+ * Copyright (C) 2026 Harmoniarr Contributors
+ * This program is free software: licensed under GPL-3.0-or-later.
+ * See LICENSE for details.
+ */
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
@@ -82,16 +89,17 @@ test('null, malformed and noncanonical lease or file manifests are not valid epo
 test('only the same live lease identity owns preparation; expiry, release and reacquisition refuse', () => {
   const f = fixture();
   const now = Date.parse(refusedAt);
-  const current = { ...f.lease, releasedAt: null, expiresAt: '2026-10-09T20:00:02.000Z' };
-  assert.deepEqual(preparationLeaseIdentity(current, f.run.id), f.lease);
-  assert.equal(hasCurrentPreparationLease(current, f.lease, f.run.id, now), true);
+  const expectedLease = { ...f.lease, acquisitionId: randomUUID() };
+  const current = { ...expectedLease, releasedAt: null, expiresAt: '2026-10-09T20:00:02.000Z' };
+  assert.deepEqual(preparationLeaseIdentity(current, f.run.id), expectedLease);
+  assert.equal(hasCurrentPreparationLease(current, expectedLease, f.run.id, now), true);
   for (const change of [{ expiresAt: refusedAt }, { expiresAt: 'invalid' }, { releasedAt: refusedAt },
     { ownerInstanceId: 'worker-2' }, { acquiredAt: refusedAt }, { leaseKey: 'another-operation' }]) {
-    assert.equal(hasCurrentPreparationLease({ ...current, ...change }, f.lease, f.run.id, now), false);
+    assert.equal(hasCurrentPreparationLease({ ...current, ...change }, expectedLease, f.run.id, now), false);
   }
-  assert.equal(hasCurrentPreparationLease(current, f.lease, randomUUID(), now), false);
+  assert.equal(hasCurrentPreparationLease(current, expectedLease, randomUUID(), now), false);
   assert.equal(hasCurrentPreparationLease(current, null, f.run.id, now), false);
-  assert.equal(hasCurrentPreparationLease(current, f.lease, f.run.id, Number.NaN), false);
+  assert.equal(hasCurrentPreparationLease(current, expectedLease, f.run.id, Number.NaN), false);
 });
 
 test('refused and crossed phases cannot be combined to turn uncertainty into a certificate', () => {

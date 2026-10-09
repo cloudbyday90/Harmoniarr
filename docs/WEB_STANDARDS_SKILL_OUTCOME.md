@@ -272,3 +272,25 @@ the four maintained files match by SHA-256 after synchronization, and both
 entry-point reference links resolve. These checks establish structure and byte
 identity, not a new behavioral skill trial or standards conformance. Application
 validation and its limits remain separate in the closure outcome.
+
+## Lease acquisition maintenance, October 9
+
+The [lease design](LEASE_ACQUISITION_DESIGN.md) showed that row IDs, instance
+names and timestamps cannot alone distinguish successive acquisitions. The
+references now map captured private tokens through every worker/heartbeat,
+lifecycle and cleanup owner, false ownership outcomes, fresh-time comparisons,
+public allowlists and compatible historical evidence. They also locate the
+actual migration/snapshot/anchor workflow and separate coordinated rollout from
+external side effects already in progress.
+
+Entry point, metadata and invocation policy are unchanged. Repository and
+installed copies passed quick_validate.py; all four files match by SHA-256, and
+both entrypoint reference links resolve. These establish structure and byte
+identity, not a new blind behavioral trial, distributed exactly-once proof or
+standards conformance. Application evidence remains in the separate lease
+outcome, including its provider/filesystem and deployment limits.
+The complete lease run also exposed stale recovery and retention fixtures. The
+evidence map now requires searching production, scripts and continuity scaffolding
+together, retaining exact domain assertions and repeating the original broad
+command after a focused fix. This is reference maintenance; its final structural
+validation and installed-copy identity belong with the lease outcome.

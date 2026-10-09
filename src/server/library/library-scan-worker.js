@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { isOperationRunLeaseLostError } from '../operation-run-lease-error.js';
 import { executeLibraryScan } from './library-scan-executor.js';
 import {
   applyLibraryScanReleaseHints,
@@ -130,23 +131,26 @@ export function createLibraryScanWorker({
     triggerReason = null,
   }) {
     let finalLeaseStatus = 'completed';
+    let acquiredLease = null;
     let leaseHeartbeat = null;
     const triggerSummary = buildScanTriggerSummary({ releaseHints, triggeredByRunId, triggerReason });
 
     try {
-      await acquireLease({ runId });
+      acquiredLease = await acquireLease({ runId });
+      if (!acquiredLease) return;
       if (renewLease) {
-        leaseHeartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId });
+        leaseHeartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId, expectedLease: acquiredLease });
         leaseHeartbeat.start();
       }
       await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
-      await markRunStarted({
+      if (await markRunStarted({
+        expectedLease: acquiredLease,
         runId,
         summary: {
           libraryRoot,
           ...triggerSummary,
         },
-      });
+      }) === false) { finalLeaseStatus = 'failed'; return; }
 
       const phaseTiming = buildPhaseTiming();
       const observedFiles = [];
@@ -205,7 +209,8 @@ export function createLibraryScanWorker({
           await captureLibrarySidecarArtwork({
             files: catalogResult.files,
           });
-        } catch {
+        } catch (sidecarError) {
+          if (isOperationRunLeaseLostError(sidecarError)) throw sidecarError;
           // Sidecar artwork capture is best-effort and must not fail the scan.
         }
         phaseTiming.finishPhase('sidecar_artwork');
@@ -240,7 +245,8 @@ export function createLibraryScanWorker({
         phaseTiming.finishPhase('discovery_reconciliation');
       }
 
-      await markRunCompleted({
+      if (await markRunCompleted({
+        expectedLease: acquiredLease,
         runId,
         summary: {
           ...summary,
@@ -248,11 +254,13 @@ export function createLibraryScanWorker({
           phases: phaseTiming.toJson(),
           ...triggerSummary,
         },
-      });
+      }) === false) { finalLeaseStatus = 'failed'; return; }
     } catch (error) {
+      if (!acquiredLease || isOperationRunLeaseLostError(error)) { finalLeaseStatus = 'failed'; return; }
       if (isOperationRunPauseError(error)) {
         finalLeaseStatus = 'paused';
-        await markRunPaused({
+        if (await markRunPaused({
+          expectedLease: acquiredLease,
           nextAttemptAt: error.nextRetryAt ?? null,
           runId,
           summary: {
@@ -263,36 +271,38 @@ export function createLibraryScanWorker({
             pauseProvider: error.pauseProvider ?? null,
             ...triggerSummary,
           },
-        });
+        }) === false) { finalLeaseStatus = 'failed'; return; }
         return;
       }
 
       if (isOperationRunCancellationError(error)) {
         finalLeaseStatus = 'cancelled';
-        await markRunCancelled({
+        if (await markRunCancelled({
+          expectedLease: acquiredLease,
           runId,
           summary: {
             currentStep: 'Library scan cancelled',
             libraryRoot,
             ...triggerSummary,
           },
-        });
+        }) === false) { finalLeaseStatus = 'failed'; return; }
         return;
       }
 
       finalLeaseStatus = 'failed';
-      await markRunFailed({
+      if (await markRunFailed({
+        expectedLease: acquiredLease,
         runId,
         errorMessage: error.message,
         summary: {
           libraryRoot,
           ...triggerSummary,
         },
-      });
+      }) === false) { finalLeaseStatus = 'failed'; return; }
     } finally {
       leaseHeartbeat?.stop();
       activeRunIds.delete(runId);
-      await releaseLease({ runId, status: finalLeaseStatus });
+      if (acquiredLease) await releaseLease({ runId, status: finalLeaseStatus, expectedLease: acquiredLease });
     }
   }
 

@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
+import { createTestJobLease } from '../../testing/server/job-lease-fixtures.js';
 import test from 'node:test';
 import { createImportCandidateTranscodeWorker } from '../../src/server/import-candidates/import-candidate-transcode-worker.js';
 
 test('createImportCandidateTranscodeWorker requeues the run when a maintenance pause is requested', async (t) => {
-  const acquireLease = t.mock.fn(async () => {});
+  const acquireLease = t.mock.fn(async ({ runId }) => createTestJobLease('import_candidate_transcode', runId));
   const releaseLease = t.mock.fn(async () => {});
   const markRunStarted = t.mock.fn(async () => {});
   const markRunCompleted = t.mock.fn(async () => {});
@@ -53,6 +54,7 @@ test('createImportCandidateTranscodeWorker requeues the run when a maintenance p
   assert.equal(markRunFailed.mock.callCount(), 0);
   assert.equal(markRunCancelled.mock.callCount(), 0);
   assert.deepEqual(pausedArgs, {
+    expectedLease: await acquireLease.mock.calls[0].result,
     nextAttemptAt: '2026-05-04T12:30:00.000Z',
     runId: 'run-paused',
     summary: {
@@ -64,13 +66,14 @@ test('createImportCandidateTranscodeWorker requeues the run when a maintenance p
     },
   });
   assert.deepEqual(releasedLeaseArgs, {
+    expectedLease: await acquireLease.mock.calls[0].result,
     runId: 'run-paused',
     status: 'paused',
   });
 });
 
 test('createImportCandidateTranscodeWorker executes transcode preflight for transcode candidates', async (t) => {
-  const acquireLease = t.mock.fn(async () => {});
+  const acquireLease = t.mock.fn(async ({ runId }) => createTestJobLease('import_candidate_transcode', runId));
   const markRunStarted = t.mock.fn(async () => {});
   const markRunCompleted = t.mock.fn(async () => {});
   const markRunFailed = t.mock.fn(async () => {});
@@ -198,6 +201,7 @@ test('createImportCandidateTranscodeWorker executes transcode preflight for tran
   assert.equal(completionArgs.summary.notRequiredCount, 0);
   assert.equal(completionArgs.summary.warningCount, 1);
   assert.deepEqual(releasedLeaseArgs, {
+    expectedLease: await acquireLease.mock.calls[0].result,
     runId: 'transcode-run-1',
     status: 'completed',
   });

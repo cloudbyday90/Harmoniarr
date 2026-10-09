@@ -67,7 +67,7 @@ async function start(c, overrides = {}) {
 async function begin(c, { detach = true } = {}) {
   if (detach) await c.pool.query('DELETE FROM import_execution_run_items WHERE operation_run_id=$1', [c.sourceRunId]);
   const lease = await c.executionRuns.acquireLease({ runId: c.newerRunId });
-  await c.executionRuns.markRunStarted({ runId: c.newerRunId });
+  await c.executionRuns.markRunStarted({ runId: c.newerRunId, expectedLease: lease });
   const candidate = await c.evidenceStore.getCandidate(c.candidate.id);
   const preparation = await c.preparation.beginPreparation({ ...owner(c), lease, requestedFiles: files(candidate),
     sourceObservation: captureRecoveryObservation(candidate) });
@@ -169,7 +169,7 @@ suite('Future-only preparation refusal in real PostgreSQL and native controlled 
     assert.equal(await c.preparation.refusePreparation({ ...first, reasonCode: 'planning_blocked' }), true);
     assert.equal((await c.preparation.beginPreparation({ ...first, requestedFiles: files(first.candidate),
       sourceObservation: captureRecoveryObservation(first.candidate) })).allowPreparation, false);
-    await c.executionRuns.releaseLease({ runId: c.newerRunId, status: 'failed' });
+    await c.executionRuns.releaseLease({ runId: c.newerRunId, status: 'failed', expectedLease: first.lease });
     const secondLease = await c.executionRuns.acquireLease({ runId: c.newerRunId });
     const second = await c.preparation.beginPreparation({ ...owner(c), lease: secondLease,
       requestedFiles: files(first.candidate), sourceObservation: captureRecoveryObservation(first.candidate) });
@@ -215,8 +215,8 @@ suite('Future-only preparation refusal in real PostgreSQL and native controlled 
   test('lifecycle writers preserve the protocol and both retention paths keep a refused epoch fence', { timeout: config.scenarioTimeoutMs }, async (t) => scenario(t, async (c) => {
     const input = await begin(c);
     assert.equal(await c.preparation.refusePreparation({ ...input, reasonCode: 'planning_blocked' }), true);
-    await c.executionRuns.releaseLease({ runId: c.newerRunId, status: 'completed' });
-    await c.executionRuns.markRunCompleted({ runId: c.newerRunId, summary: { downloadPreparationProtocol: null } });
+    await c.executionRuns.markRunCompleted({ runId: c.newerRunId, expectedLease: input.lease, summary: { downloadPreparationProtocol: null } });
+    await c.executionRuns.releaseLease({ runId: c.newerRunId, status: 'completed', expectedLease: input.lease });
     assert.equal(hasCertifiedPreProviderRefusal(await read(c)), true);
     await c.pool.query("UPDATE operation_runs SET finished_at=NOW()-INTERVAL '100 days' WHERE id=$1", [c.newerRunId]);
     const runStore = createOperationRunStore({ getPoolFn: c.getPoolFn, operationType: 'import_candidate_execution_planning' });

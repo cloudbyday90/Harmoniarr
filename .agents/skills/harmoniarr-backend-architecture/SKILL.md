@@ -18,7 +18,7 @@ Start by locating the existing boundary for the domain:
 - Routes: `src/server/routes/`
 - Shared route inventory: `src/server/route-inventory.js`
 - Migrations: `src/server/migrations/`
-- Schema snapshot and anchors: `database/schema/current.sql`, `src/server/schema-anchor-service.js`
+- Schema snapshot and anchors: `src/server/schema-snapshot.sql`, `src/server/schema-anchor-service.js`
 
 ## Boundary Rules
 

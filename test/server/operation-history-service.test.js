@@ -21,6 +21,24 @@ test('operation history preserves a fail-closed public retry flag while omitting
   }
 });
 
+test('public lease diagnostics retain stable row identity and expired state without acquisition authority or nested tokens', async () => {
+  const lease = { id: 'stable-row', jobType: 'library_scan', leaseKey: 'library_scan:run', ownerInstanceId: 'worker',
+    acquiredAt: '2026-10-09T00:00:00.000Z', heartbeatAt: '2026-10-09T00:01:00.000Z', expiresAt: '2026-10-09T00:02:00.000Z',
+    releasedAt: null, state: 'expired', status: 'active', acquisitionId: 'private-acquisition-token',
+    raw: { acquisition_id: 'private-nested-token' }, createdAt: { acquisitionId: 'private-unexpected-value-token' } };
+  const original = structuredClone(lease);
+  const row = { id: 'run', operation_type: 'library_scan', status: 'running', summary: {} };
+  const service = createOperationHistoryService({ getPoolFn: () => ({ query: async () => ({ rows: [row] }) }),
+    jobLeaseStore: { listLeases: async () => [lease] }, auditReadService: { listAuditEventsForEntity: async () => [] } });
+  const history = await service.buildOperationHistory(); const detail = await service.buildOperationRunDetail({ runId: row.id });
+  for (const value of [history.runs[0], detail.run]) {
+    assert.equal(value.lease.id, 'stable-row'); assert.equal(value.lease.state, 'expired'); assert.equal(value.lease.status, 'active');
+    assert.equal(value.lease.ownerInstanceId, 'worker'); assert.equal(value.lease.expiresAt, lease.expiresAt);
+    assert.doesNotMatch(JSON.stringify(value), /private-|acquisitionId|acquisition_id|"raw"/u);
+  }
+  assert.deepEqual(lease, original);
+});
+
 test('operation history service lists recent runs across operation types', async (t) => {
   const query = t.mock.fn(async () => ({
     rows: [{

@@ -3297,6 +3297,27 @@ No table, migration or schema snapshot is added. See separate
 [design](ABANDONED_PREPARATION_DESIGN.md) and
 [outcome](ABANDONED_PREPARATION_OUTCOME.md) for scope, evidence and limits.
 
+## Current implementation: lease acquisition fencing
+
+The October 9 additive migration adds `job_leases.acquisition_id UUID NOT NULL`
+with a random default/backfill. The stable surrogate `id` remains diagnostic
+identity; each successful acquisition rotates the private UUID. Renewal and
+release compare the captured key, owner and token, while renewal and worker
+lifecycle mutations require current unexpired ownership.
+
+Existing operation-run, advisory lease-key and lease-row locks serialize
+acquisition, lifecycle and stranded recovery. The key lock protects absence;
+fresh database clock checks run after waits. Recovery rechecks its observed
+run/claim/token and updates lease/parent in one transaction. All fourteen workers
+retain their acquisition receipt, and public diagnostics omit private tokens.
+
+New preparation/closure frames carry the token. Historical three-field frames
+remain readable and unchanged, but cannot become current dispatch authority
+through migration values. Closure's direct lease owner also rotates and compares
+the token. Snapshot/anchor/bootstrap workflows include the new column. See
+[design](LEASE_ACQUISITION_DESIGN.md) and [outcome](LEASE_ACQUISITION_OUTCOME.md)
+for executed evidence, cooperative rollout requirements and external-effect limits.
+
 ## Sources Reviewed
 
 PostgreSQL 18 official sources:

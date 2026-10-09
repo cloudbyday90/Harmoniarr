@@ -17,6 +17,7 @@
  */
 
 import { createIntervalHeartbeatRunner } from './interval-heartbeat-runner.js';
+import { normalizeExpectedJobLease } from '../job-lease-policy.js';
 
 const defaultHeartbeatIntervalMs = 60 * 1000;
 
@@ -25,14 +26,18 @@ export function createOperationRunLeaseHeartbeat({
   intervalMs = defaultHeartbeatIntervalMs,
   onError = () => {},
   renewLease,
+  expectedLease,
   runId,
   status = 'active',
 } = {}) {
+  const capturedLease = normalizeExpectedJobLease(expectedLease);
   return createIntervalHeartbeatRunnerFn({
     intervalMs,
     onTick: async () => {
       try {
-        await renewLease({ runId, status });
+        if (!capturedLease) return { reason: 'lease_lost', skipped: true };
+        const renewed = await renewLease({ runId, status, expectedLease: capturedLease });
+        if (renewed === null) return { reason: 'lease_lost', skipped: true };
         return { skipped: false };
       } catch (error) {
         onError(error);

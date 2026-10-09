@@ -95,7 +95,9 @@ suite('integration import apply and media inspection operations', () => {
       assert.ok(claimedRun?.claimedAt);
       assert.equal(claimedRun?.claimedByInstanceId, 'integration-apply-worker');
 
+      const applyLease = await applyRunStore.acquireLease({ runId: createdRun.id });
       await applyRunStore.markRunStarted({
+        expectedLease: applyLease,
         runId: createdRun.id,
         summary: {
           currentStep: 'Resolving import-pending candidate apply plans',
@@ -105,7 +107,6 @@ suite('integration import apply and media inspection operations', () => {
         },
       });
 
-      await applyRunStore.acquireLease({ runId: createdRun.id });
 
       const historyResponse = await client.requestJson('/api/v1/operations/history', {
         method: 'GET',
@@ -117,6 +118,7 @@ suite('integration import apply and media inspection operations', () => {
       );
       assert.ok(matchingRun, 'apply run should appear in operation history');
       assert.equal(matchingRun.status, 'running');
+      assert.equal(Object.hasOwn(matchingRun.lease, 'acquisitionId'), false);
       assert.equal(matchingRun.operationType, operationRunRegistry.importCandidateApply.operationType);
 
       const runDetailResponse = await client.requestJson(
@@ -126,6 +128,7 @@ suite('integration import apply and media inspection operations', () => {
 
       assert.equal(runDetailResponse.response.status, 200);
       assert.equal(runDetailResponse.payload.operationRun.run.status, 'running');
+      assert.equal(Object.hasOwn(runDetailResponse.payload.operationRun.run.lease, 'acquisitionId'), false);
       assert.equal(runDetailResponse.payload.operationRun.run.operationType, operationRunRegistry.importCandidateApply.operationType);
 
       const leaseCheck = await getPoolFn().query('SELECT lease_key FROM job_leases WHERE lease_key = $1', [`import_candidate_apply:${createdRun.id}`]);
@@ -133,6 +136,7 @@ suite('integration import apply and media inspection operations', () => {
       assert.ok(runLease, 'running apply run should have an active lease');
 
       await applyRunStore.markRunCompleted({
+        expectedLease: applyLease,
         runId: createdRun.id,
         summary: {
           appliedCount: 1,
@@ -149,7 +153,7 @@ suite('integration import apply and media inspection operations', () => {
         },
       });
 
-      await applyRunStore.releaseLease({ runId: createdRun.id, status: 'completed' });
+      await applyRunStore.releaseLease({ runId: createdRun.id, status: 'completed', expectedLease: applyLease });
 
       const completedRun = await applyRunStore.getRunById(createdRun.id);
       assert.equal(completedRun.status, 'completed');
@@ -209,7 +213,9 @@ suite('integration import apply and media inspection operations', () => {
 
       const inspectionRunStore = createImportCandidateMediaInspectionRunStore({ getPoolFn });
 
+      const inspectionLease = await inspectionRunStore.acquireLease({ runId: createdRunId });
       await inspectionRunStore.markRunStarted({
+        expectedLease: inspectionLease,
         runId: createdRunId,
         summary: {
           currentStep: 'Inspecting selected import candidate media',
@@ -217,7 +223,6 @@ suite('integration import apply and media inspection operations', () => {
         },
       });
 
-      await inspectionRunStore.acquireLease({ runId: createdRunId });
 
       const historyResponse = await client.requestJson('/api/v1/operations/history', {
         method: 'GET',

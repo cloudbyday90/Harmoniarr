@@ -29,7 +29,8 @@ async function scenario(t, run) {
     assert.equal(decision.scopedRecoveryQueued, true);
     const descriptor = operationRunRegistry.importCandidateExecutionPlanning;
     const operations = createOperationRunStore({ getPoolFn, operationType: descriptor.operationType, leaseJobType: descriptor.leaseJobType });
-    await operations.markRunCompleted({ runId: decision.recoveryRunId, summary: { currentStep: 'Controlled terminal run' } });
+    const completionLease = await operations.acquireLease({ runId: decision.recoveryRunId });
+    await operations.markRunCompleted({ runId: decision.recoveryRunId, expectedLease: completionLease, summary: { currentStep: 'Controlled terminal run' } });
     const protectedRun = await operations.getRunById(decision.recoveryRunId);
     assert.equal(protectedRun.summary.musicQueueRecovery.retired, undefined);
     const ordinary = await operations.createOperationRun({ status: 'completed', summary: {} });

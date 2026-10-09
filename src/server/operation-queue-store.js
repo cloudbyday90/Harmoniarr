@@ -17,6 +17,10 @@
  */
 
 import { getPool } from './database.js';
+import { createDatabaseTransactionRunner } from './database-transaction-service.js';
+import { createJobLeaseStore, normalizeJobLease } from './job-lease-store.js';
+import { normalizeExpectedJobLease, isCurrentJobLeaseAcquisition } from './job-lease-policy.js';
+import { lockJobLeaseKey } from './job-lease-lock-store.js';
 import { writableExecutionRunSql } from './import-candidates/import-execution-origin-sql.js';
 
 const defaultClaimTimeoutMs = 60 * 1000;
@@ -232,8 +236,8 @@ export function createOperationQueueStore({
     return result.rows.map(toOperationRun);
   }
 
-  async function recoverRunForRetry({ maxAttempts = null, nextAttemptAt, runId, summary = {} }) {
-    const result = await getPoolFn().query(
+  async function recoverRunForRetry({ maxAttempts = null, nextAttemptAt, runId, summary = {}, queryable }) {
+    const result = await queryable.query(
       `
         UPDATE operation_runs
         SET status = CASE WHEN cancel_requested_at IS NOT NULL THEN 'cancelled' ELSE 'pending' END,
@@ -251,6 +255,7 @@ export function createOperationQueueStore({
             claimed_by_instance_id = NULL
         WHERE id = $1
           AND status = 'running'
+          AND ${writableExecutionRunSql('operation_runs')}
         RETURNING
           id,
           operation_type,
@@ -275,8 +280,8 @@ export function createOperationQueueStore({
     return toOperationRun(result.rows[0]);
   }
 
-  async function markStrandedRunFailed({ errorMessage, runId, summary = {} }) {
-    const result = await getPoolFn().query(
+  async function markStrandedRunFailed({ errorMessage, runId, summary = {}, queryable }) {
+    const result = await queryable.query(
       `
         UPDATE operation_runs
         SET status = CASE WHEN cancel_requested_at IS NOT NULL THEN 'cancelled' ELSE 'failed' END,
@@ -292,7 +297,6 @@ export function createOperationQueueStore({
             error_message = CASE WHEN cancel_requested_at IS NOT NULL THEN NULL ELSE $3 END
         WHERE id = $1
           AND status = 'running'
-          AND ${writableExecutionRunSql('operation_runs')}
           AND ${writableExecutionRunSql('operation_runs')}
         RETURNING
           id,
@@ -318,11 +322,47 @@ export function createOperationQueueStore({
     return toOperationRun(result.rows[0]);
   }
 
+  async function recoverStrandedRun({ observedRun, expectedLease, recoverySummary, errorMessage, buildRetrySchedule }) {
+    const key = `${observedRun.operationType}:${observedRun.id}`;
+    const expected = expectedLease === null ? null : normalizeExpectedJobLease(expectedLease, { leaseKey: key });
+    if (expectedLease !== null && !expected) return null;
+    return createDatabaseTransactionRunner({ getPoolFn })(async (queryable) => {
+      const parent = await queryable.query(`SELECT * FROM operation_runs WHERE id=$1::uuid AND status='running'
+        AND ${writableExecutionRunSql('operation_runs')} FOR UPDATE`, [observedRun.id]);
+      const row = parent.rows[0];
+      if (!row || row.operation_type !== observedRun.operationType || row.attempt_count !== observedRun.attemptCount
+        || row.max_attempts !== observedRun.maxAttempts || toIsoString(row.claimed_at) !== observedRun.claimedAt
+        || (row.claimed_by_instance_id ?? null) !== observedRun.claimedByInstanceId) return null;
+      const leaseRow = await lockJobLeaseKey({ leaseKey: key, queryable });
+      const current = normalizeJobLease(leaseRow);
+      const observedAt = (await queryable.query('SELECT clock_timestamp() AS observed_at')).rows[0].observed_at;
+      const time = observedAt instanceof Date ? observedAt.getTime() : Date.parse(observedAt);
+      if (!Number.isFinite(time)) return null;
+      if (expected === null) {
+        if (current !== null) return null;
+      } else {
+        const actual = normalizeExpectedJobLease(current, { leaseKey: key });
+        if (!actual || actual.acquisitionId !== expected.acquisitionId || actual.ownerInstanceId !== expected.ownerInstanceId
+          || !Number.isFinite(Date.parse(current.expiresAt))
+          || (current.releasedAt == null && !isCurrentJobLeaseAcquisition(current, expected, { leaseKey: key, now: time, allowExpired: true }))
+          || (current.releasedAt == null && Date.parse(current.expiresAt) > Number(time))) return null;
+        if (current.releasedAt == null && !await createJobLeaseStore({ getPoolFn }).releaseLease({
+          leaseKey: key, expectedLease: expected, status: 'expired', queryable })) return null;
+      }
+      const schedule = buildRetrySchedule({ attemptCount: row.attempt_count, maxAttempts: row.max_attempts });
+      return schedule ? recoverRunForRetry({ runId: row.id, maxAttempts: row.max_attempts, nextAttemptAt: schedule.nextAttemptAt,
+        summary: { ...recoverySummary, currentStep: 'Automatic retry scheduled after stranded run recovery',
+          lastFailureMessage: errorMessage, retryScheduledAt: schedule.nextAttemptAt }, queryable })
+        : markStrandedRunFailed({ runId: row.id, errorMessage,
+          summary: { ...recoverySummary, currentStep: 'Stranded run recovery marked the run as failed' }, queryable });
+    });
+  }
+
   return {
+    recoverStrandedRun,
     claimNextRunnableRun,
     listRecoverableRuns,
-    markStrandedRunFailed,
-    recoverRunForRetry,
+
     scheduleRetry,
   };
 }

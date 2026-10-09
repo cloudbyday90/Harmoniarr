@@ -202,14 +202,16 @@ suite('integration import review and operations routes', () => {
       const executionRunStore = createImportCandidateExecutionRunStore({
         getPoolFn,
       });
+      const executionLease = await executionRunStore.acquireLease({ runId });
       await executionRunStore.markRunStarted({
+        expectedLease: executionLease,
         runId,
         summary: {
           currentStep: 'integration worker claimed execution planning run',
           requestedCandidateCount: 1,
         },
       });
-      const lease = await executionRunStore.acquireLease({ runId });
+      const lease = executionLease;
 
       const historyResponse = await client.requestJson('/api/v1/operations/history?limit=5');
       assert.equal(historyResponse.response.status, 200);
@@ -221,12 +223,14 @@ suite('integration import review and operations routes', () => {
       assert.equal(executionRun.lease.leaseKey, lease.leaseKey);
       assert.equal(executionRun.lease.ownerInstanceId, lease.ownerInstanceId);
       assert.equal(executionRun.lease.state, 'active');
+      assert.equal(Object.hasOwn(executionRun.lease, 'acquisitionId'), false);
 
       const runDetailResponse = await client.requestJson(`/api/v1/operations/runs/${runId}`);
       assert.equal(runDetailResponse.response.status, 200);
       assert.equal(runDetailResponse.payload.operationRun.run.id, runId);
       assert.equal(runDetailResponse.payload.operationRun.run.lease.ownerInstanceId, lease.ownerInstanceId);
       assert.equal(runDetailResponse.payload.operationRun.run.lease.status, 'active');
+      assert.equal(Object.hasOwn(runDetailResponse.payload.operationRun.run.lease, 'acquisitionId'), false);
 
       const auditEventTypes = runDetailResponse.payload.operationRun.auditEvents.map((event) => event.eventType);
       assert.equal(auditEventTypes.includes('import_candidate_execution_started'), true);

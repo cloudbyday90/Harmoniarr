@@ -21,7 +21,7 @@ const redactedEmail = '[REDACTED_EMAIL]';
 const redactedPath = '[REDACTED_PATH]';
 const redactedBearer = 'Bearer [REDACTED]';
 const privateOriginKeys = new Set(['downloadoriginsupersession', 'originresolution', 'downloadpreparationclosure',
-  'downloadpreparationprotocol', 'preproviderepoch']);
+  'downloadpreparationprotocol', 'preproviderepoch', 'acquisitionid', 'leaseacquisitionid']);
 
 const sensitiveKeys = new Set([
   'accesstoken',

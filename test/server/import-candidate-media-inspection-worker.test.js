@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
+import { createTestJobLease } from '../../testing/server/job-lease-fixtures.js';
 import test from 'node:test';
 import { createImportCandidateMediaInspectionWorker } from '../../src/server/import-candidates/import-candidate-media-inspection-worker.js';
 
 test('createImportCandidateMediaInspectionWorker requeues the run when a maintenance pause is requested', async (t) => {
-  const acquireLease = t.mock.fn(async () => {});
+  const acquireLease = t.mock.fn(async ({ runId }) => createTestJobLease('import_candidate_media_inspection', runId));
   const releaseLease = t.mock.fn(async () => {});
   const markRunStarted = t.mock.fn(async () => {});
   const markRunCompleted = t.mock.fn(async () => {});
@@ -52,6 +53,7 @@ test('createImportCandidateMediaInspectionWorker requeues the run when a mainten
   assert.equal(markRunFailed.mock.callCount(), 0);
   assert.equal(markRunCancelled.mock.callCount(), 0);
   assert.deepEqual(pausedArgs, {
+    expectedLease: await acquireLease.mock.calls[0].result,
     nextAttemptAt: '2026-05-04T12:30:00.000Z',
     runId: 'run-paused',
     summary: {
@@ -63,13 +65,14 @@ test('createImportCandidateMediaInspectionWorker requeues the run when a mainten
     },
   });
   assert.deepEqual(releasedLeaseArgs, {
+    expectedLease: await acquireLease.mock.calls[0].result,
     runId: 'run-paused',
     status: 'paused',
   });
 });
 
 test('createImportCandidateMediaInspectionWorker inspects selected candidates and records summary counts', async (t) => {
-  const acquireLease = t.mock.fn(async () => {});
+  const acquireLease = t.mock.fn(async ({ runId }) => createTestJobLease('import_candidate_media_inspection', runId));
   const markRunStarted = t.mock.fn(async () => {});
   const markRunCompleted = t.mock.fn(async () => {});
   const markRunFailed = t.mock.fn(async () => {});
@@ -195,6 +198,7 @@ test('createImportCandidateMediaInspectionWorker inspects selected candidates an
     username: 'remote-peer',
   }]);
   assert.deepEqual(releasedLeaseArgs, {
+    expectedLease: await acquireLease.mock.calls[0].result,
     runId: 'inspection-run-1',
     status: 'completed',
   });
