@@ -32,6 +32,7 @@ function buildMovePlan({ createExclusiveFileMutationPlan, file }) {
     destinationPath: file.proposedPath,
     destinationRoot: file.libraryRootPath,
     requestedMode: 'move',
+    removeSourceAfterSuccess: true,
     sourcePath: file.currentPath,
     sourceRoot: file.libraryRootPath,
   });
@@ -79,7 +80,7 @@ function buildReleaseSummary(files) {
 
 export function createLibraryOrganizeApplyWorker({
   acquireLease,
-  applyExclusiveFileMutationPlan,
+  applyOrganizeMutation,
   buildLibraryOrganizePreview,
   createExclusiveFileMutationPlan,
   createOperationRunLeaseHeartbeatFn = createOperationRunLeaseHeartbeat,
@@ -93,8 +94,8 @@ export function createLibraryOrganizeApplyWorker({
   recordActivityEventFn = null,
   releaseLease,
   renewLease,
-  updateLibraryFileCanonicalPath,
 } = {}) {
+  if (typeof applyOrganizeMutation !== 'function') throw new TypeError('Library organize requires its guarded mutation owner');
   const activeRunIds = new Set();
 
   async function notifyOrganizedReleases({ fileResults, movedCount, runId }) {
@@ -161,15 +162,8 @@ export function createLibraryOrganizeApplyWorker({
         const startedAt = new Date().toISOString();
 
         try {
-          const movePlan = buildMovePlan({ createExclusiveFileMutationPlan, file });
-          const result = await applyExclusiveFileMutationPlan(movePlan);
-
-          await updateLibraryFileCanonicalPath({
-            canonicalPath: file.proposedPath,
-            fileId: file.fileId,
-            filename: basename(file.proposedPath),
-            relativePath: file.proposedRelativePath,
-          });
+          const movePlan = await buildMovePlan({ createExclusiveFileMutationPlan, file });
+          const result = await applyOrganizeMutation({ runId, expectedLease: acquiredLease, file, plan: movePlan });
 
           movedCount += 1;
 
@@ -199,7 +193,8 @@ export function createLibraryOrganizeApplyWorker({
             },
           }) === false) { finalLeaseStatus = 'failed'; return; }
         } catch (fileError) {
-          if (isOperationRunLeaseLostError(fileError)) throw fileError;
+          if (isOperationRunLeaseLostError(fileError) || isOperationRunCancellationError(fileError)
+            || isOperationRunPauseError(fileError)) throw fileError;
           fileResults.push({
             artistName: file.match?.artistName ?? null,
             destinationPath: file.proposedPath ?? null,
@@ -248,7 +243,7 @@ export function createLibraryOrganizeApplyWorker({
           skippedCount: Math.max((organizePreview.counts?.totalFiles ?? filesToMove.length) - filesToMove.length, 0),
         },
       }) === false) { finalLeaseStatus = 'failed'; return; }
-        await notifyOrganizedReleases({ fileResults, movedCount, runId });
+      await notifyOrganizedReleases({ fileResults, movedCount, runId });
     } catch (error) {
       if (!acquiredLease || isOperationRunLeaseLostError(error)) { finalLeaseStatus = 'failed'; return; }
       if (isOperationRunPauseError(error)) {

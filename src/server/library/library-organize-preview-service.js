@@ -274,6 +274,7 @@ export function createLibraryOrganizePreviewService({
         currentRelativePath: normalizeRelativePath(row.relativePath),
         fileId: row.id,
         libraryRootPath: row.libraryRootPath,
+        libraryRootId: row.libraryRootId,
         match: {
           artistName: row.artistName,
           matchedBy: row.matchedBy,

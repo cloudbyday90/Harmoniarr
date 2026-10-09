@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createLibraryNamingService } from '../../src/server/library/library-naming-service.js';
 import { createLibraryOrganizePreviewService } from '../../src/server/library/library-organize-preview-service.js';
 
 test('buildLibraryOrganizePreview reports rename-required, canonical, and unmatched files', async () => {
   const service = createLibraryOrganizePreviewService({
+    libraryNamingService: createLibraryNamingService({ loadSettingsFn: async () => ({}) }),
     libraryOrganizePreviewStore: {
       listLibraryFilesForOrganizePreview: async () => ([
         {
@@ -13,6 +15,7 @@ test('buildLibraryOrganizePreview reports rename-required, canonical, and unmatc
           filename: '01 Foil.flac',
           id: 'file-1',
           libraryRootPath: '/music',
+          libraryRootId: 'root-1',
           matchStatus: 'matched',
           matchedBy: 'musicbrainz_recording_id',
           mediumCount: 1,
@@ -33,6 +36,7 @@ test('buildLibraryOrganizePreview reports rename-required, canonical, and unmatc
           filename: '02 - Montreal.flac',
           id: 'file-2',
           libraryRootPath: '/music',
+          libraryRootId: 'root-1',
           matchStatus: 'matched',
           matchedBy: 'musicbrainz_recording_id',
           mediumCount: 1,
@@ -53,6 +57,7 @@ test('buildLibraryOrganizePreview reports rename-required, canonical, and unmatc
           filename: '03 Mystery.flac',
           id: 'file-3',
           libraryRootPath: '/music',
+          libraryRootId: 'root-1',
           matchStatus: 'unmatched',
           matchedBy: 'missing_tag_payload',
           mediumCount: 0,
@@ -88,6 +93,7 @@ test('buildLibraryOrganizePreview reports rename-required, canonical, and unmatc
     totalFiles: 3,
   });
   assert.equal(preview.files[0].status.code, 'rename_required');
+  assert.equal(preview.files[0].libraryRootId, 'root-1');
   assert.equal(preview.files[0].proposedRelativePath, 'Autechre/Amber (1994)/01 - Foil.flac');
   assert.equal(preview.files[1].status.code, 'already_canonical');
   assert.equal(preview.files[2].status.code, 'blocked_unmatched');
@@ -95,6 +101,7 @@ test('buildLibraryOrganizePreview reports rename-required, canonical, and unmatc
 
 test('buildLibraryOrganizePreview blocks duplicate canonical targets before apply exists', async () => {
   const service = createLibraryOrganizePreviewService({
+    libraryNamingService: createLibraryNamingService({ loadSettingsFn: async () => ({}) }),
     libraryOrganizePreviewStore: {
       listLibraryFilesForOrganizePreview: async () => ([
         {
@@ -104,6 +111,7 @@ test('buildLibraryOrganizePreview blocks duplicate canonical targets before appl
           filename: '01 Foil.flac',
           id: 'file-1',
           libraryRootPath: '/music',
+          libraryRootId: 'root-1',
           matchStatus: 'matched',
           matchedBy: 'musicbrainz_recording_id',
           mediumCount: 1,
@@ -124,6 +132,7 @@ test('buildLibraryOrganizePreview blocks duplicate canonical targets before appl
           filename: 'foil-copy.flac',
           id: 'file-2',
           libraryRootPath: '/music',
+          libraryRootId: 'root-1',
           matchStatus: 'matched',
           matchedBy: 'musicbrainz_release_title_track_position',
           mediumCount: 1,
@@ -152,6 +161,7 @@ test('buildLibraryOrganizePreview blocks duplicate canonical targets before appl
 
 test('buildLibraryOrganizePreview reports empty state when no observed files are available', async () => {
   const service = createLibraryOrganizePreviewService({
+    libraryNamingService: createLibraryNamingService({ loadSettingsFn: async () => ({}) }),
     libraryOrganizePreviewStore: {
       listLibraryFilesForOrganizePreview: async () => [],
     },

@@ -3318,6 +3318,22 @@ the token. Snapshot/anchor/bootstrap workflows include the new column. See
 [design](LEASE_ACQUISITION_DESIGN.md) and [outcome](LEASE_ACQUISITION_OUTCOME.md)
 for executed evidence, cooperative rollout requirements and external-effect limits.
 
+## Current implementation: guarded library-organize catalogue updates
+
+The organize mutation owner captures file/root UUIDs and source/destination with
+the original acquisition. Short transactions use maintenance readiness followed
+by run, advisory lease key/row, captured root and file locks, refreshing clock time after
+waits. Filesystem effects run outside those transactions; callbacks repeat the
+owning gate at each native mutation stage.
+
+After verified copy/source cleanup, catalogue persistence rechecks current token,
+running/cancellation state and original file/root identity, then conditionally
+updates the canonical path. Zero rows is a stale refusal, not moved success.
+The preview now retains libraryRootId so the original root can be bound. No new
+table, migration or snapshot is needed. See separate
+[design](ORGANIZE_MUTATION_DESIGN.md) and [outcome](ORGANIZE_MUTATION_OUTCOME.md)
+for evidence and partial filesystem/DB effect limits.
+
 ## Sources Reviewed
 
 PostgreSQL 18 official sources:

@@ -161,3 +161,28 @@ side-effect guards remain necessary: a local token cannot atomically cancel
 provider or filesystem work already in progress. This reference maintenance
 does not independently re-open the ledger's URLs or certify distributed
 exactly-once behavior.
+
+## Organize mutation maintenance, October 9
+
+The root's fresh ledger in `docs/ORGANIZE_MUTATION_RESEARCH_2026_10.md` records
+official PostgreSQL locking, clock and conditional-update guidance, the exact
+local Node 24.18.1 tagged filesystem documentation, and workflow/status sources.
+The callback placement and captured-token contract are application inferences;
+this reference maintenance does not independently re-open the ledger's URLs.
+
+An earlier ownership check cannot authorize a mutation after awaited path or
+destination inspection. Recheck the immutable prepared file and original
+acquisition immediately before each new mkdir, destination copy/link and source
+removal, with fresh authoritative time after lock waits. Preserve the guard
+through transport fallback and propagate pause/cancellation to their worker
+owners. Exclusive copy and verified source removal do not make filesystem and
+catalogue state atomic: a separate current-owned old-path/root CAS must affect a
+row before counting success or notifying. Keep locks out of long filesystem I/O,
+retain partial bytes on later refusal, and preserve unrelated transport defaults.
+Compare lock acquisition against existing writers, including ordinary catalogue
+upserts: explicitly lock the root before its files. A joined row-lock query can
+create reciprocal waits despite short transactions; prove coexistence with real
+blocked writers rather than assuming row-mark order.
+Injected callback tests establish order and refusal; actual PostgreSQL and
+test-owned files establish the claimed race and transport evidence. No new UI,
+in-flight cancellation, symlink-race immunity or content-hash proof is implied.

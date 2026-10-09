@@ -128,3 +128,18 @@ DTO allowlists, mixed-binary rollout limits and external-effect boundaries.
 Keep the entry point, metadata and invocation policy unchanged. Validate and
 sync the existing four installed files; structural checks and focused application
 tests do not constitute a new blind behavioral skill trial or conformance claim.
+
+## Organize mutation maintenance, October 9
+
+Extend the two references around the [organize design](ORGANIZE_MUTATION_DESIGN.md).
+Map original acquisition and immutable file/root/plan capture, awaited native
+preflight and verification, guarded fallback, interruption propagation and the
+short catalogue CAS to their actual owners. Separate zero-effect refusal from
+post-copy partial effects and current-owned success notification. Preserve
+generic transport defaults and the existing operator confirmation; no new UI or
+filesystem/database atomicity claim is needed. Keep entry point, metadata and
+invocation policy unchanged. Validate structure and synchronize the four existing
+installed files; this maintenance is not a new blind behavioral skill trial.
+Include ordinary catalogue writers in the lock-order trace. A joined row-lock
+query must not be treated as proof of compatible acquisition order; test actual
+root/file waits with blocking process IDs and retain any reproduced deadlock.

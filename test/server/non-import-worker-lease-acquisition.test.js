@@ -54,8 +54,9 @@ function fixture(t, family, overrides = {}) {
   const options = { acquireLease: t.mock.fn(async () => lease), renewLease: async () => lease,
     createOperationRunLeaseHeartbeatFn: heartbeatFactory, isCancellationRequested: async () => false,
     pruneOldRuns: t.mock.fn(async () => {}), recordArtistRefreshCompleted: async () => ({}),
-    createExclusiveFileMutationPlan: (value) => value, applyExclusiveFileMutationPlan: async () => ({ transport: 'move' }),
-    updateLibraryFileCanonicalPath: async () => {}, onReleaseAddedFn: notify,
+    createExclusiveFileMutationPlan: (value) => value, applyOrganizeMutation: async () => ({ transport: 'copy_then_remove', sourceRemoved: true,
+      verification: { destinationExists: true, sourceSizeBytes: 1, destinationSizeBytes: 1, sourceRemoved: true, sourceExistsAfterSuccess: false } }),
+    onReleaseAddedFn: notify,
     ...callbacks, ...family.domain(work), ...overrides };
   const worker = family.factory(options);
   return { callbacks, heartbeatFactory, lease, notify, options, work,
@@ -114,7 +115,8 @@ for (const family of families) {
 
 test('organize stops after a refused progress write without moving another file or announcing success', async (t) => {
   const family = families.find((entry) => entry.name === 'library organize');
-  const move = t.mock.fn(async () => ({ transport: 'move' })); const value = fixture(t, family, { applyExclusiveFileMutationPlan: move });
+  const move = t.mock.fn(async () => ({ transport: 'copy_then_remove', sourceRemoved: true,
+    verification: { destinationExists: true, sourceSizeBytes: 1, destinationSizeBytes: 1, sourceRemoved: true, sourceExistsAfterSuccess: false } })); const value = fixture(t, family, { applyOrganizeMutation: move });
   value.work.mock.mockImplementation(async () => ({ files: [family.result.files[0], { ...family.result.files[0], fileId: 'file-2', proposedPath: '/virtual/second.flac' }], counts: { totalFiles: 2 } }));
   let started = 0; value.callbacks.markRunStarted.mock.mockImplementation(async () => ++started === 1);
   await value.run(); verifyCapturedCalls(value); assert.equal(move.mock.callCount(), 1);
@@ -123,7 +125,7 @@ test('organize stops after a refused progress write without moving another file 
 
 test('organize does not turn a typed file guard ownership loss into a recorded file failure', async (t) => {
   const family = families.find((entry) => entry.name === 'library organize');
-  const value = fixture(t, family, { applyExclusiveFileMutationPlan: async () => { throw Object.assign(new Error('Lost'), { code: 'operation_run_lease_lost' }); } });
+  const value = fixture(t, family, { applyOrganizeMutation: async () => { throw Object.assign(new Error('Lost'), { code: 'operation_run_lease_lost' }); } });
   await value.run(); verifyCapturedCalls(value); assert.equal(value.callbacks.markRunCompleted.mock.callCount(), 0);
   assert.equal(value.callbacks.markRunFailed.mock.callCount(), 0); assert.equal(value.notify.mock.callCount(), 0);
 });

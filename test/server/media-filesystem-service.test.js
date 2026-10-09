@@ -86,6 +86,7 @@ function createSimulatedMediaFilesystemDeps(t, {
     copyFileFn,
     linkFn,
     mkdirFn,
+    paths,
     removeFileFn,
     statFn,
   };
@@ -238,4 +239,158 @@ test('applyExclusiveFileMutationPlan rejects destination collisions before mutat
     (error) => error.code === 'media_filesystem_destination_exists',
   );
   assert.equal(copyFileFn.mock.callCount(), 0);
+});
+
+function guardedPlan(service, requestedMode = 'move', extra = {}) {
+  return service.createExclusiveFileMutationPlan({
+    sourcePath: '/downloads/source.flac', sourceRoot: '/downloads',
+    destinationPath: '/library/dest.flac', destinationRoot: '/library',
+    requestedMode, removeSourceAfterSuccess: true, ...extra,
+  });
+}
+
+function deferred() {
+  let resolve;
+  const promise = new Promise((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
+test('filesystem guards authorize each future stage after its awaited preparation', async (t) => {
+  const deps = createSimulatedMediaFilesystemDeps(t);
+  const service = createMediaFilesystemService(deps);
+  const stages = [];
+  const result = await service.applyExclusiveFileMutationPlan(guardedPlan(service), {
+    beforeMutation: async ({ stage }) => {
+      stages.push(stage);
+      if (stage === 'prepare_destination') assert.equal(deps.mkdirFn.mock.callCount(), 0);
+      if (stage === 'write_destination') {
+        assert.equal(deps.mkdirFn.mock.callCount(), 1);
+        assert.equal(deps.copyFileFn.mock.callCount(), 0);
+        assert.ok(deps.statFn.mock.calls.some((call) => call.arguments[0] === '/library/dest.flac'));
+      }
+      if (stage === 'remove_source') {
+        assert.equal(deps.copyFileFn.mock.callCount(), 1);
+        assert.equal(deps.removeFileFn.mock.callCount(), 0);
+        assert.equal(deps.paths.get('/library/dest.flac').size, 42);
+      }
+    },
+  });
+  assert.deepEqual(stages, ['prepare_destination', 'write_destination', 'remove_source']);
+  assert.equal(result.sourceRemoved, true);
+  assert.equal(result.transport, 'copy_then_remove');
+});
+
+test('ownership lost during source inspection refuses before creating a directory or destination', async (t) => {
+  const deps = createSimulatedMediaFilesystemDeps(t);
+  const inspected = deferred(); const resume = deferred(); let owned = true;
+  const service = createMediaFilesystemService({ ...deps, statFn: async (path) => {
+    const result = await deps.statFn(path);
+    if (path === '/downloads/source.flac') { inspected.resolve(); await resume.promise; }
+    return result;
+  } });
+  const running = service.applyExclusiveFileMutationPlan(guardedPlan(service), {
+    beforeMutation: async () => { if (!owned) throw Object.assign(new Error('Lost'), { code: 'operation_run_lease_lost' }); },
+  });
+  await inspected.promise; owned = false; resume.resolve();
+  await assert.rejects(running, { code: 'operation_run_lease_lost' });
+  assert.equal(deps.mkdirFn.mock.callCount(), 0);
+  assert.equal(deps.copyFileFn.mock.callCount(), 0);
+  assert.equal(deps.linkFn.mock.callCount(), 0);
+  assert.equal(deps.removeFileFn.mock.callCount(), 0);
+});
+
+for (const mode of ['move', 'hardlink']) {
+  test(`${mode} refuses destination creation when ownership changes during device inspection`, async (t) => {
+    const deps = createSimulatedMediaFilesystemDeps(t); let owned = true;
+    const service = createMediaFilesystemService({ ...deps, statFn: async (path) => {
+      const result = await deps.statFn(path);
+      if (path === '/library') owned = false;
+      return result;
+    } });
+    await assert.rejects(service.applyExclusiveFileMutationPlan(guardedPlan(service, mode), {
+      beforeMutation: async () => { if (!owned) throw Object.assign(new Error('Lost'), { code: 'operation_run_lease_lost' }); },
+    }), { code: 'operation_run_lease_lost' });
+    assert.equal(deps.mkdirFn.mock.callCount(), 1);
+    assert.equal(deps.copyFileFn.mock.callCount(), 0);
+    assert.equal(deps.linkFn.mock.callCount(), 0);
+    assert.equal(deps.removeFileFn.mock.callCount(), 0);
+  });
+
+  test(`${mode} preserves the source when ownership changes during destination verification`, async (t) => {
+    const deps = createSimulatedMediaFilesystemDeps(t); let owned = true;
+    const service = createMediaFilesystemService({ ...deps, statFn: async (path) => {
+      const result = await deps.statFn(path);
+      if (path === '/library/dest.flac') owned = false;
+      return result;
+    } });
+    await assert.rejects(service.applyExclusiveFileMutationPlan(guardedPlan(service, mode), {
+      beforeMutation: async () => { if (!owned) throw Object.assign(new Error('Lost'), { code: 'operation_run_lease_lost' }); },
+    }), { code: 'operation_run_lease_lost' });
+    assert.equal(deps.copyFileFn.mock.callCount() + deps.linkFn.mock.callCount(), 1);
+    assert.equal(deps.removeFileFn.mock.callCount(), 0);
+    assert.equal(deps.paths.has('/downloads/source.flac'), true);
+    assert.equal(deps.paths.has('/library/dest.flac'), true);
+  });
+}
+
+test('a source-removal guard error never triggers hardlink transport fallback', async (t) => {
+  const deps = createSimulatedMediaFilesystemDeps(t); const service = createMediaFilesystemService(deps);
+  const rejected = Object.assign(new Error('Guard refused'), { code: 'EXDEV' });
+  await assert.rejects(service.applyExclusiveFileMutationPlan(guardedPlan(service, 'hardlink', { fallbackMode: 'move' }), {
+    beforeMutation: async ({ stage }) => { if (stage === 'remove_source') throw rejected; },
+  }), (error) => error === rejected);
+  assert.equal(deps.linkFn.mock.callCount(), 1);
+  assert.equal(deps.copyFileFn.mock.callCount(), 0);
+  assert.equal(deps.removeFileFn.mock.callCount(), 0);
+  assert.equal(deps.paths.has('/downloads/source.flac'), true);
+});
+
+test('a genuine hardlink failure propagates the guard into fallback before any copy', async (t) => {
+  const deps = createSimulatedMediaFilesystemDeps(t);
+  const linkFn = t.mock.fn(async () => { throw Object.assign(new Error('Cross device'), { code: 'EXDEV' }); });
+  const service = createMediaFilesystemService({ ...deps, linkFn }); const stages = [];
+  await assert.rejects(service.applyExclusiveFileMutationPlan(guardedPlan(service, 'hardlink', { fallbackMode: 'move' }), {
+    beforeMutation: async ({ stage }) => {
+      stages.push(stage);
+      if (stages.length === 3) throw Object.assign(new Error('Lost'), { code: 'operation_run_lease_lost' });
+    },
+  }), { code: 'operation_run_lease_lost' });
+  assert.deepEqual(stages, ['prepare_destination', 'write_destination', 'prepare_destination']);
+  assert.equal(linkFn.mock.callCount(), 1);
+  assert.equal(deps.mkdirFn.mock.callCount(), 1);
+  assert.equal(deps.copyFileFn.mock.callCount(), 0);
+  assert.equal(deps.removeFileFn.mock.callCount(), 0);
+});
+
+test('a genuine hardlink fallback retains all guards and exclusive copy verification', async (t) => {
+  const deps = createSimulatedMediaFilesystemDeps(t);
+  const service = createMediaFilesystemService({ ...deps,
+    linkFn: async () => { throw Object.assign(new Error('Cross device'), { code: 'EXDEV' }); },
+  });
+  const stages = [];
+  const result = await service.applyExclusiveFileMutationPlan(guardedPlan(service, 'hardlink', { fallbackMode: 'move' }), {
+    beforeMutation: async ({ stage }) => { stages.push(stage); },
+  });
+  assert.deepEqual(stages, ['prepare_destination', 'write_destination', 'prepare_destination', 'write_destination', 'remove_source']);
+  assert.equal(deps.copyFileFn.mock.calls[0].arguments[2], 1);
+  assert.equal(result.transport, 'copy_then_remove_after_hardlink_fallback');
+  assert.equal(result.verification.sourceRemoved, true);
+});
+
+test('generic callers retain explicit source-cleanup defaults without a mutation callback', async (t) => {
+  const deps = createSimulatedMediaFilesystemDeps(t); const service = createMediaFilesystemService(deps);
+  const result = await service.applyExclusiveFileMutationPlan(guardedPlan(service, 'move', { removeSourceAfterSuccess: false }));
+  assert.equal(result.transport, 'copy_only');
+  assert.equal(deps.copyFileFn.mock.calls[0].arguments[2], 1);
+  assert.equal(deps.removeFileFn.mock.callCount(), 0);
+  assert.equal(deps.paths.has('/downloads/source.flac'), true);
+});
+
+test('invalid mutation callback fails before filesystem preparation', async (t) => {
+  const deps = createSimulatedMediaFilesystemDeps(t); const service = createMediaFilesystemService(deps);
+  await assert.rejects(service.applyExclusiveFileMutationPlan(guardedPlan(service), { beforeMutation: true }), TypeError);
+  assert.equal(deps.statFn.mock.callCount(), 0);
+  assert.equal(deps.mkdirFn.mock.callCount(), 0);
+  assert.equal(deps.copyFileFn.mock.callCount(), 0);
+  assert.equal(deps.removeFileFn.mock.callCount(), 0);
 });

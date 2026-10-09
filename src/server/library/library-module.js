@@ -66,6 +66,7 @@ import { createLibraryMediaRequestStore } from './library-media-request-store.js
 import { createLibraryOrganizeApplyRunStore } from './library-organize-apply-run-store.js';
 import { createLibraryOrganizeApplyService } from './library-organize-apply-service.js';
 import { createLibraryOrganizeApplyWorker } from './library-organize-apply-worker.js';
+import { createLibraryOrganizeMutationService } from './library-organize-mutation-service.js';
 import { createLibraryNamingService } from './library-naming-service.js';
 import { createLibraryOrganizePreviewService } from './library-organize-preview-service.js';
 import { createLibraryOrganizePreviewStore } from './library-organize-preview-store.js';
@@ -278,9 +279,15 @@ export function createLibraryModule({
     createOperationRun: libraryOrganizeApplyRunStore.createOperationRun,
     getActiveRun: libraryOrganizeApplyRunStore.getActiveRun,
   }),
+  libraryOrganizeMutationService = createLibraryOrganizeMutationService({
+    applyExclusiveFileMutationPlan: mediaFilesystemService.applyExclusiveFileMutationPlan,
+    assertMaintenanceWriteAllowed: ({ queryable }) => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+      operationLabel: 'library organize apply', queryable,
+    }),
+  }),
   libraryOrganizeApplyWorker = createLibraryOrganizeApplyWorker({
     acquireLease: libraryOrganizeApplyRunStore.acquireLease,
-    applyExclusiveFileMutationPlan: mediaFilesystemService.applyExclusiveFileMutationPlan,
+    applyOrganizeMutation: libraryOrganizeMutationService.applyOrganizeMutation,
     buildLibraryOrganizePreview: libraryOrganizePreviewService.buildLibraryOrganizePreview,
     createExclusiveFileMutationPlan: mediaFilesystemService.createExclusiveFileMutationPlan,
     isCancellationRequested: maintenanceLockOperationPauseService
@@ -299,7 +306,6 @@ export function createLibraryModule({
     recordActivityEventFn,
     releaseLease: libraryOrganizeApplyRunStore.releaseLease,
     renewLease: libraryOrganizeApplyRunStore.renewLease,
-    updateLibraryFileCanonicalPath: libraryCatalogStore.updateLibraryFileCanonicalPath,
   }),
   libraryFileMatchStore = createLibraryFileMatchStore(),
   libraryFileMatcherService = createLibraryFileMatcherService({
@@ -540,6 +546,7 @@ export function createLibraryModule({
     libraryOrganizeApplyRunStore,
     libraryOrganizeApplyService,
     libraryOrganizeApplyWorker,
+    libraryOrganizeMutationService,
     libraryOrganizePreviewService,
     libraryOrganizePreviewStore,
     providerClientResolverService,

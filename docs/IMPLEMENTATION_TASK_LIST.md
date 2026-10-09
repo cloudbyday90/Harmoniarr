@@ -6,7 +6,38 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
-## Current development slice: Lease acquisition fencing (2026-10-09)
+## Current development slice: Guarded library-organize mutation (2026-10-09)
+
+- Capture the original acquisition and prepared file/root/plan at the owning
+  organize service. Native callbacks check authority before directory creation,
+  destination writing and source cleanup, with a separate guarded catalogue
+  update. See [design](ORGANIZE_MUTATION_DESIGN.md),
+  [outcome](ORGANIZE_MUTATION_OUTCOME.md) and
+  [official research](ORGANIZE_MUTATION_RESEARCH_2026_10.md).
+- Organize explicitly removes the verified source; generic filesystem defaults
+  and exclusive destination protections remain. Pause/cancel/lease loss reach
+  their outer worker handlers, and stale/zero-row path writes never count moved.
+  In-flight filesystem effects remain outside the local transaction guarantee.
+- Fresh PR checks found no eligible unreplayed patch; see separate
+  [PR design](OPEN_PR_APPLICABILITY_ORGANIZE_MUTATION_2026_10_DESIGN.md) and
+  [outcome](OPEN_PR_APPLICABILITY_ORGANIZE_MUTATION_2026_10_OUTCOME.md).
+- Complete validation passes 9,390 tests (4,206 server, 4,377 client, 513 script
+  and 294 PostgreSQL integration), zero failures/skips, all lint/policy checks
+  and both builds. Focused policy/filesystem checks pass 56; worker/cohort/preview
+  checks pass 86; actual organize PostgreSQL/file checks pass nine. Final review
+  reproduced and corrected a catalogue/organize root/file deadlock with explicit
+  root-before-file locks. See the outcome for original red/green evidence and
+  partial-file limits. Fresh security validation reports zero npm vulnerabilities;
+  source/installed skill structure and four-file identity pass. Schema remains
+  unchanged at 105 migrations.
+  Work remains on main, without a branch, release, tag, provider upgrade or PR merge.
+- Next: guard scan catalogue upserts and missing-file tombstones with the scan's
+  original acquisition. The current writer accepts only files/root after an
+  awaited walk. Prove that a replaced scan changes no newer observations while
+  a current scan, including a genuine empty scan, can commit. Preserve the
+  explicit root-before-file lock order proved by the organize coexistence test.
+
+## Prior development slice: Lease acquisition fencing (2026-10-09)
 
 - Mint a private acquisition UUID on every successful absent/released/expired
   lease acquisition. Retain stable diagnostic row IDs; renewal/release require

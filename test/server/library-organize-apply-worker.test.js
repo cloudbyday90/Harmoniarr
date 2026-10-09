@@ -20,6 +20,13 @@ import { createOperationRunLeaseFixture } from '../../testing/operation-run-leas
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createLibraryOrganizeApplyWorker } from '../../src/server/library/library-organize-apply-worker.js';
+import { createOperationRunCancellationError, createOperationRunPauseError } from '../../src/server/operation-run-cancellation.js';
+
+function verifiedOrganizeResult() {
+  return { transport: 'copy_then_remove', sourceRemoved: true,
+    verification: { destinationExists: true, sourceSizeBytes: 1, destinationSizeBytes: 1,
+      sourceRemoved: true, sourceExistsAfterSuccess: false } };
+}
 
 function waitForWorkerTick() {
   return new Promise((resolve) => {
@@ -29,6 +36,61 @@ function waitForWorkerTick() {
 
 const leaseForTest = (runId) => createOperationRunLeaseFixture({ runId, jobType: 'library_organize_apply' });
 
+function owningWorkerFixture({ applyOrganizeMutation, createExclusiveFileMutationPlan = async (plan) => plan }) {
+  let finish;
+  const done = new Promise((resolve) => { finish = resolve; });
+  const lifecycle = [];
+  const notifications = [];
+  const file = { fileId: 'file-boundary', libraryRootId: 'root-boundary', libraryRootPath: 'D:/music',
+    currentPath: 'D:/music/incoming/01.flac', proposedPath: 'D:/music/Artist/Album/01 Track.flac',
+    proposedRelativePath: 'Artist/Album/01 Track.flac', status: { code: 'rename_required' } };
+  const lease = leaseForTest('run-boundary');
+  const worker = createLibraryOrganizeApplyWorker({
+    acquireLease: async () => lease,
+    applyOrganizeMutation,
+    createExclusiveFileMutationPlan,
+    buildLibraryOrganizePreview: async () => ({ counts: { totalFiles: 1 }, files: [file] }),
+    isCancellationRequested: async () => false,
+    markRunStarted: async () => true,
+    markRunCompleted: async (input) => { lifecycle.push({ type: 'completed', ...input }); return true; },
+    markRunFailed: async (input) => { lifecycle.push({ type: 'failed', ...input }); return true; },
+    markRunCancelled: async (input) => { lifecycle.push({ type: 'cancelled', ...input }); return true; },
+    markRunPaused: async (input) => { lifecycle.push({ type: 'paused', ...input }); return true; },
+    onReleaseAddedFn: async (input) => { notifications.push(input); },
+    releaseLease: async () => { finish(); },
+  });
+  return { worker, done, lifecycle, notifications, file, lease };
+}
+
+test('organize requires the guarded owner and passes the resolved cleanup plan with its original acquisition', async () => {
+  assert.throws(() => createLibraryOrganizeApplyWorker({}), /guarded mutation owner/u);
+  let mutation;
+  const fixture = owningWorkerFixture({ applyOrganizeMutation: async (input) => {
+    mutation = input;
+    return verifiedOrganizeResult();
+  } });
+  await fixture.worker.startWorkerRun({ runId: 'run-boundary' }); await fixture.done;
+  assert.deepEqual(mutation, { runId: 'run-boundary', expectedLease: fixture.lease, file: fixture.file,
+    plan: { sourcePath: fixture.file.currentPath, sourceRoot: fixture.file.libraryRootPath,
+      destinationPath: fixture.file.proposedPath, destinationRoot: fixture.file.libraryRootPath,
+      requestedMode: 'move', removeSourceAfterSuccess: true } });
+  assert.equal(fixture.lifecycle[0].summary.movedCount, 1);
+});
+
+test('guarded mutation pause and cancellation reach their outer handlers without completed files or notifications', async () => {
+  for (const [type, error] of [
+    ['paused', createOperationRunPauseError({ runId: 'run-boundary', pauseCode: 'maintenance_lock_active' })],
+    ['cancelled', createOperationRunCancellationError({ runId: 'run-boundary' })],
+  ]) {
+    const fixture = owningWorkerFixture({ applyOrganizeMutation: async () => { throw error; } });
+    await fixture.worker.startWorkerRun({ runId: 'run-boundary' }); await fixture.done;
+    assert.deepEqual(fixture.lifecycle.map((entry) => entry.type), [type]);
+    assert.equal(fixture.lifecycle[0].expectedLease, fixture.lease);
+    assert.equal(fixture.lifecycle[0].summary.movedCount ?? 0, 0);
+    assert.equal(fixture.notifications.length, 0);
+  }
+});
+
 test('library organize apply worker records release activity and notifications after full success', async () => {
   const releaseNotifications = [];
   const activityEvents = [];
@@ -36,7 +98,7 @@ test('library organize apply worker records release activity and notifications a
 
   const worker = createLibraryOrganizeApplyWorker({
     acquireLease: async ({ runId }) => leaseForTest(runId),
-    applyExclusiveFileMutationPlan: async () => ({ transport: 'rename' }),
+    applyOrganizeMutation: async () => verifiedOrganizeResult(),
     buildLibraryOrganizePreview: async () => ({
       counts: { totalFiles: 2 },
       files: [
@@ -71,7 +133,6 @@ test('library organize apply worker records release activity and notifications a
     recordActivityEventFn: async (payload) => { activityEvents.push(payload); },
     releaseLease: async () => {},
     renewLease: async () => {},
-    updateLibraryFileCanonicalPath: async () => {},
   });
 
   await worker.startWorkerRun({ plannedRenameCount: 2, runId: 'run-1' });
@@ -110,12 +171,12 @@ test('library organize apply worker still records release activity when some fil
   let callCount = 0;
   const worker = createLibraryOrganizeApplyWorker({
     acquireLease: async ({ runId }) => leaseForTest(runId),
-    applyExclusiveFileMutationPlan: async () => {
+    applyOrganizeMutation: async () => {
       callCount += 1;
       if (callCount === 2) {
         throw new Error('disk rename failed');
       }
-      return { transport: 'rename' };
+      return verifiedOrganizeResult();
     },
     buildLibraryOrganizePreview: async () => ({
       counts: { totalFiles: 2 },
@@ -151,7 +212,6 @@ test('library organize apply worker still records release activity when some fil
     recordActivityEventFn: async (payload) => { activityEvents.push(payload); },
     releaseLease: async () => {},
     renewLease: async () => {},
-    updateLibraryFileCanonicalPath: async () => {},
   });
 
   await worker.startWorkerRun({ plannedRenameCount: 2, runId: 'run-2' });
@@ -181,7 +241,7 @@ test('library organize apply worker records multi-release summaries in activity 
 
   const worker = createLibraryOrganizeApplyWorker({
     acquireLease: async ({ runId }) => leaseForTest(runId),
-    applyExclusiveFileMutationPlan: async () => ({ transport: 'rename' }),
+    applyOrganizeMutation: async () => verifiedOrganizeResult(),
     buildLibraryOrganizePreview: async () => ({
       counts: { totalFiles: 2 },
       files: [
@@ -216,7 +276,6 @@ test('library organize apply worker records multi-release summaries in activity 
     recordActivityEventFn: async (payload) => { activityEvents.push(payload); },
     releaseLease: async () => {},
     renewLease: async () => {},
-    updateLibraryFileCanonicalPath: async () => {},
   });
 
   await worker.startWorkerRun({ plannedRenameCount: 2, runId: 'run-4' });
@@ -253,7 +312,7 @@ test('library organize apply worker requeues the run when a maintenance pause is
 
   const worker = createLibraryOrganizeApplyWorker({
     acquireLease,
-    applyExclusiveFileMutationPlan: async () => ({ transport: 'rename' }),
+    applyOrganizeMutation: async () => verifiedOrganizeResult(),
     buildLibraryOrganizePreview: async () => ({ counts: { totalFiles: 0 }, files: [] }),
     createExclusiveFileMutationPlan: async (plan) => plan,
     isCancellationRequested: async () => ({
@@ -270,7 +329,6 @@ test('library organize apply worker requeues the run when a maintenance pause is
     markRunStarted,
     releaseLease,
     renewLease: async () => {},
-    updateLibraryFileCanonicalPath: async () => {},
   });
 
   const paused = new Promise((resolve) => {
@@ -318,7 +376,7 @@ test('library organize apply worker does not emit release activity when no files
 
   const worker = createLibraryOrganizeApplyWorker({
     acquireLease: async ({ runId }) => leaseForTest(runId),
-    applyExclusiveFileMutationPlan: async () => {
+    applyOrganizeMutation: async () => {
       throw new Error('disk rename failed');
     },
     buildLibraryOrganizePreview: async () => ({
@@ -346,7 +404,6 @@ test('library organize apply worker does not emit release activity when no files
     recordActivityEventFn: async (payload) => { activityEvents.push(payload); },
     releaseLease: async () => {},
     renewLease: async () => {},
-    updateLibraryFileCanonicalPath: async () => {},
   });
 
   await worker.startWorkerRun({ plannedRenameCount: 1, runId: 'run-3' });

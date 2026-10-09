@@ -294,3 +294,23 @@ evidence map now requires searching production, scripts and continuity scaffoldi
 together, retaining exact domain assertions and repeating the original broad
 command after a focused fix. This is reference maintenance; its final structural
 validation and installed-copy identity belong with the lease outcome.
+
+## Organize mutation maintenance, October 9
+
+The [organize design](ORGANIZE_MUTATION_DESIGN.md) exposed an awaited side-effect
+boundary beyond lifecycle token checks: directory creation, destination copy or
+link, verified source removal and catalogue persistence each need current-owned
+authorization. The references now locate immutable capture and short transactions,
+fresh clock after waits, guarded fallback, interruption propagation, zero-row CAS,
+success notification and partial-effect limits. The official-practices reference
+attributes current primary-source lookup to the separate root research ledger.
+
+Entry point, metadata and invocation policy are unchanged. Repository and
+installed copies passed structural validation; all four files match by SHA-256,
+and both entry-point reference links resolve. These establish structure and byte
+identity, not a new blind behavioral trial or standards conformance. Application
+tests and PostgreSQL/filesystem evidence remain in the separate organize outcome.
+Final cross-writer review reproduced a root/file deadlock between the actual
+catalogue and organize stores. References now require tracing the ordinary scan
+writer and explicit root-before-file acquisition with real blocking-PID proof.
+The bounded correction and red/green evidence belong in the organize outcome.

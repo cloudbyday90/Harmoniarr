@@ -168,7 +168,14 @@ export function createMediaFilesystemService({
     };
   }
 
-  async function applyExclusiveFileMutationPlan(plan) {
+  async function applyExclusiveFileMutationPlan(plan, { beforeMutation = null } = {}) {
+    if (beforeMutation != null && typeof beforeMutation !== 'function') throw new TypeError('beforeMutation must be a function');
+    let guardRejected = false;
+    async function assertMutationAllowed(stage) {
+      if (!beforeMutation) return;
+      try { await beforeMutation({ stage }); }
+      catch (error) { guardRejected = true; throw error; }
+    }
     const {
       destinationPath,
       destinationRoot,
@@ -207,6 +214,7 @@ export function createMediaFilesystemService({
       );
     }
 
+    await assertMutationAllowed('prepare_destination');
     await mkdirFn(destinationDirectoryPath, { recursive: true });
 
     const existingDestinationStats = await inspectPath(normalizedDestinationPath, statFn);
@@ -235,6 +243,7 @@ export function createMediaFilesystemService({
       fallbackReason = 'cross_device';
     }
 
+    await assertMutationAllowed('write_destination');
     try {
       if (appliedMode === 'hardlink') {
         await linkFn(normalizedSourcePath, normalizedDestinationPath);
@@ -254,6 +263,7 @@ export function createMediaFilesystemService({
         }
 
         if (removeSourceAfterSuccess) {
+          await assertMutationAllowed('remove_source');
           await removeFileFn(normalizedSourcePath);
           const sourceExistsAfterSuccess = await inspectPath(normalizedSourcePath, statFn);
           verification.sourceExistsAfterSuccess = Boolean(sourceExistsAfterSuccess);
@@ -297,6 +307,7 @@ export function createMediaFilesystemService({
       }
 
       if (removeSourceAfterSuccess) {
+        await assertMutationAllowed('remove_source');
         await removeFileFn(normalizedSourcePath);
         const sourceExistsAfterSuccess = await inspectPath(normalizedSourcePath, statFn);
         verification.sourceExistsAfterSuccess = Boolean(sourceExistsAfterSuccess);
@@ -323,12 +334,12 @@ export function createMediaFilesystemService({
         verification,
       };
     } catch (error) {
-      if (requestedMode === 'hardlink' && appliedMode === 'hardlink' && fallbackMode && shouldFallbackFromHardlink(error)) {
+      if (!guardRejected && requestedMode === 'hardlink' && appliedMode === 'hardlink' && fallbackMode && shouldFallbackFromHardlink(error)) {
         return applyExclusiveFileMutationPlan({
           ...plan,
           fallbackMode: null,
           requestedMode: fallbackMode,
-        }).then((result) => ({
+        }, { beforeMutation }).then((result) => ({
           ...result,
           fallbackFromMode: 'hardlink',
           fallbackReason: error.code ?? 'hardlink_failed',
