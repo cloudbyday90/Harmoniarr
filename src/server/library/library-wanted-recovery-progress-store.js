@@ -116,6 +116,7 @@ export const WANTED_RECOVERY_PROGRESS_JOIN_SQL = `LEFT JOIN LATERAL (
     SELECT jsonb_build_object('runId', runs.id, 'candidateId', candidate.id, 'summary', runs.summary,
       'itemStatus', item.item_status, 'handoff', item.planning_snapshot #> '{execution,handoff}',
       'requestedFiles', item.planning_snapshot #> '{execution,requestedFiles}',
+      'downloadReviewRequired', item.planning_snapshot #> '{execution,downloadReviewRequired}',
       'physicalObservation', COALESCE(item.planning_snapshot #> '{execution,acceptedCandidateObservation}',
         item.planning_snapshot #> '{execution,handoff,attempt,sourceObservation}', item.planning_snapshot #> '{execution,sourceObservation}'),
       'confirmedTransferCount', (SELECT COUNT(*)::integer FROM import_execution_transfer_links current_links

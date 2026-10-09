@@ -44,6 +44,7 @@ export function registerMissingMusicRoutes(app, {
   executeIdempotentMutation = async ({ executeMutation }) => executeMutation(),
   getMissingMusicDecisionDetail,
   getMissingMusicDownloaderHandoff,
+  getMissingMusicDownloadReviewHandoff,
   getRequestMetadata = defaultRequestAuthDependencies.getRequestMetadata,
   limitMissingMusicDecisionDetailRead = skipRateLimitMiddleware,
   limitMissingMusicDecisionDownloadStart = skipRateLimitMiddleware,
@@ -123,6 +124,12 @@ export function registerMissingMusicRoutes(app, {
       ok: true,
       ...payload,
     });
+  }));
+
+  app.get('/api/v1/missing-music/decisions/:decisionId/download-review-handoff', limitMissingMusicDecisionDetailRead, asyncRoute(async (request, response) => {
+    const session = await requireAdminSession(request);
+    const payload = await getMissingMusicDownloadReviewHandoff({ actorUser: buildActorUser(session), decisionId: request.params.decisionId });
+    response.json({ ok: true, ...payload });
   }));
 
   app.post('/api/v1/missing-music/decisions/:decisionId/matches/:matchId/select', limitMissingMusicDecisionMutation, asyncRoute(async (request, response) => {

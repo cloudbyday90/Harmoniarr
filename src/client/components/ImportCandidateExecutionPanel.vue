@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed } from 'vue';
+import { computed, nextTick, onBeforeUnmount, ref } from 'vue';
 import {
   canStartExecutionRun,
   buildImportExecutionRefreshNotice,
@@ -44,6 +44,7 @@ import {
 } from '../lib/operation-run-presentation.js';
 import { buildDownloaderTransferLocation } from '../lib/downloader-transfer-route.js';
 import ImportCandidateRunFailureNotice from './ImportCandidateRunFailureNotice.vue';
+import ImportCandidateDownloadAdoption from './ImportCandidateDownloadAdoption.vue';
 
 const props = defineProps({
   actionErrorMessage: {
@@ -90,6 +91,7 @@ const props = defineProps({
     type: Object,
     default: null,
   },
+  refreshAfterAdoption: { default: async () => {}, type: Function },
 });
 
 defineEmits(['reconcile', 'refresh', 'select-run', 'start']);
@@ -100,6 +102,22 @@ const refreshNotice = computed(() => buildImportExecutionRefreshNotice({
   isReconciling: props.isReconciling,
   summary: props.summary,
 }));
+const pendingAdoptions = ref(new Set());
+const heading = ref(null); let disposed = false;
+const adoptionBusy = computed(() => pendingAdoptions.value.size > 0);
+const olderReviewReferences = computed(() => (props.summary?.downloadAdoptionReviewReferences ?? []).filter((reference) => reference.operationRunId !== props.currentRun?.id).slice(0, 20));
+function updateAdoptionPending({ key, pending }) {
+  const next = new Set(pendingAdoptions.value); if (pending) next.add(key); else next.delete(key); pendingAdoptions.value = next;
+}
+function isUnconfirmed(item) {
+  return item?.planningSnapshot?.execution?.handoff?.state !== 'not_dispatched'
+    && (item?.downloadReviewRequired === true || item?.itemStatus === 'awaiting_confirmation' || ['dispatching', 'awaiting_confirmation'].includes(item?.planningSnapshot?.execution?.handoff?.state));
+}
+async function completeAdoption({ focus }) {
+  await props.refreshAfterAdoption(); await nextTick();
+  if (!disposed && focus.ownsFocus()) heading.value?.focus();
+}
+onBeforeUnmount(() => { disposed = true; });
 
 function downloaderTransferLocation(transfer) {
   return buildDownloaderTransferLocation(transfer);
@@ -117,7 +135,7 @@ function getDownloadAcceptanceDiagnostic(item) {
     <div class="section-header">
       <div>
         <p class="eyebrow">Downloads</p>
-        <h3>Send selected matches to downloads</h3>
+        <h3 ref="heading" tabindex="-1">Send selected matches to downloads</h3>
       </div>
       <div class="review-filter-actions">
         <button
@@ -131,14 +149,14 @@ function getDownloadAcceptanceDiagnostic(item) {
         <button
           type="button"
           class="secondary-button"
-          :disabled="isReconciling || isLoading"
+          :disabled="isReconciling || isLoading || adoptionBusy"
           @click="$emit('reconcile')"
         >
           {{ isReconciling ? 'Syncing...' : 'Sync transfer state' }}
         </button>
         <button
           type="button"
-          :disabled="!canStartExecutionRun(currentRun, selectedCandidateCount, summary) || isStarting"
+          :disabled="!canStartExecutionRun(currentRun, selectedCandidateCount, summary) || isStarting || adoptionBusy"
           @click="$emit('start')"
         >
           {{ isStarting ? 'Starting...' : 'Start download run' }}
@@ -148,6 +166,15 @@ function getDownloadAcceptanceDiagnostic(item) {
 
     <p class="review-summary-copy">Sends selected matches to the download service. Each file is recorded so you can follow progress and recovery.</p>
     <p class="review-summary-copy" v-if="summary">{{ summary.message }}</p>
+    <section v-if="olderReviewReferences.length" class="hx-download-adoption-older" aria-label="Earlier unconfirmed download requests">
+      <h4>Earlier requests still need review</h4>
+      <p>These requests remain unresolved even though newer jobs are shown below.</p>
+      <ImportCandidateDownloadAdoption v-for="reference in olderReviewReferences" :key="`${reference.operationRunId}/${reference.importCandidateId}`"
+        :operation-run-id="reference.operationRunId" :import-candidate-id="reference.importCandidateId"
+        :label="`Review earlier request ${reference.operationRunId.slice(0, 8)}`"
+        :disabled="isLoading || isReconciling || isStarting || adoptionBusy" :complete-adoption="completeAdoption"
+        @pending-change="updateAdoptionPending" />
+    </section>
 
     <dl class="review-meta-grid review-meta-grid-wide" v-if="summary?.heartbeat">
       <div>
@@ -340,6 +367,11 @@ function getDownloadAcceptanceDiagnostic(item) {
               {{ getExecutionItemStatusLabel(item.itemStatus) }}
             </span>
           </div>
+
+          <ImportCandidateDownloadAdoption v-if="isUnconfirmed(item) && (item.importCandidateId || item.planningSnapshot?.candidate?.id)"
+            :operation-run-id="currentRun.id" :import-candidate-id="item.importCandidateId || item.planningSnapshot.candidate.id"
+            :disabled="isLoading || isReconciling || isStarting || adoptionBusy" :complete-adoption="completeAdoption"
+            @pending-change="updateAdoptionPending" />
 
           <div class="metadata-card-grid review-preview-grid">
             <article class="path-card">

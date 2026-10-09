@@ -64,6 +64,10 @@ export function fetchMissingMusicDownloaderHandoff(decisionId) {
   return apiRequest(`/api/v1/missing-music/decisions/${encodeURIComponent(normalizedDecisionId)}/downloader-handoff`);
 }
 
+export function fetchMissingMusicDownloadReviewHandoff(decisionId, { signal } = {}) {
+  return apiRequest(`/api/v1/missing-music/decisions/${encodeURIComponent(decisionId)}/download-review-handoff`, { signal });
+}
+
 export function selectMissingMusicDecisionMatch({ decisionId, idempotencyKey = null, matchId } = {}) {
   const normalizedDecisionId = typeof decisionId === 'string' ? decisionId.trim() : '';
   const normalizedMatchId = typeof matchId === 'string' ? matchId.trim() : '';

@@ -51,6 +51,7 @@ import { createMusicQueueRecoveryExecutionPolicyService } from './music-queue-re
 import { createMusicQueueRecoveryLifecycleService } from './music-queue-recovery-lifecycle-service.js';
 import { createMusicQueueExecutionObservationService } from './music-queue-execution-observation-service.js';
 import { createImportExecutionHandoffService } from './import-execution-handoff-service.js';
+import { createImportCandidateDownloadAdoptionService } from './import-candidate-download-adoption-service.js';
 import { createImportCandidateRecoveryService } from './import-candidate-recovery-service.js';
 import { createImportCandidateExecutionService } from './import-candidate-execution-service.js';
 import { createImportCandidateExecutionSummaryService } from './import-candidate-execution-summary-service.js';
@@ -195,13 +196,20 @@ export function createImportCandidateModule({
   }),
   slskdTransferSnapshotService = createSlskdTransferSnapshotService({
     getDownloads: slskdService.getDownloads,
+    getBoundDownloads: typeof slskdService.getBoundDownloads === 'function' ? slskdService.getBoundDownloads : undefined,
   }),
-  slskdDownloadHandoffReconciliationService = createSlskdDownloadHandoffReconciliationService(),
+  slskdDownloadHandoffReconciliationService = createSlskdDownloadHandoffReconciliationService({ getDownloadBatchEvidence: (...args) => slskdService.getDownloadBatchEvidence(...args) }),
   importCandidateMediaInspectionRunStore = createImportCandidateMediaInspectionRunStore(),
   importCandidateTranscodeRunStore = createImportCandidateTranscodeRunStore(),
   importCandidateExecutionRunStore = createImportCandidateExecutionRunStore(),
   importExecutionTransferLinkStore = createImportExecutionTransferLinkStore(),
   importExecutionHandoffService = createImportExecutionHandoffService({ transferLinkStore: importExecutionTransferLinkStore }),
+  importCandidateDownloadAdoptionService = createImportCandidateDownloadAdoptionService({
+    adoptDownloadHandoff: importExecutionHandoffService.adoptDownloadHandoff,
+    listAdoptionTransfers: (...args) => slskdService.listAdoptionTransfers(...args),
+    validateSelectedAdoptionTransfers: (...args) => slskdService.validateSelectedAdoptionTransfers(...args),
+    assertMaintenanceWriteAllowed: ({ queryable } = {}) => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({ operationLabel: 'Existing download adoption', queryable }),
+  }),
   importCandidateApplyRunStore = createImportCandidateApplyRunStore(),
   importCandidateReleaseRecheckStore = createImportCandidateReleaseRecheckStore(),
   importCandidateSafeAutoAddQualityGateService = createImportCandidateSafeAutoAddQualityGateService({
@@ -241,6 +249,8 @@ export function createImportCandidateModule({
     acquireLease: importCandidateExecutionRunStore.acquireLease,
     buildSelectedImportCandidateSummary: importCandidateSelectionSummaryService.buildSelectedImportCandidateSummary,
     enqueueDownloads: slskdService.enqueueDownloads,
+    prepareDownloadDispatch: (...args) => slskdService.prepareDownloadDispatch(...args),
+    findMatchingTransfers: slskdDownloadHandoffReconciliationService.findMatchingTransfers,
     getImportCandidate: importCandidateService.getImportCandidate,
     prepareDownloadHandoff: importExecutionHandoffService.prepareDownloadHandoff,
     confirmDownloadHandoff: importExecutionHandoffService.confirmDownloadHandoff,
@@ -390,6 +400,8 @@ export function createImportCandidateModule({
     ?? createImportCandidateReleaseSafeAddRecheckService({
       recheckStore: importCandidateReleaseRecheckStore,
       getImportCandidate: importCandidateService.getImportCandidate,
+      getDownloadAdoptionReview: importCandidateDownloadAdoptionService.getDownloadAdoptionReview,
+      adoptExistingDownloads: importCandidateDownloadAdoptionService.adoptExistingDownloads,
       getMediaToolingStatus,
       previewImportCandidateApply: importCandidateApplyPreviewService.previewImportCandidateApply,
       listFileDecisions: listImportCandidateFileDecisions,
@@ -512,6 +524,8 @@ export function createImportCandidateModule({
     importCandidateExecutionService,
     importCandidateExecutionSummaryService,
     importCandidateExecutionWorker,
+    importExecutionHandoffService,
+    importCandidateDownloadAdoptionService,
     importCandidateRecoveryService,
     musicQueueRecoveryService,
     musicQueueRecoveryExecutionPolicyService,

@@ -18,6 +18,7 @@ async function withRetentionHistory(run) {
     for (const [handoffState, itemStatus, keep] of [
       ['dispatching', 'blocked', true],
       ['awaiting_confirmation', 'awaiting_confirmation', true],
+      ['operator_adopted', 'queued', true],
       [null, 'awaiting_confirmation', true],
       ['confirmed', 'queued', false],
       ['not_dispatched', 'awaiting_confirmation', false],
@@ -29,7 +30,8 @@ async function withRetentionHistory(run) {
       if (itemStatus) await pool.query(`INSERT INTO import_execution_run_items
         (operation_run_id,import_candidate_id,position,item_status,status_message,planning_snapshot)
         VALUES ($1,$2,1,$3,'Controlled handoff checkpoint',$4::jsonb)`, [operation.id, candidate.id, itemStatus,
-      JSON.stringify({ execution: handoffState ? { handoff: { state: handoffState } } : {} })]);
+      JSON.stringify({ execution: handoffState ? { handoff: { state: handoffState,
+        ...(handoffState === 'operator_adopted' ? { adoption: { originalUncertainty: true } } : {}) } } : {} })]);
     }
     await pool.query(`UPDATE operation_runs SET created_at=NOW()-INTERVAL '30 days',
       started_at=NOW()-INTERVAL '30 days',finished_at=NOW()-INTERVAL '30 days'
@@ -47,13 +49,13 @@ async function assertHistory({ operations, retained, reclaimable, keeper }) {
   assert.equal((await operations.getRunById(keeper.id))?.id, keeper.id);
 }
 
-test('per-type pruning retains manual/legacy unresolved checkpoints and reclaims known resolved history',
+test('per-type pruning retains manual, legacy and operator-adopted uncertainty and reclaims known resolved history',
   { timeout: 60_000 }, async () => {
     await withRetentionHistory(async (history) => {
       await history.operations.pruneOldRuns({ retainCount: 1 });
       await assertHistory(history);
       const rows = await history.pool.query('SELECT item_status FROM import_execution_run_items');
-      assert.equal(rows.rowCount, 3);
+      assert.equal(rows.rowCount, 4);
     });
   });
 

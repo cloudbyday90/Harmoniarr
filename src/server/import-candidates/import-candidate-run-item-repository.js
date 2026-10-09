@@ -109,6 +109,7 @@ export function createImportCandidateRunItemRepository({
     snapshot,
     statusMessage,
     expectedAttemptId = undefined,
+    expectedAdoptionId = undefined,
   }, queryable) {
     const db = resolveQueryable(queryable);
     const result = await db.query(
@@ -121,6 +122,7 @@ export function createImportCandidateRunItemRepository({
         WHERE operation_run_id = $1
           AND import_candidate_id = $2
           ${expectedAttemptId !== undefined ? `AND ${snapshotColumn} #>> '{execution,handoff,attempt,attemptId}' IS NOT DISTINCT FROM $6::text` : ''}
+          ${expectedAdoptionId !== undefined ? `AND ${snapshotColumn} #>> '{execution,handoff,adoption,adoptionId}' IS NOT DISTINCT FROM $7::text` : ''}
         RETURNING *
       `,
       [
@@ -130,6 +132,7 @@ export function createImportCandidateRunItemRepository({
         statusMessage,
         JSON.stringify(snapshot ?? {}),
         ...(expectedAttemptId !== undefined ? [expectedAttemptId] : []),
+        ...(expectedAdoptionId !== undefined ? [expectedAdoptionId] : []),
       ],
     );
 

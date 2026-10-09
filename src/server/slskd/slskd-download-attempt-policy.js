@@ -6,6 +6,8 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { validateSlskdProviderBinding } from './slskd-download-protocol-policy.js';
+import { hasProgressedDownloadEvidence } from './slskd-download-evidence-policy.js';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const maximumFiles = 10000;
@@ -19,6 +21,10 @@ function fileIdentity(file) {
   const filename = text(file?.filename)?.replaceAll('/', '\\');
   return filename && Number.isSafeInteger(file?.size) && file.size > 0
     ? { filename, size: file.size } : null;
+}
+
+export function normalizeDownloadFileManifest(files) {
+  return manifest(files);
 }
 
 function fileKey(file) { return `${file.filename}\u0000${file.size}`; }
@@ -41,39 +47,48 @@ function sameManifest(left, right) {
     && left.every((file, index) => fileKey(file) === fileKey(right[index]));
 }
 
-function receiptIdentity(transfer, username) {
+function receiptIdentity(transfer, username, { batchId = null, requireDirection = false } = {}) {
   const file = fileIdentity(transfer);
   const id = normalizeDownloadTransferId(transfer?.id);
   const peer = text(transfer?.username, 256);
-  const direction = !Object.hasOwn(transfer ?? {}, 'direction')
-    || transfer.direction === 'Download';
+  const direction = (!requireDirection && !Object.hasOwn(transfer ?? {}, 'direction'))
+    || transfer?.direction === 'Download';
+  const observedBatch = transfer?.batchId == null ? null : normalizeDownloadTransferId(transfer.batchId);
+  if (transfer?.batchId != null && !observedBatch) return null;
+  if (batchId != null && observedBatch !== normalizeDownloadTransferId(batchId)) return null;
   return direction && file && id && peer === username
-    ? { ...file, id, username: peer } : null;
+    ? { ...file, id, username: peer, ...(observedBatch ? { batchId: observedBatch } : {}) } : null;
 }
 
-export function matchesDownloadReceipt({ receipt, transfer } = {}) {
+export function normalizeDownloadReceipt(transfer, username) {
+  return receiptIdentity(transfer, username);
+}
+
+export function matchesDownloadReceipt({ receipt, transfer, requireDirection = false } = {}) {
   const expected = receiptIdentity(receipt, receipt?.username);
-  const observed = receiptIdentity(transfer, receipt?.username);
+  const observed = receiptIdentity(transfer, receipt?.username, { batchId: receipt?.batchId, requireDirection });
   return Boolean(expected && observed && expected.id === observed.id
     && fileKey(expected) === fileKey(observed));
 }
 
 export function createDownloadAttempt({
   attemptId = randomUUID(), importCandidateId, operationRunId,
-  requestedFiles, sourceObservation, username,
+  requestedFiles, sourceObservation, username, providerBinding = null,
 } = {}) {
   const files = manifest(requestedFiles);
   const peer = text(username, 256);
   if (!uuidPattern.test(attemptId) || !text(importCandidateId, 128)
     || !text(operationRunId, 128) || !files || !peer
     || !sourceObservation || typeof sourceObservation !== 'object'
-    || Array.isArray(sourceObservation)) {
+    || Array.isArray(sourceObservation) || (providerBinding != null && !validateSlskdProviderBinding(providerBinding))
+    || (providerBinding?.protocol === 'batch' && files?.some((file) => file.filename.split('\\').some((segment) => ['.', '..'].includes(segment))))) {
     throw new TypeError('A download attempt requires an owner, source and unique valid file manifest');
   }
   return {
-    version: 1, attemptId, importCandidateId, operationRunId,
+    version: providerBinding ? 2 : 1, attemptId, importCandidateId, operationRunId,
     requestedFiles: files, username: peer,
     sourceObservation: structuredClone(sourceObservation), receipts: [], failedFiles: [],
+    ...(providerBinding ? { providerBinding: { ...providerBinding } } : {}),
   };
 }
 
@@ -81,7 +96,13 @@ export function createDownloadAttempt({
 export function validateDownloadAttempt({
   attempt, importCandidateId, operationRunId, requestedFiles, username,
 } = {}) {
-  if (attempt?.version !== 1 || !uuidPattern.test(attempt?.attemptId ?? '')
+  if (![1, 2].includes(attempt?.version) || !uuidPattern.test(attempt?.attemptId ?? '')
+    || (attempt.version === 2 && !validateSlskdProviderBinding(attempt.providerBinding))
+    || (attempt.receiptOrigin != null && !['direct_response', 'batch_lookup', 'operator_adoption'].includes(attempt.receiptOrigin))
+    || (attempt.receiptOrigin === 'batch_lookup' && (attempt.version !== 2 || attempt.providerBinding?.protocol !== 'batch'))
+    || (attempt.receiptOrigin === 'operator_adoption' && (attempt.version !== 2 || attempt.originalDispatchUnresolved !== true
+      || !text(attempt.adoption?.actorUserId, 128) || !/^[0-9a-f]{64}$/u.test(attempt.adoption?.acceptedRequestHash ?? '')
+      || !Number.isFinite(Date.parse(attempt.adoption?.adoptedAt))))
     || attempt.importCandidateId !== importCandidateId || attempt.operationRunId !== operationRunId
     || !text(importCandidateId, 128) || !text(operationRunId, 128)
     || text(username, 256) !== attempt.username
@@ -92,7 +113,17 @@ export function validateDownloadAttempt({
   if (!files || !expected || !sameManifest(files, expected)
     || !Array.isArray(attempt.receipts) || attempt.receipts.length > files.length
     || !Array.isArray(attempt.failedFiles) || attempt.failedFiles.length > files.length) return null;
-  const receipts = attempt.receipts.map((row) => receiptIdentity(row, attempt.username));
+  const batchId = attempt.version === 2 && attempt.providerBinding.protocol === 'batch'
+    && attempt.receiptOrigin !== 'operator_adoption' ? attempt.attemptId : null;
+  const receipts = attempt.receipts.map((row) => {
+    const receipt = receiptIdentity(row, attempt.username, { batchId });
+    if (!receipt) return null;
+    if (['batch_lookup', 'operator_adoption'].includes(attempt.receiptOrigin)) {
+      if (!hasProgressedDownloadEvidence(row, { allowRemovedSuccess: attempt.receiptOrigin !== 'operator_adoption' })) return null;
+      return { ...receipt, state: row.state, ...(row.removed === true ? { removed: true } : {}) };
+    }
+    return receipt;
+  });
   const keys = new Set(files.map(fileKey));
   if (receipts.some((row) => !row || !keys.has(fileKey(row)))
     || new Set(receipts.map((row) => row.id)).size !== receipts.length
@@ -123,16 +154,24 @@ export function evaluateDownloadReceipt({ attempt, enqueueResult } = {}) {
   const matchedTransfers = [];
   const receiptIds = new Set();
   const receiptKeys = new Set();
+  const origin = enqueueResult?.evidenceOrigin ?? 'direct_response';
+  if (!['direct_response', 'batch_lookup', 'operator_adoption'].includes(origin)) malformed = true;
+  if (origin === 'batch_lookup' && (saved.version !== 2 || saved.providerBinding?.protocol !== 'batch')) malformed = true;
+  const expectedBatchId = saved.version === 2 && saved.providerBinding.protocol === 'batch'
+    && origin !== 'operator_adoption' ? saved.attemptId : null;
   for (const transfer of enqueued.slice(0, saved.requestedFiles.length)) {
-    const receipt = receiptIdentity(transfer, saved.username);
+    const receipt = receiptIdentity(transfer, saved.username, { batchId: expectedBatchId, requireDirection: saved.version === 2 });
     const key = receipt && fileKey(receipt);
-    if (!receipt || !requestedByKey.has(key) || receiptIds.has(receipt.id) || receiptKeys.has(key)) {
+    if (!receipt || !requestedByKey.has(key) || receiptIds.has(receipt.id) || receiptKeys.has(key)
+      || (['batch_lookup', 'operator_adoption'].includes(origin)
+        && !hasProgressedDownloadEvidence(transfer, { allowRemovedSuccess: origin !== 'operator_adoption' }))) {
       malformed = true;
       continue;
     }
     receiptIds.add(receipt.id);
     receiptKeys.add(key);
-    receipts.push(receipt);
+    receipts.push({ ...receipt, ...(['batch_lookup', 'operator_adoption'].includes(origin)
+      ? { state: transfer.state, ...(transfer.removed === true ? { removed: true } : {}) } : {}) });
     matchedTransfers.push({ ...transfer, ...receipt });
   }
   const failedNames = failed.slice(0, saved.requestedFiles.length).map((name) => text(name)?.replaceAll('/', '\\'));
@@ -154,7 +193,7 @@ export function evaluateDownloadReceipt({ attempt, enqueueResult } = {}) {
     allRequestedFilesMatched, disposition, matchedTransfers,
     missingFiles: saved.requestedFiles.filter((file) => !receiptKeys.has(fileKey(file))),
     requestedFileCount: saved.requestedFiles.length,
-    attempt: { ...saved, receipts, receiptDisposition: disposition,
+    attempt: { ...saved, receipts, receiptDisposition: disposition, receiptOrigin: origin,
       failedFiles: malformed ? [] : [...new Set(failedNames.filter((name) => name && requestedByFilename.has(name)
         && !receipts.some((receipt) => receipt.filename === name)))],
     },
@@ -165,7 +204,8 @@ export function evaluateStoredDownloadReceipt(context = {}) {
   const attempt = validateDownloadAttempt(context);
   if (!attempt) return null;
   const result = evaluateDownloadReceipt({ attempt, enqueueResult: {
-    enqueued: attempt.receipts, failed: attempt.failedFiles,
+    enqueued: attempt.receipts.map((receipt) => ({ ...receipt, direction: 'Download' })), failed: attempt.failedFiles,
+    evidenceOrigin: attempt.receiptOrigin ?? 'direct_response',
   } });
   // A malformed direct response cannot be upgraded after its rejected rows are omitted.
   if (result.disposition !== attempt.receiptDisposition) {

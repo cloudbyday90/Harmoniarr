@@ -23,6 +23,19 @@ function createModule(overrides = {}) {
   return { module, release };
 }
 
+test('canonical download review capability is admin-only while its exact context stays outside requester decision data', async () => {
+  const { module, release } = createModule();
+  release.libraryAddRecoveryFacts = null;
+  release.discoveryRequest = { importReviewSummary: { statusCounts: { selected: 1 }, totalCount: 1,
+    currentDownloadHandoff: { confirmationPending: true, disposition: 'unknown', operationRunId: 'review-run', importCandidateId: 'review-candidate' } } };
+  const admin = { id: 'admin-1', role: 'admin' }; const requester = { id: 'listener-1', role: 'requester' };
+  const detail = await module.routeDependencies.getMissingMusicDecisionDetail({ actorUser: admin, decisionId: release.id });
+  const own = await module.routeDependencies.getMissingMusicDecisionDetail({ actorUser: requester, decisionId: release.id });
+  assert.equal(detail.permissions.canReviewDownloadHandoff, true); assert.equal(own.permissions.canReviewDownloadHandoff, false);
+  assert.doesNotMatch(JSON.stringify({ detail, own }), /review-run|review-candidate|currentDownloadHandoff/u);
+  assert.equal((await module.routeDependencies.getMissingMusicDownloadReviewHandoff({ actorUser: admin, decisionId: release.id })).operationRunId, 'review-run');
+});
+
 test('Missing Music module composes canonical target resolution, recheck delegation and refreshed queued public projection', async (t) => {
   const recheckReleaseSafeAdd = t.mock.fn(async () => ({ outcome: 'queued', runId: 'run-add',
     sourcePath: '/private/download', candidateId: 'private-candidate', message: 'private-probe-error' }));

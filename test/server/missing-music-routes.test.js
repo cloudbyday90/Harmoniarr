@@ -48,6 +48,21 @@ function createMissingMusicRouteTestApp(overrides = {}) {
   });
 }
 
+test('Missing Music download review handoff is admin-only and ignores browser supplied recovery authority', async (t) => {
+  const getMissingMusicDownloadReviewHandoff = t.mock.fn(async () => ({ decisionId: 'wanted', operationRunId: 'run', importCandidateId: 'candidate' }));
+  const app = createMissingMusicRouteTestApp({ getMissingMusicDownloadReviewHandoff });
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(baseUrl + '/api/v1/missing-music/decisions/wanted/download-review-handoff?operationRunId=untrusted&targetUserId=untrusted');
+    assert.equal(response.status, 200);
+    assert.deepEqual(getMissingMusicDownloadReviewHandoff.mock.calls[0].arguments[0], {
+      decisionId: 'wanted', actorUser: { id: 'admin-1', isDisabled: false, role: 'admin', username: 'admin' } });
+  });
+  const denied = createMissingMusicRouteTestApp({ getMissingMusicDownloadReviewHandoff,
+    requireAdminSession: async () => { throw createApiError(403, 'admin_required', 'Administrator required'); } });
+  await withServer(denied, async (baseUrl) => { assert.equal((await fetch(baseUrl + '/api/v1/missing-music/decisions/wanted/download-review-handoff')).status, 403); });
+  assert.equal(getMissingMusicDownloadReviewHandoff.mock.callCount(), 1);
+});
+
 test('prepared Add to library authenticates, rejects body overrides, and preserves its exact durable decision contract', async (t) => {
   const order = [];
   const actorUser = { id: 'admin-1', isDisabled: false, role: 'admin', username: 'admin' };

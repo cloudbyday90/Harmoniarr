@@ -71,3 +71,15 @@ receipt ownership and truthful partial/current transfer evidence. Similar
 history, a new baseline-relative ID and a batch record are each insufficient
 causal or whole-manifest proof on their own. Maintain this as conditional project
 guidance, with no new broad audit, invocation policy or duplicate skill.
+
+## Batch and operator adoption maintenance, October 9
+
+Extend the two references with the observed batch/receipt and operator decision
+boundaries from the [batch design](BATCH_DOWNLOAD_HANDOFF_DESIGN.md). Locate
+the pinned protocol owner, exact receipt reads and existing atomic adoption
+transaction. Map incomplete admission, startup replacement IDs, stale authority,
+foreign links, uncertain replay and native dialog feedback to meaningful adverse
+evidence. Preserve a separately attributed operator choice and original unknown
+dispatch; no filename inference or uncertainty-clearing shortcut is justified.
+Document the freshly checked Idempotency-Key draft status separately from local
+and provider contracts. Keep the entry point and invocation policy unchanged.

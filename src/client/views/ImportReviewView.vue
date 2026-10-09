@@ -387,6 +387,7 @@ onBeforeUnmount(() => {
             :selected-candidate-count="selectedSummaryCounts.totalSelected"
             :selected-run-id="adminWorkflow.execution.selectedRunId?.value"
             :summary="adminWorkflow.execution.summary?.value"
+            :refresh-after-adoption="adminWorkflow.execution.handleRefresh"
             @reconcile="adminWorkflow.execution.handleReconcile"
             @refresh="adminWorkflow.execution.handleRefresh"
             @select-run="adminWorkflow.execution.handleSelectRun"

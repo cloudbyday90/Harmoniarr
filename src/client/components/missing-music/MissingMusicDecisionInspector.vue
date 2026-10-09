@@ -18,6 +18,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { buildMissingMusicDecisionDetailPresentation } from '../../lib/missing-music-decision-detail-presentation.js';
 import { buildMissingMusicMatchChoicePresentation } from '../../lib/missing-music-match-selection-presentation.js';
 import { trapModalTabFocus } from '../../lib/modal-focus-trap.js';
@@ -30,6 +31,7 @@ import { useMissingMusicFindMatches } from '../../composables/useMissingMusicFin
 import { useMissingMusicQualityFallback } from '../../composables/useMissingMusicQualityFallback.js';
 import { useMissingMusicLibraryAddRecheck } from '../../composables/useMissingMusicLibraryAddRecheck.js';
 import { useMissingMusicLibraryAdd } from '../../composables/useMissingMusicLibraryAdd.js';
+import { useMissingMusicDownloadReviewHandoff } from '../../composables/useMissingMusicDownloadReviewHandoff.js';
 import { createMissingMusicReleaseMutationGate } from '../../lib/missing-music-release-mutation-gate.js';
 import MissingMusicQualityEvidence from './MissingMusicQualityEvidence.vue';
 import MissingMusicCommandFeedback from './MissingMusicCommandFeedback.vue';
@@ -43,6 +45,7 @@ const props = defineProps({
   },
 });
 const emit = defineEmits(['changed']);
+const router = useRouter();
 
 const headingElement = ref(null);
 const focusedDecisionId = ref('');
@@ -52,6 +55,7 @@ const downloadConfirmationOpen = ref(false);
 const downloadConfirmationInvoker = ref(null);
 const libraryAddConfirmationOpen = ref(false);
 const currentDecisionId = computed(() => props.decisionId);
+const downloadReviewHandoff = useMissingMusicDownloadReviewHandoff({ decisionId: currentDecisionId });
 const mutationGate = createMissingMusicReleaseMutationGate();
 const mutationOptions = { decisionId: currentDecisionId, mutationGate, retryIntentState: {} };
 const matchSelection = useMissingMusicMatchSelection(mutationOptions);
@@ -132,6 +136,12 @@ function queueSearchAgain() {
   return completeUserCommand((decisionId) => searchAgain.searchAgain({ decisionId }));
 }
 
+async function openDownloadReview() {
+  const decisionId = props.decisionId;
+  const location = await downloadReviewHandoff.loadLocation();
+  if (location && !disposed && props.decisionId === decisionId) await router.push(location);
+}
+
 function requestMatches() {
   return completeUserCommand((decisionId) => findMatches.findMatches({ decisionId }));
 }
@@ -182,6 +192,7 @@ watch(() => props.decisionId, () => {
 
 onBeforeUnmount(() => {
   disposed = true;
+  downloadReviewHandoff.destroy();
   disposeCommandFocusTrackers();
   closeDownloadConfirmation();
 });
@@ -232,7 +243,14 @@ defineExpose({ busy, refresh: decisionDetail.refresh });
           <span class="hx-pill" :data-tone="presentation.statusTone">{{ presentation.statusLabel }}</span>
           <p role="status" aria-live="polite" aria-atomic="true">{{ presentation.statusMessage }}</p>
           <p class="missing-music-inspector__next-step"><strong>Next step:</strong> {{ presentation.nextStep }}</p>
+      </div>
+        <div v-if="presentation.canReviewDownloadHandoff" class="missing-music-inspector__start-download">
+          <button type="button" class="hx-btn" data-variant="primary" :disabled="mutationBusy || downloadReviewHandoff.isLoading.value" @click="openDownloadReview">
+            {{ downloadReviewHandoff.isLoading.value ? 'Opening review…' : 'Review download request' }}
+          </button>
+          <p>An administrator can inspect the saved request and review verified existing downloads.</p>
         </div>
+        <p v-if="downloadReviewHandoff.errorMessage.value" class="hx-alert" data-tone="danger" role="alert">{{ downloadReviewHandoff.errorMessage.value }}</p>
         <div v-if="presentation.canFindMatches" class="missing-music-inspector__start-download">
           <button type="button" class="hx-btn" data-variant="primary" aria-describedby="missing-music-find-matches-help" :disabled="mutationBusy" @click="requestMatches">
             {{ findMatches.isPending.value ? 'Requesting…' : 'Find matches' }}

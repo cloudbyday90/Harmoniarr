@@ -15,8 +15,14 @@ import { buildDownloadAcceptanceDiagnostic, buildDownloadHandoffConfirmationDiag
 import { captureRecoveryObservation, matchesAcceptedRecoveryProvenance, matchesRecoveryObservation } from './music-queue-recovery-policy.js';
 import { createImportExecutionHandoffStore } from './import-execution-handoff-store.js';
 import { createImportExecutionTransferLinkStore } from './import-execution-transfer-link-store.js';
+import { evaluateBatchDownloadEvidence } from '../slskd/slskd-download-batch-policy.js';
+import { createImportExecutionDownloadAdoptionService } from './import-execution-download-adoption-service.js';
+import { hasDownloadAdoptionMarker } from './import-execution-adoption-evidence-policy.js';
 
 const stale = () => ({ confirmed: false, disposition: 'unknown', stale: true, dispatchAllowed: false });
+const attemptIdentity = (attempt) => attempt && ({ version: attempt.version, attemptId: attempt.attemptId,
+  importCandidateId: attempt.importCandidateId, operationRunId: attempt.operationRunId, username: attempt.username,
+  requestedFiles: attempt.requestedFiles, sourceObservation: attempt.sourceObservation, providerBinding: attempt.providerBinding });
 
 /** One row-locked owner controls immutable dispatch checkpoints and their causal receipts. */
 export function createImportExecutionHandoffService({ store = createImportExecutionHandoffStore(),
@@ -30,19 +36,19 @@ export function createImportExecutionHandoffService({ store = createImportExecut
     recordConfirmedTransfers: transferLinkStore.recordConfirmedTransfers, withTransaction, recordAuditEventFn })) {
     if (typeof fn !== 'function') throw new TypeError(`createImportExecutionHandoffService requires ${name}`);
   }
-  async function prepareDownloadHandoff({ importCandidateId, operationRunId, requestedFiles, username, sourceObservation }) {
+  async function prepareDownloadHandoff({ importCandidateId, operationRunId, requestedFiles, username, sourceObservation, providerBinding = null }) {
     return withTransaction(async (queryable) => {
       const owner = { importCandidateId, operationRunId };
       const item = await store.lockEvidence(owner, queryable);
       if (!item) return stale();
       const execution = item.planningSnapshot?.execution ?? {};
       const existing = execution.handoff?.attempt;
-      if (existing || ['dispatching','awaiting_confirmation','confirmed'].includes(execution.handoff?.state)
+      if (hasDownloadAdoptionMarker(execution) || existing || ['dispatching','awaiting_confirmation','confirmed'].includes(execution.handoff?.state)
         || execution.enqueuedTransfers?.length) return { dispatchAllowed: false, attempt: existing ?? null, item };
       const candidate = await store.getCandidate(importCandidateId, queryable);
       if (candidate?.status !== 'selected' || !matchesRecoveryObservation(candidate, sourceObservation)
         || !await store.isCurrentOrigin(owner, queryable) || await store.findUnresolvedOtherHandoff(owner, queryable)) return stale();
-      const proposal = createDownloadAttempt({ importCandidateId, operationRunId, requestedFiles, username, sourceObservation });
+      const proposal = createDownloadAttempt({ importCandidateId, operationRunId, requestedFiles, username, sourceObservation, providerBinding });
       const dispatchStartedAt = getNow().toISOString();
       const saved = await store.updateCheckpoint({ item, expectedAttemptId: null, itemStatus: 'awaiting_confirmation',
         statusMessage: 'Sending the download request and recording its receipt.', execution: {
@@ -54,14 +60,14 @@ export function createImportExecutionHandoffService({ store = createImportExecut
       return { dispatchAllowed: true, attempt: proposal, dispatchStartedAt, item: saved };
     });
   }
-  async function confirmDownloadHandoff({ importCandidateId, operationRunId, attemptId, enqueueResult, actorUserId = null,
+  async function confirmDownloadHandoff({ importCandidateId, operationRunId, attemptId, expectedAttempt, enqueueResult, providerEvidence, actorUserId = null,
     warningMessage = null, requestMetadata = null }) {
     return withTransaction(async (queryable) => {
       const owner = { importCandidateId, operationRunId };
       const item = await store.lockEvidence(owner, queryable);
       const execution = item?.planningSnapshot?.execution ?? {};
       const stored = execution.handoff?.attempt;
-      if (!item || execution.handoff?.state === 'not_dispatched' || (stored?.attemptId ?? null) !== (attemptId ?? null)) return stale();
+      if (!item || hasDownloadAdoptionMarker(execution) || execution.handoff?.state === 'not_dispatched' || (stored?.attemptId ?? null) !== (attemptId ?? null)) return stale();
       const pending = async () => {
         await store.recordPendingCheck({ item, attemptId, checkedAt: getNow().toISOString() }, queryable);
         return stale();
@@ -70,6 +76,7 @@ export function createImportExecutionHandoffService({ store = createImportExecut
       const context = { attempt: stored, ...owner, requestedFiles: execution.requestedFiles, username: stored.username };
       const saved = validateDownloadAttempt(context);
       if (!saved) return pending();
+      if (expectedAttempt && !isDeepStrictEqual(attemptIdentity(expectedAttempt), attemptIdentity(saved))) return pending();
       const candidate = await store.getCandidate(importCandidateId, queryable);
       const physicalMatch = candidate != null && matchesAcceptedRecoveryProvenance(candidate, saved.sourceObservation);
       const mayAdvance = physicalMatch && ['selected','downloading'].includes(candidate.status)
@@ -78,7 +85,11 @@ export function createImportExecutionHandoffService({ store = createImportExecut
       if (mayAdvance && execution.handoff?.state === 'confirmed' && previous.disposition === 'confirmed') {
         return { ...previous, confirmed: true, alreadyConfirmed: true, candidate, item };
       }
-      const proof = enqueueResult === undefined ? previous : evaluateDownloadReceipt({ attempt: saved, enqueueResult });
+      const proof = providerEvidence !== undefined ? evaluateBatchDownloadEvidence({ attempt: saved, providerEvidence })
+        : enqueueResult === undefined ? previous : evaluateDownloadReceipt({ attempt: saved, enqueueResult });
+      if (!proof || !isDeepStrictEqual(saved.providerBinding, proof.attempt?.providerBinding)
+        || !isDeepStrictEqual(saved.requestedFiles, proof.attempt?.requestedFiles)
+        || saved.attemptId !== proof.attempt?.attemptId) return pending();
       if (!isDeepStrictEqual(saved.sourceObservation, proof.attempt?.sourceObservation)) return pending();
       if (physicalMatch) await transferLinkStore.recordConfirmedTransfers({ ...owner, transfers: proof.attempt?.receipts ?? [], queryable });
       const confirmed = mayAdvance && proof.disposition === 'confirmed' && proof.allRequestedFilesMatched === true;
@@ -115,7 +126,7 @@ export function createImportExecutionHandoffService({ store = createImportExecut
         phaseAdvanced, dispatchAllowed: false };
     });
   }
-  async function assertDownloadHandoffCurrent({ importCandidateId, operationRunId, attemptId }) {
+  async function assertDownloadHandoffCurrent({ importCandidateId, operationRunId, attemptId, expectedAttempt }) {
     return withTransaction(async (queryable) => {
       const owner = { importCandidateId, operationRunId };
       const item = await store.lockEvidence(owner, queryable);
@@ -124,6 +135,7 @@ export function createImportExecutionHandoffService({ store = createImportExecut
       const valid = validateDownloadAttempt({ attempt, ...owner, requestedFiles: execution?.requestedFiles, username: attempt?.username });
       const candidate = await store.getCandidate(importCandidateId, queryable);
       if (!valid || attempt.attemptId !== attemptId || execution.handoff.state !== 'dispatching' || attempt.receipts.length
+        || (expectedAttempt && !isDeepStrictEqual(attemptIdentity(expectedAttempt), attemptIdentity(valid)))
         || !matchesRecoveryObservation(candidate, attempt.sourceObservation) || !await store.isCurrentOrigin(owner, queryable)
         || !await store.isDispatchRunActive(owner, queryable)) {
         throw createApiError(409, 'import_execution_handoff_stale', 'The download attempt changed before provider dispatch');
@@ -141,5 +153,6 @@ export function createImportExecutionHandoffService({ store = createImportExecut
           handoff: { ...execution.handoff, state: 'not_dispatched' }, outcome: 'not_dispatched' } }, queryable));
     });
   }
-  return { prepareDownloadHandoff, confirmDownloadHandoff, assertDownloadHandoffCurrent, recordDownloadHandoffNotDispatched };
+  const adoption = createImportExecutionDownloadAdoptionService({ store, transferLinkStore, withTransaction, recordAuditEventFn, getNow });
+  return { prepareDownloadHandoff, confirmDownloadHandoff, assertDownloadHandoffCurrent, recordDownloadHandoffNotDispatched, ...adoption };
 }

@@ -6,7 +6,41 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
-## Current development slice: Attempt-owned download confirmation (2026-10-08)
+## Current development slice: Batch download handoff and operator adoption (2026-10-09)
+
+- Implemented source-verified slskd 0.25.1 legacy / 0.26.0 caller-ID batch
+  selection, pinned provider binding, whole-manifest positive lookup recovery,
+  exact receipt details and explicit administrator adoption of eligible uncertainty.
+  The separate [design](BATCH_DOWNLOAD_HANDOFF_DESIGN.md),
+  [outcome](BATCH_DOWNLOAD_HANDOFF_OUTCOME.md) and
+  [research](SLSKD_BATCH_HANDOFF_RESEARCH_2026_10.md) record October MCP sources,
+  alternatives, pros/cons, final stack, original failures and evidence limits.
+- Adoption preserves the original unknown dispatch with separate operator
+  provenance, atomic links/phase/checkpoint/audits and durable replay. Full current
+  source/scope/quality/admin/session/CSRF/maintenance checks remain in force.
+  No provider enqueue/cancel/remove occurs. Automatic recovery and retention
+  preserve uncertainty; native confirmation/canonical handoff keep requester
+  projections private and pending status/focus truthful.
+- Fresh GitHub MCP PR checks found no eligible unreplayed patch. See the
+  [PR design](OPEN_PR_APPLICABILITY_BATCH_HANDOFF_2026_10_DESIGN.md) and
+  [outcome](OPEN_PR_APPLICABILITY_BATCH_HANDOFF_2026_10_OUTCOME.md). No random
+  draw, repeated local implementation or PR merge was applicable.
+- Final complete validation passes 9,065 tests (3,934 server, 4,364 client,
+  513 script and 254 integration), zero failures/skips, all policy/lint checks
+  and both builds. Focused checks pass 113 provider, 99 backend, 18 adoption server, 63 client,
+  53 canonical/projection, 34 PostgreSQL and 27 browser tests; totals overlap
+  the broad run. Six responsive captures were inspected. Fresh audit reports
+  zero vulnerabilities. Skill structure/installed four-file identity pass.
+- Next recommendation: guarded resolution of a current-origin conflict caused
+  by a newer, never-dispatched job. Prove R2 unused, retire its allocation and
+  restore R1 atomically through shared origin ownership. Test R1's complete lost-
+  response batch proof against a concurrent R2 worker: one advancement/resolution
+  audit alongside required phase audit, zero additional POSTs; dispatched or
+  uncertain R2 must refuse. See the outcome
+  for owners and remaining incomplete/older legacy limits.
+- Work remains on main; no release, tag, branch or provider upgrade is created.
+
+## Prior development slice: Attempt-owned download confirmation (2026-10-08)
 
 - Implement attempt-owned explicit provider receipts, atomic checkpoint/link
   confirmation, durable unresolved work and truthful status. The separate

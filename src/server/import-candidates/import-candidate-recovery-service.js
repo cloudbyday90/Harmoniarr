@@ -164,6 +164,9 @@ export function createImportCandidateRecoveryService({
   }
   async function delegateScoped(kind, input) {
     const candidate = await getImportCandidate({ importCandidateId: input.failedCandidateId });
+    if (candidate && musicQueueRecoveryService?.isAdoptedDownloadEpisode
+      && await musicQueueRecoveryService.isAdoptedDownloadEpisode(candidate.id)) return { recovered: false,
+      scopedRecovery: true, requiresOperator: true, reason: 'adopted_download_requires_review', failedCandidateId: candidate.id };
     if (!musicQueueRecoveryService) {
       if (hasPersistedMusicQueueOwnership(candidate)) throw new TypeError('Music Queue recovery owner is required');
       return null;

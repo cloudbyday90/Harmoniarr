@@ -4,6 +4,7 @@ import { deriveWantedRecoveryDiscovery, deriveWantedRecoveryProgress } from '../
 import { buildAutomaticLibraryAddAuthority } from '../../src/server/import-candidates/import-candidate-music-queue-auto-safe-add-policy.js';
 import { captureRecoveryObservation } from '../../src/server/import-candidates/music-queue-recovery-policy.js';
 import { createDownloadAttempt, evaluateDownloadReceipt } from '../../src/server/slskd/slskd-download-attempt-policy.js';
+import { createOperatorDownloadAdoptionAttempt } from '../../src/server/slskd/slskd-download-adoption-policy.js';
 
 const wantedId = '00000000-0000-4000-8000-000000000001';
 const userId = '00000000-0000-4000-8000-000000000002';
@@ -161,7 +162,8 @@ test('current unresolved handoff survives terminal jobs and revoked context with
   entry.currentHandoff = { runId: entry.recoveryRun.id, candidateId: entry.candidate.id, itemStatus: 'awaiting_confirmation',
     requestedFiles, summary: { sourceWantedReleaseId: wantedId }, handoff: { state: 'awaiting_confirmation', attempt } };
   entry.recoveryRun.status = 'completed';
-  assert.deepEqual((await read()).currentDownloadHandoff, { confirmationPending: true, disposition: 'partial' });
+  assert.deepEqual((await read()).currentDownloadHandoff, { confirmationPending: true, disposition: 'partial',
+    operationRunId: entry.recoveryRun.id, importCandidateId: entry.candidate.id });
   delete entry.candidate.normalizedPayload.musicQueue;
   assert.equal((await read()).currentDownloadHandoff.confirmationPending, true, 'unknown acceptance remains blocking when current eligibility changes');
   entry.latestExecutionOriginId = 'newer';
@@ -171,4 +173,25 @@ test('current unresolved handoff survives terminal jobs and revoked context with
   assert.equal((await read()).currentDownloadHandoff, null, 'known no POST is not unresolved acceptance');
   entry.currentHandoff.itemStatus = 'queued'; entry.currentHandoff.handoff = { state: 'confirmed' };
   assert.equal((await read()).currentDownloadHandoff, null);
+});
+
+test('positive operator tracking resolves current review while retained uncertainty blocks a later selected candidate or adverse observation', async () => {
+  const { entry, read } = fixture();
+  const requestedFiles = [{ filename: 'Track.mp3', size: 1000 }];
+  const attempt = createDownloadAttempt({ importCandidateId: entry.candidate.id, operationRunId: entry.recoveryRun.id,
+    requestedFiles, username: entry.candidate.username, sourceObservation: captureRecoveryObservation(entry.candidate) });
+  const proof = createOperatorDownloadAdoptionAttempt({ attempt,
+    providerBinding: { protocol: 'legacy', version: '0.25.1', endpointFingerprint: 'a'.repeat(64) },
+    actorUserId: userId, acceptedRequestHash: 'b'.repeat(64), transfers: [{ ...requestedFiles[0],
+      id: '10000000-0000-4000-8000-000000000001', username: entry.candidate.username, direction: 'Download', state: 'InProgress' }] });
+  const adoption = { adoptionId: attempt.attemptId, source: 'operator_adoption', actorUserId: userId, requestHash: 'b'.repeat(64),
+    proof: proof.attempt, originalUncertainty: true, automaticRecoveryAllowed: false };
+  entry.recoveryRun.status = 'completed'; entry.candidate.status = 'downloading'; entry.confirmedTransferCount = 1;
+  entry.currentHandoff = { runId: entry.recoveryRun.id, candidateId: entry.candidate.id, itemStatus: 'queued', requestedFiles,
+    summary: { sourceWantedReleaseId: wantedId }, handoff: { state: 'operator_adopted', attempt, adoption } };
+  assert.equal((await read()).currentDownloadHandoff, null);
+  entry.candidate.status = 'selected';
+  assert.equal((await read()).currentDownloadHandoff.confirmationPending, true);
+  entry.candidate.status = 'downloading'; entry.currentHandoff.downloadReviewRequired = true;
+  assert.equal((await read()).currentDownloadHandoff.confirmationPending, true);
 });

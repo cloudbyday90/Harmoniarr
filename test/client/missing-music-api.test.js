@@ -24,6 +24,7 @@ import {
   fetchMissingMusicDecisionDetail,
   fetchMissingMusicDecisions,
   fetchMissingMusicDownloaderHandoff,
+  fetchMissingMusicDownloadReviewHandoff,
   findMissingMusicDecisionMatches,
   recheckMissingMusicDecisionLibraryAdd,
   selectMissingMusicDecisionMatch,
@@ -42,6 +43,15 @@ function installFetchMock(t, payload = { decisions: [] }) {
   });
   return fetchMock;
 }
+
+test('canonical admin review context uses only the opaque decision ID and supports read cancellation', async (t) => {
+  const fetchMock = installFetchMock(t, { decisionId: 'wanted' });
+  const signal = new AbortController().signal;
+  await fetchMissingMusicDownloadReviewHandoff('wanted/slash', { signal });
+  const [url, options] = fetchMock.mock.calls[0].arguments;
+  assert.equal(url, '/api/v1/missing-music/decisions/wanted%2Fslash/download-review-handoff');
+  assert.equal(options.method, 'GET'); assert.equal(options.signal, signal);
+});
 
 test('Add to library sends only an empty canonical decision command with CSRF and stable retry identity', async (t) => {
   const fetchMock = installFetchMock(t, { action: { code: 'add_to_library', outcome: 'queued' } });

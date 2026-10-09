@@ -9,6 +9,7 @@ import { registerAuthRoutes } from '../../src/server/routes/auth-routes.js';
 import { registerAdminRecoveryRoutes } from '../../src/server/routes/admin-recovery-routes.js';
 import { registerDownloaderRoutes } from '../../src/server/routes/downloader-routes.js';
 import { registerImportCandidateRoutes } from '../../src/server/routes/import-candidate-routes.js';
+import { registerImportCandidateDownloadAdoptionRoutes } from '../../src/server/routes/import-candidate-download-adoption-routes.js';
 import { registerLibraryRoutes } from '../../src/server/routes/library-routes.js';
 import { registerMissingMusicRoutes } from '../../src/server/routes/missing-music-routes.js';
 import { registerMetadataRoutes } from '../../src/server/routes/metadata-routes.js';
@@ -258,6 +259,11 @@ function collectRegisteredRoutes() {
     startImportCandidateMediaInspectionRun: asyncNoopResult({}),
     startImportCandidateTranscodeRun: asyncNoopResult({}),
     startImportCandidateExecutionRun: asyncNoopResult({}),
+  });
+
+  registerImportCandidateDownloadAdoptionRoutes(app, {
+    getDownloadAdoptionReview: asyncNoopResult({}),
+    adoptExistingDownloads: asyncNoopResult({}),
   });
 
   registerSystemRoutes(app, {

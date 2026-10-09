@@ -26,6 +26,15 @@ export function createMusicQueueRecoveryStore({ getPoolFn = getPool } = {}) {
       FROM operation_runs runs WHERE runs.id=$1::uuid`, [runId, candidateId]);
     return result.rows[0] ?? null;
   }
+  async function isAdoptedDownloadEpisode(candidateId, queryable = null) {
+    const result = await db(queryable).query(`SELECT COALESCE(item.planning_snapshot #> '{execution,handoff}' ? 'adoption',false) AS adopted
+      FROM operation_runs origin LEFT JOIN import_execution_run_items item ON item.operation_run_id=origin.id
+        AND item.import_candidate_id=$1::uuid
+      WHERE origin.operation_type='import_candidate_execution_planning'
+        AND (origin.summary->>'selectedCandidateId'=$1::text OR item.import_candidate_id IS NOT NULL)
+      ORDER BY origin.created_at DESC,origin.id DESC LIMIT 1`, [candidateId]);
+    return result.rows[0]?.adopted === true;
+  }
   async function getDiscovery(metadataReleaseId, queryable = null) {
     const result = await db(queryable).query('SELECT * FROM library_discovery_requests WHERE metadata_release_id=$1::uuid', [metadataReleaseId]);
     const row = result.rows[0];
@@ -155,7 +164,7 @@ export function createMusicQueueRecoveryStore({ getPoolFn = getPool } = {}) {
       WHERE operation_type='library_discovery_dispatch' AND status IN ('pending','running') AND summary->>'triggerSource'=$2
         AND summary #>> '{musicQueueRecovery,metadataReleaseId}'=$1::text`, [metadataReleaseId, MUSIC_QUEUE_RECOVERY_DISCOVERY_SOURCE]);
   }
-  return { ...scopeStore, getCandidate, getOrigin, getDiscovery, listCandidateIds, lockParents, getEpisode, saveEpisode,
+  return { ...scopeStore, getCandidate, getOrigin, isAdoptedDownloadEpisode, getDiscovery, listCandidateIds, lockParents, getEpisode, saveEpisode,
     recordTerminal, incrementAttempt, selectCandidate, findActiveSelection, readExecutionReservation, readDiscoveryReservation,
     supersedeDiscoveryReservations, isCurrentExecutionOrigin, scheduleRediscovery, holdRecoverySelection,
     retireExecutionReservation, recordExecutionNotDispatched, retireDiscoveryReservation, transitionExecutionPhase, lockRecoveryCreation };

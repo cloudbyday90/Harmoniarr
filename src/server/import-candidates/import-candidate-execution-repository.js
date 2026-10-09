@@ -57,6 +57,7 @@ export async function updateImportExecutionRunItem({
     snapshot: planningSnapshot,
     statusMessage,
     expectedAttemptId: planningSnapshot?.execution?.handoff?.attempt?.attemptId ?? null,
+    expectedAdoptionId: planningSnapshot?.execution?.handoff?.adoption?.adoptionId ?? null,
   }, queryable);
 
   return item ? {
@@ -91,7 +92,8 @@ export async function findUnconfirmedImportExecutionHandoff(queryable) {
       WHERE candidates.status = 'selected'
         AND ((items.item_status = 'awaiting_confirmation'
           AND items.planning_snapshot #>> '{execution,handoff,state}' IS DISTINCT FROM 'not_dispatched')
-          OR items.planning_snapshot #>> '{execution,handoff,state}' IN ('dispatching','awaiting_confirmation'))
+          OR items.planning_snapshot #>> '{execution,handoff,state}' IN ('dispatching','awaiting_confirmation')
+          OR items.planning_snapshot #> '{execution,handoff,adoption,originalUncertainty}'='true'::jsonb)
       ORDER BY items.updated_at DESC, items.id DESC
       LIMIT 1
     `,

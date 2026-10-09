@@ -39,7 +39,8 @@ export function createImportExecutionHandoffStore({ getPoolFn = getPool } = {}) 
     const result = await db(queryable).query(`SELECT id FROM import_execution_run_items WHERE import_candidate_id=$1::uuid
       AND operation_run_id<>$2::uuid AND ((item_status='awaiting_confirmation'
         AND planning_snapshot #>> '{execution,handoff,state}' IS DISTINCT FROM 'not_dispatched')
-        OR planning_snapshot #>> '{execution,handoff,state}' IN ('dispatching','awaiting_confirmation')) LIMIT 1`, [importCandidateId, operationRunId]);
+        OR planning_snapshot #>> '{execution,handoff,state}' IN ('dispatching','awaiting_confirmation')
+        OR planning_snapshot #> '{execution,handoff,adoption,originalUncertainty}'='true'::jsonb) LIMIT 1`, [importCandidateId, operationRunId]);
     return result.rows[0] ?? null;
   }
   async function isDispatchRunActive({ operationRunId }, queryable) {
@@ -47,11 +48,33 @@ export function createImportExecutionHandoffStore({ getPoolFn = getPool } = {}) 
       AND operation_type='import_candidate_execution_planning' AND status='running' AND cancel_requested_at IS NULL`, [operationRunId]);
     return result.rowCount > 0;
   }
+  async function getRun(operationRunId, queryable) {
+    const result = await db(queryable).query('SELECT id,status,operation_type FROM operation_runs WHERE id=$1::uuid', [operationRunId]);
+    return result.rows[0] ? { ...result.rows[0], operationType: result.rows[0].operation_type } : null;
+  }
+  async function hasForeignBatchAttempt({ importCandidateId, operationRunId, providerBinding, receipts, transfers = [] }, queryable) {
+    receipts ??= transfers;
+    const batchIds = [...new Set(receipts.map((row) => row.batchId).filter(Boolean))];
+    if (!batchIds.length) return false;
+    const result = await db(queryable).query(`SELECT id FROM import_execution_run_items WHERE
+      planning_snapshot #>> '{execution,handoff,attempt,providerBinding,protocol}'='batch'
+      AND lower(planning_snapshot #>> '{execution,handoff,attempt,attemptId}')=ANY($1::text[])
+      AND NOT (operation_run_id=$2::uuid AND import_candidate_id=$3::uuid
+        AND planning_snapshot #>> '{execution,handoff,attempt,providerBinding,endpointFingerprint}' IS NOT DISTINCT FROM $4::text) LIMIT 1`,
+    [batchIds.map((id) => id.toLowerCase()), operationRunId, importCandidateId, providerBinding.endpointFingerprint]);
+    return result.rowCount > 0;
+  }
+  async function setAdoptedQualityContext(importCandidateId, qualityContext, queryable) {
+    await db(queryable).query(`UPDATE import_candidates SET normalized_payload=jsonb_set(normalized_payload,'{musicQueue}',$2::jsonb),
+      updated_at=NOW() WHERE id=$1::uuid`, [importCandidateId, JSON.stringify(qualityContext)]);
+  }
   async function updateCheckpoint({ item, expectedAttemptId, execution, itemStatus, statusMessage }, queryable) {
     const result = await db(queryable).query(`UPDATE import_execution_run_items SET item_status=$2,status_message=$3,
       planning_snapshot=jsonb_set(planning_snapshot,'{execution}',$4::jsonb),updated_at=NOW()
-      WHERE id=$1::uuid AND planning_snapshot #>> '{execution,handoff,attempt,attemptId}' IS NOT DISTINCT FROM $5::text RETURNING *`,
-    [item.id, itemStatus, statusMessage, JSON.stringify(execution), expectedAttemptId]);
+      WHERE id=$1::uuid AND planning_snapshot #>> '{execution,handoff,attempt,attemptId}' IS NOT DISTINCT FROM $5::text
+      AND planning_snapshot #>> '{execution,handoff,adoption,adoptionId}' IS NOT DISTINCT FROM $6::text RETURNING *`,
+    [item.id, itemStatus, statusMessage, JSON.stringify(execution), expectedAttemptId,
+      item.planningSnapshot?.execution?.handoff?.adoption?.adoptionId ?? null]);
     return mapItem(result.rows[0]);
   }
   async function transitionDownloading({ candidate, actorUserId, reason }, queryable) {
@@ -69,6 +92,7 @@ export function createImportExecutionHandoffStore({ getPoolFn = getPool } = {}) 
         OR planning_snapshot #>> '{execution,handoff,state}' IN ('dispatching','awaiting_confirmation'))
         AND planning_snapshot #>> '{execution,handoff,attempt,attemptId}' IS NOT DISTINCT FROM $2::text`, [item.id, attemptId ?? null, checkedAt]);
   }
-  return { lockEvidence, getItem, getCandidate, isCurrentOrigin, findUnresolvedOtherHandoff, isDispatchRunActive,
+  return { lockEvidence, getItem, getCandidate, isCurrentOrigin, findUnresolvedOtherHandoff, isDispatchRunActive, getRun,
+    hasForeignBatchAttempt, setAdoptedQualityContext,
     updateCheckpoint, transitionDownloading, recordPendingCheck };
 }

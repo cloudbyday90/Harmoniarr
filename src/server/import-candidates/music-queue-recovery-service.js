@@ -37,6 +37,7 @@ export function createMusicQueueRecoveryService({ store = createMusicQueueRecove
     return hasOwnedRecoveryOrigin(candidate, await store.getOrigin(operationRunId, candidate.id));
   }
   const isCurrentExecutionObservation = ({ candidateId, operationRunId }) => store.isCurrentExecutionOrigin(candidateId, operationRunId);
+  const isAdoptedDownloadEpisode = (candidateId) => store.isAdoptedDownloadEpisode(candidateId);
   async function audit({ eventType, entityId, entityType = 'import_candidate', details, summary }, queryable) {
     await recordAuditEventFn({ actorType: 'system', actorUserId: null, eventType, entityId, entityType, details, summary }, queryable);
   }
@@ -73,6 +74,8 @@ export function createMusicQueueRecoveryService({ store = createMusicQueueRecove
       const freshParticipants = identity ? await store.readParticipantPolicies({ wantedReleaseIds: identity.wantedReleaseIds, queryable }) : [];
       const discovery = metadataReleaseId ? await store.getDiscovery(metadataReleaseId, queryable) : null;
       const origin = await store.getOrigin(operationRunId, failedCandidateId, queryable);
+      if (await store.isAdoptedDownloadEpisode(failedCandidateId, queryable)) return { ...base,
+        requiresOperator: true, reason: 'adopted_download_requires_review' };
       if (origin?.operation_type === 'import_candidate_execution_planning'
         && !await store.isCurrentExecutionOrigin(failedCandidateId, operationRunId, queryable)) return { ...base, reason: 'recovery_observation_stale' };
       const accepted = origin?.summary?.musicQueueRecovery ?? (sourceReservation?.summary?.sourceSearchId === failed.sourceSearchId
@@ -155,5 +158,5 @@ export function createMusicQueueRecoveryService({ store = createMusicQueueRecove
     }
     return result;
   }
-  return { ownsRecoveryCandidate, isCurrentExecutionObservation, handleMusicQueueRecovery, store };
+  return { ownsRecoveryCandidate, isCurrentExecutionObservation, isAdoptedDownloadEpisode, handleMusicQueueRecovery, store };
 }

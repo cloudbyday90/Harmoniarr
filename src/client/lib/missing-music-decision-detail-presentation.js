@@ -64,6 +64,7 @@ export function buildMissingMusicDecisionDetailPresentation(detail) {
   const canSearchAgain = !accountIsDisabled && detail?.permissions?.canSearchAgain === true;
   const canAllowFallbackQuality = !accountIsDisabled && detail?.permissions?.canAllowFallbackQuality === true;
   const canViewDownloader = detail?.permissions?.canViewDownloader === true;
+  const canReviewDownloadHandoff = !accountIsDisabled && detail?.permissions?.canReviewDownloadHandoff === true;
   const canRecheckLibraryAdd = buildMissingMusicLibraryAddRecoveryPresentation(detail).canRecheck;
   const canAddToLibrary = buildMissingMusicLibraryAddPresentation(detail).canAdd;
   const selectedMatchNeedsAdministrator = !accountIsDisabled
@@ -83,6 +84,7 @@ export function buildMissingMusicDecisionDetailPresentation(detail) {
     canSearchAgain,
     canAllowFallbackQuality,
     canViewDownloader,
+    canReviewDownloadHandoff,
     canRecheckLibraryAdd,
     canAddToLibrary,
     downloaderLinkAccessibleLabel: `View ${normalizeText(release.title, 'this release')} downloads for ${normalizeText(requestedFor.username, 'the selected user')} in Downloader`,

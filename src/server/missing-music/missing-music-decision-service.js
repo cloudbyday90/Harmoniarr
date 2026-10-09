@@ -24,6 +24,7 @@ import {
 } from './missing-music-decision-scope-policy.js';
 import { buildMissingMusicMatchChoices } from './missing-music-match-choice-projection.js';
 import { canStartMissingMusicDownload } from './missing-music-download-start-policy.js';
+import { canReviewMissingMusicDownload } from './missing-music-download-review-handoff-policy.js';
 import { canViewMissingMusicDownloader } from './missing-music-downloader-handoff-policy.js';
 import { canSearchMissingMusicAgain } from './missing-music-search-again-policy.js';
 import { canFindInitialMusicMatches } from '../acquisition/acquisition-initial-search-policy.js';
@@ -335,6 +336,7 @@ export function createMissingMusicDecisionService({
       qualityEvidence: buildPublicQualityEvidence(projectedRelease.quality),
       libraryAddRecovery: buildPublicLibraryAddRecovery(target.release.libraryAddRecoveryFacts),
       permissions: {
+        canReviewDownloadHandoff: canReviewMissingMusicDownload({ actorUser, targetUser: target.targetUser, release: target.release }),
         canAddToLibrary: canAddPreparedReleaseToLibrary({ release: target.release, targetUser: target.targetUser }),
         canRecheckLibraryAdd: canRecheckLibraryAdd({ release: target.release, targetUser: target.targetUser }),
         canRepairFolders: actorUser?.role === 'admin' && canRecheckLibraryAdd({ release: target.release, targetUser: target.targetUser })

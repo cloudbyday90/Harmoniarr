@@ -3212,6 +3212,33 @@ See the separate [design](DOWNLOAD_HANDOFF_CONFIRMATION_DESIGN.md) and
 [outcome](DOWNLOAD_HANDOFF_CONFIRMATION_OUTCOME.md) for alternatives, races,
 compatibility limits and executed evidence.
 
+## Current implementation: batch binding and operator adoption
+
+The October 9 batch follow-up extends the same private JSON checkpoint with
+version 2 attempts. `providerBinding` records a supported protocol/version and
+endpoint/mode fingerprint; credentials are never persisted. The owning attempt
+UUID also identifies a 0.26.0 provider batch. Version 1 historical checkpoints
+remain readable. Direct responses and full progressed batch lookups retain
+distinct receipt origins, exact GUID/BatchId and immutable file ownership.
+
+Explicit administrator adoption lives in `execution.handoff.adoption` beside
+the original attempt. It contains a separately validated operator proof,
+actor/request identity, provider binding, selected receipts, saved public outcome
+and the original uncertainty. `handoff.state = 'operator_adopted'` permits truthful
+tracking of existing downloads; it does not mark the original dispatch unused.
+Its uncertainty blocks automatic recovery and survives both retention paths.
+Normal scoped quality, source, recipient and file checks still apply.
+
+Existing durable command records own replay. Parent/candidate/item locks,
+current ownership and unique transfer links protect the commit; adoption links,
+phase, checkpoint and two required user audits share one transaction. Provider
+reads occur outside that transaction and are revalidated against its locked
+state. No table, migration or schema snapshot change is needed. Private evidence
+is stripped from public projections. See the separate
+[batch design](BATCH_DOWNLOAD_HANDOFF_DESIGN.md) and
+[outcome](BATCH_DOWNLOAD_HANDOFF_OUTCOME.md) for the exact eligible boundary,
+executed evidence and unresolved older-origin limitations.
+
 ## Sources Reviewed
 
 PostgreSQL 18 official sources:

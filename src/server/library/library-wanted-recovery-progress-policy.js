@@ -8,6 +8,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import { createAcquisitionQualityPolicyService } from '../acquisition/acquisition-quality-policy-service.js';
 import { evaluateStoredDownloadReceipt } from '../slskd/slskd-download-attempt-policy.js';
+import { evaluateStoredDownloadAdoption } from '../import-candidates/import-execution-adoption-evidence-policy.js';
 import { buildAutomaticLibraryAddAuthority, hasPersistedMusicQueueOwnership } from '../import-candidates/import-candidate-music-queue-auto-safe-add-policy.js';
 import { buildRecoveryQualityContext, hasCurrentRecoveryDiscovery, hasCurrentRecoveryRecipients,
   isValidRecoveryBaseline, matchesAcceptedRecoveryProvenance, MUSIC_QUEUE_RECOVERY_DISCOVERY_SOURCE,
@@ -34,24 +35,30 @@ export async function deriveWantedRecoveryProgress({ entries, wantedReleaseId, m
     const belongs = record?.metadataReleaseId === metadataReleaseId
       && Array.isArray(record.authority?.wantedReleaseIds) && record.authority.wantedReleaseIds.includes(wantedReleaseId);
     const handoff = entry.currentHandoff;
-    const receipt = handoff?.handoff?.attempt != null ? evaluateStoredDownloadReceipt({ attempt: handoff.handoff.attempt,
+    const adoption = handoff?.handoff?.adoption;
+    const receipt = adoption != null ? evaluateStoredDownloadAdoption({ adoption,
+      importCandidateId: candidate.id, operationRunId: handoff.runId, requestedFiles: handoff.requestedFiles,
+      username: adoption.proof?.username }) : handoff?.handoff?.attempt != null ? evaluateStoredDownloadReceipt({ attempt: handoff.handoff.attempt,
       importCandidateId: candidate.id, operationRunId: handoff.runId,
       requestedFiles: handoff.requestedFiles, username: handoff.handoff.attempt.username }) : null;
     const currentPending = handoff?.candidateId === candidate.id
       && handoff.handoff?.state !== 'not_dispatched'
       && (handoff.itemStatus === 'awaiting_confirmation' || ['dispatching', 'awaiting_confirmation'].includes(handoff.handoff?.state)
-        || (handoff.handoff?.attempt != null && !['confirmed', 'rejected'].includes(receipt?.disposition)));
+        || handoff.downloadReviewRequired === true
+        || (candidate.status === 'selected' && adoption?.originalUncertainty === true)
+        || (handoff.handoff?.attempt != null && !['confirmed', 'operator_adopted', 'rejected'].includes(receipt?.disposition)));
     const handoffBelongs = belongs || handoff?.summary?.sourceWantedReleaseId === wantedReleaseId
       || candidate.sourceSearchId === entry.discovery?.evidence?.lastSearchId
       || authority?.wantedReleaseIds.includes(wantedReleaseId) === true;
     if (currentPending && handoffBelongs) {
       facts.currentDownloadHandoff = { confirmationPending: true,
+        operationRunId: handoff.runId, importCandidateId: candidate.id,
         disposition: receipt?.disposition === 'partial' ? 'partial' : 'unknown' };
     }
     const newerAcceptedHandoff = entry.recoveryRun && handoff && handoff.runId !== entry.recoveryRun.id && handoff.runId === entry.latestExecutionOriginId
       && handoffBelongs && !currentPending && ['queued', 'queued_with_warnings', 'downloading', 'completed'].includes(handoff.itemStatus)
       && (handoff.handoff?.attempt == null ? candidate.status === 'downloading'
-        : receipt?.disposition === 'confirmed' && matchesAcceptedRecoveryProvenance(candidate, handoff.physicalObservation));
+        : ['confirmed', 'operator_adopted'].includes(receipt?.disposition) && matchesAcceptedRecoveryProvenance(candidate, handoff.physicalObservation));
     const newerAcceptedCount = newerAcceptedHandoff ? count(handoff.confirmedTransferCount) : 0;
     if (!run && candidate.status === 'selected' && entry.legacyRecoverySelection === true) facts.legacyRecoverySelection = true;
     if (run) {

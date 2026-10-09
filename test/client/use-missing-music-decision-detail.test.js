@@ -23,6 +23,7 @@ import {
   isMissingMusicDecisionNotFoundError,
   useMissingMusicDecisionDetail,
 } from '../../src/client/composables/useMissingMusicDecisionDetail.js';
+import { buildMissingMusicDecisionDetailPresentation } from '../../src/client/lib/missing-music-decision-detail-presentation.js';
 
 function createNoopRenderer() {
   return createRenderer({
@@ -78,6 +79,18 @@ test('decision detail retains only the strict server prepared-add permission', a
   payload.permissions.canAddToLibrary = true;
   await decisionDetail.refresh();
   assert.equal(decisionDetail.detail.value.permissions.canAddToLibrary, true);
+});
+
+test('server-authorized operator review survives normalized detail reads and disappears when permission is withdrawn', async (t) => {
+  let permission = true;
+  const { app, decisionDetail } = mountDecisionDetail({ decisionId: 'wanted-amber',
+    fetchMissingMusicDecisionDetail: async () => ({ ...createDetail(), permissions: { canReviewDownloadHandoff: permission } }) });
+  t.after(() => app.unmount()); await decisionDetail.load();
+  assert.equal(buildMissingMusicDecisionDetailPresentation(decisionDetail.detail.value).canReviewDownloadHandoff, true);
+  permission = 'true'; await decisionDetail.refresh();
+  assert.equal(buildMissingMusicDecisionDetailPresentation(decisionDetail.detail.value).canReviewDownloadHandoff, false);
+  permission = undefined; await decisionDetail.refresh();
+  assert.equal(decisionDetail.detail.value.permissions.canReviewDownloadHandoff, false);
 });
 
 test('useMissingMusicDecisionDetail reads a scoped release projection by route identifier', async (t) => {

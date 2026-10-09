@@ -10,6 +10,9 @@
 
 import { copyFile, mkdir, readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
+import { Buffer } from 'node:buffer';
+import process from 'node:process';
+import { URL } from 'node:url';
 import { basename, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
@@ -199,6 +202,7 @@ async function enqueueTransfers(username, files) {
       directory: `\\data\\downloads\\complete\\${fixture.id}-${variant}`,
       endedAt: new Date().toISOString(),
       filename: remoteFilename,
+      direction: 'Download',
       id: randomUUID(),
       size: file.size ?? 65536,
       startedAt: new Date().toISOString(),
@@ -224,8 +228,9 @@ const server = createServer(async (request, response) => {
       return writeJson(response, 200, evidence);
     }
     if (request.method === 'GET' && pathname === '/api/v0/application') {
-      return writeJson(response, 200, { server: { isConnected: true, isLoggedIn: true }, version: { current: 'controlled-fixture' } });
+      return writeJson(response, 200, { server: { isConnected: true, isLoggedIn: true }, version: { current: '0.25.1' } });
     }
+    if (request.method === 'GET' && pathname === '/api/v0/application/version') return writeJson(response, 200, '0.25.1');
     if (request.method === 'GET' && pathname === '/api/v0/session') return writeJson(response, 200, true);
     if (request.method === 'GET' && pathname === '/api/v0/transfers/downloads') {
       return writeJson(response, 200, listAllTransfers());
@@ -244,6 +249,12 @@ const server = createServer(async (request, response) => {
       if (searchMatch[2] === 'responses') return writeJson(response, 200, search.pollCount > 0 ? buildResponse(search.fixture) : []);
       search.pollCount += 1;
       return writeJson(response, 200, buildSearchState(search, { includeResponses: url.searchParams.get('includeResponses') === 'true' }));
+    }
+    const transferDetail = pathname.match(/^\/api\/v0\/transfers\/downloads\/([^/]+)\/([^/]+)$/u);
+    if (request.method === 'GET' && transferDetail) {
+      const transfer = (transfersByUsername.get(decodeURIComponent(transferDetail[1])) ?? [])
+        .find((row) => row.id === decodeURIComponent(transferDetail[2]));
+      return writeJson(response, transfer ? 200 : 404, transfer ?? { error: 'not_found' });
     }
     const transferMatch = pathname.match(/^\/api\/v0\/transfers\/downloads\/([^/]+)$/u);
     if (transferMatch) {

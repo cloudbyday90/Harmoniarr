@@ -165,3 +165,16 @@ test('Find matches requires the exact server permission, even when the status la
   detail.decision.requestedFor = { accountStatus: 'disabled' };
   assert.equal(buildMissingMusicDecisionDetailPresentation(detail).canFindMatches, false);
 });
+
+test('operator download review requires exact permission and active writable target history', () => {
+  const detail = { decision: { status: { nextAction: 'show_advanced_diagnostics' } }, permissions: {} };
+  assert.equal(buildMissingMusicDecisionDetailPresentation(detail).canReviewDownloadHandoff, false);
+  detail.permissions.canReviewDownloadHandoff = 'true';
+  assert.equal(buildMissingMusicDecisionDetailPresentation(detail).canReviewDownloadHandoff, false);
+  detail.permissions.canReviewDownloadHandoff = true;
+  assert.equal(buildMissingMusicDecisionDetailPresentation(detail).canReviewDownloadHandoff, true);
+  detail.permissions.isReadOnly = true;
+  assert.equal(buildMissingMusicDecisionDetailPresentation(detail).canReviewDownloadHandoff, false);
+  detail.permissions.isReadOnly = false; detail.decision.requestedFor = { accountStatus: 'disabled' };
+  assert.equal(buildMissingMusicDecisionDetailPresentation(detail).canReviewDownloadHandoff, false);
+});

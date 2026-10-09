@@ -65,10 +65,12 @@ function buildEmptySnapshot() {
 
 export function createSlskdTransferSnapshotService({
   getDownloads = createSlskdService().getDownloads,
+  getBoundDownloads = null,
 } = {}) {
   async function buildTransferSnapshot({ requestedTransfers = [] } = {}) {
     const normalizedTransfers = Array.isArray(requestedTransfers)
       ? requestedTransfers.map((transfer) => ({
+        ...transfer,
         id: normalizeTransferId(transfer?.id),
         username: normalizeTransferIdentifier(transfer?.username),
       })).filter((transfer) => transfer.id && transfer.username)
@@ -78,7 +80,12 @@ export function createSlskdTransferSnapshotService({
       return buildEmptySnapshot();
     }
 
-    const usernames = [...new Set(normalizedTransfers.map((transfer) => transfer.username))];
+    const key = (row) => `${row.providerBinding?.endpointFingerprint ?? ''}\u0000${row.username}\u0000${row.id}`;
+    const exactRequested = typeof getBoundDownloads === 'function'
+      ? normalizedTransfers.filter((row) => normalizeDownloadTransferId(row.id)) : [];
+    const exactSnapshot = exactRequested.length ? await getBoundDownloads({ requestedTransfers: exactRequested }) : { observations: [] };
+    const exactObservations = new Map((exactSnapshot.observations ?? []).map((row) => [key({ ...row.request, id: normalizeTransferId(row.request.id) }), row]));
+    const usernames = [...new Set(normalizedTransfers.filter((row) => !exactRequested.includes(row)).map((transfer) => transfer.username))];
     const indexedTransfersByUsername = new Map(await Promise.all(usernames.map(async (username) => ([
       username,
       indexDownloadGroups(await getDownloads({
@@ -88,17 +95,30 @@ export function createSlskdTransferSnapshotService({
     ]))));
 
     return {
-      getTransfer({ id, username }) {
+      getTransfer({ id, username, providerBinding = null }) {
         const normalizedId = normalizeTransferId(id);
         const normalizedUsername = normalizeTransferIdentifier(username);
         if (!normalizedId || !normalizedUsername) {
           return null;
         }
 
+        const exact = exactObservations.get(key({ id: normalizedId, username: normalizedUsername, providerBinding }));
+        if (exact) return exact.transfer;
+        if (providerBinding) return null;
+        const matching = [...exactObservations.values()].filter((row) => normalizeTransferId(row.request.id) === normalizedId && row.request.username === normalizedUsername);
+        if (matching.length === 1) return matching[0].transfer;
+        if (matching.length > 1) return null;
         return indexedTransfersByUsername.get(normalizedUsername)?.get(normalizedId) ?? null;
       },
+      isObservationPending({ id, username, providerBinding = null }) {
+        const exact = exactObservations.get(key({ id: normalizeTransferId(id), username: normalizeTransferIdentifier(username), providerBinding }));
+        if (exact) return Boolean(exact.issue);
+        if (providerBinding) return true;
+        const matching = [...exactObservations.values()].filter((row) => normalizeTransferId(row.request.id) === normalizeTransferId(id) && row.request.username === username);
+        return matching.some((row) => row.issue) || matching.length > 1;
+      },
       requestedTransferCount: normalizedTransfers.length,
-      usernameCount: usernames.length,
+      usernameCount: new Set(normalizedTransfers.map((row) => row.username)).size,
     };
   }
 

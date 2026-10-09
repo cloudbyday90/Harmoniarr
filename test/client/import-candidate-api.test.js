@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  adoptImportCandidateDownloads,
   allowImportCandidateFileLossyDerivative,
   bulkReviewImportCandidates,
   clearImportCandidateFileDecision,
@@ -10,6 +11,7 @@ import {
   fetchImportCandidateApplySummary,
   fetchImportCandidateExecutionRunDetail,
   fetchImportCandidateExecutionSummary,
+  fetchImportCandidateDownloadAdoptionReview,
   fetchImportCandidateMediaInspectionRunDetail,
   fetchImportCandidateMediaInspectionSummary,
   fetchImportCandidatePreview,
@@ -37,6 +39,23 @@ function createJsonResponse({ ok = true, payload = { ok: true }, status = 200 } 
     },
   };
 }
+
+test('download adoption sends only reviewed digest and identities with CSRF and its saved command key', async (t) => {
+  globalThis.document = { cookie: 'harmoniarr_csrf=csrf-review' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse());
+  const signal = new AbortController().signal;
+  await fetchImportCandidateDownloadAdoptionReview({ operationRunId: 'run/slash', importCandidateId: 'candidate/slash', signal });
+  const [readUrl, readOptions] = globalThis.fetch.mock.calls[0].arguments;
+  assert.equal(readUrl, '/api/v1/import-candidates/execution-runs/run%2Fslash/items/candidate%2Fslash/download-adoption-review');
+  assert.equal(readOptions.signal, signal);
+  await adoptImportCandidateDownloads({ operationRunId: 'run', importCandidateId: 'candidate', reviewDigest: 'digest', transferIds: ['guid'],
+    idempotencyKey: 'saved-key', username: 'untrusted', requestedFiles: ['/private/path'] });
+  const [url, options] = globalThis.fetch.mock.calls[1].arguments;
+  assert.equal(url, '/api/v1/import-candidates/execution-runs/run/items/candidate/download-adoption');
+  assert.equal(options.method, 'POST'); assert.equal(options.headers.get('X-CSRF-Token'), 'csrf-review');
+  assert.equal(options.headers.get('Idempotency-Key'), 'saved-key');
+  assert.deepEqual(JSON.parse(options.body), { reviewDigest: 'digest', transferIds: ['guid'] });
+});
 
 test('import-candidate-api fetchImportCandidates sends query params', async (t) => {
   globalThis.document = { cookie: '' };

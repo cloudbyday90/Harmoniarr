@@ -38,6 +38,8 @@ import {
 import { bootstrapAdminThroughUi } from '../../testing/browser/operator-browser-helpers.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 import { deriveMusicQueueStatus } from '../../src/server/acquisition/acquisition-pipeline-status-service.js';
+import { installMetadataBrowserFixtures, seedMetadataImportReviewWorkspace } from '../../testing/browser/metadata-browser-fixtures.js';
+import { buildImportReviewCandidate, buildImportReviewExecutionRun, buildImportReviewRunSummary, openImportReviewRunHistory } from '../../testing/browser/import-review-browser-helpers.js';
 
 const integrationRuntimeConfig = resolveIntegrationTestRuntimeConfig();
 
@@ -203,6 +205,7 @@ async function installMissingMusicFixture(browserContext, requests, {
     qualityFallbackRequest: null,
     qualityFallbackRequestCount: 0,
     qualityResponseWait: null,
+    downloadReviewAvailable: false,
   };
 
   await browserContext.route('**/api/v1/missing-music/decisions**', async (route) => {
@@ -217,6 +220,12 @@ async function installMissingMusicFixture(browserContext, requests, {
     const qualityFallbackPath = `${detailPath}/allow-fallback-quality`;
     const recheckPath = `${detailPath}/recheck-library-add`;
     const addPath = `${detailPath}/add-to-library`;
+    if (route.request().method() === 'GET' && requestUrl.pathname === `${detailPath}/download-review-handoff`) {
+      await route.fulfill({ status: state.downloadReviewAvailable ? 200 : 403, contentType: 'application/json',
+        body: JSON.stringify(state.downloadReviewAvailable ? { ok: true, decisionId: 'wanted-amber', operationRunId: 'run-amber', importCandidateId: 'candidate-amber',
+          release: { artistName: 'Autechre', title: 'Amber' }, requestedFor: { username: 'Jamie' } }
+          : { ok: false, error: { code: 'admin_required' } }) }); return;
+    }
     if (route.request().method() === 'POST' && requestUrl.pathname === addPath) {
       const headers = route.request().headers();
       state.addRequest = { body: route.request().postDataJSON(), csrfToken: headers['x-csrf-token'] ?? null, idempotencyKey: headers['idempotency-key'] ?? null };
@@ -430,6 +439,7 @@ async function installMissingMusicFixture(browserContext, requests, {
           canFindMatches: state.findMatchesAvailable && state.accountStatus !== 'disabled',
           canRecheckLibraryAdd: state.recheckAvailable && !state.libraryAddQueued && state.accountStatus !== 'disabled',
           canRepairFolders: state.repairFoldersAvailable && !state.libraryAddQueued && state.accountStatus !== 'disabled',
+          canReviewDownloadHandoff: state.downloadReviewAvailable && state.accountStatus !== 'disabled',
           canSelectMatch: !state.matchSelected && !state.searchStopped && !state.qualityChoiceCode && !state.recoveryPhase && !state.searchInitial && !state.libraryRecoveryReason,
           canSearchAgain: (state.recoveryPhase ? state.recoveryPhase === 'stopped' : state.searchAgainAvailable) && state.accountStatus !== 'disabled',
           canStartDownload: state.accountStatus !== 'disabled' && (state.recoveryPhase ? buildRecoveryStatus(state.recoveryPhase).nextAction === 'download_now' : state.matchSelected && !state.downloadStarted),
@@ -910,6 +920,36 @@ suite('Missing Music decision detail browser acceptance', () => {
       assert.equal(fixture.selectionRequest, null);
       await statusNode.evaluate((element) => element.recoveryStatusObservation.observer.disconnect());
     }, { scenarioName: 'missing_music_fallback_recovery_truth' });
+  });
+
+  test('admin unresolved status opens the exact server-resolved diagnostic review while normal detail omits private review identifiers', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) { t.skip(runtimeUnavailableReason); return; }
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      await installMetadataBrowserFixtures(browserContext); await bootstrapAdminThroughUi(page, { baseUrl });
+      const requests = []; const fixture = await installMissingMusicFixture(browserContext, requests, { recoveryPhase: 'handoff_unknown' });
+      const candidate = buildImportReviewCandidate({ id: 'candidate-amber', status: 'selected' });
+      const run = buildImportReviewExecutionRun({ id: 'run-amber', status: 'failed', items: [{ importCandidateId: candidate.id, itemStatus: 'awaiting_confirmation',
+        planningSnapshot: { candidate: { id: candidate.id }, execution: { handoff: { state: 'awaiting_confirmation' } } } }] });
+      await seedMetadataImportReviewWorkspace(page, { candidates: [candidate], executionSummary: buildImportReviewRunSummary({ currentRun: run,
+        summary: { status: 'attention', confirmationPending: true } }) });
+      await page.goto(baseUrl + '/app/missing/wanted-amber');
+      const inspector = page.locator('.missing-music-inspector'); await inspector.getByText('Confirming download request', { exact: true }).waitFor();
+      assert.equal(await inspector.getByRole('button', { name: 'Review download request', exact: true }).count(), 0, 'without admin review permission no operator control is shown');
+      fixture.downloadReviewAvailable = true;
+      const [response] = await Promise.all([page.waitForResponse((result) => new URL(result.url()).pathname === '/api/v1/missing-music/decisions/wanted-amber'),
+        page.evaluate(() => globalThis.document.dispatchEvent(new Event('visibilitychange')))]);
+      assert.doesNotMatch(JSON.stringify(await response.json()), /operationRunId|importCandidateId|attemptId|receipts|providerBinding|currentDownloadHandoff/u);
+      const open = inspector.getByRole('button', { name: 'Review download request', exact: true }); await open.waitFor(); await open.focus(); await page.keyboard.press('Enter');
+      await page.waitForFunction(() => { const url = new URL(globalThis.location.href); return url.searchParams.get('executionRunId') === 'run-amber'
+        && url.searchParams.get('candidate') === 'candidate-amber' && url.searchParams.get('status') === 'selected' && url.hash === '#import-execution-run-panel'; });
+      await page.getByRole('heading', { name: 'Match diagnostics', exact: true }).waitFor(); await openImportReviewRunHistory(page);
+      const panel = page.locator('.review-panel').filter({ has: page.getByRole('heading', { name: 'Send selected matches to downloads', exact: true }) });
+      await panel.getByText('Run run-amber', { exact: true }).waitFor(); await panel.getByRole('button', { name: 'Review download request', exact: true }).waitFor();
+      assert.equal(requests.filter((path) => path.endsWith('/download-review-handoff')).length, 1);
+      assert.equal(fixture.downloadStartRequest, null); await page.goto('about:blank');
+    }, { scenarioName: 'missing_music_admin_download_review_handoff' });
   });
 
   test('interrupted download refresh hides repeat Start, keeps partial receipts in review and exposes only genuine accepted progress', {

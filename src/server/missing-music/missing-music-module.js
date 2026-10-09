@@ -21,6 +21,7 @@ import { createMissingMusicDecisionCommandService } from './missing-music-decisi
 import { createMissingMusicDownloadStartService } from './missing-music-download-start-service.js';
 import { createMissingMusicDecisionTargetService } from './missing-music-decision-target-service.js';
 import { createMissingMusicDownloaderHandoffService } from './missing-music-downloader-handoff-service.js';
+import { createMissingMusicDownloadReviewHandoffService } from './missing-music-download-review-handoff-service.js';
 import { createMissingMusicSearchAgainService } from './missing-music-search-again-service.js';
 import { createMissingMusicFallbackQualityService } from './missing-music-fallback-quality-service.js';
 import { createMissingMusicFindMatchesService } from './missing-music-find-matches-service.js';
@@ -66,6 +67,9 @@ export function createMissingMusicModule({
   const missingMusicDownloaderHandoffService = createMissingMusicDownloaderHandoffService({
     resolveMissingMusicDecisionTarget: missingMusicDecisionTargetService.resolveMissingMusicDecisionTarget,
   });
+  const missingMusicDownloadReviewHandoffService = createMissingMusicDownloadReviewHandoffService({
+    resolveMissingMusicDecisionTarget: missingMusicDecisionTargetService.resolveMissingMusicDecisionTarget,
+  });
   const missingMusicSearchAgainService = createMissingMusicSearchAgainService({
     requestMusicQueueReleaseRediscovery,
     resolveMissingMusicDecisionTarget: missingMusicDecisionTargetService.resolveMissingMusicDecisionTarget,
@@ -87,6 +91,7 @@ export function createMissingMusicModule({
     missingMusicDecisionTargetService,
     missingMusicDownloadStartService,
     missingMusicDownloaderHandoffService,
+    missingMusicDownloadReviewHandoffService,
     missingMusicSearchAgainService,
     missingMusicFallbackQualityService,
     missingMusicFindMatchesService,
@@ -100,6 +105,7 @@ export function createMissingMusicModule({
       executeIdempotentMutation,
       getMissingMusicDecisionDetail: missingMusicDecisionService.getMissingMusicDecisionDetail,
       getMissingMusicDownloaderHandoff: missingMusicDownloaderHandoffService.getMissingMusicDownloaderHandoff,
+      getMissingMusicDownloadReviewHandoff: missingMusicDownloadReviewHandoffService.getMissingMusicDownloadReviewHandoff,
       listMissingMusicDecisions: missingMusicDecisionService.listMissingMusicDecisions,
       selectMissingMusicDecisionMatch: missingMusicDecisionCommandService.selectMissingMusicDecisionMatch,
       searchMissingMusicDecisionAgain: missingMusicSearchAgainService.searchMissingMusicDecisionAgain,

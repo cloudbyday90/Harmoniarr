@@ -111,6 +111,8 @@ export function createImportCandidateExecutionWorker({
     enqueued: [],
     failed: [],
   }),
+  prepareDownloadDispatch = null,
+  findMatchingTransfers = null,
   getImportCandidate = async () => null,
   prepareDownloadHandoff = null,
   confirmDownloadHandoff = null,
@@ -326,14 +328,22 @@ export function createImportCandidateExecutionWorker({
 
         const candidate = await getImportCandidate({ importCandidateId: summaryCandidate.id });
         const savedAttempt = baseSnapshot.execution?.handoff?.attempt;
+        if (Object.hasOwn(baseSnapshot.execution?.handoff ?? {}, 'adoption')) {
+          counts.blocked += 1;
+          continue;
+        }
         if (baseSnapshot.execution?.handoff?.state === 'not_dispatched') {
           counts.blocked += 1;
           continue;
         }
         if (savedAttempt || isUnconfirmedExecutionItem(persistedItem) || hasUnconfirmedDownloadHandoff(persistedItem)) {
           if (typeof confirmDownloadHandoff !== 'function') throw new TypeError('The download confirmation owner is required');
+          const evidence = typeof findMatchingTransfers === 'function' ? await findMatchingTransfers({ attempt: savedAttempt,
+            importCandidateId: summaryCandidate.id, operationRunId: runId, requestedFiles: baseSnapshot.execution?.requestedFiles,
+            username: savedAttempt?.username }) : null;
           const receipt = await confirmDownloadHandoff({ importCandidateId: summaryCandidate.id, operationRunId: runId,
-            attemptId: savedAttempt?.attemptId ?? null });
+            attemptId: savedAttempt?.attemptId ?? null, expectedAttempt: savedAttempt,
+            ...(evidence?.providerEvidence !== undefined ? { providerEvidence: evidence.providerEvidence } : {}) });
           await consumeReceipt({ receipt, candidate, summaryCandidate,
             sourceObservation: savedAttempt?.sourceObservation ?? baseSnapshot.execution?.sourceObservation });
           continue;
@@ -401,15 +411,16 @@ export function createImportCandidateExecutionWorker({
           if (error?.code === 'music_queue_recovery_not_current') await retireRecoveryExecution({ runId, candidateId: candidate.id, sourceObservation });
           throw error;
         }
+        const dispatch = typeof prepareDownloadDispatch === 'function' ? await prepareDownloadDispatch() : null;
         const prepared = await prepareDownloadHandoff({ importCandidateId: candidate.id, operationRunId: runId,
-          requestedFiles, username: candidate.username, sourceObservation });
+          requestedFiles, username: candidate.username, sourceObservation, providerBinding: dispatch?.binding ?? null });
         if (!prepared.dispatchAllowed) {
           if (prepared.stale && !prepared.attempt) {
             counts.blocked += 1;
             continue;
           }
           const receipt = await confirmDownloadHandoff({ importCandidateId: candidate.id, operationRunId: runId,
-            attemptId: prepared.attempt?.attemptId ?? null });
+            attemptId: prepared.attempt?.attemptId ?? null, expectedAttempt: prepared.attempt });
           await consumeReceipt({ receipt, candidate, summaryCandidate, sourceObservation: prepared.attempt?.sourceObservation ?? sourceObservation });
           continue;
         }
@@ -420,7 +431,9 @@ export function createImportCandidateExecutionWorker({
           }
           await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
           await assertRecoveryExecutionCurrent({ candidateId: candidate.id, runId, triggerSource, prepared: preparedRecovery });
-          await assertDownloadHandoffCurrent({ importCandidateId: candidate.id, operationRunId: runId, attemptId: prepared.attempt.attemptId });
+          await assertDownloadHandoffCurrent({ importCandidateId: candidate.id, operationRunId: runId,
+            attemptId: prepared.attempt.attemptId, expectedAttempt: prepared.attempt });
+          if (dispatch) await dispatch.assertCurrent();
           if (!hasCurrentWorkerLease(await getLease({ runId }), acquiredLease)) {
             throw createApiError(409, 'import_execution_lease_not_current', 'The worker lease changed before provider dispatch');
           }
@@ -429,9 +442,10 @@ export function createImportCandidateExecutionWorker({
           await recordDownloadHandoffNotDispatched({ importCandidateId: candidate.id, operationRunId: runId, attemptId: prepared.attempt.attemptId });
           throw error;
         }
-        const enqueueResult = await enqueueDownloads({ files: prepared.attempt.requestedFiles, username: prepared.attempt.username });
+        const enqueueResult = dispatch ? await dispatch.enqueue({ attempt: prepared.attempt })
+          : await enqueueDownloads({ files: prepared.attempt.requestedFiles, username: prepared.attempt.username });
         const receipt = await confirmDownloadHandoff({ importCandidateId: candidate.id, operationRunId: runId,
-          attemptId: prepared.attempt.attemptId, enqueueResult,
+          attemptId: prepared.attempt.attemptId, expectedAttempt: prepared.attempt, enqueueResult,
           warningMessage: summaryCandidate.executionStatus.code === 'ready_with_warnings' ? summaryCandidate.executionStatus.message : null });
         await consumeReceipt({ receipt, candidate, summaryCandidate, sourceObservation: prepared.attempt.sourceObservation });
       }

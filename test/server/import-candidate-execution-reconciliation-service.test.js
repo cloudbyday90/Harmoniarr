@@ -419,7 +419,7 @@ test('reconciliation confirms durable exact receipts through the real owner once
   const result = await fixture.service.reconcileImportCandidateExecutionState({ actorUserId: 'user-1', requestMetadata });
   assert.deepEqual(fixture.confirmDownloadHandoff.mock.calls[0].arguments[0], {
     importCandidateId: fixture.candidate.id, operationRunId: fixture.operationRunId,
-    attemptId: fixture.proof.attempt.attemptId, actorUserId: 'user-1', requestMetadata,
+    attemptId: fixture.proof.attempt.attemptId, expectedAttempt: fixture.proof.attempt, actorUserId: 'user-1', requestMetadata,
   });
   assert.equal(fixture.harness.candidateRows.get(fixture.candidate.id).status, 'downloading');
   assert.equal(fixture.harness.items.get(fixture.candidate.id).itemStatus, 'queued');

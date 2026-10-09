@@ -53,7 +53,8 @@ const withoutUnresolvedDownloadHandoffSql = `NOT EXISTS (
   WHERE retained_handoff.operation_run_id = operation_runs.id
     AND ((retained_handoff.item_status = 'awaiting_confirmation'
       AND retained_handoff.planning_snapshot #>> '{execution,handoff,state}' IS DISTINCT FROM 'not_dispatched')
-      OR retained_handoff.planning_snapshot #>> '{execution,handoff,state}' IN ('dispatching', 'awaiting_confirmation'))
+      OR retained_handoff.planning_snapshot #>> '{execution,handoff,state}' IN ('dispatching', 'awaiting_confirmation')
+      OR retained_handoff.planning_snapshot #> '{execution,handoff,adoption,originalUncertainty}'='true'::jsonb)
 )`;
 
 /**

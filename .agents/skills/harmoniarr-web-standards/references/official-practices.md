@@ -59,3 +59,28 @@ claim that a provider has no caller-ID API. The repository's
 `docs/SLSKD_TRANSFER_CONFIRMATION_RESEARCH_2026_10.md` records immutable source
 URLs, admission/retention/restart limits and the batch alternative. Its saved
 links are starting points for future fresh research.
+
+## Batch and operator decision maintenance, October 9
+
+Fresh MCP discovery/opening covered RFC 9110, OWASP business-logic and
+[transaction authorization](https://cheatsheetseries.owasp.org/cheatsheets/Transaction_Authorization_Cheat_Sheet.html),
+PostgreSQL 18 locking/application consistency, WCAG 2.2/status messages,
+[H102 native dialog guidance](https://www.w3.org/WAI/WCAG22/Techniques/html/H102)
+and WHATWG dialog for this follow-up. H102 is an informative technique, not
+a separate normative requirement. Preserve whole reviewed transaction data,
+reauthorize after awaited reads and keep provider I/O outside row locks.
+
+The [Idempotency-Key document status](https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/)
+was also freshly opened: revision 07 is an expired/archived Internet-Draft,
+not an RFC as consulted. Keep Harmoniarr's existing durable command contract
+separate from a provider's supported key. The inspected slskd 0.26.0 provider
+uses a request-body UUID; an invented header is no replay guarantee.
+
+The repository's `docs/SLSKD_BATCH_HANDOFF_RESEARCH_2026_10.md` records fresh
+immutable release, wire schema, enum and startup/shutdown evidence. A batch
+record has no complete-admission marker; local queue persistence precedes
+scheduled work. Restart may create new IDs without batch ownership. Apply
+exact manifest/ID/peer/size/direction/BatchId and positive state checks, rather
+than generalizing from record existence or timestamps. Explicit operator
+adoption is a new consent decision with separate provenance; it must preserve
+original dispatch uncertainty and refuse automatic recovery based on absence.

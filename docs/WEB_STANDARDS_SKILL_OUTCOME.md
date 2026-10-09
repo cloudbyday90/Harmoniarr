@@ -202,3 +202,22 @@ installed structure both pass validation; all four files match by SHA-256 after
 the final line-ending cleanup and synchronization. No new blind skill
 trial or full conformance claim is made; application results belong in the
 separate [confirmation outcome](DOWNLOAD_HANDOFF_CONFIRMATION_OUTCOME.md).
+
+## Batch and operator adoption maintenance, October 9
+
+The [batch design](BATCH_DOWNLOAD_HANDOFF_DESIGN.md) and immutable provider
+research exposed two useful boundaries: a caller-owned batch can exist before
+whole-file admission, and an operator adoption is a new decision rather than
+proof of the original POST. The evidence map now locates the pinned protocol,
+exact-ID observations and common adoption transaction, with restart, competing
+IDs, stale authority, required audit, replay, retention and later recovery cases.
+The official-practices reference records fresh MCP research and distinguishes
+the expired Idempotency-Key draft from local durable commands and the provider's
+body UUID. It also maps native dialog/status guidance to browser evidence.
+
+This is narrow reference maintenance of the existing practical skill. The
+entry point, UI metadata and invocation policy are unchanged. Repository and
+installed copies pass `quick_validate.py`; all four files match by SHA-256 after
+synchronization. Those checks establish structure and identity, not a new blind
+behavioral trial or standards conformance. Executed application results and
+their limits belong in the separate [batch outcome](BATCH_DOWNLOAD_HANDOFF_OUTCOME.md).

@@ -19,6 +19,10 @@
 import { createApiError } from '../auth.js';
 import { createSlskdClient } from '../integrations/slskd/slskd-client.js';
 import { observeSlskdProviderCall } from './slskd-provider-health.js';
+import { normalizeSlskdDownloadTransfer as normalizeTransfer } from './slskd-download-transfer-policy.js';
+import { createSlskdDownloadDispatchService } from './slskd-download-dispatch-service.js';
+import { assertSlskdProviderBindingCurrent } from './slskd-download-protocol-policy.js';
+import { defaultSlskdBaseUrl } from '../integrations/slskd/slskd-config.js';
 
 function normalizeSearchText(value) {
   if (typeof value !== 'string') {
@@ -199,30 +203,6 @@ function normalizeBrowsedDirectory(directory) {
   };
 }
 
-function normalizeTransfer(transfer) {
-  if (!transfer || typeof transfer !== 'object') {
-    return null;
-  }
-
-  return {
-    averageSpeed: transfer.averageSpeed ?? null,
-    bytesTransferred: transfer.bytesTransferred ?? null,
-    directory: transfer.directory ?? null,
-    endedAt: transfer.endedAt ?? null,
-    enqueuedAt: transfer.enqueuedAt ?? null,
-    exception: transfer.exception ?? null,
-    filename: transfer.filename ?? null,
-    id: transfer.id ?? null,
-    placeInQueue: transfer.placeInQueue ?? null,
-    requestedAt: transfer.requestedAt ?? null,
-    size: transfer.size ?? null,
-    startedAt: transfer.startedAt ?? null,
-    state: transfer.state ?? null,
-    username: transfer.username ?? null,
-    ...(Object.hasOwn(transfer, 'direction') ? { direction: transfer.direction } : {}),
-  };
-}
-
 function normalizeDownloadDirectory(directory) {
   if (!directory || typeof directory !== 'object') {
     return null;
@@ -359,6 +339,29 @@ export function createSlskdService({
     const client = slskdClient ?? createSlskdClientFn(config);
     return operation(client);
   }
+
+  function effectiveDownloadConfig(config = {}) {
+    return { ...config, baseUrl: config.baseUrl ?? process.env.SLSKD_BASE_URL ?? defaultSlskdBaseUrl,
+      apiKey: config.apiKey === undefined ? process.env.SLSKD_API_KEY : config.apiKey,
+      providerMode: config.providerMode ?? 'external' };
+  }
+
+  async function captureDownloadProvider() {
+    const config = effectiveDownloadConfig(await getRuntimeConfig());
+    if (config.enabled === false) throw buildUnavailableProviderError(config);
+    const client = slskdClient ?? createSlskdClientFn(config);
+    return { config, client, assertCurrent: async (binding, { requireCredentials = false } = {}) => {
+      const current = effectiveDownloadConfig(await getRuntimeConfig());
+      assertSlskdProviderBindingCurrent({ binding, config: current });
+      if (requireCredentials && current.apiKey !== config.apiKey) {
+        throw createApiError(503, 'slskd_download_provider_changed', 'The Downloader credentials changed before dispatch');
+      }
+    } };
+  }
+
+  const downloadDispatch = createSlskdDownloadDispatchService({ captureProvider: captureDownloadProvider,
+    normalizeLegacyReceipt: normalizeEnqueueResult,
+    observe: (work) => observeSlskdProviderCall(providerHealthRecorder, work) });
 
   async function getConnectionStatus() {
     const config = await getRuntimeConfig();
@@ -606,6 +609,7 @@ export function createSlskdService({
   }
 
   return {
+    ...downloadDispatch,
     cancelDownload,
     clearCompletedDownloads,
     enqueueDownloads,

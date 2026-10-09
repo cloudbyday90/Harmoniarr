@@ -173,8 +173,13 @@ export function createSlskdClient({
         return null;
       }
 
-      const text = await response.text();
-      return text ? JSON.parse(text) : null;
+      try {
+        const text = await response.text();
+        return text ? JSON.parse(text) : null;
+      } catch (cause) {
+        throw createSlskdError('slskd_unavailable', `slskd ${operation} response could not be verified`,
+          buildFailureDetails({ cause, operation, retryable: method === 'GET', status: response.status, url: url.toString() }));
+      }
     }
 
     if (response.status === 401 || response.status === 403) {
@@ -207,6 +212,28 @@ export function createSlskdClient({
     return requestJson('application', {
       operation: 'application state',
     });
+  }
+
+  function getApplicationVersion() {
+    return requestJson('application/version', { operation: 'application version' });
+  }
+
+  function normalizeBatchId(value) {
+    if (typeof value !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value)) {
+      throw createSlskdError('slskd_misconfigured', 'Expected a valid download batch identifier');
+    }
+    return value.toLowerCase();
+  }
+
+  function enqueueDownloadBatch({ id, files, username }) {
+    const peer = typeof username === 'string' ? username.trim() : '';
+    if (!peer) throw createSlskdError('slskd_misconfigured', 'Expected a username when enqueueing a download batch');
+    return requestJson('transfers/downloads/batches', { method: 'POST', operation: 'download batch enqueue',
+      body: { id: normalizeBatchId(id), username: peer, files: normalizeEnqueueRequests(files) } });
+  }
+
+  function getDownloadBatch({ id }) {
+    return requestJson(`transfers/downloads/batches/${encodeURIComponent(normalizeBatchId(id))}`, { operation: 'download batch detail' });
   }
 
   function getServerState() {
@@ -395,8 +422,11 @@ export function createSlskdClient({
     cancelDownload,
     clearCompletedDownloads,
     enqueueDownloads,
+    enqueueDownloadBatch,
     deleteSearch,
     getApplicationState,
+    getApplicationVersion,
+    getDownloadBatch,
     getDownload,
     getDownloads,
     getSearchResponses,

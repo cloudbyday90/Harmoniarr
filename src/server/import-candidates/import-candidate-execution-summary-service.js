@@ -28,6 +28,8 @@ import { createSlskdTransferSnapshotService } from '../slskd/slskd-transfer-snap
 import { createImportCandidateExecutionConfirmationWorklistService } from './import-candidate-execution-confirmation-worklist-service.js';
 import { evaluateStoredDownloadReceipt, matchesDownloadReceipt, validateDownloadAttempt } from '../slskd/slskd-download-attempt-policy.js';
 import { isUnconfirmedExecutionItem } from './import-candidate-execution-handoff-state.js';
+import { evaluateStoredDownloadAdoption, hasDownloadAdoptionMarker } from './import-execution-adoption-evidence-policy.js';
+import { hasProviderRestartEvidence } from '../slskd/slskd-download-evidence-policy.js';
 
 function isSlskdError(error) {
   return error && typeof error.code === 'string' && error.code.startsWith('slskd_');
@@ -140,8 +142,10 @@ function listRequestedTransfers(items, operationRunId) {
     const attempt = validateDownloadAttempt({ attempt: execution?.handoff?.attempt,
       importCandidateId: item.importCandidateId ?? item.planningSnapshot?.candidate?.id, operationRunId,
       requestedFiles: execution?.requestedFiles, username: execution?.handoff?.attempt?.username });
-    return [...(Array.isArray(execution?.enqueuedTransfers) ? execution.enqueuedTransfers : []),
-      ...(attempt?.receipts ?? [])];
+    const providerBinding = execution?.handoff?.adoption?.proof?.providerBinding ?? attempt?.providerBinding;
+    const transfers = hasDownloadAdoptionMarker(execution) ? execution?.handoff?.adoption?.proof?.receipts ?? []
+      : [...(Array.isArray(execution?.enqueuedTransfers) ? execution.enqueuedTransfers : []), ...(attempt?.receipts ?? [])];
+    return transfers.map((receipt) => ({ ...receipt, ...(providerBinding ? { providerBinding } : {}) }));
   });
 }
 
@@ -185,6 +189,7 @@ async function reconcileItemTransfers(item, {
   now,
   providerState,
   transferSnapshot,
+  buildTransferSnapshot,
   operationRunId,
 }) {
   const execution = item?.planningSnapshot?.execution ?? {};
@@ -218,18 +223,27 @@ async function reconcileItemTransfers(item, {
       };
     }
     const confirmed = handoffConfirmation.disposition === 'confirmed' && handoffConfirmation.allRequestedFilesMatched === true;
+    if (confirmed && handoffConfirmation.matchedTransfers?.some((receipt) => !transferSnapshot.getTransfer({ id: receipt.id, username: receipt.username }))) {
+      try { transferSnapshot = await buildTransferSnapshot({ requestedTransfers: handoffConfirmation.matchedTransfers.map((receipt) => ({ ...receipt,
+        ...(execution.handoff?.attempt?.providerBinding ? { providerBinding: execution.handoff.attempt.providerBinding } : {}) })) }); }
+      catch (error) { if (!isSlskdError(error)) throw error; providerState.transferSnapshotUnavailable = true; }
+    }
     const confirmedTransfers = confirmed ? (handoffConfirmation.matchedTransfers ?? []).map((receipt) => {
       const transfer = transferSnapshot.getTransfer({ id: receipt.id, username: receipt.username });
       return execution.handoff?.attempt != null && !matchesDownloadReceipt({ receipt, transfer }) ? null : transfer;
     }).filter(Boolean) : [];
+    const exactObservationPending = confirmed && (handoffConfirmation.matchedTransfers ?? []).some((receipt) => transferSnapshot.isObservationPending?.({
+      id: receipt.id, username: receipt.username, providerBinding: execution.handoff?.attempt?.providerBinding ?? null }) === true);
 
     return {
       ...item,
+      downloadReviewRequired: exactObservationPending,
+      automaticFailureRecoveryAllowed: !exactObservationPending,
       handoffConfirmation: {
         ...handoffConfirmation,
         checkedAt: now.toISOString(),
       },
-      liveTransferSummary: confirmed && !providerState.transferSnapshotUnavailable
+      liveTransferSummary: confirmed && !exactObservationPending && !providerState.transferSnapshotUnavailable
         && confirmedTransfers.length === handoffConfirmation.requestedFileCount && confirmedTransfers.length > 0
         ? buildLiveTransferSummary(confirmedTransfers, {
           item,
@@ -238,16 +252,20 @@ async function reconcileItemTransfers(item, {
         })
         : null,
       liveTransfers: confirmed ? confirmedTransfers : [],
-      transferObservationPending: !confirmed || providerState.transferSnapshotUnavailable || confirmedTransfers.length !== handoffConfirmation.requestedFileCount,
+      transferObservationPending: !confirmed || exactObservationPending || providerState.transferSnapshotUnavailable || confirmedTransfers.length !== handoffConfirmation.requestedFileCount,
       persistedMissingTransfer: buildPersistedMissingTransfer(item),
       persistedTransferObservation: buildPersistedTransferObservation(item),
     };
   }
 
-  const storedReceipt = execution.handoff?.attempt != null ? evaluateStoredDownloadReceipt({ attempt: execution.handoff.attempt,
+  const adopted = hasDownloadAdoptionMarker(execution);
+  const adoptionReceipt = adopted ? evaluateStoredDownloadAdoption({ adoption: execution.handoff.adoption,
     importCandidateId: item.importCandidateId ?? item.planningSnapshot?.candidate?.id, operationRunId, requestedFiles, username }) : null;
-  if (execution.handoff?.attempt != null && storedReceipt?.disposition !== 'confirmed') {
+  const storedReceipt = adopted ? adoptionReceipt : execution.handoff?.attempt != null ? evaluateStoredDownloadReceipt({ attempt: execution.handoff.attempt,
+    importCandidateId: item.importCandidateId ?? item.planningSnapshot?.candidate?.id, operationRunId, requestedFiles, username }) : null;
+  if ((adopted && !adoptionReceipt) || (!adopted && execution.handoff?.attempt != null && storedReceipt?.disposition !== 'confirmed')) {
     return { ...item, transferObservationPending: true, liveTransferSummary: null, liveTransfers: [],
+      automaticFailureRecoveryAllowed: !adopted, downloadReviewRequired: adopted,
       persistedMissingTransfer: buildPersistedMissingTransfer(item), persistedTransferObservation: buildPersistedTransferObservation(item) };
   }
   const transfers = storedReceipt?.matchedTransfers ?? (Array.isArray(execution.enqueuedTransfers)
@@ -266,19 +284,23 @@ async function reconcileItemTransfers(item, {
 
   const normalizedTransfers = transfers.map((receipt) => {
     const transfer = transferSnapshot.getTransfer({ id: receipt.id, username: receipt.username });
-    return execution.handoff?.attempt != null && !matchesDownloadReceipt({ receipt, transfer }) ? null : transfer;
+    return (adopted || execution.handoff?.attempt != null) && !matchesDownloadReceipt({ receipt, transfer, requireDirection: adopted }) ? null : transfer;
   }).filter(Boolean);
   const incompleteObservation = normalizedTransfers.length !== transfers.length
     && (execution.handoff?.attempt != null || normalizedTransfers.length > 0);
+  const exactObservationPending = transfers.some((receipt) => transferSnapshot.isObservationPending?.({ id: receipt.id,
+    username: receipt.username, providerBinding: adoptionReceipt?.attempt?.providerBinding ?? execution.handoff?.attempt?.providerBinding ?? null }) === true);
+  const providerRestart = execution.handoff?.attempt?.version === 2 && normalizedTransfers.some(hasProviderRestartEvidence);
+  const summary = providerState.transferSnapshotUnavailable || incompleteObservation || exactObservationPending ? null : buildLiveTransferSummary(normalizedTransfers, { item, missingTransferConfig, now });
+  const unsafeAdoption = adopted && (summary == null || ['failed', 'rejected', 'not_found'].includes(summary.status));
 
   return {
     ...item,
-    transferObservationPending: providerState.transferSnapshotUnavailable || incompleteObservation,
-    liveTransferSummary: providerState.transferSnapshotUnavailable || incompleteObservation ? null : buildLiveTransferSummary(normalizedTransfers, {
-      item,
-      missingTransferConfig,
-      now,
-    }),
+    downloadAdopted: adopted && adoptionReceipt != null,
+    automaticFailureRecoveryAllowed: !adopted && !providerRestart && !exactObservationPending,
+    downloadReviewRequired: unsafeAdoption || providerRestart || exactObservationPending,
+    transferObservationPending: providerState.transferSnapshotUnavailable || incompleteObservation || exactObservationPending,
+    liveTransferSummary: summary,
     liveTransfers: normalizedTransfers,
     persistedMissingTransfer: buildPersistedMissingTransfer(item),
     persistedTransferObservation: buildPersistedTransferObservation(item),
@@ -351,6 +373,12 @@ function buildDisplayRunSummary(run) {
       status: 'blocked',
     };
   }
+  if (run.items?.some((item) => item.downloadAdopted === true)) {
+    return { status: run.items.some((item) => item.downloadReviewRequired === true) ? 'attention' : 'ready',
+      message: run.items.some((item) => item.downloadReviewRequired === true)
+        ? 'Existing downloads were linked by an administrator and now need review.'
+        : 'Existing downloads were linked by an administrator.' };
+  }
 
   const unresolved = (run.items ?? []).filter(isUnconfirmedExecutionItem).length;
   if (run.executionMode === 'download_enqueue' && unresolved > 0) {
@@ -417,6 +445,7 @@ export function createImportCandidateExecutionSummaryService({
         now,
         providerState,
         transferSnapshot,
+        buildTransferSnapshot,
         operationRunId: run.id,
       }))),
       transferSnapshotUnavailable: providerState.transferSnapshotUnavailable,

@@ -111,6 +111,17 @@ export function fetchImportCandidateApplyRunDetail(runId) {
   return apiRequest(`/api/v1/import-candidates/apply-runs/${encodeURIComponent(runId)}`);
 }
 
+export function fetchImportCandidateDownloadAdoptionReview({ operationRunId, importCandidateId, signal } = {}) {
+  return apiRequest(`/api/v1/import-candidates/execution-runs/${encodeURIComponent(operationRunId)}/items/${encodeURIComponent(importCandidateId)}/download-adoption-review`, { signal });
+}
+
+export function adoptImportCandidateDownloads({ operationRunId, importCandidateId, reviewDigest, transferIds, idempotencyKey } = {}) {
+  if (typeof idempotencyKey !== 'string' || !idempotencyKey.trim()) throw new TypeError('Download adoption requires its saved command key');
+  return apiRequest(`/api/v1/import-candidates/execution-runs/${encodeURIComponent(operationRunId)}/items/${encodeURIComponent(importCandidateId)}/download-adoption`, {
+    method: 'POST', includeCsrf: true, headers: { 'Idempotency-Key': idempotencyKey }, body: { reviewDigest, transferIds },
+  });
+}
+
 export function fetchImportCandidateMediaInspectionSummary() {
   return apiRequest('/api/v1/import-candidates/media-inspection-summary');
 }

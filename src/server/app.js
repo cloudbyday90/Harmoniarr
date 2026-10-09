@@ -68,6 +68,7 @@ import { registerAuthRoutes } from './routes/auth-routes.js';
 import { registerAdminRecoveryRoutes } from './routes/admin-recovery-routes.js';
 import { registerDownloaderRoutes } from './routes/downloader-routes.js';
 import { registerImportCandidateRoutes } from './routes/import-candidate-routes.js';
+import { registerImportCandidateDownloadAdoptionRoutes } from './routes/import-candidate-download-adoption-routes.js';
 import { registerLibraryRoutes } from './routes/library-routes.js';
 import { registerMissingMusicRoutes } from './routes/missing-music-routes.js';
 import { registerMetadataRoutes } from './routes/metadata-routes.js';
@@ -204,6 +205,7 @@ export function createApp({
   registerAdminRecoveryRoutes: mountAdminRecoveryRoutes = registerAdminRecoveryRoutes,
   registerDownloaderRoutes: mountDownloaderRoutes = registerDownloaderRoutes,
   registerImportCandidateRoutes: mountImportCandidateRoutes = registerImportCandidateRoutes,
+  registerImportCandidateDownloadAdoptionRoutes: mountImportCandidateDownloadAdoptionRoutes = registerImportCandidateDownloadAdoptionRoutes,
   registerLibraryRoutes: mountLibraryRoutes = registerLibraryRoutes,
   registerMissingMusicRoutes: mountMissingMusicRoutes = registerMissingMusicRoutes,
   registerMetadataRoutes: mountMetadataRoutes = registerMetadataRoutes,
@@ -994,6 +996,20 @@ export function createApp({
     limitImportCandidateDecision: requestRateLimiterService.createMiddleware({
       bucketName: 'import-candidate-decision',
       limit: 60,
+      windowMs: 60 * 1000,
+    }),
+  });
+  mountImportCandidateDownloadAdoptionRoutes(app, {
+    ...importCandidateModule.routeDependencies,
+    executeIdempotentMutation: controlPlaneIdempotencyService.executeIdempotentMutation,
+    limitDownloadAdoptionReview: requestRateLimiterService.createMiddleware({
+      bucketName: 'import-candidate-download-adoption-review',
+      limit: 30,
+      windowMs: 60 * 1000,
+    }),
+    limitDownloadAdoptionMutation: requestRateLimiterService.createMiddleware({
+      bucketName: 'import-candidate-download-adoption-mutation',
+      limit: 10,
       windowMs: 60 * 1000,
     }),
   });

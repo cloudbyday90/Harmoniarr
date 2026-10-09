@@ -86,7 +86,7 @@ function canTransition(currentStatus, targetStatus) {
 }
 
 function shouldPersistExecutionState(item) {
-  return Boolean(item?.liveTransferSummary?.status);
+  return Boolean(item?.liveTransferSummary?.status) || item.downloadReviewRequired === true;
 }
 
 function buildUpdatedPlanningSnapshot(item, checkedAt) {
@@ -95,6 +95,8 @@ function buildUpdatedPlanningSnapshot(item, checkedAt) {
   }
 
   const execution = item?.planningSnapshot?.execution ?? {};
+  if (item.downloadReviewRequired === true) return { ...item.planningSnapshot,
+    execution: { ...execution, downloadReviewRequired: true, confirmationCheckedAt: checkedAt } };
 
   if (item.liveTransferSummary.status === 'not_found') {
     return {
@@ -126,6 +128,7 @@ function buildUpdatedPlanningSnapshot(item, checkedAt) {
       ...execution,
       latestTransferSnapshot: persistedTransferSnapshot,
       missingTransfer: null,
+      downloadReviewRequired: false,
     },
   };
 }
@@ -172,7 +175,8 @@ export function createImportCandidateExecutionReconciliationService({
         if (typeof confirmDownloadHandoff !== 'function') throw new TypeError('The download confirmation owner is required');
         const attempt = item.planningSnapshot?.execution?.handoff?.attempt;
         const receipt = await confirmDownloadHandoff({ importCandidateId, operationRunId: run.id,
-          attemptId: attempt?.attemptId ?? null, actorUserId, requestMetadata });
+          attemptId: attempt?.attemptId ?? null, expectedAttempt: attempt, actorUserId, requestMetadata,
+          ...(item.handoffConfirmation?.providerEvidence !== undefined ? { providerEvidence: item.handoffConfirmation.providerEvidence } : {}) });
         if (receipt.item && !receipt.alreadyConfirmed) snapshotsUpdated += 1;
         if (receipt.confirmed && receipt.phaseAdvanced) transitions.push({ fromStatus: 'selected', importCandidateId,
           liveTransferStatus: item.liveTransferSummary?.status ?? null, toStatus: receipt.candidate.status });
@@ -204,6 +208,7 @@ export function createImportCandidateExecutionReconciliationService({
         if (updatedItem === null) continue;
         snapshotsUpdated += 1;
       }
+      if (item.automaticFailureRecoveryAllowed === false && ['failed', 'retry_rejected'].includes(targetStatus)) continue;
 
       if (!importCandidateId || !targetStatus) {
         continue;
