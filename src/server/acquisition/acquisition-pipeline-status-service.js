@@ -257,6 +257,12 @@ export function deriveMusicQueueStatus({
   const currentExecutionStatusCounts = match.currentExecutionStatusCounts ?? {};
   const hasSafeAutoQualityStop = getCount(add.qualityBlockedCount) > 0 || add.latestOutcome === 'quality_blocked';
   const selectedCount = getCount(match.statusCounts?.selected);
+  if (match.currentDownloadHandoff?.confirmationPending === true) {
+    return { ...buildStatus(MUSIC_QUEUE_STATUS_CODES.NEEDS_HELP_ADDING, {
+      nextAction: MUSIC_QUEUE_ACTION_CODES.VIEW_RECOVERY, progressStep: 'download',
+    }), label: 'Confirming download request',
+    message: 'Harmoniarr is reviewing this download request before continuing. It will not send another request automatically.' };
+  }
   if (hasAnyStatus(match.statusCounts, ['downloading']) || getCount(match.currentConfirmedTransferCount) > 0) {
     return buildStatus(MUSIC_QUEUE_STATUS_CODES.DOWNLOADING, {
       nextAction: MUSIC_QUEUE_ACTION_CODES.OPEN_DOWNLOADER,

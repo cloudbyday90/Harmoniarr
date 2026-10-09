@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createSlskdService } from '../../src/server/slskd/slskd-service.js';
+import { createDownloadAttempt, evaluateDownloadReceipt } from '../../src/server/slskd/slskd-download-attempt-policy.js';
 
 function createProviderError() {
   const error = new Error('slskd server state request failed with status 503');
@@ -547,6 +548,35 @@ test('createSlskdService validates and normalizes download enqueue responses', a
     }],
     failed: [],
   });
+});
+
+test('createSlskdService preserves malformed enqueue envelope evidence rather than silently repairing it', async () => {
+  for (const payload of [null, {}, { Enqueued: [], Failed: null }, {
+    Enqueued: [null], Failed: [],
+  }, { Enqueued: [], Failed: ['file.flac', null] }]) {
+    const service = createSlskdService({ slskdClient: { enqueueDownloads: async () => payload } });
+    const result = await service.enqueueDownloads({ files: [{ filename: 'file.flac', size: 123 }], username: 'peer' });
+    assert.equal(result.receiptMalformed, true);
+  }
+});
+
+test('enqueue alias conflicts and upload-shaped receipts stay unknown through the actual facade', async () => {
+  const request = { files: [{ filename: 'Album\\01.flac', size: 123 }], username: 'peer' };
+  const row = { ...request.files[0], id: 'ba81acde-d7a5-4b30-a5fd-57cfc91d47b0', username: 'peer' };
+  const attempt = createDownloadAttempt({ ...request, requestedFiles: request.files,
+    importCandidateId: 'candidate', operationRunId: 'run', sourceObservation: { username: 'peer' } });
+  for (const payload of [
+    { enqueued: null, Enqueued: [row], failed: [] },
+    { enqueued: [row], Enqueued: [], failed: [] },
+    { enqueued: [row], failed: [], Failed: ['unexpected'] },
+    { enqueued: [{ ...row, direction: 'Upload' }], failed: [] },
+  ]) {
+    const service = createSlskdService({ slskdClient: { enqueueDownloads: async () => payload } });
+    const result = evaluateDownloadReceipt({ attempt, enqueueResult: await service.enqueueDownloads(request) });
+    assert.equal(result.disposition, 'unknown');
+    assert.equal(result.allRequestedFilesMatched, false);
+    assert.deepEqual(result.attempt.receipts, []);
+  }
 });
 
 test('createSlskdService cancels and removes downloads through the provider client', async (t) => {

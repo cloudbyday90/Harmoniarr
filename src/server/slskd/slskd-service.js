@@ -219,6 +219,7 @@ function normalizeTransfer(transfer) {
     startedAt: transfer.startedAt ?? null,
     state: transfer.state ?? null,
     username: transfer.username ?? null,
+    ...(Object.hasOwn(transfer, 'direction') ? { direction: transfer.direction } : {}),
   };
 }
 
@@ -250,10 +251,20 @@ function normalizeDownloadGroup(group) {
 }
 
 function normalizeEnqueueResult(payload) {
-  const enqueued = payload?.enqueued ?? payload?.Enqueued ?? [];
-  const failed = payload?.failed ?? payload?.Failed ?? [];
+  const enqueued = payload?.enqueued ?? payload?.Enqueued;
+  const failed = payload?.failed ?? payload?.Failed;
+  const aliases = [['enqueued', 'Enqueued'], ['failed', 'Failed']];
+  const invalidAliases = aliases.some(([lower, upper]) => (
+    (Object.hasOwn(payload ?? {}, lower) && Object.hasOwn(payload ?? {}, upper))
+    || (Object.hasOwn(payload ?? {}, lower) && !Array.isArray(payload[lower]))
+    || (Object.hasOwn(payload ?? {}, upper) && !Array.isArray(payload[upper]))
+  ));
+  const receiptMalformed = invalidAliases || !Array.isArray(enqueued) || !Array.isArray(failed)
+    || enqueued.some((item) => !item || typeof item !== 'object' || Array.isArray(item))
+    || failed.some((item) => typeof item !== 'string' || !item.trim());
 
   return {
+    ...(receiptMalformed ? { receiptMalformed: true } : {}),
     enqueued: Array.isArray(enqueued)
       ? enqueued.map(normalizeTransfer).filter(Boolean)
       : [],

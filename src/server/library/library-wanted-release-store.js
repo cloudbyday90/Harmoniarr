@@ -122,7 +122,8 @@ function buildLibraryAddSummary(row) {
 }
 
 function hasCurrentRecoveryProgress(progress) {
-  return progress?.recoveryExecution.status != null || progress?.recoveryExecution.reservationRetained === true
+  return progress?.currentDownloadHandoff?.confirmationPending === true
+    || progress?.recoveryExecution.status != null || progress?.recoveryExecution.reservationRetained === true
     || progress?.legacyRecoverySelection === true
     || progress?.recoverySelectionNeedsReview === true
     || progress?.currentConfirmedTransferCount > 0 || Object.keys(progress?.currentExecutionStatusCounts ?? {}).length > 0;

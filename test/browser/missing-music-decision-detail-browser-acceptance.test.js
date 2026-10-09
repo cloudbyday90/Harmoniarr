@@ -49,6 +49,7 @@ function buildRecoveryStatus(phase) {
       statusCounts: { failed: 1, pending: 2 }, pendingCount: 2, totalCount: 3,
       executionStatusCounts: { pending: 1, queued: 1 }, confirmedTransferCount: 2,
       currentConfirmedTransferCount: phase === 'confirmed' ? 1 : 0,
+      currentDownloadHandoff: ['handoff_unknown', 'handoff_partial'].includes(phase) ? { confirmationPending: true, disposition: phase === 'handoff_partial' ? 'partial' : 'unknown' } : null,
       recoveryExecution: { status: ['pending', 'running'].includes(phase) ? phase : null,
         candidateMatches: phase !== 'stopped', authorityReserved: ['pending', 'running'].includes(phase), reservationRetained: phase === 'review' },
     },
@@ -431,8 +432,8 @@ async function installMissingMusicFixture(browserContext, requests, {
           canRepairFolders: state.repairFoldersAvailable && !state.libraryAddQueued && state.accountStatus !== 'disabled',
           canSelectMatch: !state.matchSelected && !state.searchStopped && !state.qualityChoiceCode && !state.recoveryPhase && !state.searchInitial && !state.libraryRecoveryReason,
           canSearchAgain: (state.recoveryPhase ? state.recoveryPhase === 'stopped' : state.searchAgainAvailable) && state.accountStatus !== 'disabled',
-          canStartDownload: state.matchSelected && !state.downloadStarted,
-          canViewDownloader: state.downloadStarted || state.recoveryPhase === 'confirmed',
+          canStartDownload: state.accountStatus !== 'disabled' && (state.recoveryPhase ? buildRecoveryStatus(state.recoveryPhase).nextAction === 'download_now' : state.matchSelected && !state.downloadStarted),
+          canViewDownloader: state.recoveryPhase ? buildRecoveryStatus(state.recoveryPhase).nextAction === 'open_downloader' : state.downloadStarted,
           isReadOnly: state.accountStatus === 'disabled',
         },
         qualityEvidence: state.qualityChoiceCode ? {
@@ -454,8 +455,8 @@ async function installMissingMusicFixture(browserContext, requests, {
       }
       : { ...buildWorklistPayload(),
         filters: { ...buildWorklistPayload().filters, state: requestUrl.searchParams.get('state') ?? 'action' },
-        decisions: ((state.searchInitial && state.searchQueued) || (state.recoveryPhase && !['stopped', 'review', 'rediscovery_uncertain'].includes(state.recoveryPhase)) || (state.preparedDownload && (state.libraryAddQueued || !state.addAvailable))) && requestUrl.searchParams.get('state') === 'action' ? [] : [buildDecision(state)],
-        page: { ...buildWorklistPayload().page, total: ((state.searchInitial && state.searchQueued) || (state.recoveryPhase && !['stopped', 'review', 'rediscovery_uncertain'].includes(state.recoveryPhase)) || (state.preparedDownload && (state.libraryAddQueued || !state.addAvailable))) && requestUrl.searchParams.get('state') === 'action' ? 0 : 1 },
+        decisions: ((state.searchInitial && state.searchQueued) || (state.recoveryPhase && !['stopped', 'review', 'rediscovery_uncertain', 'handoff_unknown', 'handoff_partial'].includes(state.recoveryPhase)) || (state.preparedDownload && (state.libraryAddQueued || !state.addAvailable))) && requestUrl.searchParams.get('state') === 'action' ? [] : [buildDecision(state)],
+        page: { ...buildWorklistPayload().page, total: ((state.searchInitial && state.searchQueued) || (state.recoveryPhase && !['stopped', 'review', 'rediscovery_uncertain', 'handoff_unknown', 'handoff_partial'].includes(state.recoveryPhase)) || (state.preparedDownload && (state.libraryAddQueued || !state.addAvailable))) && requestUrl.searchParams.get('state') === 'action' ? 0 : 1 },
       };
 
     await route.fulfill({
@@ -909,6 +910,78 @@ suite('Missing Music decision detail browser acceptance', () => {
       assert.equal(fixture.selectionRequest, null);
       await statusNode.evaluate((element) => element.recoveryStatusObservation.observer.disconnect());
     }, { scenarioName: 'missing_music_fallback_recovery_truth' });
+  });
+
+  test('interrupted download refresh hides repeat Start, keeps partial receipts in review and exposes only genuine accepted progress', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) { t.skip(runtimeUnavailableReason); return; }
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      const fixture = await installMissingMusicFixture(browserContext, [], { matchSelected: true });
+      await page.goto(baseUrl + '/app/missing/wanted-amber', { waitUntil: 'domcontentloaded' });
+      const inspector = page.locator('.missing-music-inspector');
+      await inspector.getByRole('button', { name: 'Start download', exact: true }).waitFor();
+      await page.getByLabel('Work state', { exact: true }).selectOption('all');
+      const filter = page.getByLabel('Search releases', { exact: true });
+      await filter.focus();
+      const main = page.locator('.hx-main');
+      await main.evaluate((element) => { element.scrollTop = 0; });
+      const status = inspector.locator('.hx-missing-status-snapshot').getByRole('status');
+      const node = await status.elementHandle();
+      const privateFields = /currentDownloadHandoff|attemptId|receiptDisposition|sourceObservation|unconfirmedRuns|private-/u;
+      async function refresh() {
+        const [detailResponse, listResponse] = await Promise.all([
+          page.waitForResponse((response) => new URL(response.url()).pathname === '/api/v1/missing-music/decisions/wanted-amber'),
+          page.waitForResponse((response) => new URL(response.url()).pathname === '/api/v1/missing-music/decisions'),
+          page.evaluate(() => globalThis.document.dispatchEvent(new Event('visibilitychange'))),
+        ]);
+        await inspector.locator('.hx-missing-status-snapshot:not([aria-busy="true"])').waitFor();
+        const detail = await detailResponse.json(); const list = await listResponse.json();
+        assert.deepEqual(list.decisions[0].status, detail.decision.status);
+        assert.doesNotMatch(JSON.stringify({ detail, list }), privateFields);
+        await status.filter({ hasText: detail.decision.status.message }).waitFor();
+        await assertLocatorFocused(filter, 'handoff background refresh preserves the user-selected control');
+        assert.equal(await main.evaluate((element) => element.scrollTop), 0);
+        return detail;
+      }
+      fixture.recoveryPhase = 'handoff_unknown';
+      const unknown = await refresh();
+      assert.equal(unknown.decision.status.label, 'Confirming download request');
+      assert.equal(unknown.permissions.canStartDownload, false);
+      assert.equal(unknown.permissions.canSearchAgain, false);
+      assert.equal(await inspector.getByRole('button', { name: 'Start download', exact: true }).count(), 0);
+      assert.equal(await inspector.getByRole('link', { name: /downloads for Jamie in Downloader/u }).count(), 0);
+      assert.equal(await status.getAttribute('aria-live'), 'polite');
+      assert.equal(await status.getAttribute('aria-atomic'), 'true');
+      const directory = resolve('.tmp/download-handoff-confirmation-2026-10');
+      await mkdir(directory, { recursive: true });
+      for (const width of [390, 800, 1280]) {
+        await page.setViewportSize({ width, height: 1000 });
+        for (const theme of ['light', 'dark']) {
+          await page.evaluate((value) => globalThis.document.documentElement.setAttribute('data-theme', value), theme);
+          const region = inspector.getByRole('region', { name: 'Current status', exact: true });
+          await region.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+          assert.equal(await inspector.evaluate((element) => element.scrollWidth <= element.clientWidth), true);
+          await region.screenshot({ path: resolve(directory, `handoff-${width}-${theme}.png`), animations: 'disabled' });
+        }
+      }
+      await filter.focus(); await main.evaluate((element) => { element.scrollTop = 0; });
+      await node.evaluate((element) => { const observation = { changes: 0 };
+        observation.observer = new globalThis.MutationObserver((records) => { observation.changes += records.length; });
+        observation.observer.observe(element, { childList: true, characterData: true, subtree: true }); element.handoffObservation = observation; });
+      fixture.recoveryPhase = 'handoff_partial';
+      assert.equal((await refresh()).decision.status.label, 'Confirming download request');
+      assert.equal(await node.evaluate((element) => element.handoffObservation.changes), 0, 'an identical partial review message does not rewrite live text');
+      fixture.recoveryPhase = 'confirmed';
+      const confirmed = await refresh();
+      assert.equal(confirmed.decision.status.code, 'downloading');
+      await inspector.getByRole('link', { name: 'View Amber downloads for Jamie in Downloader', exact: true }).waitFor();
+      assert.equal(await inspector.getByRole('button', { name: 'Start download', exact: true }).count(), 0);
+      assert.equal(fixture.downloadStartRequest, null);
+      assert.equal(await node.evaluate((element) => element.isConnected), true);
+      await node.evaluate((element) => element.handoffObservation.observer.disconnect());
+    }, { scenarioName: 'missing_music_current_handoff_confirmation' });
   });
 
   test('guarded automatic adding refreshes into current prepared Add recovery without private facts, focus theft or identical-text churn', {

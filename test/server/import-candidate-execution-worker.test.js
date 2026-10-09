@@ -1,730 +1,266 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { randomUUID } from 'node:crypto';
 import { createImportCandidateExecutionWorker } from '../../src/server/import-candidates/import-candidate-execution-worker.js';
+import { createExecutionWorkerHarness, executionCandidate } from '../../testing/server/import-execution-worker-harness.js';
+import { captureRecoveryObservation } from '../../src/server/import-candidates/music-queue-recovery-policy.js';
+import { createDownloadAttempt, evaluateDownloadReceipt } from '../../src/server/slskd/slskd-download-attempt-policy.js';
+import { createImportCandidateExecutionConfirmationWorklistService } from '../../src/server/import-candidates/import-candidate-execution-confirmation-worklist-service.js';
 
-test('import execution worker enqueues ready candidates and persists per-item outcomes', async (t) => {
-  const markImportCandidateDownloading = t.mock.fn(async () => ({}));
-  const recordConfirmedTransfers = t.mock.fn(async () => []);
-  const replaceImportExecutionRunItems = t.mock.fn(async () => []);
-  const updateImportExecutionRunItem = t.mock.fn(async () => null);
-  const markRunStarted = t.mock.fn(async () => {});
-  let resolveCompleted;
-  const completed = new Promise((resolve) => {
-    resolveCompleted = resolve;
-  });
-  const markRunCompleted = t.mock.fn(async () => {
-    resolveCompleted();
-  });
-  const worker = createImportCandidateExecutionWorker({
-    acquireLease: async () => {},
-    buildSelectedImportCandidateSummary: async () => ({
-      counts: {
-        blocked: 1,
-        ready: 1,
-        readyWithWarnings: 0,
-        totalSelected: 2,
-      },
-      selectedCandidates: [{
-        executionStatus: {
-          code: 'ready',
-          message: 'Ready for download enqueue.',
-        },
-        fileCount: 1,
-        folderPath: 'Autechre/Amber',
-        id: 'candidate-1',
-        lockedFileCount: 0,
-        planning: {
-          libraryFolderPath: '/music/Autechre/Amber',
-          sourceFolderPath: '/downloads/Autechre/Amber',
-          stagingFolderPath: '/staging/import-candidates/candidate-1/Autechre/Amber',
-        },
-        selectedAt: '2026-04-30T12:00:00.000Z',
-        sourceProvider: 'slskd',
-        sourceSearchId: 'search-1',
-        totalSizeBytes: 123456,
-        username: 'source-user',
-      }, {
-        executionStatus: {
-          code: 'blocked',
-          message: 'Explicit path mapping is still required.',
-        },
-        fileCount: 1,
-        folderPath: 'Blocked/Candidate',
-        id: 'candidate-2',
-        lockedFileCount: 0,
-        planning: {
-          primaryBlocker: 'Explicit path mapping is still required.',
-        },
-        selectedAt: '2026-04-30T12:00:00.000Z',
-        sourceProvider: 'slskd',
-        sourceSearchId: 'search-2',
-        totalSizeBytes: 10,
-        username: 'blocked-user',
-      }],
-    }),
-    enqueueDownloads: t.mock.fn(async () => ({
-      enqueued: [{
-        id: 'transfer-1',
-        filename: 'Autechre\\Amber\\01 Foil.flac',
-        state: 'Queued, Remotely',
-        username: 'source-user',
-      }],
-      failed: [],
-    })),
-    getImportCandidate: async ({ importCandidateId }) => ({
-      id: importCandidateId,
-      files: [{
-        filename: '01 Foil.flac',
-        folderPath: 'Autechre/Amber',
-        isLocked: false,
-        rawPayload: {
-          filename: 'Autechre\\Amber\\01 Foil.flac',
-        },
-        sizeBytes: 123456,
-      }],
-    }),
-    markImportCandidateDownloading,
-    markRunCompleted,
-    markRunFailed: async () => {},
-    markRunStarted,
-    recordConfirmedTransfers,
-    releaseLease: async () => {},
-    replaceImportExecutionRunItems,
-    updateImportExecutionRunItem,
-  });
-
-  await worker.startWorkerRun({
-    requestedCandidateCount: 2,
-    runId: 'run-1',
-  });
-
-  await completed;
-
-  assert.equal(replaceImportExecutionRunItems.mock.callCount(), 1);
-  assert.equal(updateImportExecutionRunItem.mock.callCount(), 3);
-  assert.equal(markImportCandidateDownloading.mock.callCount(), 1);
-  assert.deepEqual(recordConfirmedTransfers.mock.calls[0].arguments, [{
-    importCandidateId: 'candidate-1',
-    operationRunId: 'run-1',
-    transfers: [{
-      id: 'transfer-1',
-      filename: 'Autechre\\Amber\\01 Foil.flac',
-      state: 'Queued, Remotely',
-      username: 'source-user',
-    }],
-  }]);
-  assert.equal(markRunStarted.mock.callCount(), 1);
-  assert.equal(markRunCompleted.mock.callCount(), 1);
-  assert.equal(
-    updateImportExecutionRunItem.mock.calls[1].arguments[0]
-      .planningSnapshot.execution.diagnostics.downloadAcceptance.code,
-    'provider_accepted',
-  );
-  assert.equal(
-    updateImportExecutionRunItem.mock.calls[2].arguments[0]
-      .planningSnapshot.execution.diagnostics.downloadAcceptance.code,
-    'planning_blocked',
-  );
-  assert.deepEqual(markRunCompleted.mock.calls[0].arguments, [{
-    runId: 'run-1',
-    summary: {
-      blockedCount: 1,
-      awaitingConfirmationCount: 0,
-      currentStep: 'Download enqueue complete',
-      executionMode: 'download_enqueue',
-      processedCandidateCount: 2,
-      queueFailedCount: 0,
-      queuedCount: 1,
-      queuedWithWarningsCount: 0,
-      readyCount: 1,
-      readyWithWarningsCount: 0,
-      recoveredCandidateCount: 0,
-      requestedCandidateCount: 2,
-      totalSelected: 2,
-    },
-  }]);
-});
-
-test('import execution worker limits a manually started run to its selected candidate', async (t) => {
-  const selectedCandidate = {
-    executionStatus: {
-      code: 'ready',
-      message: 'Ready for download enqueue.',
-    },
-    fileCount: 1,
-    folderPath: 'Autechre/Amber',
-    id: 'candidate-amber',
-    lockedFileCount: 0,
-    planning: {
-      libraryFolderPath: '/music/Autechre/Amber',
-      sourceFolderPath: '/downloads/Autechre/Amber',
-      stagingFolderPath: '/staging/import-candidates/candidate-amber/Autechre/Amber',
-    },
-    selectedAt: '2026-04-30T12:00:00.000Z',
-    sourceProvider: 'slskd',
-    sourceSearchId: 'search-amber',
-    totalSizeBytes: 123456,
-    username: 'source-user',
+function checkpoint(candidate, { receipt = false, attempt = true, runId = 'run-1' } = {}) {
+  const requestedFiles = candidate.files.filter((file) => !file.isLocked).map((file) => ({ filename: file.rawPayload.filename, size: file.sizeBytes }));
+  let saved = attempt ? createDownloadAttempt({ importCandidateId: candidate.id, operationRunId: runId,
+    requestedFiles, username: candidate.username, sourceObservation: captureRecoveryObservation(candidate) }) : null;
+  if (receipt) saved = evaluateDownloadReceipt({ attempt: saved, enqueueResult: {
+    enqueued: requestedFiles.map((file) => ({ ...file, username: candidate.username, id: randomUUID() })), failed: [],
+  } }).attempt;
+  return { id: randomUUID(), importCandidateId: candidate.id, operationRunId: runId, position: 1,
+    itemStatus: 'awaiting_confirmation', planningSnapshot: { candidate,
+      execution: { sourceObservation: captureRecoveryObservation(candidate), requestedFiles,
+        handoff: { state: 'dispatching', ...(saved ? { attempt: saved } : {}) } } },
   };
-  const buildSelectedImportCandidateSummary = t.mock.fn(async () => ({
-    counts: {
-      blocked: 0,
-      ready: 1,
-      readyWithWarnings: 0,
-      totalSelected: 1,
-    },
-    selectedCandidates: [selectedCandidate],
-  }));
-  const enqueueDownloads = t.mock.fn(async () => ({
-    enqueued: [{
-      filename: 'Autechre\\Amber\\01 Foil.flac',
-      id: 'transfer-amber',
-      state: 'Queued, Remotely',
-      username: 'source-user',
-    }],
-    failed: [],
-  }));
-  let resolveCompleted;
-  const completed = new Promise((resolve) => {
-    resolveCompleted = resolve;
-  });
-  const worker = createImportCandidateExecutionWorker({
-    acquireLease: async () => {},
-    buildSelectedImportCandidateSummary,
-    enqueueDownloads,
-    getImportCandidate: async ({ importCandidateId }) => ({
-      files: [{
-        filename: '01 Foil.flac',
-        folderPath: 'Autechre/Amber',
-        isLocked: false,
-        rawPayload: { filename: 'Autechre\\Amber\\01 Foil.flac' },
-        sizeBytes: 123456,
-      }],
-      id: importCandidateId,
-    }),
-    markImportCandidateDownloading: async () => {},
-    markRunCompleted: async () => { resolveCompleted(); },
-    markRunFailed: async () => {},
-    markRunStarted: async () => {},
-    recordConfirmedTransfers: async () => [],
-    releaseLease: async () => {},
-    replaceImportExecutionRunItems: async () => [],
-    updateImportExecutionRunItem: async () => null,
-  });
+}
 
-  await worker.startWorkerRun({
-    requestedCandidateCount: 1,
-    runId: 'run-amber',
-    selectedCandidateId: 'candidate-amber',
-  });
-  await completed;
+function assertCompleted(harness) {
+  assert.equal(harness.marks.failed, null, harness.marks.failed?.errorMessage);
+  assert.ok(harness.marks.completed);
+  return harness.marks.completed.summary;
+}
 
-  assert.deepEqual(buildSelectedImportCandidateSummary.mock.calls[0].arguments, [{
-    candidateIds: ['candidate-amber'],
-    limit: 1000,
-  }]);
-  assert.equal(enqueueDownloads.mock.callCount(), 1);
-  assert.equal(enqueueDownloads.mock.calls[0].arguments[0].username, 'source-user');
+test('execution records full exact receipts and leaves blocked candidates undispatched', async (t) => {
+  const ready = executionCandidate();
+  const blocked = executionCandidate({ id: 'blocked', executionStatus: { code: 'blocked', message: 'Configure the folder mapping.' } });
+  const harness = createExecutionWorkerHarness(t, { candidates: [ready, blocked] });
+  await harness.run();
+  const summary = assertCompleted(harness);
+  assert.equal(harness.enqueueDownloads.mock.callCount(), 1);
+  assert.equal(harness.transitionDownloading.mock.callCount(), 1);
+  assert.equal(harness.candidateRows.get(ready.id).status, 'downloading');
+  assert.equal(harness.items.get(ready.id).itemStatus, 'queued');
+  assert.equal(harness.items.get(blocked.id).itemStatus, 'blocked');
+  assert.equal(harness.items.get(ready.id).planningSnapshot.execution.diagnostics.downloadAcceptance.code, 'provider_accepted');
+  assert.equal(harness.recordConfirmedTransfers.mock.callCount(), 1);
+  assert.equal(harness.recordConfirmedTransfers.mock.calls[0].arguments[0].transfers.length, 1);
+  assert.equal(summary.queuedCount, 1);
+  assert.equal(summary.blockedCount, 1);
+  assert.equal(summary.awaitingConfirmationCount, 0);
 });
 
-test('import execution worker leaves a run untouched when another worker holds its lease', async (t) => {
-  const leaseUnavailable = Object.assign(
-    new Error('Operation run lease is currently held by another worker'),
-    { code: 'operation_run_lease_unavailable' },
-  );
-  const acquireLease = t.mock.fn(async () => {
-    throw leaseUnavailable;
-  });
-  const markRunFailed = t.mock.fn(async () => {});
+test('a manually selected run only posts its chosen candidate', async (t) => {
+  const harness = createExecutionWorkerHarness(t, { candidates: [executionCandidate(), executionCandidate({ id: 'other' })] });
+  await harness.run({ selectedCandidateId: 'candidate-1', requestedCandidateCount: 1 });
+  assertCompleted(harness);
+  assert.equal(harness.enqueueDownloads.mock.callCount(), 1);
+  assert.deepEqual(harness.buildSelectedImportCandidateSummary.mock.calls[0].arguments[0].candidateIds, ['candidate-1']);
+  assert.equal(harness.candidateRows.get('other').status, 'selected');
+  assert.equal(harness.items.has('other'), false);
+});
+
+test('another worker lease leaves the run and provider untouched', async (t) => {
+  const acquireLease = t.mock.fn(async () => { throw Object.assign(new Error('Lease held'), { code: 'operation_run_lease_unavailable' }); });
   const markRunStarted = t.mock.fn(async () => {});
+  const markRunFailed = t.mock.fn(async () => {});
   const releaseLease = t.mock.fn(async () => {});
-  const worker = createImportCandidateExecutionWorker({
-    acquireLease,
-    markRunFailed,
-    markRunStarted,
-    releaseLease,
-  });
-
-  await worker.startWorkerRun({
-    requestedCandidateCount: 1,
-    runId: 'run-held-by-another-worker',
-  });
-  await new Promise((resolve) => {
-    setTimeout(resolve, 0);
-  });
-
+  const enqueueDownloads = t.mock.fn(async () => {});
+  const worker = createImportCandidateExecutionWorker({ acquireLease, markRunStarted, markRunFailed, releaseLease, enqueueDownloads });
+  await worker.startWorkerRun({ requestedCandidateCount: 1, runId: 'held' });
+  await new Promise((resolve) => { setImmediate(resolve); });
   assert.equal(acquireLease.mock.callCount(), 1);
-  assert.equal(markRunStarted.mock.callCount(), 0);
-  assert.equal(markRunFailed.mock.callCount(), 0);
-  assert.equal(releaseLease.mock.callCount(), 0);
+  for (const effect of [markRunStarted, markRunFailed, releaseLease, enqueueDownloads]) assert.equal(effect.mock.callCount(), 0);
 });
 
-test('import execution worker requeues the run when a maintenance pause is requested', async (t) => {
-  const acquireLease = t.mock.fn(async () => {});
-  const enqueueDownloads = t.mock.fn(async () => ({
-    enqueued: [],
-    failed: [],
-  }));
-  const isCancellationRequested = t.mock.fn(async () => ({
-    kind: 'paused',
-    nextRetryAt: '2026-05-04T12:30:00.000Z',
-    pauseCode: 'recovery_lock_conflict',
-    pauseMessage: 'Import execution is paused while the restore maintenance lock is active.',
-    pauseProvider: 'restore',
-  }));
-  const markImportCandidateDownloadFailed = t.mock.fn(async () => ({}));
-  const markImportCandidateDownloading = t.mock.fn(async () => ({}));
-  const markRunCancelled = t.mock.fn(async () => {});
-  const markRunCompleted = t.mock.fn(async () => {});
-  const markRunFailed = t.mock.fn(async () => {});
-  const markRunPaused = t.mock.fn(async () => {});
-  const markRunStarted = t.mock.fn(async () => {});
-  const releaseLease = t.mock.fn(async () => {});
-  const replaceImportExecutionRunItems = t.mock.fn(async () => []);
-  const updateImportExecutionRunItem = t.mock.fn(async () => null);
-  const worker = createImportCandidateExecutionWorker({
-    acquireLease,
-    enqueueDownloads,
-    getImportCandidate: t.mock.fn(async () => null),
-    isCancellationRequested,
-    markImportCandidateDownloadFailed,
-    markImportCandidateDownloading,
-    markRunCancelled,
-    markRunCompleted,
-    markRunFailed,
-    markRunPaused,
-    markRunStarted,
-    releaseLease,
-    replaceImportExecutionRunItems,
-    updateImportExecutionRunItem,
-  });
+test('maintenance pauses before initialization or any provider work', async (t) => {
+  const harness = createExecutionWorkerHarness(t, { workerOverrides: {
+    isCancellationRequested: async () => ({ kind: 'paused', nextRetryAt: '2026-10-09T03:00:00.000Z',
+      pauseCode: 'recovery_lock_conflict', pauseMessage: 'Restore in progress.', pauseProvider: 'restore' }),
+  } });
+  const released = await harness.run();
+  assert.equal(released.status, 'paused');
+  assert.equal(harness.marks.paused.summary.pauseCode, 'recovery_lock_conflict');
+  assert.equal(harness.marks.completed, null);
+  assert.equal(harness.enqueueDownloads.mock.callCount(), 0);
+  assert.equal(harness.initializeImportExecutionRunItems.mock.callCount(), 0);
+});
 
-  const paused = new Promise((resolve) => {
-    markRunPaused.mock.mockImplementation(async (args) => {
-      resolve(args);
+test('a definitive all-file refusal may continue to a different recovery candidate', async (t) => {
+  const next = executionCandidate({ id: 'next', username: 'next-peer' });
+  const harness = createExecutionWorkerHarness(t, {
+    enqueue: async ({ files, username }) => username === 'peer'
+      ? { enqueued: [], failed: files.map((file) => file.filename) }
+      : { enqueued: files.map((file) => ({ ...file, username, id: randomUUID(), state: 'Queued' })), failed: [] },
+    workerOverrides: { handleImportCandidateDownloadFailure: async () => {
+      harness.candidateRows.set(next.id, next);
+      return { recovered: true, nextCandidateId: next.id };
+    } },
+  });
+  await harness.run();
+  const summary = assertCompleted(harness);
+  assert.equal(harness.enqueueDownloads.mock.callCount(), 2);
+  assert.equal(harness.candidateRows.get('candidate-1').status, 'failed');
+  assert.equal(harness.candidateRows.get('next').status, 'downloading');
+  assert.equal(summary.queueFailedCount, 1);
+  assert.equal(summary.queuedCount, 1);
+  assert.equal(summary.recoveredCandidateCount, 1);
+});
+
+test('no unlocked files are diagnosed before dispatch', async (t) => {
+  const harness = createExecutionWorkerHarness(t, { candidates: [executionCandidate({ files: [] })] });
+  await harness.run();
+  assert.equal(assertCompleted(harness).blockedCount, 1);
+  assert.equal(harness.enqueueDownloads.mock.callCount(), 0);
+  assert.equal(harness.items.get('candidate-1').planningSnapshot.execution.diagnostics.downloadAcceptance.code, 'no_unlocked_files');
+});
+
+test('resuming a durable full receipt confirms through the owner without a second POST', async (t) => {
+  const candidate = executionCandidate();
+  const saved = checkpoint(candidate, { receipt: true });
+  const harness = createExecutionWorkerHarness(t, { candidates: [candidate], existingItems: [saved] });
+  await harness.run();
+  assert.equal(assertCompleted(harness).awaitingConfirmationCount, 0);
+  assert.equal(harness.enqueueDownloads.mock.callCount(), 0);
+  assert.equal(harness.transitionDownloading.mock.callCount(), 1);
+  assert.equal(harness.items.get(candidate.id).planningSnapshot.execution.handoff.state, 'confirmed');
+  assert.equal(harness.items.get(candidate.id).planningSnapshot.execution.handoff.attempt.attemptId,
+    saved.planningSnapshot.execution.handoff.attempt.attemptId);
+});
+
+for (const legacy of [false, true]) {
+  test(`an unknown ${legacy ? 'legacy' : 'attempt-owned'} handoff cannot be confirmed by a history matcher`, async (t) => {
+    const candidate = executionCandidate();
+    const harness = createExecutionWorkerHarness(t, { candidates: [candidate], existingItems: [checkpoint(candidate, { attempt: !legacy })],
+      workerOverrides: { findMatchingTransfers: async () => ({ allRequestedFilesMatched: true, disposition: 'confirmed',
+        matchedTransfers: [{ ...candidate.files[0], id: randomUUID(), username: candidate.username }], requestedFileCount: 1 }) },
     });
+    await harness.run();
+    assert.equal(assertCompleted(harness).awaitingConfirmationCount, 1);
+    assert.equal(harness.enqueueDownloads.mock.callCount(), 0);
+    assert.equal(harness.transitionDownloading.mock.callCount(), 0);
+    assert.equal(harness.candidateRows.get(candidate.id).status, 'selected');
+    assert.equal(harness.items.get(candidate.id).itemStatus, 'awaiting_confirmation');
   });
-  const leaseReleased = new Promise((resolve) => {
-    releaseLease.mock.mockImplementation(async (args) => {
-      resolve(args);
-    });
-  });
+}
 
-  await worker.startWorkerRun({
-    requestedCandidateCount: 4,
-    runId: 'run-paused',
-  });
+test('partial acceptance retains exact identities but does not advance or resend the request', async (t) => {
+  const candidate = executionCandidate();
+  candidate.files.push({ ...candidate.files[0], id: 'file-2', filename: '02.flac', rawPayload: { filename: 'Artist\\Album\\02.flac' } });
+  const harness = createExecutionWorkerHarness(t, { candidates: [candidate], enqueue: async ({ files, username }) => ({
+    enqueued: [{ ...files[0], username, id: randomUUID() }], failed: [files[1].filename],
+  }) });
+  await harness.run();
+  assert.equal(assertCompleted(harness).awaitingConfirmationCount, 1);
+  assert.equal(harness.enqueueDownloads.mock.callCount(), 1);
+  assert.equal(harness.candidateRows.get(candidate.id).status, 'selected');
+  assert.equal(harness.items.get(candidate.id).planningSnapshot.execution.handoff.attempt.receipts.length, 1);
+  assert.equal(harness.items.get(candidate.id).planningSnapshot.execution.handoff.attempt.receiptDisposition, 'partial');
+  assert.equal(harness.transitionDownloading.mock.callCount(), 0);
+});
 
-  const pausedArgs = await paused;
-  const releasedLeaseArgs = await leaseReleased;
+test('a lost response preserves its attempt for review and never marks downloading', async (t) => {
+  const harness = createExecutionWorkerHarness(t, { enqueue: async () => { throw new Error('Connection lost after POST'); } });
+  await harness.run();
+  assert.ok(harness.marks.failed);
+  assert.equal(harness.enqueueDownloads.mock.callCount(), 1);
+  assert.equal(harness.transitionDownloading.mock.callCount(), 0);
+  const execution = harness.items.get('candidate-1').planningSnapshot.execution;
+  assert.equal(execution.handoff.state, 'dispatching');
+  assert.ok(execution.handoff.attempt.attemptId);
+  assert.deepEqual(execution.handoff.attempt.receipts, []);
+});
 
-  assert.equal(markRunStarted.mock.callCount(), 0);
-  assert.equal(replaceImportExecutionRunItems.mock.callCount(), 0);
-  assert.equal(updateImportExecutionRunItem.mock.callCount(), 0);
-  assert.equal(enqueueDownloads.mock.callCount(), 0);
-  assert.equal(markImportCandidateDownloading.mock.callCount(), 0);
-  assert.equal(markImportCandidateDownloadFailed.mock.callCount(), 0);
-  assert.equal(markRunCompleted.mock.callCount(), 0);
-  assert.equal(markRunFailed.mock.callCount(), 0);
-  assert.equal(markRunCancelled.mock.callCount(), 0);
-  assert.deepEqual(pausedArgs, {
-    nextAttemptAt: '2026-05-04T12:30:00.000Z',
-    runId: 'run-paused',
-    summary: {
-      currentStep: 'Download enqueue paused by maintenance lock',
-      executionMode: 'download_enqueue',
-      pauseCode: 'recovery_lock_conflict',
-      pauseMessage: 'Import execution is paused while the restore maintenance lock is active.',
-      pauseProvider: 'restore',
-      requestedCandidateCount: 4,
+test('a replaced lease refuses the prepared POST and records known non-dispatch', async (t) => {
+  const harness = createExecutionWorkerHarness(t, { workerOverrides: {
+    getLease: async () => ({ ownerInstanceId: 'another-worker', acquiredAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 60_000).toISOString(), state: 'active', status: 'active' }),
+  } });
+  await harness.run();
+  assert.equal(harness.enqueueDownloads.mock.callCount(), 0);
+  assert.equal(harness.transitionDownloading.mock.callCount(), 0);
+  assert.equal(harness.items.get('candidate-1').planningSnapshot.execution.handoff.state, 'not_dispatched');
+});
+
+test('source drift after checkpoint preparation refuses before the provider call', async (t) => {
+  const harness = createExecutionWorkerHarness(t, { workerOverrides: {
+    prepareDownloadHandoff: async (args) => {
+      const prepared = await harness.handoff.prepareDownloadHandoff(args);
+      harness.candidateRows.get(args.importCandidateId).sourceResponseKey = 'changed-response';
+      return prepared;
     },
-  });
-  assert.deepEqual(releasedLeaseArgs, {
-    runId: 'run-paused',
-    status: 'paused',
-  });
+  } });
+  await harness.run();
+  assert.equal(harness.enqueueDownloads.mock.callCount(), 0);
+  assert.equal(harness.transitionDownloading.mock.callCount(), 0);
+  assert.equal(harness.items.get('candidate-1').planningSnapshot.execution.handoff.state, 'not_dispatched');
 });
 
-test('import execution worker cascades all-failed enqueue results to the next recovery candidate', async (t) => {
-  const initialCandidate = {
-    executionStatus: {
-      code: 'ready',
-      message: 'Ready for download enqueue.',
-    },
-    fileCount: 1,
-    folderPath: 'Autechre/Amber',
-    id: 'candidate-1',
-    lockedFileCount: 0,
-    planning: {
-      libraryFolderPath: '/music/Autechre/Amber',
-      sourceFolderPath: '/downloads/Autechre/Amber',
-      stagingFolderPath: '/staging/import-candidates/candidate-1/Autechre/Amber',
-    },
-    selectedAt: '2026-04-30T12:00:00.000Z',
-    sourceProvider: 'slskd',
-    sourceSearchId: 'search-1',
-    totalSizeBytes: 123456,
-    username: 'source-user',
-  };
-  const recoveryCandidate = {
-    ...initialCandidate,
-    id: 'candidate-2',
-    planning: {
-      ...initialCandidate.planning,
-      stagingFolderPath: '/staging/import-candidates/candidate-2/Autechre/Amber',
-    },
-    username: 'recovery-user',
-  };
-  let summaryCallCount = 0;
-  const buildSelectedImportCandidateSummary = t.mock.fn(async () => {
-    summaryCallCount += 1;
-    return {
-      counts: {
-        blocked: 0,
-        ready: 1,
-        readyWithWarnings: 0,
-        totalSelected: 1,
+test('new planning blockers cannot erase an older unknown request or its original manifest', async (t) => {
+  const candidate = executionCandidate();
+  const saved = checkpoint(candidate);
+  const blocked = { ...candidate, files: [], executionStatus: { code: 'blocked', message: 'Folder mapping changed.' } };
+  const harness = createExecutionWorkerHarness(t, { candidates: [blocked], existingItems: [saved] });
+  await harness.run();
+  assert.equal(assertCompleted(harness).awaitingConfirmationCount, 1);
+  assert.equal(harness.enqueueDownloads.mock.callCount(), 0);
+  assert.equal(harness.items.get(candidate.id).itemStatus, 'awaiting_confirmation');
+  assert.deepEqual(harness.items.get(candidate.id).planningSnapshot.execution.requestedFiles,
+    saved.planningSnapshot.execution.requestedFiles);
+});
+
+test('an absent lease identity cannot authorize a prepared POST', async (t) => {
+  const harness = createExecutionWorkerHarness(t, { workerOverrides: {
+    acquireLease: async () => ({}), getLease: async () => ({}),
+  } });
+  await harness.run();
+  assert.equal(harness.enqueueDownloads.mock.callCount(), 0);
+  assert.equal(harness.items.get('candidate-1').planningSnapshot.execution.handoff.state, 'not_dispatched');
+});
+
+test('a malformed current lease expiry cannot authorize a prepared POST', async (t) => {
+  const harness = createExecutionWorkerHarness(t, { workerOverrides: {
+    getLease: async () => ({ ...harness.lease, expiresAt: 'invalid' }),
+  } });
+  await harness.run();
+  assert.equal(harness.enqueueDownloads.mock.callCount(), 0);
+  assert.equal(harness.items.get('candidate-1').planningSnapshot.execution.handoff.state, 'not_dispatched');
+});
+
+test('a resumed known non-dispatch remains stopped without claiming uncertain acceptance', async (t) => {
+  const candidate = executionCandidate();
+  const saved = checkpoint(candidate);
+  saved.itemStatus = 'blocked';
+  saved.planningSnapshot.execution.handoff.state = 'not_dispatched';
+  const harness = createExecutionWorkerHarness(t, { candidates: [candidate], existingItems: [saved] });
+  await harness.run();
+  const summary = assertCompleted(harness);
+  assert.equal(summary.blockedCount, 1);
+  assert.equal(summary.awaitingConfirmationCount, 0);
+  assert.equal(harness.enqueueDownloads.mock.callCount(), 0);
+  assert.equal(harness.items.get(candidate.id).itemStatus, 'blocked');
+});
+
+test('a known stopped checkpoint does not advertise public confirmation pending', async () => {
+  const worklist = createImportCandidateExecutionConfirmationWorklistService({ buildRunWithItems: async (run) => run });
+  const result = await worklist.buildExecutionConfirmationWorklist({ currentRun: {
+    id: 'stopped-run', items: [{ itemStatus: 'awaiting_confirmation',
+      planningSnapshot: { execution: { handoff: { state: 'not_dispatched' } } } }],
+  } });
+  assert.equal(result.confirmationPending, false);
+  assert.equal(result.pendingConfirmationCount, 0);
+});
+
+for (const kind of ['expired', 'replaced']) {
+  test(`a lease ${kind} during the awaited final checkpoint guard cannot authorize POST`, async (t) => {
+    let observedLease;
+    const harness = createExecutionWorkerHarness(t, { workerOverrides: {
+      getLease: async () => observedLease ?? harness.lease,
+      assertDownloadHandoffCurrent: async (args) => {
+        await harness.handoff.assertDownloadHandoffCurrent(args);
+        observedLease = { ...harness.lease, ...(kind === 'expired'
+          ? { expiresAt: new Date(Date.now() - 1000).toISOString(), state: 'expired' }
+          : { ownerInstanceId: 'replacement-worker' }) };
       },
-      selectedCandidates: summaryCallCount === 1
-        ? [initialCandidate]
-        : [recoveryCandidate],
-    };
+    } });
+    await harness.run();
+    assert.equal(harness.enqueueDownloads.mock.callCount(), 0);
+    assert.equal(harness.items.get('candidate-1').planningSnapshot.execution.handoff.state, 'not_dispatched');
   });
-  const enqueueDownloads = t.mock.fn(async ({ username }) => username === 'source-user'
-    ? {
-        enqueued: [],
-        failed: ['Autechre\\Amber\\01 Foil.flac'],
-      }
-    : {
-        enqueued: [{
-          id: 'transfer-2',
-          filename: 'Autechre\\Amber\\01 Foil.flac',
-          state: 'Queued, Remotely',
-          username,
-        }],
-        failed: [],
-      });
-  const markImportCandidateDownloadFailed = t.mock.fn(async () => ({}));
-  const markImportCandidateDownloading = t.mock.fn(async () => ({}));
-  const recordActivityEventFn = t.mock.fn(async () => {});
-  const updateImportExecutionRunItem = t.mock.fn(async () => null);
-  const upsertImportExecutionRunItem = t.mock.fn(async () => null);
-  let resolveCompleted;
-  const completed = new Promise((resolve) => {
-    resolveCompleted = resolve;
-  });
-  const markRunCompleted = t.mock.fn(async (args) => {
-    resolveCompleted(args);
-  });
-  const worker = createImportCandidateExecutionWorker({
-    acquireLease: async () => {},
-    buildSelectedImportCandidateSummary,
-    enqueueDownloads,
-    getImportCandidate: async ({ importCandidateId }) => ({
-      id: importCandidateId,
-      files: [{
-        filename: '01 Foil.flac',
-        folderPath: 'Autechre/Amber',
-        isLocked: false,
-        rawPayload: {
-          filename: 'Autechre\\Amber\\01 Foil.flac',
-        },
-        sizeBytes: 123456,
-      }],
-    }),
-    handleImportCandidateDownloadFailure: t.mock.fn(async () => ({
-      failedCandidateId: 'candidate-1',
-      nextCandidateId: 'candidate-2',
-      reason: 'candidate_promoted',
-      recovered: true,
-    })),
-    markImportCandidateDownloadFailed,
-    markImportCandidateDownloading,
-    markRunCompleted,
-    markRunFailed: async () => {},
-    markRunStarted: async () => {},
-    recordActivityEventFn,
-    releaseLease: async () => {},
-    replaceImportExecutionRunItems: async () => [],
-    updateImportExecutionRunItem,
-    upsertImportExecutionRunItem,
-  });
-
-  await worker.startWorkerRun({
-    requestedCandidateCount: 1,
-    runId: 'run-recovery',
-  });
-
-  const completedArgs = await completed;
-
-  assert.equal(enqueueDownloads.mock.callCount(), 2);
-  assert.equal(enqueueDownloads.mock.calls[0].arguments[0].username, 'source-user');
-  assert.equal(enqueueDownloads.mock.calls[1].arguments[0].username, 'recovery-user');
-  assert.equal(markImportCandidateDownloadFailed.mock.callCount(), 1);
-  assert.equal(recordActivityEventFn.mock.callCount(), 2);
-  assert.equal(recordActivityEventFn.mock.calls[0].arguments[0].eventType, 'music_queue_match_retrying');
-  assert.equal(recordActivityEventFn.mock.calls[1].arguments[0].eventType, 'music_queue_download_started');
-  assert.equal(markImportCandidateDownloading.mock.callCount(), 1);
-  assert.equal(markImportCandidateDownloading.mock.calls[0].arguments[0].importCandidateId, 'candidate-2');
-  assert.equal(upsertImportExecutionRunItem.mock.callCount(), 1);
-  assert.equal(upsertImportExecutionRunItem.mock.calls[0].arguments[0].importCandidateId, 'candidate-2');
-  const recoveryUpdate = updateImportExecutionRunItem.mock.calls
-    .map((call) => call.arguments[0])
-    .find((item) => item.planningSnapshot.execution.recovery?.nextCandidateId === 'candidate-2');
-  assert.equal(recoveryUpdate.planningSnapshot.execution.recovery.nextCandidateId, 'candidate-2');
-  const rejectedUpdate = updateImportExecutionRunItem.mock.calls
-    .map((call) => call.arguments[0])
-    .find((item) => item.planningSnapshot.execution.diagnostics.downloadAcceptance.code === 'provider_rejected_all_files');
-  assert.equal(
-    rejectedUpdate
-      .planningSnapshot.execution.diagnostics.downloadAcceptance.code,
-    'provider_rejected_all_files',
-  );
-  assert.equal(completedArgs.summary.queueFailedCount, 1);
-  assert.equal(completedArgs.summary.queuedCount, 1);
-  assert.equal(completedArgs.summary.recoveredCandidateCount, 1);
-  assert.equal(completedArgs.summary.processedCandidateCount, 2);
-});
-
-test('import execution worker persists no-file diagnostics before provider enqueue', async (t) => {
-  const enqueueDownloads = t.mock.fn(async () => ({
-    enqueued: [],
-    failed: [],
-  }));
-  const updateImportExecutionRunItem = t.mock.fn(async () => null);
-  let resolveCompleted;
-  const completed = new Promise((resolve) => {
-    resolveCompleted = resolve;
-  });
-  const worker = createImportCandidateExecutionWorker({
-    acquireLease: async () => {},
-    buildSelectedImportCandidateSummary: async () => ({
-      counts: {
-        blocked: 0,
-        ready: 1,
-        readyWithWarnings: 0,
-        totalSelected: 1,
-      },
-      selectedCandidates: [{
-        executionStatus: {
-          code: 'ready',
-          message: 'Ready for download enqueue.',
-        },
-        fileCount: 2,
-        folderPath: 'Autechre/Amber',
-        id: 'candidate-no-files',
-        lockedFileCount: 2,
-        planning: {
-          libraryFolderPath: '/music/Autechre/Amber',
-          sourceFolderPath: '/downloads/Autechre/Amber',
-          stagingFolderPath: '/staging/import-candidates/candidate-no-files/Autechre/Amber',
-        },
-        selectedAt: '2026-04-30T12:00:00.000Z',
-        sourceProvider: 'slskd',
-        sourceSearchId: 'search-1',
-        totalSizeBytes: 123456,
-        username: 'source-user',
-      }],
-    }),
-    enqueueDownloads,
-    getImportCandidate: async ({ importCandidateId }) => ({
-      id: importCandidateId,
-      files: [{
-        filename: '01 Foil.flac',
-        folderPath: 'Autechre/Amber',
-        isLocked: true,
-        sizeBytes: 123456,
-      }],
-    }),
-    markRunCompleted: t.mock.fn(async (args) => {
-      resolveCompleted(args);
-    }),
-    markRunFailed: async () => {},
-    markRunStarted: async () => {},
-    releaseLease: async () => {},
-    replaceImportExecutionRunItems: async () => [],
-    updateImportExecutionRunItem,
-  });
-
-  await worker.startWorkerRun({
-    requestedCandidateCount: 1,
-    runId: 'run-no-files',
-  });
-
-  const completedArgs = await completed;
-  const itemUpdate = updateImportExecutionRunItem.mock.calls[0].arguments[0];
-
-  assert.equal(enqueueDownloads.mock.callCount(), 0);
-  assert.equal(itemUpdate.itemStatus, 'blocked');
-  assert.equal(itemUpdate.statusMessage, 'No unlocked files are available to enqueue from this candidate.');
-  assert.equal(itemUpdate.planningSnapshot.execution.diagnostics.downloadAcceptance.code, 'no_unlocked_files');
-  assert.equal(completedArgs.summary.blockedCount, 1);
-});
-
-test('import execution worker confirms an interrupted handoff without sending a second provider request', async (t) => {
-  const candidate = {
-    executionStatus: { code: 'ready', message: 'Ready for download enqueue.' },
-    fileCount: 1,
-    folderPath: 'Autechre/Amber',
-    id: 'candidate-confirmed-handoff',
-    lockedFileCount: 0,
-    planning: {},
-    selectedAt: '2026-08-25T12:00:00.000Z',
-    sourceProvider: 'slskd',
-    sourceSearchId: 'search-confirmed-handoff',
-    totalSizeBytes: 123,
-    username: 'source-user',
-  };
-  const enqueueDownloads = t.mock.fn(async () => ({ enqueued: [], failed: [] }));
-  const markImportCandidateDownloading = t.mock.fn(async () => ({}));
-  const recordConfirmedTransfers = t.mock.fn(async () => []);
-  const updateImportExecutionRunItem = t.mock.fn(async () => null);
-  let resolveCompleted;
-  const completed = new Promise((resolve) => {
-    resolveCompleted = resolve;
-  });
-  const worker = createImportCandidateExecutionWorker({
-    acquireLease: async () => {},
-    buildSelectedImportCandidateSummary: async () => ({
-      counts: { blocked: 0, ready: 1, readyWithWarnings: 0, totalSelected: 1 },
-      selectedCandidates: [candidate],
-    }),
-    enqueueDownloads,
-    findMatchingTransfers: async () => ({
-      allRequestedFilesMatched: true,
-      matchedTransfers: [{
-        filename: 'Autechre\\Amber\\01 Foil.flac',
-        id: 'transfer-confirmed',
-        size: 123,
-        username: 'source-user',
-      }],
-      requestedFileCount: 1,
-    }),
-    getImportCandidate: async () => ({
-      files: [{
-        filename: '01 Foil.flac',
-        folderPath: 'Autechre/Amber',
-        isLocked: false,
-        sizeBytes: 123,
-      }],
-    }),
-    listImportExecutionRunItems: async () => [{
-      id: 'run-item-confirmed-handoff',
-      importCandidateId: candidate.id,
-      itemStatus: 'awaiting_confirmation',
-      operationRunId: 'run-confirmed-handoff',
-      planningSnapshot: {
-        candidate,
-        execution: {
-          handoff: { state: 'dispatching' },
-          requestedFiles: [{ filename: 'Autechre\\Amber\\01 Foil.flac', size: 123 }],
-        },
-      },
-      position: 1,
-      statusMessage: 'Confirming earlier request.',
-    }],
-    markImportCandidateDownloading,
-    markRunCompleted: async (args) => resolveCompleted(args),
-    markRunFailed: async () => {},
-    markRunStarted: async () => {},
-    recordConfirmedTransfers,
-    releaseLease: async () => {},
-    updateImportExecutionRunItem,
-    upsertImportExecutionRunItem: async () => null,
-  });
-
-  await worker.startWorkerRun({ requestedCandidateCount: 1, runId: 'run-confirmed-handoff' });
-  const completedArgs = await completed;
-
-  assert.equal(enqueueDownloads.mock.callCount(), 0);
-  assert.deepEqual(recordConfirmedTransfers.mock.calls[0].arguments, [{
-    importCandidateId: candidate.id,
-    operationRunId: 'run-confirmed-handoff',
-    transfers: [{
-      filename: 'Autechre\\Amber\\01 Foil.flac',
-      id: 'transfer-confirmed',
-      size: 123,
-      username: 'source-user',
-    }],
-  }]);
-  assert.equal(markImportCandidateDownloading.mock.callCount(), 1);
-  assert.equal(updateImportExecutionRunItem.mock.calls[0].arguments[0].itemStatus, 'queued');
-  assert.equal(updateImportExecutionRunItem.mock.calls[0].arguments[0].planningSnapshot.execution.handoff.state, 'confirmed');
-  assert.equal(completedArgs.summary.awaitingConfirmationCount, 0);
-});
-
-test('import execution worker retains an unconfirmed handoff instead of retrying the provider request', async (t) => {
-  const candidate = {
-    executionStatus: { code: 'ready', message: 'Ready for download enqueue.' },
-    fileCount: 1,
-    folderPath: 'Autechre/Amber',
-    id: 'candidate-pending-handoff',
-    lockedFileCount: 0,
-    planning: {},
-    selectedAt: '2026-08-25T12:00:00.000Z',
-    sourceProvider: 'slskd',
-    sourceSearchId: 'search-pending-handoff',
-    totalSizeBytes: 123,
-    username: 'source-user',
-  };
-  const enqueueDownloads = t.mock.fn(async () => ({ enqueued: [], failed: [] }));
-  const updateImportExecutionRunItem = t.mock.fn(async () => null);
-  let resolveCompleted;
-  const completed = new Promise((resolve) => {
-    resolveCompleted = resolve;
-  });
-  const worker = createImportCandidateExecutionWorker({
-    acquireLease: async () => {},
-    buildSelectedImportCandidateSummary: async () => ({
-      counts: { blocked: 0, ready: 1, readyWithWarnings: 0, totalSelected: 1 },
-      selectedCandidates: [candidate],
-    }),
-    enqueueDownloads,
-    findMatchingTransfers: async () => ({
-      allRequestedFilesMatched: false,
-      matchedTransfers: [],
-      requestedFileCount: 1,
-    }),
-    getImportCandidate: async () => ({
-      files: [{
-        filename: '01 Foil.flac',
-        folderPath: 'Autechre/Amber',
-        isLocked: false,
-        sizeBytes: 123,
-      }],
-    }),
-    listImportExecutionRunItems: async () => [{
-      id: 'run-item-pending-handoff',
-      importCandidateId: candidate.id,
-      itemStatus: 'awaiting_confirmation',
-      operationRunId: 'run-pending-handoff',
-      planningSnapshot: {
-        candidate,
-        execution: {
-          handoff: { state: 'dispatching' },
-          requestedFiles: [{ filename: 'Autechre\\Amber\\01 Foil.flac', size: 123 }],
-        },
-      },
-      position: 1,
-      statusMessage: 'Confirming earlier request.',
-    }],
-    markRunCompleted: async (args) => resolveCompleted(args),
-    markRunFailed: async () => {},
-    markRunStarted: async () => {},
-    releaseLease: async () => {},
-    updateImportExecutionRunItem,
-    upsertImportExecutionRunItem: async () => null,
-  });
-
-  await worker.startWorkerRun({ requestedCandidateCount: 1, runId: 'run-pending-handoff' });
-  const completedArgs = await completed;
-
-  assert.equal(enqueueDownloads.mock.callCount(), 0);
-  assert.equal(updateImportExecutionRunItem.mock.calls[0].arguments[0].itemStatus, 'awaiting_confirmation');
-  assert.equal(
-    updateImportExecutionRunItem.mock.calls[0].arguments[0]
-      .planningSnapshot.execution.diagnostics.downloadAcceptance.code,
-    'provider_confirmation_pending',
-  );
-  assert.equal(completedArgs.summary.awaitingConfirmationCount, 1);
-});
+}

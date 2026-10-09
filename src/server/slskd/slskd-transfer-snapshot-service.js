@@ -17,21 +17,33 @@
  */
 
 import { createSlskdService } from './slskd-service.js';
+import { normalizeDownloadTransferId } from './slskd-download-attempt-policy.js';
 
 function normalizeTransferIdentifier(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function normalizeTransferId(value) {
+  const id = normalizeTransferIdentifier(value);
+  return normalizeDownloadTransferId(id) ?? id;
+}
+
 function indexDownloadGroups(groups) {
   const indexedTransfers = new Map();
+  const ambiguousIds = new Set();
 
   for (const group of Array.isArray(groups) ? groups : []) {
     const directories = Array.isArray(group?.directories) ? group.directories : [];
     for (const directory of directories) {
       const files = Array.isArray(directory?.files) ? directory.files : [];
       for (const transfer of files) {
-        const transferId = normalizeTransferIdentifier(transfer?.id);
-        if (!transferId || indexedTransfers.has(transferId)) {
+        const transferId = normalizeTransferId(transfer?.id);
+        if (!transferId || ambiguousIds.has(transferId)) {
+          continue;
+        }
+        if (indexedTransfers.has(transferId)) {
+          indexedTransfers.delete(transferId);
+          ambiguousIds.add(transferId);
           continue;
         }
 
@@ -57,7 +69,7 @@ export function createSlskdTransferSnapshotService({
   async function buildTransferSnapshot({ requestedTransfers = [] } = {}) {
     const normalizedTransfers = Array.isArray(requestedTransfers)
       ? requestedTransfers.map((transfer) => ({
-        id: normalizeTransferIdentifier(transfer?.id),
+        id: normalizeTransferId(transfer?.id),
         username: normalizeTransferIdentifier(transfer?.username),
       })).filter((transfer) => transfer.id && transfer.username)
       : [];
@@ -77,7 +89,7 @@ export function createSlskdTransferSnapshotService({
 
     return {
       getTransfer({ id, username }) {
-        const normalizedId = normalizeTransferIdentifier(id);
+        const normalizedId = normalizeTransferId(id);
         const normalizedUsername = normalizeTransferIdentifier(username);
         if (!normalizedId || !normalizedUsername) {
           return null;

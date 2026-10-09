@@ -50,6 +50,7 @@ import { createMusicQueueRecoveryService } from './music-queue-recovery-service.
 import { createMusicQueueRecoveryExecutionPolicyService } from './music-queue-recovery-execution-policy-service.js';
 import { createMusicQueueRecoveryLifecycleService } from './music-queue-recovery-lifecycle-service.js';
 import { createMusicQueueExecutionObservationService } from './music-queue-execution-observation-service.js';
+import { createImportExecutionHandoffService } from './import-execution-handoff-service.js';
 import { createImportCandidateRecoveryService } from './import-candidate-recovery-service.js';
 import { createImportCandidateExecutionService } from './import-candidate-execution-service.js';
 import { createImportCandidateExecutionSummaryService } from './import-candidate-execution-summary-service.js';
@@ -68,8 +69,8 @@ import { listImportCandidateFileDecisions } from './import-candidate-file-decisi
 import {
   findUnconfirmedImportExecutionHandoff,
   listImportExecutionRunItems,
+  initializeImportExecutionRunItems,
   recordImportExecutionAcceptedObservation,
-  replaceImportExecutionRunItems,
   updateImportExecutionRunItem,
   upsertImportExecutionRunItem,
 } from './import-candidate-execution-repository.js';
@@ -195,13 +196,12 @@ export function createImportCandidateModule({
   slskdTransferSnapshotService = createSlskdTransferSnapshotService({
     getDownloads: slskdService.getDownloads,
   }),
-  slskdDownloadHandoffReconciliationService = createSlskdDownloadHandoffReconciliationService({
-    getDownloads: slskdService.getDownloads,
-  }),
+  slskdDownloadHandoffReconciliationService = createSlskdDownloadHandoffReconciliationService(),
   importCandidateMediaInspectionRunStore = createImportCandidateMediaInspectionRunStore(),
   importCandidateTranscodeRunStore = createImportCandidateTranscodeRunStore(),
   importCandidateExecutionRunStore = createImportCandidateExecutionRunStore(),
   importExecutionTransferLinkStore = createImportExecutionTransferLinkStore(),
+  importExecutionHandoffService = createImportExecutionHandoffService({ transferLinkStore: importExecutionTransferLinkStore }),
   importCandidateApplyRunStore = createImportCandidateApplyRunStore(),
   importCandidateReleaseRecheckStore = createImportCandidateReleaseRecheckStore(),
   importCandidateSafeAutoAddQualityGateService = createImportCandidateSafeAutoAddQualityGateService({
@@ -241,14 +241,16 @@ export function createImportCandidateModule({
     acquireLease: importCandidateExecutionRunStore.acquireLease,
     buildSelectedImportCandidateSummary: importCandidateSelectionSummaryService.buildSelectedImportCandidateSummary,
     enqueueDownloads: slskdService.enqueueDownloads,
-    findMatchingTransfers: slskdDownloadHandoffReconciliationService.findMatchingTransfers,
     getImportCandidate: importCandidateService.getImportCandidate,
+    prepareDownloadHandoff: importExecutionHandoffService.prepareDownloadHandoff,
+    confirmDownloadHandoff: importExecutionHandoffService.confirmDownloadHandoff,
+    assertDownloadHandoffCurrent: importExecutionHandoffService.assertDownloadHandoffCurrent,
+    recordDownloadHandoffNotDispatched: importExecutionHandoffService.recordDownloadHandoffNotDispatched,
+    getLease: importCandidateExecutionRunStore.getLease,
     ownsRecoveryCandidate: importCandidateRecoveryService.ownsRecoveryCandidate,
     resolveRecoveryExecution: musicQueueRecoveryExecutionPolicyService.resolveRecoveryExecution,
     assertRecoveryExecutionCurrent: musicQueueRecoveryExecutionPolicyService.assertRecoveryExecutionCurrent,
     retireRecoveryExecution: musicQueueRecoveryLifecycleService.retireExecution,
-    isCurrentExecutionObservation: musicQueueRecoveryService.isCurrentExecutionObservation,
-    transitionOwnedExecutionCandidate: musicQueueExecutionObservationService.transitionOwnedExecutionCandidate,
     handleImportCandidateDownloadFailure: importCandidateRecoveryService.handleImportCandidateDownloadFailure,
     isCancellationRequested: maintenanceLockOperationPauseService
       ? createOperationRunInterruptionGate({
@@ -258,19 +260,16 @@ export function createImportCandidateModule({
       })
       : importCandidateExecutionRunStore.isCancellationRequested,
     markImportCandidateDownloadFailed: importCandidateService.markImportCandidateDownloadFailed,
-    markImportCandidateDownloading: importCandidateService.markImportCandidateDownloading,
     markRunCancelled: importCandidateExecutionRunStore.markRunCancelled,
     markRunCompleted: importCandidateExecutionRunStore.markRunCompleted,
     markRunFailed: importCandidateExecutionRunStore.markRunFailed,
     markRunPaused: importCandidateExecutionRunStore.markRunPaused,
     markRunStarted: importCandidateExecutionRunStore.markRunStarted,
     recordActivityEventFn,
-    recordAcceptedCandidateObservation: recordImportExecutionAcceptedObservation,
-    recordConfirmedTransfers: importExecutionTransferLinkStore.recordConfirmedTransfers,
     releaseLease: importCandidateExecutionRunStore.releaseLease,
     listImportExecutionRunItems,
     renewLease: importCandidateExecutionRunStore.renewLease,
-    replaceImportExecutionRunItems,
+    initializeImportExecutionRunItems,
     updateImportExecutionRunItem,
     upsertImportExecutionRunItem,
   }),
@@ -464,6 +463,7 @@ export function createImportCandidateModule({
     importCandidateApplyRunStore,
   }),
   importCandidateExecutionReconciliationService = createImportCandidateExecutionReconciliationService({
+    confirmDownloadHandoff: importExecutionHandoffService.confirmDownloadHandoff,
     ownsRecoveryCandidate: importCandidateRecoveryService.ownsRecoveryCandidate,
     isCurrentExecutionObservation: musicQueueRecoveryService.isCurrentExecutionObservation,
     recordAcceptedCandidateObservation: recordImportExecutionAcceptedObservation,

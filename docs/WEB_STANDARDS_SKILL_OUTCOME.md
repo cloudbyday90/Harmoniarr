@@ -187,3 +187,18 @@ installed files match their maintained source by SHA-256 after synchronization.
 These checks validate skill structure and identity, not application behavior or
 a fresh blind skill trial. Executed recovery evidence and limits belong in the
 separate [recovery outcome](MUSIC_QUEUE_FALLBACK_RECOVERY_OUTCOME.md).
+
+## Attempt-owned confirmation maintenance, October 8 local
+
+Fresh provider research showed that the pinned slskd 0.25.1 legacy API and
+0.26.0 caller-ID batch API need different attribution decisions. The practice
+reference now locates the immutable research ledger, and the evidence map adds
+receipt/current-attempt ownership, unknown/partial status, retention and API
+privacy counterexamples. Local admission is distinguished from remote completion.
+
+This is narrow reference maintenance based on observed implementation work.
+Entrypoint, UI metadata and invocation policy remain unchanged. Repository and
+installed structure both pass validation; all four files match by SHA-256 after
+the final line-ending cleanup and synchronization. No new blind skill
+trial or full conformance claim is made; application results belong in the
+separate [confirmation outcome](DOWNLOAD_HANDOFF_CONFIRMATION_OUTCOME.md).

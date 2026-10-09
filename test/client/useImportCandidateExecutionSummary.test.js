@@ -2,6 +2,23 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { useImportCandidateExecutionSummary } from '../../src/client/composables/useImportCandidateExecutionSummary.js';
 
+test('execution summary forwards polling options and keeps terminal confirmation actionable until it settles', async (t) => {
+  let calls = 0;
+  const workflow = useImportCandidateExecutionSummary({ pollIntervalMs: 10,
+    fetchImportCandidateExecutionSummary: async () => { calls += 1; return { importCandidateExecution: {
+      currentRun: { id: 'finished', status: 'completed' }, confirmationPending: calls < 2,
+      summary: { confirmationPending: calls < 2, status: calls < 2 ? 'attention' : 'ready' } } }; },
+  });
+  t.after(() => workflow.destroy());
+  await workflow.loadImportCandidateExecutionSummary();
+  const deadline = Date.now() + 1000;
+  while (calls < 2 && Date.now() < deadline) await new Promise((resolve) => { setTimeout(resolve, 5); });
+  assert.equal(calls, 2);
+  assert.equal(workflow.summary.value.confirmationPending, false);
+  await new Promise((resolve) => { setTimeout(resolve, 30); });
+  assert.equal(calls, 2, 'settled terminal work no longer polls');
+});
+
 test('useImportCandidateExecutionSummary loads the shared execution summary payload', async () => {
   const workflow = useImportCandidateExecutionSummary({
     fetchImportCandidateExecutionSummary: async () => ({

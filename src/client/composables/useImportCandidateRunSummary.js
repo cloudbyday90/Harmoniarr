@@ -22,6 +22,7 @@ import { getErrorMessage } from '../lib/error-utils.js';
 const activeRunStatuses = new Set(['pending', 'running']);
 
 function hasActiveRun(runSummaryValue) {
+  if (runSummaryValue?.confirmationPending === true || runSummaryValue?.summary?.confirmationPending === true) return true;
   const status = runSummaryValue?.activeRun?.status ?? runSummaryValue?.currentRun?.status;
   return activeRunStatuses.has(status);
 }

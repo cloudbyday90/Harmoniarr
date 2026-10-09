@@ -248,3 +248,10 @@ test('createImportCandidateExecutionHeartbeat pauses while a conflicting mainten
     nextRetryAt: '2026-04-30T14:05:00.000Z',
   });
 });
+test('older unresolved or unavailable transfer observations remain actionable without an active current run', () => {
+  const unresolved = { executionMode: 'download_enqueue', items: [{ itemStatus: 'blocked',
+    planningSnapshot: { execution: { handoff: { state: 'dispatching' } } } }] };
+  assert.equal(shouldRunImportCandidateExecutionHeartbeat({ executionSummary: { currentRun: null, unconfirmedRuns: [unresolved] } }), true);
+  const observing = { executionMode: 'download_enqueue', items: [{ itemStatus: 'queued', transferObservationPending: true }] };
+  assert.equal(shouldRunImportCandidateExecutionHeartbeat({ executionSummary: { currentRun: observing } }), true);
+});

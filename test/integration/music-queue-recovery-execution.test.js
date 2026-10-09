@@ -41,6 +41,12 @@ async function makeChild(context, options = {}) {
   await context.pool.query("UPDATE operation_runs SET status='completed' WHERE id=$1", [f.originRunId]);
   return { f, candidate, runId: result.recoveryRunId };
 }
+async function freshOrigin(context, seeded) {
+  const run = await context.executionRuns.createOperationRun({ status: 'running', requestedCandidateCount: 1,
+    summary: { triggerSource: 'missing_music_manual', selectedCandidateId: seeded.candidate.id,
+      sourceSearchId: seeded.searchId, sourceWantedReleaseId: seeded.wantedId } });
+  return { ...seeded, originRunId: run.id };
+}
 
 suite('Scoped recovery execution and reconciliation with isolated PostgreSQL', () => {
   before(async () => {
@@ -52,7 +58,7 @@ suite('Scoped recovery execution and reconciliation with isolated PostgreSQL', (
   test('the actual failed enqueue worker queues a child while its parent is running and rolls back owned failure on queue or audit error', { timeout: config.scenarioTimeoutMs }, async (t) => {
     await scenario(t, async (context) => {
       for (const fault of [null, 'queue', 'audit']) {
-        const f = await fixture(context); const next = await replacement(context, f);
+        const f = await freshOrigin(context, await fixture(context)); const next = await replacement(context, f);
         await context.pool.query("UPDATE import_candidates SET status='selected',updated_at=NOW() WHERE id=$1", [f.candidate.id]);
         if (fault) await context.pool.query(`CREATE FUNCTION fail_recovery_${fault}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
           IF ${fault === 'queue' ? "NEW.summary->>'triggerSource'='music_queue_fallback_recovery'" : "NEW.event_type='import_candidate_download_failed'"}
@@ -144,7 +150,7 @@ suite('Scoped recovery execution and reconciliation with isolated PostgreSQL', (
     });
   });
 
-  test('unknown provider outcomes retain reservation, survive pruning, and confirm the same request without sending another POST', { timeout: config.scenarioTimeoutMs }, async (t) => {
+  test('a lost response without a durable receipt remains unresolved, survives pruning and never sends another POST', { timeout: config.scenarioTimeoutMs }, async (t) => {
     await scenario(t, async (context) => {
       const child = await makeChild(context);
       let posts = 0;
@@ -162,19 +168,18 @@ suite('Scoped recovery execution and reconciliation with isolated PostgreSQL', (
       await context.pool.query("UPDATE operation_runs SET status='pending',created_at=NOW() WHERE id=$1", [child.runId]);
       const confirmations = await runWorker(context, child.runId, child.candidate.id, {
         enqueueDownloads: async () => { posts += 1; throw new Error('Must confirm instead of POST'); },
-        findMatchingTransfers: async ({ requestedFiles }) => ({ allRequestedFilesMatched: true,
-          matchedTransfers: requestedFiles.map((file) => ({ ...file, id: randomUUID() })) }),
       });
-      assert.equal(posts, 1); assert.equal(confirmations.confirmed, 1);
+      assert.equal(posts, 1); assert.equal(confirmations.confirmed, 0);
       run = await context.store.getOrigin(child.runId, child.candidate.id);
-      assert.equal(run.execution_snapshot.execution.handoff.state, 'confirmed');
-      assert.equal((await context.store.getCandidate(child.candidate.id)).status, 'downloading');
+      assert.equal(run.execution_snapshot.execution.handoff.state, 'dispatching');
+      assert.equal(run.execution_snapshot.execution.handoff.attempt.receipts.length, 0);
+      assert.equal((await context.store.getCandidate(child.candidate.id)).status, 'selected');
     });
   });
 
   test('legacy owned context loss refuses while genuine generic work retains its provider contract and a fresh protected selection can follow safe retirement', { timeout: config.scenarioTimeoutMs }, async (t) => {
     await scenario(t, async (context) => {
-      const f = await fixture(context);
+      const f = await freshOrigin(context, await fixture(context));
       await context.pool.query("UPDATE import_candidates SET status='selected',normalized_payload=normalized_payload-'musicQueue' WHERE id=$1", [f.candidate.id]);
       const refused = await runWorker(context, f.originRunId, f.candidate.id);
       assert.equal(refused.enqueue, 0); assert.equal((await context.store.getCandidate(f.candidate.id)).status, 'held');

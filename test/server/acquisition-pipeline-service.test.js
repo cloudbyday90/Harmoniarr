@@ -127,6 +127,7 @@ test('legacy acquisition list and detail derive status privately while preservin
   Object.assign(summary, { statusCounts: { failed: 1, pending: 1 },
     currentConfirmedTransferCount: 0, currentExecutionStatusCounts: {}, legacyRecoverySelection: false, recoverySelectionNeedsReview: false,
     recoveryExecution: { status: 'pending', candidateMatches: true, authorityReserved: true, reservationRetained: true },
+    currentDownloadHandoff: null,
     downloadExecutionSummary: { itemStatusCounts: { queued: 1 } } });
   release.discoveryRequest.recoveryDiscovery = { status: 'pending', reservationRetained: true };
   const projectorOptions = { qualityPolicyService };
@@ -138,7 +139,7 @@ test('legacy acquisition list and detail derive status privately while preservin
   for (const row of [projected, list.releases[0], detail.release]) {
     assert.deepEqual(row.status, projected.status);
     assert.deepEqual(row.evidence.match.executionStatusCounts, { queued: 1 }, 'existing public diagnostics remain available');
-    assert.doesNotMatch(JSON.stringify(row.evidence), /recoveryExecution|recoveryDiscovery|reservationRetained|authorityReserved|candidateMatches|legacyRecoverySelection|recoverySelectionNeedsReview|currentConfirmedTransferCount|currentExecutionStatusCounts/u);
+    assert.doesNotMatch(JSON.stringify(row.evidence), /currentDownloadHandoff|recoveryExecution|recoveryDiscovery|reservationRetained|authorityReserved|candidateMatches|legacyRecoverySelection|recoverySelectionNeedsReview|currentConfirmedTransferCount|currentExecutionStatusCounts/u);
   }
 });
 

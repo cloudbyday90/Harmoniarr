@@ -21,11 +21,12 @@ import { captureRecoveryObservation } from '../../src/server/import-candidates/m
 import { createImportExecutionTransferLinkStore } from '../../src/server/import-candidates/import-execution-transfer-link-store.js';
 import { createLibraryWantedReleaseStore } from '../../src/server/library/library-wanted-release-store.js';
 import { createMissingMusicDecisionService } from '../../src/server/missing-music/missing-music-decision-service.js';
+import { createImportCandidateExecutionConfirmationWorklistStore } from '../../src/server/import-candidates/import-candidate-execution-confirmation-worklist-store.js';
 
 const config = resolveIntegrationTestRuntimeConfig();
 let runtime;
 let unavailable;
-const privateFacts = /musicQueueRecovery|recoveryExecution|recoveryDiscovery|recoverySelectionNeedsReview|legacyRecoverySelection|reservationRetained|authority|participant|episode|baselineRequirement|private-provider|private-path|sourceSearchId|currentConfirmedTransferCount|currentExecutionStatusCounts/u;
+const privateFacts = /attemptId|currentDownloadHandoff|musicQueueRecovery|recoveryExecution|recoveryDiscovery|recoverySelectionNeedsReview|legacyRecoverySelection|reservationRetained|authority|participant|episode|baselineRequirement|private-provider|private-path|sourceSearchId|currentConfirmedTransferCount|currentExecutionStatusCounts/u;
 
 async function seed(pool) {
   const owner = (await pool.query(`INSERT INTO app_users (username,password_hash,role,user_preferences)
@@ -292,5 +293,32 @@ suite('Missing Music recovery read projection with PostgreSQL', () => {
       await pool.query('DELETE FROM operation_runs WHERE id=$1', [newer.id]);
       assert.equal((await fixture.read('downloading')).decision.status.code, 'downloading', 'the exact current child receipt remains observable when no newer origin exists');
     }, { scenarioName: 'recovery_projection_latest_origin' });
+  });
+
+  test('older interrupted attempts remain public review across a newer blocked allocation, private worklist finds them and genuine acceptance takes precedence', {
+    timeout: config.scenarioTimeoutMs,
+  }, async (t) => {
+    if (unavailable) { t.skip(unavailable); return; }
+    await runtime.runScenario(async ({ getPoolFn }) => {
+      const pool = getPoolFn(); const fixture = await seed(pool);
+      await pool.query(`INSERT INTO import_execution_run_items (operation_run_id,import_candidate_id,position,item_status,planning_snapshot,status_message)
+        VALUES ($1,$2,1,'blocked',$3::jsonb,'Test-owned stale item status after interrupted dispatch')`,
+      [fixture.run.id, fixture.candidate.id, JSON.stringify({ execution: { handoff: { state: 'dispatching', attempt: { attemptId: 'private-attempt', receiptDisposition: 'partial' } } } })]);
+      await pool.query("UPDATE operation_runs SET status='completed' WHERE id=$1", [fixture.run.id]);
+      const newer = await seedOperationRunFixture({ queryable: pool, runOverrides: { operationType: 'import_candidate_execution_planning', status: 'completed',
+        summary: { executionMode: 'download_enqueue', selectedCandidateId: fixture.candidate.id, sourceWantedReleaseId: fixture.wantedId } } });
+      await pool.query(`INSERT INTO import_execution_run_items (operation_run_id,import_candidate_id,position,item_status,status_message)
+        VALUES ($1,$2,1,'blocked','Test-owned blocked newer allocation')`, [newer.id, fixture.candidate.id]);
+      const unknown = await fixture.read('action');
+      assert.equal(unknown.decision.status.label, 'Confirming download request');
+      assert.equal(unknown.permissions.canStartDownload, false);
+      assert.equal(unknown.permissions.canSearchAgain, false);
+      const waiting = await createImportCandidateExecutionConfirmationWorklistStore({ getPoolFn: () => pool }).listUnconfirmedExecutionRuns({ excludeRunId: newer.id });
+      assert.deepEqual(waiting.runIds, [fixture.run.id]);
+      assert.equal(waiting.pendingConfirmationCount, 1);
+      await receipt(pool, fixture.candidate.id, newer.id);
+      await pool.query("UPDATE import_candidates SET status='downloading' WHERE id=$1", [fixture.candidate.id]);
+      assert.equal((await fixture.read('downloading')).decision.status.code, 'downloading', 'a genuine newer recorded acceptance has precedence over old uncertainty');
+    }, { scenarioName: 'download_handoff_current_read_and_older_polling' });
   });
 });

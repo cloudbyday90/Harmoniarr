@@ -1347,6 +1347,14 @@ describe('getHeartbeatSkipReasonLabel', () => {
 // ---------------------------------------------------------------------------
 
 describe('canStartExecutionRun', () => {
+  it('refuses unresolved current or older handoffs while retaining ordinary completed-job eligibility', () => {
+    assert.equal(canStartExecutionRun({ status: 'completed', awaitingConfirmationCount: 1 }, 1), false);
+    assert.equal(canStartExecutionRun({ status: 'failed', items: [{ itemStatus: 'awaiting_confirmation' }] }, 1), false);
+    assert.equal(canStartExecutionRun({ status: 'completed', items: [{ itemStatus: 'blocked', planningSnapshot: { execution: { handoff: { state: 'dispatching' } } } }] }, 1), false);
+    assert.equal(canStartExecutionRun({ status: 'completed', awaitingConfirmationCount: 1, items: [{ itemStatus: 'awaiting_confirmation', planningSnapshot: { execution: { handoff: { state: 'not_dispatched' } } } }] }, 1), true);
+    assert.equal(canStartExecutionRun({ status: 'completed' }, 1, { confirmationPending: true, pendingConfirmationCount: 2 }), false);
+    assert.equal(canStartExecutionRun({ status: 'completed' }, 1, { confirmationPending: false, pendingConfirmationCount: 0 }), true);
+  });
   it('returns true when there is no current run and candidates are selected', () => {
     assert.equal(canStartExecutionRun(null, 2), true);
   });

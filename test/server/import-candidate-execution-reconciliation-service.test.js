@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { randomUUID } from 'node:crypto';
 import { createImportCandidateExecutionReconciliationService } from '../../src/server/import-candidates/import-candidate-execution-reconciliation-service.js';
+import { createDownloadAttempt, evaluateDownloadReceipt } from '../../src/server/slskd/slskd-download-attempt-policy.js';
+import { captureRecoveryObservation } from '../../src/server/import-candidates/music-queue-recovery-policy.js';
+import { createExecutionWorkerHarness, executionCandidate } from '../../testing/server/import-execution-worker-harness.js';
 
 test('reconcileImportCandidateExecutionState persists workflow transitions from live transfer state', async (t) => {
   const markImportCandidateDownloading = t.mock.fn(async ({ importCandidateId }) => ({
@@ -12,7 +16,7 @@ test('reconcileImportCandidateExecutionState persists workflow transitions from 
   const markImportCandidateDownloadFailed = t.mock.fn(async ({ importCandidateId }) => ({
     candidate: { id: importCandidateId, status: 'failed' },
   }));
-  const updateImportExecutionRunItem = t.mock.fn(async () => null);
+  const updateImportExecutionRunItem = t.mock.fn(async (item) => item);
   const service = createImportCandidateExecutionReconciliationService({
     buildImportCandidateExecutionSummary: async () => ({
       currentRun: {
@@ -144,7 +148,7 @@ test('reconcileImportCandidateExecutionState starts safe auto apply after comple
       },
     }),
     startSafeApplyRunAfterDownloadCompleted,
-    updateImportExecutionRunItem: async () => null,
+    updateImportExecutionRunItem: async (item) => item,
   });
 
   const result = await service.reconcileImportCandidateExecutionState({
@@ -172,7 +176,7 @@ test('reconcileImportCandidateExecutionState only fails missing transfers after 
   const markImportCandidateDownloadFailed = t.mock.fn(async ({ importCandidateId }) => ({
     candidate: { id: importCandidateId, status: 'failed' },
   }));
-  const updateImportExecutionRunItem = t.mock.fn(async () => null);
+  const updateImportExecutionRunItem = t.mock.fn(async (item) => item);
   const service = createImportCandidateExecutionReconciliationService({
     buildImportCandidateExecutionSummary: async () => ({
       currentRun: {
@@ -277,7 +281,7 @@ test('reconcileImportCandidateExecutionState schedules rejected-transfer retries
     }),
     handleImportCandidateRejectedTransfer,
     markImportCandidateDownloadFailed,
-    updateImportExecutionRunItem: async () => null,
+    updateImportExecutionRunItem: async (item) => item,
   });
 
   const result = await service.reconcileImportCandidateExecutionState();
@@ -340,7 +344,7 @@ test('reconcileImportCandidateExecutionState reports rediscovery scheduled after
     handleImportCandidateDownloadFailure,
     markImportCandidateDownloadFailed,
     recordActivityEventFn,
-    updateImportExecutionRunItem: async () => null,
+    updateImportExecutionRunItem: async (item) => item,
   });
 
   const result = await service.reconcileImportCandidateExecutionState();
@@ -361,52 +365,174 @@ test('reconcileImportCandidateExecutionState reports rediscovery scheduled after
   }]);
 });
 
-test('reconcileImportCandidateExecutionState confirms a checkpointed handoff without retrying slskd', async (t) => {
-  const markImportCandidateDownloading = t.mock.fn(async ({ importCandidateId }) => ({
-    candidate: { id: importCandidateId, status: 'downloading' },
-  }));
-  const updateImportExecutionRunItem = t.mock.fn(async () => null);
-  const service = createImportCandidateExecutionReconciliationService({
-    buildImportCandidateExecutionSummary: async () => ({
-      currentRun: {
-        id: 'run-handoff-confirmation',
-        items: [{
-          handoffConfirmation: {
-            allRequestedFilesMatched: true,
-            matchedTransfers: [{
-              filename: 'Autechre\\Amber\\01 Foil.flac',
-              id: 'transfer-handoff-confirmed',
-              size: 123,
-              username: 'source-user',
-            }],
-            requestedFileCount: 1,
-          },
-          itemStatus: 'awaiting_confirmation',
-          liveTransferSummary: { status: 'queued' },
-          planningSnapshot: {
-            candidate: { id: 'candidate-handoff-confirmed' },
-            execution: {
-              handoff: { state: 'awaiting_confirmation' },
-              requestedFiles: [{ filename: 'Autechre\\Amber\\01 Foil.flac', size: 123 }],
-            },
-          },
-          statusMessage: 'Confirming earlier request.',
-        }],
-      },
-    }),
-    getImportCandidate: async () => ({
-      id: 'candidate-handoff-confirmed',
-      status: 'selected',
-    }),
-    markImportCandidateDownloading,
-    updateImportExecutionRunItem,
+function checkpointFixture(t, { disposition = 'confirmed', legacy = false } = {}) {
+  const candidate = executionCandidate({ id: 'candidate-handoff-confirmed' });
+  if (disposition === 'partial') {
+    candidate.files.push({ ...candidate.files[0], id: 'file-2', filename: '02.flac',
+      rawPayload: { filename: 'Artist\\Album\\02.flac' } });
+    candidate.fileCount = 2; candidate.totalSizeBytes = 246;
+  }
+  const operationRunId = 'run-handoff-confirmation';
+  const requestedFiles = candidate.files.map((file) => ({ filename: file.rawPayload.filename, size: file.sizeBytes }));
+  const sourceObservation = captureRecoveryObservation(candidate);
+  const original = createDownloadAttempt({ importCandidateId: candidate.id, operationRunId,
+    requestedFiles, sourceObservation, username: candidate.username });
+  const transfers = requestedFiles.map((file) => ({ ...file, id: randomUUID(), username: candidate.username, direction: 'Download' }));
+  const proof = evaluateDownloadReceipt({ attempt: original, enqueueResult: {
+    enqueued: disposition === 'confirmed' ? transfers : disposition === 'partial' ? [transfers[0]] : [],
+    failed: disposition === 'partial' ? [requestedFiles[1].filename]
+      : disposition === 'rejected' ? requestedFiles.map((file) => file.filename) : [],
+  } });
+  const item = { id: randomUUID(), importCandidateId: candidate.id, operationRunId,
+    itemStatus: 'awaiting_confirmation', statusMessage: 'Confirming earlier request.',
+    // Even a full-looking legacy matcher result cannot replace the stored owner proof.
+    handoffConfirmation: { allRequestedFilesMatched: true, disposition: 'confirmed',
+      matchedTransfers: transfers, requestedFileCount: requestedFiles.length },
+    liveTransferSummary: { status: 'queued' },
+    planningSnapshot: { candidate: { id: candidate.id, status: 'selected' }, execution: {
+      sourceObservation, requestedFiles, handoff: { state: 'awaiting_confirmation', ...(legacy ? {} : { attempt: proof.attempt }) },
+    } },
+  };
+  const harness = createExecutionWorkerHarness(t, { candidates: [candidate], existingItems: [item] });
+  const confirmDownloadHandoff = t.mock.fn(harness.handoff.confirmDownloadHandoff);
+  const markImportCandidateDownloadFailed = t.mock.fn(async ({ importCandidateId }) => {
+    const changed = { ...harness.candidateRows.get(importCandidateId), status: 'failed' };
+    harness.candidateRows.set(importCandidateId, changed);
+    return { candidate: changed };
   });
+  const handleImportCandidateDownloadFailure = t.mock.fn(async () => ({ recovered: false }));
+  const service = createImportCandidateExecutionReconciliationService({
+    buildImportCandidateExecutionSummary: async () => ({ currentRun: { id: operationRunId, items: [item] } }),
+    confirmDownloadHandoff,
+    getImportCandidate: async ({ importCandidateId }) => structuredClone(harness.candidateRows.get(importCandidateId)),
+    markImportCandidateDownloading: async () => assert.fail('Only the receipt owner may advance the handoff phase'),
+    updateImportExecutionRunItem: async () => assert.fail('Only the receipt owner may certify its checkpoint'),
+    markImportCandidateDownloadFailed, handleImportCandidateDownloadFailure,
+  });
+  return { candidate, item, operationRunId, proof, harness, confirmDownloadHandoff,
+    markImportCandidateDownloadFailed, handleImportCandidateDownloadFailure, service };
+}
 
-  const result = await service.reconcileImportCandidateExecutionState();
+test('reconciliation confirms durable exact receipts through the real owner once without another provider request', async (t) => {
+  const fixture = checkpointFixture(t);
+  const requestMetadata = { ipAddress: '127.0.0.1', userAgent: 'unit-reconciliation' };
+  const result = await fixture.service.reconcileImportCandidateExecutionState({ actorUserId: 'user-1', requestMetadata });
+  assert.deepEqual(fixture.confirmDownloadHandoff.mock.calls[0].arguments[0], {
+    importCandidateId: fixture.candidate.id, operationRunId: fixture.operationRunId,
+    attemptId: fixture.proof.attempt.attemptId, actorUserId: 'user-1', requestMetadata,
+  });
+  assert.equal(fixture.harness.candidateRows.get(fixture.candidate.id).status, 'downloading');
+  assert.equal(fixture.harness.items.get(fixture.candidate.id).itemStatus, 'queued');
+  assert.equal(fixture.harness.items.get(fixture.candidate.id).planningSnapshot.execution.handoff.state, 'confirmed');
+  assert.equal(fixture.harness.transitionDownloading.mock.callCount(), 1);
+  assert.equal(fixture.harness.recordConfirmedTransfers.mock.callCount(), 1);
+  assert.equal(fixture.harness.enqueueDownloads.mock.callCount(), 0);
+  assert.equal(result.summary.snapshotsUpdated, 1); assert.equal(result.summary.transitioned, 1);
+  const replay = await fixture.service.reconcileImportCandidateExecutionState();
+  assert.equal(replay.summary.snapshotsUpdated, 0); assert.equal(replay.summary.transitioned, 0);
+  assert.equal(fixture.harness.transitionDownloading.mock.callCount(), 1);
+  assert.equal(fixture.harness.recordConfirmedTransfers.mock.callCount(), 1);
+});
 
-  assert.equal(markImportCandidateDownloading.mock.callCount(), 1);
-  assert.equal(updateImportExecutionRunItem.mock.callCount(), 1);
-  assert.equal(updateImportExecutionRunItem.mock.calls[0].arguments[0].itemStatus, 'queued');
-  assert.equal(updateImportExecutionRunItem.mock.calls[0].arguments[0].planningSnapshot.execution.handoff.state, 'confirmed');
+test('unknown, partial and uncorrelated legacy checkpoints cannot be confirmed by a full-looking matcher boolean', async (t) => {
+  for (const options of [{ disposition: 'unknown' }, { disposition: 'partial' }, { legacy: true }]) {
+    const fixture = checkpointFixture(t, options);
+    const result = await fixture.service.reconcileImportCandidateExecutionState();
+    assert.equal(fixture.harness.candidateRows.get(fixture.candidate.id).status, 'selected');
+    assert.equal(fixture.harness.items.get(fixture.candidate.id).planningSnapshot.execution.handoff.state, 'awaiting_confirmation');
+    assert.equal(fixture.harness.transitionDownloading.mock.callCount(), 0);
+    assert.equal(fixture.harness.enqueueDownloads.mock.callCount(), 0);
+    assert.equal(fixture.markImportCandidateDownloadFailed.mock.callCount(), 0);
+    assert.equal(fixture.handleImportCandidateDownloadFailure.mock.callCount(), 0);
+    assert.equal(result.summary.transitioned, 0); assert.equal(result.summary.recovered, 0);
+  }
+});
+
+test('a causal full receipt cannot advance a candidate whose source changed after the checkpoint', async (t) => {
+  const fixture = checkpointFixture(t);
+  fixture.harness.candidateRows.get(fixture.candidate.id).sourceResponseKey = 'new-current-source';
+  const result = await fixture.service.reconcileImportCandidateExecutionState();
+  const ownerResult = await fixture.confirmDownloadHandoff.mock.calls[0].result;
+  assert.equal(ownerResult.disposition, 'confirmed'); assert.equal(ownerResult.confirmed, false);
+  assert.equal(ownerResult.phaseAdvanced, false);
+  assert.equal(fixture.harness.candidateRows.get(fixture.candidate.id).status, 'selected');
+  assert.equal(fixture.harness.candidateRows.get(fixture.candidate.id).sourceResponseKey, 'new-current-source');
+  assert.equal(fixture.harness.transitionDownloading.mock.callCount(), 0);
+  assert.equal(fixture.harness.recordConfirmedTransfers.mock.callCount(), 0);
+  assert.equal(fixture.handleImportCandidateDownloadFailure.mock.callCount(), 0);
+  assert.equal(result.summary.transitioned, 0);
+});
+
+test('an already-confirmed generic attempt refuses stale source or newer-origin completion before phase, failure or auto-add', async (t) => {
+  for (const drift of ['source', 'origin']) {
+    const fixture = checkpointFixture(t);
+    const candidate = fixture.harness.candidateRows.get(fixture.candidate.id);
+    candidate.status = 'downloading';
+    const acceptedCandidateObservation = captureRecoveryObservation(candidate);
+    if (drift === 'source') candidate.sourceResponseKey = 'new-current-source';
+    const item = structuredClone(fixture.item);
+    item.itemStatus = 'queued';
+    item.planningSnapshot.execution.handoff.state = 'confirmed';
+    item.planningSnapshot.execution.acceptedCandidateObservation = acceptedCandidateObservation;
+    item.planningSnapshot.execution.enqueuedTransfers = fixture.proof.matchedTransfers;
+    item.liveTransferSummary = { status: 'completed', message: 'The old provider receipt reports completion.' };
+    item.liveTransfers = fixture.proof.matchedTransfers.map((transfer) => ({ ...transfer, state: 'Completed, Succeeded', bytesTransferred: transfer.size }));
+    const service = createImportCandidateExecutionReconciliationService({
+      getImportCandidate: async () => structuredClone(candidate),
+      isCurrentExecutionObservation: async () => drift !== 'origin',
+      ownsRecoveryCandidate: async () => false,
+      updateImportExecutionRunItem: async (input) => input,
+      confirmDownloadHandoff: async () => assert.fail('This attempt is already confirmed'),
+      markImportCandidateImportPending: async () => assert.fail('An old receipt cannot advance the current generic source'),
+      markImportCandidateDownloadFailed: async () => assert.fail('Stale receipt observation cannot fail the current source'),
+      transitionOwnedExecutionCandidate: async () => assert.fail('A stale observation cannot reach the phase owner'),
+      handleImportCandidateDownloadFailure: async () => assert.fail('Stale receipt observation cannot acquire another match'),
+      handleImportCandidateRejectedTransfer: async () => assert.fail('Stale receipt observation cannot retry'),
+      startSafeApplyRunAfterDownloadCompleted: async () => assert.fail('Stale receipt observation cannot auto-add'),
+    });
+    const result = await service.reconcileImportCandidateExecutionState({ executionSummary: {
+      currentRun: { id: fixture.operationRunId, items: [item] },
+    } });
+    assert.equal(candidate.status, 'downloading', drift);
+    assert.equal(result.summary.transitioned, 0, drift);
+    assert.equal(result.summary.recovered, 0, drift);
+    assert.equal(result.summary.autoApplyStarted, 0, drift);
+  }
+});
+
+test('an exact persisted rejection reaches failure recovery without treating partial evidence as rejection', async (t) => {
+  const fixture = checkpointFixture(t, { disposition: 'rejected' });
+  await fixture.service.reconcileImportCandidateExecutionState();
+  assert.equal(fixture.harness.items.get(fixture.candidate.id).itemStatus, 'queue_failed');
+  assert.equal(fixture.markImportCandidateDownloadFailed.mock.callCount(), 1);
+  assert.equal(fixture.handleImportCandidateDownloadFailure.mock.callCount(), 1);
+  assert.equal(fixture.harness.transitionDownloading.mock.callCount(), 0);
+  assert.equal(fixture.harness.enqueueDownloads.mock.callCount(), 0);
+});
+
+test('older unresolved runs are reconciled once even when the latest run has no matching item', async (t) => {
+  const fixture = checkpointFixture(t);
+  const older = { id: fixture.operationRunId, items: [fixture.item] };
+  const result = await fixture.service.reconcileImportCandidateExecutionState({ executionSummary: {
+    currentRun: { id: 'new-current-run', items: [] }, unconfirmedRuns: [older, older],
+  } });
+  assert.equal(result.currentRunId, 'new-current-run');
+  assert.equal(fixture.confirmDownloadHandoff.mock.callCount(), 1);
+  assert.equal(fixture.harness.transitionDownloading.mock.callCount(), 1);
   assert.equal(result.summary.transitioned, 1);
+});
+
+test('a refused normal snapshot CAS cannot advance phase or trigger recovery', async (t) => {
+  const updateImportExecutionRunItem = t.mock.fn(async () => null);
+  const service = createImportCandidateExecutionReconciliationService({ updateImportExecutionRunItem,
+    getImportCandidate: async () => assert.fail('A refused snapshot cannot proceed to a phase decision'),
+    markImportCandidateDownloading: async () => assert.fail('A refused snapshot cannot advance phase'),
+    handleImportCandidateDownloadFailure: async () => assert.fail('A refused snapshot cannot trigger recovery'),
+  });
+  const result = await service.reconcileImportCandidateExecutionState({ executionSummary: { currentRun: {
+    id: 'current-run', items: [{ importCandidateId: 'candidate', itemStatus: 'queued',
+      planningSnapshot: { candidate: { id: 'candidate' }, execution: {} }, liveTransferSummary: { status: 'queued' } }],
+  } } });
+  assert.equal(updateImportExecutionRunItem.mock.callCount(), 1);
+  assert.equal(result.summary.snapshotsUpdated, 0); assert.equal(result.summary.transitioned, 0);
 });

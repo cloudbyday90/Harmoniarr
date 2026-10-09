@@ -6,7 +6,35 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
-## Current development slice (2026-10-08)
+## Current development slice: Attempt-owned download confirmation (2026-10-08)
+
+- Implement attempt-owned explicit provider receipts, atomic checkpoint/link
+  confirmation, durable unresolved work and truthful status. The separate
+  [design](DOWNLOAD_HANDOFF_CONFIRMATION_DESIGN.md),
+  [outcome](DOWNLOAD_HANDOFF_CONFIRMATION_OUTCOME.md) and
+  [provider research](SLSKD_TRANSFER_CONFIRMATION_RESEARCH_2026_10.md) record
+  alternatives, official October research, implementation and actual evidence.
+- Fresh PR applicability has no eligible unreplayed patch; all three observed
+  open patches already exist locally. See the separate
+  [design](OPEN_PR_APPLICABILITY_TRANSFER_CONFIRMATION_2026_10_DESIGN.md) and
+  [outcome](OPEN_PR_APPLICABILITY_TRANSFER_CONFIRMATION_2026_10_OUTCOME.md).
+- Next recommendation: evaluate slskd 0.26 caller-ID batches with an explicit
+  supported-version policy and exact per-file batch ownership. Batch existence
+  alone cannot prove full admission. Include exact known-receipt reads for removed
+  transfers, restart/storage loss and safe incomplete-batch/operator resolution.
+- Complete validation passes 8,960 tests (3,855 server, 4,350 client, 513 script
+  and 242 integration), zero failures/skips, all policy/lint checks and both
+  builds. Separate checks pass 26 browser scenarios and 32 PostgreSQL scenarios
+  across confirmation/recovery, projection and retention. Focused totals overlap
+  the complete run. Six responsive captures were inspected; final audit reports
+  zero vulnerabilities. Original focused failures, corrected reruns and source/
+  provider/assistive-technology limits are recorded in the outcome.
+- The practical web-standards skill now maps exact provider-version/receipt
+  attribution, incomplete observations, privacy and retention to owning consumers.
+  Repository/installed validation and four-file identity pass; no new blind skill
+  trial is claimed. Work remains on main without a release, branch, tag or PR merge.
+
+## Prior development slice: Scoped fallback recovery (2026-10-08)
 
 - Scoped Music Queue fallback recovery is implemented through fresh
   consent/floor/format requirements, a source-attempt ledger, atomic durable
@@ -33,7 +61,8 @@ Database model source: `docs/DATABASE_MODEL.md`
   provider attempt. Current filename/size matching over retained history cannot
   distinguish an old identical transfer. Preserve uncertain dispatch; inspect
   actual provider identity/time contracts and test partial acceptance without
-  assuming external exactly-once execution. This follow-up remains unimplemented.
+  assuming external exactly-once execution. This follow-up is implemented in the
+  current confirmation slice above, with unknown legacy responses kept unresolved.
 - The [scoped-overrides skill](../.agents/skills/harmoniarr-scoped-overrides/SKILL.md)
   now maps explicit null, all valid participant floors and durable recovery
   attempts to their owning consumers. Source/installed validation and three-file

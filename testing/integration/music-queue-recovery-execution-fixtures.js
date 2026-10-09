@@ -6,12 +6,15 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { createImportExecutionHandoffService } from '../../src/server/import-candidates/import-execution-handoff-service.js';
+import { createImportExecutionHandoffStore } from '../../src/server/import-candidates/import-execution-handoff-store.js';
+import { createImportExecutionTransferLinkStore } from '../../src/server/import-candidates/import-execution-transfer-link-store.js';
 import { createMusicQueueRecoveryExecutionPolicyService } from '../../src/server/import-candidates/music-queue-recovery-execution-policy-service.js';
 import { createMusicQueueRecoveryLifecycleService } from '../../src/server/import-candidates/music-queue-recovery-lifecycle-service.js';
 import { createMusicQueueExecutionObservationService } from '../../src/server/import-candidates/music-queue-execution-observation-service.js';
 import { createImportCandidateExecutionWorker } from '../../src/server/import-candidates/import-candidate-execution-worker.js';
 import { createImportCandidateRecoveryService } from '../../src/server/import-candidates/import-candidate-recovery-service.js';
-import { listImportExecutionRunItems, replaceImportExecutionRunItems, updateImportExecutionRunItem,
+import { listImportExecutionRunItems, initializeImportExecutionRunItems, updateImportExecutionRunItem,
   upsertImportExecutionRunItem, recordImportExecutionAcceptedObservation } from '../../src/server/import-candidates/import-candidate-execution-repository.js';
 
 export function createRecoveryExecutionOwners(context) {
@@ -23,12 +26,26 @@ export function createRecoveryExecutionOwners(context) {
   return { policy, lifecycle, observation, recovery };
 }
 export async function runMusicQueueRecoveryExecutionWorker(context, runId, candidateId, overrides = {}) {
-  const { policy, lifecycle, observation, recovery } = createRecoveryExecutionOwners(context);
+  const { policy, lifecycle, recovery } = createRecoveryExecutionOwners(context);
   const raw = await context.store.getOrigin(runId, candidateId);
   let finish;
   const finished = new Promise((resolve) => { finish = resolve; });
   const calls = { enqueue: 0, confirmed: 0, genericFailure: 0 };
+  const linkStore = createImportExecutionTransferLinkStore({ getPoolFn: context.getPoolFn });
+  const handoff = createImportExecutionHandoffService({ store: createImportExecutionHandoffStore({ getPoolFn: context.getPoolFn }),
+    withTransaction: context.withTransaction, transferLinkStore: { recordConfirmedTransfers: async (input) => {
+      if (input.transfers.length) calls.confirmed += 1;
+      return linkStore.recordConfirmedTransfers(input);
+    } } });
   const worker = createImportCandidateExecutionWorker({
+    ...handoff,
+    prepareDownloadHandoff: async (input) => {
+      const prepared = await handoff.prepareDownloadHandoff(input);
+      if (prepared.dispatchAllowed && overrides.updateImportExecutionRunItem) await overrides.updateImportExecutionRunItem({
+        importCandidateId: candidateId, operationRunId: runId, itemStatus: prepared.item.itemStatus,
+        planningSnapshot: prepared.item.planningSnapshot, statusMessage: prepared.item.statusMessage });
+      return prepared;
+    },
     ...context.executionRuns,
     buildSelectedImportCandidateSummary: async () => {
       const candidate = await context.store.getCandidate(candidateId);
@@ -41,14 +58,12 @@ export async function runMusicQueueRecoveryExecutionWorker(context, runId, candi
     resolveRecoveryExecution: policy.resolveRecoveryExecution,
     assertRecoveryExecutionCurrent: policy.assertRecoveryExecutionCurrent,
     retireRecoveryExecution: lifecycle.retireExecution,
-    transitionOwnedExecutionCandidate: observation.transitionOwnedExecutionCandidate,
     handleImportCandidateDownloadFailure: recovery.handleImportCandidateDownloadFailure,
     markImportCandidateDownloadFailed: async () => { calls.genericFailure += 1; throw new Error('Owned failure must not precommit a generic transition'); },
-    enqueueDownloads: async ({ files }) => { calls.enqueue += 1; return { enqueued: files.map((file) => ({ ...file, id: randomUUID() })), failed: [] }; },
-    recordConfirmedTransfers: async () => { calls.confirmed += 1; },
+    enqueueDownloads: async ({ files, username }) => { calls.enqueue += 1; return { enqueued: files.map((file) => ({ ...file, username, id: randomUUID() })), failed: [] }; },
     recordAcceptedCandidateObservation: (input) => recordImportExecutionAcceptedObservation(input, context.pool),
     listImportExecutionRunItems: (id) => listImportExecutionRunItems(id, context.pool),
-    replaceImportExecutionRunItems: (id, items) => replaceImportExecutionRunItems(id, items, context.pool),
+    initializeImportExecutionRunItems: (id, items) => initializeImportExecutionRunItems(id, items, context.pool),
     upsertImportExecutionRunItem: (input) => upsertImportExecutionRunItem(input, context.pool),
     updateImportExecutionRunItem: (input) => updateImportExecutionRunItem(input, context.pool),
     ...overrides,

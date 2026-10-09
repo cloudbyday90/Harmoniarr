@@ -61,3 +61,13 @@ Validate skill structure, installed/source identity, and reference links. An
 independent bounded scenario should receive only the skill, a realistic request,
 and minimal raw artifacts without expected findings. Record actual decisions,
 evidence limits, and any justified instruction correction in a separate outcome.
+
+## Attempt-owned confirmation maintenance, October 8 local
+
+Extend the existing evidence map with the observed provider receipt boundary.
+The [confirmation design](DOWNLOAD_HANDOFF_CONFIRMATION_DESIGN.md) requires
+supported-version research before selecting a replay contract, exact durable
+receipt ownership and truthful partial/current transfer evidence. Similar
+history, a new baseline-relative ID and a batch record are each insufficient
+causal or whole-manifest proof on their own. Maintain this as conditional project
+guidance, with no new broad audit, invocation policy or duplicate skill.

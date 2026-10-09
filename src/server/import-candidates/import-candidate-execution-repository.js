@@ -56,6 +56,7 @@ export async function updateImportExecutionRunItem({
     operationRunId,
     snapshot: planningSnapshot,
     statusMessage,
+    expectedAttemptId: planningSnapshot?.execution?.handoff?.attempt?.attemptId ?? null,
   }, queryable);
 
   return item ? {
@@ -73,8 +74,8 @@ export async function recordImportExecutionAcceptedObservation({ importCandidate
 /**
  * Finds the latest selected candidate whose prior slskd enqueue POST reached
  * the durable handoff checkpoint but never reached a durable confirmation.
- * A new run must not send that POST again because the provider does not offer
- * an idempotency key contract.
+ * A new run must not resend an uncertain POST. The pinned legacy endpoint has
+ * no caller ID; newer provider batch APIs require separate capability controls.
  */
 export async function findUnconfirmedImportExecutionHandoff(queryable) {
   const db = queryable ?? getPool();
@@ -88,7 +89,9 @@ export async function findUnconfirmedImportExecutionHandoff(queryable) {
       INNER JOIN import_candidates AS candidates
         ON candidates.id = items.import_candidate_id
       WHERE candidates.status = 'selected'
-        AND items.item_status = 'awaiting_confirmation'
+        AND ((items.item_status = 'awaiting_confirmation'
+          AND items.planning_snapshot #>> '{execution,handoff,state}' IS DISTINCT FROM 'not_dispatched')
+          OR items.planning_snapshot #>> '{execution,handoff,state}' IN ('dispatching','awaiting_confirmation'))
       ORDER BY items.updated_at DESC, items.id DESC
       LIMIT 1
     `,
@@ -117,10 +120,18 @@ export async function upsertImportExecutionRunItem({
     position,
     snapshot: planningSnapshot,
     statusMessage,
+    preserveExisting: true,
   }, queryable);
 
   return {
     ...item,
     planningSnapshot: item.snapshot,
   };
+}
+
+/** Initializers preserve any checkpoint another worker already committed. */
+export async function initializeImportExecutionRunItems(operationRunId, items, queryable) {
+  const stored = [];
+  for (const item of items) stored.push(await upsertImportExecutionRunItem({ ...item, operationRunId }, queryable));
+  return stored;
 }

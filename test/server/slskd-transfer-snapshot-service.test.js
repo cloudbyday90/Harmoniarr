@@ -81,3 +81,25 @@ test('buildTransferSnapshot returns an empty snapshot when no valid transfers ar
   assert.equal(snapshot.requestedTransferCount, 0);
   assert.equal(snapshot.getTransfer({ id: 'transfer-1', username: 'source-user' }), null);
 });
+
+test('GUID lookup normalizes ID case while preserving peer and legacy opaque ID case', async () => {
+  const id = 'ba81acde-d7a5-4b30-a5fd-57cfc91d47b0';
+  const service = createSlskdTransferSnapshotService({ getDownloads: async ({ username }) => {
+    assert.equal(username, 'Peer');
+    return [{ directories: [{ files: [{ id: id.toUpperCase(), username }, { id: 'OpaqueID', username }] }] }];
+  } });
+  const snapshot = await service.buildTransferSnapshot({ requestedTransfers: [{ id, username: 'Peer' }] });
+  assert.equal(snapshot.getTransfer({ id, username: 'Peer' }).id, id.toUpperCase());
+  assert.equal(snapshot.getTransfer({ id: 'OpaqueID', username: 'Peer' }).id, 'OpaqueID');
+  assert.equal(snapshot.getTransfer({ id: 'opaqueid', username: 'Peer' }), null);
+  assert.equal(snapshot.getTransfer({ id, username: 'peer' }), null);
+});
+
+test('duplicate provider identities cannot choose an arbitrary completed row', async () => {
+  const id = 'ba81acde-d7a5-4b30-a5fd-57cfc91d47b0';
+  const service = createSlskdTransferSnapshotService({ getDownloads: async () => [{ directories: [{ files: [
+    { id, state: 'Completed, Succeeded' }, { id: id.toUpperCase(), state: 'Queued' }, { id, state: 'Completed, Succeeded' },
+  ] }] }] });
+  const snapshot = await service.buildTransferSnapshot({ requestedTransfers: [{ id, username: 'peer' }] });
+  assert.equal(snapshot.getTransfer({ id, username: 'peer' }), null);
+});

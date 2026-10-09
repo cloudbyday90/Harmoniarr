@@ -359,6 +359,7 @@ test('canonical stopped or selected recovery cannot inherit activity from stale 
     [{ recoveryExecution: { status: null, candidateMatches: true, authorityReserved: false, reservationRetained: true } }, 'needs_help_adding', false],
     [{ statusCounts: { selected: 1 }, legacyRecoverySelection: true }, 'needs_help_adding', false],
     [{ statusCounts: { selected: 1 }, recoverySelectionNeedsReview: true }, 'needs_help_adding', false],
+    [{ statusCounts: { selected: 1 }, currentDownloadHandoff: { confirmationPending: true, disposition: 'partial' } }, 'needs_help_adding', false],
     [{ statusCounts: { failed: 1, selected: 1 }, recoverySelectedCount: 1 }, 'match_selected', true],
     [{ statusCounts: { failed: 1, selected: 1 }, recoverySelectedCount: 1,
       downloadExecutionSummary: { itemStatusCounts: { blocked: 1 } } }, 'needs_help_adding', false],

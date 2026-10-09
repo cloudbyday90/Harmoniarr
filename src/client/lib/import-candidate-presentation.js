@@ -847,8 +847,13 @@ export function getHeartbeatSkipReasonLabel(reason) {
  * @param {number} selectedCandidateCount
  * @returns {boolean}
  */
-export function canStartExecutionRun(currentRun, selectedCandidateCount) {
+export function canStartExecutionRun(currentRun, selectedCandidateCount, summary = null) {
   if (selectedCandidateCount <= 0) return false;
+  if (summary?.confirmationPending === true || Number(summary?.pendingConfirmationCount) > 0
+    || (!(currentRun?.items?.length > 0) && Number(currentRun?.awaitingConfirmationCount) > 0)
+    || currentRun?.items?.some((item) => item.planningSnapshot?.execution?.handoff?.state !== 'not_dispatched'
+      && (item.itemStatus === 'awaiting_confirmation'
+      || ['dispatching', 'awaiting_confirmation'].includes(item.planningSnapshot?.execution?.handoff?.state)))) return false;
   return !currentRun || (
     currentRun.status !== 'pending' &&
     currentRun.status !== 'running'

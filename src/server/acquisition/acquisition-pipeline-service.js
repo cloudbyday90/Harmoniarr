@@ -118,6 +118,7 @@ function buildMatchEvidence(release) {
     confirmedTransferCount: getCount(confirmedTransferSummary.transferCount),
     currentConfirmedTransferCount: getCount(importReviewSummary.currentConfirmedTransferCount),
     currentExecutionStatusCounts: importReviewSummary.currentExecutionStatusCounts ?? {},
+    currentDownloadHandoff: importReviewSummary.currentDownloadHandoff ?? null,
     executionStatusCounts: executionSummary.itemStatusCounts ?? {},
     latestEventType: importReviewSummary.latestEventType ?? null,
     latestConfirmedTransferAt: confirmedTransferSummary.latestConfirmedAt ?? null,
@@ -185,7 +186,7 @@ function buildQualityEvidence(release, qualityPolicyService) {
   return evaluateReleaseQualityEvidence(release, qualityPolicyService);
 }
 
-const privateMatchReadFields = new Set(['currentConfirmedTransferCount', 'currentExecutionStatusCounts', 'legacyRecoverySelection',
+const privateMatchReadFields = new Set(['currentConfirmedTransferCount', 'currentExecutionStatusCounts', 'currentDownloadHandoff', 'legacyRecoverySelection',
   'recoveryExecution', 'recoverySelectionNeedsReview']);
 
 function buildPublicProjectionEvidence(evidence) {

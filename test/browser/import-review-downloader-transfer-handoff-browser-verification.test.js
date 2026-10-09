@@ -30,6 +30,7 @@ import {
 } from '../../testing/browser/metadata-browser-fixtures.js';
 import { bootstrapAdminThroughUi } from '../../testing/browser/operator-browser-helpers.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
+import { buildPublicImportCandidateExecution } from '../../src/server/import-candidates/import-candidate-execution-public-projection.js';
 
 const integrationRuntimeConfig = resolveIntegrationTestRuntimeConfig();
 
@@ -217,6 +218,63 @@ suite('Import Review Downloader transfer handoff browser verification', () => {
     await browserRuntime?.cleanup();
   }, {
     timeout: integrationRuntimeConfig.suiteTeardownTimeoutMs,
+  });
+
+  test('older unresolved requests disable legacy Start without exposing attempts and background refresh restores eligibility after confirmation', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) { t.skip(runtimeUnavailableReason); return; }
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      const { candidate, workspace } = buildLinkedTransferWorkspace();
+      let pending = true;
+      await installMetadataBrowserFixtures(browserContext);
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      function publicSummary() {
+        const internal = { currentRun: { id: 'newer-completed', status: 'completed', executionMode: 'download_enqueue', items: [] },
+          confirmationPending: pending, pendingConfirmationCount: pending ? 2 : 0,
+          unconfirmedRuns: [{ id: 'private-older-job', items: [{ planningSnapshot: { execution: { handoff: { attempt: { attemptId: 'private-attempt' } } } } }] }],
+          summary: { status: pending ? 'attention' : 'ready', confirmationPending: pending, pendingConfirmationCount: pending ? 2 : 0,
+            message: pending ? 'A download request is still being confirmed with Downloader. Harmoniarr will not send it again automatically.' : 'Earlier download requests are confirmed.' } };
+        return buildPublicImportCandidateExecution(internal);
+      }
+      const selectedWorkspace = { ...workspace, candidates: [{ ...candidate, status: 'selected' }], executionSummary: publicSummary() };
+      await seedMetadataImportReviewWorkspace(page, selectedWorkspace);
+      await page.goto(baseUrl + '/app/activity/candidates', { waitUntil: 'domcontentloaded' });
+      await page.getByRole('heading', { name: 'Match diagnostics', exact: true }).waitFor();
+      await openImportReviewRunHistory(page);
+      const panel = getRunwayPanel(page, 'Send selected matches to downloads');
+      await panel.locator('p.review-summary-copy').filter({ hasText: 'A download request is still being confirmed with Downloader. Harmoniarr will not send it again automatically.' }).waitFor();
+      const start = panel.getByRole('button', { name: 'Start download run', exact: true });
+      assert.equal(await start.isDisabled(), true);
+      const refresh = panel.getByRole('button', { name: 'Refresh', exact: true });
+      await refresh.focus();
+      const main = page.locator('.hx-main');
+      await main.evaluate((element) => { element.scrollTop = 0; });
+      await page.evaluate(() => {
+        const originalFetch = globalThis.fetch.bind(globalThis);
+        globalThis.handoffReadProbe = { reads: 0, starts: 0, payload: null };
+        globalThis.fetch = async (input, init) => {
+          const path = new URL(typeof input === 'string' ? input : input.url, globalThis.location.origin).pathname;
+          const response = await originalFetch(input, init);
+          if (path === '/api/v1/import-candidates/execution-summary') {
+            globalThis.handoffReadProbe.payload = await response.clone().json(); globalThis.handoffReadProbe.reads += 1;
+          }
+          if (path === '/api/v1/import-candidates/execution-runs' && init?.method === 'POST') globalThis.handoffReadProbe.starts += 1;
+          return response;
+        };
+      });
+      pending = false;
+      await seedMetadataImportReviewWorkspace(page, { ...selectedWorkspace, executionSummary: publicSummary() });
+      await page.evaluate(() => globalThis.document.dispatchEvent(new Event('visibilitychange')));
+      await page.waitForFunction(() => globalThis.handoffReadProbe.reads > 0);
+      assert.doesNotMatch(JSON.stringify(await page.evaluate(() => globalThis.handoffReadProbe.payload)), /attemptId|private-|unconfirmedRuns/u);
+      await panel.locator('p.review-summary-copy').filter({ hasText: 'Earlier download requests are confirmed.' }).waitFor();
+      assert.equal(await start.isDisabled(), false);
+      assert.equal(await refresh.evaluate((element) => globalThis.document.activeElement === element), true);
+      assert.equal(await main.evaluate((element) => element.scrollTop), 0);
+      assert.equal(await page.evaluate(() => globalThis.handoffReadProbe.starts), 0);
+      await page.goto('about:blank', { waitUntil: 'load' });
+    }, { scenarioName: 'import_review_older_download_confirmation' });
   });
 
   test('admins can open a live Import Review execution transfer in Downloader', {

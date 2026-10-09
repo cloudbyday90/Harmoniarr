@@ -25,6 +25,8 @@ import {
 import { useImportCandidateRunSummary } from './useImportCandidateRunSummary.js';
 
 export function useImportCandidateExecutionSummary({
+  pollIntervalMs = 0,
+  revalidateOnFocus = false,
   fetchImportCandidateExecutionRunDetail = defaultFetchImportCandidateExecutionRunDetail,
   fetchImportCandidateExecutionSummary = defaultFetchImportCandidateExecutionSummary,
   reconcileImportCandidateExecutionState = defaultReconcileImportCandidateExecutionState,
@@ -34,6 +36,8 @@ export function useImportCandidateExecutionSummary({
     fetchRunDetail: async (runId) => (await fetchImportCandidateExecutionRunDetail(runId)).importCandidateExecutionRun ?? null,
     fetchSummary: fetchImportCandidateExecutionSummary,
     loadErrorMessage: 'Import execution summary failed',
+    pollIntervalMs,
+    revalidateOnFocus,
     secondaryAction: reconcileImportCandidateExecutionState,
     secondaryActionErrorMessage: 'Import execution reconciliation failed',
     startRun: startImportCandidateExecutionRun,

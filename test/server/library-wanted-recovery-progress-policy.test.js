@@ -3,6 +3,7 @@ import test from 'node:test';
 import { deriveWantedRecoveryDiscovery, deriveWantedRecoveryProgress } from '../../src/server/library/library-wanted-recovery-progress-policy.js';
 import { buildAutomaticLibraryAddAuthority } from '../../src/server/import-candidates/import-candidate-music-queue-auto-safe-add-policy.js';
 import { captureRecoveryObservation } from '../../src/server/import-candidates/music-queue-recovery-policy.js';
+import { createDownloadAttempt, evaluateDownloadReceipt } from '../../src/server/slskd/slskd-download-attempt-policy.js';
 
 const wantedId = '00000000-0000-4000-8000-000000000001';
 const userId = '00000000-0000-4000-8000-000000000002';
@@ -148,4 +149,26 @@ test('malformed discovery recipient facts cannot throw or promise progress', () 
     entry.discovery.evidence.downloadRecoveryRediscovery = { owningRunId: entry.recoveryRun.id, sourceSearchId: record.failedSourceSearchId };
     assert.equal(deriveWantedRecoveryDiscovery({ entry, wantedReleaseId: wantedId, metadataReleaseId: metadataId }), null);
   }
+});
+
+test('current unresolved handoff survives terminal jobs and revoked context without mistaking old attempts for current progress', async () => {
+  const { entry, read } = fixture();
+  const requestedFiles = [{ filename: 'One.mp3', size: 1000 }, { filename: 'Two.mp3', size: 1000 }];
+  const attempt = evaluateDownloadReceipt({ attempt: createDownloadAttempt({ importCandidateId: entry.candidate.id,
+    operationRunId: entry.recoveryRun.id, requestedFiles, username: entry.candidate.username,
+    sourceObservation: captureRecoveryObservation(entry.candidate) }), enqueueResult: {
+    enqueued: [{ id: '10000000-0000-4000-8000-000000000001', username: entry.candidate.username, ...requestedFiles[0] }], failed: [] } }).attempt;
+  entry.currentHandoff = { runId: entry.recoveryRun.id, candidateId: entry.candidate.id, itemStatus: 'awaiting_confirmation',
+    requestedFiles, summary: { sourceWantedReleaseId: wantedId }, handoff: { state: 'awaiting_confirmation', attempt } };
+  entry.recoveryRun.status = 'completed';
+  assert.deepEqual((await read()).currentDownloadHandoff, { confirmationPending: true, disposition: 'partial' });
+  delete entry.candidate.normalizedPayload.musicQueue;
+  assert.equal((await read()).currentDownloadHandoff.confirmationPending, true, 'unknown acceptance remains blocking when current eligibility changes');
+  entry.latestExecutionOriginId = 'newer';
+  assert.equal((await read()).currentDownloadHandoff.confirmationPending, true, 'mere job allocation does not resolve a dispatched attempt');
+  entry.currentHandoff.runId = 'newer';
+  entry.currentHandoff.handoff.state = 'not_dispatched';
+  assert.equal((await read()).currentDownloadHandoff, null, 'known no POST is not unresolved acceptance');
+  entry.currentHandoff.itemStatus = 'queued'; entry.currentHandoff.handoff = { state: 'confirmed' };
+  assert.equal((await read()).currentDownloadHandoff, null);
 });

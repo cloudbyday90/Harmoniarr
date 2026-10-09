@@ -25,6 +25,9 @@ import { createImportCandidateRunSummaryService } from './import-candidate-run-s
 import { classifySlskdTransferState } from './import-candidate-transfer-state-policy.js';
 import { deriveTerminalTransferOutcome } from './import-candidate-terminal-recovery-policy.js';
 import { createSlskdTransferSnapshotService } from '../slskd/slskd-transfer-snapshot-service.js';
+import { createImportCandidateExecutionConfirmationWorklistService } from './import-candidate-execution-confirmation-worklist-service.js';
+import { evaluateStoredDownloadReceipt, matchesDownloadReceipt, validateDownloadAttempt } from '../slskd/slskd-download-attempt-policy.js';
+import { isUnconfirmedExecutionItem } from './import-candidate-execution-handoff-state.js';
 
 function isSlskdError(error) {
   return error && typeof error.code === 'string' && error.code.startsWith('slskd_');
@@ -131,10 +134,14 @@ function buildLiveTransferSummary(transfers, { item, missingTransferConfig, now 
   };
 }
 
-function listRequestedTransfers(items) {
+function listRequestedTransfers(items, operationRunId) {
   return items.flatMap((item) => {
-    const enqueuedTransfers = item?.planningSnapshot?.execution?.enqueuedTransfers;
-    return Array.isArray(enqueuedTransfers) ? enqueuedTransfers : [];
+    const execution = item?.planningSnapshot?.execution;
+    const attempt = validateDownloadAttempt({ attempt: execution?.handoff?.attempt,
+      importCandidateId: item.importCandidateId ?? item.planningSnapshot?.candidate?.id, operationRunId,
+      requestedFiles: execution?.requestedFiles, username: execution?.handoff?.attempt?.username });
+    return [...(Array.isArray(execution?.enqueuedTransfers) ? execution.enqueuedTransfers : []),
+      ...(attempt?.receipts ?? [])];
   });
 }
 
@@ -178,18 +185,21 @@ async function reconcileItemTransfers(item, {
   now,
   providerState,
   transferSnapshot,
+  operationRunId,
 }) {
   const execution = item?.planningSnapshot?.execution ?? {};
-  const handoffState = execution?.handoff?.state ?? null;
   const requestedFiles = Array.isArray(execution.requestedFiles) ? execution.requestedFiles : [];
-  const username = item?.planningSnapshot?.candidate?.username ?? null;
+  const username = execution.handoff?.attempt?.username
+    ?? execution.acceptedCandidateObservation?.username ?? execution.sourceObservation?.username
+    ?? item?.planningSnapshot?.candidate?.username ?? null;
 
-  if ((handoffState === 'dispatching' || handoffState === 'awaiting_confirmation')
-    && requestedFiles.length > 0
-    && username) {
+  if (isUnconfirmedExecutionItem(item)) {
     let handoffConfirmation;
     try {
       handoffConfirmation = await findMatchingTransfers({
+        attempt: execution.handoff?.attempt,
+        importCandidateId: item.importCandidateId ?? item.planningSnapshot?.candidate?.id,
+        operationRunId,
         requestedFiles,
         username,
       });
@@ -201,12 +211,17 @@ async function reconcileItemTransfers(item, {
       providerState.transferSnapshotUnavailable = true;
       handoffConfirmation = {
         allRequestedFilesMatched: false,
+        disposition: 'unknown',
         matchedTransfers: [],
         providerUnavailable: true,
         requestedFileCount: requestedFiles.length,
       };
     }
-    const confirmedTransfers = handoffConfirmation.matchedTransfers ?? [];
+    const confirmed = handoffConfirmation.disposition === 'confirmed' && handoffConfirmation.allRequestedFilesMatched === true;
+    const confirmedTransfers = confirmed ? (handoffConfirmation.matchedTransfers ?? []).map((receipt) => {
+      const transfer = transferSnapshot.getTransfer({ id: receipt.id, username: receipt.username });
+      return execution.handoff?.attempt != null && !matchesDownloadReceipt({ receipt, transfer }) ? null : transfer;
+    }).filter(Boolean) : [];
 
     return {
       ...item,
@@ -214,22 +229,30 @@ async function reconcileItemTransfers(item, {
         ...handoffConfirmation,
         checkedAt: now.toISOString(),
       },
-      liveTransferSummary: confirmedTransfers.length > 0
+      liveTransferSummary: confirmed && !providerState.transferSnapshotUnavailable
+        && confirmedTransfers.length === handoffConfirmation.requestedFileCount && confirmedTransfers.length > 0
         ? buildLiveTransferSummary(confirmedTransfers, {
           item,
           missingTransferConfig,
           now,
         })
         : null,
-      liveTransfers: confirmedTransfers,
+      liveTransfers: confirmed ? confirmedTransfers : [],
+      transferObservationPending: !confirmed || providerState.transferSnapshotUnavailable || confirmedTransfers.length !== handoffConfirmation.requestedFileCount,
       persistedMissingTransfer: buildPersistedMissingTransfer(item),
       persistedTransferObservation: buildPersistedTransferObservation(item),
     };
   }
 
-  const transfers = Array.isArray(execution.enqueuedTransfers)
+  const storedReceipt = execution.handoff?.attempt != null ? evaluateStoredDownloadReceipt({ attempt: execution.handoff.attempt,
+    importCandidateId: item.importCandidateId ?? item.planningSnapshot?.candidate?.id, operationRunId, requestedFiles, username }) : null;
+  if (execution.handoff?.attempt != null && storedReceipt?.disposition !== 'confirmed') {
+    return { ...item, transferObservationPending: true, liveTransferSummary: null, liveTransfers: [],
+      persistedMissingTransfer: buildPersistedMissingTransfer(item), persistedTransferObservation: buildPersistedTransferObservation(item) };
+  }
+  const transfers = storedReceipt?.matchedTransfers ?? (Array.isArray(execution.enqueuedTransfers)
     ? execution.enqueuedTransfers.filter((transfer) => transfer?.id && transfer?.username)
-    : [];
+    : []);
 
   if (transfers.length < 1) {
     return {
@@ -241,14 +264,17 @@ async function reconcileItemTransfers(item, {
     };
   }
 
-  const normalizedTransfers = transfers.map((transfer) => transferSnapshot.getTransfer({
-    id: transfer.id,
-    username: transfer.username,
-  })).filter(Boolean);
+  const normalizedTransfers = transfers.map((receipt) => {
+    const transfer = transferSnapshot.getTransfer({ id: receipt.id, username: receipt.username });
+    return execution.handoff?.attempt != null && !matchesDownloadReceipt({ receipt, transfer }) ? null : transfer;
+  }).filter(Boolean);
+  const incompleteObservation = normalizedTransfers.length !== transfers.length
+    && (execution.handoff?.attempt != null || normalizedTransfers.length > 0);
 
   return {
     ...item,
-    liveTransferSummary: buildLiveTransferSummary(normalizedTransfers, {
+    transferObservationPending: providerState.transferSnapshotUnavailable || incompleteObservation,
+    liveTransferSummary: providerState.transferSnapshotUnavailable || incompleteObservation ? null : buildLiveTransferSummary(normalizedTransfers, {
       item,
       missingTransferConfig,
       now,
@@ -284,7 +310,7 @@ function buildDisplayRunSummary(run) {
   }
 
   if (run.executionMode === 'download_enqueue') {
-    if ((run.awaitingConfirmationCount ?? 0) > 0) {
+    if ((run.items?.length ?? 0) === 0 && (run.awaitingConfirmationCount ?? 0) > 0) {
       return {
         message: `${run.awaitingConfirmationCount} download request${run.awaitingConfirmationCount === 1 ? ' is' : 's are'} being confirmed with Downloader; Harmoniarr will not send ${run.awaitingConfirmationCount === 1 ? 'it' : 'them'} again automatically.`,
         status: 'attention',
@@ -326,6 +352,11 @@ function buildDisplayRunSummary(run) {
     };
   }
 
+  const unresolved = (run.items ?? []).filter(isUnconfirmedExecutionItem).length;
+  if (run.executionMode === 'download_enqueue' && unresolved > 0) {
+    return { status: 'attention', message: `${unresolved} download request${unresolved === 1 ? ' is' : 's are'} being confirmed with Downloader; Harmoniarr will not send ${unresolved === 1 ? 'it' : 'them'} again automatically.` };
+  }
+
   if ((run.readyWithWarningsCount ?? 0) > 0) {
     return {
       message: `${run.readyWithWarningsCount} planned import candidate${run.readyWithWarningsCount === 1 ? ' has' : 's have'} warnings before download behavior exists.`,
@@ -365,7 +396,7 @@ export function createImportCandidateExecutionSummaryService({
 
     try {
       transferSnapshot = await buildTransferSnapshot({
-        requestedTransfers: listRequestedTransfers(items),
+        requestedTransfers: listRequestedTransfers(items, run.id),
       });
     } catch (error) {
       if (!isSlskdError(error)) {
@@ -386,15 +417,23 @@ export function createImportCandidateExecutionSummaryService({
         now,
         providerState,
         transferSnapshot,
+        operationRunId: run.id,
       }))),
       transferSnapshotUnavailable: providerState.transferSnapshotUnavailable,
     };
   }
 
+  const confirmationWorklist = createImportCandidateExecutionConfirmationWorklistService({
+    listUnconfirmedExecutionRuns: importCandidateExecutionRunStore.listUnconfirmedExecutionRuns,
+    getRunById: importCandidateExecutionRunStore.getRunById,
+    buildRunWithItems,
+  });
+
   const runSummaryService = createImportCandidateRunSummaryService({
     buildDisplayRunSummary,
     buildRunWithItems,
-    extendSummary: async () => ({
+    extendSummary: async ({ currentRun }) => ({
+      ...await confirmationWorklist.buildExecutionConfirmationWorklist({ currentRun }),
       heartbeat: {
         ...importCandidateExecutionHeartbeatConfig,
         state: importCandidateExecutionHeartbeatState.getHeartbeatState(),
@@ -408,6 +447,11 @@ export function createImportCandidateExecutionSummaryService({
 
   return {
     buildImportCandidateExecutionRunDetail: runSummaryService.buildRunDetail,
-    buildImportCandidateExecutionSummary: runSummaryService.buildRunSummary,
+    buildImportCandidateExecutionSummary: async () => {
+      const result = await runSummaryService.buildRunSummary();
+      return { ...result, summary: { ...result.summary,
+        ...(result.confirmationPending ? { status: 'attention', message: 'A download request is still being confirmed with Downloader. Harmoniarr will not send it again automatically.' } : {}),
+        confirmationPending: result.confirmationPending, pendingConfirmationCount: result.pendingConfirmationCount } };
+    },
   };
 }

@@ -120,6 +120,7 @@ export function createImportExecutionTransferLinkStore({
     importCandidateId,
     operationRunId,
     transfers = [],
+    queryable = null,
   } = {}) {
     const normalizedImportCandidateId = normalizeString(importCandidateId);
     const normalizedOperationRunId = normalizeString(operationRunId);
@@ -136,7 +137,7 @@ export function createImportExecutionTransferLinkStore({
       );
     }
 
-    const pool = getPoolFn();
+    const pool = queryable ?? getPoolFn();
     const result = await pool.query(
       `
         WITH requested_transfers AS (

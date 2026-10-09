@@ -47,6 +47,15 @@ const unreservedMusicQueueRecoverySql = `NOT (
   AND summary #>> '{musicQueueRecovery,retired}' IS DISTINCT FROM 'true'
 )`;
 
+// Retention must not erase the no-second-POST checkpoint, including older manual runs.
+const withoutUnresolvedDownloadHandoffSql = `NOT EXISTS (
+  SELECT 1 FROM import_execution_run_items retained_handoff
+  WHERE retained_handoff.operation_run_id = operation_runs.id
+    AND ((retained_handoff.item_status = 'awaiting_confirmation'
+      AND retained_handoff.planning_snapshot #>> '{execution,handoff,state}' IS DISTINCT FROM 'not_dispatched')
+      OR retained_handoff.planning_snapshot #>> '{execution,handoff,state}' IN ('dispatching', 'awaiting_confirmation'))
+)`;
+
 /**
  * Global, cross-operation-type retention sweep for the operation-run ledger.
  *
@@ -72,6 +81,7 @@ export async function pruneOperationRunsLedger({
       WHERE status IN ('completed', 'failed', 'cancelled')
         AND ${unreferencedByExternalRequestIntentSql}
         AND ${unreservedMusicQueueRecoverySql}
+        AND ${withoutUnresolvedDownloadHandoffSql}
         AND COALESCE(finished_at, cancelled_at, started_at, created_at) < $1
         AND id NOT IN (
           SELECT id
@@ -114,6 +124,7 @@ export async function countPrunableOperationRuns({
       WHERE status IN ('completed', 'failed', 'cancelled')
         AND ${unreferencedByExternalRequestIntentSql}
         AND ${unreservedMusicQueueRecoverySql}
+        AND ${withoutUnresolvedDownloadHandoffSql}
         AND COALESCE(finished_at, cancelled_at, started_at, created_at) < $1
         AND id NOT IN (
           SELECT id
@@ -380,6 +391,7 @@ export function createOperationRunStore({
         WHERE operation_type = $1
           AND status IN ('completed', 'failed', 'cancelled')
           AND ${unreservedMusicQueueRecoverySql}
+          AND ${withoutUnresolvedDownloadHandoffSql}
           AND ${unreferencedByExternalRequestIntentSql}
           AND id NOT IN (
             SELECT id

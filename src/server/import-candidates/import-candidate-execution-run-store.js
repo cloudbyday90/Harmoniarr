@@ -19,6 +19,7 @@
 import { createOperationRunStore } from '../operation-run-store.js';
 import { getPool } from '../database.js';
 import { operationRunRegistry } from '../../shared/operation-run-descriptors.js';
+import { createImportCandidateExecutionConfirmationWorklistStore } from './import-candidate-execution-confirmation-worklist-store.js';
 
 function toNumberOrNull(value) {
   return Number.isFinite(value) ? value : null;
@@ -105,11 +106,13 @@ export function createImportCandidateExecutionRunStore({
   }
 
   return {
+    ...createImportCandidateExecutionConfirmationWorklistStore({ getPoolFn }),
     acquireLease: operationRunStore.acquireLease,
     createOperationRun,
     getActiveRun,
     getRunById,
     getLatestRun,
+    getLease: operationRunStore.getLease,
     listRecentRuns,
     isCancellationRequested: operationRunStore.isCancellationRequested,
     markRunCancelled: operationRunStore.markRunCancelled,

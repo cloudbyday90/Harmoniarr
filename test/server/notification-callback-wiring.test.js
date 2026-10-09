@@ -96,6 +96,7 @@ test('reconciliation service calls onDownloadCompletedFn when transitioning to i
   const notifications = [];
   const activityEvents = [];
   const service = createImportCandidateExecutionReconciliationService({
+    updateImportExecutionRunItem: async (item) => item,
     buildImportCandidateExecutionSummary: async () => ({
       currentRun: { id: 'run-1', items: [{
         importCandidateId: 'ic-1',
@@ -128,6 +129,7 @@ test('reconciliation service calls onDownloadCompletedFn when transitioning to i
 test('reconciliation service does not call onDownloadCompletedFn when no import_pending transition', async () => {
   const notifications = [];
   const service = createImportCandidateExecutionReconciliationService({
+    updateImportExecutionRunItem: async (item) => item,
     buildImportCandidateExecutionSummary: async () => ({
       currentRun: { id: 'run-1', items: [{
         importCandidateId: 'ic-1',
@@ -151,6 +153,7 @@ test('reconciliation service does not call onDownloadCompletedFn when no import_
 
 test('reconciliation service swallows onDownloadCompletedFn errors', async () => {
   const service = createImportCandidateExecutionReconciliationService({
+    updateImportExecutionRunItem: async (item) => item,
     buildImportCandidateExecutionSummary: async () => ({
       currentRun: { id: 'run-1', items: [{
         importCandidateId: 'ic-1',
@@ -169,6 +172,23 @@ test('reconciliation service swallows onDownloadCompletedFn errors', async () =>
 
   const result = await service.reconcileImportCandidateExecutionState();
   assert.equal(result.summary.transitioned, 1);
+});
+
+test('completion activity and notifications stay silent when the phase write refuses', async (t) => {
+  const notify = t.mock.fn(async () => {});
+  const activity = t.mock.fn(async () => {});
+  const service = createImportCandidateExecutionReconciliationService({
+    updateImportExecutionRunItem: async (item) => item,
+    getImportCandidate: async () => ({ id: 'candidate', status: 'downloading' }),
+    markImportCandidateImportPending: async () => null,
+    onDownloadCompletedFn: notify, recordActivityEventFn: activity,
+  });
+  await service.reconcileImportCandidateExecutionSummary({ executionSummary: { currentRun: { id: 'run', items: [{
+    importCandidateId: 'candidate', planningSnapshot: { candidate: { id: 'candidate' } },
+    liveTransferSummary: { status: 'completed' },
+  }] } } });
+  assert.equal(notify.mock.callCount(), 0);
+  assert.equal(activity.mock.callCount(), 0);
 });
 
 test('apply worker calls onReleaseAddedFn and recordActivityEventFn after successful apply', async () => {

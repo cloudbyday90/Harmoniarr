@@ -17,6 +17,7 @@
  */
 
 import { createApiError, getRequestMetadata, requireCsrf, requireSession } from '../auth.js';
+import { buildPublicImportCandidateExecution } from '../import-candidates/import-candidate-execution-public-projection.js';
 import { createRequestAuthDependencies } from '../auth-module.js';
 import { asyncRoute, sanitizePageLimit, sanitizePageOffset } from '../http.js';
 import {
@@ -152,7 +153,7 @@ export function registerImportCandidateRoutes(app, {
 
     response.json({
       ok: true,
-      importCandidateExecution: await buildImportCandidateExecutionSummary(),
+      importCandidateExecution: buildPublicImportCandidateExecution(await buildImportCandidateExecutionSummary()),
     });
   }));
 
@@ -161,9 +162,9 @@ export function registerImportCandidateRoutes(app, {
 
     response.json({
       ok: true,
-      importCandidateExecutionRun: await buildImportCandidateExecutionRunDetail({
+      importCandidateExecutionRun: buildPublicImportCandidateExecution(await buildImportCandidateExecutionRunDetail({
         runId: request.params.runId,
-      }),
+      })),
     });
   }));
 

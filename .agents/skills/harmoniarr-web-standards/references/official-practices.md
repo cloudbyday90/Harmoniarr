@@ -46,3 +46,16 @@ framework, idempotency-header protocol, or security-scanner installation. Choose
 the narrow existing boundary that satisfies the requested behavior. General
 security review and dependency hygiene complement these practices but do not
 constitute a security certification.
+
+## Provider receipt contract maintenance, October 8 local / October 9 UTC
+
+RFC 9110, OWASP business logic, PostgreSQL 18 locking/application consistency,
+normative WCAG 2.2 and its informative status explanation were freshly
+discovered/opened for attempt-owned confirmation. Provider-specific source is
+separate from those standards: the checked-in slskd 0.25.1 legacy POST and
+slskd 0.26.0 caller-ID batch API have different attribution contracts. Inspect
+the exact supported release and per-file evidence rather than applying a blanket
+claim that a provider has no caller-ID API. The repository's
+`docs/SLSKD_TRANSFER_CONFIRMATION_RESEARCH_2026_10.md` records immutable source
+URLs, admission/retention/restart limits and the batch alternative. Its saved
+links are starting points for future fresh research.

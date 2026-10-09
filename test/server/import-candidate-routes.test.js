@@ -1005,6 +1005,28 @@ test('import candidate execution summary route requires administrator access', a
   });
 });
 
+test('execution summary and historical detail exclude private attempts while preserving bounded pending counts', async () => {
+  const run = { id: 'run-private', status: 'completed', items: [{ itemStatus: 'awaiting_confirmation',
+    planningSnapshot: { execution: { handoff: { state: 'awaiting_confirmation', attempt: { attemptId: 'private-attempt-uuid', receipts: [{ id: 'private-receipt' }] } } } },
+    handoffConfirmation: { disposition: 'partial', requestedFileCount: 2, allRequestedFilesMatched: false, matchedTransfers: [{ id: 'private-receipt' }], attempt: { attemptId: 'private-attempt-uuid' } } }] };
+  const app = createImportCandidateRouteTestApp({ buildImportCandidateExecutionSummary: async () => ({ currentRun: run,
+    unconfirmedRuns: [{ id: 'private-older-run' }], confirmationPending: true, pendingConfirmationCount: 2 }),
+  buildImportCandidateExecutionRunDetail: async () => ({ run }) });
+  await withServer(app, async (baseUrl) => {
+    for (const path of ['/api/v1/import-candidates/execution-summary', '/api/v1/import-candidates/execution-runs/run-private']) {
+      const response = await fetch(baseUrl + path);
+      assert.equal(response.status, 200);
+      const payload = await response.json();
+      assert.doesNotMatch(JSON.stringify(payload), /private-attempt|private-receipt|private-older-run|unconfirmedRuns|attemptId/u);
+      const data = payload.importCandidateExecution ?? payload.importCandidateExecutionRun;
+      const item = (data.currentRun ?? data.run).items[0];
+      assert.equal(item.handoffConfirmation.disposition, 'partial');
+      assert.equal(item.handoffConfirmation.matchedTransferCount, 1);
+    }
+  });
+  assert.equal(run.items[0].planningSnapshot.execution.handoff.attempt.attemptId, 'private-attempt-uuid');
+});
+
 test('import candidate apply summary route returns latest durable apply state', async (t) => {
   const buildImportCandidateApplySummary = t.mock.fn(async () => ({
     activeRun: null,

@@ -138,7 +138,7 @@ function getDownloadAcceptanceDiagnostic(item) {
         </button>
         <button
           type="button"
-          :disabled="!canStartExecutionRun(currentRun, selectedCandidateCount) || isStarting"
+          :disabled="!canStartExecutionRun(currentRun, selectedCandidateCount, summary) || isStarting"
           @click="$emit('start')"
         >
           {{ isStarting ? 'Starting...' : 'Start download run' }}

@@ -3193,6 +3193,25 @@ Optional later indexes:
 - Should local app users be required in v1, or should first release support a single admin only?
 - Should Harmoniarr include an authenticated database maintenance page in v1, or keep maintenance visible only through logs and health endpoints first?
 
+## Current implementation: attempt-owned transfer receipts
+
+The October 2026 confirmation change uses the existing
+`import_execution_run_items.planning_snapshot.execution.handoff.attempt` JSON
+checkpoint. Version 1 records a local attempt UUID, run/candidate ownership,
+unchanged source observation, immutable requested files and bounded explicit
+provider receipt/rejection identities. It adds no table, migration or schema
+snapshot change. Existing `import_execution_transfer_links` retain their unique
+provider/peer/transfer association; new legacy-provider receipts require valid
+provider GUIDs without changing historical link storage.
+
+Checkpoint preparation precedes provider I/O. Full receipt links, confirmation,
+candidate phase and required audit share one transaction with current ownership
+checks. Unresolved checkpoints survive per-type and global retention, including
+terminal manual runs. Their private evidence is omitted from API extensions.
+See the separate [design](DOWNLOAD_HANDOFF_CONFIRMATION_DESIGN.md) and
+[outcome](DOWNLOAD_HANDOFF_CONFIRMATION_OUTCOME.md) for alternatives, races,
+compatibility limits and executed evidence.
+
 ## Sources Reviewed
 
 PostgreSQL 18 official sources:

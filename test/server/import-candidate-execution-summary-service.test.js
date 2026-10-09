@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createImportCandidateExecutionSummaryService } from '../../src/server/import-candidates/import-candidate-execution-summary-service.js';
+import { createDownloadAttempt, evaluateDownloadReceipt } from '../../src/server/slskd/slskd-download-attempt-policy.js';
+import { createSlskdDownloadHandoffReconciliationService } from '../../src/server/slskd/slskd-download-handoff-reconciliation-service.js';
+
+const transferId = '10000000-0000-4000-8000-000000000001';
+const secondTransferId = '10000000-0000-4000-8000-000000000002';
+function savedAttempt({ importCandidateId, operationRunId, username, files, receipts }) {
+  const attempt = createDownloadAttempt({ importCandidateId, operationRunId, username, requestedFiles: files, sourceObservation: { candidateId: importCandidateId, username } });
+  return evaluateDownloadReceipt({ attempt, enqueueResult: { enqueued: receipts, failed: [] } }).attempt;
+}
 
 test('buildImportCandidateExecutionSummary returns the current run with persisted items', async () => {
   const importCandidateExecutionHeartbeatState = {
@@ -74,12 +83,17 @@ test('buildImportCandidateExecutionSummary returns the current run with persiste
 });
 
 test('buildImportCandidateExecutionSummary exposes exact transfer confirmation for a checkpointed handoff', async () => {
+  const attempt = savedAttempt({ importCandidateId: 'candidate-handoff-summary', operationRunId: 'run-handoff-summary', username: 'source-user',
+    files: [{ filename: 'Autechre\\Amber\\01 Foil.flac', size: 123 }], receipts: [{ id: transferId, username: 'source-user', filename: 'Autechre\\Amber\\01 Foil.flac', size: 123 }] });
   const service = createImportCandidateExecutionSummaryService({
+    buildTransferSnapshot: async ({ requestedTransfers }) => { assert.equal(requestedTransfers[0].id, transferId);
+      return { getTransfer: ({ id }) => ({ ...requestedTransfers.find((transfer) => transfer.id === id), state: 'Queued, Remotely' }) }; },
     findMatchingTransfers: async ({ requestedFiles, username }) => ({
+      disposition: 'confirmed',
       allRequestedFilesMatched: true,
       matchedTransfers: [{
         filename: requestedFiles[0].filename,
-        id: 'transfer-handoff-summary',
+        id: transferId,
         size: requestedFiles[0].size,
         state: 'Queued, Remotely',
         username,
@@ -100,7 +114,7 @@ test('buildImportCandidateExecutionSummary exposes exact transfer confirmation f
       planningSnapshot: {
         candidate: { id: 'candidate-handoff-summary', username: 'source-user' },
         execution: {
-          handoff: { state: 'awaiting_confirmation' },
+          handoff: { state: 'awaiting_confirmation', attempt },
           requestedFiles: [{ filename: 'Autechre\\Amber\\01 Foil.flac', size: 123 }],
         },
       },
@@ -112,7 +126,7 @@ test('buildImportCandidateExecutionSummary exposes exact transfer confirmation f
   const item = summary.currentRun.items[0];
 
   assert.equal(item.handoffConfirmation.allRequestedFilesMatched, true);
-  assert.equal(item.handoffConfirmation.matchedTransfers[0].id, 'transfer-handoff-summary');
+  assert.equal(item.handoffConfirmation.matchedTransfers[0].id, transferId);
   assert.equal(item.liveTransferSummary.status, 'queued');
 });
 
@@ -148,6 +162,109 @@ test('buildImportCandidateExecutionSummary keeps an unconfirmed handoff visible 
 
   assert.equal(summary.currentRun.transferSnapshotUnavailable, true);
   assert.equal(summary.currentRun.items[0].handoffConfirmation.providerUnavailable, true);
+});
+
+test('unknown or partial current receipts never display a completed subset and pass exact immutable attempt context', async () => {
+  for (const disposition of ['unknown', 'partial']) {
+    const attempt = savedAttempt({ importCandidateId: 'candidate-original', operationRunId: 'run-original', username: 'original-peer',
+      files: [{ filename: 'One.mp3', size: 1000 }, { filename: 'Two.mp3', size: 1000 }], receipts: [{ id: transferId, username: 'original-peer', filename: 'One.mp3', size: 1000 }] });
+    const service = createImportCandidateExecutionSummaryService({
+      buildTransferSnapshot: async () => ({ getTransfer: () => ({ id: transferId, username: 'original-peer', state: 'Completed, Succeeded', size: 1000, bytesTransferred: 1000 }) }),
+      findMatchingTransfers: async (args) => {
+        assert.equal(args.attempt, attempt);
+        assert.equal(args.importCandidateId, 'candidate-original');
+        assert.equal(args.operationRunId, 'run-original');
+        assert.equal(args.username, 'original-peer');
+        assert.deepEqual(args.requestedFiles, [{ filename: 'One.mp3', size: 1000 }, { filename: 'Two.mp3', size: 1000 }]);
+        return { disposition, allRequestedFilesMatched: false, requestedFileCount: 2, matchedTransfers: attempt.receipts };
+      },
+      importCandidateExecutionRunStore: { getActiveRun: async () => null, getLatestRun: async () => ({ id: 'run-original', executionMode: 'download_enqueue', status: 'completed' }) },
+      listImportExecutionRunItemsFn: async () => [{ itemStatus: 'awaiting_confirmation', planningSnapshot: {
+        candidate: { id: 'candidate-original', username: 'mutable-peer' }, execution: { handoff: { state: 'awaiting_confirmation', attempt },
+          requestedFiles: [{ filename: 'One.mp3', size: 1000 }, { filename: 'Two.mp3', size: 1000 }] } } }],
+    });
+    const summary = await service.buildImportCandidateExecutionSummary();
+    assert.equal(summary.currentRun.items[0].liveTransferSummary, null);
+    assert.deepEqual(summary.currentRun.items[0].liveTransfers, []);
+    assert.equal(summary.confirmationPending, true);
+    assert.equal(summary.summary.status, 'attention');
+    assert.equal(summary.pendingConfirmationCount, 1);
+  }
+});
+
+test('complete receipts remain accepted while unavailable or incomplete live observations cannot imply whole-request completion', async () => {
+  for (const unavailable of [false, true]) {
+    const receipts = [{ id: transferId, username: 'peer', filename: 'One.mp3', size: 1000 }, { id: secondTransferId, username: 'peer', filename: 'Two.mp3', size: 1000 }];
+    const attempt = savedAttempt({ importCandidateId: 'candidate', operationRunId: 'run', username: 'peer',
+      files: [{ filename: 'One.mp3', size: 1000 }, { filename: 'Two.mp3', size: 1000 }], receipts });
+    const service = createImportCandidateExecutionSummaryService({
+      buildTransferSnapshot: async () => {
+        if (unavailable) throw Object.assign(new Error('Unavailable'), { code: 'slskd_unavailable' });
+        return { getTransfer: ({ id }) => id === transferId ? { ...receipts[0], state: 'Completed, Succeeded', bytesTransferred: 1000 } : null };
+      },
+      findMatchingTransfers: async () => ({ disposition: 'confirmed', allRequestedFilesMatched: true, requestedFileCount: 2, matchedTransfers: receipts }),
+      importCandidateExecutionRunStore: { getActiveRun: async () => null, getLatestRun: async () => ({ id: 'run', executionMode: 'download_enqueue', status: 'completed' }) },
+      listImportExecutionRunItemsFn: async () => [{ itemStatus: 'awaiting_confirmation', planningSnapshot: { candidate: { id: 'candidate', username: 'peer' },
+        execution: { handoff: { state: 'awaiting_confirmation', attempt }, requestedFiles: [{ filename: 'One.mp3', size: 1000 }, { filename: 'Two.mp3', size: 1000 }] } } }],
+    });
+    const summary = await service.buildImportCandidateExecutionSummary();
+    assert.equal(summary.currentRun.items[0].handoffConfirmation.disposition, 'confirmed');
+    assert.equal(summary.currentRun.items[0].liveTransferSummary, null);
+    assert.equal(summary.currentRun.items[0].transferObservationPending, true);
+  }
+});
+
+test('newer ordinary summary still hydrates older pending jobs privately with a bounded legacy control indication', async () => {
+  const service = createImportCandidateExecutionSummaryService({
+    buildTransferSnapshot: async () => ({ getTransfer: () => null }),
+    importCandidateExecutionRunStore: { getActiveRun: async () => null, getLatestRun: async () => ({ id: 'newer', executionMode: 'download_enqueue', status: 'completed' }),
+      listUnconfirmedExecutionRuns: async (args) => { assert.equal(args.excludeRunId, 'newer'); return { runIds: ['older'], pendingConfirmationCount: 1 }; },
+      getRunById: async (id) => ({ id, executionMode: 'download_enqueue', status: 'failed' }) },
+    listImportExecutionRunItemsFn: async (id) => id === 'older' ? [{ itemStatus: 'awaiting_confirmation', planningSnapshot: { candidate: { id: 'candidate' },
+      execution: { handoff: { state: 'awaiting_confirmation' }, requestedFiles: [{ filename: 'One.mp3', size: 1000 }] } } }] : [],
+  });
+  const result = await service.buildImportCandidateExecutionSummary();
+  assert.equal(result.currentRun.id, 'newer');
+  assert.equal(result.unconfirmedRuns[0].id, 'older');
+  assert.equal(result.summary.confirmationPending, true);
+  assert.equal(result.summary.pendingConfirmationCount, 1);
+});
+
+test('legacy awaiting items without a handoff stay unknown while proven not dispatched items ignore stale awaiting counts', async () => {
+  for (const notDispatched of [false, true]) {
+    const service = createImportCandidateExecutionSummaryService({
+      buildTransferSnapshot: async () => ({ getTransfer: () => null }),
+      findMatchingTransfers: createSlskdDownloadHandoffReconciliationService().findMatchingTransfers,
+      importCandidateExecutionRunStore: { getActiveRun: async () => null, getLatestRun: async () => ({ id: 'legacy', executionMode: 'download_enqueue', status: 'completed', awaitingConfirmationCount: 1 }) },
+      listImportExecutionRunItemsFn: async () => [{ itemStatus: 'awaiting_confirmation', planningSnapshot: { candidate: { id: 'legacy-candidate', username: 'peer' },
+        execution: { requestedFiles: [{ filename: 'One.mp3', size: 1000 }], ...(notDispatched ? { handoff: { state: 'not_dispatched' } } : {}) } } }],
+    });
+    const result = await service.buildImportCandidateExecutionSummary();
+    assert.equal(result.confirmationPending, !notDispatched);
+    assert.equal(result.currentRun.items[0].liveTransferSummary, null);
+    if (!notDispatched) assert.equal(result.currentRun.items[0].handoffConfirmation.disposition, 'unknown');
+    else assert.notEqual(result.summary.status, 'attention');
+  }
+});
+
+test('new attempt live state rejects wrong peer, filename, size and direction through pending and confirmed checkpoints', async () => {
+  for (const state of ['awaiting_confirmation', 'confirmed']) {
+    for (const change of [{ username: 'wrong-peer' }, { filename: 'Wrong.mp3' }, { size: 999 }, { direction: 'Upload' }]) {
+      const files = [{ filename: 'One.mp3', size: 1000 }];
+      const receipts = [{ id: transferId, username: 'peer', ...files[0] }];
+      const attempt = savedAttempt({ importCandidateId: 'candidate', operationRunId: 'run', username: 'peer', files, receipts });
+      const service = createImportCandidateExecutionSummaryService({
+        buildTransferSnapshot: async () => ({ getTransfer: () => ({ ...receipts[0], state: 'Completed, Succeeded', ...change }) }),
+        findMatchingTransfers: createSlskdDownloadHandoffReconciliationService().findMatchingTransfers,
+        importCandidateExecutionRunStore: { getActiveRun: async () => null, getLatestRun: async () => ({ id: 'run', executionMode: 'download_enqueue', status: 'completed' }) },
+        listImportExecutionRunItemsFn: async () => [{ itemStatus: state === 'confirmed' ? 'queued' : 'awaiting_confirmation', planningSnapshot: {
+          candidate: { id: 'candidate', username: 'peer' }, execution: { handoff: { state, attempt }, requestedFiles: files, enqueuedTransfers: receipts } } }],
+      });
+      const summary = await service.buildImportCandidateExecutionSummary();
+      assert.equal(summary.currentRun.items[0].liveTransferSummary, null, JSON.stringify({ state, change }));
+      assert.equal(summary.currentRun.items[0].transferObservationPending, true);
+    }
+  }
 });
 
 test('buildImportCandidateExecutionSummary reports no run when none exist', async () => {
@@ -576,7 +693,8 @@ test('buildImportCandidateExecutionSummary returns partial data with transferSna
   assert.equal(summary.currentRun.items.length, 1);
   assert.equal(summary.currentRun.items[0].id, 'item-down');
   assert.equal(summary.currentRun.items[0].liveTransfers.length, 0);
-  assert.equal(summary.currentRun.items[0].liveTransferSummary.status, 'not_found');
+  assert.equal(summary.currentRun.items[0].liveTransferSummary, null);
+  assert.equal(summary.currentRun.items[0].transferObservationPending, true);
   assert.notEqual(summary.currentRun.items[0].persistedTransferObservation, null);
   assert.equal(summary.currentRun.items[0].persistedTransferObservation.summary.status, 'active');
   assert.equal(summary.recentRuns.length, 0);
@@ -614,7 +732,8 @@ test('buildImportCandidateExecutionSummary returns partial data with transferSna
   const summary = await service.buildImportCandidateExecutionSummary();
 
   assert.equal(summary.currentRun.transferSnapshotUnavailable, true);
-  assert.equal(summary.currentRun.items[0].liveTransferSummary.status, 'not_found');
+  assert.equal(summary.currentRun.items[0].liveTransferSummary, null);
+  assert.equal(summary.currentRun.items[0].transferObservationPending, true);
   assert.equal(summary.currentRun.items[0].persistedTransferObservation, null);
 });
 
@@ -717,5 +836,6 @@ test('buildImportCandidateExecutionRunDetail returns partial data with transferS
   assert.equal(detail.run.transferSnapshotUnavailable, true);
   assert.equal(detail.run.items.length, 1);
   assert.equal(detail.run.items[0].persistedTransferObservation.summary.status, 'queued');
-  assert.equal(detail.run.items[0].liveTransferSummary.status, 'not_found');
+  assert.equal(detail.run.items[0].liveTransferSummary, null);
+  assert.equal(detail.run.items[0].transferObservationPending, true);
 });

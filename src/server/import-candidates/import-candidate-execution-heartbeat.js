@@ -18,12 +18,13 @@
 
 import { createImportCandidateExecutionHeartbeatState } from './import-candidate-execution-heartbeat-state.js';
 import { createIntervalHeartbeatRunner } from '../heartbeat/interval-heartbeat-runner.js';
+import { isUnconfirmedExecutionItem } from './import-candidate-execution-handoff-state.js';
 
 const defaultHeartbeatIntervalMs = 60 * 1000;
 
 function hasActionableTransfers(items) {
   return items.some((item) => {
-    if (item?.itemStatus === 'awaiting_confirmation') {
+    if (isUnconfirmedExecutionItem(item) || item?.transferObservationPending) {
       return true;
     }
 
@@ -39,15 +40,8 @@ function hasActionableTransfers(items) {
 
 export function shouldRunImportCandidateExecutionHeartbeat({ executionSummary }) {
   const run = executionSummary?.currentRun ?? null;
-  if (!run) {
-    return false;
-  }
-
-  if (run.executionMode !== 'download_enqueue') {
-    return false;
-  }
-
-  return hasActionableTransfers(run.items ?? []);
+  return [run, ...(executionSummary?.unconfirmedRuns ?? [])].filter(Boolean)
+    .some((entry) => entry.executionMode === 'download_enqueue' && hasActionableTransfers(entry.items ?? []));
 }
 
 export function createImportCandidateExecutionHeartbeat({

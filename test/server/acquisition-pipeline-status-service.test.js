@@ -351,6 +351,19 @@ test('retired selections and legacy automatic intents remain reviewable without 
   }
 });
 
+test('unknown or partial current attempts override preparation and incomplete receipt observations without offering another download', () => {
+  for (const disposition of ['unknown', 'partial']) {
+    const status = deriveMusicQueueStatus({ release: { wantedStatus: 'missing', missingTrackCount: 10 },
+      match: { statusCounts: { selected: 1, downloading: 1 }, currentConfirmedTransferCount: 1, currentExecutionStatusCounts: { running: 1 },
+        currentDownloadHandoff: { confirmationPending: true, disposition },
+        recoveryExecution: { status: 'running', candidateMatches: true, authorityReserved: true } } });
+    assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.NEEDS_HELP_ADDING);
+    assert.equal(status.label, 'Confirming download request');
+    assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.VIEW_RECOVERY);
+    assert.equal(status.message, 'Harmoniarr is reviewing this download request before continuing. It will not send another request automatically.');
+  }
+});
+
 test('durable delayed search evidence distinguishes waiting, actual search and unresolved terminal ownership', () => {
   for (const [stage, code] of [['pending', MUSIC_QUEUE_STATUS_CODES.RETRYING_SEARCH], ['running', MUSIC_QUEUE_STATUS_CODES.SEARCHING],
     [null, MUSIC_QUEUE_STATUS_CODES.NEEDS_HELP_ADDING]]) {

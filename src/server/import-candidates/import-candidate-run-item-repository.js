@@ -108,6 +108,7 @@ export function createImportCandidateRunItemRepository({
     operationRunId,
     snapshot,
     statusMessage,
+    expectedAttemptId = undefined,
   }, queryable) {
     const db = resolveQueryable(queryable);
     const result = await db.query(
@@ -119,6 +120,7 @@ export function createImportCandidateRunItemRepository({
             updated_at = NOW()
         WHERE operation_run_id = $1
           AND import_candidate_id = $2
+          ${expectedAttemptId !== undefined ? `AND ${snapshotColumn} #>> '{execution,handoff,attempt,attemptId}' IS NOT DISTINCT FROM $6::text` : ''}
         RETURNING *
       `,
       [
@@ -127,6 +129,7 @@ export function createImportCandidateRunItemRepository({
         itemStatus,
         statusMessage,
         JSON.stringify(snapshot ?? {}),
+        ...(expectedAttemptId !== undefined ? [expectedAttemptId] : []),
       ],
     );
 
@@ -140,6 +143,7 @@ export function createImportCandidateRunItemRepository({
     position,
     snapshot,
     statusMessage,
+    preserveExisting = false,
   }, queryable) {
     const db = resolveQueryable(queryable);
     const result = await db.query(
@@ -155,11 +159,11 @@ export function createImportCandidateRunItemRepository({
         )
         VALUES ($1, $2, $3, $4, $5, $6::jsonb, NOW())
         ON CONFLICT (operation_run_id, import_candidate_id) DO UPDATE
-        SET position = EXCLUDED.position,
+        ${preserveExisting ? `SET operation_run_id = ${tableName}.operation_run_id` : `SET position = EXCLUDED.position,
             item_status = EXCLUDED.item_status,
             status_message = EXCLUDED.status_message,
             ${snapshotColumn} = EXCLUDED.${snapshotColumn},
-            updated_at = NOW()
+            updated_at = NOW()`}
         RETURNING *
       `,
       [
