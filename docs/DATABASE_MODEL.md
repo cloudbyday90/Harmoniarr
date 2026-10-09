@@ -3239,6 +3239,27 @@ is stripped from public projections. See the separate
 [outcome](BATCH_DOWNLOAD_HANDOFF_OUTCOME.md) for the exact eligible boundary,
 executed evidence and unresolved older-origin limitations.
 
+## Current implementation: guarded download origin resolution
+
+The October 9 origin-resolution follow-up uses two matching private version 1
+records instead of a new table: R2 `operation_runs.summary.downloadOriginSupersession`
+and R1 `planning_snapshot.execution.handoff.originResolution`. They bind one
+candidate, source/newer run UUIDs, exact source attempt, resolution UUID,
+actor/request hash, timestamp and bounded saved outcome. R2 becomes permanently
+cancelled; effective-origin SQL excludes it only when the typed reciprocal pair
+matches the actual R1 item/attempt. Malformed or orphan markers fail closed.
+
+Scoped allocation/association shares the candidate parent fence; ordered run,
+item and lease locks recheck the unused proof. Ordinary source writes compare
+the resolution ID as well as attempt/adoption IDs, and retired work is fenced
+from lifecycle/retry/claim/item rewrites. Both lineage rows survive both pruning
+paths. Private bounded restored polling keeps confirmed older downloads
+observable; public projections omit its rows and reciprocal metadata. The
+existing durable command and owning confirmation transaction commit retirement,
+links, phase and required audits together. See the separate
+[design](DOWNLOAD_ORIGIN_RESOLUTION_DESIGN.md) and
+[outcome](DOWNLOAD_ORIGIN_RESOLUTION_OUTCOME.md) for executed evidence and limits.
+
 ## Sources Reviewed
 
 PostgreSQL 18 official sources:

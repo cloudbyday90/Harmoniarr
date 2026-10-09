@@ -226,7 +226,12 @@ suite('Scoped recovery execution and reconciliation with isolated PostgreSQL', (
       await service.reconcileImportCandidateExecutionSummary({ executionSummary: await summary('completed') });
       assert.equal(autoStarted, 0); assert.equal((await context.store.getCandidate(f.candidate.id)).status, 'downloading');
       await context.pool.query('UPDATE import_candidate_files SET size_bytes=size_bytes-1 WHERE import_candidate_id=$1', [f.candidate.id]);
-      await context.executionRuns.createOperationRun({ requestedCandidateCount: 1, summary: { triggerSource: 'missing_music_manual', selectedCandidateId: f.candidate.id, sourceWantedReleaseId: f.wantedId } });
+      // Model an already-existing legacy allocation; the current producer now refuses a downloading candidate.
+      await context.pool.query(`INSERT INTO operation_runs(operation_type,status,started_at,summary)
+        VALUES('import_candidate_execution_planning','pending',NOW(),$1::jsonb)`, [JSON.stringify({
+        executionMode: 'download_enqueue', requestedCandidateCount: 1, triggerSource: 'missing_music_manual',
+        selectedCandidateId: f.candidate.id, sourceWantedReleaseId: f.wantedId,
+      })]);
       await service.reconcileImportCandidateExecutionSummary({ executionSummary: await summary('completed') });
       assert.equal(autoStarted, 0); assert.equal((await context.store.getCandidate(f.candidate.id)).status, 'downloading');
     });

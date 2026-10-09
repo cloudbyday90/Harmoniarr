@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createImportCandidateModule } from '../../src/server/import-candidates/import-candidate-module.js';
 
-test('createImportCandidateModule exposes shared import candidate route dependencies', () => {
+test('createImportCandidateModule exposes shared import candidate route dependencies', async () => {
   const slskdService = {
     getDownload: () => {},
     getSearchResponses: () => {},
@@ -93,6 +93,14 @@ test('createImportCandidateModule exposes shared import candidate route dependen
   const importCandidateSelectionSummaryService = {
     buildSelectedImportCandidateSummary: () => {},
   };
+  const importCandidateDownloadAdoptionService = {
+    getDownloadAdoptionReview: async (input) => ({ downloadAdoptionReview: { ...input, canAdopt: false } }),
+    adoptExistingDownloads: async () => ({ downloadAdoption: { outcome: 'adopted' } }),
+  };
+  const importCandidateDownloadOriginService = {
+    getDownloadOriginReview: async (input) => ({ downloadOriginReview: { ...input, canRestore: false } }),
+    resolveDownloadOrigin: async () => ({ downloadOriginResolution: { outcome: 'restored' } }),
+  };
 
   const importCandidateModule = createImportCandidateModule({
     importCandidateApplyQueueService: { queuePreparedImportCandidateApply: async () => {} },
@@ -128,8 +136,19 @@ test('createImportCandidateModule exposes shared import candidate route dependen
     importCandidatePreviewService,
     importCandidateSelectionSummaryService,
     importCandidateService,
+    importCandidateDownloadAdoptionService,
+    importCandidateDownloadOriginService,
     slskdService,
   });
+
+  assert.equal(importCandidateModule.routeDependencies.getDownloadAdoptionReview, importCandidateDownloadAdoptionService.getDownloadAdoptionReview);
+  assert.equal(importCandidateModule.routeDependencies.adoptExistingDownloads, importCandidateDownloadAdoptionService.adoptExistingDownloads);
+  assert.deepEqual(await importCandidateModule.routeDependencies.getDownloadAdoptionReview({ operationRunId: 'test-run' }),
+    { downloadAdoptionReview: { operationRunId: 'test-run', canAdopt: false } });
+  assert.equal(importCandidateModule.routeDependencies.getDownloadOriginReview, importCandidateDownloadOriginService.getDownloadOriginReview);
+  assert.equal(importCandidateModule.routeDependencies.resolveDownloadOrigin, importCandidateDownloadOriginService.resolveDownloadOrigin);
+  assert.deepEqual(await importCandidateModule.routeDependencies.getDownloadOriginReview({ operationRunId: 'test-run' }),
+    { downloadOriginReview: { operationRunId: 'test-run', canRestore: false } });
 
   assert.equal(importCandidateModule.importCandidateApplyOperationService, importCandidateApplyOperationService);
   assert.equal(importCandidateModule.importCandidateApplyRunStore, importCandidateApplyRunStore);
@@ -162,6 +181,10 @@ test('createImportCandidateModule exposes shared import candidate route dependen
   assert.equal(importCandidateModule.importCandidateSelectionSummaryService, importCandidateSelectionSummaryService);
   assert.equal(importCandidateModule.slskdService, slskdService);
   assert.deepEqual(importCandidateModule.routeDependencies, {
+    getDownloadOriginReview: importCandidateDownloadOriginService.getDownloadOriginReview,
+    resolveDownloadOrigin: importCandidateDownloadOriginService.resolveDownloadOrigin,
+    getDownloadAdoptionReview: importCandidateDownloadAdoptionService.getDownloadAdoptionReview,
+    adoptExistingDownloads: importCandidateDownloadAdoptionService.adoptExistingDownloads,
     buildImportCandidateApplyRunDetail: importCandidateApplySummaryService.buildImportCandidateApplyRunDetail,
     buildImportCandidateApplySummary: importCandidateApplySummaryService.buildImportCandidateApplySummary,
     buildImportCandidateExecutionRunDetail: importCandidateExecutionSummaryService.buildImportCandidateExecutionRunDetail,

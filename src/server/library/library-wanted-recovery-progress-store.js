@@ -5,6 +5,8 @@
  * See LICENSE file for details.
  */
 
+import { effectiveExecutionOriginSql, validExecutionOriginSupersessionSql } from '../import-candidates/import-execution-origin-sql.js';
+
 // Correlated with the owning wanted release (lwr) and current discovery (ldr).
 // Raw observations stay inside the read mapper; only bounded facts leave it.
 export const WANTED_RECOVERY_PROGRESS_SELECT_SQL = `recovery_progress.entries AS recovery_progress_entries,
@@ -47,12 +49,7 @@ export const WANTED_RECOVERY_PROGRESS_JOIN_SQL = `LEFT JOIN LATERAL (
     'candidate', ${CANDIDATE_JSON_SQL},
     'recoveryRun', recovery_run.value,
     'currentHandoff', current_handoff.value,
-    'latestExecutionOriginId', (SELECT origin.id FROM operation_runs origin
-      WHERE origin.operation_type = 'import_candidate_execution_planning'
-        AND (origin.summary->>'selectedCandidateId' = candidate.id::text
-          OR EXISTS (SELECT 1 FROM import_execution_run_items origin_item
-            WHERE origin_item.operation_run_id = origin.id AND origin_item.import_candidate_id = candidate.id))
-      ORDER BY origin.created_at DESC, origin.id DESC LIMIT 1),
+    'latestExecutionOriginId', ${effectiveExecutionOriginSql({ importCandidateIdSql: 'candidate.id' })},
     'legacyRecoverySelection', candidate.selection_reason = 'recovery_cascade' AND (
       candidate.normalized_payload ? 'musicQueue' OR candidate.normalized_payload ? 'musicQueueContext'
       OR EXISTS (SELECT 1 FROM operation_runs legacy
@@ -125,6 +122,7 @@ export const WANTED_RECOVERY_PROGRESS_JOIN_SQL = `LEFT JOIN LATERAL (
     LEFT JOIN import_execution_run_items item ON item.operation_run_id = runs.id AND item.import_candidate_id = candidate.id
     WHERE runs.operation_type = 'import_candidate_execution_planning'
       AND (runs.summary->>'selectedCandidateId' = candidate.id::text OR item.import_candidate_id IS NOT NULL)
+      AND NOT (${validExecutionOriginSupersessionSql({ runAlias: 'runs', importCandidateIdSql: 'candidate.id' })})
       AND COALESCE(item.planning_snapshot #>> '{execution,handoff,state}', '') <> 'not_dispatched'
       AND (item.item_status = 'awaiting_confirmation'
         OR item.planning_snapshot #>> '{execution,handoff,state}' IN ('dispatching','awaiting_confirmation')

@@ -10,6 +10,7 @@ import { registerAdminRecoveryRoutes } from '../../src/server/routes/admin-recov
 import { registerDownloaderRoutes } from '../../src/server/routes/downloader-routes.js';
 import { registerImportCandidateRoutes } from '../../src/server/routes/import-candidate-routes.js';
 import { registerImportCandidateDownloadAdoptionRoutes } from '../../src/server/routes/import-candidate-download-adoption-routes.js';
+import { registerImportCandidateDownloadOriginRoutes } from '../../src/server/routes/import-candidate-download-origin-routes.js';
 import { registerLibraryRoutes } from '../../src/server/routes/library-routes.js';
 import { registerMissingMusicRoutes } from '../../src/server/routes/missing-music-routes.js';
 import { registerMetadataRoutes } from '../../src/server/routes/metadata-routes.js';
@@ -264,6 +265,10 @@ function collectRegisteredRoutes() {
   registerImportCandidateDownloadAdoptionRoutes(app, {
     getDownloadAdoptionReview: asyncNoopResult({}),
     adoptExistingDownloads: asyncNoopResult({}),
+  });
+  registerImportCandidateDownloadOriginRoutes(app, {
+    getDownloadOriginReview: asyncNoopResult({}),
+    resolveDownloadOrigin: asyncNoopResult({}),
   });
 
   registerSystemRoutes(app, {

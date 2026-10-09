@@ -83,3 +83,13 @@ evidence. Preserve a separately attributed operator choice and original unknown
 dispatch; no filename inference or uncertainty-clearing shortcut is justified.
 Document the freshly checked Idempotency-Key draft status separately from local
 and provider contracts. Keep the entry point and invocation policy unchanged.
+
+## Origin resolution maintenance, October 9
+
+Extend the existing references with the observed boundary from the
+[resolution design](DOWNLOAD_ORIGIN_RESOLUTION_DESIGN.md): a cancelled/newer
+job cannot be ignored without local non-dispatch proof, and an existing row lock
+alone does not fence a future allocation. Map reciprocal ownership, current
+authority, late source and newer snapshots, actual module exports, retention and
+private polling to meaningful adverse tests. Keep the entry point and invocation
+policy unchanged; no duplicate skill or new blanket compliance workflow is needed.

@@ -322,6 +322,16 @@ function buildDisplayRunSummary(run) {
     };
   }
 
+  if (run.downloadOriginResolved === true) return { status: run.items?.some((item) => item.downloadReviewRequired) ? 'attention' : 'ready',
+    message: run.items?.some((item) => item.downloadReviewRequired) ? 'The restored download request needs review.'
+      : 'The original request was restored. Harmoniarr is tracking its verified downloads.' };
+  if (run.items?.some((item) => item.downloadAdopted === true)) {
+    return { status: run.items.some((item) => item.downloadReviewRequired === true) ? 'attention' : 'ready',
+      message: run.items.some((item) => item.downloadReviewRequired === true)
+        ? 'Existing downloads were linked by an administrator and now need review.'
+        : 'Existing downloads were linked by an administrator.' };
+  }
+
   if (run.status === 'failed') {
     return {
       message: run.errorMessage
@@ -373,13 +383,6 @@ function buildDisplayRunSummary(run) {
       status: 'blocked',
     };
   }
-  if (run.items?.some((item) => item.downloadAdopted === true)) {
-    return { status: run.items.some((item) => item.downloadReviewRequired === true) ? 'attention' : 'ready',
-      message: run.items.some((item) => item.downloadReviewRequired === true)
-        ? 'Existing downloads were linked by an administrator and now need review.'
-        : 'Existing downloads were linked by an administrator.' };
-  }
-
   const unresolved = (run.items ?? []).filter(isUnconfirmedExecutionItem).length;
   if (run.executionMode === 'download_enqueue' && unresolved > 0) {
     return { status: 'attention', message: `${unresolved} download request${unresolved === 1 ? ' is' : 's are'} being confirmed with Downloader; Harmoniarr will not send ${unresolved === 1 ? 'it' : 'them'} again automatically.` };
@@ -454,6 +457,7 @@ export function createImportCandidateExecutionSummaryService({
 
   const confirmationWorklist = createImportCandidateExecutionConfirmationWorklistService({
     listUnconfirmedExecutionRuns: importCandidateExecutionRunStore.listUnconfirmedExecutionRuns,
+    listRestoredExecutionRuns: importCandidateExecutionRunStore.listRestoredExecutionRuns,
     getRunById: importCandidateExecutionRunStore.getRunById,
     buildRunWithItems,
   });

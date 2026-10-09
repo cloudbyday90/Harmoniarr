@@ -52,6 +52,7 @@ import { createMusicQueueRecoveryLifecycleService } from './music-queue-recovery
 import { createMusicQueueExecutionObservationService } from './music-queue-execution-observation-service.js';
 import { createImportExecutionHandoffService } from './import-execution-handoff-service.js';
 import { createImportCandidateDownloadAdoptionService } from './import-candidate-download-adoption-service.js';
+import { createImportCandidateDownloadOriginService } from './import-candidate-download-origin-service.js';
 import { createImportCandidateRecoveryService } from './import-candidate-recovery-service.js';
 import { createImportCandidateExecutionService } from './import-candidate-execution-service.js';
 import { createImportCandidateExecutionSummaryService } from './import-candidate-execution-summary-service.js';
@@ -209,6 +210,13 @@ export function createImportCandidateModule({
     listAdoptionTransfers: (...args) => slskdService.listAdoptionTransfers(...args),
     validateSelectedAdoptionTransfers: (...args) => slskdService.validateSelectedAdoptionTransfers(...args),
     assertMaintenanceWriteAllowed: ({ queryable } = {}) => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({ operationLabel: 'Existing download adoption', queryable }),
+  }),
+  importCandidateDownloadOriginService = createImportCandidateDownloadOriginService({
+    prepareDownloadDispatch: (...args) => slskdService.prepareDownloadDispatch(...args),
+    getDownloadBatchEvidence: (...args) => slskdService.getDownloadBatchEvidence(...args),
+    confirmDownloadHandoff: importExecutionHandoffService.confirmDownloadHandoff,
+    assertMaintenanceWriteAllowed: ({ queryable } = {}) => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+      operationLabel: 'Download origin resolution', queryable }),
   }),
   importCandidateApplyRunStore = createImportCandidateApplyRunStore(),
   importCandidateReleaseRecheckStore = createImportCandidateReleaseRecheckStore(),
@@ -400,8 +408,6 @@ export function createImportCandidateModule({
     ?? createImportCandidateReleaseSafeAddRecheckService({
       recheckStore: importCandidateReleaseRecheckStore,
       getImportCandidate: importCandidateService.getImportCandidate,
-      getDownloadAdoptionReview: importCandidateDownloadAdoptionService.getDownloadAdoptionReview,
-      adoptExistingDownloads: importCandidateDownloadAdoptionService.adoptExistingDownloads,
       getMediaToolingStatus,
       previewImportCandidateApply: importCandidateApplyPreviewService.previewImportCandidateApply,
       listFileDecisions: listImportCandidateFileDecisions,
@@ -526,6 +532,7 @@ export function createImportCandidateModule({
     importCandidateExecutionWorker,
     importExecutionHandoffService,
     importCandidateDownloadAdoptionService,
+    importCandidateDownloadOriginService,
     importCandidateRecoveryService,
     musicQueueRecoveryService,
     musicQueueRecoveryExecutionPolicyService,
@@ -545,6 +552,10 @@ export function createImportCandidateModule({
     importCandidateSelectionSummaryService,
     importCandidateService,
     routeDependencies: {
+      getDownloadOriginReview: importCandidateDownloadOriginService.getDownloadOriginReview,
+      resolveDownloadOrigin: importCandidateDownloadOriginService.resolveDownloadOrigin,
+      getDownloadAdoptionReview: importCandidateDownloadAdoptionService.getDownloadAdoptionReview,
+      adoptExistingDownloads: importCandidateDownloadAdoptionService.adoptExistingDownloads,
       buildImportCandidateApplyRunDetail: importCandidateApplySummaryService.buildImportCandidateApplyRunDetail,
       buildImportCandidateApplySummary: importCandidateApplySummaryService.buildImportCandidateApplySummary,
       buildImportCandidateExecutionRunDetail: importCandidateExecutionSummaryService.buildImportCandidateExecutionRunDetail,

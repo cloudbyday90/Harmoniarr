@@ -121,6 +121,10 @@ export function useImportReviewAdminWorkflow({
     });
   }
 
+  async function handleDownloadReviewCompleted() {
+    await Promise.all([refreshExecutionSummary(), refreshQueue({ preserveSelection: true })]);
+  }
+
   async function refreshMediaInspectionSummary() {
     await mediaInspectionSummaryWorkflow.loadImportCandidateMediaInspectionSummary({
       preferredRunId: currentRouteState().mediaInspectionRunId || null,
@@ -298,6 +302,7 @@ export function useImportReviewAdminWorkflow({
     execution: {
       ...executionSummaryWorkflow,
       handleRefresh: refreshExecutionSummary,
+      handleDownloadReviewCompleted,
       handleReconcile: handleReconcileExecutionState,
       handleSelectRun: handleSelectExecutionRun,
       handleStartRun: handleStartExecutionRun,

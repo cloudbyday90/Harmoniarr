@@ -20,6 +20,7 @@ const redactedValue = '[REDACTED]';
 const redactedEmail = '[REDACTED_EMAIL]';
 const redactedPath = '[REDACTED_PATH]';
 const redactedBearer = 'Bearer [REDACTED]';
+const privateOriginKeys = new Set(['downloadoriginsupersession', 'originresolution']);
 
 const sensitiveKeys = new Set([
   'accesstoken',
@@ -137,7 +138,7 @@ export function createControlPlaneRedactionService() {
 
     if (typeof value === 'object') {
       return Object.fromEntries(
-        Object.entries(value).map(([entryKey, entryValue]) => [
+        Object.entries(value).filter(([entryKey]) => !privateOriginKeys.has(normalizeKey(entryKey))).map(([entryKey, entryValue]) => [
           entryKey,
           redactValue(entryValue, { key: entryKey }),
         ]),

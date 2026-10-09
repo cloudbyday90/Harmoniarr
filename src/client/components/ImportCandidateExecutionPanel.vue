@@ -103,8 +103,9 @@ const refreshNotice = computed(() => buildImportExecutionRefreshNotice({
   summary: props.summary,
 }));
 const pendingAdoptions = ref(new Set());
+const completingDownloadReviews = ref(0);
 const heading = ref(null); let disposed = false;
-const adoptionBusy = computed(() => pendingAdoptions.value.size > 0);
+const adoptionBusy = computed(() => pendingAdoptions.value.size > 0 || completingDownloadReviews.value > 0);
 const olderReviewReferences = computed(() => (props.summary?.downloadAdoptionReviewReferences ?? []).filter((reference) => reference.operationRunId !== props.currentRun?.id).slice(0, 20));
 function updateAdoptionPending({ key, pending }) {
   const next = new Set(pendingAdoptions.value); if (pending) next.add(key); else next.delete(key); pendingAdoptions.value = next;
@@ -114,8 +115,11 @@ function isUnconfirmed(item) {
     && (item?.downloadReviewRequired === true || item?.itemStatus === 'awaiting_confirmation' || ['dispatching', 'awaiting_confirmation'].includes(item?.planningSnapshot?.execution?.handoff?.state));
 }
 async function completeAdoption({ focus }) {
-  await props.refreshAfterAdoption(); await nextTick();
-  if (!disposed && focus.ownsFocus()) heading.value?.focus();
+  completingDownloadReviews.value += 1;
+  try {
+    await props.refreshAfterAdoption(); await nextTick();
+    if (!disposed && focus.ownsFocus()) heading.value?.focus();
+  } finally { completingDownloadReviews.value -= 1; }
 }
 onBeforeUnmount(() => { disposed = true; });
 

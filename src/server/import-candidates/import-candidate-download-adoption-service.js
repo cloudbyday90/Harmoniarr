@@ -7,18 +7,13 @@
 
 import { isDeepStrictEqual } from 'node:util';
 import { createApiError } from '../auth.js';
+import { createAcquisitionQualityPolicyService } from '../acquisition/acquisition-quality-policy-service.js';
+import { createImportExecutionDownloadAuthorityService, normalizeDownloadCommandContext } from './import-execution-download-authority-service.js';
 import { createDatabaseTransactionRunner } from '../database-transaction-service.js';
 import { lockAppUserEligibility } from '../app-user-eligibility-lock-store.js';
-import { createAcquisitionQualityPolicyService } from '../acquisition/acquisition-quality-policy-service.js';
-import { normalizeSavedQualityPreferences } from '../acquisition/acquisition-quality-evidence-policy.js';
-import { buildAutomaticLibraryAddAuthority } from './import-candidate-music-queue-auto-safe-add-policy.js';
-import { buildRecoveryQualityContext, hasCurrentRecoveryDiscovery, hasCurrentRecoveryRecipients,
-  hasOwnedRecoveryOrigin, isValidRecoveryBaseline } from './music-queue-recovery-policy.js';
-import { recoveryParticipantSnapshot } from './music-queue-recovery-execution-policy-service.js';
 import { buildDownloadAdoptionOutcome, buildDownloadAdoptionRequestHash, buildDownloadAdoptionReviewDigest,
   buildDownloadAdoptionReviewFiles, normalizeDownloadAdoptionCommand, resolveDownloadAdoptionEpisode } from './import-candidate-download-adoption-policy.js';
 import { createImportCandidateDownloadAdoptionStore } from './import-candidate-download-adoption-store.js';
-import { normalizeDownloadTransferId } from '../slskd/slskd-download-attempt-policy.js';
 import { validateDownloadAdoptionSelection } from '../slskd/slskd-download-adoption-policy.js';
 
 const stale = () => createApiError(409, 'import_execution_download_adoption_not_current', 'The reviewed download handoff changed. Review it again before continuing.');
@@ -36,54 +31,8 @@ export function createImportCandidateDownloadAdoptionService({ store = createImp
     if (typeof fn !== 'function') throw new TypeError(`Download adoption requires ${name}`);
   }
 
-  function identifiers({ operationRunId, importCandidateId, actorUserId, refreshTokenId } = {}) {
-    const normalized = Object.fromEntries(Object.entries({ operationRunId, importCandidateId, actorUserId, refreshTokenId })
-      .map(([key, value]) => [key, normalizeDownloadTransferId(value)]));
-    if (Object.values(normalized).some((id) => !id)) {
-      throw createApiError(400, 'validation_error', 'Valid download episode and session identifiers are required');
-    }
-    return normalized;
-  }
-
-  async function actor(input, queryable = null, fresh = false) {
-    const value = await store.getActor({ actorUserId: input.actorUserId, refreshTokenId: input.refreshTokenId,
-      lock: queryable != null, queryable });
-    if (!value || value.role !== 'admin' || value.isDisabled || value.sessionRevoked || value.sessionReplaced
-      || !Number.isFinite(Date.parse(value.sessionExpiresAt)) || Date.parse(value.sessionExpiresAt) <= getNow().getTime()) {
-      throw createApiError(403, 'admin_required', 'Current administrator access is required');
-    }
-    if (fresh && value.mustChangePassword) throw createApiError(403, 'reauth_required', 'Re-authentication is required before continuing');
-    return value;
-  }
-
-  async function policy(episode, currentActor, queryable = null) {
-    const { candidate, run } = episode;
-    const identity = buildAutomaticLibraryAddAuthority(candidate);
-    const owned = hasOwnedRecoveryOrigin(candidate, { summary: run.summary });
-    let participants = [];
-    let context = { profileCode: 'lossless_archive', qualityOverride: null, minimumBitrateKbps: null };
-    if (owned) {
-      if (!identity || candidate.normalizedPayload?.requestOwnership?.externalRequestReleaseIntentId) throw stale();
-      participants = await store.readParticipantPolicies({ wantedReleaseIds: identity.wantedReleaseIds, queryable });
-      if (!hasCurrentRecoveryRecipients(candidate, participants)) throw stale();
-      const metadataReleaseId = participants[0]?.metadataReleaseId;
-      const record = run.summary?.musicQueueRecovery;
-      if (record != null && (!isValidRecoveryBaseline(record.baselineRequirement) || record.retired === true
-        || record.metadataReleaseId !== metadataReleaseId || !isDeepStrictEqual(record.authority, identity))) throw stale();
-      const discovery = await store.getDiscovery(metadataReleaseId, queryable);
-      if (!hasCurrentRecoveryDiscovery(discovery, record?.failedSourceSearchId ?? candidate.sourceSearchId)
-        || await store.findActiveSelection({ failedCandidateId: candidate.id, metadataReleaseId, queryable })) throw stale();
-      context = await buildRecoveryQualityContext({ failedCandidate: candidate, participants, baselineRequirement: record?.baselineRequirement ?? null });
-    } else if (candidate.normalizedPayload?.requestOwnership != null) {
-      // An unproven external/request target is not an unowned manual import.
-      throw stale();
-    }
-    const quality = qualityPolicyService.evaluateQualityEvidence({ candidate, profileCode: context.profileCode,
-      qualityOverride: context.qualityOverride, minimumBitrateKbps: context.minimumBitrateKbps ?? null });
-    if (quality.autoDownloadEligible !== true) throw stale();
-    return { participants, context, identity, snapshot: { context,
-      participants: recoveryParticipantSnapshot(participants), actorPreferences: normalizeSavedQualityPreferences(currentActor.qualityPreferences) } };
-  }
+  const { actor, policy } = createImportExecutionDownloadAuthorityService({ store, getNow, qualityPolicyService, createStaleError: stale });
+  const identifiers = normalizeDownloadCommandContext;
 
   async function providerReview(episode, selectedIds = null, binding = null) {
     const listed = await listAdoptionTransfers({ requestedFiles: episode.requestedFiles, username: episode.username });

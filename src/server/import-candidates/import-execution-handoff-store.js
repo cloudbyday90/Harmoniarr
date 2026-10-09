@@ -6,6 +6,7 @@
  */
 
 import { getPool } from '../database.js';
+import { effectiveExecutionOriginSql, writableExecutionRunSql } from './import-execution-origin-sql.js';
 import { getImportCandidateById, listImportCandidateFiles, insertImportCandidateEvent, transitionImportCandidateStatus }
   from './import-candidate-repository.js';
 
@@ -30,9 +31,7 @@ export function createImportExecutionHandoffStore({ getPoolFn = getPool } = {}) 
     return candidate ? { ...candidate, files: await listImportCandidateFiles(importCandidateId, db(queryable)) } : null;
   }
   async function isCurrentOrigin({ importCandidateId, operationRunId }, queryable) {
-    const result = await db(queryable).query(`SELECT runs.id FROM operation_runs runs WHERE operation_type='import_candidate_execution_planning'
-      AND (summary->>'selectedCandidateId'=$1::text OR EXISTS(SELECT 1 FROM import_execution_run_items
-        WHERE operation_run_id=runs.id AND import_candidate_id=$1::uuid)) ORDER BY created_at DESC,id DESC LIMIT 1`, [importCandidateId]);
+    const result = await db(queryable).query(`SELECT ${effectiveExecutionOriginSql({ importCandidateIdSql: '$1' })} AS id`, [importCandidateId]);
     return result.rows[0]?.id === operationRunId;
   }
   async function findUnresolvedOtherHandoff({ importCandidateId, operationRunId }, queryable) {
@@ -45,7 +44,8 @@ export function createImportExecutionHandoffStore({ getPoolFn = getPool } = {}) 
   }
   async function isDispatchRunActive({ operationRunId }, queryable) {
     const result = await db(queryable).query(`SELECT id FROM operation_runs WHERE id=$1::uuid
-      AND operation_type='import_candidate_execution_planning' AND status='running' AND cancel_requested_at IS NULL`, [operationRunId]);
+      AND operation_type='import_candidate_execution_planning' AND status='running' AND cancel_requested_at IS NULL
+      AND ${writableExecutionRunSql('operation_runs')}`, [operationRunId]);
     return result.rowCount > 0;
   }
   async function getRun(operationRunId, queryable) {
@@ -72,9 +72,12 @@ export function createImportExecutionHandoffStore({ getPoolFn = getPool } = {}) 
     const result = await db(queryable).query(`UPDATE import_execution_run_items SET item_status=$2,status_message=$3,
       planning_snapshot=jsonb_set(planning_snapshot,'{execution}',$4::jsonb),updated_at=NOW()
       WHERE id=$1::uuid AND planning_snapshot #>> '{execution,handoff,attempt,attemptId}' IS NOT DISTINCT FROM $5::text
-      AND planning_snapshot #>> '{execution,handoff,adoption,adoptionId}' IS NOT DISTINCT FROM $6::text RETURNING *`,
+      AND planning_snapshot #>> '{execution,handoff,adoption,adoptionId}' IS NOT DISTINCT FROM $6::text
+      AND planning_snapshot #>> '{execution,handoff,originResolution,resolutionId}' IS NOT DISTINCT FROM $7::text
+      AND EXISTS(SELECT 1 FROM operation_runs parent WHERE parent.id=operation_run_id AND ${writableExecutionRunSql('parent')}) RETURNING *`,
     [item.id, itemStatus, statusMessage, JSON.stringify(execution), expectedAttemptId,
-      item.planningSnapshot?.execution?.handoff?.adoption?.adoptionId ?? null]);
+      item.planningSnapshot?.execution?.handoff?.adoption?.adoptionId ?? null,
+      item.planningSnapshot?.execution?.handoff?.originResolution?.resolutionId ?? null]);
     return mapItem(result.rows[0]);
   }
   async function transitionDownloading({ candidate, actorUserId, reason }, queryable) {
@@ -90,7 +93,8 @@ export function createImportExecutionHandoffStore({ getPoolFn = getPool } = {}) 
       WHERE id=$1::uuid AND ((item_status='awaiting_confirmation'
           AND planning_snapshot #>> '{execution,handoff,state}' IS DISTINCT FROM 'not_dispatched')
         OR planning_snapshot #>> '{execution,handoff,state}' IN ('dispatching','awaiting_confirmation'))
-        AND planning_snapshot #>> '{execution,handoff,attempt,attemptId}' IS NOT DISTINCT FROM $2::text`, [item.id, attemptId ?? null, checkedAt]);
+        AND planning_snapshot #>> '{execution,handoff,attempt,attemptId}' IS NOT DISTINCT FROM $2::text
+        AND EXISTS(SELECT 1 FROM operation_runs parent WHERE parent.id=operation_run_id AND ${writableExecutionRunSql('parent')})`, [item.id, attemptId ?? null, checkedAt]);
   }
   return { lockEvidence, getItem, getCandidate, isCurrentOrigin, findUnresolvedOtherHandoff, isDispatchRunActive, getRun,
     hasForeignBatchAttempt, setAdoptedQualityContext,

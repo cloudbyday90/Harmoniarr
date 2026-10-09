@@ -6,6 +6,7 @@
  */
 
 import { getPool } from '../database.js';
+import { effectiveExecutionOriginSql, validExecutionOriginSupersessionSql } from './import-execution-origin-sql.js';
 
 export const MAX_UNCONFIRMED_EXECUTION_RUNS = 20;
 
@@ -34,5 +35,20 @@ export function createImportCandidateExecutionConfirmationWorklistStore({ getPoo
     const row = result.rows[0] ?? {};
     return { runIds: Array.isArray(row.run_ids) ? row.run_ids : [], pendingConfirmationCount: row.pending_confirmation_count ?? 0 };
   }
-  return { listUnconfirmedExecutionRuns };
+  async function listRestoredExecutionRuns({ excludeRunId = null, limit = MAX_UNCONFIRMED_EXECUTION_RUNS } = {}) {
+    const bounded = Number.isInteger(limit) && limit > 0 ? Math.min(limit, MAX_UNCONFIRMED_EXECUTION_RUNS) : MAX_UNCONFIRMED_EXECUTION_RUNS;
+    const result = await getPoolFn().query(`SELECT source_item.operation_run_id,MIN(source_item.updated_at) AS last_checked_at,
+      jsonb_agg(source_item.import_candidate_id ORDER BY source_item.import_candidate_id) AS candidate_ids
+      FROM import_execution_run_items source_item JOIN import_candidates candidate ON candidate.id=source_item.import_candidate_id
+      JOIN operation_runs retired ON retired.summary #>> '{downloadOriginSupersession,sourceRunId}'=source_item.operation_run_id::text
+        AND retired.summary #>> '{downloadOriginSupersession,importCandidateId}'=source_item.import_candidate_id::text
+      WHERE candidate.status IN ('selected','downloading')
+        AND ${validExecutionOriginSupersessionSql({ runAlias: 'retired', importCandidateIdSql: 'candidate.id' })}
+        AND source_item.operation_run_id=${effectiveExecutionOriginSql({ importCandidateIdSql: 'candidate.id' })}
+        AND ($1::text IS NULL OR source_item.operation_run_id::text<>$1::text)
+      GROUP BY source_item.operation_run_id ORDER BY last_checked_at,source_item.operation_run_id LIMIT $2`, [excludeRunId, bounded]);
+    return { runIds: result.rows.map((row) => row.operation_run_id),
+      candidateIdsByRun: Object.fromEntries(result.rows.map((row) => [row.operation_run_id, row.candidate_ids])) };
+  }
+  return { listUnconfirmedExecutionRuns, listRestoredExecutionRuns };
 }

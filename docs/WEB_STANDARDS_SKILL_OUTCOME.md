@@ -221,3 +221,21 @@ installed copies pass `quick_validate.py`; all four files match by SHA-256 after
 synchronization. Those checks establish structure and identity, not a new blind
 behavioral trial or standards conformance. Executed application results and
 their limits belong in the separate [batch outcome](BATCH_DOWNLOAD_HANDOFF_OUTCOME.md).
+
+## Origin resolution maintenance, October 9
+
+The [resolution design](DOWNLOAD_ORIGIN_RESOLUTION_DESIGN.md) exposed an
+ownership/evidence boundary across producers and consumers: cancellation or
+missing history does not certify non-dispatch, and existing-row locks alone do
+not fence a later allocation. The references now map reciprocal records,
+current authority, stale source/newer snapshots, actual module exports, retention
+and private polling to their owning code and adverse cases. Source snapshot
+comparison includes the new resolution identity, and invoked assembled-module
+checks complement isolated route/service tests. Fresh official research records
+the frozen WCAG Recommendation and distinguishes guidance from application inference.
+
+This is narrow reference maintenance. Entry point, UI metadata and invocation
+policy are unchanged; no fresh blind behavioral trial or full conformance claim
+is made. Repository and installed copies pass structural validation, and all four
+files match by SHA-256 after final synchronization. Application evidence is separate in the
+[resolution outcome](DOWNLOAD_ORIGIN_RESOLUTION_OUTCOME.md).

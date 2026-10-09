@@ -20,6 +20,8 @@ import { createOperationRunStore } from '../operation-run-store.js';
 import { getPool } from '../database.js';
 import { operationRunRegistry } from '../../shared/operation-run-descriptors.js';
 import { createImportCandidateExecutionConfirmationWorklistStore } from './import-candidate-execution-confirmation-worklist-store.js';
+import { createDatabaseTransactionRunner } from '../database-transaction-service.js';
+import { lockExecutionCandidateAllocation } from './import-execution-allocation-store.js';
 
 function toNumberOrNull(value) {
   return Number.isFinite(value) ? value : null;
@@ -52,6 +54,7 @@ function normalizeRun(run) {
     status: run.status,
     totalSelected: toNumberOrNull(run.summary.totalSelected),
     triggerSource: run.summary.triggerSource ?? 'manual',
+    ...(run.downloadOriginResolved === true ? { downloadOriginResolved: true } : {}),
   };
 }
 
@@ -74,6 +77,10 @@ export function createImportCandidateExecutionRunStore({
     summary = null,
     triggeredByUserId = null,
   }) {
+    if (summary?.selectedCandidateId && !queryable) return createDatabaseTransactionRunner({ getPoolFn })(
+      (client) => createOperationRun({ queryable: client, executionMode, nextAttemptAt, requestedCandidateCount, status, summary, triggeredByUserId }));
+    if (summary?.selectedCandidateId) await lockExecutionCandidateAllocation({ importCandidateId: summary.selectedCandidateId,
+      requireSelected: status === 'pending', queryable });
     const run = await operationRunStore.createOperationRun({
       queryable,
       status,

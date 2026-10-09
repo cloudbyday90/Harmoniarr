@@ -50,7 +50,7 @@ export function createSlskdDownloadDispatchService({ captureProvider, normalizeL
     await pinned.assertCurrent(binding, { requireCredentials: true });
     return {
       binding,
-      assertCurrent: () => pinned.assertCurrent(binding, { requireCredentials: true }),
+      assertCurrent: ({ queryable } = {}) => pinned.assertCurrent(binding, { requireCredentials: true, queryable }),
       enqueue: async ({ attempt }) => {
         if (attempt?.providerBinding?.protocol !== binding.protocol || attempt.providerBinding.version !== binding.version
           || attempt.providerBinding.endpointFingerprint !== binding.endpointFingerprint) throw createApiError(409, 'slskd_download_attempt_binding_invalid', 'The saved download transport changed');

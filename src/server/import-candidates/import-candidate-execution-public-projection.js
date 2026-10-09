@@ -28,7 +28,11 @@ function projectItem(item) {
 }
 
 function projectRun(run) {
-  return run ? { ...run, ...(Array.isArray(run.items) ? { items: run.items.map(projectItem) } : {}) } : run;
+  if (!run) return run;
+  const summary = run.summary && typeof run.summary === 'object' ? { ...run.summary } : run.summary;
+  if (summary) delete summary.downloadOriginSupersession;
+  return { ...run, ...(Object.hasOwn(run, 'summary') ? { summary } : {}),
+    ...(Array.isArray(run.items) ? { items: run.items.map(projectItem) } : {}) };
 }
 
 /** API projection only: heartbeat/reconciliation retain their full internal checkpoints. */
@@ -48,6 +52,7 @@ export function buildPublicImportCandidateExecution(value) {
     }
   }
   delete projected.unconfirmedRuns;
+  delete projected.restoredRuns;
   if (references.length > 0) {
     projected.downloadAdoptionReviewReferences = references;
     if (value.summary) projected.summary = { ...value.summary, downloadAdoptionReviewReferences: references };

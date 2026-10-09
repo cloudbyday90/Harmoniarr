@@ -12,6 +12,7 @@ const count = (value) => typeof value === 'number' && Number.isFinite(value) && 
 
 export function createImportCandidateExecutionConfirmationWorklistService({
   listUnconfirmedExecutionRuns = async () => ({ runIds: [], pendingConfirmationCount: 0 }),
+  listRestoredExecutionRuns = async () => ({ runIds: [], candidateIdsByRun: {} }),
   getRunById = async () => null, buildRunWithItems,
 } = {}) {
   if (typeof buildRunWithItems !== 'function') throw new TypeError('Confirmation worklist requires buildRunWithItems');
@@ -31,7 +32,18 @@ export function createImportCandidateExecutionConfirmationWorklistService({
     const currentCount = (currentRun?.items ?? []).filter(isUnconfirmedExecutionItem).length;
     const observedOlderCount = unconfirmedRuns.reduce((total, run) => total + run.items.length, 0);
     const pendingConfirmationCount = count(Math.max(count(result.pendingConfirmationCount), observedOlderCount) + currentCount);
-    return { unconfirmedRuns, pendingConfirmationCount, confirmationPending: pendingConfirmationCount > 0 };
+    const restored = await listRestoredExecutionRuns({ excludeRunId: currentRun?.id ?? null, limit: MAX_UNCONFIRMED_EXECUTION_RUNS });
+    const restoredRuns = [];
+    for (const id of [...new Set(restored.runIds ?? [])].slice(0, MAX_UNCONFIRMED_EXECUTION_RUNS)) {
+      if (id === currentRun?.id) continue;
+      const run = await getRunById(id);
+      if (run?.executionMode !== 'download_enqueue') continue;
+      const hydrated = await buildRunWithItems(run);
+      const ids = restored.candidateIdsByRun?.[id] ?? [];
+      const items = (hydrated?.items ?? []).filter((item) => ids.includes(item.importCandidateId));
+      if (items.length) restoredRuns.push({ ...hydrated, items });
+    }
+    return { unconfirmedRuns, restoredRuns, pendingConfirmationCount, confirmationPending: pendingConfirmationCount > 0 };
   }
   return { buildExecutionConfirmationWorklist };
 }

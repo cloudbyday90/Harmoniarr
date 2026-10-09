@@ -218,3 +218,19 @@ test('a durable exact batch rejection is preserved during resume without replaci
   assert.equal(reads, 0);
   assert.deepEqual(proof.attempt.failedFiles, initial.requestedFiles.map((file) => file.filename));
 });
+
+test('a pinned local configuration assertion uses its caller-owned transaction without provider IO', async () => {
+  const owningClient = { query: async () => ({ rows: [] }) };
+  const observedContexts = [];
+  let providerReads = 0;
+  const service = createSlskdService({ getClientConfig: async ({ queryable } = {}) => {
+    observedContexts.push(queryable); return { baseUrl: 'http://localhost:5030', apiKey: 'test-key', providerMode: 'external' };
+  }, createSlskdClientFn: (config) => createSlskdClient({ ...config, fetchImpl: async () => {
+    providerReads += 1; return Response.json('0.26.0');
+  } }) });
+  const dispatch = await service.prepareDownloadDispatch();
+  const readsBefore = providerReads;
+  await dispatch.assertCurrent({ queryable: owningClient });
+  assert.equal(observedContexts.at(-1), owningClient);
+  assert.equal(providerReads, readsBefore);
+});

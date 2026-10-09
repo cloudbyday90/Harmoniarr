@@ -40,7 +40,7 @@ function hasActionableTransfers(items) {
 
 export function shouldRunImportCandidateExecutionHeartbeat({ executionSummary }) {
   const run = executionSummary?.currentRun ?? null;
-  return [run, ...(executionSummary?.unconfirmedRuns ?? [])].filter(Boolean)
+  return [run, ...(executionSummary?.unconfirmedRuns ?? []), ...(executionSummary?.restoredRuns ?? [])].filter(Boolean)
     .some((entry) => entry.executionMode === 'download_enqueue' && hasActionableTransfers(entry.items ?? []));
 }
 

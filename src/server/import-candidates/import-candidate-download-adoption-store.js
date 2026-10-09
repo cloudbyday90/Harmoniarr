@@ -8,6 +8,7 @@
 import { getPool } from '../database.js';
 import { createImportExecutionHandoffStore } from './import-execution-handoff-store.js';
 import { createMusicQueueRecoveryStore } from './music-queue-recovery-store.js';
+import { effectiveExecutionOriginSql } from './import-execution-origin-sql.js';
 
 /** Adoption reads use the existing candidate and recipient owners; SQL stays here. */
 export function createImportCandidateDownloadAdoptionStore({ getPoolFn = getPool } = {}) {
@@ -35,11 +36,7 @@ export function createImportCandidateDownloadAdoptionStore({ getPoolFn = getPool
     const run = row ? { id: row.id, operationType: row.operation_type, status: row.status, summary: row.summary } : null;
     const candidate = await handoffStore.getCandidate(importCandidateId, db(queryable));
     const item = await handoffStore.getItem({ importCandidateId, operationRunId }, db(queryable));
-    const origin = await db(queryable).query(`SELECT origin.id FROM operation_runs origin
-      WHERE origin.operation_type='import_candidate_execution_planning'
-      AND (origin.summary->>'selectedCandidateId'=$1::text OR EXISTS (SELECT 1 FROM import_execution_run_items
-        WHERE operation_run_id=origin.id AND import_candidate_id=$1::uuid))
-      ORDER BY origin.created_at DESC,origin.id DESC LIMIT 1`, [importCandidateId]);
+    const origin = await db(queryable).query(`SELECT ${effectiveExecutionOriginSql({ importCandidateIdSql: '$1' })} AS id`, [importCandidateId]);
     return { candidate, run, item, currentOriginId: origin.rows[0]?.id ?? null };
   }
 

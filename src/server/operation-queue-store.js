@@ -17,6 +17,7 @@
  */
 
 import { getPool } from './database.js';
+import { writableExecutionRunSql } from './import-candidates/import-execution-origin-sql.js';
 
 const defaultClaimTimeoutMs = 60 * 1000;
 
@@ -110,6 +111,7 @@ export function createOperationQueueStore({
           SELECT id
           FROM operation_runs
           WHERE status = 'pending'
+            AND ${writableExecutionRunSql('operation_runs')}
             AND next_attempt_at <= NOW()
             AND attempt_count < max_attempts
             AND (
@@ -167,6 +169,7 @@ export function createOperationQueueStore({
             claimed_at = NULL,
             claimed_by_instance_id = NULL
         WHERE id = $1
+          AND ${writableExecutionRunSql('operation_runs')}
         RETURNING
           id,
           operation_type,
@@ -286,6 +289,8 @@ export function createOperationQueueStore({
             error_message = CASE WHEN cancel_requested_at IS NOT NULL THEN NULL ELSE $3 END
         WHERE id = $1
           AND status = 'running'
+          AND ${writableExecutionRunSql('operation_runs')}
+          AND ${writableExecutionRunSql('operation_runs')}
         RETURNING
           id,
           operation_type,

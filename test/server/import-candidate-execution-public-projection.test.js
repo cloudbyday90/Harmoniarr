@@ -52,3 +52,14 @@ test('adopted downloads expose review-only references on later adverse evidence 
   assert.doesNotMatch(JSON.stringify(result), /private-proof|adoption|proof/u);
   assert.equal(result.currentRun.items[0].downloadReviewRequired, true);
 });
+
+test('origin lineage stays private in every run projection without mutating its internal pair', () => {
+  const run = { id: 'restored', summary: { currentStep: 'Tracking downloads', downloadOriginSupersession: { requestHash: 'private-hash' } },
+    items: [{ importCandidateId: 'candidate', planningSnapshot: { execution: { handoff: { state: 'confirmed',
+      originResolution: { sourceAttemptId: 'private-attempt' } } } } }] };
+  const output = buildPublicImportCandidateExecution({ activeRun: run, currentRun: run, latestRun: run, run, recentRuns: [run],
+    restoredRuns: [{ id: 'private-restored-worklist', items: run.items }] });
+  assert.doesNotMatch(JSON.stringify(output), /private-|originResolution|downloadOriginSupersession|restoredRuns/u);
+  assert.equal(output.run.summary.currentStep, 'Tracking downloads');
+  assert.equal(run.summary.downloadOriginSupersession.requestHash, 'private-hash');
+});

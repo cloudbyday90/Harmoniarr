@@ -69,6 +69,7 @@ import { registerAdminRecoveryRoutes } from './routes/admin-recovery-routes.js';
 import { registerDownloaderRoutes } from './routes/downloader-routes.js';
 import { registerImportCandidateRoutes } from './routes/import-candidate-routes.js';
 import { registerImportCandidateDownloadAdoptionRoutes } from './routes/import-candidate-download-adoption-routes.js';
+import { registerImportCandidateDownloadOriginRoutes } from './routes/import-candidate-download-origin-routes.js';
 import { registerLibraryRoutes } from './routes/library-routes.js';
 import { registerMissingMusicRoutes } from './routes/missing-music-routes.js';
 import { registerMetadataRoutes } from './routes/metadata-routes.js';
@@ -206,6 +207,7 @@ export function createApp({
   registerDownloaderRoutes: mountDownloaderRoutes = registerDownloaderRoutes,
   registerImportCandidateRoutes: mountImportCandidateRoutes = registerImportCandidateRoutes,
   registerImportCandidateDownloadAdoptionRoutes: mountImportCandidateDownloadAdoptionRoutes = registerImportCandidateDownloadAdoptionRoutes,
+  registerImportCandidateDownloadOriginRoutes: mountImportCandidateDownloadOriginRoutes = registerImportCandidateDownloadOriginRoutes,
   registerLibraryRoutes: mountLibraryRoutes = registerLibraryRoutes,
   registerMissingMusicRoutes: mountMissingMusicRoutes = registerMissingMusicRoutes,
   registerMetadataRoutes: mountMetadataRoutes = registerMetadataRoutes,
@@ -1011,6 +1013,16 @@ export function createApp({
       bucketName: 'import-candidate-download-adoption-mutation',
       limit: 10,
       windowMs: 60 * 1000,
+    }),
+  });
+  mountImportCandidateDownloadOriginRoutes(app, {
+    ...importCandidateModule.routeDependencies,
+    executeIdempotentMutation: controlPlaneIdempotencyService.executeIdempotentMutation,
+    limitDownloadOriginReview: requestRateLimiterService.createMiddleware({
+      bucketName: 'import-candidate-download-origin-review', limit: 30, windowMs: 60 * 1000,
+    }),
+    limitDownloadOriginMutation: requestRateLimiterService.createMiddleware({
+      bucketName: 'import-candidate-download-origin-mutation', limit: 10, windowMs: 60 * 1000,
     }),
   });
   mountLibraryRoutes(app, {

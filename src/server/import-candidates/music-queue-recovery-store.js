@@ -6,6 +6,7 @@
  */
 
 import { getPool } from '../database.js';
+import { effectiveExecutionOriginSql } from './import-execution-origin-sql.js';
 import { getImportCandidateById, listImportCandidateFiles, insertImportCandidateEvent } from './import-candidate-repository.js';
 import { createImportCandidateReleaseRecheckStore } from './import-candidate-release-recheck-store.js';
 import { MUSIC_QUEUE_RECOVERY_EXECUTION_SOURCE, MUSIC_QUEUE_RECOVERY_DISCOVERY_SOURCE } from './music-queue-recovery-policy.js';
@@ -30,9 +31,7 @@ export function createMusicQueueRecoveryStore({ getPoolFn = getPool } = {}) {
     const result = await db(queryable).query(`SELECT COALESCE(item.planning_snapshot #> '{execution,handoff}' ? 'adoption',false) AS adopted
       FROM operation_runs origin LEFT JOIN import_execution_run_items item ON item.operation_run_id=origin.id
         AND item.import_candidate_id=$1::uuid
-      WHERE origin.operation_type='import_candidate_execution_planning'
-        AND (origin.summary->>'selectedCandidateId'=$1::text OR item.import_candidate_id IS NOT NULL)
-      ORDER BY origin.created_at DESC,origin.id DESC LIMIT 1`, [candidateId]);
+      WHERE origin.id=${effectiveExecutionOriginSql({ importCandidateIdSql: '$1' })}`, [candidateId]);
     return result.rows[0]?.adopted === true;
   }
   async function getDiscovery(metadataReleaseId, queryable = null) {
@@ -59,9 +58,7 @@ export function createMusicQueueRecoveryStore({ getPoolFn = getPool } = {}) {
     await queryable.query("SELECT pg_advisory_xact_lock(hashtextextended('harmoniarr.music-queue-recovery-create',0))");
   }
   async function isCurrentExecutionOrigin(candidateId, originRunId, queryable = null) {
-    const result = await db(queryable).query(`SELECT runs.id FROM operation_runs runs WHERE operation_type='import_candidate_execution_planning'
-      AND (runs.summary->>'selectedCandidateId'=$1::text OR EXISTS(SELECT 1 FROM import_execution_run_items WHERE operation_run_id=runs.id AND import_candidate_id=$1::uuid))
-      ORDER BY runs.created_at DESC,runs.id DESC LIMIT 1`, [candidateId]);
+    const result = await db(queryable).query(`SELECT ${effectiveExecutionOriginSql({ importCandidateIdSql: '$1' })} AS id`, [candidateId]);
     return result.rows[0]?.id === originRunId;
   }
   async function getEpisode(candidateId, originRunId, queryable) {

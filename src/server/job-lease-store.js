@@ -76,8 +76,8 @@ export function createJobLeaseStore({
 } = {}) {
   const resolvedLeaseDurationMs = normalizeLeaseDurationMs(leaseDurationMs);
 
-  async function acquireLease({ jobType, leaseKey }) {
-    const result = await getPoolFn().query(
+  async function acquireLease({ jobType, leaseKey, queryable = null }) {
+    const result = await (queryable ?? getPoolFn()).query(
       `
         INSERT INTO job_leases (
           job_type,

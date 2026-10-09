@@ -122,6 +122,17 @@ export function adoptImportCandidateDownloads({ operationRunId, importCandidateI
   });
 }
 
+export function fetchImportCandidateDownloadOriginReview({ operationRunId, importCandidateId, signal } = {}) {
+  return apiRequest(`/api/v1/import-candidates/execution-runs/${encodeURIComponent(operationRunId)}/items/${encodeURIComponent(importCandidateId)}/download-origin-review`, { signal });
+}
+
+export function resolveImportCandidateDownloadOrigin({ operationRunId, importCandidateId, reviewDigest, idempotencyKey } = {}) {
+  if (typeof idempotencyKey !== 'string' || !idempotencyKey.trim()) throw new TypeError('Download resolution requires its saved command key');
+  return apiRequest(`/api/v1/import-candidates/execution-runs/${encodeURIComponent(operationRunId)}/items/${encodeURIComponent(importCandidateId)}/download-origin-resolution`, {
+    method: 'POST', includeCsrf: true, headers: { 'Idempotency-Key': idempotencyKey }, body: { reviewDigest },
+  });
+}
+
 export function fetchImportCandidateMediaInspectionSummary() {
   return apiRequest('/api/v1/import-candidates/media-inspection-summary');
 }

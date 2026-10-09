@@ -326,8 +326,8 @@ export function createSlskdService({
   providerHealthRecorder = null,
   slskdClient = null,
 } = {}) {
-  async function getRuntimeConfig() {
-    return getClientConfig();
+  async function getRuntimeConfig({ queryable } = {}) {
+    return queryable ? getClientConfig({ queryable }) : getClientConfig();
   }
 
   async function withClient(operation) {
@@ -350,8 +350,8 @@ export function createSlskdService({
     const config = effectiveDownloadConfig(await getRuntimeConfig());
     if (config.enabled === false) throw buildUnavailableProviderError(config);
     const client = slskdClient ?? createSlskdClientFn(config);
-    return { config, client, assertCurrent: async (binding, { requireCredentials = false } = {}) => {
-      const current = effectiveDownloadConfig(await getRuntimeConfig());
+    return { config, client, assertCurrent: async (binding, { requireCredentials = false, queryable } = {}) => {
+      const current = effectiveDownloadConfig(await getRuntimeConfig({ queryable }));
       assertSlskdProviderBindingCurrent({ binding, config: current });
       if (requireCredentials && current.apiKey !== config.apiKey) {
         throw createApiError(503, 'slskd_download_provider_changed', 'The Downloader credentials changed before dispatch');

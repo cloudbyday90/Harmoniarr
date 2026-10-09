@@ -6,7 +6,38 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
-## Current development slice: Batch download handoff and operator adoption (2026-10-09)
+## Current development slice: Guarded download origin resolution (2026-10-09)
+
+- Resolve one provably unused newer allocation that blocks a source-owned older
+  complete batch. Preserve both histories and use fresh administrator, session,
+  CSRF, recipient/quality, source, provider-binding and current-pair authority.
+  Paired private records, retirement, links, confirmation and required audits
+  share the existing transaction and durable command boundaries. The separate
+  [design](DOWNLOAD_ORIGIN_RESOLUTION_DESIGN.md),
+  [outcome](DOWNLOAD_ORIGIN_RESOLUTION_OUTCOME.md) and
+  [official research](ORIGIN_RESOLUTION_RESEARCH_2026_10.md) record alternatives,
+  pros/cons, final stack and actual evidence/limits.
+- Shared allocation, item, worker, lifecycle, retry and effective-origin owners
+  honor retirement. Bounded private restored polling keeps older positive work
+  observable through completion. Native confirmation refreshes both execution
+  and selected summaries; private lineage is omitted from public projections.
+- Corrected the previous slice's misplaced adoption route exports and added an
+  invoked module-handler regression. The actual top-level provider module also
+  supplies the exact-ID snapshot adapter. Full validation passes 9,126 tests
+  (3,977 server, 4,375 client, 513 script and 261 integration), zero failures/skips,
+  all policy/lint checks and both builds. Separate 31 browser scenarios and
+  37 PostgreSQL regressions pass; focused totals overlap the full run. Six
+  responsive captures were inspected; fresh audit reports zero vulnerabilities.
+- Next: persist explicit pre-provider refusal/non-dispatch certificates for future
+  leased jobs and blocked preparation/version decisions. Preserve existing unknown
+  dispatch and prove late retries cannot overwrite or send work; do not certify
+  historical missing checkpoints by inference. See the outcome for actual limits.
+- Fresh MCP PR collection/head/file checks found no eligible unreplayed patch;
+  see the separate [PR design](OPEN_PR_APPLICABILITY_ORIGIN_RESOLUTION_2026_10_DESIGN.md)
+  and [outcome](OPEN_PR_APPLICABILITY_ORIGIN_RESOLUTION_2026_10_OUTCOME.md).
+- Work remains on main without a release, branch, tag, PR merge or provider upgrade.
+
+## Prior development slice: Batch download handoff and operator adoption (2026-10-09)
 
 - Implemented source-verified slskd 0.25.1 legacy / 0.26.0 caller-ID batch
   selection, pinned provider binding, whole-manifest positive lookup recovery,

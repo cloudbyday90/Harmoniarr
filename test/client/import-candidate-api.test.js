@@ -12,6 +12,7 @@ import {
   fetchImportCandidateExecutionRunDetail,
   fetchImportCandidateExecutionSummary,
   fetchImportCandidateDownloadAdoptionReview,
+  fetchImportCandidateDownloadOriginReview,
   fetchImportCandidateMediaInspectionRunDetail,
   fetchImportCandidateMediaInspectionSummary,
   fetchImportCandidatePreview,
@@ -22,6 +23,7 @@ import {
   reconcileImportCandidateExecutionState,
   rejectImportCandidate,
   reopenImportCandidate,
+  resolveImportCandidateDownloadOrigin,
   selectImportCandidate,
   skipImportCandidateFile,
   startImportCandidateApplyRun,
@@ -55,6 +57,21 @@ test('download adoption sends only reviewed digest and identities with CSRF and 
   assert.equal(options.method, 'POST'); assert.equal(options.headers.get('X-CSRF-Token'), 'csrf-review');
   assert.equal(options.headers.get('Idempotency-Key'), 'saved-key');
   assert.deepEqual(JSON.parse(options.body), { reviewDigest: 'digest', transferIds: ['guid'] });
+});
+
+test('download origin resolution reviews one exact episode and sends only its digest with a saved key and CSRF', async (t) => {
+  globalThis.document = { cookie: 'harmoniarr_csrf=csrf-origin' }; globalThis.fetch = t.mock.fn(async () => createJsonResponse());
+  const signal = new AbortController().signal;
+  await fetchImportCandidateDownloadOriginReview({ operationRunId: 'earlier/run', importCandidateId: 'candidate/slash', signal });
+  const [readUrl, options] = globalThis.fetch.mock.calls[0].arguments;
+  assert.equal(readUrl, '/api/v1/import-candidates/execution-runs/earlier%2Frun/items/candidate%2Fslash/download-origin-review'); assert.equal(options.signal, signal);
+  assert.throws(() => resolveImportCandidateDownloadOrigin({ operationRunId: 'earlier', importCandidateId: 'candidate', reviewDigest: 'digest' }), /saved command key/u);
+  await resolveImportCandidateDownloadOrigin({ operationRunId: 'earlier', importCandidateId: 'candidate', reviewDigest: 'digest', idempotencyKey: 'saved-key',
+    newerRunId: 'untrusted', username: 'untrusted', transferIds: ['untrusted'], requestedFiles: ['private'] });
+  const [writeUrl, write] = globalThis.fetch.mock.calls[1].arguments;
+  assert.equal(writeUrl, '/api/v1/import-candidates/execution-runs/earlier/items/candidate/download-origin-resolution');
+  assert.equal(write.method, 'POST'); assert.equal(write.headers.get('X-CSRF-Token'), 'csrf-origin'); assert.equal(write.headers.get('Idempotency-Key'), 'saved-key');
+  assert.deepEqual(JSON.parse(write.body), { reviewDigest: 'digest' });
 });
 
 test('import-candidate-api fetchImportCandidates sends query params', async (t) => {

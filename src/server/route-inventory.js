@@ -217,6 +217,8 @@ export const serverRouteInventory = Object.freeze([
   { method: 'GET', path: '/api/v1/import-candidates/execution-runs/:runId', access: 'authenticated', area: 'import-candidates', kind: 'read' },
   { method: 'GET', path: '/api/v1/import-candidates/execution-runs/:runId/items/:importCandidateId/download-adoption-review', access: 'admin', area: 'import-candidates', kind: 'read' },
   { method: 'POST', path: '/api/v1/import-candidates/execution-runs/:runId/items/:importCandidateId/download-adoption', access: 'admin', area: 'import-candidates', kind: 'mutation' },
+  { method: 'GET', path: '/api/v1/import-candidates/execution-runs/:runId/items/:importCandidateId/download-origin-review', access: 'admin', area: 'import-candidates', kind: 'read' },
+  { method: 'POST', path: '/api/v1/import-candidates/execution-runs/:runId/items/:importCandidateId/download-origin-resolution', access: 'admin', area: 'import-candidates', kind: 'mutation' },
   { method: 'GET', path: '/api/v1/import-candidates/apply-summary', access: 'authenticated', area: 'import-candidates', kind: 'diagnostic' },
   { method: 'GET', path: '/api/v1/import-candidates/apply-runs/:runId', access: 'authenticated', area: 'import-candidates', kind: 'read' },
   { method: 'GET', path: '/api/v1/import-candidates/media-inspection-summary', access: 'authenticated', area: 'import-candidates', kind: 'diagnostic' },

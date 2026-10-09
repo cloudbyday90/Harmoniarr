@@ -10,12 +10,15 @@ import { useImportCandidateDownloadAdoption } from '../composables/useImportCand
 import { buildImportCandidateDownloadAdoptionPresentation } from '../lib/import-candidate-download-adoption-presentation.js';
 import { trapModalTabFocus } from '../lib/modal-focus-trap.js';
 import { createUserCommandFocusTracker } from '../lib/user-command-focus.js';
+import ImportCandidateDownloadOriginResolution from './ImportCandidateDownloadOriginResolution.vue';
 
 const props = defineProps({ operationRunId: { required: true, type: String }, importCandidateId: { required: true, type: String },
   disabled: { default: false, type: Boolean }, label: { default: 'Review download request', type: String },
   completeAdoption: { default: null, type: Function } });
 const emit = defineEmits(['adopted', 'pending-change']);
 const dialog = ref(null); const invoker = ref(null); const feedback = ref(null); let disposed = false;
+const originResolution = ref(null);
+const interactionBusy = ref(false);
 let pendingIdentity = null;
 const workflow = useImportCandidateDownloadAdoption({ operationRunId: () => props.operationRunId, importCandidateId: () => props.importCandidateId });
 const presentation = computed(() => buildImportCandidateDownloadAdoptionPresentation(workflow.review.value));
@@ -23,30 +26,40 @@ const titleId = computed(() => `download-adoption-title-${props.operationRunId}-
 const currentIdentity = () => `${props.operationRunId}/${props.importCandidateId}`;
 function closeReview() { dialog.value?.close(); }
 async function openReview(event) {
-  if (props.disabled || workflow.isPending.value || dialog.value?.open) return;
-  invoker.value = event.currentTarget; dialog.value?.showModal();
+  if (props.disabled || interactionBusy.value || workflow.isPending.value || dialog.value?.open) return;
+  invoker.value = event.currentTarget;
+  if (originResolution.value?.hasUncertainIntent === true) {
+    await originResolution.value.openReview({ returnTarget: invoker.value }); return;
+  }
+  dialog.value?.showModal();
   await workflow.loadReview();
 }
+async function openOriginReview() {
+  if (props.disabled || workflow.isLoading.value || workflow.isPending.value || workflow.review.value?.reasonCode !== 'download_episode_not_current') return;
+  const identity = currentIdentity(); closeReview(); await nextTick();
+  if (!disposed && identity === currentIdentity()) await originResolution.value?.openReview({ returnTarget: invoker.value });
+}
 async function confirm() {
-  if (props.disabled || workflow.isPending.value || workflow.isLoading.value || !presentation.value.canAdopt) return;
+  if (props.disabled || interactionBusy.value || workflow.isPending.value || workflow.isLoading.value || !presentation.value.canAdopt) return;
   const identity = currentIdentity(); const focus = createUserCommandFocusTracker({ document: globalThis.document, returnTarget: invoker.value });
+  interactionBusy.value = true;
   const promise = workflow.adopt(); closeReview();
   try {
     const result = await promise;
     if (disposed || identity !== currentIdentity()) return;
+    if (!result) { interactionBusy.value = false; await nextTick(); focus.restoreAfterFailure(); return; }
     await nextTick();
-    if (!result) { focus.restoreAfterFailure(); return; }
     if (props.completeAdoption) await props.completeAdoption({ action: result.downloadAdoption, focus });
     else if (focus.ownsFocus()) feedback.value?.focus();
     emit('adopted', result.downloadAdoption);
-  } finally { focus.dispose(); }
+  } finally { if (identity === currentIdentity()) interactionBusy.value = false; focus.dispose(); }
 }
-watch(() => workflow.isPending.value, (pending) => {
+watch(() => interactionBusy.value || workflow.isPending.value, (pending) => {
   if (pending) pendingIdentity = currentIdentity();
   emit('pending-change', { key: pendingIdentity ?? currentIdentity(), pending });
   if (!pending) pendingIdentity = null;
 }, { flush: 'sync' });
-watch(currentIdentity, closeReview, { flush: 'sync' });
+watch(currentIdentity, () => { closeReview(); interactionBusy.value = false; }, { flush: 'sync' });
 onBeforeUnmount(() => { disposed = true; closeReview(); workflow.destroy(); emit('pending-change', { key: pendingIdentity ?? currentIdentity(), pending: false }); });
 </script>
 
@@ -56,6 +69,8 @@ onBeforeUnmount(() => { disposed = true; closeReview(); workflow.destroy(); emit
     <p ref="feedback" tabindex="-1" role="status" aria-live="polite" aria-atomic="true" class="hx-download-adoption__feedback">{{ workflow.statusMessage.value }}</p>
     <p v-if="workflow.errorMessage.value && !dialog?.open" class="hx-alert" data-tone="danger" role="alert">{{ workflow.errorMessage.value }}</p>
   </div>
+  <ImportCandidateDownloadOriginResolution ref="originResolution" :operation-run-id="operationRunId" :import-candidate-id="importCandidateId"
+    :disabled="disabled" :complete-resolution="completeAdoption" @pending-change="emit('pending-change', $event)" />
   <dialog ref="dialog" class="hx-download-adoption__dialog" :aria-labelledby="titleId" @keydown="trapModalTabFocus">
     <form method="dialog" class="hx-download-adoption__content" @submit.prevent="confirm">
       <h2 :id="titleId">Use existing downloads?</h2>
@@ -74,6 +89,8 @@ onBeforeUnmount(() => { disposed = true; closeReview(); workflow.destroy(); emit
       </div>
       <div class="hx-download-adoption__actions">
         <button type="button" class="hx-btn" autofocus @click="closeReview">Cancel</button>
+        <button v-if="!presentation.canAdopt && workflow.review.value?.reasonCode === 'download_episode_not_current'" type="button" class="hx-btn"
+          :disabled="disabled || workflow.isLoading.value || workflow.isPending.value" @click="openOriginReview">Review earlier download request</button>
         <button v-if="presentation.canAdopt" type="submit" class="hx-btn" data-variant="primary" :disabled="workflow.isLoading.value || workflow.isPending.value || disabled">Use existing downloads</button>
       </div>
     </form>

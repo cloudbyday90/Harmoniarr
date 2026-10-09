@@ -17,6 +17,7 @@
  */
 
 import { isUnconfirmedExecutionItem } from './import-candidate-execution-handoff-state.js';
+import { mergeExecutionObservationRuns } from './import-execution-observation-policy.js';
 import { hasPersistedMusicQueueOwnership } from './import-candidate-music-queue-auto-safe-add-policy.js';
 import { matchesAcceptedRecoveryProvenance } from './music-queue-recovery-policy.js';
 import {
@@ -159,7 +160,7 @@ export function createImportCandidateExecutionReconciliationService({
   } = {}) {
     const checkedAt = new Date().toISOString();
     const currentRun = executionSummary.currentRun;
-    const runs = [...new Map([currentRun, ...(executionSummary.unconfirmedRuns ?? [])].filter(Boolean).map((run) => [run.id, run])).values()];
+    const runs = mergeExecutionObservationRuns([currentRun, ...(executionSummary.unconfirmedRuns ?? []), ...(executionSummary.restoredRuns ?? [])]);
     let snapshotsUpdated = 0;
     const retries = [];
     const transitions = [];

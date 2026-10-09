@@ -18,6 +18,7 @@
 
 import { createImportCandidateRunItemRepository } from './import-candidate-run-item-repository.js';
 import { getPool } from '../database.js';
+import { writableExecutionRunSql } from './import-execution-origin-sql.js';
 
 const importExecutionRunItemRepository = createImportCandidateRunItemRepository({
   snapshotColumn: 'planning_snapshot',
@@ -58,6 +59,7 @@ export async function updateImportExecutionRunItem({
     statusMessage,
     expectedAttemptId: planningSnapshot?.execution?.handoff?.attempt?.attemptId ?? null,
     expectedAdoptionId: planningSnapshot?.execution?.handoff?.adoption?.adoptionId ?? null,
+    expectedOriginResolutionId: planningSnapshot?.execution?.handoff?.originResolution?.resolutionId ?? null,
   }, queryable);
 
   return item ? {
@@ -68,7 +70,8 @@ export async function updateImportExecutionRunItem({
 
 export async function recordImportExecutionAcceptedObservation({ importCandidateId, operationRunId, observation }, queryable) {
   await (queryable ?? getPool()).query(`UPDATE import_execution_run_items SET planning_snapshot=jsonb_set(planning_snapshot,
-    '{execution,acceptedCandidateObservation}',$3::jsonb),updated_at=NOW() WHERE operation_run_id=$1::uuid AND import_candidate_id=$2::uuid`,
+    '{execution,acceptedCandidateObservation}',$3::jsonb),updated_at=NOW() WHERE operation_run_id=$1::uuid AND import_candidate_id=$2::uuid
+    AND EXISTS(SELECT 1 FROM operation_runs parent WHERE parent.id=operation_run_id AND ${writableExecutionRunSql('parent')})`,
   [operationRunId, importCandidateId, JSON.stringify(observation)]);
 }
 
@@ -125,15 +128,18 @@ export async function upsertImportExecutionRunItem({
     preserveExisting: true,
   }, queryable);
 
-  return {
+  return item ? {
     ...item,
     planningSnapshot: item.snapshot,
-  };
+  } : null;
 }
 
 /** Initializers preserve any checkpoint another worker already committed. */
 export async function initializeImportExecutionRunItems(operationRunId, items, queryable) {
   const stored = [];
-  for (const item of items) stored.push(await upsertImportExecutionRunItem({ ...item, operationRunId }, queryable));
+  for (const item of items) {
+    const inserted = await upsertImportExecutionRunItem({ ...item, operationRunId }, queryable);
+    if (inserted) stored.push(inserted);
+  }
   return stored;
 }

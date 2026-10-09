@@ -24,11 +24,12 @@ export function createSlskdModule({
   providerHealthRecorder = null,
   slskdConfigService = createSlskdConfigService(),
   slskdService = createSlskdService({
-    getClientConfig: async () => slskdConfigService.buildRuntimeConfig(),
+    getClientConfig: async ({ queryable } = {}) => slskdConfigService.buildRuntimeConfig(queryable),
     providerHealthRecorder,
   }),
   slskdTransferSnapshotService = createSlskdTransferSnapshotService({
     getDownloads: slskdService.getDownloads,
+    getBoundDownloads: typeof slskdService.getBoundDownloads === 'function' ? slskdService.getBoundDownloads : undefined,
   }),
 } = {}) {
   return {

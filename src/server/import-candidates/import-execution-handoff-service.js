@@ -61,8 +61,8 @@ export function createImportExecutionHandoffService({ store = createImportExecut
     });
   }
   async function confirmDownloadHandoff({ importCandidateId, operationRunId, attemptId, expectedAttempt, enqueueResult, providerEvidence, actorUserId = null,
-    warningMessage = null, requestMetadata = null }) {
-    return withTransaction(async (queryable) => {
+    warningMessage = null, requestMetadata = null, queryable: callerQueryable = null }) {
+    const write = async (queryable) => {
       const owner = { importCandidateId, operationRunId };
       const item = await store.lockEvidence(owner, queryable);
       const execution = item?.planningSnapshot?.execution ?? {};
@@ -124,7 +124,8 @@ export function createImportExecutionHandoffService({ store = createImportExecut
         details: { importCandidateId, requestedFileCount: proof.requestedFileCount } }, queryable);
       return { ...proof, confirmed, definitiveFailure: rejected, candidate: updated, item: storedItem, statusMessage,
         phaseAdvanced, dispatchAllowed: false };
-    });
+    };
+    return callerQueryable ? write(callerQueryable) : withTransaction(write);
   }
   async function assertDownloadHandoffCurrent({ importCandidateId, operationRunId, attemptId, expectedAttempt }) {
     return withTransaction(async (queryable) => {

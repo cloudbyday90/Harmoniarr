@@ -19,6 +19,9 @@
 import { getPool } from './database.js';
 import { buildJobLeaseKey, createJobLeaseStore } from './job-lease-store.js';
 import { createOperationRetryPolicyService } from './operation-retry-policy-service.js';
+import { createDatabaseTransactionRunner } from './database-transaction-service.js';
+import { lockExecutionRunLeaseAdmission } from './import-candidates/import-execution-allocation-store.js';
+import { resolvedExecutionRunSql, validExecutionOriginSupersessionSql, writableExecutionRunSql } from './import-candidates/import-execution-origin-sql.js';
 
 function toNumberOrNull(value) {
   return Number.isFinite(value) ? value : null;
@@ -48,13 +51,14 @@ const unreservedMusicQueueRecoverySql = `NOT (
 )`;
 
 // Retention must not erase the no-second-POST checkpoint, including older manual runs.
-const withoutUnresolvedDownloadHandoffSql = `NOT EXISTS (
+const withoutUnresolvedDownloadHandoffSql = `${writableExecutionRunSql('operation_runs')} AND NOT EXISTS (
   SELECT 1 FROM import_execution_run_items retained_handoff
   WHERE retained_handoff.operation_run_id = operation_runs.id
     AND ((retained_handoff.item_status = 'awaiting_confirmation'
       AND retained_handoff.planning_snapshot #>> '{execution,handoff,state}' IS DISTINCT FROM 'not_dispatched')
       OR retained_handoff.planning_snapshot #>> '{execution,handoff,state}' IN ('dispatching', 'awaiting_confirmation')
-      OR retained_handoff.planning_snapshot #> '{execution,handoff,adoption,originalUncertainty}'='true'::jsonb)
+      OR retained_handoff.planning_snapshot #> '{execution,handoff,adoption,originalUncertainty}'='true'::jsonb
+      OR COALESCE(retained_handoff.planning_snapshot #> '{execution,handoff}','{}'::jsonb) ? 'originResolution')
 )`;
 
 /**
@@ -168,6 +172,7 @@ function normalizeOperationRun(row) {
     startedAt: row.started_at?.toISOString?.() ?? row.started_at ?? null,
     status: row.status,
     summary: normalizeRunSummary(row.summary),
+    ...(row.download_origin_resolved === true ? { downloadOriginResolved: true } : {}),
   };
 }
 
@@ -252,9 +257,11 @@ export function createOperationRunStore({
     const pool = getPoolFn();
     const result = await pool.query(
       `
-        SELECT id, operation_type, status, started_at, finished_at, summary, error_message, cancel_requested_at, cancel_requested_by_user_id, cancelled_at, next_attempt_at, attempt_count, max_attempts, claimed_at, claimed_by_instance_id
+        SELECT id, operation_type, status, started_at, finished_at, summary, error_message, cancel_requested_at, cancel_requested_by_user_id, cancelled_at, next_attempt_at, attempt_count, max_attempts, claimed_at, claimed_by_instance_id,
+          ${resolvedExecutionRunSql('operation_runs')} AS download_origin_resolved
         FROM operation_runs
         WHERE operation_type = $1
+          AND NOT (${validExecutionOriginSupersessionSql({ runAlias: 'operation_runs' })})
         ORDER BY started_at DESC, created_at DESC
         LIMIT 1
       `,
@@ -268,7 +275,8 @@ export function createOperationRunStore({
     const pool = getPoolFn();
     const result = await pool.query(
       `
-        SELECT id, operation_type, status, started_at, finished_at, summary, error_message, cancel_requested_at, cancel_requested_by_user_id, cancelled_at, next_attempt_at, attempt_count, max_attempts, claimed_at, claimed_by_instance_id
+        SELECT id, operation_type, status, started_at, finished_at, summary, error_message, cancel_requested_at, cancel_requested_by_user_id, cancelled_at, next_attempt_at, attempt_count, max_attempts, claimed_at, claimed_by_instance_id,
+          ${resolvedExecutionRunSql('operation_runs')} AS download_origin_resolved
         FROM operation_runs
         WHERE operation_type = $1
           AND id = $2
@@ -308,6 +316,7 @@ export function createOperationRunStore({
           claimed_by_instance_id = NULL,
             error_message = NULL
         WHERE id = $1
+          AND ${writableExecutionRunSql('operation_runs')}
       `,
       [runId, JSON.stringify(normalizeRunSummary(summary))],
     );
@@ -326,6 +335,7 @@ export function createOperationRunStore({
           claimed_by_instance_id = NULL,
             error_message = NULL
         WHERE id = $1
+          AND ${writableExecutionRunSql('operation_runs')}
       `,
       [runId, JSON.stringify(normalizeRunSummary(summary))],
     );
@@ -352,6 +362,7 @@ export function createOperationRunStore({
               error_message = NULL,
               next_attempt_at = $3::timestamptz
           WHERE id = $1
+            AND ${writableExecutionRunSql('operation_runs')}
         `,
         [
           runId,
@@ -378,6 +389,7 @@ export function createOperationRunStore({
           claimed_by_instance_id = NULL,
             error_message = $3
         WHERE id = $1
+          AND ${writableExecutionRunSql('operation_runs')}
       `,
       [runId, JSON.stringify(normalizeRunSummary(summary)), errorMessage],
     );
@@ -438,6 +450,7 @@ export function createOperationRunStore({
           claimed_by_instance_id = NULL,
             error_message = NULL
         WHERE id = $1
+          AND ${writableExecutionRunSql('operation_runs')}
       `,
       [runId, JSON.stringify(normalizeRunSummary(summary))],
     );
@@ -458,16 +471,23 @@ export function createOperationRunStore({
             attempt_count = GREATEST(attempt_count - 1, 0)
         WHERE id = $1
           AND status IN ('pending', 'running')
+          AND ${writableExecutionRunSql('operation_runs')}
       `,
       [runId, JSON.stringify(normalizeRunSummary(summary)), nextAttemptAt],
     );
   }
 
   async function acquireLease({ runId }) {
-    const lease = await jobLeaseStore.acquireLease({
+    const acquire = (queryable = null) => jobLeaseStore.acquireLease({
       jobType: resolvedLeaseJobType,
       leaseKey: buildLeaseKey(runId),
+      ...(queryable ? { queryable } : {}),
     });
+    const lease = operationType === 'import_candidate_execution_planning'
+      ? await createDatabaseTransactionRunner({ getPoolFn })(async (queryable) => {
+        if (!await lockExecutionRunLeaseAdmission({ runId, queryable })) return null;
+        return acquire(queryable);
+      }) : await acquire();
 
     if (!lease) {
       throw createOperationRunLeaseUnavailableError({ runId });

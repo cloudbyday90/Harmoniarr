@@ -84,3 +84,21 @@ exact manifest/ID/peer/size/direction/BatchId and positive state checks, rather
 than generalizing from record existence or timestamps. Explicit operator
 adoption is a new consent decision with separate provenance; it must preserve
 original dispatch uncertainty and refuse automatic recovery based on absence.
+
+## Origin resolution maintenance, October 9
+
+Fresh MCP discovery/opening for `docs/ORIGIN_RESOLUTION_RESEARCH_2026_10.md`
+rechecked OWASP authorization/transaction/business logic, RFC 9110, PostgreSQL 18
+locking/consistency, W3C publication history/status/H102 and WHATWG dialog. The
+[frozen WCAG 2.2 Recommendation](https://www.w3.org/TR/2024/REC-WCAG22-20241212/)
+was reached through W3C history. Earlier provider research is explicitly inherited,
+not a new certification of changing provider versions.
+
+An explicit ownership resolution is an application inference from these sources.
+A row lock on existing work does not reserve an absent future allocation; its
+creation/association must participate in the same parent fence. A cancelled run
+may already have dispatched. Keep the exact locally proved unused job separate
+from older positive provider evidence, preserve paired authority across all
+writers/readers and recheck current significant data before commit. Verify native
+sequential modal focus and expose pending results after closure; a DOM pass is
+not evidence of assistive-technology speech.

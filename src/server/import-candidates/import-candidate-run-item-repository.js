@@ -17,6 +17,9 @@
  */
 
 import { getPool } from '../database.js';
+import { writableExecutionRunSql } from './import-execution-origin-sql.js';
+import { createDatabaseTransactionRunner } from '../database-transaction-service.js';
+import { createApiError } from '../auth.js';
 
 function resolveQueryable(queryable) {
   return queryable ?? getPool();
@@ -64,7 +67,20 @@ export function createImportCandidateRunItemRepository({
   }
 
   async function replaceRunItems(operationRunId, items, queryable) {
+    if (tableName === 'import_execution_run_items' && (!queryable || typeof queryable.release !== 'function')) {
+      return createDatabaseTransactionRunner({ getPoolFn: () => queryable ?? getPool() })(
+        (client) => replaceRunItems(operationRunId, items, client));
+    }
     const db = resolveQueryable(queryable);
+    if (tableName === 'import_execution_run_items') {
+      const existing = await db.query('SELECT import_candidate_id FROM import_execution_run_items WHERE operation_run_id=$1::uuid', [operationRunId]);
+      const ids = [...new Set([...items.map((item) => item.importCandidateId), ...existing.rows.map((row) => row.import_candidate_id)])].sort();
+      await db.query('SELECT id FROM import_candidates WHERE id=ANY($1::uuid[]) ORDER BY id FOR UPDATE', [ids]);
+      const guard = await db.query(`SELECT id FROM operation_runs WHERE id=$1::uuid AND ${writableExecutionRunSql('operation_runs')}
+        AND NOT EXISTS(SELECT 1 FROM import_execution_run_items source_item WHERE source_item.operation_run_id=$1::uuid
+          AND COALESCE(source_item.planning_snapshot #> '{execution,handoff}','{}'::jsonb) ? 'originResolution') FOR UPDATE`, [operationRunId]);
+      if (!guard.rowCount) throw createApiError(409, 'import_execution_origin_resolution_stale', 'The execution history is protected');
+    }
     await db.query(
       `DELETE FROM ${tableName} WHERE operation_run_id = $1`,
       [operationRunId],
@@ -110,10 +126,14 @@ export function createImportCandidateRunItemRepository({
     statusMessage,
     expectedAttemptId = undefined,
     expectedAdoptionId = undefined,
+    expectedOriginResolutionId = undefined,
   }, queryable) {
     const db = resolveQueryable(queryable);
     const result = await db.query(
-      `
+      `${tableName === 'import_execution_run_items' ? `WITH candidate_guard AS MATERIALIZED (
+        SELECT id FROM import_candidates WHERE id=$2::uuid FOR UPDATE),
+        run_guard AS MATERIALIZED (SELECT parent.id FROM operation_runs parent JOIN candidate_guard ON TRUE
+          WHERE parent.id=$1::uuid AND ${writableExecutionRunSql('parent')} FOR SHARE OF parent)` : ''}
         UPDATE ${tableName}
         SET item_status = $3,
             status_message = $4,
@@ -123,6 +143,8 @@ export function createImportCandidateRunItemRepository({
           AND import_candidate_id = $2
           ${expectedAttemptId !== undefined ? `AND ${snapshotColumn} #>> '{execution,handoff,attempt,attemptId}' IS NOT DISTINCT FROM $6::text` : ''}
           ${expectedAdoptionId !== undefined ? `AND ${snapshotColumn} #>> '{execution,handoff,adoption,adoptionId}' IS NOT DISTINCT FROM $7::text` : ''}
+          ${expectedOriginResolutionId !== undefined ? `AND ${snapshotColumn} #>> '{execution,handoff,originResolution,resolutionId}' IS NOT DISTINCT FROM $8::text` : ''}
+          ${tableName === 'import_execution_run_items' ? 'AND EXISTS(SELECT 1 FROM run_guard)' : ''}
         RETURNING *
       `,
       [
@@ -133,6 +155,7 @@ export function createImportCandidateRunItemRepository({
         JSON.stringify(snapshot ?? {}),
         ...(expectedAttemptId !== undefined ? [expectedAttemptId] : []),
         ...(expectedAdoptionId !== undefined ? [expectedAdoptionId] : []),
+        ...(expectedOriginResolutionId !== undefined ? [expectedOriginResolutionId] : []),
       ],
     );
 
@@ -150,7 +173,10 @@ export function createImportCandidateRunItemRepository({
   }, queryable) {
     const db = resolveQueryable(queryable);
     const result = await db.query(
-      `
+      `${tableName === 'import_execution_run_items' ? `WITH candidate_guard AS MATERIALIZED (
+        SELECT id,status FROM import_candidates WHERE id=$2::uuid FOR UPDATE),
+        run_guard AS MATERIALIZED (SELECT parent.id FROM operation_runs parent JOIN candidate_guard ON TRUE
+          WHERE parent.id=$1::uuid AND ${writableExecutionRunSql('parent')} FOR SHARE OF parent)` : ''}
         INSERT INTO ${tableName} (
           operation_run_id,
           import_candidate_id,
@@ -160,7 +186,11 @@ export function createImportCandidateRunItemRepository({
           ${snapshotColumn},
           updated_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6::jsonb, NOW())
+        ${tableName === 'import_execution_run_items' ? `SELECT $1,$2,$3,$4,$5,$6::jsonb,NOW()
+          FROM candidate_guard candidate_parent JOIN run_guard parent ON TRUE
+          WHERE TRUE
+            AND (candidate_parent.status='selected' OR EXISTS(SELECT 1 FROM import_execution_run_items existing
+              WHERE existing.operation_run_id=$1::uuid AND existing.import_candidate_id=$2::uuid))` : 'VALUES ($1, $2, $3, $4, $5, $6::jsonb, NOW())'}
         ON CONFLICT (operation_run_id, import_candidate_id) DO UPDATE
         ${preserveExisting ? `SET operation_run_id = ${tableName}.operation_run_id` : `SET position = EXCLUDED.position,
             item_status = EXCLUDED.item_status,
@@ -179,7 +209,7 @@ export function createImportCandidateRunItemRepository({
       ],
     );
 
-    return mapRunItem(result.rows[0]);
+    return result.rows[0] ? mapRunItem(result.rows[0]) : null;
   }
 
   return {

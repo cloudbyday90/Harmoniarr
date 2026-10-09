@@ -19,6 +19,7 @@
 import { createApiError } from './auth.js';
 import { getPool } from './database.js';
 import { createOperationQueueStore } from './operation-queue-store.js';
+import { createControlPlaneRedactionService } from './control-plane-redaction-service.js';
 import {
   canRequestOperationRunCancellation,
   canRequestOperationRunRetry,
@@ -125,7 +126,8 @@ export function createOperationRunControlService({
       [runId, requestedByUserId],
     );
 
-    return toOperationRun(result.rows[0]);
+    const run = toOperationRun(result.rows[0]);
+    return run ? { ...run, summary: createControlPlaneRedactionService().redactOperationSummary(run.summary) } : null;
   }
 
   async function requestOperationRunRetry({ runId }) {
@@ -137,6 +139,9 @@ export function createOperationRunControlService({
 
     if (!canRequestOperationRunRetry(existingRun)) {
       throw createApiError(409, 'operation_run_not_retryable', 'Operation run is not retryable');
+    }
+    if (Object.hasOwn(existingRun.summary ?? {}, 'downloadOriginSupersession')) {
+      throw createApiError(409, 'operation_run_not_retryable', 'A retired download request cannot be restarted');
     }
 
     return operationQueueStore.scheduleRetry({
