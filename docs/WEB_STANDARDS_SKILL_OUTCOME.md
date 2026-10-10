@@ -435,3 +435,14 @@ remain unchanged; this is structure/identity evidence, not a new blind skill tri
 The follow-up also maps pre-aborted startup, pre-launch registration and startup
 failure drainage to the observed scan adapter. Its adverse controls remain
 separate from the unclassified trigger of the original full-run timeout.
+
+## Prepared test database maintenance, October 10, America/New_York
+
+The maintained references locate migration fingerprint/ledger owners, source
+sealing, fresh clones and strict owned cleanup. They distinguish zero-session
+evidence from administrator-proof immutability and inclusive/nested phase costs
+from whole-gate performance. Runtime/PostgreSQL evidence remains in the separate
+template outcome; structural validation passed for source/installed copies and
+all four standards files match by SHA256 at final freeze. Metadata and invocation
+policy remain unchanged. This is structural/runtime evidence, not a new blind
+skill trial or frontend conformance claim.

@@ -57,6 +57,16 @@ Reject pre-aborted startup and register observed completion before launching
 detached work; refused late registration must not leave a worker running. Startup
 failure must settle that registered completion rather than hanging its drain.
 
+Wanted explicitly opts into a per-file migration-only template. Keep its fresh
+scenario clones and idempotent migration check; do not template dedicated
+migration/bootstrap/recovery validation. Use `HARMONIARR_INTEGRATION_WANTED_SCHEMA_MODE=empty`
+for a comparison profile. Source admission requires verified input lineage,
+connection sealing and zero active source sessions. Strict selected-mode cleanup
+rejects otherwise successful work after cleanup failure; original errors still win.
+See `docs/POSTGRES_TEST_TEMPLATES_DESIGN.md` and its outcome for ownership and
+measurement limits. Build independent clients from owned connection config;
+spreading internal `pool.options` can omit protected, non-enumerable credentials.
+
 Use PowerShell commands from the repository root.
 
 ## Validation Matrix

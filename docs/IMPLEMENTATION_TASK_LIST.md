@@ -6,7 +6,37 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
-## Current development slice: Fixture observability and lifecycle (2026-10-10)
+## Current development slice: Prepared PostgreSQL test databases (2026-10-10)
+
+- Four ESM modules own migration input/implementation fingerprints, pool-bound
+  full ledger/key verification, source SQL and private template lifecycle. Only
+  Wanted explicitly selects a per-file template; thirty fresh scenario databases,
+  seeds, ten case assertions, real transactions and deadlines remain unchanged.
+  See [design](POSTGRES_TEST_TEMPLATES_DESIGN.md),
+  [outcome](POSTGRES_TEST_TEMPLATES_OUTCOME.md) and
+  [official research](POSTGRES_TEST_TEMPLATES_RESEARCH_2026_10.md).
+- Seal source connections and verify quiescence/OID/role/configuration before
+  publication/admission. Register work before awaits; retain positively created
+  ownership, sibling/replacement refusal and strict selected-mode cleanup.
+- Focused controls pass 65; corrected real PostgreSQL acceptance passes 18,
+  including the unchanged Wanted cases. Dedicated untemplated bootstrap passes
+  105/105 migrations. Complete `npm run validate` passes 9,783 tests (4,535 server,
+  4,377 client, 525 script, 346 integration), zero failures/cancellations/skips,
+  all checks and both builds. Security reports zero npm vulnerabilities; skills
+  validate structurally with four-file source/installed standards identity.
+- Local Wanted suite: 59.34s to 17.89s; repeated migration sum 43.63s to one
+  1.26s preparation plus 0.69s checks. Clone creation/admission adds cost; this
+  pair does not establish CI capacity or whole-gate speedup. Final integration
+  took 22m55s and validation 25m24s wall; aggregate improvement is not demonstrated.
+- Next: parent-owned PostgreSQL for serial file subprocesses with registered
+  child databases and parent-only shutdown; validate child failure/drain and
+  measure startup before adoption. Discovery-request recomputation remains next
+  product work. Stay on main without release/branch/tag/deployment/PR merge.
+- Fresh PR assessment is separate:
+  [design](OPEN_PR_APPLICABILITY_TEST_TEMPLATES_2026_10_DESIGN.md) and
+  [outcome](OPEN_PR_APPLICABILITY_TEST_TEMPLATES_2026_10_OUTCOME.md).
+
+## Prior development slice: Fixture observability and lifecycle (2026-10-10)
 
 - Pair native serial output with approved early failure locations/categories;
   expose optional monotonic setup/schema/fixture/work/cleanup measurements.

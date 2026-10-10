@@ -100,3 +100,12 @@ without starting detached work. Startup failure must settle the registered drain
 Use native held-case reporter proof, error/privacy canaries, deterministic clocks,
 release/drain failure controls and real isolated PostgreSQL ownership beside
 structure checks. The separate fixture-observability outcome owns executed claims.
+
+Prepared-schema admission maps to `migration-template-inputs.js`,
+`migration-template-preparation.js`, `postgres-template-store.js` and
+`postgres-migration-template.js` under `testing/integration/`. Trace actual
+lineage/profile, private source sealing, fresh clone ownership and strict cleanup.
+Use real rows/triggers/leases, source connection denial, fingerprint drift and
+replacement-OID/sibling controls beside unit evidence. Dedicated fresh migration
+and snapshot-bootstrap proof remain separate; nested creation/admission spans
+must not be added twice. The template outcome owns measured/complete-gate claims.

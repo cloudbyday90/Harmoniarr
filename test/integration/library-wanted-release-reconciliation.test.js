@@ -155,7 +155,8 @@ async function scanWorker(c, runs, run, reconcile, signal = c.signal) {
 
 suite('Current operator inputs own wanted rows and discovery links', () => {
   before(async () => {
-    try { runtime = await createPostgresIntegrationRuntime({ config }); }
+    try { runtime = await createPostgresIntegrationRuntime({ config,
+      schemaMode: process.env.HARMONIARR_INTEGRATION_WANTED_SCHEMA_MODE ?? 'migration_template' }); }
     catch (error) {
       if (!isSkippableIntegrationRuntimeError(error)) throw error;
       unavailable = toIntegrationRuntimeUnavailableReason(error);

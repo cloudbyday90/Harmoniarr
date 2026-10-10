@@ -35,11 +35,18 @@ export async function withTemporaryPostgresDatabase({
   databaseName = createTemporaryDatabaseName(),
   env = process.env,
   phaseObserver = createIntegrationFixturePhaseObserver({ env }),
+  createDatabaseFn = ({ adminClient, databaseName: name }) => adminClient.query(`CREATE DATABASE ${quoteIdentifier(name)}`),
+  strictCleanup = false,
+  signal,
   run,
 } = {}) {
   if (typeof run !== 'function') {
     throw new Error('run is required');
   }
+  if (typeof createDatabaseFn !== 'function' || typeof strictCleanup !== 'boolean'
+    || (signal != null && typeof signal.aborted !== 'boolean')) throw new TypeError('Invalid temporary database lifecycle options');
+  const assertNotAborted = () => { if (signal?.aborted) throw signal.reason; };
+  assertNotAborted();
 
   const adminConfig = buildPostgresAdminConnectionConfig(env);
   const databaseConfig = {
@@ -50,34 +57,46 @@ export async function withTemporaryPostgresDatabase({
   const databasePoolRuntimeState = { closing: false };
   let databasePool;
   let databaseCreated = false;
+  let result; let primaryError; let failed = false; let cleanupError; let cleanupFailed = false;
+  const cleanup = async (phase, operation) => {
+    try { await phaseObserver.measure(phase, operation); }
+    catch (error) { if (!cleanupFailed) { cleanupFailed = true; cleanupError = error; } }
+  };
 
   try {
     await phaseObserver.measure('database_connect', () => adminClient.connect());
-    await phaseObserver.measure('database_create', () => adminClient.query(`CREATE DATABASE ${quoteIdentifier(databaseName)}`));
+    assertNotAborted();
+    await phaseObserver.measure('database_create', () => createDatabaseFn({ adminClient, databaseName }));
     databaseCreated = true;
+    assertNotAborted();
     databasePool = await phaseObserver.measure('pool_create', () => createPool(databaseConfig));
     if (typeof databasePool?.on === 'function') {
       attachPoolErrorHandler(databasePool, { runtimeState: databasePoolRuntimeState });
     }
+    assertNotAborted();
 
-    return await run({
+    result = await run({
       databaseConfig,
       databaseName,
       getPoolFn: () => databasePool,
       phaseObserver,
     });
-  } finally {
+  } catch (error) { failed = true; primaryError = error; }
+  finally {
     databasePoolRuntimeState.closing = true;
-    if (databasePool) await phaseObserver.measure('pool_close', () => databasePool.end()).catch(() => {});
+    if (databasePool) await cleanup('pool_close', () => databasePool.end());
 
     if (databaseCreated && typeof adminClient.query === 'function') {
-      await phaseObserver.measure('backend_drain', () => drainPostgresFixtureBackends({ adminClient, databaseName })).catch(() => {});
+      await cleanup('backend_drain', () => drainPostgresFixtureBackends({ adminClient, databaseName }));
 
-      await phaseObserver.measure('database_drop', () => adminClient.query(`DROP DATABASE IF EXISTS ${quoteIdentifier(databaseName)}`)).catch(() => {});
+      await cleanup('database_drop', () => adminClient.query(`DROP DATABASE IF EXISTS ${quoteIdentifier(databaseName)}`));
     }
 
     if (typeof adminClient.end === 'function') {
-      await phaseObserver.measure('admin_close', () => adminClient.end()).catch(() => {});
+      await cleanup('admin_close', () => adminClient.end());
     }
   }
+  if (failed) throw primaryError;
+  if (strictCleanup && cleanupFailed) throw cleanupError;
+  return result;
 }

@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { withTemporaryPostgresDatabase } from '../../testing/postgres-temporary-database.js';
 import { createFixturePhaseObserver } from '../../testing/integration/fixture-phase-observer.js';
+import { createFixtureGate } from '../../testing/integration/fixture-lifecycle.js';
 
 function fixture({ createError = null, runError = null, poolError = null, countError = null } = {}) {
   const calls = []; const records = [];
@@ -69,4 +70,60 @@ test('callback failure keeps its identity when pool cleanup fails and owned data
   await assert.rejects(withTemporaryPostgresDatabase(f.input), (error) => error === primary);
   assert.ok(f.calls.some((call) => typeof call === 'object' && /^DROP DATABASE/u.test(call.sql)));
   assert.equal(f.records.find((record) => record.phase === 'pool_close').outcome, 'failed');
+});
+
+test('strict cleanup rejects incomplete pool closure after an otherwise successful scenario', async () => {
+  const failure = new Error('Controlled pool closure failure'); const f = fixture({ poolError: failure });
+  await assert.rejects(withTemporaryPostgresDatabase({ ...f.input, strictCleanup: true }), (error) => error === failure);
+  assert.ok(f.calls.some((call) => typeof call === 'object' && /^DROP DATABASE/u.test(call.sql)));
+  assert.equal(f.calls.at(-1), 'admin:end');
+});
+
+test('legacy cleanup keeps its successful result while strict verification rejects an unreadable drain', async () => {
+  const failure = new Error('Controlled unreadable backend count');
+  const legacy = fixture({ countError: failure });
+  assert.equal(await withTemporaryPostgresDatabase(legacy.input), 'complete');
+  const strict = fixture({ countError: failure });
+  await assert.rejects(withTemporaryPostgresDatabase({ ...strict.input, strictCleanup: true }), (error) => error === failure);
+});
+
+test('strict cleanup preserves a null primary error and continues all owned cleanup', async () => {
+  const f = fixture({ poolError: new Error('Secondary closure failure') });
+  await withTemporaryPostgresDatabase({ ...f.input, strictCleanup: true, run: async () => { throw null; } })
+    .then(() => assert.fail('The scenario failure was lost'), (error) => assert.equal(error, null));
+  assert.ok(f.calls.some((call) => typeof call === 'object' && /^DROP DATABASE/u.test(call.sql)));
+  assert.equal(f.calls.at(-1), 'admin:end');
+});
+
+test('an adapter creation refusal never gains cleanup ownership', async () => {
+  const failure = Object.assign(new Error('Controlled clone collision'), { code: '42P04' }); const f = fixture();
+  await assert.rejects(withTemporaryPostgresDatabase({ ...f.input, strictCleanup: true,
+    createDatabaseFn: async () => { throw failure; } }), (error) => error === failure);
+  assert.equal(f.calls.includes('run'), false);
+  assert.equal(f.calls.some((call) => typeof call === 'object' && /DROP DATABASE|pg_terminate_backend/u.test(call.sql)), false);
+});
+
+test('pre-aborted creation launches nothing; cancellation after acknowledged creation cleans only the owned database', async () => {
+  const controller = new AbortController(); controller.abort(null); const before = fixture();
+  await withTemporaryPostgresDatabase({ ...before.input, signal: controller.signal })
+    .then(() => assert.fail('A cancelled creation launched'), (error) => assert.equal(error, null));
+  assert.deepEqual(before.calls, []);
+  const during = new AbortController(); const reason = new Error('Cancelled after creation'); const after = fixture();
+  await assert.rejects(withTemporaryPostgresDatabase({ ...after.input, signal: during.signal,
+    createDatabaseFn: async () => { after.calls.push('create acknowledged'); during.abort(reason); } }), (error) => error === reason);
+  assert.equal(after.calls.includes('run'), false); assert.equal(after.calls.includes('pool:end'), false);
+  assert.ok(after.calls.some((call) => typeof call === 'object' && /^DROP DATABASE/u.test(call.sql)));
+});
+
+test('cancellation during asynchronous pool creation closes its pool and never starts scenario work', async () => {
+  const f = fixture(); const originalFactory = f.input.createPool;
+  const entered = createFixtureGate(); const resume = createFixtureGate();
+  const controller = new AbortController(); const reason = new Error('Cancelled during pool creation');
+  const operation = withTemporaryPostgresDatabase({ ...f.input, strictCleanup: true, signal: controller.signal,
+    createPool: async () => { entered.release(); await resume.promise; return originalFactory(); } });
+  operation.catch(() => {});
+  await entered.promise; controller.abort(reason); resume.release();
+  await assert.rejects(operation, (error) => error === reason);
+  assert.equal(f.calls.includes('run'), false); assert.equal(f.calls.includes('pool:end'), true);
+  assert.ok(f.calls.some((call) => typeof call === 'object' && /^DROP DATABASE/u.test(call.sql)));
 });

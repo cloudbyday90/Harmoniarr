@@ -223,3 +223,12 @@ testing evidence separate from W3C frontend conformance. Preserve entry point,
 metadata and invocation policy; validate/sync maintained references after edits.
 Map scan-fixture startup to pre-abort refusal, completion registration before
 launch and settled startup failure, so late callbacks cannot invent unowned work.
+
+## Prepared test database maintenance, October 10, America/New_York
+
+Map migration-only input identity, private source sealing/quiescence, independent
+clone resources, observed OID/role checks and strict selected-mode cleanup to the
+new fixture owners. Keep database settings/GRANT copying, privileged-administrator
+and unabortable-I/O limits explicit. Link separate fresh bootstrap and clone
+acceptance evidence; do not infer global speed or conformance from a local pair.
+Preserve entry point, metadata and invocation policy; validate/sync references.

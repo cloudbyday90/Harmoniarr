@@ -348,3 +348,14 @@ failure must settle its already-registered completion. The scan-fixture controls
 map these local ownership rules separately from the original timeout's trigger.
 These are testing/evidence boundaries, not frontend conformance or universal
 I/O cancellation claims.
+
+## Prepared test database maintenance, October 10, America/New_York
+
+The fresh `docs/POSTGRES_TEST_TEMPLATES_RESEARCH_2026_10.md` ledger owns
+PostgreSQL 18/pg/OWASP consultation. Connection sealing prevents new source
+sessions; it does not terminate existing sessions or constrain another privileged
+administrator. Verify quiescence before publishing a private source, retain fresh
+scenario databases and refuse observed source/identity drift. Database-level
+settings/GRANTs are not assumed copied. Creation acknowledgement owns cleanup;
+unknown OID must produce incomplete evidence rather than destructive guessing.
+These are testing/resource boundaries, not a new frontend conformance claim.

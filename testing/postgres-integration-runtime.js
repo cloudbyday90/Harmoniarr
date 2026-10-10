@@ -12,6 +12,7 @@ import { buildPoolConfig } from '../src/server/database.js';
 import { resolveIntegrationTestRuntimeConfig } from './integration/runtime-config.js';
 import { withTemporaryPostgresDatabase } from './postgres-temporary-database.js';
 import { createIntegrationFixturePhaseObserver } from './integration/fixture-phase-observer.js';
+import { createPreparedPostgresTemplate } from './integration/postgres-migration-template.js';
 
 const { Pool } = pg;
 
@@ -41,33 +42,54 @@ function createDefaultPostgresContainer(config) {
   return container;
 }
 
+async function createDatabaseRuntime({ config, env, source, phaseObserver, schemaMode, signal,
+  closeServer, createPreparedPostgresTemplateFn, withTemporaryPostgresDatabaseFn }) {
+  const createPool = createPoolFactory(env);
+  const prepared = schemaMode === 'migration_template'
+    ? await createPreparedPostgresTemplateFn({ env, createPool, phaseObserver: phaseObserver.child(), signal,
+      withTemporaryPostgresDatabaseFn })
+    : null;
+  let cleanupPromise;
+  return {
+    config, source, schemaMode,
+    cleanup() {
+      if (!cleanupPromise) {
+        cleanupPromise = (async () => {
+          let failed = false; let failure;
+          try { await prepared?.cleanup(); }
+          catch (error) { failed = true; failure = error; }
+          try { await closeServer(); }
+          catch (error) { if (prepared && !failed) { failed = true; failure = error; } }
+          if (failed) throw failure;
+        })();
+        cleanupPromise.catch(() => {});
+      }
+      return cleanupPromise;
+    },
+    async runIsolatedDatabase(run, { phaseObserver: observer = phaseObserver.child(), signal: caseSignal } = {}) {
+      if (typeof run !== 'function') throw new TypeError('Database scenario requires a callback');
+      const execute = (context) => run({ ...context, source, schemaMode, phaseObserver: observer });
+      if (prepared) return prepared.runIsolatedDatabase(execute, { phaseObserver: observer, signal: caseSignal });
+      return withTemporaryPostgresDatabaseFn({ createPool, env, phaseObserver: observer, signal: caseSignal, run: execute });
+    },
+  };
+}
+
 export async function createPostgresIntegrationRuntime({
   config = resolveIntegrationTestRuntimeConfig(),
   createPostgresContainer = createDefaultPostgresContainer,
   env = process.env,
   phaseObserver = createIntegrationFixturePhaseObserver({ env }),
   withTemporaryPostgresDatabaseFn = withTemporaryPostgresDatabase,
+  createPreparedPostgresTemplateFn = createPreparedPostgresTemplate,
+  schemaMode = 'empty',
+  signal,
 } = {}) {
+  if (!['empty', 'migration_template'].includes(schemaMode)) throw new TypeError('Invalid PostgreSQL fixture schema mode');
+  if (signal?.aborted) throw signal.reason;
   if (hasConfiguredPostgresAdminConnection(env)) {
-    return {
-      config,
-      source: 'external_postgres',
-      async cleanup() {},
-      async runIsolatedDatabase(run, { phaseObserver: scenarioObserver = phaseObserver.child() } = {}) {
-        return withTemporaryPostgresDatabaseFn({
-          createPool: createPoolFactory(env),
-          env,
-          phaseObserver: scenarioObserver,
-          run: ({ databaseConfig, databaseName, getPoolFn }) => run({
-            databaseConfig,
-            databaseName,
-            getPoolFn,
-            source: 'external_postgres',
-            phaseObserver: scenarioObserver,
-          }),
-        });
-      },
-    };
+    return createDatabaseRuntime({ config, env, source: 'external_postgres', phaseObserver, schemaMode, signal,
+      closeServer: async () => {}, createPreparedPostgresTemplateFn, withTemporaryPostgresDatabaseFn });
   }
 
   const container = await phaseObserver.measure('container_start', () => createPostgresContainer(config).start());
@@ -80,29 +102,11 @@ export async function createPostgresIntegrationRuntime({
     PGUSER: container.getUsername(),
   };
 
-  return {
-    config,
-    source: 'testcontainer_postgres',
-    async cleanup() {
-      await phaseObserver.measure('container_stop', () => container.stop({
-        timeout: config.containerStopTimeoutMs,
-      })).catch(() => {});
-    },
-    async runIsolatedDatabase(run, { phaseObserver: scenarioObserver = phaseObserver.child() } = {}) {
-      return withTemporaryPostgresDatabaseFn({
-        createPool: createPoolFactory(containerEnv),
-        env: containerEnv,
-        phaseObserver: scenarioObserver,
-        run: ({ databaseConfig, databaseName, getPoolFn }) => run({
-          databaseConfig,
-          databaseName,
-          getPoolFn,
-          source: 'testcontainer_postgres',
-          phaseObserver: scenarioObserver,
-        }),
-      });
-    },
-  };
+  const closeServer = () => phaseObserver.measure('container_stop', () => container.stop({ timeout: config.containerStopTimeoutMs }));
+  try {
+    return await createDatabaseRuntime({ config, env: containerEnv, source: 'testcontainer_postgres', phaseObserver,
+      schemaMode, signal, closeServer, createPreparedPostgresTemplateFn, withTemporaryPostgresDatabaseFn });
+  } catch (error) { await closeServer().catch(() => {}); throw error; }
 }
 
 export async function withPostgresIntegrationRuntime({
@@ -112,6 +116,9 @@ export async function withPostgresIntegrationRuntime({
   phaseObserver = createIntegrationFixturePhaseObserver({ env }),
   run,
   withTemporaryPostgresDatabaseFn = withTemporaryPostgresDatabase,
+  createPreparedPostgresTemplateFn = createPreparedPostgresTemplate,
+  schemaMode = 'empty',
+  signal,
 } = {}) {
   if (typeof run !== 'function') {
     throw new Error('run is required');
@@ -123,11 +130,17 @@ export async function withPostgresIntegrationRuntime({
     env,
     phaseObserver,
     withTemporaryPostgresDatabaseFn,
+    createPreparedPostgresTemplateFn,
+    schemaMode,
+    signal,
   });
 
+  let result; let failed = false; let failure;
   try {
-    return await runtime.runIsolatedDatabase(run);
-  } finally {
-    await runtime.cleanup();
-  }
+    result = await runtime.runIsolatedDatabase(run, { signal });
+  } catch (error) { failed = true; failure = error; }
+  try { await runtime.cleanup(); }
+  catch (error) { if (!failed) { failed = true; failure = error; } }
+  if (failed) throw failure;
+  return result;
 }

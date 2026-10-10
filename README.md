@@ -21,6 +21,14 @@ cleanup durations. See the [fixture design](docs/TEST_FIXTURE_OBSERVABILITY_DESI
 [outcome](docs/TEST_FIXTURE_OBSERVABILITY_OUTCOME.md) and
 [research](docs/TEST_FIXTURE_OBSERVABILITY_RESEARCH_2026_10.md).
 
+Wanted now explicitly selects a migration-only template in its per-file runtime;
+every variant still receives a fresh database and pool. Other suites keep their
+existing preparation paths. Set `HARMONIARR_INTEGRATION_WANTED_SCHEMA_MODE=empty`
+for the unchanged preparation profile, or `migration_template` for the selected
+profile. See the [template design](docs/POSTGRES_TEST_TEMPLATES_DESIGN.md),
+[outcome](docs/POSTGRES_TEST_TEMPLATES_OUTCOME.md) and
+[official research](docs/POSTGRES_TEST_TEMPLATES_RESEARCH_2026_10.md).
+
 - [Planning document](docs/harmoniarr.md)
 - [AI workflow and shared Copilot skills](docs/AI_WORKFLOW.md)
 - [Docker deployment baseline](docs/DOCKER_DEPLOYMENT.md)
