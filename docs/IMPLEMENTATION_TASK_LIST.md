@@ -6,7 +6,41 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
-## Current development slice: Prepared PostgreSQL test databases (2026-10-10)
+## Current development slice: Parent-owned PostgreSQL test launcher (2026-10-10)
+
+- An explicit ESM CLI profile shares one newly owned PostgreSQL server across the
+  verified serial Wanted/catalogue cohort. File processes, fresh scenario
+  databases/pools and Wanted's private migration template remain isolated.
+  Default complete integration validation is unchanged. See
+  [design](POSTGRES_TEST_LAUNCHER_DESIGN.md),
+  [outcome](POSTGRES_TEST_LAUNCHER_OUTCOME.md) and
+  [official research](POSTGRES_TEST_LAUNCHER_RESEARCH_2026_10.md).
+- Per-file loopback capabilities and bounded records own reserve/CREATE/OID
+  acknowledgement, verified release and parent reconciliation. Observe actual
+  process close and known-worker absence before cleanup/next file. Refuse uncertain
+  and replacement identities; never adopt names by prefix or signal reported PIDs.
+- Final shared profile passes the unchanged 18 cases in 51.64s wall against
+  baseline 69.96s (26.2% local reduction, no CI/full-gate speed claim). All 44
+  databases registered/released. Real Windows/PostgreSQL adverse acceptance passes
+  four cases; focused ownership/process/transport/hooks and lint/hygiene pass.
+  Complete `npm run validate` passes 9,850 tests (4,571 server, 4,377 client,
+  552 script, 350 integration), zero failures/cancellations/skips, all checks/lint
+  and both builds. Wall time is 21m14s, integration 18m20s; default scheduling is
+  unchanged and no causal whole-gate speedup is claimed. Dedicated untemplated
+  bootstrap passes 105/105 and security reports zero npm vulnerabilities.
+- Standards/testing skills now map applicable ownership, process and evidence
+  contracts; maintained standards source/installed copies structurally validate
+  and match four files. W3C frontend conformance is outside this CLI slice.
+- Fresh PR assessment is separate:
+  [design](OPEN_PR_APPLICABILITY_TEST_LAUNCHER_2026_10_DESIGN.md) and
+  [outcome](OPEN_PR_APPLICABILITY_TEST_LAUNCHER_2026_10_OUTCOME.md). Observed open
+  PRs already have local replays; no new eligible draw or merge.
+- Next: audit the release-reconciliation/tag-snapshot creation paths and legacy
+  held gates, prove complete registration/cancellation, then measure an equivalent
+  expanded profile before default adoption. Discovery-request recomputation
+  remains next product work. Stay on main without release/branch/tag/deployment.
+
+## Prior development slice: Prepared PostgreSQL test databases (2026-10-10)
 
 - Four ESM modules own migration input/implementation fingerprints, pool-bound
   full ledger/key verification, source SQL and private template lifecycle. Only

@@ -69,6 +69,17 @@ spreading internal `pool.options` can omit protected, non-enumerable credentials
 
 Use PowerShell commands from the repository root.
 
+`npm run test:integration:shared-postgres` is an opt-in serial Wanted/catalogue
+cohort. It owns one fresh server, preserving isolated file processes, databases
+and pools. The default complete gate is unchanged. Do not expand its allowlist
+until every fixture-created database has the parent reserve/CREATE/OID commit
+contract. Raw Dockerized fixtures and manually created siblings require separate
+ownership work. Close admission, observe the actual child close and known-worker
+absence, then reconcile before the next file. A signal acknowledgement or reporter
+end is insufficient. Unknown/replacement identities are refusals, not prefix-based
+cleanup targets. See `docs/POSTGRES_TEST_LAUNCHER_DESIGN.md` and its outcome for
+measured scope and process/platform limits.
+
 ## Validation Matrix
 
 Client utility or composable:

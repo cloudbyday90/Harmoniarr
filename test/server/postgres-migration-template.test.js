@@ -91,6 +91,27 @@ function destructiveSourceQueries(f) {
     && (event.sql.includes(`"${sourceName}"`) || event.values?.[0] === sourceName));
 }
 
+test('parent source acknowledgement precedes preparation and release follows its verified drop', async () => {
+  const f = fixture(); const calls = [];
+  delete f.input.databaseName;
+  f.input.parentClientFactory = () => ({ reserve: async () => sourceName,
+    commit: async (name, oid) => { assert.equal(f.preparationCount(), 0); assert.equal(f.databases.get(name).oid, oid); calls.push('commit'); },
+    assertOwned: async (name, oid) => { assert.equal(f.databases.get(name).oid, oid); calls.push('assert'); },
+    release: async (name) => { assert.equal(f.databases.has(name), false); calls.push('release'); } });
+  const owner = await createPreparedPostgresTemplate(f.input); await owner.cleanup();
+  assert.deepEqual(calls, ['commit', 'assert', 'release']); assert.equal(f.databases.size, 0);
+});
+test('lost parent source acknowledgement retains the same identity for cleanup and preserves the first error', async () => {
+  const f = fixture(); const failure = new Error('lost acknowledgement'); let commits = 0; let released = false;
+  delete f.input.databaseName;
+  f.input.parentClientFactory = () => ({ reserve: async () => sourceName,
+    commit: async (name, oid) => { assert.equal(f.databases.get(name).oid, oid); if (++commits === 1) throw failure; },
+    assertOwned: async (name, oid) => assert.equal(f.databases.get(name).oid, oid),
+    release: async (name) => { assert.equal(f.databases.has(name), false); released = true; } });
+  await assert.rejects(createPreparedPostgresTemplate(f.input), (error) => error === failure);
+  assert.equal(commits, 2); assert.equal(released, true); assert.equal(f.preparationCount(), 0);
+});
+
 test('one preparation publishes only clone contexts and closes the private pool before sealing', async () => {
   const f = fixture(); const owner = await createPreparedPostgresTemplate(f.input);
   try {

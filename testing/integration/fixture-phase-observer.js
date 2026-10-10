@@ -12,7 +12,8 @@ const phases = new Set(['container_start', 'container_stop', 'database_connect',
   'pool_create', 'schema_prepare', 'fixture_seed', 'application_create', 'scenario_work',
   'http_scenario', 'pool_close', 'backend_drain', 'database_drop', 'admin_close',
   'workspace_create', 'workspace_remove', 'server_start', 'server_close', 'shutdown_drain',
-  'template_prepare', 'template_seal', 'template_verify', 'template_drop']);
+  'template_prepare', 'template_seal', 'template_verify', 'template_drop',
+  'database_register', 'database_release']);
 const isUuid = (value) => typeof value === 'string'
   && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(value);
 

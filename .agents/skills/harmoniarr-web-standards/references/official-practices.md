@@ -359,3 +359,19 @@ scenario databases and refuse observed source/identity drift. Database-level
 settings/GRANTs are not assumed copied. Creation acknowledgement owns cleanup;
 unknown OID must produce incomplete evidence rather than destructive guessing.
 These are testing/resource boundaries, not a new frontend conformance claim.
+
+## Parent-owned test launcher maintenance, October 10, America/New_York
+
+The MCP-discovered exact Node, PostgreSQL, Testcontainers and Microsoft sources
+are recorded in `docs/POSTGRES_TEST_LAUNCHER_RESEARCH_2026_10.md`. For resource
+sharing, distinguish runner events, process exit, actual close, output drainage
+and database identity. Reserve only an observed-absent generated name; acknowledge
+successful CREATE with current role/OID before scenario use. A lost acknowledgement
+requires the same identity, not another reservation. Revoke scope admission before
+owned-tree cancellation and require known-worker absence before reconciliation.
+Never derive ownership from a database prefix, stdout or reported PID. Report
+uncertain identities and incomplete termination truthfully, preserving the primary
+failure. Loopback alone is not authorization: use per-scope capabilities, bounded
+structured records and fixed diagnostics without credentials. Native test output
+has separate disclosure limits. This applies to trusted development fixtures,
+not arbitrary hostile privileged code, POSIX runtime proof or WCAG conformance.

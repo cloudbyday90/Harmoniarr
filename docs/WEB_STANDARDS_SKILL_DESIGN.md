@@ -232,3 +232,13 @@ new fixture owners. Keep database settings/GRANT copying, privileged-administrat
 and unabortable-I/O limits explicit. Link separate fresh bootstrap and clone
 acceptance evidence; do not infer global speed or conformance from a local pair.
 Preserve entry point, metadata and invocation policy; validate/sync references.
+
+## Parent-owned launcher maintenance, October 10, 2026
+
+Extend the existing standards skill's evidence references for native process
+lifecycle, bounded authenticated loopback control and positively acknowledged
+PostgreSQL ownership. Keep its current metadata and invocation policy. W3C covers
+applicable UI behavior; Node/PostgreSQL lifecycle contracts and OWASP input/logging
+practices own this CLI slice. A benchmark does not grant permission to expand the
+cohort or establish complete-gate throughput. Each recommendation must map to its
+implementation owner, failure case and executed evidence.

@@ -29,6 +29,13 @@ profile. See the [template design](docs/POSTGRES_TEST_TEMPLATES_DESIGN.md),
 [outcome](docs/POSTGRES_TEST_TEMPLATES_OUTCOME.md) and
 [official research](docs/POSTGRES_TEST_TEMPLATES_RESEARCH_2026_10.md).
 
+`npm run test:integration:shared-postgres` runs the verified Wanted/catalogue
+cohort serially against one newly owned PostgreSQL server, with separate file
+processes and scenario databases. The complete gate remains unchanged. See the
+[launcher design](docs/POSTGRES_TEST_LAUNCHER_DESIGN.md),
+[measured outcome](docs/POSTGRES_TEST_LAUNCHER_OUTCOME.md) and
+[official research](docs/POSTGRES_TEST_LAUNCHER_RESEARCH_2026_10.md).
+
 - [Planning document](docs/harmoniarr.md)
 - [AI workflow and shared Copilot skills](docs/AI_WORKFLOW.md)
 - [Docker deployment baseline](docs/DOCKER_DEPLOYMENT.md)

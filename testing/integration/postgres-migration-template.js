@@ -13,6 +13,7 @@ import { createIntegrationFixturePhaseObserver } from './fixture-phase-observer.
 import { loadMigrationTemplateInputs, buildMigrationTemplateFingerprint } from './migration-template-inputs.js';
 import { prepareMigrationTemplateDatabase } from './migration-template-preparation.js';
 import { createPostgresTemplateStore, templateDatabaseProfile, templateRefusal } from './postgres-template-store.js';
+import { createParentPostgresClient, parentPostgresClientError } from './parent-postgres-client.js';
 
 function assertNotAborted(signal) {
   if (signal != null && typeof signal.aborted !== 'boolean') throw new TypeError('Invalid template fixture signal');
@@ -24,21 +25,35 @@ export async function createPreparedPostgresTemplate({
   env = process.env,
   createPool = (config) => new pg.Pool({ ...buildPoolConfig(env), ...config }),
   adminClientFactory = (config) => new pg.Client(config),
-  databaseName = `harmoniarr_template_${randomUUID().replaceAll('-', '')}`,
+  databaseName,
   loadInputsFn = loadMigrationTemplateInputs,
   prepareDatabaseFn = prepareMigrationTemplateDatabase,
   withTemporaryPostgresDatabaseFn = withTemporaryPostgresDatabase,
   phaseObserver = createIntegrationFixturePhaseObserver({ env }),
   signal,
+  parentClientFactory = createParentPostgresClient,
 } = {}) {
   assertNotAborted(signal);
   env = Object.freeze({ ...env });
+  const parent = parentClientFactory({ env });
+  if (parent && databaseName !== undefined) throw parentPostgresClientError('fixture_parent_named_database_forbidden');
+  databaseName ??= parent ? await parent.reserve('template') : `harmoniarr_template_${randomUUID().replaceAll('-', '')}`;
   if ([createPool, adminClientFactory, loadInputsFn, prepareDatabaseFn, withTemporaryPostgresDatabaseFn]
     .some((fn) => typeof fn !== 'function')) throw new TypeError('Invalid template fixture dependencies');
   const adminClient = adminClientFactory(buildPostgresAdminConnectionConfig(env));
   const store = createPostgresTemplateStore({ adminClient });
   const poolState = { closing: false }; let pool; let created = false; let oid;
   let fingerprint; let inputs; let profile;
+  let registered = false;
+  const dropSource = async () => {
+    if (!oid) throw templateRefusal('fixture_template_cleanup_incomplete');
+    if (parent) {
+      if (!registered) { await parent.commit(databaseName, oid); registered = true; }
+      await parent.assertOwned(databaseName, oid);
+    }
+    await store.dropOwned(databaseName, oid);
+    if (parent) await phaseObserver.measure('database_release', () => parent.release(databaseName, oid));
+  };
   const closePool = async () => {
     if (!pool) return;
     poolState.closing = true;
@@ -56,6 +71,9 @@ export async function createPreparedPostgresTemplate({
     const initial = await store.inspect(databaseName);
     if (!initial) throw templateRefusal();
     oid = initial.oid; profile = templateDatabaseProfile(initial);
+    if (parent) await phaseObserver.measure('database_register', async () => {
+      await parent.commit(databaseName, oid); registered = true;
+    });
     fingerprint = buildMigrationTemplateFingerprint({ inputs, databaseProfile: profile });
     assertNotAborted(signal);
     pool = await phaseObserver.measure('pool_create', () => createPool({ ...buildConnectionConfig(env), database: databaseName }));
@@ -77,9 +95,9 @@ export async function createPreparedPostgresTemplate({
   } catch (primaryError) {
     await closePool().catch(() => {});
     if (created) await phaseObserver.measure('template_drop', async () => {
-      if (!oid) throw templateRefusal('fixture_template_cleanup_incomplete');
-      await store.dropOwned(databaseName, oid);
+      await dropSource();
     }).catch(() => {});
+    if (!created && parent) await phaseObserver.measure('database_release', () => parent.abandon(databaseName)).catch(() => {});
     await phaseObserver.measure('admin_close', () => adminClient.end()).catch(() => {});
     throw primaryError;
   }
@@ -118,7 +136,7 @@ export async function createPreparedPostgresTemplate({
         cleanupPromise = (async () => {
           await Promise.allSettled([...active]);
           let failed = false; let failure;
-          try { await phaseObserver.measure('template_drop', () => store.dropOwned(databaseName, oid)); }
+          try { await phaseObserver.measure('template_drop', dropSource); }
           catch (error) { failed = true; failure = error; }
           try { await phaseObserver.measure('admin_close', () => adminClient.end()); }
           catch (error) { if (!failed) { failed = true; failure = error; } }

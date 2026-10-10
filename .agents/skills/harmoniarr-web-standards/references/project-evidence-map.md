@@ -109,3 +109,14 @@ Use real rows/triggers/leases, source connection denial, fingerprint drift and
 replacement-OID/sibling controls beside unit evidence. Dedicated fresh migration
 and snapshot-bootstrap proof remain separate; nested creation/admission spans
 must not be added twice. The template outcome owns measured/complete-gate claims.
+
+Parent-owned serial sharing maps to `postgres-test-launcher.js`,
+`parent-postgres-registry.js`, `parent-postgres-store.js`,
+`parent-postgres-control-server.js` and `parent-postgres-client.js` under
+`testing/integration/`. `postgres-file-process.js` owns native CLI close/output;
+`owned-process-tree.js` targets only its actual spawned root. Follow reserve,
+CREATE/OID acknowledgement, child close, known-worker absence and reconciliation
+before the next file. Real abandoned-child, cancellation, uncommitted and
+replacement canaries live in `test/integration/parent-postgres-launcher.test.js`.
+The launcher outcome separates cohort timing from full-gate coverage and
+platform limitations; do not expand its explicit cohort from a passing benchmark.

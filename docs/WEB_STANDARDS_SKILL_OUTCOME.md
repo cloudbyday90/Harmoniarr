@@ -446,3 +446,15 @@ template outcome; structural validation passed for source/installed copies and
 all four standards files match by SHA256 at final freeze. Metadata and invocation
 policy remain unchanged. This is structural/runtime evidence, not a new blind
 skill trial or frontend conformance claim.
+
+## Parent-owned launcher maintenance, October 10, 2026
+
+The standards references now map reserve/CREATE/OID acknowledgement, actual child
+close, known-worker absence and reconciliation before another test file. They
+separate resource ownership from database prefixes, stdout, reported PIDs and
+signal acknowledgements. Bounded per-scope loopback control and fixed diagnostics
+implement applicable OWASP practices; the unchanged browser surface has no new
+W3C conformance claim. Runtime evidence remains in the separate launcher outcome.
+Source/installed structural validation passed at final freeze, with all four
+maintained standards files matching by SHA256;
+this narrow maintenance does not claim a new blind skill trial.

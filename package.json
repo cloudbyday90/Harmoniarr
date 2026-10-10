@@ -67,6 +67,7 @@
     "test:coverage": "node --test --experimental-test-coverage",
     "test:integration": "node --test --test-concurrency=1 --test-reporter=spec --test-reporter=./testing/reporters/early-failure-reporter.js --test-reporter-destination=stdout --test-reporter-destination=stderr \"test/integration/**/*.test.js\"",
     "test:integration:serial": "npm run test:integration",
+    "test:integration:shared-postgres": "node scripts/run-shared-postgres-tests.js",
     "test:node": "npm run test:server && npm run test:client && npm run test:scripts && npm run test:integration",
     "test:scripts": "node --test \"test/scripts/**/*.test.js\" \"test/compose-image-tag-policy.test.js\"",
     "test:server": "node --test \"test/server/**/*.test.js\"",

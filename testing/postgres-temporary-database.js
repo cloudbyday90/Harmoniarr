@@ -10,6 +10,8 @@ import pg from 'pg';
 import { attachPoolErrorHandler, buildConnectionConfig } from '../src/server/database.js';
 import { createIntegrationFixturePhaseObserver } from './integration/fixture-phase-observer.js';
 import { drainPostgresFixtureBackends } from './integration/postgres-backend-drain.js';
+import { createParentPostgresClient, parentPostgresClientError } from './integration/parent-postgres-client.js';
+import { createParentPostgresStore } from './integration/parent-postgres-store.js';
 
 const { Client, Pool } = pg;
 
@@ -32,12 +34,13 @@ function quoteIdentifier(identifier) {
 export async function withTemporaryPostgresDatabase({
   adminClientFactory = (config) => new Client(config),
   createPool = (config) => new Pool(config),
-  databaseName = createTemporaryDatabaseName(),
+  databaseName,
   env = process.env,
   phaseObserver = createIntegrationFixturePhaseObserver({ env }),
   createDatabaseFn = ({ adminClient, databaseName: name }) => adminClient.query(`CREATE DATABASE ${quoteIdentifier(name)}`),
   strictCleanup = false,
   signal,
+  parentClientFactory = createParentPostgresClient,
   run,
 } = {}) {
   if (typeof run !== 'function') {
@@ -47,6 +50,10 @@ export async function withTemporaryPostgresDatabase({
     || (signal != null && typeof signal.aborted !== 'boolean')) throw new TypeError('Invalid temporary database lifecycle options');
   const assertNotAborted = () => { if (signal?.aborted) throw signal.reason; };
   assertNotAborted();
+  const parent = parentClientFactory({ env });
+  if (parent && databaseName !== undefined) throw parentPostgresClientError('fixture_parent_named_database_forbidden');
+  databaseName ??= parent ? await parent.reserve('scenario') : createTemporaryDatabaseName();
+  if (parent) strictCleanup = true;
 
   const adminConfig = buildPostgresAdminConnectionConfig(env);
   const databaseConfig = {
@@ -57,10 +64,16 @@ export async function withTemporaryPostgresDatabase({
   const databasePoolRuntimeState = { closing: false };
   let databasePool;
   let databaseCreated = false;
+  let parentOid; let registered = false;
   let result; let primaryError; let failed = false; let cleanupError; let cleanupFailed = false;
   const cleanup = async (phase, operation) => {
     try { await phaseObserver.measure(phase, operation); }
     catch (error) { if (!cleanupFailed) { cleanupFailed = true; cleanupError = error; } }
+  };
+  const assertParentOwnership = async () => {
+    if (!parentOid) throw parentPostgresClientError('fixture_parent_registration_uncertain');
+    if (!registered) await parent.commit(databaseName, parentOid);
+    await parent.assertOwned(databaseName, parentOid);
   };
 
   try {
@@ -68,6 +81,12 @@ export async function withTemporaryPostgresDatabase({
     assertNotAborted();
     await phaseObserver.measure('database_create', () => createDatabaseFn({ adminClient, databaseName }));
     databaseCreated = true;
+    if (parent) await phaseObserver.measure('database_register', async () => {
+      const row = await createParentPostgresStore({ adminClient }).inspect(databaseName);
+      if (!row?.owned) throw parentPostgresClientError('fixture_parent_identity_changed');
+      parentOid = row.oid;
+      await parent.commit(databaseName, parentOid); registered = true;
+    });
     assertNotAborted();
     databasePool = await phaseObserver.measure('pool_create', () => createPool(databaseConfig));
     if (typeof databasePool?.on === 'function') {
@@ -87,9 +106,19 @@ export async function withTemporaryPostgresDatabase({
     if (databasePool) await cleanup('pool_close', () => databasePool.end());
 
     if (databaseCreated && typeof adminClient.query === 'function') {
-      await cleanup('backend_drain', () => drainPostgresFixtureBackends({ adminClient, databaseName }));
-
-      await cleanup('database_drop', () => adminClient.query(`DROP DATABASE IF EXISTS ${quoteIdentifier(databaseName)}`));
+      let owned = !parent;
+      if (parent) {
+        try {
+          await assertParentOwnership(); owned = true;
+        } catch (error) { if (!cleanupFailed) { cleanupFailed = true; cleanupError = error; } }
+      }
+      if (owned) {
+        await cleanup('backend_drain', () => drainPostgresFixtureBackends({ adminClient, databaseName }));
+        await cleanup('database_drop', () => adminClient.query(`DROP DATABASE IF EXISTS ${quoteIdentifier(databaseName)}`));
+        if (parent) await cleanup('database_release', () => parent.release(databaseName, parentOid));
+      }
+    } else if (parent) {
+      await cleanup('database_release', () => parent.abandon(databaseName));
     }
 
     if (typeof adminClient.end === 'function') {

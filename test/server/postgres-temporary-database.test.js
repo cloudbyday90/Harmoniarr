@@ -11,6 +11,39 @@ import { withTemporaryPostgresDatabase } from '../../testing/postgres-temporary-
 import { createFixturePhaseObserver } from '../../testing/integration/fixture-phase-observer.js';
 import { createFixtureGate } from '../../testing/integration/fixture-lifecycle.js';
 
+function parentFixture({ commitError, ownershipError } = {}) {
+  const calls = []; let commits = 0;
+  const parent = { reserve: async () => { calls.push('reserve'); return 'hx_parent'; },
+    commit: async () => { calls.push('commit'); if (++commits === 1 && commitError) throw commitError; },
+    assertOwned: async () => { calls.push('assert'); if (ownershipError) throw ownershipError; },
+    release: async () => calls.push('release'), abandon: async () => calls.push('abandon') };
+  const admin = { connect: async () => calls.push('connect'), end: async () => calls.push('admin:end'),
+    query: async (sql) => { calls.push(sql); return { rows: [{ oid: '42', owned: true, active_count: 0 }] }; } };
+  const input = { env: {}, parentClientFactory: () => parent, adminClientFactory: () => admin,
+    createPool: () => { calls.push('pool'); return { end: async () => calls.push('pool:end') }; },
+    run: async () => { calls.push('run'); return 'complete'; } };
+  return { calls, input };
+}
+
+test('parent acknowledgement precedes scenario pool and release follows acknowledged owned drop', async () => {
+  const f = parentFixture(); assert.equal(await withTemporaryPostgresDatabase(f.input), 'complete');
+  assert.ok(f.calls.indexOf('commit') < f.calls.indexOf('pool'));
+  assert.ok(f.calls.indexOf('assert') < f.calls.findIndex((sql) => /^DROP DATABASE/u.test(sql)));
+  assert.ok(f.calls.indexOf('release') > f.calls.findIndex((sql) => /^DROP DATABASE/u.test(sql)));
+});
+test('lost registration acknowledgement is retried with the same identity before cleanup, preserving original error', async () => {
+  const failure = new Error('lost acknowledgement'); const f = parentFixture({ commitError: failure });
+  await assert.rejects(withTemporaryPostgresDatabase(f.input), (error) => error === failure);
+  assert.equal(f.calls.filter((call) => call === 'commit').length, 2);
+  assert.equal(f.calls.includes('pool'), false); assert.equal(f.calls.includes('release'), true);
+});
+test('parent ownership rejection prevents destructive scenario cleanup and rejects a successful callback', async () => {
+  const failure = new Error('replacement database'); const f = parentFixture({ ownershipError: failure });
+  await assert.rejects(withTemporaryPostgresDatabase(f.input), (error) => error === failure);
+  assert.equal(f.calls.some((sql) => /pg_terminate_backend|DROP DATABASE/u.test(sql)), false);
+  assert.equal(f.calls.includes('release'), false); assert.equal(f.calls.at(-1), 'admin:end');
+});
+
 function fixture({ createError = null, runError = null, poolError = null, countError = null } = {}) {
   const calls = []; const records = [];
   const admin = {
