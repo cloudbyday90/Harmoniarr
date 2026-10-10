@@ -17,7 +17,8 @@
  */
 
 import { parseFile } from 'music-metadata';
-import { createLibraryTagSnapshotStore } from './library-tag-snapshot-store.js';
+import { createApiError } from '../auth.js';
+import { captureTagSnapshotSource, isTagSnapshotRefusal } from './library-tag-snapshot-policy.js';
 
 function sanitizeTagValue(value) {
   if (value == null) {
@@ -118,56 +119,40 @@ export function createLibraryTagExtractionService({
   extractor = 'music-metadata',
   extractorVersion = null,
   libraryEmbeddedArtworkService = null,
-  libraryTagSnapshotStore = createLibraryTagSnapshotStore(),
+  writeOwnedLibraryFileTagSnapshot,
 } = {}) {
-  async function extractLibraryFileTags({ files }) {
+  if (typeof writeOwnedLibraryFileTagSnapshot !== 'function') {
+    throw new TypeError('Tag extraction requires its guarded snapshot owner');
+  }
+  async function extractLibraryFileTags({ files, ...context }) {
     const extractedFiles = [];
-
-    for (const file of files) {
-      if (file.fileState !== 'observed') {
-        continue;
-      }
-
+    const sources = files.filter((file) => file.fileState === 'observed').map((file) => {
+      const prepared = captureTagSnapshotSource({ ...context, file });
+      if (!prepared) throw createApiError(409, 'library_tag_snapshot_invalid', 'The original tag source is invalid');
+      return { prepared, file: { ...structuredClone(file), ...prepared.file } };
+    });
+    for (const { prepared, file } of sources) {
+      let metadata;
+      let extractionPayload;
       try {
-        const metadata = await extractMetadata(file.canonicalPath);
-        const extractionPayload = buildExtractionPayload(metadata);
-        await libraryTagSnapshotStore.writeLibraryFileTagSnapshot({
-          ...extractionPayload,
-          extractor,
-          extractorVersion,
-          libraryFileId: file.id,
-          sourceModifiedAt: file.modifiedAt ?? null,
-          sourceSizeBytes: file.sizeBytes ?? null,
-        });
-        extractedFiles.push({
-          ...file,
-          tagPayload: extractionPayload.normalizedTags,
-        });
-
-        if (libraryEmbeddedArtworkService) {
-          try {
-            await libraryEmbeddedArtworkService.captureEmbeddedArtwork({
-              libraryFileId: file.id,
-              metadata,
-            });
-          } catch {
-            // Embedded artwork capture remains best-effort; missing or invalid art must not block scans.
-          }
-        }
+        metadata = await extractMetadata(file.canonicalPath);
+        extractionPayload = buildExtractionPayload(metadata);
       } catch (error) {
-        await libraryTagSnapshotStore.writeLibraryFileTagSnapshot({
-          extractor,
-          extractorVersion,
-          libraryFileId: file.id,
-          rawTags: {
-            error: error instanceof Error ? error.message : String(error),
-          },
+        if (isTagSnapshotRefusal(error)) throw error;
+        extractionPayload = {
+          rawTags: { error: error instanceof Error ? error.message : String(error) },
           status: 'failed',
-        });
-        extractedFiles.push({
-          ...file,
-          tagPayload: null,
-        });
+        };
+      }
+      await writeOwnedLibraryFileTagSnapshot({ prepared, payload: { ...extractionPayload, extractor, extractorVersion } });
+      extractedFiles.push({ ...file, tagPayload: extractionPayload.normalizedTags ?? null });
+      if (extractionPayload.status === 'extracted' && libraryEmbeddedArtworkService) {
+        try {
+          await libraryEmbeddedArtworkService.captureEmbeddedArtwork({ libraryFileId: file.id, metadata });
+        } catch (error) {
+          if (isTagSnapshotRefusal(error)) throw error;
+          // Genuine artwork failures remain best-effort after committed tag persistence.
+        }
       }
     }
 

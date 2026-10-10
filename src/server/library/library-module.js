@@ -85,6 +85,7 @@ import { createLibraryScanService } from './library-scan-service.js';
 import { createLibrarySidecarArtworkService } from './library-sidecar-artwork-service.js';
 import { createLibraryTagExtractionService } from './library-tag-extraction-service.js';
 import { createLibraryTagSnapshotStore } from './library-tag-snapshot-store.js';
+import { createLibraryTagSnapshotService } from './library-tag-snapshot-service.js';
 import { createLibraryWantedReleaseService } from './library-wanted-release-service.js';
 import { createLibraryWantedReleaseStore } from './library-wanted-release-store.js';
 import { createLibraryWantedSummaryService } from './library-wanted-summary-service.js';
@@ -422,9 +423,15 @@ export function createLibraryModule({
     artworkAssignmentService,
     artworkIngestionService,
   }),
+  libraryTagSnapshotService = createLibraryTagSnapshotService({
+    writeLibraryFileTagSnapshot: libraryTagSnapshotStore.writeLibraryFileTagSnapshot,
+    assertMaintenanceWriteAllowed: ({ queryable }) => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+      operationLabel: 'library tag snapshot', queryable,
+    }),
+  }),
   libraryTagExtractionService = createLibraryTagExtractionService({
     libraryEmbeddedArtworkService,
-    libraryTagSnapshotStore,
+    writeOwnedLibraryFileTagSnapshot: libraryTagSnapshotService.writeOwnedLibraryFileTagSnapshot,
   }),
   libraryScanCatalogueService = createLibraryScanCatalogueService({
     recordLibraryFiles: libraryCatalogStore.recordLibraryFiles,
@@ -577,6 +584,7 @@ export function createLibraryModule({
     librarySidecarArtworkService,
     libraryTagExtractionService,
     libraryTagSnapshotStore,
+    libraryTagSnapshotService,
     libraryWantedReleaseService,
     libraryWantedReleaseStore,
     libraryWantedSummaryService,

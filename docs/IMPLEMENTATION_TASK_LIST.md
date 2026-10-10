@@ -6,7 +6,38 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
-## Current development slice: Acquisition-owned scan catalogue (2026-10-09)
+## Current development slice: Acquisition-owned tag snapshots (2026-10-09 local)
+
+- Capture the original scan acquisition and root/file path/size/mtime before
+  awaited parsing. One current-owned transaction covers snapshot history and
+  the current file source CAS, with fresh post-wait/final time and checked
+  returned identities. See separate [design](TAG_SNAPSHOT_DESIGN.md),
+  [outcome](TAG_SNAPSHOT_OUTCOME.md) and [research](TAG_SNAPSHOT_RESEARCH_2026_10.md).
+- Keep persistence outside the parser-failure catch. Genuine parser failures
+  still record one owned failure; refusals never retry as failed snapshots or
+  hand off artwork. Preserve sequential extraction, known source stamps and
+  standalone internal writer behavior. Later artwork, sidecar, matching and
+  physical-byte identity remain separate boundaries.
+- Fresh PR discovery found no eligible unreplayed patch; see
+  [PR design](OPEN_PR_APPLICABILITY_TAG_SNAPSHOT_2026_10_DESIGN.md) and
+  [outcome](OPEN_PR_APPLICABILITY_TAG_SNAPSHOT_2026_10_OUTCOME.md).
+- Complete validation passes 9,509 tests (4,309 server, 4,377 client, 513 script
+  and 310 PostgreSQL integration), zero failures/skips, all required lint/policy
+  checks and both builds. Focused owner/policy/writer checks pass 49; extraction/
+  worker/module/cohort checks pass 90; targeted PostgreSQL checks pass 26, including
+  eight new native-parser/source-ownership cases. Focused counts overlap the
+  complete run. See the outcome for the genuine malformed-WAV fixture correction
+  and source-frame fixture calibration, retained red/green evidence and limits.
+  Security checks report zero npm vulnerabilities; standards skill source/
+  installed structure and four-file identity pass. Schema stays at 105 migrations.
+  Work stays on main without a branch, release, tag, deployment or PR merge.
+- Next priority: guard file-match persistence after awaited metadata lookup with
+  captured acquisition and file/tag source comparisons. Stale matched, unmatched
+  or ambiguous associations can affect coverage and fulfillment. This is a source
+  finding; reproduce held-A/newer-B matching refusal and retain current canonical
+  matching. Embedded artwork ownership after ingestion remains a further follow-up.
+
+## Prior development slice: Acquisition-owned scan catalogue (2026-10-09)
 
 - Require one guarded owner after the successful filesystem walk, carrying the
   original acquisition and requested/canonical roots. One transaction covers

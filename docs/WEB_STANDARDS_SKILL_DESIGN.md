@@ -151,6 +151,17 @@ empty-scan success and distinguish it from stale empty observations. Keep later
 tag, artwork and reconciliation ownership outside this bounded guarantee. Entry
 point, metadata and invocation policy remain unchanged; validate and synchronize
 the existing four installed files without claiming a new behavioral skill trial.
+
+## Tag snapshot maintenance, October 9 local / October 10 UTC
+
+Extend the two references around the [tag design](TAG_SNAPSHOT_DESIGN.md).
+Map immutable source/acquisition capture before parsing, payload copy, same-client
+ownership and source CAS, atomic history/current-file writes, final rollback and
+parser-error separation to their actual owners. Keep source stamps distinct from
+authorization predicates and preserve nullable mtime and platform filename
+identity. Artwork starts after accepted persistence and remains a separate owner.
+Entry point, metadata and invocation policy stay unchanged; validate and sync the
+four installed files without claiming a new behavioral trial or media-byte proof.
 Include ordinary catalogue writers in the lock-order trace. A joined row-lock
 query must not be treated as proof of compatible acquisition order; test actual
 root/file waits with blocking process IDs and retain any reproduced deadlock.

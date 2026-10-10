@@ -194,6 +194,11 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
   assert.equal(recordLibraryScanCatalogue.mock.calls[0].arguments[0].requestedLibraryRoot, rootDir);
   assert.equal(extractLibraryFileTags.mock.callCount(), 1);
   assert.deepEqual(extractLibraryFileTags.mock.calls[0].arguments[0], {
+    runId: 'run-1',
+    expectedLease: leaseForTest('run-1'),
+    requestedLibraryRoot: rootDir,
+    libraryRootPath: rootDir,
+    libraryRootId: 'root-1',
     files: [{
       canonicalPath: join(rootDir, 'Artist', 'track-01.flac'),
       fileState: 'observed',

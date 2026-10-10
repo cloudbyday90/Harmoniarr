@@ -198,6 +198,11 @@ export function createLibraryScanWorker({
         phaseTiming.startPhase('tag_extraction');
         if (filesToExtract.length > 0) {
           const extractionResult = await extractLibraryFileTags({
+            runId,
+            expectedLease: acquiredLease,
+            requestedLibraryRoot: libraryRoot,
+            libraryRootPath: summary.libraryRoot,
+            libraryRootId: catalogResult.libraryRootId,
             files: filesToExtract,
           });
           filesToExtract = Array.isArray(extractionResult?.files)

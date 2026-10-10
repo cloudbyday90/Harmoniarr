@@ -210,3 +210,24 @@ Validate actual parent path components using the selected platform's separator,
 preserving legitimate contained double-dot names and literal POSIX backslashes.
 Include positive filename cases beside traversal refusals; a broad prefix or
 cross-platform separator rewrite can incorrectly reject a successful walk.
+
+## Tag snapshot maintenance, October 9 local / October 10 UTC
+
+The separate `docs/TAG_SNAPSHOT_RESEARCH_2026_10.md` ledger owns current
+primary-source discovery. Applying transaction, conditional-write and current
+workflow guidance to tag persistence is a project inference; this maintenance
+does not independently re-open those sources or add a browser requirement.
+
+An accepted size/mtime stamp is evidence about parser input, not current write
+authority. Capture immutable source and acquisition before parsing, then persist
+history and the current file together under maintenance, run/lease/root/file
+ownership with the same transaction client. Compare path, root, size, nullable
+mtime and observed/nondeleted state at the guarded source CAS. Check exact
+returned identities and refresh time after waits and at the final boundary;
+zero-row writes and later refusal roll back both changes. Distinguish genuine
+parser failure from ownership/source/database failure instead of converting all
+errors into a second failed snapshot. Artwork follows successful persistence as
+a separate owner. Preserve actual platform filename semantics and source stamps
+on current parser failure. Focused doubles establish orchestration; actual SQL
+and native parser fixtures establish database/media evidence. Same-size/same-mtime
+physical changes, later artwork and commit acknowledgement remain bounded limits.

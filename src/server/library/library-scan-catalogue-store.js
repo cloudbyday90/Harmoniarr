@@ -19,12 +19,17 @@ export function createLibraryScanCatalogueStore() {
     `, [prepared.runId])).rows[0] ?? null;
   }
 
-  async function lockContext({ prepared, queryable }) {
+  async function lockRunAndLease({ prepared, queryable }) {
     const run = await readRun(prepared, queryable, true);
     const lease = normalizeJobLease(await lockJobLeaseKey({
       leaseKey: prepared.expectedLease.leaseKey,
       queryable,
     }));
+    return { run, lease };
+  }
+
+  async function lockContext({ prepared, queryable }) {
+    const { run, lease } = await lockRunAndLease({ prepared, queryable });
     // Match catalogue and organize writers: lock the root before any files.
     const root = (await queryable.query(`
       SELECT id, canonical_path FROM library_roots
@@ -47,5 +52,5 @@ export function createLibraryScanCatalogueStore() {
     return value instanceof Date ? value.getTime() : Date.parse(value);
   }
 
-  return { lockContext, readContext, readClock };
+  return { lockRunAndLease, lockContext, readContext, readClock };
 }

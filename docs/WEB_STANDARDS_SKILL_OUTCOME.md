@@ -326,6 +326,23 @@ installed copies passed structural validation; all four files match by SHA-256,
 and both reference links resolve. Those checks establish structure and byte
 identity, not a new blind behavioral skill trial or standards conformance.
 Focused application and actual database evidence remain in the scan outcome.
+
+## Tag snapshot maintenance, October 9 local / October 10 UTC
+
+The [tag design](TAG_SNAPSHOT_DESIGN.md) exposed an awaited parser-to-write
+boundary and an error-classification problem. The references now map immutable
+source/acquisition capture, payload copying, same-client current authority, source
+CAS, atomic history/current-file writes and final checks to the owning code.
+They distinguish parser failure from refusal/persistence failure, source stamps
+from write guards, and accepted tag persistence from later artwork work. Current
+source discovery remains attributed to the separate research ledger.
+
+Entry point, metadata and invocation policy are unchanged. Repository and
+installed copies passed structural validation; all four files match by SHA-256,
+and both reference links resolve. These establish structure and byte identity,
+not a new blind behavioral skill trial, atomic filesystem observation or full
+standards conformance. Application and actual database/media evidence remain in
+the separate tag outcome.
 Final cross-writer review reproduced a root/file deadlock between the actual
 catalogue and organize stores. References now require tracing the ordinary scan
 writer and explicit root-before-file acquisition with real blocking-PID proof.

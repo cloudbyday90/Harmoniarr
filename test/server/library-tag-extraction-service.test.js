@@ -1,11 +1,76 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createLibraryTagExtractionService } from '../../src/server/library/library-tag-extraction-service.js';
+import { basename, extname, posix } from 'node:path';
+import { createOperationRunLeaseFixture } from '../../testing/operation-run-lease-fixtures.js';
+
+const runId = '33333333-3333-4333-8333-333333333333';
+const libraryRootId = '44444444-4444-4444-8444-444444444444';
+const context = { runId, libraryRootId, libraryRootPath: '/data/music', requestedLibraryRoot: '/data/music',
+  expectedLease: createOperationRunLeaseFixture({ runId, jobType: 'library_scan' }) };
+function source(file) {
+  return { sizeBytes: 123, modifiedAt: null, filename: basename(file.canonicalPath),
+    relativePath: posix.relative(context.libraryRootPath, file.canonicalPath), extension: extname(file.canonicalPath), ...file };
+}
+const extractTags = (service, { files }) => service.extractLibraryFileTags({ ...context, files: files.map(source) });
+
+test('tag extraction requires its owner and propagates one refused write without failed fallback or artwork', async () => {
+  assert.throws(() => createLibraryTagExtractionService({}), /guarded snapshot owner/u);
+  for (const code of ['operation_run_lease_lost', 'library_tag_snapshot_stale', 'database_fault']) {
+    const error = Object.assign(new Error(code), { code });
+    const writes = []; const artwork = [];
+    const service = createLibraryTagExtractionService({ extractMetadata: async () => ({ common: {}, native: {}, format: {} }),
+      writeOwnedLibraryFileTagSnapshot: async (input) => { writes.push(input); throw error; },
+      libraryEmbeddedArtworkService: { captureEmbeddedArtwork: async (input) => { artwork.push(input); } } });
+    await assert.rejects(extractTags(service, { files: [{ id: '11111111-1111-4111-8111-111111111111',
+      canonicalPath: '/data/music/track.flac', fileState: 'observed' }] }), (caught) => caught === error);
+    assert.equal(writes.length, 1); assert.equal(writes[0].payload.status, 'extracted'); assert.equal(artwork.length, 0);
+  }
+});
+
+test('tag extraction freezes every original source and presentation before the first parser await', async () => {
+  const modifiedAt = new Date('2026-04-30T18:00:00.000Z');
+  const second = source({ id: '22222222-2222-4222-8222-222222222222', canonicalPath: '/data/music/second.flac',
+    fileState: 'observed', modifiedAt, scopeMetadataReleaseId: 'original-hint' });
+  const paths = []; const writes = [];
+  const service = createLibraryTagExtractionService({ extractMetadata: async (path) => {
+    paths.push(path);
+    if (paths.length === 1) {
+      second.id = '11111111-1111-4111-8111-111111111111'; second.canonicalPath = '/data/music/changed.flac';
+      second.sizeBytes = 999; second.scopeMetadataReleaseId = 'changed-hint'; modifiedAt.setTime(0);
+      await Promise.resolve();
+    }
+    return { common: {}, native: {}, format: {} };
+  }, writeOwnedLibraryFileTagSnapshot: async (input) => { writes.push(input); } });
+  const result = await service.extractLibraryFileTags({ ...context, files: [source({
+    id: '11111111-1111-4111-8111-111111111111', canonicalPath: '/data/music/first.flac', fileState: 'observed' }), second] });
+  assert.deepEqual(paths, ['/data/music/first.flac', '/data/music/second.flac']);
+  assert.equal(writes[1].prepared.file.id, '22222222-2222-4222-8222-222222222222');
+  assert.equal(writes[1].prepared.file.modifiedAt, '2026-04-30T18:00:00.000Z');
+  assert.equal(writes[1].prepared.file.sizeBytes, 123); assert.ok(Object.isFrozen(writes[1].prepared.file));
+  assert.equal(result.files[1].scopeMetadataReleaseId, 'original-hint');
+});
+
+test('typed parser and post-commit artwork refusals escape without a failed snapshot', async () => {
+  for (const boundary of ['parser', 'artwork']) {
+    const error = Object.assign(new Error('Owned operation paused'), { code: 'operation_run_paused' });
+    const writes = [];
+    const service = createLibraryTagExtractionService({
+      extractMetadata: async () => { if (boundary === 'parser') throw error; return { common: {}, native: {}, format: {} }; },
+      writeOwnedLibraryFileTagSnapshot: async (input) => { writes.push(input); },
+      libraryEmbeddedArtworkService: { captureEmbeddedArtwork: async () => { throw error; } },
+    });
+    await assert.rejects(extractTags(service, { files: [{ id: '11111111-1111-4111-8111-111111111111',
+      canonicalPath: '/data/music/track.flac', fileState: 'observed' }] }), (caught) => caught === error);
+    assert.equal(writes.length, boundary === 'parser' ? 0 : 1);
+    assert.ok(writes.every((input) => input.payload.status === 'extracted'));
+  }
+});
 
 test('extractLibraryFileTags parses observed files sequentially and persists normalized snapshots', async (t) => {
   const metadataByPath = new Map();
   const captureEmbeddedArtwork = t.mock.fn(async () => {});
-  const writeLibraryFileTagSnapshot = t.mock.fn(async () => {});
+  const writeOwnedLibraryFileTagSnapshot = t.mock.fn(async () => {});
   const extractMetadata = t.mock.fn(async (filePath) => ({
     common: {
       album: 'Amber',
@@ -69,10 +134,10 @@ test('extractLibraryFileTags parses observed files sequentially and persists nor
   const service = createLibraryTagExtractionService({
     extractMetadata,
     libraryEmbeddedArtworkService: { captureEmbeddedArtwork },
-    libraryTagSnapshotStore: { writeLibraryFileTagSnapshot },
+    writeOwnedLibraryFileTagSnapshot,
   });
 
-  const result = await service.extractLibraryFileTags({
+  const result = await extractTags(service, {
     files: [
       {
         canonicalPath: '/data/music/Artist/cover.jpg',
@@ -82,14 +147,14 @@ test('extractLibraryFileTags parses observed files sequentially and persists nor
       {
         canonicalPath: '/data/music/Artist/track-01.flac',
         fileState: 'observed',
-        id: 'file-1',
+        id: '11111111-1111-4111-8111-111111111111',
         modifiedAt: '2026-04-30T18:00:00.000Z',
         sizeBytes: 123,
       },
       {
         canonicalPath: '/data/music/Artist/track-02.flac',
         fileState: 'observed',
-        id: 'file-2',
+        id: '22222222-2222-4222-8222-222222222222',
         modifiedAt: '2026-04-30T18:01:00.000Z',
         sizeBytes: 456,
       },
@@ -103,14 +168,17 @@ test('extractLibraryFileTags parses observed files sequentially and persists nor
       '/data/music/Artist/track-02.flac',
     ],
   );
-  assert.equal(writeLibraryFileTagSnapshot.mock.callCount(), 2);
+  assert.equal(writeOwnedLibraryFileTagSnapshot.mock.callCount(), 2);
+  assert.equal(writeOwnedLibraryFileTagSnapshot.mock.calls[0].arguments[0].prepared.file.id, '11111111-1111-4111-8111-111111111111');
+  assert.equal(writeOwnedLibraryFileTagSnapshot.mock.calls[0].arguments[0].prepared.file.sizeBytes, 123);
+  assert.equal(writeOwnedLibraryFileTagSnapshot.mock.calls[0].arguments[0].prepared.file.modifiedAt, '2026-04-30T18:00:00.000Z');
   assert.equal(captureEmbeddedArtwork.mock.callCount(), 2);
   assert.deepEqual(result.files.map((file) => ({
     id: file.id,
     tagPayload: file.tagPayload,
   })), [
     {
-      id: 'file-1',
+      id: '11111111-1111-4111-8111-111111111111',
       tagPayload: {
         album: 'Amber',
         albumArtist: 'Autechre',
@@ -132,7 +200,7 @@ test('extractLibraryFileTags parses observed files sequentially and persists nor
       },
     },
     {
-      id: 'file-2',
+      id: '22222222-2222-4222-8222-222222222222',
       tagPayload: {
         album: 'Amber',
         albumArtist: 'Autechre',
@@ -155,10 +223,10 @@ test('extractLibraryFileTags parses observed files sequentially and persists nor
     },
   ]);
   assert.deepEqual(captureEmbeddedArtwork.mock.calls[0].arguments[0], {
-    libraryFileId: 'file-1',
+    libraryFileId: '11111111-1111-4111-8111-111111111111',
     metadata: metadataByPath.get('/data/music/Artist/track-01.flac'),
   });
-  assert.deepEqual(writeLibraryFileTagSnapshot.mock.calls[0].arguments[0], {
+  assert.deepEqual(writeOwnedLibraryFileTagSnapshot.mock.calls[0].arguments[0].payload, {
     audioCodec: 'FLAC',
     bitrateKbps: 932,
     bitDepth: 16,
@@ -167,7 +235,6 @@ test('extractLibraryFileTags parses observed files sequentially and persists nor
     embeddedArtworkCount: 1,
     extractor: 'music-metadata',
     extractorVersion: null,
-    libraryFileId: 'file-1',
     normalizedTags: {
       album: 'Amber',
       albumArtist: 'Autechre',
@@ -194,49 +261,46 @@ test('extractLibraryFileTags parses observed files sequentially and persists nor
       tagTypes: ['vorbis'],
     },
     sampleRateHz: 44100,
-    sourceModifiedAt: '2026-04-30T18:00:00.000Z',
-    sourceSizeBytes: 123,
     status: 'extracted',
     tagFormat: 'vorbis',
   });
 });
 
 test('extractLibraryFileTags records failed extraction attempts without throwing', async (t) => {
-  const writeLibraryFileTagSnapshot = t.mock.fn(async () => {});
+  const writeOwnedLibraryFileTagSnapshot = t.mock.fn(async () => {});
   const service = createLibraryTagExtractionService({
     extractMetadata: async () => {
       throw new Error('unsupported file content');
     },
-    libraryTagSnapshotStore: { writeLibraryFileTagSnapshot },
+    writeOwnedLibraryFileTagSnapshot,
   });
 
-  const result = await service.extractLibraryFileTags({
+  const result = await extractTags(service, {
     files: [{
       canonicalPath: '/data/music/Artist/track-01.flac',
       fileState: 'observed',
-      id: 'file-1',
+      id: '11111111-1111-4111-8111-111111111111',
     }],
   });
 
-  assert.deepEqual(writeLibraryFileTagSnapshot.mock.calls[0].arguments[0], {
+  assert.deepEqual(writeOwnedLibraryFileTagSnapshot.mock.calls[0].arguments[0].payload, {
     extractor: 'music-metadata',
     extractorVersion: null,
-    libraryFileId: 'file-1',
     rawTags: {
       error: 'unsupported file content',
     },
     status: 'failed',
   });
-  assert.deepEqual(result.files, [{
+  assert.deepEqual(result.files.map(({ canonicalPath, fileState, id, tagPayload }) => ({ canonicalPath, fileState, id, tagPayload })), [{
     canonicalPath: '/data/music/Artist/track-01.flac',
     fileState: 'observed',
-    id: 'file-1',
+    id: '11111111-1111-4111-8111-111111111111',
     tagPayload: null,
   }]);
 });
 
 test('extractLibraryFileTags treats embedded artwork capture as best effort after snapshot persistence', async (t) => {
-  const writeLibraryFileTagSnapshot = t.mock.fn(async () => {});
+  const writeOwnedLibraryFileTagSnapshot = t.mock.fn(async () => {});
   const captureEmbeddedArtwork = t.mock.fn(async () => {
     throw new Error('invalid embedded artwork');
   });
@@ -251,23 +315,23 @@ test('extractLibraryFileTags treats embedded artwork capture as best effort afte
       native: {},
     }),
     libraryEmbeddedArtworkService: { captureEmbeddedArtwork },
-    libraryTagSnapshotStore: { writeLibraryFileTagSnapshot },
+    writeOwnedLibraryFileTagSnapshot,
   });
 
-  await service.extractLibraryFileTags({
+  await extractTags(service, {
     files: [{
       canonicalPath: '/data/music/Artist/track-01.mp3',
       fileState: 'observed',
-      id: 'file-1',
+      id: '11111111-1111-4111-8111-111111111111',
     }],
   });
 
-  assert.equal(writeLibraryFileTagSnapshot.mock.callCount(), 1);
+  assert.equal(writeOwnedLibraryFileTagSnapshot.mock.callCount(), 1);
   assert.equal(captureEmbeddedArtwork.mock.callCount(), 1);
 });
 
 test('extractLibraryFileTags still invokes the shared embedded artwork reconciler when pictures are absent', async (t) => {
-  const writeLibraryFileTagSnapshot = t.mock.fn(async () => {});
+  const writeOwnedLibraryFileTagSnapshot = t.mock.fn(async () => {});
   const captureEmbeddedArtwork = t.mock.fn(async () => null);
   const service = createLibraryTagExtractionService({
     extractMetadata: async () => ({
@@ -280,21 +344,21 @@ test('extractLibraryFileTags still invokes the shared embedded artwork reconcile
       native: {},
     }),
     libraryEmbeddedArtworkService: { captureEmbeddedArtwork },
-    libraryTagSnapshotStore: { writeLibraryFileTagSnapshot },
+    writeOwnedLibraryFileTagSnapshot,
   });
 
-  await service.extractLibraryFileTags({
+  await extractTags(service, {
     files: [{
       canonicalPath: '/data/music/Artist/track-02.mp3',
       fileState: 'observed',
-      id: 'file-2',
+      id: '22222222-2222-4222-8222-222222222222',
     }],
   });
 
-  assert.equal(writeLibraryFileTagSnapshot.mock.callCount(), 1);
+  assert.equal(writeOwnedLibraryFileTagSnapshot.mock.callCount(), 1);
   assert.equal(captureEmbeddedArtwork.mock.callCount(), 1);
   assert.deepEqual(captureEmbeddedArtwork.mock.calls[0].arguments[0], {
-    libraryFileId: 'file-2',
+    libraryFileId: '22222222-2222-4222-8222-222222222222',
     metadata: {
       common: {
         picture: [],

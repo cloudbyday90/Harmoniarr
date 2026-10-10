@@ -82,6 +82,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
   const librarySidecarArtworkService = { captureSidecarArtwork };
   const libraryTagExtractionService = { extractLibraryFileTags };
   const libraryTagSnapshotStore = {};
+  const libraryTagSnapshotService = { writeOwnedLibraryFileTagSnapshot: async () => {} };
   const libraryWantedReleaseService = { reconcileWantedReleases };
   const libraryWantedReleaseStore = {};
   const libraryWantedSummaryService = { buildLibraryWantedReleases, buildLibraryWantedSummary };
@@ -136,6 +137,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
     librarySidecarArtworkService,
     libraryTagExtractionService,
     libraryTagSnapshotStore,
+    libraryTagSnapshotService,
     libraryWantedReleaseService,
     libraryWantedReleaseStore,
     libraryWantedSummaryService,
@@ -188,6 +190,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
   assert.equal(libraryModule.librarySidecarArtworkService, librarySidecarArtworkService);
   assert.equal(libraryModule.libraryTagExtractionService, libraryTagExtractionService);
   assert.equal(libraryModule.libraryTagSnapshotStore, libraryTagSnapshotStore);
+  assert.equal(libraryModule.libraryTagSnapshotService, libraryTagSnapshotService);
   assert.equal(libraryModule.libraryWantedReleaseService, libraryWantedReleaseService);
   assert.equal(libraryModule.libraryWantedReleaseStore, libraryWantedReleaseStore);
   assert.equal(libraryModule.libraryWantedSummaryService, libraryWantedSummaryService);
@@ -325,6 +328,7 @@ test('createLibraryModule initializes the default discovery worker after pause s
       extractLibraryFileTags: async () => {},
     },
     libraryTagSnapshotStore: {},
+    libraryTagSnapshotService: { writeOwnedLibraryFileTagSnapshot: async () => {} },
     libraryWantedReleaseService: {
       reconcileWantedReleases: async () => {},
     },

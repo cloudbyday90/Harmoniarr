@@ -3350,6 +3350,23 @@ require their guarded owner. No schema change is introduced. Filesystem reads
 and later enrichment remain outside this transaction. See separate
 [design](SCAN_CATALOGUE_DESIGN.md) and [outcome](SCAN_CATALOGUE_OUTCOME.md).
 
+## Current implementation: acquisition-owned tag snapshot persistence
+
+The tag snapshot owner captures the original scan acquisition, roots and file
+identity before parsing. Maintenance readiness and run/advisory key/lease locks
+precede explicit root-before-file locks. Snapshot INSERT and current-file UPDATE
+share one supplied transaction client. The UPDATE repeats original root/path,
+size and nullable mtime plus observed/not-deleted predicates and requires one
+returned file; one returned snapshot and fresh final ownership/source/time checks
+are also required. Refusal rolls back history and the read model together.
+
+Parser failures use the same guard. They retain prior successful extraction
+stamps and cannot reset ignored/deleted files into observed state. Current success
+uses captured source measurements; stamps are separate from source CAS authority.
+No schema change is introduced. Parsing and later artwork remain outside these
+SQL locks. See [design](TAG_SNAPSHOT_DESIGN.md) and
+[outcome](TAG_SNAPSHOT_OUTCOME.md) for execution evidence and physical-byte limits.
+
 ## Sources Reviewed
 
 PostgreSQL 18 official sources:

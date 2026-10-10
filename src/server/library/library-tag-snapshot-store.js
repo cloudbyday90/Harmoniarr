@@ -17,6 +17,8 @@
  */
 
 import { getPool } from '../database.js';
+import { createApiError } from '../auth.js';
+import { createDatabaseTransactionRunner } from '../database-transaction-service.js';
 
 function toNullableInteger(value) {
   if (value == null) {
@@ -29,6 +31,7 @@ function toNullableInteger(value) {
 
 export function createLibraryTagSnapshotStore({
   getPoolFn = getPool,
+  withTransaction = createDatabaseTransactionRunner({ getPoolFn }),
 } = {}) {
   async function writeLibraryFileTagSnapshot({
     audioCodec = null,
@@ -47,14 +50,16 @@ export function createLibraryTagSnapshotStore({
     sourceSizeBytes = null,
     status,
     tagFormat = null,
+    queryable = null,
+    expectedSource = null,
+    beforeWrite = null,
   }) {
-    const pool = getPoolFn();
-    const client = await pool.connect();
-
-    try {
-      await client.query('BEGIN');
-
-      await client.query(
+    if (queryable != null && typeof queryable.query !== 'function') throw new TypeError('Tag snapshot queryable must supply query');
+    if (beforeWrite != null && typeof beforeWrite !== 'function') throw new TypeError('Tag snapshot beforeWrite must be a function');
+    if (expectedSource != null && expectedSource.id !== libraryFileId) throw new TypeError('Tag snapshot source must match its file');
+    async function writeSnapshot(client) {
+      await beforeWrite?.({ queryable: client, stage: 'snapshot' });
+      const snapshot = await client.query(
         `
           INSERT INTO file_tag_snapshots (
             library_file_id,
@@ -68,6 +73,7 @@ export function createLibraryTagSnapshotStore({
             extracted_at
           )
           VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, NOW())
+          RETURNING id
         `,
         [
           libraryFileId,
@@ -80,8 +86,11 @@ export function createLibraryTagSnapshotStore({
           normalizedTags ? JSON.stringify(normalizedTags) : null,
         ],
       );
-
-      await client.query(
+      if (snapshot.rowCount !== 1 || snapshot.rows.length !== 1) {
+        throw createApiError(409, 'library_tag_snapshot_incomplete', 'The tag snapshot was not inserted');
+      }
+      await beforeWrite?.({ queryable: client, stage: 'file_update' });
+      const result = await client.query(
         `
           UPDATE library_files
             SET audio_codec = $2,
@@ -104,6 +113,10 @@ export function createLibraryTagSnapshotStore({
               file_state = 'observed',
               updated_at = NOW()
           WHERE id = $1
+          ${expectedSource ? `AND library_root_id = $12::uuid AND canonical_path = $13
+            AND size_bytes = $14::bigint AND modified_at IS NOT DISTINCT FROM $15::timestamptz
+            AND file_state = 'observed' AND deleted_at IS NULL` : ''}
+          RETURNING id
         `,
         [
           libraryFileId,
@@ -117,16 +130,16 @@ export function createLibraryTagSnapshotStore({
           status,
           toNullableInteger(sourceSizeBytes),
           sourceModifiedAt,
+          ...(expectedSource ? [expectedSource.libraryRootId, expectedSource.canonicalPath,
+            expectedSource.sizeBytes, expectedSource.modifiedAt] : []),
         ],
       );
-
-      await client.query('COMMIT');
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
+      if (result.rowCount !== 1 || result.rows.length !== 1 || result.rows[0].id !== libraryFileId) {
+        throw createApiError(409, 'library_tag_snapshot_stale', 'The library file changed before the tag update');
+      }
+      return { snapshotId: snapshot.rows[0].id, libraryFileId: result.rows[0].id };
     }
+    return queryable ? writeSnapshot(queryable) : withTransaction(writeSnapshot);
   }
 
   return {
