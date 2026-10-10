@@ -465,3 +465,11 @@ signal abortion. Runtime proof belongs in the separate cohort-adoption outcome;
 source/installed structural validation passed and all four maintained files match
 by SHA256 at final freeze. No
 new browser conformance or blind skill-trial claim is made.
+
+Library-template reference maintenance maps actual schema preparation, explicit
+suite selection, clone isolation and pre-seed source refusal. It distinguishes
+key/checksum/status lineage from filename-only case checks and measured phase
+savings from variable profile wall time. Runtime evidence belongs in the separate
+library-template outcome; maintained source/installed structure and identity are
+validated at final freeze, with all four standards files matching by SHA256,
+without a new browser or blind-trial claim.

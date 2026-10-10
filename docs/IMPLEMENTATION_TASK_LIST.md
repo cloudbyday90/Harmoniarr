@@ -6,7 +6,39 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
-## Current development slice: Audited shared PostgreSQL cohort adoption (2026-10-10)
+## Current development slice: Measured library schema templates (2026-10-10)
+
+- Instrument actual schema, seed and work/drain through two narrow ESM helpers
+  (explicit pool preparation and strict per-suite mode policy), preserving original
+  34 native cases, all variants/SQL/parser assertions and deadlines. See
+  [design](LIBRARY_TEST_SCHEMA_TEMPLATES_DESIGN.md),
+  [outcome](LIBRARY_TEST_SCHEMA_TEMPLATES_OUTCOME.md) and
+  [research](LIBRARY_TEST_SCHEMA_TEMPLATES_RESEARCH_2026_10.md).
+- Measured empty release/tag schema application totals 51.77s across 46 variants.
+  Reuse verified private sources with complete lineage, sealing/OID/role/zero-session
+  admission, fresh clones and actual idempotent case checks. Explicit selected
+  profile passes 34/34 at 70.40s; promoted per-suite defaults pass 34/34 at 92.29s
+  against 105.70s empty baseline, all 92 databases registered/released. Direct costs
+  and wall variance are separate; no CI/full-gate causal speedup is claimed.
+- Nine controls and scoped lint pass; two new actual native-media/PG controls prove
+  tag/trigger/run/lease isolation after a failed clone and pre-seed refusal after
+  source reopening. Dedicated untemplated bootstrap passes 105/105; security
+  reports zero npm vulnerabilities. Stable `npm run validate` passes 9,888 tests
+  (4,603 server, 4,377 client, 552 script, 356 integration), zero failures/
+  cancellations/skips, all checks/lint and both builds. Wall is 23m33s, integration
+  20m54s, longer than the previous aggregate run; selected setup gains don't prove
+  whole-gate improvement. Scheduling/concurrency remain unchanged.
+- Per-suite empty overrides remain. Catalogue/global/dedicated lifecycle/migration/
+  bootstrap/recovery defaults are unchanged. Standards/testing evidence references
+  map actual pool/source lineage and nested phase limits. PR assessment is separate:
+  [design](OPEN_PR_APPLICABILITY_LIBRARY_TEMPLATES_2026_10_DESIGN.md) and
+  [outcome](OPEN_PR_APPLICABILITY_LIBRARY_TEMPLATES_2026_10_OUTCOME.md); no eligible
+  unreplayed patch after fresh complete source checks.
+- Next: audit catalogue's remaining fixture lifetimes before assessing templates
+  for its measured 13.43–19.15s repeated setup. Discovery-request recomputation is
+  next product work. Stay on main without release/branch/tag/deployment/PR merge.
+
+## Prior development slice: Audited shared PostgreSQL cohort adoption (2026-10-10)
 
 - Release reconciliation/tag snapshots retain all 16 original cases/46 variants,
   real SQL assertions and deadlines while adopting scoped gates, registered worker/

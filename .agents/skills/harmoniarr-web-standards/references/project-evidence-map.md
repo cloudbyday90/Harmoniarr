@@ -129,3 +129,12 @@ files verify actual SQL rollback, captured lease release and held native-parser
 cancellation before writes. The original serialization tests additionally fence
 their borrowed idle-client reads before rollback. The separate cohort-adoption
 outcome owns executed counts, matched-order measurements and scope limits.
+
+Library schema measurement/selection maps to `library-test-schema-preparation.js`
+and `library-test-schema-policy.js`; actual source/clone ownership remains in the
+existing migration-template modules. The separate
+`library-schema-template-adoption.test.js` proves native tag/trigger/run/lease
+isolation across a failed clone and refusal before seeds after source reopening.
+Trace explicit domain overrides and bound pool calls before trusting a faster
+profile. The library-template outcome separates phase costs, default/trial wall
+variance and dedicated untemplated proof from complete-gate validation.

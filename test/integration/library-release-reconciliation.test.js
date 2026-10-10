@@ -17,7 +17,8 @@ import { waitForFixtureReady } from '../../testing/integration/fixture-lifecycle
 import { createScopedFixtureGate, startScopedFixtureWork, withFixtureWorkScope } from '../../testing/integration/fixture-work-scope.js';
 import { withRollbackFixtureClient } from '../../testing/integration/fixture-transaction-client.js';
 import { startReleaseReconciliationFixtureWorker } from '../../testing/integration/library-release-reconciliation-worker-fixture.js';
-import { applyPendingMigrations } from '../../src/server/migrations.js';
+import { prepareLibraryTestSchema } from '../../testing/integration/library-test-schema-preparation.js';
+import { resolveLibraryTestSchemaMode } from '../../testing/integration/library-test-schema-policy.js';
 import { createDatabaseTransactionRunner } from '../../src/server/database-transaction-service.js';
 import { createJobLeaseStore } from '../../src/server/job-lease-store.js';
 import { createOperationRunStore } from '../../src/server/operation-run-store.js';
@@ -76,66 +77,71 @@ const matched = (file, metadata) => ({ libraryFileId: file.id, metadataArtistId:
 
 async function scenario(t, callback) {
   if (unavailable) { t.skip(unavailable); return; }
-  await runtime.runIsolatedDatabase(async ({ getPoolFn }) => {
-    await applyPendingMigrations({ getPoolFn }); const pool = getPoolFn();
-    if (!reportedVersion) { t.diagnostic((await pool.query('SELECT version() AS version')).rows[0].version); reportedVersion = true; }
-    const base = resolve('.tmp', `release-reconciliation-${randomUUID()}`);
-    const rootPath = join(base, 'first'); const otherRoot = join(base, 'second');
-    const catalog = createLibraryCatalogStore({ getPoolFn }); const rawMatches = createLibraryFileMatchStore({ getPoolFn });
-    const observation = (root, name = 'track.flac', state = 'observed') => ({ canonicalPath: join(root, name),
-      filename: name, relativePath: name, extension: '.flac', fileState: state, sizeBytes: 100, modifiedAt: '2026-10-10T00:00:00.000Z' });
-    const first = await catalog.recordLibraryFiles({ libraryRootPath: rootPath, files: [observation(rootPath)] });
-    const second = await catalog.recordLibraryFiles({ libraryRootPath: otherRoot, files: [observation(otherRoot)] });
-    const metadataA = await seedMetadataReleaseFixture({ queryable: pool });
-    const metadataB = await seedMetadataReleaseFixture({ queryable: pool, releaseTitle: 'Second release' });
-    const metadataC = await seedMetadataReleaseFixture({ queryable: pool, releaseTitle: 'Stale release' });
-    const extraTrack = await insertMetadataTrack({ metadataMediumId: metadataB.metadataMediumId,
-      position: 2, numberText: '2', title: 'Second track' }, pool);
-    await rawMatches.writeLibraryFileMatchBatch({ matches: [matched(first.files[0], metadataA), matched(second.files[0], metadataB)] });
-    const rawProjection = createLibraryReleaseReconciliationStore({ getPoolFn });
-    const coverage = createLibraryReleaseCoverageStore();
-    const current = mapReleaseCoverageRows(await coverage.loadLibraryReleaseCoverageRows({ queryable: pool }));
-    await rawProjection.replaceLibraryReleaseReconciliations({ reconciliations: [...current,
-      { ...current[0], metadataArtistId: metadataC.metadataArtistId, metadataReleaseGroupId: metadataC.metadataReleaseGroupId,
-        metadataReleaseId: metadataC.metadataReleaseId }] });
-    const makeRuns = (ownerInstanceId, operationType = 'library_scan') => createOperationRunStore({ getPoolFn,
-      operationType, leaseJobType: operationType,
-      createJobLeaseStoreFn: () => createJobLeaseStore({ getPoolFn, ownerInstanceId, leaseDurationMs: 60_000 }) });
-    const a = makeRuns('reconciliation-owner'); const b = makeRuns('reconciliation-owner');
-    const run = await a.createOperationRun({ status: 'pending', summary: { libraryRoot: rootPath } });
-    const maintenance = createMaintenanceLockService({ getPoolFn });
-    const guard = createMaintenanceLockWriteGuardService({ listActiveMaintenanceLocks: maintenance.listActiveMaintenanceLocks });
-    const withTransaction = createDatabaseTransactionRunner({ getPoolFn });
-    const assertMaintenanceWriteAllowed = ({ queryable }) => guard.assertNoActiveWriteLocks({ queryable });
-    const makeService = (hooks = {}) => {
-      let reads = 0; const mutations = [];
-      const service = createLibraryReleaseReconciliationService({ getPoolFn, assertMaintenanceWriteAllowed,
-        withTransaction: async (work) => { await hooks.beforeTransaction?.(); return (hooks.withTransaction ?? withTransaction)(work); },
-        store: hooks.store ?? createLibraryReleaseReconciliationGuardStore(),
-        coverageStore: { loadLibraryReleaseCoverageRows: async (input) => {
-          const rows = await coverage.loadLibraryReleaseCoverageRows(input); reads += 1;
-          await hooks.afterCoverage?.({ ...input, rows, index: reads }); return rows;
-        } },
-        libraryReleaseReconciliationStore: { replaceLibraryReleaseReconciliations: async (input) => {
-          const queryable = { query: async (sql, values) => {
-            if (/DELETE FROM library_release_reconciliations/u.test(sql)) mutations.push('delete');
-            if (/INSERT INTO library_release_reconciliations/u.test(sql)) mutations.push('upsert');
-            return input.queryable.query(sql, values);
-          } };
-          const result = await rawProjection.replaceLibraryReleaseReconciliations({ ...input, queryable,
-            beforeWrite: async (stage) => { await input.beforeWrite(stage); await hooks.beforeMutation?.(stage); } });
-          await hooks.afterReplace?.({ ...input, result }); return result;
-        } },
-      });
-      return { ...service, mutations, reads: () => reads };
-    };
-    const catalogueOwner = createLibraryScanCatalogueService({ recordLibraryFiles: catalog.recordLibraryFiles,
-      withTransaction, assertMaintenanceWriteAllowed });
-    const context = (runId, lease, root = rootPath, rootId = first.libraryRootId) => ({ runId, expectedLease: lease,
-      requestedLibraryRoot: root, libraryRootPath: root, libraryRootId: rootId });
-    await withFixtureWorkScope({ signal: t.signal }, (scope) => callback({ scope, pool, getPoolFn, base, rootPath, otherRoot,
-      first, second, metadataA, metadataB, metadataC, extraTrack, observation, catalog, rawMatches, rawProjection, coverage,
-      a, b, run, makeRuns, maintenance, withTransaction, assertMaintenanceWriteAllowed, catalogueOwner, makeService, context }));
+  await runtime.runIsolatedDatabase(async ({ getPoolFn, phaseObserver }) => {
+    await prepareLibraryTestSchema({ getPoolFn, phaseObserver, signal: t.signal });
+    const fixture = await phaseObserver.measure('fixture_seed', async () => {
+      const pool = getPoolFn();
+      if (!reportedVersion) { t.diagnostic((await pool.query('SELECT version() AS version')).rows[0].version); reportedVersion = true; }
+      const base = resolve('.tmp', `release-reconciliation-${randomUUID()}`);
+      const rootPath = join(base, 'first'); const otherRoot = join(base, 'second');
+      const catalog = createLibraryCatalogStore({ getPoolFn }); const rawMatches = createLibraryFileMatchStore({ getPoolFn });
+      const observation = (root, name = 'track.flac', state = 'observed') => ({ canonicalPath: join(root, name),
+        filename: name, relativePath: name, extension: '.flac', fileState: state, sizeBytes: 100, modifiedAt: '2026-10-10T00:00:00.000Z' });
+      const first = await catalog.recordLibraryFiles({ libraryRootPath: rootPath, files: [observation(rootPath)] });
+      const second = await catalog.recordLibraryFiles({ libraryRootPath: otherRoot, files: [observation(otherRoot)] });
+      const metadataA = await seedMetadataReleaseFixture({ queryable: pool });
+      const metadataB = await seedMetadataReleaseFixture({ queryable: pool, releaseTitle: 'Second release' });
+      const metadataC = await seedMetadataReleaseFixture({ queryable: pool, releaseTitle: 'Stale release' });
+      const extraTrack = await insertMetadataTrack({ metadataMediumId: metadataB.metadataMediumId,
+        position: 2, numberText: '2', title: 'Second track' }, pool);
+      await rawMatches.writeLibraryFileMatchBatch({ matches: [matched(first.files[0], metadataA), matched(second.files[0], metadataB)] });
+      const rawProjection = createLibraryReleaseReconciliationStore({ getPoolFn });
+      const coverage = createLibraryReleaseCoverageStore();
+      const current = mapReleaseCoverageRows(await coverage.loadLibraryReleaseCoverageRows({ queryable: pool }));
+      await rawProjection.replaceLibraryReleaseReconciliations({ reconciliations: [...current,
+        { ...current[0], metadataArtistId: metadataC.metadataArtistId, metadataReleaseGroupId: metadataC.metadataReleaseGroupId,
+          metadataReleaseId: metadataC.metadataReleaseId }] });
+      const makeRuns = (ownerInstanceId, operationType = 'library_scan') => createOperationRunStore({ getPoolFn,
+        operationType, leaseJobType: operationType,
+        createJobLeaseStoreFn: () => createJobLeaseStore({ getPoolFn, ownerInstanceId, leaseDurationMs: 60_000 }) });
+      const a = makeRuns('reconciliation-owner'); const b = makeRuns('reconciliation-owner');
+      const run = await a.createOperationRun({ status: 'pending', summary: { libraryRoot: rootPath } });
+      const maintenance = createMaintenanceLockService({ getPoolFn });
+      const guard = createMaintenanceLockWriteGuardService({ listActiveMaintenanceLocks: maintenance.listActiveMaintenanceLocks });
+      const withTransaction = createDatabaseTransactionRunner({ getPoolFn });
+      const assertMaintenanceWriteAllowed = ({ queryable }) => guard.assertNoActiveWriteLocks({ queryable });
+      const makeService = (hooks = {}) => {
+        let reads = 0; const mutations = [];
+        const service = createLibraryReleaseReconciliationService({ getPoolFn, assertMaintenanceWriteAllowed,
+          withTransaction: async (work) => { await hooks.beforeTransaction?.(); return (hooks.withTransaction ?? withTransaction)(work); },
+          store: hooks.store ?? createLibraryReleaseReconciliationGuardStore(),
+          coverageStore: { loadLibraryReleaseCoverageRows: async (input) => {
+            const rows = await coverage.loadLibraryReleaseCoverageRows(input); reads += 1;
+            await hooks.afterCoverage?.({ ...input, rows, index: reads }); return rows;
+          } },
+          libraryReleaseReconciliationStore: { replaceLibraryReleaseReconciliations: async (input) => {
+            const queryable = { query: async (sql, values) => {
+              if (/DELETE FROM library_release_reconciliations/u.test(sql)) mutations.push('delete');
+              if (/INSERT INTO library_release_reconciliations/u.test(sql)) mutations.push('upsert');
+              return input.queryable.query(sql, values);
+            } };
+            const result = await rawProjection.replaceLibraryReleaseReconciliations({ ...input, queryable,
+              beforeWrite: async (stage) => { await input.beforeWrite(stage); await hooks.beforeMutation?.(stage); } });
+            await hooks.afterReplace?.({ ...input, result }); return result;
+          } },
+        });
+        return { ...service, mutations, reads: () => reads };
+      };
+      const catalogueOwner = createLibraryScanCatalogueService({ recordLibraryFiles: catalog.recordLibraryFiles,
+        withTransaction, assertMaintenanceWriteAllowed });
+      const context = (runId, lease, root = rootPath, rootId = first.libraryRootId) => ({ runId, expectedLease: lease,
+        requestedLibraryRoot: root, libraryRootPath: root, libraryRootId: rootId });
+      return { pool, getPoolFn, base, rootPath, otherRoot,
+        first, second, metadataA, metadataB, metadataC, extraTrack, observation, catalog, rawMatches, rawProjection, coverage,
+        a, b, run, makeRuns, maintenance, withTransaction, assertMaintenanceWriteAllowed, catalogueOwner, makeService, context };
+    });
+    await phaseObserver.measure('scenario_work', () => withFixtureWorkScope({ signal: t.signal },
+      (scope) => callback({ ...fixture, scope })));
   }, { signal: t.signal });
 }
 async function open(c, runs = c.a, root = c.rootPath) {
@@ -177,7 +183,8 @@ async function waitForBlock(c, holderPid, queryable, operation) {
 
 suite('Original scan acquisition owns serialized global release reconciliation', () => {
   before(async () => {
-    try { runtime = await createPostgresIntegrationRuntime({ config }); }
+    try { runtime = await createPostgresIntegrationRuntime({ config,
+      schemaMode: resolveLibraryTestSchemaMode({ domain: 'release_reconciliation', defaultMode: 'migration_template' }) }); }
     catch (error) {
       if (!isSkippableIntegrationRuntimeError(error)) throw error;
       unavailable = toIntegrationRuntimeUnavailableReason(error);

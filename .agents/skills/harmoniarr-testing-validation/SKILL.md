@@ -69,6 +69,16 @@ spreading internal `pool.options` can omit protected, non-enumerable credentials
 
 Use PowerShell commands from the repository root.
 
+Release reconciliation and tag snapshots also select a private per-file migration
+source. Their independent overrides are `HARMONIARR_INTEGRATION_RELEASE_SCHEMA_MODE`
+and `HARMONIARR_INTEGRATION_TAG_SCHEMA_MODE`: `empty` preserves comparison and
+`migration_template` selects the audited path. Catalogue/global/dedicated
+bootstrap/recovery defaults are unchanged. Measure actual schema, seed and work
+spans; tag work includes seeding, so don't add nested spans twice. The per-clone
+migration call is an idempotent filename check; complete source key/checksum/status
+lineage belongs to the existing template owner. See
+`docs/LIBRARY_TEST_SCHEMA_TEMPLATES_DESIGN.md` and its measured outcome.
+
 `npm run test:integration:shared-postgres` is an opt-in serial Wanted/catalogue/
 release-reconciliation/tag-snapshot cohort. It owns one fresh server, preserving
 isolated file processes, databases

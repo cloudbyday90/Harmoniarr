@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os';
 import { createPostgresIntegrationRuntime } from '../../testing/postgres-integration-runtime.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 import { isSkippableIntegrationRuntimeError, toIntegrationRuntimeUnavailableReason } from '../../testing/integration/runtime-availability.js';
-import { applyPendingMigrations } from '../../src/server/migrations.js';
+import { prepareLibraryTestSchema } from '../../testing/integration/library-test-schema-preparation.js';
 import { createDatabaseTransactionRunner } from '../../src/server/database-transaction-service.js';
 import { createJobLeaseStore } from '../../src/server/job-lease-store.js';
 import { createOperationRunStore } from '../../src/server/operation-run-store.js';
@@ -51,43 +51,46 @@ const expire = (c) => c.pool.query("UPDATE job_leases SET expires_at=clock_times
 
 async function scenario(t, callback, { empty = false } = {}) {
   if (unavailable) { t.skip(unavailable); return; }
-  await runtime.runIsolatedDatabase(async ({ getPoolFn }) => {
-    await applyPendingMigrations({ getPoolFn });
+  await runtime.runIsolatedDatabase(async ({ getPoolFn, phaseObserver }) => {
+    await prepareLibraryTestSchema({ getPoolFn, phaseObserver, signal: t.signal });
     const requestedRoot = await mkdtemp(join(tmpdir(), 'harmoniarr-scan-catalogue-'));
     const rootPath = await realpath(requestedRoot);
     try {
-      const pool = getPoolFn();
-      const stable = join(rootPath, 'stable.flac');
-      const old = join(rootPath, 'old.flac');
-      const newFile = join(rootPath, 'new.flac');
-      const cover = join(rootPath, 'cover.jpg');
-      const oldBytes = Buffer.from('Old observed bytes');
-      const replacementBytes = Buffer.from('Current replacement bytes are longer');
-      const catalog = createLibraryCatalogStore({ getPoolFn });
-      let seed;
-      if (!empty) {
-        await writeFile(stable, oldBytes); await writeFile(old, oldBytes); await writeFile(cover, 'ignored cover fixture');
-        const observed = await walk(requestedRoot);
-        seed = await catalog.recordLibraryFiles({ libraryRootPath: observed.summary.libraryRoot, files: observed.files });
-        await pool.query(`UPDATE library_files SET tag_payload='{"title":"Retained tag"}'::jsonb,
-          tag_extracted_size_bytes=size_bytes,tag_extracted_modified_at=modified_at WHERE canonical_path=$1`, [stable]);
-      }
-      const makeRuns = (ownerInstanceId, operationType = 'library_scan') => createOperationRunStore({ getPoolFn,
-        operationType, leaseJobType: operationType,
-        createJobLeaseStoreFn: () => createJobLeaseStore({ getPoolFn, ownerInstanceId, leaseDurationMs: 60_000 }),
+      const fixture = await phaseObserver.measure('fixture_seed', async () => {
+        const pool = getPoolFn();
+        const stable = join(rootPath, 'stable.flac');
+        const old = join(rootPath, 'old.flac');
+        const newFile = join(rootPath, 'new.flac');
+        const cover = join(rootPath, 'cover.jpg');
+        const oldBytes = Buffer.from('Old observed bytes');
+        const replacementBytes = Buffer.from('Current replacement bytes are longer');
+        const catalog = createLibraryCatalogStore({ getPoolFn });
+        let seed;
+        if (!empty) {
+          await writeFile(stable, oldBytes); await writeFile(old, oldBytes); await writeFile(cover, 'ignored cover fixture');
+          const observed = await walk(requestedRoot);
+          seed = await catalog.recordLibraryFiles({ libraryRootPath: observed.summary.libraryRoot, files: observed.files });
+          await pool.query(`UPDATE library_files SET tag_payload='{"title":"Retained tag"}'::jsonb,
+            tag_extracted_size_bytes=size_bytes,tag_extracted_modified_at=modified_at WHERE canonical_path=$1`, [stable]);
+        }
+        const makeRuns = (ownerInstanceId, operationType = 'library_scan') => createOperationRunStore({ getPoolFn,
+          operationType, leaseJobType: operationType,
+          createJobLeaseStoreFn: () => createJobLeaseStore({ getPoolFn, ownerInstanceId, leaseDurationMs: 60_000 }),
+        });
+        const a = makeRuns('scan-original'); const b = makeRuns('scan-replacement');
+        const run = await a.createOperationRun({ status: 'pending', summary: { libraryRoot: requestedRoot } });
+        const maintenance = createMaintenanceLockService({ getPoolFn });
+        const guard = createMaintenanceLockWriteGuardService({ listActiveMaintenanceLocks: maintenance.listActiveMaintenanceLocks });
+        const withTransaction = createDatabaseTransactionRunner({ getPoolFn });
+        const createOwner = (recordLibraryFiles = catalog.recordLibraryFiles) => createLibraryScanCatalogueService({
+          recordLibraryFiles, withTransaction,
+          assertMaintenanceWriteAllowed: ({ queryable }) => guard.assertNoActiveWriteLocks({ queryable }),
+        });
+        return { getPoolFn, pool, rootPath, requestedRoot, stable, old, newFile, cover, oldBytes,
+          replacementBytes, seed, catalog, a, b, run, maintenance, guard, withTransaction, makeRuns, createOwner,
+          owner: createOwner() };
       });
-      const a = makeRuns('scan-original'); const b = makeRuns('scan-replacement');
-      const run = await a.createOperationRun({ status: 'pending', summary: { libraryRoot: requestedRoot } });
-      const maintenance = createMaintenanceLockService({ getPoolFn });
-      const guard = createMaintenanceLockWriteGuardService({ listActiveMaintenanceLocks: maintenance.listActiveMaintenanceLocks });
-      const withTransaction = createDatabaseTransactionRunner({ getPoolFn });
-      const createOwner = (recordLibraryFiles = catalog.recordLibraryFiles) => createLibraryScanCatalogueService({
-        recordLibraryFiles, withTransaction,
-        assertMaintenanceWriteAllowed: ({ queryable }) => guard.assertNoActiveWriteLocks({ queryable }),
-      });
-      await callback({ getPoolFn, pool, rootPath, requestedRoot, stable, old, newFile, cover, oldBytes,
-        replacementBytes, seed, catalog, a, b, run, maintenance, guard, withTransaction, makeRuns, createOwner,
-        owner: createOwner() });
+      await phaseObserver.measure('scenario_work', () => callback(fixture));
     } finally {
       const cleanupPath = resolve(requestedRoot); const delta = relative(resolve(tmpdir()), cleanupPath);
       assert.ok(delta && !delta.startsWith('..') && !isAbsolute(delta)

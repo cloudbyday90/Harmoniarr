@@ -394,3 +394,12 @@ transaction's cached activity view. Refresh with a separately awaited
 `pg_stat_clear_snapshot()` before polling statistics, retaining serial ownership,
 abort checks and the original bounds. This refreshes monitoring evidence; it
 does not reset counters, advance domain authority or justify a longer deadline.
+
+Measured library template adoption follows
+`docs/LIBRARY_TEST_SCHEMA_TEMPLATES_RESEARCH_2026_10.md`: bind schema work to the
+scenario pool, preserve fresh seeds after clone admission, and distinguish complete
+source lineage from per-clone filename idempotence. Source sealing requires actual
+zero sessions and captured OID/role; settings/GRANTs are not assumed copied.
+Report preparation/check/validation/copy costs separately and keep nested spans
+out of wall-time sums. Explicit suite defaults don't authorize global template
+selection, migration/bootstrap/recovery replacement or a new conformance claim.

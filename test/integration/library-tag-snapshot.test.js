@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import { parseFile } from 'music-metadata';
 import { createPostgresIntegrationRuntime } from '../../testing/postgres-integration-runtime.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
+import { resolveLibraryTestSchemaMode } from '../../testing/integration/library-test-schema-policy.js';
 import { isSkippableIntegrationRuntimeError, toIntegrationRuntimeUnavailableReason } from '../../testing/integration/runtime-availability.js';
 import { createOperationRunControlService } from '../../src/server/operation-run-control-service.js';
 import { createLibraryTagExtractionService } from '../../src/server/library/library-tag-extraction-service.js';
@@ -66,7 +67,8 @@ async function waitForBlock(c, holderPid, queryable = c.pool, operation) {
 
 suite('Captured scan source and acquisition own native tag snapshot persistence', () => {
   before(async () => {
-    try { runtime = await createPostgresIntegrationRuntime({ config }); }
+    try { runtime = await createPostgresIntegrationRuntime({ config,
+      schemaMode: resolveLibraryTestSchemaMode({ domain: 'tag_snapshot', defaultMode: 'migration_template' }) }); }
     catch (error) {
       if (!isSkippableIntegrationRuntimeError(error)) throw error;
       unavailable = toIntegrationRuntimeUnavailableReason(error);

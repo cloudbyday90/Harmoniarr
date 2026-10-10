@@ -7,7 +7,6 @@
 
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { applyPendingMigrations } from '../../src/server/migrations.js';
 import { createDatabaseTransactionRunner } from '../../src/server/database-transaction-service.js';
 import { createJobLeaseStore } from '../../src/server/job-lease-store.js';
 import { createOperationRunStore } from '../../src/server/operation-run-store.js';
@@ -20,6 +19,7 @@ import { createLibraryTagSnapshotStore } from '../../src/server/library/library-
 import { createLibraryTagSnapshotService } from '../../src/server/library/library-tag-snapshot-service.js';
 import { withFixtureWorkScope } from './fixture-work-scope.js';
 import { withFixtureWorkspace } from './fixture-workspace.js';
+import { prepareLibraryTestSchema } from './library-test-schema-preparation.js';
 
 export function taggedWav(title, samples = 800) {
   const chunk = (name, data) => {
@@ -50,33 +50,38 @@ export async function snapshotTagFixture(context) {
 export async function withLibraryTagSnapshotScenario(runtime, testContext, callback, {
   signal = testContext.signal, workspaceOptions = {},
 } = {}) {
-  return runtime.runIsolatedDatabase(async ({ getPoolFn, databaseName }) => {
-    await applyPendingMigrations({ getPoolFn });
+  return runtime.runIsolatedDatabase(async ({ getPoolFn, databaseName, phaseObserver }) => {
+    await prepareLibraryTestSchema({ getPoolFn, phaseObserver, signal });
     return withFixtureWorkspace({ prefix: 'harmoniarr-tag-snapshot-', ...workspaceOptions }, ({ requestedRoot, rootPath }) =>
-      withFixtureWorkScope({ signal }, async (scope) => {
-        const pool = getPoolFn(); const path = join(rootPath, '01-original.wav');
-        await writeFile(path, taggedWav('Original title'));
-        const catalog = createLibraryCatalogStore({ getPoolFn });
-        const initial = await observeTagFixtureFiles(requestedRoot);
-        const seeded = await catalog.recordLibraryFiles({ libraryRootPath: initial.summary.libraryRoot, files: initial.files });
-        const file = seeded.files[0];
-        const makeRuns = (ownerInstanceId, operationType = 'library_scan') => createOperationRunStore({ getPoolFn,
-          operationType, leaseJobType: operationType,
-          createJobLeaseStoreFn: () => createJobLeaseStore({ getPoolFn, ownerInstanceId, leaseDurationMs: 60_000 }) });
-        const a = makeRuns('tag-original'); const b = makeRuns('tag-replacement');
-        const run = await a.createOperationRun({ status: 'pending', summary: { libraryRoot: requestedRoot } });
-        const maintenance = createMaintenanceLockService({ getPoolFn });
-        const guard = createMaintenanceLockWriteGuardService({ listActiveMaintenanceLocks: maintenance.listActiveMaintenanceLocks });
-        const withTransaction = createDatabaseTransactionRunner({ getPoolFn });
-        const assertMaintenanceWriteAllowed = ({ queryable }) => guard.assertNoActiveWriteLocks({ queryable });
-        const scanCatalogue = createLibraryScanCatalogueService({ recordLibraryFiles: catalog.recordLibraryFiles,
-          withTransaction, assertMaintenanceWriteAllowed });
-        const rawTags = createLibraryTagSnapshotStore({ getPoolFn });
-        const createTagOwner = (writeLibraryFileTagSnapshot = rawTags.writeLibraryFileTagSnapshot) => createLibraryTagSnapshotService({
-          writeLibraryFileTagSnapshot, withTransaction, assertMaintenanceWriteAllowed });
-        return callback({ getPoolFn, pool, databaseName, scope, requestedRoot, rootPath, path, file, rootId: seeded.libraryRootId,
-          a, b, run, maintenance, withTransaction, makeRuns, catalog, scanCatalogue, rawTags, createTagOwner,
-          tagOwner: createTagOwner() });
-      }));
+      // scenario_work includes fixture_seed, callback work and actual drain;
+      // nested phase durations must not be summed as wall time.
+      phaseObserver.measure('scenario_work', () => withFixtureWorkScope({ signal }, async (scope) => {
+        const context = await phaseObserver.measure('fixture_seed', async () => {
+          const pool = getPoolFn(); const path = join(rootPath, '01-original.wav');
+          await writeFile(path, taggedWav('Original title'));
+          const catalog = createLibraryCatalogStore({ getPoolFn });
+          const initial = await observeTagFixtureFiles(requestedRoot);
+          const seeded = await catalog.recordLibraryFiles({ libraryRootPath: initial.summary.libraryRoot, files: initial.files });
+          const file = seeded.files[0];
+          const makeRuns = (ownerInstanceId, operationType = 'library_scan') => createOperationRunStore({ getPoolFn,
+            operationType, leaseJobType: operationType,
+            createJobLeaseStoreFn: () => createJobLeaseStore({ getPoolFn, ownerInstanceId, leaseDurationMs: 60_000 }) });
+          const a = makeRuns('tag-original'); const b = makeRuns('tag-replacement');
+          const run = await a.createOperationRun({ status: 'pending', summary: { libraryRoot: requestedRoot } });
+          const maintenance = createMaintenanceLockService({ getPoolFn });
+          const guard = createMaintenanceLockWriteGuardService({ listActiveMaintenanceLocks: maintenance.listActiveMaintenanceLocks });
+          const withTransaction = createDatabaseTransactionRunner({ getPoolFn });
+          const assertMaintenanceWriteAllowed = ({ queryable }) => guard.assertNoActiveWriteLocks({ queryable });
+          const scanCatalogue = createLibraryScanCatalogueService({ recordLibraryFiles: catalog.recordLibraryFiles,
+            withTransaction, assertMaintenanceWriteAllowed });
+          const rawTags = createLibraryTagSnapshotStore({ getPoolFn });
+          const createTagOwner = (writeLibraryFileTagSnapshot = rawTags.writeLibraryFileTagSnapshot) => createLibraryTagSnapshotService({
+            writeLibraryFileTagSnapshot, withTransaction, assertMaintenanceWriteAllowed });
+          return { getPoolFn, pool, databaseName, scope, requestedRoot, rootPath, path, file, rootId: seeded.libraryRootId,
+            a, b, run, maintenance, withTransaction, makeRuns, catalog, scanCatalogue, rawTags, createTagOwner,
+            tagOwner: createTagOwner() };
+        });
+        return callback(context);
+      })));
   }, { signal });
 }

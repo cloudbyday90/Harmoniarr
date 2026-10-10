@@ -247,3 +247,8 @@ The audited cohort extension routes fixture-specific ownership through its
 research/evidence map: after-drain SQL finalizers, discarded uncertain clients,
 idle-client read fences and parser-hook refusal before writes. Keep the entrypoint
 and invocation metadata unchanged; this is narrow reference maintenance.
+
+The measured library-template extension locates explicit schema/domain policy,
+source lineage and fresh-clone seeding. Distinguish owner verification from case
+filename idempotence and nested phase costs from profile wall time. Reuse the
+existing owner instead of prescribing a new cache or broader cohort by inference.
