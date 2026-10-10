@@ -70,6 +70,7 @@ export function createMetadataArtistRefreshWorker({
         metadataArtistId,
         musicBrainzArtistId,
         runId,
+        workerContext: { operationType: 'metadata_artist_refresh', runId, expectedLease: acquiredLease },
         throwIfCancelled: () => throwIfOperationRunCancellationRequested({ isCancellationRequested, runId }),
         triggerSource,
       });

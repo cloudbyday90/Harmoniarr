@@ -277,3 +277,53 @@ stable-input barrier needs a coordinated producer/snapshot/lock-order design and
 actual interleaving evidence. Focused doubles establish orchestration; PostgreSQL
 owns waits, rollback and query-snapshot claims. No UI change, media-byte or
 external atomicity guarantee follows from this derived read-model boundary.
+
+## Wanted replacement maintenance, October 10, America/New_York
+
+The saved `docs/WANTED_RELEASE_RECONCILIATION_RESEARCH_2026_10.md` ledger owns
+current primary-source consultation. Optional worker ownership, source-frame
+comparison and shared parent/link admission are bounded project choices; this
+maintenance does not independently re-open the ledger's sources.
+
+One raw persistence helper can serve callers with different authority. Preserve
+original scan, discovery and metadata acquisitions, explicit internal direct
+rebuilds, scoped-recovery exclusion and authorized restore under maintenance.
+Presence of a malformed worker context must not silently become direct authority.
+Bind every nested reader to the owning client, copy inputs before later awaits,
+and compare decision source as well as derived rows. Exclude only verified unused
+housekeeping; identical output does not make a changed saved profile equivalent.
+Only an exact missing-artist result at that boundary can yield its accepted
+empty projection; other reader/persistence errors must escape.
+
+The ownership key is a user/release pair. Multi-array bulk input must come from
+the same validated rows, with complete unique returned and deleted pairs. Required
+discovery-link synchronization belongs in the same transaction and rollback.
+Acquire shared publisher admission before parent mutations when both writers
+change those links. This coordinates participating publishers, not every source
+or manual writer. Several READ COMMITTED component snapshots do not form one
+global instant or guarantee latest state at commit. Disabled/history projection
+semantics and later acquisition authority remain separate; no new UI or universal
+deadlock/remote atomicity claim follows from the local replacement guard.
+
+The root's October 10 UUID consultation, recorded at 12:31:43 UTC, discovered the
+17 page and followed its official navigation to
+[PostgreSQL 18 UUID type](https://www.postgresql.org/docs/18/datatype-uuid.html).
+The raw response is retained in
+`.tmp/wanted-release-reconciliation-2026-10/uuid-restore-identity-source.json`.
+The database accepts alternate UUID spellings and emits canonical text. For raw
+restore identity/deduplication and returned-pair checks, use that value identity
+before constructing JavaScript maps or sets; valid aliases must not become
+different owners or falsely expected deletions. Preserve strict live-source and
+acquisition validation separately. The reproduced unit uses canonical SQL-return
+doubles; it is not an additional PostgreSQL execution by the skill maintainer.
+
+The completed application gate exposed a PostgreSQL client query-overlap
+deprecation despite successful transaction identity tests. Same-client ownership
+and safe scheduling are separate obligations. The project reader now awaits
+artist and policy reads serially on its transaction client, including release
+groups/releases in the actual narrow metadata method. A delayed nonreentrant
+client reproduced both overlapping layers, then passed after correction. Keep
+source capture immediately after each read; do not infer that Promise.all is safe
+for a transaction client merely because it is suitable for independent pool work.
+These are observed application/driver controls, not a fresh official-source lookup
+or proof of every database caller's scheduling behavior.

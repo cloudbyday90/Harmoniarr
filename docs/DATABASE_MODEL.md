@@ -3399,6 +3399,26 @@ require another pass, and later fulfillment remains separate. See
 [design](RELEASE_RECONCILIATION_DESIGN.md) and
 [outcome](RELEASE_RECONCILIATION_OUTCOME.md) for evidence and limits.
 
+## Current implementation: current-owned wanted replacement and link publication
+
+Wanted reconciliation uses genuine optional worker authority, same-client
+maintenance readiness, explicit READ COMMITTED and shared wanted/discovery
+publication admission. The queryable reader uses complete uncached metadata,
+monitoring, selection, override and availability inputs with the existing policy
+calculator. Queries are awaited sequentially on that transaction client.
+Input/output drift or final authority loss refuses replacement.
+
+The extracted write store verifies exact composite (user,release) deletion and
+bulk-upsert identities, preserves wanted UUIDs and synchronizes required links
+through that client. Raw restore pairs use canonical UUID value identity before
+deduplication, preserving accepted alternate spellings and last-value handling.
+Rollback covers all rows and link changes. Authorized restore
+retains its raw saved-snapshot path under maintenance; discovery raw replacement
+joins admission before parent mutation. No schema change is introduced. Multiple
+component snapshots and later source commits remain bounded limits. See
+[design](WANTED_RELEASE_RECONCILIATION_DESIGN.md) and
+[outcome](WANTED_RELEASE_RECONCILIATION_OUTCOME.md) for execution evidence.
+
 ## Sources Reviewed
 
 PostgreSQL 18 official sources:

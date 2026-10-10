@@ -9,6 +9,36 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 Run the smallest focused tests that prove the changed behavior, then broaden based on blast radius. Before commit or push, run the validation level appropriate to the risk.
 
+Use `npm run validate:fast` for complete static, server/client/script and build
+feedback during development. It omits PostgreSQL; include the directly affected
+real database tests when SQL, locks, constraints or rollback own the behavior.
+Select owning services plus affected callers/consumers explicitly; filenames or
+direct-import graphs alone cannot establish that selection's completeness.
+
+Finish source review and inspect focused logs for warnings before a complete
+gate. Combine affected integration files once, rather than running the new file
+and then repeating it inside the same broader group. Once those pass, reserve
+the complete gate for the stable final candidate; repeat it after material code
+changes, failures or unresolved concerns.
+
+`npm run validate` retains the complete serial gate; use
+`npm run test:integration:serial` for its database layer explicitly. The local
+two-worker experiment exposed a recovery failure and was not promoted. Read the
+documented outcome before attempting further scheduling experiments; a faster
+run with failures cannot replace passing coverage. Preserve per-file process isolation and serial scenarios
+inside each file: the app harness changes process environment and the global
+pool. Parallel files do not permit overlapping queries on one pg client or
+sharing mutable scenario databases. See the repository's
+`docs/TEST_EXECUTION_EFFICIENCY_DESIGN.md` and outcome for evidence and limits.
+
+If a scheduling experiment fails, reject promotion before changing deadlines or
+assertions. Stop a rejected experiment when further work cannot change that
+decision, preserving actual failures and stopping only its owned resources.
+Report incomplete counts honestly. Diagnose the smallest failing scope with TAP
+or another reporter that exposes error details promptly; a spec-only long run
+can defer stacks until its final summary. Fixture barriers should race the active
+operation's failure and always release/drain in cleanup, including cancellation.
+
 Use PowerShell commands from the repository root.
 
 ## Validation Matrix

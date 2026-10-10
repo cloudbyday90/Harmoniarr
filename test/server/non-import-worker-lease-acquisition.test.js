@@ -145,3 +145,13 @@ test('scan sidecar best-effort handling preserves typed ownership loss', async (
   await value.run(); verifyCapturedCalls(value); assert.equal(value.callbacks.markRunCompleted.mock.callCount(), 0);
   assert.equal(value.callbacks.markRunFailed.mock.callCount(), 0); assert.equal(value.callbacks.releaseLease.mock.callCount(), 1);
 });
+
+test('artist refresh forwards its original acquired lease as the wanted projection owner', async (t) => {
+  const family = families.find((entry) => entry.name === 'artist refresh');
+  const value = fixture(t, family);
+  await value.run();
+  assert.deepEqual(value.work.mock.calls[0].arguments[0].workerContext, {
+    operationType: 'metadata_artist_refresh', runId: 'run', expectedLease: value.lease,
+  });
+  assert.equal(value.work.mock.calls[0].arguments[0].workerContext.expectedLease, value.lease);
+});

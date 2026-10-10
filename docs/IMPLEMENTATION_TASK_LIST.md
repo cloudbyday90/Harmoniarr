@@ -6,7 +6,44 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
-## Current development slice: Acquisition-owned release reconciliation (2026-10-10 client date)
+## Current development slice: Current-owned wanted replacement (2026-10-10)
+
+- Capture genuine scan/discovery/metadata worker context, preserving direct rebuild
+  and authorized raw restore contracts. Compute complete current desired-state
+  inputs on one READ COMMITTED client after shared publication admission. See
+  [design](WANTED_RELEASE_RECONCILIATION_DESIGN.md),
+  [outcome](WANTED_RELEASE_RECONCILIATION_OUTCOME.md) and
+  [research](WANTED_RELEASE_RECONCILIATION_RESEARCH_2026_10.md).
+- Revalidate input frame/output before paired DELETE, bulk upsert, link sync and
+  final checks. Verify complete composite keys and roll back rows/links together.
+  Raw wanted/discovery publishers share admission before parent writes. Preserve
+  current policy, disabled-account projection, stable wanted IDs and link evidence.
+- PR assessment is separate: [design](OPEN_PR_APPLICABILITY_WANTED_RELEASE_2026_10_DESIGN.md)
+  and [outcome](OPEN_PR_APPLICABILITY_WANTED_RELEASE_2026_10_OUTCOME.md).
+- The corrected full gate passes 9,659 tests (4,434 server, 4,377 client, 513 script,
+  335 PostgreSQL integration), zero failures/cancellations/skips, all required
+  lint/policy checks and both builds. Focused wanted tests pass 68; caller checks
+  pass 99; related PostgreSQL checks pass 54, including nine new wanted cases.
+  Counts overlap the full run. Security reports zero npm vulnerabilities.
+  Standards skill structure and installed four-file identity pass; schema stays
+  at 105 migrations. See the outcome for the fixture corrections, reproduced UUID
+  restore compatibility fix and source-freshness limits.
+  Work stays on main without a branch, release, tag, deployment or PR merge.
+- Testing efficiency: add fast static/unit/build feedback. A complete two-worker
+  experiment exposed a recovery failure and was not promoted; retain serial
+  complete execution and serial scenarios within a file. See
+  [design](TEST_EXECUTION_EFFICIENCY_DESIGN.md),
+  [outcome](TEST_EXECUTION_EFFICIENCY_OUTCOME.md) and
+  [research](TEST_EXECUTION_EFFICIENCY_RESEARCH_2026_10.md).
+- Next test architecture: instrument setup/schema/scenario/cleanup cost, then
+  consolidate run-scoped PostgreSQL ownership and design disposable template
+  clones while retaining dedicated migration/bootstrap tests.
+- Next product boundary: guard discovery-request replacement after awaited source computation,
+  preserving recipients/consent/manual intent/recovery/search evidence. Admission
+  alone does not refresh cached source data. This is a source finding; embedded
+  artwork remains a further follow-up.
+
+## Prior development slice: Acquisition-owned release reconciliation (2026-10-10 client date)
 
 - Capture original scan/root/acquisition context; serialize global projection
   replacement and read fresh global coverage through the same READ COMMITTED

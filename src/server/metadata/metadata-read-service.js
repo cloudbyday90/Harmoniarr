@@ -161,6 +161,15 @@ export function createMetadataReadService({
     return buildArtistPayload(artist);
   }
 
+  // Complete local inputs for wanted policy, without unrelated artist-view reads.
+  async function getArtistWantedProjection({ artistId, queryable = pool }) {
+    const artist = await getMetadataArtistById(artistId, queryable);
+    if (!artist) throw createMetadataNotFoundError('artist', artistId);
+    const releaseGroups = await listMetadataReleaseGroupsByArtistId(artistId, queryable);
+    const releases = await listMetadataReleasesByArtistId(artistId, queryable);
+    return { artist: mapArtist(artist), releaseGroups: releaseGroups.map(mapReleaseGroup), releases: releases.map(mapRelease) };
+  }
+
   // Internal complete identities for summary calculations, not a public catalog representation.
   async function getArtistProjectionInputs({ artistId }) {
     const artist = await getMetadataArtistById(artistId, pool);
@@ -312,6 +321,7 @@ export function createMetadataReadService({
 
   return {
     getArtistProjectionInputs,
+    getArtistWantedProjection,
     getArtistDetectionEvents,
     getArtist,
     getArtistByMusicBrainzId,

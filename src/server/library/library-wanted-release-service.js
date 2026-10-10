@@ -16,132 +16,89 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { createMetadataReadService } from '../metadata/metadata-read-service.js';
-import { createOperatorArtistMonitoringStore } from '../metadata/operator-artist-monitoring-store.js';
-import { createOperatorReleaseGroupSelectionStore } from '../metadata/operator-release-group-selection-store.js';
-import { createOperatorTrackOverrideStore } from '../metadata/operator-track-override-store.js';
-import { createLibraryReleaseReconciliationStore } from './library-release-reconciliation-store.js';
-import { createLibraryWantedReleaseProjectionService } from './library-wanted-release-projection-service.js';
+import { getPool } from '../database.js';
+import { createApiError } from '../auth.js';
+import { createDatabaseTransactionRunner } from '../database-transaction-service.js';
+import { isCurrentJobLeaseAcquisition } from '../job-lease-policy.js';
+import { createOperationRunCancellationError, createOperationRunPauseError } from '../operation-run-cancellation.js';
+import { MUSIC_QUEUE_RECOVERY_DISCOVERY_SOURCE } from '../import-candidates/music-queue-recovery-policy.js';
 import { createLibraryWantedReleaseStore } from './library-wanted-release-store.js';
-
-const MAX_ARTIST_PROJECTION_CONCURRENCY = 6;
-
-function isMissingMetadataArtist(error) {
-  return error?.code === 'metadata_not_found' && error?.status === 404;
-}
-
-function listMetadataReleaseIds(artistPayload = {}) {
-  return [
-    ...new Set(
-      (Array.isArray(artistPayload.releases) ? artistPayload.releases : [])
-        .map((release) => release?.id)
-        .filter((metadataReleaseId) => typeof metadataReleaseId === 'string' && metadataReleaseId.length > 0),
-    ),
-  ];
-}
-
-async function mapWithConcurrency(values, mapper, concurrency = MAX_ARTIST_PROJECTION_CONCURRENCY) {
-  const results = new Array(values.length);
-  let nextIndex = 0;
-  const workerCount = Math.min(Math.max(1, concurrency), values.length);
-
-  await Promise.all(Array.from({ length: workerCount }, async () => {
-    while (nextIndex < values.length) {
-      const index = nextIndex;
-      nextIndex += 1;
-      results[index] = await mapper(values[index]);
-    }
-  }));
-
-  return results;
-}
+import { createLibraryWantedReleaseReader } from './library-wanted-release-reader.js';
+import { createLibraryWantedReleaseGuardStore } from './library-wanted-release-guard-store.js';
+import { captureWantedContext, captureWantedRows, captureWantedSource, sameWantedProjection,
+  isCompleteWantedReplacement } from './library-wanted-release-reconciliation-policy.js';
 
 export function createLibraryWantedReleaseService({
-  getMetadataArtist = null,
-  libraryReleaseReconciliationStore = createLibraryReleaseReconciliationStore(),
-  libraryWantedReleaseProjectionService = createLibraryWantedReleaseProjectionService(),
-  libraryWantedReleaseStore = createLibraryWantedReleaseStore(),
-  listLibraryReleaseReconciliationsByMetadataReleaseIds = null,
-  listOperatorArtistMonitoringSnapshot = null,
-  listOperatorReleaseGroupSelections = null,
-  listOperatorTrackOverrides = null,
-  metadataReadService = null,
-  operatorArtistMonitoringStore = null,
-  operatorReleaseGroupSelectionStore = null,
-  operatorTrackOverrideStore = null,
+  getPoolFn = getPool,
+  libraryWantedReleaseStore = createLibraryWantedReleaseStore({ getPoolFn }),
+  projectionReader = createLibraryWantedReleaseReader(),
+  store = createLibraryWantedReleaseGuardStore(),
+  assertMaintenanceWriteAllowed,
+  withTransaction = createDatabaseTransactionRunner({ getPoolFn }),
 } = {}) {
-  const resolvedMetadataReadService = metadataReadService ?? createMetadataReadService();
-  const resolvedOperatorArtistMonitoringStore = operatorArtistMonitoringStore
-    ?? createOperatorArtistMonitoringStore();
-  const resolvedOperatorReleaseGroupSelectionStore = operatorReleaseGroupSelectionStore
-    ?? createOperatorReleaseGroupSelectionStore();
-  const resolvedOperatorTrackOverrideStore = operatorTrackOverrideStore
-    ?? createOperatorTrackOverrideStore();
-  const readMetadataArtist = getMetadataArtist ?? resolvedMetadataReadService.getArtist;
-  const readMonitoringSnapshot = listOperatorArtistMonitoringSnapshot
-    ?? resolvedOperatorArtistMonitoringStore.listOperatorArtistMonitoringSnapshot;
-  const readReleaseSelections = listOperatorReleaseGroupSelections
-    ?? resolvedOperatorReleaseGroupSelectionStore.listOperatorReleaseGroupSelections;
-  const readTrackOverrides = listOperatorTrackOverrides
-    ?? resolvedOperatorTrackOverrideStore.listOperatorTrackOverrides;
-  const readReconciliations = listLibraryReleaseReconciliationsByMetadataReleaseIds
-    ?? libraryReleaseReconciliationStore.listReconciliationsByMetadataReleaseIds;
+  for (const [name, fn] of Object.entries({ assertMaintenanceWriteAllowed, withTransaction,
+    replaceLibraryWantedReleases: libraryWantedReleaseStore.replaceLibraryWantedReleases,
+    readWantedReleaseProjection: projectionReader.readWantedReleaseProjection,
+    lockContext: store.lockContext, readContext: store.readContext, readClock: store.readClock })) {
+    if (typeof fn !== 'function') throw new TypeError('Wanted reconciliation requires ' + name);
+  }
 
-  async function projectWantedReleasesForArtist(monitoring) {
-    const { appUserId, metadataArtistId } = monitoring;
-
-    try {
-      const [artistPayload, releaseGroupSelections, trackOverrides] = await Promise.all([
-        readMetadataArtist({ artistId: metadataArtistId }),
-        readReleaseSelections({ appUserId, metadataArtistId }),
-        readTrackOverrides({ appUserId, metadataArtistId }),
-      ]);
-      const metadataReleaseIds = listMetadataReleaseIds(artistPayload);
-      const libraryReleaseReconciliations = metadataReleaseIds.length > 0
-        ? await readReconciliations({ metadataReleaseIds })
-        : [];
-
-      return libraryWantedReleaseProjectionService.projectWantedReleases({
-        appUserId,
-        artistPayload,
-        libraryReleaseReconciliations,
-        monitoring,
-        releaseGroupSelections,
-        trackOverrides,
-      });
-    } catch (error) {
-      // A metadata refresh can remove an artist after monitoring is read. The
-      // projection is rebuilt on the next discovery run, so this race should
-      // not fail or leave the complete wanted-releases replacement incomplete.
-      if (isMissingMetadataArtist(error)) {
-        return [];
-      }
-
-      throw error;
+  async function assertCurrent({ prepared, context, queryable }) {
+    if (prepared.mode === 'direct') return;
+    const now = await store.readClock(queryable); const { run, lease } = context;
+    if (!run || run.id !== prepared.runId || run.operation_type !== prepared.operationType
+      || !isCurrentJobLeaseAcquisition(lease, prepared.expectedLease, { leaseKey: prepared.expectedLease.leaseKey, now })) {
+      throw createApiError(409, 'operation_run_lease_lost', 'Wanted reconciliation no longer owns its operation');
+    }
+    if (run.cancel_requested_at != null || run.cancelled_at != null) {
+      throw createOperationRunCancellationError({ runId: prepared.runId });
+    }
+    if (run.status !== 'running') throw createApiError(409, 'operation_run_lease_lost', 'This operation is no longer running');
+    if (run.summary?.triggerSource === MUSIC_QUEUE_RECOVERY_DISCOVERY_SOURCE) {
+      throw createApiError(409, 'library_wanted_projection_invalid', 'Scoped recovery cannot replace global wanted releases');
     }
   }
 
-  async function loadWantedReleases() {
-    const monitoringRows = await readMonitoringSnapshot();
-    const monitoredArtists = (Array.isArray(monitoringRows) ? monitoringRows : [])
-      .filter((monitoring) => (
-        monitoring?.isMonitored === true
-        && typeof monitoring.appUserId === 'string'
-        && monitoring.appUserId.length > 0
-        && typeof monitoring.metadataArtistId === 'string'
-        && monitoring.metadataArtistId.length > 0
-      ));
-    const wantedByArtist = await mapWithConcurrency(monitoredArtists, projectWantedReleasesForArtist);
-
-    return wantedByArtist.flat();
+  async function readProjection(queryable) {
+    const input = await projectionReader.readWantedReleaseProjection({ queryable });
+    const wantedReleases = captureWantedRows(input?.wantedReleases); const source = captureWantedSource(input?.source);
+    if (!wantedReleases || !source) throw createApiError(409, 'library_wanted_projection_invalid', 'Wanted projection could not be verified');
+    return Object.freeze({ wantedReleases, source });
   }
 
-  async function reconcileWantedReleases() {
-    const wantedReleases = await loadWantedReleases();
-    await libraryWantedReleaseStore.replaceLibraryWantedReleases({ wantedReleases });
+  async function reconcileWantedReleases(input = {}) {
+    const prepared = captureWantedContext(input);
+    if (!prepared) throw createApiError(409, 'library_wanted_projection_invalid', 'The original wanted operation context is invalid');
+    return withTransaction(async (queryable) => {
+      await queryable.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
+      try {
+        await assertMaintenanceWriteAllowed({ queryable });
+      } catch (error) {
+        if (error?.code !== 'recovery_lock_conflict') throw error;
+        if (prepared.mode === 'direct') throw error;
+        throw createOperationRunPauseError({ runId: prepared.runId, pauseCode: 'maintenance_lock_active',
+          message: 'Wanted reconciliation is paused by maintenance' });
+      }
+      await assertCurrent({ prepared, context: await store.lockContext({ prepared, queryable }), queryable });
+      const projection = await readProjection(queryable);
+      const recheck = async () => {
+        const current = await readProjection(queryable);
+        await assertCurrent({ prepared, context: await store.readContext({ prepared, queryable }), queryable });
+        if (!sameWantedProjection(current, projection)) {
+          throw createApiError(409, 'library_wanted_projection_stale', 'Saved policy or availability changed during wanted reconciliation');
+        }
+      };
+      const result = await libraryWantedReleaseStore.replaceLibraryWantedReleases({
+        wantedReleases: projection.wantedReleases, queryable, beforeWrite: recheck,
+      });
+      await recheck();
+      if (!isCompleteWantedReplacement(result, projection.wantedReleases)) {
+        throw createApiError(409, 'library_wanted_projection_incomplete', 'The wanted replacement could not be verified');
+      }
+      return { wantedKeys: result.wantedKeys.map((key) => ({ appUserId: key.appUserId, metadataReleaseId: key.metadataReleaseId })),
+        deletedWantedKeys: result.deletedWantedKeys.map((key) => ({ appUserId: key.appUserId, metadataReleaseId: key.metadataReleaseId })) };
+    });
   }
 
-  return {
-    reconcileWantedReleases,
-  };
+  return { reconcileWantedReleases };
 }

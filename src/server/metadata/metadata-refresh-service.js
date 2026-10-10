@@ -131,13 +131,17 @@ export function createMetadataRefreshService({
     };
   }
 
-  async function refreshArtistCatalogById({
-    metadataArtistId = null,
-    musicBrainzArtistId,
-    runId = null,
-    throwIfCancelled = async () => {},
-    triggerSource = 'manual',
-  } = {}) {
+  async function refreshArtistCatalogById(input = {}) {
+    const {
+      metadataArtistId = null,
+      musicBrainzArtistId,
+      runId = null,
+      throwIfCancelled = async () => {},
+      triggerSource = 'manual',
+    } = input;
+    const wantedInput = Object.hasOwn(input, 'workerContext')
+      ? { workerContext: structuredClone(input.workerContext) }
+      : {};
     const fetchedAt = nowFn().toISOString();
     await throwIfCancelled();
 
@@ -205,7 +209,7 @@ export function createMetadataRefreshService({
     await throwIfCancelled();
     let wantedReconciliationCompleted = false;
     if (reconcileWantedReleases) {
-      await reconcileWantedReleases();
+      await reconcileWantedReleases(wantedInput);
       wantedReconciliationCompleted = true;
     }
     const operatorReconciliationQueue = await queueOperatorReconciliationsAfterRefresh({

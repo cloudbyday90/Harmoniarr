@@ -17,6 +17,7 @@
  */
 
 import { getPool } from '../database.js';
+import { lockLibraryRequestProjection } from './library-request-projection-lock-store.js';
 import { normalizeMetadataReleaseDateForDateColumn } from '../metadata/metadata-release-date-normalization.js';
 import { createLibraryDiscoveryRequestWantedReleaseLinkStore } from './library-discovery-request-wanted-release-link-store.js';
 import { isMusicQueueRediscoveryInProgress } from '../acquisition/acquisition-rediscovery-policy.js';
@@ -1026,6 +1027,7 @@ export function createLibraryDiscoveryRequestStore({
 
     try {
       await client.query('BEGIN');
+      await lockLibraryRequestProjection({ queryable: client });
 
       const metadataReleaseIds = discoveryRequests
         .map((discoveryRequest) => discoveryRequest.metadataReleaseId)

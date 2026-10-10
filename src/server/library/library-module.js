@@ -345,6 +345,9 @@ export function createLibraryModule({
   libraryWantedReleaseStore = createLibraryWantedReleaseStore(),
   libraryWantedReleaseService = createLibraryWantedReleaseService({
     libraryWantedReleaseStore,
+    assertMaintenanceWriteAllowed: ({ queryable }) => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+      operationLabel: 'wanted release reconciliation', queryable,
+    }),
   }),
   libraryDiscoveryHeartbeatState = createLibraryDiscoveryHeartbeatState(),
   libraryDiscoveryRunStore = createLibraryDiscoveryRunStore(),

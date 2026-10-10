@@ -67,6 +67,7 @@ test('refreshArtistCatalogById stores the artist catalog and triggers wanted rec
   assert.equal(storeArtist.mock.callCount(), 1);
   assert.equal(storeReleaseGroup.mock.callCount(), 2);
   assert.equal(reconcileWantedReleases.mock.callCount(), 1);
+  assert.deepEqual(reconcileWantedReleases.mock.calls[0].arguments, [{}]);
   assert.equal(result.releaseGroupCount, 2);
   assert.equal(result.refreshedAt, '2026-05-02T12:00:00.000Z');
   assert.equal(result.wantedReconciliationCompleted, true);
@@ -167,6 +168,34 @@ test('refreshArtistCatalogById records detection history for newly discovered re
     triggerSource: 'scheduled',
   });
   assert.equal(result.detectedReleaseGroupCount, 1);
+});
+
+test('metadata refresh captures the provided wanted owner before provider awaits without inferring one from history', async () => {
+  for (const mode of ['captured', 'absent', 'null', 'undefined']) {
+    const forwarded = [];
+    const input = { musicBrainzArtistId: 'mb-artist', runId: 'history-run' };
+    const expected = { operationType: 'metadata_artist_refresh', runId: 'original-run',
+      expectedLease: { leaseKey: 'metadata_artist_refresh:original-run', ownerInstanceId: 'original-owner', acquisitionId: 'original-token' } };
+    if (mode === 'captured') input.workerContext = structuredClone(expected);
+    if (mode === 'null') input.workerContext = null;
+    if (mode === 'undefined') input.workerContext = undefined;
+    const service = createMetadataRefreshService({
+      metadataService: { storeArtist: async () => ({ id: 'stored-artist' }) },
+      musicBrainzClient: {
+        lookupArtist: async () => {
+          if (mode === 'captured') {
+            input.workerContext.runId = 'replacement-run';
+            input.workerContext.expectedLease.acquisitionId = 'replacement-token';
+          }
+          return { id: 'mb-artist', name: 'Artist' };
+        },
+        browseArtistReleaseGroups: async () => ({ 'release-groups': [], 'release-group-count': 0 }),
+      },
+      reconcileWantedReleases: async (value) => { forwarded.push(value); },
+    });
+    await service.refreshArtistCatalogById(input);
+    assert.deepEqual(forwarded, [mode === 'absent' ? {} : { workerContext: mode === 'captured' ? expected : input.workerContext }]);
+  }
 });
 
 test('refreshArtistCatalogById prefers operator-derived monitoring for detection decisions', async (t) => {

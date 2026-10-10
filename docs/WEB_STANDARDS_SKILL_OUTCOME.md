@@ -388,3 +388,36 @@ installed copies passed structural validation; all four files match by SHA-256,
 and both reference links resolve. Those checks establish structure and byte
 identity, not a new blind behavioral trial or standards conformance. Application
 and actual PostgreSQL evidence remain in the separate release outcome.
+
+## Wanted replacement maintenance, October 10, America/New_York
+
+The [wanted design](WANTED_RELEASE_RECONCILIATION_DESIGN.md) exposed distinct
+caller authority and a required parent/link transaction. The references now map
+optional original worker context versus direct/restore modes, nested same-client
+capture, source/output comparison, paired bulk identities and link rollback.
+They distinguish exact artist404 handling from other failures and cooperative
+publisher admission from global source or acquisition authority. Current official
+consultation remains attributed to the saved research ledger.
+
+Entry point, metadata and invocation policy are unchanged. Repository and installed
+copies passed structural validation; all four files match by SHA-256, and both
+reference links resolve. Those checks establish structure and byte identity,
+not a new blind behavioral trial, one global snapshot or standards conformance.
+Application and actual PostgreSQL/caller evidence remain in the wanted outcome.
+
+Late restore review found a value-identity mismatch: PostgreSQL returns canonical
+UUID text while accepted historical inputs can use alternate spellings. The
+references now require raw pair normalization before deduplication and expected
+sets, with last-value behavior and strict worker/source validation preserved.
+The narrow unit reproduced refusal with canonical SQL-return doubles, then passed
+after the root correction; actual PostgreSQL and full validation remain separate.
+The four maintained source/installed files were structurally validated and synced
+again after this reference change.
+
+The successful application gate then exposed a client query-overlap deprecation.
+Focused nonreentrant controls reproduced both the outer reader and nested narrow
+metadata method. The references now distinguish same-client ownership from safe
+serial scheduling and immediate capture before later reads. Both isolated controls
+and the original focused command passed after the root correction; actual
+PostgreSQL and full-gate evidence remain separate. The four installed skill files
+were structurally validated and synchronized again after this maintenance.

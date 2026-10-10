@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createLibraryWantedReleaseStore } from '../../src/server/library/library-wanted-release-store.js';
+import { createLibraryWantedReleaseWriteStore } from '../../src/server/library/library-wanted-release-write-store.js';
 
 test('listWantedReleasesWithMetadata maps discovery request recovery evidence', async () => {
   let observedSql = '';
@@ -400,6 +401,9 @@ test('replaceLibraryWantedReleases preserves operator row identities and synchro
   const client = {
     query: t.mock.fn(async (sql, params) => {
       queries.push({ params, sql });
+      if (sql.includes('DELETE FROM library_wanted_releases')) return { rowCount: 0, rows: [] };
+      if (sql.includes('INSERT INTO library_wanted_releases')) return { rowCount: params[0].length,
+        rows: params[0].map((appUserId, index) => ({ app_user_id: appUserId, metadata_release_id: params[3][index] })) };
       return { rows: [] };
     }),
     release: t.mock.fn(),
@@ -433,21 +437,22 @@ test('replaceLibraryWantedReleases preserves operator row identities and synchro
   assert.match(staleCleanupQuery.sql, /UNNEST\(\$1::uuid\[\], \$2::uuid\[\]\)/u);
   assert.deepEqual(staleCleanupQuery.params, [['user-1'], ['release-1']]);
   assert.match(insertQuery.sql, /app_user_id/);
-  assert.match(insertQuery.sql, /ON CONFLICT \(app_user_id, metadata_release_id\) DO UPDATE/u);
+  assert.match(insertQuery.sql, /ON CONFLICT\s*\(app_user_id,\s*metadata_release_id\) DO UPDATE/u);
   assert.deepEqual(insertQuery.params, [
-    'user-1',
-    'artist-1',
-    'rg-1',
-    'release-1',
-    'missing',
-    12,
-    0,
-    12,
-    '2026-01-01',
-    'Official',
-    '{"strategy":"monitored_release_absent"}',
+    ['user-1'],
+    ['artist-1'],
+    ['rg-1'],
+    ['release-1'],
+    ['missing'],
+    [12],
+    [0],
+    [12],
+    ['2026-01-01'],
+    ['Official'],
+    ['{"strategy":"monitored_release_absent"}'],
   ]);
   assert.equal(syncActiveWantedReleaseLinks.mock.callCount(), 1);
+  assert.equal(syncActiveWantedReleaseLinks.mock.calls[0].arguments[0].client, client);
   assert.equal(client.release.mock.callCount(), 1);
 });
 
@@ -475,4 +480,136 @@ test('listLibraryWantedReleases maps appUserId for backup export', async () => {
   const rows = await store.listLibraryWantedReleases();
 
   assert.equal(rows[0].appUserId, 'user-1');
+});
+
+function writeRow(appUserId = 'user-a', changes = {}) {
+  return { appUserId, metadataArtistId: 'artist', metadataReleaseGroupId: 'group', metadataReleaseId: 'shared-release',
+    wantedStatus: 'missing', expectedTrackCount: 10, matchedTrackCount: 0, missingTrackCount: 10,
+    releaseDate: '2026', releaseStatus: 'Official', evidence: { strategy: 'monitored_release_absent' }, ...changes };
+}
+function writeFixture(t, { targets = [{ app_user_id: 'obsolete-user', metadata_release_id: 'old-release' }],
+  deletedRows = null, writtenRows = null, linkFailure = null, onAdmission = null } = {}) {
+  const events = [];
+  const query = t.mock.fn(async (sql, values) => {
+    if (/pg_advisory_xact_lock/u.test(sql)) { events.push('admission'); await onAdmission?.(); return { rows: [] }; }
+    if (/SELECT app_user_id, metadata_release_id FROM library_wanted_releases/u.test(sql)) { events.push('targets'); return { rows: targets }; }
+    if (/DELETE FROM library_wanted_releases/u.test(sql)) {
+      events.push('delete'); const rows = deletedRows ?? targets.filter((row) => !values[0].some((user, index) => user === row.app_user_id && values[1][index] === row.metadata_release_id));
+      return { rowCount: rows.length, rows };
+    }
+    if (/INSERT INTO library_wanted_releases/u.test(sql)) {
+      events.push('upsert'); const rows = writtenRows ?? values[0].map((appUserId, index) => ({ app_user_id: appUserId, metadata_release_id: values[3][index] }));
+      return { rowCount: rows.length, rows };
+    }
+    events.push(sql); return { rows: [] };
+  });
+  const client = { query, release: t.mock.fn() };
+  const syncActiveWantedReleaseLinks = t.mock.fn(async ({ client: owner }) => {
+    assert.equal(owner, client); events.push('links'); if (linkFailure) throw linkFailure;
+  });
+  const store = createLibraryWantedReleaseWriteStore({ getPoolFn: () => ({ connect: async () => client }),
+    libraryDiscoveryRequestWantedReleaseLinkStore: { syncActiveWantedReleaseLinks } });
+  return { store, client, query, events, syncActiveWantedReleaseLinks };
+}
+
+test('same release for different users retains paired identities and same-client required link synchronization', async (t) => {
+  const value = writeFixture(t);
+  const result = await value.store.replaceLibraryWantedReleases({ wantedReleases: [writeRow(), writeRow('user-b')], queryable: value.client,
+    beforeWrite: async ({ queryable, stage }) => { assert.equal(queryable, value.client); value.events.push(`guard:${stage}`); },
+  });
+  assert.deepEqual(result.wantedKeys, [{ appUserId: 'user-a', metadataReleaseId: 'shared-release' }, { appUserId: 'user-b', metadataReleaseId: 'shared-release' }]);
+  assert.deepEqual(value.events, ['admission', 'targets', 'guard:delete', 'delete', 'guard:upsert_batch', 'upsert', 'guard:links', 'links']);
+  const inserted = value.query.mock.calls.find((call) => /INSERT INTO library_wanted_releases/u.test(call.arguments[0]));
+  assert.deepEqual(inserted.arguments[1][0], ['user-a', 'user-b']); assert.deepEqual(inserted.arguments[1][3], ['shared-release', 'shared-release']);
+  assert.doesNotMatch(inserted.arguments[0].split('DO UPDATE SET')[1], /(?:\bid|\bapp_user_id|\bmetadata_release_id|\bdiscovery_request_id)\s*=/u);
+  assert.equal(value.client.release.mock.callCount(), 0);
+});
+
+test('raw restore-compatible replacement requires no worker/maintenance context and preserves current date and dedupe behavior', async (t) => {
+  const rows = [writeRow('user-a', { expectedTrackCount: 9 }), writeRow('user-b'), writeRow('user-a')];
+  const value = writeFixture(t, { onAdmission: async () => { await Promise.resolve(); rows[2].appUserId = 'changed'; rows[2].expectedTrackCount = 999; rows[2].evidence.strategy = 'changed'; } });
+  const result = await value.store.replaceLibraryWantedReleases({ wantedReleases: rows });
+  assert.deepEqual(result.wantedKeys, [{ appUserId: 'user-b', metadataReleaseId: 'shared-release' }, { appUserId: 'user-a', metadataReleaseId: 'shared-release' }]);
+  const values = value.query.mock.calls.find((call) => /INSERT INTO library_wanted_releases/u.test(call.arguments[0])).arguments[1];
+  assert.deepEqual(values[5], [10, 10]); assert.deepEqual(values[8], ['2026-01-01', '2026-01-01']);
+  assert.deepEqual(values[10], ['{"strategy":"monitored_release_absent"}', '{"strategy":"monitored_release_absent"}']);
+  assert.equal(value.events.at(-1), 'COMMIT'); assert.equal(value.client.release.mock.callCount(), 1);
+});
+
+test('valid empty raw replacement deletes every obsolete pair and still synchronizes links before commit', async (t) => {
+  const value = writeFixture(t); const result = await value.store.replaceLibraryWantedReleases({ wantedReleases: [] });
+  assert.deepEqual(result.wantedKeys, []); assert.equal(result.deletedWantedKeys.length, 1);
+  assert.deepEqual(value.events, ['BEGIN', 'admission', 'targets', 'delete', 'links', 'COMMIT']);
+  assert.equal(value.syncActiveWantedReleaseLinks.mock.callCount(), 1);
+});
+
+test('required link failure rolls back DELETE and all upserts without a best-effort success', async (t) => {
+  const failure = new Error('Link write failed'); const value = writeFixture(t, { linkFailure: failure });
+  await assert.rejects(value.store.replaceLibraryWantedReleases({ wantedReleases: [writeRow(), writeRow('user-b')] }), (error) => error === failure);
+  assert.deepEqual(value.events, ['BEGIN', 'admission', 'targets', 'delete', 'upsert', 'links', 'ROLLBACK']);
+  assert.equal(value.client.release.mock.callCount(), 1);
+});
+
+for (const stage of ['delete', 'upsert_batch', 'links']) {
+  test(`${stage} guard is awaited and its refusal rolls back the complete wanted/link transaction`, async (t) => {
+    const value = writeFixture(t); const failure = Object.assign(new Error('Stale'), { code: 'library_wanted_projection_stale' });
+    await assert.rejects(value.store.replaceLibraryWantedReleases({ wantedReleases: [writeRow()],
+      beforeWrite: async ({ stage: current }) => { await Promise.resolve(); if (current === stage) throw failure; },
+    }), (error) => error === failure);
+    assert.equal(value.events.includes('delete'), stage !== 'delete'); assert.equal(value.events.includes('upsert'), stage === 'links');
+    assert.equal(value.events.includes('links'), false); assert.equal(value.events.at(-1), 'ROLLBACK');
+  });
+}
+
+test('missing, duplicate or foreign returned composite keys refuse complete replacement and roll back', async (t) => {
+  for (const writtenRows of [[], [{ app_user_id: 'user-a', metadata_release_id: 'shared-release' }],
+    [{ app_user_id: 'user-a', metadata_release_id: 'shared-release' }, { app_user_id: 'user-a', metadata_release_id: 'shared-release' }],
+    [{ app_user_id: 'user-a', metadata_release_id: 'shared-release' }, { app_user_id: 'foreign', metadata_release_id: 'shared-release' }]]) {
+    const value = writeFixture(t, { writtenRows });
+    await assert.rejects(value.store.replaceLibraryWantedReleases({ wantedReleases: [writeRow(), writeRow('user-b')] }), { code: 'library_wanted_projection_incomplete' });
+    assert.equal(value.events.at(-1), 'ROLLBACK'); assert.equal(value.events.includes('links'), false);
+  }
+  const deletion = writeFixture(t, { deletedRows: [{ app_user_id: 'foreign', metadata_release_id: 'old-release' }] });
+  await assert.rejects(deletion.store.replaceLibraryWantedReleases({ wantedReleases: [] }), { code: 'library_wanted_projection_incomplete' });
+  assert.equal(deletion.events.includes('links'), false);
+});
+
+test('missing paired ownership or mandatory link adapter refuses instead of independently filtering arrays', async (t) => {
+  assert.throws(() => createLibraryWantedReleaseWriteStore({ libraryDiscoveryRequestWantedReleaseLinkStore: {} }), TypeError);
+  const value = writeFixture(t);
+  for (const row of [{ ...writeRow(), appUserId: null }, { ...writeRow(), metadataReleaseId: '' }]) {
+    await assert.rejects(value.store.replaceLibraryWantedReleases({ wantedReleases: [row] }), TypeError);
+  }
+  assert.deepEqual(value.events, []);
+});
+
+test('raw wanted restore deduplicates equivalent UUID spellings and returns canonical pair identities', async (t) => {
+  const appUserId = '60000000-0000-4000-8000-0000000000ab';
+  const metadataReleaseId = '60000000-0000-4000-8000-0000000000cd';
+  const statements = [];
+  const query = t.mock.fn(async (sql, values) => {
+    statements.push({ sql, values });
+    if (/SELECT app_user_id, metadata_release_id FROM library_wanted_releases/u.test(sql)) {
+      return { rows: [{ app_user_id: appUserId, metadata_release_id: metadataReleaseId }] };
+    }
+    if (/DELETE FROM library_wanted_releases/u.test(sql)) return { rowCount: 0, rows: [] };
+    if (/INSERT INTO library_wanted_releases/u.test(sql)) return { rowCount: 1,
+      rows: [{ app_user_id: appUserId, metadata_release_id: metadataReleaseId }] };
+    return { rows: [] };
+  });
+  const client = { query, release: t.mock.fn() }; const links = t.mock.fn(async ({ client: owner }) => { assert.equal(owner, client); });
+  const store = createLibraryWantedReleaseWriteStore({ getPoolFn: () => ({ connect: async () => client }),
+    libraryDiscoveryRequestWantedReleaseLinkStore: { syncActiveWantedReleaseLinks: links } });
+  const base = writeRow(appUserId, { metadataArtistId: '60000000-0000-4000-8000-000000000020',
+    metadataReleaseGroupId: '60000000-0000-4000-8000-000000000021', metadataReleaseId });
+  const result = await store.replaceLibraryWantedReleases({ wantedReleases: [
+    { ...base, appUserId: appUserId.toUpperCase(), metadataReleaseId: metadataReleaseId.toUpperCase(), evidence: { version: 'first' } },
+    { ...base, appUserId: `{${appUserId}}`, metadataReleaseId: metadataReleaseId.replaceAll('-', ''), evidence: { version: 'second' } },
+    { ...base, appUserId: appUserId.replaceAll('-', '').toUpperCase(), metadataReleaseId: `{${metadataReleaseId.toUpperCase()}}`, evidence: { version: 'last' } },
+  ] });
+  assert.deepEqual(result, { wantedKeys: [{ appUserId, metadataReleaseId }], deletedWantedKeys: [] });
+  const inserted = statements.find(({ sql }) => /INSERT INTO library_wanted_releases/u.test(sql));
+  assert.deepEqual(inserted.values[0], [appUserId]); assert.deepEqual(inserted.values[3], [metadataReleaseId]);
+  assert.deepEqual(inserted.values[10], ['{"version":"last"}']);
+  assert.equal(links.mock.callCount(), 1); assert.equal(client.release.mock.callCount(), 1);
 });

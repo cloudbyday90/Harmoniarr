@@ -101,7 +101,9 @@ export function createLibraryDiscoveryWorker({
       }) === false) { leaseLost = true; finalLeaseStatus = 'failed'; return; }
 
       if (!scopedRecovery && reconcileWantedReleases) {
-        await reconcileWantedReleases();
+        await reconcileWantedReleases({
+          workerContext: { operationType: 'library_discovery_dispatch', runId, expectedLease: acquiredLease },
+        });
       }
 
       if (!scopedRecovery && reconcileDiscoveryRequests) {

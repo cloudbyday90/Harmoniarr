@@ -6,6 +6,15 @@ The repository contains the Node.js ESM server, Vue client, PostgreSQL schema, a
 
 Harmoniarr is being planned as a self-hosted FOSS application with no SLA or operational warranty. The docs in this repository describe intended behavior and design direction, not a hosted-service support commitment.
 
+For development, run the focused tests for the changed domain, then
+`npm run validate:fast` for static checks, unit tests and builds. Database changes
+also need their affected PostgreSQL tests. Run `npm run validate` for the complete
+serial gate; `npm run test:integration:serial` runs its database layer explicitly.
+The two-worker experiment exposed a recovery failure and was not promoted. See the
+[efficiency design](docs/TEST_EXECUTION_EFFICIENCY_DESIGN.md),
+[measured outcome](docs/TEST_EXECUTION_EFFICIENCY_OUTCOME.md) and
+[official research](docs/TEST_EXECUTION_EFFICIENCY_RESEARCH_2026_10.md).
+
 - [Planning document](docs/harmoniarr.md)
 - [AI workflow and shared Copilot skills](docs/AI_WORKFLOW.md)
 - [Docker deployment baseline](docs/DOCKER_DEPLOYMENT.md)
@@ -67,6 +76,11 @@ Harmoniarr is being planned as a self-hosted FOSS application with no SLA or ope
 - [Guarded download origin resolution design](docs/DOWNLOAD_ORIGIN_RESOLUTION_DESIGN.md)
 - [Guarded download origin resolution outcome](docs/DOWNLOAD_ORIGIN_RESOLUTION_OUTCOME.md)
 - [Origin resolution official research](docs/ORIGIN_RESOLUTION_RESEARCH_2026_10.md)
+- [Current-owned wanted-release replacement design](docs/WANTED_RELEASE_RECONCILIATION_DESIGN.md)
+- [Wanted-release outcome and next recommendation](docs/WANTED_RELEASE_RECONCILIATION_OUTCOME.md)
+- [Wanted-release official research](docs/WANTED_RELEASE_RECONCILIATION_RESEARCH_2026_10.md)
+- [Wanted-release open PR applicability design](docs/OPEN_PR_APPLICABILITY_WANTED_RELEASE_2026_10_DESIGN.md)
+- [Wanted-release open PR applicability outcome](docs/OPEN_PR_APPLICABILITY_WANTED_RELEASE_2026_10_OUTCOME.md)
 - [Acquisition-owned release reconciliation design](docs/RELEASE_RECONCILIATION_DESIGN.md)
 - [Release reconciliation outcome and next recommendation](docs/RELEASE_RECONCILIATION_OUTCOME.md)
 - [Release reconciliation official research](docs/RELEASE_RECONCILIATION_RESEARCH_2026_10.md)

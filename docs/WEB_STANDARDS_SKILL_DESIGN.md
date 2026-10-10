@@ -189,3 +189,26 @@ to their owners. Keep new-row/other-root evidence and late-source limits explici
 Existing entry-point guidance is sufficient; preserve metadata and invocation
 policy. Validate and synchronize the four installed files, reporting structural
 checks separately from actual PostgreSQL and application evidence.
+
+## Wanted replacement maintenance, October 10, America/New_York
+
+Extend the two references around the [wanted design](WANTED_RELEASE_RECONCILIATION_DESIGN.md).
+Map distinct caller contracts, original optional worker context, same-client nested
+reads, immutable decision inputs and both source/output comparison to their actual
+owners. Preserve composite user/release keys, raw restore compatibility, required
+link rollback and shared admission before parent writes. Keep exact missing-artist
+handling and component-snapshot/later-acquisition limits explicit. Existing entry
+point guidance is sufficient; preserve metadata and invocation policy. Validate
+and synchronize the four installed files without claiming a behavioral trial.
+
+Keep raw restore UUID value identity distinct from input text and strict worker
+authority. Add the verified alternate-spelling/canonical-return counterexample
+to the references, preserving paired last-value deduplication and exact set
+checks. Retain the unit red/green evidence and its SQL-double limit separately
+from actual PostgreSQL restoration proof.
+
+Keep transaction-client identity separate from its query scheduling contract.
+Extend references with delayed nonreentrant controls across outer artists, policy
+reads and actual nested metadata queries. Serial reads must retain immediate
+source capture before the next await. No entry-point or invocation-policy change
+is needed; structural maintenance is separate from driver/runtime evidence.

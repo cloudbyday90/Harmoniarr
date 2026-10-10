@@ -255,7 +255,9 @@ export function createLibraryScanWorker({
 
       if (reconcileWantedReleases) {
         phaseTiming.startPhase('wanted_reconciliation');
-        await reconcileWantedReleases();
+        await reconcileWantedReleases({
+          workerContext: { operationType: 'library_scan', runId, expectedLease: acquiredLease },
+        });
         phaseTiming.finishPhase('wanted_reconciliation');
       }
 

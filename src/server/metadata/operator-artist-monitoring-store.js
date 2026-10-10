@@ -170,8 +170,8 @@ export function createOperatorArtistMonitoringStore({
     );
   }
 
-  async function listOperatorArtistMonitoringSnapshot() {
-    const pool = getPoolFn();
+  async function listOperatorArtistMonitoringSnapshot({ queryable = null } = {}) {
+    const pool = queryable ?? getPoolFn();
     const result = await pool.query(
       `
         SELECT *

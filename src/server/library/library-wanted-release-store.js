@@ -18,7 +18,7 @@
 
 import { getPool } from '../database.js';
 import { buildImportCandidateSelectionReadiness } from '../import-candidates/import-candidate-selection-readiness.js';
-import { normalizeMetadataReleaseDateForDateColumn } from '../metadata/metadata-release-date-normalization.js';
+import { createLibraryWantedReleaseWriteStore } from './library-wanted-release-write-store.js';
 import { createLibraryDiscoveryRequestWantedReleaseLinkStore } from './library-discovery-request-wanted-release-link-store.js';
 import { createLibraryWantedReleasePageStore } from './library-wanted-release-page-store.js';
 import { RELEASE_RECHECK_FACTS_LATERAL_SQL, RELEASE_RECHECK_FACTS_SELECT_SQL, mapReleaseRecheckFacts } from '../import-candidates/import-candidate-release-recheck-store.js';
@@ -285,116 +285,9 @@ export function createLibraryWantedReleaseStore({
     }));
   }
 
-  async function replaceLibraryWantedReleases({ wantedReleases }) {
-    const pool = getPoolFn();
-    const client = await pool.connect();
-
-    try {
-      await client.query('BEGIN');
-
-      const scopedWantedReleases = wantedReleases.filter((wantedRelease) => (
-        typeof wantedRelease?.appUserId === 'string'
-        && wantedRelease.appUserId.trim()
-        && typeof wantedRelease?.metadataReleaseId === 'string'
-        && wantedRelease.metadataReleaseId.trim()
-      ));
-      const appUserIds = scopedWantedReleases
-        .map((wantedRelease) => wantedRelease.appUserId)
-        .filter((appUserId) => typeof appUserId === 'string' && appUserId.trim());
-      const metadataReleaseIds = scopedWantedReleases
-        .map((wantedRelease) => wantedRelease.metadataReleaseId)
-        .filter((metadataReleaseId) => typeof metadataReleaseId === 'string' && metadataReleaseId.trim());
-
-      if (appUserIds.length > 0) {
-        await client.query(
-          `
-            DELETE FROM library_wanted_releases
-            WHERE NOT EXISTS (
-              SELECT 1
-              FROM UNNEST($1::uuid[], $2::uuid[]) AS current_wanted_releases(app_user_id, metadata_release_id)
-              WHERE current_wanted_releases.app_user_id = library_wanted_releases.app_user_id
-                AND current_wanted_releases.metadata_release_id = library_wanted_releases.metadata_release_id
-            )
-          `,
-          [appUserIds, metadataReleaseIds],
-        );
-      } else {
-        await client.query('DELETE FROM library_wanted_releases');
-      }
-
-      for (const wantedRelease of wantedReleases) {
-        await client.query(
-          `
-            INSERT INTO library_wanted_releases (
-              app_user_id,
-              metadata_artist_id,
-              metadata_release_group_id,
-              metadata_release_id,
-              wanted_status,
-              expected_track_count,
-              matched_track_count,
-              missing_track_count,
-              release_date,
-              release_status,
-              evidence,
-              last_reconciled_at,
-              updated_at
-            )
-            VALUES (
-              $1,
-              $2,
-              $3,
-              $4,
-              $5,
-              $6,
-              $7,
-              $8,
-              $9,
-              $10,
-              $11::jsonb,
-              NOW(),
-              NOW()
-            )
-            ON CONFLICT (app_user_id, metadata_release_id) DO UPDATE
-            SET
-              metadata_artist_id = EXCLUDED.metadata_artist_id,
-              metadata_release_group_id = EXCLUDED.metadata_release_group_id,
-              wanted_status = EXCLUDED.wanted_status,
-              expected_track_count = EXCLUDED.expected_track_count,
-              matched_track_count = EXCLUDED.matched_track_count,
-              missing_track_count = EXCLUDED.missing_track_count,
-              release_date = EXCLUDED.release_date,
-              release_status = EXCLUDED.release_status,
-              evidence = EXCLUDED.evidence,
-              last_reconciled_at = EXCLUDED.last_reconciled_at,
-              updated_at = EXCLUDED.updated_at
-          `,
-          [
-            wantedRelease.appUserId,
-            wantedRelease.metadataArtistId,
-            wantedRelease.metadataReleaseGroupId,
-            wantedRelease.metadataReleaseId,
-            wantedRelease.wantedStatus,
-            wantedRelease.expectedTrackCount,
-            wantedRelease.matchedTrackCount,
-            wantedRelease.missingTrackCount,
-            normalizeMetadataReleaseDateForDateColumn(wantedRelease.releaseDate),
-            wantedRelease.releaseStatus,
-            JSON.stringify(wantedRelease.evidence ?? {}),
-          ],
-        );
-      }
-
-      await libraryDiscoveryRequestWantedReleaseLinkStore.syncActiveWantedReleaseLinks({ client });
-
-      await client.query('COMMIT');
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
-  }
+  const { replaceLibraryWantedReleases } = createLibraryWantedReleaseWriteStore({
+    getPoolFn, libraryDiscoveryRequestWantedReleaseLinkStore,
+  });
 
   async function listWantedReleasesWithMetadata({
     appUserId = null,

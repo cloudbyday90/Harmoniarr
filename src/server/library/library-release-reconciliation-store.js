@@ -25,12 +25,12 @@ export function createLibraryReleaseReconciliationStore({
   getPoolFn = getPool,
   withTransaction = createDatabaseTransactionRunner({ getPoolFn }),
 } = {}) {
-  async function listReconciliationsByMetadataReleaseIds({ metadataReleaseIds } = {}) {
+  async function listReconciliationsByMetadataReleaseIds({ metadataReleaseIds, queryable = null } = {}) {
     if (!Array.isArray(metadataReleaseIds) || metadataReleaseIds.length < 1) {
       return [];
     }
 
-    const result = await getPoolFn().query(
+    const result = await (queryable ?? getPoolFn()).query(
       `
         SELECT
           metadata_artist_id,

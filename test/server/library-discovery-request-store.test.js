@@ -741,6 +741,11 @@ test('replaceLibraryDiscoveryRequests upserts stable requests, normalizes dates,
   const insertQuery = queries.find((entry) => entry.sql.includes('INSERT INTO library_discovery_requests'));
   assert.equal(insertQuery.params[7], '2000-01-01');
   assert.match(insertQuery.sql, /ON CONFLICT \(metadata_release_id\) DO UPDATE/u);
+  const admission = queries.findIndex((entry) => entry.sql.includes('pg_advisory_xact_lock'));
+  const firstParentMutation = queries.findIndex((entry) => /(?:DELETE FROM|INSERT INTO) library_discovery_requests/u.test(entry.sql));
+  assert.ok(admission > queries.findIndex((entry) => entry.sql === 'BEGIN'));
+  assert.ok(admission < firstParentMutation, 'Shared link publishers must obtain admission before parent mutations');
   assert.equal(syncActiveWantedReleaseLinks.mock.callCount(), 1);
+  assert.equal(syncActiveWantedReleaseLinks.mock.calls[0].arguments[0].client, client);
   assert.equal(client.release.mock.callCount(), 1);
 });

@@ -267,7 +267,9 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
     libraryRootId: 'root-1',
   }]);
   assert.equal(reconcileWantedReleases.mock.callCount(), 1);
-  assert.deepEqual(reconcileWantedReleases.mock.calls[0].arguments, []);
+  assert.deepEqual(reconcileWantedReleases.mock.calls[0].arguments, [{
+    workerContext: { operationType: 'library_scan', runId: 'run-1', expectedLease: leaseForTest('run-1') },
+  }]);
   assert.equal(reconcileDiscoveryRequests.mock.callCount(), 1);
   assert.deepEqual(reconcileDiscoveryRequests.mock.calls[0].arguments, []);
   assert.deepEqual(

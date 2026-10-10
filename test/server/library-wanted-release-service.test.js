@@ -19,7 +19,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildLibraryWantedReleaseProjection } from '../../src/server/library/library-wanted-release-projection-service.js';
-import { createLibraryWantedReleaseService } from '../../src/server/library/library-wanted-release-service.js';
+import { createLibraryWantedReleaseReader } from '../../src/server/library/library-wanted-release-reader.js';
 
 function buildArtistPayload() {
   return {
@@ -160,8 +160,8 @@ test('wanted-release projection retains eligible policy selections and reports p
   });
 });
 
-test('reconcileWantedReleases reads each monitored artist through injected read boundaries', async (t) => {
-  const replaceLibraryWantedReleases = t.mock.fn(async () => {});
+test('wanted reader reads each monitored artist through injected read boundaries', async (t) => {
+  const queryable = { query: async () => ({ rows: [] }) };
   const listReconciliations = t.mock.fn(async ({ metadataReleaseIds }) => {
     assert.deepEqual(metadataReleaseIds.sort(), [
       'release-complete',
@@ -175,12 +175,12 @@ test('reconcileWantedReleases reads each monitored artist through injected read 
       reconciliationStatus: 'complete',
     }];
   });
-  const service = createLibraryWantedReleaseService({
-    getMetadataArtist: async ({ artistId }) => {
+  const reader = createLibraryWantedReleaseReader({
+    getMetadataArtist: async ({ artistId, queryable: client }) => {
+      assert.equal(client, queryable);
       assert.equal(artistId, 'artist-1');
       return buildArtistPayload();
     },
-    libraryWantedReleaseStore: { replaceLibraryWantedReleases },
     listLibraryReleaseReconciliationsByMetadataReleaseIds: listReconciliations,
     listOperatorArtistMonitoringSnapshot: async () => [{
       appUserId: 'user-1',
@@ -202,11 +202,10 @@ test('reconcileWantedReleases reads each monitored artist through injected read 
     },
   });
 
-  await service.reconcileWantedReleases();
+  const result = await reader.readWantedReleaseProjection({ queryable });
 
   assert.equal(listReconciliations.mock.calls.length, 1);
-  assert.deepEqual(replaceLibraryWantedReleases.mock.calls[0].arguments[0], {
-    wantedReleases: [{
+  assert.deepEqual(result.wantedReleases, [{
       appUserId: 'user-1',
       evidence: {
         monitoredReleaseGroupTypes: ['album'],
@@ -227,35 +226,28 @@ test('reconcileWantedReleases reads each monitored artist through injected read 
       releaseDate: '2028-06-01',
       releaseStatus: 'Official',
       wantedStatus: 'missing',
-    }],
-  });
+    }]);
 });
 
-test('reconcileWantedReleases clears stale wanted releases when no monitored artists remain', async (t) => {
-  const replaceLibraryWantedReleases = t.mock.fn(async () => {});
-  const service = createLibraryWantedReleaseService({
-    libraryWantedReleaseStore: { replaceLibraryWantedReleases },
+test('wanted reader returns an empty projection when no monitored artists remain', async () => {
+  const reader = createLibraryWantedReleaseReader({
     listOperatorArtistMonitoringSnapshot: async () => [],
   });
 
-  await service.reconcileWantedReleases();
+  const result = await reader.readWantedReleaseProjection({ queryable: { query: async () => ({ rows: [] }) } });
 
-  assert.deepEqual(replaceLibraryWantedReleases.mock.calls[0].arguments[0], {
-    wantedReleases: [],
-  });
+  assert.deepEqual(result.wantedReleases, []);
 });
 
-test('reconcileWantedReleases tolerates a metadata artist removed during the projection run', async (t) => {
-  const replaceLibraryWantedReleases = t.mock.fn(async () => {});
+test('wanted reader tolerates a metadata artist removed during the projection run', async () => {
   const missingArtistError = Object.assign(new Error('Metadata artist was not found: artist-1'), {
     code: 'metadata_not_found',
     status: 404,
   });
-  const service = createLibraryWantedReleaseService({
+  const reader = createLibraryWantedReleaseReader({
     getMetadataArtist: async () => {
       throw missingArtistError;
     },
-    libraryWantedReleaseStore: { replaceLibraryWantedReleases },
     listOperatorArtistMonitoringSnapshot: async () => [{
       appUserId: 'user-1',
       isMonitored: true,
@@ -265,9 +257,149 @@ test('reconcileWantedReleases tolerates a metadata artist removed during the pro
     listOperatorTrackOverrides: async () => [],
   });
 
-  await service.reconcileWantedReleases();
+  const result = await reader.readWantedReleaseProjection({ queryable: { query: async () => ({ rows: [] }) } });
 
-  assert.deepEqual(replaceLibraryWantedReleases.mock.calls[0].arguments[0], {
-    wantedReleases: [],
+  assert.deepEqual(result.wantedReleases, []);
+});
+
+function readerFixture(overrides = {}) {
+  const queryable = { query: async () => ({ rows: [] }) };
+  const monitoring = { appUserId: 'user-1', metadataArtistId: 'artist-1', isMonitored: true, isEnabled: false,
+    monitoredReleaseGroupTypes: ['album'], releaseScope: 'current_and_future', wantedAutomationMode: 'current_and_future_matching',
+    qualityProfile: { minimumQuality: 'high' }, updatedAt: '2026-10-10T01:00:00.000Z' };
+  const artistPayload = buildArtistPayload(); const selections = []; const trackOverrides = [];
+  const calls = [];
+  const reader = createLibraryWantedReleaseReader({
+    listOperatorArtistMonitoringSnapshot: async ({ queryable: client }) => { assert.equal(client, queryable); calls.push('monitoring'); return [monitoring]; },
+    getMetadataArtist: async ({ artistId, queryable: client }) => { assert.equal(client, queryable); assert.equal(artistId, 'artist-1'); calls.push('metadata'); return artistPayload; },
+    listOperatorReleaseGroupSelections: async ({ appUserId, metadataArtistId, queryable: client }) => {
+      assert.equal(client, queryable); assert.equal(appUserId, 'user-1'); assert.equal(metadataArtistId, 'artist-1'); calls.push('selections'); return selections;
+    },
+    listOperatorTrackOverrides: async ({ appUserId, queryable: client }) => { assert.equal(client, queryable); assert.equal(appUserId, 'user-1'); calls.push('overrides'); return trackOverrides; },
+    listLibraryReleaseReconciliationsByMetadataReleaseIds: async ({ queryable: client }) => { assert.equal(client, queryable); calls.push('availability'); return []; },
+    ...overrides,
   });
+  return { queryable, monitoring, artistPayload, selections, trackOverrides, calls, reader };
+}
+
+test('wanted reader uses one client for all nested inputs and preserves existing disabled-monitor semantics', async () => {
+  const value = readerFixture(); const result = await value.reader.readWantedReleaseProjection({ queryable: value.queryable });
+  assert.deepEqual(value.calls, ['monitoring', 'metadata', 'selections', 'overrides', 'availability']);
+  assert.ok(result.wantedReleases.some((row) => row.metadataReleaseId === 'release-policy'));
+  assert.equal(result.source.artists[0].monitoring.isEnabled, false);
+  assert.equal(result.source.artists[0].monitoring.qualityProfile.minimumQuality, 'high');
+  assert.equal(Object.hasOwn(result.source.artists[0].monitoring, 'updatedAt'), false);
+});
+
+test('wanted reader captures monitoring before metadata awaits and metadata inputs before availability awaits', async () => {
+  let value;
+  value = readerFixture({
+    getMetadataArtist: async () => {
+      await Promise.resolve(); value.monitoring.qualityProfile.minimumQuality = 'lossless'; value.monitoring.monitoredReleaseGroupTypes.push('single');
+      return value.artistPayload;
+    },
+    listLibraryReleaseReconciliationsByMetadataReleaseIds: async () => {
+      await Promise.resolve(); value.artistPayload.releases[0].trackCount = 999;
+      value.selections.push({ metadataReleaseGroupId: 'group-policy', selectionState: 'excluded' });
+      value.trackOverrides.push({ metadataReleaseId: 'release-policy', included: false }); return [];
+    },
+  });
+  const result = await value.reader.readWantedReleaseProjection({ queryable: value.queryable });
+  const source = result.source.artists[0];
+  assert.equal(source.monitoring.qualityProfile.minimumQuality, 'high'); assert.deepEqual(source.monitoring.monitoredReleaseGroupTypes, ['album']);
+  assert.equal(source.artistPayload.releases[0].trackCount, 10); assert.deepEqual(source.releaseGroupSelections, []); assert.deepEqual(source.trackOverrides, []);
+  assert.equal(result.wantedReleases.find((row) => row.metadataReleaseId === 'release-policy').expectedTrackCount, 10);
+  assert.equal(Object.isFrozen(source.artistPayload.releases), true);
+});
+
+test('only an exact metadata-not-found artist read is tolerated, while selection/availability and real failures escape', async () => {
+  for (const boundary of ['getMetadataArtist', 'listOperatorReleaseGroupSelections', 'listOperatorTrackOverrides', 'listLibraryReleaseReconciliationsByMetadataReleaseIds']) {
+    for (const failure of [Object.assign(new Error('Missing'), { status: 404, code: 'metadata_not_found' }),
+      Object.assign(new Error('Unrelated'), { status: 404, code: 'other_not_found' }), new Error('Database unavailable')]) {
+      const value = readerFixture({ [boundary]: async () => { throw failure; } });
+      if (boundary === 'getMetadataArtist' && failure.code === 'metadata_not_found') {
+        assert.deepEqual((await value.reader.readWantedReleaseProjection({ queryable: value.queryable })).wantedReleases, []);
+      } else await assert.rejects(value.reader.readWantedReleaseProjection({ queryable: value.queryable }), (error) => error === failure);
+    }
+  }
+});
+
+test('malformed reader input arrays and missing client fail instead of becoming an empty cleanup source', async () => {
+  for (const boundary of ['listOperatorArtistMonitoringSnapshot', 'listOperatorReleaseGroupSelections', 'listOperatorTrackOverrides', 'listLibraryReleaseReconciliationsByMetadataReleaseIds']) {
+    const value = readerFixture({ [boundary]: async () => null });
+    await assert.rejects(value.reader.readWantedReleaseProjection({ queryable: value.queryable }), { code: 'library_wanted_projection_invalid' });
+  }
+  for (const payload of [null, {}, { artist: { id: 'another-artist' }, releaseGroups: [], releases: [] }]) {
+    const value = readerFixture({ getMetadataArtist: async () => payload });
+    await assert.rejects(value.reader.readWantedReleaseProjection({ queryable: value.queryable }), { code: 'library_wanted_projection_invalid' });
+  }
+  const value = readerFixture(); await assert.rejects(value.reader.readWantedReleaseProjection({ queryable: {} }), TypeError);
+});
+
+test('wanted reader does not overlap queries on one client across artists or policy reads', async () => {
+  const uuid = (value) => `70000000-0000-4000-8000-${String(value).padStart(12, '0')}`;
+  const appUserId = uuid(1); const artistIds = [uuid(2), uuid(3)];
+  let active = false; let maximumActive = 0; const calls = [];
+  const queryable = { async query(kind, args = []) {
+    if (active) throw new Error('The same PostgreSQL client received an overlapping query');
+    active = true; maximumActive = Math.max(maximumActive, 1); calls.push({ kind, args });
+    try {
+      await new Promise((done) => { setImmediate(done); });
+      if (kind === 'monitoring') return { rows: artistIds.map((metadataArtistId) => ({ appUserId, metadataArtistId, isMonitored: true,
+        monitoredReleaseGroupTypes: ['album'], releaseScope: 'current_and_future', wantedAutomationMode: 'current_and_future_matching' })) };
+      if (kind === 'artist') {
+        const index = artistIds.indexOf(args[0]);
+        return { rows: [{ artist: { id: args[0] }, releaseGroups: [{ id: uuid(10 + index), primaryType: 'album', title: 'Album' }],
+          releases: [{ id: uuid(20 + index), releaseGroupId: uuid(10 + index), title: 'Album', isCanonical: true,
+            trackCount: 10, releaseDate: '2028-06-01', status: 'Official' }] }] };
+      }
+      return { rows: [] };
+    } finally { active = false; }
+  } };
+  const reader = createLibraryWantedReleaseReader({
+    listOperatorArtistMonitoringSnapshot: async ({ queryable: client }) => (await client.query('monitoring')).rows,
+    getMetadataArtist: async ({ artistId, queryable: client }) => (await client.query('artist', [artistId])).rows[0],
+    listOperatorReleaseGroupSelections: async ({ metadataArtistId, queryable: client }) => (await client.query('selections', [metadataArtistId])).rows,
+    listOperatorTrackOverrides: async ({ metadataArtistId, queryable: client }) => (await client.query('overrides', [metadataArtistId])).rows,
+    listLibraryReleaseReconciliationsByMetadataReleaseIds: async ({ metadataReleaseIds, queryable: client }) => (await client.query('availability', metadataReleaseIds)).rows,
+  });
+  const result = await reader.readWantedReleaseProjection({ queryable });
+  assert.equal(maximumActive, 1); assert.equal(active, false); assert.equal(result.wantedReleases.length, 2);
+  assert.deepEqual(result.wantedReleases.map((row) => row.metadataArtistId).sort(), artistIds);
+  assert.equal(calls.filter((call) => call.kind === 'artist').length, 2);
+  assert.equal(calls.filter((call) => call.kind === 'selections').length, 2);
+  assert.equal(calls.filter((call) => call.kind === 'overrides').length, 2);
+  assert.equal(calls.filter((call) => call.kind === 'availability').length, 2);
+});
+
+test('default wanted metadata composition does not overlap release-group and release queries on its client', async () => {
+  const uuid = (value) => `71000000-0000-4000-8000-${String(value).padStart(12, '0')}`;
+  const appUserId = uuid(1); const artistId = uuid(2); const groupId = uuid(10); const releaseId = uuid(20);
+  let active = false; const calls = [];
+  const queryable = { async query(sql) {
+    if (active) throw new Error('Nested metadata reads overlapped on the same PostgreSQL client');
+    active = true;
+    try {
+      await new Promise((done) => { setImmediate(done); });
+      if (sql === 'monitoring') { calls.push('monitoring'); return { rows: [{ appUserId, metadataArtistId: artistId, isMonitored: true,
+        monitoredReleaseGroupTypes: ['album'], releaseScope: 'current_and_future', wantedAutomationMode: 'current_and_future_matching' }] }; }
+      if (/FROM metadata_artists/u.test(sql)) { calls.push('artist'); return { rows: [{ id: artistId, name: 'Artist', sort_name: 'Artist' }] }; }
+      if (/FROM metadata_release_groups/u.test(sql)) { calls.push('groups'); return { rows: [{ id: groupId,
+        metadata_artist_id: artistId, primary_type: 'album', title: 'Album', release_count: 1 }] }; }
+      if (/FROM metadata_releases/u.test(sql)) { calls.push('releases'); return { rows: [{ id: releaseId,
+        metadata_release_group_id: groupId, title: 'Album', is_canonical: true, release_date: '2028-06-01', track_count: 10, status: 'Official' }] }; }
+      if (['selections', 'overrides', 'availability'].includes(sql)) { calls.push(sql); return { rows: [] }; }
+      assert.fail(`Unexpected lookup outside the narrow metadata projection: ${sql}`);
+    } finally { active = false; }
+  } };
+  const reader = createLibraryWantedReleaseReader({
+    listOperatorArtistMonitoringSnapshot: async ({ queryable: client }) => (await client.query('monitoring')).rows,
+    listOperatorReleaseGroupSelections: async ({ queryable: client }) => (await client.query('selections')).rows,
+    listOperatorTrackOverrides: async ({ queryable: client }) => (await client.query('overrides')).rows,
+    listLibraryReleaseReconciliationsByMetadataReleaseIds: async ({ queryable: client }) => (await client.query('availability')).rows,
+  });
+  const result = await reader.readWantedReleaseProjection({ queryable });
+  assert.equal(active, false); assert.equal(result.wantedReleases.length, 1);
+  assert.equal(result.wantedReleases[0].metadataReleaseId, releaseId);
+  assert.deepEqual(calls, ['monitoring', 'artist', 'groups', 'releases', 'selections', 'overrides', 'availability']);
 });

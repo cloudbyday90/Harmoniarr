@@ -87,6 +87,9 @@ test('createLibraryDiscoveryWorker reconciles and dispatches a protected discove
     },
   });
   assert.equal(reconcileWantedReleases.mock.callCount(), 1);
+  assert.deepEqual(reconcileWantedReleases.mock.calls[0].arguments, [{
+    workerContext: { operationType: 'library_discovery_dispatch', runId: 'run-3', expectedLease: leaseForTest('run-3') },
+  }]);
   assert.equal(reconcileDiscoveryRequests.mock.callCount(), 1);
   assert.equal(prefetchMonitoredArtistArtwork.mock.callCount(), 1);
   assert.equal(dispatchDiscoveryRequests.mock.callCount(), 1);
