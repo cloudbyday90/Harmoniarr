@@ -372,3 +372,19 @@ literal POSIX backslash filenames. References now require positive identity
 controls beside parent-traversal refusals. The correction uses the selected
 platform's path components/separator; exact tagged Node documentation and the
 red/green application evidence remain in the separate scan ledger/outcome.
+
+## Release reconciliation maintenance, October 10, America/New_York
+
+The [release design](RELEASE_RECONCILIATION_DESIGN.md) introduced a bounded
+global read-model decision. The references now map original scan authority,
+projection admission, READ COMMITTED reads after waits, whole-aggregate drift,
+verified cleanup/upserts and rollback. They distinguish cooperative projection
+serialization from source-writer barriers and preserve late-source/new-row limits
+instead of claiming strict freshness at commit. Current official consultation
+remains attributed to the saved research ledger.
+
+Entry point, metadata and invocation policy are unchanged. Repository and
+installed copies passed structural validation; all four files match by SHA-256,
+and both reference links resolve. Those checks establish structure and byte
+identity, not a new blind behavioral trial or standards conformance. Application
+and actual PostgreSQL evidence remain in the separate release outcome.

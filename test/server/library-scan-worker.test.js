@@ -259,7 +259,13 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
     }],
   });
   assert.equal(reconcileLibraryReleases.mock.callCount(), 1);
-  assert.deepEqual(reconcileLibraryReleases.mock.calls[0].arguments, []);
+  assert.deepEqual(reconcileLibraryReleases.mock.calls[0].arguments, [{
+    runId: 'run-1',
+    expectedLease: leaseForTest('run-1'),
+    requestedLibraryRoot: rootDir,
+    libraryRootPath: rootDir,
+    libraryRootId: 'root-1',
+  }]);
   assert.equal(reconcileWantedReleases.mock.callCount(), 1);
   assert.deepEqual(reconcileWantedReleases.mock.calls[0].arguments, []);
   assert.equal(reconcileDiscoveryRequests.mock.callCount(), 1);

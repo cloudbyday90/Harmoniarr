@@ -17,9 +17,13 @@
  */
 
 import { getPool } from '../database.js';
+import { createApiError } from '../auth.js';
+import { createDatabaseTransactionRunner } from '../database-transaction-service.js';
+import { lockLibraryReleaseReconciliation } from './library-release-reconciliation-lock-store.js';
 
 export function createLibraryReleaseReconciliationStore({
   getPoolFn = getPool,
+  withTransaction = createDatabaseTransactionRunner({ getPoolFn }),
 } = {}) {
   async function listReconciliationsByMetadataReleaseIds({ metadataReleaseIds } = {}) {
     if (!Array.isArray(metadataReleaseIds) || metadataReleaseIds.length < 1) {
@@ -62,78 +66,60 @@ export function createLibraryReleaseReconciliationStore({
     }));
   }
 
-  async function replaceLibraryReleaseReconciliations({ reconciliations }) {
-    const pool = getPoolFn();
-    const client = await pool.connect();
-
-    try {
-      await client.query('BEGIN');
-
-      if (reconciliations.length === 0) {
-        await client.query('DELETE FROM library_release_reconciliations');
-      } else {
-        await client.query(
-          `
-            DELETE FROM library_release_reconciliations
-            WHERE NOT (metadata_release_id = ANY($1::uuid[]))
-          `,
-          [reconciliations.map((reconciliation) => reconciliation.metadataReleaseId)],
-        );
-      }
-
-      for (const reconciliation of reconciliations) {
-        await client.query(
-          `
-            INSERT INTO library_release_reconciliations (
-              metadata_artist_id,
-              metadata_release_group_id,
-              metadata_release_id,
-              reconciliation_status,
-              expected_track_count,
-              matched_track_count,
-              missing_track_count,
-              matched_file_count,
-              duplicate_track_count,
-              evidence,
-              last_reconciled_at,
-              updated_at
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, NOW(), NOW())
-            ON CONFLICT (metadata_release_id) DO UPDATE
-            SET metadata_artist_id = EXCLUDED.metadata_artist_id,
-                metadata_release_group_id = EXCLUDED.metadata_release_group_id,
-                reconciliation_status = EXCLUDED.reconciliation_status,
-                expected_track_count = EXCLUDED.expected_track_count,
-                matched_track_count = EXCLUDED.matched_track_count,
-                missing_track_count = EXCLUDED.missing_track_count,
-                matched_file_count = EXCLUDED.matched_file_count,
-                duplicate_track_count = EXCLUDED.duplicate_track_count,
-                evidence = EXCLUDED.evidence,
-                last_reconciled_at = NOW(),
-                updated_at = NOW()
-          `,
-          [
-            reconciliation.metadataArtistId,
-            reconciliation.metadataReleaseGroupId,
-            reconciliation.metadataReleaseId,
-            reconciliation.reconciliationStatus,
-            reconciliation.expectedTrackCount,
-            reconciliation.matchedTrackCount,
-            reconciliation.missingTrackCount,
-            reconciliation.matchedFileCount,
-            reconciliation.duplicateTrackCount,
-            reconciliation.evidence ? JSON.stringify(reconciliation.evidence) : null,
-          ],
-        );
-      }
-
-      await client.query('COMMIT');
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
+  async function replaceLibraryReleaseReconciliations({ reconciliations, queryable = null, beforeWrite = null }) {
+    if (!Array.isArray(reconciliations)) throw new TypeError('Release reconciliations must be an array');
+    if (queryable != null && typeof queryable.query !== 'function') throw new TypeError('Release reconciliation queryable must supply query');
+    if (beforeWrite != null && typeof beforeWrite !== 'function') throw new TypeError('Release reconciliation beforeWrite must be a function');
+    const rowsById = new Map();
+    for (const row of reconciliations) {
+      rowsById.delete(row.metadataReleaseId);
+      rowsById.set(row.metadataReleaseId, row);
     }
+    const rows = [...rowsById.values()];
+    const ids = rows.map((row) => row.metadataReleaseId);
+    // Copy scalar/JSON persistence values before admission or guard waits.
+    const values = ['metadataArtistId', 'metadataReleaseGroupId', 'metadataReleaseId', 'reconciliationStatus',
+      'expectedTrackCount', 'matchedTrackCount', 'missingTrackCount', 'matchedFileCount', 'duplicateTrackCount']
+      .map((field) => rows.map((row) => row[field]));
+    values.push(rows.map((row) => row.evidence == null ? null : JSON.stringify(row.evidence)));
+    const incomplete = () => createApiError(409, 'library_release_reconciliation_incomplete', 'The complete release projection was not replaced');
+    async function replace(client) {
+      await lockLibraryReleaseReconciliation({ queryable: client });
+      const targets = await client.query('SELECT metadata_release_id FROM library_release_reconciliations ORDER BY metadata_release_id');
+      const retained = new Set(ids);
+      const expectedDeleted = new Set(targets.rows.map((row) => row.metadata_release_id).filter((id) => !retained.has(id)));
+      await beforeWrite?.({ queryable: client, stage: 'delete' });
+      const deleted = await client.query(`DELETE FROM library_release_reconciliations
+        WHERE NOT (metadata_release_id = ANY($1::uuid[])) RETURNING metadata_release_id`, [ids]);
+      if (deleted.rowCount !== expectedDeleted.size || deleted.rows.length !== expectedDeleted.size
+        || !deleted.rows.every((row) => expectedDeleted.delete(row.metadata_release_id))) throw incomplete();
+      const deletedMetadataReleaseIds = deleted.rows.map((row) => row.metadata_release_id);
+      if (ids.length === 0) return { metadataReleaseIds: [], deletedMetadataReleaseIds };
+      await beforeWrite?.({ queryable: client, stage: 'upsert_batch' });
+      const written = await client.query(`
+        INSERT INTO library_release_reconciliations (metadata_artist_id, metadata_release_group_id,
+          metadata_release_id, reconciliation_status, expected_track_count, matched_track_count,
+          missing_track_count, matched_file_count, duplicate_track_count, evidence, last_reconciled_at, updated_at)
+        SELECT t.*, clock_timestamp(), clock_timestamp()
+        FROM UNNEST($1::uuid[], $2::uuid[], $3::uuid[], $4::text[], $5::integer[], $6::integer[],
+          $7::integer[], $8::integer[], $9::integer[], $10::jsonb[]) AS t(metadata_artist_id,
+          metadata_release_group_id, metadata_release_id, reconciliation_status, expected_track_count,
+          matched_track_count, missing_track_count, matched_file_count, duplicate_track_count, evidence)
+        WHERE TRUE
+        ON CONFLICT (metadata_release_id) DO UPDATE
+        SET metadata_artist_id=EXCLUDED.metadata_artist_id, metadata_release_group_id=EXCLUDED.metadata_release_group_id,
+          reconciliation_status=EXCLUDED.reconciliation_status, expected_track_count=EXCLUDED.expected_track_count,
+          matched_track_count=EXCLUDED.matched_track_count, missing_track_count=EXCLUDED.missing_track_count,
+          matched_file_count=EXCLUDED.matched_file_count, duplicate_track_count=EXCLUDED.duplicate_track_count,
+          evidence=EXCLUDED.evidence, last_reconciled_at=clock_timestamp(), updated_at=clock_timestamp()
+        RETURNING metadata_release_id
+      `, values);
+      const expectedWritten = new Set(ids);
+      if (written.rowCount !== ids.length || written.rows.length !== ids.length
+        || !written.rows.every((row) => expectedWritten.delete(row.metadata_release_id))) throw incomplete();
+      return { metadataReleaseIds: written.rows.map((row) => row.metadata_release_id), deletedMetadataReleaseIds };
+    }
+    return queryable ? replace(queryable) : withTransaction(replace);
   }
 
   async function listLibraryReleasesWithMetadata({

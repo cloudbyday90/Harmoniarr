@@ -243,7 +243,13 @@ export function createLibraryScanWorker({
 
       if (reconcileLibraryReleases) {
         phaseTiming.startPhase('release_reconciliation');
-        await reconcileLibraryReleases();
+        await reconcileLibraryReleases({
+          runId,
+          expectedLease: acquiredLease,
+          requestedLibraryRoot: libraryRoot,
+          libraryRootPath: summary.libraryRoot,
+          libraryRootId: catalogResult.libraryRootId,
+        });
         phaseTiming.finishPhase('release_reconciliation');
       }
 

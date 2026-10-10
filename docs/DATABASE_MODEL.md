@@ -3383,6 +3383,22 @@ and later artwork/reconciliation are separate boundaries. See
 [design](FILE_MATCH_DESIGN.md) and [outcome](FILE_MATCH_OUTCOME.md) for evidence,
 metadata-candidate and physical-byte limits.
 
+## Current implementation: acquisition-owned release reconciliation
+
+Release coverage is read through the owning transaction after current original
+scan authority and global projection admission. READ COMMITTED is selected before
+the first query; later aggregate reads receive new statement snapshots. Source
+rows/tables are not fenced. Changed IDs/counts/status/evidence, authority loss or
+post-wait/final expiry refuse deletion and batch upsert together.
+
+All raw projection replacements share one transaction advisory key. DELETE checks
+its returned identities against current targets; UNNEST upsert requires the full
+expected release set. Valid empty coverage still cleans up. Existing status rules
+remain; no schema change is introduced. Source commits after the final read may
+require another pass, and later fulfillment remains separate. See
+[design](RELEASE_RECONCILIATION_DESIGN.md) and
+[outcome](RELEASE_RECONCILIATION_OUTCOME.md) for evidence and limits.
+
 ## Sources Reviewed
 
 PostgreSQL 18 official sources:

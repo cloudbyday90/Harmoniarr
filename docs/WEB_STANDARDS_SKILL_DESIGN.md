@@ -177,3 +177,15 @@ application evidence, without a new blind behavioral trial or conformance claim.
 Include ordinary catalogue writers in the lock-order trace. A joined row-lock
 query must not be treated as proof of compatible acquisition order; test actual
 root/file waits with blocking process IDs and retain any reproduced deadlock.
+
+## Release reconciliation maintenance, October 10, America/New_York
+
+Extend the two references around the
+[release design](RELEASE_RECONCILIATION_DESIGN.md). Distinguish projection-writer
+admission from source coordination and statement snapshots from strict freshness
+at commit. Map original context, fresh global reads after waits, whole-aggregate
+comparison, empty cleanup, exact deleted/upserted identities and atomic rollback
+to their owners. Keep new-row/other-root evidence and late-source limits explicit.
+Existing entry-point guidance is sufficient; preserve metadata and invocation
+policy. Validate and synchronize the four installed files, reporting structural
+checks separately from actual PostgreSQL and application evidence.

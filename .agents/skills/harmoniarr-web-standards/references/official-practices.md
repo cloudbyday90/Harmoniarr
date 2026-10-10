@@ -252,3 +252,28 @@ than converting a refusal into unmatched success. Database ownership does not
 freeze physical bytes or metadata candidates, undo earlier tag/artwork work, or
 grant later reconciliation authority. Focused doubles and actual PostgreSQL
 evidence remain separate from structural skill validation and UI conformance.
+
+## Release reconciliation maintenance, October 10, America/New_York
+
+The saved `docs/RELEASE_RECONCILIATION_RESEARCH_2026_10.md` ledger owns fresh
+primary-source discovery. Choosing serialized projection replacement with
+repeated READ COMMITTED aggregate comparison is a bounded project decision;
+this maintenance does not independently re-open the ledger's sources.
+
+Capture original scan authority before awaiting admission, then compute global
+coverage inside the owning transaction after waits. Set snapshot semantics
+explicitly: a lock acquired after an older snapshot does not refresh that
+snapshot. Recheck the full mapped aggregate, authority and fresh time before
+DELETE, bulk upsert and the final boundary; source drift or incomplete returned
+identities rolls back all projection writes. Keep valid empty cleanup and existing
+coverage/status calculations. Use the same advisory admission key in standalone
+and owning replacers, with one transaction client and no cached aggregate replay.
+
+The key serializes participating projection writers, not metadata/file/match
+producers. Other-root inserts and new metadata rows belong in freshness proof,
+but changes after the final query can await another pass. Do not claim strict
+commit-fresh state, phantom prevention, or universal deadlock freedom. A broader
+stable-input barrier needs a coordinated producer/snapshot/lock-order design and
+actual interleaving evidence. Focused doubles establish orchestration; PostgreSQL
+owns waits, rollback and query-snapshot claims. No UI change, media-byte or
+external atomicity guarantee follows from this derived read-model boundary.

@@ -6,7 +6,35 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
-## Current development slice: Acquisition-owned file matches (2026-10-09 local)
+## Current development slice: Acquisition-owned release reconciliation (2026-10-10 client date)
+
+- Capture original scan/root/acquisition context; serialize global projection
+  replacement and read fresh global coverage through the same READ COMMITTED
+  client. Revalidate before DELETE, batch upsert and final commit checks. See
+  [design](RELEASE_RECONCILIATION_DESIGN.md),
+  [outcome](RELEASE_RECONCILIATION_OUTCOME.md) and
+  [research](RELEASE_RECONCILIATION_RESEARCH_2026_10.md).
+- Verify exact deletion/upsert identities and roll back the whole replacement
+  after source/authority/SQL refusal. Preserve valid empty cleanup and existing
+  statuses/counts. Query-snapshot freshness does not freeze source producers or
+  grant later wanted/request fulfillment authority.
+- PR eligibility is separate: [design](OPEN_PR_APPLICABILITY_RELEASE_RECONCILIATION_2026_10_DESIGN.md)
+  and [outcome](OPEN_PR_APPLICABILITY_RELEASE_RECONCILIATION_2026_10_OUTCOME.md).
+- Full validation passes 9,609 tests (4,393 server, 4,377 client, 513 script,
+  326 PostgreSQL integration), zero failures/skips, all required lint/policy
+  checks and both builds. Focused owner/store tests pass 43; worker/module/lease
+  checks pass 83; related PostgreSQL tests pass 42, including eight new release
+  reconciliation cases. Counts overlap the full run. Security reports zero npm
+  vulnerabilities. Standards skill structure and installed four-file identity
+  pass; schema stays at 105 migrations. See the outcome for evidence and limits.
+  Work stays on main without a branch, release, tag, deployment or PR merge.
+- Next priority: wanted-release DELETE/upsert after awaited operator policy and
+  availability projection. Preserve scan/discovery/metadata caller authority,
+  current desired state and valid empty cleanup; reproduce old-body refusal after
+  a newer saved policy. Discovery requests and embedded artwork follow. These are
+  source findings, not executed downstream races in this slice.
+
+## Prior development slice: Acquisition-owned file matches (2026-10-09 local)
 
 - Capture original scan acquisition, roots, file tuple, nullable tags and release
   scope before awaited metadata lookup. Persist through one guarded batch with

@@ -17,123 +17,85 @@
  */
 
 import { getPool } from '../database.js';
+import { createApiError } from '../auth.js';
+import { createDatabaseTransactionRunner } from '../database-transaction-service.js';
+import { isCurrentJobLeaseAcquisition } from '../job-lease-policy.js';
+import { createOperationRunCancellationError, createOperationRunPauseError } from '../operation-run-cancellation.js';
 import { createLibraryReleaseReconciliationStore } from './library-release-reconciliation-store.js';
-
-function buildReconciliationStatus({ duplicateTrackCount, expectedTrackCount, matchedTrackCount }) {
-  if (duplicateTrackCount > 0) {
-    return 'duplicate';
-  }
-
-  if (matchedTrackCount >= expectedTrackCount) {
-    return 'complete';
-  }
-
-  return 'partial';
-}
-
-function mapReconciliationRow(row) {
-  const expectedTrackCount = Number(row.expected_track_count ?? 0);
-  const matchedTrackCount = Number(row.matched_track_count ?? 0);
-  const matchedFileCount = Number(row.matched_file_count ?? 0);
-  const duplicateTrackCount = Number(row.duplicate_track_count ?? 0);
-  const missingTrackCount = Math.max(expectedTrackCount - matchedTrackCount, 0);
-
-  return {
-    duplicateTrackCount,
-    evidence: {
-      strategy: 'matched_track_coverage',
-      trackCoverage: expectedTrackCount === 0
-        ? 0
-        : matchedTrackCount / expectedTrackCount,
-    },
-    expectedTrackCount,
-    matchedFileCount,
-    matchedTrackCount,
-    metadataArtistId: row.metadata_artist_id,
-    metadataReleaseGroupId: row.metadata_release_group_id,
-    metadataReleaseId: row.metadata_release_id,
-    missingTrackCount,
-    reconciliationStatus: buildReconciliationStatus({
-      duplicateTrackCount,
-      expectedTrackCount,
-      matchedTrackCount,
-    }),
-  };
-}
+import { createLibraryReleaseCoverageStore } from './library-release-coverage-store.js';
+import { createLibraryReleaseReconciliationGuardStore } from './library-release-reconciliation-guard-store.js';
+import { captureReleaseReconciliationContext, mapReleaseCoverageRows, sameReleaseCoverage,
+  isCompleteReleaseReconciliationResult } from './library-release-reconciliation-policy.js';
 
 export function createLibraryReleaseReconciliationService({
   getPoolFn = getPool,
-  libraryReleaseReconciliationStore = createLibraryReleaseReconciliationStore(),
+  libraryReleaseReconciliationStore = createLibraryReleaseReconciliationStore({ getPoolFn }),
+  coverageStore = createLibraryReleaseCoverageStore(),
+  store = createLibraryReleaseReconciliationGuardStore(),
+  assertMaintenanceWriteAllowed,
+  withTransaction = createDatabaseTransactionRunner({ getPoolFn }),
 } = {}) {
-  async function loadLibraryReleaseReconciliations() {
-    const pool = getPoolFn();
-    const result = await pool.query(
-      `
-        WITH matched_files AS (
-          SELECT
-            library_file_matches.metadata_release_id,
-            library_file_matches.metadata_track_id,
-            COUNT(*)::integer AS file_count
-          FROM library_file_matches
-          JOIN library_files ON library_files.id = library_file_matches.library_file_id
-          WHERE library_file_matches.match_status = 'matched'
-            AND library_file_matches.metadata_release_id IS NOT NULL
-            AND library_file_matches.metadata_track_id IS NOT NULL
-            AND library_files.deleted_at IS NULL
-            AND library_files.file_state = 'observed'
-          GROUP BY library_file_matches.metadata_release_id, library_file_matches.metadata_track_id
-        ),
-        expected AS (
-          SELECT
-            metadata_artists.id AS metadata_artist_id,
-            metadata_release_groups.id AS metadata_release_group_id,
-            metadata_releases.id AS metadata_release_id,
-            COUNT(metadata_tracks.id)::integer AS expected_track_count
-          FROM metadata_releases
-          JOIN metadata_release_groups ON metadata_release_groups.id = metadata_releases.metadata_release_group_id
-          JOIN metadata_artists ON metadata_artists.id = metadata_release_groups.metadata_artist_id
-          JOIN metadata_media ON metadata_media.metadata_release_id = metadata_releases.id
-          JOIN metadata_tracks ON metadata_tracks.metadata_medium_id = metadata_media.id
-          WHERE metadata_releases.id IN (
-            SELECT DISTINCT metadata_release_id
-            FROM matched_files
-          )
-          GROUP BY metadata_artists.id, metadata_release_groups.id, metadata_releases.id
-        ),
-        matched AS (
-          SELECT
-            metadata_release_id,
-            COUNT(*)::integer AS matched_track_count,
-            COALESCE(SUM(file_count), 0)::integer AS matched_file_count,
-            COUNT(*) FILTER (WHERE file_count > 1)::integer AS duplicate_track_count
-          FROM matched_files
-          GROUP BY metadata_release_id
-        )
-        SELECT
-          expected.metadata_artist_id,
-          expected.metadata_release_group_id,
-          expected.metadata_release_id,
-          expected.expected_track_count,
-          matched.matched_track_count,
-          matched.matched_file_count,
-          matched.duplicate_track_count
-        FROM expected
-        JOIN matched ON matched.metadata_release_id = expected.metadata_release_id
-        ORDER BY expected.metadata_release_id ASC
-      `,
-    );
-
-    return result.rows.map(mapReconciliationRow);
+  for (const [name, fn] of Object.entries({ assertMaintenanceWriteAllowed, withTransaction,
+    replaceLibraryReleaseReconciliations: libraryReleaseReconciliationStore.replaceLibraryReleaseReconciliations,
+    loadLibraryReleaseCoverageRows: coverageStore.loadLibraryReleaseCoverageRows,
+    lockContext: store.lockContext, readContext: store.readContext, readClock: store.readClock })) {
+    if (typeof fn !== 'function') throw new TypeError('Release reconciliation requires ' + name);
   }
 
-  async function reconcileLibraryReleases() {
-    const reconciliations = await loadLibraryReleaseReconciliations();
-    await libraryReleaseReconciliationStore.replaceLibraryReleaseReconciliations({
-      reconciliations,
+  async function assertCurrent({ context, prepared, queryable }) {
+    const now = await store.readClock(queryable);
+    const { run, lease, root } = context;
+    if (!run || run.id !== prepared.runId || run.operation_type !== 'library_scan'
+      || !isCurrentJobLeaseAcquisition(lease, prepared.expectedLease, { leaseKey: prepared.expectedLease.leaseKey, now })) {
+      throw createApiError(409, 'operation_run_lease_lost', 'This release reconciliation no longer owns the scan');
+    }
+    if (run.cancel_requested_at != null || run.cancelled_at != null) {
+      throw createOperationRunCancellationError({ runId: prepared.runId });
+    }
+    if (run.status !== 'running') throw createApiError(409, 'operation_run_lease_lost', 'This scan is no longer running');
+    if (run.summary?.libraryRoot !== prepared.requestedLibraryRoot || root?.id !== prepared.libraryRootId
+      || root.canonicalPath !== prepared.libraryRootPath) {
+      throw createApiError(409, 'library_release_reconciliation_stale', 'The scan root changed before release reconciliation');
+    }
+  }
+
+  async function readCoverage(queryable) {
+    const coverage = mapReleaseCoverageRows(await coverageStore.loadLibraryReleaseCoverageRows({ queryable }));
+    if (!coverage) throw createApiError(409, 'library_release_reconciliation_invalid', 'Release coverage could not be verified');
+    return coverage;
+  }
+
+  async function reconcileLibraryReleases(input) {
+    const prepared = captureReleaseReconciliationContext(input);
+    if (!prepared) throw createApiError(409, 'library_release_reconciliation_invalid', 'The original scan context is invalid');
+    return withTransaction(async (queryable) => {
+      await queryable.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
+      try {
+        await assertMaintenanceWriteAllowed({ queryable });
+      } catch (error) {
+        if (error?.code !== 'recovery_lock_conflict') throw error;
+        throw createOperationRunPauseError({ runId: prepared.runId, pauseCode: 'maintenance_lock_active',
+          message: 'Release reconciliation is paused by a maintenance lock' });
+      }
+      await assertCurrent({ context: await store.lockContext({ prepared, queryable }), prepared, queryable });
+      const reconciliations = await readCoverage(queryable);
+      const recheck = async () => {
+        const current = await readCoverage(queryable);
+        await assertCurrent({ context: await store.readContext({ prepared, queryable }), prepared, queryable });
+        if (!sameReleaseCoverage(current, reconciliations)) {
+          throw createApiError(409, 'library_release_reconciliation_stale', 'Library coverage changed during release reconciliation');
+        }
+      };
+      const result = await libraryReleaseReconciliationStore.replaceLibraryReleaseReconciliations({
+        reconciliations, queryable, beforeWrite: recheck,
+      });
+      await recheck();
+      if (!isCompleteReleaseReconciliationResult(result, reconciliations)) {
+        throw createApiError(409, 'library_release_reconciliation_incomplete', 'The release reconciliation replacement could not be verified');
+      }
+      return { metadataReleaseIds: [...result.metadataReleaseIds], deletedMetadataReleaseIds: [...result.deletedMetadataReleaseIds] };
     });
   }
 
-  return {
-    reconcileLibraryReleases,
-  };
+  return { reconcileLibraryReleases };
 }

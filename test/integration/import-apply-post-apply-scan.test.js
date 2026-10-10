@@ -256,7 +256,9 @@ function buildLibraryScanHarness({
   });
   const libraryReleaseReconciliationStore = createLibraryReleaseReconciliationStore({ getPoolFn });
   const libraryReleaseReconciliationService = createLibraryReleaseReconciliationService({
+    getPoolFn,
     libraryReleaseReconciliationStore,
+    assertMaintenanceWriteAllowed: ({ queryable }) => maintenanceGuard.assertNoActiveWriteLocks({ queryable }),
   });
   const libraryScanRunStore = createLibraryScanRunStore({ getPoolFn });
   const libraryScanService = createLibraryScanService({

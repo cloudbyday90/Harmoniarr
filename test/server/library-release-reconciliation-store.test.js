@@ -2,8 +2,28 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createLibraryReleaseReconciliationStore } from '../../src/server/library/library-release-reconciliation-store.js';
 
+function createProjectionQuery(t, { targets = [], deletedRows = null, writtenRows = null, failAt = null, events = [], onAdmission = null } = {}) {
+  return t.mock.fn(async (sql, values) => {
+    if (/pg_advisory_xact_lock/u.test(sql)) { events.push('admission'); await onAdmission?.(); return { rows: [] }; }
+    if (/SELECT metadata_release_id FROM library_release_reconciliations/u.test(sql)) {
+      events.push('targets'); return { rows: targets.map((metadataReleaseId) => ({ metadata_release_id: metadataReleaseId })) };
+    }
+    if (/DELETE FROM library_release_reconciliations/u.test(sql)) {
+      events.push('delete'); if (failAt === 'delete') throw new Error('Delete failed');
+      const rows = deletedRows ?? targets.filter((id) => !values[0].includes(id)).map((metadataReleaseId) => ({ metadata_release_id: metadataReleaseId }));
+      return { rowCount: rows.length, rows };
+    }
+    if (/INSERT INTO library_release_reconciliations/u.test(sql)) {
+      events.push('upsert'); if (failAt === 'upsert') throw new Error('Upsert failed');
+      const rows = writtenRows ?? values[2].map((metadataReleaseId) => ({ metadata_release_id: metadataReleaseId }));
+      return { rowCount: rows.length, rows };
+    }
+    events.push(sql); return { rows: [] };
+  });
+}
+
 test('replaceLibraryReleaseReconciliations replaces the current reconciliation projection in one transaction', async (t) => {
-  const query = t.mock.fn(async () => ({ rows: [] }));
+  const query = createProjectionQuery(t, { targets: ['release-old'] });
   const release = t.mock.fn(() => {});
   const store = createLibraryReleaseReconciliationStore({
     getPoolFn: () => ({
@@ -33,27 +53,28 @@ test('replaceLibraryReleaseReconciliations replaces the current reconciliation p
   });
 
   assert.equal(query.mock.calls[0].arguments[0], 'BEGIN');
-  assert.match(query.mock.calls[1].arguments[0], /DELETE FROM library_release_reconciliations/);
-  assert.deepEqual(query.mock.calls[1].arguments[1], [['release-1']]);
-  assert.match(query.mock.calls[2].arguments[0], /INSERT INTO library_release_reconciliations/);
-  assert.deepEqual(query.mock.calls[2].arguments[1], [
-    'artist-1',
-    'release-group-1',
-    'release-1',
-    'complete',
-    2,
-    2,
-    0,
-    2,
-    0,
-    '{"strategy":"matched_track_coverage","trackCoverage":1}',
+  assert.match(query.mock.calls[1].arguments[0], /pg_advisory_xact_lock/u);
+  const deleted = query.mock.calls.find((call) => /DELETE FROM library_release_reconciliations/u.test(call.arguments[0]));
+  assert.deepEqual(deleted.arguments[1], [['release-1']]);
+  const written = query.mock.calls.find((call) => /INSERT INTO library_release_reconciliations/u.test(call.arguments[0]));
+  assert.deepEqual(written.arguments[1], [
+    ['artist-1'],
+    ['release-group-1'],
+    ['release-1'],
+    ['complete'],
+    [2],
+    [2],
+    [0],
+    [2],
+    [0],
+    ['{"strategy":"matched_track_coverage","trackCoverage":1}'],
   ]);
-  assert.equal(query.mock.calls[3].arguments[0], 'COMMIT');
+  assert.equal(query.mock.calls.at(-1).arguments[0], 'COMMIT');
   assert.equal(release.mock.callCount(), 1);
 });
 
 test('replaceLibraryReleaseReconciliations clears the projection when no reconciliations remain', async (t) => {
-  const query = t.mock.fn(async () => ({ rows: [] }));
+  const query = createProjectionQuery(t, { targets: ['release-1', 'release-2'] });
   const release = t.mock.fn(() => {});
   const store = createLibraryReleaseReconciliationStore({
     getPoolFn: () => ({
@@ -64,13 +85,16 @@ test('replaceLibraryReleaseReconciliations clears the projection when no reconci
     }),
   });
 
-  await store.replaceLibraryReleaseReconciliations({
+  const result = await store.replaceLibraryReleaseReconciliations({
     reconciliations: [],
   });
 
   assert.equal(query.mock.calls[0].arguments[0], 'BEGIN');
-  assert.equal(query.mock.calls[1].arguments[0], 'DELETE FROM library_release_reconciliations');
-  assert.equal(query.mock.calls[2].arguments[0], 'COMMIT');
+  const deleted = query.mock.calls.find((call) => /DELETE FROM library_release_reconciliations/u.test(call.arguments[0]));
+  assert.deepEqual(deleted.arguments[1], [[]]);
+  assert.equal(query.mock.calls.some((call) => /INSERT INTO library_release_reconciliations/u.test(call.arguments[0])), false);
+  assert.deepEqual(result, { metadataReleaseIds: [], deletedMetadataReleaseIds: ['release-1', 'release-2'] });
+  assert.equal(query.mock.calls.at(-1).arguments[0], 'COMMIT');
   assert.equal(release.mock.callCount(), 1);
 });
 
@@ -179,4 +203,98 @@ test('listLibraryReleasesWithMetadata can list removed releases', async (t) => {
     appUserId: 'operator-1',
     visibilityState: 'removed',
   });
+});
+
+function projectionRow(id = 'release-1', changes = {}) {
+  return { metadataArtistId: 'artist-1', metadataReleaseGroupId: 'group-1', metadataReleaseId: id,
+    reconciliationStatus: 'complete', expectedTrackCount: 2, matchedTrackCount: 2, missingTrackCount: 0,
+    matchedFileCount: 2, duplicateTrackCount: 0, evidence: { strategy: 'matched_track_coverage', trackCoverage: 1 }, ...changes };
+}
+function standaloneStore(query, release) {
+  return createLibraryReleaseReconciliationStore({ getPoolFn: () => ({ connect: async () => ({ query, release }) }) });
+}
+
+test('supplied-client replacement takes projection admission and awaits guards without nesting or borrowing', async (t) => {
+  const events = []; const query = createProjectionQuery(t, { targets: ['obsolete'], events }); const queryable = { query };
+  const store = createLibraryReleaseReconciliationStore({ getPoolFn: () => { assert.fail('Owner already supplies a connection'); },
+    withTransaction: async () => { assert.fail('Caller transaction must not be nested'); },
+  });
+  const result = await store.replaceLibraryReleaseReconciliations({ reconciliations: [projectionRow()], queryable,
+    beforeWrite: async ({ queryable: client, stage }) => { await Promise.resolve(); assert.equal(client, queryable); events.push(`guard:${stage}`); },
+  });
+  assert.deepEqual(events, ['admission', 'targets', 'guard:delete', 'delete', 'guard:upsert_batch', 'upsert']);
+  assert.deepEqual(result, { metadataReleaseIds: ['release-1'], deletedMetadataReleaseIds: ['obsolete'] });
+  assert.deepEqual(query.mock.calls[0].arguments[1], ['harmoniarr.library-release-reconciliation']);
+});
+
+test('replacement waits for the deletion guard after admission and target observation', async (t) => {
+  const events = []; const query = createProjectionQuery(t, { events }); const queryable = { query };
+  let entered; let resume; const ready = new Promise((done) => { entered = done; }); const paused = new Promise((done) => { resume = done; });
+  const store = createLibraryReleaseReconciliationStore({ getPoolFn: () => { assert.fail('Unexpected connection'); } });
+  const running = store.replaceLibraryReleaseReconciliations({ reconciliations: [projectionRow()], queryable,
+    beforeWrite: async ({ stage }) => { if (stage === 'delete') { entered(); await paused; } },
+  });
+  await ready; assert.deepEqual(events, ['admission', 'targets']); resume(); await running;
+  assert.deepEqual(events, ['admission', 'targets', 'delete', 'upsert']);
+});
+
+test('standalone input deduplication and persistence values are captured before admission waits', async (t) => {
+  const rows = [projectionRow('release-1', { matchedTrackCount: 1 }), projectionRow('release-2'), projectionRow('release-1')];
+  const query = createProjectionQuery(t, { onAdmission: async () => {
+    await Promise.resolve(); rows[2].metadataReleaseId = 'changed'; rows[2].expectedTrackCount = 999; rows[2].evidence.trackCoverage = 0;
+  } });
+  const release = t.mock.fn(); const store = standaloneStore(query, release);
+  assert.deepEqual(await store.replaceLibraryReleaseReconciliations({ reconciliations: rows }), { metadataReleaseIds: ['release-2', 'release-1'], deletedMetadataReleaseIds: [] });
+  const args = query.mock.calls.find((call) => /INSERT INTO library_release_reconciliations/u.test(call.arguments[0])).arguments[1];
+  assert.deepEqual(args[2], ['release-2', 'release-1']); assert.deepEqual(args[4], [2, 2]);
+  assert.deepEqual(args[9], ['{"strategy":"matched_track_coverage","trackCoverage":1}', '{"strategy":"matched_track_coverage","trackCoverage":1}']);
+  assert.equal(release.mock.callCount(), 1);
+});
+
+for (const stage of ['delete', 'upsert_batch']) {
+  test(`${stage} guard refusal rolls back the entire standalone replacement without retry`, async (t) => {
+    const events = []; const query = createProjectionQuery(t, { targets: ['obsolete'], events }); const release = t.mock.fn();
+    const failure = Object.assign(new Error('Stale'), { code: 'library_release_reconciliation_stale' });
+    await assert.rejects(standaloneStore(query, release).replaceLibraryReleaseReconciliations({ reconciliations: [projectionRow()],
+      beforeWrite: async (args) => { if (args.stage === stage) throw failure; },
+    }), (error) => error === failure);
+    assert.equal(events.includes('delete'), stage === 'upsert_batch'); assert.equal(events.includes('upsert'), false);
+    assert.equal(events.at(-1), 'ROLLBACK'); assert.equal(events.includes('COMMIT'), false); assert.equal(release.mock.callCount(), 1);
+  });
+}
+
+test('DELETE and bulk upsert SQL failures roll back all projection changes and preserve the error', async (t) => {
+  for (const failAt of ['delete', 'upsert']) {
+    const events = []; const query = createProjectionQuery(t, { targets: ['obsolete'], events, failAt }); const release = t.mock.fn();
+    await assert.rejects(standaloneStore(query, release).replaceLibraryReleaseReconciliations({ reconciliations: [projectionRow(), projectionRow('release-2')] }),
+      (error) => error.message === (failAt === 'delete' ? 'Delete failed' : 'Upsert failed'));
+    assert.equal(events.at(-1), 'ROLLBACK'); assert.equal(events.includes('COMMIT'), false); assert.equal(release.mock.callCount(), 1);
+  }
+});
+
+test('exact deleted identity verification refuses missing, extra, foreign or duplicated deletion results', async (t) => {
+  for (const deletedRows of [[], [{ metadata_release_id: 'old-1' }], [{ metadata_release_id: 'old-1' }, { metadata_release_id: 'old-1' }],
+    [{ metadata_release_id: 'old-1' }, { metadata_release_id: 'foreign' }],
+    [{ metadata_release_id: 'old-1' }, { metadata_release_id: 'old-2' }, { metadata_release_id: 'extra' }]]) {
+    const events = []; const query = createProjectionQuery(t, { targets: ['old-1', 'old-2'], deletedRows, events }); const release = t.mock.fn();
+    await assert.rejects(standaloneStore(query, release).replaceLibraryReleaseReconciliations({ reconciliations: [projectionRow()] }), { code: 'library_release_reconciliation_incomplete' });
+    assert.equal(events.includes('upsert'), false); assert.equal(events.at(-1), 'ROLLBACK'); assert.equal(release.mock.callCount(), 1);
+  }
+});
+
+test('exact bulk identity verification refuses zero, partial, duplicate and foreign results after deletion', async (t) => {
+  for (const writtenRows of [[], [{ metadata_release_id: 'release-1' }], [{ metadata_release_id: 'release-1' }, { metadata_release_id: 'release-1' }],
+    [{ metadata_release_id: 'release-1' }, { metadata_release_id: 'foreign' }]]) {
+    const events = []; const query = createProjectionQuery(t, { targets: ['obsolete'], writtenRows, events }); const release = t.mock.fn();
+    await assert.rejects(standaloneStore(query, release).replaceLibraryReleaseReconciliations({ reconciliations: [projectionRow(), projectionRow('release-2')] }), { code: 'library_release_reconciliation_incomplete' });
+    assert.equal(events.includes('delete'), true); assert.equal(events.includes('upsert'), true);
+    assert.equal(events.at(-1), 'ROLLBACK'); assert.equal(events.includes('COMMIT'), false); assert.equal(release.mock.callCount(), 1);
+  }
+});
+
+test('malformed projection input, supplied client or guard refuses before borrowing or issuing SQL', async (t) => {
+  const query = createProjectionQuery(t); const store = createLibraryReleaseReconciliationStore({ getPoolFn: () => { assert.fail('Unexpected connection'); } });
+  for (const input of [{ reconciliations: null }, { reconciliations: [], queryable: { noQuery: true } },
+    { reconciliations: [], queryable: { query }, beforeWrite: true }]) await assert.rejects(store.replaceLibraryReleaseReconciliations(input), TypeError);
+  assert.equal(query.mock.callCount(), 0);
 });

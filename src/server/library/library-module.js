@@ -327,6 +327,9 @@ export function createLibraryModule({
   libraryReleaseReconciliationStore = createLibraryReleaseReconciliationStore(),
   libraryReleaseReconciliationService = createLibraryReleaseReconciliationService({
     libraryReleaseReconciliationStore,
+    assertMaintenanceWriteAllowed: ({ queryable }) => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+      operationLabel: 'library release reconciliation', queryable,
+    }),
   }),
   libraryReleaseVisibilityStore = createLibraryReleaseVisibilityStore(),
   libraryReleaseVisibilityService = createLibraryReleaseVisibilityService({
