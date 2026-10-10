@@ -19,6 +19,7 @@ import { createLibraryDiscoveryWorker } from '../../src/server/library/library-d
 import { createMusicQueueRecoveryFixtureContext, seedMusicQueueRecoveryFixture, recoverMusicQueueFixture }
   from '../../testing/integration/music-queue-recovery-fixtures.js';
 import { createPostgresIntegrationRuntime } from '../../testing/postgres-integration-runtime.js';
+import { createFixtureWorkerObserver, withFixtureLifecycle } from '../../testing/integration/fixture-lifecycle.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 import { isSkippableIntegrationRuntimeError, toIntegrationRuntimeUnavailableReason } from '../../testing/integration/runtime-availability.js';
 
@@ -35,6 +36,7 @@ async function scenario(t, run) {
     context.requestStore = createLibraryDiscoveryRequestStore({ getPoolFn, withTransaction: context.withTransaction, recoveryStore: context.store });
     context.scoped = createLibraryMusicQueueRecoveryDiscoveryService({ store: context.store, withTransaction: context.withTransaction,
       assertMaintenanceWriteAllowed: context.assertMaintenanceWriteAllowed });
+    context.fixtureSignal = t.signal;
     await run(context);
   });
 }
@@ -44,7 +46,9 @@ async function queued(context, options = {}) {
   assert.equal(result.reason, 'rediscovery_scheduled', JSON.stringify(result));
   return { ...fixture, runId: result.rediscovery.discoveryRunId };
 }
-async function runWorker(context, fixture, { prepare = async () => null, provider = async () => ({ id: randomUUID() }) } = {}) {
+async function runWorker(context, fixture, { prepare = async () => null, provider = async () => ({ id: randomUUID() }),
+  signal = context.fixtureSignal } = {}) {
+  return withFixtureLifecycle({ signal }, async (scope) => {
   const searches = []; const ingestions = []; const globalCalls = [];
   const dispatch = createLibraryDiscoveryDispatchService({ loadSettingsFn: async () => ({ library: { discoveryBatchSize: 5 } }),
     libraryDiscoveryRequestStore: context.requestStore, musicQueueRecoveryDiscoveryService: context.scoped,
@@ -52,12 +56,10 @@ async function runWorker(context, fixture, { prepare = async () => null, provide
     slskdService: { startSearch: async (input) => { searches.push(input); return provider(input); } },
     importCandidateService: { ingestSlskdSearchResponses: async (input) => { ingestions.push(input); return { candidateCount: 0, fileCount: 0 }; } },
   });
-  let finish;
   let terminalOutcome;
-  const done = new Promise((resolve) => { finish = resolve; });
   const runs = context.discoveryRuns;
-  const worker = createLibraryDiscoveryWorker({ acquireLease: runs.acquireLease,
-    releaseLease: async (input) => { await runs.releaseLease(input); finish(terminalOutcome); },
+  const callbacks = { acquireLease: runs.acquireLease,
+    releaseLease: runs.releaseLease,
     isCancellationRequested: runs.isCancellationRequested, markRunStarted: runs.markRunStarted,
     markRunCompleted: async (input) => { await runs.markRunCompleted(input); terminalOutcome = { state: 'completed', summary: input.summary }; },
     markRunFailed: async (input) => { await runs.markRunFailed(input); terminalOutcome = { state: 'failed', error: input.errorMessage }; },
@@ -66,11 +68,17 @@ async function runWorker(context, fixture, { prepare = async () => null, provide
     dispatchDiscoveryRequests: dispatch.dispatchReadyDiscoveryRequests,
     reconcileWantedReleases: async () => globalCalls.push('wanted'), reconcileDiscoveryRequests: async () => globalCalls.push('discovery'),
     prefetchMonitoredArtistArtwork: async () => globalCalls.push('artwork'),
+  };
+  const observer = createFixtureWorkerObserver({ callbacks });
+  const worker = createLibraryDiscoveryWorker({ ...callbacks, ...observer.callbacks,
+    isCancellationRequested: async (input) => scope.signal.aborted || await runs.isCancellationRequested(input),
   });
+  scope.track(observer.finished);
   await worker.startWorkerRun({ runId: fixture.runId, triggerSource: MUSIC_QUEUE_RECOVERY_DISCOVERY_SOURCE });
-  const outcome = await done;
+  await observer.finished;
   assert.deepEqual(globalCalls, []);
-  return { outcome, searches, ingestions, dispatch };
+  return { outcome: terminalOutcome, searches, ingestions, dispatch };
+  });
 }
 async function reconcile(context) {
   const service = createLibraryDiscoveryRequestService({ getPoolFn: context.getPoolFn, libraryDiscoveryRequestStore: context.requestStore,

@@ -11,6 +11,7 @@ import pg from 'pg';
 import { buildPoolConfig } from '../src/server/database.js';
 import { resolveIntegrationTestRuntimeConfig } from './integration/runtime-config.js';
 import { withTemporaryPostgresDatabase } from './postgres-temporary-database.js';
+import { createIntegrationFixturePhaseObserver } from './integration/fixture-phase-observer.js';
 
 const { Pool } = pg;
 
@@ -44,6 +45,7 @@ export async function createPostgresIntegrationRuntime({
   config = resolveIntegrationTestRuntimeConfig(),
   createPostgresContainer = createDefaultPostgresContainer,
   env = process.env,
+  phaseObserver = createIntegrationFixturePhaseObserver({ env }),
   withTemporaryPostgresDatabaseFn = withTemporaryPostgresDatabase,
 } = {}) {
   if (hasConfiguredPostgresAdminConnection(env)) {
@@ -51,22 +53,24 @@ export async function createPostgresIntegrationRuntime({
       config,
       source: 'external_postgres',
       async cleanup() {},
-      async runIsolatedDatabase(run) {
+      async runIsolatedDatabase(run, { phaseObserver: scenarioObserver = phaseObserver.child() } = {}) {
         return withTemporaryPostgresDatabaseFn({
           createPool: createPoolFactory(env),
           env,
+          phaseObserver: scenarioObserver,
           run: ({ databaseConfig, databaseName, getPoolFn }) => run({
             databaseConfig,
             databaseName,
             getPoolFn,
             source: 'external_postgres',
+            phaseObserver: scenarioObserver,
           }),
         });
       },
     };
   }
 
-  const container = await createPostgresContainer(config).start();
+  const container = await phaseObserver.measure('container_start', () => createPostgresContainer(config).start());
   const containerEnv = {
     PGDATABASE: container.getDatabase(),
     PGHOST: container.getHost(),
@@ -80,19 +84,21 @@ export async function createPostgresIntegrationRuntime({
     config,
     source: 'testcontainer_postgres',
     async cleanup() {
-      await container.stop({
+      await phaseObserver.measure('container_stop', () => container.stop({
         timeout: config.containerStopTimeoutMs,
-      }).catch(() => {});
+      })).catch(() => {});
     },
-    async runIsolatedDatabase(run) {
+    async runIsolatedDatabase(run, { phaseObserver: scenarioObserver = phaseObserver.child() } = {}) {
       return withTemporaryPostgresDatabaseFn({
         createPool: createPoolFactory(containerEnv),
         env: containerEnv,
+        phaseObserver: scenarioObserver,
         run: ({ databaseConfig, databaseName, getPoolFn }) => run({
           databaseConfig,
           databaseName,
           getPoolFn,
           source: 'testcontainer_postgres',
+          phaseObserver: scenarioObserver,
         }),
       });
     },
@@ -103,6 +109,7 @@ export async function withPostgresIntegrationRuntime({
   createPostgresContainer = createDefaultPostgresContainer,
   config = resolveIntegrationTestRuntimeConfig(),
   env = process.env,
+  phaseObserver = createIntegrationFixturePhaseObserver({ env }),
   run,
   withTemporaryPostgresDatabaseFn = withTemporaryPostgresDatabase,
 } = {}) {
@@ -114,6 +121,7 @@ export async function withPostgresIntegrationRuntime({
     config,
     createPostgresContainer,
     env,
+    phaseObserver,
     withTemporaryPostgresDatabaseFn,
   });
 

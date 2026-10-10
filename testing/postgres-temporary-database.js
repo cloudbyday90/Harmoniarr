@@ -8,11 +8,10 @@
 
 import pg from 'pg';
 import { attachPoolErrorHandler, buildConnectionConfig } from '../src/server/database.js';
+import { createIntegrationFixturePhaseObserver } from './integration/fixture-phase-observer.js';
+import { drainPostgresFixtureBackends } from './integration/postgres-backend-drain.js';
 
 const { Client, Pool } = pg;
-
-const DRAIN_POLL_INTERVAL_MS = 50;
-const DRAIN_TIMEOUT_MS = 5_000;
 
 export function buildPostgresAdminConnectionConfig(env = process.env) {
   return {
@@ -30,50 +29,12 @@ function quoteIdentifier(identifier) {
   return `"${String(identifier).replaceAll('"', '""')}"`;
 }
 
-async function countActiveBackends(client, databaseName) {
-  const result = await client.query(
-    `
-      SELECT COUNT(*)::integer AS active_count
-      FROM pg_stat_activity
-      WHERE datname = $1
-        AND pid <> pg_backend_pid()
-    `,
-    [databaseName],
-  );
-  return result.rows[0]?.active_count ?? 0;
-}
-
-async function drainDatabaseBackends(client, databaseName) {
-  const deadline = Date.now() + DRAIN_TIMEOUT_MS;
-
-  while (Date.now() < deadline) {
-    const activeCount = await countActiveBackends(client, databaseName).catch(() => 0);
-    if (activeCount === 0) {
-      return;
-    }
-
-    await client.query(
-      `
-        SELECT pg_terminate_backend(pid)
-        FROM pg_stat_activity
-        WHERE datname = $1
-          AND pid <> pg_backend_pid()
-      `,
-      [databaseName],
-    ).catch(() => {});
-
-    await new Promise((resolve) => {
-      const timer = setTimeout(resolve, DRAIN_POLL_INTERVAL_MS);
-      timer.unref?.();
-    });
-  }
-}
-
 export async function withTemporaryPostgresDatabase({
   adminClientFactory = (config) => new Client(config),
   createPool = (config) => new Pool(config),
   databaseName = createTemporaryDatabaseName(),
   env = process.env,
+  phaseObserver = createIntegrationFixturePhaseObserver({ env }),
   run,
 } = {}) {
   if (typeof run !== 'function') {
@@ -88,11 +49,13 @@ export async function withTemporaryPostgresDatabase({
   const adminClient = adminClientFactory(adminConfig);
   const databasePoolRuntimeState = { closing: false };
   let databasePool;
+  let databaseCreated = false;
 
   try {
-    await adminClient.connect();
-    await adminClient.query(`CREATE DATABASE ${quoteIdentifier(databaseName)}`);
-    databasePool = createPool(databaseConfig);
+    await phaseObserver.measure('database_connect', () => adminClient.connect());
+    await phaseObserver.measure('database_create', () => adminClient.query(`CREATE DATABASE ${quoteIdentifier(databaseName)}`));
+    databaseCreated = true;
+    databasePool = await phaseObserver.measure('pool_create', () => createPool(databaseConfig));
     if (typeof databasePool?.on === 'function') {
       attachPoolErrorHandler(databasePool, { runtimeState: databasePoolRuntimeState });
     }
@@ -101,29 +64,20 @@ export async function withTemporaryPostgresDatabase({
       databaseConfig,
       databaseName,
       getPoolFn: () => databasePool,
+      phaseObserver,
     });
   } finally {
     databasePoolRuntimeState.closing = true;
-    await databasePool?.end().catch(() => {});
+    if (databasePool) await phaseObserver.measure('pool_close', () => databasePool.end()).catch(() => {});
 
-    if (typeof adminClient.query === 'function') {
-      await adminClient.query(
-        `
-          SELECT pg_terminate_backend(pid)
-          FROM pg_stat_activity
-          WHERE datname = $1
-            AND pid <> pg_backend_pid()
-        `,
-        [databaseName],
-      ).catch(() => {});
+    if (databaseCreated && typeof adminClient.query === 'function') {
+      await phaseObserver.measure('backend_drain', () => drainPostgresFixtureBackends({ adminClient, databaseName })).catch(() => {});
 
-      await drainDatabaseBackends(adminClient, databaseName);
-
-      await adminClient.query(`DROP DATABASE IF EXISTS ${quoteIdentifier(databaseName)}`).catch(() => {});
+      await phaseObserver.measure('database_drop', () => adminClient.query(`DROP DATABASE IF EXISTS ${quoteIdentifier(databaseName)}`)).catch(() => {});
     }
 
     if (typeof adminClient.end === 'function') {
-      await adminClient.end().catch(() => {});
+      await phaseObserver.measure('admin_close', () => adminClient.end()).catch(() => {});
     }
   }
 }

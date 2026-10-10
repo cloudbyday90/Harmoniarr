@@ -15,6 +15,12 @@ The two-worker experiment exposed a recovery failure and was not promoted. See t
 [measured outcome](docs/TEST_EXECUTION_EFFICIENCY_OUTCOME.md) and
 [official research](docs/TEST_EXECUTION_EFFICIENCY_RESEARCH_2026_10.md).
 
+Serial integration now includes a bounded early failure reporter alongside native
+output. Set `HARMONIARR_INTEGRATION_PHASE_TIMINGS=1` to collect safe setup/work/
+cleanup durations. See the [fixture design](docs/TEST_FIXTURE_OBSERVABILITY_DESIGN.md),
+[outcome](docs/TEST_FIXTURE_OBSERVABILITY_OUTCOME.md) and
+[research](docs/TEST_FIXTURE_OBSERVABILITY_RESEARCH_2026_10.md).
+
 - [Planning document](docs/harmoniarr.md)
 - [AI workflow and shared Copilot skills](docs/AI_WORKFLOW.md)
 - [Docker deployment baseline](docs/DOCKER_DEPLOYMENT.md)

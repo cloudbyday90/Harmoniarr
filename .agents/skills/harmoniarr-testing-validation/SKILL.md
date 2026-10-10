@@ -39,6 +39,24 @@ or another reporter that exposes error details promptly; a spec-only long run
 can defer stacks until its final summary. Fixture barriers should race the active
 operation's failure and always release/drain in cleanup, including cancellation.
 
+The serial integration script now pairs native spec output with an early bounded
+failure reporter. Its approved category and project-relative frames become
+available on native failure events; other native output is independent. For
+setup investigation, enable `HARMONIARR_INTEGRATION_PHASE_TIMINGS=1`. Phase rows
+contain opaque correlation, approved labels, outcomes and monotonic durations;
+overlapping parent/child spans must not be summed as gate wall time. Failed
+verification is not successful cleanup. See
+`docs/TEST_FIXTURE_OBSERVABILITY_OUTCOME.md` for current measured limits.
+
+Use `testing/integration/fixture-lifecycle.js` for controlled gates and tracked
+cooperative work. Release failure must cancel signal-dependent drains too; an
+earlier blocked task cannot hide a later rejection. These helpers do not stop
+arbitrary I/O or make an unreleased client safe to close. Never terminate/drop a
+database unless this invocation acknowledged creating it.
+Reject pre-aborted startup and register observed completion before launching
+detached work; refused late registration must not leave a worker running. Startup
+failure must settle that registered completion rather than hanging its drain.
+
 Use PowerShell commands from the repository root.
 
 ## Validation Matrix

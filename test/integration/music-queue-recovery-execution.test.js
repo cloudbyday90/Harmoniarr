@@ -30,7 +30,7 @@ async function scenario(t, run) {
   if (unavailableReason) { t.skip(unavailableReason); return; }
   await runtime.runIsolatedDatabase(async ({ getPoolFn }) => {
     await applyPendingMigrations({ getPoolFn });
-    await run(createMusicQueueRecoveryFixtureContext({ getPoolFn }));
+    await run({ ...createMusicQueueRecoveryFixtureContext({ getPoolFn }), fixtureSignal: t.signal });
   });
 }
 async function makeChild(context, options = {}) {

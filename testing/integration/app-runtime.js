@@ -16,6 +16,7 @@ import { resolveIntegrationTestRuntimeConfig } from './runtime-config.js';
 import { createPostgresIntegrationRuntime, withPostgresIntegrationRuntime } from '../postgres-integration-runtime.js';
 import { createSessionHttpClient } from '../server/http-session-client.js';
 import { withServer } from '../server/http-test-helpers.js';
+import { createIntegrationFixturePhaseObserver } from './fixture-phase-observer.js';
 
 const packageJsonPath = resolve(import.meta.dirname, '../../package.json');
 const SCENARIO_SHUTDOWN_DRAIN_MS = 150;
@@ -101,31 +102,33 @@ export async function createIntegrationAppRuntime({
   createAppFn = createApp,
   prepareDatabaseFn = prepareDatabase,
   postgresRuntimeFactory = createPostgresIntegrationRuntime,
+  phaseObserver = createIntegrationFixturePhaseObserver(),
 } = {}) {
-  const runtimeWorkspace = clientDistDir
+  const runtimeWorkspace = await phaseObserver.measure('workspace_create', async () => clientDistDir
     ? {
         clientDistDir,
         workspaceDir: await mkdtemp(join(tmpdir(), 'harmoniarr-integration-')),
       }
-    : await createRuntimeWorkspace();
+    : await createRuntimeWorkspace());
   let postgresRuntime;
 
   try {
-    postgresRuntime = await postgresRuntimeFactory({ config });
+    postgresRuntime = await postgresRuntimeFactory({ config, phaseObserver });
   } catch (error) {
-    await rm(runtimeWorkspace.workspaceDir, { force: true, recursive: true }).catch(() => {});
+    await phaseObserver.measure('workspace_remove', () => rm(runtimeWorkspace.workspaceDir, { force: true, recursive: true })).catch(() => {});
     throw error;
   }
 
   return {
     config,
     async cleanup() {
-      await closePool().catch(() => {});
-      await postgresRuntime.cleanup();
-      await rm(runtimeWorkspace.workspaceDir, { force: true, recursive: true }).catch(() => {});
+      await phaseObserver.measure('pool_close', () => closePool()).catch(() => {});
+      try { await postgresRuntime.cleanup(); }
+      finally { await phaseObserver.measure('workspace_remove', () => rm(runtimeWorkspace.workspaceDir, { force: true, recursive: true })).catch(() => {}); }
     },
     async runScenario(run, {
       scenarioName = 'integration_scenario',
+      phaseObserver: scenarioObserver = phaseObserver.child(),
     } = {}) {
       if (typeof run !== 'function') {
         throw new Error('run is required');
@@ -139,8 +142,8 @@ export async function createIntegrationAppRuntime({
         const scenarioWorkspaceDir = join(runtimeWorkspace.workspaceDir, scenarioName);
         let scenarioFailed = true;
 
-        await mkdir(scenarioWorkspaceDir, { recursive: true });
-        await closePool().catch(() => {});
+        await scenarioObserver.measure('workspace_create', () => mkdir(scenarioWorkspaceDir, { recursive: true }));
+        await scenarioObserver.measure('pool_close', () => closePool()).catch(() => {});
 
         return withEnvironmentVariables({
           HARMONIARR_CONTACT_EMAIL: 'integration-tests@example.invalid',
@@ -155,18 +158,16 @@ export async function createIntegrationAppRuntime({
           VAPID_PRIVATE_KEY: TEST_VAPID_PRIVATE_KEY,
           VAPID_PUBLIC_KEY: TEST_VAPID_PUBLIC_KEY,
         }, async () => {
-          await closePool().catch(() => {});
-          await prepareDatabaseFn();
-
-          const { app } = createAppFn({
-            clientDistDir: runtimeWorkspace.clientDistDir,
-            packageJsonPath,
-          });
-
+          await scenarioObserver.measure('pool_close', () => closePool()).catch(() => {});
           try {
-            const result = await withServer(
+            await scenarioObserver.measure('schema_prepare', () => prepareDatabaseFn());
+            const { app } = await scenarioObserver.measure('application_create', () => createAppFn({
+              clientDistDir: runtimeWorkspace.clientDistDir,
+              packageJsonPath,
+            }));
+            const result = await scenarioObserver.measure('http_scenario', () => withServer(
               app,
-              async (baseUrl) => run({
+              async (baseUrl) => scenarioObserver.measure('scenario_work', () => run({
                 baseUrl,
                 client: createSessionHttpClient(baseUrl, {
                   requestTimeoutMs: config.httpRequestTimeoutMs,
@@ -178,23 +179,25 @@ export async function createIntegrationAppRuntime({
                 postgresSource: source,
                 backupsDir: join(scenarioWorkspaceDir, 'backups'),
                 workspaceDir: scenarioWorkspaceDir,
-              }),
+                phaseObserver: scenarioObserver,
+              })),
               {
                 closeTimeoutMs: config.suiteTeardownTimeoutMs,
                 listenTimeoutMs: config.poolConnectionTimeoutMs,
+                phaseObserver: scenarioObserver,
               },
-            );
+            ));
             scenarioFailed = false;
             return result;
           } finally {
-            await waitForScenarioShutdownDrain();
-            await closePool().catch(() => {});
+            await scenarioObserver.measure('shutdown_drain', () => waitForScenarioShutdownDrain());
+            await scenarioObserver.measure('pool_close', () => closePool()).catch(() => {});
             if (!config.keepArtifactsOnFailure || !scenarioFailed) {
-              await rm(scenarioWorkspaceDir, { force: true, recursive: true }).catch(() => {});
+              await scenarioObserver.measure('workspace_remove', () => rm(scenarioWorkspaceDir, { force: true, recursive: true })).catch(() => {});
             }
           }
         });
-      });
+      }, { phaseObserver: scenarioObserver });
     },
   };
 }
@@ -205,16 +208,18 @@ export async function withIntegrationApp({
   prepareDatabaseFn = prepareDatabase,
   run,
   withPostgresIntegrationRuntimeFn = withPostgresIntegrationRuntime,
+  phaseObserver = createIntegrationFixturePhaseObserver(),
 } = {}) {
   if (typeof run !== 'function') {
     throw new Error('run is required');
   }
 
-  const runtimeWorkspace = await createRuntimeWorkspace();
+  const runtimeWorkspace = await phaseObserver.measure('workspace_create', () => createRuntimeWorkspace());
 
   try {
     return await withPostgresIntegrationRuntimeFn({
       config,
+      phaseObserver,
       run: async ({ databaseConfig, databaseName, source }) => {
         await closePool().catch(() => {});
 
@@ -232,17 +237,15 @@ export async function withIntegrationApp({
           VAPID_PUBLIC_KEY: TEST_VAPID_PUBLIC_KEY,
         }, async () => {
           await closePool().catch(() => {});
-          await prepareDatabaseFn();
-
-          const { app } = createAppFn({
-            clientDistDir: runtimeWorkspace.clientDistDir,
-            packageJsonPath,
-          });
-
           try {
-            return await withServer(
+            await phaseObserver.measure('schema_prepare', () => prepareDatabaseFn());
+            const { app } = await phaseObserver.measure('application_create', () => createAppFn({
+              clientDistDir: runtimeWorkspace.clientDistDir,
+              packageJsonPath,
+            }));
+            return await phaseObserver.measure('http_scenario', () => withServer(
               app,
-              async (baseUrl) => run({
+              async (baseUrl) => phaseObserver.measure('scenario_work', () => run({
                 baseUrl,
                 client: createSessionHttpClient(baseUrl, {
                   requestTimeoutMs: config.httpRequestTimeoutMs,
@@ -253,21 +256,23 @@ export async function withIntegrationApp({
                 postgresSource: source,
                 backupsDir: join(runtimeWorkspace.workspaceDir, 'backups'),
                 workspaceDir: runtimeWorkspace.workspaceDir,
-              }),
+                phaseObserver,
+              })),
               {
                 closeTimeoutMs: config.suiteTeardownTimeoutMs,
                 listenTimeoutMs: config.poolConnectionTimeoutMs,
+                phaseObserver,
               },
-            );
+            ));
           } finally {
-            await waitForScenarioShutdownDrain();
-            await closePool().catch(() => {});
+            await phaseObserver.measure('shutdown_drain', () => waitForScenarioShutdownDrain());
+            await phaseObserver.measure('pool_close', () => closePool()).catch(() => {});
           }
         });
       },
     });
   } finally {
-    await closePool().catch(() => {});
-    await rm(runtimeWorkspace.workspaceDir, { force: true, recursive: true }).catch(() => {});
+    await phaseObserver.measure('pool_close', () => closePool()).catch(() => {});
+    await phaseObserver.measure('workspace_remove', () => rm(runtimeWorkspace.workspaceDir, { force: true, recursive: true })).catch(() => {});
   }
 }

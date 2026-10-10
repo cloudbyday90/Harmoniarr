@@ -30,7 +30,7 @@ async function scenario(t, run) {
   if (unavailableReason) { t.skip(unavailableReason); return; }
   await runtime.runIsolatedDatabase(async ({ getPoolFn }) => {
     await applyPendingMigrations({ getPoolFn });
-    await run(createImportExecutionHandoffFixtureContext({ getPoolFn }));
+    await run({ ...createImportExecutionHandoffFixtureContext({ getPoolFn }), fixtureSignal: t.signal });
   });
 }
 async function provider(t, { response = 'direct', version = '0.26.0' } = {}) {

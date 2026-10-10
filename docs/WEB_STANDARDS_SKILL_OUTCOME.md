@@ -421,3 +421,17 @@ serial scheduling and immediate capture before later reads. Both isolated contro
 and the original focused command passed after the root correction; actual
 PostgreSQL and full-gate evidence remain separate. The four installed skill files
 were structurally validated and synchronized again after this maintenance.
+
+## Fixture evidence maintenance, October 10, America/New_York
+
+The references now locate bounded early failure reporting, safe monotonic phase
+measurements, cooperative gate/worker cleanup and creation-owned database teardown.
+They distinguish failed drain verification, overlapping spans, native streams and
+event arrival from broader success or conformance claims. Application/helper and
+actual PostgreSQL evidence remain in the separate fixture-observability outcome;
+source/installed structural validation passed at final freeze, with all four
+maintained standards files matching by SHA256. Metadata and invocation policy
+remain unchanged; this is structure/identity evidence, not a new blind skill trial.
+The follow-up also maps pre-aborted startup, pre-launch registration and startup
+failure drainage to the observed scan adapter. Its adverse controls remain
+separate from the unclassified trigger of the original full-run timeout.

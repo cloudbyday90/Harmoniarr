@@ -24,7 +24,6 @@ import { createMaintenanceLockWriteGuardService } from '../../src/server/recover
 import { executeLibraryScan } from '../../src/server/library/library-scan-executor.js';
 import { createLibraryCatalogStore } from '../../src/server/library/library-catalog-store.js';
 import { createLibraryScanCatalogueService } from '../../src/server/library/library-scan-catalogue-service.js';
-import { createLibraryScanWorker } from '../../src/server/library/library-scan-worker.js';
 import { createLibraryTagSnapshotStore } from '../../src/server/library/library-tag-snapshot-store.js';
 import { createLibraryTagSnapshotService } from '../../src/server/library/library-tag-snapshot-service.js';
 import { captureTagSnapshotSource } from '../../src/server/library/library-tag-snapshot-policy.js';
@@ -34,6 +33,8 @@ import { createLibraryFileMatcherService } from '../../src/server/library/librar
 import { createLibraryOrganizeMutationStore } from '../../src/server/library/library-organize-mutation-store.js';
 import { captureOrganizeMutation } from '../../src/server/library/library-organize-mutation-policy.js';
 import { createMediaFilesystemService } from '../../src/server/media/media-filesystem-service.js';
+import { createFixtureGate, withFixtureLifecycle } from '../../testing/integration/fixture-lifecycle.js';
+import { startLibraryScanFixtureWorker } from '../../testing/integration/library-scan-worker-fixture.js';
 
 const config = resolveIntegrationTestRuntimeConfig();
 let runtime;
@@ -41,10 +42,10 @@ let unavailable;
 let reportedDatabaseVersion = false;
 const tags = (title = 'Foil') => ({ album: 'Amber', albumArtist: 'Autechre', artist: 'Autechre',
   musicBrainz: {}, title, track: { number: 1 }, artists: ['Autechre'] });
-function gate() {
-  let release;
-  const promise = new Promise((done) => { release = done; });
-  return { promise, release };
+function gate(c) {
+  const controlled = createFixtureGate({ signal: c.scope.signal });
+  c.scope.onRelease(() => controlled.release());
+  return controlled;
 }
 async function walk(root) {
   const files = [];
@@ -99,9 +100,11 @@ async function scenario(t, callback, { scoped = false, twoFiles = false, nullTag
         withTransaction, assertMaintenanceWriteAllowed });
       const createOwner = (writeLibraryFileMatchBatch = rawMatches.writeLibraryFileMatchBatch) => createLibraryFileMatchService({
         writeLibraryFileMatchBatch, withTransaction, assertMaintenanceWriteAllowed });
-      await callback({ getPoolFn, pool, requestedRoot, rootPath, path, seed, metadataA, metadataB, rawTags, rawMatches,
+      await withFixtureLifecycle({ signal: t.signal }, (scope) => callback({
+        getPoolFn, pool, requestedRoot, rootPath, path, seed, metadataA, metadataB, rawTags, rawMatches,
         releaseHints, a, b, run, maintenance, catalog, makeRuns, withTransaction, scanCatalogue, tagOwner,
-        createOwner, owner: createOwner() });
+        createOwner, owner: createOwner(), scope,
+      }));
     } finally {
       const cleanupPath = resolve(requestedRoot); const delta = relative(resolve(tmpdir()), cleanupPath);
       assert.ok(delta && !delta.startsWith('..') && !isAbsolute(delta)
@@ -111,11 +114,11 @@ async function scenario(t, callback, { scoped = false, twoFiles = false, nullTag
   });
 }
 async function start(c, runs, hooks = {}) {
-  const released = gate(); const reconciliations = []; let capturedLease; let sidecarCount = 0;
+  const reconciliations = []; let capturedLease; let sidecarCount = 0;
   const matcher = createLibraryFileMatcherService({ getPoolFn: () => ({ query: async (...args) => {
     const result = await c.pool.query(...args); await hooks.afterLookup?.(result); return result;
   } }), writeOwnedLibraryFileMatchBatch: (hooks.owner ?? c.owner).writeOwnedLibraryFileMatchBatch });
-  const worker = createLibraryScanWorker({ ...runs,
+  const callbacks = { ...runs,
     acquireLease: async (input) => { capturedLease = await runs.acquireLease(input); return capturedLease; },
     recordLibraryScanCatalogue: c.scanCatalogue.recordLibraryScanCatalogue,
     ...(hooks.extract ? { extractLibraryFileTags: async (input) => {
@@ -129,10 +132,10 @@ async function start(c, runs, hooks = {}) {
     reconcileLibraryReleases: async () => { reconciliations.push('releases'); },
     reconcileWantedReleases: async () => { reconciliations.push('wanted'); },
     reconcileDiscoveryRequests: async () => { reconciliations.push('discovery'); },
-    releaseLease: async (input) => { try { return await runs.releaseLease(input); } finally { released.release(); } },
-  });
-  await worker.startWorkerRun({ runId: c.run.id, libraryRoot: c.requestedRoot, releaseHints: c.releaseHints });
-  return { done: released.promise, reconciliations, lease: () => capturedLease, sidecars: () => sidecarCount };
+  };
+  const job = await startLibraryScanFixtureWorker({ callbacks, signal: c.scope.signal, track: (operation) => c.scope.track(operation),
+    run: { runId: c.run.id, libraryRoot: c.requestedRoot, releaseHints: c.releaseHints } });
+  return { ...job, reconciliations, lease: () => capturedLease, sidecars: () => sidecarCount };
 }
 async function waitForBlock(c, holderPid) {
   for (let count = 0; count < 100; count += 1) {
@@ -154,9 +157,9 @@ suite('Captured source, tags and scan acquisition own file-match persistence', (
   after(async () => { await runtime?.cleanup(); }, { timeout: config.suiteTeardownTimeoutMs });
 
   test('a lookup held across same-owner acquisition replacement cannot overwrite the newer real match or reconcile', { timeout: config.scenarioTimeoutMs }, async (t) => scenario(t, async (c) => {
-    const entered = gate(); const resume = gate();
+    const entered = gate(c); const resume = gate(c);
     const first = await start(c, c.a, { afterLookup: async () => { entered.release(); await resume.promise; } });
-    await entered.promise;
+    await first.waitForReady(entered.promise);
     await writeFile(c.path, 'New replacement source with a changed length and modified timestamp.');
     await expire(c); const replacement = await start(c, c.b, { extract: true, title: 'Montreal' }); await replacement.done;
     assert.equal(first.lease().ownerInstanceId, replacement.lease().ownerInstanceId);
@@ -171,9 +174,9 @@ suite('Captured source, tags and scan acquisition own file-match persistence', (
 
   test('source, tag and relevant scope drift after actual metadata lookup refuse old proposals', { timeout: config.scenarioTimeoutMs }, async (t) => {
     for (const drift of ['path', 'root', 'root_path', 'size', 'mtime', 'ignored', 'deleted', 'tags', 'scope', 'requested']) await scenario(t, async (c) => {
-      const entered = gate(); const resume = gate(); const file = c.seed.files[0];
+      const entered = gate(c); const resume = gate(c); const file = c.seed.files[0];
       const job = await start(c, c.a, { afterLookup: async () => { entered.release(); await resume.promise; } });
-      await entered.promise;
+      await job.waitForReady(entered.promise);
       if (drift === 'path') await c.pool.query('UPDATE library_files SET canonical_path=$2 WHERE id=$1', [file.id, join(c.rootPath, 'changed.flac')]);
       if (drift === 'root') {
         const root = (await c.pool.query("INSERT INTO library_roots(name,path,canonical_path) VALUES('Other',$1,$1) RETURNING id", [join(c.rootPath, 'other')])).rows[0].id;
@@ -196,9 +199,9 @@ suite('Captured source, tags and scan acquisition own file-match persistence', (
 
   test('current cancellation and maintenance after lookup stop the batch and later reconciliation', { timeout: config.scenarioTimeoutMs }, async (t) => {
     for (const reason of ['cancel', 'maintenance']) await scenario(t, async (c) => {
-      const entered = gate(); const resume = gate();
+      const entered = gate(c); const resume = gate(c);
       const job = await start(c, c.a, { afterLookup: async () => { entered.release(); await resume.promise; } });
-      await entered.promise; const initial = await snapshot(c);
+      await job.waitForReady(entered.promise); const initial = await snapshot(c);
       if (reason === 'cancel') await createOperationRunControlService({ getPoolFn: c.getPoolFn })
         .requestOperationRunCancellation({ runId: c.run.id, requestedByUserId: null });
       else await c.maintenance.acquireMaintenanceLock({ lockType: 'maintenance', reason: 'Controlled matching pause' });
@@ -210,9 +213,9 @@ suite('Captured source, tags and scan acquisition own file-match persistence', (
 
   test('expiry across real root and file lock waits leaves every match unchanged', { timeout: config.scenarioTimeoutMs }, async (t) => {
     for (const lock of ['root', 'file']) await scenario(t, async (c) => {
-      const entered = gate(); const resume = gate();
+      const entered = gate(c); const resume = gate(c);
       const job = await start(c, c.a, { afterLookup: async () => { entered.release(); await resume.promise; } });
-      await entered.promise; const initial = await snapshot(c); const holder = await c.pool.connect();
+      await job.waitForReady(entered.promise); const initial = await snapshot(c); const holder = await c.pool.connect();
       try {
         await holder.query('BEGIN');
         await holder.query(lock === 'root' ? 'SELECT id FROM library_roots WHERE id=$1 FOR UPDATE'
@@ -251,10 +254,12 @@ suite('Captured source, tags and scan acquisition own file-match persistence', (
   });
 
   test('current nullable tags match as missing while JSON null and an empty object cannot be adopted as the old SQL null', { timeout: config.scenarioTimeoutMs }, async (t) => {
-    for (const change of ['none', 'json_null', 'object']) await scenario(t, async (c) => {
-      const entered = gate(); const resume = gate();
+    for (const change of ['none', 'json_null', 'object']) {
+      t.diagnostic(`Controlled nullable-tag variant: ${change}`);
+      await scenario(t, async (c) => {
+      const entered = gate(c); const resume = gate(c);
       const job = await start(c, c.a, { afterLookup: async () => { entered.release(); await resume.promise; } });
-      await entered.promise;
+      await job.waitForReady(entered.promise);
       if (change !== 'none') await c.pool.query('UPDATE library_files SET tag_payload=$2::jsonb WHERE id=$1', [c.seed.files[0].id, change === 'json_null' ? 'null' : '{}']);
       const initial = await snapshot(c); resume.release(); await job.done;
       if (change === 'none') {
@@ -264,7 +269,8 @@ suite('Captured source, tags and scan acquisition own file-match persistence', (
         assert.deepEqual(await snapshot(c), initial); assert.deepEqual(job.reconciliations, []);
         assert.notEqual((await parent(c)).status, 'completed');
       }
-    }, { nullTags: true });
+      }, { nullTags: true });
+    }
   });
 
   test('equivalent JSON key order, unrelated hints and post-extraction presentation stamps preserve current matches', { timeout: config.scenarioTimeoutMs }, async (t) => {
@@ -287,7 +293,7 @@ suite('Captured source, tags and scan acquisition own file-match persistence', (
 
   test('match persistence serializes with current catalogue, tag and organize root-first writers without deadlock', { timeout: config.scenarioTimeoutMs }, async (t) => {
     for (const other of ['catalogue', 'tag', 'organize']) await scenario(t, async (c) => {
-      const entered = gate(); const resume = gate(); let matchPid;
+      const entered = gate(c); const resume = gate(c); let matchPid;
       const owner = c.createOwner(async (input) => {
         matchPid = (await input.queryable.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
         const queryable = { query: async (sql, values) => {
@@ -312,11 +318,12 @@ suite('Captured source, tags and scan acquisition own file-match persistence', (
       await tagRuns.markRunStarted({ runId: tagRun.id, expectedLease: tagLease });
       const tagPrepared = captureTagSnapshotSource({ runId: tagRun.id, expectedLease: tagLease,
         requestedLibraryRoot: c.requestedRoot, libraryRootPath: c.rootPath, libraryRootId: c.seed.libraryRootId, file: c.seed.files[0] });
-      const job = await start(c, c.a, { owner }); await entered.promise;
+      const job = await start(c, c.a, { owner }); await job.waitForReady(entered.promise);
       const contender = other === 'catalogue' ? c.catalog.recordLibraryFiles({ libraryRootPath: c.rootPath, files: c.seed.files })
         : other === 'tag' ? c.tagOwner.writeOwnedLibraryFileTagSnapshot({ prepared: tagPrepared,
           payload: { status: 'extracted', extractor: 'coexisting-control', normalizedTags: tags() } })
           : c.withTransaction((queryable) => createLibraryOrganizeMutationStore().lockContext({ prepared, queryable }));
+      c.scope.track(contender);
       try { await waitForBlock(c, matchPid); } finally { resume.release(); }
       await contender; await job.done;
       assert.equal((await snapshot(c)).matches[0].match_status, 'matched'); assert.equal((await parent(c)).status, 'completed');

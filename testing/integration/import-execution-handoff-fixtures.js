@@ -17,6 +17,7 @@ import { captureRecoveryObservation } from '../../src/server/import-candidates/m
 import { initializeImportExecutionRunItems, upsertImportExecutionRunItem, listImportExecutionRunItems,
   updateImportExecutionRunItem } from '../../src/server/import-candidates/import-candidate-execution-repository.js';
 import { seedImportCandidateFixture } from './import-candidate-fixtures.js';
+import { createFixtureWorkerObserver, withFixtureLifecycle } from './fixture-lifecycle.js';
 
 export function createImportExecutionHandoffFixtureContext({ getPoolFn }) {
   const store = createImportExecutionHandoffStore({ getPoolFn });
@@ -43,10 +44,12 @@ export async function seedImportExecutionHandoffFixture(context, { files = 1 } =
     requestedFiles: candidate.files.map((file) => ({ filename: file.rawPayload.filename, size: file.sizeBytes })) };
 }
 
-export async function runImportExecutionHandoffFixtureWorker(context, fixture, overrides = {}) {
-  let finish;
-  const done = new Promise((resolve) => { finish = resolve; });
-  const worker = createImportCandidateExecutionWorker({ ...context.runs, ...context.handoff, ...context.preparation,
+export async function runImportExecutionHandoffFixtureWorker(context, fixture, overrides = {}, {
+  createWorkerFn = createImportCandidateExecutionWorker,
+  signal = context.fixtureSignal,
+} = {}) {
+  return withFixtureLifecycle({ signal }, async (scope) => {
+  const callbacks = { ...context.runs, ...context.handoff, ...context.preparation,
     getImportCandidate: ({ importCandidateId }) => context.store.getCandidate(importCandidateId),
     buildSelectedImportCandidateSummary: async () => ({ selectedCandidates: [{ ...(await context.store.getCandidate(fixture.importCandidateId)),
       executionStatus: { code: 'ready', message: 'Controlled valid planning' } }], counts: { totalSelected: 1, ready: 1 } }),
@@ -54,8 +57,14 @@ export async function runImportExecutionHandoffFixtureWorker(context, fixture, o
     initializeImportExecutionRunItems: (id, items) => initializeImportExecutionRunItems(id, items, context.pool),
     upsertImportExecutionRunItem: (input) => upsertImportExecutionRunItem(input, context.pool),
     updateImportExecutionRunItem: (input) => updateImportExecutionRunItem(input, context.pool),
-    releaseLease: async (input) => { await context.runs.releaseLease(input); finish(); }, ...overrides,
+    ...overrides,
+  };
+  const observer = createFixtureWorkerObserver({ callbacks });
+  const worker = createWorkerFn({ ...callbacks, ...observer.callbacks,
+    isCancellationRequested: async (input) => scope.signal.aborted || await callbacks.isCancellationRequested?.(input) || false,
   });
+  scope.track(observer.finished);
   await worker.startWorkerRun({ runId: fixture.operationRunId, requestedCandidateCount: 1, selectedCandidateId: fixture.importCandidateId });
-  await done;
+  await observer.finished;
+  });
 }

@@ -6,7 +6,42 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
-## Current development slice: Current-owned wanted replacement (2026-10-10)
+## Current development slice: Fixture observability and lifecycle (2026-10-10)
+
+- Pair native serial output with approved early failure locations/categories;
+  expose optional monotonic setup/schema/fixture/work/cleanup measurements.
+  See [design](TEST_FIXTURE_OBSERVABILITY_DESIGN.md),
+  [outcome](TEST_FIXTURE_OBSERVABILITY_OUTCOME.md) and
+  [research](TEST_FIXTURE_OBSERVABILITY_RESEARCH_2026_10.md).
+- Race readiness with operation settlement, preserve original error identity,
+  release/drain registered cooperative work on cancellation and cleanup failure,
+  and observe worker adapter rejection without hanging completion. Preserve
+  serial isolation and all deadlines/assertions.
+- A later file-match timeout exposed an older bare readiness/release helper.
+  Extract its observed worker adapter and adopt registered scenario gates/drains;
+  bounded controls prove the helper correction separately from that timeout's
+  still-unclassified trigger.
+- Database teardown requires acknowledged creation; backend-drain evidence must
+  establish a readable zero count. Schema preparation is inside app teardown;
+  HTTP teardown closes owned active sockets and preserves scenario errors.
+- Completed staged validation passes 9,724 tests: 4,484 server, 4,377 client,
+  525 script and all 338 serial integration cases, zero failures/cancellations/skips;
+  static/lint/policy checks, both builds and security checks pass. The initial
+  full-command push failures and superseded timeout/media-skip attempt remain
+  separate evidence; their triggers are not retroactively attributed to the
+  reproduced fixture corrections. Focused controls and real PostgreSQL groups
+  are recorded in the outcome. Fresh PR applicability is separate:
+  [design](OPEN_PR_APPLICABILITY_TEST_FIXTURES_2026_10_DESIGN.md) and
+  [outcome](OPEN_PR_APPLICABILITY_TEST_FIXTURES_2026_10_OUTCOME.md).
+- Next: prove an opt-in pristine template for Wanted in the existing per-file
+  runtime, with fresh scenario clones, unchanged cases, sibling/cleanup/refusal
+  controls and dedicated untemplated migration/bootstrap/recovery proof. Measure
+  clone cost before designing a parent-owned PostgreSQL launcher across files.
+  Legacy unregistered work and unbounded pool cleanup remain separate
+  resource-owner limits. Discovery-request recomputation remains the next product
+  boundary. Work stays on main without release, branch, tag, deployment or PR merge.
+
+## Prior development slice: Current-owned wanted replacement (2026-10-10)
 
 - Capture genuine scan/discovery/metadata worker context, preserving direct rebuild
   and authorized raw restore contracts. Compute complete current desired-state

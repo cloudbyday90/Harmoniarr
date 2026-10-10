@@ -1,3 +1,10 @@
+/*
+ * Harmoniarr - Soulseek-native music library management
+ * Copyright (C) 2026 Harmoniarr Contributors
+ * This program is free software: licensed under GPL-3.0-or-later.
+ * See LICENSE for details.
+ */
+
 import express from 'express';
 
 function defaultJsonErrorHandler(error, _request, response, _next) {
@@ -43,20 +50,28 @@ function withTimeout(createPromise, timeoutMs, label) {
 export async function withServer(app, callback, {
   closeTimeoutMs = 10_000,
   listenTimeoutMs = 10_000,
+  phaseObserver = null,
 } = {}) {
-  const server = await withTimeout(
+  const measure = (phase, run) => phaseObserver ? phaseObserver.measure(phase, run) : run();
+  const server = await measure('server_start', () => withTimeout(
     () => new Promise((resolve) => {
       const activeServer = app.listen(0, '127.0.0.1', () => resolve(activeServer));
     }),
     listenTimeoutMs,
     'HTTP test server startup',
-  );
+  ));
 
+  let scenarioFailed = false;
+  let result; let failure;
   try {
     const address = server.address();
-    return await callback(`http://127.0.0.1:${address.port}`);
-  } finally {
-    await withTimeout(
+    result = await callback(`http://127.0.0.1:${address.port}`);
+  } catch (error) {
+    scenarioFailed = true;
+    failure = error;
+  }
+  try {
+    await measure('server_close', () => withTimeout(
       () => new Promise((resolve, reject) => {
         server.close((error) => {
           if (error) {
@@ -66,9 +81,14 @@ export async function withServer(app, callback, {
 
           resolve();
         });
+        server.closeAllConnections?.();
       }),
       closeTimeoutMs,
       'HTTP test server shutdown',
-    );
+    ));
+  } catch (error) {
+    if (!scenarioFailed) { scenarioFailed = true; failure = error; }
   }
+  if (scenarioFailed) throw failure;
+  return result;
 }

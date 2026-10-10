@@ -212,3 +212,14 @@ Extend references with delayed nonreentrant controls across outer artists, polic
 reads and actual nested metadata queries. Serial reads must retain immediate
 source capture before the next await. No entry-point or invocation-policy change
 is needed; structural maintenance is separate from driver/runtime evidence.
+
+## Fixture evidence maintenance, October 10, America/New_York
+
+Map prompt approved failure locations, monotonic safe phase records, first-error
+preservation and cooperative release/drain to the new testing modules. Retain
+native-output/event-arrival limits, failed verification and creation-owned
+destructive cleanup. Keep timing totals separate from whole-gate duration and
+testing evidence separate from W3C frontend conformance. Preserve entry point,
+metadata and invocation policy; validate/sync maintained references after edits.
+Map scan-fixture startup to pre-abort refusal, completion registration before
+launch and settled startup failure, so late callbacks cannot invent unowned work.

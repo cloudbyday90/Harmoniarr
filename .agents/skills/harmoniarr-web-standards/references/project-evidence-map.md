@@ -88,3 +88,15 @@ according to its driver contract. Use a delayed nonreentrant client double with
 multiple artists and the actual narrow metadata composition to catch overlapping
 queries that ordinary async mocks hide. Keep capture immediately after each
 read before awaiting the next input; pool-level concurrency is a different owner.
+
+Fixture diagnostics map to `testing/reporters/early-failure-format.js` and the
+streaming adapter beside it; timing maps to
+`testing/integration/fixture-phase-observer.js`. Controlled readiness, cancellation,
+release and drain map to `fixture-lifecycle.js`; verified backend cleanup maps to
+`postgres-backend-drain.js` and the temporary-database helper's creation guard.
+The observed scan adapter is `testing/integration/library-scan-worker-fixture.js`;
+register completion before launch and reject pre-aborted or refused registration
+without starting detached work. Startup failure must settle the registered drain.
+Use native held-case reporter proof, error/privacy canaries, deterministic clocks,
+release/drain failure controls and real isolated PostgreSQL ownership beside
+structure checks. The separate fixture-observability outcome owns executed claims.

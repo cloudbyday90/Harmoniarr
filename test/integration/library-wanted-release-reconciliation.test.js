@@ -34,16 +34,14 @@ import { createLibraryScanWorker } from '../../src/server/library/library-scan-w
 import { createLibraryDiscoveryWorker } from '../../src/server/library/library-discovery-worker.js';
 import { createMetadataArtistRefreshWorker } from '../../src/server/metadata/metadata-artist-refresh-worker.js';
 import { createMetadataRefreshService } from '../../src/server/metadata/metadata-refresh-service.js';
+import { createFixtureGate, createFixtureWorkerObserver, waitForFixtureReady, withFixtureLifecycle }
+  from '../../testing/integration/fixture-lifecycle.js';
 
 const config = resolveIntegrationTestRuntimeConfig();
 let runtime;
 let unavailable;
 let reportedVersion = false;
-function gate() {
-  let release;
-  const promise = new Promise((done) => { release = done; });
-  return { promise, release };
-}
+const gate = createFixtureGate;
 const rows = async (c) => (await c.pool.query('SELECT * FROM library_wanted_releases ORDER BY app_user_id,metadata_release_id')).rows;
 const links = async (c) => (await c.pool.query('SELECT * FROM library_discovery_request_wanted_release_links ORDER BY discovery_request_id,wanted_release_id')).rows;
 const state = async (c) => ({ wanted: await rows(c), links: await links(c) });
@@ -73,8 +71,9 @@ async function waitForBlock(c, holderPid) {
 }
 async function scenario(t, callback) {
   if (unavailable) { t.skip(unavailable); return; }
-  await runtime.runIsolatedDatabase(async ({ getPoolFn }) => {
-    await applyPendingMigrations({ getPoolFn });
+  await runtime.runIsolatedDatabase(async ({ getPoolFn, phaseObserver }) => {
+    await phaseObserver.measure('schema_prepare', () => applyPendingMigrations({ getPoolFn }));
+    const context = await phaseObserver.measure('fixture_seed', async () => {
     const pool = getPoolFn();
     if (!reportedVersion) { t.diagnostic((await pool.query('SELECT version() AS version')).rows[0].version); reportedVersion = true; }
     const metadata = await seedMetadataReleaseFixture({ queryable: pool });
@@ -131,22 +130,27 @@ async function scenario(t, callback) {
       assert.equal(await runs.markRunStarted({ runId: run.id, expectedLease: lease, summary }), true);
       return { runs, run, lease, input: { workerContext: { operationType, runId: run.id, expectedLease: lease } } };
     };
-    await callback({ pool, getPoolFn, metadata, stale, users, monitoring, monitor, raw, discoveryStore, reader,
-      withTransaction, maintenance, assertMaintenanceWriteAllowed, makeRuns, makeService, open });
+    return { pool, getPoolFn, metadata, stale, users, monitoring, monitor, raw, discoveryStore, reader,
+      withTransaction, maintenance, assertMaintenanceWriteAllowed, makeRuns, makeService, open, signal: t.signal };
+    });
+    await phaseObserver.measure('scenario_work', () => callback(context));
   });
 }
-async function scanWorker(c, runs, run, reconcile) {
-  const done = gate(); let lease; const later = [];
+async function scanWorker(c, runs, run, reconcile, signal = c.signal) {
+  let lease; const later = [];
   const root = resolve('.tmp', 'wanted-projection-controlled-root');
-  const worker = createLibraryScanWorker({ ...runs,
+  const callbacks = { ...runs,
     acquireLease: async (input) => { lease = await runs.acquireLease(input); return lease; },
     executeScan: async () => ({ libraryRoot: root, filesSeen: 0 }),
     recordLibraryScanCatalogue: async () => ({ files: [], libraryRootId: randomUUID(), observedFileCount: 0 }),
     reconcileWantedReleases: reconcile, reconcileDiscoveryRequests: async () => later.push('discovery'),
-    releaseLease: async (input) => { try { return await runs.releaseLease(input); } finally { done.release(); } },
+  };
+  const observer = createFixtureWorkerObserver({ callbacks });
+  const worker = createLibraryScanWorker({ ...callbacks, ...observer.callbacks,
+    isCancellationRequested: async (input) => signal?.aborted || await runs.isCancellationRequested(input),
   });
   await worker.startWorkerRun({ runId: run.id, libraryRoot: root });
-  return { done: done.promise, lease: () => lease, later };
+  return { done: observer.finished, lease: () => lease, later };
 }
 
 suite('Current operator inputs own wanted rows and discovery links', () => {
@@ -160,26 +164,29 @@ suite('Current operator inputs own wanted rows and discovery links', () => {
   after(async () => { await runtime?.cleanup(); }, { timeout: config.suiteTeardownTimeoutMs });
 
   test('a delayed old scan cannot clear or overwrite the replacement owner publication', { timeout: config.scenarioTimeoutMs }, async (t) => {
-    for (const empty of [false, true]) await scenario(t, async (c) => {
+    for (const empty of [false, true]) await scenario(t, async (c) => withFixtureLifecycle({ signal: c.signal }, async (scope) => {
       const runs = c.makeRuns(); const run = await runs.createOperationRun({ status: 'pending', summary: {} });
       if (empty) await c.pool.query('UPDATE operator_artist_monitoring SET is_monitored=FALSE');
-      const entered = gate(); const resume = gate(); const owner = c.makeService();
+      const entered = gate({ signal: scope.signal }); const resume = gate({ signal: scope.signal }); const owner = c.makeService();
+      scope.onRelease(() => resume.release());
       const old = await scanWorker(c, runs, run, async (input) => {
         const diagnostic = await c.reader.readWantedReleaseProjection({ queryable: c.pool });
         assert.equal(diagnostic.wantedReleases.length === 0, empty);
         entered.release(); await resume.promise;
         return owner.reconcileWantedReleases(input);
-      });
-      await entered.promise; await expire(c, old.lease());
+      }, scope.signal);
+      scope.track(old.done);
+      await waitForFixtureReady({ ready: entered.promise, operation: old.done, signal: scope.signal }); await expire(c, old.lease());
       await c.pool.query("UPDATE operator_artist_monitoring SET is_monitored=TRUE,acquisition_profile_key='lossless_archive'");
-      const replacement = await scanWorker(c, c.makeRuns(), run, c.makeService().reconcileWantedReleases); await replacement.done;
+      const replacement = await scanWorker(c, c.makeRuns(), run, c.makeService().reconcileWantedReleases, scope.signal);
+      scope.track(replacement.done); await replacement.done;
       const published = await state(c); const completed = await parent(c, run.id);
       assert.equal(published.wanted.length, 2); assert.equal(completed.status, 'completed');
       assert.notEqual(old.lease().acquisitionId, replacement.lease().acquisitionId);
       resume.release(); await old.done;
       assert.deepEqual(await state(c), published); assert.deepEqual(await parent(c, run.id), completed);
       assert.deepEqual(owner.mutations, []); assert.deepEqual(old.later, []);
-    });
+    }));
   });
 
   test('direct projection uses one connection, keeps disabled recipients, stable IDs and saved link evidence', { timeout: config.scenarioTimeoutMs }, async (t) => scenario(t, async (c) => {
@@ -208,11 +215,14 @@ suite('Current operator inputs own wanted rows and discovery links', () => {
   }));
 
   test('policy, selections, overrides, availability, metadata and recipient phantoms refuse a stale input frame', { timeout: config.scenarioTimeoutMs }, async (t) => {
-    for (const change of ['monitoring', 'profile', 'selection', 'override', 'availability', 'metadata', 'new_monitor', 'new_artist', 'artist_delete', 'user_delete']) await scenario(t, async (c) => {
-      const active = await c.open(); const entered = gate(); const resume = gate();
+    for (const change of ['monitoring', 'profile', 'selection', 'override', 'availability', 'metadata', 'new_monitor', 'new_artist', 'artist_delete', 'user_delete']) await scenario(t, async (c) => withFixtureLifecycle({ signal: c.signal }, async (scope) => {
+      const active = await c.open(); const entered = gate({ signal: scope.signal }); const resume = gate({ signal: scope.signal });
+      scope.onRelease(() => resume.release());
       const owner = c.makeService({ afterRead: async ({ index }) => { if (index === 1) { entered.release(); await resume.promise; } } });
       const pending = owner.reconcileWantedReleases(active.input);
-      await Promise.race([entered.promise, pending.then(() => assert.fail('The controlled read must precede publication'))]);
+      // The explicit rejection assertion below owns this expected failure.
+      scope.track(pending.catch(() => {}));
+      await waitForFixtureReady({ ready: entered.promise, operation: pending, signal: scope.signal });
       t.diagnostic(`Observed initial ${change} decision frame before the competing writer`);
       let current; let mutationError;
       try {
@@ -242,7 +252,7 @@ suite('Current operator inputs own wanted rows and discovery links', () => {
       await assert.rejects(pending, (error) => error.code === 'library_wanted_projection_stale');
       assert.deepEqual(await state(c), current); assert.deepEqual(owner.mutations, []);
       await active.runs.releaseLease({ runId: active.run.id, expectedLease: active.lease, status: 'failed' });
-    });
+    }));
   });
 
   test('discovery and metadata workers forward original authority while direct refresh and explicit selection remain valid', { timeout: config.scenarioTimeoutMs }, async (t) => scenario(t, async (c) => {
@@ -307,8 +317,9 @@ suite('Current operator inputs own wanted rows and discovery links', () => {
   });
 
   test('raw wanted and discovery parent publishers serialize before mutations and retain exact shared links', { timeout: config.scenarioTimeoutMs }, async (t) => {
-    for (const first of ['wanted', 'discovery']) await scenario(t, async (c) => {
-      const entered = gate(); const resume = gate(); let holder; let paused = false; const secondMutations = [];
+    for (const first of ['wanted', 'discovery']) await scenario(t, async (c) => withFixtureLifecycle({ signal: c.signal }, async (scope) => {
+      const entered = gate({ signal: scope.signal }); const resume = gate({ signal: scope.signal }); let holder; let paused = false; const secondMutations = [];
+      scope.onRelease(() => resume.release());
       const wrappedPool = { connect: async () => {
         const client = await c.pool.connect(); return { release: () => client.release(), query: async (sql, values) => {
           const result = await client.query(sql, values);
@@ -323,7 +334,8 @@ suite('Current operator inputs own wanted rows and discovery links', () => {
       const firstPromise = first === 'wanted'
         ? createLibraryWantedReleaseStore({ getPoolFn: () => wrappedPool }).replaceLibraryWantedReleases({ wantedReleases: desired })
         : createLibraryDiscoveryRequestStore({ getPoolFn: () => wrappedPool }).replaceLibraryDiscoveryRequests({ discoveryRequests: [discovery(c.metadata)] });
-      await entered.promise;
+      scope.track(firstPromise);
+      await waitForFixtureReady({ ready: entered.promise, operation: firstPromise, signal: scope.signal });
       const secondPool = { connect: async () => {
         const client = await c.pool.connect(); return { release: () => client.release(), query: async (sql, values) => {
           if (/DELETE FROM library_(wanted_releases|discovery_requests)/u.test(sql)) secondMutations.push('delete');
@@ -333,12 +345,13 @@ suite('Current operator inputs own wanted rows and discovery links', () => {
       const secondPromise = first === 'wanted'
         ? createLibraryDiscoveryRequestStore({ getPoolFn: () => secondPool }).replaceLibraryDiscoveryRequests({ discoveryRequests: [discovery(c.metadata)] })
         : createLibraryWantedReleaseStore({ getPoolFn: () => secondPool }).replaceLibraryWantedReleases({ wantedReleases: desired });
+      scope.track(secondPromise);
       await waitForBlock(c, holder); assert.deepEqual(secondMutations, []);
       resume.release(); await Promise.all([firstPromise, secondPromise]);
       const current = await state(c); assert.equal(current.wanted.length, 2); assert.equal(current.links.length, 2);
       assert.equal((await c.pool.query('SELECT * FROM library_discovery_requests')).rowCount, 1);
       assert.deepEqual(new Set(current.links.map((link) => link.wanted_release_id)), new Set(current.wanted.map((row) => row.id)));
-    });
+    }));
   });
 
   test('DELETE, second bulk row, link sync, incomplete return and final source or lease faults roll the entire publication back', { timeout: config.scenarioTimeoutMs }, async (t) => {
@@ -432,4 +445,33 @@ suite('Current operator inputs own wanted rows and discovery links', () => {
       assert.deepEqual(results.at(-1).deletedWantedKeys, []);
     } finally { await c.maintenance.releaseMaintenanceLock({ lockId: lock.id }); }
   }));
+
+  test('fixture readiness failures and cancellation drain the actual wanted transaction before teardown and preserve the primary error', { timeout: config.scenarioTimeoutMs }, async (t) => {
+    for (const mode of ['failure_before_ready', 'cancel_while_held']) await scenario(t, async (c) => {
+      const previous = await state(c); const primary = new Error(`Controlled ${mode}`);
+      const controller = new AbortController(); const entered = gate(); const order = [];
+      const operation = withFixtureLifecycle({ signal: AbortSignal.any([c.signal, controller.signal]) }, async (scope) => {
+        const resume = gate({ signal: scope.signal });
+        scope.onRelease(() => { order.push('release'); resume.release(); throw new Error('Controlled secondary cleanup failure'); });
+        const owner = c.makeService({ afterRead: async ({ index }) => {
+          if (index !== 1) return;
+          if (mode === 'failure_before_ready') throw primary;
+          entered.release(); await resume.promise;
+        } });
+        const pending = scope.track(owner.reconcileWantedReleases());
+        pending.then(() => order.push('transaction settled'), () => order.push('transaction settled'));
+        await waitForFixtureReady({ ready: entered.promise, operation: pending, signal: scope.signal });
+        await pending;
+      });
+      operation.catch(() => {});
+      if (mode === 'cancel_while_held') {
+        await waitForFixtureReady({ ready: entered.promise, operation }); controller.abort(primary);
+      }
+      await assert.rejects(operation, (error) => error === primary);
+      assert.equal(order.includes('release'), true); assert.equal(order.includes('transaction settled'), true);
+      assert.deepEqual(await state(c), previous);
+      assert.equal((await c.pool.query(`SELECT count(*)::integer AS count FROM pg_stat_activity
+        WHERE datname=current_database() AND state='idle in transaction'`)).rows[0].count, 0);
+    });
+  });
 });

@@ -327,3 +327,24 @@ source capture immediately after each read; do not infer that Promise.all is saf
 for a transaction client merely because it is suitable for independent pool work.
 These are observed application/driver controls, not a fresh official-source lookup
 or proof of every database caller's scheduling behavior.
+
+## Fixture evidence maintenance, October 10, America/New_York
+
+The fresh `docs/TEST_FIXTURE_OBSERVABILITY_RESEARCH_2026_10.md` ledger owns
+Node/pg/Testcontainers/W3C/OWASP consultation. Emit bounded approved diagnostics
+on runner failure events, preserving failure exits; do not dump arbitrary error
+messages, causes, expected/actual data or environment values. Native output is a
+separate stream, and event arrival is not proof of throw-time flushing.
+
+Measure setup, schema, fixture, work and cleanup through monotonic phase evidence.
+Do not label unreadable counts or timed-out drains successful. Cancellation is a
+request: release cooperative dependencies and drain actual tracked work before
+reusing resources. Preserve the first cause when cleanup also fails. Parent/child
+spans overlap, so their sums are not gate wall time. Acknowledged creation owns
+database teardown; failed creation cannot authorize deleting an existing database.
+Check pre-aborted startup and establish completion ownership before launching
+detached work. A refused late registration must not launch a worker, and startup
+failure must settle its already-registered completion. The scan-fixture controls
+map these local ownership rules separately from the original timeout's trigger.
+These are testing/evidence boundaries, not frontend conformance or universal
+I/O cancellation claims.

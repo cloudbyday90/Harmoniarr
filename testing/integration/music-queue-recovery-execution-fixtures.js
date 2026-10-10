@@ -18,6 +18,7 @@ import { createImportExecutionPreProviderStore } from '../../src/server/import-c
 import { createImportCandidateRecoveryService } from '../../src/server/import-candidates/import-candidate-recovery-service.js';
 import { listImportExecutionRunItems, initializeImportExecutionRunItems, updateImportExecutionRunItem,
   upsertImportExecutionRunItem, recordImportExecutionAcceptedObservation } from '../../src/server/import-candidates/import-candidate-execution-repository.js';
+import { createFixtureWorkerObserver, withFixtureLifecycle } from './fixture-lifecycle.js';
 
 export function createRecoveryExecutionOwners(context) {
   const policy = createMusicQueueRecoveryExecutionPolicyService({ store: context.store, assertMaintenanceWriteAllowed: context.assertMaintenanceWriteAllowed });
@@ -27,11 +28,12 @@ export function createRecoveryExecutionOwners(context) {
     getImportCandidate: ({ importCandidateId }) => context.store.getCandidate(importCandidateId) });
   return { policy, lifecycle, observation, recovery };
 }
-export async function runMusicQueueRecoveryExecutionWorker(context, runId, candidateId, overrides = {}) {
+export async function runMusicQueueRecoveryExecutionWorker(context, runId, candidateId, overrides = {}, {
+  signal = context.fixtureSignal, createWorkerFn = createImportCandidateExecutionWorker,
+} = {}) {
+  return withFixtureLifecycle({ signal }, async (scope) => {
   const { policy, lifecycle, recovery } = createRecoveryExecutionOwners(context);
   const raw = await context.store.getOrigin(runId, candidateId);
-  let finish;
-  const finished = new Promise((resolve) => { finish = resolve; });
   const calls = { enqueue: 0, confirmed: 0, genericFailure: 0 };
   const linkStore = createImportExecutionTransferLinkStore({ getPoolFn: context.getPoolFn });
   const preparation = createImportExecutionPreProviderService({ store: createImportExecutionPreProviderStore({ getPoolFn: context.getPoolFn }),
@@ -41,7 +43,7 @@ export async function runMusicQueueRecoveryExecutionWorker(context, runId, candi
       if (input.transfers.length) calls.confirmed += 1;
       return linkStore.recordConfirmedTransfers(input);
     } } });
-  const worker = createImportCandidateExecutionWorker({
+  const callbacks = {
     ...handoff,
     ...preparation,
     prepareDownloadHandoff: async (input) => {
@@ -72,10 +74,15 @@ export async function runMusicQueueRecoveryExecutionWorker(context, runId, candi
     upsertImportExecutionRunItem: (input) => upsertImportExecutionRunItem(input, context.pool),
     updateImportExecutionRunItem: (input) => updateImportExecutionRunItem(input, context.pool),
     ...overrides,
-    releaseLease: async (input) => { await context.executionRuns.releaseLease(input); finish(); },
+  };
+  const observer = createFixtureWorkerObserver({ callbacks });
+  const worker = createWorkerFn({ ...callbacks, ...observer.callbacks,
+    isCancellationRequested: async (input) => scope.signal.aborted || await callbacks.isCancellationRequested?.(input) || false,
   });
+  scope.track(observer.finished);
   await worker.startWorkerRun({ runId, selectedCandidateId: candidateId, requestedCandidateCount: 1,
     sourceSearchId: raw.summary.sourceSearchId, triggerSource: raw.summary.triggerSource ?? 'manual' });
-  await finished;
+  await observer.finished;
   return calls;
+  });
 }
