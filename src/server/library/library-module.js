@@ -54,6 +54,7 @@ import { createLibraryDiscoveryWorker } from './library-discovery-worker.js';
 import { createLibraryEmbeddedArtworkService } from './library-embedded-artwork-service.js';
 import { createLibraryFileMatcherService } from './library-file-matcher-service.js';
 import { createLibraryFileMatchStore } from './library-file-match-store.js';
+import { createLibraryFileMatchService } from './library-file-match-service.js';
 import { createLibraryMediaRequestFulfillmentService } from './library-media-request-fulfillment-service.js';
 import { createLibraryExternalRequestCollectionReviewStore } from './library-external-request-collection-review-store.js';
 import { createLibraryExternalRequestCollectionReviewService } from './library-external-request-collection-review-service.js';
@@ -310,8 +311,14 @@ export function createLibraryModule({
     renewLease: libraryOrganizeApplyRunStore.renewLease,
   }),
   libraryFileMatchStore = createLibraryFileMatchStore(),
+  libraryFileMatchService = createLibraryFileMatchService({
+    writeLibraryFileMatchBatch: libraryFileMatchStore.writeLibraryFileMatchBatch,
+    assertMaintenanceWriteAllowed: ({ queryable }) => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+      operationLabel: 'library file matching', queryable,
+    }),
+  }),
   libraryFileMatcherService = createLibraryFileMatcherService({
-    libraryFileMatchStore,
+    writeOwnedLibraryFileMatchBatch: libraryFileMatchService.writeOwnedLibraryFileMatchBatch,
   }),
   libraryReconciliationSummaryStore = createLibraryReconciliationSummaryStore(),
   libraryReconciliationSummaryService = createLibraryReconciliationSummaryService({
@@ -547,6 +554,7 @@ export function createLibraryModule({
     libraryEmbeddedArtworkService,
     libraryFileMatcherService,
     libraryFileMatchStore,
+    libraryFileMatchService,
     libraryExternalIntakeRunStore,
     libraryExternalIntakeService,
     libraryExternalIntakeWorker,

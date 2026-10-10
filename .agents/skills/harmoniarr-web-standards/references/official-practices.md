@@ -231,3 +231,24 @@ a separate owner. Preserve actual platform filename semantics and source stamps
 on current parser failure. Focused doubles establish orchestration; actual SQL
 and native parser fixtures establish database/media evidence. Same-size/same-mtime
 physical changes, later artwork and commit acknowledgement remain bounded limits.
+
+## File match maintenance, October 9 local / October 10 UTC
+
+The separate `docs/FILE_MATCH_RESEARCH_2026_10.md` ledger owns current primary
+source consultation. Applying current-state transactions and structured-value
+comparison to file matching is a project inference; this maintenance does not
+independently re-open those sources or require a new UI audit.
+
+Capture source, tags and decision-relevant scope before awaited metadata lookup.
+Preserve SQL NULL versus an empty JSON object; ignore object key order while
+retaining array order and scalar distinctions. Current tag stamps cannot replace
+comparison of the actual tag payload. Derive relevant scope from the saved run
+hint without treating unrelated summary edits as a different match intent. Use
+one client and compatible locks for an atomic match batch, then recheck source,
+authority and fresh time before SQL and before commit. Returned identities and
+source/tag predicates must cover both inserts and conflict updates; one stale
+sibling or missing row refuses the batch. Preserve matching strategies rather
+than converting a refusal into unmatched success. Database ownership does not
+freeze physical bytes or metadata candidates, undo earlier tag/artwork work, or
+grant later reconciliation authority. Focused doubles and actual PostgreSQL
+evidence remain separate from structural skill validation and UI conformance.

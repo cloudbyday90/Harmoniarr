@@ -17,6 +17,8 @@
  */
 
 import { getPool } from '../database.js';
+import { createApiError } from '../auth.js';
+import { createDatabaseTransactionRunner } from '../database-transaction-service.js';
 
 function normalizeMatch(match) {
   return {
@@ -67,16 +69,34 @@ function buildBatchValues(matches) {
 
 export function createLibraryFileMatchStore({
   getPoolFn = getPool,
+  withTransaction = createDatabaseTransactionRunner({ getPoolFn }),
 } = {}) {
-  async function writeLibraryFileMatchBatch({ matches }) {
+  async function writeLibraryFileMatchBatch({ matches, expectedSources = null, queryable = null, beforeWrite = null }) {
+    if (queryable != null && typeof queryable.query !== 'function') throw new TypeError('File match queryable must supply query');
+    if (beforeWrite != null && typeof beforeWrite !== 'function') throw new TypeError('File match beforeWrite must be a function');
     const normalizedMatches = dedupeMatchesByLibraryFileId(Array.isArray(matches) ? matches : []);
     if (normalizedMatches.length === 0) {
-      return;
+      return { libraryFileIds: [] };
     }
-
-    const pool = getPoolFn();
-    await pool.query(
-      `
+    const guarded = expectedSources !== null;
+    const values = buildBatchValues(normalizedMatches);
+    if (guarded) {
+      if (!Array.isArray(expectedSources) || expectedSources.length !== normalizedMatches.length) {
+        throw new TypeError('File match sources must cover every match');
+      }
+      const sources = new Map(expectedSources.map((file) => [file.id, file]));
+      if (sources.size !== normalizedMatches.length || !normalizedMatches.every((match) => sources.has(match.libraryFileId))) {
+        throw new TypeError('File match source identities must match results');
+      }
+      const ordered = normalizedMatches.map((match) => sources.get(match.libraryFileId));
+      values.push(ordered.map((file) => file.libraryRootId), ordered.map((file) => file.canonicalPath),
+        ordered.map((file) => file.sizeBytes), ordered.map((file) => file.modifiedAt),
+        ordered.map((file) => file.tagPayload == null ? null : JSON.stringify(file.tagPayload)));
+    }
+    async function writeBatch(client) {
+      await beforeWrite?.({ queryable: client, stage: 'match_batch' });
+      const result = await client.query(
+        `
         INSERT INTO library_file_matches (
           library_file_id,
           metadata_artist_id,
@@ -118,6 +138,7 @@ export function createLibraryFileMatchStore({
           $9::text[],
           $10::text[],
           $11::jsonb[]
+          ${guarded ? ', $12::uuid[], $13::text[], $14::bigint[], $15::timestamptz[], $16::jsonb[]' : ''}
         ) AS t(
           library_file_id,
           metadata_artist_id,
@@ -130,7 +151,14 @@ export function createLibraryFileMatchStore({
           confidence,
           matched_by,
           evidence
+          ${guarded ? ', source_root_id, source_path, source_size, source_modified_at, source_tags' : ''}
         )
+        ${guarded ? `JOIN library_files files ON files.id = t.library_file_id
+          AND files.library_root_id = t.source_root_id AND files.canonical_path = t.source_path
+          AND files.size_bytes = t.source_size AND files.modified_at IS NOT DISTINCT FROM t.source_modified_at
+          AND files.tag_payload IS NOT DISTINCT FROM t.source_tags
+          AND files.file_state = 'observed' AND files.deleted_at IS NULL` : ''}
+        WHERE TRUE
         ON CONFLICT (library_file_id) DO UPDATE
         SET metadata_artist_id = EXCLUDED.metadata_artist_id,
             metadata_release_group_id = EXCLUDED.metadata_release_group_id,
@@ -144,13 +172,26 @@ export function createLibraryFileMatchStore({
             evidence = EXCLUDED.evidence,
             matched_at = NOW(),
             updated_at = NOW()
-      `,
-      buildBatchValues(normalizedMatches),
-    );
+        RETURNING library_file_id
+        `,
+        values,
+      );
+      if (result.rowCount !== normalizedMatches.length || result.rows.length !== normalizedMatches.length) {
+        throw createApiError(409, guarded ? 'library_file_match_stale' : 'library_file_match_incomplete',
+          'The complete file match batch was not persisted');
+      }
+      const expected = new Set(normalizedMatches.map((match) => match.libraryFileId));
+      const libraryFileIds = result.rows.map((row) => row.library_file_id);
+      if (!libraryFileIds.every((id) => expected.delete(id))) {
+        throw createApiError(409, 'library_file_match_incomplete', 'The file match result identities could not be verified');
+      }
+      return { libraryFileIds };
+    }
+    return queryable ? writeBatch(queryable) : withTransaction(writeBatch);
   }
 
   async function writeLibraryFileMatch(match) {
-    await writeLibraryFileMatchBatch({ matches: [match] });
+    return writeLibraryFileMatchBatch({ matches: [match] });
   }
 
   return {

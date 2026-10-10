@@ -66,6 +66,11 @@ authorization or a consistent general read. Reuse workers instead of introducing
 another operation system. Keep new first-party modules ESM and responsibilities
 narrow.
 
+When lookup or preparation precedes a write, capture the accepted source before
+that await and compare it at the owning mutation boundary. Preserve nullable
+structured values and every decision-relevant input; convenience normalization
+must not equate absent tags with an empty object or erase a saved scope.
+
 ## Verify and report the actual result
 
 Choose evidence at the boundary that owns the claim: keyboard/pending/focus and

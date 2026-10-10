@@ -12,6 +12,10 @@ import { createMaintenanceLockService } from '../../src/server/recovery/maintena
 import { createMaintenanceLockWriteGuardService } from '../../src/server/recovery/maintenance-lock-write-guard-service.js';
 import { createLibraryFileMatcherService } from '../../src/server/library/library-file-matcher-service.js';
 import { createLibraryFileMatchStore } from '../../src/server/library/library-file-match-store.js';
+import { createLibraryFileMatchService } from '../../src/server/library/library-file-match-service.js';
+import { createLibraryTagSnapshotStore } from '../../src/server/library/library-tag-snapshot-store.js';
+import { createLibraryTagSnapshotService } from '../../src/server/library/library-tag-snapshot-service.js';
+import { captureTagSnapshotSource } from '../../src/server/library/library-tag-snapshot-policy.js';
 import { createLibraryReleaseReconciliationService } from '../../src/server/library/library-release-reconciliation-service.js';
 import { createLibraryReleaseReconciliationStore } from '../../src/server/library/library-release-reconciliation-store.js';
 import { createLibraryScanRunStore } from '../../src/server/library/library-scan-run-store.js';
@@ -236,9 +240,19 @@ function buildLibraryScanHarness({
     assertMaintenanceWriteAllowed: ({ queryable }) => maintenanceGuard.assertNoActiveWriteLocks({ queryable }),
   });
   const libraryFileMatchStore = createLibraryFileMatchStore({ getPoolFn });
+  const ownedMatches = createLibraryFileMatchService({
+    writeLibraryFileMatchBatch: libraryFileMatchStore.writeLibraryFileMatchBatch,
+    withTransaction: createDatabaseTransactionRunner({ getPoolFn }),
+    assertMaintenanceWriteAllowed: ({ queryable }) => maintenanceGuard.assertNoActiveWriteLocks({ queryable }),
+  });
   const libraryFileMatcherService = createLibraryFileMatcherService({
     getPoolFn,
-    libraryFileMatchStore,
+    writeOwnedLibraryFileMatchBatch: ownedMatches.writeOwnedLibraryFileMatchBatch,
+  });
+  const ownedTags = createLibraryTagSnapshotService({
+    writeLibraryFileTagSnapshot: createLibraryTagSnapshotStore({ getPoolFn }).writeLibraryFileTagSnapshot,
+    withTransaction: createDatabaseTransactionRunner({ getPoolFn }),
+    assertMaintenanceWriteAllowed: ({ queryable }) => maintenanceGuard.assertNoActiveWriteLocks({ queryable }),
   });
   const libraryReleaseReconciliationStore = createLibraryReleaseReconciliationStore({ getPoolFn });
   const libraryReleaseReconciliationService = createLibraryReleaseReconciliationService({
@@ -263,7 +277,16 @@ function buildLibraryScanHarness({
       libraryRoot: musicRoot,
       relativePath: relativeLibraryPath,
     }),
-    extractLibraryFileTags: tagExtractionService.extractLibraryFileTags,
+    extractLibraryFileTags: async (input) => {
+      const sources = new Map(input.files.map((file) => [file.id, captureTagSnapshotSource({ ...input, file })]));
+      const result = await tagExtractionService.extractLibraryFileTags(input);
+      for (const file of result.files) {
+        await ownedTags.writeOwnedLibraryFileTagSnapshot({ prepared: sources.get(file.id), payload: {
+          status: 'extracted', extractor: 'controlled-post-apply-fixture', normalizedTags: file.tagPayload,
+        } });
+      }
+      return result;
+    },
     isCancellationRequested: libraryScanRunStore.isCancellationRequested,
     markRunCancelled: libraryScanRunStore.markRunCancelled,
     markRunCompleted: libraryScanRunStore.markRunCompleted,

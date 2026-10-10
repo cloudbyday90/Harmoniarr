@@ -3367,6 +3367,22 @@ No schema change is introduced. Parsing and later artwork remain outside these
 SQL locks. See [design](TAG_SNAPSHOT_DESIGN.md) and
 [outcome](TAG_SNAPSHOT_OUTCOME.md) for execution evidence and physical-byte limits.
 
+## Current implementation: acquisition-owned file-match persistence
+
+The matcher captures the original scan acquisition, roots, file source and tag
+payload before metadata lookup. The owning service locks maintenance readiness,
+run/advisory key/lease, root and sorted files through one client. Current file
+tuple and semantic tags, relevant saved release hints and post-wait/final time
+must agree. INSERT SELECT repeats observed/not-deleted source and JSONB predicates;
+complete returned file identities are required. Missing rows, SQL failures or
+final ownership refusal roll back the whole match batch.
+
+No schema change is introduced. Lookup/scoring remain outside SQL locks and
+existing match strategies remain. Catalogue/tag commits, earlier sidecar artwork
+and later artwork/reconciliation are separate boundaries. See
+[design](FILE_MATCH_DESIGN.md) and [outcome](FILE_MATCH_OUTCOME.md) for evidence,
+metadata-candidate and physical-byte limits.
+
 ## Sources Reviewed
 
 PostgreSQL 18 official sources:

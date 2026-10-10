@@ -343,10 +343,28 @@ and both reference links resolve. These establish structure and byte identity,
 not a new blind behavioral skill trial, atomic filesystem observation or full
 standards conformance. Application and actual database/media evidence remain in
 the separate tag outcome.
+
 Final cross-writer review reproduced a root/file deadlock between the actual
 catalogue and organize stores. References now require tracing the ordinary scan
 writer and explicit root-before-file acquisition with real blocking-PID proof.
 The bounded correction and red/green evidence belong in the organize outcome.
+
+## File match evolution, October 9 local / October 10 UTC
+
+The [match design](FILE_MATCH_DESIGN.md) exposed two transferable decisions:
+capture the source before an awaited lookup, and preserve nullable structured
+inputs instead of coalescing absent tags or losing a relevant saved scope. The
+entry point now states that short rule. The references locate the actual source,
+scope and batch owners and map semantic JSON equality, source CAS, exact returned
+IDs, final rollback and unchanged strategy behavior to meaningful adverse cases.
+Primary-source lookup remains attributed to the separate research ledger.
+
+Metadata and invocation policy are unchanged. Source and installed copies passed
+structural validation; all four files match by SHA-256, and both reference links
+resolve. Those checks establish structure and byte identity, not a new blind
+behavioral skill trial, metadata-candidate snapshot or standards conformance.
+Application and actual database evidence remain in the separate match outcome.
+
 ## Path capture regression maintenance
 
 Scan capture review reproduced rejection of contained double-dot names and

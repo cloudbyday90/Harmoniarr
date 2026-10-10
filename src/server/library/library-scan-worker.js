@@ -230,6 +230,11 @@ export function createLibraryScanWorker({
         const filesToMatch = extractLibraryFileTags ? filesToExtract : observedCatalogFiles;
         if (filesToMatch.length > 0) {
           await matchLibraryFiles({
+            runId,
+            expectedLease: acquiredLease,
+            requestedLibraryRoot: libraryRoot,
+            libraryRootPath: summary.libraryRoot,
+            libraryRootId: catalogResult.libraryRootId,
             files: filesToMatch,
           });
         }

@@ -238,6 +238,11 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
   });
   assert.equal(matchLibraryFiles.mock.callCount(), 1);
   assert.deepEqual(matchLibraryFiles.mock.calls[0].arguments[0], {
+    runId: 'run-1',
+    expectedLease: leaseForTest('run-1'),
+    requestedLibraryRoot: rootDir,
+    libraryRootPath: rootDir,
+    libraryRootId: 'root-1',
     files: [{
       canonicalPath: join(rootDir, 'Artist', 'track-01.flac'),
       fileState: 'observed',
@@ -541,6 +546,11 @@ test('createLibraryScanWorker matches freshly extracted tag payloads in the same
 
   assert.equal(extractLibraryFileTags.mock.callCount(), 1);
   assert.deepEqual(matchLibraryFiles.mock.calls[0].arguments[0], {
+    runId: 'run-fresh-tags',
+    expectedLease: leaseForTest('run-fresh-tags'),
+    requestedLibraryRoot: '/library',
+    libraryRootPath: '/library',
+    libraryRootId: 'root-1',
     files: [{
       canonicalPath: '/library/Artist/track-01.flac',
       fileState: 'observed',

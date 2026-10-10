@@ -162,6 +162,18 @@ authorization predicates and preserve nullable mtime and platform filename
 identity. Artwork starts after accepted persistence and remains a separate owner.
 Entry point, metadata and invocation policy stay unchanged; validate and sync the
 four installed files without claiming a new behavioral trial or media-byte proof.
+
+## File match evolution, October 9 local / October 10 UTC
+
+Extend the existing practical skill around the [match design](FILE_MATCH_DESIGN.md).
+Add one reusable entry-point rule for capturing source before an awaited lookup
+and preserving nullable structured values and scope; keep detailed owners and
+counterexamples in the two references. Map semantic tag equality, relevant saved
+hints, one-client atomic batch/source CAS, exact returned identities and final
+rollback without changing matching strategies or implying a metadata snapshot.
+Metadata, invocation policy and scope boundaries remain unchanged. Validate and
+sync the four installed files; report structural checks separately from actual
+application evidence, without a new blind behavioral trial or conformance claim.
 Include ordinary catalogue writers in the lock-order trace. A joined row-lock
 query must not be treated as proof of compatible acquisition order; test actual
 root/file waits with blocking process IDs and retain any reproduced deadlock.

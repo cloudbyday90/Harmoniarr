@@ -6,7 +6,33 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
-## Current development slice: Acquisition-owned tag snapshots (2026-10-09 local)
+## Current development slice: Acquisition-owned file matches (2026-10-09 local)
+
+- Capture original scan acquisition, roots, file tuple, nullable tags and release
+  scope before awaited metadata lookup. Persist through one guarded batch with
+  current authority/source/hint comparisons, source CAS, fresh clock checks and
+  verified returned identities. See [design](FILE_MATCH_DESIGN.md),
+  [outcome](FILE_MATCH_OUTCOME.md) and [research](FILE_MATCH_RESEARCH_2026_10.md).
+- Preserve existing matching strategies/confidence and stop later reconciliation
+  after refusal. Keep lookup outside locks; saved tag-source comparison does not
+  establish physical byte or metadata-candidate snapshot consistency.
+- Fresh PR applicability is separate: [design](OPEN_PR_APPLICABILITY_FILE_MATCH_2026_10_DESIGN.md)
+  and [outcome](OPEN_PR_APPLICABILITY_FILE_MATCH_2026_10_OUTCOME.md).
+- Full validation passes 9,565 tests (4,357 server, 4,377 client, 513 script,
+  318 PostgreSQL integration), zero failures/skips, all required lint/policy
+  checks and both builds. Focused owner/store checks pass 50; strategy/wiring/
+  cohort checks pass 96; related PostgreSQL checks pass 34, including eight new
+  matching cases. Counts overlap the full run. Security reports zero npm
+  vulnerabilities. Standards skill structure and four-file installed identity
+  pass; schema stays at 105 migrations. See the outcome for evidence and limits.
+  Work stays on main without a branch, release, tag, deployment or PR merge.
+- Next priority: guard release reconciliation DELETE/upsert after awaited global
+  coverage lookup; carry original scan authority and design current coverage/
+  serialization inside its owning transaction. Reproduce held-A/newer-B refusal.
+  Embedded artwork assignment after ingestion and no-picture clearing follow.
+  Both are source-observed follow-ups, not executed races in this slice.
+
+## Prior development slice: Acquisition-owned tag snapshots (2026-10-09 local)
 
 - Capture the original scan acquisition and root/file path/size/mtime before
   awaited parsing. One current-owned transaction covers snapshot history and

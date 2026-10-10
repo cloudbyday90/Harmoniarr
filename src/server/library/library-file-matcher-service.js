@@ -17,7 +17,8 @@
  */
 
 import { getPool } from '../database.js';
-import { createLibraryFileMatchStore } from './library-file-match-store.js';
+import { createApiError } from '../auth.js';
+import { captureFileMatchBatch } from './library-file-match-policy.js';
 import {
   findConventionalTagMatches,
   normalizeMatchText,
@@ -242,8 +243,11 @@ function resolveMatchResult({ candidates, file, normalizedTags }) {
 
 export function createLibraryFileMatcherService({
   getPoolFn = getPool,
-  libraryFileMatchStore = createLibraryFileMatchStore(),
+  writeOwnedLibraryFileMatchBatch,
 } = {}) {
+  if (typeof writeOwnedLibraryFileMatchBatch !== 'function') {
+    throw new TypeError('File matching requires its guarded batch owner');
+  }
   async function loadTrackLookupRows() {
     const pool = getPoolFn();
     const result = await pool.query(
@@ -277,15 +281,14 @@ export function createLibraryFileMatcherService({
     })));
   }
 
-  async function matchLibraryFiles({ files }) {
+  async function matchLibraryFiles({ files, ...context }) {
+    const prepared = captureFileMatchBatch({ ...context,
+      files: Array.isArray(files) ? files.filter((file) => file.fileState === 'observed') : files });
+    if (!prepared) throw createApiError(409, 'library_file_match_invalid', 'The original file-match sources are invalid');
     const candidates = await loadTrackLookupRows();
     const matchResults = [];
 
-    for (const file of files) {
-      if (file.fileState !== 'observed') {
-        continue;
-      }
-
+    for (const file of prepared.files) {
       const normalizedTags = file.tagPayload ?? null;
       if (!normalizedTags) {
         matchResults.push({
@@ -307,7 +310,8 @@ export function createLibraryFileMatcherService({
       });
     }
 
-    await libraryFileMatchStore.writeLibraryFileMatchBatch({
+    return writeOwnedLibraryFileMatchBatch({
+      prepared,
       matches: matchResults,
     });
   }

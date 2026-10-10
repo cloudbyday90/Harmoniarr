@@ -48,6 +48,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
   const libraryEmbeddedArtworkService = { captureEmbeddedArtwork };
   const libraryFileMatcherService = { matchLibraryFiles };
   const libraryFileMatchStore = {};
+  const libraryFileMatchService = { writeOwnedLibraryFileMatchBatch: async () => ({ libraryFileIds: [] }) };
   const getMediaRequestReassignmentHistory = () => {};
   const cancelMediaRequest = () => {};
   const reassignMediaRequest = () => {};
@@ -108,6 +109,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
     libraryEmbeddedArtworkService,
     libraryFileMatcherService,
     libraryFileMatchStore,
+    libraryFileMatchService,
     libraryMediaRequestService,
     libraryMediaRequestStore,
     libraryOrganizeApplyRunStore,
@@ -163,6 +165,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
   assert.equal(libraryModule.libraryEmbeddedArtworkService, libraryEmbeddedArtworkService);
   assert.equal(libraryModule.libraryFileMatcherService, libraryFileMatcherService);
   assert.equal(libraryModule.libraryFileMatchStore, libraryFileMatchStore);
+  assert.equal(libraryModule.libraryFileMatchService, libraryFileMatchService);
   assert.equal(libraryModule.libraryMediaRequestService, libraryMediaRequestService);
   assert.equal(libraryModule.libraryMediaRequestStore, libraryMediaRequestStore);
   assert.equal(libraryModule.libraryOrganizeApplyRunStore, libraryOrganizeApplyRunStore);
@@ -282,6 +285,7 @@ test('createLibraryModule initializes the default discovery worker after pause s
       matchLibraryFiles: async () => {},
     },
     libraryFileMatchStore: {},
+    libraryFileMatchService: { writeOwnedLibraryFileMatchBatch: async () => ({ libraryFileIds: [] }) },
     libraryMediaRequestService: {
       buildMediaRequestDetail: () => {},
       buildMediaRequestSummary: () => {},
