@@ -11,6 +11,36 @@ import {
 
 const leaseForTest = (runId) => createOperationRunLeaseFixture({ runId, jobType: 'library_scan' });
 
+test('scan requires its guarded catalogue owner and reports verified unique observations while keeping walk counts', async () => {
+  assert.throws(() => createLibraryScanWorker({}), /guarded catalogue owner/u);
+  let finish;
+  const done = new Promise((resolve) => { finish = resolve; });
+  let completed;
+  let handoff;
+  const lease = leaseForTest('run-deduplicated');
+  const file = { canonicalPath: '/library/track.flac', relativePath: 'track.flac', filename: 'track.flac',
+    extension: '.flac', sizeBytes: 12, fileState: 'observed' };
+  const worker = createLibraryScanWorker({
+    acquireLease: async () => lease,
+    executeScan: async ({ onFile }) => {
+      await onFile(file); await onFile(file);
+      return { libraryRoot: '/library', filesSeen: 2 };
+    },
+    recordLibraryScanCatalogue: async (input) => {
+      handoff = input;
+      return { files: [{ ...file, id: 'persisted-file' }], observedFileCount: 1 };
+    },
+    markRunStarted: async () => true,
+    markRunCompleted: async (input) => { completed = input; return true; },
+    markRunFailed: async () => { assert.fail('A verified unique catalogue result should complete'); },
+    releaseLease: async () => { finish(); },
+  });
+  await worker.startWorkerRun({ runId: 'run-deduplicated', libraryRoot: '/library' }); await done;
+  assert.equal(handoff.expectedLease, lease); assert.equal(handoff.files.length, 2);
+  assert.equal(handoff.requestedLibraryRoot, '/library');
+  assert.equal(completed.summary.filesSeen, 2); assert.equal(completed.summary.observedFileCount, 1);
+});
+
 test('shouldExtractLibraryFileTags skips observed files with unchanged tag extraction stamps', () => {
   assert.equal(shouldExtractLibraryFileTags({
     fileState: 'observed',
@@ -68,7 +98,7 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
     start: startLeaseHeartbeat,
     stop: stopLeaseHeartbeat,
   }));
-  const recordLibraryFiles = t.mock.fn(async () => ({
+  const recordLibraryScanCatalogue = t.mock.fn(async () => ({
     files: [{
       canonicalPath: join(rootDir, 'Artist', 'cover.jpg'),
       fileState: 'ignored',
@@ -108,7 +138,7 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
     reconcileDiscoveryRequests,
     reconcileLibraryReleases,
     reconcileWantedReleases,
-    recordLibraryFiles,
+    recordLibraryScanCatalogue,
     releaseLease,
     renewLease,
   });
@@ -156,9 +186,12 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
     },
   }]);
   assert.equal(markRunFailed.mock.callCount(), 0);
-  assert.equal(recordLibraryFiles.mock.callCount(), 1);
-  assert.equal(recordLibraryFiles.mock.calls[0].arguments[0].libraryRootPath, rootDir);
-  assert.equal(recordLibraryFiles.mock.calls[0].arguments[0].files.length, 2);
+  assert.equal(recordLibraryScanCatalogue.mock.callCount(), 1);
+  assert.equal(recordLibraryScanCatalogue.mock.calls[0].arguments[0].libraryRootPath, rootDir);
+  assert.equal(recordLibraryScanCatalogue.mock.calls[0].arguments[0].files.length, 2);
+  assert.equal(recordLibraryScanCatalogue.mock.calls[0].arguments[0].runId, 'run-1');
+  assert.deepEqual(recordLibraryScanCatalogue.mock.calls[0].arguments[0].expectedLease, leaseForTest('run-1'));
+  assert.equal(recordLibraryScanCatalogue.mock.calls[0].arguments[0].requestedLibraryRoot, rootDir);
   assert.equal(extractLibraryFileTags.mock.callCount(), 1);
   assert.deepEqual(extractLibraryFileTags.mock.calls[0].arguments[0], {
     files: [{
@@ -222,7 +255,7 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
   assert.equal(reconcileDiscoveryRequests.mock.callCount(), 1);
   assert.deepEqual(reconcileDiscoveryRequests.mock.calls[0].arguments, []);
   assert.deepEqual(
-    recordLibraryFiles.mock.calls[0].arguments[0].files
+    recordLibraryScanCatalogue.mock.calls[0].arguments[0].files
       .map((file) => ({
         fileState: file.fileState,
         relativePath: file.relativePath,
@@ -268,7 +301,7 @@ test('createLibraryScanWorker ignores sidecar artwork failures and still complet
   const markRunFailed = t.mock.fn(async () => {});
   const releaseLease = t.mock.fn(async () => {});
   const acquireLease = t.mock.fn(async ({ runId }) => leaseForTest(runId));
-  const recordLibraryFiles = t.mock.fn(async () => ({
+  const recordLibraryScanCatalogue = t.mock.fn(async () => ({
     files: [{
       canonicalPath: '/library/Artist/cover.jpg',
       fileState: 'ignored',
@@ -296,7 +329,7 @@ test('createLibraryScanWorker ignores sidecar artwork failures and still complet
     markRunFailed,
     markRunStarted,
     matchLibraryFiles: t.mock.fn(async () => {}),
-    recordLibraryFiles,
+    recordLibraryScanCatalogue,
     releaseLease,
   });
 
@@ -341,6 +374,7 @@ test('createLibraryScanWorker requeues the run when a maintenance pause is reque
   const worker = createLibraryScanWorker({
     acquireLease,
     createOperationRunLeaseHeartbeatFn,
+    recordLibraryScanCatalogue: async () => { assert.fail('Paused startup must not reach the catalogue owner'); },
     isCancellationRequested,
     markRunCancelled,
     markRunCompleted,
@@ -412,7 +446,7 @@ test('createLibraryScanWorker skips extraction and matching for unchanged files'
     markRunFailed: async () => {},
     markRunStarted: async () => {},
     matchLibraryFiles,
-    recordLibraryFiles: async () => ({
+    recordLibraryScanCatalogue: async () => ({
       files: [{
         canonicalPath: '/library/Artist/track-01.flac',
         fileState: 'observed',
@@ -469,7 +503,7 @@ test('createLibraryScanWorker matches freshly extracted tag payloads in the same
     markRunFailed: async () => {},
     markRunStarted: async () => {},
     matchLibraryFiles,
-    recordLibraryFiles: async () => ({
+    recordLibraryScanCatalogue: async () => ({
       files: [{
         canonicalPath: '/library/Artist/track-01.flac',
         fileState: 'observed',

@@ -90,6 +90,7 @@ import { createLibraryWantedReleaseStore } from './library-wanted-release-store.
 import { createLibraryWantedSummaryService } from './library-wanted-summary-service.js';
 import { createLibraryWantedSummaryStore } from './library-wanted-summary-store.js';
 import { createLibraryScanWorker } from './library-scan-worker.js';
+import { createLibraryScanCatalogueService } from './library-scan-catalogue-service.js';
 import { createMediaFilesystemService } from '../media/media-filesystem-service.js';
 import { createOperationRunInterruptionGate } from '../operation-run-cancellation.js';
 import { createMaintenanceLockService } from '../recovery/maintenance-lock-service.js';
@@ -425,6 +426,13 @@ export function createLibraryModule({
     libraryEmbeddedArtworkService,
     libraryTagSnapshotStore,
   }),
+  libraryScanCatalogueService = createLibraryScanCatalogueService({
+    recordLibraryFiles: libraryCatalogStore.recordLibraryFiles,
+    assertMaintenanceWriteAllowed: ({ queryable }) => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+      operationLabel: 'library scan catalogue',
+      queryable,
+    }),
+  }),
   libraryScanWorker = createLibraryScanWorker({
     acquireLease: libraryScanRunStore.acquireLease,
     captureLibrarySidecarArtwork: librarySidecarArtworkService.captureSidecarArtwork,
@@ -445,7 +453,7 @@ export function createLibraryModule({
     markRunFailed: libraryScanRunStore.markRunFailed,
     markRunPaused: libraryScanRunStore.markRunPaused,
     markRunStarted: libraryScanRunStore.markRunStarted,
-    recordLibraryFiles: libraryCatalogStore.recordLibraryFiles,
+    recordLibraryScanCatalogue: libraryScanCatalogueService.recordLibraryScanCatalogue,
     releaseLease: libraryScanRunStore.releaseLease,
     renewLease: libraryScanRunStore.renewLease,
   }),
@@ -573,6 +581,7 @@ export function createLibraryModule({
     libraryWantedReleaseStore,
     libraryWantedSummaryService,
     libraryWantedSummaryStore,
+    libraryScanCatalogueService,
     libraryScanWorker,
     routeDependencies: {
       externalRequestCollectionReviewService,

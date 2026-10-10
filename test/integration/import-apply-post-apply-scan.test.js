@@ -6,6 +6,10 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { after, before, suite, test } from 'node:test';
 import { createImportCandidateModule } from '../../src/server/import-candidates/import-candidate-module.js';
 import { createLibraryCatalogStore } from '../../src/server/library/library-catalog-store.js';
+import { createLibraryScanCatalogueService } from '../../src/server/library/library-scan-catalogue-service.js';
+import { createDatabaseTransactionRunner } from '../../src/server/database-transaction-service.js';
+import { createMaintenanceLockService } from '../../src/server/recovery/maintenance-lock-service.js';
+import { createMaintenanceLockWriteGuardService } from '../../src/server/recovery/maintenance-lock-write-guard-service.js';
 import { createLibraryFileMatcherService } from '../../src/server/library/library-file-matcher-service.js';
 import { createLibraryFileMatchStore } from '../../src/server/library/library-file-match-store.js';
 import { createLibraryReleaseReconciliationService } from '../../src/server/library/library-release-reconciliation-service.js';
@@ -224,6 +228,13 @@ function buildLibraryScanHarness({
   tagExtractionService,
 }) {
   const libraryCatalogStore = createLibraryCatalogStore({ getPoolFn });
+  const maintenanceLocks = createMaintenanceLockService({ getPoolFn });
+  const maintenanceGuard = createMaintenanceLockWriteGuardService({ listActiveMaintenanceLocks: maintenanceLocks.listActiveMaintenanceLocks });
+  const scanCatalogue = createLibraryScanCatalogueService({
+    recordLibraryFiles: libraryCatalogStore.recordLibraryFiles,
+    withTransaction: createDatabaseTransactionRunner({ getPoolFn }),
+    assertMaintenanceWriteAllowed: ({ queryable }) => maintenanceGuard.assertNoActiveWriteLocks({ queryable }),
+  });
   const libraryFileMatchStore = createLibraryFileMatchStore({ getPoolFn });
   const libraryFileMatcherService = createLibraryFileMatcherService({
     getPoolFn,
@@ -260,7 +271,7 @@ function buildLibraryScanHarness({
     markRunPaused: libraryScanRunStore.markRunPaused,
     markRunStarted: libraryScanRunStore.markRunStarted,
     matchLibraryFiles: libraryFileMatcherService.matchLibraryFiles,
-    recordLibraryFiles: libraryCatalogStore.recordLibraryFiles,
+    recordLibraryScanCatalogue: scanCatalogue.recordLibraryScanCatalogue,
     reconcileLibraryReleases: libraryReleaseReconciliationService.reconcileLibraryReleases,
     releaseLease: libraryScanRunStore.releaseLease,
     renewLease: libraryScanRunStore.renewLease,

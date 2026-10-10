@@ -87,6 +87,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
   const libraryWantedSummaryService = { buildLibraryWantedReleases, buildLibraryWantedSummary };
   const libraryWantedSummaryStore = {};
   const libraryScanWorker = {};
+  const libraryScanCatalogueService = { recordLibraryScanCatalogue: async () => ({ files: [], observedFileCount: 0 }) };
 
   const libraryModule = createLibraryModule({
     artworkAssignmentService,
@@ -140,6 +141,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
     libraryWantedSummaryService,
     libraryWantedSummaryStore,
     libraryScanWorker,
+    libraryScanCatalogueService,
     prefetchMonitoredArtistArtwork,
     settingsService: {},
   });
@@ -191,6 +193,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
   assert.equal(libraryModule.libraryWantedSummaryService, libraryWantedSummaryService);
   assert.equal(libraryModule.libraryWantedSummaryStore, libraryWantedSummaryStore);
   assert.equal(libraryModule.libraryScanWorker, libraryScanWorker);
+  assert.equal(libraryModule.libraryScanCatalogueService, libraryScanCatalogueService);
   assert.equal(typeof libraryModule.routeDependencies.buildMediaRequestPipeline, 'function');
   assert.deepEqual(Object.fromEntries(
     Object.entries(libraryModule.routeDependencies).filter(([k]) => k !== 'buildMediaRequestPipeline'),
@@ -314,6 +317,7 @@ test('createLibraryModule initializes the default discovery worker after pause s
       buildLibraryScanSummary: () => {},
     },
     libraryScanWorker: {},
+    libraryScanCatalogueService: { recordLibraryScanCatalogue: async () => ({ files: [], observedFileCount: 0 }) },
     librarySidecarArtworkService: {
       captureSidecarArtwork: async () => {},
     },

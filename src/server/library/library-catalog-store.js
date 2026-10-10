@@ -18,6 +18,7 @@
 
 import { basename } from 'node:path';
 import { getPool } from '../database.js';
+import { createDatabaseTransactionRunner } from '../database-transaction-service.js';
 
 const libraryFileUpsertBatchSize = 5_000;
 
@@ -101,15 +102,18 @@ function chunkFiles(files, chunkSize = libraryFileUpsertBatchSize) {
 
 export function createLibraryCatalogStore({
   getPoolFn = getPool,
+  withTransaction = createDatabaseTransactionRunner({ getPoolFn }),
 } = {}) {
-  async function recordLibraryFiles({ files, libraryRootPath }) {
+  async function recordLibraryFiles({ files, libraryRootPath, queryable = null, beforeWrite = null }) {
+    if (beforeWrite != null && typeof beforeWrite !== 'function') {
+      throw new TypeError('Catalogue beforeWrite must be a function');
+    }
+    if (queryable != null && typeof queryable.query !== 'function') {
+      throw new TypeError('Catalogue queryable must supply query');
+    }
     const normalizedFiles = dedupeFilesByCanonicalPath(files.map(normalizeObservedFile));
-    const pool = getPoolFn();
-    const client = await pool.connect();
-
-    try {
-      await client.query('BEGIN');
-
+    async function writeCatalogue(client) {
+      await beforeWrite?.({ queryable: client, stage: 'root' });
       const rootResult = await client.query(
         `
           INSERT INTO library_roots (
@@ -134,6 +138,7 @@ export function createLibraryCatalogStore({
       const persistedFiles = [];
 
       for (const fileBatch of chunkFiles(normalizedFiles)) {
+        await beforeWrite?.({ queryable: client, stage: 'file_batch' });
         const batchResult = await client.query(
           `
             WITH input_rows AS (
@@ -237,6 +242,7 @@ export function createLibraryCatalogStore({
         persistedFiles.push(...batchResult.rows.map(mapPersistedFile));
       }
 
+      await beforeWrite?.({ queryable: client, stage: 'tombstones' });
       await client.query(
         `
           UPDATE library_files
@@ -249,19 +255,13 @@ export function createLibraryCatalogStore({
         [libraryRootId, normalizedFiles.map((file) => file.canonicalPath)],
       );
 
-      await client.query('COMMIT');
-
       return {
         files: persistedFiles,
         libraryRootId,
         observedFileCount: persistedFiles.length,
       };
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
     }
+    return queryable ? writeCatalogue(queryable) : withTransaction(writeCatalogue);
   }
 
   async function updateLibraryFileCanonicalPath({ canonicalPath, fileId, filename, relativePath }) {

@@ -3334,6 +3334,22 @@ table, migration or snapshot is needed. See separate
 [design](ORGANIZE_MUTATION_DESIGN.md) and [outcome](ORGANIZE_MUTATION_OUTCOME.md)
 for evidence and partial filesystem/DB effect limits.
 
+## Current implementation: acquisition-owned scan catalogue persistence
+
+The scan catalogue owner captures the original run/acquisition and both the
+requested root frame and canonical walk root, plus immutable scalar observations.
+Its transaction uses maintenance readiness first, then run/advisory key/lease
+and root-before-file coordination. All existing root upsert, 5,000-file batches
+and missing-file tombstones share that client. Fresh authority checks run after
+waits, before write phases and before commit; refusal rolls back the entire
+catalogue change rather than publishing provisional success.
+
+Current empty scans remain valid and incomplete walks do not reach persistence.
+The standalone catalogue writer remains available internally; scan workers
+require their guarded owner. No schema change is introduced. Filesystem reads
+and later enrichment remain outside this transaction. See separate
+[design](SCAN_CATALOGUE_DESIGN.md) and [outcome](SCAN_CATALOGUE_OUTCOME.md).
+
 ## Sources Reviewed
 
 PostgreSQL 18 official sources:

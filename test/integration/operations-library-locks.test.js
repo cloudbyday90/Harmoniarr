@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import { after, before, suite, test } from 'node:test';
 import { createLibraryScanRunStore } from '../../src/server/library/library-scan-run-store.js';
 import { createLibraryScanWorker } from '../../src/server/library/library-scan-worker.js';
+import { createLibraryCatalogStore } from '../../src/server/library/library-catalog-store.js';
+import { createLibraryScanCatalogueService } from '../../src/server/library/library-scan-catalogue-service.js';
+import { createDatabaseTransactionRunner } from '../../src/server/database-transaction-service.js';
+import { createMaintenanceLockWriteGuardService } from '../../src/server/recovery/maintenance-lock-write-guard-service.js';
 import { createOperationQueueDispatcher } from '../../src/server/operation-queue-dispatcher.js';
 import {
   createOperationRunInterruptionGate,
@@ -308,10 +312,17 @@ suite('integration operations lifecycle and library lock routes', () => {
       const operationPauseService = createMaintenanceLockOperationPauseService({
         listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks,
       });
+      const catalogueGuard = createMaintenanceLockWriteGuardService({ listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks });
+      const scanCatalogue = createLibraryScanCatalogueService({
+        recordLibraryFiles: createLibraryCatalogStore({ getPoolFn }).recordLibraryFiles,
+        withTransaction: createDatabaseTransactionRunner({ getPoolFn }),
+        assertMaintenanceWriteAllowed: ({ queryable }) => catalogueGuard.assertNoActiveWriteLocks({ queryable }),
+      });
       let executeScanCallCount = 0;
 
       const worker = createLibraryScanWorker({
         acquireLease: runStore.acquireLease,
+        recordLibraryScanCatalogue: scanCatalogue.recordLibraryScanCatalogue,
         createOperationRunLeaseHeartbeatFn: () => ({
           start() {},
           stop() {},

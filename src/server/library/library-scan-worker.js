@@ -117,10 +117,13 @@ export function createLibraryScanWorker({
   reconcileDiscoveryRequests = null,
   reconcileLibraryReleases = null,
   reconcileWantedReleases = null,
-  recordLibraryFiles = null,
+  recordLibraryScanCatalogue,
   releaseLease,
   renewLease,
 } = {}) {
+  if (typeof recordLibraryScanCatalogue !== 'function') {
+    throw new TypeError('Library scan requires its guarded catalogue owner');
+  }
   const activeRunIds = new Set();
 
   async function runScan({
@@ -169,25 +172,26 @@ export function createLibraryScanWorker({
       let catalogResult = null;
       let observedCatalogFiles = [];
       let filesToExtract = [];
-      if (recordLibraryFiles) {
-        phaseTiming.startPhase('catalog');
-        catalogResult = await recordLibraryFiles({
-          files: observedFiles,
-          libraryRootPath: summary.libraryRoot,
-        });
-        const hintedCatalogFiles = applyLibraryScanReleaseHints({
-          files: catalogResult.files ?? [],
-          releaseHints,
-        });
-        catalogResult = {
-          ...catalogResult,
-          files: hintedCatalogFiles,
-        };
-        observedCatalogFiles = hintedCatalogFiles
-          .filter((file) => file.fileState === 'observed');
-        filesToExtract = observedCatalogFiles;
-        phaseTiming.finishPhase('catalog');
-      }
+      phaseTiming.startPhase('catalog');
+      catalogResult = await recordLibraryScanCatalogue({
+        runId,
+        expectedLease: acquiredLease,
+        requestedLibraryRoot: libraryRoot,
+        files: observedFiles,
+        libraryRootPath: summary.libraryRoot,
+      });
+      const hintedCatalogFiles = applyLibraryScanReleaseHints({
+        files: catalogResult.files ?? [],
+        releaseHints,
+      });
+      catalogResult = {
+        ...catalogResult,
+        files: hintedCatalogFiles,
+      };
+      observedCatalogFiles = hintedCatalogFiles
+        .filter((file) => file.fileState === 'observed');
+      filesToExtract = observedCatalogFiles;
+      phaseTiming.finishPhase('catalog');
 
       if (extractLibraryFileTags && observedCatalogFiles.length) {
         filesToExtract = observedCatalogFiles.filter(shouldExtractLibraryFileTags);
@@ -250,7 +254,7 @@ export function createLibraryScanWorker({
         runId,
         summary: {
           ...summary,
-          observedFileCount: observedFiles.length,
+          observedFileCount: catalogResult.observedFileCount,
           phases: phaseTiming.toJson(),
           ...triggerSummary,
         },

@@ -140,6 +140,17 @@ generic transport defaults and the existing operator confirmation; no new UI or
 filesystem/database atomicity claim is needed. Keep entry point, metadata and
 invocation policy unchanged. Validate structure and synchronize the four existing
 installed files; this maintenance is not a new blind behavioral skill trial.
+
+## Scan catalogue maintenance, October 9
+
+Extend the two references around the [scan design](SCAN_CATALOGUE_DESIGN.md).
+Map immutable observation/token capture, requested versus resolved root identity,
+same-client maintenance and ownership, compatible root/file locking, awaited
+batch/tombstone guards and final rollback to their actual owners. Preserve current
+empty-scan success and distinguish it from stale empty observations. Keep later
+tag, artwork and reconciliation ownership outside this bounded guarantee. Entry
+point, metadata and invocation policy remain unchanged; validate and synchronize
+the existing four installed files without claiming a new behavioral skill trial.
 Include ordinary catalogue writers in the lock-order trace. A joined row-lock
 query must not be treated as proof of compatible acquisition order; test actual
 root/file waits with blocking process IDs and retain any reproduced deadlock.

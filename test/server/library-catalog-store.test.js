@@ -311,3 +311,89 @@ test('recordLibraryFiles chunks large file batches at 5000 rows', async (t) => {
   assert.equal(batchCalls[1].arguments[1][1].length, 1);
   assert.equal(result.observedFileCount, 5001);
 });
+
+function guardedCatalogueFile(index = 1) {
+  return { canonicalPath: `/data/music/Artist/track-${index}.flac`, extension: '.flac', fileState: 'observed',
+    filename: `track-${index}.flac`, modifiedAt: '2026-10-09T12:00:00.000Z',
+    relativePath: `Artist/track-${index}.flac`, sizeBytes: index };
+}
+
+function guardedCatalogueClient(t, events = []) {
+  return { query: t.mock.fn(async (sql, values) => {
+    if (/INSERT INTO library_roots/u.test(sql)) {
+      events.push('root'); return { rows: [{ id: 'root-1', canonical_path: values[2] }] };
+    }
+    if (/WITH input_rows/u.test(sql)) {
+      events.push('batch');
+      return { rows: values[1].map((canonicalPath, index) => createPersistedFileRow({
+        canonicalPath, extension: values[4][index], fileState: values[7][index], filename: values[3][index],
+        id: `file-${canonicalPath}`, modifiedAt: values[6][index], relativePath: values[2][index], sizeBytes: values[5][index],
+      })) };
+    }
+    events.push('tombstone'); return { rows: [] };
+  }) };
+}
+
+test('catalogue uses the supplied transaction client for awaited guards and every write without owning its transaction', async (t) => {
+  const events = []; const queryable = guardedCatalogueClient(t, events); const guardCalls = [];
+  const store = createLibraryCatalogStore({ getPoolFn: () => { assert.fail('Caller-owned catalogue must not borrow a connection'); } });
+  const result = await store.recordLibraryFiles({ files: [guardedCatalogueFile()], libraryRootPath: '/data/music', queryable,
+    beforeWrite: async (args) => {
+      await Promise.resolve(); assert.equal(args.queryable, queryable); assert.equal(typeof args.stage, 'string');
+      guardCalls.push(args); events.push('guard');
+    },
+  });
+  assert.deepEqual(events, ['guard', 'root', 'guard', 'batch', 'guard', 'tombstone']);
+  assert.equal(guardCalls.length, 3); assert.equal(result.observedFileCount, 1);
+  assert.ok(queryable.query.mock.calls.every((call) => !/^(BEGIN|COMMIT|ROLLBACK)$/u.test(call.arguments[0])));
+});
+
+test('catalogue waits for an unresolved guard before issuing even the root write', async (t) => {
+  let entered; let resume;
+  const enteredGuard = new Promise((done) => { entered = done; });
+  const guardReady = new Promise((done) => { resume = done; });
+  const queryable = guardedCatalogueClient(t); let guardCount = 0;
+  const store = createLibraryCatalogStore({ getPoolFn: () => { assert.fail('Unexpected connection'); } });
+  const running = store.recordLibraryFiles({ files: [guardedCatalogueFile()], libraryRootPath: '/data/music', queryable,
+    beforeWrite: async () => { if (++guardCount === 1) { entered(); await guardReady; } },
+  });
+  await enteredGuard; assert.equal(queryable.query.mock.callCount(), 0); resume();
+  const result = await running; assert.equal(result.observedFileCount, 1);
+});
+
+for (const [name, rejectionAt, expectedWrites] of [['root', 1, []], ['batch', 2, ['root']], ['tombstone', 3, ['root', 'batch']]]) {
+  test(`catalogue ${name} guard refusal prevents that write and preserves caller transaction ownership`, async (t) => {
+    const events = []; const queryable = guardedCatalogueClient(t, events); let guardCount = 0;
+    const rejected = Object.assign(new Error('Lost'), { code: 'operation_run_lease_lost' });
+    const store = createLibraryCatalogStore({ getPoolFn: () => { assert.fail('Unexpected connection'); } });
+    await assert.rejects(store.recordLibraryFiles({ files: [guardedCatalogueFile()], libraryRootPath: '/data/music', queryable,
+      beforeWrite: async () => { if (++guardCount === rejectionAt) throw rejected; },
+    }), (error) => error === rejected);
+    assert.deepEqual(events, expectedWrites);
+    assert.ok(queryable.query.mock.calls.every((call) => !/^(BEGIN|COMMIT|ROLLBACK)$/u.test(call.arguments[0])));
+  });
+}
+
+test('catalogue guards each 5000-row batch and tombstones while preserving batching', async (t) => {
+  const events = []; const queryable = guardedCatalogueClient(t, events);
+  const store = createLibraryCatalogStore({ getPoolFn: () => { assert.fail('Unexpected connection'); } });
+  const result = await store.recordLibraryFiles({ files: Array.from({ length: 5001 }, (_, index) => guardedCatalogueFile(index)),
+    libraryRootPath: '/data/music', queryable, beforeWrite: async ({ queryable: client }) => {
+      assert.equal(client, queryable); events.push('guard');
+    },
+  });
+  assert.deepEqual(events, ['guard', 'root', 'guard', 'batch', 'guard', 'batch', 'guard', 'tombstone']);
+  const batches = queryable.query.mock.calls.filter((call) => /WITH input_rows/u.test(call.arguments[0]));
+  assert.deepEqual(batches.map((call) => call.arguments[1][1].length), [5000, 1]);
+  assert.equal(result.observedFileCount, 5001);
+});
+
+test('standalone catalogue still owns rollback and release when an awaited guard refuses', async (t) => {
+  const query = t.mock.fn(async () => ({ rows: [] })); const { store, release } = createCatalogStoreWithQuery(query, t);
+  const rejected = Object.assign(new Error('Paused'), { code: 'operation_run_paused' });
+  await assert.rejects(store.recordLibraryFiles({ files: [], libraryRootPath: '/data/music',
+    beforeWrite: async () => { throw rejected; },
+  }), (error) => error === rejected);
+  assert.deepEqual(query.mock.calls.map((call) => call.arguments[0]), ['BEGIN', 'ROLLBACK']);
+  assert.equal(release.mock.callCount(), 1);
+});

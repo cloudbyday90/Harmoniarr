@@ -186,3 +186,27 @@ blocked writers rather than assuming row-mark order.
 Injected callback tests establish order and refusal; actual PostgreSQL and
 test-owned files establish the claimed race and transport evidence. No new UI,
 in-flight cancellation, symlink-race immunity or content-hash proof is implied.
+
+## Scan catalogue maintenance, October 9
+
+The separate `docs/SCAN_CATALOGUE_RESEARCH_2026_10.md` ledger owns current
+primary-source discovery. Applying database transaction, lock-order and fresh
+clock guidance to the observed scan writer is a project inference; this
+maintenance does not independently re-open those sources or add a UI standard.
+
+A completed filesystem walk is an observation, not current write authority or
+a filesystem snapshot. Capture the original acquisition and immutable scalar
+observations, keeping the requested root distinct from its resolved root. Use
+one current-owned catalogue transaction and the same client for maintenance,
+parent/lease checks, root, batches and tombstones. Await each write guard and
+recheck fresh time after waits and at the final boundary; a late refusal rolls
+back provisional catalogue changes. A legitimate empty successful observation
+can tombstone old files, whereas stale work must not. Preserve standalone writer
+transactions and batching. Focused callback tests establish orchestration;
+actual PostgreSQL owns locking, rollback and one-connection evidence. A guarded
+catalogue commit does not fence later tag, artwork or reconciliation work, make
+the filesystem walk atomic, or guarantee ownership through commit acknowledgement.
+Validate actual parent path components using the selected platform's separator,
+preserving legitimate contained double-dot names and literal POSIX backslashes.
+Include positive filename cases beside traversal refusals; a broad prefix or
+cross-platform separator rewrite can incorrectly reject a successful walk.

@@ -57,6 +57,7 @@ function fixture(t, family, overrides = {}) {
     createExclusiveFileMutationPlan: (value) => value, applyOrganizeMutation: async () => ({ transport: 'copy_then_remove', sourceRemoved: true,
       verification: { destinationExists: true, sourceSizeBytes: 1, destinationSizeBytes: 1, sourceRemoved: true, sourceExistsAfterSuccess: false } }),
     onReleaseAddedFn: notify,
+    recordLibraryScanCatalogue: async () => ({ files: [], observedFileCount: 0 }),
     ...callbacks, ...family.domain(work), ...overrides };
   const worker = family.factory(options);
   return { callbacks, heartbeatFactory, lease, notify, options, work,
@@ -139,7 +140,7 @@ test('discovery artwork best-effort handling preserves typed ownership loss', as
 
 test('scan sidecar best-effort handling preserves typed ownership loss', async (t) => {
   const family = families.find((entry) => entry.name === 'library scan');
-  const value = fixture(t, family, { recordLibraryFiles: async () => ({ files: [{ fileState: 'observed' }] }),
+  const value = fixture(t, family, { recordLibraryScanCatalogue: async () => ({ files: [{ fileState: 'observed' }], observedFileCount: 1 }),
     captureLibrarySidecarArtwork: async () => { throw Object.assign(new Error('Lost'), { code: 'operation_run_lease_lost' }); } });
   await value.run(); verifyCapturedCalls(value); assert.equal(value.callbacks.markRunCompleted.mock.callCount(), 0);
   assert.equal(value.callbacks.markRunFailed.mock.callCount(), 0); assert.equal(value.callbacks.releaseLease.mock.callCount(), 1);

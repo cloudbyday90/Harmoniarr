@@ -310,7 +310,30 @@ installed copies passed structural validation; all four files match by SHA-256,
 and both entry-point reference links resolve. These establish structure and byte
 identity, not a new blind behavioral trial or standards conformance. Application
 tests and PostgreSQL/filesystem evidence remain in the separate organize outcome.
+
+## Scan catalogue maintenance, October 9
+
+The [scan design](SCAN_CATALOGUE_DESIGN.md) exposed a database ownership boundary
+after the filesystem walk. The references now map immutable observation/token
+capture, distinct requested and resolved roots, same-client guards, compatible
+root/file locking, batch/tombstone checks and final rollback. They distinguish
+current empty-scan success from stale tombstones and keep downstream writers
+outside this slice. Primary-source lookup remains attributed to the separate
+scan research ledger.
+
+Entry point, metadata and invocation policy are unchanged. Repository and
+installed copies passed structural validation; all four files match by SHA-256,
+and both reference links resolve. Those checks establish structure and byte
+identity, not a new blind behavioral skill trial or standards conformance.
+Focused application and actual database evidence remain in the scan outcome.
 Final cross-writer review reproduced a root/file deadlock between the actual
 catalogue and organize stores. References now require tracing the ordinary scan
 writer and explicit root-before-file acquisition with real blocking-PID proof.
 The bounded correction and red/green evidence belong in the organize outcome.
+## Path capture regression maintenance
+
+Scan capture review reproduced rejection of contained double-dot names and
+literal POSIX backslash filenames. References now require positive identity
+controls beside parent-traversal refusals. The correction uses the selected
+platform's path components/separator; exact tagged Node documentation and the
+red/green application evidence remain in the separate scan ledger/outcome.

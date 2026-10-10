@@ -6,7 +6,38 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
-## Current development slice: Guarded library-organize mutation (2026-10-09)
+## Current development slice: Acquisition-owned scan catalogue (2026-10-09)
+
+- Require one guarded owner after the successful filesystem walk, carrying the
+  original acquisition and requested/canonical roots. One transaction covers
+  root metadata, every file batch and missing-file tombstones; fresh authority
+  checks precede write phases and commit. See separate
+  [design](SCAN_CATALOGUE_DESIGN.md), [outcome](SCAN_CATALOGUE_OUTCOME.md) and
+  [official research](SCAN_CATALOGUE_RESEARCH_2026_10.md).
+- Preserve genuinely current empty scans, immutable observations/Date values,
+  root-before-file locks, existing deduplication/batches and tag metadata.
+  Catalogue refusal stops downstream work. Later enrichment/reconciliation and
+  changing filesystem observations remain outside this transaction guarantee.
+- Fresh PR checks found no eligible unreplayed patch; see separate
+  [PR design](OPEN_PR_APPLICABILITY_SCAN_CATALOGUE_2026_10_DESIGN.md) and
+  [outcome](OPEN_PR_APPLICABILITY_SCAN_CATALOGUE_2026_10_OUTCOME.md).
+- Final complete validation passes 9,450 tests (4,258 server, 4,377 client,
+  513 script and 302 PostgreSQL integration), zero failures/skips, all required
+  lint/policy checks and both builds. Focused owner/policy/catalogue checks pass
+  55; worker/module/cohort checks pass 83; actual scan PostgreSQL/walker checks
+  pass eight; affected integration checks pass 15. Focused counts overlap the
+  complete suite. See the outcome for the module fixture correction, two genuine
+  filename regressions, retained original evidence and final correction.
+  Security checks report zero npm vulnerabilities. Source/installed standards
+  skill structure and four-file identity pass; schema remains at 105 migrations.
+  Work stays on main without a branch, release, tag, deployment or PR merge.
+- Next: guard scan tag snapshot persistence after awaited metadata extraction
+  with the original acquisition and file path/size/mtime comparisons. Prevent
+  stale success or failure snapshots and artwork, while retaining current
+  per-file extraction. This is a source finding; the next slice must reproduce
+  the held-A/newer-B race and preserve current positive enrichment.
+
+## Prior development slice: Guarded library-organize mutation (2026-10-09)
 
 - Capture the original acquisition and prepared file/root/plan at the owning
   organize service. Native callbacks check authority before directory creation,
