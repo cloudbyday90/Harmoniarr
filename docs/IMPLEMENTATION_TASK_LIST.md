@@ -6,7 +6,40 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
-## Current development slice: Parent-owned PostgreSQL test launcher (2026-10-10)
+## Current development slice: Audited shared PostgreSQL cohort adoption (2026-10-10)
+
+- Release reconciliation/tag snapshots retain all 16 original cases/46 variants,
+  real SQL assertions and deadlines while adopting scoped gates, registered worker/
+  direct-task completion, deferred lease cleanup and owned workspace/rollback
+  helpers. Genuine parser failures retain their oracle; fixture-hook failures
+  cannot persist failed snapshots. See
+  [design](SHARED_POSTGRES_COHORT_ADOPTION_DESIGN.md),
+  [outcome](SHARED_POSTGRES_COHORT_ADOPTION_OUTCOME.md) and
+  [research](SHARED_POSTGRES_COHORT_ADOPTION_RESEARCH_2026_10.md).
+- Paused-client observers refuse new reads after abort and drain before rollback.
+  A rejected first candidate exposed transaction-held PostgreSQL monitoring cache;
+  the same case reproduced red then passed after sequential statistics refresh,
+  with all polling/expiry bounds unchanged. Original logs remain retained.
+- Four actual PostgreSQL lifecycle cases pass. Public four-file profile passes
+  34/34, 90 registered/released, one server, 98.86s versus 217.42s matched-order
+  baseline (54.5% observed local reduction, no causal/CI/full-gate speedup claim).
+  Focused helpers/workers/selection and scoped lint pass; security reports zero
+  npm vulnerabilities. Complete `npm run validate` passes 9,877 tests (4,594 server,
+  4,377 client, 552 script, 354 integration), zero failures/cancellations/skips,
+  all static/lint checks and both builds. Wall time is 18m20s, integration 16m7s;
+  default scheduling is unchanged and whole-gate causal speedup is not claimed.
+- Standards/testing references preserve outcome/drain, parser-hook and snapshot
+  ownership distinctions; maintained standards source/installed copies match.
+  PR applicability is separate:
+  [design](OPEN_PR_APPLICABILITY_COHORT_ADOPTION_2026_10_DESIGN.md) and
+  [outcome](OPEN_PR_APPLICABILITY_COHORT_ADOPTION_2026_10_OUTCOME.md), eligible set
+  empty after fresh complete metadata/file/replay checks.
+- Next: instrument remaining empty-schema preparation, then assess verified
+  per-file migration templates with fresh variants and dedicated bootstrap proof.
+  Discovery-request recomputation remains next product work. Stay on main without
+  release/branch/tag/deployment/PR merge; default complete scheduling is unchanged.
+
+## Prior development slice: Parent-owned PostgreSQL test launcher (2026-10-10)
 
 - An explicit ESM CLI profile shares one newly owned PostgreSQL server across the
   verified serial Wanted/catalogue cohort. File processes, fresh scenario

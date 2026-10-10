@@ -458,3 +458,10 @@ W3C conformance claim. Runtime evidence remains in the separate launcher outcome
 Source/installed structural validation passed at final freeze, with all four
 maintained standards files matching by SHA256;
 this narrow maintenance does not claim a new blind skill trial.
+
+The cohort-adoption references now distinguish deferred lease SQL, actual
+read-before-rollback drainage, parser-versus-fixture failure and Node's normal
+signal abortion. Runtime proof belongs in the separate cohort-adoption outcome;
+source/installed structural validation passed and all four maintained files match
+by SHA256 at final freeze. No
+new browser conformance or blind skill-trial claim is made.

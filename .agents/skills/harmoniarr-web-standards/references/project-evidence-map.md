@@ -120,3 +120,12 @@ before the next file. Real abandoned-child, cancellation, uncommitted and
 replacement canaries live in `test/integration/parent-postgres-launcher.test.js`.
 The launcher outcome separates cohort timing from full-gate coverage and
 platform limitations; do not expand its explicit cohort from a passing benchmark.
+
+Audited release/tag fixture lifetimes map to `fixture-work-scope.js`,
+`fixture-workspace.js`, `fixture-transaction-client.js` and the two domain worker
+fixtures under `testing/integration/`. Tag's reusable scenario owns native media
+and database/workspace ordering. The two `library-*-fixture-lifecycle.test.js`
+files verify actual SQL rollback, captured lease release and held native-parser
+cancellation before writes. The original serialization tests additionally fence
+their borrowed idle-client reads before rollback. The separate cohort-adoption
+outcome owns executed counts, matched-order measurements and scope limits.

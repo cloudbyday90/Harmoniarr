@@ -11,6 +11,8 @@ import { resolve, relative, isAbsolute } from 'node:path';
 export const sharedPostgresTestCohort = Object.freeze([
   'test/integration/library-wanted-release-reconciliation.test.js',
   'test/integration/library-scan-catalogue.test.js',
+  'test/integration/library-release-reconciliation.test.js',
+  'test/integration/library-tag-snapshot.test.js',
 ]);
 
 export async function resolvePostgresTestCohort({ args = [], cwd = process.cwd() } = {}) {

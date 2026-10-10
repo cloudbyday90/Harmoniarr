@@ -7,128 +7,58 @@
 
 import assert from 'node:assert/strict';
 import { after, before, suite, test } from 'node:test';
-import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
-import { basename, isAbsolute, join, relative, resolve } from 'node:path';
-import { tmpdir } from 'node:os';
+import { writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { parseFile } from 'music-metadata';
 import { createPostgresIntegrationRuntime } from '../../testing/postgres-integration-runtime.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 import { isSkippableIntegrationRuntimeError, toIntegrationRuntimeUnavailableReason } from '../../testing/integration/runtime-availability.js';
-import { applyPendingMigrations } from '../../src/server/migrations.js';
-import { createDatabaseTransactionRunner } from '../../src/server/database-transaction-service.js';
-import { createJobLeaseStore } from '../../src/server/job-lease-store.js';
-import { createOperationRunStore } from '../../src/server/operation-run-store.js';
 import { createOperationRunControlService } from '../../src/server/operation-run-control-service.js';
-import { createMaintenanceLockService } from '../../src/server/recovery/maintenance-lock-service.js';
-import { createMaintenanceLockWriteGuardService } from '../../src/server/recovery/maintenance-lock-write-guard-service.js';
-import { executeLibraryScan } from '../../src/server/library/library-scan-executor.js';
-import { createLibraryCatalogStore } from '../../src/server/library/library-catalog-store.js';
-import { createLibraryScanCatalogueService } from '../../src/server/library/library-scan-catalogue-service.js';
-import { createLibraryScanWorker } from '../../src/server/library/library-scan-worker.js';
-import { createLibraryTagSnapshotStore } from '../../src/server/library/library-tag-snapshot-store.js';
-import { createLibraryTagSnapshotService } from '../../src/server/library/library-tag-snapshot-service.js';
 import { createLibraryTagExtractionService } from '../../src/server/library/library-tag-extraction-service.js';
 import { createLibraryOrganizeMutationStore } from '../../src/server/library/library-organize-mutation-store.js';
 import { captureOrganizeMutation } from '../../src/server/library/library-organize-mutation-policy.js';
 import { createMediaFilesystemService } from '../../src/server/media/media-filesystem-service.js';
+import { createScopedFixtureGate, startScopedFixtureWork } from '../../testing/integration/fixture-work-scope.js';
+import { withRollbackFixtureClient } from '../../testing/integration/fixture-transaction-client.js';
+import { startLibraryTagSnapshotFixtureWorker as start } from '../../testing/integration/library-tag-snapshot-worker-fixture.js';
+import { observeTagFixtureFiles as observed, snapshotTagFixture as snapshot, taggedWav,
+  withLibraryTagSnapshotScenario } from '../../testing/integration/library-tag-snapshot-scenario.js';
 
 const config = resolveIntegrationTestRuntimeConfig();
 let runtime;
 let unavailable;
-function gate() {
-  let release;
-  const promise = new Promise((done) => { release = done; });
-  return { promise, release };
-}
-function taggedWav(title, samples = 800) {
-  const chunk = (name, data) => {
-    const header = Buffer.alloc(8); header.write(name); header.writeUInt32LE(data.length, 4);
-    return Buffer.concat([header, data, ...(data.length % 2 ? [Buffer.alloc(1)] : [])]);
-  };
-  const format = Buffer.alloc(16);
-  format.writeUInt16LE(1); format.writeUInt16LE(1, 2); format.writeUInt32LE(8000, 4);
-  format.writeUInt32LE(16000, 8); format.writeUInt16LE(2, 12); format.writeUInt16LE(16, 14);
-  const body = Buffer.concat([chunk('fmt ', format),
-    chunk('LIST', Buffer.concat([Buffer.from('INFO'), chunk('INAM', Buffer.from(`${title}\0`))])),
-    chunk('data', Buffer.alloc(samples * 2))]);
-  const header = Buffer.alloc(12); header.write('RIFF'); header.writeUInt32LE(body.length + 4, 4); header.write('WAVE', 8);
-  return Buffer.concat([header, body]);
-}
-async function observed(root) {
-  const files = [];
-  const summary = await executeLibraryScan({ libraryRoot: root, onFile: async (file) => { files.push(file); } });
-  return { files, summary };
-}
-async function snapshot(c) {
-  return { files: (await c.pool.query('SELECT * FROM library_files ORDER BY id')).rows,
-    history: (await c.pool.query('SELECT * FROM file_tag_snapshots ORDER BY id')).rows };
-}
 const parent = async (c) => (await c.pool.query('SELECT * FROM operation_runs WHERE id=$1', [c.run.id])).rows[0];
 const expire = (c) => c.pool.query("UPDATE job_leases SET expires_at=clock_timestamp()-INTERVAL '1 second' WHERE lease_key=$1", [`library_scan:${c.run.id}`]);
 
 async function scenario(t, callback) {
   if (unavailable) { t.skip(unavailable); return; }
-  await runtime.runIsolatedDatabase(async ({ getPoolFn }) => {
-    await applyPendingMigrations({ getPoolFn });
-    const requestedRoot = await mkdtemp(join(tmpdir(), 'harmoniarr-tag-snapshot-'));
-    const rootPath = await realpath(requestedRoot);
-    try {
-      const pool = getPoolFn(); const path = join(rootPath, '01-original.wav');
-      await writeFile(path, taggedWav('Original title'));
-      const catalog = createLibraryCatalogStore({ getPoolFn });
-      const initial = await observed(requestedRoot);
-      const seeded = await catalog.recordLibraryFiles({ libraryRootPath: initial.summary.libraryRoot, files: initial.files });
-      const file = seeded.files[0];
-      const makeRuns = (ownerInstanceId, operationType = 'library_scan') => createOperationRunStore({ getPoolFn,
-        operationType, leaseJobType: operationType,
-        createJobLeaseStoreFn: () => createJobLeaseStore({ getPoolFn, ownerInstanceId, leaseDurationMs: 60_000 }) });
-      const a = makeRuns('tag-original'); const b = makeRuns('tag-replacement');
-      const run = await a.createOperationRun({ status: 'pending', summary: { libraryRoot: requestedRoot } });
-      const maintenance = createMaintenanceLockService({ getPoolFn });
-      const guard = createMaintenanceLockWriteGuardService({ listActiveMaintenanceLocks: maintenance.listActiveMaintenanceLocks });
-      const withTransaction = createDatabaseTransactionRunner({ getPoolFn });
-      const assertMaintenanceWriteAllowed = ({ queryable }) => guard.assertNoActiveWriteLocks({ queryable });
-      const scanCatalogue = createLibraryScanCatalogueService({ recordLibraryFiles: catalog.recordLibraryFiles,
-        withTransaction, assertMaintenanceWriteAllowed });
-      const rawTags = createLibraryTagSnapshotStore({ getPoolFn });
-      const createTagOwner = (writeLibraryFileTagSnapshot = rawTags.writeLibraryFileTagSnapshot) => createLibraryTagSnapshotService({
-        writeLibraryFileTagSnapshot, withTransaction, assertMaintenanceWriteAllowed });
-      await callback({ getPoolFn, pool, requestedRoot, rootPath, path, file, rootId: seeded.libraryRootId,
-        a, b, run, maintenance, withTransaction, makeRuns, catalog, scanCatalogue, rawTags, createTagOwner,
-        tagOwner: createTagOwner() });
-    } finally {
-      const cleanupPath = resolve(requestedRoot); const delta = relative(resolve(tmpdir()), cleanupPath);
-      assert.ok(delta && !delta.startsWith('..') && !isAbsolute(delta)
-        && basename(cleanupPath).startsWith('harmoniarr-tag-snapshot-'), 'Cleanup stays in the test-owned temporary directory');
-      await rm(cleanupPath, { recursive: true, force: true });
-    }
-  });
+  await withLibraryTagSnapshotScenario(runtime, t, callback);
 }
-async function start(c, runs, hooks = {}) {
-  const released = gate(); const artwork = []; const downstream = []; let capturedLease;
-  const extraction = createLibraryTagExtractionService({
-    extractMetadata: async (path) => { const result = await parseFile(path); await hooks.afterParse?.(path, result); return result; },
-    writeOwnedLibraryFileTagSnapshot: (hooks.owner ?? c.tagOwner).writeOwnedLibraryFileTagSnapshot,
-    libraryEmbeddedArtworkService: { captureEmbeddedArtwork: async (input) => { artwork.push(input); } },
-  });
-  const worker = createLibraryScanWorker({ ...runs,
-    acquireLease: async (input) => { capturedLease = await runs.acquireLease(input); return capturedLease; },
-    recordLibraryScanCatalogue: c.scanCatalogue.recordLibraryScanCatalogue,
-    extractLibraryFileTags: extraction.extractLibraryFileTags,
-    captureLibrarySidecarArtwork: async () => { downstream.push('sidecar'); },
-    matchLibraryFiles: async () => { downstream.push('matching'); },
-    reconcileLibraryReleases: async () => { downstream.push('releases'); },
-    reconcileWantedReleases: async () => { downstream.push('wanted'); },
-    reconcileDiscoveryRequests: async () => { downstream.push('discovery'); },
-    releaseLease: async (input) => { try { return await runs.releaseLease(input); } finally { released.release(); } },
-  });
-  await worker.startWorkerRun({ runId: c.run.id, libraryRoot: c.requestedRoot });
-  return { done: released.promise, artwork, downstream, lease: () => capturedLease };
+function heldObserver(queryable, signal) {
+  let inFlight = Promise.resolve();
+  return { query: (...args) => {
+    if (signal.aborted) throw signal.reason;
+    inFlight = queryable.query(...args); return inFlight;
+  }, drain: () => inFlight.then(() => undefined, () => undefined) };
 }
-async function waitForBlock(c, holderPid) {
+async function waitForBlock(c, holderPid, queryable = c.pool, operation) {
+  let outcome;
+  operation?.then(() => { outcome = { completed: true }; }, (error) => { outcome = { error }; });
+  const assertPending = () => {
+    if (c.scope.signal.aborted) throw c.scope.signal.reason;
+    if (outcome && Object.hasOwn(outcome, 'error')) throw outcome.error;
+    if (outcome?.completed) throw Object.assign(new Error('Fixture operation completed before the required lock wait'), {
+      code: 'fixture_operation_completed_before_ready',
+    });
+  };
   for (let count = 0; count < 100; count += 1) {
-    if ((await c.pool.query(`SELECT pid FROM pg_stat_activity WHERE datname=current_database()
-      AND $1::integer=ANY(pg_blocking_pids(pid))`, [holderPid])).rowCount) return;
+    assertPending();
+    await queryable.query('SELECT pg_stat_clear_snapshot()');
+    assertPending();
+    const result = await queryable.query(`SELECT pid FROM pg_stat_activity WHERE datname=current_database()
+      AND $1::integer=ANY(pg_blocking_pids(pid))`, [holderPid]);
+    assertPending();
+    if (result.rowCount) return;
     await new Promise((done) => { setTimeout(done, 10); });
   }
   assert.fail('Expected the actual PostgreSQL root/file lock wait');
@@ -145,11 +75,11 @@ suite('Captured scan source and acquisition own native tag snapshot persistence'
   after(async () => { await runtime?.cleanup(); }, { timeout: config.suiteTeardownTimeoutMs });
 
   test('old native parsing released after replacement persistence creates no history, metadata overwrite or artwork', { timeout: config.scenarioTimeoutMs }, async (t) => scenario(t, async (c) => {
-    const entered = gate(); const resume = gate();
+    const entered = createScopedFixtureGate(c.scope); const resume = createScopedFixtureGate(c.scope);
     const first = await start(c, c.a, { afterParse: async (_path, metadata) => {
       assert.equal(metadata.common.title, 'Original title'); entered.release(); await resume.promise;
     } });
-    await entered.promise;
+    await first.waitForReady(entered.promise);
     await writeFile(c.path, taggedWav('Replacement title with different length', 1600));
     await expire(c); const replacement = await start(c, c.b); await replacement.done;
     assert.notEqual(first.lease().acquisitionId, replacement.lease().acquisitionId);
@@ -165,9 +95,9 @@ suite('Captured scan source and acquisition own native tag snapshot persistence'
 
   test('changed source, root, state, deletion or requested frame refuse parsed results without failed fallback', { timeout: config.scenarioTimeoutMs }, async (t) => {
     for (const drift of ['path', 'root_id', 'root_path', 'size', 'mtime', 'ignored', 'deleted', 'requested']) await scenario(t, async (c) => {
-      const entered = gate(); const resume = gate();
+      const entered = createScopedFixtureGate(c.scope); const resume = createScopedFixtureGate(c.scope);
       const job = await start(c, c.a, { afterParse: async () => { entered.release(); await resume.promise; } });
-      await entered.promise;
+      await job.waitForReady(entered.promise);
       if (drift === 'path') await c.pool.query('UPDATE library_files SET canonical_path=$2 WHERE id=$1', [c.file.id, join(c.rootPath, 'changed.wav')]);
       if (drift === 'root_id') {
         const other = (await c.pool.query("INSERT INTO library_roots(name,path,canonical_path) VALUES('Other',$1,$1) RETURNING id", [join(c.rootPath, 'other')])).rows[0].id;
@@ -188,9 +118,9 @@ suite('Captured scan source and acquisition own native tag snapshot persistence'
 
   test('current cancellation and maintenance after native parsing use outer handlers without snapshot or artwork', { timeout: config.scenarioTimeoutMs }, async (t) => {
     for (const reason of ['cancel', 'maintenance']) await scenario(t, async (c) => {
-      const entered = gate(); const resume = gate();
+      const entered = createScopedFixtureGate(c.scope); const resume = createScopedFixtureGate(c.scope);
       const job = await start(c, c.a, { afterParse: async () => { entered.release(); await resume.promise; } });
-      await entered.promise; const initial = await snapshot(c);
+      await job.waitForReady(entered.promise); const initial = await snapshot(c);
       if (reason === 'cancel') await createOperationRunControlService({ getPoolFn: c.getPoolFn })
         .requestOperationRunCancellation({ runId: c.run.id, requestedByUserId: null });
       else await c.maintenance.acquireMaintenanceLock({ lockType: 'maintenance', reason: 'Controlled tag pause' });
@@ -202,19 +132,18 @@ suite('Captured scan source and acquisition own native tag snapshot persistence'
 
   test('expiry after actual root or file lock waits refuses both history and current fields', { timeout: config.scenarioTimeoutMs }, async (t) => {
     for (const lock of ['root', 'file']) await scenario(t, async (c) => {
-      const entered = gate(); const resume = gate();
+      const entered = createScopedFixtureGate(c.scope); const resume = createScopedFixtureGate(c.scope);
       const job = await start(c, c.a, { afterParse: async () => { entered.release(); await resume.promise; } });
-      await entered.promise; const initial = await snapshot(c); const holder = await c.pool.connect();
-      try {
-        await holder.query('BEGIN');
+      await job.waitForReady(entered.promise); const initial = await snapshot(c);
+      await startScopedFixtureWork(c.scope, () => withRollbackFixtureClient(c.pool, async (holder) => {
         await holder.query(lock === 'root' ? 'SELECT id FROM library_roots WHERE id=$1 FOR UPDATE'
           : 'SELECT id FROM library_files WHERE id=$1 FOR UPDATE', [lock === 'root' ? c.rootId : c.file.id]);
         const holderPid = (await holder.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
         await c.pool.query("UPDATE job_leases SET expires_at=clock_timestamp()+INTERVAL '700 milliseconds' WHERE lease_key=$1", [job.lease().leaseKey]);
-        resume.release(); await waitForBlock(c, holderPid); await c.pool.query('SELECT pg_sleep(0.8)');
+        resume.release(); await waitForBlock(c, holderPid, holder, job.done); await holder.query('SELECT pg_sleep(0.8)');
         await holder.query('COMMIT'); await job.done;
         assert.deepEqual(await snapshot(c), initial); assert.deepEqual(job.artwork, []); assert.deepEqual(job.downstream, []);
-      } finally { await holder.query('ROLLBACK'); holder.release(); }
+      }));
     });
   });
 
@@ -249,6 +178,7 @@ suite('Captured scan source and acquisition own native tag snapshot persistence'
 
   test('a genuine native parser failure persists once under current authority and preserves successful source stamps', { timeout: config.scenarioTimeoutMs }, async (t) => scenario(t, async (c) => {
     const lease = await c.a.acquireLease({ runId: c.run.id });
+    if (lease) c.scope.onAfterDrain(() => c.a.releaseLease({ runId: c.run.id, expectedLease: lease, status: 'completed' }));
     assert.equal(await c.a.markRunStarted({ runId: c.run.id, expectedLease: lease, summary: { libraryRoot: c.requestedRoot } }), true);
     const artwork = [];
     const extraction = createLibraryTagExtractionService({ writeOwnedLibraryFileTagSnapshot: c.tagOwner.writeOwnedLibraryFileTagSnapshot,
@@ -270,17 +200,20 @@ suite('Captured scan source and acquisition own native tag snapshot persistence'
     assert.equal(final.files[0].tag_extracted_size_bytes, successful.tag_extracted_size_bytes);
     assert.deepEqual(final.files[0].tag_extracted_modified_at, successful.tag_extracted_modified_at);
     assert.equal(artwork.length, 1);
-    await c.a.releaseLease({ runId: c.run.id, expectedLease: lease, status: 'completed' });
   }));
 
   test('tag transactions serialize before catalogue and organize root/file snapshots without deadlock', { timeout: config.scenarioTimeoutMs }, async (t) => {
     for (const other of ['catalogue', 'organize']) await scenario(t, async (c) => {
-      const entered = gate(); const resume = gate(); let tagPid;
+      const entered = createScopedFixtureGate(c.scope); const resume = createScopedFixtureGate(c.scope); let tagPid;
       const owner = c.createTagOwner(async (input) => {
         tagPid = (await input.queryable.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+        const observer = heldObserver(input.queryable, c.scope.signal);
         const queryable = { query: async (sql, values) => {
           const result = await input.queryable.query(sql, values);
-          if (sql.includes('INSERT INTO file_tag_snapshots')) { entered.release(); await resume.promise; }
+          if (sql.includes('INSERT INTO file_tag_snapshots')) {
+            entered.release(observer);
+            try { await resume.promise; } finally { await observer.drain(); }
+          }
           return result;
         } };
         return c.rawTags.writeLibraryFileTagSnapshot({ ...input, queryable });
@@ -288,6 +221,7 @@ suite('Captured scan source and acquisition own native tag snapshot persistence'
       const organizeRuns = c.makeRuns('tag-organize-coexistence', 'library_organize_apply');
       const organizeRun = await organizeRuns.createOperationRun({ status: 'pending' });
       const lease = await organizeRuns.acquireLease({ runId: organizeRun.id });
+      if (lease) c.scope.onAfterDrain(() => organizeRuns.releaseLease({ runId: organizeRun.id, expectedLease: lease, status: 'completed' }));
       await organizeRuns.markRunStarted({ runId: organizeRun.id, expectedLease: lease });
       const destination = join(c.rootPath, 'organized.wav'); const media = createMediaFilesystemService();
       const prepared = captureOrganizeMutation({ runId: organizeRun.id, expectedLease: lease,
@@ -295,13 +229,13 @@ suite('Captured scan source and acquisition own native tag snapshot persistence'
           currentPath: c.path, proposedPath: destination, proposedRelativePath: 'organized.wav' },
         plan: media.createExclusiveFileMutationPlan({ requestedMode: 'move', removeSourceAfterSuccess: true,
           sourcePath: c.path, sourceRoot: c.rootPath, destinationPath: destination, destinationRoot: c.rootPath }) });
-      const job = await start(c, c.a, { owner }); await entered.promise;
-      const contender = other === 'catalogue' ? c.catalog.recordLibraryFiles({ libraryRootPath: c.rootPath, files: [c.file] })
-        : c.withTransaction((queryable) => createLibraryOrganizeMutationStore().lockContext({ prepared, queryable }));
-      try { await waitForBlock(c, tagPid); } finally { resume.release(); }
+      const job = await start(c, c.a, { owner }); const tagConnection = await job.waitForReady(entered.promise);
+      const contender = startScopedFixtureWork(c.scope, () => other === 'catalogue'
+        ? c.catalog.recordLibraryFiles({ libraryRootPath: c.rootPath, files: [c.file] })
+        : c.withTransaction((queryable) => createLibraryOrganizeMutationStore().lockContext({ prepared, queryable })));
+      try { await waitForBlock(c, tagPid, tagConnection, contender); } finally { resume.release(); }
       await contender; await job.done;
       assert.equal((await snapshot(c)).history.length, 1); assert.equal((await parent(c)).status, 'completed');
-      await organizeRuns.releaseLease({ runId: organizeRun.id, expectedLease: lease, status: 'completed' });
     });
   });
 

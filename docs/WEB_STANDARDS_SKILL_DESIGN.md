@@ -242,3 +242,8 @@ applicable UI behavior; Node/PostgreSQL lifecycle contracts and OWASP input/logg
 practices own this CLI slice. A benchmark does not grant permission to expand the
 cohort or establish complete-gate throughput. Each recommendation must map to its
 implementation owner, failure case and executed evidence.
+
+The audited cohort extension routes fixture-specific ownership through its
+research/evidence map: after-drain SQL finalizers, discarded uncertain clients,
+idle-client read fences and parser-hook refusal before writes. Keep the entrypoint
+and invocation metadata unchanged; this is narrow reference maintenance.

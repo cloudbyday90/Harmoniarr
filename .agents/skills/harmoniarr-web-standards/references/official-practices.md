@@ -375,3 +375,22 @@ failure. Loopback alone is not authorization: use per-scope capabilities, bounde
 structured records and fixed diagnostics without credentials. Native test output
 has separate disclosure limits. This applies to trusted development fixtures,
 not arbitrary hostile privileged code, POSIX runtime proof or WCAG conformance.
+
+For audited cohort adoption, the fresh
+`docs/SHARED_POSTGRES_COHORT_ADOPTION_RESEARCH_2026_10.md` maps actual worker
+drainage and the documented pg client-discard API. Defer SQL lease finalizers
+until controlled holds release and transactions settle; an early release may
+wait on its own held rows. A paused client's observer must refuse new reads after
+abort and finish its current read before that owner's rollback. Distinguish
+fixture-hook failures from native parser errors at the owning write boundary.
+Node also aborts a test signal after normal completion; signal state alone is
+not an outcome or quiescence certificate. These are fixture ownership practices,
+not new UI behavior or permission to broaden a database cohort automatically.
+
+PostgreSQL activity monitoring has a transaction-held session snapshot separate
+from READ COMMITTED row snapshots. The same-case reproduced failure is recorded
+in the cohort-adoption outcome: a new contender can be absent from a paused
+transaction's cached activity view. Refresh with a separately awaited
+`pg_stat_clear_snapshot()` before polling statistics, retaining serial ownership,
+abort checks and the original bounds. This refreshes monitoring evidence; it
+does not reset counters, advance domain authority or justify a longer deadline.

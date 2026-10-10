@@ -69,8 +69,9 @@ spreading internal `pool.options` can omit protected, non-enumerable credentials
 
 Use PowerShell commands from the repository root.
 
-`npm run test:integration:shared-postgres` is an opt-in serial Wanted/catalogue
-cohort. It owns one fresh server, preserving isolated file processes, databases
+`npm run test:integration:shared-postgres` is an opt-in serial Wanted/catalogue/
+release-reconciliation/tag-snapshot cohort. It owns one fresh server, preserving
+isolated file processes, databases
 and pools. The default complete gate is unchanged. Do not expand its allowlist
 until every fixture-created database has the parent reserve/CREATE/OID commit
 contract. Raw Dockerized fixtures and manually created siblings require separate
@@ -79,6 +80,16 @@ absence, then reconcile before the next file. A signal acknowledgement or report
 end is insufficient. Unknown/replacement identities are refusals, not prefix-based
 cleanup targets. See `docs/POSTGRES_TEST_LAUNCHER_DESIGN.md` and its outcome for
 measured scope and process/platform limits.
+
+The audited extension uses scoped gates and actual worker/task drainage before
+temporary media or database teardown. Defer captured lease SQL until held
+transactions drain; discard clients after uncertain BEGIN/ROLLBACK. A borrowed
+paused transaction must stop observer admission on abort, drain its current read
+before rollback, and refresh PostgreSQL's monitoring snapshot before each activity
+poll. READ COMMITTED row snapshots alone don't refresh that cache. Native test
+signals can also abort after normal completion. See
+`docs/SHARED_POSTGRES_COHORT_ADOPTION_DESIGN.md` and its outcome for adverse proof,
+the retained failed candidate and matched-order measurement limitations.
 
 ## Validation Matrix
 

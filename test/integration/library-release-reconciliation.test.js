@@ -13,6 +13,10 @@ import { createPostgresIntegrationRuntime } from '../../testing/postgres-integra
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 import { isSkippableIntegrationRuntimeError, toIntegrationRuntimeUnavailableReason } from '../../testing/integration/runtime-availability.js';
 import { seedMetadataReleaseFixture } from '../../testing/integration/metadata-fixtures.js';
+import { waitForFixtureReady } from '../../testing/integration/fixture-lifecycle.js';
+import { createScopedFixtureGate, startScopedFixtureWork, withFixtureWorkScope } from '../../testing/integration/fixture-work-scope.js';
+import { withRollbackFixtureClient } from '../../testing/integration/fixture-transaction-client.js';
+import { startReleaseReconciliationFixtureWorker } from '../../testing/integration/library-release-reconciliation-worker-fixture.js';
 import { applyPendingMigrations } from '../../src/server/migrations.js';
 import { createDatabaseTransactionRunner } from '../../src/server/database-transaction-service.js';
 import { createJobLeaseStore } from '../../src/server/job-lease-store.js';
@@ -22,7 +26,6 @@ import { createMaintenanceLockService } from '../../src/server/recovery/maintena
 import { createMaintenanceLockWriteGuardService } from '../../src/server/recovery/maintenance-lock-write-guard-service.js';
 import { createLibraryCatalogStore } from '../../src/server/library/library-catalog-store.js';
 import { createLibraryScanCatalogueService } from '../../src/server/library/library-scan-catalogue-service.js';
-import { createLibraryScanWorker } from '../../src/server/library/library-scan-worker.js';
 import { createLibraryFileMatchStore } from '../../src/server/library/library-file-match-store.js';
 import { createLibraryFileMatchService } from '../../src/server/library/library-file-match-service.js';
 import { createLibraryFileMatcherService } from '../../src/server/library/library-file-matcher-service.js';
@@ -44,10 +47,23 @@ const config = resolveIntegrationTestRuntimeConfig();
 let runtime;
 let unavailable;
 let reportedVersion = false;
-function gate() {
-  let release;
-  const promise = new Promise((done) => { release = done; });
-  return { promise, release };
+const gate = (c) => createScopedFixtureGate(c.scope);
+const ready = (c, readiness, operation) => waitForFixtureReady({ ready: readiness, operation, signal: c.scope.signal });
+// The original rejection remains observable/asserted; only its cleanup drain settles normally.
+const expectedWork = (c, work) => startScopedFixtureWork({ ...c.scope,
+  track: (operation) => c.scope.track(operation.then(() => undefined, () => undefined)),
+}, work);
+const releaseAfterDrain = (c, runs, runId, lease) => c.scope.onAfterDrain(() => runs.releaseLease({
+  runId, expectedLease: lease, status: 'completed',
+}));
+// A cancelled hold waits for its observer's current read before the owner can roll back this client.
+function heldObserver(queryable, signal) {
+  let inFlight = Promise.resolve();
+  return { query: (...args) => {
+    if (signal.aborted) throw signal.reason;
+    inFlight = queryable.query(...args); return inFlight;
+  },
+    drain: () => inFlight.then(() => undefined, () => undefined) };
 }
 const projection = async (c) => (await c.pool.query('SELECT * FROM library_release_reconciliations ORDER BY metadata_release_id')).rows;
 const parent = async (c) => (await c.pool.query('SELECT * FROM operation_runs WHERE id=$1', [c.run.id])).rows[0];
@@ -117,38 +133,43 @@ async function scenario(t, callback) {
       withTransaction, assertMaintenanceWriteAllowed });
     const context = (runId, lease, root = rootPath, rootId = first.libraryRootId) => ({ runId, expectedLease: lease,
       requestedLibraryRoot: root, libraryRootPath: root, libraryRootId: rootId });
-    await callback({ pool, getPoolFn, base, rootPath, otherRoot, first, second, metadataA, metadataB, metadataC,
-      extraTrack, observation, catalog, rawMatches, rawProjection, coverage, a, b, run, makeRuns, maintenance,
-      withTransaction, assertMaintenanceWriteAllowed, catalogueOwner, makeService, context });
-  });
+    await withFixtureWorkScope({ signal: t.signal }, (scope) => callback({ scope, pool, getPoolFn, base, rootPath, otherRoot,
+      first, second, metadataA, metadataB, metadataC, extraTrack, observation, catalog, rawMatches, rawProjection, coverage,
+      a, b, run, makeRuns, maintenance, withTransaction, assertMaintenanceWriteAllowed, catalogueOwner, makeService, context }));
+  }, { signal: t.signal });
 }
 async function open(c, runs = c.a, root = c.rootPath) {
   const run = root === c.rootPath ? c.run : await runs.createOperationRun({ status: 'pending', summary: { libraryRoot: root } });
   const lease = await runs.acquireLease({ runId: run.id });
+  releaseAfterDrain(c, runs, run.id, lease);
   assert.equal(await runs.markRunStarted({ runId: run.id, expectedLease: lease, summary: { libraryRoot: root } }), true);
   return { run, lease, input: c.context(run.id, lease, root, root === c.rootPath ? c.first.libraryRootId : c.second.libraryRootId) };
 }
 async function startWorker(c, runs, reconciler) {
-  const released = gate(); const later = []; let lease;
-  const worker = createLibraryScanWorker({ ...runs,
-    acquireLease: async (input) => { lease = await runs.acquireLease(input); return lease; },
-    executeScan: async ({ onFile }) => {
-      await onFile(c.observation(c.rootPath));
-      return { libraryRoot: c.rootPath, filesSeen: 1, filesMatched: 1, filesUnmatched: 0 };
-    },
+  return startReleaseReconciliationFixtureWorker({ scope: c.scope, runs, runId: c.run.id, libraryRoot: c.rootPath,
+    observation: c.observation,
     recordLibraryScanCatalogue: c.catalogueOwner.recordLibraryScanCatalogue,
     reconcileLibraryReleases: reconciler,
-    reconcileWantedReleases: async () => { later.push('wanted'); },
-    reconcileDiscoveryRequests: async () => { later.push('discovery'); },
-    releaseLease: async (input) => { try { return await runs.releaseLease(input); } finally { released.release(); } },
   });
-  await worker.startWorkerRun({ runId: c.run.id, libraryRoot: c.rootPath });
-  return { done: released.promise, later, lease: () => lease };
 }
-async function waitForBlock(c, holderPid) {
+async function waitForBlock(c, holderPid, queryable, operation) {
+  let outcome;
+  operation.then(() => { outcome = { completed: true }; }, (error) => { outcome = { error }; });
+  const assertPending = () => {
+    if (c.scope.signal.aborted) throw c.scope.signal.reason;
+    if (outcome && Object.hasOwn(outcome, 'error')) throw outcome.error;
+    if (outcome?.completed) throw Object.assign(new Error('Fixture operation completed before the required lock wait'), {
+      code: 'fixture_operation_completed_before_ready',
+    });
+  };
   for (let count = 0; count < 100; count += 1) {
-    if ((await c.pool.query(`SELECT pid FROM pg_stat_activity WHERE datname=current_database()
-      AND $1::integer=ANY(pg_blocking_pids(pid))`, [holderPid])).rowCount) return;
+    assertPending();
+    await queryable.query('SELECT pg_stat_clear_snapshot()');
+    assertPending();
+    const observed = await queryable.query(`SELECT pid FROM pg_stat_activity WHERE datname=current_database()
+      AND $1::integer=ANY(pg_blocking_pids(pid))`, [holderPid]);
+    assertPending();
+    if (observed.rowCount) return;
     await new Promise((done) => { setTimeout(done, 10); });
   }
   assert.fail('Expected an actual PostgreSQL projection/root lock wait');
@@ -167,14 +188,14 @@ suite('Original scan acquisition owns serialized global release reconciliation',
   test('an old scan body paused after preliminary coverage observation cannot overwrite or clear replacement publication', { timeout: config.scenarioTimeoutMs }, async (t) => {
     for (const empty of [false, true]) await scenario(t, async (c) => {
       if (empty) await c.pool.query("UPDATE library_file_matches SET match_status='unmatched'");
-      const entered = gate(); const resume = gate(); const oldOwner = c.makeService();
+      const entered = gate(c); const resume = gate(c); const oldOwner = c.makeService();
       const first = await startWorker(c, c.a, async (input) => {
         const diagnostic = await c.coverage.loadLibraryReleaseCoverageRows({ queryable: c.pool });
         assert.equal(diagnostic.length === 0, empty); entered.release(); await resume.promise;
         // This diagnostic read is never passed back as authority or a cached replacement.
         return oldOwner.reconcileLibraryReleases(input);
       });
-      await entered.promise; await expire(c, first.lease());
+      await first.waitForReady(entered.promise); await expire(c, first.lease());
       await c.pool.query("UPDATE library_file_matches SET match_status='matched'");
       const replacement = await startWorker(c, c.b, c.makeService().reconcileLibraryReleases); await replacement.done;
       const current = await projection(c); const completed = await parent(c);
@@ -188,7 +209,7 @@ suite('Original scan acquisition owns serialized global release reconciliation',
 
   test('current global complete, partial, duplicate and genuinely empty coverage publish verified identities', { timeout: config.scenarioTimeoutMs }, async (t) => scenario(t, async (c) => {
     const active = await open(c); const owner = c.makeService();
-    const first = await owner.reconcileLibraryReleases(active.input);
+    const first = await startScopedFixtureWork(c.scope, () => owner.reconcileLibraryReleases(active.input));
     assert.deepEqual(new Set(first.metadataReleaseIds), new Set([c.metadataA.metadataReleaseId, c.metadataB.metadataReleaseId]));
     assert.deepEqual(first.deletedMetadataReleaseIds, [c.metadataC.metadataReleaseId]);
     let rows = await projection(c);
@@ -197,23 +218,22 @@ suite('Original scan acquisition owns serialized global release reconciliation',
     const duplicate = await c.catalog.recordLibraryFiles({ libraryRootPath: c.otherRoot,
       files: [c.observation(c.otherRoot), c.observation(c.otherRoot, 'duplicate.flac')] });
     await c.rawMatches.writeLibraryFileMatch(matched(duplicate.files.find((file) => basename(file.canonicalPath) === 'duplicate.flac'), c.metadataB));
-    await owner.reconcileLibraryReleases(active.input); rows = await projection(c);
+    await startScopedFixtureWork(c.scope, () => owner.reconcileLibraryReleases(active.input)); rows = await projection(c);
     const duplicated = rows.find((row) => row.metadata_release_id === c.metadataB.metadataReleaseId);
     assert.equal(duplicated.reconciliation_status, 'duplicate'); assert.equal(duplicated.duplicate_track_count, 1);
     assert.equal(duplicated.missing_track_count, 1); assert.equal(duplicated.matched_file_count, 2);
     await c.pool.query('UPDATE library_files SET deleted_at=clock_timestamp()');
-    const cleared = await owner.reconcileLibraryReleases(active.input);
+    const cleared = await startScopedFixtureWork(c.scope, () => owner.reconcileLibraryReleases(active.input));
     assert.deepEqual(cleared.metadataReleaseIds, []); assert.equal(cleared.deletedMetadataReleaseIds.length, 2);
     assert.deepEqual(await projection(c), []);
-    await c.a.releaseLease({ runId: c.run.id, expectedLease: active.lease, status: 'completed' });
   }));
 
   test('other-root phantoms, metadata track changes, cascades and initially empty changes refuse the old aggregate', { timeout: config.scenarioTimeoutMs }, async (t) => {
     for (const change of ['other_root', 'new_release', 'track', 'cascade', 'empty']) await scenario(t, async (c) => {
-      const active = await open(c); const entered = gate(); const resume = gate(); const initial = await projection(c);
+      const active = await open(c); const entered = gate(c); const resume = gate(c); const initial = await projection(c);
       if (change === 'empty') await c.pool.query("UPDATE library_file_matches SET match_status='unmatched'");
       const owner = c.makeService({ afterCoverage: async ({ index }) => { if (index === 1) { entered.release(); await resume.promise; } } });
-      const pending = owner.reconcileLibraryReleases(active.input); await entered.promise;
+      const pending = expectedWork(c, () => owner.reconcileLibraryReleases(active.input)); await ready(c, entered.promise, pending);
       if (change === 'other_root') {
         const observed = await c.catalog.recordLibraryFiles({ libraryRootPath: c.otherRoot,
           files: [c.observation(c.otherRoot), c.observation(c.otherRoot, 'new-track.flac')] });
@@ -228,36 +248,34 @@ suite('Original scan acquisition owns serialized global release reconciliation',
       if (change === 'empty') await c.pool.query("UPDATE library_file_matches SET match_status='matched'");
       resume.release(); await assert.rejects(pending, { code: 'library_release_reconciliation_stale' });
       assert.deepEqual(owner.mutations, []); assert.deepEqual(await projection(c), initial);
-      await c.a.releaseLease({ runId: c.run.id, expectedLease: active.lease, status: 'completed' });
     });
   });
 
   test('real global-advisory, root-table, target-table and target-row waits crossing expiry roll back publication', { timeout: config.scenarioTimeoutMs }, async (t) => {
     for (const wait of ['advisory', 'root_table', 'target_table', 'target_row']) await scenario(t, async (c) => {
-      const active = await open(c); const initial = await projection(c); const holder = await c.pool.connect();
-      try {
-        await holder.query('BEGIN');
+      const active = await open(c); const initial = await projection(c);
+      await startScopedFixtureWork(c.scope, () => withRollbackFixtureClient(c.pool, async (holder) => {
         if (wait === 'advisory') await lockLibraryReleaseReconciliation({ queryable: holder });
         if (wait === 'root_table') await holder.query('LOCK TABLE library_roots IN ACCESS EXCLUSIVE MODE');
         if (wait === 'target_table') await holder.query('LOCK TABLE library_release_reconciliations IN ACCESS EXCLUSIVE MODE');
         if (wait === 'target_row') await holder.query('SELECT metadata_release_id FROM library_release_reconciliations WHERE metadata_release_id=$1 FOR UPDATE', [c.metadataC.metadataReleaseId]);
         const pid = (await holder.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
         await c.pool.query("UPDATE job_leases SET expires_at=clock_timestamp()+INTERVAL '700 milliseconds' WHERE lease_key=$1", [active.lease.leaseKey]);
-        const result = c.makeService().reconcileLibraryReleases(active.input);
+        const result = expectedWork(c, () => c.makeService().reconcileLibraryReleases(active.input));
         const settled = result.then((value) => ({ value }), (error) => ({ error }));
-        await waitForBlock(c, pid); await c.pool.query('SELECT pg_sleep(0.8)'); await holder.query('COMMIT');
+        await waitForBlock(c, pid, holder, result); await holder.query('SELECT pg_sleep(0.8)'); await holder.query('COMMIT');
         assert.equal((await settled).error?.code, 'operation_run_lease_lost');
         assert.deepEqual(await projection(c), initial);
-      } finally { await holder.query('ROLLBACK'); holder.release(); }
-      await c.a.releaseLease({ runId: c.run.id, expectedLease: active.lease, status: 'completed' });
+      }));
     });
   });
 
   test('different-root admission is serialized and a waiter overrides repeatable-read before fresh coverage and mutation timestamps', { timeout: config.scenarioTimeoutMs }, async (t) => scenario(t, async (c) => {
     const first = await open(c); const second = await open(c, c.b, c.otherRoot);
-    const entered = gate(); const resume = gate(); const admitted = gate(); const allowRead = gate(); let holderPid;
+    const entered = gate(c); const resume = gate(c); const admitted = gate(c); const allowRead = gate(c); let holderPid; let heldQueryable;
     const ownerA = c.makeService({ afterCoverage: async ({ queryable, index }) => { if (index === 1) {
-      holderPid = (await queryable.query('SELECT pg_backend_pid() AS pid')).rows[0].pid; entered.release(); await resume.promise;
+      heldQueryable = heldObserver(queryable, c.scope.signal); holderPid = (await queryable.query('SELECT pg_backend_pid() AS pid')).rows[0].pid; entered.release();
+      try { await resume.promise; } finally { await heldQueryable.drain(); }
     } } });
     const authority = createLibraryReleaseReconciliationGuardStore();
     const ownerB = c.makeService({
@@ -272,24 +290,23 @@ suite('Original scan acquisition owns serialized global release reconciliation',
         assert.equal(rows.find((row) => row.metadata_release_id === c.metadataB.metadataReleaseId).expected_track_count, 3);
       } },
     });
-    const publicationA = ownerA.reconcileLibraryReleases(first.input); await entered.promise;
-    const publicationB = ownerB.reconcileLibraryReleases(second.input); await waitForBlock(c, holderPid);
+    const publicationA = startScopedFixtureWork(c.scope, () => ownerA.reconcileLibraryReleases(first.input)); await ready(c, entered.promise, publicationA);
+    const publicationB = startScopedFixtureWork(c.scope, () => ownerB.reconcileLibraryReleases(second.input));
+    await waitForBlock(c, holderPid, heldQueryable, publicationB);
     assert.equal(ownerB.reads(), 0); resume.release(); await publicationA; const previousProjection = await projection(c);
-    await admitted.promise;
+    await ready(c, admitted.promise, publicationB);
     await insertMetadataTrack({ metadataMediumId: c.metadataB.metadataMediumId, position: 3, numberText: '3', title: 'Committed before waiter read' }, c.pool);
     allowRead.release(); await publicationB; const afterRows = await projection(c);
     const earlier = previousProjection.find((row) => row.metadata_release_id === c.metadataB.metadataReleaseId);
     const later = afterRows.find((row) => row.metadata_release_id === c.metadataB.metadataReleaseId);
     assert.equal(later.expected_track_count, 3); assert.ok(later.last_reconciled_at >= earlier.last_reconciled_at);
-    await c.a.releaseLease({ runId: first.run.id, expectedLease: first.lease, status: 'completed' });
-    await c.b.releaseLease({ runId: second.run.id, expectedLease: second.lease, status: 'completed' });
   }));
 
   test('cancellation, maintenance and root-frame changes stop reconciliation and subsequent worker stages', { timeout: config.scenarioTimeoutMs }, async (t) => {
     for (const change of ['cancel', 'maintenance', 'requested', 'root']) await scenario(t, async (c) => {
-      const entered = gate(); const resume = gate(); const initial = await projection(c);
+      const entered = gate(c); const resume = gate(c); const initial = await projection(c);
       const owner = c.makeService({ beforeTransaction: async () => { entered.release(); await resume.promise; } });
-      const job = await startWorker(c, c.a, owner.reconcileLibraryReleases); await entered.promise;
+      const job = await startWorker(c, c.a, owner.reconcileLibraryReleases); await job.waitForReady(entered.promise);
       if (change === 'cancel') await createOperationRunControlService({ getPoolFn: c.getPoolFn }).requestOperationRunCancellation({ runId: c.run.id, requestedByUserId: null });
       if (change === 'maintenance') await c.maintenance.acquireMaintenanceLock({ lockType: 'maintenance', reason: 'Controlled release pause' });
       if (change === 'requested') await c.pool.query("UPDATE operation_runs SET summary=jsonb_set(summary,'{libraryRoot}',to_jsonb($2::text)) WHERE id=$1", [c.run.id, join(c.base, 'changed')]);
@@ -316,7 +333,7 @@ suite('Original scan acquisition owns serialized global release reconciliation',
         if (failure === 'expiry') await queryable.query("UPDATE job_leases SET expires_at=clock_timestamp()-INTERVAL '1 second' WHERE lease_key=$1", [active.lease.leaseKey]);
         if (failure === 'source') await insertMetadataTrack({ metadataMediumId: c.metadataA.metadataMediumId, position: 2, numberText: '2', title: 'Changed after replacement' }, c.pool);
       } });
-      const rejection = await owner.reconcileLibraryReleases(active.input).then(() => null, (error) => error);
+      const rejection = await expectedWork(c, () => owner.reconcileLibraryReleases(active.input)).then(() => null, (error) => error);
       assert.ok(rejection);
       if (failure === 'delete' || failure === 'bulk') assert.match(rejection.message, /Controlled projection SQL failure/u);
       if (failure.startsWith('skip')) assert.equal(rejection.code, 'library_release_reconciliation_incomplete');
@@ -324,20 +341,21 @@ suite('Original scan acquisition owns serialized global release reconciliation',
       if (failure === 'source') assert.equal(rejection.code, 'library_release_reconciliation_stale');
       if (failure === 'expiry' || failure === 'source') assert.equal(provisional, 2);
       assert.deepEqual(await projection(c), initial);
-      await c.a.releaseLease({ runId: c.run.id, expectedLease: active.lease, status: 'completed' });
     });
   });
 
   test('source writers can progress without dependency locks and standalone projection writers share admission', { timeout: config.scenarioTimeoutMs }, async (t) => scenario(t, async (c) => {
-    const active = await open(c); const entered = gate(); const resume = gate(); let pid;
+    const active = await open(c); const entered = gate(c); const resume = gate(c); let pid; let heldQueryable;
     const owner = c.makeService({ afterCoverage: async ({ queryable, index }) => { if (index === 1) {
-      pid = (await queryable.query('SELECT pg_backend_pid() AS pid')).rows[0].pid; entered.release(); await resume.promise;
+      heldQueryable = heldObserver(queryable, c.scope.signal); pid = (await queryable.query('SELECT pg_backend_pid() AS pid')).rows[0].pid; entered.release();
+      try { await resume.promise; } finally { await heldQueryable.drain(); }
     } } });
-    const pending = owner.reconcileLibraryReleases(active.input); await entered.promise;
+    const pending = startScopedFixtureWork(c.scope, () => owner.reconcileLibraryReleases(active.input)); await ready(c, entered.promise, pending);
     // A cooperating scan has a distinct acquisition even when observing the same root.
     const producerRuns = c.makeRuns('source-cooperator');
     const producerRun = await producerRuns.createOperationRun({ status: 'pending', summary: { libraryRoot: c.rootPath } });
     const producerLease = await producerRuns.acquireLease({ runId: producerRun.id });
+    releaseAfterDrain(c, producerRuns, producerRun.id, producerLease);
     await producerRuns.markRunStarted({ runId: producerRun.id, expectedLease: producerLease });
     await c.catalog.recordLibraryFiles({ libraryRootPath: c.rootPath,
       files: [c.observation(c.rootPath), c.observation(c.rootPath, 'ignored.flac', 'ignored')] });
@@ -360,6 +378,7 @@ suite('Original scan acquisition owns serialized global release reconciliation',
     const organizeRuns = c.makeRuns('organize-cooperator', 'library_organize_apply');
     const organizeRun = await organizeRuns.createOperationRun({ status: 'pending' });
     const organizeLease = await organizeRuns.acquireLease({ runId: organizeRun.id });
+    releaseAfterDrain(c, organizeRuns, organizeRun.id, organizeLease);
     await organizeRuns.markRunStarted({ runId: organizeRun.id, expectedLease: organizeLease });
     const file = c.first.files[0]; const destination = join(c.rootPath, 'organized.flac');
     const prepared = captureOrganizeMutation({ runId: organizeRun.id, expectedLease: organizeLease,
@@ -369,11 +388,8 @@ suite('Original scan acquisition owns serialized global release reconciliation',
         sourcePath: file.canonicalPath, sourceRoot: c.rootPath, destinationPath: destination, destinationRoot: c.rootPath }) });
     await c.withTransaction((queryable) => createLibraryOrganizeMutationStore().lockContext({ prepared, queryable }));
     const currentRows = mapReleaseCoverageRows(await c.coverage.loadLibraryReleaseCoverageRows({ queryable: c.pool }));
-    const rawPending = c.rawProjection.replaceLibraryReleaseReconciliations({ reconciliations: currentRows });
-    await waitForBlock(c, pid); resume.release(); await pending; await rawPending;
+    const rawPending = startScopedFixtureWork(c.scope, () => c.rawProjection.replaceLibraryReleaseReconciliations({ reconciliations: currentRows }));
+    await waitForBlock(c, pid, heldQueryable, rawPending); resume.release(); await pending; await rawPending;
     assert.equal((await projection(c)).length, 2);
-    await c.a.releaseLease({ runId: c.run.id, expectedLease: active.lease, status: 'completed' });
-    await producerRuns.releaseLease({ runId: producerRun.id, expectedLease: producerLease, status: 'completed' });
-    await organizeRuns.releaseLease({ runId: organizeRun.id, expectedLease: organizeLease, status: 'completed' });
   }));
 });
