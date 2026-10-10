@@ -138,3 +138,20 @@ isolation across a failed clone and refusal before seeds after source reopening.
 Trace explicit domain overrides and bound pool calls before trusting a faster
 profile. The library-template outcome separates phase costs, default/trial wall
 variance and dedicated untemplated proof from complete-gate validation.
+
+Catalogue's reusable scenario and worker live in
+`library-scan-catalogue-scenario.js` and `library-scan-catalogue-worker-fixture.js`.
+`fixture-lock-observer.js` owns serialized activity reads, closed admission and
+current-read drain. Trace native acquisition refusal, after-walk hook failures,
+actual release settlement and organize-task registration before trusting cleanup.
+`library-catalogue-fixture-lifecycle.test.js`, `library-catalogue-template-adoption.test.js`
+and the separate catalogue outcome own executed
+rollback, media removal, clone independence and pre-seed refusal claims.
+
+App-fixture preparation is a different path: `testing/integration/app-runtime.js`
+and `src/server/database.js` own its global pool and shutdown behavior. For a
+first-checkout failure, retain bounded native cause/pool counters and owned server
+phases before attributing it to template selection or scheduling. A fixed delay
+is not observed task drainage; source-review lifetime candidates and passing
+retries are not reproduced causes or remediation. The catalogue outcome retains
+the rejected broad attempt and focused investigation separately.

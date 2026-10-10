@@ -6,7 +6,50 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
-## Current development slice: Measured library schema templates (2026-10-10)
+## Current development slice: Catalogue fixture lifetime and templates (2026-10-10)
+
+- Preserve eight native catalogue cases/thirteen fresh variants while adopting
+  scoped gates, observed completion, tracked organize work, after-drain captured
+  leases, rollback clients and closed/drained borrowed statistics reads. Narrow
+  ESM modules own scenario/workspace, worker and lock observation. See
+  [design](CATALOGUE_TEST_LIFECYCLE_DESIGN.md),
+  [outcome](CATALOGUE_TEST_LIFECYCLE_OUTCOME.md) and
+  [official research](CATALOGUE_TEST_LIFECYCLE_RESEARCH_2026_10.md).
+- Nine worker/observer and four strict schema-policy controls pass. Four actual
+  PG cases prove original Error/null preservation through held rollback/release/
+  media removal, failed-clone rows/trigger/run/lease/file independence and
+  reopened-source refusal before workspace or seeds. Dedicated untemplated
+  bootstrap passes 105/105; security reports zero npm vulnerabilities.
+- Audited empty and explicit template profiles retain all 34 cases: 72.14s and
+  69.19s wall, 92/92 and 93/93 owned/releases, zero failures/cancellations/skips/
+  reaped databases. Catalogue source plus checks is 1.59s versus 16.51s repeated
+  application, with another 0.43s verification. Wall gain is 4.1% locally;
+  pre-audit/cache differences do not establish causal full-gate/CI performance.
+- Only original catalogue selects the verified source by default; its independent
+  empty override remains. Global and dedicated lifecycle/bootstrap/migration/
+  recovery paths remain empty. Ten source files are frozen for the final complete
+  gate with overrides absent. `npm run validate` passes 9,901 tests (4,612 server,
+  4,377 client, 552 script, 360 integration), zero fail/cancel/skip and both builds.
+  Wall24m28s/integration21m32s do not demonstrate whole-gate improvement.
+  The first broad attempt encountered two unchanged app-fixture bootstrap
+  pool acquisition failures and was deliberately stopped; focused 2/2 pass,
+  original causes remain unreproduced and source hashes are unchanged.
+- Maintain the standards AI skill's source/evidence map and installed identity.
+  Fresh complete PR checks find no eligible unreplayed patch: separate
+  [design](OPEN_PR_APPLICABILITY_CATALOGUE_LIFECYCLE_2026_10_DESIGN.md) and
+  [outcome](OPEN_PR_APPLICABILITY_CATALOGUE_LIFECYCLE_2026_10_OUTCOME.md).
+- Next: capture bounded first-checkout error/pool/server diagnostics and audit
+  app-fixture invocation/pool lifetimes before scheduling changes. After that,
+  compose exactly the audited cohort plus a disjoint,
+  exhaustive serial remainder into the complete gate, with matched whole-gate
+  count/timing proof before promotion. Discovery-request recomputation remains
+  next product work. Main only; no release, branch, tag, deployment or PR merge.
+- Subsequent user-requested no-cache local walkthrough rebuild follows the
+  separate [design](LOCAL_DOCKER_REBUILD_2026_10_DESIGN.md) and
+  [research](LOCAL_DOCKER_REBUILD_RESEARCH_2026_10.md), with preserved existing
+  state and applicable isolated packaged/browser proofs after code publication.
+
+## Prior development slice: Measured library schema templates (2026-10-10)
 
 - Instrument actual schema, seed and work/drain through two narrow ESM helpers
   (explicit pool preparation and strict per-suite mode policy), preserving original

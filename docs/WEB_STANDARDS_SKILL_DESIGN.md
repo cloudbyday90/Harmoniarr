@@ -252,3 +252,9 @@ The measured library-template extension locates explicit schema/domain policy,
 source lineage and fresh-clone seeding. Distinguish owner verification from case
 filename idempotence and nested phase costs from profile wall time. Reuse the
 existing owner instead of prescribing a new cache or broader cohort by inference.
+
+Catalogue maintenance maps observed completion versus finally markers, closed
+borrowed-read admission, after-drain manual leases and source admission before
+workspace creation. Preserve the skill's routing/metadata and keep runtime,
+structure and browser-conformance evidence separate. The catalogue documents
+own the current research, recommendations and executed measurements.

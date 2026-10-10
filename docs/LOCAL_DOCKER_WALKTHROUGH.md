@@ -199,8 +199,10 @@ browser-visible diagnostic panel. To require that slskd accepted at least one
 transfer, run:
 
 Before starting an Import Review download run, verify the connection and path
-mapping alone with the explicit read-only mode. It never starts a provider
-request or transfer, and it does not claim that one has been accepted:
+mapping alone with the explicit readiness-only mode. It signs in and may read
+download status from the configured provider. It submits no searches or transfer
+commands, changes no provider configuration, and does not require or claim an
+accepted transfer:
 
 ```powershell
 npm run validate:docker-provider-acceptance -- -- --readiness-only

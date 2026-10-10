@@ -72,12 +72,24 @@ Use PowerShell commands from the repository root.
 Release reconciliation and tag snapshots also select a private per-file migration
 source. Their independent overrides are `HARMONIARR_INTEGRATION_RELEASE_SCHEMA_MODE`
 and `HARMONIARR_INTEGRATION_TAG_SCHEMA_MODE`: `empty` preserves comparison and
-`migration_template` selects the audited path. Catalogue/global/dedicated
+`migration_template` selects the audited path. Global/dedicated
 bootstrap/recovery defaults are unchanged. Measure actual schema, seed and work
 spans; tag work includes seeding, so don't add nested spans twice. The per-clone
 migration call is an idempotent filename check; complete source key/checksum/status
 lineage belongs to the existing template owner. See
 `docs/LIBRARY_TEST_SCHEMA_TEMPLATES_DESIGN.md` and its measured outcome.
+
+Catalogue now selects its own verified migration-only source after the scoped
+worker/task/observer/workspace audit. Use
+`HARMONIARR_INTEGRATION_CATALOGUE_SCHEMA_MODE=empty` for comparison, or
+`migration_template` for explicit selection. Dedicated catalogue adverse
+lifetimes still prepare empty databases. Its seed/work spans do not overlap;
+scenario_work includes actual drain and manual lease finalizers. See
+`docs/CATALOGUE_TEST_LIFECYCLE_DESIGN.md` and its outcome for unchanged native
+cases, Error/null rollback, clone isolation, pre-seed refusal and local variance.
+Remove override variables for default-mode proof; an empty value is a deliberate
+strict refusal, not absence. Avoid repeating a passing cohort after promotion
+when the final complete gate already exercises its changed default.
 
 `npm run test:integration:shared-postgres` is an opt-in serial Wanted/catalogue/
 release-reconciliation/tag-snapshot cohort. It owns one fresh server, preserving

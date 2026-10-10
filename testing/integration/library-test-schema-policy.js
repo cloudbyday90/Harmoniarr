@@ -6,6 +6,7 @@
  */
 
 export const libraryTestSchemaEnvironmentKeys = Object.freeze({
+  catalogue: 'HARMONIARR_INTEGRATION_CATALOGUE_SCHEMA_MODE',
   release_reconciliation: 'HARMONIARR_INTEGRATION_RELEASE_SCHEMA_MODE',
   tag_snapshot: 'HARMONIARR_INTEGRATION_TAG_SCHEMA_MODE',
 });

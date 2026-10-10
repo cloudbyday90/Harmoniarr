@@ -403,3 +403,12 @@ zero sessions and captured OID/role; settings/GRANTs are not assumed copied.
 Report preparation/check/validation/copy costs separately and keep nested spans
 out of wall-time sums. Explicit suite defaults don't authorize global template
 selection, migration/bootstrap/recovery replacement or a new conformance claim.
+
+Catalogue lifetime assessment follows the fresh
+`docs/CATALOGUE_TEST_LIFECYCLE_RESEARCH_2026_10.md`. A finally-released marker
+is not observed worker completion: acquisition refusal and release failures need
+their own settled outcomes. Race held readiness against that outcome, register
+direct work before launch and drain current borrowed-client reads before rollback.
+Close observer admission before drainage; refresh monitoring snapshots within
+paused transactions. Assess template preparation only after these owners are
+sound, retaining independent sources/clones and unchanged domain assertions.

@@ -21,19 +21,23 @@ test('suite defaults and explicit empty/template overrides select only supported
 });
 test('per-domain overrides cannot retarget another domain or inherit Wanted mode', () => {
   const env = { HARMONIARR_INTEGRATION_RELEASE_SCHEMA_MODE: 'empty',
+    HARMONIARR_INTEGRATION_CATALOGUE_SCHEMA_MODE: 'empty',
     HARMONIARR_INTEGRATION_TAG_SCHEMA_MODE: 'migration_template', HARMONIARR_INTEGRATION_WANTED_SCHEMA_MODE: 'malformed' };
   assert.equal(resolveLibraryTestSchemaMode({ domain: 'release_reconciliation', env, defaultMode: 'migration_template' }), 'empty');
   assert.equal(resolveLibraryTestSchemaMode({ domain: 'tag_snapshot', env }), 'migration_template');
+  assert.equal(resolveLibraryTestSchemaMode({ domain: 'catalogue', env, defaultMode: 'migration_template' }), 'empty');
 });
 test('unknown, null, empty and non-string configured modes refuse without fallback or reflecting their contents', () => {
-  for (const value of ['', null, false, [], 'snapshot', 'private-password']) {
-    assert.throws(() => resolveLibraryTestSchemaMode({ domain: 'tag_snapshot',
-      env: { HARMONIARR_INTEGRATION_TAG_SCHEMA_MODE: value }, defaultMode: 'migration_template' }),
-    (error) => error instanceof TypeError && !error.message.includes('private-password'));
+  for (const domain of Object.keys(libraryTestSchemaEnvironmentKeys)) {
+    for (const value of ['', null, false, [], 'snapshot', 'private-password']) {
+      assert.throws(() => resolveLibraryTestSchemaMode({ domain,
+        env: { [libraryTestSchemaEnvironmentKeys[domain]]: value }, defaultMode: 'migration_template' }),
+      (error) => error instanceof TypeError && !error.message.includes('private-password'));
+    }
   }
 });
 test('unsupported owners and defaults cannot select a library template mode', () => {
-  for (const domain of ['catalogue', 'wanted', '__proto__', undefined]) {
+  for (const domain of ['wanted', '__proto__', undefined]) {
     assert.throws(() => resolveLibraryTestSchemaMode({ domain, env: {} }), TypeError);
   }
   assert.throws(() => resolveLibraryTestSchemaMode({ domain: 'tag_snapshot', env: null }), TypeError);

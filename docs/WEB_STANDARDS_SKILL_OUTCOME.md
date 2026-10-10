@@ -473,3 +473,14 @@ savings from variable profile wall time. Runtime evidence belongs in the separat
 library-template outcome; maintained source/installed structure and identity are
 validated at final freeze, with all four standards files matching by SHA256,
 without a new browser or blind-trial claim.
+
+Catalogue maintenance now maps observed completion versus finally markers,
+borrowed observer admission/drain, non-Error native adapter handling, captured
+after-drain leases and pre-workspace source refusal. The separate
+[catalogue outcome](CATALOGUE_TEST_LIFECYCLE_OUTCOME.md) owns executed runtime and
+performance claims. The existing entrypoint, metadata and invocation policy are
+unchanged; narrow references preserve the skill's applicable W3C/WHATWG/IETF,
+OWASP and vendor-contract workflow. Source and installed structural validation
+passed; all four maintained files match by SHA256 after synchronization. The
+testing skill also passes structural validation. These checks do not prove a new
+blind skill trial or browser conformance.

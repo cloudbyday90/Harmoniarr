@@ -45,11 +45,19 @@ Release reconciliation and tag snapshots now select private migration-only
 templates, retaining fresh scenario databases/pools/seeds and actual idempotent
 migration calls. Set `HARMONIARR_INTEGRATION_RELEASE_SCHEMA_MODE=empty` or
 `HARMONIARR_INTEGRATION_TAG_SCHEMA_MODE=empty` for their comparison paths.
-Catalogue and the global runtime remain empty; dedicated migration/bootstrap/
+The global runtime remains empty; dedicated migration/bootstrap/
 recovery paths keep their own preparation. See the
 [schema design](docs/LIBRARY_TEST_SCHEMA_TEMPLATES_DESIGN.md),
 [measured outcome](docs/LIBRARY_TEST_SCHEMA_TEMPLATES_OUTCOME.md) and
 [official research](docs/LIBRARY_TEST_SCHEMA_TEMPLATES_RESEARCH_2026_10.md).
+
+Catalogue now also selects a private migration-only source after its worker,
+transaction, observer and workspace lifetime audit. It keeps all eight native
+cases and thirteen fresh scenario variants. Use
+`HARMONIARR_INTEGRATION_CATALOGUE_SCHEMA_MODE=empty` for comparison. See the
+[catalogue design](docs/CATALOGUE_TEST_LIFECYCLE_DESIGN.md),
+[outcome](docs/CATALOGUE_TEST_LIFECYCLE_OUTCOME.md) and
+[official research](docs/CATALOGUE_TEST_LIFECYCLE_RESEARCH_2026_10.md).
 
 - [Planning document](docs/harmoniarr.md)
 - [AI workflow and shared Copilot skills](docs/AI_WORKFLOW.md)
