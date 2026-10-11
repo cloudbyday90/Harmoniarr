@@ -543,3 +543,9 @@ CLI failure from native PostgreSQL rejection. Runtime counts and retained failed
 controls belong to the separate PostgreSQL failure evidence outcome. This narrow
 maintenance changes no standards entrypoint, metadata or invocation policy and
 adds no browser, accessibility or whole-system security certification.
+
+Dispatcher references locate the modular lifetime owner and supervisor preference.
+They retain the returning-claim and acceptance/completion distinction instead
+of extrapolating one worker to application-wide drainage. Native counts and the
+controlled baseline belong to the dedicated dispatcher outcome. This narrow
+maintenance adds no new blind skill trial, browser or security certification.

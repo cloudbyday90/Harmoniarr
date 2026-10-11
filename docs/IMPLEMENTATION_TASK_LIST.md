@@ -6,6 +6,27 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Dispatcher lifetime (2026-10-11)
+
+- Add modular ESM terminal claim/tick/handler ownership. Complete a committed
+  returning claim after closure, then stop claiming and await returned worker
+  completion. Preserve ordinary timer pause/restart and original Error/null;
+  supervisor prefers terminal drainage before resource cleanup. See
+  [design](DISPATCHER_LIFETIME_DESIGN.md),
+  [research](DISPATCHER_LIFETIME_RESEARCH_2026_10.md) and
+  [outcome](DISPATCHER_LIFETIME_OUTCOME.md).
+- Controlled original supervised stop failed while a claim was held. Final
+  focused controls pass 32/32, native owning/recovery/apply group passes 8/8,
+  and complete fast validation passes 9,606 tests plus both builds. No failures/
+  cancellations/skips in those passing runs. This is scoped native validation,
+  not a new exhaustive gate or matched full-suite speedup.
+- [Fresh PR assessment](OPEN_PR_APPLICABILITY_DISPATCHER_LIFETIME_2026_10_OUTCOME.md)
+  finds no eligible unreplayed patch; main only, no release or merge.
+- Next: own library-scan completion/finalizers and propagate its handle into
+  actual application/fixture drainage, then remaining consumers/periodic work
+  before removing the 150 ms wait and optimizing exhaustive cohort/remainder
+  dispatch. Historical intermittent failure causes remain unconfirmed.
+
 ## Completed slice: Owned PostgreSQL failure evidence (2026-10-11)
 
 - Capture before fixture teardown through narrow ESM record/host/readiness/capture

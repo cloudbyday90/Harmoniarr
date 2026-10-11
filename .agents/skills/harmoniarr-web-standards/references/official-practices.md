@@ -473,3 +473,11 @@ OWASP guidance supports approved immutable fields without credentials, SQL,
 names or error prose. W3C monotonic timing describes observation spans; a later
 successful probe cannot certify the original failure window. Await actual
 diagnostic completion before owned teardown and preserve the original error.
+
+October 11 dispatcher guidance uses docs/DISPATCHER_LIFETIME_RESEARCH_2026_10.md:
+timer cancellation does not drain admitted SQL/promises. Register ticks and
+launches before execution, seal new claims synchronously, finish a committed
+in-flight claim handoff and then drain returned completion. PostgreSQL queue
+locking does not replace authorization or worker lease fencing. Monotonic spans
+measure drain boundaries; a queued acknowledgement is an earlier event. Fixed
+refusals add no private inputs, and no UI conformance claim follows.

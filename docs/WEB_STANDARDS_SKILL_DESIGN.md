@@ -296,3 +296,9 @@ authentication/readiness planes, conservative command-failure interpretation
 and immutable bounded records. Keep raw vendor logs private and observation
 timings separate from causal proof. Reuse the existing entrypoint/metadata;
 the separate PostgreSQL failure evidence documents own design and outcomes.
+
+Dispatcher reference maintenance follows claim admission, committed handoff,
+returned completion and supervised resource teardown. Keep ordinary timer pause
+separate from terminal drainage and actual completion separate from legacy
+acceptance. The dedicated design/research/outcome documents own evidence and
+scope; existing skill entrypoint, metadata and invocation policy are retained.

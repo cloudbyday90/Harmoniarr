@@ -2,6 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createOperationQueueHandlers } from '../../src/server/operation-queue-handlers.js';
 
+test('apply queue handler preserves the queued acknowledgement completion capability', async () => {
+  const completion = Promise.resolve(); const accepted = { completion };
+  const handlers = createOperationQueueHandlers({ importCandidateModule: {
+    importCandidateApplyWorker: { startWorkerRun: async () => accepted },
+  } });
+  assert.equal(await handlers.import_candidate_apply({ run: { id: 'owned', summary: {} } }), accepted);
+});
+
 test('external release discovery queue handler preserves the reviewed intent and original request', async (t) => {
   const startWorkerRun = t.mock.fn(async () => {});
   const handlers = createOperationQueueHandlers({ libraryModule: { libraryExternalRequestDiscoveryWorker: { startWorkerRun } } });

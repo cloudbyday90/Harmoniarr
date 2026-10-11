@@ -93,3 +93,14 @@ test('createStartupServiceSupervisor rejects invalid services', () => {
     supervisor.registerService({ start() {} });
   }, /start\(\) and stop\(\)/);
 });
+
+test('terminal service drainage preserves its receiver and precedes shutdown resource cleanup', async () => {
+  const held = Promise.withResolvers(); let cleanup = false;
+  const service = { start() {}, stop() { assert.fail('Terminal service used timer-only stop'); },
+    stopAndDrain() { assert.equal(this, service); return held.promise; } };
+  const supervisor = createStartupServiceSupervisor({ processEmitter: new EventEmitter() });
+  supervisor.registerService(service);
+  const closing = supervisor.shutdown({ onShutdown: async () => { cleanup = true; } });
+  await Promise.resolve(); assert.equal(cleanup, false);
+  held.resolve(); await closing; assert.equal(cleanup, true);
+});

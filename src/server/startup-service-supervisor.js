@@ -41,7 +41,8 @@ export function createStartupServiceSupervisor({
 
   async function stopAll() {
     for (const service of [...services].reverse()) {
-      await service.stop();
+      if (typeof service.stopAndDrain === 'function') await service.stopAndDrain();
+      else await service.stop();
     }
   }
 

@@ -223,3 +223,12 @@ traffic. Host authentication and readiness success are distinct; nonzero CLI
 exits remain ambiguous command failures. Unit gates and the native failure
 evidence suite own current proof; the dedicated outcome owns counts and limits,
 not historical root-cause remediation or a full-suite speedup.
+
+Dispatcher ownership maps to src/server/operation-dispatcher-lifetime.js and
+operation-queue-dispatcher.js. Startup supervision prefers stopAndDrain; ordinary
+stop still allows pause/restart. The two-phase drain finishes admitted ticks,
+including returning committed claims, before sealing launches. Existing queue
+handlers return acknowledgements; apply supplies actual completion, while
+legacy consumers still require explicit ownership. Unit gates and the native
+dispatcher lifetime suite own current proof; the separate outcome retains the
+baseline failure, native scope and remaining library-scan/heartbeat boundary.

@@ -255,3 +255,13 @@ rejection/no-response codes. Preserve original Error/null and await both probe
 completions. Locate the factories in testing/integration/postgres-failure-*.js,
 postgres-host-probe.js and postgres-readiness-probe.js; the dedicated failure
 evidence outcome owns executed scope and historical-cause limits.
+
+Dispatcher lifetime now has terminal stopAndDrain in addition to ordinary timer
+pause. Gate admitted claims across closure: a committed returning claim must
+handoff once, with no later claim, before launch admission seals. Await handler
+and optional queued completion; acceptance-only legacy workers remain unowned.
+Prove sibling/tick/stop/reporter failures and Error/null precedence through actual
+drainage. Supervisor prefers terminal drainage before resource cleanup. Keep
+the residual fixture wait until library scan and remaining workers are owned;
+docs/DISPATCHER_LIFETIME_OUTCOME.md separates executed native scope from claims
+about full-app quiescence or faster exhaustive validation.
