@@ -243,3 +243,15 @@ since they may include SQL or sensitive values, and publish only bounded reviewe
 findings. Restore diagnostic environment variables, preserve original bounds,
 and refuse cleanup against unknown process/container identities. The apply
 outcome retains the current full-run failures and separate diagnostic passes.
+
+Owned-server failure evidence now captures schema failures before app cleanup and
+temporary-database failures before pool/drop cleanup. Default failure-only mode
+runs no probes on success; set HARMONIARR_INTEGRATION_SERVER_DIAGNOSTICS=off to
+disable it. Automatic probes require the default fresh Testcontainers capability;
+external, reused, custom and pre-cancelled contexts remain unavailable without
+new traffic. Keep independent host authentication and container readiness
+separate. Nonzero Docker CLI exits are command failures, not certified PostgreSQL
+rejection/no-response codes. Preserve original Error/null and await both probe
+completions. Locate the factories in testing/integration/postgres-failure-*.js,
+postgres-host-probe.js and postgres-readiness-probe.js; the dedicated failure
+evidence outcome owns executed scope and historical-cause limits.

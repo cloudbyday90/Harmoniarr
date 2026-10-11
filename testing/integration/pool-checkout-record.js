@@ -43,7 +43,7 @@ export function capturePoolCheckoutSnapshot(pool) {
   });
 }
 
-function errorChain(error) {
+export function capturePostgresDiagnosticErrors(error) {
   const seen = new Set(); const result = [];
   let current = error;
   for (let depth = 0; depth < 3 && !seen.has(current); depth++) {
@@ -72,6 +72,6 @@ export function buildPoolCheckoutRecord({ correlationId, source, serverPhase, ou
     outcome: ['started', 'passed', 'failed'].includes(outcome) ? outcome : 'unknown',
     before: projectSnapshot(before), requested: projectSnapshot(requested), settled: projectSnapshot(settled),
     durationMs: Number.isFinite(durationMs) && durationMs >= 0 && durationMs <= 86_400_000 ? durationMs : null,
-    errors: outcome === 'failed' ? errorChain(error) : Object.freeze([]),
+    errors: outcome === 'failed' ? capturePostgresDiagnosticErrors(error) : Object.freeze([]),
   });
 }

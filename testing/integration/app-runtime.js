@@ -19,6 +19,7 @@ import { withServer } from '../server/http-test-helpers.js';
 import { createIntegrationFixturePhaseObserver } from './fixture-phase-observer.js';
 import { createIntegrationPoolCheckoutObserver, observeAppSchemaPreparation } from './app-checkout-observer.js';
 import { withIntegrationAppWorkerDrain } from './app-worker-lifecycle.js';
+import { observePostgresFixtureFailure } from './postgres-failure-evidence.js';
 
 const packageJsonPath = resolve(import.meta.dirname, '../../package.json');
 const SCENARIO_SHUTDOWN_DRAIN_MS = 150;
@@ -141,6 +142,7 @@ export async function createIntegrationAppRuntime({
         databaseConfig,
         databaseName,
         source,
+        captureServerFailure,
       }) => {
         const scenarioWorkspaceDir = join(runtimeWorkspace.workspaceDir, scenarioName);
         let scenarioFailed = true;
@@ -163,9 +165,9 @@ export async function createIntegrationAppRuntime({
         }, async () => {
           await scenarioObserver.measure('pool_close', () => closePool()).catch(() => {});
           try {
-            await scenarioObserver.measure('schema_prepare', () => observeAppSchemaPreparation({
+            await observePostgresFixtureFailure(captureServerFailure, 'schema_prepare', () => scenarioObserver.measure('schema_prepare', () => observeAppSchemaPreparation({
               prepareDatabaseFn, getPoolFn: getPool, observer: checkoutObserver, source, phaseObserver: scenarioObserver,
-            }));
+            })));
             const application = await scenarioObserver.measure('application_create', () => createAppFn({
               clientDistDir: runtimeWorkspace.clientDistDir,
               packageJsonPath,
@@ -173,7 +175,7 @@ export async function createIntegrationAppRuntime({
             const result = await withIntegrationAppWorkerDrain({ application, phaseObserver: scenarioObserver },
               () => scenarioObserver.measure('http_scenario', () => withServer(
               application.app,
-              async (baseUrl) => scenarioObserver.measure('scenario_work', () => run({
+              async (baseUrl) => scenarioObserver.measure('scenario_work', () => observePostgresFixtureFailure(captureServerFailure, 'database_scenario', () => run({
                 baseUrl,
                 client: createSessionHttpClient(baseUrl, {
                   requestTimeoutMs: config.httpRequestTimeoutMs,
@@ -186,7 +188,7 @@ export async function createIntegrationAppRuntime({
                 backupsDir: join(scenarioWorkspaceDir, 'backups'),
                 workspaceDir: scenarioWorkspaceDir,
                 phaseObserver: scenarioObserver,
-              })),
+              }))),
               {
                 closeTimeoutMs: config.suiteTeardownTimeoutMs,
                 listenTimeoutMs: config.poolConnectionTimeoutMs,
@@ -227,7 +229,7 @@ export async function withIntegrationApp({
     return await withPostgresIntegrationRuntimeFn({
       config,
       phaseObserver,
-      run: async ({ databaseConfig, databaseName, source }) => {
+      run: async ({ databaseConfig, databaseName, source, captureServerFailure }) => {
         await closePool().catch(() => {});
 
         return withEnvironmentVariables({
@@ -245,9 +247,9 @@ export async function withIntegrationApp({
         }, async () => {
           await closePool().catch(() => {});
           try {
-            await phaseObserver.measure('schema_prepare', () => observeAppSchemaPreparation({
+            await observePostgresFixtureFailure(captureServerFailure, 'schema_prepare', () => phaseObserver.measure('schema_prepare', () => observeAppSchemaPreparation({
               prepareDatabaseFn, getPoolFn: getPool, observer: checkoutObserver, source, phaseObserver,
-            }));
+            })));
             const application = await phaseObserver.measure('application_create', () => createAppFn({
               clientDistDir: runtimeWorkspace.clientDistDir,
               packageJsonPath,
@@ -255,7 +257,7 @@ export async function withIntegrationApp({
             return await withIntegrationAppWorkerDrain({ application, phaseObserver },
               () => phaseObserver.measure('http_scenario', () => withServer(
               application.app,
-              async (baseUrl) => phaseObserver.measure('scenario_work', () => run({
+              async (baseUrl) => phaseObserver.measure('scenario_work', () => observePostgresFixtureFailure(captureServerFailure, 'database_scenario', () => run({
                 baseUrl,
                 client: createSessionHttpClient(baseUrl, {
                   requestTimeoutMs: config.httpRequestTimeoutMs,
@@ -267,7 +269,7 @@ export async function withIntegrationApp({
                 backupsDir: join(runtimeWorkspace.workspaceDir, 'backups'),
                 workspaceDir: runtimeWorkspace.workspaceDir,
                 phaseObserver,
-              })),
+              }))),
               {
                 closeTimeoutMs: config.suiteTeardownTimeoutMs,
                 listenTimeoutMs: config.poolConnectionTimeoutMs,

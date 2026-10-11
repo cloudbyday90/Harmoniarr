@@ -10,9 +10,10 @@ import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import pg from 'pg';
 import { buildPoolConfig } from '../src/server/database.js';
 import { resolveIntegrationTestRuntimeConfig } from './integration/runtime-config.js';
-import { withTemporaryPostgresDatabase } from './postgres-temporary-database.js';
+import { buildPostgresAdminConnectionConfig, withTemporaryPostgresDatabase } from './postgres-temporary-database.js';
 import { createIntegrationFixturePhaseObserver } from './integration/fixture-phase-observer.js';
 import { createPreparedPostgresTemplate } from './integration/postgres-migration-template.js';
+import { createPostgresFailureEvidence } from './integration/postgres-failure-evidence.js';
 
 const { Pool } = pg;
 
@@ -43,7 +44,7 @@ function createDefaultPostgresContainer(config) {
 }
 
 async function createDatabaseRuntime({ config, env, source, phaseObserver, schemaMode, signal,
-  closeServer, createPreparedPostgresTemplateFn, withTemporaryPostgresDatabaseFn }) {
+  closeServer, createPreparedPostgresTemplateFn, withTemporaryPostgresDatabaseFn, failureEvidence }) {
   const createPool = createPoolFactory(env);
   const prepared = schemaMode === 'migration_template'
     ? await createPreparedPostgresTemplateFn({ env, createPool, phaseObserver: phaseObserver.child(), signal,
@@ -68,9 +69,11 @@ async function createDatabaseRuntime({ config, env, source, phaseObserver, schem
     },
     async runIsolatedDatabase(run, { phaseObserver: observer = phaseObserver.child(), signal: caseSignal } = {}) {
       if (typeof run !== 'function') throw new TypeError('Database scenario requires a callback');
-      const execute = (context) => run({ ...context, source, schemaMode, phaseObserver: observer });
-      if (prepared) return prepared.runIsolatedDatabase(execute, { phaseObserver: observer, signal: caseSignal });
-      return withTemporaryPostgresDatabaseFn({ createPool, env, phaseObserver: observer, signal: caseSignal, run: execute });
+      const captureServerFailure = failureEvidence.createCapture({ correlationId: observer.correlationId, signal: caseSignal });
+      const execute = (context) => run({ ...context, source, schemaMode, phaseObserver: observer, captureServerFailure });
+      if (prepared) return prepared.runIsolatedDatabase(execute, { phaseObserver: observer, signal: caseSignal, onFailure: captureServerFailure });
+      return withTemporaryPostgresDatabaseFn({ createPool, env, phaseObserver: observer, signal: caseSignal, run: execute,
+        onFailure: captureServerFailure });
     },
   };
 }
@@ -84,12 +87,17 @@ export async function createPostgresIntegrationRuntime({
   createPreparedPostgresTemplateFn = createPreparedPostgresTemplate,
   schemaMode = 'empty',
   signal,
+  failureEvidenceFactory = createPostgresFailureEvidence,
 } = {}) {
   if (!['empty', 'migration_template'].includes(schemaMode)) throw new TypeError('Invalid PostgreSQL fixture schema mode');
   if (signal?.aborted) throw signal.reason;
+  const evidenceMode = env.HARMONIARR_INTEGRATION_SERVER_DIAGNOSTICS ?? 'failures';
+  if (!['off', 'failures'].includes(evidenceMode)) throw new TypeError('Invalid PostgreSQL server diagnostic setting');
+  const fresh = createPostgresContainer === createDefaultPostgresContainer && !config.useContainerReuse;
   if (hasConfiguredPostgresAdminConnection(env)) {
     return createDatabaseRuntime({ config, env, source: 'external_postgres', phaseObserver, schemaMode, signal,
-      closeServer: async () => {}, createPreparedPostgresTemplateFn, withTemporaryPostgresDatabaseFn });
+      closeServer: async () => {}, createPreparedPostgresTemplateFn, withTemporaryPostgresDatabaseFn,
+      failureEvidence: failureEvidenceFactory({ mode: evidenceMode, source: 'external_postgres' }) });
   }
 
   const container = await phaseObserver.measure('container_start', () => createPostgresContainer(config).start());
@@ -105,7 +113,10 @@ export async function createPostgresIntegrationRuntime({
   const closeServer = () => phaseObserver.measure('container_stop', () => container.stop({ timeout: config.containerStopTimeoutMs }));
   try {
     return await createDatabaseRuntime({ config, env: containerEnv, source: 'testcontainer_postgres', phaseObserver,
-      schemaMode, signal, closeServer, createPreparedPostgresTemplateFn, withTemporaryPostgresDatabaseFn });
+      schemaMode, signal, closeServer, createPreparedPostgresTemplateFn, withTemporaryPostgresDatabaseFn,
+      failureEvidence: failureEvidenceFactory({ mode: evidenceMode,
+        source: 'testcontainer_postgres', fresh, containerId: container.getId?.(),
+        connectionConfig: buildPostgresAdminConnectionConfig(containerEnv) }) });
   } catch (error) { await closeServer().catch(() => {}); throw error; }
 }
 

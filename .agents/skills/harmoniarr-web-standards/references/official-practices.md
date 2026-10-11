@@ -464,3 +464,12 @@ does not drain advisory writes, active renewal or lease release. Keep best-effor
 domain outcomes separate from completion, and primary errors separate from cleanup
 fallout. New fixed refusals and approved phase records add no private inputs or
 connection data. The W3C timing draft informs elapsed spans, not a new UI claim.
+
+October 11 owned-server evidence follows
+docs/POSTGRES_FAILURE_EVIDENCE_RESEARCH_2026_10.md. PostgreSQL readiness does not
+authenticate a role; Docker CLI errors can overlap native readiness codes.
+Use an independent authenticated pg client and retain CLI failures conservatively.
+OWASP guidance supports approved immutable fields without credentials, SQL,
+names or error prose. W3C monotonic timing describes observation spans; a later
+successful probe cannot certify the original failure window. Await actual
+diagnostic completion before owned teardown and preserve the original error.

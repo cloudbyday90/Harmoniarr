@@ -68,6 +68,21 @@ function fixture({ createError = null, runError = null, poolError = null, countE
   return { calls, records, input };
 }
 
+test('failure evidence settles before pool and owned database cleanup while retaining Error/null', async () => {
+  for (const primary of [new Error('original'), null]) {
+    const f = fixture(); const ready = Promise.withResolvers(); const held = Promise.withResolvers();
+    let observed;
+    const pending = withTemporaryPostgresDatabase({ ...f.input, run: async () => { throw primary; },
+      onFailure: async error => { observed = error; ready.resolve(); await held.promise; throw new Error('secondary observer'); } });
+    void pending.catch(() => {});
+    await ready.promise; assert.equal(observed, primary);
+    assert.equal(f.calls.includes('pool:end'), false);
+    assert.equal(f.calls.some(call => /^DROP DATABASE/u.test(call.sql ?? '')), false);
+    held.resolve(); await assert.rejects(pending, error => error === primary);
+    assert.equal(f.calls.includes('pool:end'), true);
+  }
+});
+
 test('temporary database phases include owned creation and cleanup without connection or database values', async () => {
   const f = fixture(); assert.equal(await withTemporaryPostgresDatabase(f.input), 'complete');
   assert.deepEqual(f.records.map((record) => record.phase), ['database_connect', 'database_create', 'pool_create',

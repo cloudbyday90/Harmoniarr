@@ -290,3 +290,9 @@ work, active heartbeat renewal, lease finalization and application-owned drain.
 Keep observed completion, best-effort outcomes, primary errors and residual
 owners distinct. Reuse the skill's metadata and invocation policy; route actual
 runtime proof through the separate design/research/outcome documents.
+
+Owned-server maintenance maps failure-time resource ownership, separate
+authentication/readiness planes, conservative command-failure interpretation
+and immutable bounded records. Keep raw vendor logs private and observation
+timings separate from causal proof. Reuse the existing entrypoint/metadata;
+the separate PostgreSQL failure evidence documents own design and outcomes.

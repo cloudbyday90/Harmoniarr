@@ -6,6 +6,27 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Owned PostgreSQL failure evidence (2026-10-11)
+
+- Capture before fixture teardown through narrow ESM record/host/readiness/capture
+  modules. Default failure-only mode runs no success-path probes; off, external,
+  reused, custom and cancelled contexts start no automatic traffic. Preserve
+  original Error/null and wait for actual diagnostic completion. See
+  [design](POSTGRES_FAILURE_EVIDENCE_DESIGN.md),
+  [research](POSTGRES_FAILURE_EVIDENCE_RESEARCH_2026_10.md) and
+  [outcome](POSTGRES_FAILURE_EVIDENCE_OUTCOME.md).
+- Focused controls 59/59; final fast validation 9,594 tests plus both builds;
+  affected native group 23/23 without failures/cancellations/skips. This is scoped
+  native validation, not a new exhaustive gate or matched speedup. Retained
+  rejected controls and historical failure causes remain explicit. Nonzero
+  Docker exits are command failures, not PostgreSQL rejection certificates.
+- [Fresh PR assessment](OPEN_PR_APPLICABILITY_SERVER_EVIDENCE_2026_10_OUTCOME.md)
+  finds no unreplayed applicable patch; main only, no release or merge.
+- Next: own dispatcher claim/tick and launched completion, then library scan
+  before removing the residual fixture wait. Use captured evidence for recurring
+  failures and extend parent/source owners separately before exhaustive
+  cohort/remainder optimization.
+
 ## Completed slice: Apply worker lifetime (2026-10-11)
 
 - Reproduce duplicate execution during held lease release, then own completion

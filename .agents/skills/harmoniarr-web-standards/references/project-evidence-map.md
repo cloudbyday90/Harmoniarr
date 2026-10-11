@@ -211,3 +211,15 @@ terminal status, avoiding shared-hook/workspace mutation under a prior run's
 finalizer. The native held-release control proves this separate boundary. Do not
 attribute an unreproduced full-gate authority assertion to a passing focused
 retry or to a separately proved completion gap.
+
+Owned PostgreSQL failure evidence maps to fixture-only
+testing/integration/postgres-failure-evidence.js, postgres-failure-record.js,
+postgres-host-probe.js and postgres-readiness-probe.js. Temporary database and
+template clone hooks capture before cleanup; both app entry points capture
+schema/scenario failures before their own teardown. Correlation joins existing
+checkout records. Only the default fresh container is automatically probed.
+Success/off/external/reused/custom/cancelled contexts do not launch diagnostic
+traffic. Host authentication and readiness success are distinct; nonzero CLI
+exits remain ambiguous command failures. Unit gates and the native failure
+evidence suite own current proof; the dedicated outcome owns counts and limits,
+not historical root-cause remediation or a full-suite speedup.

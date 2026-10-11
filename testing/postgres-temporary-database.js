@@ -41,12 +41,14 @@ export async function withTemporaryPostgresDatabase({
   strictCleanup = false,
   signal,
   parentClientFactory = createParentPostgresClient,
+  onFailure = null,
   run,
 } = {}) {
   if (typeof run !== 'function') {
     throw new Error('run is required');
   }
   if (typeof createDatabaseFn !== 'function' || typeof strictCleanup !== 'boolean'
+    || (onFailure !== null && typeof onFailure !== 'function')
     || (signal != null && typeof signal.aborted !== 'boolean')) throw new TypeError('Invalid temporary database lifecycle options');
   const assertNotAborted = () => { if (signal?.aborted) throw signal.reason; };
   assertNotAborted();
@@ -100,7 +102,10 @@ export async function withTemporaryPostgresDatabase({
       getPoolFn: () => databasePool,
       phaseObserver,
     });
-  } catch (error) { failed = true; primaryError = error; }
+  } catch (error) {
+    failed = true; primaryError = error;
+    try { await onFailure?.(error); } catch { /* Diagnostics must preserve the original rejection. */ }
+  }
   finally {
     databasePoolRuntimeState.closing = true;
     if (databasePool) await cleanup('pool_close', () => databasePool.end());

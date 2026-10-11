@@ -151,6 +151,17 @@ test('invalid schema mode and pre-aborted startup refuse before creating a conta
     .then(() => assert.fail('Cancelled runtime launched'), (error) => assert.equal(error, null));
 });
 
+test('invalid server diagnostic settings refuse before startup and injected containers are unverified', async () => {
+  await assert.rejects(createPostgresIntegrationRuntime({ env: { HARMONIARR_INTEGRATION_SERVER_DIAGNOSTICS: 'private-invalid' },
+    createPostgresContainer: () => assert.fail('Invalid diagnostics launched a container') }), TypeError);
+  let supplied;
+  const runtime = await createPostgresIntegrationRuntime({ env: {},
+    createPostgresContainer: () => fakeContainer(async () => {}),
+    failureEvidenceFactory: options => { supplied = options; return { createCapture: () => async () => {} }; },
+  });
+  assert.equal(supplied.fresh, false); await runtime.cleanup();
+});
+
 test('failed template startup still stops the owned server without replacing its error', async () => {
   const primary = new Error('Controlled template preparation failure'); let stopped = 0;
   await assert.rejects(createPostgresIntegrationRuntime({ env: {}, schemaMode: 'migration_template',

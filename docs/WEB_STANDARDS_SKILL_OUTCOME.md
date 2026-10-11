@@ -536,3 +536,10 @@ validation; the four installed standards files match their source hashes.
 Testing guidance also separates first connection establishment, socket reset
 during SQL and observed pool queuing, retaining private vendor logs and original
 bounds rather than treating isolated retries as causal remediation.
+
+Owned-server references now locate the independent diagnostic factories and
+capture-before-cleanup hooks. They distinguish readiness from authentication and
+CLI failure from native PostgreSQL rejection. Runtime counts and retained failed
+controls belong to the separate PostgreSQL failure evidence outcome. This narrow
+maintenance changes no standards entrypoint, metadata or invocation policy and
+adds no browser, accessibility or whole-system security certification.

@@ -105,12 +105,12 @@ export async function createPreparedPostgresTemplate({
   const active = new Set(); let closed = false; let cleanupPromise;
   const owner = {
     schemaMode: 'migration_template',
-    async runIsolatedDatabase(run, { phaseObserver: observer = phaseObserver.child(), signal: caseSignal } = {}) {
+    async runIsolatedDatabase(run, { phaseObserver: observer = phaseObserver.child(), signal: caseSignal, onFailure = null } = {}) {
       if (closed) throw templateRefusal('fixture_template_closed');
       if (typeof run !== 'function') throw new TypeError('Template scenario requires a callback');
       assertNotAborted(caseSignal);
       const operation = Promise.resolve().then(() => withTemporaryPostgresDatabaseFn({
-        env, createPool, adminClientFactory, strictCleanup: true, signal: caseSignal, phaseObserver: observer,
+        env, createPool, adminClientFactory, strictCleanup: true, signal: caseSignal, phaseObserver: observer, onFailure,
         createDatabaseFn: async ({ adminClient: cloneAdmin, databaseName: cloneName }) => {
           const cloneStore = createPostgresTemplateStore({ adminClient: cloneAdmin });
           await observer.measure('template_verify', async () => {
