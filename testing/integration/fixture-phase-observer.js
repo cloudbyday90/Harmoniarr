@@ -56,7 +56,7 @@ export function createFixturePhaseObserver({ enabled = true, onRecord = null,
     return createFixturePhaseObserver({ enabled, onRecord, now, parentId: correlationId });
   }
 
-  return { measure, child };
+  return { measure, child, correlationId };
 }
 
 export function createIntegrationFixturePhaseObserver({ env = process.env,

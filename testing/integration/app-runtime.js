@@ -17,6 +17,7 @@ import { createPostgresIntegrationRuntime, withPostgresIntegrationRuntime } from
 import { createSessionHttpClient } from '../server/http-session-client.js';
 import { withServer } from '../server/http-test-helpers.js';
 import { createIntegrationFixturePhaseObserver } from './fixture-phase-observer.js';
+import { createIntegrationPoolCheckoutObserver, observeAppSchemaPreparation } from './app-checkout-observer.js';
 
 const packageJsonPath = resolve(import.meta.dirname, '../../package.json');
 const SCENARIO_SHUTDOWN_DRAIN_MS = 150;
@@ -103,6 +104,7 @@ export async function createIntegrationAppRuntime({
   prepareDatabaseFn = prepareDatabase,
   postgresRuntimeFactory = createPostgresIntegrationRuntime,
   phaseObserver = createIntegrationFixturePhaseObserver(),
+  checkoutObserver = createIntegrationPoolCheckoutObserver(),
 } = {}) {
   const runtimeWorkspace = await phaseObserver.measure('workspace_create', async () => clientDistDir
     ? {
@@ -160,7 +162,9 @@ export async function createIntegrationAppRuntime({
         }, async () => {
           await scenarioObserver.measure('pool_close', () => closePool()).catch(() => {});
           try {
-            await scenarioObserver.measure('schema_prepare', () => prepareDatabaseFn());
+            await scenarioObserver.measure('schema_prepare', () => observeAppSchemaPreparation({
+              prepareDatabaseFn, getPoolFn: getPool, observer: checkoutObserver, source, phaseObserver: scenarioObserver,
+            }));
             const { app } = await scenarioObserver.measure('application_create', () => createAppFn({
               clientDistDir: runtimeWorkspace.clientDistDir,
               packageJsonPath,
@@ -209,6 +213,7 @@ export async function withIntegrationApp({
   run,
   withPostgresIntegrationRuntimeFn = withPostgresIntegrationRuntime,
   phaseObserver = createIntegrationFixturePhaseObserver(),
+  checkoutObserver = createIntegrationPoolCheckoutObserver(),
 } = {}) {
   if (typeof run !== 'function') {
     throw new Error('run is required');
@@ -238,7 +243,9 @@ export async function withIntegrationApp({
         }, async () => {
           await closePool().catch(() => {});
           try {
-            await phaseObserver.measure('schema_prepare', () => prepareDatabaseFn());
+            await phaseObserver.measure('schema_prepare', () => observeAppSchemaPreparation({
+              prepareDatabaseFn, getPoolFn: getPool, observer: checkoutObserver, source, phaseObserver,
+            }));
             const { app } = await phaseObserver.measure('application_create', () => createAppFn({
               clientDistDir: runtimeWorkspace.clientDistDir,
               packageJsonPath,

@@ -272,3 +272,9 @@ readiness, post-render publication, same-tick failure/context cancellation and
 scope disposal. Retain native focus and silent polling. The separate Downloader
 documents own research and executed reactive/browser/fast-gate evidence; preserve
 the entrypoint, metadata and invocation policy and sync only maintained resources.
+
+First-checkout maintenance locates the connect-only preparation adapter,
+allowlisted fields, monotonic/correlated measurements and observer-failure
+isolation. Keep SQL/checkout failure, declared server phase/live health and safe
+records/native streams separate. Reuse current metadata and preserve original
+resource outcomes; the dedicated checkout documents own executed evidence.

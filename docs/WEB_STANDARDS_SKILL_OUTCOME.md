@@ -504,3 +504,10 @@ belong to the separate [Downloader outcome](DOWNLOADER_FILTER_ANNOUNCEMENT_OUTCO
 Source and installed structural validation passed after synchronization;
 entrypoint/metadata/invocation policy are unchanged. This narrow maintenance adds
 no new blind skill trial, screen-reader speech or conformance claim.
+
+First-checkout references now map actual pg preparation/counter/cause owners,
+bounded privacy and phase correlation. W3C timing guidance applies to elapsed
+measurements; the CLI fixture slice adds no frontend conformance claim. The
+separate [checkout outcome](APP_FIXTURE_CHECKOUT_DIAGNOSTICS_OUTCOME.md) owns
+native proof and historical-cause limits. This is narrow maintained-reference
+work, with unchanged entrypoint, metadata and invocation policy.

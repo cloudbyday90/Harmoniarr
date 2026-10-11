@@ -183,3 +183,13 @@ When validation fails:
 ## Reporting
 
 In final updates, report exact commands run and whether they passed. If a command could not run, state the concrete blocker and the remaining risk.
+
+For a first app-fixture checkout, the default bounded observer emits failures;
+`HARMONIARR_INTEGRATION_POOL_DIAGNOSTICS=all` adds first start/success and `off`
+disables it. Pair its correlation ID with schema phases when timings are enabled.
+Use pre/requested/settled counters and approved cause codes; an uncoded queued
+timeout is not proof of a socket timeout. The observer adds no probe/retry and
+does not classify subsequent schema SQL as a checkout failure. Keep last server
+admission and driver closing flags separate from live-health/drain proof. See
+`docs/APP_FIXTURE_CHECKOUT_DIAGNOSTICS_OUTCOME.md` for native controls, actual
+version and retained failures before changing app-pool shutdown or scheduling.

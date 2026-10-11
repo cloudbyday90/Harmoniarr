@@ -6,7 +6,35 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
-## Current slice: Downloader deferred filter feedback (2026-10-11)
+## Current slice: First app-fixture checkout diagnostics (2026-10-11)
+
+- Add fixture-only ESM projection/observation through the existing bootstrap
+  injection. Default failure-only records contain bounded approved codes/counters;
+  all/off investigation modes preserve original clients/errors, native bounds and
+  pool APIs. Schema phases share opaque correlation IDs. See
+  [design](APP_FIXTURE_CHECKOUT_DIAGNOSTICS_DESIGN.md),
+  [research](APP_FIXTURE_CHECKOUT_DIAGNOSTICS_RESEARCH_2026_10.md) and
+  [outcome](APP_FIXTURE_CHECKOUT_DIAGNOSTICS_OUTCOME.md).
+- Focused controls 24/24 and native owning cases 9/9 pass: actual uncoded
+  saturation, ECONNREFUSED, both fixture entry points and original Activity/admin
+  consumers. PostgreSQL fixture 18.3 is observed independently from 18.6 docs.
+  Privacy/identity/receiver/mode/sink controls and scoped lint pass.
+- Standards/testing references locate actual owners and limits. Fresh
+  [PR outcome](OPEN_PR_APPLICABILITY_APP_CHECKOUT_2026_10_OUTCOME.md) finds no
+  eligible unreplayed patch. No historical cause, cleanup redesign or whole-gate
+  speedup is claimed. Main only; no release, branch or PR merge.
+- Next: controlled invocation/global-pool lifetime audit before replacing fixed
+  shutdown drain or singleton-clear timing; then exhaustive cohort/remainder
+  dispatcher with matched full-gate evidence. Discovery-request recomputation
+  remains subsequent product work.
+
+- Final complete fast gate passes 9,556 tests, static/full lint/test hygiene and
+  both builds in 127.35s, zero failures/skips. Seven frozen code files define
+  publication scope; start records carry no invented settlement data. Npm audit
+  reports zero vulnerabilities. The full serial database gate remains separate
+  from the nine executed native owning cases.
+
+## Completed slice: Downloader deferred filter feedback (2026-10-11)
 
 - Complete the latest explicit filter announcement after initial queue/release
   readiness. A narrow ESM composable owns publication, supersession and failure/

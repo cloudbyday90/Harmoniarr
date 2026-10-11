@@ -22,6 +22,7 @@ test('fixture phases preserve results and errors while measuring approved outcom
     { phase: 'fixture_seed', outcome: 'cancelled', durationMs: 5, sequence: 3 },
   ]);
   assert.equal(new Set(records.map((record) => record.correlationId)).size, 1);
+  assert.equal(observer.correlationId, records[0].correlationId);
   assert.ok(records.every(Object.isFrozen));
   assert.equal(JSON.stringify(records).includes('private'), false);
   assert.equal(JSON.stringify(records).includes('Secret'), false);

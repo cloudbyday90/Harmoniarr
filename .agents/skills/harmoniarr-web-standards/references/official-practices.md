@@ -436,3 +436,12 @@ failure/context cancellation own invalidation. These are application lifecycle
 choices, not a new ARIA role or universal rule to block controls while loading.
 Preserve plain-text interpolation and distinguish actual Vue/DOM evidence from
 assistive-technology speech. Polling carries no new filter-announcement intent.
+
+October 11 first-checkout maintenance follows the fresh MCP-discovered
+`docs/APP_FIXTURE_CHECKOUT_DIAGNOSTICS_RESEARCH_2026_10.md` ledger. W3C/Node elapsed
+clock principles, pg/PostgreSQL code/counter contracts and OWASP bounded logging
+apply at different boundaries. A timed-out wait can be uncoded in the installed
+driver; do not recover a classification from private prose. Preserve original
+errors and distinguish first checkout from subsequent schema SQL, safe records
+from native streams, and last admitted phase from fresh server health. Observer
+failures cannot take over operation results; driver flags remain version-specific.

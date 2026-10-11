@@ -156,6 +156,16 @@ is not observed task drainage; source-review lifetime candidates and passing
 retries are not reproduced causes or remediation. The catalogue outcome retains
 the rejected broad attempt and focused investigation separately.
 
+First app-fixture checkout now maps to `app-checkout-observer.js` and
+`pool-checkout-record.js` under `testing/integration/`. Bootstrap's existing
+factory consumes only connect; retain the concrete receiver/client and keep
+migrations/application code on the unmodified pool. Trace default failure-only
+records, all/off modes and phase correlation. Native saturation can have no code;
+dispatch counters and bounded cause codes are observations, not a diagnosis.
+Do not serialize messages, stack, options or endpoints. The separate app-checkout
+outcome owns adverse/native consumer evidence; last admitted server phase and
+driver closing flags do not certify liveness, drainage or historical remediation.
+
 Packaged DOM checks map to `scripts/docker-provider-acceptance-dom.js` and
 `test/browser/docker-provider-acceptance-dom.test.js`: observe the mounted queue
 response and matching Transfer Queue render, then scope row/status checks there.
