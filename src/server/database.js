@@ -17,11 +17,16 @@
  */
 
 import pg from 'pg';
+import { createDatabasePoolLifecycle } from './database-pool-lifecycle.js';
 
 const { Pool } = pg;
 
-let sharedPool;
-let sharedPoolRuntimeState;
+const poolLifecycle = createDatabasePoolLifecycle({
+  createPool: ({ runtimeState }) => attachPoolErrorHandler(
+    new Pool(buildPoolConfig()),
+    { runtimeState },
+  ),
+});
 
 function writePoolError(stderr, error) {
   stderr.write(`[harmoniarr-db] pooled idle client error: ${error?.message ?? 'Unknown pool error'}\n`);
@@ -135,26 +140,9 @@ export function buildPoolConfig(env = process.env) {
 }
 
 export function getPool() {
-  if (!sharedPool) {
-    sharedPoolRuntimeState = { closing: false };
-    sharedPool = attachPoolErrorHandler(
-      new Pool(buildPoolConfig()),
-      { runtimeState: sharedPoolRuntimeState },
-    );
-  }
-
-  return sharedPool;
+  return poolLifecycle.getPool();
 }
 
-export async function closePool() {
-  if (sharedPool) {
-    const pool = sharedPool;
-    const runtimeState = sharedPoolRuntimeState;
-    sharedPool = undefined;
-    sharedPoolRuntimeState = undefined;
-    if (runtimeState) {
-      runtimeState.closing = true;
-    }
-    await pool.end();
-  }
+export function closePool() {
+  return poolLifecycle.closePool();
 }

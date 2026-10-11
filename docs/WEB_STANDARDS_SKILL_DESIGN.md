@@ -278,3 +278,9 @@ allowlisted fields, monotonic/correlated measurements and observer-failure
 isolation. Keep SQL/checkout failure, declared server phase/live health and safe
 records/native streams separate. Reuse current metadata and preserve original
 resource outcomes; the dedicated checkout documents own executed evidence.
+
+Pool-shutdown maintenance maps the generation fence, native end completion,
+concurrent close identity and retained uncertain failure. Keep HTTP socket close
+separate from launched work and successful pool restart separate from invocation
+sealing. Reuse the existing standards workflow and metadata; the dedicated pool
+documents own source status, adverse proof and publication checks.

@@ -6,7 +6,29 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
-## Current slice: First app-fixture checkout diagnostics (2026-10-11)
+## Current slice: Database pool shutdown ownership (2026-10-11)
+
+- Reproduce replacement creation while native end waits for a held client; add a
+  narrow ESM lifecycle owner with synchronous refusal, shared close completion,
+  restart after success and retained closed state/failure after uncertain end.
+  See [design](DATABASE_POOL_SHUTDOWN_DESIGN.md),
+  [research](DATABASE_POOL_SHUTDOWN_RESEARCH_2026_10.md) and
+  [outcome](DATABASE_POOL_SHUTDOWN_OUTCOME.md).
+- Focused controls 14/14 and native held-client control 1/1 pass. The actual HTTP
+  gate proves detached work can outlive server closure. No historical bootstrap
+  cause or whole-gate speedup is claimed. Complete serial validation exits zero:
+  9,918 passed, 10 media-prerequisite skips, no failures, all static/lint/build
+  checks passed. The three owning media suites then pass 22/22 without skips,
+  including every omitted case. Separate runs and timings remain explicit.
+- Standards/testing skills locate the new owner and the remaining boundary.
+  [Fresh PR assessment](OPEN_PR_APPLICABILITY_POOL_SHUTDOWN_2026_10_OUTCOME.md)
+  finds no eligible unreplayed patch. Main only; no release or PR merge.
+- Next: own apply-worker completion and close worker admission; drain that work
+  before fixture resources and environment are restored, proving failures and
+  cancellation before removing the fixed 150 ms delay. Then assess the exhaustive
+  cohort/remainder dispatcher with matched full-gate evidence.
+
+## Completed slice: First app-fixture checkout diagnostics (2026-10-11)
 
 - Add fixture-only ESM projection/observation through the existing bootstrap
   injection. Default failure-only records contain bounded approved codes/counters;

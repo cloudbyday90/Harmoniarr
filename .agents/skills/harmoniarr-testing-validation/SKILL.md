@@ -193,3 +193,22 @@ does not classify subsequent schema SQL as a checkout failure. Keep last server
 admission and driver closing flags separate from live-health/drain proof. See
 `docs/APP_FIXTURE_CHECKOUT_DIAGNOSTICS_OUTCOME.md` for native controls, actual
 version and retained failures before changing app-pool shutdown or scheduling.
+
+The shared pool lifecycle now refuses replacement while native end is pending
+or failed, sharing the original close promise and failure. Native held-client
+proof is in `test/integration/database-pool-lifecycle.test.js`; the controlled
+HTTP closure proof keeps detached application work separate from socket drain.
+See `docs/DATABASE_POOL_SHUTDOWN_OUTCOME.md`. Successful end permits serial reuse
+and does not fence a preceding invocation after restart. Keep the fixture delay
+until actual launched worker completion/admission has been owned and tested;
+neither more sleep nor an async-context getter guard drains captured resources.
+
+Before a complete native gate, verify local ffmpeg/ffprobe or configure an
+existing verified media image through `HARMONIARR_INTEGRATION_MEDIA_IMAGE`.
+Capture its immutable image ID and observed tool version; the shared media
+fixture runs without network access and mounts only its owned workspace.
+Count native skips explicitly. If tooling was absent, run the owning media files
+with that prerequisite supplied rather than repeating an otherwise passing full
+gate when code is unchanged. Report both runs separately; their combined coverage
+is not one skip-free complete run or a matched performance benchmark. Restore
+the scoped environment afterward.

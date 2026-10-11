@@ -445,3 +445,13 @@ driver; do not recover a classification from private prose. Preserve original
 errors and distinguish first checkout from subsequent schema SQL, safe records
 from native streams, and last admitted phase from fresh server health. Observer
 failures cannot take over operation results; driver flags remain version-specific.
+
+October 11 pool-lifecycle maintenance uses the fresh MCP ledger in
+`docs/DATABASE_POOL_SHUTDOWN_RESEARCH_2026_10.md`: pg end waits for returned clients,
+while Node HTTP close owns sockets rather than arbitrary application promises.
+Use a synchronous admission fence and one observed end outcome for each pool
+generation. A failure leaves that generation unavailable; success permits the
+existing serial restart contract. This project choice does not replace actual
+worker ownership, justify a fixed delay, or establish the historical failure's
+cause. Keep OWASP-sensitive data out of new refusal messages; existing native
+reporters and idle-client logging have separate contracts.

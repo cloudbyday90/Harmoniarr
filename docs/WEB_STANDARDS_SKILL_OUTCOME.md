@@ -511,3 +511,16 @@ measurements; the CLI fixture slice adds no frontend conformance claim. The
 separate [checkout outcome](APP_FIXTURE_CHECKOUT_DIAGNOSTICS_OUTCOME.md) owns
 native proof and historical-cause limits. This is narrow maintained-reference
 work, with unchanged entrypoint, metadata and invocation policy.
+
+Pool-shutdown references now locate the modular lifecycle owner, real held-client
+control and controlled HTTP detached-work boundary. The separate
+[pool outcome](DATABASE_POOL_SHUTDOWN_OUTCOME.md) owns runtime and validation
+claims. The entrypoint, metadata and invocation policy remain unchanged. This
+reference maintenance adds no blind trial, accessibility certification or claim
+that an async getter fence drains every application effect.
+
+The maintained testing skill also records local media prerequisite admission and
+separate follow-up coverage after native skips. Source/installed standards and
+testing structural validation passed; the four standards files match after
+synchronization. Runtime counts and skip closure remain in the pool outcome,
+without inventing one skip-free complete run or a matched benchmark.

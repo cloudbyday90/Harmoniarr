@@ -156,6 +156,15 @@ is not observed task drainage; source-review lifetime candidates and passing
 retries are not reproduced causes or remediation. The catalogue outcome retains
 the rejected broad attempt and focused investigation separately.
 
+Pool generation ownership now maps to `src/server/database-pool-lifecycle.js`.
+It fences getters synchronously during end, shares actual completion among close
+callers, and retains closed admission after an uncertain failure. Unit controls
+cover null/Error identity and reentrancy; the native held-client test in
+`test/integration/database-pool-lifecycle.test.js` proves no replacement during
+end and intended restart after release. `http-shutdown-lifetime.test.js` proves
+the separate detached-work boundary. The pool-shutdown outcome owns executed
+evidence; successful pool close still does not seal old invocation work forever.
+
 First app-fixture checkout now maps to `app-checkout-observer.js` and
 `pool-checkout-record.js` under `testing/integration/`. Bootstrap's existing
 factory consumes only connect; retain the concrete receiver/client and keep
