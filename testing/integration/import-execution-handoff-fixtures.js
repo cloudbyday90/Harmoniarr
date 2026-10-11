@@ -17,7 +17,8 @@ import { captureRecoveryObservation } from '../../src/server/import-candidates/m
 import { initializeImportExecutionRunItems, upsertImportExecutionRunItem, listImportExecutionRunItems,
   updateImportExecutionRunItem } from '../../src/server/import-candidates/import-candidate-execution-repository.js';
 import { seedImportCandidateFixture } from './import-candidate-fixtures.js';
-import { createFixtureWorkerObserver, withFixtureLifecycle } from './fixture-lifecycle.js';
+import { withFixtureLifecycle } from './fixture-lifecycle.js';
+import { startImportExecutionFixtureWorker } from './import-execution-worker-fixture.js';
 
 export function createImportExecutionHandoffFixtureContext({ getPoolFn }) {
   const store = createImportExecutionHandoffStore({ getPoolFn });
@@ -59,12 +60,9 @@ export async function runImportExecutionHandoffFixtureWorker(context, fixture, o
     updateImportExecutionRunItem: (input) => updateImportExecutionRunItem(input, context.pool),
     ...overrides,
   };
-  const observer = createFixtureWorkerObserver({ callbacks });
-  const worker = createWorkerFn({ ...callbacks, ...observer.callbacks,
-    isCancellationRequested: async (input) => scope.signal.aborted || await callbacks.isCancellationRequested?.(input) || false,
-  });
-  scope.track(observer.finished);
-  await worker.startWorkerRun({ runId: fixture.operationRunId, requestedCandidateCount: 1, selectedCandidateId: fixture.importCandidateId });
-  await observer.finished;
+  const worker = await startImportExecutionFixtureWorker({ callbacks, createWorkerFn,
+    signal: scope.signal, track: scope.track,
+    run: { runId: fixture.operationRunId, requestedCandidateCount: 1, selectedCandidateId: fixture.importCandidateId } });
+  await worker.done;
   });
 }

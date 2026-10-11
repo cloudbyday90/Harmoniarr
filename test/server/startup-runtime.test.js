@@ -12,6 +12,8 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
   const registeredServices = [];
   const applyCloseEntered = Promise.withResolvers();
   const applyCloseGate = Promise.withResolvers();
+  const executionCloseEntered = Promise.withResolvers();
+  const executionCloseGate = Promise.withResolvers();
   let resolveShutdownComplete;
   const shutdownComplete = new Promise((resolve) => {
     resolveShutdownComplete = resolve;
@@ -195,6 +197,11 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
         },
         importCandidateExecutionWorker: {
           startWorkerRun: async () => {},
+          async close() {
+            callOrder.push('execution.close');
+            executionCloseEntered.resolve();
+            await executionCloseGate.promise;
+          },
         },
       },
       fulfillmentModule: {
@@ -424,9 +431,13 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
 
   processEmitter.emit('SIGTERM');
   try {
+    await waitForFixtureReady({ ready: executionCloseEntered.promise, operation: shutdownComplete });
+    assert.equal(callOrder.includes('apply.close'), false);
+    assert.equal(callOrder.includes('closePool'), false);
+    executionCloseGate.resolve();
     await waitForFixtureReady({ ready: applyCloseEntered.promise, operation: shutdownComplete });
     assert.equal(callOrder.includes('closePool'), false);
-  } finally { applyCloseGate.resolve(); }
+  } finally { executionCloseGate.resolve(); applyCloseGate.resolve(); }
   await shutdownComplete;
 
   assert.deepEqual(callOrder, [
@@ -461,6 +472,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'stop:metadata',
     'stop:queue',
     'server.close',
+    'execution.close',
     'apply.close',
     'scan.close',
     'closePool',

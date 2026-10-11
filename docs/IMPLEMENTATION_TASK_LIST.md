@@ -6,6 +6,30 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Import execution lifetime (2026-10-11)
+
+- Reproduce duplicate acquisition during held final release, then own queued
+  execution through returned provider/confirmation/Activity work, admitted
+  renewal and captured lease cleanup. Reuse modular ESM services and preserve
+  provider authority, saved consent and uncertain-acceptance policy. Capture
+  execution/apply/scan instances at startup and both app fixtures; await actual
+  completion in handoff/recovery fixtures. See
+  [design](IMPORT_EXECUTION_LIFETIME_DESIGN.md),
+  [research](IMPORT_EXECUTION_LIFETIME_RESEARCH_2026_10.md) and
+  [outcome](IMPORT_EXECUTION_LIFETIME_OUTCOME.md).
+- Focused 101/101; complete fast 9,636 plus both builds; separate native lifetime
+  4/4 and remaining affected group 47/47. All have zero failures/cancellations/
+  skips. These native groups are scoped coverage, not one exhaustive run; no
+  matched full-suite speedup is claimed. Standards/testing skill maintenance
+  passes structural validation, installed standards hashes match and npm audit
+  reports zero vulnerabilities.
+- [Fresh PR assessment](OPEN_PR_APPLICABILITY_EXECUTION_LIFETIME_2026_10_OUTCOME.md)
+  finds no eligible unreplayed patch; main only, no release or merge.
+- Next: own media-inspection execution and media/provider finalizers, then
+  transcode and remaining periodic producers before deleting the residual wait
+  or promoting exhaustive cohort/remainder dispatch. Historical failure causes
+  remain unconfirmed; remote downloads and hidden work are separate owners.
+
 ## Completed slice: Library scan lifetime (2026-10-11)
 
 - Reproduce duplicate acquisition during final release and premature fixture

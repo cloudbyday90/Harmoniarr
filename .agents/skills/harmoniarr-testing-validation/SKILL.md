@@ -276,3 +276,15 @@ an unreachable observer on early execution failure. Keep callback errors and
 legacy injected test-double limits explicit. See
 docs/LIBRARY_SCAN_LIFETIME_OUTCOME.md; remaining workers and hidden/unreturned
 work still prevent deleting the residual delay or claiming whole-app drainage.
+
+Import execution now returns actual completion through provider preparation,
+enqueue, confirmation, returned Activity and lease finalization. Queued acceptance
+and remote download completion remain separate. Both handoff/recovery fixture
+helpers retain the real handle, including early execution failure before an
+unreachable release observer. Preserve callback-observer Error/null policy and
+legacy double limits. Gate admitted renewal, provider and Activity work separately;
+application cleanup captures execution/apply/scan before awaiting, attempts all
+known owners after failure and preserves the earliest failure. See
+docs/IMPORT_EXECUTION_LIFETIME_OUTCOME.md. Other workers, periodic work and hidden
+callbacks remain unowned; do not remove residual delay or infer a whole-suite
+performance improvement from focused timings.

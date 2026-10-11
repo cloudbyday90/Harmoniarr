@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { withIntegrationAppWorkerDrain } from '../../testing/integration/app-worker-lifecycle.js';
 import { createFixturePhaseObserver } from '../../testing/integration/fixture-phase-observer.js';
+import { drainApplicationWorkerOwners } from '../../src/server/application-worker-drain.js';
 
 test('app drain awaits the concrete worker receiver and preserves the scenario result', async () => {
   const gate = Promise.withResolvers();
@@ -54,4 +55,17 @@ test('app drain waits for apply before scan, drains scan after apply null and pr
   applyGate.reject(null); await scanEntered.promise; assert.equal(settled, false);
   scanGate.reject(new Error('scan fallout')); await assert.rejects(pending, error => error === null);
   assert.equal(settled, true);
+});
+
+test('application drain captures all three receivers and attempts apply/scan after execution null', async () => {
+  const gate = Promise.withResolvers(); const entered = Promise.withResolvers(); const calls = [];
+  const execution = { close() { assert.equal(this, execution); calls.push('execution'); entered.resolve(); return gate.promise; } };
+  const apply = { close() { assert.equal(this, apply); calls.push('apply'); throw new Error('apply fallout'); } };
+  const scan = { close() { assert.equal(this, scan); calls.push('scan'); return Promise.reject(new Error('scan fallout')); } };
+  const application = { importCandidateModule: { importCandidateExecutionWorker: execution, importCandidateApplyWorker: apply },
+    libraryModule: { libraryScanWorker: scan } };
+  const pending = drainApplicationWorkerOwners(application); void pending.catch(() => {}); await entered.promise;
+  application.importCandidateModule = {}; application.libraryModule = {};
+  assert.deepEqual(calls, ['execution']); gate.reject(null);
+  await assert.rejects(pending, error => error === null); assert.deepEqual(calls, ['execution', 'apply', 'scan']);
 });

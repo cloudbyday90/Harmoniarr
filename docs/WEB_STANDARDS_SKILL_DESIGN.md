@@ -308,3 +308,11 @@ terminal status, observed release and full execution completion. Shared lease
 cleanup and producer-before-consumer application drainage retain original
 failures. The dedicated documents own design/research/runtime evidence; the
 existing standards entrypoint, metadata and invocation policy stay in place.
+
+Execution reference maintenance connects queued intent, provider acceptance,
+receipt confirmation, returned Activity and lease finalization. Capture the
+concrete execution/apply/scan owners and keep remote downloads, callback observers
+and actual local completion distinct. Rechecked HTTP retry guidance supplements
+ECMAScript, Node, driver, OWASP and W3C timing sources. The
+[execution design](IMPORT_EXECUTION_LIFETIME_DESIGN.md) owns the implementation;
+this is reference maintenance with existing entrypoint/metadata/invocation policy.

@@ -555,3 +555,11 @@ apply/scan drainage at startup and both fixture entry points. Standalone fixture
 observation remains distinct from returned execution; legacy test doubles and
 remaining workers keep explicit limits. The separate scan outcome owns executed
 counts. This is narrow maintenance, with no new blind trial or conformance claim.
+
+Execution references now locate the shared completion/advisory/lease owner,
+captured application drainage and the handoff/recovery fixture handle. Official
+practices distinguish safe non-idempotent retry from uncertain acceptance and
+local execution completion from remote downloads. The
+[execution outcome](IMPORT_EXECUTION_LIFETIME_OUTCOME.md) owns runtime evidence
+and structural validation results. No new blind skill trial, metadata change or
+accessibility/security certification is claimed.

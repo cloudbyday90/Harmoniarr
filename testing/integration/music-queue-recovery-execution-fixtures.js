@@ -18,7 +18,8 @@ import { createImportExecutionPreProviderStore } from '../../src/server/import-c
 import { createImportCandidateRecoveryService } from '../../src/server/import-candidates/import-candidate-recovery-service.js';
 import { listImportExecutionRunItems, initializeImportExecutionRunItems, updateImportExecutionRunItem,
   upsertImportExecutionRunItem, recordImportExecutionAcceptedObservation } from '../../src/server/import-candidates/import-candidate-execution-repository.js';
-import { createFixtureWorkerObserver, withFixtureLifecycle } from './fixture-lifecycle.js';
+import { withFixtureLifecycle } from './fixture-lifecycle.js';
+import { startImportExecutionFixtureWorker } from './import-execution-worker-fixture.js';
 
 export function createRecoveryExecutionOwners(context) {
   const policy = createMusicQueueRecoveryExecutionPolicyService({ store: context.store, assertMaintenanceWriteAllowed: context.assertMaintenanceWriteAllowed });
@@ -75,14 +76,11 @@ export async function runMusicQueueRecoveryExecutionWorker(context, runId, candi
     updateImportExecutionRunItem: (input) => updateImportExecutionRunItem(input, context.pool),
     ...overrides,
   };
-  const observer = createFixtureWorkerObserver({ callbacks });
-  const worker = createWorkerFn({ ...callbacks, ...observer.callbacks,
-    isCancellationRequested: async (input) => scope.signal.aborted || await callbacks.isCancellationRequested?.(input) || false,
-  });
-  scope.track(observer.finished);
-  await worker.startWorkerRun({ runId, selectedCandidateId: candidateId, requestedCandidateCount: 1,
-    sourceSearchId: raw.summary.sourceSearchId, triggerSource: raw.summary.triggerSource ?? 'manual' });
-  await observer.finished;
+  const worker = await startImportExecutionFixtureWorker({ callbacks, createWorkerFn,
+    signal: scope.signal, track: scope.track,
+    run: { runId, selectedCandidateId: candidateId, requestedCandidateCount: 1,
+      sourceSearchId: raw.summary.sourceSearchId, triggerSource: raw.summary.triggerSource ?? 'manual' } });
+  await worker.done;
   return calls;
   });
 }

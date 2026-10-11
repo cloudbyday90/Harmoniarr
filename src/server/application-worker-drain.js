@@ -7,9 +7,11 @@
 
 import { withWorkerTaskCleanup } from './worker-task-cleanup.js';
 
-/** Capture concrete owners; apply can enqueue scan work before its own completion. */
-export function drainApplyAndScanWorkers({ importCandidateModule, libraryModule }) {
+/** Capture owned workers; apply can enqueue scan work before its own completion. */
+export function drainApplicationWorkerOwners({ importCandidateModule, libraryModule }) {
+  const execution = importCandidateModule?.importCandidateExecutionWorker;
   const apply = importCandidateModule?.importCandidateApplyWorker;
   const scan = libraryModule?.libraryScanWorker;
-  return withWorkerTaskCleanup(() => apply?.close?.(), () => scan?.close?.());
+  return withWorkerTaskCleanup(() => execution?.close?.(),
+    () => withWorkerTaskCleanup(() => apply?.close?.(), () => scan?.close?.()));
 }

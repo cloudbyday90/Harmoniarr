@@ -241,3 +241,15 @@ beyond callback observation and preserves earlier observer failures. Trace
 guarded catalogue/tags/matching/reconciliation plus admitted renewal and lease
 release. Native scan lifetime and existing consumer suites own proof; the
 separate outcome owns exact counts and remaining worker/child-job limitations.
+
+Import execution uses the same task/advisory/lease owners in
+src/server/import-candidates/import-candidate-execution-worker.js. Trace awaited
+preparation, final current-authority guards, enqueue and receipt confirmation;
+unknown acceptance remains saved and grants no automatic resend. Returned Activity
+fanout drains under best-effort policy before renewal/release cleanup. The renamed
+drainApplicationWorkerOwners captures execution/apply/scan instances; only apply
+has a proved direct scan launch. Both app fixtures and startup share the selection.
+testing/integration/import-execution-worker-fixture.js waits beyond the release
+observer for actual completion and preserves earlier callback errors; legacy
+injected doubles do not certify execution drainage. The execution lifetime design,
+research and outcome own controls, native scope and remaining hidden/remote work.

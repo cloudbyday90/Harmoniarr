@@ -49,9 +49,7 @@ async function read(c) {
     item: await c.evidenceStore.getItem({ operationRunId: c.newerRunId, importCandidateId: c.candidate.id }) };
 }
 async function start(c, overrides = {}) {
-  let finish; const completed = new Promise((resolve) => { finish = resolve; });
   const worker = createImportCandidateExecutionWorker({ ...c.executionRuns, ...c.currentHandoff, ...c.preparation,
-    releaseLease: async (input) => { await c.executionRuns.releaseLease(input); finish(); },
     getImportCandidate: ({ importCandidateId }) => c.evidenceStore.getCandidate(importCandidateId),
     buildSelectedImportCandidateSummary: async () => ({ counts: { ready: 1, blocked: 0, totalSelected: 1 },
       selectedCandidates: [{ ...await c.evidenceStore.getCandidate(c.candidate.id), planning: {},
@@ -60,9 +58,9 @@ async function start(c, overrides = {}) {
     listImportExecutionRunItems: (id) => listImportExecutionRunItems(id, c.pool),
     updateImportExecutionRunItem: (input) => updateImportExecutionRunItem(input, c.pool),
     prepareDownloadDispatch: c.provider.prepareDownloadDispatch, ...overrides });
-  worker.startWorkerRun({ runId: c.newerRunId, requestedCandidateCount: 1, selectedCandidateId: c.candidate.id,
+  const { completion } = await worker.startWorkerRun({ runId: c.newerRunId, requestedCandidateCount: 1, selectedCandidateId: c.candidate.id,
     triggerSource: 'missing_music_manual', sourceSearchId: c.candidate.sourceSearchId });
-  await completed;
+  await completion;
 }
 async function begin(c, { detach = true } = {}) {
   if (detach) await c.pool.query('DELETE FROM import_execution_run_items WHERE operation_run_id=$1', [c.sourceRunId]);

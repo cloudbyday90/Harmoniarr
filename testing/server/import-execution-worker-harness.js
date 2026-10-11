@@ -112,7 +112,8 @@ export function createExecutionWorkerHarness(t, { candidates = [executionCandida
     transitionDownloading, recordAuditEventFn, initializeImportExecutionRunItems, updateImportExecutionRunItem,
     buildSelectedImportCandidateSummary, releaseLease,
     run: async (args = {}) => {
-      await worker.startWorkerRun({ requestedCandidateCount: candidates.length, runId: 'run-1', ...args });
+      const { completion } = await worker.startWorkerRun({ requestedCandidateCount: candidates.length, runId: 'run-1', ...args });
+      await completion;
       return finished;
     },
   };

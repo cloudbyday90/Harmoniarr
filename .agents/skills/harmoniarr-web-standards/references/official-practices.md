@@ -489,3 +489,13 @@ must still be attempted after drain failure. Capture concrete owners and drain
 apply before scan, retaining primary failures while finishing cleanup. OWASP
 guidance applies to fixed refusals and approved diagnostics; W3C timing informs
 actual elapsed drains without changing domain timestamps or certifying UI.
+
+October 11 execution ownership uses
+docs/IMPORT_EXECUTION_LIFETIME_RESEARCH_2026_10.md. Rechecked ECMAScript 2026,
+Node 24.18.1 timers, driver pooling, OWASP logging, RFC 9110 and the September 1
+W3C timing Working Draft through MCP. Await returned provider/confirmation work
+without interpreting local completion as remote download completion. RFC 9110
+does not authorize a second non-idempotent request after unknown acceptance.
+Drain returned Activity under its existing best-effort policy; required audit
+remains transactional. Concrete execution/apply/scan ownership protects known
+finalizers, while remaining workers and hidden work need separate proof.
