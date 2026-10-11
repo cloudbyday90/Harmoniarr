@@ -5,15 +5,15 @@
  * See LICENSE for details.
  */
 
-import { withWorkerTaskCleanup } from './worker-task-cleanup.js';
+import { drainWorkerOwners } from './worker-owner-drain.js';
 
 /** Capture owned workers; apply can enqueue scan work before its own completion. */
 export function drainApplicationWorkerOwners({ importCandidateModule, libraryModule }) {
-  const execution = importCandidateModule?.importCandidateExecutionWorker;
-  const inspection = importCandidateModule?.importCandidateMediaInspectionWorker;
-  const apply = importCandidateModule?.importCandidateApplyWorker;
-  const scan = libraryModule?.libraryScanWorker;
-  return withWorkerTaskCleanup(() => execution?.close?.(),
-    () => withWorkerTaskCleanup(() => inspection?.close?.(),
-      () => withWorkerTaskCleanup(() => apply?.close?.(), () => scan?.close?.())));
+  return drainWorkerOwners([
+    importCandidateModule?.importCandidateExecutionWorker,
+    importCandidateModule?.importCandidateMediaInspectionWorker,
+    importCandidateModule?.importCandidateTranscodeWorker,
+    importCandidateModule?.importCandidateApplyWorker,
+    libraryModule?.libraryScanWorker,
+  ]);
 }

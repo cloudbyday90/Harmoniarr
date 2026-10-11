@@ -6,6 +6,30 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Transcode orchestration lifetime (2026-10-11)
+
+- Reproduce duplicate acquisition during held final release, then own queued
+  orchestration through returned preview/preflight, admitted renewal and captured
+  lease finalization. Preserve the actual null-output preflight boundary; file
+  mutation belongs to separate owners and no direct child launch exists here.
+  Replace nested application cleanup with a small ESM ordered-owner drain,
+  snapshotting execution/inspection/transcode/apply/scan and preserving first
+  Error/null while attempting each. See [design](TRANSCODE_LIFETIME_DESIGN.md),
+  [research](TRANSCODE_LIFETIME_RESEARCH_2026_10.md) and
+  [outcome](TRANSCODE_LIFETIME_OUTCOME.md).
+- Focused 103/103; complete fast 9,670 plus both builds; affected native 30/30
+  across eight files, including five new PostgreSQL/process lifetime checks.
+  All have zero failures/cancellations/skips. Native process proof is distinct
+  from ffmpeg encode correctness. Structural skill validation, installed source
+  hashes and npm audit pass. No exhaustive native or matched speedup claim.
+- [Fresh PR assessment](OPEN_PR_APPLICABILITY_TRANSCODE_LIFETIME_2026_10_OUTCOME.md)
+  finds no eligible unreplayed patch; main only, no release or merge.
+- Next: own library-organize apply completion through actual file mutation,
+  returned handoffs and lease finalizers. Then remaining workers/periodic
+  producers and command-error/hidden descendants before removing residual waits
+  or promoting exhaustive test scheduling. Historical SQL reset causes remain
+  unconfirmed.
+
 ## Completed slice: Media inspection lifetime (2026-10-11)
 
 - Reproduce duplicate acquisition during held final release, then retain actual

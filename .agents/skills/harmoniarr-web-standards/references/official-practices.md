@@ -508,3 +508,12 @@ command closure before treating worker completion as a drain. Error/reporter and
 unreturned descendant contracts need separate proof. OWASP keeps diagnostic
 Activity best-effort while actual returned work is owned. W3C timing remains a
 Working Draft source for elapsed observations, not a browser certification.
+
+October 11 transcode guidance uses docs/TRANSCODE_LIFETIME_RESEARCH_2026_10.md.
+Official FFmpeg formats describe the null muxer; the actual wired execution
+service uses that preflight-only boundary. Trace current source before assuming
+file mutation or a downstream handoff from an operation name. Node normal stdio
+close, returned promises and driver teardown are separate lifetimes. Snapshot
+concrete ordered cleanup owners before awaiting and retain first Error/null while
+attempting all selected cleanup. W3C timing remains draft observation guidance;
+controlled native process checks do not certify codecs or browser conformance.

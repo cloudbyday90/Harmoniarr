@@ -263,3 +263,13 @@ attempts every known owner after failure. Only apply has a verified direct scan
 launch. The media-inspection lifetime documents own native PostgreSQL/process
 proof, callback error limits and remaining transcode/periodic work. The native
 controlled Node probe is process-lifetime evidence, not ffprobe conformance.
+
+Transcode orchestration now uses shared task/lease completion in
+import-candidate-transcode-worker.js. The wired media-transcode-execution-service
+performs null-output preflight; file mutation and child-worker launches were not
+found in this body. Returned preview/preflight and normal command/stdout close
+remain distinct from transformed files. worker-owner-drain.js snapshots ordered
+concrete owners and retains first Error/null after attempting each. Application
+selection is execution/inspection/transcode/apply/scan; apply has a proved
+scan-producing handoff. The transcode documents own PostgreSQL/process controls and
+remaining organize/periodic/command-error limitations.

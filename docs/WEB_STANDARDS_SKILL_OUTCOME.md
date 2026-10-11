@@ -569,3 +569,10 @@ execution/inspection/apply/scan drainage at startup and both app fixtures. The
 [inspection outcome](MEDIA_INSPECTION_LIFETIME_OUTCOME.md) owns gated process,
 PostgreSQL and structural skill evidence. This remains narrow reference maintenance
 without a new blind skill trial, invocation change or conformance certification.
+
+Transcode references locate null-output preflight, returned completion and the
+small ordered worker-owner drain. They distinguish source-traced preflight from
+file mutation and normal process closure from hidden/error paths. The
+[transcode outcome](TRANSCODE_LIFETIME_OUTCOME.md) owns runtime and structural skill
+evidence. This is narrow reference maintenance without a new blind trial,
+invocation-policy change or codec/accessibility/security certification.

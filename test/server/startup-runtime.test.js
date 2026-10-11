@@ -16,6 +16,8 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
   const executionCloseGate = Promise.withResolvers();
   const inspectionCloseEntered = Promise.withResolvers();
   const inspectionCloseGate = Promise.withResolvers();
+  const transcodeCloseEntered = Promise.withResolvers();
+  const transcodeCloseGate = Promise.withResolvers();
   let resolveShutdownComplete;
   const shutdownComplete = new Promise((resolve) => {
     resolveShutdownComplete = resolve;
@@ -179,6 +181,14 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
         },
       },
       importCandidateModule: {
+        importCandidateTranscodeWorker: {
+          startWorkerRun: async () => {},
+          async close() {
+            callOrder.push('transcode.close');
+            transcodeCloseEntered.resolve();
+            await transcodeCloseGate.promise;
+          },
+        },
         importCandidateMediaInspectionWorker: {
           startWorkerRun: async () => {},
           async close() {
@@ -449,9 +459,13 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     assert.equal(callOrder.includes('apply.close'), false);
     assert.equal(callOrder.includes('closePool'), false);
     inspectionCloseGate.resolve();
+    await waitForFixtureReady({ ready: transcodeCloseEntered.promise, operation: shutdownComplete });
+    assert.equal(callOrder.includes('apply.close'), false);
+    assert.equal(callOrder.includes('closePool'), false);
+    transcodeCloseGate.resolve();
     await waitForFixtureReady({ ready: applyCloseEntered.promise, operation: shutdownComplete });
     assert.equal(callOrder.includes('closePool'), false);
-  } finally { executionCloseGate.resolve(); inspectionCloseGate.resolve(); applyCloseGate.resolve(); }
+  } finally { executionCloseGate.resolve(); inspectionCloseGate.resolve(); transcodeCloseGate.resolve(); applyCloseGate.resolve(); }
   await shutdownComplete;
 
   assert.deepEqual(callOrder, [
@@ -488,6 +502,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'server.close',
     'execution.close',
     'inspection.close',
+    'transcode.close',
     'apply.close',
     'scan.close',
     'closePool',

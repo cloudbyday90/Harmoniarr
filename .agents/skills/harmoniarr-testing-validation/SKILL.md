@@ -298,3 +298,13 @@ Error/null. See docs/MEDIA_INSPECTION_LIFETIME_OUTCOME.md for native process and
 both app-fixture evidence. Keep command-error, hidden descendant and remaining
 worker limits explicit; no terminal status or residual sleep certifies complete
 application quiescence.
+
+Transcode orchestration owns returned preview/preflight through admitted renewal
+and captured lease release. The current service runs ffmpeg null-output preflight;
+do not infer file mutation or a child-worker launch from its name. Gate normal
+command/stdout close, held preview cancellation and late admission separately.
+worker-owner-drain snapshots ordered concrete owners, preserves receivers and
+retains first Error/null while attempting all selected cleanup. Application now
+selects execution/inspection/transcode/apply/scan. The transcode lifetime outcome
+owns actual PostgreSQL/process scope; controlled Node process proof is not codec
+correctness, exhaustive validation or complete application quiescence.

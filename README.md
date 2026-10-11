@@ -71,6 +71,7 @@ cases and thirteen fresh scenario variants. Use
 - [Library scan lifetime design](docs/LIBRARY_SCAN_LIFETIME_DESIGN.md), [research](docs/LIBRARY_SCAN_LIFETIME_RESEARCH_2026_10.md) and [outcome](docs/LIBRARY_SCAN_LIFETIME_OUTCOME.md)
 - [Import execution lifetime design](docs/IMPORT_EXECUTION_LIFETIME_DESIGN.md), [research](docs/IMPORT_EXECUTION_LIFETIME_RESEARCH_2026_10.md) and [outcome](docs/IMPORT_EXECUTION_LIFETIME_OUTCOME.md)
 - [Media inspection lifetime design](docs/MEDIA_INSPECTION_LIFETIME_DESIGN.md), [research](docs/MEDIA_INSPECTION_LIFETIME_RESEARCH_2026_10.md) and [outcome](docs/MEDIA_INSPECTION_LIFETIME_OUTCOME.md)
+- [Transcode orchestration lifetime design](docs/TRANSCODE_LIFETIME_DESIGN.md), [research](docs/TRANSCODE_LIFETIME_RESEARCH_2026_10.md) and [outcome](docs/TRANSCODE_LIFETIME_OUTCOME.md)
 - [Downloader filter feedback design](docs/DOWNLOADER_FILTER_ANNOUNCEMENT_DESIGN.md), [research](docs/DOWNLOADER_FILTER_ANNOUNCEMENT_RESEARCH_2026_10.md) and [outcome](docs/DOWNLOADER_FILTER_ANNOUNCEMENT_OUTCOME.md)
 - [No-cache local rebuild design](docs/LOCAL_DOCKER_REBUILD_2026_10_DESIGN.md), [official research](docs/LOCAL_DOCKER_REBUILD_RESEARCH_2026_10.md) and [outcome](docs/LOCAL_DOCKER_REBUILD_2026_10_OUTCOME.md)
 - [Backup, restore, and upgrade design](docs/BACKUP_RESTORE_DESIGN.md)

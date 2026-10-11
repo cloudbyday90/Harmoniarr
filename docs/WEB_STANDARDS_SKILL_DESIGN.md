@@ -323,3 +323,10 @@ guidance complements ECMAScript, driver pooling, OWASP and W3C timing. Keep actu
 returned work separate from hidden descendants and a controlled Node probe from
 ffprobe correctness. The [inspection design](MEDIA_INSPECTION_LIFETIME_DESIGN.md)
 owns this bounded implementation; existing skill entrypoint/metadata/policy remain.
+
+Transcode reference maintenance follows current preflight-only source rather than
+assuming file mutation from its name. Ordered concrete owner capture replaces
+growing nested cleanup adapters while retaining original failure and receiver
+semantics. [Transcode design](TRANSCODE_LIFETIME_DESIGN.md) owns implementation;
+FFmpeg, Node, ECMAScript, driver and W3C sources inform applicable boundaries.
+Existing standards entrypoint, metadata and invocation policy remain.
