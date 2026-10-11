@@ -228,6 +228,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
         },
         libraryScanWorker: {
           startWorkerRun: async () => {},
+          close: async () => { callOrder.push('scan.close'); },
         },
       },
       metadataModule: {
@@ -461,6 +462,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'stop:queue',
     'server.close',
     'apply.close',
+    'scan.close',
     'closePool',
   ]);
   assert.deepEqual(stderrWrites, []);

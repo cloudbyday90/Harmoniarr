@@ -6,6 +6,28 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Library scan lifetime (2026-10-11)
+
+- Reproduce duplicate acquisition during final release and premature fixture
+  completion, then own the full scan through shared ESM task/lease cleanup.
+  Return completion while preserving queued acceptance. Capture apply/scan
+  instances and drain producer before consumer at startup and both fixtures,
+  preserving original Error/null while attempting all known cleanup. See
+  [design](LIBRARY_SCAN_LIFETIME_DESIGN.md),
+  [research](LIBRARY_SCAN_LIFETIME_RESEARCH_2026_10.md) and
+  [outcome](LIBRARY_SCAN_LIFETIME_OUTCOME.md).
+- Focused controls pass 44/44; final affected native group passes 54/54 with
+  no failures/cancellations/skips; complete fast validation passes 9,617 tests
+  and both builds. Standalone native lifetime 4/4 is separately recorded and
+  included in that group, not additional unique coverage. No exhaustive native
+  pass or matched whole-suite speedup is claimed.
+- [Fresh PR assessment](OPEN_PR_APPLICABILITY_SCAN_LIFETIME_2026_10_OUTCOME.md)
+  finds no eligible unreplayed patch; main only, no release or merge.
+- Next: own import-execution completion, its lease/provider finalizers and
+  verified producer handoffs, then remaining workers/periodic work before
+  deleting the residual wait or promoting exhaustive cohort/remainder dispatch.
+  Historical failure causes remain unconfirmed.
+
 ## Completed slice: Dispatcher lifetime (2026-10-11)
 
 - Add modular ESM terminal claim/tick/handler ownership. Complete a committed

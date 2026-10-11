@@ -22,7 +22,16 @@ export async function startLibraryScanFixtureWorker({ callbacks, run, signal,
   }
   const observer = createFixtureWorkerObserver({ callbacks });
   const startup = createFixtureGate();
-  const done = startup.promise.then(() => observer.finished);
+  let completion;
+  let callbackFailed = false; let callbackFailure;
+  void observer.finished.catch(error => { callbackFailed = true; callbackFailure = error; });
+  const done = startup.promise.then(async () => {
+    if (completion) {
+      try { await completion; }
+      catch (error) { throw callbackFailed ? callbackFailure : error; }
+    }
+    return observer.finished;
+  });
   done.catch(() => {});
   try {
     track?.(done);
@@ -31,7 +40,14 @@ export async function startLibraryScanFixtureWorker({ callbacks, run, signal,
       ...(signal ? { isCancellationRequested: async (input) => signal.aborted
         || (typeof callbacks.isCancellationRequested === 'function' ? await callbacks.isCancellationRequested(input) : false) } : {}),
     });
-    await worker.startWorkerRun(run);
+    const accepted = await worker.startWorkerRun(run);
+    completion = accepted?.completion;
+    if (completion !== undefined && (completion === null || typeof completion.then !== 'function')) {
+      throw new TypeError('Scan fixture completion must be a promise');
+    }
+    if (createWorkerFn === createLibraryScanWorker && completion === undefined) {
+      throw new TypeError('The scan worker must supply actual completion');
+    }
     startup.release();
   } catch (error) {
     startup.abort(error);

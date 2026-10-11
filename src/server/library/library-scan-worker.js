@@ -23,6 +23,9 @@ import {
   countLibraryScanReleaseHints,
 } from './library-scan-release-hints.js';
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
+import { createWorkerTaskLifecycle } from '../worker-task-lifecycle.js';
+import { withWorkerTaskCleanup } from '../worker-task-cleanup.js';
+import { drainWorkerLease } from '../worker-lease-cleanup.js';
 import {
   isOperationRunCancellationError,
   isOperationRunPauseError,
@@ -124,7 +127,7 @@ export function createLibraryScanWorker({
   if (typeof recordLibraryScanCatalogue !== 'function') {
     throw new TypeError('Library scan requires its guarded catalogue owner');
   }
-  const activeRunIds = new Set();
+  const lifecycle = createWorkerTaskLifecycle({ execute: runScan });
 
   async function runScan({
     libraryRoot,
@@ -138,194 +141,194 @@ export function createLibraryScanWorker({
     let leaseHeartbeat = null;
     const triggerSummary = buildScanTriggerSummary({ releaseHints, triggeredByRunId, triggerReason });
 
-    try {
-      acquiredLease = await acquireLease({ runId });
-      if (!acquiredLease) return;
-      if (renewLease) {
-        leaseHeartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId, expectedLease: acquiredLease });
-        leaseHeartbeat.start();
-      }
-      await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
-      if (await markRunStarted({
-        expectedLease: acquiredLease,
-        runId,
-        summary: {
+    return withWorkerTaskCleanup(async () => {
+      try {
+        acquiredLease = await acquireLease({ runId });
+        if (!acquiredLease) return;
+        if (renewLease) {
+          leaseHeartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId, expectedLease: acquiredLease });
+          leaseHeartbeat.start();
+        }
+        await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
+        if (await markRunStarted({
+          expectedLease: acquiredLease,
+          runId,
+          summary: {
+            libraryRoot,
+            ...triggerSummary,
+          },
+        }) === false) { finalLeaseStatus = 'failed'; return; }
+
+        const phaseTiming = buildPhaseTiming();
+        const observedFiles = [];
+
+        phaseTiming.startPhase('filesystem_walk');
+        const summary = await executeScan({
+          isCancellationRequested,
           libraryRoot,
-          ...triggerSummary,
-        },
-      }) === false) { finalLeaseStatus = 'failed'; return; }
+          onFile: async (file) => {
+            observedFiles.push(file);
+          },
+          runId,
+        });
+        phaseTiming.finishPhase('filesystem_walk');
 
-      const phaseTiming = buildPhaseTiming();
-      const observedFiles = [];
-
-      phaseTiming.startPhase('filesystem_walk');
-      const summary = await executeScan({
-        isCancellationRequested,
-        libraryRoot,
-        onFile: async (file) => {
-          observedFiles.push(file);
-        },
-        runId,
-      });
-      phaseTiming.finishPhase('filesystem_walk');
-
-      let catalogResult = null;
-      let observedCatalogFiles = [];
-      let filesToExtract = [];
-      phaseTiming.startPhase('catalog');
-      catalogResult = await recordLibraryScanCatalogue({
-        runId,
-        expectedLease: acquiredLease,
-        requestedLibraryRoot: libraryRoot,
-        files: observedFiles,
-        libraryRootPath: summary.libraryRoot,
-      });
-      const hintedCatalogFiles = applyLibraryScanReleaseHints({
-        files: catalogResult.files ?? [],
-        releaseHints,
-      });
-      catalogResult = {
-        ...catalogResult,
-        files: hintedCatalogFiles,
-      };
-      observedCatalogFiles = hintedCatalogFiles
-        .filter((file) => file.fileState === 'observed');
-      filesToExtract = observedCatalogFiles;
-      phaseTiming.finishPhase('catalog');
-
-      if (extractLibraryFileTags && observedCatalogFiles.length) {
-        filesToExtract = observedCatalogFiles.filter(shouldExtractLibraryFileTags);
-        phaseTiming.startPhase('tag_extraction');
-        if (filesToExtract.length > 0) {
-          const extractionResult = await extractLibraryFileTags({
-            runId,
-            expectedLease: acquiredLease,
-            requestedLibraryRoot: libraryRoot,
-            libraryRootPath: summary.libraryRoot,
-            libraryRootId: catalogResult.libraryRootId,
-            files: filesToExtract,
-          });
-          filesToExtract = Array.isArray(extractionResult?.files)
-            ? extractionResult.files
-            : filesToExtract;
-        }
-        phaseTiming.finishPhase('tag_extraction');
-      }
-
-      if (captureLibrarySidecarArtwork && catalogResult?.files?.length) {
-        phaseTiming.startPhase('sidecar_artwork');
-        try {
-          await captureLibrarySidecarArtwork({
-            files: catalogResult.files,
-          });
-        } catch (sidecarError) {
-          if (isOperationRunLeaseLostError(sidecarError)) throw sidecarError;
-          // Sidecar artwork capture is best-effort and must not fail the scan.
-        }
-        phaseTiming.finishPhase('sidecar_artwork');
-      }
-
-      if (matchLibraryFiles && observedCatalogFiles.length) {
-        phaseTiming.startPhase('file_matching');
-        const filesToMatch = extractLibraryFileTags ? filesToExtract : observedCatalogFiles;
-        if (filesToMatch.length > 0) {
-          await matchLibraryFiles({
-            runId,
-            expectedLease: acquiredLease,
-            requestedLibraryRoot: libraryRoot,
-            libraryRootPath: summary.libraryRoot,
-            libraryRootId: catalogResult.libraryRootId,
-            files: filesToMatch,
-          });
-        }
-        phaseTiming.finishPhase('file_matching');
-      }
-
-      if (reconcileLibraryReleases) {
-        phaseTiming.startPhase('release_reconciliation');
-        await reconcileLibraryReleases({
+        let catalogResult = null;
+        let observedCatalogFiles = [];
+        let filesToExtract = [];
+        phaseTiming.startPhase('catalog');
+        catalogResult = await recordLibraryScanCatalogue({
           runId,
           expectedLease: acquiredLease,
           requestedLibraryRoot: libraryRoot,
+          files: observedFiles,
           libraryRootPath: summary.libraryRoot,
-          libraryRootId: catalogResult.libraryRootId,
         });
-        phaseTiming.finishPhase('release_reconciliation');
-      }
-
-      if (reconcileWantedReleases) {
-        phaseTiming.startPhase('wanted_reconciliation');
-        await reconcileWantedReleases({
-          workerContext: { operationType: 'library_scan', runId, expectedLease: acquiredLease },
+        const hintedCatalogFiles = applyLibraryScanReleaseHints({
+          files: catalogResult.files ?? [],
+          releaseHints,
         });
-        phaseTiming.finishPhase('wanted_reconciliation');
-      }
+        catalogResult = {
+          ...catalogResult,
+          files: hintedCatalogFiles,
+        };
+        observedCatalogFiles = hintedCatalogFiles
+          .filter((file) => file.fileState === 'observed');
+        filesToExtract = observedCatalogFiles;
+        phaseTiming.finishPhase('catalog');
 
-      if (reconcileDiscoveryRequests) {
-        phaseTiming.startPhase('discovery_reconciliation');
-        await reconcileDiscoveryRequests();
-        phaseTiming.finishPhase('discovery_reconciliation');
-      }
+        if (extractLibraryFileTags && observedCatalogFiles.length) {
+          filesToExtract = observedCatalogFiles.filter(shouldExtractLibraryFileTags);
+          phaseTiming.startPhase('tag_extraction');
+          if (filesToExtract.length > 0) {
+            const extractionResult = await extractLibraryFileTags({
+              runId,
+              expectedLease: acquiredLease,
+              requestedLibraryRoot: libraryRoot,
+              libraryRootPath: summary.libraryRoot,
+              libraryRootId: catalogResult.libraryRootId,
+              files: filesToExtract,
+            });
+            filesToExtract = Array.isArray(extractionResult?.files)
+              ? extractionResult.files
+              : filesToExtract;
+          }
+          phaseTiming.finishPhase('tag_extraction');
+        }
 
-      if (await markRunCompleted({
-        expectedLease: acquiredLease,
-        runId,
-        summary: {
-          ...summary,
-          observedFileCount: catalogResult.observedFileCount,
-          phases: phaseTiming.toJson(),
-          ...triggerSummary,
-        },
-      }) === false) { finalLeaseStatus = 'failed'; return; }
-    } catch (error) {
-      if (!acquiredLease || isOperationRunLeaseLostError(error)) { finalLeaseStatus = 'failed'; return; }
-      if (isOperationRunPauseError(error)) {
-        finalLeaseStatus = 'paused';
-        if (await markRunPaused({
+        if (captureLibrarySidecarArtwork && catalogResult?.files?.length) {
+          phaseTiming.startPhase('sidecar_artwork');
+          try {
+            await captureLibrarySidecarArtwork({
+              files: catalogResult.files,
+            });
+          } catch (sidecarError) {
+            if (isOperationRunLeaseLostError(sidecarError)) throw sidecarError;
+            // Sidecar artwork capture is best-effort and must not fail the scan.
+          }
+          phaseTiming.finishPhase('sidecar_artwork');
+        }
+
+        if (matchLibraryFiles && observedCatalogFiles.length) {
+          phaseTiming.startPhase('file_matching');
+          const filesToMatch = extractLibraryFileTags ? filesToExtract : observedCatalogFiles;
+          if (filesToMatch.length > 0) {
+            await matchLibraryFiles({
+              runId,
+              expectedLease: acquiredLease,
+              requestedLibraryRoot: libraryRoot,
+              libraryRootPath: summary.libraryRoot,
+              libraryRootId: catalogResult.libraryRootId,
+              files: filesToMatch,
+            });
+          }
+          phaseTiming.finishPhase('file_matching');
+        }
+
+        if (reconcileLibraryReleases) {
+          phaseTiming.startPhase('release_reconciliation');
+          await reconcileLibraryReleases({
+            runId,
+            expectedLease: acquiredLease,
+            requestedLibraryRoot: libraryRoot,
+            libraryRootPath: summary.libraryRoot,
+            libraryRootId: catalogResult.libraryRootId,
+          });
+          phaseTiming.finishPhase('release_reconciliation');
+        }
+
+        if (reconcileWantedReleases) {
+          phaseTiming.startPhase('wanted_reconciliation');
+          await reconcileWantedReleases({
+            workerContext: { operationType: 'library_scan', runId, expectedLease: acquiredLease },
+          });
+          phaseTiming.finishPhase('wanted_reconciliation');
+        }
+
+        if (reconcileDiscoveryRequests) {
+          phaseTiming.startPhase('discovery_reconciliation');
+          await reconcileDiscoveryRequests();
+          phaseTiming.finishPhase('discovery_reconciliation');
+        }
+
+        if (await markRunCompleted({
           expectedLease: acquiredLease,
-          nextAttemptAt: error.nextRetryAt ?? null,
           runId,
           summary: {
-            currentStep: 'Library scan paused by maintenance lock',
-            libraryRoot,
-            pauseCode: error.pauseCode ?? null,
-            pauseMessage: error.message,
-            pauseProvider: error.pauseProvider ?? null,
+            ...summary,
+            observedFileCount: catalogResult.observedFileCount,
+            phases: phaseTiming.toJson(),
             ...triggerSummary,
           },
         }) === false) { finalLeaseStatus = 'failed'; return; }
-        return;
-      }
+      } catch (error) {
+        if (isOperationRunLeaseLostError(error)) { finalLeaseStatus = 'failed'; return; }
+        if (!acquiredLease) { finalLeaseStatus = 'failed'; throw error; }
+        if (isOperationRunPauseError(error)) {
+          finalLeaseStatus = 'paused';
+          if (await markRunPaused({
+            expectedLease: acquiredLease,
+            nextAttemptAt: error.nextRetryAt ?? null,
+            runId,
+            summary: {
+              currentStep: 'Library scan paused by maintenance lock',
+              libraryRoot,
+              pauseCode: error.pauseCode ?? null,
+              pauseMessage: error.message,
+              pauseProvider: error.pauseProvider ?? null,
+              ...triggerSummary,
+            },
+          }) === false) { finalLeaseStatus = 'failed'; return; }
+          return;
+        }
 
-      if (isOperationRunCancellationError(error)) {
-        finalLeaseStatus = 'cancelled';
-        if (await markRunCancelled({
+        if (isOperationRunCancellationError(error)) {
+          finalLeaseStatus = 'cancelled';
+          if (await markRunCancelled({
+            expectedLease: acquiredLease,
+            runId,
+            summary: {
+              currentStep: 'Library scan cancelled',
+              libraryRoot,
+              ...triggerSummary,
+            },
+          }) === false) { finalLeaseStatus = 'failed'; return; }
+          return;
+        }
+
+        finalLeaseStatus = 'failed';
+        if (await markRunFailed({
           expectedLease: acquiredLease,
           runId,
+          errorMessage: error?.message ?? 'Library scan failed',
           summary: {
-            currentStep: 'Library scan cancelled',
             libraryRoot,
             ...triggerSummary,
           },
         }) === false) { finalLeaseStatus = 'failed'; return; }
-        return;
       }
-
-      finalLeaseStatus = 'failed';
-      if (await markRunFailed({
-        expectedLease: acquiredLease,
-        runId,
-        errorMessage: error.message,
-        summary: {
-          libraryRoot,
-          ...triggerSummary,
-        },
-      }) === false) { finalLeaseStatus = 'failed'; return; }
-    } finally {
-      leaseHeartbeat?.stop();
-      activeRunIds.delete(runId);
-      if (acquiredLease) await releaseLease({ runId, status: finalLeaseStatus, expectedLease: acquiredLease });
-    }
+    }, () => drainWorkerLease({ heartbeat: leaseHeartbeat, lease: acquiredLease, releaseLease,
+      runId, status: finalLeaseStatus }));
   }
 
   async function startWorkerRun({
@@ -335,23 +338,18 @@ export function createLibraryScanWorker({
     triggeredByRunId = null,
     triggerReason = null,
   }) {
-    if (activeRunIds.has(runId)) {
-      return;
-    }
-
-    activeRunIds.add(runId);
-    queueMicrotask(() => {
-      void runScan({
+    const completion = lifecycle.start({
         libraryRoot,
         releaseHints,
         runId,
         triggeredByRunId,
         triggerReason,
-      });
     });
+    return { completion };
   }
 
   return {
     startWorkerRun,
+    close: lifecycle.close,
   };
 }

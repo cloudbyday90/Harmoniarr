@@ -26,6 +26,7 @@ import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lea
 import { createWorkerTaskLifecycle } from '../worker-task-lifecycle.js';
 import { withWorkerTaskCleanup } from '../worker-task-cleanup.js';
 import { createWorkerAdvisoryTasks } from '../worker-advisory-tasks.js';
+import { drainWorkerLease } from '../worker-lease-cleanup.js';
 import { assessDeliveredQuality } from '../media/media-delivery-quality.js';
 import { createImportCandidateSafeAutoAddQualityGateService } from './import-candidate-safe-auto-add-quality-gate.js';
 import { readImportCandidateApplyScope } from './import-candidate-apply-scope.js';
@@ -840,18 +841,8 @@ export function createImportCandidateApplyWorker({
       }
     }, async () => {
       await advisoryTasks.close();
-      let cleanupFailed = false;
-      let cleanupFailure;
-      try {
-        if (leaseHeartbeat?.stopAndDrain) await leaseHeartbeat.stopAndDrain();
-        else await leaseHeartbeat?.stop();
-      } catch (error) { cleanupFailed = true; cleanupFailure = error; }
-      try {
-        if (acquiredLease) await releaseLease({ runId, status: finalLeaseStatus, expectedLease: acquiredLease });
-      } catch (error) {
-        if (!cleanupFailed) { cleanupFailed = true; cleanupFailure = error; }
-      }
-      if (cleanupFailed) throw cleanupFailure;
+      await drainWorkerLease({ heartbeat: leaseHeartbeat, lease: acquiredLease, releaseLease,
+        runId, status: finalLeaseStatus });
     });
   }
 

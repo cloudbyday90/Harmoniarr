@@ -41,3 +41,17 @@ test('worker cleanup failure rejects an otherwise successful scenario including 
     phaseObserver: createFixturePhaseObserver(),
   }, async () => 'success'), error => error === null);
 });
+
+test('app drain waits for apply before scan, drains scan after apply null and preserves both receivers', async () => {
+  const applyGate = Promise.withResolvers(); const applyEntered = Promise.withResolvers();
+  const scanGate = Promise.withResolvers(); const scanEntered = Promise.withResolvers(); let settled = false; let scanCalled = false;
+  const apply = { close() { assert.equal(this, apply); applyEntered.resolve(); return applyGate.promise; } };
+  const scan = { close() { assert.equal(this, scan); scanCalled = true; scanEntered.resolve(); return scanGate.promise; } };
+  const pending = withIntegrationAppWorkerDrain({ application: { importCandidateModule: { importCandidateApplyWorker: apply },
+    libraryModule: { libraryScanWorker: scan } }, phaseObserver: createFixturePhaseObserver() }, async () => 'result');
+  void pending.then(() => { settled = true; }, () => { settled = true; });
+  await applyEntered.promise; assert.equal(scanCalled, false);
+  applyGate.reject(null); await scanEntered.promise; assert.equal(settled, false);
+  scanGate.reject(new Error('scan fallout')); await assert.rejects(pending, error => error === null);
+  assert.equal(settled, true);
+});

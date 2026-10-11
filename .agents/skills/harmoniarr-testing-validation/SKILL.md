@@ -265,3 +265,14 @@ drainage. Supervisor prefers terminal drainage before resource cleanup. Keep
 the residual fixture wait until library scan and remaining workers are owned;
 docs/DISPATCHER_LIFETIME_OUTCOME.md separates executed native scope from claims
 about full-app quiescence or faster exhaustive validation.
+
+Library scan now returns actual completion and has terminal close; coalescing
+extends through admitted heartbeat renewal and lease release. The shared
+worker-lease cleanup attempts release after drain failure, preserving original
+Error/null. Application drainage captures apply/scan owners, drains the producer
+first and attempts scan cleanup after apply failure. Standalone scan fixtures
+wait for returned execution beyond callback observation, without hanging behind
+an unreachable observer on early execution failure. Keep callback errors and
+legacy injected test-double limits explicit. See
+docs/LIBRARY_SCAN_LIFETIME_OUTCOME.md; remaining workers and hidden/unreturned
+work still prevent deleting the residual delay or claiming whole-app drainage.

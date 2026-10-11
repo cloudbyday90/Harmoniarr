@@ -6,9 +6,10 @@
  */
 
 import { withWorkerTaskCleanup } from '../../src/server/worker-task-cleanup.js';
+import { drainApplyAndScanWorkers } from '../../src/server/application-worker-drain.js';
 
-/** Drain this application's apply owner without replacing an original scenario failure. */
+/** Drain this application's apply/scan owners without replacing the scenario failure. */
 export function withIntegrationAppWorkerDrain({ application, phaseObserver }, run) {
   return withWorkerTaskCleanup(run, () => phaseObserver.measure('app_worker_drain',
-    () => application.importCandidateModule?.importCandidateApplyWorker?.close?.()));
+    () => drainApplyAndScanWorkers(application)));
 }

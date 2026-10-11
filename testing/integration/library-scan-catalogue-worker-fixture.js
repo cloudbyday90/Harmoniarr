@@ -20,7 +20,7 @@ export async function startLibraryScanCatalogueFixtureWorker({ scope, runs, runI
       try { await afterWalk?.(result); }
       catch (error) {
         rememberHookFailure(error);
-        // The native worker records Error objects; preserve the fixture's original reason separately.
+        // Persisted worker outcomes and the fixture's original assertion have separate ownership.
         throw error instanceof Error ? error : new Error('The controlled catalogue walk hook failed');
       }
       return result;
@@ -29,7 +29,7 @@ export async function startLibraryScanCatalogueFixtureWorker({ scope, runs, runI
       if (scope.signal.aborted) throw createOperationRunCancellationError({ runId });
       try { return await recordLibraryScanCatalogue(input); }
       catch (error) {
-        // Ordinary SQL/service Errors are native job outcomes; null fixture cancellation cannot enter error.message.
+        // Preserve null fixture cancellation separately from ordinary persisted SQL/service outcomes.
         if (error instanceof Error) throw error;
         rememberHookFailure(error);
         throw scope.signal.aborted ? createOperationRunCancellationError({ runId })

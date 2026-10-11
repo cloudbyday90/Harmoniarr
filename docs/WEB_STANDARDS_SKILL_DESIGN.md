@@ -302,3 +302,9 @@ returned completion and supervised resource teardown. Keep ordinary timer pause
 separate from terminal drainage and actual completion separate from legacy
 acceptance. The dedicated design/research/outcome documents own evidence and
 scope; existing skill entrypoint, metadata and invocation policy are retained.
+
+Scan reference maintenance distinguishes accepted queue intent, persisted
+terminal status, observed release and full execution completion. Shared lease
+cleanup and producer-before-consumer application drainage retain original
+failures. The dedicated documents own design/research/runtime evidence; the
+existing standards entrypoint, metadata and invocation policy stay in place.

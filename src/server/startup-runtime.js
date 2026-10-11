@@ -35,6 +35,7 @@ import { createMaintenanceLockHeartbeatPauseService } from './recovery/maintenan
 import { createRuntimeReporter } from './runtime-reporter.js';
 import { bootstrapDatabaseSchemaFromSnapshot } from './schema-bootstrap.js';
 import { createStartupServiceSupervisor } from './startup-service-supervisor.js';
+import { drainApplyAndScanWorkers } from './application-worker-drain.js';
 import { createStartupValidationService } from './startup-validation-service.js';
 
 function closeServer(server) {
@@ -237,7 +238,7 @@ export async function startServerRuntime({
       await startupServiceSupervisor.shutdown({
         onShutdown: async () => {
           await closeServer(server);
-          await importCandidateModule.importCandidateApplyWorker?.close?.();
+          await drainApplyAndScanWorkers({ importCandidateModule, libraryModule });
           await closeDatabasePool();
         },
       });

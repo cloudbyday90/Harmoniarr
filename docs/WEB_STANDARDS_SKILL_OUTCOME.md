@@ -549,3 +549,9 @@ They retain the returning-claim and acceptance/completion distinction instead
 of extrapolating one worker to application-wide drainage. Native counts and the
 controlled baseline belong to the dedicated dispatcher outcome. This narrow
 maintenance adds no new blind skill trial, browser or security certification.
+
+Scan references locate actual completion, shared lease cleanup and concrete
+apply/scan drainage at startup and both fixture entry points. Standalone fixture
+observation remains distinct from returned execution; legacy test doubles and
+remaining workers keep explicit limits. The separate scan outcome owns executed
+counts. This is narrow maintenance, with no new blind trial or conformance claim.

@@ -481,3 +481,11 @@ in-flight claim handoff and then drain returned completion. PostgreSQL queue
 locking does not replace authorization or worker lease fencing. Monotonic spans
 measure drain boundaries; a queued acknowledgement is an earlier event. Fixed
 refusals add no private inputs, and no UI conformance claim follows.
+
+October 11 scan ownership uses docs/LIBRARY_SCAN_LIFETIME_RESEARCH_2026_10.md.
+A queued handle preserves acceptance timing while owning returned execution
+through finalizers. Timer stop is earlier than renewal drainage; lease release
+must still be attempted after drain failure. Capture concrete owners and drain
+apply before scan, retaining primary failures while finishing cleanup. OWASP
+guidance applies to fixed refusals and approved diagnostics; W3C timing informs
+actual elapsed drains without changing domain timestamps or certifying UI.

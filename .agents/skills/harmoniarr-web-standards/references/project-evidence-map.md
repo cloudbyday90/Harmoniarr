@@ -232,3 +232,12 @@ handlers return acknowledgements; apply supplies actual completion, while
 legacy consumers still require explicit ownership. Unit gates and the native
 dispatcher lifetime suite own current proof; the separate outcome retains the
 baseline failure, native scope and remaining library-scan/heartbeat boundary.
+
+Library scan now uses the shared task lifecycle and worker-lease-cleanup.js.
+application-worker-drain.js captures concrete apply/scan instances and drains
+the producer before its consumer; startup and both app fixtures use that owner
+selection. Standalone library-scan-worker-fixture.js retains the execution handle
+beyond callback observation and preserves earlier observer failures. Trace
+guarded catalogue/tags/matching/reconciliation plus admitted renewal and lease
+release. Native scan lifetime and existing consumer suites own proof; the
+separate outcome owns exact counts and remaining worker/child-job limitations.
