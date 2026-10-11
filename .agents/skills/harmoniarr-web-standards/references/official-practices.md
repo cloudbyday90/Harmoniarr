@@ -412,3 +412,19 @@ direct work before launch and drain current borrowed-client reads before rollbac
 Close observer admission before drainage; refresh monitoring snapshots within
 paused transactions. Assess template preparation only after these owners are
 sound, retaining independent sources/clones and unchanged domain assertions.
+
+Docker/DOM contract maintenance uses the verified
+`docs/LOCAL_DOCKER_REBUILD_RESEARCH_2026_10.md` ledger: no-cache layers differ
+from persistent npm mounts/base pulls; health differs from provider acceptance;
+configured readiness signs in and may read provider status. Keep existing state
+and conditional walkthrough branches. This reference update inherits the
+ledger's vendor sources and version limits; it does not certify a new deployment.
+
+The clean W3C status explanation above was reopened October 10 for the observed
+delayed filter count. Keep a current user-action result in its existing polite
+region without focus movement or periodic-poll noise. Validator readiness waits
+establish that validator's mounted snapshot; they do not repair the app's stale
+announcement or prove actual screen-reader speech. Scope assertions to rendered
+native panels and exercise real current-quality owners rather than forcing a
+fixture past an earlier refusal. No blanket pre-interaction wait or conformance
+claim follows from this seam maintenance.

@@ -6,7 +6,37 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
-## Current development slice: Catalogue fixture lifetime and templates (2026-10-10)
+## Current follow-up: No-cache local walkthrough and packaged validators (2026-10-10)
+
+- Rebuild the published catalogue candidate with a new owned Buildx builder and
+  the guide's no-cache path. Start the exact resulting image, retain existing
+  binds/settings, reuse its admin and leave the healthy loopback walkthrough
+  running. See [design](LOCAL_DOCKER_REBUILD_2026_10_DESIGN.md),
+  [official research](LOCAL_DOCKER_REBUILD_RESEARCH_2026_10.md) and
+  [outcome](LOCAL_DOCKER_REBUILD_2026_10_OUTCOME.md).
+- Managed-provider startup/private API and preserved provider readiness pass.
+  Strict accepted-transfer/linkage proof passes with 12 of 859 linked transfers,
+  retained after filtering and refresh. Provider health remains attention;
+  acceptance, library-add readiness and container health are distinct.
+- Correct validator ownership: diagnostic label/title belong to one visible
+  article; mounted queue response/rendering precede a loaded-journey filter
+  check; file-backed fixtures retain actual accepted observations and saved
+  apply-run scope. Existing quality preflight and worker guards stay authoritative.
+- Packaged media/recovery passes all seven controls. Full independent source and
+  rebuilt-image deployment paths pass, including restart/persistence, backup/
+  restore, Request Music and nine operator browser checkpoints. Native evidence
+  checks and all owned resource/secret cleanup pass; optional baseline upgrade
+  remains explicitly skipped. Final script suite 552/552, focused controls 26/26
+  and scoped lint/static checks pass. No app/image inputs changed after rebuild.
+- Next: fix the reproduced application status message when filtering before
+  async data arrives. Its live region remains 0 of 0 after twelve rows render.
+  Preserve filter/focus ownership and avoid background polling announcements.
+  Then capture first app-pool checkout diagnostics and compose the audited cohort
+  plus exhaustive serial remainder before promoting complete-gate scheduling.
+  Discovery-request recomputation remains the subsequent product task.
+- Main only; commit/push changes without branch, release, tag or PR merge.
+
+## Completed development slice: Catalogue fixture lifetime and templates (2026-10-10)
 
 - Preserve eight native catalogue cases/thirteen fresh variants while adopting
   scoped gates, observed completion, tracked organize work, after-drain captured

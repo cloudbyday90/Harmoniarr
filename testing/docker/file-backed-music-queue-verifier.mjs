@@ -18,7 +18,8 @@
 
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { chmod, copyFile, mkdir, rm, stat } from 'node:fs/promises';
+import process from 'node:process';
+import { chmod, copyFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
@@ -30,6 +31,7 @@ import {
   upsertImportCandidate,
 } from '/app/server-dist/import-candidates/import-candidate-repository.js';
 import { upsertImportExecutionRunItem } from '/app/server-dist/import-candidates/import-candidate-execution-repository.js';
+import { captureRecoveryObservation } from '/app/server-dist/import-candidates/music-queue-recovery-policy.js';
 import { createMediaInspectionService } from '/app/server-dist/media/media-inspection-service.js';
 import { createMediaToolingStatusService } from '/app/server-dist/media/media-tooling-status-service.js';
 import { persistSettings } from '/app/server-dist/settings.js';
@@ -327,6 +329,11 @@ async function reconcileCompletedTransfer({
   expectedAutoApplyStarted = 1,
   importCandidateModule,
 }) {
+  const savedCandidate = await importCandidateModule.importCandidateService.getImportCandidate({
+    importCandidateId: candidate.id,
+  });
+  assert.ok(savedCandidate, 'completed-transfer fixture must read its persisted candidate and files');
+  const acceptedObservation = captureRecoveryObservation(savedCandidate);
   const executionRun = await importCandidateModule.importCandidateExecutionRunStore.createOperationRun({
     requestedCandidateCount: 1,
     status: 'completed',
@@ -335,8 +342,12 @@ async function reconcileCompletedTransfer({
     candidate: {
       id: candidate.id,
     },
+    execution: {
+      sourceObservation: acceptedObservation,
+      acceptedCandidateObservation: acceptedObservation,
+    },
   };
-  await upsertImportExecutionRunItem({
+  const executionItem = await upsertImportExecutionRunItem({
     importCandidateId: candidate.id,
     itemStatus: 'queued',
     operationRunId: executionRun.id,
@@ -344,21 +355,21 @@ async function reconcileCompletedTransfer({
     position: 1,
     statusMessage: 'Docker fixture transfer was accepted by the provider.',
   });
+  assert.ok(executionItem?.id, 'completed-transfer fixture must retain its saved execution item identity');
+  const savedRun = await importCandidateModule.importCandidateExecutionRunStore.getRunById(executionRun.id);
+  assert.ok(savedRun, 'completed-transfer fixture must read its saved execution run');
 
   const reconciliation = await importCandidateModule.importCandidateExecutionReconciliationService
     .reconcileImportCandidateExecutionSummary({
       executionSummary: {
         currentRun: {
-          id: executionRun.id,
+          ...savedRun,
           items: [{
-            importCandidateId: candidate.id,
-            itemStatus: 'queued',
+            ...executionItem,
             liveTransferSummary: {
               message: 'Docker fixture transfer completed.',
               status: 'completed',
             },
-            planningSnapshot,
-            statusMessage: 'Docker fixture transfer completed.',
           }],
         },
       },
@@ -373,7 +384,7 @@ async function reconcileCompletedTransfer({
   return reconciliation;
 }
 
-async function executeSafeAutoAdd({ candidate, importCandidateModule }) {
+async function executeSafeAutoAdd({ candidate, importCandidateModule, beforeWorkerStart = null, completedExecutionRunId = null }) {
   const initialPreview = await importCandidateModule.importCandidateApplyPreviewService.previewImportCandidateApply({
     importCandidateId: candidate.id,
   });
@@ -384,22 +395,75 @@ async function executeSafeAutoAdd({ candidate, importCandidateModule }) {
   );
   const libraryPath = initialPreview.files[0]?.libraryTarget?.path;
   assert.ok(libraryPath, 'safe automatic add must resolve a library target');
-  const reconciliation = await reconcileCompletedTransfer({ candidate, importCandidateModule });
-  const applyRunId = reconciliation.autoApplyRuns[0]?.runId ?? null;
+  let automaticAdd;
+  if (completedExecutionRunId) {
+    automaticAdd = await importCandidateModule.importCandidateAutoApplyRunService.startSafeApplyRunAfterDownloadCompleted({
+      importCandidateId: candidate.id, operationRunId: completedExecutionRunId,
+    });
+    assert.equal(automaticAdd.started, true, 'the real valid media must pass current automatic-add preparation');
+  } else {
+    const reconciliation = await reconcileCompletedTransfer({ candidate, importCandidateModule });
+    automaticAdd = reconciliation.autoApplyRuns[0];
+  }
+  const applyRunId = automaticAdd?.runId ?? null;
   assert.ok(applyRunId, 'completed transfer must create an apply run ID');
+  const queuedApplyRun = await importCandidateModule.importCandidateApplyRunStore.getRunById(applyRunId);
+  assert.ok(queuedApplyRun, 'automatic add must retain its persisted apply run');
+  assert.deepEqual(queuedApplyRun.importCandidateIds, [candidate.id], 'automatic add must retain its captured candidate scope');
+  assert.equal(queuedApplyRun.scopedCandidateCount, 1, 'automatic add must retain one scoped candidate');
+  assert.equal(queuedApplyRun.requestedCandidateCount, 1, 'automatic add must retain one requested candidate');
+  assert.equal(queuedApplyRun.executableCandidateCount, 1, 'automatic add must retain one executable candidate');
+  assert.equal(queuedApplyRun.applySafetyMode, 'safe_auto', 'automatic add must retain its saved safety mode');
+  await beforeWorkerStart?.({ sourcePath: initialPreview.files[0]?.sourceFile?.path, libraryPath, applyRun: queuedApplyRun });
 
   await importCandidateModule.importCandidateApplyWorker.startWorkerRun({
-    applySafetyMode: 'safe_auto',
-    executableCandidateCount: 1,
-    requestedCandidateCount: 1,
-    runId: applyRunId,
-    triggerSource: 'download_completed',
+    applySafetyMode: queuedApplyRun.applySafetyMode,
+    executableCandidateCount: queuedApplyRun.executableCandidateCount,
+    importCandidateIds: queuedApplyRun.importCandidateIds,
+    requestedCandidateCount: queuedApplyRun.requestedCandidateCount,
+    runId: queuedApplyRun.id,
+    triggerSource: queuedApplyRun.triggerSource,
   });
 
   return {
     libraryPath,
     run: await waitForRun(importCandidateModule.importCandidateApplyRunStore, applyRunId),
   };
+}
+
+async function executeQualityChangedAfterQueue({ candidate, importCandidateModule, verifiedLibraryPath, pool }) {
+  const preview = await previewCandidate(importCandidateModule, candidate.id);
+  const sourcePath = preview.files[0]?.sourceFile?.path;
+  assert.equal(sourcePath, `${downloadsRoot}/docker-file-backed-transcoded/disguised.flac`, 'media changes stay in the acknowledged disposable source');
+  assert.ok(verifiedLibraryPath.startsWith(`${musicRoot}/`), 'valid admission bytes come from the verified disposable library');
+  const disguisedBytes = await readFile(sourcePath);
+  assert.equal(preview.files[0]?.inspection?.metadata?.primaryAudioCodec, 'flac', 'the actual transcoded source must still claim a FLAC container');
+  const refusal = await reconcileCompletedTransfer({ candidate, expectedAutoApplyStarted: 0, importCandidateModule });
+  assert.equal(refusal.autoApplyRuns[0]?.started, false, 'disguised media must be refused before automatic queueing');
+  assert.equal(refusal.autoApplyRuns[0]?.runId ?? null, null, 'preflight refusal must allocate no apply run');
+  assert.equal(refusal.autoApplyRuns[0]?.skippedReason, 'no_safe_import_pending_candidate', 'quality refusal must remain in review');
+  assert.equal((await importCandidateModule.importCandidateService.getImportCandidate({ importCandidateId: candidate.id })).status,
+    'import_pending', 'preflight quality review must retain the completed candidate');
+  assert.equal(await countApplyRunItemsForCandidate(pool, candidate.id), 0, 'preflight refusal must create no apply item');
+  await assert.rejects(stat(preview.files[0].libraryTarget.path), { code: 'ENOENT' });
+  assert.deepEqual(await readFile(sourcePath), disguisedBytes, 'preflight refusal must retain the actual downloaded bytes');
+
+  // The actual owner admits real valid media. Only then change this task-owned source to exercise the worker's fresh check.
+  await copyFile(verifiedLibraryPath, sourcePath);
+  const result = await executeSafeAutoAdd({ candidate, importCandidateModule, completedExecutionRunId: refusal.currentRunId,
+    beforeWorkerStart: async (queued) => {
+      assert.equal(queued.sourcePath, sourcePath, 'queued startup must use the same captured disposable source');
+      await writeFile(sourcePath, disguisedBytes);
+    } });
+  assert.deepEqual(await readFile(sourcePath), disguisedBytes, 'the worker quality stop must retain the changed source bytes');
+  const appliedItems = await pool.query(`SELECT apply_snapshot FROM import_apply_run_items
+    WHERE operation_run_id=$1 AND import_candidate_id=$2`, [result.run.id, candidate.id]);
+  assert.equal(appliedItems.rows.length, 1, 'the guarded quality stop must retain its single actual apply item');
+  const quality = appliedItems.rows[0].apply_snapshot?.apply?.qualityGate;
+  assert.equal(quality?.eligible, false, 'the real module worker must persist its rejected quality decision');
+  assert.ok(quality.blockers.some((blocker) => ['safe_auto_spectral_suspicious', 'safe_auto_spectral_transcoded'].includes(blocker.code)),
+    'the review decision must be measured transcode evidence rather than unavailable tooling');
+  return { ...result, preflightSkippedReason: refusal.autoApplyRuns[0].skippedReason };
 }
 
 async function assertFileExists(pathValue) {
@@ -550,9 +614,11 @@ async function runVerification() {
     label: 'transcoded',
   }, { appUserId });
   const disguisedCandidate = disguisedSeed.candidate;
-  const disguisedResult = await executeSafeAutoAdd({
+  const disguisedResult = await executeQualityChangedAfterQueue({
     candidate: disguisedCandidate,
     importCandidateModule,
+    verifiedLibraryPath: authenticResult.libraryPath,
+    pool,
   });
   const disguisedFinalCandidate = await importCandidateModule.importCandidateService.getImportCandidate({
     importCandidateId: disguisedCandidate.id,
@@ -817,6 +883,7 @@ async function runVerification() {
       candidateId: disguisedCandidate.id,
       finalStatus: disguisedFinalCandidate.status,
       runId: disguisedResult.run.id,
+      preflightSkippedReason: disguisedResult.preflightSkippedReason,
     },
     collision: {
       candidateId: collisionCandidate.id,

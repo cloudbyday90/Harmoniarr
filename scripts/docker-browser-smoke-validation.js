@@ -20,6 +20,15 @@ async function waitForHeading(page, name) {
   await page.getByRole('heading', { name }).waitFor();
 }
 
+async function openActivityDiagnostics(page) {
+  const disclosure = page.locator('details.activity-diagnostics');
+  await disclosure.waitFor();
+  if (!await disclosure.evaluate((element) => element.open)) {
+    await disclosure.locator(':scope > summary').click();
+  }
+  return disclosure;
+}
+
 function sanitizeEvidenceFileSegment(value) {
   return String(value)
     .toLowerCase()
@@ -247,8 +256,8 @@ export async function runOperatorBrowserScenario({
     await page.waitForURL(/\/app\/downloader(?:\?.*)?(?:#.*)?$/);
     await waitForHeading(page, 'Downloader');
     await page.getByText('Set up Soulseek to enable downloads').waitFor();
-    await page.getByText('Add your Soulseek download client URL and slskd API key in Settings.').waitFor();
-    await page.getByRole('link', { name: 'Configure slskd' }).waitFor();
+    await page.getByText('Choose Managed or connect an external Soulseek download client in Settings. Harmoniarr will not search, download, or check transfers while it is off.').waitFor();
+    await page.getByRole('link', { exact: true, name: 'Set up Soulseek' }).waitFor();
     await page.waitForTimeout(downloaderProviderSetupObservationMs);
   } finally {
     page.off('response', recordDownloaderQueueResponse);
@@ -269,27 +278,42 @@ export async function runOperatorBrowserScenario({
   await waitForHeading(page, 'Settings');
   await record('settings_loaded');
 
-  await page.getByRole('link', { name: 'Activity' }).click();
-  await page.waitForURL(/\/app\/activity(?:\/operations)?(?:\?.*)?(?:#.*)?$/);
-  await waitForHeading(page, 'Activity');
+  await page.getByRole('link', { exact: true, name: 'Activity' }).click();
+  await page.waitForURL(/\/app\/activity\/feed(?:\?.*)?(?:#.*)?$/);
+  await waitForHeading(page, 'Activity timeline');
+  const timelineDiagnostics = await openActivityDiagnostics(page);
+  await timelineDiagnostics.getByRole('link', { exact: true, name: 'Background jobs' }).click();
+  await page.waitForURL(/\/app\/activity\/operations(?:\?.*)?(?:#.*)?$/);
   await waitForHeading(page, 'Background Jobs');
   await record('operations_loaded');
 
-  await page.getByRole('link', { name: 'Candidates' }).click();
-  await page.waitForURL(/\/app\/activity\/candidates(?:\?.*)?(?:#.*)?$/);
+  const operationDiagnostics = await openActivityDiagnostics(page);
+  await operationDiagnostics.getByRole('link', { exact: true, name: 'Match diagnostics' }).click();
+  await page.waitForURL(/\/app\/activity\/diagnostics\/matches(?:\?.*)?(?:#.*)?$/);
   await waitForHeading(page, 'Match diagnostics');
   await record('candidates_loaded');
 
-  await page.getByRole('link', { name: 'Settings' }).click();
+  await page.getByRole('link', { exact: true, name: 'Settings' }).click();
   await page.waitForURL(/\/app\/settings(?:\?.*)?(?:#.*)?$/);
-  await page.getByRole('link', { name: 'Backup & Restore' }).click();
+  const moreSettings = page.getByRole('navigation', { exact: true, name: 'More settings sections' });
+  if (!await moreSettings.isVisible()) {
+    await page.getByRole('navigation', { exact: true, name: 'Settings sections' })
+      .getByRole('button', { exact: true, name: 'More settings' }).click();
+  }
+  await moreSettings.getByRole('link', { exact: true, name: 'Backup & restore' }).click();
   await page.waitForURL(/\/app\/settings\/recovery(?:\?.*)?(?:#.*)?$/);
-  await waitForHeading(page, 'Backups');
+  await waitForHeading(page, 'Recovery status');
   await record('recovery_loaded');
 
-  await page.getByRole('button', { name: 'Create backup' }).click();
-  await page.getByRole('link', { name: 'Download' }).waitFor();
-  await page.getByText('This backup passed all checks and can be applied.').waitFor();
+  await page.getByRole('button', { exact: true, name: 'Create backup' }).click();
+  await page.locator('#recovery-backup-create-status[data-state="created"]').waitFor();
+  await page.getByRole('region', { exact: true, name: 'Review backup history' })
+    .getByRole('button', { exact: true, name: 'Review restore' }).click();
+  const restoreDetails = page.getByRole('region', { exact: true, name: 'Restore a backup' });
+  await restoreDetails.getByText('This backup passed all checks and can be applied.', { exact: true }).waitFor();
+  await restoreDetails.getByRole('button', { exact: true, name: 'Show file actions' }).click();
+  await restoreDetails.getByRole('region', { exact: true, name: 'Backup file actions' })
+    .getByRole('link', { exact: true, name: 'Download backup' }).waitFor();
   await record('backup_preview_ready');
 
   return checkpoints;

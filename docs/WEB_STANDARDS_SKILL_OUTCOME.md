@@ -484,3 +484,15 @@ OWASP and vendor-contract workflow. Source and installed structural validation
 passed; all four maintained files match by SHA256 after synchronization. The
 testing skill also passes structural validation. These checks do not prove a new
 blind skill trial or browser conformance.
+
+## Packaged validator maintenance, October 10, 2026
+
+The references now distinguish one visible diagnostic panel from repeated labels,
+mounted queue response/rendering from premature filter counts, and genuine media
+preflight from the worker's fresh verification. They retain the reproduced
+application's stale early-filter live-region finding as separate follow-up.
+The [Docker outcome](LOCAL_DOCKER_REBUILD_2026_10_OUTCOME.md) owns actual native
+proof, retained failures and limits. Source and installed structural validation
+passed; the four maintained files are synchronized without entrypoint, metadata
+or invocation-policy changes. No new blind trial, assistive-technology speech
+or full conformance claim is made.

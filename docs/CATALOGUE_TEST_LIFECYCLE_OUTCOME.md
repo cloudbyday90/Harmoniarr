@@ -158,6 +158,9 @@ The subsequent user-requested local rebuild follows the separate
 The walkthrough's readiness wording was corrected from an absolute no-provider-
 request claim to its actual sign-in/status-read boundary; it submits no searches
 or transfer commands. That documentation correction adds no runtime change.
+The subsequently completed [Docker outcome](LOCAL_DOCKER_REBUILD_2026_10_OUTCOME.md)
+records the no-cache image, preserved walkthrough, validator-contract corrections
+and applicable packaged/browser evidence separately from this catalogue gate.
 
 Evidence lives under `.tmp/catalogue-test-lifecycle-2026-10/`: corrected pre-audit,
 audited-empty and template-trial logs/state/phase summaries; bounded failed and

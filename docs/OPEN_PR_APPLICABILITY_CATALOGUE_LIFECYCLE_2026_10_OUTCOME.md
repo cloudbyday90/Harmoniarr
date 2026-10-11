@@ -65,3 +65,23 @@ Recorded **22:54:02 UTC**; observed host time
 or Link-header claim. Root's complete validation, publication and Docker rebuild
 evidence remain separate. No tests, PostgreSQL/Docker, Git, runtime or remote
 mutations. Final assessment frozen.
+
+## Docker follow-up final observation
+
+Fresh GitHub MCP discovery began **23:55:18 UTC**, using the returned repository
+metadata/pulls template. [Open page 1](https://api.github.com/repos/cloudbyday90/Harmoniarr/pulls?state=open&per_page=100&page=1)
+and [explicit terminal page 2](https://api.github.com/repos/cloudbyday90/Harmoniarr/pulls?state=open&per_page=100&page=2)
+at **23:55:19 UTC** returned three/zero. Full PR40/24/23 records at
+**23:55:20 UTC / 19:55:20 EDT**, October 10, remained open, non-draft, with the
+exact heads/bases above and one changed file each. Complete initial filename
+lists were reused only for unchanged immutable pairs/counts. Every observed
+scope remains previously replayed; eligible set is **empty**, with no draw/replay.
+
+The already observed raw responses/comparisons were persisted, without another
+lookup, to `.tmp/local-docker-rebuild-2026-10/pr-final-refresh.json` at
+**23:56:32 UTC**. SHA256:
+`bca523154da5c60be79ffbd683bca5e6b00c374304d2ce1704aee630f9527aba`.
+Host observation: `2026-10-10T19:55:21.6810362-04:00`. Prior observations are
+retained. No atomic snapshot or Link-header claim; root's Docker/validation/
+publication evidence remains separate. No PR actions, Git, tests, Docker or
+PostgreSQL by this researcher. Frozen.

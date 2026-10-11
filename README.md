@@ -63,6 +63,7 @@ cases and thirteen fresh scenario variants. Use
 - [AI workflow and shared Copilot skills](docs/AI_WORKFLOW.md)
 - [Docker deployment baseline](docs/DOCKER_DEPLOYMENT.md)
 - [Local Docker walkthrough](docs/LOCAL_DOCKER_WALKTHROUGH.md)
+- [No-cache local rebuild design](docs/LOCAL_DOCKER_REBUILD_2026_10_DESIGN.md), [official research](docs/LOCAL_DOCKER_REBUILD_RESEARCH_2026_10.md) and [outcome](docs/LOCAL_DOCKER_REBUILD_2026_10_OUTCOME.md)
 - [Backup, restore, and upgrade design](docs/BACKUP_RESTORE_DESIGN.md)
 - [Bootstrap-admin recovery runbook](docs/ADMIN_RECOVERY_RUNBOOK.md)
 - [Security policy and posture](docs/SECURITY_POLICY.md)

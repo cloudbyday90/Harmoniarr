@@ -2,6 +2,11 @@
 
 This walkthrough gives you one disposable local Docker path for exploring the current app without hand-editing a host `.env` file or using the first-run bootstrap form manually.
 
+The October 2026 [no-cache rebuild design](LOCAL_DOCKER_REBUILD_2026_10_DESIGN.md),
+[official research](LOCAL_DOCKER_REBUILD_RESEARCH_2026_10.md) and
+[outcome](LOCAL_DOCKER_REBUILD_2026_10_OUTCOME.md) record preserved-state and
+isolated packaged validation, including the remaining early-filter status issue.
+
 It is intentionally separate from the canonical deployment baseline in `compose.yaml`.
 
 ## What It Does

@@ -71,3 +71,54 @@ password-only files; keep keys/passwords out of arguments, terminal output and
 committed evidence. Positive resource identities own cleanup; verify absence and
 preserve the primary failure. Separate outcome/evidence will record actual build,
 health, provider readiness, browser/packaged results and cleanup limits.
+
+## Validator contract migration
+
+Downloader navigation starts an asynchronous queue load. Observe the mounted
+same-origin GET and successful coherent payload, then the Transfer Queue card's
+matching rendered count before the validator exercises its filter. Scope rows,
+status and counts to that card. This defines a validator snapshot; it does not
+require users to wait before interacting with native controls. Run-history
+diagnostics use an eyebrow label and strong title, not a heading. Check both in
+one visible diagnostic article within the native disclosure; repeated labels
+elsewhere cannot satisfy it. One panel does not prove every run item/provider file.
+
+Quality fixtures retain the real owner and native verification. First prove
+actual below-policy media is refused before automatic queueing, with source bytes
+retained and no apply item. A separate worker control admits genuine valid media
+through current preflight, then changes only the acknowledged disposable source
+before startup. Verify its fresh native quality reason, durable state, preserved
+source and absent destination. An earlier authority/source refusal is not proof
+of the later verifier. Keep actor/recipient/source/run/quality fences intact;
+fixture adaptation must not bypass authorization or substitute injected success.
+
+| Choice | Benefit | Limit / selection |
+| --- | --- | --- |
+| Owning DOM helper and native measured-media fixtures | Checks mounted/panel/current-policy contracts | Selected validator work; package execution still required |
+| Larger timeouts or invented heading roles | Small edits | Hide the observed boundary; reject |
+| Action-owned app announcement update | Aligns visible/live counts after delayed load | Separate application follow-up with browser evidence |
+
+## Observed application follow-up
+
+Retained `live-ui-diagnostic.json` shows visible **12 of 859** transfers while
+status remains **0 of 0** after a filter change before load. `DownloaderView.vue`
+snapshots its computed label only in filter handlers; `useAsyncResource` later
+changes queue data without completing that announcement. A loaded-validator wait
+does not fix this application behavior.
+
+Propose a pending announcement owned by the latest explicit filter action. If
+initial queue data is absent, complete it after successful mounted load using
+current visible counts. Superseded actions, failed loading and unmount must not
+publish a stale result. Keep the persistent polite/atomic region and usable
+controls, preserve focus and avoid periodic-poll announcement noise. Cover delayed
+load, rapid filters, empty/error outcomes and unrelated refresh. DOM assertions
+do not prove assistive-technology speech/full conformance. This app fix is outside
+the validator work.
+
+The stack remains Vue/native semantics, narrow ESM DOM adapters and existing
+owner/media/packaged validators. Root's outcome separates failed attempts,
+corrected fixtures, executed packaging and the unresolved app follow-up. No
+passing result is preclaimed while packaging checks are pending.
+
+Executed results, source continuity and publication scope are recorded in the
+separate [outcome](LOCAL_DOCKER_REBUILD_2026_10_OUTCOME.md).

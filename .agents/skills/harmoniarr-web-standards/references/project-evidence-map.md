@@ -155,3 +155,19 @@ phases before attributing it to template selection or scheduling. A fixed delay
 is not observed task drainage; source-review lifetime candidates and passing
 retries are not reproduced causes or remediation. The catalogue outcome retains
 the rejected broad attempt and focused investigation separately.
+
+Packaged DOM checks map to `scripts/docker-provider-acceptance-dom.js` and
+`test/browser/docker-provider-acceptance-dom.test.js`: observe the mounted queue
+response and matching Transfer Queue render, then scope row/status checks there.
+Match diagnostic label and strong title within one visible article in its native
+disclosure; do not invent a heading role. `testing/docker/file-backed-music-queue-verifier.mjs`
+owns separate real preflight refusal and genuinely admitted worker-quality checks.
+Preserve current authority and source bytes instead of bypassing policy to reach
+a later gate. The Docker outcome owns actual execution and cleanup claims.
+
+Downloader's user filter handlers in `src/client/views/DownloaderView.vue` can
+snapshot counts before `useAsyncResource` finishes its initial load. Loaded
+validator evidence does not fix that stale app status. Follow a bounded latest
+user-action announcement through delayed load/unmount, preserving focus and
+avoiding automatic polling noise. This is an app follow-up, not a universal
+requirement to delay user interaction until every resource loads.

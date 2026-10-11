@@ -15,6 +15,7 @@ import {
   summarizeMusicQueueTransferLinkage,
 } from './downloader-music-queue-evidence.js';
 import { createDockerProviderAcceptanceArtifact } from './docker-provider-acceptance-artifact.js';
+import { openDownloaderQueueSnapshot, waitForDownloadAcceptanceDiagnosticPanel } from './docker-provider-acceptance-dom.js';
 import {
   buildProviderAcceptanceReadiness,
   formatProviderAcceptanceReadinessError,
@@ -248,24 +249,28 @@ async function verifyMusicQueueLinkageInDownloader({
   page,
   timeoutMs,
 } = {}) {
-  const beforeRefresh = summarizeMusicQueueTransferLinkage(downloaderQueue);
+  const initialLinkage = summarizeMusicQueueTransferLinkage(downloaderQueue);
   assertCondition(
-    beforeRefresh.linkedTransferCount > 0,
+    initialLinkage.linkedTransferCount > 0,
     'Expected at least one Downloader transfer linked to Music Queue',
   );
 
-  await page.goto(`${baseUrl}/app/downloader`, { waitUntil: 'domcontentloaded' });
-  await waitForHeading(page, 'Downloader');
+  const { downloaderQueue: mountedQueue, transferQueueCard } = await openDownloaderQueueSnapshot({
+    baseUrl, page, timeoutMs,
+  });
+  const { afterRefresh: beforeRefresh } = assertMusicQueueTransferLinkagePreserved({
+    beforeRefresh: downloaderQueue, afterRefresh: mountedQueue,
+  });
 
   const musicQueueFilter = page.getByRole('checkbox', {
-    name: 'Only transfers linked to Music Queue',
+    name: 'Only transfers linked to Missing Music',
   });
   await musicQueueFilter.check();
-  await page.getByRole('status').filter({
+  await transferQueueCard.getByRole('status').filter({
     hasText: `Showing ${beforeRefresh.linkedTransferCount} of ${beforeRefresh.totalTransferCount} transfers.`,
   }).waitFor({ timeout: timeoutMs });
   assertExactRowCount(
-    await page.getByRole('row').count() - 1,
+    await transferQueueCard.getByRole('row').count() - 1,
     beforeRefresh.linkedTransferCount,
     'Music Queue filter',
   );
@@ -280,11 +285,11 @@ async function verifyMusicQueueLinkageInDownloader({
   const refreshedQueue = await refreshResponse.json();
   const linkage = assertMusicQueueTransferLinkagePreserved({
     afterRefresh: refreshedQueue,
-    beforeRefresh: downloaderQueue,
+    beforeRefresh: mountedQueue,
   });
   assertCondition(await musicQueueFilter.isChecked(), 'Music Queue filter must remain selected after refresh');
   assertExactRowCount(
-    await page.getByRole('row').count() - 1,
+    await transferQueueCard.getByRole('row').count() - 1,
     linkage.afterRefresh.linkedTransferCount,
     'Refreshed Music Queue filter',
   );
@@ -392,8 +397,9 @@ export async function runProviderAcceptanceBrowserScenario({
     const firstDiagnostic = result.importReview.diagnostics[0] ?? null;
     assertCondition(firstDiagnostic, 'Expected one download acceptance diagnostic after readiness passed');
     const runHistoryDisclosure = await openImportReviewRunHistoryDisclosure(page);
-    await runHistoryDisclosure.getByText('Download acceptance diagnostic', { exact: true }).waitFor({ timeout: timeoutMs });
-    await runHistoryDisclosure.getByText(firstDiagnostic.title, { exact: true }).waitFor({ timeout: timeoutMs });
+    await waitForDownloadAcceptanceDiagnosticPanel({
+      disclosure: runHistoryDisclosure, page, timeoutMs, title: firstDiagnostic.title,
+    });
     await record('provider_acceptance_ui_verified');
   }
 

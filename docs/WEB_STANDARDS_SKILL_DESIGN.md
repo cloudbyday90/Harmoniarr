@@ -258,3 +258,11 @@ borrowed-read admission, after-drain manual leases and source admission before
 workspace creation. Preserve the skill's routing/metadata and keep runtime,
 structure and browser-conformance evidence separate. The catalogue documents
 own the current research, recommendations and executed measurements.
+
+Docker/DOM maintenance maps no-cache layers versus npm mounts, configured
+readiness versus acceptance, mounted queue snapshots, visible diagnostic panel
+scope and real preflight/worker quality checks. Keep the entrypoint, metadata
+and invocation policy unchanged. Loaded-validator evidence does not close the
+observed app's delayed filter announcement; action-owned current status without
+focus/poll noise is a separate follow-up. Preserve browser/packaged/native-media
+and assistive-technology evidence distinctions; root owns sync/structural checks.
