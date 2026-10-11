@@ -16,6 +16,10 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createWorkerTaskLifecycle } from '../worker-task-lifecycle.js';
+import { withWorkerTaskCleanup } from '../worker-task-cleanup.js';
+import { createWorkerAdvisoryTasks } from '../worker-advisory-tasks.js';
+import { drainWorkerLease } from '../worker-lease-cleanup.js';
 import { isOperationRunLeaseLostError } from '../operation-run-lease-error.js';
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
 import {
@@ -60,144 +64,146 @@ export function createImportCandidateMediaInspectionWorker({
   releaseLease,
   renewLease,
 } = {}) {
-  const activeRunIds = new Set();
+  const lifecycle = createWorkerTaskLifecycle({ execute: runInspection });
 
   async function runInspection({ requestedCandidateCount, runId }) {
     let finalLeaseStatus = 'completed';
     let leaseHeartbeat = null;
     let acquiredLease = null;
 
-    try {
-      acquiredLease = await acquireLease({ runId });
-      if (renewLease) {
-        leaseHeartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId, expectedLease: acquiredLease });
-        leaseHeartbeat.start();
-      }
-
-      await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
-      if (await markRunStarted({ expectedLease: acquiredLease,
-        runId,
-        summary: {
-          currentStep: 'Inspecting selected import candidate media',
-          requestedCandidateCount,
-        },
-      }) === false) return;
-
-      const selectedSummary = await buildSelectedImportCandidateSummary({ limit: 1000 });
-      const counters = {
-        blockedCandidateCount: 0,
-        inspectedCandidateCount: 0,
-        inspectedFileCount: 0,
-        inspectionUnavailableCount: 0,
-        warningCount: 0,
-      };
-      const inspectionDiagnostics = [];
-
-      for (const candidate of selectedSummary.selectedCandidates ?? []) {
-        await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
-
-        if (candidate?.executionStatus?.code === 'blocked') {
-          counters.blockedCandidateCount += 1;
-          continue;
+    const advisoryTasks = createWorkerAdvisoryTasks();
+    const recordActivity = typeof recordActivityEventFn === 'function'
+      ? event => advisoryTasks.schedule(recordActivityEventFn, event)
+      : null;
+    return withWorkerTaskCleanup(async () => {
+      try {
+        acquiredLease = await acquireLease({ runId });
+        if (renewLease) {
+          leaseHeartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId, expectedLease: acquiredLease });
+          leaseHeartbeat.start();
         }
 
-        const applyPreview = await previewImportCandidateApply({
-          importCandidateId: candidate.id,
-        });
-        const inspectionSummary = summarizeInspection(applyPreview.files ?? []);
-        const candidateDiagnostics = buildMediaInspectionDiagnostics({
-          applyPreview,
-          candidate,
-          maxDiagnostics: MAX_MEDIA_INSPECTION_DIAGNOSTICS - inspectionDiagnostics.length,
-        });
+        await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
+        if (await markRunStarted({ expectedLease: acquiredLease,
+          runId,
+          summary: {
+            currentStep: 'Inspecting selected import candidate media',
+            requestedCandidateCount,
+          },
+        }) === false) return;
 
-        counters.inspectedCandidateCount += 1;
-        counters.inspectedFileCount += inspectionSummary.fileCount;
-        counters.inspectionUnavailableCount += inspectionSummary.inspectionUnavailableCount;
-        counters.warningCount += inspectionSummary.warningCount;
-        inspectionDiagnostics.push(...candidateDiagnostics);
-        recordActivityEventSafely(
-          recordActivityEventFn,
-          buildMusicQueueAudioInspectionActivityEvent({
+        const selectedSummary = await buildSelectedImportCandidateSummary({ limit: 1000 });
+        const counters = {
+          blockedCandidateCount: 0,
+          inspectedCandidateCount: 0,
+          inspectedFileCount: 0,
+          inspectionUnavailableCount: 0,
+          warningCount: 0,
+        };
+        const inspectionDiagnostics = [];
+
+        for (const candidate of selectedSummary.selectedCandidates ?? []) {
+          await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
+
+          if (candidate?.executionStatus?.code === 'blocked') {
+            counters.blockedCandidateCount += 1;
+            continue;
+          }
+
+          const applyPreview = await previewImportCandidateApply({
+            importCandidateId: candidate.id,
+          });
+          const inspectionSummary = summarizeInspection(applyPreview.files ?? []);
+          const candidateDiagnostics = buildMediaInspectionDiagnostics({
+            applyPreview,
             candidate,
-            inspectionUnavailableCount: inspectionSummary.inspectionUnavailableCount,
-            operationRunId: runId,
-            warningCount: inspectionSummary.warningCount,
-          }),
-        );
-      }
+            maxDiagnostics: MAX_MEDIA_INSPECTION_DIAGNOSTICS - inspectionDiagnostics.length,
+          });
 
-      if (await markRunCompleted({ expectedLease: acquiredLease,
-        runId,
-        summary: {
-          blockedCandidateCount: counters.blockedCandidateCount,
-          currentStep: 'Media inspection complete',
-          inspectedCandidateCount: counters.inspectedCandidateCount,
-          inspectedFileCount: counters.inspectedFileCount,
-          inspectionDiagnostics,
-          inspectionUnavailableCount: counters.inspectionUnavailableCount,
-          requestedCandidateCount,
-          warningCount: counters.warningCount,
-        },
-      }) === false) return;
-    } catch (error) {
-      if (!acquiredLease || isOperationRunLeaseLostError(error)) return;
-      if (isOperationRunPauseError(error)) {
-        finalLeaseStatus = 'paused';
-        await markRunPaused({ expectedLease: acquiredLease,
-          nextAttemptAt: error.nextRetryAt ?? null,
+          counters.inspectedCandidateCount += 1;
+          counters.inspectedFileCount += inspectionSummary.fileCount;
+          counters.inspectionUnavailableCount += inspectionSummary.inspectionUnavailableCount;
+          counters.warningCount += inspectionSummary.warningCount;
+          inspectionDiagnostics.push(...candidateDiagnostics);
+          recordActivityEventSafely(
+            recordActivity,
+            buildMusicQueueAudioInspectionActivityEvent({
+              candidate,
+              inspectionUnavailableCount: inspectionSummary.inspectionUnavailableCount,
+              operationRunId: runId,
+              warningCount: inspectionSummary.warningCount,
+            }),
+          );
+        }
+
+        if (await markRunCompleted({ expectedLease: acquiredLease,
           runId,
           summary: {
-            currentStep: 'Media inspection paused by maintenance lock',
-            pauseCode: error.pauseCode ?? null,
-            pauseMessage: error.message,
-            pauseProvider: error.pauseProvider ?? null,
+            blockedCandidateCount: counters.blockedCandidateCount,
+            currentStep: 'Media inspection complete',
+            inspectedCandidateCount: counters.inspectedCandidateCount,
+            inspectedFileCount: counters.inspectedFileCount,
+            inspectionDiagnostics,
+            inspectionUnavailableCount: counters.inspectionUnavailableCount,
+            requestedCandidateCount,
+            warningCount: counters.warningCount,
+          },
+        }) === false) return;
+      } catch (error) {
+        if (isOperationRunLeaseLostError(error)) return;
+        if (!acquiredLease) {
+          if (error?.code === 'operation_run_lease_unavailable') return;
+          throw error;
+        }
+        if (isOperationRunPauseError(error)) {
+          finalLeaseStatus = 'paused';
+          await markRunPaused({ expectedLease: acquiredLease,
+            nextAttemptAt: error.nextRetryAt ?? null,
+            runId,
+            summary: {
+              currentStep: 'Media inspection paused by maintenance lock',
+              pauseCode: error.pauseCode ?? null,
+              pauseMessage: error.message,
+              pauseProvider: error.pauseProvider ?? null,
+              requestedCandidateCount,
+            },
+          });
+          return;
+        }
+
+        if (isOperationRunCancellationError(error)) {
+          finalLeaseStatus = 'cancelled';
+          await markRunCancelled({ expectedLease: acquiredLease,
+            runId,
+            summary: {
+              currentStep: 'Media inspection cancelled',
+              requestedCandidateCount,
+            },
+          });
+          return;
+        }
+
+        finalLeaseStatus = 'failed';
+        await markRunFailed({ expectedLease: acquiredLease,
+          errorMessage: error?.message ?? 'Media inspection failed',
+          runId,
+          summary: {
+            currentStep: 'Media inspection failed',
             requestedCandidateCount,
           },
         });
-        return;
       }
-
-      if (isOperationRunCancellationError(error)) {
-        finalLeaseStatus = 'cancelled';
-        await markRunCancelled({ expectedLease: acquiredLease,
-          runId,
-          summary: {
-            currentStep: 'Media inspection cancelled',
-            requestedCandidateCount,
-          },
-        });
-        return;
-      }
-
-      finalLeaseStatus = 'failed';
-      await markRunFailed({ expectedLease: acquiredLease,
-        errorMessage: error.message,
-        runId,
-        summary: {
-          currentStep: 'Media inspection failed',
-          requestedCandidateCount,
-        },
-      });
-    } finally {
-      leaseHeartbeat?.stop();
-      activeRunIds.delete(runId);
-      if (acquiredLease) await releaseLease({ runId, status: finalLeaseStatus, expectedLease: acquiredLease });
-    }
-  }
-
-  async function startWorkerRun({ requestedCandidateCount, runId }) {
-    if (activeRunIds.has(runId)) {
-      return;
-    }
-
-    activeRunIds.add(runId);
-    queueMicrotask(() => {
-      void runInspection({ requestedCandidateCount, runId });
+    }, async () => {
+      await advisoryTasks.close();
+      await drainWorkerLease({ heartbeat: leaseHeartbeat, lease: acquiredLease, releaseLease,
+        runId, status: finalLeaseStatus });
     });
   }
 
-  return {
-    startWorkerRun,
-  };
+  async function startWorkerRun({ requestedCandidateCount, runId }) {
+    const completion = lifecycle.start({ requestedCandidateCount, runId });
+    return { completion };
+  }
+
+  return { startWorkerRun, close: lifecycle.close };
 }

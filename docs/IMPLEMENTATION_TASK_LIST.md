@@ -6,6 +6,30 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Media inspection lifetime (2026-10-11)
+
+- Reproduce duplicate acquisition during held final release, then retain actual
+  inspection completion through returned preview/Activity work, admitted renewal
+  and captured lease release. Reuse modular ESM owners and preserve command,
+  selected-candidate, diagnostics and domain outcome policies. Capture concrete
+  execution/inspection/apply/scan owners at startup and both app fixtures. See
+  [design](MEDIA_INSPECTION_LIFETIME_DESIGN.md),
+  [research](MEDIA_INSPECTION_LIFETIME_RESEARCH_2026_10.md) and
+  [outcome](MEDIA_INSPECTION_LIFETIME_OUTCOME.md).
+- Focused 87/87; complete fast 9,651 plus both builds; affected native 25/25
+  across seven files including five new PostgreSQL/process lifetime checks.
+  All have zero failures/cancellations/skips. Native process proof uses a
+  controlled Node probe, not an ffprobe conformance claim. Standards/testing
+  maintenance passes structural validation, installed standards hashes match and
+  npm audit reports zero vulnerabilities. No exhaustive native or matched
+  full-suite performance claim is made.
+- [Fresh PR assessment](OPEN_PR_APPLICABILITY_MEDIA_INSPECTION_LIFETIME_2026_10_OUTCOME.md)
+  finds no eligible unreplayed patch; main only, no release or merge.
+- Next: own transcode-orchestration completion, file mutation and downstream
+  handoffs, then remaining periodic producers and command-error/hidden work before
+  removing residual waits or promoting exhaustive test scheduling changes.
+  Historical SQL reset causes remain unconfirmed.
+
 ## Completed slice: Import execution lifetime (2026-10-11)
 
 - Reproduce duplicate acquisition during held final release, then own queued

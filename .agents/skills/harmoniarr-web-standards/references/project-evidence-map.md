@@ -253,3 +253,13 @@ testing/integration/import-execution-worker-fixture.js waits beyond the release
 observer for actual completion and preserves earlier callback errors; legacy
 injected doubles do not certify execution drainage. The execution lifetime design,
 research and outcome own controls, native scope and remaining hidden/remote work.
+
+Media inspection now uses those same shared task/advisory/lease owners in
+import-candidate-media-inspection-worker.js. Trace apply-preview to
+media/media-inspection-service.js and media/media-command-service.js: returned
+preview and normal command/stdout close are owned; process exit alone is earlier.
+Captured application drainage includes execution/inspection/apply/scan and still
+attempts every known owner after failure. Only apply has a verified direct scan
+launch. The media-inspection lifetime documents own native PostgreSQL/process
+proof, callback error limits and remaining transcode/periodic work. The native
+controlled Node probe is process-lifetime evidence, not ffprobe conformance.

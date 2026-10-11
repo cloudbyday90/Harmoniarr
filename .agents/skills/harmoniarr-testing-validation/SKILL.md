@@ -288,3 +288,13 @@ known owners after failure and preserves the earliest failure. See
 docs/IMPORT_EXECUTION_LIFETIME_OUTCOME.md. Other workers, periodic work and hidden
 callbacks remain unowned; do not remove residual delay or infer a whole-suite
 performance improvement from focused timings.
+
+Media inspection now retains actual completion through returned preview,
+diagnostic Activity, admitted renewal and captured lease release. Gate normal
+command/stdout close separately from process exit; a controlled Node probe tests
+process ownership, not ffprobe behavior. Application drainage captures concrete
+execution/inspection/apply/scan owners and attempts all known cleanup after
+Error/null. See docs/MEDIA_INSPECTION_LIFETIME_OUTCOME.md for native process and
+both app-fixture evidence. Keep command-error, hidden descendant and remaining
+worker limits explicit; no terminal status or residual sleep certifies complete
+application quiescence.

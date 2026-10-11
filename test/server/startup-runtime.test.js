@@ -14,6 +14,8 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
   const applyCloseGate = Promise.withResolvers();
   const executionCloseEntered = Promise.withResolvers();
   const executionCloseGate = Promise.withResolvers();
+  const inspectionCloseEntered = Promise.withResolvers();
+  const inspectionCloseGate = Promise.withResolvers();
   let resolveShutdownComplete;
   const shutdownComplete = new Promise((resolve) => {
     resolveShutdownComplete = resolve;
@@ -177,6 +179,14 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
         },
       },
       importCandidateModule: {
+        importCandidateMediaInspectionWorker: {
+          startWorkerRun: async () => {},
+          async close() {
+            callOrder.push('inspection.close');
+            inspectionCloseEntered.resolve();
+            await inspectionCloseGate.promise;
+          },
+        },
         importCandidateApplyWorker: {
           startWorkerRun: async () => {},
           async close() {
@@ -435,9 +445,13 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     assert.equal(callOrder.includes('apply.close'), false);
     assert.equal(callOrder.includes('closePool'), false);
     executionCloseGate.resolve();
+    await waitForFixtureReady({ ready: inspectionCloseEntered.promise, operation: shutdownComplete });
+    assert.equal(callOrder.includes('apply.close'), false);
+    assert.equal(callOrder.includes('closePool'), false);
+    inspectionCloseGate.resolve();
     await waitForFixtureReady({ ready: applyCloseEntered.promise, operation: shutdownComplete });
     assert.equal(callOrder.includes('closePool'), false);
-  } finally { executionCloseGate.resolve(); applyCloseGate.resolve(); }
+  } finally { executionCloseGate.resolve(); inspectionCloseGate.resolve(); applyCloseGate.resolve(); }
   await shutdownComplete;
 
   assert.deepEqual(callOrder, [
@@ -473,6 +487,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'stop:queue',
     'server.close',
     'execution.close',
+    'inspection.close',
     'apply.close',
     'scan.close',
     'closePool',

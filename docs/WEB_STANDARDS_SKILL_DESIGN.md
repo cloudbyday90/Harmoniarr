@@ -316,3 +316,10 @@ and actual local completion distinct. Rechecked HTTP retry guidance supplements
 ECMAScript, Node, driver, OWASP and W3C timing sources. The
 [execution design](IMPORT_EXECUTION_LIFETIME_DESIGN.md) owns the implementation;
 this is reference maintenance with existing entrypoint/metadata/invocation policy.
+
+Media-inspection references trace queued acceptance through preview, command/stdout
+closure, diagnostic Activity and captured lease finalization. Official runtime
+guidance complements ECMAScript, driver pooling, OWASP and W3C timing. Keep actual
+returned work separate from hidden descendants and a controlled Node probe from
+ffprobe correctness. The [inspection design](MEDIA_INSPECTION_LIFETIME_DESIGN.md)
+owns this bounded implementation; existing skill entrypoint/metadata/policy remain.

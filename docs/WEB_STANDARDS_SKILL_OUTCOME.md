@@ -563,3 +563,9 @@ local execution completion from remote downloads. The
 [execution outcome](IMPORT_EXECUTION_LIFETIME_OUTCOME.md) owns runtime evidence
 and structural validation results. No new blind skill trial, metadata change or
 accessibility/security certification is claimed.
+
+Media-inspection references locate normal command/stdout closure and concrete
+execution/inspection/apply/scan drainage at startup and both app fixtures. The
+[inspection outcome](MEDIA_INSPECTION_LIFETIME_OUTCOME.md) owns gated process,
+PostgreSQL and structural skill evidence. This remains narrow reference maintenance
+without a new blind skill trial, invocation change or conformance certification.

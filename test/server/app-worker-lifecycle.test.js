@@ -57,15 +57,29 @@ test('app drain waits for apply before scan, drains scan after apply null and pr
   assert.equal(settled, true);
 });
 
-test('application drain captures all three receivers and attempts apply/scan after execution null', async () => {
+test('application drain captures all four receivers and attempts inspection/apply/scan after execution null', async () => {
   const gate = Promise.withResolvers(); const entered = Promise.withResolvers(); const calls = [];
   const execution = { close() { assert.equal(this, execution); calls.push('execution'); entered.resolve(); return gate.promise; } };
+  const inspection = { close() { assert.equal(this, inspection); calls.push('inspection'); throw new Error('inspection fallout'); } };
   const apply = { close() { assert.equal(this, apply); calls.push('apply'); throw new Error('apply fallout'); } };
   const scan = { close() { assert.equal(this, scan); calls.push('scan'); return Promise.reject(new Error('scan fallout')); } };
-  const application = { importCandidateModule: { importCandidateExecutionWorker: execution, importCandidateApplyWorker: apply },
+  const application = { importCandidateModule: { importCandidateExecutionWorker: execution, importCandidateMediaInspectionWorker: inspection, importCandidateApplyWorker: apply },
     libraryModule: { libraryScanWorker: scan } };
   const pending = drainApplicationWorkerOwners(application); void pending.catch(() => {}); await entered.promise;
   application.importCandidateModule = {}; application.libraryModule = {};
   assert.deepEqual(calls, ['execution']); gate.reject(null);
-  await assert.rejects(pending, error => error === null); assert.deepEqual(calls, ['execution', 'apply', 'scan']);
+  await assert.rejects(pending, error => error === null); assert.deepEqual(calls, ['execution', 'inspection', 'apply', 'scan']);
 });
+
+for (const primary of [new Error('inspection cleanup'), null]) {
+  test(`inspection ${primary === null ? 'null' : 'Error'} remains primary while apply and scan drain`, async () => {
+    const calls = [];
+    const application = { importCandidateModule: {
+      importCandidateExecutionWorker: { close: async () => { calls.push('execution'); } },
+      importCandidateMediaInspectionWorker: { close: async () => { calls.push('inspection'); throw primary; } },
+      importCandidateApplyWorker: { close: async () => { calls.push('apply'); throw new Error('apply fallout'); } },
+    }, libraryModule: { libraryScanWorker: { close: async () => { calls.push('scan'); throw new Error('scan fallout'); } } } };
+    await assert.rejects(drainApplicationWorkerOwners(application), error => error === primary);
+    assert.deepEqual(calls, ['execution', 'inspection', 'apply', 'scan']);
+  });
+}
