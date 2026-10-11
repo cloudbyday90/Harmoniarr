@@ -19,6 +19,7 @@ import {
   installDownloaderBrowserFixtures,
 } from '../../testing/browser/downloader-browser-fixtures.js';
 import { bootstrapAdminThroughUi } from '../../testing/browser/operator-browser-helpers.js';
+import { installControlledDownloaderQueue } from '../../testing/browser/downloader-filter-loading-fixture.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 
 const integrationRuntimeConfig = resolveIntegrationTestRuntimeConfig();
@@ -116,6 +117,97 @@ suite('Downloader Music Queue filter browser verification', () => {
     await browserRuntime?.cleanup();
   }, {
     timeout: integrationRuntimeConfig.suiteTeardownTimeoutMs,
+  });
+
+  test('finishes the latest early filter after queue loading and keeps polling silent', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) { t.skip(runtimeUnavailableReason); return; }
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      const fixture = await installControlledDownloaderQueue(browserContext, fourTransferQueue);
+      try {
+        await bootstrapAdminThroughUi(page, { baseUrl });
+        await page.goto(`${baseUrl}/app/downloader`, { waitUntil: 'domcontentloaded' });
+        const queue = page.locator('article.downloader-transfer-queue');
+        await queue.getByRole('heading', { name: 'Transfer Queue', exact: true }).waitFor();
+        await fixture.firstRequest;
+        await queue.getByRole('status').evaluate((element) => {
+          globalThis.__filterAnnouncements = [];
+          new globalThis.MutationObserver(() => globalThis.__filterAnnouncements.push(element.textContent.trim()))
+            .observe(element, { childList: true, subtree: true, characterData: true });
+        });
+        const state = page.getByLabel('State');
+        await state.selectOption('queued');
+        await page.getByRole('checkbox', { name: 'Only transfers linked to Missing Music' }).check();
+        await state.selectOption('active');
+        await state.focus();
+        assert.equal(await queue.getByRole('status').innerText(), '');
+        fixture.releaseFirst();
+        await queue.locator('.hx-card-subtitle').getByText('Showing 2 of 4 transfers.', { exact: true }).waitFor();
+        assert.equal(await queue.getByRole('status').innerText(), 'Showing 2 of 4 transfers.');
+        assert.equal(await state.evaluate((control) => control === globalThis.document.activeElement), true);
+        assert.equal(await queue.getByRole('row').count(), 3);
+        fixture.setQueue(defaultQueue);
+        await queue.locator('.hx-card-subtitle').getByText('Showing 1 of 1 transfer.', { exact: true }).waitFor();
+        assert.ok(fixture.reads >= 2, 'the actual periodic queue GET must complete');
+        assert.equal(await queue.getByRole('status').innerText(), 'Showing 2 of 4 transfers.');
+        fixture.setQueue(fourTransferQueue);
+        await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+        await queue.locator('.hx-card-subtitle').getByText('Showing 2 of 4 transfers.', { exact: true }).waitFor();
+        assert.equal(await queue.getByRole('status').innerText(), 'Showing 2 of 4 transfers.');
+        assert.deepEqual(await page.evaluate(() => globalThis.__filterAnnouncements.filter(Boolean)), ['Showing 2 of 4 transfers.']);
+      } finally { await fixture.drain(); }
+    }, { scenarioName: 'downloader_early_filter_status' });
+  });
+
+  test('failed initial loading cancels early feedback and a retry does not revive it', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) { t.skip(runtimeUnavailableReason); return; }
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      const fixture = await installControlledDownloaderQueue(browserContext, fourTransferQueue);
+      try {
+        await bootstrapAdminThroughUi(page, { baseUrl });
+        await page.goto(`${baseUrl}/app/downloader`, { waitUntil: 'domcontentloaded' });
+        const queue = page.locator('article.downloader-transfer-queue');
+        await queue.getByRole('heading', { name: 'Transfer Queue', exact: true }).waitFor();
+        await fixture.firstRequest;
+        await page.getByRole('checkbox', { name: 'Only transfers linked to Missing Music' }).check();
+        fixture.releaseFirst({ status: 503 });
+        await page.locator('article[role="status"] .hx-pill[data-tone="danger"]').waitFor();
+        assert.equal(await queue.getByRole('status').innerText(), '');
+        await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+        await queue.locator('.hx-card-subtitle').getByText('Showing 2 of 4 transfers.', { exact: true }).waitFor();
+        assert.equal(await queue.getByRole('status').innerText(), '');
+        await page.getByLabel('State').selectOption('queued');
+        await queue.getByRole('status').getByText('Showing 0 of 4 transfers.', { exact: true }).waitFor();
+      } finally { await fixture.drain(); }
+    }, { scenarioName: 'downloader_failed_filter_status' });
+  });
+
+  test('navigation disposes an early filter without announcing it on the next visit', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) { t.skip(runtimeUnavailableReason); return; }
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      const fixture = await installControlledDownloaderQueue(browserContext, fourTransferQueue);
+      try {
+        await bootstrapAdminThroughUi(page, { baseUrl });
+        await page.goto(`${baseUrl}/app/downloader`, { waitUntil: 'domcontentloaded' });
+        await page.getByRole('heading', { name: 'Downloader', exact: true }).waitFor();
+        await fixture.firstRequest;
+        await page.getByRole('checkbox', { name: 'Only transfers linked to Missing Music' }).check();
+        await page.getByRole('link', { name: 'Home', exact: true }).click();
+        await page.waitForURL(/\/app$/u);
+        fixture.setQueue(defaultQueue);
+        await page.getByRole('link', { name: 'Downloader', exact: true }).click();
+        const queue = page.locator('article.downloader-transfer-queue');
+        await queue.locator('.hx-card-subtitle').getByText('Showing 1 of 1 transfer.', { exact: true }).waitFor();
+        fixture.releaseFirst(); await fixture.drain();
+        assert.equal(await queue.getByRole('status').innerText(), '');
+        assert.equal(await page.getByRole('checkbox', { name: 'Only transfers linked to Missing Music' }).isChecked(), false);
+      } finally { await fixture.drain(); }
+    }, { scenarioName: 'downloader_disposed_filter_status' });
   });
 
   test('combines native state and Music Queue linkage filters without changing the queue response', {

@@ -266,3 +266,9 @@ and invocation policy unchanged. Loaded-validator evidence does not close the
 observed app's delayed filter announcement; action-owned current status without
 focus/poll noise is a separate follow-up. Preserve browser/packaged/native-media
 and assistive-technology evidence distinctions; root owns sync/structural checks.
+
+October 11 maintenance maps the actual `useFilterResultAnnouncement` owner,
+readiness, post-render publication, same-tick failure/context cancellation and
+scope disposal. Retain native focus and silent polling. The separate Downloader
+documents own research and executed reactive/browser/fast-gate evidence; preserve
+the entrypoint, metadata and invocation policy and sync only maintained resources.

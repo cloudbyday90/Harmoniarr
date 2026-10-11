@@ -496,3 +496,11 @@ proof, retained failures and limits. Source and installed structural validation
 passed; the four maintained files are synchronized without entrypoint, metadata
 or invocation-policy changes. No new blind trial, assistive-technology speech
 or full conformance claim is made.
+
+October 11 references now locate the implemented pending-announcement owner and
+its reactive/actual Vue browser controls rather than treating the delayed filter
+finding as unimplemented work. Fresh W3C/Vue/OWASP research and executed results
+belong to the separate [Downloader outcome](DOWNLOADER_FILTER_ANNOUNCEMENT_OUTCOME.md).
+Source and installed structural validation passed after synchronization;
+entrypoint/metadata/invocation policy are unchanged. This narrow maintenance adds
+no new blind skill trial, screen-reader speech or conformance claim.

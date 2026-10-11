@@ -23,7 +23,6 @@ test('DownloaderView announces only user-initiated filter result changes', async
   const source = await readFile(viewPath, 'utf8');
 
   assert.match(source, /filterResultAnnouncement/);
-  assert.match(source, /async function announceFilterResult/);
   assert.match(source, /role="status" aria-live="polite" aria-atomic="true"/);
   assert.match(source, /<DownloaderTransferFilters/);
   assert.match(source, /@update:music-queue-linked-only="updateMusicQueueLinkedOnly"/);

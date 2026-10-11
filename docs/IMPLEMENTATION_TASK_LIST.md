@@ -6,7 +6,30 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
-## Current follow-up: No-cache local walkthrough and packaged validators (2026-10-10)
+## Current slice: Downloader deferred filter feedback (2026-10-11)
+
+- Complete the latest explicit filter announcement after initial queue/release
+  readiness. A narrow ESM composable owns publication, supersession and failure/
+  context/scope cancellation; native controls remain usable and focus stays put.
+  Poll/manual refresh does not announce a new filter action. See
+  [design](DOWNLOADER_FILTER_ANNOUNCEMENT_DESIGN.md),
+  [research](DOWNLOADER_FILTER_ANNOUNCEMENT_RESEARCH_2026_10.md) and
+  [outcome](DOWNLOADER_FILTER_ANNOUNCEMENT_OUTCOME.md).
+- Actual original browser failure retained; focused controls 12/12, actual filter
+  browser 4/4 and provider/legacy release consumers 2/2 pass without skips.
+  Updated standards references locate the actual owner/evidence. Fresh
+  [PR assessment](OPEN_PR_APPLICABILITY_DOWNLOADER_FILTER_2026_10_OUTCOME.md)
+  finds no eligible unreplayed patch. Main only; no release, branch or PR merge.
+- Stable complete fast gate passes 9,548 tests, full lint/static/test hygiene and
+  both builds in 183.14s, zero failures/skips. Npm audit reports zero vulnerabilities.
+  Six frozen code hashes and maintained skill identity define publication scope;
+  full serial PostgreSQL replay is separate from this client-only change.
+- Next: bounded first app-fixture checkout diagnostics and invocation/pool-lifetime
+  investigation before scheduling changes; then audited cohort plus exhaustive
+  serial remainder with matched full-gate proof. Discovery-request recomputation
+  remains subsequent product work.
+
+## Completed follow-up: No-cache local walkthrough and packaged validators (2026-10-10)
 
 - Rebuild the published catalogue candidate with a new owned Buildx builder and
   the guide's no-cache path. Start the exact resulting image, retain existing

@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import DownloaderTransferDetailDrawer from '../components/downloader/DownloaderTransferDetailDrawer.vue';
 import DownloaderTransferFilters from '../components/downloader/DownloaderTransferFilters.vue';
@@ -60,6 +60,7 @@ import {
   createSettingsRecoveryContext,
 } from '../lib/settings-recovery-handoff.js';
 import { useAsyncResource } from '../composables/useAsyncResource.js';
+import { useFilterResultAnnouncement } from '../composables/useFilterResultAnnouncement.js';
 import { useMissingMusicDownloaderHandoff } from '../composables/useMissingMusicDownloaderHandoff.js';
 
 const POLL_INTERVAL_MS = 5000;
@@ -72,7 +73,6 @@ const downloaderRecoveryContext = Object.freeze(createSettingsRecoveryContext({
 
 const selectedStateFilter = ref('all');
 const musicQueueLinkedOnly = ref(false);
-const filterResultAnnouncement = ref('');
 const selectedTransferKey = ref(null);
 const actionErrorMessage = ref('');
 const pendingAction = ref('');
@@ -163,6 +163,13 @@ const filterResultLabel = computed(() => (
       })
 ));
 
+const { announcement: filterResultAnnouncement, requestAnnouncement: announceFilterResult } = useFilterResultAnnouncement({
+  ready: computed(() => Boolean(downloaderQueue.value) && !missingMusicHandoffPending.value),
+  failed: computed(() => (!downloaderQueue.value && Boolean(errorMessage.value)) || missingMusicHandoffUnavailable.value),
+  resultLabel: filterResultLabel,
+  contextKey: computed(() => route.fullPath),
+});
+
 const providerDisabled = computed(() => isDownloaderProviderDisabled(downloaderQueue.value));
 const activitySummary = computed(() => buildDownloaderActivitySummary(downloaderQueue.value));
 const emptyState = computed(() => buildDownloaderEmptyState(downloaderQueue.value));
@@ -213,20 +220,14 @@ function selectRouteTransferIfAvailable() {
   selectedTransferKey.value = routeTransfer.transferKey;
 }
 
-async function announceFilterResult() {
-  filterResultAnnouncement.value = '';
-  await nextTick();
-  filterResultAnnouncement.value = filterResultLabel.value;
-}
-
 function updateStateFilter(stateFilter) {
   selectedStateFilter.value = stateFilter;
-  void announceFilterResult();
+  announceFilterResult();
 }
 
 function updateMusicQueueLinkedOnly(linkedOnly) {
   musicQueueLinkedOnly.value = linkedOnly;
-  void announceFilterResult();
+  announceFilterResult();
 }
 
 watch(

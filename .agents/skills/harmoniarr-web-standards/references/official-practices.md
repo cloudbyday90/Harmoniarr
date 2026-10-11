@@ -428,3 +428,11 @@ announcement or prove actual screen-reader speech. Scope assertions to rendered
 native panels and exercise real current-quality owners rather than forcing a
 fixture past an earlier refusal. No blanket pre-interaction wait or conformance
 claim follows from this seam maintenance.
+
+October 11 Downloader maintenance follows the fresh MCP-discovered W3C/Vue/OWASP
+ledger in `docs/DOWNLOADER_FILTER_ANNOUNCEMENT_RESEARCH_2026_10.md`. A post-render
+watcher owns publication timing; scope disposal and immediate simple-boolean
+failure/context cancellation own invalidation. These are application lifecycle
+choices, not a new ARIA role or universal rule to block controls while loading.
+Preserve plain-text interpolation and distinguish actual Vue/DOM evidence from
+assistive-technology speech. Polling carries no new filter-announcement intent.

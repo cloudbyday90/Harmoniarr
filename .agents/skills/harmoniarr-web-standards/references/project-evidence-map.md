@@ -165,9 +165,12 @@ owns separate real preflight refusal and genuinely admitted worker-quality check
 Preserve current authority and source bytes instead of bypassing policy to reach
 a later gate. The Docker outcome owns actual execution and cleanup claims.
 
-Downloader's user filter handlers in `src/client/views/DownloaderView.vue` can
-snapshot counts before `useAsyncResource` finishes its initial load. Loaded
-validator evidence does not fix that stale app status. Follow a bounded latest
-user-action announcement through delayed load/unmount, preserving focus and
-avoiding automatic polling noise. This is an app follow-up, not a universal
-requirement to delay user interaction until every resource loads.
+Downloader now routes explicit filter feedback through
+`src/client/composables/useFilterResultAnnouncement.js`. Trace latest request,
+queue/release readiness, render settlement and failure/context/scope cancellation.
+Use its reactive controls and the actual Downloader filter browser suite to prove
+deferred counts, silent polling, retry and navigation; loaded validator evidence
+is a different boundary. The separate Downloader outcome owns executed claims.
+Keep native controls usable, preserve focus and avoid turning ordinary data
+changes into announcement intents. Synchronous failure cancellation prevents a
+same-tick retry from reviving the preceding user request.
