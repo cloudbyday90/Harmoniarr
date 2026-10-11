@@ -524,3 +524,15 @@ separate follow-up coverage after native skips. Source/installed standards and
 testing structural validation passed; the four standards files match after
 synchronization. Runtime counts and skip closure remain in the pool outcome,
 without inventing one skip-free complete run or a matched benchmark.
+
+Apply-lifetime references map actual admission/completion services, terminal
+heartbeat drainage and fixture/production call sites. The separate
+[apply outcome](APPLY_WORKER_LIFETIME_OUTCOME.md) owns runtime and gate results.
+This narrow maintenance preserves entrypoint, metadata and invocation policy and
+adds no new blind trial, browser conformance or application-wide quiescence claim.
+
+Source/installed standards and the maintained testing skill pass structural
+validation; the four installed standards files match their source hashes.
+Testing guidance also separates first connection establishment, socket reset
+during SQL and observed pool queuing, retaining private vendor logs and original
+bounds rather than treating isolated retries as causal remediation.

@@ -455,3 +455,12 @@ existing serial restart contract. This project choice does not replace actual
 worker ownership, justify a fixed delay, or establish the historical failure's
 cause. Keep OWASP-sensitive data out of new refusal messages; existing native
 reporters and idle-client logging have separate contracts.
+
+October 11 apply-worker maintenance follows
+`docs/APPLY_WORKER_LIFETIME_RESEARCH_2026_10.md`. Register actual completion before
+launch, close admission before drain, observe every task even after a sibling
+fails, and retain Error/null identity. A terminal database status or cleared timer
+does not drain advisory writes, active renewal or lease release. Keep best-effort
+domain outcomes separate from completion, and primary errors separate from cleanup
+fallout. New fixed refusals and approved phase records add no private inputs or
+connection data. The W3C timing draft informs elapsed spans, not a new UI claim.

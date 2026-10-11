@@ -237,6 +237,7 @@ export async function startServerRuntime({
       await startupServiceSupervisor.shutdown({
         onShutdown: async () => {
           await closeServer(server);
+          await importCandidateModule.importCandidateApplyWorker?.close?.();
           await closeDatabasePool();
         },
       });

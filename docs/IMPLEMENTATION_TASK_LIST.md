@@ -6,7 +6,34 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
-## Current slice: Database pool shutdown ownership (2026-10-11)
+## Completed slice: Apply worker lifetime (2026-10-11)
+
+- Reproduce duplicate execution during held lease release, then own completion
+  and admission in narrow ESM services. Preserve queued acknowledgement and
+  persisted domain outcomes while draining returned advisory callbacks, actual
+  heartbeat renewal and lease finalization. Both fixture entry points and
+  production shutdown close the apply owner before its pool. See
+  [design](APPLY_WORKER_LIFETIME_DESIGN.md),
+  [research](APPLY_WORKER_LIFETIME_RESEARCH_2026_10.md) and
+  [outcome](APPLY_WORKER_LIFETIME_OUTCOME.md).
+- Focused controls 45/45, initial native owning cases 7/7 and refined lifetime/
+  automatic-authority cases 13/13 pass. Final fast validation passes 9,583 tests,
+  static/full lint/test hygiene and both builds. The complete serial native
+  diagnostic gate passes 369 tests with actual media prerequisites and zero
+  failures/cancellations/skips: 9,952 final-candidate passing tests across the
+  two layers. Its 26 min 37.82 s wrapper measurement is not a matched benchmark
+  or a successful default validation invocation; rejected attempts remain
+  explicit in the outcome.
+  [PR applicability](OPEN_PR_APPLICABILITY_APPLY_LIFETIME_2026_10_OUTCOME.md)
+  remains empty; main only, no release or merge.
+- Next: capture bounded owned-server evidence for intermittent first connection
+  timeouts and SQL resets, and reproduce the unexplained full-run authority
+  assertion before claiming causal remediation. Then own dispatcher claim/tick
+  completion and remaining consumers beginning with library scan before replacing
+  the residual fixture wait and assessing exhaustive cohort/remainder dispatch.
+  This one worker does not establish whole-app drainage or bootstrap remediation.
+
+## Completed slice: Database pool shutdown ownership (2026-10-11)
 
 - Reproduce replacement creation while native end waits for a held client; add a
   narrow ESM lifecycle owner with synchronous refusal, shared close completion,

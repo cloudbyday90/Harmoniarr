@@ -212,3 +212,34 @@ with that prerequisite supplied rather than repeating an otherwise passing full
 gate when code is unchanged. Report both runs separately; their combined coverage
 is not one skip-free complete run or a matched performance benchmark. Restore
 the scoped environment afterward.
+
+Apply-worker close now owns admission and actual finalization through returned
+advisory callbacks, `stopAndDrain()` renewal completion and captured lease release.
+The queued start acknowledgement and durable terminal status are earlier
+boundaries. Gate these independently; a duplicate run must remain coalesced until
+release settles, and failed scheduling must not orphan work. Both app fixtures
+drain their concrete apply owner before pool/environment teardown and preserve
+Error/null scenario failures. See `docs/APPLY_WORKER_LIFETIME_OUTCOME.md` for
+executed evidence and the remaining child-scan/other-worker boundary. Keep the
+residual delay until those owners are audited; do not extrapolate this one worker
+to complete application quiescence or faster full-gate coverage.
+
+Retain the apply start acknowledgement's `completion` handle when a fixture
+needs one run to finish before changing its shared hooks or workspace. Await
+that actual result, then read domain status once; polling terminal status is not
+an execution drain. Awaiting the acknowledgement alone still does not wait for
+the job. Capture readiness against the completion promise so startup failures
+cannot strand a held checkpoint. A full-run assertion passing in isolation is
+unreproduced evidence, not a diagnosis or proof that a different lifetime fix
+caused its remediation.
+
+When a native connection failure recurs, capture evidence from the invocation's
+actual server before cleanup where possible. Distinguish a socket reset during
+SQL, first connection establishment and an observed queued waiter. Last server
+admission, a later healthy container and an isolated passing retry do not prove
+health at the failure or its cause. Existing Testcontainers server logging can
+support an explicitly scoped diagnostic run; retain raw vendor logs locally,
+since they may include SQL or sensitive values, and publish only bounded reviewed
+findings. Restore diagnostic environment variables, preserve original bounds,
+and refuse cleanup against unknown process/container identities. The apply
+outcome retains the current full-run failures and separate diagnostic passes.

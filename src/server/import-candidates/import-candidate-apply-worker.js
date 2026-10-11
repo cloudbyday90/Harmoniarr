@@ -23,6 +23,9 @@ import { buildReleaseAddedActivityEvent } from '../activity/release-added-activi
 import { buildRequestFulfilledActivityEvent } from '../activity/request-fulfillment-activity-event-service.js';
 import { classifyApplyOutcomeQuality } from '../activity/source-user-outcome-quality.js';
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
+import { createWorkerTaskLifecycle } from '../worker-task-lifecycle.js';
+import { withWorkerTaskCleanup } from '../worker-task-cleanup.js';
+import { createWorkerAdvisoryTasks } from '../worker-advisory-tasks.js';
 import { assessDeliveredQuality } from '../media/media-delivery-quality.js';
 import { createImportCandidateSafeAutoAddQualityGateService } from './import-candidate-safe-auto-add-quality-gate.js';
 import { readImportCandidateApplyScope } from './import-candidate-apply-scope.js';
@@ -326,7 +329,7 @@ export function createImportCandidateApplyWorker({
   spectralDrainLimit = 8,
   updateImportApplyRunItem = async () => null,
 } = {}) {
-  const activeRunIds = new Set();
+  const lifecycle = createWorkerTaskLifecycle({ execute: runApply });
 
   function buildQualityRecoverySummary(qualityRecoveries) {
     if (!Array.isArray(qualityRecoveries) || qualityRecoveries.length === 0) {
@@ -358,481 +361,498 @@ export function createImportCandidateApplyWorker({
     let leaseHeartbeat = null;
     let acquiredLease = null;
     const scopedCandidateIds = readImportCandidateApplyScope(importCandidateIds);
+    const advisoryTasks = createWorkerAdvisoryTasks();
+    const recordActivity = typeof recordActivityEventFn === 'function'
+      ? event => advisoryTasks.schedule(recordActivityEventFn, event)
+      : null;
 
-    try {
-      acquiredLease = await acquireLease({ runId });
-      if (renewLease) {
-        leaseHeartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId, expectedLease: acquiredLease });
-        leaseHeartbeat.start();
-      }
-      await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
-      if (await markRunStarted({ expectedLease: acquiredLease,
-        runId,
-        summary: {
-          currentStep: 'Resolving import-pending candidate apply plans',
-          executionMode: 'move',
-          executableCandidateCount,
-          requestedCandidateCount,
-          ...buildApplyTriggerSummary({ applySafetyMode, importCandidateIds: scopedCandidateIds, triggerSource }),
-        },
-      }) === false) return;
-
-      const importPendingSummary = await buildImportPendingCandidateSummary({
-        ...(Array.isArray(scopedCandidateIds) ? { candidateIds: scopedCandidateIds } : {}),
-        limit: 1000,
-      });
-      const runnableCandidates = resolveRunnableCandidates(
-        importPendingSummary.importPendingCandidates ?? [],
-        applySafetyMode,
-      );
-      const persistedRunItems = await listImportApplyRunItems(runId);
-      const persistedItemsByCandidateId = new Map(
-        persistedRunItems.map((item) => [item.importCandidateId, item]),
-      );
-      const candidatesForRun = persistedRunItems.length > 0
-        ? runnableCandidates.filter((candidate) => persistedItemsByCandidateId.has(candidate.id))
-        : runnableCandidates;
-      const runItems = persistedRunItems.length > 0
-        ? persistedRunItems
-        : buildRunItems(candidatesForRun);
-      if (persistedRunItems.length === 0) {
-        await replaceImportApplyRunItems(runId, runItems);
-      }
-      const existingImportOperations = await listImportOperations({ operationRunId: runId });
-      let operationPositionCursor = getMaximumOperationPosition(existingImportOperations);
-
-      const counts = {
-        applied: 0,
-        appliedWithWarnings: 0,
-        applyFailed: 0,
-        awaitingConfirmation: 0,
-        blocked: 0,
-        qualityBlocked: 0,
-      };
-      const postApplyReleaseHints = [];
-      const qualityRecoveries = [];
-
-      for (const summaryCandidate of candidatesForRun) {
-        await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
-        const persistedItem = persistedItemsByCandidateId.get(summaryCandidate.id);
-        const baseSnapshot = persistedItem?.applySnapshot ?? createBaseSnapshot(summaryCandidate);
-
-        if (summaryCandidate.importStatus.code === 'blocked') {
-          counts.blocked += 1;
-          await updateImportApplyRunItem({
-            applySnapshot: {
-              ...baseSnapshot,
-              apply: {
-                ...baseSnapshot.apply,
-                outcome: 'blocked',
-              },
-            },
-            importCandidateId: summaryCandidate.id,
-            itemStatus: 'blocked',
-            operationRunId: runId,
-            statusMessage: summaryCandidate.importStatus.message,
-          });
-          recordActivityEventSafely(recordActivityEventFn, buildMusicQueueAddBlockedActivityEvent({
-            blockerCode: summaryCandidate.importStatus.blockerCode,
-            runId,
-            summaryCandidate,
-          }));
-          continue;
+    return withWorkerTaskCleanup(async () => {
+      try {
+        acquiredLease = await acquireLease({ runId });
+        if (renewLease) {
+          leaseHeartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId, expectedLease: acquiredLease });
+          leaseHeartbeat.start();
         }
+        await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
+        if (await markRunStarted({ expectedLease: acquiredLease,
+          runId,
+          summary: {
+            currentStep: 'Resolving import-pending candidate apply plans',
+            executionMode: 'move',
+            executableCandidateCount,
+            requestedCandidateCount,
+            ...buildApplyTriggerSummary({ applySafetyMode, importCandidateIds: scopedCandidateIds, triggerSource }),
+          },
+        }) === false) return;
 
-        try {
-          const currentQualityCandidate = applySafetyMode === 'safe_auto'
-            ? await resolveCurrentSafeAutoAddCandidate({ summaryCandidate, triggerSource, runId }) : summaryCandidate;
-          const pendingMutation = baseSnapshot.apply?.pendingMutation;
-          let applyPreview = null;
-          if (pendingMutation) {
-            const confirmation = await confirmPendingMutation(pendingMutation);
-            if (confirmation?.status === 'ambiguous') {
-              counts.awaitingConfirmation += 1;
-              await updateImportApplyRunItem({
-                applySnapshot: buildFilesystemConfirmationSnapshot({
-                  baseSnapshot,
-                  confirmation,
-                  outcome: 'awaiting_confirmation',
-                }),
-                importCandidateId: summaryCandidate.id,
-                itemStatus: 'awaiting_confirmation',
-                operationRunId: runId,
-                statusMessage: buildFilesystemConfirmationStatusMessage(confirmation),
-              });
-              continue;
-            }
+        const importPendingSummary = await buildImportPendingCandidateSummary({
+          ...(Array.isArray(scopedCandidateIds) ? { candidateIds: scopedCandidateIds } : {}),
+          limit: 1000,
+        });
+        const runnableCandidates = resolveRunnableCandidates(
+          importPendingSummary.importPendingCandidates ?? [],
+          applySafetyMode,
+        );
+        const persistedRunItems = await listImportApplyRunItems(runId);
+        const persistedItemsByCandidateId = new Map(
+          persistedRunItems.map((item) => [item.importCandidateId, item]),
+        );
+        const candidatesForRun = persistedRunItems.length > 0
+          ? runnableCandidates.filter((candidate) => persistedItemsByCandidateId.has(candidate.id))
+          : runnableCandidates;
+        const runItems = persistedRunItems.length > 0
+          ? persistedRunItems
+          : buildRunItems(candidatesForRun);
+        if (persistedRunItems.length === 0) {
+          await replaceImportApplyRunItems(runId, runItems);
+        }
+        const existingImportOperations = await listImportOperations({ operationRunId: runId });
+        let operationPositionCursor = getMaximumOperationPosition(existingImportOperations);
 
-            if (confirmation?.status === 'confirmed') {
-              applyPreview = buildRecoveryApplyPreview({
-                applySnapshot: baseSnapshot,
-                mutationIntent: pendingMutation,
-              });
-              if (!applyPreview) {
+        const counts = {
+          applied: 0,
+          appliedWithWarnings: 0,
+          applyFailed: 0,
+          awaitingConfirmation: 0,
+          blocked: 0,
+          qualityBlocked: 0,
+        };
+        const postApplyReleaseHints = [];
+        const qualityRecoveries = [];
+
+        for (const summaryCandidate of candidatesForRun) {
+          await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
+          const persistedItem = persistedItemsByCandidateId.get(summaryCandidate.id);
+          const baseSnapshot = persistedItem?.applySnapshot ?? createBaseSnapshot(summaryCandidate);
+
+          if (summaryCandidate.importStatus.code === 'blocked') {
+            counts.blocked += 1;
+            await updateImportApplyRunItem({
+              applySnapshot: {
+                ...baseSnapshot,
+                apply: {
+                  ...baseSnapshot.apply,
+                  outcome: 'blocked',
+                },
+              },
+              importCandidateId: summaryCandidate.id,
+              itemStatus: 'blocked',
+              operationRunId: runId,
+              statusMessage: summaryCandidate.importStatus.message,
+            });
+            recordActivityEventSafely(recordActivity, buildMusicQueueAddBlockedActivityEvent({
+              blockerCode: summaryCandidate.importStatus.blockerCode,
+              runId,
+              summaryCandidate,
+            }));
+            continue;
+          }
+
+          try {
+            const currentQualityCandidate = applySafetyMode === 'safe_auto'
+              ? await resolveCurrentSafeAutoAddCandidate({ summaryCandidate, triggerSource, runId }) : summaryCandidate;
+            const pendingMutation = baseSnapshot.apply?.pendingMutation;
+            let applyPreview = null;
+            if (pendingMutation) {
+              const confirmation = await confirmPendingMutation(pendingMutation);
+              if (confirmation?.status === 'ambiguous') {
                 counts.awaitingConfirmation += 1;
-                const incompleteCheckpointConfirmation = {
-                  ...confirmation,
-                  message: 'The earlier filesystem change is confirmed, but the saved import plan is incomplete. No further file changes will be made automatically.',
-                  status: 'ambiguous',
-                };
                 await updateImportApplyRunItem({
                   applySnapshot: buildFilesystemConfirmationSnapshot({
                     baseSnapshot,
-                    confirmation: incompleteCheckpointConfirmation,
+                    confirmation,
                     outcome: 'awaiting_confirmation',
                   }),
                   importCandidateId: summaryCandidate.id,
                   itemStatus: 'awaiting_confirmation',
                   operationRunId: runId,
-                  statusMessage: buildFilesystemConfirmationStatusMessage(incompleteCheckpointConfirmation),
+                  statusMessage: buildFilesystemConfirmationStatusMessage(confirmation),
                 });
                 continue;
               }
-            }
-          }
 
-          if (!applyPreview) {
-            applyPreview = await previewImportCandidateApply({ importCandidateId: summaryCandidate.id });
-          }
-          if (applySafetyMode === 'safe_auto') {
-            const qualityGate = await safeAutoAddQualityGateService.evaluateSafeAutoAddQuality({
-              applyPreview,
-              summaryCandidate: currentQualityCandidate,
-            });
-            if (!qualityGate.eligible) {
-              const recoveryReasonCode = deriveImportCandidateAddRecoveryReasonCode({
-                addBlockerCode: IMPORT_CANDIDATE_ADD_BLOCKER_CODES.MEDIA_VERIFICATION,
-                qualityGate,
-              });
-              counts.blocked += 1;
-              counts.qualityBlocked += 1;
-              await updateImportApplyRunItem({
-                applySnapshot: {
-                  ...baseSnapshot,
-                  apply: {
-                    ...baseSnapshot.apply,
-                    addBlockerCode: IMPORT_CANDIDATE_ADD_BLOCKER_CODES.MEDIA_VERIFICATION,
-                    outcome: 'quality_blocked',
-                    qualityGate,
-                    ...(recoveryReasonCode ? { recoveryReasonCode } : {}),
-                  },
-                  fullPreview: {
-                    counts: applyPreview.counts,
-                    summary: applyPreview.summary,
-                  },
-                },
-                importCandidateId: summaryCandidate.id,
-                itemStatus: 'blocked',
-                operationRunId: runId,
-                statusMessage: qualityGate.message,
-              });
-              let observedRecovery = null;
-              if (typeof handleImportCandidateQualityFailure === 'function') {
-                try {
-                  observedRecovery = await handleImportCandidateQualityFailure({
-                    failedCandidateId: summaryCandidate.id,
-                    ...(currentQualityCandidate.recheckPolicySnapshot?.candidate ? { observation: captureRecoveryObservation(currentQualityCandidate.recheckPolicySnapshot.candidate) } : {}),
-                    failureReason: qualityGate.message,
+              if (confirmation?.status === 'confirmed') {
+                applyPreview = buildRecoveryApplyPreview({
+                  applySnapshot: baseSnapshot,
+                  mutationIntent: pendingMutation,
+                });
+                if (!applyPreview) {
+                  counts.awaitingConfirmation += 1;
+                  const incompleteCheckpointConfirmation = {
+                    ...confirmation,
+                    message: 'The earlier filesystem change is confirmed, but the saved import plan is incomplete. No further file changes will be made automatically.',
+                    status: 'ambiguous',
+                  };
+                  await updateImportApplyRunItem({
+                    applySnapshot: buildFilesystemConfirmationSnapshot({
+                      baseSnapshot,
+                      confirmation: incompleteCheckpointConfirmation,
+                      outcome: 'awaiting_confirmation',
+                    }),
+                    importCandidateId: summaryCandidate.id,
+                    itemStatus: 'awaiting_confirmation',
                     operationRunId: runId,
-                    profileCode: qualityGate.profileCode,
-                    qualityLabel: qualityGate.status ?? 'quality_blocked',
-                    qualityWeight: 0,
-                    scheduleFollowUpRun: true,
+                    statusMessage: buildFilesystemConfirmationStatusMessage(incompleteCheckpointConfirmation),
                   });
-                  qualityRecoveries.push(observedRecovery);
-                } catch (error) {
-                  qualityRecoveries.push({
-                    failedCandidateId: summaryCandidate.id,
-                    reason: error?.code ?? 'quality_recovery_failed',
-                    recovered: false,
-                  });
+                  continue;
                 }
               }
-              const scopedStop = ['music_queue_manual_add','music_queue_prerequisite_recheck','music_queue_download_completed'].includes(triggerSource)
-                || observedRecovery?.scopedRecovery === true;
-              if (!scopedStop || (observedRecovery?.terminalObservationRecorded && !observedRecovery.episodeReplayed)) {
-                recordActivityEventSafely(recordActivityEventFn, buildMusicQueueAddBlockedActivityEvent({
-                  blockerCode: IMPORT_CANDIDATE_ADD_BLOCKER_CODES.MEDIA_VERIFICATION, recoveryReasonCode, runId, summaryCandidate,
+            }
+
+            if (!applyPreview) {
+              applyPreview = await previewImportCandidateApply({ importCandidateId: summaryCandidate.id });
+            }
+            if (applySafetyMode === 'safe_auto') {
+              const qualityGate = await safeAutoAddQualityGateService.evaluateSafeAutoAddQuality({
+                applyPreview,
+                summaryCandidate: currentQualityCandidate,
+              });
+              if (!qualityGate.eligible) {
+                const recoveryReasonCode = deriveImportCandidateAddRecoveryReasonCode({
+                  addBlockerCode: IMPORT_CANDIDATE_ADD_BLOCKER_CODES.MEDIA_VERIFICATION,
+                  qualityGate,
+                });
+                counts.blocked += 1;
+                counts.qualityBlocked += 1;
+                await updateImportApplyRunItem({
+                  applySnapshot: {
+                    ...baseSnapshot,
+                    apply: {
+                      ...baseSnapshot.apply,
+                      addBlockerCode: IMPORT_CANDIDATE_ADD_BLOCKER_CODES.MEDIA_VERIFICATION,
+                      outcome: 'quality_blocked',
+                      qualityGate,
+                      ...(recoveryReasonCode ? { recoveryReasonCode } : {}),
+                    },
+                    fullPreview: {
+                      counts: applyPreview.counts,
+                      summary: applyPreview.summary,
+                    },
+                  },
+                  importCandidateId: summaryCandidate.id,
+                  itemStatus: 'blocked',
+                  operationRunId: runId,
+                  statusMessage: qualityGate.message,
+                });
+                let observedRecovery = null;
+                if (typeof handleImportCandidateQualityFailure === 'function') {
+                  try {
+                    observedRecovery = await handleImportCandidateQualityFailure({
+                      failedCandidateId: summaryCandidate.id,
+                      ...(currentQualityCandidate.recheckPolicySnapshot?.candidate ? { observation: captureRecoveryObservation(currentQualityCandidate.recheckPolicySnapshot.candidate) } : {}),
+                      failureReason: qualityGate.message,
+                      operationRunId: runId,
+                      profileCode: qualityGate.profileCode,
+                      qualityLabel: qualityGate.status ?? 'quality_blocked',
+                      qualityWeight: 0,
+                      scheduleFollowUpRun: true,
+                    });
+                    qualityRecoveries.push(observedRecovery);
+                  } catch (error) {
+                    qualityRecoveries.push({
+                      failedCandidateId: summaryCandidate.id,
+                      reason: error?.code ?? 'quality_recovery_failed',
+                      recovered: false,
+                    });
+                  }
+                }
+                const scopedStop = ['music_queue_manual_add','music_queue_prerequisite_recheck','music_queue_download_completed'].includes(triggerSource)
+                  || observedRecovery?.scopedRecovery === true;
+                if (!scopedStop || (observedRecovery?.terminalObservationRecorded && !observedRecovery.episodeReplayed)) {
+                  recordActivityEventSafely(recordActivity, buildMusicQueueAddBlockedActivityEvent({
+                    blockerCode: IMPORT_CANDIDATE_ADD_BLOCKER_CODES.MEDIA_VERIFICATION, recoveryReasonCode, runId, summaryCandidate,
+                  }));
+                }
+                continue;
+              }
+            }
+            const persistedOperationPosition = Number(pendingMutation?.operationPosition);
+            const operationPositionStart = Math.max(
+              operationPositionCursor,
+              Number.isInteger(persistedOperationPosition) && persistedOperationPosition > 0
+                ? persistedOperationPosition
+                : 0,
+            );
+            operationPositionCursor = operationPositionStart + Math.max(
+              (applyPreview.files?.length ?? 0) * 2,
+              1,
+            );
+            const applyResult = await applyImportCandidatePreview({
+              applyPreview,
+              applySafetyMode,
+              ...(applySafetyMode === 'safe_auto' ? { assertSafeAutoPolicyCurrent: () => assertCurrentSafeAutoAddCandidate({
+                summaryCandidate: currentQualityCandidate, triggerSource, runId,
+              }) } : {}),
+              executionMode: 'move',
+              importCandidateId: summaryCandidate.id,
+              onMutationIntent: async (mutationIntent) => updateImportApplyRunItem({
+                applySnapshot: buildMutationCheckpointSnapshot({
+                  applyPreview,
+                  baseSnapshot,
+                  mutationIntent,
+                }),
+                importCandidateId: summaryCandidate.id,
+                itemStatus: 'applying',
+                operationRunId: runId,
+                statusMessage: 'Applying files to the library.',
+              }),
+              operationPositionStart,
+              operationRunId: runId,
+            });
+            const itemStatus = (applyResult.summary.failedFileCount ?? 0) > 0
+              ? 'apply_failed'
+              : summaryCandidate.importStatus.code === 'ready_with_warnings'
+                || (applyResult.summary.transcodePreflightFailedCount ?? 0) > 0
+                || (applyResult.summary.transcodePreflightUnavailableCount ?? 0) > 0
+                || (applyResult.summary.skippedFileCount ?? 0) > 0
+                ? 'applied_with_warnings'
+                : 'applied';
+            const statusMessage = buildApplyStatusMessage({
+              applyResult,
+              importStatusCode: summaryCandidate.importStatus.code,
+            });
+
+            if (itemStatus === 'apply_failed') {
+              counts.applyFailed += 1;
+            } else if (itemStatus === 'applied_with_warnings') {
+              counts.appliedWithWarnings += 1;
+            } else {
+              counts.applied += 1;
+            }
+
+            await updateImportApplyRunItem({
+              applySnapshot: {
+                ...baseSnapshot,
+                apply: {
+                  ...baseSnapshot.apply,
+                  filesystemConfirmation: null,
+                  outcome: itemStatus,
+                  pendingMutation: null,
+                  result: applyResult.summary,
+                },
+                fileOperations: applyResult.fileOperations,
+                fullPreview: {
+                  counts: applyPreview.counts,
+                  summary: applyPreview.summary,
+                },
+              },
+              importCandidateId: summaryCandidate.id,
+              itemStatus,
+              operationRunId: runId,
+              statusMessage,
+            });
+
+            if (itemStatus !== 'apply_failed') {
+              // Grade the *fidelity* of what was delivered (fake/transcoded
+              // lossless, low bitrate, missing tags) from the preview inspection
+              // metadata, so the reputation ledger downgrades poor sources even
+              // when the apply itself completed cleanly.
+              const deliveryQuality = assessDeliveredQuality({ files: applyPreview.files });
+              const outcomeQuality = classifyApplyOutcomeQuality({
+                status: itemStatus,
+                summary: applyResult.summary,
+                deliveryQuality,
+              });
+              await markImportCandidateApplied({
+                importCandidateId: summaryCandidate.id,
+                qualityLabel: outcomeQuality.qualityLabel,
+                qualityWeight: outcomeQuality.qualityWeight,
+                reason: statusMessage,
+              });
+
+              // Off-path producer: queue the heavy spectral-cutoff FFT analysis for
+              // lossless-claimed files now living in the library. Its advisory
+              // outcome does not reclassify applied files; worker completion
+              // still owns the returned enqueue work.
+              if (typeof enqueueSpectralAnalysisFn === 'function' && summaryCandidate.username) {
+                advisoryTasks.schedule(enqueueSpectralAnalysisFn, {
+                  files: buildSpectralFileDescriptors(applyPreview),
+                  importCandidateId: summaryCandidate.id,
+                  username: summaryCandidate.username,
+                });
+              }
+
+              try {
+                const releaseHints = await buildPostApplyReleaseHints({
+                  applyResult,
+                  summaryCandidate,
+                });
+                if (Array.isArray(releaseHints) && releaseHints.length > 0) {
+                  postApplyReleaseHints.push(...releaseHints);
+                }
+              } catch {
+                // Release hints improve post-apply matching, but a hint lookup must not
+                // reclassify files that were already moved into the library.
+              }
+
+              const notifyUserId = summaryCandidate.requestOwnership?.sourceRequestedForUserId
+                ?? summaryCandidate.requestOwnership?.sourceRequestedByUserId
+                ?? null;
+              if (notifyUserId && typeof sendFulfillmentNotificationFn === 'function') {
+                advisoryTasks.schedule(sendFulfillmentNotificationFn, { userId: notifyUserId });
+              }
+
+              if (typeof onReleaseAddedFn === 'function') {
+                advisoryTasks.schedule(onReleaseAddedFn, {
+                  artistName: summaryCandidate.releaseIdentity?.artistName ?? null,
+                  folderPath: summaryCandidate.folderPath ?? null,
+                  importCandidateId: summaryCandidate.id,
+                  releaseTitle: summaryCandidate.releaseIdentity?.releaseTitle ?? null,
+                  username: summaryCandidate.username ?? null,
+                });
+              }
+
+              if (typeof recordActivityEventFn === 'function') {
+                advisoryTasks.schedule(recordActivityEventFn, buildReleaseAddedActivityEvent({
+                  artistName: summaryCandidate.releaseIdentity?.artistName ?? null,
+                  entityId: summaryCandidate.id,
+                  entityType: 'import_candidate',
+                  fallbackEntityTitle: summaryCandidate.folderPath ?? null,
+                  operationType: 'import_candidate_apply',
+                  releaseTitle: summaryCandidate.releaseIdentity?.releaseTitle ?? null,
+                  runId,
+                  wantedReleaseId: summaryCandidate.musicQueueContext?.wantedReleaseId ?? null,
                 }));
               }
-              continue;
-            }
-          }
-          const persistedOperationPosition = Number(pendingMutation?.operationPosition);
-          const operationPositionStart = Math.max(
-            operationPositionCursor,
-            Number.isInteger(persistedOperationPosition) && persistedOperationPosition > 0
-              ? persistedOperationPosition
-              : 0,
-          );
-          operationPositionCursor = operationPositionStart + Math.max(
-            (applyPreview.files?.length ?? 0) * 2,
-            1,
-          );
-          const applyResult = await applyImportCandidatePreview({
-            applyPreview,
-            applySafetyMode,
-            ...(applySafetyMode === 'safe_auto' ? { assertSafeAutoPolicyCurrent: () => assertCurrentSafeAutoAddCandidate({
-              summaryCandidate: currentQualityCandidate, triggerSource, runId,
-            }) } : {}),
-            executionMode: 'move',
-            importCandidateId: summaryCandidate.id,
-            onMutationIntent: async (mutationIntent) => updateImportApplyRunItem({
-              applySnapshot: buildMutationCheckpointSnapshot({
-                applyPreview,
-                baseSnapshot,
-                mutationIntent,
-              }),
-              importCandidateId: summaryCandidate.id,
-              itemStatus: 'applying',
-              operationRunId: runId,
-              statusMessage: 'Applying files to the library.',
-            }),
-            operationPositionStart,
-            operationRunId: runId,
-          });
-          const itemStatus = (applyResult.summary.failedFileCount ?? 0) > 0
-            ? 'apply_failed'
-            : summaryCandidate.importStatus.code === 'ready_with_warnings'
-              || (applyResult.summary.transcodePreflightFailedCount ?? 0) > 0
-              || (applyResult.summary.transcodePreflightUnavailableCount ?? 0) > 0
-              || (applyResult.summary.skippedFileCount ?? 0) > 0
-              ? 'applied_with_warnings'
-              : 'applied';
-          const statusMessage = buildApplyStatusMessage({
-            applyResult,
-            importStatusCode: summaryCandidate.importStatus.code,
-          });
 
-          if (itemStatus === 'apply_failed') {
+              if (notifyUserId && typeof recordActivityEventFn === 'function') {
+                const requestFulfilledEvent = buildRequestFulfilledActivityEvent({ candidate: summaryCandidate });
+                if (requestFulfilledEvent) {
+                  advisoryTasks.schedule(recordActivityEventFn, requestFulfilledEvent);
+                }
+              }
+            }
+          } catch (error) {
             counts.applyFailed += 1;
-          } else if (itemStatus === 'applied_with_warnings') {
-            counts.appliedWithWarnings += 1;
-          } else {
-            counts.applied += 1;
-          }
-
-          await updateImportApplyRunItem({
-            applySnapshot: {
-              ...baseSnapshot,
-              apply: {
-                ...baseSnapshot.apply,
-                filesystemConfirmation: null,
-                outcome: itemStatus,
-                pendingMutation: null,
-                result: applyResult.summary,
+            await updateImportApplyRunItem({
+              applySnapshot: {
+                ...baseSnapshot,
+                apply: {
+                  ...baseSnapshot.apply,
+                  errorMessage: error instanceof Error ? error.message : String(error),
+                  ...(error?.code === 'safe_auto_alternate_input_requires_verification'
+                    ? { addBlockerCode: IMPORT_CANDIDATE_ADD_BLOCKER_CODES.UNSAFE_ADD_PLAN } : {}),
+                  outcome: 'apply_failed',
+                },
               },
-              fileOperations: applyResult.fileOperations,
-              fullPreview: {
-                counts: applyPreview.counts,
-                summary: applyPreview.summary,
-              },
-            },
-            importCandidateId: summaryCandidate.id,
-            itemStatus,
-            operationRunId: runId,
-            statusMessage,
-          });
-
-          if (itemStatus !== 'apply_failed') {
-            // Grade the *fidelity* of what was delivered (fake/transcoded
-            // lossless, low bitrate, missing tags) from the preview inspection
-            // metadata, so the reputation ledger downgrades poor sources even
-            // when the apply itself completed cleanly.
-            const deliveryQuality = assessDeliveredQuality({ files: applyPreview.files });
-            const outcomeQuality = classifyApplyOutcomeQuality({
-              status: itemStatus,
-              summary: applyResult.summary,
-              deliveryQuality,
-            });
-            await markImportCandidateApplied({
               importCandidateId: summaryCandidate.id,
-              qualityLabel: outcomeQuality.qualityLabel,
-              qualityWeight: outcomeQuality.qualityWeight,
-              reason: statusMessage,
+              itemStatus: 'apply_failed',
+              operationRunId: runId,
+              statusMessage: error instanceof Error ? error.message : String(error),
             });
-
-            // Off-path producer: queue the heavy spectral-cutoff FFT analysis for
-            // lossless-claimed files now living in the library. This is fire and
-            // forget and honours queue back-pressure, so it can never stall or
-            // fail the apply run.
-            if (typeof enqueueSpectralAnalysisFn === 'function' && summaryCandidate.username) {
-              void Promise.resolve(enqueueSpectralAnalysisFn({
-                files: buildSpectralFileDescriptors(applyPreview),
-                importCandidateId: summaryCandidate.id,
-                username: summaryCandidate.username,
-              })).catch(() => {});
-            }
-
-            try {
-              const releaseHints = await buildPostApplyReleaseHints({
-                applyResult,
-                summaryCandidate,
-              });
-              if (Array.isArray(releaseHints) && releaseHints.length > 0) {
-                postApplyReleaseHints.push(...releaseHints);
-              }
-            } catch {
-              // Release hints improve post-apply matching, but a hint lookup must not
-              // reclassify files that were already moved into the library.
-            }
-
-            const notifyUserId = summaryCandidate.requestOwnership?.sourceRequestedForUserId
-              ?? summaryCandidate.requestOwnership?.sourceRequestedByUserId
-              ?? null;
-            if (notifyUserId && typeof sendFulfillmentNotificationFn === 'function') {
-              void sendFulfillmentNotificationFn({ userId: notifyUserId }).catch(() => {});
-            }
-
-            if (typeof onReleaseAddedFn === 'function') {
-              void onReleaseAddedFn({
-                artistName: summaryCandidate.releaseIdentity?.artistName ?? null,
-                folderPath: summaryCandidate.folderPath ?? null,
-                importCandidateId: summaryCandidate.id,
-                releaseTitle: summaryCandidate.releaseIdentity?.releaseTitle ?? null,
-                username: summaryCandidate.username ?? null,
-              }).catch(() => {});
-            }
-
-            if (typeof recordActivityEventFn === 'function') {
-              void recordActivityEventFn(buildReleaseAddedActivityEvent({
-                artistName: summaryCandidate.releaseIdentity?.artistName ?? null,
-                entityId: summaryCandidate.id,
-                entityType: 'import_candidate',
-                fallbackEntityTitle: summaryCandidate.folderPath ?? null,
-                operationType: 'import_candidate_apply',
-                releaseTitle: summaryCandidate.releaseIdentity?.releaseTitle ?? null,
-                runId,
-                wantedReleaseId: summaryCandidate.musicQueueContext?.wantedReleaseId ?? null,
-              })).catch(() => {});
-            }
-
-            if (notifyUserId && typeof recordActivityEventFn === 'function') {
-              const requestFulfilledEvent = buildRequestFulfilledActivityEvent({ candidate: summaryCandidate });
-              if (requestFulfilledEvent) {
-                void recordActivityEventFn(requestFulfilledEvent).catch(() => {});
-              }
-            }
           }
-        } catch (error) {
-          counts.applyFailed += 1;
-          await updateImportApplyRunItem({
-            applySnapshot: {
-              ...baseSnapshot,
-              apply: {
-                ...baseSnapshot.apply,
-                errorMessage: error instanceof Error ? error.message : String(error),
-                ...(error?.code === 'safe_auto_alternate_input_requires_verification'
-                  ? { addBlockerCode: IMPORT_CANDIDATE_ADD_BLOCKER_CODES.UNSAFE_ADD_PLAN } : {}),
-                outcome: 'apply_failed',
-              },
+        }
+
+        if (await markRunCompleted({ expectedLease: acquiredLease,
+          runId,
+          summary: {
+            appliedCount: counts.applied,
+            appliedWithWarningsCount: counts.appliedWithWarnings,
+            applyFailedCount: counts.applyFailed,
+            blockedCount: counts.blocked,
+            currentStep: 'Import apply complete',
+            executionMode: 'move',
+            processedCandidateCount: runItems.length,
+            readyCount: importPendingSummary.counts?.ready ?? 0,
+            readyWithWarningsCount: importPendingSummary.counts?.readyWithWarnings ?? 0,
+            requestedCandidateCount,
+            ...(counts.awaitingConfirmation > 0 ? { awaitingConfirmationCount: counts.awaitingConfirmation } : {}),
+            ...(counts.qualityBlocked > 0 ? { qualityBlockedCount: counts.qualityBlocked } : {}),
+            ...buildQualityRecoverySummary(qualityRecoveries),
+            ...buildApplyTriggerSummary({ applySafetyMode, importCandidateIds: scopedCandidateIds, triggerSource }),
+            ...buildSkippedUnsafeCandidateCount(importPendingSummary, runItems, applySafetyMode),
+            totalImportPending: importPendingSummary.counts?.totalImportPending ?? runItems.length,
+          },
+        }) === false) return;
+
+        if (typeof scheduleLibraryScan === 'function' && (counts.applied + counts.appliedWithWarnings) > 0) {
+          try {
+            await scheduleLibraryScan({
+              releaseHints: postApplyReleaseHints,
+              triggeredByRunId: runId,
+            });
+          } catch {
+            // A scan that is already queued/running, or a scan readiness failure, should not
+            // turn an otherwise successful import apply run into a failed operation.
+          }
+        }
+
+        // Off-path consumer: drain a bounded batch of queued spectral-analysis
+        // jobs at the tail of the run. Confirmed transcodes are merged back into
+        // the reputation ledger by the sidecar service. Its bounded returned
+        // work belongs to completion; advisory errors do not fail the domain run.
+        if (typeof processPendingSpectralJobsFn === 'function') {
+          try {
+            await processPendingSpectralJobsFn({ limit: spectralDrainLimit });
+          } catch {
+            // Spectral analysis is advisory; a drain failure must not fail the run.
+          }
+        }
+      } catch (error) {
+        if (isOperationRunLeaseLostError(error)) return;
+        if (!acquiredLease) throw error;
+        if (isOperationRunPauseError(error)) {
+          finalLeaseStatus = 'paused';
+          await markRunPaused({ expectedLease: acquiredLease,
+            nextAttemptAt: error.nextRetryAt ?? null,
+            runId,
+            summary: {
+              currentStep: 'Import apply paused by maintenance lock',
+              executionMode: 'move',
+              executableCandidateCount,
+              pauseCode: error.pauseCode ?? null,
+              pauseMessage: error.message,
+              pauseProvider: error.pauseProvider ?? null,
+              requestedCandidateCount,
+              ...buildApplyTriggerSummary({ applySafetyMode, importCandidateIds: scopedCandidateIds, triggerSource }),
             },
-            importCandidateId: summaryCandidate.id,
-            itemStatus: 'apply_failed',
-            operationRunId: runId,
-            statusMessage: error instanceof Error ? error.message : String(error),
           });
+          return;
         }
-      }
 
-      if (await markRunCompleted({ expectedLease: acquiredLease,
-        runId,
-        summary: {
-          appliedCount: counts.applied,
-          appliedWithWarningsCount: counts.appliedWithWarnings,
-          applyFailedCount: counts.applyFailed,
-          blockedCount: counts.blocked,
-          currentStep: 'Import apply complete',
-          executionMode: 'move',
-          processedCandidateCount: runItems.length,
-          readyCount: importPendingSummary.counts?.ready ?? 0,
-          readyWithWarningsCount: importPendingSummary.counts?.readyWithWarnings ?? 0,
-          requestedCandidateCount,
-          ...(counts.awaitingConfirmation > 0 ? { awaitingConfirmationCount: counts.awaitingConfirmation } : {}),
-          ...(counts.qualityBlocked > 0 ? { qualityBlockedCount: counts.qualityBlocked } : {}),
-          ...buildQualityRecoverySummary(qualityRecoveries),
-          ...buildApplyTriggerSummary({ applySafetyMode, importCandidateIds: scopedCandidateIds, triggerSource }),
-          ...buildSkippedUnsafeCandidateCount(importPendingSummary, runItems, applySafetyMode),
-          totalImportPending: importPendingSummary.counts?.totalImportPending ?? runItems.length,
-        },
-      }) === false) return;
-
-      if (typeof scheduleLibraryScan === 'function' && (counts.applied + counts.appliedWithWarnings) > 0) {
-        try {
-          await scheduleLibraryScan({
-            releaseHints: postApplyReleaseHints,
-            triggeredByRunId: runId,
+        if (isOperationRunCancellationError(error)) {
+          finalLeaseStatus = 'cancelled';
+          await markRunCancelled({ expectedLease: acquiredLease,
+            runId,
+            summary: {
+              currentStep: 'Import apply cancelled',
+              executionMode: 'move',
+              executableCandidateCount,
+              requestedCandidateCount,
+              ...buildApplyTriggerSummary({ applySafetyMode, importCandidateIds: scopedCandidateIds, triggerSource }),
+            },
           });
-        } catch {
-          // A scan that is already queued/running, or a scan readiness failure, should not
-          // turn an otherwise successful import apply run into a failed operation.
+          return;
         }
-      }
 
-      // Off-path consumer: drain a bounded batch of queued spectral-analysis
-      // jobs at the tail of the run. Confirmed transcodes are merged back into
-      // the reputation ledger by the sidecar service. Bounded + best-effort so
-      // the heavy FFT work never extends or fails an apply run.
-      if (typeof processPendingSpectralJobsFn === 'function') {
-        try {
-          await processPendingSpectralJobsFn({ limit: spectralDrainLimit });
-        } catch {
-          // Spectral analysis is advisory; a drain failure must not fail the run.
-        }
-      }
-    } catch (error) {
-      if (!acquiredLease || isOperationRunLeaseLostError(error)) return;
-      if (isOperationRunPauseError(error)) {
-        finalLeaseStatus = 'paused';
-        await markRunPaused({ expectedLease: acquiredLease,
-          nextAttemptAt: error.nextRetryAt ?? null,
+        finalLeaseStatus = 'failed';
+        await markRunFailed({ expectedLease: acquiredLease,
+          errorMessage: error?.message ?? 'Import apply failed',
           runId,
           summary: {
-            currentStep: 'Import apply paused by maintenance lock',
-            executionMode: 'move',
-            executableCandidateCount,
-            pauseCode: error.pauseCode ?? null,
-            pauseMessage: error.message,
-            pauseProvider: error.pauseProvider ?? null,
-            requestedCandidateCount,
-            ...buildApplyTriggerSummary({ applySafetyMode, importCandidateIds: scopedCandidateIds, triggerSource }),
-          },
-        });
-        return;
-      }
-
-      if (isOperationRunCancellationError(error)) {
-        finalLeaseStatus = 'cancelled';
-        await markRunCancelled({ expectedLease: acquiredLease,
-          runId,
-          summary: {
-            currentStep: 'Import apply cancelled',
+            currentStep: 'Import apply failed',
             executionMode: 'move',
             executableCandidateCount,
             requestedCandidateCount,
             ...buildApplyTriggerSummary({ applySafetyMode, importCandidateIds: scopedCandidateIds, triggerSource }),
           },
         });
-        return;
       }
-
-      finalLeaseStatus = 'failed';
-      await markRunFailed({ expectedLease: acquiredLease,
-        errorMessage: error.message,
-        runId,
-        summary: {
-          currentStep: 'Import apply failed',
-          executionMode: 'move',
-          executableCandidateCount,
-          requestedCandidateCount,
-          ...buildApplyTriggerSummary({ applySafetyMode, importCandidateIds: scopedCandidateIds, triggerSource }),
-        },
-      });
-    } finally {
-      leaseHeartbeat?.stop();
-      activeRunIds.delete(runId);
-      if (acquiredLease) await releaseLease({ runId, status: finalLeaseStatus, expectedLease: acquiredLease });
-    }
+    }, async () => {
+      await advisoryTasks.close();
+      let cleanupFailed = false;
+      let cleanupFailure;
+      try {
+        if (leaseHeartbeat?.stopAndDrain) await leaseHeartbeat.stopAndDrain();
+        else await leaseHeartbeat?.stop();
+      } catch (error) { cleanupFailed = true; cleanupFailure = error; }
+      try {
+        if (acquiredLease) await releaseLease({ runId, status: finalLeaseStatus, expectedLease: acquiredLease });
+      } catch (error) {
+        if (!cleanupFailed) { cleanupFailed = true; cleanupFailure = error; }
+      }
+      if (cleanupFailed) throw cleanupFailure;
+    });
   }
 
   async function startWorkerRun({
@@ -843,24 +863,19 @@ export function createImportCandidateApplyWorker({
     runId,
     triggerSource = 'manual',
   }) {
-    if (activeRunIds.has(runId)) {
-      return;
-    }
-
-    activeRunIds.add(runId);
-    queueMicrotask(() => {
-      void runApply({
-        applySafetyMode,
-        executableCandidateCount,
-        importCandidateIds,
-        requestedCandidateCount,
-        runId,
-        triggerSource,
-      });
+    const completion = lifecycle.start({
+      applySafetyMode,
+      executableCandidateCount,
+      importCandidateIds,
+      requestedCandidateCount,
+      runId,
+      triggerSource,
     });
+    return { completion };
   }
 
   return {
     startWorkerRun,
+    close: lifecycle.close,
   };
 }

@@ -284,3 +284,9 @@ concurrent close identity and retained uncertain failure. Keep HTTP socket close
 separate from launched work and successful pool restart separate from invocation
 sealing. Reuse the existing standards workflow and metadata; the dedicated pool
 documents own source status, adverse proof and publication checks.
+
+Apply-lifetime maintenance follows queued acceptance through returned advisory
+work, active heartbeat renewal, lease finalization and application-owned drain.
+Keep observed completion, best-effort outcomes, primary errors and residual
+owners distinct. Reuse the skill's metadata and invocation policy; route actual
+runtime proof through the separate design/research/outcome documents.

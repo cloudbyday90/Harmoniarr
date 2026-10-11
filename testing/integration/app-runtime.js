@@ -18,6 +18,7 @@ import { createSessionHttpClient } from '../server/http-session-client.js';
 import { withServer } from '../server/http-test-helpers.js';
 import { createIntegrationFixturePhaseObserver } from './fixture-phase-observer.js';
 import { createIntegrationPoolCheckoutObserver, observeAppSchemaPreparation } from './app-checkout-observer.js';
+import { withIntegrationAppWorkerDrain } from './app-worker-lifecycle.js';
 
 const packageJsonPath = resolve(import.meta.dirname, '../../package.json');
 const SCENARIO_SHUTDOWN_DRAIN_MS = 150;
@@ -165,12 +166,13 @@ export async function createIntegrationAppRuntime({
             await scenarioObserver.measure('schema_prepare', () => observeAppSchemaPreparation({
               prepareDatabaseFn, getPoolFn: getPool, observer: checkoutObserver, source, phaseObserver: scenarioObserver,
             }));
-            const { app } = await scenarioObserver.measure('application_create', () => createAppFn({
+            const application = await scenarioObserver.measure('application_create', () => createAppFn({
               clientDistDir: runtimeWorkspace.clientDistDir,
               packageJsonPath,
             }));
-            const result = await scenarioObserver.measure('http_scenario', () => withServer(
-              app,
+            const result = await withIntegrationAppWorkerDrain({ application, phaseObserver: scenarioObserver },
+              () => scenarioObserver.measure('http_scenario', () => withServer(
+              application.app,
               async (baseUrl) => scenarioObserver.measure('scenario_work', () => run({
                 baseUrl,
                 client: createSessionHttpClient(baseUrl, {
@@ -190,7 +192,7 @@ export async function createIntegrationAppRuntime({
                 listenTimeoutMs: config.poolConnectionTimeoutMs,
                 phaseObserver: scenarioObserver,
               },
-            ));
+            )));
             scenarioFailed = false;
             return result;
           } finally {
@@ -246,12 +248,13 @@ export async function withIntegrationApp({
             await phaseObserver.measure('schema_prepare', () => observeAppSchemaPreparation({
               prepareDatabaseFn, getPoolFn: getPool, observer: checkoutObserver, source, phaseObserver,
             }));
-            const { app } = await phaseObserver.measure('application_create', () => createAppFn({
+            const application = await phaseObserver.measure('application_create', () => createAppFn({
               clientDistDir: runtimeWorkspace.clientDistDir,
               packageJsonPath,
             }));
-            return await phaseObserver.measure('http_scenario', () => withServer(
-              app,
+            return await withIntegrationAppWorkerDrain({ application, phaseObserver },
+              () => phaseObserver.measure('http_scenario', () => withServer(
+              application.app,
               async (baseUrl) => phaseObserver.measure('scenario_work', () => run({
                 baseUrl,
                 client: createSessionHttpClient(baseUrl, {
@@ -270,7 +273,7 @@ export async function withIntegrationApp({
                 listenTimeoutMs: config.poolConnectionTimeoutMs,
                 phaseObserver,
               },
-            ));
+            )));
           } finally {
             await phaseObserver.measure('shutdown_drain', () => waitForScenarioShutdownDrain());
             await phaseObserver.measure('pool_close', () => closePool()).catch(() => {});

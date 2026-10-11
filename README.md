@@ -65,6 +65,7 @@ cases and thirteen fresh scenario variants. Use
 - [Local Docker walkthrough](docs/LOCAL_DOCKER_WALKTHROUGH.md)
 - [First app-checkout diagnostics design](docs/APP_FIXTURE_CHECKOUT_DIAGNOSTICS_DESIGN.md), [research](docs/APP_FIXTURE_CHECKOUT_DIAGNOSTICS_RESEARCH_2026_10.md) and [outcome](docs/APP_FIXTURE_CHECKOUT_DIAGNOSTICS_OUTCOME.md)
 - [Database pool shutdown design](docs/DATABASE_POOL_SHUTDOWN_DESIGN.md), [research](docs/DATABASE_POOL_SHUTDOWN_RESEARCH_2026_10.md) and [outcome](docs/DATABASE_POOL_SHUTDOWN_OUTCOME.md)
+- [Apply worker lifetime design](docs/APPLY_WORKER_LIFETIME_DESIGN.md), [research](docs/APPLY_WORKER_LIFETIME_RESEARCH_2026_10.md) and [outcome](docs/APPLY_WORKER_LIFETIME_OUTCOME.md)
 - [Downloader filter feedback design](docs/DOWNLOADER_FILTER_ANNOUNCEMENT_DESIGN.md), [research](docs/DOWNLOADER_FILTER_ANNOUNCEMENT_RESEARCH_2026_10.md) and [outcome](docs/DOWNLOADER_FILTER_ANNOUNCEMENT_OUTCOME.md)
 - [No-cache local rebuild design](docs/LOCAL_DOCKER_REBUILD_2026_10_DESIGN.md), [official research](docs/LOCAL_DOCKER_REBUILD_RESEARCH_2026_10.md) and [outcome](docs/LOCAL_DOCKER_REBUILD_2026_10_OUTCOME.md)
 - [Backup, restore, and upgrade design](docs/BACKUP_RESTORE_DESIGN.md)

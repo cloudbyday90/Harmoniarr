@@ -193,3 +193,21 @@ is a different boundary. The separate Downloader outcome owns executed claims.
 Keep native controls usable, preserve focus and avoid turning ordinary data
 changes into announcement intents. Synchronous failure cancellation prevents a
 same-tick retry from reviving the preceding user request.
+
+Apply-worker completion maps to `src/server/worker-task-lifecycle.js`,
+`worker-task-cleanup.js`, `worker-advisory-tasks.js` and the existing apply worker.
+Keep queued acknowledgement distinct from completion, including returned activity,
+notification and spectral enqueue work, admitted heartbeat renewals and captured
+lease release. `stopAndDrain()` is terminal; ordinary timer stop is separate.
+`testing/integration/app-worker-lifecycle.js` drains the actual application's apply
+owner before pool/environment teardown; production startup closes it before its
+pool too. Unit gates and `test/integration/apply-worker-lifetime.test.js` own proof.
+The dedicated apply-lifetime outcome separates these owners from child scans,
+other workers, hidden unreturned callback work and the retained residual delay.
+
+The apply acknowledgement now carries `completion` without making start await
+execution. `runLibraryAddFixtureWorker` retains that handle before reading one
+terminal status, avoiding shared-hook/workspace mutation under a prior run's
+finalizer. The native held-release control proves this separate boundary. Do not
+attribute an unreproduced full-gate authority assertion to a passing focused
+retry or to a separately proved completion gap.

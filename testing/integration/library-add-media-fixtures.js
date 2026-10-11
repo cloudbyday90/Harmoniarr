@@ -95,11 +95,11 @@ export async function seedOwnedLibraryAddFixture({ pool, owner, workspaceDir, me
 export async function runLibraryAddFixtureWorker({ pool, module, runId }) {
   const claimed = await createOperationQueueStore({ getPoolFn: () => pool }).claimNextRunnableRun({ operationTypes: ['import_candidate_apply'] });
   assert.equal(claimed.id, runId);
-  module.importCandidateApplyWorker.startWorkerRun({ ...claimed.summary, runId });
-  for (let attempt = 0; attempt < 120; attempt += 1) {
-    const run = await module.importCandidateApplyRunStore.getRunById(runId);
-    if (['completed', 'failed', 'paused', 'cancelled'].includes(run.status)) return run;
-    await new Promise((complete) => { setTimeout(complete, 100); });
-  }
-  assert.fail('The real apply worker did not persist a terminal result');
+  const { completion } = await module.importCandidateApplyWorker.startWorkerRun({ ...claimed.summary, runId });
+  assert.ok(completion && typeof completion.then === 'function', 'The apply worker must expose actual run completion');
+  await completion;
+  const run = await module.importCandidateApplyRunStore.getRunById(runId);
+  assert.ok(['completed', 'failed', 'paused', 'cancelled'].includes(run.status),
+    'The completed apply worker must persist a terminal result');
+  return run;
 }

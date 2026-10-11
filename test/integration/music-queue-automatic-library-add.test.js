@@ -240,7 +240,7 @@ suite('Automatic Music Queue library addition with PostgreSQL and test-owned mea
         if (variant === 'preview') inspectionHook = async () => { inspections += 1;
           if (inspections === 2) await pool.query("UPDATE import_candidates SET folder_path='changed-during-preview' WHERE id=$1", [fixture.candidateId]); };
         const run = await runWorker(pool, accepted.runId); inspectionHook = null;
-        assert.equal(run.appliedCount, 0, JSON.stringify(run)); assert.ok((run.applyFailedCount ?? 0) + (run.qualityBlockedCount ?? 0) > 0);
+        assert.equal(run.appliedCount, 0, JSON.stringify({ variant, run })); assert.ok((run.applyFailedCount ?? 0) + (run.qualityBlockedCount ?? 0) > 0);
         if (variant === 'preview') assert.equal(inspections, 2);
         await assert.rejects(stat(preview.files[0].libraryTarget.path), { code: 'ENOENT' }); assert.ok((await stat(fixture.sourcePath)).isFile());
         if (changedPlan) await assert.rejects(stat(changedPlan.files[0].libraryTarget.path), { code: 'ENOENT' });

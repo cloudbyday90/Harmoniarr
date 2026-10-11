@@ -18,6 +18,7 @@
 
 import { createIntervalHeartbeatRunner } from './interval-heartbeat-runner.js';
 import { normalizeExpectedJobLease } from '../job-lease-policy.js';
+import { createWorkerTaskLifecycle } from '../worker-task-lifecycle.js';
 
 const defaultHeartbeatIntervalMs = 60 * 1000;
 
@@ -31,18 +32,56 @@ export function createOperationRunLeaseHeartbeat({
   status = 'active',
 } = {}) {
   const capturedLease = normalizeExpectedJobLease(expectedLease);
-  return createIntervalHeartbeatRunnerFn({
-    intervalMs,
-    onTick: async () => {
+  let sequence = 0;
+  let stopping;
+  const tasks = createWorkerTaskLifecycle({
+    execute: async () => {
       try {
         if (!capturedLease) return { reason: 'lease_lost', skipped: true };
         const renewed = await renewLease({ runId, status, expectedLease: capturedLease });
         if (renewed === null) return { reason: 'lease_lost', skipped: true };
         return { skipped: false };
       } catch (error) {
-        onError(error);
+        await onError(error);
         return { reason: 'error', skipped: true };
       }
     },
   });
+  const runner = createIntervalHeartbeatRunnerFn({
+    intervalMs,
+    onTick: () => stopping
+      ? Promise.resolve({ reason: 'stopped', skipped: true })
+      : tasks.start({ runId: ++sequence }).catch(() => ({ reason: 'error', skipped: true })),
+  });
+
+  function stopAndDrain() {
+    if (stopping) return stopping;
+    const completion = Promise.withResolvers();
+    stopping = completion.promise;
+    const draining = tasks.close();
+    let stopFailed = false;
+    let stopFailure;
+    try { runner.stop(); }
+    catch (error) { stopFailed = true; stopFailure = error; }
+    draining.then(() => {
+      if (stopFailed) completion.reject(stopFailure);
+      else completion.resolve();
+    }, completion.reject);
+    return stopping;
+  }
+
+  return {
+    ...runner,
+    start() {
+      if (stopping) {
+        throw Object.assign(new Error('Lease heartbeat admission is closed'), { code: 'heartbeat_closing' });
+      }
+      return runner.start();
+    },
+    tick() {
+      if (stopping) return Promise.resolve({ reason: 'stopped', skipped: true });
+      return runner.tick();
+    },
+    stopAndDrain,
+  };
 }

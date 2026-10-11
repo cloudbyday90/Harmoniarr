@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import test from 'node:test';
 import { startServerRuntime } from '../../src/server/startup-runtime.js';
+import { waitForFixtureReady } from '../../testing/integration/fixture-lifecycle.js';
 
 test('startServerRuntime composes startup services, starts them, and shuts them down on signal', async () => {
   const processEmitter = new EventEmitter();
@@ -9,6 +10,8 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
   const stderrWrites = [];
   const callOrder = [];
   const registeredServices = [];
+  const applyCloseEntered = Promise.withResolvers();
+  const applyCloseGate = Promise.withResolvers();
   let resolveShutdownComplete;
   const shutdownComplete = new Promise((resolve) => {
     resolveShutdownComplete = resolve;
@@ -174,6 +177,11 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
       importCandidateModule: {
         importCandidateApplyWorker: {
           startWorkerRun: async () => {},
+          async close() {
+            callOrder.push('apply.close');
+            applyCloseEntered.resolve();
+            await applyCloseGate.promise;
+          },
         },
         importCandidateExecutionHeartbeatConfig: {
           intervalMs: 60000,
@@ -414,6 +422,10 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
   ]);
 
   processEmitter.emit('SIGTERM');
+  try {
+    await waitForFixtureReady({ ready: applyCloseEntered.promise, operation: shutdownComplete });
+    assert.equal(callOrder.includes('closePool'), false);
+  } finally { applyCloseGate.resolve(); }
   await shutdownComplete;
 
   assert.deepEqual(callOrder, [
@@ -448,6 +460,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'stop:metadata',
     'stop:queue',
     'server.close',
+    'apply.close',
     'closePool',
   ]);
   assert.deepEqual(stderrWrites, []);
