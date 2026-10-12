@@ -31,7 +31,7 @@ const args = { intentId: 'intent', mediaRequestId: 'request', runId: 'run', trig
 
 test('external discovery worker completes search as import review without auto-download', async (t) => {
   const fixture = createFixture(t, async () => ({ candidateCount: 2, fileCount: 8, searchId: 'search' }));
-  await fixture.worker.startWorkerRun(args);
+  await (await fixture.worker.startWorkerRun(args)).completion;
   assert.deepEqual(await fixture.released, { expectedLease: leaseForTest('run'), runId: 'run', status: 'completed' });
   assert.deepEqual(fixture.dependencies.discoverExternalRequestRelease.mock.calls[0].arguments[0], { intentId: 'intent', mediaRequestId: 'request', operationRunId: 'run', triggeredByUserId: 'admin' });
   assert.equal(fixture.dependencies.markRunCompleted.mock.calls[0].arguments[0].summary.currentStep, 'Candidates ready for import review');
@@ -45,7 +45,7 @@ for (const scenario of ['cancelled', 'paused', 'failed']) {
       : scenario === 'paused' ? createOperationRunPauseError({ pauseCode: 'recovery_lock_conflict', nextRetryAt: '2026-09-10T00:00:00Z' })
         : new Error('Provider details with confidential data');
     const fixture = createFixture(t, async () => { throw error; });
-    await fixture.worker.startWorkerRun(args);
+    await (await fixture.worker.startWorkerRun(args)).completion;
     assert.deepEqual(await fixture.released, { expectedLease: leaseForTest('run'), runId: 'run', status: scenario });
     assert.equal(fixture.dependencies.markRunCompleted.mock.callCount(), 0);
     assert.equal(fixture.dependencies.markRunCancelled.mock.callCount(), scenario === 'cancelled' ? 1 : 0);
@@ -61,9 +61,12 @@ test('duplicate in-process starts execute one discovery run', async (t) => {
   let finish;
   const pending = new Promise((resolve) => { finish = resolve; });
   const fixture = createFixture(t, async () => { await pending; return { candidateCount: 1, fileCount: 1 }; });
-  await fixture.worker.startWorkerRun(args);
-  await fixture.worker.startWorkerRun(args);
+  const first = await fixture.worker.startWorkerRun(args);
+  const second = await fixture.worker.startWorkerRun(args);
+  assert.equal(first.completion, second.completion);
   finish();
+  await first.completion;
+  await fixture.worker.close();
   await fixture.released;
   assert.equal(fixture.dependencies.acquireLease.mock.callCount(), 1);
   assert.equal(fixture.dependencies.discoverExternalRequestRelease.mock.callCount(), 1);
@@ -71,7 +74,7 @@ test('duplicate in-process starts execute one discovery run', async (t) => {
 
 test('an empty discovery result remains actionable through explicit background-job retry', async (t) => {
   const fixture = createFixture(t, async () => ({ candidateCount: 0, fileCount: 0 }));
-  await fixture.worker.startWorkerRun(args);
+  await (await fixture.worker.startWorkerRun(args)).completion;
   assert.deepEqual(await fixture.released, { expectedLease: leaseForTest('run'), runId: 'run', status: 'failed' });
   const failure = fixture.dependencies.markRunFailed.mock.calls[0].arguments[0];
   assert.match(failure.summary.currentStep, /No candidates found/);
@@ -83,8 +86,8 @@ test('an empty discovery result remains actionable through explicit background-j
 test('a worker cannot release or fail another worker’s active lease', async (t) => {
   const fixture = createFixture(t, async () => assert.fail('Another worker owns this run'));
   fixture.dependencies.acquireLease.mock.mockImplementation(async () => { throw Object.assign(new Error('Lease unavailable'), { code: 'operation_run_lease_unavailable' }); });
-  await fixture.worker.startWorkerRun(args);
-  await new Promise((resolve) => { setImmediate(resolve); });
+  await (await fixture.worker.startWorkerRun(args)).completion;
+  await fixture.worker.close();
   assert.equal(fixture.dependencies.releaseLease.mock.callCount(), 0);
   assert.equal(fixture.dependencies.markRunFailed.mock.callCount(), 0);
 });

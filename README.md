@@ -76,6 +76,7 @@ cases and thirteen fresh scenario variants. Use
 - [Library discovery dispatch lifetime design](docs/DISCOVERY_DISPATCH_LIFETIME_DESIGN.md), [research](docs/DISCOVERY_DISPATCH_LIFETIME_RESEARCH_2026_10.md) and [outcome](docs/DISCOVERY_DISPATCH_LIFETIME_OUTCOME.md)
 - [External intake planning lifetime design](docs/EXTERNAL_INTAKE_LIFETIME_DESIGN.md), [research](docs/EXTERNAL_INTAKE_LIFETIME_RESEARCH_2026_10.md) and [outcome](docs/EXTERNAL_INTAKE_LIFETIME_OUTCOME.md)
 - [Provider ingest execution lifetime design](docs/PROVIDER_INGEST_LIFETIME_DESIGN.md), [research](docs/PROVIDER_INGEST_LIFETIME_RESEARCH_2026_10.md) and [outcome](docs/PROVIDER_INGEST_LIFETIME_OUTCOME.md)
+- [External request discovery lifetime design](docs/EXTERNAL_REQUEST_DISCOVERY_LIFETIME_DESIGN.md), [research](docs/EXTERNAL_REQUEST_DISCOVERY_LIFETIME_RESEARCH_2026_10.md) and [outcome](docs/EXTERNAL_REQUEST_DISCOVERY_LIFETIME_OUTCOME.md)
 - [Downloader filter feedback design](docs/DOWNLOADER_FILTER_ANNOUNCEMENT_DESIGN.md), [research](docs/DOWNLOADER_FILTER_ANNOUNCEMENT_RESEARCH_2026_10.md) and [outcome](docs/DOWNLOADER_FILTER_ANNOUNCEMENT_OUTCOME.md)
 - [No-cache local rebuild design](docs/LOCAL_DOCKER_REBUILD_2026_10_DESIGN.md), [official research](docs/LOCAL_DOCKER_REBUILD_RESEARCH_2026_10.md) and [outcome](docs/LOCAL_DOCKER_REBUILD_2026_10_OUTCOME.md)
 - [Backup, restore, and upgrade design](docs/BACKUP_RESTORE_DESIGN.md)

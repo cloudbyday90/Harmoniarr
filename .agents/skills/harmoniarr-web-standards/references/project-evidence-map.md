@@ -319,3 +319,17 @@ selected owners. Native fixture helpers locate real seed/plan/queue/read owners
 and injected loopback transport without altering production endpoints. Parent
 tests check HTTP/body persistence, actor/recipient resources, release and collection
 publication/cancellation. Dedicated provider-ingest documents own executed scope.
+
+External request discovery now owns approved lookup/search/ingestion and captured
+lease drainage in library/library-external-request-discovery-worker.js. The service
+guard checks intent/request relationship, target and current state before provider
+work and on candidate ingestion's transaction client after locking the request.
+Ingested candidates/files remain target-owned and pending import review; required
+audit is awaited. No automatic acquisition handoff was found in that body.
+Application adds external-request discovery after provider before global discovery
+and existing downstream owners, capturing ten receivers. Native fixture helpers
+seed through real approval and exercise real slskd client/service over owned HTTP.
+Parent tests verify candidate/file/audit ownership, release/resource lifetime and
+cancellation/retargeting publication refusal. The dispatch harness retains its
+15-second bound, retains worker completion beyond claim/tick completion, reads status once and drains before
+disposal. Dedicated documents own scope and remaining metadata/periodic limits.

@@ -559,3 +559,15 @@ TC39 completion and driver cleanup support shared ownership; one bounded batch o
 a handled row failure can finish local execution without proving the collection
 or remote work complete. W3C timing remains draft measurement guidance and IETF
 uncertainty policy does not authorize replay during shutdown.
+
+October 12 external-request discovery guidance uses
+docs/EXTERNAL_REQUEST_DISCOVERY_LIFETIME_RESEARCH_2026_10.md. OWASP object/relationship
+authorization stays at the service and actual transaction-owned publication;
+queued acceptance, ownership IDs or worker completion do not grant target authority.
+Retain approved intent, current eligibility, sanitized failure and explicit
+no-candidate retry. TC39 completion preserves Error/null while driver drainage
+requires the local worker to finish before pool disposal. Preserve distinct
+acquired-unavailable lease status during this lifetime change. RFC 9110 uncertainty
+does not authorize search POST replay or automatic download. W3C timing is still
+draft observation guidance; a 15-second owned dispatch deadline replaces status
+polling without treating timeout/cancellation as proof that remote work stopped.

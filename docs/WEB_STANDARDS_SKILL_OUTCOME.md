@@ -605,3 +605,10 @@ partial-result policy and the distinct hidden post-abort boundary. The
 [provider outcome](PROVIDER_INGEST_LIFETIME_OUTCOME.md) owns native HTTP, resource,
 publication/cancellation and structural evidence. This is narrow reference
 maintenance without a new blind trial or conformance certification.
+
+External-request discovery references locate approved intent/current target
+guards, candidate transaction/audit, actual completion and ten concrete app owners.
+The bounded dispatch harness awaits execution rather than polling terminal status.
+The [external discovery outcome](EXTERNAL_REQUEST_DISCOVERY_LIFETIME_OUTCOME.md)
+owns native HTTP, publication refusal, resource and structural evidence. This is
+narrow reference maintenance without a new blind trial or conformance claim.

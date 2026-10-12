@@ -33,6 +33,8 @@ import {
   isSkippableIntegrationRuntimeError,
   toIntegrationRuntimeUnavailableReason,
 } from '../../testing/integration/runtime-availability.js';
+import { withWorkerTaskCleanup } from '../../src/server/worker-task-cleanup.js';
+import { withFixtureLifecycle } from '../../testing/integration/fixture-lifecycle.js';
 import { createSessionHttpClient } from '../../testing/server/http-session-client.js';
 
 const config = resolveIntegrationTestRuntimeConfig();
@@ -160,12 +162,25 @@ function createDiscoveryHarness(context, { waitForResponses = async () => {} } =
     reviewStore: createLibraryExternalRequestReviewStore(),
     slskdService,
   });
+  const workerCompletions = new Map();
+  const worker = module.libraryExternalRequestDiscoveryWorker;
+  const startWorkerRun = worker.startWorkerRun;
+  worker.startWorkerRun = (input) => {
+    const accepted = startWorkerRun.call(worker, input);
+    const completion = accepted.then((handle) => {
+      if (!handle?.completion || typeof handle.completion.then !== 'function') throw new TypeError('Discovery fixture requires actual worker completion');
+      return handle.completion;
+    });
+    void completion.catch(() => {});
+    workerCompletions.set(input.runId, completion);
+    return accepted;
+  };
   const dispatchErrors = [];
   const dispatcher = createOperationQueueDispatcher({
     handlers: createOperationQueueHandlers({ libraryModule: module }),
     onError: async (error) => { dispatchErrors.push(error); },
   });
-  return { dispatchErrors, dispatcher, module, searches };
+  return { dispatchErrors, dispatcher, module, searches, workerCompletions };
 }
 
 async function runScenario(t, run) {
@@ -251,60 +266,66 @@ suite('integration external request discovery review', () => {
     timeout: config.scenarioTimeoutMs,
   }, async (t) => runScenario(t, async (context) => {
     const fixture = await seedApproval(context, { recipientCount: 2 });
-    const { dispatchErrors, dispatcher, searches } = createDiscoveryHarness(context);
-    const service = createLibraryExternalRequestReviewService();
-    const approvals = [];
-    for (let index = 0; index < fixture.requests.length; index += 1) {
-      approvals.push(await service.approveRelease(approvalInput(context, fixture, index)));
-    }
-    for (const approval of approvals) {
-      const dispatched = await dispatcher.tick();
-      assert.equal(dispatched.claimedCount, 1);
-      const deadline = Date.now() + 15_000;
-      let run;
-      do {
-        [run] = (await context.pool.query('SELECT status, summary FROM operation_runs WHERE id = $1', [approval.run.id])).rows;
-        if (!['pending', 'running'].includes(run.status)) break;
-        await new Promise((resolve) => { setTimeout(resolve, 20); });
-      } while (Date.now() < deadline);
-      assert.equal(run.status, 'completed', JSON.stringify(run));
-      assert.equal(run.summary.candidateCount, 1);
-    }
-    assert.deepEqual(dispatchErrors, []);
-    assert.equal(searches.length, 2);
-    assert.equal(new Set(searches.map((search) => search.id)).size, 2);
-    assert.equal(searches[0].query, searches[1].query);
-    const candidates = await context.pool.query('SELECT id, status, source_search_id, source_response_key, normalized_payload FROM import_candidates ORDER BY created_at');
-    assert.equal(candidates.rows.length, 2);
-    assert.equal(new Set(candidates.rows.map((row) => row.source_response_key)).size, 1, 'identical peer folders must remain distinct across target searches');
-    assert.equal(new Set(candidates.rows.map((row) => row.source_search_id)).size, 2);
-    assert.equal(await findNextCandidateForRecovery({
-      excludeCandidateId: randomUUID(),
-      maxDownloadAttemptCount: 3,
-      metadataReleaseId: fixture.metadata.metadataReleaseId,
-    }, context.pool), null, 'automatic recovery must not select candidates still awaiting external request import review');
-    for (let index = 0; index < fixture.requests.length; index += 1) {
-      const candidate = candidates.rows.find((row) => row.normalized_payload.requestOwnership.sourceMediaRequestId === fixture.requests[index].id);
-      assert.ok(candidate);
-      assert.equal(candidate.status, 'pending', 'discovery never bypasses import review');
-      const ownership = candidate.normalized_payload.requestOwnership;
-      assert.equal(ownership.externalRequestReleaseIntentId, approvals[index].intent.id);
-      assert.equal(ownership.sourceRequestedForUserId, fixture.users[index].id);
-      assert.equal(ownership.sourceRequestedByUserId, context.adminId);
-      assert.equal(ownership.metadataReleaseId, fixture.metadata.metadataReleaseId);
-      const requester = createSessionHttpClient(context.baseUrl);
-      const login = await loginWithPassword(requester, { password, username: fixture.users[index].username });
-      assert.equal(login.response.status, 200);
-      const pipeline = await requester.requestJson(`${requestPath}/${fixture.requests[index].id}/pipeline`);
-      assert.equal(pipeline.response.status, 200);
-      assert.equal(pipeline.payload.candidates.length, 1);
-      assert.equal(pipeline.payload.candidates[0].status, 'pending');
-      const own = await requester.requestJson(`/api/v1/import-candidates/${candidate.id}`);
-      assert.equal(own.response.status, 200);
-      const siblingCandidate = candidates.rows.find((row) => row.id !== candidate.id);
-      const sibling = await requester.requestJson(`/api/v1/import-candidates/${siblingCandidate.id}`);
-      assert.equal(sibling.response.status, 404);
-    }
+    const { dispatchErrors, dispatcher, searches, module, workerCompletions } = createDiscoveryHarness(context);
+    return withWorkerTaskCleanup(async () => {
+      const service = createLibraryExternalRequestReviewService();
+      const approvals = [];
+      for (let index = 0; index < fixture.requests.length; index += 1) {
+        approvals.push(await service.approveRelease(approvalInput(context, fixture, index)));
+      }
+      for (const approval of approvals) {
+        const dispatched = await withFixtureLifecycle({ signal: AbortSignal.any([t.signal, AbortSignal.timeout(15_000)]) },
+          async (scope) => {
+            const tick = await scope.track(dispatcher.tick());
+            const completion = workerCompletions.get(approval.run.id);
+            assert.ok(completion, 'The claimed run must have an owned worker handle');
+            await scope.track(completion);
+            return tick;
+          });
+        assert.equal(dispatched.claimedCount, 1);
+        const [run] = (await context.pool.query('SELECT status, summary FROM operation_runs WHERE id = $1', [approval.run.id])).rows;
+        assert.equal(run.status, 'completed', JSON.stringify(run));
+        assert.equal(run.summary.candidateCount, 1);
+      }
+      assert.deepEqual(dispatchErrors, []);
+      assert.equal(searches.length, 2);
+      assert.equal(new Set(searches.map((search) => search.id)).size, 2);
+      assert.equal(searches[0].query, searches[1].query);
+      const candidates = await context.pool.query('SELECT id, status, source_search_id, source_response_key, normalized_payload FROM import_candidates ORDER BY created_at');
+      assert.equal(candidates.rows.length, 2);
+      assert.equal(new Set(candidates.rows.map((row) => row.source_response_key)).size, 1, 'identical peer folders must remain distinct across target searches');
+      assert.equal(new Set(candidates.rows.map((row) => row.source_search_id)).size, 2);
+      assert.equal(await findNextCandidateForRecovery({
+        excludeCandidateId: randomUUID(),
+        maxDownloadAttemptCount: 3,
+        metadataReleaseId: fixture.metadata.metadataReleaseId,
+      }, context.pool), null, 'automatic recovery must not select candidates still awaiting external request import review');
+      for (let index = 0; index < fixture.requests.length; index += 1) {
+        const candidate = candidates.rows.find((row) => row.normalized_payload.requestOwnership.sourceMediaRequestId === fixture.requests[index].id);
+        assert.ok(candidate);
+        assert.equal(candidate.status, 'pending', 'discovery never bypasses import review');
+        const ownership = candidate.normalized_payload.requestOwnership;
+        assert.equal(ownership.externalRequestReleaseIntentId, approvals[index].intent.id);
+        assert.equal(ownership.sourceRequestedForUserId, fixture.users[index].id);
+        assert.equal(ownership.sourceRequestedByUserId, context.adminId);
+        assert.equal(ownership.metadataReleaseId, fixture.metadata.metadataReleaseId);
+        const requester = createSessionHttpClient(context.baseUrl);
+        const login = await loginWithPassword(requester, { password, username: fixture.users[index].username });
+        assert.equal(login.response.status, 200);
+        const pipeline = await requester.requestJson(`${requestPath}/${fixture.requests[index].id}/pipeline`);
+        assert.equal(pipeline.response.status, 200);
+        assert.equal(pipeline.payload.candidates.length, 1);
+        assert.equal(pipeline.payload.candidates[0].status, 'pending');
+        const own = await requester.requestJson(`/api/v1/import-candidates/${candidate.id}`);
+        assert.equal(own.response.status, 200);
+        const siblingCandidate = candidates.rows.find((row) => row.id !== candidate.id);
+        const sibling = await requester.requestJson(`/api/v1/import-candidates/${siblingCandidate.id}`);
+        assert.equal(sibling.response.status, 404);
+      }
+    }, () => withWorkerTaskCleanup(
+      () => dispatcher.stopAndDrain(),
+      () => module.libraryExternalRequestDiscoveryWorker.close(),
+    ));
   }));
 
   test('persists concurrent target discovery with cancellation checks using the existing transaction clients', {

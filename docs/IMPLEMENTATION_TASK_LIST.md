@@ -6,6 +6,31 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: External request discovery lifetime (2026-10-12)
+
+- Reproduce duplicate acquisition during held release, then own approved lookup/
+  search/ingestion and renewal/release through shared ESM services. Preserve
+  target/intent authority, sanitized/no-candidate retry, cancellation and acquired-
+  unavailable policy. Capture ten concrete owners at startup and both app fixtures.
+  Unit/native consumers retain actual completion beyond claim/tick/release
+  observation. See [design](EXTERNAL_REQUEST_DISCOVERY_LIFETIME_DESIGN.md),
+  [research](EXTERNAL_REQUEST_DISCOVERY_LIFETIME_RESEARCH_2026_10.md) and
+  [outcome](EXTERNAL_REQUEST_DISCOVERY_LIFETIME_OUTCOME.md).
+- Focused 268/268; complete fast 9,771 plus both builds. First native 65/66 exposed
+  a fixture's premature status read after tick. Corrected worker-handle fixture
+  passes the failed case and final affected group 66/66 across nine verified files,
+  including six new HTTP/SQL lifetime and publication-refusal cases. All final
+  runs have zero failures/cancellations/skips; eight other JavaScript files remain
+  frozen. Final fixture lint/hygiene pass; fast application code was unchanged.
+  Retain original failure; no exhaustive-native or matched speedup claim.
+- Standards/testing skill maintenance, installed hashes and npm audit pass.
+  [Fresh PR assessment](OPEN_PR_APPLICABILITY_EXTERNAL_REQUEST_DISCOVERY_LIFETIME_2026_10_OUTCOME.md)
+  finds no eligible unreplayed patch; main only, no release or merge.
+- Next: metadata artist refresh completion through provider work, schedule writes
+  and captured lease cleanup, preserving worker context/fencing and cancellation.
+  Remaining worker/periodic ownership precedes residual-wait removal or exhaustive
+  scheduling changes; historical SQL-reset causes remain unconfirmed.
+
 ## Completed slice: Provider ingest execution lifetime (2026-10-11)
 
 - Reproduce duplicate acquisition during held release, then own returned provider/

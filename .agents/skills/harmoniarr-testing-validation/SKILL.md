@@ -349,4 +349,17 @@ with an injected owned loopback transport; they do not establish live-provider o
 post-abort hidden completion. Keep partial row counts and bounded preparing/ready
 collection status distinct from worker completion. The dedicated provider-ingest
 outcome owns both app-fixture and collection publication/cancellation evidence.
-Remaining external-discovery/periodic owners keep the residual fixture delay.
+Remaining metadata/periodic owners keep the residual fixture delay.
+
+External request discovery now returns actual completion through returned search,
+candidate transaction/audit and renewal/release. Await it beyond queued acceptance
+and release observation; retain sanitized failure, no-candidate/manual retry and
+the distinct acquired-unavailable lease outcome. Native parent checkpoints use
+real approval, slskd client/service and candidate stores, proving current-target
+publication refusal after held response. Owned dispatch retains its 15-second
+bound via fixture lifecycle, retains worker completion beyond claim/tick completion
+and then reads persisted status once; drain dispatcher
+and worker before disposal while preserving original Error/null. The dedicated
+external-request discovery outcome owns executed evidence and limits. Other
+workers/periodic producers still prevent removing residual delay or claiming
+complete application drainage or exhaustive speedup.

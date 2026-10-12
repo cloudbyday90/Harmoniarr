@@ -338,6 +338,13 @@ callback assertions from serving as false proof. The
 [organize design](ORGANIZE_APPLY_LIFETIME_DESIGN.md) owns this slice; existing skill
 entrypoint, metadata and invocation policy remain.
 
+External-request discovery maintenance traces approved intent and current target
+guards into actual candidate transactions, then returned audit and lease cleanup.
+It preserves sanitized/no-candidate retry and distinct acquired-unavailable policy.
+The [external discovery design](EXTERNAL_REQUEST_DISCOVERY_LIFETIME_DESIGN.md)
+owns this slice's native authorization/lifetime evidence. Existing skill entrypoint,
+metadata and invocation policy remain.
+
 Discovery references follow queued intent through returned reconciliation,
 artwork/provider and selected-import queue handoffs, then eligible ledger cleanup.
 They preserve scoped consent and distinguish local drainage from remote completion.
