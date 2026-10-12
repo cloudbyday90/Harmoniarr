@@ -23,15 +23,17 @@ import { parentPostgresEnvironmentKeys } from '../../testing/integration/parent-
 import { createParentPostgresRegistry } from '../../testing/integration/parent-postgres-registry.js';
 import { createParentPostgresStore } from '../../testing/integration/parent-postgres-store.js';
 import { runPostgresTestFile } from '../../testing/integration/postgres-file-process.js';
-import { postgresWorkersAreQuiescent } from '../../testing/integration/postgres-test-launcher.js';
+import { postgresWorkersAreQuiescent, runSharedPostgresTests } from '../../testing/integration/postgres-test-launcher.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 import { isSkippableIntegrationRuntimeError, toIntegrationRuntimeUnavailableReason } from '../../testing/integration/runtime-availability.js';
+import { createPostgresFailureEvidence } from '../../testing/integration/postgres-failure-evidence.js';
 
 const config = resolveIntegrationTestRuntimeConfig();
 const fixtureFile = resolve('testing/integration/fixtures/parent-postgres-worker.js');
 let owner;
 let admin;
 let unavailable;
+const parentFailureRecords = [];
 
 function quotedName(name) {
   assert.match(name, /^[a-z][a-z0-9_]{0,62}$/u);
@@ -106,7 +108,10 @@ function skipIfUnavailable(t) {
 suite('Parent-owned PostgreSQL subprocess recovery', () => {
   before(async () => {
     try {
-      owner = await createOwnedPostgresServer({ config });
+      owner = await createOwnedPostgresServer({ config,
+        env: { ...process.env, HARMONIARR_INTEGRATION_SERVER_DIAGNOSTICS: 'failures' },
+        failureEvidenceFactory: options => createPostgresFailureEvidence({ ...options,
+          onRecord: record => parentFailureRecords.push(record) }) });
       admin = new pg.Client({ ...buildPostgresAdminConnectionConfig(owner.env), statement_timeout: 5000 });
       await admin.connect();
     } catch (error) {
@@ -187,6 +192,41 @@ suite('Parent-owned PostgreSQL subprocess recovery', () => {
     await assert.rejects(f.registry.finishScope(f.scope.token, { workersQuiescent: true }),
       (error) => error.code === 'fixture_parent_database_uncertain' && error.stats.uncertain === 1 && error.stats.reaped === 0);
     await protectedDatabase.assertUnchanged();
+  });
+
+  test('a failed shared file captures actual owned server state before reaping its database and preserves a sibling', { timeout: config.scenarioTimeoutMs }, async (t) => {
+    if (skipIfUnavailable(t)) return;
+    const canary = await ownCanaryDatabase(t); const output = { stdout: '', stderr: '' }; let capturedScope;
+    const streams = Object.fromEntries(Object.keys(output).map(key => [key,
+      new Writable({ write(chunk, _encoding, callback) { output[key] += chunk.toString(); callback(); } })]));
+    parentFailureRecords.length = 0; let reaped = false;
+    await assert.rejects(runSharedPostgresTests({ resolveFiles: async () => [fixtureFile],
+      env: { ...process.env, HARMONIARR_PARENT_PG_FIXTURE_MODE: 'exit' }, ...streams,
+      createServer: async () => ({ ...owner, close: async () => {} }),
+      createRegistry: options => {
+        const registry = createParentPostgresRegistry(options);
+        return { ...registry, beginScope() { capturedScope = registry.beginScope(); return capturedScope; },
+          async finishScope(...args) {
+            // Capture must finish while the acknowledged child database remains.
+            assert.equal(parentFailureRecords.length, 1);
+            const result = await registry.finishScope(...args);
+            assert.equal(result.reaped, 1); reaped = true; return result;
+          } };
+      },
+    }), { code: 'fixture_parent_test_failed' });
+    assert.equal(reaped, true); assert.equal(parentFailureRecords.length, 1);
+    const record = parentFailureRecords[0];
+    assert.equal(record.phase, 'test_file'); assert.equal(record.source, 'testcontainer_postgres');
+    assert.equal(record.host.outcome, 'passed'); assert.equal(record.host.closed, true);
+    assert.equal(record.readiness.outcome, 'accepting');
+    assert.deepEqual(record.containerState, { outcome: 'passed', running: true, paused: false,
+      restarting: false, oomKilled: false, exitCode: 0, restartCount: 0, errors: [] });
+    const serialized = JSON.stringify(parentFailureRecords);
+    for (const secret of [owner.env.PGPASSWORD, capturedScope.token]) {
+      assert.equal(serialized.includes(secret), false);
+      assert.equal(output.stderr.includes(secret), false);
+    }
+    await canary.assertUnchanged();
   });
 
   test('replacement OID retains its independently owned data and connections when old scope cleanup refuses', { timeout: config.scenarioTimeoutMs }, async (t) => {

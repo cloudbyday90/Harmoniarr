@@ -43,6 +43,32 @@ test('a failed native test stops admission and prevents another file while owned
   assert.equal(f.events.filter((event) => event === 'scope').length, 1);
   assert.equal(f.events.at(-1), 'server:stop'); assert.ok(f.events.includes('reconcile'));
 });
+
+test('failed file evidence drains before parent reconciliation and cannot replace original Error or null', async () => {
+  for (const primary of [new Error('Original file failure'), null]) {
+    const f = fixture(); const held = Promise.withResolvers(); const entered = Promise.withResolvers();
+    f.input.createServer = async ({ env }) => {
+      assert.equal(env.CUSTOM, 'preserved');
+      return { env: { PGPASSWORD: 'secret' }, close: async () => f.events.push('server:stop'),
+        createFailureCapture: ({ correlationId }) => {
+          assert.match(correlationId, /^[0-9a-f-]{36}$/u);
+          return async (error, phase) => {
+            assert.equal(error, primary); assert.equal(phase, 'test_file');
+            entered.resolve(); await held.promise; f.events.push('evidence:done'); throw new Error('Diagnostic failure');
+          };
+        } };
+    };
+    f.input.runFile = async () => { throw primary; };
+    const pending = runSharedPostgresTests(f.input); pending.catch(() => {});
+    await entered.promise; assert.equal(f.events.includes('admission:close'), true);
+    assert.equal(f.events.includes('reconcile'), false);
+    assert.equal(f.events.includes('server:stop'), false);
+    held.resolve(); await assert.rejects(pending, error => error === primary);
+    assert.ok(f.events.indexOf('evidence:done') < f.events.indexOf('reconcile'));
+    assert.equal(f.events.at(-1), 'server:stop');
+    assert.equal(f.events.filter(event => event === 'scope').length, 1);
+  }
+});
 test('original null cancellation survives incomplete worker and server cleanup failures', async () => {
   const f = fixture(); f.input.runFile = async ({ onCancel, onTermination }) => {
     onCancel(); onTermination({ quiescent: false }); throw null;
@@ -69,6 +95,7 @@ test('pre-aborted launcher starts nothing and worker probes treat only ESRCH as 
 });
 test('public cohort refuses arbitrary or duplicate file selection before allocating server resources', async () => {
   for (const args of [['test/integration/parent-postgres-launcher.test.js'],
+    ['test/integration/music-queue-recovery-execution.test.js'],
     [sharedPostgresTestCohort[0], sharedPostgresTestCohort[0]], ['--test-force-exit']]) {
     const f = fixture();
     await assert.rejects(runSharedPostgresTests({ ...f.input, resolveFiles: resolvePostgresTestCohort, args }), TypeError);
@@ -76,4 +103,14 @@ test('public cohort refuses arbitrary or duplicate file selection before allocat
   }
   const files = await resolvePostgresTestCohort({ args: [sharedPostgresTestCohort[0]] });
   assert.equal(files.length, 1); assert.match(files[0], /library-wanted-release-reconciliation\.test\.js$/u);
+});
+
+test('public selection admits the audited recovery suite and preserves requested Wanted/recovery order', async () => {
+  const args = ['test/integration/library-wanted-release-reconciliation.test.js',
+    'test/integration/music-queue-recovery-transaction.test.js'];
+  const files = await resolvePostgresTestCohort({ args });
+  assert.equal(files.length, 2);
+  assert.match(files[0], /library-wanted-release-reconciliation\.test\.js$/u);
+  assert.match(files[1], /music-queue-recovery-transaction\.test\.js$/u);
+  assert.equal(sharedPostgresTestCohort.at(-1), args[1]);
 });

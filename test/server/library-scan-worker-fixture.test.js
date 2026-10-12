@@ -14,6 +14,19 @@ import { startLibraryScanFixtureWorker } from '../../testing/integration/library
 const run = { runId: 'test-owned-scan', libraryRoot: 'test-owned-root' };
 const outcome = (promise) => promise.then((value) => ({ value }), (error) => ({ error }));
 
+test('lease release observation cannot complete a fixture while returned worker finalization remains held', async () => {
+  const finalization = createFixtureGate(); let completed = false;
+  const job = await startLibraryScanFixtureWorker({ run, callbacks: { releaseLease: async () => true },
+    createWorkerFn: callbacks => ({ startWorkerRun: async () => {
+      await callbacks.releaseLease(); return { completion: finalization.promise };
+    } }) });
+  job.done.then(() => { completed = true; });
+  try {
+    await setImmediate(); assert.equal(completed, false);
+  } finally { finalization.release(); await job.done; }
+  assert.equal(completed, true);
+});
+
 test('an actual scan ending before metadata lookup refuses unreachable readiness without waiting for the case deadline', async () => {
   const ready = createFixtureGate(); const failure = new Error('Controlled scan failure before lookup');
   let recordedFailure; let released = false;

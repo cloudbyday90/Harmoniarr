@@ -30,16 +30,16 @@ import { createLibraryReleaseReconciliationStore } from '../../src/server/librar
 import { createOperatorArtistMonitoringStore } from '../../src/server/metadata/operator-artist-monitoring-store.js';
 import { createOperatorReleaseGroupSelectionStore } from '../../src/server/metadata/operator-release-group-selection-store.js';
 import { createOperatorTrackOverrideStore } from '../../src/server/metadata/operator-track-override-store.js';
-import { createLibraryScanWorker } from '../../src/server/library/library-scan-worker.js';
 import { createLibraryDiscoveryWorker } from '../../src/server/library/library-discovery-worker.js';
 import { createMetadataArtistRefreshWorker } from '../../src/server/metadata/metadata-artist-refresh-worker.js';
 import { createMetadataRefreshService } from '../../src/server/metadata/metadata-refresh-service.js';
-import { createFixtureGate, createFixtureWorkerObserver, waitForFixtureReady, withFixtureLifecycle }
+import { createFixtureGate, waitForFixtureReady, withFixtureLifecycle }
   from '../../testing/integration/fixture-lifecycle.js';
 import { waitForFixturePostgresBlock } from '../../testing/integration/fixture-lock-observer.js';
 import { withRollbackFixtureClient } from '../../testing/integration/fixture-transaction-client.js';
 import { buildIntegrationPoolConfig } from '../../testing/integration/pool-policy.js';
 import { withFixturePostgresObserver } from '../../testing/integration/fixture-postgres-observer.js';
+import { startLibraryScanFixtureWorker } from '../../testing/integration/library-scan-worker-fixture.js';
 
 const config = resolveIntegrationTestRuntimeConfig();
 let runtime;
@@ -136,7 +136,7 @@ async function scenario(t, callback) {
     await phaseObserver.measure('scenario_work', () => callback(context));
   });
 }
-async function scanWorker(c, runs, run, reconcile, signal = c.signal) {
+async function scanWorker(c, runs, run, reconcile, scope) {
   let lease; const later = [];
   const root = resolve('.tmp', 'wanted-projection-controlled-root');
   const callbacks = { ...runs,
@@ -145,12 +145,9 @@ async function scanWorker(c, runs, run, reconcile, signal = c.signal) {
     recordLibraryScanCatalogue: async () => ({ files: [], libraryRootId: randomUUID(), observedFileCount: 0 }),
     reconcileWantedReleases: reconcile, reconcileDiscoveryRequests: async () => later.push('discovery'),
   };
-  const observer = createFixtureWorkerObserver({ callbacks });
-  const worker = createLibraryScanWorker({ ...callbacks, ...observer.callbacks,
-    isCancellationRequested: async (input) => signal?.aborted || await runs.isCancellationRequested(input),
-  });
-  await worker.startWorkerRun({ runId: run.id, libraryRoot: root });
-  return { done: observer.finished, lease: () => lease, later };
+  const job = await startLibraryScanFixtureWorker({ callbacks, signal: scope.signal,
+    track: scope.track, run: { runId: run.id, libraryRoot: root } });
+  return { ...job, lease: () => lease, later };
 }
 
 suite('Current operator inputs own wanted rows and discovery links', () => {
@@ -175,12 +172,11 @@ suite('Current operator inputs own wanted rows and discovery links', () => {
         assert.equal(diagnostic.wantedReleases.length === 0, empty);
         entered.release(); await resume.promise;
         return owner.reconcileWantedReleases(input);
-      }, scope.signal);
-      scope.track(old.done);
+      }, scope);
       await waitForFixtureReady({ ready: entered.promise, operation: old.done, signal: scope.signal }); await expire(c, old.lease());
       await c.pool.query("UPDATE operator_artist_monitoring SET is_monitored=TRUE,acquisition_profile_key='lossless_archive'");
-      const replacement = await scanWorker(c, c.makeRuns(), run, c.makeService().reconcileWantedReleases, scope.signal);
-      scope.track(replacement.done); await replacement.done;
+      const replacement = await scanWorker(c, c.makeRuns(), run, c.makeService().reconcileWantedReleases, scope);
+      await replacement.done;
       const published = await state(c); const completed = await parent(c, run.id);
       assert.equal(published.wanted.length, 2); assert.equal(completed.status, 'completed');
       assert.notEqual(old.lease().acquisitionId, replacement.lease().acquisitionId);

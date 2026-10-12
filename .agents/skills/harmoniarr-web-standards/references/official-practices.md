@@ -1,5 +1,16 @@
 # Official practices by boundary
 
+October 12 shared-pilot guidance uses
+docs/WANTED_RECOVERY_SHARED_POSTGRES_RESEARCH_2026_10.md. Node 24 documents default
+process isolation; Testcontainers lifecycle and PostgreSQL source-connection
+rules support serial subprocesses, a newly owned server and sealed private
+templates. Ownership follows acknowledged CREATE/OID identity, not a name prefix.
+Driver disposal follows actual returned work, not release observation. OWASP
+logging guidance keeps parent snapshots bounded and secret-free; close admission
+before observing failure, and retain original child Error/null. W3C timing is a
+September 1, 2026 Working Draft: label command/adapter scope, overlapping spans
+and single-pair/cache/order variance instead of claiming a universal speedup.
+
 October 12 fixture-reset guidance uses
 docs/POSTGRES_FIXTURE_RESET_RESEARCH_2026_10.md. Driver documentation supplies
 pool bounds/client drainage; Docker documents targeted container inspection.

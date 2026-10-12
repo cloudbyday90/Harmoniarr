@@ -21,6 +21,7 @@ import { createMusicQueueRecoveryFixtureContext, seedMusicQueueRecoveryFixture a
 import { withFixturePostgresObserver } from '../../testing/integration/fixture-postgres-observer.js';
 import { withRollbackFixtureClient } from '../../testing/integration/fixture-transaction-client.js';
 import { withFixtureLifecycle } from '../../testing/integration/fixture-lifecycle.js';
+import { runParallelTasksAndDrain } from '../../src/server/parallel-task-drain.js';
 
 const config = resolveIntegrationTestRuntimeConfig();
 let runtime; let unavailableReason;
@@ -77,7 +78,9 @@ suite('Scoped Music Queue recovery transactions with isolated PostgreSQL', () =>
   test('competing rejected and failed observations share one episode, attempt and durable child', { timeout: config.scenarioTimeoutMs }, async (t) => {
     await scenario(t, async (context) => {
       const f = await fixture(context); await replacement(context, f);
-      const results = await Promise.all([recover(context, f, 'rejected'), recover(context, f, 'download')]);
+      const results = await runParallelTasksAndDrain([
+        () => recover(context, f, 'rejected'), () => recover(context, f, 'download'),
+      ]);
       assert.equal(results[0].recoveryRunId, results[1].recoveryRunId);
       assert.equal(results.filter((result) => result.episodeReplayed).length, 1);
       assert.equal((await context.store.getCandidate(f.candidate.id)).downloadAttemptCount, 1);

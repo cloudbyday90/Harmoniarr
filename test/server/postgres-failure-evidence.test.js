@@ -49,6 +49,11 @@ test('success and off mode launch no probe, including invalid injected observer 
     'schema_prepare', () => Promise.reject(null)), e => e === null);
 });
 
+test('parent file failure uses an approved distinct phase without serializing raw details', () => {
+  const record = buildPostgresFailureRecord({ phase: 'test_file', error: new Error('private-parent-token') });
+  assert.equal(record.phase, 'test_file'); assert.equal(JSON.stringify(record).includes('private'), false);
+});
+
 test('external, reused, unknown and pre-cancelled capabilities cannot launch automatic probes', async () => {
   for (const input of [{ ...owned, source: 'external_postgres' }, { ...owned, fresh: false },
     { ...owned, containerId: 'private-name' }, owned]) {

@@ -1,5 +1,15 @@
 # Project standards-to-evidence map
 
+Shared-pilot evidence: Wanted reuses library-scan-worker-fixture.js's pre-launch
+registration and returned completion; recovery uses parallel-task-drain.js for
+competing observations. owned-postgres-server.js privately binds its fresh-server
+failure capability, while postgres-test-launcher.js closes admission before a
+file-failure snapshot and reconciles only after observation and process/worker
+quiescence. The child's external config carries no container inspection authority.
+The native parent proof captures three planes before owned reaping and preserves
+a sibling and secret/token canaries. Dedicated pilot design/research/outcome own
+the matched 19-case measurement and separately checked final public profile.
+
 Fixture-reset evidence: integration/pool-policy.js owns identical explicit
 direct/app limits; postgres-integration-runtime.js also applies them to templates.
 Abandonment scenarios use registered scoped work and readiness races, retaining

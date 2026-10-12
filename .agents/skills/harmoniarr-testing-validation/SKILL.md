@@ -201,7 +201,7 @@ strict refusal, not absence. Avoid repeating a passing cohort after promotion
 when the final complete gate already exercises its changed default.
 
 `npm run test:integration:shared-postgres` is an opt-in serial Wanted/catalogue/
-release-reconciliation/tag-snapshot cohort. It owns one fresh server, preserving
+release-reconciliation/tag-snapshot/Music Queue recovery transaction cohort. It owns one fresh server, preserving
 isolated file processes, databases
 and pools. The default complete gate is unchanged. Do not expand its allowlist
 until every fixture-created database has the parent reserve/CREATE/OID commit
@@ -211,6 +211,18 @@ absence, then reconcile before the next file. A signal acknowledgement or report
 end is insufficient. Unknown/replacement identities are refusals, not prefix-based
 cleanup targets. See `docs/POSTGRES_TEST_LAUNCHER_DESIGN.md` and its outcome for
 measured scope and process/platform limits.
+
+Wanted/recovery adoption keeps Wanted's private template and recovery's empty
+migration path. Register the scan fixture's actual completion before launch;
+lease-release observation is earlier. Drain competing returned recovery work
+through first Error/null. Close parent admission before failure diagnostics,
+then capture only the acknowledged fresh server's independent query/readiness/
+state before reconciliation/disposal. Child native failure remains the original
+evidence. Measure matched code/order/reporters/image/schema/bounds and report
+command versus adapter wall separately; one baseline-first pair is not a CI
+speedup. See docs/WANTED_RECOVERY_SHARED_POSTGRES_OUTCOME.md. Further allowlist
+expansion still needs creation/ownership/drainage proof; no global parallelism,
+cross-run reuse or recovery schema caching is implied.
 
 The audited extension uses scoped gates and actual worker/task drainage before
 temporary media or database teardown. Defer captured lease SQL until held

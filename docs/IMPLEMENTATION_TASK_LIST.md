@@ -6,6 +6,30 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Wanted/recovery shared PostgreSQL pilot (2026-10-12)
+
+The [pilot outcome](WANTED_RECOVERY_SHARED_POSTGRES_OUTCOME.md),
+[design](WANTED_RECOVERY_SHARED_POSTGRES_DESIGN.md) and
+[official research](WANTED_RECOVERY_SHARED_POSTGRES_RESEARCH_2026_10.md) own the
+matched measurement and secure ownership boundaries. Wanted now retains actual
+scan completion and recovery drains competing returned work. The parent closes
+admission before failure snapshots, retaining the child's original failure and
+its own Error/null through cleanup. Only the audited recovery transaction suite
+joins the opt-in allowlist; the complete default gate stays unchanged.
+
+- Measurement: both matched profiles pass 19/19 with the same image/code/order/
+  reporters/schema/bounds. Command wall 49.013s separate versus 42.824s shared,
+  an observed 12.6% local reduction. Single-pair/cache/order limits apply; no CI
+  or universal speedup is claimed. All 45 registered databases release normally.
+- Validation: expanded public profile 43/43, 107 registered/released, zero reaped;
+  five native parent controls, focused ownership/refusal checks and 9,982 fast
+  tests plus static checks/builds. Skill structure/hashes and dependency audit
+  pass. Later failure-order refinement has separate reproof from the measurement.
+- Next: partial two-owner delivery recovery and fulfilled-source retirement,
+  preserving current recipient consent, private roots, catalog/manifest binding
+  and byte-backed receipts. A private copy failure must not authorize another
+  provider dispatch. Future test-profile expansion requires another owner audit.
+
 ## Completed slice: Bounded PostgreSQL fixture policy and observation (2026-10-12)
 
 The [fixture-reset outcome](POSTGRES_FIXTURE_RESET_OUTCOME.md),

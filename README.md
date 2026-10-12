@@ -38,12 +38,18 @@ profile. See the [template design](docs/POSTGRES_TEST_TEMPLATES_DESIGN.md),
 [official research](docs/POSTGRES_TEST_TEMPLATES_RESEARCH_2026_10.md).
 
 `npm run test:integration:shared-postgres` runs the verified Wanted/catalogue/
-release-reconciliation/tag-snapshot cohort serially against one newly owned
-PostgreSQL server, with separate file
+release-reconciliation/tag-snapshot/Music Queue recovery transaction cohort
+serially against one newly owned PostgreSQL server, with separate file
 processes and scenario databases. The complete gate remains unchanged. See the
 [launcher design](docs/POSTGRES_TEST_LAUNCHER_DESIGN.md),
 [measured outcome](docs/POSTGRES_TEST_LAUNCHER_OUTCOME.md) and
 [official research](docs/POSTGRES_TEST_LAUNCHER_RESEARCH_2026_10.md).
+The [Wanted/recovery pilot design](docs/WANTED_RECOVERY_SHARED_POSTGRES_DESIGN.md),
+[research](docs/WANTED_RECOVERY_SHARED_POSTGRES_RESEARCH_2026_10.md) and
+[outcome](docs/WANTED_RECOVERY_SHARED_POSTGRES_OUTCOME.md) record matched local
+measurement, actual completion ownership and parent-owned failure snapshots.
+To run only this audited pair, use
+`npm run test:integration:shared-postgres -- test/integration/library-wanted-release-reconciliation.test.js test/integration/music-queue-recovery-transaction.test.js`.
 The [audited extension design](docs/SHARED_POSTGRES_COHORT_ADOPTION_DESIGN.md),
 [outcome](docs/SHARED_POSTGRES_COHORT_ADOPTION_OUTCOME.md) and
 [research](docs/SHARED_POSTGRES_COHORT_ADOPTION_RESEARCH_2026_10.md) record worker,

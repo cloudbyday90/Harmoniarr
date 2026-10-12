@@ -7,6 +7,7 @@
 
 import pg from 'pg';
 import { performance } from 'node:perf_hooks';
+import { randomUUID } from 'node:crypto';
 import { buildPostgresAdminConnectionConfig } from '../postgres-temporary-database.js';
 import { createOwnedPostgresServer } from './owned-postgres-server.js';
 import { createParentPostgresStore } from './parent-postgres-store.js';
@@ -47,7 +48,7 @@ export async function runSharedPostgresTests({ args = [], cwd = process.cwd(), e
     for (const key of ['registered', 'released', 'reaped']) totals[key] += stats[key];
   }
   try {
-    owner = await createServer({ signal });
+    owner = await createServer({ signal, env });
     admin = createAdminClient({ ...buildPostgresAdminConnectionConfig(owner.env), statement_timeout: 5000 });
     await admin.connect();
     registry = createRegistry({ store: createStore({ adminClient: admin }) });
@@ -67,7 +68,16 @@ export async function runSharedPostgresTests({ args = [], cwd = process.cwd(), e
           onTermination: (status) => { quiescent = status.quiescent === true; } });
         quiescent = true;
         if (result.exitCode !== 0) throw parentPostgresClientError('fixture_parent_test_failed');
-      } catch (error) { remember(error); }
+      } catch (error) {
+        remember(error);
+        // Refuse late registrations before a diagnostic can delay reconciliation.
+        await cleanup(() => registry.closeAdmission(token));
+        // Only the parent has the fresh-server capability. Native child output
+        // retains the original failure; this is a later independent snapshot.
+        try {
+          await owner.createFailureCapture?.({ correlationId: randomUUID(), signal })(error, 'test_file');
+        } catch { /* Optional evidence cannot replace the primary Error/null. */ }
+      }
       await cleanup(finishScope);
       if (failed) break;
       totals.completed += 1;

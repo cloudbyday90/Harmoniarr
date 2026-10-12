@@ -17,7 +17,7 @@ export function buildPostgresFailureRecord({ correlationId, source, phase, error
   return Object.freeze({ version: 2, kind: 'owned_server_failure',
     correlationId: isCheckoutCorrelationId(correlationId) ? correlationId : null,
     source: member(source, ['testcontainer_postgres', 'external_postgres']),
-    phase: member(phase, ['schema_prepare', 'database_scenario']),
+    phase: member(phase, ['schema_prepare', 'database_scenario', 'test_file']),
     errors: capturePostgresDiagnosticErrors(error), durationMs: duration(durationMs),
     host: Object.freeze({
       outcome: member(read(host, 'outcome'), ['passed', 'failed', 'unavailable']),

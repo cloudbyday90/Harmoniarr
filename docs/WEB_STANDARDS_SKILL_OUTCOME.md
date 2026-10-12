@@ -1,5 +1,17 @@
 # Practical web standards skill outcome
 
+October 12 shared-pilot maintenance maps actual completion and first-failure
+drainage to parent-owned resource observation. Admission closes before probes;
+original native failure and Error/null remain separate from healthy snapshots.
+References connect Node process isolation, PostgreSQL source sealing, maintainer
+pool disposal, OWASP data minimization and W3C draft monotonic measurement to
+the [pilot design](WANTED_RECOVERY_SHARED_POSTGRES_DESIGN.md),
+[research](WANTED_RECOVERY_SHARED_POSTGRES_RESEARCH_2026_10.md) and
+[outcome](WANTED_RECOVERY_SHARED_POSTGRES_OUTCOME.md). The measured pair and final
+public profile have separate scope/code-freeze claims. This is reference
+maintenance with structural/hash checks, not a new blind trial or conformance
+certification.
+
 October 12 fixture-reset maintenance adds an actionable diagnostic workflow to
 the existing skill: verify actual pool policy, own readiness/drainage, minimize
 logged data and distinguish three current observations from historical causality.

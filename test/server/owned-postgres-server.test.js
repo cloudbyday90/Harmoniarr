@@ -36,3 +36,23 @@ test('configuration extraction failure stops the newly acquired server and prese
   await assert.rejects(createOwnedPostgresServer(f.input), (error) => error === failure);
   assert.equal(f.calls.at(-1), 'stop');
 });
+
+test('diagnostic capability captures acknowledged admin config but refuses fresh ownership for injected containers', async () => {
+  const f = fixture(); let supplied; const capture = () => {};
+  const owner = await createOwnedPostgresServer({ ...f.input, env: { HARMONIARR_INTEGRATION_SERVER_DIAGNOSTICS: 'off' },
+    failureEvidenceFactory: options => { supplied = options; return { createCapture: capture }; } });
+  assert.equal(supplied.mode, 'off'); assert.equal(supplied.fresh, false);
+  assert.equal(supplied.source, 'testcontainer_postgres');
+  assert.equal(supplied.connectionConfig.database, 'postgres');
+  assert.equal(supplied.connectionConfig.password, owner.env.PGPASSWORD);
+  assert.equal(owner.createFailureCapture, capture); await owner.close();
+});
+
+test('invalid diagnostic mode refuses allocation and failed capability setup closes its acquired server', async () => {
+  const f = fixture();
+  await assert.rejects(createOwnedPostgresServer({ ...f.input, env: { HARMONIARR_INTEGRATION_SERVER_DIAGNOSTICS: 'invalid' } }), TypeError);
+  assert.deepEqual(f.calls, []);
+  const primary = new Error('Capability construction failed');
+  await assert.rejects(createOwnedPostgresServer({ ...f.input, failureEvidenceFactory: () => { throw primary; } }), error => error === primary);
+  assert.equal(f.calls.at(-1), 'stop');
+});
