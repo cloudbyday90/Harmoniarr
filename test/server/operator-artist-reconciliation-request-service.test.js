@@ -3,6 +3,9 @@ import test from 'node:test';
 
 import { createOperatorArtistReconciliationRequestService } from '../../src/server/metadata/operator-artist-reconciliation-request-service.js';
 
+// These tests own request/event behavior; authority is covered independently and with PostgreSQL.
+const publicationGuard = { capture: input => input, lockContext: async () => {}, assertCurrent: async () => {} };
+
 test('materializeDesiredReleaseRequests creates requests for eligible releases and reconciles discovery once', async (t) => {
   const query = t.mock.fn(async () => ({ rows: [] }));
   const client = {
@@ -22,8 +25,10 @@ test('materializeDesiredReleaseRequests creates requests for eligible releases a
     assert.match(mediaRequestId, /^request-for-/);
   });
   const reconcileDiscoveryRequests = t.mock.fn(async () => {});
+  const cancellationReads = [];
 
   const service = createOperatorArtistReconciliationRequestService({
+    publicationGuard,
     createMediaRequest,
     findActiveDuplicateRequest: async () => null,
     getPoolFn: () => ({ connect }),
@@ -32,6 +37,7 @@ test('materializeDesiredReleaseRequests creates requests for eligible releases a
   });
 
   const result = await service.materializeDesiredReleaseRequests({
+    throwIfCancelled: async input => { cancellationReads.push(input?.queryable); },
     appUserId: 'user-1',
     artistName: 'Autechre',
     desiredReleases: [{
@@ -78,6 +84,7 @@ test('materializeDesiredReleaseRequests creates requests for eligible releases a
   assert.equal(createMediaRequest.mock.callCount(), 1);
   assert.equal(insertMediaRequestEvent.mock.callCount(), 1);
   assert.equal(reconcileDiscoveryRequests.mock.callCount(), 1);
+  assert.deepEqual(cancellationReads, [undefined, client, client]);
 
   const executedSql = query.mock.calls.map((call) => call.arguments[0]);
   assert.ok(executedSql.includes('BEGIN'));
@@ -95,6 +102,7 @@ test('materializeDesiredReleaseRequests suppresses duplicates after acquiring th
     throw new Error('createMediaRequest should not run for duplicates');
   });
   const service = createOperatorArtistReconciliationRequestService({
+    publicationGuard,
     createMediaRequest,
     findActiveDuplicateRequest: async ({ queryable }) => {
       assert.equal(queryable, client);
@@ -135,6 +143,6 @@ test('materializeDesiredReleaseRequests suppresses duplicates after acquiring th
 
   const executedSql = query.mock.calls.map((call) => call.arguments[0]);
   assert.ok(executedSql.includes('BEGIN'));
-  assert.ok(executedSql.includes('ROLLBACK'));
+  assert.ok(executedSql.includes('COMMIT'));
   assert.ok(executedSql.some((sql) => sql.includes('pg_advisory_xact_lock')));
 });

@@ -1,6 +1,25 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createOperatorArtistReconciliationExecutionService } from '../../src/server/metadata/operator-artist-reconciliation-execution-service.js';
+import { createReconciliationPublicationFixture } from '../../testing/operator-reconciliation-publication-fixtures.js';
+
+test('execution owns accepted acquisition and plan inputs before later request reads', async () => {
+  const fixture = createReconciliationPublicationFixture(); const gate = Promise.withResolvers(); const entered = Promise.withResolvers(); let published;
+  const snapshot = structuredClone(fixture.input.publicationSource.snapshot);
+  const service = createOperatorArtistReconciliationExecutionService({ getMetadataArtist: async () => fixture.artistPayload,
+    getOperatorArtistMonitoring: async () => fixture.monitoring, getOperatorArtistReconciliationSnapshotById: async () => snapshot,
+    listOperatorReleaseGroupSelections: async () => [], listOperatorTrackOverrides: async () => [], listActiveRequestsByMetadataReleaseIds: async () => [],
+    listLibraryReleaseReconciliationsByMetadataReleaseIds: async () => [], listDiscoveryRequestsByMetadataReleaseIds: async () => { entered.resolve(); await gate.promise; return []; },
+    operatorArtistReconciliationRequestService: { materializeDesiredReleaseRequests: async input => { published = input; return { createdRequestCount: 0, createdRequestIds: [], duplicateSuppressedCount: 0 }; } },
+  });
+  const input = structuredClone(fixture.input); const expected = structuredClone(input.workerContext);
+  const pending = service.executeOperatorArtistReconciliation(input); await entered.promise;
+  try { input.workerContext.expectedLease.acquisitionId = 'changed'; fixture.artistPayload.releases[0].title = 'Changed'; fixture.monitoring.wantedAutomationMode = 'manual_only'; snapshot.snapshotRevision = 99; }
+  finally { gate.resolve(); }
+  const result = await pending; assert.deepEqual(published.workerContext, expected);
+  assert.equal(published.desiredReleases[0].releaseTitle, 'Album'); assert.equal(published.desiredReleases[0].eligibleForDownstreamWork, true);
+  assert.equal(published.snapshotRevision, 1); assert.equal(result.snapshotRevision, 1); assert.equal(result.wantedAutomationMode, 'future_matching');
+});
 
 for (const batch of ['inputs', 'requests']) {
   for (const primary of [new Error('parallel read'), null]) {

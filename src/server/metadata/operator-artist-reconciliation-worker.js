@@ -86,7 +86,8 @@ export function createOperatorArtistReconciliationWorker({
           metadataArtistId,
           snapshotId,
           snapshotRevision,
-          throwIfCancelled: () => throwIfOperationRunCancellationRequested({ isCancellationRequested, runId }),
+          workerContext: { operationType: 'operator_artist_reconciliation', runId, expectedLease: acquiredLease },
+          throwIfCancelled: ({ queryable = null } = {}) => throwIfOperationRunCancellationRequested({ isCancellationRequested, runId, queryable }),
         });
 
         if (await markRunCompleted({

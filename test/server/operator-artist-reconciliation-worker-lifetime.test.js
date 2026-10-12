@@ -34,17 +34,20 @@ test('operator reconciliation coalesces duplicate admission through held release
 });
 
 test('queued handler retains captured actor and snapshot through execution and terminal close', async () => {
-  const gate = Promise.withResolvers(); const entered = Promise.withResolvers(); let input; let completed; let released = false;
+  const gate = Promise.withResolvers(); const entered = Promise.withResolvers(); let input; let completed; let released = false; let checkedQueryable;
   const worker = createOperatorArtistReconciliationWorker(callbacks({ executeOperatorArtistReconciliation: async value => {
     input = value; entered.resolve(); await gate.promise; return result;
-  }, markRunCompleted: async value => { completed = value; return true; }, releaseLease: async () => { released = true; } }));
+  }, isCancellationRequested: async value => { checkedQueryable = value.queryable; return false; },
+  markRunCompleted: async value => { completed = value; return true; }, releaseLease: async () => { released = true; } }));
   const handlers = createOperationQueueHandlers({ metadataModule: { operatorArtistReconciliationWorker: worker } });
   const accepted = await handlers.operator_artist_reconciliation({ run: { id: run.runId, summary: run } });
   const closing = worker.close(); assert.equal(worker.close(), closing); await entered.promise;
   try {
     assert.equal(typeof accepted.completion.then, 'function'); assert.equal(completed, undefined); assert.equal(released, false);
     for (const field of ['appUserId', 'metadataArtistId', 'snapshotId', 'snapshotRevision']) assert.equal(input[field], run[field]);
+    assert.deepEqual(input.workerContext, { operationType: 'operator_artist_reconciliation', runId: run.runId, expectedLease: lease() });
     await input.throwIfCancelled(); await assert.rejects(worker.startWorkerRun({ ...run, runId: 'late' }), { code: 'worker_closing' });
+    const queryable = {}; await input.throwIfCancelled({ queryable }); assert.equal(checkedQueryable, queryable);
   } finally { gate.resolve(); await accepted.completion; await closing; }
   assert.equal(released, true); assert.equal(completed.summary.triggerSource, 'save');
   for (const field of Object.keys(result)) assert.deepEqual(completed.summary[field], result[field]);

@@ -5,6 +5,22 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For operator request publication, test actual SQL guards after planning, identity
+contention and event insertion, including latest save, changed policy/selection/
+override/catalog, lease replacement/clock expiry, disabled actor, cancellation,
+partial progress and duplicate concurrency. Preserve request/event rollback and
+await native client end after uncertain rollback. Production lease heartbeat
+renews immediately: a controlled short-expiry fixture must own that choice or
+renewal can replace its intended deadline. Inspect this before broad native gates.
+See `docs/OPERATOR_RECONCILIATION_PUBLICATION_AUTHORITY_OUTCOME.md` for retained
+stopped-candidate evidence, final gate scope and writer coordination limits.
+
+Cancellation rechecks inside a publication transaction must forward its queryable
+through the existing worker/interruption/store adapters. A third pool checkout
+can starve behind an admitted blocked save or publisher with a two-client pool.
+Use an independent, owned-config observer for contention proof; do not enlarge
+the application pool or spread internal pool.options to make a test pass.
+
 Operator artist reconciliation now returns actual completion and terminal close.
 See `docs/OPERATOR_ARTIST_RECONCILIATION_LIFETIME_OUTCOME.md`: native tests hold
 scoped snapshot reads, required request-event transactions, real discovery

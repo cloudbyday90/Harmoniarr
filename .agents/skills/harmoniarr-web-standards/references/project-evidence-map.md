@@ -362,3 +362,25 @@ import owners. Native lifetime fixtures hold real snapshot, event, discovery and
 release, check resources outside best-effort callbacks, and verify scoped lookup,
 revision, cancellation and transaction rollback. Dedicated design/research/
 outcome documents own evidence and the policy/lease follow-up.
+
+Publication now uses metadata/operator-reconciliation-publication-policy.js,
+-store.js and -service.js. Execution captures acquisition before awaits and owns
+the normalized plan source; default request materialization refuses missing
+context. Per-release transactions acquire canonical save scope, run, lease key/
+row, existing source rows and request identity in order; guard latest scoped
+snapshot, enabled actor, current policy/catalog/target and SQL clock before writes
+and after required events. Preserve nullable values, normalized override fields,
+catalog iteration, duplicate handling and earlier committed progress. Discovery
+runs after returning the request client. database-transaction-service.js evicts
+non-Error rollback failures without replacing original Error/null; native proof
+awaits the discarded client's end and reads clean state on another connection.
+Dedicated design/research/outcome own canonical writer scope and adverse tests;
+standalone/phantom/catalog writer coordination remains a separate follow-up.
+
+Reconciliation's worker hook now forwards the owned queryable to cancellation/
+maintenance adapters at in-transaction checkpoints. A two-client native pool
+exposed self-starvation when that hook requested a third checkout; corrected
+concurrent publication and save contention use the same transaction client.
+Fixture lock observation has its own client from acknowledged connection config,
+awaited and closed separately. Keep this distinct from increasing application
+pool capacity or changing checkout/operation deadlines.

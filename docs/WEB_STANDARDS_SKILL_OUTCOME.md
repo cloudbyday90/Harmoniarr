@@ -615,6 +615,14 @@ Source and installed copies are structurally validated and hash-compared before
 publication. This is reference maintenance; no new skill entrypoint, blind trial
 or standards-conformance certification is claimed.
 
+Publication references now locate ordered scope/run/lease checks, immutable plan
+source, final SQL-clock verification and uncertain-client eviction. They identify
+the immediate-renewal fixture correction and require honest stopped-candidate
+reporting. The [authority outcome](OPERATOR_RECONCILIATION_PUBLICATION_AUTHORITY_OUTCOME.md)
+owns executed native refusal, concurrency, partial-progress and cleanup evidence.
+Source/installed structural and hash validation remain the publication checks;
+this introduces no new blind skill trial or broad conformance certification.
+
 External-request discovery references locate approved intent/current target
 guards, candidate transaction/audit, actual completion and ten concrete app owners.
 The bounded dispatch harness awaits execution rather than polling terminal status.

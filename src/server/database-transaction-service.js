@@ -22,7 +22,8 @@ export function createDatabaseTransactionRunner({ getPoolFn = getPool } = {}) {
         await client.query('ROLLBACK');
       } catch (rollbackError) {
         // Preserve the operation failure and evict a client with unknown state.
-        releaseError = rollbackError;
+        releaseError = rollbackError instanceof Error
+          ? rollbackError : new Error('Transaction rollback failed', { cause: rollbackError });
       }
       throw error;
     } finally {

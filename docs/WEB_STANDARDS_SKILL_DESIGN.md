@@ -381,3 +381,11 @@ and distinguishes snapshot identity/revision checks from mutation-time policy an
 lease fencing. The [reconciliation design](OPERATOR_ARTIST_RECONCILIATION_LIFETIME_DESIGN.md)
 owns this slice. This updates concrete references; skill metadata and invocation
 policy stay unchanged, without a new blind trial or conformance claim.
+
+Publication authority maintenance connects PostgreSQL ordered locks, driver
+eviction and OWASP current authority to real per-release request/event guards.
+References separate captured source, verified publication, partial progress and
+remaining writer coordination. The
+[authority design](OPERATOR_RECONCILIATION_PUBLICATION_AUTHORITY_DESIGN.md)
+owns alternatives and scope. This is practical reference maintenance; skill
+metadata, invocation policy and the existing entrypoint remain unchanged.

@@ -583,6 +583,21 @@ returned catalog, wanted/queue/detection and scheduler work through lease cleanu
 W3C timing remains draft observation guidance, not a schedule-policy mandate.
 TC39 permits null rejection; preserve original failures while finishing cleanup.
 
+October 12 operator publication authority guidance uses
+docs/OPERATOR_RECONCILIATION_PUBLICATION_AUTHORITY_RESEARCH_2026_10.md. PostgreSQL
+18 locks and READ COMMITTED inform ordered scope/run/acquisition checks and
+fresh source/clock verification after contention and before commit. Existing
+canonical saves share the scope lock; scoped read identity alone is insufficient.
+Preserve normalized nullable consent and catalog iteration order when capturing
+the accepted plan. Driver transactions share one sequential client; a falsey
+rollback rejection must still evict an uncertain client because release uses a
+truthy destroy argument. TC39 allows arbitrary rejection, so preserve the primary
+Error/null and retain rollback cause separately. W3C timing is draft observation
+guidance, not lease expiry authority. Immediate production renewal can override
+a short test lease: isolate that renewal in controlled expiry evidence rather
+than widening a test or production deadline. Do not infer coordinated phantom/
+global source writers or full authorization coverage from this scoped protocol.
+
 October 12 operator-reconciliation guidance uses
 docs/OPERATOR_ARTIST_RECONCILIATION_LIFETIME_RESEARCH_2026_10.md. TC39 allSettled
 owns returned parallel tasks through sibling failures; preserve first observed

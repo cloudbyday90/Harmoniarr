@@ -6,6 +6,32 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Operator reconciliation publication authority (2026-10-12)
+
+- Reproduce stale request publication after a newer canonical save. Capture
+  acquisition and immutable plan source, then guard current scope/snapshot/
+  policy/catalog/target and SQL-clock lease inside each request/event transaction.
+  Preserve save/run/lease lock order, duplicate handling and earlier durable
+  progress. Forward the owned queryable for cancellation/maintenance checks and
+  evict uncertain clients after falsey rollback failures. See
+  [design](OPERATOR_RECONCILIATION_PUBLICATION_AUTHORITY_DESIGN.md),
+  [research](OPERATOR_RECONCILIATION_PUBLICATION_AUTHORITY_RESEARCH_2026_10.md) and
+  [outcome](OPERATOR_RECONCILIATION_PUBLICATION_AUTHORITY_OUTCOME.md).
+- Final focused 329/329; complete fast 9,852 plus both builds; affected native
+  76/76 across fourteen verified files, including sixteen new authority,
+  contention, partial-progress and cleanup cases. Zero failures/cancellations/
+  skips. Retain the stopped expiry fixture and 74/76 failed candidate, followed
+  by 2/2 targeted correction and final complete gates. No widened deadlines,
+  application pool capacity, exhaustive-native or matched speedup claim.
+- Standards/testing skill structure and installed hashes pass; npm audit reports
+  zero vulnerabilities. [Fresh PR assessment](OPEN_PR_APPLICABILITY_RECONCILIATION_AUTHORITY_2026_10_OUTCOME.md)
+  finds no eligible unreplayed revision; main only, no release or merge.
+- Next: standalone policy/snapshot and catalog writer participation, including
+  absent/inserted rows and consistent lock order. Preserve scoped consent and
+  per-release atomicity before broadening the protocol's guarantees. Remaining
+  worker/periodic ownership precedes residual-wait removal; historical unrelated
+  SQL-reset causes remain unconfirmed.
+
 ## Completed slice: Operator artist reconciliation lifetime (2026-10-12)
 
 - Reproduce held-release duplicate admission and fail-fast sibling read escape.

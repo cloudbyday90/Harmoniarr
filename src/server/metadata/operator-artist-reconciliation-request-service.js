@@ -16,6 +16,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createDatabaseTransactionRunner } from '../database-transaction-service.js';
+import { createOperatorReconciliationPublicationService } from './operator-reconciliation-publication-service.js';
 import { getPool } from '../database.js';
 import { createLibraryMediaRequestStore } from '../library/library-media-request-store.js';
 import { normalizeMetadataReleaseDateForDateColumn } from './metadata-release-date-normalization.js';
@@ -108,6 +110,8 @@ function buildRequestEvidence({
 
 export function createOperatorArtistReconciliationRequestService({
   getPoolFn = getPool,
+  publicationGuard = createOperatorReconciliationPublicationService(),
+  withTransaction = createDatabaseTransactionRunner({ getPoolFn }),
   createMediaRequest = null,
   findActiveDuplicateRequest = null,
   insertMediaRequestEvent = null,
@@ -125,131 +129,70 @@ export function createOperatorArtistReconciliationRequestService({
 
   async function materializeDesiredReleaseRequests({
     appUserId,
+    metadataArtistId,
     artistName,
     desiredReleases = [],
     snapshotId,
     snapshotRevision,
+    workerContext,
+    publicationSource,
     throwIfCancelled = async () => {},
   } = {}) {
+    const prepared = publicationGuard.capture({ appUserId, metadataArtistId, snapshotId, snapshotRevision, workerContext, publicationSource });
+    const eligibleDesiredReleases = uniqueDesiredReleases(structuredClone(Array.isArray(desiredReleases) ? desiredReleases : []));
     const createdRequestIds = [];
     const createdRequests = [];
-    let createdRequestCount = 0;
     let duplicateSuppressedCount = 0;
     let skippedRequestCount = 0;
-    const eligibleDesiredReleases = uniqueDesiredReleases(
-      Array.isArray(desiredReleases) ? desiredReleases : [],
-    );
-    const pool = getPoolFn();
-    const client = await pool.connect();
 
     try {
       for (const desiredRelease of eligibleDesiredReleases) {
-        if (!desiredRelease?.eligibleForDownstreamWork) {
-          skippedRequestCount += 1;
-          continue;
-        }
-
+        if (!desiredRelease?.eligibleForDownstreamWork) { skippedRequestCount += 1; continue; }
         await throwIfCancelled();
-
-        await client.query('BEGIN');
-
-        try {
-          const requestIdentityKey = buildRequestIdentityKey({
-            artistName,
-            desiredRelease,
-          });
-          await acquireRequestIdentityLock({ client, requestIdentityKey });
-
-          const duplicateRequest = await findSharedDuplicateRequest({
-            artistName,
+        const mediaRequest = await withTransaction(async queryable => {
+          await queryable.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
+          const authority = { prepared, desiredRelease, artistName, queryable };
+          await publicationGuard.lockContext({ prepared, queryable });
+          await publicationGuard.assertCurrent(authority);
+          await acquireRequestIdentityLock({ client: queryable, requestIdentityKey: buildRequestIdentityKey({ artistName, desiredRelease }) });
+          const duplicateRequest = await findSharedDuplicateRequest({ artistName,
             musicbrainzReleaseId: desiredRelease.musicbrainzReleaseId ?? null,
-            releaseTitle: desiredRelease.releaseTitle ?? desiredRelease.releaseGroupTitle ?? null,
-            queryable: client,
-          });
-
-          if (duplicateRequest) {
-            duplicateSuppressedCount += 1;
-            await client.query('ROLLBACK');
-            continue;
-          }
-
-          const mediaRequest = await createSharedMediaRequest({
-            artistName,
-            evidence: buildRequestEvidence({
-              appUserId,
-              desiredRelease,
-              snapshotId,
-              snapshotRevision,
-            }),
+            releaseTitle: desiredRelease.releaseTitle ?? desiredRelease.releaseGroupTitle ?? null, queryable });
+          if (duplicateRequest) return null;
+          await throwIfCancelled({ queryable });
+          await publicationGuard.assertCurrent(authority);
+          const request = await createSharedMediaRequest({ artistName,
+            evidence: buildRequestEvidence({ appUserId: prepared.appUserId, desiredRelease, snapshotId: prepared.snapshotId, snapshotRevision: prepared.snapshotRevision }),
             expectedReleaseDate: normalizeMetadataReleaseDateForDateColumn(desiredRelease.releaseDate),
             matchedMetadataReleaseGroupId: desiredRelease.metadataReleaseGroupId,
             matchedMetadataReleaseId: desiredRelease.metadataReleaseId,
             musicbrainzReleaseId: desiredRelease.musicbrainzReleaseId ?? null,
-            normalizedQuery: buildNormalizedQuery({
-              artistName,
-              releaseTitle: desiredRelease.releaseTitle ?? desiredRelease.releaseGroupTitle ?? null,
-            }),
-            notes: null,
-            queryable: client,
-            releaseTitle: desiredRelease.releaseTitle ?? desiredRelease.releaseGroupTitle ?? null,
-            requestKind: 'release',
-            requestState: 'needs_fetch',
-            requestedByUserId: appUserId,
-            requestedForUserId: appUserId,
-            sourceProvider: null,
-            sourceUrl: null,
-            trackTitle: null,
+            normalizedQuery: buildNormalizedQuery({ artistName, releaseTitle: desiredRelease.releaseTitle ?? desiredRelease.releaseGroupTitle ?? null }),
+            notes: null, queryable, releaseTitle: desiredRelease.releaseTitle ?? desiredRelease.releaseGroupTitle ?? null,
+            requestKind: 'release', requestState: 'needs_fetch', requestedByUserId: prepared.appUserId, requestedForUserId: prepared.appUserId,
+            sourceProvider: null, sourceUrl: null, trackTitle: null,
           });
-
-          await insertSharedMediaRequestEvent({
-            actorUserId: appUserId,
-            details: {
-              automationSource: 'operator_artist_reconciliation',
-              metadataReleaseGroupId: desiredRelease.metadataReleaseGroupId,
-              metadataReleaseId: desiredRelease.metadataReleaseId,
-              snapshotId,
-              snapshotRevision,
-            },
-            eventType: 'created',
-            mediaRequestId: mediaRequest.id,
-            queryable: client,
-          });
-
-          await client.query('COMMIT');
-
-          createdRequestCount += 1;
-          createdRequestIds.push(mediaRequest.id);
-          createdRequests.push(mediaRequest);
-        } catch (error) {
-          await client.query('ROLLBACK');
-          throw error;
-        }
+          await insertSharedMediaRequestEvent({ actorUserId: prepared.appUserId, details: {
+            automationSource: 'operator_artist_reconciliation', metadataReleaseGroupId: desiredRelease.metadataReleaseGroupId,
+            metadataReleaseId: desiredRelease.metadataReleaseId, snapshotId: prepared.snapshotId, snapshotRevision: prepared.snapshotRevision,
+          }, eventType: 'created', mediaRequestId: request.id, queryable });
+          await throwIfCancelled({ queryable });
+          await publicationGuard.assertCurrent(authority);
+          return request;
+        });
+        if (!mediaRequest) { duplicateSuppressedCount += 1; continue; }
+        createdRequestIds.push(mediaRequest.id); createdRequests.push(mediaRequest);
       }
-
-      if (createdRequestCount > 0 && typeof reconcileDiscoveryRequests === 'function') {
-        await reconcileDiscoveryRequests();
-      }
+      if (createdRequestIds.length > 0 && typeof reconcileDiscoveryRequests === 'function') await reconcileDiscoveryRequests();
     } catch (error) {
-      if (createdRequestCount > 0 && typeof reconcileDiscoveryRequests === 'function') {
-        try {
-          await reconcileDiscoveryRequests();
-        } catch {
-          // Preserve the original reconciliation error.
-        }
+      if (createdRequestIds.length > 0 && typeof reconcileDiscoveryRequests === 'function') {
+        try { await reconcileDiscoveryRequests(); } catch { /* Preserve the original publication failure. */ }
       }
       throw error;
-    } finally {
-      client.release();
     }
-
-    return {
-      createdRequestCount,
-      createdRequestIds,
-      createdRequests,
-      discoveryReconciled: createdRequestCount > 0 && typeof reconcileDiscoveryRequests === 'function',
-      duplicateSuppressedCount,
-      skippedRequestCount,
-    };
+    return { createdRequestCount: createdRequestIds.length, createdRequestIds, createdRequests,
+      discoveryReconciled: createdRequestIds.length > 0 && typeof reconcileDiscoveryRequests === 'function',
+      duplicateSuppressedCount, skippedRequestCount };
   }
 
   return {

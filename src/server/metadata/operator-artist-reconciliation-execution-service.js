@@ -17,6 +17,7 @@
  */
 
 import { runParallelTasksAndDrain } from '../parallel-task-drain.js';
+import { captureReconciliationPublicationSource } from './operator-reconciliation-publication-policy.js';
 import { createApiError } from '../auth.js';
 import { createLibraryDiscoveryRequestStore } from '../library/library-discovery-request-store.js';
 import { createLibraryMediaRequestStore } from '../library/library-media-request-store.js';
@@ -120,8 +121,10 @@ export function createOperatorArtistReconciliationExecutionService({
     metadataArtistId,
     snapshotId,
     snapshotRevision,
+    workerContext = null,
     throwIfCancelled = async () => {},
   } = {}) {
+    const capturedWorkerContext = structuredClone(workerContext);
     await throwIfCancelled();
 
     const [artistPayload, monitoring, snapshot, releaseSelections, trackOverrides] = await runParallelTasksAndDrain([
@@ -151,16 +154,19 @@ export function createOperatorArtistReconciliationExecutionService({
     };
     const resolvedReleaseSelections = Array.isArray(releaseSelections) ? releaseSelections : [];
     const resolvedTrackOverrides = Array.isArray(trackOverrides) ? trackOverrides : [];
+    const publicationSource = captureReconciliationPublicationSource({ artistPayload, monitoring: resolvedMonitoring,
+      releaseGroupSelections: resolvedReleaseSelections, trackOverrides: resolvedTrackOverrides, snapshot });
+    const snapshotSavedAt = snapshot.updatedAt ?? snapshot.createdAt ?? null;
     const {
       effectiveReleaseGroups,
       orphanedReleaseGroupSelections,
       orphanedTrackOverrides,
     } = buildOperatorArtistEffectiveReleaseGroups({
-      monitoredReleaseGroupTypes: resolvedMonitoring.monitoredReleaseGroupTypes,
-      releaseGroupSelections: resolvedReleaseSelections,
-      releaseGroups: Array.isArray(artistPayload?.releaseGroups) ? artistPayload.releaseGroups : [],
-      releases: Array.isArray(artistPayload?.releases) ? artistPayload.releases : [],
-      trackOverrides: resolvedTrackOverrides,
+      monitoredReleaseGroupTypes: publicationSource.monitoring.monitoredReleaseGroupTypes,
+      releaseGroupSelections: publicationSource.releaseGroupSelections,
+      releaseGroups: Array.isArray(publicationSource.releaseGroups) ? publicationSource.releaseGroups : [],
+      releases: Array.isArray(publicationSource.releases) ? publicationSource.releases : [],
+      trackOverrides: publicationSource.trackOverrides,
     });
     const desiredReleaseIds = [
       ...new Set(
@@ -193,16 +199,19 @@ export function createOperatorArtistReconciliationExecutionService({
       activeRequestsByReleaseId: activeRequestByReleaseId,
       metadataArtistId,
       discoveryRequestsByReleaseId: discoveryRequestByReleaseId,
-      monitoring: resolvedMonitoring,
+      monitoring: publicationSource.monitoring,
       releaseGroups: effectiveReleaseGroups,
       releaseReconciliationsByReleaseId: reconciliationByReleaseId,
     });
     const materializationResult = await materializeDesiredReleaseRequests({
       appUserId,
-      artistName: artistPayload?.artist?.name ?? null,
+      metadataArtistId,
+      artistName: publicationSource.artist.name ?? null,
+      workerContext: capturedWorkerContext,
+      publicationSource,
       desiredReleases: desiredStatePlan.desiredReleases,
-      snapshotId: snapshot.id,
-      snapshotRevision: snapshot.snapshotRevision,
+      snapshotId: publicationSource.snapshot.id,
+      snapshotRevision: publicationSource.snapshot.snapshotRevision,
       throwIfCancelled,
     });
 
@@ -215,8 +224,8 @@ export function createOperatorArtistReconciliationExecutionService({
     const unselectedReleaseGroupCount = effectiveReleaseGroups.filter(
       (releaseGroup) => releaseGroup.operatorState.selectionState === 'unselected',
     ).length;
-    const desiredTrackOverrideCount = resolvedTrackOverrides.filter((override) => override.isDesired === true).length;
-    const suppressedTrackOverrideCount = resolvedTrackOverrides.filter((override) => override.isDesired === false).length;
+    const desiredTrackOverrideCount = publicationSource.trackOverrides.filter((override) => override.isDesired === true).length;
+    const suppressedTrackOverrideCount = publicationSource.trackOverrides.filter((override) => override.isDesired === false).length;
 
     return {
       appUserId,
@@ -239,27 +248,27 @@ export function createOperatorArtistReconciliationExecutionService({
       futureEligibleCount: desiredStatePlan.summary.futureEligibleCount,
       futureScopeBlockedCount: desiredStatePlan.summary.futureScopeBlockedCount,
       manualOnlyBlockedCount: desiredStatePlan.summary.manualOnlyBlockedCount,
-      monitoredReleaseGroupTypeCount: toCount(resolvedMonitoring?.monitoredReleaseGroupTypes?.length),
-      monitoredReleaseGroupTypes: Array.isArray(resolvedMonitoring?.monitoredReleaseGroupTypes)
-        ? [...resolvedMonitoring.monitoredReleaseGroupTypes]
+      monitoredReleaseGroupTypeCount: toCount(publicationSource.monitoring?.monitoredReleaseGroupTypes?.length),
+      monitoredReleaseGroupTypes: Array.isArray(publicationSource.monitoring?.monitoredReleaseGroupTypes)
+        ? [...publicationSource.monitoring.monitoredReleaseGroupTypes]
         : [],
       orphanedReleaseGroupSelectionCount: orphanedReleaseGroupSelections.length,
       orphanedTrackOverrideCount: orphanedTrackOverrides.length,
       partialReleaseGroupCount,
       policyDesiredReleaseCount: desiredStatePlan.summary.policyDesiredReleaseCount,
       queuedDiscoveryCount: desiredStatePlan.summary.queuedDiscoveryCount,
-      releaseGroupSelectionCount: resolvedReleaseSelections.length,
-      selectionSourceMode: resolvedMonitoring?.selectionSourceMode ?? null,
-      snapshotId: snapshot.id,
-      snapshotPayloadKeyCount: countPlainObjectKeys(snapshot.snapshotPayload),
-      snapshotRevision: snapshot.snapshotRevision,
-      snapshotSavedAt: snapshot.updatedAt ?? snapshot.createdAt ?? null,
+      releaseGroupSelectionCount: publicationSource.releaseGroupSelections.length,
+      selectionSourceMode: publicationSource.monitoring?.selectionSourceMode ?? null,
+      snapshotId: publicationSource.snapshot.id,
+      snapshotPayloadKeyCount: countPlainObjectKeys(publicationSource.snapshot.snapshotPayload),
+      snapshotRevision: publicationSource.snapshot.snapshotRevision,
+      snapshotSavedAt,
       suppressedTrackOverrideCount,
       trackOnlyBlockedCount: desiredStatePlan.summary.trackOnlyBlockedCount,
-      trackOverrideCount: resolvedTrackOverrides.length,
+      trackOverrideCount: publicationSource.trackOverrides.length,
       unselectedReleaseGroupCount,
       unresolvedReleaseCount: desiredStatePlan.summary.unresolvedReleaseCount,
-      wantedAutomationMode: resolvedMonitoring?.wantedAutomationMode ?? null,
+      wantedAutomationMode: publicationSource.monitoring?.wantedAutomationMode ?? null,
     };
   }
 

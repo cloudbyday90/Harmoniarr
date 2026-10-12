@@ -79,6 +79,7 @@ cases and thirteen fresh scenario variants. Use
 - [External request discovery lifetime design](docs/EXTERNAL_REQUEST_DISCOVERY_LIFETIME_DESIGN.md), [research](docs/EXTERNAL_REQUEST_DISCOVERY_LIFETIME_RESEARCH_2026_10.md) and [outcome](docs/EXTERNAL_REQUEST_DISCOVERY_LIFETIME_OUTCOME.md)
 - [Metadata artist refresh lifetime design](docs/METADATA_ARTIST_REFRESH_LIFETIME_DESIGN.md), [research](docs/METADATA_ARTIST_REFRESH_LIFETIME_RESEARCH_2026_10.md) and [outcome](docs/METADATA_ARTIST_REFRESH_LIFETIME_OUTCOME.md)
 - [Operator artist reconciliation lifetime design](docs/OPERATOR_ARTIST_RECONCILIATION_LIFETIME_DESIGN.md), [research](docs/OPERATOR_ARTIST_RECONCILIATION_LIFETIME_RESEARCH_2026_10.md) and [outcome](docs/OPERATOR_ARTIST_RECONCILIATION_LIFETIME_OUTCOME.md)
+- [Operator reconciliation publication authority design](docs/OPERATOR_RECONCILIATION_PUBLICATION_AUTHORITY_DESIGN.md), [research](docs/OPERATOR_RECONCILIATION_PUBLICATION_AUTHORITY_RESEARCH_2026_10.md) and [outcome](docs/OPERATOR_RECONCILIATION_PUBLICATION_AUTHORITY_OUTCOME.md)
 - [Downloader filter feedback design](docs/DOWNLOADER_FILTER_ANNOUNCEMENT_DESIGN.md), [research](docs/DOWNLOADER_FILTER_ANNOUNCEMENT_RESEARCH_2026_10.md) and [outcome](docs/DOWNLOADER_FILTER_ANNOUNCEMENT_OUTCOME.md)
 - [No-cache local rebuild design](docs/LOCAL_DOCKER_REBUILD_2026_10_DESIGN.md), [official research](docs/LOCAL_DOCKER_REBUILD_RESEARCH_2026_10.md) and [outcome](docs/LOCAL_DOCKER_REBUILD_2026_10_OUTCOME.md)
 - [Backup, restore, and upgrade design](docs/BACKUP_RESTORE_DESIGN.md)

@@ -10,6 +10,18 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createDatabaseTransactionRunner } from '../../src/server/database-transaction-service.js';
 
+for (const rollbackReason of [null, undefined, 0, '']) {
+  for (const primary of [new Error('work failure'), null]) {
+    test(`rollback reason ${String(rollbackReason)} evicts the uncertain client and preserves ${primary === null ? 'null' : 'Error'}`, async () => {
+      let released;
+      const client = { query: async statement => { if (statement === 'ROLLBACK') throw rollbackReason; }, release: reason => { released = reason; } };
+      const withTransaction = createDatabaseTransactionRunner({ getPoolFn: () => ({ connect: async () => client }) });
+      await assert.rejects(withTransaction(async () => { throw primary; }), error => error === primary);
+      assert.ok(released instanceof Error); assert.equal(released.message, 'Transaction rollback failed'); assert.equal(released.cause, rollbackReason);
+    });
+  }
+}
+
 function createTransactionFixture({ queryFailures = {} } = {}) {
   const queries = [];
   const releases = [];
