@@ -60,6 +60,7 @@ export function createOperatorArtistDesiredStateService({
       policyDesiredReleaseCount: 0,
       queuedDiscoveryCount: 0,
       trackOnlyBlockedCount: 0,
+      trackScopeBlockedCount: 0,
       unmonitoredBlockedCount: 0,
       unresolvedReleaseCount: 0,
     };
@@ -133,6 +134,9 @@ export function createOperatorArtistDesiredStateService({
       } else if (discoveryRequest?.requestStatus === 'ready' || discoveryRequest?.requestStatus === 'blocked') {
         incrementCount(summary, 'queuedDiscoveryCount');
         blockReason = 'discovery_request_exists';
+      } else if (operatorState.operatorTrackScope?.mode === 'unresolved') {
+        incrementCount(summary, 'trackScopeBlockedCount');
+        blockReason = 'operator_track_identity_unresolved';
       } else if (!isExplicitSelection && monitoring.isMonitored !== true) {
         incrementCount(summary, 'unmonitoredBlockedCount');
         blockReason = 'artist_unmonitored';
@@ -177,6 +181,7 @@ export function createOperatorArtistDesiredStateService({
         releaseTitle: resolvedRelease.title ?? null,
         selectionOrigin: operatorState.selectionOrigin ?? null,
         selectionState,
+        operatorTrackScope: operatorState.operatorTrackScope ?? null,
       });
     }
 

@@ -100,6 +100,7 @@ function buildRequestEvidence({
     operatorArtistReconciliation: {
       appUserId,
       isExplicitSelection: desiredRelease.isExplicitSelection === true,
+      ...(desiredRelease.operatorTrackScope ? { operatorTrackScope: desiredRelease.operatorTrackScope } : {}),
       selectionState: desiredRelease.selectionState ?? 'selected',
       snapshotId,
       snapshotRevision,

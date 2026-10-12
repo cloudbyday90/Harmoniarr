@@ -70,6 +70,7 @@ function buildWantedReleaseEvidence({
         : 'monitored_release_absent',
     wantedAutomationMode: monitoring.wantedAutomationMode
       ?? defaultOperatorArtistMonitoringPolicy.wantedAutomationMode,
+    ...(desiredRelease.operatorTrackScope ? { operatorTrackScope: desiredRelease.operatorTrackScope } : {}),
   };
 }
 
@@ -81,12 +82,15 @@ function toWantedRelease({
   monitoring,
 }) {
   const resolvedRelease = releaseById.get(desiredRelease.metadataReleaseId) ?? null;
-  const expectedTrackCount = toCount(reconciliation?.expectedTrackCount) || toCount(resolvedRelease?.trackCount);
+  const subset = desiredRelease.operatorTrackScope?.mode === 'tracks';
+  const expectedTrackCount = subset ? desiredRelease.operatorTrackScope.tracks.length
+    : toCount(reconciliation?.expectedTrackCount) || toCount(resolvedRelease?.trackCount);
+  if (desiredRelease.operatorTrackScope?.mode === 'unresolved') return null;
   if (expectedTrackCount < 1) {
     return null;
   }
 
-  const matchedTrackCount = Math.min(toCount(reconciliation?.matchedTrackCount), expectedTrackCount);
+  const matchedTrackCount = subset ? 0 : Math.min(toCount(reconciliation?.matchedTrackCount), expectedTrackCount);
 
   return {
     appUserId: null,
@@ -153,6 +157,7 @@ export function buildLibraryWantedReleaseProjection({
     releaseGroups,
     releases,
     trackOverrides: Array.isArray(trackOverrides) ? trackOverrides : [],
+    trackCatalog: artistPayload.trackCatalog ?? [],
   });
   const desiredStatePlan = operatorArtistDesiredStateService.buildDesiredStatePlan({
     metadataArtistId: artistPayload?.artist?.id ?? null,

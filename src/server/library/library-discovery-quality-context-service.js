@@ -6,6 +6,7 @@
  */
 
 import { isScopedQualityFallbackOverride, normalizeSavedQualityPreferences, resolveAcquisitionQualityProfileCode } from '../acquisition/acquisition-quality-evidence-policy.js';
+import { createOperatorTrackScopeVerificationService } from '../metadata/operator-track-scope-verification-service.js';
 
 const PROFILE_PRIORITY = { any_available: 0, high_quality: 1, lossless_archive: 2 };
 
@@ -30,15 +31,25 @@ function hasKnownRequirement(explicitProfile, preferences) {
   return normalizeSavedQualityPreferences(preferences) != null;
 }
 
-export function createLibraryDiscoveryQualityContextService({ getUserPreferencesFn = null } = {}) {
+export function createLibraryDiscoveryQualityContextService({ getUserPreferencesFn = null,
+  trackScopeVerifier = createOperatorTrackScopeVerificationService() } = {}) {
   async function readPreferences(userId) {
     if (!userId || typeof getUserPreferencesFn !== 'function') return null;
     try { return await getUserPreferencesFn({ userId }); } catch { return null; }
   }
 
-  async function resolveSharedDiscoveryQualityContext(claimedRequest) {
+  async function resolveSharedDiscoveryQualityContext(claimedRequest, { queryable = null } = {}) {
     const links = normalizeLinks(claimedRequest?.operatorLinks);
     const sharedExplicitProfile = claimedRequest?.evidence?.qualityProfile ?? claimedRequest?.evidence?.acquisitionProfile ?? null;
+    const operatorTrackScopes = links.filter(link => Object.hasOwn(link, 'operatorTrackScope'))
+      .map(link => ({ wantedReleaseId: link.wantedReleaseId, scope: link.operatorTrackScope }));
+    if (claimedRequest?.metadataReleaseId && operatorTrackScopes.some(entry => entry.scope?.metadataReleaseId !== claimedRequest.metadataReleaseId)) {
+      await trackScopeVerifier.assertScopesCurrent([{ scope: null }], { queryable });
+    }
+    if (operatorTrackScopes.length === 0 && Object.hasOwn(claimedRequest?.evidence ?? {}, 'operatorTrackScope')) {
+      operatorTrackScopes.push({ mediaRequestId: claimedRequest.evidence.sourceMediaRequestId, scope: claimedRequest.evidence.operatorTrackScope });
+    }
+    if (operatorTrackScopes.length > 0) await trackScopeVerifier.assertScopesCurrent(operatorTrackScopes, { queryable });
     if (links.length === 0) {
       const preferences = await readPreferences(claimedRequest?.evidence?.sourceRequestedForUserId ?? claimedRequest?.evidence?.sourceRequestedByUserId);
       const profileCode = resolveAcquisitionQualityProfileCode({ explicitProfile: sharedExplicitProfile, userPreferences: preferences });
@@ -46,6 +57,7 @@ export function createLibraryDiscoveryQualityContextService({ getUserPreferences
       const wantedReleaseId = claimedRequest?.wantedReleaseId ?? legacyOverride?.wantedReleaseId ?? claimedRequest?.evidence?.musicQueueRediscovery?.wantedReleaseId ?? null;
       const qualityOverride = isScopedQualityFallbackOverride(legacyOverride, wantedReleaseId) ? legacyOverride : null;
       return { profileCode, qualityOverride, ...(wantedReleaseId ? { wantedReleaseId } : {}), sharedOperatorDiscovery: false,
+        ...(operatorTrackScopes.length > 0 ? { operatorTrackScopes } : {}),
         ...(preferences?.minimumQuality === 'high' ? { minimumBitrateKbps: 320 } : {}),
         formatPreferences: qualityOverride ? buildSharedFormatPreferences(profileCode, true, preferences?.minimumQuality === 'high' ? 320 : 256)
           : preferences ? { minimumQuality: preferences.minimumQuality, preferredFormat: preferences.preferredFormat } : null,
@@ -75,6 +87,7 @@ export function createLibraryDiscoveryQualityContextService({ getUserPreferences
       ...(minimumBitrateKbps > 256 ? { minimumBitrateKbps } : {}) } : null;
     const wantedReleaseIds = links.map((link) => link.wantedReleaseId);
     return { profileCode, qualityOverride, wantedReleaseId: wantedReleaseIds[0],
+      ...(operatorTrackScopes.length > 0 ? { operatorTrackScopes } : {}),
       ...(minimumBitrateKbps > 256 ? { minimumBitrateKbps } : {}),
       ...(wantedReleaseIds.length > 1 ? { wantedReleaseIds } : {}), sharedOperatorDiscovery: true,
       formatPreferences: buildSharedFormatPreferences(profileCode, fallbackOverrideActive, minimumBitrateKbps),

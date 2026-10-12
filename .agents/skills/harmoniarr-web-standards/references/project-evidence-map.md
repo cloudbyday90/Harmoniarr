@@ -1,5 +1,19 @@
 # Project standards-to-evidence map
 
+Verified track requirements: operator-track-catalog-store.js reads current
+release/recording/medium/track identities; operator-track-scope-policy.js resolves
+recording+positions exactly and refuses unsupported track MBIDs. Effective state
+and publication capture include the catalog. The typed scope is stored in request
+and Wanted evidence, retained by discovery participants and candidate context.
+operator-track-scope-verification-service.js checks current catalog and legacy
+candidate ownership requirements before selection, preparation and each apply
+mutation. Proper subsets remain blocked for release-wide work. SQL presence flags
+preserve explicit nulls; mixed owners are never dropped to obtain a broader grant.
+Standalone medium/recording/track/delete writers share existing exclusive source
+admission. The dedicated design/research/outcome owns executed proof and limits:
+subset file selection, media verification and per-owner fulfillment remain work
+to complete before enabling partial acquisition.
+
 Track consent: metadata/operator-track-consent-policy.js derives a positive
 resolved override for the current target, retaining null group scope and refusing
 another edition. operator-artist-effective-state.js keeps descriptive counts and

@@ -6,6 +6,32 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Verified track requirements (2026-10-12)
+
+- Reproduce ungrounded recording and partial-to-whole publication. Verify exact
+  current catalog membership, capture/recheck catalog and carry typed owner scope
+  through request, Wanted, discovery and candidate context. Proper subsets remain
+  blocked before release-wide provider work and filesystem mutation; verified
+  whole-catalog and independent full-release contracts remain supported. See
+  [design](OPERATOR_TRACK_CATALOG_DESIGN.md),
+  [research](OPERATOR_TRACK_CATALOG_RESEARCH_2026_10.md) and
+  [outcome](OPERATOR_TRACK_CATALOG_OUTCOME.md).
+- Enroll standalone medium/recording/track/delete writers in existing source
+  admission. Preserve null markers, all participants, current legacy-candidate
+  checks and owned recovery queryables. Final focused 404/404, complete fast 9,932
+  plus builds, affected native 172/172 across 23 files; zero final failures,
+  cancellations/skips. Retain 162/172 native and 17/17 fixture repair separately.
+  Production/unit hashes stay exact after native-only corrections.
+- Standards/scoped/testing skill structure and installed hashes pass; dependency
+  audit reports zero vulnerabilities. The
+  [PR assessment](OPEN_PR_APPLICABILITY_TRACK_CATALOG_2026_10_OUTCOME.md)
+  finds no eligible unreplayed revision. Main only, no release or merge.
+- Next: exact subset file selection, media/import verification and owner-specific
+  track fulfillment before enabling partial acquisition. Prove one selected track
+  from a two-track release across real handoff, reject extra/ambiguous/wrong media,
+  and preserve mixed recipient scope. Track-MBID persistence requires separate
+  schema/remapping work; projection-reader coordination remains later work.
+
 ## Completed slice: Operator track acquisition consent (2026-10-12)
 
 - Reproduce valid saved suppression/unresolved/other-edition exceptions and

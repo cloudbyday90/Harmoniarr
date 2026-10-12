@@ -34,7 +34,8 @@ suite('Supported metadata source writers coordinate through admitted publication
   after(async () => { await postgres?.cleanup(); }, { timeout: config.suiteTeardownTimeoutMs });
   const scenario = run => withIntegrationApp({ config, run,
     withPostgresIntegrationRuntimeFn: ({ run: execute, phaseObserver }) => postgres.runIsolatedDatabase(execute, { phaseObserver }) });
-  for (const kind of ['selection', 'selection_replace', 'override', 'override_replace', 'snapshot', 'monitoring', 'catalog_group', 'catalog_release', 'metadata_service', 'canonical', 'bulk_monitoring', 'bulk_selection', 'bulk_override']) {
+  for (const kind of ['selection', 'selection_replace', 'override', 'override_replace', 'snapshot', 'monitoring', 'catalog_group', 'catalog_release',
+    'catalog_medium', 'catalog_track', 'catalog_recording', 'catalog_media_delete', 'metadata_service', 'canonical', 'bulk_monitoring', 'bulk_selection', 'bulk_override']) {
     test(`${kind} waits through the final check and request/event commit`, { timeout: config.scenarioTimeoutMs }, async t => {
       await scenario(async ({ databaseConfig }) => {
         const fixture = await seedOperatorReconciliationLifetimeRun(); const write = await buildMetadataSourceWriter(kind, fixture);

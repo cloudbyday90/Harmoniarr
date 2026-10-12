@@ -118,10 +118,10 @@ for (const monitoring of [undefined, { isMonitored: false, monitoredReleaseGroup
       appUserId: 'user-1', artistPayload: buildArtistPayload(), monitoring,
       releaseGroupSelections: [{ metadataReleaseGroupId: 'group-manual',
         resolvedMetadataReleaseId: 'release-manual', selectionOrigin: 'manual_inclusion',
-        selectionSource: 'manual', selectionState: 'partial' }],
+        selectionSource: 'manual', selectionState: 'selected' }],
     });
     assert.deepEqual(wantedReleases.map(release => release.metadataReleaseId), ['release-manual']);
-    assert.equal(wantedReleases[0].evidence.selectionState, 'partial');
+    assert.equal(wantedReleases[0].evidence.selectionState, 'selected');
     assert.equal(wantedReleases[0].evidence.selectionSource, 'manual');
   });
 }
@@ -403,6 +403,7 @@ test('default wanted metadata composition does not overlap release-group and rel
       if (/FROM metadata_releases/u.test(sql)) { calls.push('releases'); return { rows: [{ id: releaseId,
         metadata_release_group_id: groupId, title: 'Album', is_canonical: true, release_date: '2028-06-01', track_count: 10, status: 'Official' }] }; }
       if (['selections', 'overrides', 'availability'].includes(sql)) { calls.push(sql); return { rows: [] }; }
+      if (/FROM metadata_tracks track/u.test(sql)) { calls.push('tracks'); return { rows: [] }; }
       assert.fail(`Unexpected lookup outside the narrow metadata projection: ${sql}`);
     } finally { active = false; }
   } };
@@ -415,5 +416,5 @@ test('default wanted metadata composition does not overlap release-group and rel
   const result = await reader.readWantedReleaseProjection({ queryable });
   assert.equal(active, false); assert.equal(result.wantedReleases.length, 1);
   assert.equal(result.wantedReleases[0].metadataReleaseId, releaseId);
-  assert.deepEqual(calls, ['monitoring', 'artist', 'groups', 'releases', 'selections', 'overrides', 'availability']);
+  assert.deepEqual(calls, ['monitoring', 'artist', 'groups', 'releases', 'tracks', 'selections', 'overrides', 'availability']);
 });

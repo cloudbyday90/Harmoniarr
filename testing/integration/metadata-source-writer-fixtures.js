@@ -12,7 +12,8 @@ import { createOperatorArtistReconciliationSnapshotStore } from '../../src/serve
 import { createOperatorReleaseGroupSelectionStore } from '../../src/server/metadata/operator-release-group-selection-store.js';
 import { createOperatorTrackOverrideStore } from '../../src/server/metadata/operator-track-override-store.js';
 import { createMetadataService } from '../../src/server/metadata/metadata-service.js';
-import { upsertMetadataRelease, upsertMetadataReleaseGroup } from '../../src/server/metadata/metadata-repository.js';
+import { upsertMetadataRelease, upsertMetadataReleaseGroup, insertMetadataMedium, insertMetadataTrack,
+  upsertMetadataRecording, deleteMetadataMediaByReleaseId } from '../../src/server/metadata/metadata-repository.js';
 import { forceCanonicalRelease } from '../../src/server/metadata/canonical-release-service.js';
 import { defaultOperatorArtistMonitoringPolicy } from '../../src/server/metadata/operator-artist-monitoring-policy.js';
 
@@ -33,6 +34,12 @@ export async function buildMetadataSourceWriter(kind, fixture) {
   const release = { metadataReleaseGroupId: fixture.metadata.metadataReleaseGroupId, sourceProvider: 'musicbrainz', sourceReleaseId: randomUUID(), musicbrainzReleaseId: randomUUID(),
     title: 'New admitted edition', status: 'Official', releaseDate: '2099-10-02', trackCount: 1, mediumCount: 1 };
   switch (kind) {
+    case 'catalog_medium': return () => insertMetadataMedium({ metadataReleaseId: fixture.metadata.metadataReleaseId, position: 2 });
+    case 'catalog_track': return () => insertMetadataTrack({ metadataMediumId: fixture.metadata.metadataMediumId,
+      metadataRecordingId: fixture.metadata.metadataRecordingId, position: 2, title: 'New track' });
+    case 'catalog_recording': return () => upsertMetadataRecording({ sourceProvider: 'musicbrainz', sourceRecordingId: randomUUID(),
+      musicbrainzRecordingId: randomUUID(), title: 'New recording' });
+    case 'catalog_media_delete': return () => deleteMetadataMediaByReleaseId(fixture.metadata.metadataReleaseId);
     case 'selection': return () => createOperatorReleaseGroupSelectionStore().upsertOperatorReleaseGroupSelection(selection);
     case 'selection_replace': return () => createOperatorReleaseGroupSelectionStore().replaceOperatorArtistReleaseGroupSelections({ ...scope, operatorReleaseGroupSelections: [selection] });
     case 'override': return () => createOperatorTrackOverrideStore().upsertOperatorTrackOverride(override);

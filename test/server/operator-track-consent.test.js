@@ -16,6 +16,8 @@ function prepare({ trackOverrides = [], releaseGroupSelections = [], releases, m
     releases: releases ?? [{ id: 'release', releaseGroupId: 'group', isCanonical: true,
       title: 'Album', releaseDate: '1994-11-07' }],
     monitoredReleaseGroupTypes: ['album'], trackOverrides, releaseGroupSelections,
+    trackCatalog: [{ metadataReleaseId: 'release', metadataTrackId: 'track', recordingMbid: 'recording',
+      mediumPosition: 1, trackPosition: 1, title: 'Track', lengthMs: 300000 }],
   });
   const plan = createOperatorArtistDesiredStateService().buildDesiredStatePlan({
     releaseGroups: effective.effectiveReleaseGroups,
@@ -39,13 +41,14 @@ const cases = [
 
 for (const { name, count, ...override } of cases) {
   test(`${name} derives ${count ? 'positive' : 'no'} acquisition consent`, () => {
-    const { plan, state } = prepare({ trackOverrides: [{ ...override, metadataReleaseGroupId: 'group' }] });
+    const { plan, state } = prepare({ trackOverrides: [{ recordingMbid: 'recording', mediumPosition: 1,
+      trackPosition: 1, ...override, metadataReleaseGroupId: 'group' }] });
     assert.equal(state.trackOverrideSummary.totalCount, 1);
     assert.equal(state.trackOverrideSummary.resolvedDesiredCount, count);
     assert.equal(plan.desiredReleases[0].isExplicitSelection, count === 1);
     assert.equal(plan.desiredReleases[0].eligibleForDownstreamWork, count === 1);
     assert.equal(plan.summary.explicitDesiredReleaseCount, count);
-    assert.equal(plan.summary.trackOnlyBlockedCount, count === 1 ? 0 : 1);
+    assert.equal(plan.summary.trackOnlyBlockedCount + plan.summary.trackScopeBlockedCount, count === 1 ? 0 : 1);
   });
 }
 
@@ -59,9 +62,10 @@ test('mixed suppression and desired review cannot manufacture resolved desire', 
   assert.equal(plan.summary.eligibleReleaseCount, 0);
 });
 
-test('one resolved desired track retains its exception alongside negative and unresolved overrides', () => {
+test('an incomplete desired set remains blocked despite one verified resolved track', () => {
   const { plan, state } = prepare({ trackOverrides: [
-    { metadataReleaseGroupId: 'group', isDesired: true, remapStatus: 'resolved', metadataReleaseId: 'release' },
+    { metadataReleaseGroupId: 'group', isDesired: true, remapStatus: 'resolved', metadataReleaseId: 'release',
+      recordingMbid: 'recording', mediumPosition: 1, trackPosition: 1 },
     { metadataReleaseGroupId: 'group', isDesired: false, remapStatus: 'resolved' },
     { metadataReleaseGroupId: 'group', isDesired: true, remapStatus: 'orphaned' },
   ] });
@@ -69,7 +73,8 @@ test('one resolved desired track retains its exception alongside negative and un
   assert.equal(state.trackOverrideSummary.resolvedDesiredCount, 1);
   assert.equal(state.trackOverrideSummary.suppressedCount, 1);
   assert.equal(state.trackOverrideSummary.orphanedCount, 1);
-  assert.equal(plan.summary.eligibleReleaseCount, 1);
+  assert.equal(plan.summary.eligibleReleaseCount, 0);
+  assert.equal(plan.summary.trackScopeBlockedCount, 1);
 });
 
 test('no resolved edition cannot grant track consent', () => {
@@ -90,7 +95,7 @@ for (const selectionState of ['selected', 'partial', 'unselected']) {
     if (selectionState === 'unselected') assert.deepEqual(plan.desiredReleases, []);
     else {
       assert.equal(plan.desiredReleases[0].isExplicitSelection, true);
-      assert.equal(plan.desiredReleases[0].eligibleForDownstreamWork, true);
+      assert.equal(plan.desiredReleases[0].eligibleForDownstreamWork, selectionState !== 'partial');
       assert.equal(plan.desiredReleases[0].selectionOrigin, 'manual_inclusion');
     }
   });
@@ -128,7 +133,8 @@ for (const [monitoring, blockReason] of [
   test(`only resolved desired intent retains the ${blockReason} exception`, () => {
     for (const isDesired of [false, true]) {
       const { plan } = prepare({ monitoring, trackOverrides: [
-        { metadataReleaseGroupId: 'group', metadataReleaseId: 'release', isDesired, remapStatus: 'resolved' },
+        { metadataReleaseGroupId: 'group', metadataReleaseId: 'release', isDesired, remapStatus: 'resolved',
+          recordingMbid: 'recording', mediumPosition: 1, trackPosition: 1 },
       ] });
       assert.equal(plan.desiredReleases[0].eligibleForDownstreamWork, isDesired);
       assert.equal(plan.desiredReleases[0].blockReason, isDesired ? null : blockReason);

@@ -1,5 +1,12 @@
 # Practical web standards skill outcome
 
+October 12 catalog references trace exact local identities, typed requirement
+carriers, conservative downstream gates and supported writer admission. The
+[catalog outcome](OPERATOR_TRACK_CATALOG_OUTCOME.md) owns native reproduction,
+current-catalog refusal, publication and acquisition evidence. Structural and
+installed hash checks validate reference maintenance; no new blind trial,
+partial-download capability or standards certification is claimed.
+
 October 12 track-consent references locate the narrow policy, effective target
 summary, three eligibility consumers and shared native worker owner. The
 [track-consent outcome](OPERATOR_TRACK_CONSENT_OUTCOME.md) owns saved suppression,

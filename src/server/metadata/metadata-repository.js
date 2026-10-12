@@ -213,107 +213,115 @@ export async function upsertMetadataRelease(release, queryable) {
 }
 
 export async function deleteMetadataMediaByReleaseId(metadataReleaseId, queryable) {
-  const db = resolveQueryable(queryable);
-  await db.query('DELETE FROM metadata_media WHERE metadata_release_id = $1', [metadataReleaseId]);
+  const accepted = structuredClone(metadataReleaseId);
+  return createMetadataSourceWriteService().withExclusiveWrite(async db => {
+    await db.query('DELETE FROM metadata_media WHERE metadata_release_id = $1', [accepted]);
+  }, { queryable });
 }
 
 export async function insertMetadataMedium(medium, queryable) {
-  const db = resolveQueryable(queryable);
-  const result = await db.query(
-    `
-      INSERT INTO metadata_media (
-        metadata_release_id,
-        position,
-        title,
-        format,
-        track_count,
-        updated_at
-      )
-      VALUES ($1, $2, $3, $4, $5, NOW())
-      RETURNING *
-    `,
-    [
-      medium.metadataReleaseId,
-      medium.position,
-      medium.title ?? null,
-      medium.format ?? null,
-      medium.trackCount ?? null,
-    ],
-  );
+  const accepted = structuredClone(medium);
+  return createMetadataSourceWriteService().withExclusiveWrite(async db => {
+    const result = await db.query(
+      `
+        INSERT INTO metadata_media (
+          metadata_release_id,
+          position,
+          title,
+          format,
+          track_count,
+          updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, NOW())
+        RETURNING *
+      `,
+      [
+        accepted.metadataReleaseId,
+        accepted.position,
+        accepted.title ?? null,
+        accepted.format ?? null,
+        accepted.trackCount ?? null,
+      ],
+    );
 
-  return result.rows[0];
+    return result.rows[0];
+  }, { queryable });
 }
 
 export async function upsertMetadataRecording(recording, queryable) {
-  const db = resolveQueryable(queryable);
-  const result = await db.query(
-    `
-      INSERT INTO metadata_recordings (
-        source_provider,
-        source_recording_id,
-        musicbrainz_recording_id,
-        title,
-        length_ms,
-        artist_credit,
-        raw_payload,
-        fetched_at,
-        updated_at
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, NOW())
-      ON CONFLICT (source_provider, source_recording_id) DO UPDATE
-      SET musicbrainz_recording_id = EXCLUDED.musicbrainz_recording_id,
-          title = EXCLUDED.title,
-          length_ms = EXCLUDED.length_ms,
-          artist_credit = EXCLUDED.artist_credit,
-          raw_payload = EXCLUDED.raw_payload,
-          fetched_at = EXCLUDED.fetched_at,
-          updated_at = NOW()
-      RETURNING *
-    `,
-    [
-      recording.sourceProvider,
-      recording.sourceRecordingId,
-      recording.musicbrainzRecordingId ?? null,
-      recording.title,
-      recording.lengthMs ?? null,
-      recording.artistCredit ?? null,
-      recording.rawPayload ? JSON.stringify(recording.rawPayload) : null,
-      recording.fetchedAt ?? null,
-    ],
-  );
+  const accepted = structuredClone(recording);
+  return createMetadataSourceWriteService().withExclusiveWrite(async db => {
+    const result = await db.query(
+      `
+        INSERT INTO metadata_recordings (
+          source_provider,
+          source_recording_id,
+          musicbrainz_recording_id,
+          title,
+          length_ms,
+          artist_credit,
+          raw_payload,
+          fetched_at,
+          updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, NOW())
+        ON CONFLICT (source_provider, source_recording_id) DO UPDATE
+        SET musicbrainz_recording_id = EXCLUDED.musicbrainz_recording_id,
+            title = EXCLUDED.title,
+            length_ms = EXCLUDED.length_ms,
+            artist_credit = EXCLUDED.artist_credit,
+            raw_payload = EXCLUDED.raw_payload,
+            fetched_at = EXCLUDED.fetched_at,
+            updated_at = NOW()
+        RETURNING *
+      `,
+      [
+        accepted.sourceProvider,
+        accepted.sourceRecordingId,
+        accepted.musicbrainzRecordingId ?? null,
+        accepted.title,
+        accepted.lengthMs ?? null,
+        accepted.artistCredit ?? null,
+        accepted.rawPayload ? JSON.stringify(accepted.rawPayload) : null,
+        accepted.fetchedAt ?? null,
+      ],
+    );
 
-  return result.rows[0];
+    return result.rows[0];
+  }, { queryable });
 }
 
 export async function insertMetadataTrack(track, queryable) {
-  const db = resolveQueryable(queryable);
-  const result = await db.query(
-    `
-      INSERT INTO metadata_tracks (
-        metadata_medium_id,
-        metadata_recording_id,
-        position,
-        number_text,
-        title,
-        length_ms,
-        artist_credit,
-        updated_at
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-      RETURNING *
-    `,
-    [
-      track.metadataMediumId,
-      track.metadataRecordingId ?? null,
-      track.position,
-      track.numberText ?? null,
-      track.title,
-      track.lengthMs ?? null,
-      track.artistCredit ?? null,
-    ],
-  );
+  const accepted = structuredClone(track);
+  return createMetadataSourceWriteService().withExclusiveWrite(async db => {
+    const result = await db.query(
+      `
+        INSERT INTO metadata_tracks (
+          metadata_medium_id,
+          metadata_recording_id,
+          position,
+          number_text,
+          title,
+          length_ms,
+          artist_credit,
+          updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+        RETURNING *
+      `,
+      [
+        accepted.metadataMediumId,
+        accepted.metadataRecordingId ?? null,
+        accepted.position,
+        accepted.numberText ?? null,
+        accepted.title,
+        accepted.lengthMs ?? null,
+        accepted.artistCredit ?? null,
+      ],
+    );
 
-  return result.rows[0];
+    return result.rows[0];
+  }, { queryable });
 }
 
 export async function insertMetadataProviderSnapshot(snapshot, queryable) {

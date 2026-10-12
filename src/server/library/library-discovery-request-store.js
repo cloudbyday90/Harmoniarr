@@ -59,6 +59,7 @@ function normalizeOperatorLinks(value) {
         ? link.qualityOverride
         : null,
       wantedReleaseId,
+      ...(link.hasOperatorTrackScope === true || link.operatorTrackScope != null ? { operatorTrackScope: link.operatorTrackScope } : {}),
     }];
   });
 }
@@ -218,6 +219,8 @@ export function createLibraryDiscoveryRequestStore({
                   'isDisabled', app_users.is_disabled,
                   'qualityPreferences', app_users.user_preferences,
                   'qualityProfile', library_wanted_releases.evidence->>'qualityProfile',
+                  'operatorTrackScope', library_wanted_releases.evidence->'operatorTrackScope',
+                  'hasOperatorTrackScope', library_wanted_releases.evidence?'operatorTrackScope',
                   'qualityOverride', library_discovery_request_wanted_release_links.evidence->'musicQueueQualityOverride',
                   'wantedReleaseId', library_wanted_releases.id
                 )
@@ -439,6 +442,12 @@ export function createLibraryDiscoveryRequestStore({
       `,
       [errorCode, errorMessage, searchQuery, metadataReleaseId, ...(recoveryRunId ? [recoveryRunId] : [])],
     );
+  }
+
+  async function markDiscoveryRequestTrackScopeBlocked({ metadataReleaseId }) {
+    await getPoolFn().query(`UPDATE library_discovery_requests SET request_status='blocked',
+      blocked_reason='operator_track_scope_verification_required',next_search_after=NULL,updated_at=NOW()
+      WHERE metadata_release_id=$1::uuid`, [metadataReleaseId]);
   }
 
   async function recordDiscoverySearchSuccess({
@@ -1148,6 +1157,7 @@ export function createLibraryDiscoveryRequestStore({
     markDownloadRecoveryRediscoveryExhausted,
     markDiscoveryRequestExhausted,
     recordDiscoverySearchFailure,
+    markDiscoveryRequestTrackScopeBlocked,
     recordDiscoverySearchSuccess,
     releaseFolderSetupBlockedAutomaticDiscoveryRequests,
     requestMusicQueueRediscovery,

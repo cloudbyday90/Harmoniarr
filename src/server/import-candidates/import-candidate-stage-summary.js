@@ -78,6 +78,7 @@ function buildMusicQueueContext(candidate) {
 
   return {
     profileCode,
+    ...(Object.hasOwn(context, 'operatorTrackScopes') ? { operatorTrackScopes: structuredClone(context.operatorTrackScopes) } : {}),
     ...(typeof context.minimumBitrateKbps === 'number' && Number.isFinite(context.minimumBitrateKbps)
       && context.minimumBitrateKbps >= 256 && context.minimumBitrateKbps <= 10_000 ? { minimumBitrateKbps: context.minimumBitrateKbps } : {}),
     ...(qualityOverride ? { qualityOverride } : {}),

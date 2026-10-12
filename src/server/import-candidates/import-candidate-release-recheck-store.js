@@ -74,6 +74,8 @@ export function createImportCandidateReleaseRecheckStore({ getPoolFn = getPool }
   async function readParticipantPolicies({ wantedReleaseIds, queryable = null }) {
     const result = await (queryable ?? getPoolFn()).query(`SELECT wanted.id AS wanted_release_id, wanted.app_user_id,
       wanted.metadata_release_id, wanted.evidence->>'qualityProfile' AS quality_profile,
+      wanted.evidence->'operatorTrackScope' AS operator_track_scope,
+      wanted.evidence?'operatorTrackScope' AS has_operator_track_scope,
       wanted.wanted_status, wanted.missing_track_count, wanted.evidence->>'visibilityState' AS visibility_state,
       owner.user_preferences AS quality_preferences, owner.is_disabled,
       links.wanted_release_id IS NOT NULL AS discovery_link_exists,
@@ -87,6 +89,7 @@ export function createImportCandidateReleaseRecheckStore({ getPoolFn = getPool }
         WHERE original.id = ANY($1::uuid[])) ORDER BY wanted.id`, [wantedReleaseIds]);
     return result.rows.map((row) => ({ wantedReleaseId: row.wanted_release_id, appUserId: row.app_user_id,
       metadataReleaseId: row.metadata_release_id, qualityProfile: row.quality_profile ?? null,
+      ...(row.has_operator_track_scope === true || row.operator_track_scope != null ? { operatorTrackScope: row.operator_track_scope } : {}),
       qualityPreferences: row.quality_preferences, qualityOverride: row.quality_override ?? null, isDisabled: row.is_disabled,
       wantedStatus: row.wanted_status, missingTrackCount: row.missing_track_count, visibilityState: row.visibility_state ?? null,
       discoveryLinkExists: row.discovery_link_exists === true }));

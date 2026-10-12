@@ -7,6 +7,7 @@
 
 import { isScopedQualityFallbackOverride } from '../acquisition/acquisition-quality-evidence-policy.js';
 import { createLibraryDiscoveryQualityContextService } from '../library/library-discovery-quality-context-service.js';
+import { createOperatorTrackScopeVerificationService } from '../metadata/operator-track-scope-verification-service.js';
 
 const PROFILE_PRIORITY = { any_available: 0, high_quality: 1, lossless_archive: 2 };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -26,9 +27,12 @@ function boundedFloor(value) {
 }
 
 /** Retain the downloaded candidate's requirement and apply any stricter current participant policy. */
-export async function buildRecheckQualityContext({ candidate, participants }) {
+export async function buildRecheckQualityContext({ candidate, participants, queryable = null }) {
   const base = getRecheckMusicQueueContext(candidate);
-  const current = await createLibraryDiscoveryQualityContextService().resolveSharedDiscoveryQualityContext({ operatorLinks: participants });
+  if (Object.hasOwn(base ?? {}, 'operatorTrackScopes')) {
+    await createOperatorTrackScopeVerificationService().assertScopesCurrent(base.operatorTrackScopes, { queryable });
+  }
+  const current = await createLibraryDiscoveryQualityContextService().resolveSharedDiscoveryQualityContext({ operatorLinks: participants }, { queryable });
   const baseProfile = Object.hasOwn(PROFILE_PRIORITY, base?.profileCode) ? base.profileCode : 'lossless_archive';
   const profileCode = PROFILE_PRIORITY[current.profileCode] > PROFILE_PRIORITY[baseProfile] ? current.profileCode : baseProfile;
   const savedConsent = participants.find((participant) => participant.wantedReleaseId === base?.qualityOverride?.wantedReleaseId);
@@ -41,7 +45,8 @@ export async function buildRecheckQualityContext({ candidate, participants }) {
     boundedFloor(current.minimumBitrateKbps), profileCode === 'high_quality' || qualityOverride ? 256 : 0,
     ...participants.map((participant) => participant.qualityPreferences?.minimumQuality === 'high' ? 320 : 0)) || null;
   const ids = getRecheckWantedReleaseIds(candidate);
-  return { profileCode, qualityOverride: qualityOverride ? { ...qualityOverride,
+  return { profileCode, ...(current.operatorTrackScopes ? { operatorTrackScopes: current.operatorTrackScopes } : {}),
+  qualityOverride: qualityOverride ? { ...qualityOverride,
     ...(minimumBitrateKbps > 256 ? { minimumBitrateKbps } : {}) } : null,
   ...(minimumBitrateKbps ? { minimumBitrateKbps } : {}), wantedReleaseId: ids.includes(base?.wantedReleaseId) ? base.wantedReleaseId : ids[0],
   ...(ids.length > 1 ? { wantedReleaseIds: ids } : {}), sharedOperatorDiscovery: base?.sharedOperatorDiscovery === true };

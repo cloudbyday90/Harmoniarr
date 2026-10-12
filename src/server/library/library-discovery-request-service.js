@@ -22,6 +22,7 @@ import {
   parseMetadataReleaseDateInstant,
 } from '../metadata/metadata-release-date-normalization.js';
 import { createLibraryDiscoveryRequestStore } from './library-discovery-request-store.js';
+import { isReleaseWideOperatorTrackScope, OPERATOR_TRACK_SCOPE_BLOCKER } from '../metadata/operator-track-scope-policy.js';
 
 const defaultAutomaticCooldownMs = 6 * 60 * 60 * 1000;
 const exhaustedBlockedReason = 'search_attempts_exhausted';
@@ -132,6 +133,8 @@ function mapDiscoveryRow(row, { automaticCooldownMs, now }) {
     ? row.prior_evidence
     : {};
   const requestSourceEvidence = {};
+  const hasTrackScope = row.has_source_track_scope === true || row.source_track_scope != null;
+  if (hasTrackScope) requestSourceEvidence.operatorTrackScope = row.source_track_scope;
   if (row.source_media_request_id) {
     requestSourceEvidence.sourceMediaRequestId = row.source_media_request_id;
   }
@@ -152,6 +155,13 @@ function mapDiscoveryRow(row, { automaticCooldownMs, now }) {
   const releaseDate = normalizeMetadataReleaseDateForDateColumn(row.release_date);
   const releaseDateDeadline = parseMetadataReleaseDateInstant(row.release_date);
   const cooldownDeadline = buildCooldownDeadline(row.last_search_at, automaticCooldownMs);
+  if (hasTrackScope && !isReleaseWideOperatorTrackScope(row.source_track_scope)) {
+    return { blockedReason: OPERATOR_TRACK_SCOPE_BLOCKER, evidence: { ...priorEvidence, ...requestSourceEvidence },
+      lastSearchAt: toIsoStringOrNull(row.last_search_at), manualRequestedAt: toIsoStringOrNull(row.manual_requested_at),
+      metadataArtistId: row.metadata_artist_id, metadataReleaseGroupId: row.metadata_release_group_id,
+      metadataReleaseId: row.metadata_release_id, releaseDate, wantedStatus: row.wanted_status, searchMode,
+      nextSearchAfter: null, requestStatus: 'blocked', researchAttemptCount, searchAttemptCount };
+  }
 
   if (row.blocked_reason === 'recovery_scope_changed' || priorEvidence.downloadRecoveryRediscovery?.state === 'guard_refused') {
     return {
@@ -365,6 +375,8 @@ export function createLibraryDiscoveryRequestService({
             library_wanted_releases.evidence->>'strategy' AS wanted_strategy,
             NULL::uuid AS source_media_request_id,
             NULL::text AS source_request_kind,
+            library_wanted_releases.evidence->'operatorTrackScope' AS source_track_scope,
+            library_wanted_releases.evidence?'operatorTrackScope' AS has_source_track_scope,
             NULL::uuid AS source_requested_by_user_id,
             library_wanted_releases.app_user_id AS source_requested_for_user_id,
             NULL::timestamptz AS source_requested_at,
@@ -393,6 +405,8 @@ export function createLibraryDiscoveryRequestService({
             'media_request_intake' AS wanted_strategy,
             media_requests.id AS source_media_request_id,
             media_requests.request_kind AS source_request_kind,
+            media_requests.evidence #> '{operatorArtistReconciliation,operatorTrackScope}' AS source_track_scope,
+            COALESCE(media_requests.evidence->'operatorArtistReconciliation'?'operatorTrackScope',FALSE) AS has_source_track_scope,
             media_requests.requested_by_user_id AS source_requested_by_user_id,
             media_requests.requested_for_user_id AS source_requested_for_user_id,
             media_requests.created_at AS source_requested_at,
@@ -430,6 +444,8 @@ export function createLibraryDiscoveryRequestService({
             source_rows.wanted_strategy,
             source_rows.source_media_request_id,
             source_rows.source_request_kind,
+            source_rows.source_track_scope,
+            source_rows.has_source_track_scope,
             source_rows.source_requested_by_user_id,
             source_rows.source_requested_for_user_id,
             source_rows.source_requested_at,
@@ -460,6 +476,8 @@ export function createLibraryDiscoveryRequestService({
           deduped_sources.wanted_strategy,
           deduped_sources.source_media_request_id,
           deduped_sources.source_request_kind,
+          deduped_sources.source_track_scope,
+          deduped_sources.has_source_track_scope,
           deduped_sources.source_requested_by_user_id,
           deduped_sources.source_requested_for_user_id,
           deduped_sources.source_requested_at,

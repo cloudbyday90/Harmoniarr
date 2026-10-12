@@ -22,6 +22,7 @@ import { normalizeMetadataArtistReadView } from './metadata-artist-read-view.js'
 import { createMetadataArtistProjectionStore } from './metadata-artist-projection-store.js';
 import { runParallelTasksAndDrain } from '../parallel-task-drain.js';
 import { getPool } from '../database.js';
+import { createOperatorTrackCatalogStore } from './operator-track-catalog-store.js';
 import { createMetadataMonitoredArtistStore } from './metadata-monitored-artist-store.js';
 import { createMetadataReleaseDetectionService } from './metadata-release-detection-service.js';
 import {
@@ -168,7 +169,10 @@ export function createMetadataReadService({
     if (!artist) throw createMetadataNotFoundError('artist', artistId);
     const releaseGroups = await listMetadataReleaseGroupsByArtistId(artistId, queryable);
     const releases = await listMetadataReleasesByArtistId(artistId, queryable);
-    return { artist: mapArtist(artist), releaseGroups: releaseGroups.map(mapReleaseGroup), releases: releases.map(mapRelease) };
+    const trackCatalog = await createOperatorTrackCatalogStore().listTrackCatalog({
+      metadataReleaseIds: releases.map(release => release.id), queryable,
+    });
+    return { artist: mapArtist(artist), releaseGroups: releaseGroups.map(mapReleaseGroup), releases: releases.map(mapRelease), trackCatalog };
   }
 
   // Internal complete identities for summary calculations, not a public catalog representation.

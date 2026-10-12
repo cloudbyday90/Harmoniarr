@@ -1,5 +1,12 @@
 # Practical web standards skill design
 
+October 12 catalog maintenance connects domain identity documentation, current
+SQL evidence and typed owner requirements to actual acquisition boundaries. The
+[catalog design](OPERATOR_TRACK_CATALOG_DESIGN.md) selects conservative subset
+refusal while retaining verified whole-release behavior. References distinguish
+catalog membership, search/scoring, provider admission and file verification,
+without changing skill metadata or invocation policy.
+
 October 12 track-consent maintenance maps OWASP positive grants and protected
 transaction data to the saved override/target predicate and final SQL recheck.
 The [track-consent design](OPERATOR_TRACK_CONSENT_DESIGN.md) compares options and

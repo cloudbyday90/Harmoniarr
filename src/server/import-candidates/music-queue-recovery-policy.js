@@ -73,9 +73,9 @@ export function hasCurrentRecoveryDiscovery(discovery, sourceSearchId) {
 }
 
 /** Current consent is rebuilt, while both acquisition baselines and every valid recipient floor are retained. */
-export async function buildRecoveryQualityContext({ failedCandidate, candidate = failedCandidate, participants, baselineRequirement = null }) {
-  const failed = await buildRecheckQualityContext({ candidate: failedCandidate, participants });
-  const chosen = await buildRecheckQualityContext({ candidate, participants });
+export async function buildRecoveryQualityContext({ failedCandidate, candidate = failedCandidate, participants, baselineRequirement = null, queryable = null }) {
+  const failed = await buildRecheckQualityContext({ candidate: failedCandidate, participants, queryable });
+  const chosen = await buildRecheckQualityContext({ candidate, participants, queryable });
   const baselineCode = Object.hasOwn(priority, baselineRequirement?.profileCode) ? baselineRequirement.profileCode : 'any_available';
   const profileCode = [failed.profileCode, chosen.profileCode, baselineCode].reduce((selected, code) => priority[code] > priority[selected] ? code : selected, 'any_available');
   const minimumBitrateKbps = Math.max(boundedRecoveryFloor(failed.minimumBitrateKbps), boundedRecoveryFloor(chosen.minimumBitrateKbps),

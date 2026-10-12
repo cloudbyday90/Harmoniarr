@@ -17,6 +17,7 @@
  */
 
 import { isResolvedDesiredTrackOverrideForRelease } from './operator-track-consent-policy.js';
+import { buildOperatorTrackScope, resolveOperatorTrackOverride } from './operator-track-scope-policy.js';
 
 export function normalizeReleaseGroupPrimaryType(primaryType) {
   if (typeof primaryType !== 'string' || primaryType.trim().length === 0) {
@@ -54,10 +55,11 @@ function createOverrideBucketsByReleaseGroup(trackOverrides = []) {
   return buckets;
 }
 
-export function summarizeTrackOverrides(trackOverrides = [], metadataReleaseId = null) {
+export function summarizeTrackOverrides(trackOverrides = [], metadataReleaseId = null, trackCatalog = []) {
   const desiredCount = trackOverrides.filter((trackOverride) => trackOverride.isDesired === true).length;
   const resolvedDesiredCount = trackOverrides.filter((trackOverride) =>
-    isResolvedDesiredTrackOverrideForRelease(trackOverride, metadataReleaseId)).length;
+    isResolvedDesiredTrackOverrideForRelease(trackOverride, metadataReleaseId)
+      && resolveOperatorTrackOverride(trackOverride, metadataReleaseId, trackCatalog ?? [])).length;
   const suppressedCount = trackOverrides.filter((trackOverride) => trackOverride.isDesired === false).length;
   const reviewNeededCount = trackOverrides.filter((trackOverride) => trackOverride.remapStatus === 'review_needed').length;
   const orphanedCount = trackOverrides.filter((trackOverride) => trackOverride.remapStatus === 'orphaned').length;
@@ -106,6 +108,7 @@ export function buildOperatorArtistEffectiveReleaseGroups({
   releases = [],
   monitoredReleaseGroupTypes = [],
   trackOverrides = [],
+  trackCatalog = null,
 }) {
   const releaseLookup = createReleaseLookup(releases);
   const canonicalReleaseLookup = createCanonicalReleaseLookup(releases);
@@ -133,12 +136,17 @@ export function buildOperatorArtistEffectiveReleaseGroups({
       ...releaseGroup,
       operatorState: {
         isExplicitSelection: selectionState.isExplicit,
+        ...(Array.isArray(trackCatalog) ? { operatorTrackScope: selectionState.selectionState === 'partial'
+          || (!selectionState.isExplicit && releaseGroupTrackOverrides.some(override => override.isDesired === true
+            && (override.metadataReleaseId == null || override.metadataReleaseId === resolvedRelease?.id)))
+          ? buildOperatorTrackScope({ metadataReleaseId: resolvedRelease?.id ?? null, trackCatalog,
+            trackOverrides: releaseGroupTrackOverrides }) : null } : {}),
         resolvedMetadataReleaseId: selectionState.resolvedMetadataReleaseId,
         resolvedRelease,
         selectionOrigin: selectionState.selectionOrigin,
         selectionSource: selectionState.selectionSource,
         selectionState: selectionState.selectionState,
-        trackOverrideSummary: summarizeTrackOverrides(releaseGroupTrackOverrides, resolvedRelease?.id),
+        trackOverrideSummary: summarizeTrackOverrides(releaseGroupTrackOverrides, resolvedRelease?.id, trackCatalog),
       },
     };
   });

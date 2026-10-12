@@ -92,8 +92,8 @@ async function scenario(t, callback) {
       const metadataA = await seedMetadataReleaseFixture({ queryable: pool });
       const metadataB = await seedMetadataReleaseFixture({ queryable: pool, releaseTitle: 'Second release' });
       const metadataC = await seedMetadataReleaseFixture({ queryable: pool, releaseTitle: 'Stale release' });
-      const extraTrack = await insertMetadataTrack({ metadataMediumId: metadataB.metadataMediumId,
-        position: 2, numberText: '2', title: 'Second track' }, pool);
+      const extraTrack = await createDatabaseTransactionRunner({ getPoolFn })(queryable => insertMetadataTrack({ metadataMediumId: metadataB.metadataMediumId,
+        position: 2, numberText: '2', title: 'Second track' }, queryable));
       await rawMatches.writeLibraryFileMatchBatch({ matches: [matched(first.files[0], metadataA), matched(second.files[0], metadataB)] });
       const rawProjection = createLibraryReleaseReconciliationStore({ getPoolFn });
       const coverage = createLibraryReleaseCoverageStore();
@@ -250,8 +250,8 @@ suite('Original scan acquisition owns serialized global release reconciliation',
         const root = join(c.base, 'third'); const file = await c.catalog.recordLibraryFiles({ libraryRootPath: root, files: [c.observation(root)] });
         await c.rawMatches.writeLibraryFileMatch(matched(file.files[0], c.metadataC));
       }
-      if (change === 'track') await insertMetadataTrack({ metadataMediumId: c.metadataA.metadataMediumId, position: 2, numberText: '2', title: 'New expected track' }, c.pool);
-      if (change === 'cascade') await deleteMetadataMediaByReleaseId(c.metadataA.metadataReleaseId, c.pool);
+      if (change === 'track') await c.withTransaction(queryable => insertMetadataTrack({ metadataMediumId: c.metadataA.metadataMediumId, position: 2, numberText: '2', title: 'New expected track' }, queryable));
+      if (change === 'cascade') await c.withTransaction(queryable => deleteMetadataMediaByReleaseId(c.metadataA.metadataReleaseId, queryable));
       if (change === 'empty') await c.pool.query("UPDATE library_file_matches SET match_status='matched'");
       resume.release(); await assert.rejects(pending, { code: 'library_release_reconciliation_stale' });
       assert.deepEqual(owner.mutations, []); assert.deepEqual(await projection(c), initial);
@@ -302,7 +302,7 @@ suite('Original scan acquisition owns serialized global release reconciliation',
     await waitForBlock(c, holderPid, heldQueryable, publicationB);
     assert.equal(ownerB.reads(), 0); resume.release(); await publicationA; const previousProjection = await projection(c);
     await ready(c, admitted.promise, publicationB);
-    await insertMetadataTrack({ metadataMediumId: c.metadataB.metadataMediumId, position: 3, numberText: '3', title: 'Committed before waiter read' }, c.pool);
+    await c.withTransaction(queryable => insertMetadataTrack({ metadataMediumId: c.metadataB.metadataMediumId, position: 3, numberText: '3', title: 'Committed before waiter read' }, queryable));
     allowRead.release(); await publicationB; const afterRows = await projection(c);
     const earlier = previousProjection.find((row) => row.metadata_release_id === c.metadataB.metadataReleaseId);
     const later = afterRows.find((row) => row.metadata_release_id === c.metadataB.metadataReleaseId);
@@ -338,7 +338,7 @@ suite('Original scan acquisition owns serialized global release reconciliation',
       const owner = c.makeService({ afterReplace: async ({ queryable }) => {
         provisional = (await queryable.query('SELECT COUNT(*)::integer AS count FROM library_release_reconciliations')).rows[0].count;
         if (failure === 'expiry') await queryable.query("UPDATE job_leases SET expires_at=clock_timestamp()-INTERVAL '1 second' WHERE lease_key=$1", [active.lease.leaseKey]);
-        if (failure === 'source') await insertMetadataTrack({ metadataMediumId: c.metadataA.metadataMediumId, position: 2, numberText: '2', title: 'Changed after replacement' }, c.pool);
+        if (failure === 'source') await c.withTransaction(catalogClient => insertMetadataTrack({ metadataMediumId: c.metadataA.metadataMediumId, position: 2, numberText: '2', title: 'Changed after replacement' }, catalogClient));
       } });
       const rejection = await expectedWork(c, () => owner.reconcileLibraryReleases(active.input)).then(() => null, (error) => error);
       assert.ok(rejection);

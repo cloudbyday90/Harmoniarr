@@ -103,7 +103,7 @@ export function createMusicQueueRecoveryService({ store = createMusicQueueRecove
       if (eligible && (kind !== 'import' || canRecover)) {
         const attempted = await store.incrementAttempt(failed.id, queryable);
         const required = await buildRecoveryQualityContext({ failedCandidate: failed, participants: freshParticipants,
-          baselineRequirement: accepted?.baselineRequirement ?? null });
+          baselineRequirement: accepted?.baselineRequirement ?? null, queryable });
         let selected; let selectedContext;
         const retry = kind === 'rejected' && attempted.downloadAttemptCount < maxAttempts;
         for (const candidateId of retry ? [failed.id] : candidates) {
@@ -112,7 +112,7 @@ export function createMusicQueueRecoveryService({ store = createMusicQueueRecove
             || (!retry && (!['pending','held'].includes(candidate.status)
             || candidate.downloadAttemptCount >= maxAttempts)) || !(candidate.files?.some((file) => !file.isLocked))) continue;
           const context = await buildRecoveryQualityContext({ failedCandidate: failed, candidate, participants: freshParticipants,
-            baselineRequirement: recoveryBaseline(required) });
+            baselineRequirement: recoveryBaseline(required), queryable });
           const quality = qualityPolicyService.evaluateQualityEvidence({ candidate, profileCode: context.profileCode,
             qualityOverride: context.qualityOverride, minimumBitrateKbps: context.minimumBitrateKbps ?? null });
           if (!quality.autoDownloadEligible) continue;

@@ -19,6 +19,8 @@
 import { copyFile, link, mkdir, rm, stat } from 'node:fs/promises';
 import { posix as path } from 'node:path';
 import { createMediaFilesystemService } from '../media/media-filesystem-service.js';
+import { createOperatorTrackScopeVerificationService } from '../metadata/operator-track-scope-verification-service.js';
+import { getPool } from '../database.js';
 import { recordImportOperation } from './import-candidate-operation-repository.js';
 import { assertSafeAutoApplyInputs } from './import-candidate-safe-auto-apply-input-policy.js';
 
@@ -213,6 +215,8 @@ export function createImportCandidateApplyOperationService({
   recordImportOperationFn = recordImportOperation,
   removeFileFn = rm,
   statFn = stat,
+  getPoolFn = getPool,
+  assertTrackScopeCurrent = createOperatorTrackScopeVerificationService({ getPoolFn }).assertCandidateIdCurrent,
 } = {}) {
   const resolvedMediaFilesystemService = mediaFilesystemService ?? createMediaFilesystemService({
     copyFileFn,
@@ -235,6 +239,7 @@ export function createImportCandidateApplyOperationService({
     if (!Array.isArray(applyPreview?.files)) {
       throw new Error('applyPreview.files must be an array');
     }
+    await assertTrackScopeCurrent(importCandidateId);
 
     if ((applyPreview?.summary?.status ?? 'blocked') === 'blocked') {
       throw buildBlockedError(applyPreview.summary?.message ?? 'Import candidate is not ready for apply.');
@@ -293,6 +298,7 @@ export function createImportCandidateApplyOperationService({
       });
 
       await onMutationIntentFn(intent);
+      await assertTrackScopeCurrent(importCandidateId);
       if (applySafetyMode === 'safe_auto') await assertSafeAutoPolicyCurrent();
 
       const result = await resolvedMediaFilesystemService.applyExclusiveFileMutationPlan(

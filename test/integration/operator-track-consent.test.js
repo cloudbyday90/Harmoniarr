@@ -111,7 +111,9 @@ suite('Saved track overrides grant acquisition exceptions only with resolved des
             assert.equal(state.operation.error_message, 'Saved artist policy or catalog changed before request publication');
           } else {
             assert.equal(state.operation.status, 'completed');
-            assert.equal(state.operation.summary.trackOnlyBlockedCount, 1);
+            const blocker = ['review_needed', 'orphaned'].includes(entry.remapStatus)
+              ? 'trackScopeBlockedCount' : 'trackOnlyBlockedCount';
+            assert.equal(state.operation.summary[blocker], 1);
             assert.equal(state.operation.summary.downstreamCreatedRequestCount, 0);
           }
         }

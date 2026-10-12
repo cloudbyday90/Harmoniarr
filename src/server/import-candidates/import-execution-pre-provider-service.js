@@ -15,12 +15,14 @@ import { hasPreProviderProtocol, normalizePreparationFiles, preparationLeaseIden
   validatePreProviderEpoch, hasPreparationProviderEvidence, PRE_PROVIDER_REFUSAL_REASONS } from './import-execution-pre-provider-policy.js';
 import { matchesRecoveryObservation } from './music-queue-recovery-policy.js';
 import { validateDownloadAttempt } from '../slskd/slskd-download-attempt-policy.js';
+import { createOperatorTrackScopeVerificationService } from '../metadata/operator-track-scope-verification-service.js';
 
 const stale = () => createApiError(409, 'import_execution_preparation_stale', 'The preparation owner changed before dispatch');
 const executionFor = (context) => context.item?.planningSnapshot?.execution ?? {};
 
 export function createImportExecutionPreProviderService({ store = createImportExecutionPreProviderStore(),
-  withTransaction = createDatabaseTransactionRunner(), recordAuditEventFn = recordAuditEvent, getNow = () => new Date() } = {}) {
+  withTransaction = createDatabaseTransactionRunner(), recordAuditEventFn = recordAuditEvent, getNow = () => new Date(),
+  trackScopeVerifier = createOperatorTrackScopeVerificationService() } = {}) {
   for (const [name, fn] of Object.entries({ lockContext: store.lockContext, saveEpoch: store.saveEpoch,
     isCurrentOrigin: store.isCurrentOrigin, findUnresolvedOtherHandoff: store.findUnresolvedOtherHandoff,
     withTransaction, recordAuditEventFn, getNow })) {
@@ -50,6 +52,7 @@ export function createImportExecutionPreProviderService({ store = createImportEx
     return withTransaction(async (queryable) => {
       const context = await store.lockContext({ ...input, queryable });
       if (!context.run || !context.item) return { tracked: true, allowPreparation: false, reasonCode: 'preparation_not_current' };
+      await trackScopeVerifier.assertCandidateCurrent(context.candidate, { queryable });
       const markerPresent = Object.hasOwn(context.run?.summary ?? {}, 'downloadPreparationProtocol');
       if (!markerPresent) return { tracked: false, allowPreparation: true };
       const blocked = { tracked: true, allowPreparation: false, reasonCode: 'preparation_not_current' };
@@ -99,6 +102,7 @@ export function createImportExecutionPreProviderService({ store = createImportEx
     return withTransaction(async (queryable) => {
       const context = await store.lockContext({ ...input, queryable });
       const epoch = currentEpoch(context, input);
+      await trackScopeVerifier.assertCandidateCurrent(context.candidate, { queryable });
       if (!owns(context, input) || !epoch || epoch.phase !== 'preparing'
         || hasPreparationProviderEvidence(executionFor(context), { stagedAttemptId: epoch.attemptId ?? null })) return false;
       const refused = { ...epoch, phase: 'refused', refusal: { reasonCode: input.reasonCode, refusedAt: getNow().toISOString() } };
@@ -113,6 +117,7 @@ export function createImportExecutionPreProviderService({ store = createImportEx
   async function markDispatchPossible(input) {
     return withTransaction(async (queryable) => {
       const context = await store.lockContext({ ...input, queryable });
+      await trackScopeVerifier.assertCandidateCurrent(context.candidate, { queryable });
       const epoch = currentEpoch(context, input);
       const execution = executionFor(context);
       const attempt = validateDownloadAttempt({ attempt: execution.handoff?.attempt, operationRunId: input.runId,

@@ -1,5 +1,17 @@
 # Official practices by boundary
 
+October 12 catalog requirement guidance uses
+docs/OPERATOR_TRACK_CATALOG_RESEARCH_2026_10.md. MusicBrainz distinguishes a
+recording from its appearances as tracks on particular media; recording identity
+alone cannot prove edition/position membership. OWASP server-owned transaction
+data and business-logic verification inform exact current-catalog requirements
+and conservative refusal of unsupported subset work. PostgreSQL cooperation and
+node-postgres single-client ownership protect the SQL proof, distinct from file
+identity verification. WCAG status/label guidance informs bounded review reasons;
+no backend result establishes rendered accessibility conformance. Track-MBID
+persistence and subset acquisition need their own positive evidence and migration
+design rather than assuming the current catalog or filename scores support them.
+
 October 12 track-consent guidance uses
 docs/OPERATOR_TRACK_CONSENT_RESEARCH_2026_10.md. OWASP least privilege/default
 denial and server-owned significant transaction data inform deriving exceptions

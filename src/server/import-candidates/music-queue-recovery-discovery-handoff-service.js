@@ -63,7 +63,7 @@ export function createMusicQueueRecoveryDiscoveryHandoffService({ store = create
         || !hasCurrentRecoveryRecipients(candidate, participants))) return refuse();
       const contexts = new Map();
       for (const candidate of freshCandidates) contexts.set(candidate.id, await buildRecoveryQualityContext({
-        failedCandidate: failed, candidate, participants, baselineRequirement: current.record.baselineRequirement }));
+        failedCandidate: failed, candidate, participants, baselineRequirement: current.record.baselineRequirement, queryable }));
       const evaluation = buildImportCandidateAutoSelectionEvaluation({ candidates: freshCandidates, policy: selectionPolicy,
         qualityPolicyService: { evaluateQualityEvidence: ({ candidate }) => {
           const context = contexts.get(candidate.id);

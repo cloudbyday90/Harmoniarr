@@ -434,7 +434,15 @@ export function createLibraryDiscoveryDispatchService({
 
       const ownership = recoveryPrepared ? recoveryPrepared.requestOwnership : buildRequestOwnershipContext(claimedRequest);
       const discoveryScope = buildDiscoveryScope(claimedRequest);
-      const sharedQualityContext = recoveryPrepared ? recoveryPrepared.context : await resolveSharedDiscoveryQualityContext(claimedRequest);
+      let sharedQualityContext;
+      try {
+        sharedQualityContext = recoveryPrepared ? recoveryPrepared.context : await resolveSharedDiscoveryQualityContext(claimedRequest);
+      } catch (error) {
+        if (error?.code !== 'operator_track_scope_verification_required') throw error;
+        await libraryDiscoveryRequestStore.markDiscoveryRequestTrackScopeBlocked({ metadataReleaseId: claimedRequest.metadataReleaseId });
+        failures.push({ code: error.code, message: error.message, metadataReleaseId: claimedRequest.metadataReleaseId });
+        continue;
+      }
       const {
         formatPreferences,
         preferredFormat,

@@ -5,6 +5,17 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For track requirements, prove current recording/medium/track-position membership,
+unsupported track MBIDs, incomplete desired sets, exact scope persistence and
+post-plan catalog changes with real saves and guarded publication. Keep partial
+scope blocked before provider search, selection, pre-provider admission and
+filesystem mutation until exact subset enforcement exists. Test explicit null
+markers, mixed participants and legacy candidates against current requirements;
+do not infer permission from filename scores. Forward the owned queryable during
+recovery and prove standalone medium/recording/track writers block after final
+publication checks. See `docs/OPERATOR_TRACK_CATALOG_OUTCOME.md`. Keep initial
+red, fixture failures and pre-review passing gates separate from final evidence.
+
 Track-consent validation must distinguish suppression and declared resolved
 desire, remap review/orphan state, and binding to the selected edition. Keep
 descriptive counts while deriving resolvedDesiredCount; old total/desired counts

@@ -97,7 +97,7 @@ export function createOperatorArtistReconciliationExecutionService({
     ?? createOperatorArtistDesiredStateService();
   const resolvedOperatorArtistReconciliationRequestService = operatorArtistReconciliationRequestService
     ?? createOperatorArtistReconciliationRequestService();
-  const readMetadataArtist = getMetadataArtist ?? resolvedMetadataReadService.getArtist;
+  const readMetadataArtist = getMetadataArtist ?? resolvedMetadataReadService.getArtistWantedProjection;
   const readOperatorArtistMonitoring = getOperatorArtistMonitoring
     ?? resolvedOperatorArtistMonitoringService.getOperatorArtistMonitoring;
   const readSnapshotById = getOperatorArtistReconciliationSnapshotById
@@ -167,6 +167,7 @@ export function createOperatorArtistReconciliationExecutionService({
       releaseGroups: Array.isArray(publicationSource.releaseGroups) ? publicationSource.releaseGroups : [],
       releases: Array.isArray(publicationSource.releases) ? publicationSource.releases : [],
       trackOverrides: publicationSource.trackOverrides,
+      trackCatalog: publicationSource.trackCatalog,
     });
     const desiredReleaseIds = [
       ...new Set(
@@ -265,6 +266,7 @@ export function createOperatorArtistReconciliationExecutionService({
       snapshotSavedAt,
       suppressedTrackOverrideCount,
       trackOnlyBlockedCount: desiredStatePlan.summary.trackOnlyBlockedCount,
+      trackScopeBlockedCount: desiredStatePlan.summary.trackScopeBlockedCount,
       trackOverrideCount: publicationSource.trackOverrides.length,
       unselectedReleaseGroupCount,
       unmonitoredBlockedCount: desiredStatePlan.summary.unmonitoredBlockedCount,

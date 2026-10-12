@@ -26,7 +26,8 @@ export function createOperatorReconciliationPublicationService({ store = createO
     const source = await store.readSource({ prepared, queryable });
     if (!isDeepStrictEqual(source, prepared.source) || artistName !== source?.artist.name) throw stalePublication();
     const { effectiveReleaseGroups } = buildOperatorArtistEffectiveReleaseGroups({ releaseGroups: source.releaseGroups, releases: source.releases,
-      monitoredReleaseGroupTypes: source.monitoring.monitoredReleaseGroupTypes, releaseGroupSelections: source.releaseGroupSelections, trackOverrides: source.trackOverrides });
+      monitoredReleaseGroupTypes: source.monitoring.monitoredReleaseGroupTypes, releaseGroupSelections: source.releaseGroupSelections,
+      trackOverrides: source.trackOverrides, trackCatalog: source.trackCatalog });
     const current = createOperatorArtistDesiredStateService({ getNow: () => new Date(now) }).buildDesiredStatePlan({
       metadataArtistId: prepared.metadataArtistId, monitoring: source.monitoring, releaseGroups: effectiveReleaseGroups,
     }).desiredReleases.find(target => target.metadataReleaseId === desiredRelease.metadataReleaseId);

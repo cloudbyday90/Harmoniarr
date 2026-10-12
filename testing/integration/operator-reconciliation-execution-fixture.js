@@ -16,6 +16,7 @@ import { readOperatorReconciliationLifetimeState } from './operator-reconciliati
 
 export async function executeOperatorReconciliationFixtureRun(run, {
   transformDesiredReleases = releases => releases,
+  beforeMaterialize = async () => {},
 } = {}) {
   const requests = createOperatorArtistReconciliationRequestService({
     reconcileDiscoveryRequests: createLibraryDiscoveryRequestService().reconcileDiscoveryRequests,
@@ -27,6 +28,7 @@ export async function executeOperatorReconciliationFixtureRun(run, {
       materializeDesiredReleaseRequests: async input => {
         captured = structuredClone(input.publicationSource);
         desiredReleases = structuredClone(input.desiredReleases);
+        await beforeMaterialize(input);
         return requests.materializeDesiredReleaseRequests({ ...input,
           desiredReleases: transformDesiredReleases(input.desiredReleases) });
       },

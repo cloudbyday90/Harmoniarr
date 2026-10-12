@@ -18,6 +18,23 @@ test('ordinary reconciliation preserves a scoped refusal even after its deadline
 });
 import { createLibraryDiscoveryRequestService } from '../../src/server/library/library-discovery-request-service.js';
 
+test('an explicit null track requirement remains blocked without consuming the search budget', async () => {
+  let observed;
+  const service = createLibraryDiscoveryRequestService({ getPoolFn: () => ({ query: async () => ({ rows: [{
+    metadata_artist_id: 'artist', metadata_release_group_id: 'group', metadata_release_id: 'release',
+    wanted_status: 'missing', search_mode: 'manual', has_source_track_scope: true, source_track_scope: null,
+    search_attempt_count: 1, research_attempt_count: 2,
+  }] }) }), libraryDiscoveryRequestStore: { replaceLibraryDiscoveryRequests: async input => { observed = input.discoveryRequests[0]; } } });
+  await service.reconcileDiscoveryRequests();
+  assert.equal(observed.requestStatus, 'blocked');
+  assert.equal(observed.blockedReason, 'operator_track_scope_verification_required');
+  assert.equal(observed.nextSearchAfter, null);
+  assert.equal(observed.searchAttemptCount, 1);
+  assert.equal(observed.researchAttemptCount, 2);
+  assert.equal(Object.hasOwn(observed.evidence, 'operatorTrackScope'), true);
+  assert.equal(observed.evidence.operatorTrackScope, null);
+});
+
 test('reconcileDiscoveryRequests records ready, cooldown, and blocked automatic requests from wanted releases', async (t) => {
   const replaceLibraryDiscoveryRequests = t.mock.fn(async () => {});
   const now = new Date('2026-04-30T14:00:00.000Z');

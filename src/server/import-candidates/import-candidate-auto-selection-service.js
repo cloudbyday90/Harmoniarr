@@ -24,6 +24,8 @@ import {
   buildMusicQueueMatchSelectedActivityEvent,
 } from '../activity/music-queue-milestone-activity-event-service.js';
 import { recordActivityEventSafely } from '../activity/music-queue-lifecycle-activity-event-service.js';
+import { hasBlockedOperatorTrackScopes } from '../metadata/operator-track-scope-policy.js';
+import { createOperatorTrackScopeVerificationService } from '../metadata/operator-track-scope-verification-service.js';
 
 export const DEFAULT_AUTO_SELECTION_REASON = 'High-confidence automatic selection';
 const REVIEWABLE_STATUSES = new Set(['pending', 'held']);
@@ -60,6 +62,7 @@ function buildScoredCandidates(candidates) {
   return candidates
     // Approved metadata still requires an operator to review the actual source files.
     .filter((candidate) => !candidate?.normalizedPayload?.requestOwnership?.externalRequestReleaseIntentId)
+    .filter(candidate => !hasBlockedOperatorTrackScopes(candidate.normalizedPayload?.musicQueue ?? candidate.normalizedPayload?.musicQueueContext))
     .map((candidate) => ({
       candidate,
       score: getCandidateCompositeScore(candidate),
@@ -198,6 +201,7 @@ export function createImportCandidateAutoSelectionService({
   recordActivityEventFn = null,
   selectImportCandidate,
   selectionReason = DEFAULT_AUTO_SELECTION_REASON,
+  trackScopeVerifier = createOperatorTrackScopeVerificationService(),
 } = {}) {
   async function selectHighConfidenceCandidate({
     actorUserId = null,
@@ -280,6 +284,7 @@ export function createImportCandidateAutoSelectionService({
       };
     }
 
+    await trackScopeVerifier.assertCandidateCurrent(bestCandidate);
     await selectImportCandidate({
       actorUserId,
       importCandidateId: bestCandidate.id,

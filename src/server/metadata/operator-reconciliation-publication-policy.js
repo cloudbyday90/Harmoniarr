@@ -34,6 +34,7 @@ export function captureReconciliationPublicationSource({ artistPayload, monitori
     artist: { id: artistPayload?.artist?.id, name: artistPayload?.artist?.name },
     // Catalog query order also owns per-release progress; preserve it when capturing the plan.
     releaseGroups: artistPayload.releaseGroups.map(stableRow), releases: artistPayload.releases.map(stableRow),
+    trackCatalog: (artistPayload.trackCatalog ?? []).map(stableRow),
     monitoring: Object.fromEntries(['acquisitionProfileKey', 'isMonitored', 'monitoredReleaseGroupTypes', 'releaseScope',
       'searchOnAddMode', 'selectionSourceMode', 'wantedAutomationMode'].map(key => [key, policy[key]])),
     releaseGroupSelections: sorted(releaseGroupSelections), trackOverrides: sorted(trackOverrides),
@@ -64,6 +65,6 @@ export function isPublicationRunScope(run, prepared) {
 
 export function capturePublicationTarget(target) {
   return Object.fromEntries(['metadataArtistId', 'metadataReleaseGroupId', 'metadataReleaseId', 'musicbrainzReleaseId',
-    'releaseDate', 'releaseGroupTitle', 'releaseTitle', 'isExplicitSelection', 'selectionOrigin', 'selectionState'].map(key => [key,
+    'releaseDate', 'releaseGroupTitle', 'releaseTitle', 'isExplicitSelection', 'selectionOrigin', 'selectionState', 'operatorTrackScope'].map(key => [key,
     ['metadataArtistId', 'metadataReleaseGroupId', 'metadataReleaseId'].includes(key) ? uuid(target[key]) : target[key]]));
 }

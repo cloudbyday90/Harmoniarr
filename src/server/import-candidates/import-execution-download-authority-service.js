@@ -58,7 +58,7 @@ export function createImportExecutionDownloadAuthorityService({ store, getNow = 
       const discovery = await store.getDiscovery(metadataReleaseId, queryable);
       if (!hasCurrentRecoveryDiscovery(discovery, record?.failedSourceSearchId ?? candidate.sourceSearchId)
         || await store.findActiveSelection({ failedCandidateId: candidate.id, metadataReleaseId, queryable })) throw createStaleError();
-      context = await buildRecoveryQualityContext({ failedCandidate: candidate, participants, baselineRequirement: record?.baselineRequirement ?? null });
+      context = await buildRecoveryQualityContext({ failedCandidate: candidate, participants, baselineRequirement: record?.baselineRequirement ?? null, queryable });
     } else if (candidate.normalizedPayload?.requestOwnership != null) {
       throw createStaleError();
     }
