@@ -10,7 +10,14 @@ roots and separate receipts. Recipient-owned subset publication must not be
 suppressed by another person's active request or the shared discovery row;
 whole-release deduplication retains its prior semantics. Copies retain shared
 input, and each destination root owns filesystem containment. Preserve every
-quality floor/consent; broader unions and partial delivery recovery stay blocked.
+quality floor/consent; broader unions stay blocked. Bounded partial delivery
+recovery now uses docs/OPERATOR_TRACK_RECOVERY_OUTCOME.md: require a committed
+checkpoint bound to both current plans and all accepted participants, current
+acquisition authority and unchanged destination bytes. Preview independently
+rechecks evidence; it grants no adoption authority. Final receipts/source state
+and required events are atomic. Lost current private bytes reopen only the
+matching retired owned source; an old receipt cannot suppress that reopened
+requirement. Unrecorded copies and changed consent/catalog/root remain review.
 
 | Boundary | Source area | Question to answer |
 | --- | --- | --- |

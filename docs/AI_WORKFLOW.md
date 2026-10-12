@@ -72,6 +72,13 @@ unresolved causes and failed cohorts rather than prescribing generic retries.
 
 ## Repository Rules
 
+The standards skill also covers recoverable file delivery: connect OWASP current
+transaction authority, PostgreSQL event/receipt ownership, Node filesystem limits
+and IETF retry semantics to observable recovery behavior. Its maintained evidence
+map distinguishes partial checkpoints, fulfillment and current availability. See
+the [recovery design](OPERATOR_TRACK_RECOVERY_DESIGN.md) and
+[outcome](OPERATOR_TRACK_RECOVERY_OUTCOME.md) for the bounded two-owner proof.
+
 - Keep `.agents/` content shareable and repo-safe.
 - Do not store secrets, tokens, local absolute paths, or machine-specific setup in these files.
 - Prefer durable guidance over personal prompt fragments.

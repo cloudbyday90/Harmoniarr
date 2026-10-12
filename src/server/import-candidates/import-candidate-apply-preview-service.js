@@ -19,6 +19,7 @@
 import { stat } from 'node:fs/promises';
 import { createMediaLosslessRetentionPolicyService } from '../media/media-lossless-retention-policy-service.js';
 import { IMPORT_CANDIDATE_ADD_BLOCKER_CODES } from './import-candidate-add-blocker.js';
+import { createOperatorTrackDeliveryRecoveryService } from '../metadata/operator-track-delivery-recovery-service.js';
 
 function mapDecisionsByFileId(decisions) {
   return decisions.reduce((mapped, decision) => {
@@ -169,10 +170,13 @@ export function createImportCandidateApplyPreviewService({
   mediaTranscodePlanningService = null,
   previewImportCandidate = null,
   statFn = stat,
+  trackDeliveryRecoveryService = null,
 } = {}) {
   if (typeof previewImportCandidate !== 'function') {
     throw new Error('createImportCandidateApplyPreviewService requires previewImportCandidate');
   }
+  const recoveryService = trackDeliveryRecoveryService ?? createOperatorTrackDeliveryRecoveryService({
+    ...(mediaInspectionService ? { mediaInspectionService } : {}) });
 
   async function previewImportCandidateApply({ importCandidateId, targetUser = null }) {
     const preview = await previewImportCandidate({ importCandidateId, targetUser });
@@ -236,6 +240,13 @@ export function createImportCandidateApplyPreviewService({
         transcodePlan,
       };
     }));
+
+    if (files.some(file => file.delivery)) {
+      const delivered = await recoveryService.resolveDelivered({ importCandidateId, files });
+      for (const file of files) if (delivered.has(file.fileId) && file.sourceFile.exists) {
+        file.status = { code: 'ready', message: 'This private delivery is verified and will be retained while remaining tracks are applied.' };
+      }
+    }
 
     const counts = files.reduce((summary, file) => {
       summary.totalFiles += 1;

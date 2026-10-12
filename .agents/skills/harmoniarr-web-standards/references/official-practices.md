@@ -1,5 +1,14 @@
 # Official practices by boundary
 
+October 12 recovery guidance uses docs/OPERATOR_TRACK_RECOVERY_RESEARCH_2026_10.md.
+OWASP transaction authorization informs current recipient/root/plan checks at
+mutation and final publication. PostgreSQL cooperating locks protect checkpoint,
+receipt, source state and required events on one client; Node filesystem APIs do
+not make a copy atomic with SQL. RFC 9110 retry semantics do not grant another
+provider POST after a private copy failure. A historical receipt and a current
+byte-backed availability result are different claims. W3C timing remains draft
+measurement guidance, separate from lease authority or accessibility proof.
+
 October 12 shared-pilot guidance uses
 docs/WANTED_RECOVERY_SHARED_POSTGRES_RESEARCH_2026_10.md. Node 24 documents default
 process isolation; Testcontainers lifecycle and PostgreSQL source-connection

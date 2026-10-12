@@ -25,6 +25,7 @@ import { MUSIC_QUEUE_RECOVERY_DISCOVERY_SOURCE } from '../import-candidates/musi
 import { createLibraryWantedReleaseStore } from './library-wanted-release-store.js';
 import { createLibraryWantedReleaseReader } from './library-wanted-release-reader.js';
 import { createLibraryWantedReleaseGuardStore } from './library-wanted-release-guard-store.js';
+import { createOperatorTrackSourceLifecycleService } from '../metadata/operator-track-source-lifecycle-service.js';
 import { captureWantedContext, captureWantedRows, captureWantedSource, sameWantedProjection,
   isCompleteWantedReplacement } from './library-wanted-release-reconciliation-policy.js';
 
@@ -35,6 +36,7 @@ export function createLibraryWantedReleaseService({
   store = createLibraryWantedReleaseGuardStore(),
   assertMaintenanceWriteAllowed,
   withTransaction = createDatabaseTransactionRunner({ getPoolFn }),
+  trackSourceLifecycle = createOperatorTrackSourceLifecycleService(),
 } = {}) {
   for (const [name, fn] of Object.entries({ assertMaintenanceWriteAllowed, withTransaction,
     replaceLibraryWantedReleases: libraryWantedReleaseStore.replaceLibraryWantedReleases,
@@ -95,6 +97,8 @@ export function createLibraryWantedReleaseService({
       if (!isCompleteWantedReplacement(result, projection.wantedReleases)) {
         throw createApiError(409, 'library_wanted_projection_incomplete', 'The wanted replacement could not be verified');
       }
+      await trackSourceLifecycle.reconcileSources({ sources: (projection.source.artists ?? []).flatMap(artist => artist.trackSources ?? []),
+        queryable, assertCurrent: recheck });
       return { wantedKeys: result.wantedKeys.map((key) => ({ appUserId: key.appUserId, metadataReleaseId: key.metadataReleaseId })),
         deletedWantedKeys: result.deletedWantedKeys.map((key) => ({ appUserId: key.appUserId, metadataReleaseId: key.metadataReleaseId })) };
     });

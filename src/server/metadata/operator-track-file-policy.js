@@ -95,6 +95,8 @@ export function assertOperatorTrackMedia({ track, inspection, releaseMbid }) {
 
 export function hasOwnerTrackFulfillment({ request, candidate }) {
   const scope = request?.evidence?.operatorArtistReconciliation?.operatorTrackScope;
+  const lifecycle = request?.evidence?.operatorTrackSourceLifecycle;
+  if (lifecycle?.version === 1 && lifecycle.state === 'reopened' && isDeepStrictEqual(lifecycle.scope, scope)) return false;
   const receipts = getOperatorTrackFulfillmentReceipts(candidate);
   const ownerId = request?.requestedForUser?.id ?? request?.requestedForUserId ?? request?.requestedByUser?.id;
   return receipts.some(receipt => isSupportedOperatorTrackScope(scope) && scope.mode === 'tracks' && candidate?.status === 'applied'

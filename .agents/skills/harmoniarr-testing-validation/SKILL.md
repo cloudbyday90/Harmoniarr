@@ -30,8 +30,14 @@ and changed roots. Use the owning queryable for quality rechecks and receipt
 publication. Required-event failure must roll back both receipts and status;
 replacing one delivered file restores only that owner's Wanted requirement.
 Keep pre-fix intake/staging diagnostics separate from frozen final proof. See
-docs/OPERATOR_TRACK_UNION_OUTCOME.md. Same-file sharing, larger/multi-disc unions
-and partial restart/adoption/origin recovery remain conservative.
+docs/OPERATOR_TRACK_UNION_OUTCOME.md. Bounded partial recovery now requires the
+actual worker/run retry, one committed first-delivery checkpoint, both captured
+plans, current lease/consent/catalog/root, unchanged first bytes and mutation of
+only the unresolved recipient. Prove required-source-event rollback, lease expiry
+after a checkpoint event, private-directory redirection refusal, no provider
+dispatch and owner-specific source/Wanted reopening after byte loss. See
+docs/OPERATOR_TRACK_RECOVERY_OUTCOME.md. Same-file sharing, larger/multi-disc
+unions and unrecorded restart/adoption/origin recovery remain conservative.
 
 For track requirements, prove current recording/medium/track-position membership,
 unsupported track MBIDs, incomplete desired sets, exact scope persistence and

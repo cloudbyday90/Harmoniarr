@@ -695,6 +695,7 @@ export function createImportCandidateService({
     toStatus,
     queryable = null,
     applyResult = null,
+    applyContext = null,
   }) {
     const normalizedImportCandidateId = normalizeRequiredString(importCandidateId, {
       fieldName: 'importCandidateId',
@@ -709,7 +710,7 @@ export function createImportCandidateService({
       }
       if (toStatus === 'selected') await trackScopeVerifier.assertCandidateCurrent(currentCandidate, { queryable: client });
       if (toStatus === 'applied') {
-        const receipt = await trackFulfillmentService.persistFulfillment({ candidate: currentCandidate, applyResult, queryable: client });
+        const receipt = await trackFulfillmentService.persistFulfillment({ candidate: currentCandidate, applyResult, queryable: client, applyContext });
         if (receipt) eventDetails = { ...eventDetails, operatorTrackFulfillment: receipt };
       }
 
@@ -755,6 +756,9 @@ export function createImportCandidateService({
         previousStatus: currentCandidate.status,
         reason: normalizedReason,
       }, client);
+
+      if (toStatus === 'applied') await trackFulfillmentService.assertPublicationCurrent?.({
+        candidate: currentCandidate, applyResult, queryable: client, applyContext });
 
       return {
         candidate: transitionedCandidate,
@@ -882,6 +886,7 @@ export function createImportCandidateService({
 
   function markImportCandidateApplied({
     applyResult = null,
+    applyContext = null,
     actorUserId = null,
     importCandidateId,
     qualityLabel = null,
@@ -893,6 +898,7 @@ export function createImportCandidateService({
       actorUserId,
       eventType: 'import_candidate_applied',
       applyResult,
+      applyContext,
       fromStatuses: ['import_pending'],
       importCandidateId,
       reason,

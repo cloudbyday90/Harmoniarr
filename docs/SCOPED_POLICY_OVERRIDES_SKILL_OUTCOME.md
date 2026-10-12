@@ -1,5 +1,13 @@
 # Scoped policy overrides skill outcome
 
+October 12 recovery maintenance updates the acquisition consumer map for bounded
+two-owner checkpoints and owner-specific source retirement/reopening. Both plans,
+all accepted participants and current byte/lease evidence remain necessary;
+historical receipts cannot fulfill a reopened matching requirement. The
+[recovery outcome](OPERATOR_TRACK_RECOVERY_OUTCOME.md) owns actual worker/native
+evidence. This update uses the existing skill's source/install arrangement and
+does not claim a new independent behavioral evaluation.
+
 Completed October 3, 2026. The separate
 [design](SCOPED_POLICY_OVERRIDES_SKILL_DESIGN.md) records the capability boundary,
 alternatives, and validation plan.

@@ -71,6 +71,12 @@ that await and compare it at the owning mutation boundary. Preserve nullable
 structured values and every decision-relevant input; convenience normalization
 must not equate absent tags with an empty object or erase a saved scope.
 
+For filesystem recovery, distinguish a committed delivery checkpoint, final
+fulfillment and current availability. Bind every accepted recipient plan and
+reverify current private-root bytes before resume and final publication. A
+preview flag or historical receipt alone cannot authorize adoption. SQL locks
+cannot make file copies atomic; retain conservative review for unrecorded copies.
+
 ## Verify and report the actual result
 
 Choose evidence at the boundary that owns the claim: keyboard/pending/focus and

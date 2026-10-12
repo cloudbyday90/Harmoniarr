@@ -1,5 +1,14 @@
 # Practical web standards skill outcome
 
+October 12 delivery-recovery maintenance adds a practical distinction between
+checkpoint, fulfillment and current availability. References map complete current
+recipient plans, private-root byte checks, lease gates, source lifecycle and
+atomic required events to the [recovery design](OPERATOR_TRACK_RECOVERY_DESIGN.md),
+[research](OPERATOR_TRACK_RECOVERY_RESEARCH_2026_10.md) and
+[outcome](OPERATOR_TRACK_RECOVERY_OUTCOME.md). This is narrow reference/workflow
+maintenance; structural validation and installed hashes are checked separately
+from runtime evidence. No new blind trial or conformance certification is claimed.
+
 October 12 shared-pilot maintenance maps actual completion and first-failure
 drainage to parent-owned resource observation. Admission closes before probes;
 original native failure and Error/null remain separate from healthy snapshots.

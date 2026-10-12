@@ -6,6 +6,28 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Two-owner delivery recovery (2026-10-12)
+
+The [recovery outcome](OPERATOR_TRACK_RECOVERY_OUTCOME.md),
+[design](OPERATOR_TRACK_RECOVERY_DESIGN.md) and
+[official research](OPERATOR_TRACK_RECOVERY_RESEARCH_2026_10.md) own the bounded
+implementation and proof. Verified partial copies now retain durable checkpoints
+bound to both current plans. Actual worker retry resumes only the unresolved
+recipient without provider dispatch. Final two-owner receipts, applied status,
+source retirement and required events commit together. Loss of current private
+bytes reopens only the corresponding matching owned source/Wanted requirement.
+
+- Validation: frozen fast gate passes 9,995 cases, static checks and both builds;
+  88/88 affected native cases across twelve serial files, without failures,
+  cancellations or skips. Controls prove real partial retry, event rollback,
+  redirected root refusal, late lease expiry and owner-specific reopening. Five
+  skill validators/seven installed hashes pass; dependency audit reports zero
+  vulnerabilities. The outcome preserves pre-fix diagnostics separately.
+- Next: measure receipt lookup, then design an indexed owner receipt ledger with
+  scan-owned invalidation and explicit backfill/rollback contracts. Preserve
+  historical evidence versus current availability. Broader unions and changed-
+  scope source intake remain separate; unrecorded crash copies require review.
+
 ## Completed slice: Wanted/recovery shared PostgreSQL pilot (2026-10-12)
 
 The [pilot outcome](WANTED_RECOVERY_SHARED_POSTGRES_OUTCOME.md),
@@ -67,8 +89,9 @@ as clean gates. Source remained frozen and no bounds/assertions/skips changed.
 
 - Validation follow-up: the newer fixture-reset slice above repairs reproduced
   policy/observer defects while preserving unresolved historical reset evidence.
-  Partial delivery recovery, fulfilled-source retirement and safe reopening when
-  owned media is missing remain the feature follow-up. Broader unions are separate.
+  The recovery slice above now proves partial delivery recovery, fulfilled-source
+  retirement and safe reopening for missing owned media. Broader unions remain
+  separate.
 
 ## Completed slice: Exact single-track acquisition (2026-10-12)
 

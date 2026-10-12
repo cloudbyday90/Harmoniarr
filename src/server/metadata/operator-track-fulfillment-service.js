@@ -9,19 +9,51 @@ import { createOperatorTrackScopeVerificationService } from './operator-track-sc
 import { createOperatorTrackAcquisitionStore } from './operator-track-acquisition-store.js';
 import { refuseOperatorTrackFiles } from './operator-track-file-policy.js';
 import { createOperatorTrackDeliveryPlanService } from './operator-track-delivery-plan-service.js';
+import { createOperatorTrackDeliveryProgressStore } from './operator-track-delivery-progress-store.js';
+import { fingerprintOperatorTrackFile } from './operator-track-file-evidence-service.js';
+import { createOperatorTrackSourceLifecycleService } from './operator-track-source-lifecycle-service.js';
+import { isCurrentJobLeaseAcquisition, normalizeExpectedJobLease } from '../job-lease-policy.js';
 
 export function createOperatorTrackFulfillmentService({
   verifier = createOperatorTrackScopeVerificationService(), store = createOperatorTrackAcquisitionStore(),
   deliveryPlanService = createOperatorTrackDeliveryPlanService(),
+  progressStore = createOperatorTrackDeliveryProgressStore(), fingerprintTrackFile = fingerprintOperatorTrackFile,
+  sourceLifecycle = createOperatorTrackSourceLifecycleService(),
 } = {}) {
-  async function persistFulfillment({ candidate, applyResult, queryable }) {
+  async function assertPublicationCurrent({ candidate, applyResult, queryable, applyContext = null }) {
     const selection = await verifier.assertCandidateCurrent(candidate, { queryable });
+    if (!selection?.sharedDelivery) return;
+    if (applyContext) {
+      const expectedLease = normalizeExpectedJobLease(applyContext.expectedLease, { leaseKey: `import_candidate_apply:${applyContext.operationRunId}` });
+      if (!expectedLease) throw refuseOperatorTrackFiles();
+      const { run, lease, now } = await progressStore.readAuthority({ ...applyContext, expectedLease, queryable });
+      if (run?.operation_type !== 'import_candidate_apply' || run.status !== 'running' || run.cancel_requested_at || run.cancelled_at
+        || (Array.isArray(run.summary?.importCandidateIds) && !run.summary.importCandidateIds.includes(candidate.id))
+        || !isCurrentJobLeaseAcquisition(lease, expectedLease, { now })) throw refuseOperatorTrackFiles();
+    }
+    await deliveryPlanService.assertPreviewCurrent({ selection, files: applyResult.fileOperations, queryable });
+    for (const file of applyResult.fileOperations) if (!isDeepStrictEqual(file.trackFileEvidence,
+      await fingerprintTrackFile(file.libraryPath, { libraryRoot: file.delivery?.libraryRoot }))) throw refuseOperatorTrackFiles();
+  }
+  async function persistFulfillment({ candidate, applyResult, queryable, applyContext = null }) {
+    let selection = await verifier.assertCandidateCurrent(candidate, { queryable });
     if (!selection) return null;
     if (selection.sharedDelivery) {
+      const expectedLease = applyContext ? normalizeExpectedJobLease(applyContext.expectedLease,
+        { leaseKey: `import_candidate_apply:${applyContext.operationRunId}` }) : null;
+      if (applyContext && !expectedLease) throw refuseOperatorTrackFiles();
+      candidate = await progressStore.lockContext({ candidate, queryable, ...(applyContext ? { ...applyContext, expectedLease } : {}) });
+      const current = await verifier.assertCandidateCurrent(candidate, { queryable });
+      if (!isDeepStrictEqual(current.participants, selection.participants)) throw refuseOperatorTrackFiles();
+      selection = current;
       const files = applyResult?.fileOperations;
       if (!isDeepStrictEqual(applyResult?.operatorTrackScope, selection.scope) || files?.length !== 2
         || new Set(files.map(file => file.fileId)).size !== 2) throw refuseOperatorTrackFiles();
       await deliveryPlanService.assertPreviewCurrent({ selection, files, queryable });
+      await assertPublicationCurrent({ candidate, applyResult, queryable, applyContext });
+      for (const file of files) {
+        if (!isDeepStrictEqual(file.trackFileEvidence, await fingerprintTrackFile(file.libraryPath, { libraryRoot: file.delivery?.libraryRoot }))) throw refuseOperatorTrackFiles();
+      }
       const receipts = selection.participants.map(participant => {
         const binding = selection.bindings.find(entry => entry.track.metadataTrackId === participant.scope.tracks[0].metadataTrackId);
         const file = files.find(entry => entry.fileId === binding?.fileId);
@@ -33,6 +65,9 @@ export function createOperatorTrackFulfillmentService({
       });
       const receipt = structuredClone({ version: 2, receipts });
       await store.saveFulfillment({ importCandidateId: candidate.id, receipt, queryable });
+      await sourceLifecycle.reconcileSources({ sources: receipts.map(entry => ({ ownerId: entry.ownerId, mediaRequestId: entry.sourceMediaRequestId,
+        importCandidateId: candidate.id, scope: entry.scope, available: true })), queryable,
+      assertCurrent: () => assertPublicationCurrent({ candidate, applyResult, queryable, applyContext }) });
       return receipt;
     }
     const files = applyResult?.fileOperations;
@@ -48,5 +83,5 @@ export function createOperatorTrackFulfillmentService({
     await store.saveFulfillment({ importCandidateId: candidate.id, receipt, queryable });
     return receipt;
   }
-  return { persistFulfillment };
+  return { persistFulfillment, assertPublicationCurrent };
 }

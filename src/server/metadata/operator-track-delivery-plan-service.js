@@ -6,6 +6,7 @@
  */
 import { posix as path } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
+import { realpath } from 'node:fs/promises';
 import { getPool } from '../database.js';
 import { loadSettings } from '../settings.js';
 import { buildUserMusicRootPath } from '../paths/user-music-root-service.js';
@@ -16,16 +17,28 @@ const normalize = value => typeof value === 'string' ? value.replaceAll('\\', '/
 const within = (filePath, root) => path.resolve(normalize(filePath)).toLowerCase().startsWith(`${path.resolve(normalize(root)).toLowerCase()}/`);
 
 export function createOperatorTrackDeliveryPlanService({ getPoolFn = getPool,
-  store = createOperatorTrackAcquisitionStore({ getPoolFn }), loadSettingsFn = loadSettings } = {}) {
+  store = createOperatorTrackAcquisitionStore({ getPoolFn }), loadSettingsFn = loadSettings, realpathFn = realpath } = {}) {
+  async function resolvePrivateOwnerRoot({ ownerId, queryable = null, settings = null }) {
+    const currentSettings = settings ?? await loadSettingsFn(queryable ?? getPoolFn());
+    const musicRoot = currentSettings.paths?.music;
+    const owner = await store.readDeliveryOwner({ ownerId, queryable });
+    if (!musicRoot || !owner || owner.is_disabled === true || !owner.managed_library_relative_root) throw refuseOperatorTrackFiles();
+    const root = buildUserMusicRootPath({ musicRoot, relativeRoot: owner.managed_library_relative_root });
+    try {
+      const actual = normalize(await realpathFn(root));
+      const expected = normalize(buildUserMusicRootPath({ musicRoot: await realpathFn(musicRoot), relativeRoot: owner.managed_library_relative_root }));
+      const compare = value => process.platform === 'win32' ? value.toLowerCase() : value;
+      if (compare(actual) !== compare(expected)) throw refuseOperatorTrackFiles();
+    } catch (error) { if (!['ENOENT', 'ENOTDIR'].includes(error?.code)) throw error; }
+    return root;
+  }
   async function readRoots({ selection, settings = null, queryable = null }) {
     const currentSettings = settings ?? await loadSettingsFn(queryable ?? getPoolFn());
     const musicRoot = currentSettings.paths?.music;
     if (!musicRoot) throw refuseOperatorTrackFiles();
     const roots = [];
     for (const participant of selection.participants) {
-      const owner = await store.readDeliveryOwner({ ownerId: participant.ownerId, queryable });
-      if (!owner || owner.is_disabled === true || !owner.managed_library_relative_root) throw refuseOperatorTrackFiles();
-      roots.push({ participant, root: buildUserMusicRootPath({ musicRoot, relativeRoot: owner.managed_library_relative_root }) });
+      roots.push({ participant, root: await resolvePrivateOwnerRoot({ ownerId: participant.ownerId, queryable, settings: currentSettings }) });
     }
     if (roots.length !== 2 || within(roots[0].root, roots[1].root) || within(roots[1].root, roots[0].root)
       || normalize(roots[0].root).toLowerCase() === normalize(roots[1].root).toLowerCase()) throw refuseOperatorTrackFiles();
@@ -51,5 +64,5 @@ export function createOperatorTrackDeliveryPlanService({ getPoolFn = getPool,
         || !within(file.libraryTarget?.path ?? file.libraryPath, target.root)) throw refuseOperatorTrackFiles();
     }
   }
-  return { planFilePreviews, assertPreviewCurrent, assertRecipientsCurrent: readRoots };
+  return { planFilePreviews, assertPreviewCurrent, assertRecipientsCurrent: readRoots, resolvePrivateOwnerRoot };
 }

@@ -8,6 +8,7 @@
 import { createApiError } from '../auth.js';
 import { createOperatorTrackAcquisitionStore } from '../metadata/operator-track-acquisition-store.js';
 import { fingerprintOperatorTrackFile } from '../metadata/operator-track-file-evidence-service.js';
+import { createOperatorTrackDeliveryPlanService } from '../metadata/operator-track-delivery-plan-service.js';
 import { isDeepStrictEqual } from 'node:util';
 import { createMetadataReadService } from '../metadata/metadata-read-service.js';
 import { createOperatorArtistMonitoringStore } from '../metadata/operator-artist-monitoring-store.js';
@@ -33,6 +34,7 @@ export function createLibraryWantedReleaseReader({
   libraryWantedReleaseProjectionService = createLibraryWantedReleaseProjectionService(),
   listTrackFulfillment = null,
   fingerprintTrackFile = fingerprintOperatorTrackFile,
+  resolvePrivateTrackRoot = createOperatorTrackDeliveryPlanService().resolvePrivateOwnerRoot,
 } = {}) {
   async function readWantedReleaseProjection({ queryable }) {
     if (typeof queryable?.query !== 'function') throw new TypeError('Wanted projection requires a transaction queryable');
@@ -79,14 +81,23 @@ export function createLibraryWantedReleaseReader({
       const needsTrackFulfillment = inputs.trackOverrides.some(override => override.isDesired === true);
       const receipts = needsTrackFulfillment && metadataReleaseIds.length ? await readFulfillment({ ownerId: appUserId, metadataReleaseIds, queryable }) : [];
       const trackFulfillment = [];
+      const trackSources = [];
+      const desired = libraryWantedReleaseProjectionService.projectWantedReleases({ appUserId, ...inputs, libraryReleaseReconciliations: availability });
       for (const receipt of receipts) {
         if (receipt?.version !== 1 || receipt.ownerId !== appUserId || receipt.files?.length !== 1) continue;
+        let available = false; let currentRoot = null;
         try {
-          const evidence = await fingerprintTrackFile(receipt.files[0].libraryPath);
-          if (isDeepStrictEqual(evidence, receipt.files[0].evidence)) trackFulfillment.push(receipt);
-        } catch (error) { if (!['ENOENT', 'ENOTDIR'].includes(error?.code)) throw error; }
+          if (receipt.wantedReleaseId) currentRoot = await resolvePrivateTrackRoot({ ownerId: appUserId, queryable });
+          const evidence = await fingerprintTrackFile(receipt.files[0].libraryPath, currentRoot ? { libraryRoot: currentRoot } : {});
+          available = isDeepStrictEqual(evidence, receipt.files[0].evidence);
+          if (available) trackFulfillment.push(receipt);
+        } catch (error) { if (!['ENOENT', 'ENOTDIR', 'operator_track_scope_verification_required'].includes(error?.code)) throw error; }
+        if (receipt.wantedReleaseId && receipt.importCandidateId && desired.some(row => isDeepStrictEqual(row.evidence?.operatorTrackScope, receipt.scope))) {
+          trackSources.push({ ownerId: appUserId, mediaRequestId: receipt.sourceMediaRequestId, importCandidateId: receipt.importCandidateId,
+            scope: receipt.scope, available, currentRoot });
+        }
       }
-      const source = capture({ ...inputs, libraryReleaseReconciliations: availability, trackFulfillment });
+      const source = capture({ ...inputs, libraryReleaseReconciliations: availability, trackFulfillment, trackSources });
       const wantedReleases = libraryWantedReleaseProjectionService.projectWantedReleases({ appUserId, ...source });
       results.push({ wantedReleases, source });
     }

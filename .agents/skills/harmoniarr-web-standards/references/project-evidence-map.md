@@ -1,5 +1,16 @@
 # Project standards-to-evidence map
 
+Two-owner recovery: operator-track-delivery-progress-{policy,store,service}.js
+binds both plans and a verified delivery to the accepted participants and current
+apply acquisition. operator-track-delivery-recovery-service.js independently
+rechecks saved evidence for preview/execution. Fulfillment and source-lifecycle
+services publish two receipts, retire owned typed requests and commit required
+events together. Wanted's reader captures current availability without writes;
+reconciliation reopens only matching retired sources whose delivery is lost.
+The recovery design/research/outcome own real worker, byte-change, root-alias,
+late-lease and event-rollback proof. Unrecorded copies and unsupported unions
+remain review; no provider replay or filesystem/SQL atomicity is implied.
+
 Shared-pilot evidence: Wanted reuses library-scan-worker-fixture.js's pre-launch
 registration and returned completion; recovery uses parallel-task-drain.js for
 competing observations. owned-postgres-server.js privately binds its fresh-server
@@ -40,8 +51,9 @@ apply uses each recipient root as its filesystem boundary and retains shared
 download input through copies. Version-two receipt envelopes contain separate
 owner/request/scope/byte receipts, visible to each owned request and Wanted read.
 The union design/research/outcome own actual worker, PostgreSQL, media, rollback
-and late-change evidence. Arbitrary unions, same-file delivery and partial
-recovery remain conservative; metadata tags do not establish acoustic identity.
+and late-change evidence. Arbitrary unions and same-file delivery remain
+conservative; bounded partial recovery is now described above. Metadata tags
+do not establish acoustic identity.
 
 Exact single-track acquisition: metadata/operator-track-file-policy.js binds one
 numbered file to a supported disc-one track and refuses contradictory raw paths;

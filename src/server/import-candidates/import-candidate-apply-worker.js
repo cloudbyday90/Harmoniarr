@@ -599,6 +599,7 @@ export function createImportCandidateApplyWorker({
               }),
               operationPositionStart,
               operationRunId: runId,
+              expectedLease: acquiredLease,
             });
             const itemStatus = (applyResult.summary.failedFileCount ?? 0) > 0
               ? 'apply_failed'
@@ -656,6 +657,7 @@ export function createImportCandidateApplyWorker({
               });
               await markImportCandidateApplied({
                 applyResult,
+                applyContext: { operationRunId: runId, expectedLease: acquiredLease },
                 importCandidateId: summaryCandidate.id,
                 qualityLabel: outcomeQuality.qualityLabel,
                 qualityWeight: outcomeQuality.qualityWeight,

@@ -25,6 +25,9 @@ import { getPool } from '../database.js';
 import { createMediaInspectionService } from '../media/media-inspection-service.js';
 import { assertOperatorTrackMedia, refuseOperatorTrackFiles } from '../metadata/operator-track-file-policy.js';
 import { fingerprintOperatorTrackFile } from '../metadata/operator-track-file-evidence-service.js';
+import { createOperatorTrackDeliveryRecoveryService } from '../metadata/operator-track-delivery-recovery-service.js';
+import { createOperatorTrackDeliveryProgressService } from '../metadata/operator-track-delivery-progress-service.js';
+import { createOperatorTrackDeliveryProgressStore } from '../metadata/operator-track-delivery-progress-store.js';
 import { recordImportOperation } from './import-candidate-operation-repository.js';
 import { assertSafeAutoApplyInputs } from './import-candidate-safe-auto-apply-input-policy.js';
 
@@ -222,6 +225,8 @@ export function createImportCandidateApplyOperationService({
   getPoolFn = getPool,
   mediaInspectionService = createMediaInspectionService(),
   fingerprintTrackFile = fingerprintOperatorTrackFile,
+  trackDeliveryRecoveryService = null,
+  trackDeliveryProgressService = null,
   assertTrackScopeCurrent = createOperatorTrackScopeVerificationService({ getPoolFn }).assertCandidateIdCurrent,
 } = {}) {
   const resolvedMediaFilesystemService = mediaFilesystemService ?? createMediaFilesystemService({
@@ -231,6 +236,10 @@ export function createImportCandidateApplyOperationService({
     removeFileFn,
     statFn,
   });
+  const recoveryService = trackDeliveryRecoveryService ?? createOperatorTrackDeliveryRecoveryService({
+    store: createOperatorTrackDeliveryProgressStore({ getPoolFn }),
+    verifier: createOperatorTrackScopeVerificationService({ getPoolFn }), mediaInspectionService, fingerprintTrackFile });
+  const progressService = trackDeliveryProgressService ?? createOperatorTrackDeliveryProgressService({ getPoolFn, mediaInspectionService, fingerprintTrackFile });
 
   async function applyImportCandidatePreview({
     applyPreview,
@@ -241,14 +250,18 @@ export function createImportCandidateApplyOperationService({
     onMutationIntent: onMutationIntentFn = onMutationIntent,
     operationPositionStart = 0,
     operationRunId = null,
+    expectedLease = null,
   }) {
     if (!Array.isArray(applyPreview?.files)) {
       throw new Error('applyPreview.files must be an array');
     }
     const trackSelection = await assertTrackScopeCurrent(importCandidateId, { applyPreview });
-    if (trackSelection && applyPreview.files.some(file => file.recovery?.confirmedFinalizeIntent)) throw refuseOperatorTrackFiles();
+    if (trackSelection?.sharedDelivery && operationRunId && !expectedLease) throw refuseOperatorTrackFiles();
+    const delivered = trackSelection?.sharedDelivery
+      ? await recoveryService.resolveDelivered({ importCandidateId, files: applyPreview.files, selection: trackSelection }) : new Map();
+    if (trackSelection && applyPreview.files.some(file => file.recovery?.confirmedFinalizeIntent && !delivered.has(file.fileId))) throw refuseOperatorTrackFiles();
     if (trackSelection?.sharedDelivery) {
-      if (applyPreview.files.some(file => file.recovery)) throw refuseOperatorTrackFiles();
+      if (applyPreview.files.some(file => file.recovery && !delivered.has(file.fileId))) throw refuseOperatorTrackFiles();
       executionMode = 'copy';
     }
 
@@ -259,6 +272,7 @@ export function createImportCandidateApplyOperationService({
     const fileOperations = [];
     const summary = {
       appliedFileCount: 0,
+      ...(trackSelection?.sharedDelivery ? { resumedDeliveryCount: 0 } : {}),
       failedFileCount: 0,
       notAttemptedCount: 0,
       reusedExistingLosslessCount: 0,
@@ -309,6 +323,9 @@ export function createImportCandidateApplyOperationService({
       });
 
       await onMutationIntentFn(intent);
+      if (trackSelection?.sharedDelivery && operationRunId && expectedLease) {
+        await progressService.assertDeliveryAuthority({ importCandidateId, applyPreview, operationRunId, expectedLease });
+      }
       const currentSelection = await assertTrackScopeCurrent(importCandidateId, { applyPreview });
       if (trackSelection) {
         const binding = currentSelection?.bindings.find(entry => entry.fileId === file.fileId);
@@ -411,6 +428,15 @@ export function createImportCandidateApplyOperationService({
 
     for (let index = 0; index < applyPreview.files.length; index += 1) {
       const file = applyPreview.files[index];
+
+      if (delivered.has(file.fileId)) {
+        const current = await assertTrackScopeCurrent(importCandidateId, { applyPreview });
+        const rechecked = await recoveryService.resolveDelivered({ importCandidateId, files: applyPreview.files, selection: current });
+        if (!rechecked.has(file.fileId)) throw refuseOperatorTrackFiles();
+        fileOperations.push({ ...rechecked.get(file.fileId), transport: 'verified_delivery_resume', steps: [] });
+        summary.appliedFileCount += 1; summary.resumedDeliveryCount += 1;
+        continue;
+      }
 
       if (file.status?.code === 'skipped') {
         const pendingStep = resolvePendingStep(file);
@@ -666,6 +692,9 @@ export function createImportCandidateApplyOperationService({
           operation.verifiedTrack = structuredClone(track);
           operation.trackFileEvidence = await fingerprintTrackFile(file.libraryTarget.path);
           if (!isDeepStrictEqual(beforeInspection, operation.trackFileEvidence)) throw refuseOperatorTrackFiles();
+          if (trackSelection.sharedDelivery && operationRunId && expectedLease) {
+            await progressService.recordDelivery({ importCandidateId, operation, applyPreview, operationRunId, expectedLease });
+          }
         }
         summary.appliedFileCount += 1;
         await persistOperation({
@@ -721,6 +750,7 @@ export function createImportCandidateApplyOperationService({
           executionMode,
           fileOperations,
           summary,
+          ...(trackSelection ? { operatorTrackScope: trackSelection.scope } : {}),
         };
       }
     }

@@ -74,6 +74,7 @@ cases and thirteen fresh scenario variants. Use
 [official research](docs/CATALOGUE_TEST_LIFECYCLE_RESEARCH_2026_10.md).
 
 - [Planning document](docs/harmoniarr.md)
+- [Two-owner delivery recovery design](docs/OPERATOR_TRACK_RECOVERY_DESIGN.md), [official research](docs/OPERATOR_TRACK_RECOVERY_RESEARCH_2026_10.md) and [outcome](docs/OPERATOR_TRACK_RECOVERY_OUTCOME.md)
 - [AI workflow and shared Copilot skills](docs/AI_WORKFLOW.md)
 - [Docker deployment baseline](docs/DOCKER_DEPLOYMENT.md)
 - [Local Docker walkthrough](docs/LOCAL_DOCKER_WALKTHROUGH.md)
