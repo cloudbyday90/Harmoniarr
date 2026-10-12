@@ -42,5 +42,11 @@ export function isReleaseWideOperatorTrackScope(scope) {
 export function hasBlockedOperatorTrackScopes(context) {
   if (!context || !Object.hasOwn(context, 'operatorTrackScopes')) return false;
   return !Array.isArray(context.operatorTrackScopes) || context.operatorTrackScopes.length === 0
-    || context.operatorTrackScopes.some(entry => !text(entry?.wantedReleaseId ?? entry?.mediaRequestId) || !isReleaseWideOperatorTrackScope(entry.scope));
+    || context.operatorTrackScopes.some(entry => !text(entry?.wantedReleaseId ?? entry?.mediaRequestId) || !isSupportedOperatorTrackScope(entry.scope));
+}
+
+export function isSupportedOperatorTrackScope(scope) {
+  return isReleaseWideOperatorTrackScope(scope) || (scope?.mode === 'tracks'
+    && scope.tracks?.length === 1 && scope.tracks[0]?.mediumPosition === 1
+    && isReleaseWideOperatorTrackScope({ ...scope, mode: 'release' }));
 }

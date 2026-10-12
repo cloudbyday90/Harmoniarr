@@ -1,5 +1,19 @@
 # Project standards-to-evidence map
 
+Exact single-track acquisition: metadata/operator-track-file-policy.js binds one
+numbered file to a supported disc-one track and refuses contradictory raw paths;
+the scope verifier checks current consent/catalog and exact requested manifests
+on the owning queryable. Candidate preview/execution filter sibling/artwork files.
+Apply probes actual source/staging/destination identity and records stable SHA-256
+evidence. operator-track-fulfillment-service.js persists owner/request/scope/file
+receipts with applied status and required event; Wanted compares current bytes.
+Global complete/duplicate counts cannot replace owner-specific subset evidence.
+Use the subset design/research/outcome for supported scope and executed proof.
+Other subset shapes and incompatible participants stay blocked; source-owner
+delivery is not implicit delivery to every shared participant. Embedded MBIDs
+do not prove acoustic identity. This slice supersedes the preceding blanket
+subset block only for the specifically verified single-track case.
+
 Verified track requirements: operator-track-catalog-store.js reads current
 release/recording/medium/track identities; operator-track-scope-policy.js resolves
 recording+positions exactly and refuses unsupported track MBIDs. Effective state

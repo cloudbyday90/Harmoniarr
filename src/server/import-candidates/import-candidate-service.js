@@ -25,6 +25,9 @@ import { resolveScoringSettings, scoreDownloadResult } from '../library/download
 import { loadSettings } from '../settings.js';
 import { scoreCandidateFormatMatch } from '../library/format-preference-scoring.js';
 import { getPool } from '../database.js';
+import { createOperatorTrackScopeVerificationService } from '../metadata/operator-track-scope-verification-service.js';
+import { createOperatorTrackAcquisitionStore } from '../metadata/operator-track-acquisition-store.js';
+import { createOperatorTrackFulfillmentService } from '../metadata/operator-track-fulfillment-service.js';
 import {
   createSlskdIngestionDiagnostics,
   finalizeSlskdIngestionDiagnostics,
@@ -497,6 +500,9 @@ export function createImportCandidateService({
   musicQueueSelectionGuard = createImportCandidateMusicQueueSelectionGuard(),
   normalizeSlskdResponsesFn = normalizeSlskdResponsesToImportCandidatesWithDiagnostics,
   pool = getPool(),
+  trackScopeVerifier = createOperatorTrackScopeVerificationService({ getPoolFn: () => pool }),
+  trackAcquisitionStore = createOperatorTrackAcquisitionStore({ getPoolFn: () => pool }),
+  trackFulfillmentService = createOperatorTrackFulfillmentService({ verifier: trackScopeVerifier, store: trackAcquisitionStore }),
   recordAuditEventFn = recordAuditEvent,
   recordSourceUserOutcomeEvidenceFn = async () => null,
   replaceImportCandidateFilesFn = replaceImportCandidateFiles,
@@ -688,6 +694,7 @@ export function createImportCandidateService({
     summary,
     toStatus,
     queryable = null,
+    applyResult = null,
   }) {
     const normalizedImportCandidateId = normalizeRequiredString(importCandidateId, {
       fieldName: 'importCandidateId',
@@ -699,6 +706,11 @@ export function createImportCandidateService({
       const currentCandidate = await getImportCandidateByIdFn(normalizedImportCandidateId, client);
       if (!currentCandidate) {
         throw createApiError(404, 'import_candidate_not_found', 'Import candidate not found');
+      }
+      if (toStatus === 'selected') await trackScopeVerifier.assertCandidateCurrent(currentCandidate, { queryable: client });
+      if (toStatus === 'applied') {
+        const receipt = await trackFulfillmentService.persistFulfillment({ candidate: currentCandidate, applyResult, queryable: client });
+        if (receipt) eventDetails = { ...eventDetails, operatorTrackFulfillment: receipt };
       }
 
       if (toStatus === 'selected'
@@ -869,6 +881,7 @@ export function createImportCandidateService({
   }
 
   function markImportCandidateApplied({
+    applyResult = null,
     actorUserId = null,
     importCandidateId,
     qualityLabel = null,
@@ -879,6 +892,7 @@ export function createImportCandidateService({
     return transitionCandidateReviewStatus({
       actorUserId,
       eventType: 'import_candidate_applied',
+      applyResult,
       fromStatuses: ['import_pending'],
       importCandidateId,
       reason,

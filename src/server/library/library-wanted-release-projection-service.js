@@ -20,6 +20,7 @@ import { normalizeMetadataReleaseDateForDateColumn } from '../metadata/metadata-
 import { createOperatorArtistDesiredStateService } from '../metadata/operator-artist-desired-state-service.js';
 import { buildOperatorArtistEffectiveReleaseGroups } from '../metadata/operator-artist-effective-state.js';
 import { defaultOperatorArtistMonitoringPolicy } from '../metadata/operator-artist-monitoring-policy.js';
+import { isDeepStrictEqual } from 'node:util';
 
 function toCount(value) {
   const parsed = Number.parseInt(String(value ?? 0), 10);
@@ -131,6 +132,7 @@ export function buildLibraryWantedReleaseProjection({
   operatorArtistDesiredStateService = createOperatorArtistDesiredStateService(),
   releaseGroupSelections = [],
   trackOverrides = [],
+  trackFulfillment = [],
 } = {}) {
   if (typeof appUserId !== 'string' || appUserId.trim().length < 1) {
     return [];
@@ -170,9 +172,12 @@ export function buildLibraryWantedReleaseProjection({
     .filter((desiredRelease) => (
       typeof desiredRelease.metadataReleaseId === 'string'
       && desiredRelease.metadataReleaseId.length > 0
-      && !isAcquiredReconciliation(reconciliationByReleaseId.get(desiredRelease.metadataReleaseId))
+      && (desiredRelease.operatorTrackScope?.mode === 'tracks' || !isAcquiredReconciliation(reconciliationByReleaseId.get(desiredRelease.metadataReleaseId)))
       && (desiredRelease.isExplicitSelection === true || desiredRelease.eligibleForDownstreamWork === true)
     ))
+    .filter(desiredRelease => desiredRelease.operatorTrackScope?.mode !== 'tracks' || !trackFulfillment.some(receipt =>
+      receipt.ownerId === appUserId && isDeepStrictEqual(receipt.scope, desiredRelease.operatorTrackScope)
+      && receipt.files?.length === 1 && isDeepStrictEqual(receipt.files[0].track, desiredRelease.operatorTrackScope.tracks[0])))
     .map((desiredRelease) => {
       const wantedRelease = toWantedRelease({
         desiredRelease,

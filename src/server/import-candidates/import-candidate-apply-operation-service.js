@@ -17,10 +17,14 @@
  */
 
 import { copyFile, link, mkdir, rm, stat } from 'node:fs/promises';
+import { isDeepStrictEqual } from 'node:util';
 import { posix as path } from 'node:path';
 import { createMediaFilesystemService } from '../media/media-filesystem-service.js';
 import { createOperatorTrackScopeVerificationService } from '../metadata/operator-track-scope-verification-service.js';
 import { getPool } from '../database.js';
+import { createMediaInspectionService } from '../media/media-inspection-service.js';
+import { assertOperatorTrackMedia, refuseOperatorTrackFiles } from '../metadata/operator-track-file-policy.js';
+import { fingerprintOperatorTrackFile } from '../metadata/operator-track-file-evidence-service.js';
 import { recordImportOperation } from './import-candidate-operation-repository.js';
 import { assertSafeAutoApplyInputs } from './import-candidate-safe-auto-apply-input-policy.js';
 
@@ -216,6 +220,8 @@ export function createImportCandidateApplyOperationService({
   removeFileFn = rm,
   statFn = stat,
   getPoolFn = getPool,
+  mediaInspectionService = createMediaInspectionService(),
+  fingerprintTrackFile = fingerprintOperatorTrackFile,
   assertTrackScopeCurrent = createOperatorTrackScopeVerificationService({ getPoolFn }).assertCandidateIdCurrent,
 } = {}) {
   const resolvedMediaFilesystemService = mediaFilesystemService ?? createMediaFilesystemService({
@@ -239,7 +245,8 @@ export function createImportCandidateApplyOperationService({
     if (!Array.isArray(applyPreview?.files)) {
       throw new Error('applyPreview.files must be an array');
     }
-    await assertTrackScopeCurrent(importCandidateId);
+    const trackSelection = await assertTrackScopeCurrent(importCandidateId, { applyPreview });
+    if (trackSelection && applyPreview.files.some(file => file.recovery?.confirmedFinalizeIntent)) throw refuseOperatorTrackFiles();
 
     if ((applyPreview?.summary?.status ?? 'blocked') === 'blocked') {
       throw buildBlockedError(applyPreview.summary?.message ?? 'Import candidate is not ready for apply.');
@@ -298,8 +305,15 @@ export function createImportCandidateApplyOperationService({
       });
 
       await onMutationIntentFn(intent);
-      await assertTrackScopeCurrent(importCandidateId);
+      const currentSelection = await assertTrackScopeCurrent(importCandidateId, { applyPreview });
+      if (trackSelection) {
+        const binding = currentSelection?.bindings.find(entry => entry.fileId === file.fileId);
+        if (!binding) throw refuseOperatorTrackFiles();
+        assertOperatorTrackMedia({ track: binding.track, releaseMbid: currentSelection.releaseMbid,
+          inspection: await mediaInspectionService.inspectSourceFile({ sourcePath }) });
+      }
       if (applySafetyMode === 'safe_auto') await assertSafeAutoPolicyCurrent();
+      if (trackSelection) await assertTrackScopeCurrent(importCandidateId, { applyPreview });
 
       const result = await resolvedMediaFilesystemService.applyExclusiveFileMutationPlan(
         resolvedMediaFilesystemService.createExclusiveFileMutationPlan({
@@ -639,6 +653,15 @@ export function createImportCandidateApplyOperationService({
         });
         operation.status = 'applied';
         operation.transport = finalizeMove.transport;
+        if (trackSelection) {
+          const track = trackSelection.bindings.find(entry => entry.fileId === file.fileId).track;
+          const beforeInspection = await fingerprintTrackFile(file.libraryTarget.path);
+          assertOperatorTrackMedia({ track, releaseMbid: trackSelection.releaseMbid,
+            inspection: await mediaInspectionService.inspectSourceFile({ sourcePath: file.libraryTarget.path }) });
+          operation.verifiedTrack = structuredClone(track);
+          operation.trackFileEvidence = await fingerprintTrackFile(file.libraryTarget.path);
+          if (!isDeepStrictEqual(beforeInspection, operation.trackFileEvidence)) throw refuseOperatorTrackFiles();
+        }
         summary.appliedFileCount += 1;
         await persistOperation({
           destinationPath: file.libraryTarget.path,
@@ -701,6 +724,7 @@ export function createImportCandidateApplyOperationService({
       executionMode,
       fileOperations,
       summary,
+      ...(trackSelection ? { operatorTrackScope: trackSelection.scope } : {}),
     };
   }
 

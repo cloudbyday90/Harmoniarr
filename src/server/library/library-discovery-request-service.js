@@ -22,7 +22,7 @@ import {
   parseMetadataReleaseDateInstant,
 } from '../metadata/metadata-release-date-normalization.js';
 import { createLibraryDiscoveryRequestStore } from './library-discovery-request-store.js';
-import { isReleaseWideOperatorTrackScope, OPERATOR_TRACK_SCOPE_BLOCKER } from '../metadata/operator-track-scope-policy.js';
+import { isSupportedOperatorTrackScope, OPERATOR_TRACK_SCOPE_BLOCKER } from '../metadata/operator-track-scope-policy.js';
 
 const defaultAutomaticCooldownMs = 6 * 60 * 60 * 1000;
 const exhaustedBlockedReason = 'search_attempts_exhausted';
@@ -155,7 +155,7 @@ function mapDiscoveryRow(row, { automaticCooldownMs, now }) {
   const releaseDate = normalizeMetadataReleaseDateForDateColumn(row.release_date);
   const releaseDateDeadline = parseMetadataReleaseDateInstant(row.release_date);
   const cooldownDeadline = buildCooldownDeadline(row.last_search_at, automaticCooldownMs);
-  if (hasTrackScope && !isReleaseWideOperatorTrackScope(row.source_track_scope)) {
+  if (hasTrackScope && !isSupportedOperatorTrackScope(row.source_track_scope)) {
     return { blockedReason: OPERATOR_TRACK_SCOPE_BLOCKER, evidence: { ...priorEvidence, ...requestSourceEvidence },
       lastSearchAt: toIsoStringOrNull(row.last_search_at), manualRequestedAt: toIsoStringOrNull(row.manual_requested_at),
       metadataArtistId: row.metadata_artist_id, metadataReleaseGroupId: row.metadata_release_group_id,

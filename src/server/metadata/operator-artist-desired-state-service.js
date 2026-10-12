@@ -119,10 +119,10 @@ export function createOperatorArtistDesiredStateService({
 
       let blockReason = null;
 
-      if (reconciliation?.reconciliationStatus === 'complete') {
+      if (operatorState.operatorTrackScope?.mode !== 'tracks' && reconciliation?.reconciliationStatus === 'complete') {
         incrementCount(summary, 'completeBlockedCount');
         blockReason = 'already_complete';
-      } else if (reconciliation?.reconciliationStatus === 'duplicate') {
+      } else if (operatorState.operatorTrackScope?.mode !== 'tracks' && reconciliation?.reconciliationStatus === 'duplicate') {
         incrementCount(summary, 'duplicateBlockedCount');
         blockReason = 'already_duplicate';
       } else if (activeRequest) {

@@ -18,6 +18,7 @@
 
 import { posix as path } from 'node:path';
 import { createApiError } from '../auth.js';
+import { selectOperatorTrackFiles } from '../metadata/operator-track-file-policy.js';
 import { createImportCandidateCanonicalNamingService } from './import-candidate-canonical-naming-service.js';
 import { createLibraryNamingService } from '../library/library-naming-service.js';
 import { createMediaStagingSafetyService } from '../media/media-staging-safety-service.js';
@@ -105,10 +106,12 @@ export function createImportCandidatePreviewService({
   }
 
   async function previewImportCandidate({ importCandidateId, targetUser = null }) {
-    const candidate = await getImportCandidate({ importCandidateId });
+    let candidate = await getImportCandidate({ importCandidateId });
     if (!candidate) {
       throw createApiError(404, 'import_candidate_not_found', 'Import candidate not found');
     }
+    const trackSelection = selectOperatorTrackFiles(candidate);
+    if (trackSelection) candidate = { ...candidate, files: trackSelection.files };
 
     const settings = await loadSettingsFn();
     const downloadsRoot = settings.paths?.downloads;

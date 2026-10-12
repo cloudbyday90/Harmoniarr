@@ -655,6 +655,7 @@ export function createImportCandidateApplyWorker({
                 deliveryQuality,
               });
               await markImportCandidateApplied({
+                applyResult,
                 importCandidateId: summaryCandidate.id,
                 qualityLabel: outcomeQuality.qualityLabel,
                 qualityWeight: outcomeQuality.qualityWeight,

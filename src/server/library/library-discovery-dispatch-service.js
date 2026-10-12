@@ -30,6 +30,7 @@ import {
 } from '../activity/music-queue-lifecycle-activity-event-service.js';
 import { loadSettings } from '../settings.js';
 import { createApiError } from '../auth.js';
+import { getSingleTrackRequirement } from '../metadata/operator-track-file-policy.js';
 import { MUSIC_QUEUE_RECOVERY_DISCOVERY_SOURCE } from '../import-candidates/music-queue-recovery-policy.js';
 import { buildSharedFormatPreferences, createLibraryDiscoveryQualityContextService } from './library-discovery-quality-context-service.js';
 
@@ -450,7 +451,9 @@ export function createLibraryDiscoveryDispatchService({
         ...qualityContext
       } = sharedQualityContext;
 
-      const searchQuery = buildDiscoverySearchQuery({
+      const selectedTrack = qualityContext.operatorTrackScopes?.some(entry => entry.scope?.mode === 'tracks')
+        ? getSingleTrackRequirement(qualityContext.operatorTrackScopes) : null;
+      const searchQuery = selectedTrack ? [claimedRequest.artistName, selectedTrack.title, preferredFormat === 'flac' ? 'flac' : null].filter(Boolean).join(' ') : buildDiscoverySearchQuery({
         ...claimedRequest,
         preferredFormat,
       });
@@ -514,6 +517,8 @@ export function createLibraryDiscoveryDispatchService({
         const effectiveFormatPreferences = formatPreferences
           ?? (sharedOperatorDiscovery ? buildSharedFormatPreferences(qualityContext.profileCode) : null);
 
+        if (selectedTrack) tracklistExpectations = { expectedTrackTitles: [selectedTrack.title], expectedTrackCount: 1,
+          expectedDurationSeconds: selectedTrack.lengthMs / 1000 };
         const ingestionResult = await importCandidateService.ingestSlskdSearchResponses({
           actorUserId,
           albumTitle: claimedRequest.releaseTitle ?? claimedRequest.releaseGroupTitle ?? null,

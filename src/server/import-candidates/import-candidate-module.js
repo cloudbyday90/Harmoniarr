@@ -176,6 +176,7 @@ export function createImportCandidateModule({
     previewImportCandidate: importCandidatePreviewService.previewImportCandidate,
   }),
   importCandidateApplyOperationService = createImportCandidateApplyOperationService({
+    mediaInspectionService,
     mediaTranscodeExecutionService,
   }),
   importCandidateReleaseHintService = createImportCandidateReleaseHintService(),

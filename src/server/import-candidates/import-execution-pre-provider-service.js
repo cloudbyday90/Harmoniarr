@@ -52,7 +52,7 @@ export function createImportExecutionPreProviderService({ store = createImportEx
     return withTransaction(async (queryable) => {
       const context = await store.lockContext({ ...input, queryable });
       if (!context.run || !context.item) return { tracked: true, allowPreparation: false, reasonCode: 'preparation_not_current' };
-      await trackScopeVerifier.assertCandidateCurrent(context.candidate, { queryable });
+      await trackScopeVerifier.assertCandidateCurrent(context.candidate, { queryable, requestedFiles: input.requestedFiles });
       const markerPresent = Object.hasOwn(context.run?.summary ?? {}, 'downloadPreparationProtocol');
       if (!markerPresent) return { tracked: false, allowPreparation: true };
       const blocked = { tracked: true, allowPreparation: false, reasonCode: 'preparation_not_current' };
@@ -89,6 +89,7 @@ export function createImportExecutionPreProviderService({ store = createImportEx
   async function stagePreparationAttempt({ runId, importCandidateId, epochId, lease, attempt, queryable }) {
     const input = { runId, importCandidateId, epochId, lease };
     const context = await store.lockContext({ ...input, queryable });
+    await trackScopeVerifier.assertCandidateCurrent(context.candidate, { queryable, requestedFiles: attempt.requestedFiles });
     const epoch = currentEpoch(context, input);
     if (!owns(context, input, { active: true }) || !epoch || epoch.phase !== 'preparing'
       || hasPreparationProviderEvidence(executionFor(context)) || epoch.attemptId != null
@@ -117,7 +118,7 @@ export function createImportExecutionPreProviderService({ store = createImportEx
   async function markDispatchPossible(input) {
     return withTransaction(async (queryable) => {
       const context = await store.lockContext({ ...input, queryable });
-      await trackScopeVerifier.assertCandidateCurrent(context.candidate, { queryable });
+      await trackScopeVerifier.assertCandidateCurrent(context.candidate, { queryable, requestedFiles: executionFor(context).requestedFiles });
       const epoch = currentEpoch(context, input);
       const execution = executionFor(context);
       const attempt = validateDownloadAttempt({ attempt: execution.handoff?.attempt, operationRunId: input.runId,
@@ -132,6 +133,7 @@ export function createImportExecutionPreProviderService({ store = createImportEx
         || !await store.isCurrentOrigin({ operationRunId: input.runId, importCandidateId: input.importCandidateId }, queryable)
         || await store.findUnresolvedOtherHandoff({ operationRunId: input.runId, importCandidateId: input.importCandidateId }, queryable)) throw stale();
       if (input.assertProviderCurrent) await input.assertProviderCurrent({ queryable });
+      await trackScopeVerifier.assertCandidateCurrent(context.candidate, { queryable, requestedFiles: execution.requestedFiles });
       if (!hasCurrentPreparationLease(context.lease, input.lease, input.runId, getNow().getTime())) throw stale();
       const crossed = { ...epoch, phase: 'may_have_dispatched', dispatchPossibleAt: getNow().toISOString() };
       if (!validatePreProviderEpoch(crossed, { runId: input.runId, importCandidateId: input.importCandidateId })) throw stale();

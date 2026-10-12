@@ -7,13 +7,17 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 For track requirements, prove current recording/medium/track-position membership,
 unsupported track MBIDs, incomplete desired sets, exact scope persistence and
-post-plan catalog changes with real saves and guarded publication. Keep partial
-scope blocked before provider search, selection, pre-provider admission and
-filesystem mutation until exact subset enforcement exists. Test explicit null
+post-plan catalog changes with real saves and guarded publication. For the
+supported one-track/disc-one subset, prove the completed worker's exact provider
+manifest, actual media identity/duration, untouched sibling, late consent refusal,
+atomic receipt/event rollback and replaced-file Wanted restoration. Global
+complete/duplicate counts must not suppress a person's typed subset. Keep other
+subset shapes blocked before provider/file work. Test explicit null
 markers, mixed participants and legacy candidates against current requirements;
 do not infer permission from filename scores. Forward the owned queryable during
 recovery and prove standalone medium/recording/track writers block after final
-publication checks. See `docs/OPERATOR_TRACK_CATALOG_OUTCOME.md`. Keep initial
+publication checks. See `docs/OPERATOR_TRACK_SUBSET_OUTCOME.md` and the preceding
+catalog outcome. Keep initial
 red, fixture failures and pre-review passing gates separate from final evidence.
 
 Track-consent validation must distinguish suppression and declared resolved

@@ -1,5 +1,12 @@
 # Practical web standards skill design
 
+October 12 single-track maintenance adds Picard format interpretation and
+verified file/receipt evidence to the practical W3C/OWASP/PostgreSQL workflow.
+The [subset design](OPERATOR_TRACK_SUBSET_DESIGN.md) connects each practice to
+an implementation owner and a failure case. The supported one-track slice is
+distinct from general subset support and acoustic identification. Skill metadata
+and invocation policy remain unchanged; this is reference maintenance.
+
 October 12 catalog maintenance connects domain identity documentation, current
 SQL evidence and typed owner requirements to actual acquisition boundaries. The
 [catalog design](OPERATOR_TRACK_CATALOG_DESIGN.md) selects conservative subset

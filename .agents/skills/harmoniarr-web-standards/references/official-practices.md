@@ -1,5 +1,16 @@
 # Official practices by boundary
 
+October 12 single-track guidance uses
+docs/OPERATOR_TRACK_SUBSET_RESEARCH_2026_10.md. Picard 3.0 distinguishes Vorbis
+recording tags from release-track tags; check the actual probe format and edition,
+not a familiar tag name in isolation. OWASP protected transaction data informs
+exact provider manifests and current consent. SQL single-client ownership and
+required-event rollback protect receipt publication. Actual media inspection and
+unchanged destination fingerprints protect a separate filesystem evidence claim.
+WCAG status semantics remain relevant to future rendered feedback; backend
+receipts do not prove accessibility or acoustic identification. General subset
+unions and per-owner delivery need their own positive evidence.
+
 October 12 catalog requirement guidance uses
 docs/OPERATOR_TRACK_CATALOG_RESEARCH_2026_10.md. MusicBrainz distinguishes a
 recording from its appearances as tracks on particular media; recording identity

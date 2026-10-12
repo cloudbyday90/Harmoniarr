@@ -24,6 +24,7 @@ import { isOperationRunLeaseLostError } from '../operation-run-lease-error.js';
 import { isCurrentJobLeaseAcquisition } from '../job-lease-policy.js';
 import { captureRecoveryObservation } from './music-queue-recovery-policy.js';
 import { createApiError } from '../auth.js';
+import { selectOperatorTrackFiles } from '../metadata/operator-track-file-policy.js';
 import { preProviderRefusalReason } from './import-execution-pre-provider-policy.js';
 import { hasPersistedMusicQueueOwnership } from './import-candidate-music-queue-auto-safe-add-policy.js';
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
@@ -361,7 +362,8 @@ export function createImportCandidateExecutionWorker({
           }
 
           const sourceObservation = captureRecoveryObservation(candidate);
-          const requestedFiles = buildEnqueueRequests((candidate?.files ?? []).filter((file) => !file.isLocked));
+          const trackSelection = selectOperatorTrackFiles(candidate);
+          const requestedFiles = buildEnqueueRequests((trackSelection?.files ?? candidate?.files ?? []).filter((file) => !file.isLocked));
           const preparation = beginPreparation ? await beginPreparation({ runId, importCandidateId: summaryCandidate.id,
             requestedFiles, sourceObservation, lease: acquiredLease }) : { tracked: false, allowPreparation: true };
           if (!preparation.allowPreparation) {

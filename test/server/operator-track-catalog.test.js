@@ -38,10 +38,10 @@ test('null binding preserves group scope, while incomplete desired identity bloc
 test('verified subset cannot be treated as release-wide work', () => {
   const subset = buildOperatorTrackScope({ metadataReleaseId: 'release', trackCatalog: [track, { ...track, metadataTrackId: 'second', trackPosition: 2 }], trackOverrides: [override] });
   assert.equal(subset.mode, 'tracks');
-  assert.equal(hasBlockedOperatorTrackScopes({ operatorTrackScopes: [{ wantedReleaseId: 'wanted', scope: subset }] }), true);
+  assert.equal(hasBlockedOperatorTrackScopes({ operatorTrackScopes: [{ wantedReleaseId: 'wanted', scope: subset }] }), false);
   assert.equal(hasBlockedOperatorTrackScopes({ operatorTrackScopes: [{ mediaRequestId: 'request', scope }] }), false);
 });
-for (const invalid of [null, [], [{ scope: null }], [{ scope: { ...scope, mode: 'tracks' } }]]) {
+for (const invalid of [null, [], [{ scope: null }], [{ scope: { ...scope, mode: 'tracks', tracks: [{ ...track, mediumPosition: 2 }] } }]]) {
   test(`invalid/subset requirement refuses before catalog reads (${JSON.stringify(invalid)})`, async () => {
     const verifier = createOperatorTrackScopeVerificationService({ catalogStore: { listTrackCatalog: async () => assert.fail('Refusal must precede read') } });
     await assert.rejects(verifier.assertScopesCurrent(invalid), { code: 'operator_track_scope_verification_required' });

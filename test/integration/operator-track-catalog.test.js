@@ -7,6 +7,17 @@
 import assert from 'node:assert/strict';
 import { before, after, suite, test } from 'node:test';
 import { randomUUID } from 'node:crypto';
+import { mkdir, stat, readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { createLibraryAddMediaFixture, libraryAddRuntimePath } from '../../testing/integration/library-add-media-fixtures.js';
+import { seedImportCandidateFixture } from '../../testing/integration/import-candidate-fixtures.js';
+import { createImportCandidateService } from '../../src/server/import-candidates/import-candidate-service.js';
+import { createImportCandidatePreviewService } from '../../src/server/import-candidates/import-candidate-preview-service.js';
+import { createImportCandidateApplyPreviewService } from '../../src/server/import-candidates/import-candidate-apply-preview-service.js';
+import { createMediaInspectionService } from '../../src/server/media/media-inspection-service.js';
+import { assertOperatorTrackManifest, assertOperatorTrackMedia } from '../../src/server/metadata/operator-track-file-policy.js';
+import { buildMediaRequestFulfillmentStatus } from '../../src/server/library/library-media-request-fulfillment-service.js';
+import { createLibraryReleaseReconciliationStore } from '../../src/server/library/library-release-reconciliation-store.js';
 import { getPool } from '../../src/server/database.js';
 import { createDatabaseTransactionRunner } from '../../src/server/database-transaction-service.js';
 import { createOperatorArtistSaveService } from '../../src/server/metadata/operator-artist-save-service.js';
@@ -90,8 +101,7 @@ suite('Current catalog and operator track requirements', () => {
         const invoke = () => createDatabaseTransactionRunner()(queryable => verifier.assertScopesCurrent([{ scope }], { queryable }));
         if (subset) {
           const discovery = (await getPool().query('SELECT request_status,blocked_reason,search_attempt_count FROM library_discovery_requests')).rows[0];
-          assert.equal(discovery.request_status, 'blocked');
-          assert.equal(discovery.blocked_reason, 'operator_track_scope_verification_required');
+          assert.notEqual(discovery.blocked_reason, 'operator_track_scope_verification_required');
           assert.equal(discovery.search_attempt_count, 0);
           assert.deepEqual(state.discovery[0].evidence.operatorTrackScope, scope);
           const dispatch = createLibraryDiscoveryDispatchService({ libraryDiscoveryRequestStore: createLibraryDiscoveryRequestStore(),
@@ -110,7 +120,7 @@ suite('Current catalog and operator track requirements', () => {
           await assert.rejects(apply.applyImportCandidatePreview({ importCandidateId: candidate.id,
             applyPreview: { files: [{ filename: '01 Foil.flac' }], summary: { status: 'ready' } } }),
           { code: 'operator_track_scope_verification_required' });
-          await assert.rejects(invoke(), { code: 'operator_track_scope_verification_required' });
+          await invoke();
           await assert.rejects(createLibraryDiscoveryQualityContextService().resolveSharedDiscoveryQualityContext({
             operatorLinks: [{ wantedReleaseId: randomUUID(), appUserId: fixture.user.id, operatorTrackScope: scope, qualityPreferences: {} },
               { wantedReleaseId: randomUUID(), appUserId: fixture.other.id, qualityPreferences: {} }],
@@ -134,6 +144,97 @@ suite('Current catalog and operator track requirements', () => {
       assert.equal(state.operation.error_message, 'Saved artist policy or catalog changed before request publication');
       assert.deepEqual(state.requests, []);
       assert.deepEqual(state.events, []);
+    });
+  });
+
+  test('one of two tracks is selected, media-verified, imported and fulfilled only for its owner', { timeout: config.scenarioTimeoutMs }, async () => {
+    await scenario(async ({ workspaceDir }) => {
+      const fixture = await prepare({ subset: true });
+      const pool = getPool();
+      await pool.query('UPDATE metadata_tracks SET length_ms=2000 WHERE id=$1', [fixture.metadata.metadataTrackId]);
+      await createLibraryReleaseReconciliationStore().replaceLibraryReleaseReconciliations({ reconciliations: [{
+        metadataArtistId: fixture.metadata.metadataArtistId, metadataReleaseGroupId: fixture.metadata.metadataReleaseGroupId,
+        metadataReleaseId: fixture.metadata.metadataReleaseId, reconciliationStatus: 'complete', expectedTrackCount: 2,
+        matchedTrackCount: 2, missingTrackCount: 0, matchedFileCount: 2, duplicateTrackCount: 0,
+        evidence: { scope: 'global-coarse-availability' } }] });
+      const { state } = await executeOperatorReconciliationFixtureRun(fixture.saved.reconciliation.run);
+      assert.equal(state.requests.length, 1, 'Global release counts cannot fulfill this owner\'s selected track');
+      const request = state.requests[0];
+      const scope = request.evidence.operatorArtistReconciliation.operatorTrackScope;
+      const readWanted = () => createDatabaseTransactionRunner()(queryable => createLibraryWantedReleaseReader().readWantedReleaseProjection({ queryable }));
+      assert.equal((await readWanted()).wantedReleases.length, 1);
+      const releaseMbid = (await pool.query('SELECT musicbrainz_release_id FROM metadata_releases WHERE id=$1', [scope.metadataReleaseId])).rows[0].musicbrainz_release_id;
+      const paths = Object.fromEntries(['downloads', 'staging', 'music'].map(key => [key, join(workspaceDir, key)]));
+      await mkdir(join(paths.downloads, 'subset'), { recursive: true });
+      const sourcePath = join(paths.downloads, 'subset', '01 Foil.flac');
+      const siblingPath = join(paths.downloads, 'subset', '02 Second.flac');
+      const media = createLibraryAddMediaFixture({ getFixtureRoot: () => workspaceDir });
+      assert.equal(await media.verifyTooling(), null);
+      await media.mediaCommand('ffmpeg', ['-v', 'error', '-nostdin', '-y', '-f', 'lavfi', '-i', 'sine=frequency=1000:sample_rate=44100',
+        '-t', '2', '-ac', '2', '-c:a', 'flac', '-metadata', 'title=Foil', '-metadata', 'track=1', '-metadata', 'disc=1',
+        '-metadata', `MUSICBRAINZ_TRACKID=${scope.tracks[0].recordingMbid}`, '-metadata', `MUSICBRAINZ_ALBUMID=${releaseMbid}`, sourcePath], { readonly: false });
+      await writeFile(siblingPath, 'Unrequested sibling must remain untouched');
+      const siblingBefore = await readFile(siblingPath);
+      const candidate = await seedImportCandidateFixture({ queryable: pool, candidateOverrides: {
+        status: 'pending', sourceSearchId: 'native-subset-search', folderPath: 'subset', normalizedPayload: {
+          musicQueue: { operatorTrackScopes: [{ mediaRequestId: request.id, scope }] }, requestOwnership: {
+            sourceMediaRequestId: request.id, sourceRequestedForUserId: fixture.user.id } } },
+      files: [{ filename: '01 Foil.flac', extension: 'flac', sizeBytes: (await stat(sourcePath)).size, lengthSeconds: 2, isLocked: false },
+        { filename: '02 Second.flac', extension: 'flac', sizeBytes: siblingBefore.length, lengthSeconds: 300, isLocked: false }] });
+      const verifier = createOperatorTrackScopeVerificationService();
+      const candidates = createImportCandidateService({ pool });
+      await candidates.selectImportCandidate({ importCandidateId: candidate.id, actorUserId: fixture.user.id });
+      const selected = await candidates.getImportCandidate({ importCandidateId: candidate.id });
+      const selection = await createDatabaseTransactionRunner()(queryable => verifier.assertCandidateCurrent(selected, { queryable }));
+      assert.equal(selection.files.length, 1);
+      const requestedFiles = selection.files.map(file => ({ filename: file.rawPayload.filename, size: file.sizeBytes }));
+      await verifier.assertCandidateCurrent(selected, { requestedFiles });
+      assert.throws(() => assertOperatorTrackManifest(selection, [...requestedFiles, { filename: 'subset\\02 Second.flac', size: siblingBefore.length }]),
+        { code: 'operator_track_scope_verification_required' });
+      await pool.query('UPDATE operator_track_override SET is_desired=false WHERE app_user_id=$1', [fixture.user.id]);
+      await assert.rejects(verifier.assertCandidateCurrent(selected, { requestedFiles }), { code: 'operator_track_scope_verification_required' });
+      await pool.query('UPDATE operator_track_override SET is_desired=true WHERE app_user_id=$1', [fixture.user.id]);
+      await candidates.markImportCandidateImportPending({ importCandidateId: candidate.id });
+      const previewService = createImportCandidatePreviewService({ getImportCandidate: candidates.getImportCandidate,
+        loadSettingsFn: async () => ({ paths: Object.fromEntries(Object.entries(paths).map(([key, value]) => [key, libraryAddRuntimePath(value)])) }) });
+      const inspection = createMediaInspectionService({ mediaCommandService: { runCommand: ({ binary, args }) => media.mediaCommand(binary, args) } });
+      const preview = await createImportCandidateApplyPreviewService({ previewImportCandidate: previewService.previewImportCandidate,
+        mediaInspectionService: inspection }).previewImportCandidateApply({ importCandidateId: candidate.id });
+      assert.equal(preview.files.length, 1);
+      const wrong = structuredClone(preview);
+      wrong.files[0].inspection.metadata.tags.musicbrainz_trackid = randomUUID();
+      assert.throws(() => assertOperatorTrackMedia({ track: scope.tracks[0], releaseMbid, inspection: wrong.files[0].inspection }),
+        { code: 'operator_track_scope_verification_required' });
+      const apply = createImportCandidateApplyOperationService({ mediaInspectionService: inspection });
+      await assert.rejects(apply.applyImportCandidatePreview({ importCandidateId: candidate.id, applyPreview: wrong, executionMode: 'copy' }),
+        { code: 'operator_track_scope_verification_required' });
+      const revoked = createImportCandidateApplyOperationService({ mediaInspectionService: inspection,
+        onMutationIntent: async () => pool.query('UPDATE operator_track_override SET is_desired=false WHERE app_user_id=$1', [fixture.user.id]) });
+      const stopped = await revoked.applyImportCandidatePreview({ importCandidateId: candidate.id, applyPreview: preview, executionMode: 'copy' });
+      assert.equal(stopped.summary.failedFileCount, 1);
+      await assert.rejects(stat(preview.files[0].stagingTarget.path), { code: 'ENOENT' });
+      await pool.query('UPDATE operator_track_override SET is_desired=true WHERE app_user_id=$1', [fixture.user.id]);
+      const result = await apply.applyImportCandidatePreview({ importCandidateId: candidate.id, applyPreview: preview, executionMode: 'copy' });
+      assert.equal(result.summary.appliedFileCount, 1);
+      assert.equal(result.summary.failedFileCount, 0);
+      assert.deepEqual(result.fileOperations[0].verifiedTrack, scope.tracks[0]);
+      assert.deepEqual(await readFile(siblingPath), siblingBefore);
+      await assert.rejects(stat(join(paths.music, 'subset', '02 Second.flac')), { code: 'ENOENT' });
+      const eventFailure = new Error('Controlled receipt event failure');
+      const failingEvent = createImportCandidateService({ pool, insertImportCandidateEventFn: async () => { throw eventFailure; } });
+      await assert.rejects(failingEvent.markImportCandidateApplied({ importCandidateId: candidate.id, applyResult: result }), error => error === eventFailure);
+      const rolledBack = await candidates.getImportCandidate({ importCandidateId: candidate.id });
+      assert.equal(rolledBack.status, 'import_pending');
+      assert.equal(Object.hasOwn(rolledBack.normalizedPayload, 'operatorTrackFulfillment'), false);
+      const applied = await candidates.markImportCandidateApplied({ importCandidateId: candidate.id, applyResult: result });
+      assert.deepEqual(applied.candidate.normalizedPayload.operatorTrackFulfillment.scope, scope);
+      const requested = { ...request, requestedForUser: { id: fixture.user.id } };
+      assert.equal(buildMediaRequestFulfillmentStatus({ request: requested, importCandidates: [applied.candidate] }).code, 'fulfilled');
+      assert.equal(buildMediaRequestFulfillmentStatus({ request: { ...requested, requestedForUser: { id: fixture.other.id } },
+        importCandidates: [applied.candidate] }).code, 'under_review');
+      assert.deepEqual((await readWanted()).wantedReleases, []);
+      await writeFile(result.fileOperations[0].libraryPath, 'Replaced file cannot retain fulfillment');
+      assert.equal((await readWanted()).wantedReleases.length, 1);
     });
   });
 });

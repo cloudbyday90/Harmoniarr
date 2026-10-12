@@ -84,6 +84,7 @@ cases and thirteen fresh scenario variants. Use
 - [Operator monitoring opt-out design](docs/OPERATOR_MONITORING_OPT_OUT_DESIGN.md), [research](docs/OPERATOR_MONITORING_OPT_OUT_RESEARCH_2026_10.md) and [outcome](docs/OPERATOR_MONITORING_OPT_OUT_OUTCOME.md)
 - [Operator track consent design](docs/OPERATOR_TRACK_CONSENT_DESIGN.md), [research](docs/OPERATOR_TRACK_CONSENT_RESEARCH_2026_10.md) and [outcome](docs/OPERATOR_TRACK_CONSENT_OUTCOME.md)
 - [Verified operator track requirements design](docs/OPERATOR_TRACK_CATALOG_DESIGN.md), [research](docs/OPERATOR_TRACK_CATALOG_RESEARCH_2026_10.md) and [outcome](docs/OPERATOR_TRACK_CATALOG_OUTCOME.md)
+- [Exact single-track acquisition design](docs/OPERATOR_TRACK_SUBSET_DESIGN.md), [research](docs/OPERATOR_TRACK_SUBSET_RESEARCH_2026_10.md) and [outcome](docs/OPERATOR_TRACK_SUBSET_OUTCOME.md)
 - [Downloader filter feedback design](docs/DOWNLOADER_FILTER_ANNOUNCEMENT_DESIGN.md), [research](docs/DOWNLOADER_FILTER_ANNOUNCEMENT_RESEARCH_2026_10.md) and [outcome](docs/DOWNLOADER_FILTER_ANNOUNCEMENT_OUTCOME.md)
 - [No-cache local rebuild design](docs/LOCAL_DOCKER_REBUILD_2026_10_DESIGN.md), [official research](docs/LOCAL_DOCKER_REBUILD_RESEARCH_2026_10.md) and [outcome](docs/LOCAL_DOCKER_REBUILD_2026_10_OUTCOME.md)
 - [Backup, restore, and upgrade design](docs/BACKUP_RESTORE_DESIGN.md)

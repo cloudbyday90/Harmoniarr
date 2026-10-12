@@ -1,5 +1,13 @@
 # Practical web standards skill outcome
 
+October 12 single-track maintenance extends the existing skill with exact file
+manifests, actual Picard-compatible probe tags, current consent, destination-byte
+receipts and per-owner outcome checks. The
+[subset outcome](OPERATOR_TRACK_SUBSET_OUTCOME.md) owns executed evidence and
+limits. Five structural validators pass and seven installed standards/scoped
+files match their source hashes in that final candidate; no new blind trial or
+accessibility certification is claimed.
+
 October 12 catalog references trace exact local identities, typed requirement
 carriers, conservative downstream gates and supported writer admission. The
 [catalog outcome](OPERATOR_TRACK_CATALOG_OUTCOME.md) owns native reproduction,

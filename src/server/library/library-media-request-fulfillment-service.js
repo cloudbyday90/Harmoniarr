@@ -19,6 +19,7 @@
 import { buildExternalRequestProgressStatus } from './library-external-request-progress.js';
 import { buildExternalRequestIntentFulfillmentStatus } from './library-external-request-intent-fulfillment.js';
 import { buildExternalRequestCollectionFulfillmentStatus } from './library-external-request-collection-fulfillment.js';
+import { hasOwnerTrackFulfillment } from '../metadata/operator-track-file-policy.js';
 
 const candidateStatusPriority = new Map([
   ['applied', 700],
@@ -171,6 +172,10 @@ export function buildMediaRequestFulfillmentStatus({ importCandidates = [], requ
   }
 
   const selectedCandidate = [...importCandidates].sort((left, right) => {
+    if (request?.evidence?.operatorArtistReconciliation?.operatorTrackScope?.mode === 'tracks') {
+      const fulfilledDifference = Number(hasOwnerTrackFulfillment({ request, candidate: right })) - Number(hasOwnerTrackFulfillment({ request, candidate: left }));
+      if (fulfilledDifference !== 0) return fulfilledDifference;
+    }
     const priorityDifference = getCandidatePriority(right) - getCandidatePriority(left);
     if (priorityDifference !== 0) {
       return priorityDifference;
@@ -178,6 +183,13 @@ export function buildMediaRequestFulfillmentStatus({ importCandidates = [], requ
 
     return candidateTimestampValue(right) - candidateTimestampValue(left);
   })[0];
+
+  if (Object.hasOwn(request?.evidence?.operatorArtistReconciliation ?? {}, 'operatorTrackScope')
+    && request.evidence.operatorArtistReconciliation.operatorTrackScope?.mode !== 'release'
+    && selectedCandidate.status === 'applied' && !hasOwnerTrackFulfillment({ request, candidate: selectedCandidate })) {
+    return { code: 'under_review', label: 'Needs review', tone: 'held',
+      detail: 'The selected tracks do not yet have verified import evidence for this person.', occurredAt: selectedCandidate.updatedAt ?? null };
+  }
 
   return {
     ...mapCandidateFulfillmentStatus(selectedCandidate),

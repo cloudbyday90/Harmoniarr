@@ -6,6 +6,23 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Exact single-track acquisition (2026-10-12)
+
+The [single-track slice](OPERATOR_TRACK_SUBSET_OUTCOME.md) implements one track
+on disc one: exact file manifest, actual media checks, destination-byte receipt
+and source-owner fulfillment. Global complete/duplicate counts cannot fulfill
+that typed requirement for a person. See its
+[design](OPERATOR_TRACK_SUBSET_DESIGN.md) and
+[research](OPERATOR_TRACK_SUBSET_RESEARCH_2026_10.md). General multi-track/disc and
+different-owner unions remain a separate follow-up; final validation is recorded
+in the new outcome.
+
+- Validation: 9,950 fast tests and both builds; 87/87 affected PostgreSQL tests in
+  11 serial files; zero reported npm vulnerabilities; structural skill checks.
+
+- Next: two owners requesting different tracks, exact union selection and explicit
+  per-owner delivery/fulfillment, including multi-disc and recovery behavior.
+
 ## Completed slice: Verified track requirements (2026-10-12)
 
 - Reproduce ungrounded recording and partial-to-whole publication. Verify exact
