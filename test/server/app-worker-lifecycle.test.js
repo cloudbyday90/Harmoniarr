@@ -57,20 +57,21 @@ test('app drain waits for apply before scan, drains scan after apply null and pr
   assert.equal(settled, true);
 });
 
-test('application drain captures all five receivers and attempts inspection/transcode/apply/scan after execution null', async () => {
+test('application drain captures all six receivers and attempts every known owner after execution null', async () => {
   const gate = Promise.withResolvers(); const entered = Promise.withResolvers(); const calls = [];
   const execution = { close() { assert.equal(this, execution); calls.push('execution'); entered.resolve(); return gate.promise; } };
   const inspection = { close() { assert.equal(this, inspection); calls.push('inspection'); throw new Error('inspection fallout'); } };
   const transcode = { close() { assert.equal(this, transcode); calls.push('transcode'); throw new Error('transcode fallout'); } };
   const apply = { close() { assert.equal(this, apply); calls.push('apply'); throw new Error('apply fallout'); } };
   const scan = { close() { assert.equal(this, scan); calls.push('scan'); return Promise.reject(new Error('scan fallout')); } };
+  const organize = { close() { assert.equal(this, organize); calls.push('organize'); throw new Error('organize fallout'); } };
   const application = { importCandidateModule: { importCandidateExecutionWorker: execution, importCandidateMediaInspectionWorker: inspection,
     importCandidateTranscodeWorker: transcode, importCandidateApplyWorker: apply },
-    libraryModule: { libraryScanWorker: scan } };
+    libraryModule: { libraryOrganizeApplyWorker: organize, libraryScanWorker: scan } };
   const pending = drainApplicationWorkerOwners(application); void pending.catch(() => {}); await entered.promise;
   application.importCandidateModule = {}; application.libraryModule = {};
   assert.deepEqual(calls, ['execution']); gate.reject(null);
-  await assert.rejects(pending, error => error === null); assert.deepEqual(calls, ['execution', 'inspection', 'transcode', 'apply', 'scan']);
+  await assert.rejects(pending, error => error === null); assert.deepEqual(calls, ['execution', 'inspection', 'transcode', 'apply', 'organize', 'scan']);
 });
 
 for (const primary of [new Error('inspection cleanup'), null]) {
@@ -83,6 +84,18 @@ for (const primary of [new Error('inspection cleanup'), null]) {
     }, libraryModule: { libraryScanWorker: { close: async () => { calls.push('scan'); throw new Error('scan fallout'); } } } };
     await assert.rejects(drainApplicationWorkerOwners(application), error => error === primary);
     assert.deepEqual(calls, ['execution', 'inspection', 'apply', 'scan']);
+  });
+}
+
+for (const primary of [new Error('organize cleanup'), null]) {
+  test(`organize ${primary === null ? 'null' : 'Error'} remains primary while scan drains`, async () => {
+    const calls = [];
+    const application = { libraryModule: {
+      libraryOrganizeApplyWorker: { close: async () => { calls.push('organize'); throw primary; } },
+      libraryScanWorker: { close: async () => { calls.push('scan'); throw new Error('scan fallout'); } },
+    } };
+    await assert.rejects(drainApplicationWorkerOwners(application), error => error === primary);
+    assert.deepEqual(calls, ['organize', 'scan']);
   });
 }
 

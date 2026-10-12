@@ -16,6 +16,10 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createWorkerTaskLifecycle } from '../worker-task-lifecycle.js';
+import { withWorkerTaskCleanup } from '../worker-task-cleanup.js';
+import { createWorkerAdvisoryTasks } from '../worker-advisory-tasks.js';
+import { drainWorkerLease } from '../worker-lease-cleanup.js';
 import { isOperationRunLeaseLostError } from '../operation-run-lease-error.js';
 import { basename } from 'node:path';
 import { buildReleaseAddedActivityEvent } from '../activity/release-added-activity-presentation-service.js';
@@ -96,9 +100,9 @@ export function createLibraryOrganizeApplyWorker({
   renewLease,
 } = {}) {
   if (typeof applyOrganizeMutation !== 'function') throw new TypeError('Library organize requires its guarded mutation owner');
-  const activeRunIds = new Set();
+  const lifecycle = createWorkerTaskLifecycle({ execute: runOrganizeApply });
 
-  async function notifyOrganizedReleases({ fileResults, movedCount, runId }) {
+  async function notifyOrganizedReleases({ advisoryTasks, fileResults, movedCount, runId }) {
     if (movedCount < 1) {
       return;
     }
@@ -106,16 +110,16 @@ export function createLibraryOrganizeApplyWorker({
     const releaseSummary = buildReleaseSummary(fileResults);
 
     if (typeof onReleaseAddedFn === 'function') {
-      void onReleaseAddedFn({
+      advisoryTasks.schedule(onReleaseAddedFn, {
         movedCount,
         releaseCount: releaseSummary.count,
         releaseTitle: releaseSummary.primaryReleaseTitle,
         artistName: releaseSummary.primaryArtistName,
-      }).catch(() => {});
+      });
     }
 
     if (typeof recordActivityEventFn === 'function') {
-      void recordActivityEventFn(buildReleaseAddedActivityEvent({
+      advisoryTasks.schedule(recordActivityEventFn, buildReleaseAddedActivityEvent({
         artistName: releaseSummary.primaryArtistName,
         entityType: 'library_release',
         movedCount,
@@ -124,7 +128,7 @@ export function createLibraryOrganizeApplyWorker({
         releases: releaseSummary.releases,
         releaseTitle: releaseSummary.primaryReleaseTitle,
         runId,
-      })).catch(() => {});
+      }));
     }
   }
 
@@ -133,177 +137,176 @@ export function createLibraryOrganizeApplyWorker({
     let acquiredLease = null;
     let leaseHeartbeat = null;
 
-    try {
-      acquiredLease = await acquireLease({ runId });
-      if (!acquiredLease) return;
-      if (renewLease) {
-        leaseHeartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId, expectedLease: acquiredLease });
-        leaseHeartbeat.start();
-      }
-      await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
-      if (await markRunStarted({
-        expectedLease: acquiredLease,
-        runId,
-        summary: {
-          currentStep: 'Preparing library organize apply plan',
-          plannedRenameCount,
-        },
-      }) === false) { finalLeaseStatus = 'failed'; return; }
-
-      const organizePreview = await buildLibraryOrganizePreview();
-      const filesToMove = (organizePreview.files ?? []).filter((file) => file.status?.code === 'rename_required');
-      const fileResults = [];
-      let movedCount = 0;
-
-      for (let index = 0; index < filesToMove.length; index += 1) {
-        const file = filesToMove[index];
+    const advisoryTasks = createWorkerAdvisoryTasks();
+    return withWorkerTaskCleanup(async () => {
+      try {
+        acquiredLease = await acquireLease({ runId });
+        if (!acquiredLease) return;
+        if (renewLease) {
+          leaseHeartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId, expectedLease: acquiredLease });
+          leaseHeartbeat.start();
+        }
         await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
+        if (await markRunStarted({
+          expectedLease: acquiredLease,
+          runId,
+          summary: {
+            currentStep: 'Preparing library organize apply plan',
+            plannedRenameCount,
+          },
+        }) === false) { finalLeaseStatus = 'failed'; return; }
 
-        const startedAt = new Date().toISOString();
+        const organizePreview = await buildLibraryOrganizePreview();
+        const filesToMove = (organizePreview.files ?? []).filter((file) => file.status?.code === 'rename_required');
+        const fileResults = [];
+        let movedCount = 0;
 
-        try {
-          const movePlan = await buildMovePlan({ createExclusiveFileMutationPlan, file });
-          const result = await applyOrganizeMutation({ runId, expectedLease: acquiredLease, file, plan: movePlan });
+        for (let index = 0; index < filesToMove.length; index += 1) {
+          const file = filesToMove[index];
+          await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
 
-          movedCount += 1;
+          const startedAt = new Date().toISOString();
 
-          fileResults.push({
-            artistName: file.match?.artistName ?? null,
-            destinationPath: file.proposedPath,
-            errorMessage: null,
-            fileId: file.fileId ?? null,
-            filename: basename(file.proposedPath),
-            releaseTitle: file.match?.releaseTitle ?? null,
-            sourcePath: file.currentPath,
-            startedAt,
-            status: 'moved',
-            transport: result.transport,
-            verification: result.verification ?? null,
-          });
+          try {
+            const movePlan = await buildMovePlan({ createExclusiveFileMutationPlan, file });
+            const result = await applyOrganizeMutation({ runId, expectedLease: acquiredLease, file, plan: movePlan });
 
-          if (await markRunStarted({
-            expectedLease: acquiredLease,
-            runId,
-            summary: {
-              currentStep: `Applied ${movedCount} of ${filesToMove.length} organize changes`,
-              fileResults,
-              latestTransport: result.transport,
-              movedCount,
-              plannedRenameCount: filesToMove.length,
-            },
-          }) === false) { finalLeaseStatus = 'failed'; return; }
-        } catch (fileError) {
-          if (isOperationRunLeaseLostError(fileError) || isOperationRunCancellationError(fileError)
-            || isOperationRunPauseError(fileError)) throw fileError;
-          fileResults.push({
-            artistName: file.match?.artistName ?? null,
-            destinationPath: file.proposedPath ?? null,
-            errorMessage: fileError instanceof Error ? fileError.message : String(fileError),
-            fileId: file.fileId ?? null,
-            filename: basename(file.currentPath ?? file.proposedPath ?? ''),
-            releaseTitle: file.match?.releaseTitle ?? null,
-            sourcePath: file.currentPath ?? null,
-            startedAt,
-            status: 'failed',
-            transport: null,
-          });
+            movedCount += 1;
 
-          for (let remainingIndex = index + 1; remainingIndex < filesToMove.length; remainingIndex += 1) {
-            fileResults.push(buildNotAttemptedFileResult(filesToMove[remainingIndex]));
+            fileResults.push({
+              artistName: file.match?.artistName ?? null,
+              destinationPath: file.proposedPath,
+              errorMessage: null,
+              fileId: file.fileId ?? null,
+              filename: basename(file.proposedPath),
+              releaseTitle: file.match?.releaseTitle ?? null,
+              sourcePath: file.currentPath,
+              startedAt,
+              status: 'moved',
+              transport: result.transport,
+              verification: result.verification ?? null,
+            });
+
+            if (await markRunStarted({
+              expectedLease: acquiredLease,
+              runId,
+              summary: {
+                currentStep: `Applied ${movedCount} of ${filesToMove.length} organize changes`,
+                fileResults,
+                latestTransport: result.transport,
+                movedCount,
+                plannedRenameCount: filesToMove.length,
+              },
+            }) === false) { finalLeaseStatus = 'failed'; return; }
+          } catch (fileError) {
+            if (isOperationRunLeaseLostError(fileError) || isOperationRunCancellationError(fileError)
+              || isOperationRunPauseError(fileError)) throw fileError;
+            fileResults.push({
+              artistName: file.match?.artistName ?? null,
+              destinationPath: file.proposedPath ?? null,
+              errorMessage: fileError instanceof Error ? fileError.message : String(fileError),
+              fileId: file.fileId ?? null,
+              filename: basename(file.currentPath ?? file.proposedPath ?? ''),
+              releaseTitle: file.match?.releaseTitle ?? null,
+              sourcePath: file.currentPath ?? null,
+              startedAt,
+              status: 'failed',
+              transport: null,
+            });
+
+            for (let remainingIndex = index + 1; remainingIndex < filesToMove.length; remainingIndex += 1) {
+              fileResults.push(buildNotAttemptedFileResult(filesToMove[remainingIndex]));
+            }
+
+            const breakdown = buildOperationResultBreakdown(fileResults);
+
+            if (await markRunCompleted({
+              expectedLease: acquiredLease,
+              runId,
+              summary: {
+                ...breakdown,
+                fileResults,
+                movedCount,
+                plannedRenameCount: filesToMove.length,
+                skippedCount: Math.max((organizePreview.counts?.totalFiles ?? filesToMove.length) - filesToMove.length, 0),
+              },
+            }) === false) { finalLeaseStatus = 'failed'; return; }
+            await notifyOrganizedReleases({ advisoryTasks, fileResults, movedCount, runId });
+            return;
           }
+        }
 
-          const breakdown = buildOperationResultBreakdown(fileResults);
+        const breakdown = buildOperationResultBreakdown(fileResults);
 
-          if (await markRunCompleted({
+        if (await markRunCompleted({
+          expectedLease: acquiredLease,
+          runId,
+          summary: {
+            ...breakdown,
+            fileResults,
+            movedCount,
+            plannedRenameCount: filesToMove.length,
+            skippedCount: Math.max((organizePreview.counts?.totalFiles ?? filesToMove.length) - filesToMove.length, 0),
+          },
+        }) === false) { finalLeaseStatus = 'failed'; return; }
+        await notifyOrganizedReleases({ advisoryTasks, fileResults, movedCount, runId });
+      } catch (error) {
+        if (isOperationRunLeaseLostError(error)) { finalLeaseStatus = 'failed'; return; }
+        if (!acquiredLease) {
+          if (error?.code === 'operation_run_lease_unavailable') { finalLeaseStatus = 'failed'; return; }
+          throw error;
+        }
+        if (isOperationRunPauseError(error)) {
+          finalLeaseStatus = 'paused';
+          if (await markRunPaused({
             expectedLease: acquiredLease,
+            nextAttemptAt: error.nextRetryAt ?? null,
             runId,
             summary: {
-              ...breakdown,
-              fileResults,
-              movedCount,
-              plannedRenameCount: filesToMove.length,
-              skippedCount: Math.max((organizePreview.counts?.totalFiles ?? filesToMove.length) - filesToMove.length, 0),
+              currentStep: 'Library organize apply paused by maintenance lock',
+              pauseCode: error.pauseCode ?? null,
+              pauseMessage: error.message,
+              pauseProvider: error.pauseProvider ?? null,
+              plannedRenameCount,
             },
           }) === false) { finalLeaseStatus = 'failed'; return; }
-          await notifyOrganizedReleases({ fileResults, movedCount, runId });
           return;
         }
-      }
 
-      const breakdown = buildOperationResultBreakdown(fileResults);
+        if (isOperationRunCancellationError(error)) {
+          finalLeaseStatus = 'cancelled';
+          if (await markRunCancelled({
+            expectedLease: acquiredLease,
+            runId,
+            summary: {
+              currentStep: 'Library organize apply cancelled',
+              plannedRenameCount,
+            },
+          }) === false) { finalLeaseStatus = 'failed'; return; }
+          return;
+        }
 
-      if (await markRunCompleted({
-        expectedLease: acquiredLease,
-        runId,
-        summary: {
-          ...breakdown,
-          fileResults,
-          movedCount,
-          plannedRenameCount: filesToMove.length,
-          skippedCount: Math.max((organizePreview.counts?.totalFiles ?? filesToMove.length) - filesToMove.length, 0),
-        },
-      }) === false) { finalLeaseStatus = 'failed'; return; }
-      await notifyOrganizedReleases({ fileResults, movedCount, runId });
-    } catch (error) {
-      if (!acquiredLease || isOperationRunLeaseLostError(error)) { finalLeaseStatus = 'failed'; return; }
-      if (isOperationRunPauseError(error)) {
-        finalLeaseStatus = 'paused';
-        if (await markRunPaused({
+        finalLeaseStatus = 'failed';
+        if (await markRunFailed({
           expectedLease: acquiredLease,
-          nextAttemptAt: error.nextRetryAt ?? null,
           runId,
+          errorMessage: error?.message ?? 'Library organize apply failed',
           summary: {
-            currentStep: 'Library organize apply paused by maintenance lock',
-            pauseCode: error.pauseCode ?? null,
-            pauseMessage: error.message,
-            pauseProvider: error.pauseProvider ?? null,
             plannedRenameCount,
           },
         }) === false) { finalLeaseStatus = 'failed'; return; }
-        return;
       }
-
-      if (isOperationRunCancellationError(error)) {
-        finalLeaseStatus = 'cancelled';
-        if (await markRunCancelled({
-          expectedLease: acquiredLease,
-          runId,
-          summary: {
-            currentStep: 'Library organize apply cancelled',
-            plannedRenameCount,
-          },
-        }) === false) { finalLeaseStatus = 'failed'; return; }
-        return;
-      }
-
-      finalLeaseStatus = 'failed';
-      if (await markRunFailed({
-        expectedLease: acquiredLease,
-        runId,
-        errorMessage: error.message,
-        summary: {
-          plannedRenameCount,
-        },
-      }) === false) { finalLeaseStatus = 'failed'; return; }
-    } finally {
-      leaseHeartbeat?.stop();
-      activeRunIds.delete(runId);
-      if (acquiredLease) await releaseLease({ runId, status: finalLeaseStatus, expectedLease: acquiredLease });
-    }
-  }
-
-  async function startWorkerRun({ plannedRenameCount = null, runId }) {
-    if (activeRunIds.has(runId)) {
-      return;
-    }
-
-    activeRunIds.add(runId);
-    queueMicrotask(() => {
-      void runOrganizeApply({ plannedRenameCount, runId });
+    }, async () => {
+      await advisoryTasks.close();
+      await drainWorkerLease({ heartbeat: leaseHeartbeat, lease: acquiredLease, releaseLease,
+        runId, status: finalLeaseStatus });
     });
   }
 
-  return {
-    startWorkerRun,
-  };
+  async function startWorkerRun({ plannedRenameCount = null, runId }) {
+    const completion = lifecycle.start({ plannedRenameCount, runId });
+    return { completion };
+  }
+
+  return { startWorkerRun, close: lifecycle.close };
 }

@@ -330,3 +330,10 @@ growing nested cleanup adapters while retaining original failure and receiver
 semantics. [Transcode design](TRANSCODE_LIFETIME_DESIGN.md) owns implementation;
 FFmpeg, Node, ECMAScript, driver and W3C sources inform applicable boundaries.
 Existing standards entrypoint, metadata and invocation policy remain.
+
+Organize references retain the guarded file/SQL owner while adding returned
+callback and lease lifetime. Best-effort outcome and remote delivery stay distinct
+from local completion. Parent-visible native checkpoints prevent swallowed
+callback assertions from serving as false proof. The
+[organize design](ORGANIZE_APPLY_LIFETIME_DESIGN.md) owns this slice; existing skill
+entrypoint, metadata and invocation policy remain.

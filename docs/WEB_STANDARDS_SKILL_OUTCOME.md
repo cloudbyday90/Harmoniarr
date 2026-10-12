@@ -576,3 +576,10 @@ file mutation and normal process closure from hidden/error paths. The
 [transcode outcome](TRANSCODE_LIFETIME_OUTCOME.md) owns runtime and structural skill
 evidence. This is narrow reference maintenance without a new blind trial,
 invocation-policy change or codec/accessibility/security certification.
+
+Organize references locate guarded movement, owned notification/Activity and
+six concrete application owners. They separate callback outcome, local returned
+work and remote delivery, and route fixture proof through parent-visible
+checkpoints. The [organize outcome](ORGANIZE_APPLY_LIFETIME_OUTCOME.md) owns native
+bytes/catalog/resource evidence and structural validation. This is narrow
+reference maintenance without a new blind trial or conformance claim.

@@ -14,6 +14,7 @@ export function drainApplicationWorkerOwners({ importCandidateModule, libraryMod
     importCandidateModule?.importCandidateMediaInspectionWorker,
     importCandidateModule?.importCandidateTranscodeWorker,
     importCandidateModule?.importCandidateApplyWorker,
+    libraryModule?.libraryOrganizeApplyWorker,
     libraryModule?.libraryScanWorker,
   ]);
 }

@@ -517,3 +517,13 @@ close, returned promises and driver teardown are separate lifetimes. Snapshot
 concrete ordered cleanup owners before awaiting and retain first Error/null while
 attempting all selected cleanup. W3C timing remains draft observation guidance;
 controlled native process checks do not certify codecs or browser conformance.
+
+October 11 organize guidance uses docs/ORGANIZE_APPLY_LIFETIME_RESEARCH_2026_10.md.
+Official Node filesystem guidance distinguishes exclusive destination creation
+from copy atomicity; preserve verified movement and current-authority guards.
+Returned notification/Activity lifetime is separate from best-effort outcome and
+remote delivery. OWASP diagnostic policy does not weaken required mutation or
+persistence. W3C timing remains draft observation guidance. In fixtures, assert
+lifetime checkpoints from the parent test: a failure inside a swallowed callback
+can otherwise disappear. These checks establish the selected boundary, not global
+atomicity or whole-app/security conformance.

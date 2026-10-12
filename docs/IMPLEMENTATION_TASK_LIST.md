@@ -6,6 +6,30 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Library organize apply lifetime (2026-10-11)
+
+- Reproduce duplicate acquisition during final release, then own guarded
+  movement/persistence, returned notification/Activity and renewal/release cleanup
+  through shared modular ESM services. Keep mutation authority and partial-result
+  policy intact; best-effort adapters accept synchronous throws and plain returns.
+  Capture execution/inspection/transcode/apply/organize/scan at startup and both
+  app fixtures. See [design](ORGANIZE_APPLY_LIFETIME_DESIGN.md),
+  [research](ORGANIZE_APPLY_LIFETIME_RESEARCH_2026_10.md) and
+  [outcome](ORGANIZE_APPLY_LIFETIME_OUTCOME.md).
+- Focused 172/172; complete fast 9,690 plus both builds; broader affected native
+  43/43. A final fixture-only checkpoint strengthening passes its own native 4/4
+  and scoped lint with production/other test hashes unchanged. These four cases
+  are repeats, not additional unique coverage. All runs have zero failures/
+  cancellations/skips. Four fixed 100 ms unit waits were removed in favor of
+  actual completion; no exhaustive-native or matched full-suite speedup claim.
+- Standards/testing skill maintenance, installed hashes and npm audit pass.
+  [Fresh PR assessment](OPEN_PR_APPLICABILITY_ORGANIZE_APPLY_LIFETIME_2026_10_OUTCOME.md)
+  finds no eligible unreplayed patch; main only, no release or merge.
+- Next: library-discovery dispatch completion, returned reconciliation/artwork/
+  provider work and ledger/lease finalizers, preserving scoped recovery authority.
+  Then remaining workers/periodic producers before removing residual waits or
+  promoting exhaustive scheduling. Historical SQL-reset causes remain unconfirmed.
+
 ## Completed slice: Transcode orchestration lifetime (2026-10-11)
 
 - Reproduce duplicate acquisition during held final release, then own queued

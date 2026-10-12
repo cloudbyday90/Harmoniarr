@@ -119,7 +119,6 @@ function native(c, hooks = {}) {
 }
 
 async function start(c, runs, transport, hooks = {}) {
-  const released = gate();
   const notifications = [];
   const activity = [];
   let capturedLease;
@@ -139,10 +138,9 @@ async function start(c, runs, transport, hooks = {}) {
     },
     onReleaseAddedFn: async (value) => { notifications.push(value); },
     recordActivityEventFn: async (value) => { activity.push(value); },
-    releaseLease: async (input) => { try { return await runs.releaseLease(input); } finally { released.release(); } },
   });
-  await worker.startWorkerRun({ runId: c.run.id, plannedRenameCount: 1 });
-  return { done: released.promise, notifications, activity, lease: () => capturedLease };
+  const { completion } = await worker.startWorkerRun({ runId: c.run.id, plannedRenameCount: 1 });
+  return { done: completion, notifications, activity, lease: () => capturedLease };
 }
 
 const expire = (c) => c.pool.query("UPDATE job_leases SET expires_at=clock_timestamp()-INTERVAL '1 second' WHERE lease_key=$1", [`library_organize_apply:${c.run.id}`]);

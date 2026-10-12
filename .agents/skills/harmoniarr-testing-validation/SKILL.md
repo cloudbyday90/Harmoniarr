@@ -308,3 +308,14 @@ retains first Error/null while attempting all selected cleanup. Application now
 selects execution/inspection/transcode/apply/scan. The transcode lifetime outcome
 owns actual PostgreSQL/process scope; controlled Node process proof is not codec
 correctness, exhaustive validation or complete application quiescence.
+
+Organize apply now owns guarded movement, returned notification/Activity and
+renewal/release cleanup. Await its actual handle in native mutation and unit
+fixtures; fixed 100 ms sleeps and release observation are earlier boundaries.
+Use parent-visible checkpoints for best-effort callbacks, since assertions thrown
+inside them can be swallowed by outcome policy. Prove callback completion and
+release ordering outside that adapter, then byte/catalog/database availability.
+Application selects execution/inspection/transcode/apply/organize/scan. The
+organize lifetime outcome separates the broader native group from a strengthened
+fixture-only rerun; do not sum repeats or describe unchanged production evidence
+as a new exhaustive/matched performance result.

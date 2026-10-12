@@ -273,3 +273,13 @@ concrete owners and retains first Error/null after attempting each. Application
 selection is execution/inspection/transcode/apply/scan; apply has a proved
 scan-producing handoff. The transcode documents own PostgreSQL/process controls and
 remaining organize/periodic/command-error limitations.
+
+Organize apply now uses shared task/advisory/lease owners in
+library/library-organize-apply-worker.js. Preserve guarded exclusive mutation and
+fresh canonical-path persistence; lifetime drainage does not make filesystem and
+SQL writes atomic. Notifications/Activity are admitted after successful terminal
+persistence with moved files, including partial results. Returned callbacks drain
+best-effort, including synchronous adapters. Application selection now includes
+organize before scan, without inferring a scan launch from notification wiring.
+Native mutation fixtures retain actual completion. The organize lifetime documents
+own real byte/catalog/resource evidence and remaining discovery/periodic work.

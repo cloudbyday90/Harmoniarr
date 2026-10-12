@@ -28,17 +28,9 @@ function verifiedOrganizeResult() {
       sourceRemoved: true, sourceExistsAfterSuccess: false } };
 }
 
-function waitForWorkerTick() {
-  return new Promise((resolve) => {
-    setTimeout(resolve, 100);
-  });
-}
-
 const leaseForTest = (runId) => createOperationRunLeaseFixture({ runId, jobType: 'library_organize_apply' });
 
 function owningWorkerFixture({ applyOrganizeMutation, createExclusiveFileMutationPlan = async (plan) => plan }) {
-  let finish;
-  const done = new Promise((resolve) => { finish = resolve; });
   const lifecycle = [];
   const notifications = [];
   const file = { fileId: 'file-boundary', libraryRootId: 'root-boundary', libraryRootPath: 'D:/music',
@@ -57,9 +49,9 @@ function owningWorkerFixture({ applyOrganizeMutation, createExclusiveFileMutatio
     markRunCancelled: async (input) => { lifecycle.push({ type: 'cancelled', ...input }); return true; },
     markRunPaused: async (input) => { lifecycle.push({ type: 'paused', ...input }); return true; },
     onReleaseAddedFn: async (input) => { notifications.push(input); },
-    releaseLease: async () => { finish(); },
+    releaseLease: async () => {},
   });
-  return { worker, done, lifecycle, notifications, file, lease };
+  return { worker, lifecycle, notifications, file, lease };
 }
 
 test('organize requires the guarded owner and passes the resolved cleanup plan with its original acquisition', async () => {
@@ -69,7 +61,7 @@ test('organize requires the guarded owner and passes the resolved cleanup plan w
     mutation = input;
     return verifiedOrganizeResult();
   } });
-  await fixture.worker.startWorkerRun({ runId: 'run-boundary' }); await fixture.done;
+  await (await fixture.worker.startWorkerRun({ runId: 'run-boundary' })).completion;
   assert.deepEqual(mutation, { runId: 'run-boundary', expectedLease: fixture.lease, file: fixture.file,
     plan: { sourcePath: fixture.file.currentPath, sourceRoot: fixture.file.libraryRootPath,
       destinationPath: fixture.file.proposedPath, destinationRoot: fixture.file.libraryRootPath,
@@ -83,7 +75,7 @@ test('guarded mutation pause and cancellation reach their outer handlers without
     ['cancelled', createOperationRunCancellationError({ runId: 'run-boundary' })],
   ]) {
     const fixture = owningWorkerFixture({ applyOrganizeMutation: async () => { throw error; } });
-    await fixture.worker.startWorkerRun({ runId: 'run-boundary' }); await fixture.done;
+    await (await fixture.worker.startWorkerRun({ runId: 'run-boundary' })).completion;
     assert.deepEqual(fixture.lifecycle.map((entry) => entry.type), [type]);
     assert.equal(fixture.lifecycle[0].expectedLease, fixture.lease);
     assert.equal(fixture.lifecycle[0].summary.movedCount ?? 0, 0);
@@ -135,8 +127,7 @@ test('library organize apply worker records release activity and notifications a
     renewLease: async () => {},
   });
 
-  await worker.startWorkerRun({ plannedRenameCount: 2, runId: 'run-1' });
-  await waitForWorkerTick();
+  await (await worker.startWorkerRun({ plannedRenameCount: 2, runId: 'run-1' })).completion;
 
   assert.equal(completedSummary.movedCount, 2);
   assert.equal(releaseNotifications.length, 1);
@@ -214,8 +205,7 @@ test('library organize apply worker still records release activity when some fil
     renewLease: async () => {},
   });
 
-  await worker.startWorkerRun({ plannedRenameCount: 2, runId: 'run-2' });
-  await waitForWorkerTick();
+  await (await worker.startWorkerRun({ plannedRenameCount: 2, runId: 'run-2' })).completion;
 
   assert.equal(releaseNotifications.length, 1);
   assert.equal(releaseNotifications[0].releaseTitle, 'Amber');
@@ -278,8 +268,7 @@ test('library organize apply worker records multi-release summaries in activity 
     renewLease: async () => {},
   });
 
-  await worker.startWorkerRun({ plannedRenameCount: 2, runId: 'run-4' });
-  await waitForWorkerTick();
+  await (await worker.startWorkerRun({ plannedRenameCount: 2, runId: 'run-4' })).completion;
 
   assert.equal(activityEvents.length, 1);
   assert.equal(activityEvents[0].entityArtist, null);
@@ -342,7 +331,7 @@ test('library organize apply worker requeues the run when a maintenance pause is
     });
   });
 
-  await worker.startWorkerRun({ plannedRenameCount: 5, runId: 'run-paused' });
+  await (await worker.startWorkerRun({ plannedRenameCount: 5, runId: 'run-paused' })).completion;
 
   const pausedArgs = await paused;
   const releasedLeaseArgs = await leaseReleased;
@@ -406,8 +395,7 @@ test('library organize apply worker does not emit release activity when no files
     renewLease: async () => {},
   });
 
-  await worker.startWorkerRun({ plannedRenameCount: 1, runId: 'run-3' });
-  await waitForWorkerTick();
+  await (await worker.startWorkerRun({ plannedRenameCount: 1, runId: 'run-3' })).completion;
 
   assert.equal(releaseNotifications.length, 0);
   assert.equal(activityEvents.length, 0);

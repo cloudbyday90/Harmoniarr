@@ -18,6 +18,8 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
   const inspectionCloseGate = Promise.withResolvers();
   const transcodeCloseEntered = Promise.withResolvers();
   const transcodeCloseGate = Promise.withResolvers();
+  const organizeCloseEntered = Promise.withResolvers();
+  const organizeCloseGate = Promise.withResolvers();
   let resolveShutdownComplete;
   const shutdownComplete = new Promise((resolve) => {
     resolveShutdownComplete = resolve;
@@ -237,6 +239,14 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
         resolveDispatchReadiness: () => ({ allowed: true }),
       },
       libraryModule: {
+        libraryOrganizeApplyWorker: {
+          startWorkerRun: async () => {},
+          async close() {
+            callOrder.push('organize.close');
+            organizeCloseEntered.resolve();
+            await organizeCloseGate.promise;
+          },
+        },
         libraryDiscoveryDispatchPolicyService: {
           resolveDispatchReadiness: () => ({ allowed: true }),
         },
@@ -465,7 +475,10 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     transcodeCloseGate.resolve();
     await waitForFixtureReady({ ready: applyCloseEntered.promise, operation: shutdownComplete });
     assert.equal(callOrder.includes('closePool'), false);
-  } finally { executionCloseGate.resolve(); inspectionCloseGate.resolve(); transcodeCloseGate.resolve(); applyCloseGate.resolve(); }
+    applyCloseGate.resolve();
+    await waitForFixtureReady({ ready: organizeCloseEntered.promise, operation: shutdownComplete });
+    assert.equal(callOrder.includes('scan.close'), false); assert.equal(callOrder.includes('closePool'), false);
+  } finally { executionCloseGate.resolve(); inspectionCloseGate.resolve(); transcodeCloseGate.resolve(); applyCloseGate.resolve(); organizeCloseGate.resolve(); }
   await shutdownComplete;
 
   assert.deepEqual(callOrder, [
@@ -504,6 +517,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'inspection.close',
     'transcode.close',
     'apply.close',
+    'organize.close',
     'scan.close',
     'closePool',
   ]);
