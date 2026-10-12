@@ -20,27 +20,29 @@ const correlationId = '11111111-1111-4111-8111-111111111111';
 const owned = { source: 'testcontainer_postgres', fresh: true, containerId };
 const flush = () => new Promise(resolve => { setImmediate(resolve); });
 
-test('capture registers one canonical completion and drains both planes before publishing', async () => {
+test('capture registers one canonical completion and drains all three observations before publishing', async () => {
   const held = Promise.withResolvers(); const records = []; let calls = 0;
   const primary = Object.assign(new Error('private SQL/password'), { code: 'ECONNRESET' });
   const owner = createPostgresFailureEvidence({ ...owned, onRecord: record => records.push(record),
     hostProbeFactory: () => async () => { calls += 1; throw null; },
-    readinessProbeFactory: () => async () => { calls += 1; await held.promise; return { outcome: 'accepting', cliExitCode: 0 }; } });
+    readinessProbeFactory: () => async () => { calls += 1; return { outcome: 'accepting', cliExitCode: 0 }; },
+    containerStateProbeFactory: () => async () => { calls += 1; await held.promise; return { outcome: 'passed', running: true, restartCount: 0 }; } });
   const capture = owner.createCapture({ correlationId });
   const pending = capture(primary, 'schema_prepare');
   assert.equal(capture(new Error('secondary')), pending);
-  await flush(); assert.equal(calls, 2); assert.equal(records.length, 0);
+  await flush(); assert.equal(calls, 3); assert.equal(records.length, 0);
   held.resolve(); await pending;
   assert.equal(records.length, 1); assert.equal(records[0].correlationId, correlationId);
   assert.equal(records[0].errors[0].code, 'ECONNRESET');
   assert.equal(records[0].host.outcome, 'failed'); assert.equal(records[0].readiness.outcome, 'accepting');
+  assert.equal(records[0].version, 2); assert.equal(records[0].containerState.running, true);
   assert.equal(JSON.stringify(records).includes('private'), false);
 });
 
 test('success and off mode launch no probe, including invalid injected observer work', async () => {
   const forbidden = () => assert.fail('Unrequested diagnostic launched');
   const capture = createPostgresFailureEvidence({ ...owned, mode: 'off', onRecord: forbidden,
-    hostProbeFactory: forbidden, readinessProbeFactory: forbidden }).createCapture();
+    hostProbeFactory: forbidden, readinessProbeFactory: forbidden, containerStateProbeFactory: forbidden }).createCapture();
   assert.equal(await observePostgresFixtureFailure(capture, 'database_scenario', () => 'result'), 'result');
   await assert.rejects(observePostgresFixtureFailure(capture, 'schema_prepare', () => Promise.reject(null)), e => e === null);
   await assert.rejects(observePostgresFixtureFailure(async () => { throw new Error('sink'); },
@@ -54,25 +56,29 @@ test('external, reused, unknown and pre-cancelled capabilities cannot launch aut
     if (input === owned) controller.abort(null);
     const forbidden = () => assert.fail('Unowned/cancelled diagnostic launched');
     await createPostgresFailureEvidence({ ...input, onRecord: r => records.push(r),
-      hostProbeFactory: forbidden, readinessProbeFactory: forbidden })
+      hostProbeFactory: forbidden, readinessProbeFactory: forbidden, containerStateProbeFactory: forbidden })
       .createCapture({ signal: controller.signal })(null);
     assert.equal(records[0].host.outcome, 'unavailable'); assert.equal(records[0].readiness.outcome, 'unavailable');
+    assert.equal(records[0].containerState.outcome, 'unavailable');
   }
 });
 
 test('hostile and changing getters cannot smuggle raw values into approved records', () => {
   const privateValue = 'private-password';
-  const host = { outcome: 'passed' }; const readiness = { outcome: 'accepting' };
+  const host = { outcome: 'passed' }; const readiness = { outcome: 'accepting' }; const containerState = { outcome: 'passed' };
   for (const [object, key, first] of [[host, 'version', 180003], [host, 'recovery', false],
-    [host, 'closed', true], [readiness, 'cliExitCode', 0]]) {
+    [host, 'closed', true], [readiness, 'cliExitCode', 0], [containerState, 'running', true],
+    [containerState, 'restartCount', 0]]) {
     let reads = 0; Object.defineProperty(object, key, { get: () => ++reads === 1 ? first : privateValue });
   }
   const record = buildPostgresFailureRecord({ correlationId: privateValue, source: privateValue, phase: privateValue,
-    error: new Proxy({}, { get() { throw new Error(privateValue); } }), host, readiness, durationMs: Infinity });
+    error: new Proxy({}, { get() { throw new Error(privateValue); } }), host, readiness, containerState, durationMs: Infinity });
   assert.equal(record.host.version, 180003); assert.equal(record.host.recovery, false);
   assert.equal(record.host.closed, true); assert.equal(record.readiness.cliExitCode, 0);
+  assert.equal(record.containerState.running, true); assert.equal(record.containerState.restartCount, 0);
   assert.equal(JSON.stringify(record).includes(privateValue), false);
   assert.ok(Object.isFrozen(record)); assert.ok(Object.isFrozen(record.host)); assert.ok(Object.isFrozen(record.readiness));
+  assert.ok(Object.isFrozen(record.containerState));
 });
 
 test('throwing clocks and synchronous/asynchronous sinks cannot replace an original Error or null', async () => {

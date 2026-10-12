@@ -12,6 +12,39 @@ import {
   hasConfiguredPostgresAdminConnection,
   withPostgresIntegrationRuntime,
 } from '../../testing/postgres-integration-runtime.js';
+import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
+
+for (const source of ['external', 'container', 'template']) {
+  test(`${source} direct pools enforce the integration policy over ambient pool settings`, async () => {
+    const config = resolveIntegrationTestRuntimeConfig(); let checked = false;
+    const inspectPool = async ({ createPool }) => {
+      const pool = createPool({ database: 'owned_scenario', host: 'owned_host', port: 12345 });
+      try {
+        assert.equal(pool.options.max, config.poolMax);
+        assert.equal(pool.options.connectionTimeoutMillis, config.poolConnectionTimeoutMs);
+        assert.equal(pool.options.idleTimeoutMillis, config.poolIdleTimeoutMs);
+        assert.equal(pool.options.maxUses, config.poolMaxUses);
+        assert.equal(pool.options.allowExitOnIdle, config.poolAllowExitOnIdle);
+        assert.equal(pool.options.database, 'owned_scenario');
+        assert.equal(pool.options.host, 'owned_host'); assert.equal(pool.options.port, 12345);
+        checked = true;
+      } finally { await pool.end(); }
+    };
+    const runtime = await createPostgresIntegrationRuntime({ config,
+      env: { ...(source !== 'container' ? { PGPASSWORD: 'controlled' } : {}),
+        HARMONIARR_PG_POOL_MAX: '40', HARMONIARR_PG_POOL_CONNECTION_TIMEOUT_MS: '1' },
+      createPostgresContainer: () => fakeContainer(async () => {}),
+      schemaMode: source === 'template' ? 'migration_template' : 'empty',
+      withTemporaryPostgresDatabaseFn: inspectPool,
+      createPreparedPostgresTemplateFn: async options => {
+        await inspectPool(options); return { cleanup: async () => {} };
+      },
+    });
+    try { if (source !== 'template') await runtime.runIsolatedDatabase(async () => {}); }
+    finally { await runtime.cleanup(); }
+    assert.equal(checked, true);
+  });
+}
 
 suite('PostgreSQL integration runtime', () => {
   test('detects whether an external admin connection is configured', () => {

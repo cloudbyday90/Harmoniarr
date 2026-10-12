@@ -64,6 +64,12 @@ locally with Codex metadata. Its [design](WEB_STANDARDS_SKILL_DESIGN.md) and
 [outcome](WEB_STANDARDS_SKILL_OUTCOME.md) document applicable practice families,
 source status, structural validation, and independent bounded evaluation.
 
+Its fixture diagnostic workflow now verifies actual resource policy and separates
+owned work completion from database/container observations. The
+[reset investigation](POSTGRES_FIXTURE_RESET_DESIGN.md) applies maintainer,
+OWASP and W3C draft guidance through focused adverse evidence, preserving
+unresolved causes and failed cohorts rather than prescribing generic retries.
+
 ## Repository Rules
 
 - Keep `.agents/` content shareable and repo-safe.

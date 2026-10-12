@@ -20,6 +20,7 @@ import { createIntegrationFixturePhaseObserver } from './fixture-phase-observer.
 import { createIntegrationPoolCheckoutObserver, observeAppSchemaPreparation } from './app-checkout-observer.js';
 import { withIntegrationAppWorkerDrain } from './app-worker-lifecycle.js';
 import { observePostgresFixtureFailure } from './postgres-failure-evidence.js';
+import { buildIntegrationPoolEnvironment } from './pool-policy.js';
 
 const packageJsonPath = resolve(import.meta.dirname, '../../package.json');
 const SCENARIO_SHUTDOWN_DRAIN_MS = 150;
@@ -50,16 +51,6 @@ async function withEnvironmentVariables(overrides, run) {
       }
     }
   }
-}
-
-function buildTestPoolEnvironment(config) {
-  return {
-    HARMONIARR_PG_POOL_ALLOW_EXIT_ON_IDLE: String(config.poolAllowExitOnIdle),
-    HARMONIARR_PG_POOL_CONNECTION_TIMEOUT_MS: String(config.poolConnectionTimeoutMs),
-    HARMONIARR_PG_POOL_IDLE_TIMEOUT_MS: String(config.poolIdleTimeoutMs),
-    HARMONIARR_PG_POOL_MAX: String(config.poolMax),
-    HARMONIARR_PG_POOL_MAX_USES: String(config.poolMaxUses),
-  };
 }
 
 /**
@@ -153,7 +144,7 @@ export async function createIntegrationAppRuntime({
         return withEnvironmentVariables({
           HARMONIARR_CONTACT_EMAIL: 'integration-tests@example.invalid',
           ...buildIntegrationBackupEnvironment(scenarioWorkspaceDir),
-          ...buildTestPoolEnvironment(config),
+          ...buildIntegrationPoolEnvironment(config),
           PGDATABASE: databaseConfig.database,
           PGHOST: databaseConfig.host,
           PGPASSWORD: databaseConfig.password ?? null,
@@ -235,7 +226,7 @@ export async function withIntegrationApp({
         return withEnvironmentVariables({
           HARMONIARR_CONTACT_EMAIL: 'integration-tests@example.invalid',
           ...buildIntegrationBackupEnvironment(runtimeWorkspace.workspaceDir),
-          ...buildTestPoolEnvironment(config),
+          ...buildIntegrationPoolEnvironment(config),
           PGDATABASE: databaseConfig.database,
           PGHOST: databaseConfig.host,
           PGPASSWORD: databaseConfig.password ?? null,

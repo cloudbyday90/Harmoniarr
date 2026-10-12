@@ -10,6 +10,7 @@ import { createServer } from 'node:net';
 import pg from 'pg';
 import { after, before, suite, test } from 'node:test';
 import { getPool } from '../../src/server/database.js';
+import { setImmediate } from 'node:timers/promises';
 import { createPostgresIntegrationRuntime } from '../../testing/postgres-integration-runtime.js';
 import { createIntegrationAppRuntime, withIntegrationApp } from '../../testing/integration/app-runtime.js';
 import { createPostgresFailureEvidence } from '../../testing/integration/postgres-failure-evidence.js';
@@ -17,6 +18,8 @@ import { createPostgresHostProbe } from '../../testing/integration/postgres-host
 import { createPoolCheckoutObserver } from '../../testing/integration/app-checkout-observer.js';
 import { createFixtureGate, waitForFixtureReady } from '../../testing/integration/fixture-lifecycle.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
+import { createScopedFixtureGate, startScopedFixtureWork, withFixtureWorkScope }
+  from '../../testing/integration/fixture-work-scope.js';
 
 const config = resolveIntegrationTestRuntimeConfig();
 let runtime;
@@ -91,10 +94,70 @@ suite('Owned PostgreSQL failure evidence before fixture teardown', () => {
       assert.equal(records[0].host.outcome, 'passed'); assert.equal(records[0].host.closed, true);
       assert.ok(records[0].host.version >= 180000); assert.equal(records[0].host.recovery, false);
       assert.equal(records[0].readiness.outcome, 'accepting'); assert.equal(records[0].readiness.cliExitCode, 0);
+      assert.equal(records[0].version, 2);
+      assert.deepEqual(records[0].containerState, { outcome: 'passed', running: true, paused: false,
+        restarting: false, oomKilled: false, exitCode: 0, restartCount: 0, errors: [] });
       assert.equal(JSON.stringify(records).includes('intentionally-invalid'), false);
       diagnosticPool = null;
     });
   }
+
+  test('direct native fixture queues a third checkout within the configured two-client policy', {
+    timeout: config.scenarioTimeoutMs,
+  }, async () => {
+    records = []; diagnosticPool = null;
+    await runtime.runIsolatedDatabase(async ({ getPoolFn }) => {
+      const pool = getPoolFn(); let first; let second; let third; let queued;
+      try {
+        assert.equal(pool.options.max, config.poolMax); assert.equal(config.poolMax, 2);
+        assert.equal(pool.options.connectionTimeoutMillis, config.poolConnectionTimeoutMs);
+        first = await pool.connect(); second = await pool.connect();
+        queued = pool.connect(); queued.catch(() => {});
+        await setImmediate();
+        assert.equal(pool.totalCount, 2); assert.equal(pool.waitingCount, 1);
+        first.release(); first = null; third = await queued;
+        assert.equal((await third.query('SELECT 1 AS value')).rows[0].value, 1);
+        assert.equal(pool.waitingCount, 0);
+      } finally {
+        first?.release(); second?.release();
+        if (!third && queued) third = await queued.catch(() => null);
+        third?.release();
+      }
+    });
+    assert.equal(records.length, 0);
+  });
+
+  test('owned backend termination before a checkpoint surfaces its original failure and drains before teardown', {
+    timeout: config.scenarioTimeoutMs,
+  }, async t => {
+    records = []; diagnosticPool = null; let primary; let drained = false; let completedCheckpoint = false;
+    const pending = runtime.runIsolatedDatabase(async ({ getPoolFn }) => {
+      diagnosticPool = getPoolFn();
+      await withFixtureWorkScope({ signal: t.signal }, async scope => {
+        const entered = createScopedFixtureGate(scope);
+        const operation = startScopedFixtureWork(scope, async () => {
+          const client = await diagnosticPool.connect(); client.on('error', () => {});
+          try {
+            // Only this scenario's own captured connection is terminated.
+            await client.query('SELECT pg_terminate_backend(pg_backend_pid())');
+            entered.release(); completedCheckpoint = true;
+          } catch (error) { primary = error; throw error; }
+          finally { client.release(true); await client.end(); drained = true; }
+        });
+        await waitForFixtureReady({ ready: entered.promise, operation, signal: scope.signal });
+      });
+    }, { signal: t.signal });
+    await assert.rejects(pending, error => error === primary && error.code === '57P01');
+    assert.equal(completedCheckpoint, false); assert.equal(drained, true);
+    assert.equal(diagnosticPool.ended, true); assert.equal(records.length, 1);
+    assert.equal(records[0].errors[0].code, '57P01');
+    assert.equal(records[0].host.outcome, 'passed'); assert.equal(records[0].readiness.outcome, 'accepting');
+    assert.equal(records[0].containerState.running, true); assert.equal(records[0].containerState.restartCount, 0);
+    diagnosticPool = null;
+    await runtime.runIsolatedDatabase(async ({ getPoolFn }) => {
+      assert.equal((await getPoolFn().query('SELECT 1 AS value')).rows[0].value, 1);
+    });
+  });
 
   test('container readiness does not certify authentication and a failed probe closes its native client', {
     timeout: config.scenarioTimeoutMs,

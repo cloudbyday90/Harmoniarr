@@ -6,6 +6,29 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Bounded PostgreSQL fixture policy and observation (2026-10-12)
+
+The [fixture-reset outcome](POSTGRES_FIXTURE_RESET_OUTCOME.md),
+[design](POSTGRES_FIXTURE_RESET_DESIGN.md) and
+[research](POSTGRES_FIXTURE_RESET_RESEARCH_2026_10.md) separate historical
+connection-reset uncertainty from reproduced pool-policy and observer defects.
+Direct/app/template pools share explicit limits. Scoped work drains before
+teardown; independent bounded lock observers no longer compete for held clients.
+Failure-only version-two evidence adds sanitized state for the captured fresh
+container. No deadline/capacity increase, retry, skip or parallel promotion.
+
+- Validation: 57 focused and 9,976 fast tests plus static checks/builds; final
+  serial affected cohort 158/158 and four audited native files 32/32, all without
+  failures/cancellations/skips. Preserve the first 155/158 cohort and earlier
+  reset evidence separately. Common code hashes remained exact across final
+  gates; the four later corrections affect native test files only.
+- Next: pilot the repaired Wanted/recovery suites in the existing serial shared
+  PostgreSQL launcher after ownership, drainage and failure-evidence audits;
+  require matched-order measurement before promotion. Then partial two-owner
+  delivery recovery and fulfilled-source retirement. Any recurrent reset uses
+  its original failure and all three observations; the historical cause remains
+  unresolved.
+
 ## Completed slice: Two-owner track delivery (2026-10-12)
 
 The [two-owner slice](OPERATOR_TRACK_UNION_OUTCOME.md) adds recipient-
@@ -18,9 +41,10 @@ selected native cases have passing evidence across the broad and isolated checks
 Both broad runs also exposed connection resets; they are preserved, not reported
 as clean gates. Source remained frozen and no bounds/assertions/skips changed.
 
-- Next: diagnose repeated native PostgreSQL connection resets during longer
-  cohorts; then partial delivery recovery, fulfilled-source retirement and safe
-  reopening when owned media is missing. Broader unions remain separate.
+- Validation follow-up: the newer fixture-reset slice above repairs reproduced
+  policy/observer defects while preserving unresolved historical reset evidence.
+  Partial delivery recovery, fulfilled-source retirement and safe reopening when
+  owned media is missing remain the feature follow-up. Broader unions are separate.
 
 ## Completed slice: Exact single-track acquisition (2026-10-12)
 

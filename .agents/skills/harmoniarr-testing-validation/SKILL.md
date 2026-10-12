@@ -5,6 +5,23 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+Direct database fixtures now enforce the same integration pool policy as app
+fixtures, including template preparation/clones. Verify actual max/checkout
+settings instead of assuming documentation applies. Legacy direct pools omitted
+that policy; preserve their failed evidence rather than comparing changed pool
+pressure as a matched speed benchmark. Abandonment checkpoints register actual
+completion, race failure/cancellation, release gates and drain before database
+teardown. Failure-only version-two records separate independent host/query,
+container readiness and bounded state. Healthy snapshots do not diagnose a
+previous ECONNRESET; controlled 57P01 termination proves failure handling only.
+See docs/POSTGRES_FIXTURE_RESET_DESIGN.md and its outcome. No retry, deadline
+increase, global parallelism or skip should convert a failed cohort into green.
+If a lock test holds both clients, use fixture-postgres-observer.js with the
+acknowledged scenario connection config; never request a third checkout to
+observe its own wait or spread internal pool.options. Observe expected rejection
+immediately and unlock/drain holders and publishers before database teardown.
+Keep matched-order shared-runner adoption separate from claims about a reset fix.
+
 For two-owner unions, prove actual saved intent creates two owned requests but
 one discovery row, then one exact two-file provider manifest. Verify distinct
 private deliveries, untouched extra/sibling tracks, retained shared input,

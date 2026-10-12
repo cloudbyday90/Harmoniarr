@@ -1,5 +1,16 @@
 # Official practices by boundary
 
+October 12 fixture-reset guidance uses
+docs/POSTGRES_FIXTURE_RESET_RESEARCH_2026_10.md. Driver documentation supplies
+pool bounds/client drainage; Docker documents targeted container inspection.
+Apply explicit fixture policy across direct/app/template entrypoints and retain
+acknowledged connection ownership. OWASP logging guidance informs bounded
+boolean/integer records and secret exclusion; diagnostic failure cannot replace
+the original Error/null. W3C High Resolution Time is a September 1, 2026 Working
+Draft and supports monotonic observation only. Readiness, a successful independent
+query and current container state do not explain a previous reset. No raw log
+capture, retries, larger pools or longer deadlines are justified by this guidance.
+
 October 12 two-owner guidance uses docs/OPERATOR_TRACK_UNION_RESEARCH_2026_10.md.
 OWASP resource-specific authorization separates provider work from recipient
 delivery. Protected transaction data includes the complete accepted participant

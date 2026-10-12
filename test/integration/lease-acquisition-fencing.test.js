@@ -19,31 +19,37 @@ import { createOperationQueueStore } from '../../src/server/operation-queue-stor
 import { createOperationStrandedRunRecoveryService } from '../../src/server/operation-stranded-run-recovery-service.js';
 import { createOperationRunLeaseHeartbeat } from '../../src/server/heartbeat/operation-run-lease-heartbeat.js';
 import { createArtworkCleanupWorker } from '../../src/server/artwork/artwork-cleanup-worker.js';
+import { withFixturePostgresObserver } from '../../testing/integration/fixture-postgres-observer.js';
+import { withRollbackFixtureClient } from '../../testing/integration/fixture-transaction-client.js';
+import { withFixtureLifecycle } from '../../testing/integration/fixture-lifecycle.js';
 
 const config = resolveIntegrationTestRuntimeConfig(); let runtime; let unavailable;
 const gate = () => { let release; const promise = new Promise((resolve) => { release = resolve; }); return { promise, release }; };
 async function scenario(t, callback) {
   if (unavailable) { t.skip(unavailable); return; }
-  await runtime.runIsolatedDatabase(async ({ getPoolFn }) => {
+  await runtime.runIsolatedDatabase(async ({ getPoolFn, databaseConfig }) => {
     await applyPendingMigrations({ getPoolFn });
     const a = createJobLeaseStore({ getPoolFn, ownerInstanceId: 'same-owner', leaseDurationMs: 60_000 });
     const b = createJobLeaseStore({ getPoolFn, ownerInstanceId: 'replacement-owner', leaseDurationMs: 60_000 });
     const runs = createOperationRunStore({ getPoolFn, operationType: 'artwork_cleanup',
       createJobLeaseStoreFn: () => a });
     const run = await runs.createOperationRun({ status: 'pending', summary: { currentStep: 'Controlled lease fixture' } });
-    await callback({ getPoolFn, pool: getPoolFn(), a, b, runs, run, key: `artwork_cleanup:${run.id}`,
+    await callback({ getPoolFn, pool: getPoolFn(), databaseConfig, a, b, runs, run, key: `artwork_cleanup:${run.id}`,
       queue: createOperationQueueStore({ getPoolFn }) });
   });
 }
 const expire = (c) => c.pool.query("UPDATE job_leases SET expires_at=clock_timestamp()-INTERVAL '1 second' WHERE lease_key=$1", [c.key]);
 const parent = async (c) => (await c.pool.query('SELECT * FROM operation_runs WHERE id=$1', [c.run.id])).rows[0];
-async function waitForBlock(c) {
+async function waitForBlock(c, signal) {
+  await withFixturePostgresObserver({ connectionConfig: c.databaseConfig, signal }, async (observer) => {
   for (let index = 0; index < 100; index += 1) {
-    if ((await c.pool.query(`SELECT pid FROM pg_stat_activity WHERE datname=current_database()
+    await observer.query('SELECT pg_stat_clear_snapshot()');
+    if ((await observer.query(`SELECT pid FROM pg_stat_activity WHERE datname=current_database()
       AND cardinality(pg_blocking_pids(pid))>0 AND query NOT LIKE '%pg_stat_activity%'`)).rowCount > 0) return;
     await new Promise((resolve) => { setTimeout(resolve, 10); });
   }
   assert.fail('Expected a real PostgreSQL lock wait');
+  });
 }
 
 suite('Acquisition-token lease and lifecycle fences in real PostgreSQL', () => {
@@ -119,10 +125,14 @@ suite('Acquisition-token lease and lifecycle fences in real PostgreSQL', () => {
   test('expiry while waiting for the lease key refuses renewal and lifecycle writes but permits exact own release', { timeout: config.scenarioTimeoutMs }, async (t) => scenario(t, async (c) => {
     const first = await c.runs.acquireLease({ runId: c.run.id });
     const expires = (await c.pool.query("UPDATE job_leases SET expires_at=clock_timestamp()+INTERVAL '500 milliseconds' WHERE lease_key=$1 RETURNING expires_at", [c.key])).rows[0].expires_at;
-    const holder = await c.pool.connect(); await holder.query('BEGIN'); await lockJobLeaseKey({ leaseKey: c.key, queryable: holder });
-    const mark = c.runs.markRunStarted({ runId: c.run.id, expectedLease: first }); await waitForBlock(c);
-    await new Promise((resolve) => { setTimeout(resolve, Math.max(0, expires.getTime() - Date.now()) + 50); });
-    await holder.query('COMMIT'); holder.release();
+    let mark;
+    await withFixtureLifecycle({ signal: t.signal }, async (scope) => withRollbackFixtureClient(c.pool, async (holder) => {
+      await lockJobLeaseKey({ leaseKey: c.key, queryable: holder });
+      mark = c.runs.markRunStarted({ runId: c.run.id, expectedLease: first }); scope.track(mark);
+      await waitForBlock(c, scope.signal);
+      await new Promise((resolve) => { setTimeout(resolve, Math.max(0, expires.getTime() - Date.now()) + 50); });
+      await holder.query('COMMIT');
+    }));
     assert.equal(await mark, false); assert.equal((await parent(c)).status, 'pending');
     assert.equal(await c.runs.renewLease({ runId: c.run.id, expectedLease: first }), null);
     assert.equal((await c.runs.releaseLease({ runId: c.run.id, expectedLease: first, status: 'expired' })).state, 'released');
@@ -145,11 +155,15 @@ suite('Acquisition-token lease and lifecycle fences in real PostgreSQL', () => {
   test('the key advisory fence covers missing-row recovery against a raw generic acquisition', { timeout: config.scenarioTimeoutMs }, async (t) => scenario(t, async (c) => {
     await c.pool.query("UPDATE operation_runs SET status='running',attempt_count=1 WHERE id=$1", [c.run.id]);
     const observed = (await c.queue.listRecoverableRuns({ operationTypes: ['artwork_cleanup'] }))[0];
-    const holder = await c.pool.connect(); await holder.query('BEGIN'); await lockJobLeaseKey({ leaseKey: c.key, queryable: holder });
-    const acquired = c.b.acquireLease({ jobType: 'artwork_cleanup', leaseKey: c.key }); await waitForBlock(c);
-    const recovered = c.queue.recoverStrandedRun({ observedRun: observed, expectedLease: null,
-      recoverySummary: {}, errorMessage: 'Observed missing lease', buildRetrySchedule: () => null });
-    await holder.query('COMMIT'); holder.release();
+    let acquired; let recovered;
+    await withFixtureLifecycle({ signal: t.signal }, async (scope) => withRollbackFixtureClient(c.pool, async (holder) => {
+      await lockJobLeaseKey({ leaseKey: c.key, queryable: holder });
+      acquired = c.b.acquireLease({ jobType: 'artwork_cleanup', leaseKey: c.key }); scope.track(acquired);
+      await waitForBlock(c, scope.signal);
+      recovered = c.queue.recoverStrandedRun({ observedRun: observed, expectedLease: null,
+        recoverySummary: {}, errorMessage: 'Observed missing lease', buildRetrySchedule: () => null });
+      scope.track(recovered); await holder.query('COMMIT');
+    }));
     assert.ok(await acquired); assert.equal(await recovered, null); assert.equal((await parent(c)).status, 'running');
   }));
 

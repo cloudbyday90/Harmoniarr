@@ -21,6 +21,14 @@ cleanup durations. See the [fixture design](docs/TEST_FIXTURE_OBSERVABILITY_DESI
 [outcome](docs/TEST_FIXTURE_OBSERVABILITY_OUTCOME.md) and
 [research](docs/TEST_FIXTURE_OBSERVABILITY_RESEARCH_2026_10.md).
 
+Direct PostgreSQL and app fixtures now apply one explicit pool policy. Native
+failure evidence also captures bounded state from the exact owned fresh
+container, alongside independent query/readiness observations. See the
+[reset investigation design](docs/POSTGRES_FIXTURE_RESET_DESIGN.md),
+[research](docs/POSTGRES_FIXTURE_RESET_RESEARCH_2026_10.md) and
+[outcome](docs/POSTGRES_FIXTURE_RESET_OUTCOME.md) for checkpoint drainage,
+controlled failure proof and the limits of connection-reset diagnosis.
+
 Wanted now explicitly selects a migration-only template in its per-file runtime;
 every variant still receives a fresh database and pool. Other suites keep their
 existing preparation paths. Set `HARMONIARR_INTEGRATION_WANTED_SCHEMA_MODE=empty`

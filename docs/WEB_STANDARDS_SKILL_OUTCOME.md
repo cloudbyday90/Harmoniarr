@@ -1,5 +1,14 @@
 # Practical web standards skill outcome
 
+October 12 fixture-reset maintenance adds an actionable diagnostic workflow to
+the existing skill: verify actual pool policy, own readiness/drainage, minimize
+logged data and distinguish three current observations from historical causality.
+The separate [reset design](POSTGRES_FIXTURE_RESET_DESIGN.md),
+[research](POSTGRES_FIXTURE_RESET_RESEARCH_2026_10.md) and
+[outcome](POSTGRES_FIXTURE_RESET_OUTCOME.md) own implementation and executed
+evidence. This extends the practical standards skill without duplicating its
+instructions or claiming a new blind trial or broader conformance.
+
 October 12 two-owner maintenance extends concrete references with recipient-owned
 request publication, complete typed participants, exact union manifests, private
 copy delivery and separate receipts. The

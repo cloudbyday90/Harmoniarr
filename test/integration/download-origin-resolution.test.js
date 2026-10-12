@@ -27,25 +27,30 @@ import { buildPublicImportCandidateExecution } from '../../src/server/import-can
 import { createImportCandidateExecutionWorker } from '../../src/server/import-candidates/import-candidate-execution-worker.js';
 import { createSlskdModule } from '../../src/server/slskd/slskd-module.js';
 import { createSlskdConfigService } from '../../src/server/slskd/slskd-config-service.js';
+import { withFixturePostgresObserver } from '../../testing/integration/fixture-postgres-observer.js';
+import { waitForFixtureReady, withFixtureLifecycle } from '../../testing/integration/fixture-lifecycle.js';
 
 const config = resolveIntegrationTestRuntimeConfig(); let runtime; let unavailable;
 async function scenario(t, callback, options = {}) {
   if (unavailable) { t.skip(unavailable); return; }
-  await runtime.runIsolatedDatabase(async ({ getPoolFn }) => {
+  await runtime.runIsolatedDatabase(async ({ getPoolFn, databaseConfig }) => {
     await applyPendingMigrations({ getPoolFn });
-    await callback(await seedImportExecutionOriginFixture(t, { getPoolFn, ...options }));
+    await callback({ ...await seedImportExecutionOriginFixture(t, { getPoolFn, ...options }), databaseConfig });
   });
 }
 const resolve = (context, command, service = context.service) => service.resolveDownloadOrigin({ ...context.owner, command });
 const barrier = () => { let release; const promise = new Promise((res) => { release = res; }); return { promise, release }; };
-async function waitForBlock(context) {
+async function waitForBlock(context, signal) {
+  await withFixturePostgresObserver({ connectionConfig: context.databaseConfig, signal }, async (observer) => {
   for (let index = 0; index < 100; index += 1) {
-    const rows = await context.pool.query(`SELECT pid FROM pg_stat_activity WHERE datname=current_database()
+    await observer.query('SELECT pg_stat_clear_snapshot()');
+    const rows = await observer.query(`SELECT pid FROM pg_stat_activity WHERE datname=current_database()
       AND cardinality(pg_blocking_pids(pid))>0 AND query NOT LIKE '%pg_stat_activity%'`);
     if (rows.rowCount) return;
     await new Promise((res) => { setTimeout(res, 10); });
   }
   assert.fail('Expected an actual PostgreSQL writer lock wait');
+  });
 }
 
 suite('Guarded origin retirement and restored observation in real PostgreSQL', () => {
@@ -129,31 +134,35 @@ suite('Guarded origin retirement and restored observation in real PostgreSQL', (
     }
   }));
 
-  test('retirement serializes scoped allocation, lease admission and stale source writes through actual parent lock waits', { timeout: config.scenarioTimeoutMs }, async (t) => scenario(t, async (context) => {
+  test('retirement serializes scoped allocation, lease admission and stale source writes through actual parent lock waits', { timeout: config.scenarioTimeoutMs }, async (t) => scenario(t, async (context) => withFixtureLifecycle({ signal: t.signal }, async (scope) => {
     const entered = barrier(); const release = barrier();
+    scope.onRelease(() => release.release());
     const service = context.createService({ confirmDownloadHandoff: async (input) => { entered.release(); await release.promise; return context.handoff.confirmDownloadHandoff(input); } });
     const command = await reviewImportExecutionOrigin(context, service);
     const staleSource = await context.evidenceStore.getItem(context.owner);
     const resolving = resolve(context, command, service);
-    await entered.promise;
+    scope.track(resolving);
+    await waitForFixtureReady({ ready: entered.promise, operation: resolving, signal: scope.signal });
+    // Set up the unscoped writer before contenders consume the remaining slot.
+    const unscoped = await context.executionRuns.createOperationRun({ status: 'pending', requestedCandidateCount: 1,
+      summary: { executionMode: 'download_enqueue', requestedCandidateCount: 1, triggerSource: 'manual' } });
     const allocation = context.executionRuns.createOperationRun({ status: 'pending', requestedCandidateCount: 1,
       summary: { executionMode: 'download_enqueue', requestedCandidateCount: 1, selectedCandidateId: context.candidate.id, triggerSource: 'manual' } });
     const lease = context.executionRuns.acquireLease({ runId: context.newerRunId });
-    const unscoped = await context.executionRuns.createOperationRun({ status: 'pending', requestedCandidateCount: 1,
-      summary: { executionMode: 'download_enqueue', requestedCandidateCount: 1, triggerSource: 'manual' } });
     const association = initializeImportExecutionRunItems(unscoped.id, [{ importCandidateId: context.candidate.id, position: 1,
       itemStatus: 'ready', statusMessage: 'Stale unscoped initializer', planningSnapshot: {} }], context.pool);
     const stale = updateImportExecutionRunItem({ importCandidateId: context.candidate.id, operationRunId: context.sourceRunId,
       itemStatus: 'blocked', statusMessage: 'Stale old writer', planningSnapshot: staleSource.planningSnapshot }, context.pool);
     const observed = Promise.allSettled([allocation, lease, stale, association]);
-    await waitForBlock(context); release.release(); await resolving;
+    scope.track(observed);
+    await waitForBlock(context, scope.signal); release.release(); await resolving;
     const results = await observed;
     assert.equal(results[0].status, 'rejected'); assert.equal(results[1].status, 'rejected');
     assert.equal(results[2].status, 'fulfilled'); assert.equal(results[2].value, null);
     assert.equal(results[3].status, 'fulfilled'); assert.deepEqual(results[3].value, []);
     assert.equal((await context.evidenceStore.getItem(context.owner)).planningSnapshot.execution.handoff.state, 'confirmed');
     assert.equal(context.state.posts, 0);
-  }));
+  })));
 
   test('retired jobs cannot restart, retry, rewrite items or lose lineage through either retention sweep', { timeout: config.scenarioTimeoutMs }, async (t) => scenario(t, async (context) => {
     const command = await reviewImportExecutionOrigin(context); await resolve(context, command);

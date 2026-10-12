@@ -30,6 +30,9 @@ import { captureOrganizeMutation } from '../../src/server/library/library-organi
 import { createLibraryOrganizeMutationService } from '../../src/server/library/library-organize-mutation-service.js';
 import { createLibraryOrganizeApplyWorker } from '../../src/server/library/library-organize-apply-worker.js';
 import { createLibraryCatalogStore } from '../../src/server/library/library-catalog-store.js';
+import { withFixturePostgresObserver } from '../../testing/integration/fixture-postgres-observer.js';
+import { waitForFixtureReady, withFixtureLifecycle } from '../../testing/integration/fixture-lifecycle.js';
+import { withRollbackFixtureClient } from '../../testing/integration/fixture-transaction-client.js';
 
 const config = resolveIntegrationTestRuntimeConfig();
 let runtime;
@@ -46,7 +49,7 @@ const exists = async (path) => stat(path).then(() => true, (error) => {
 
 async function scenario(t, callback) {
   if (unavailable) { t.skip(unavailable); return; }
-  await runtime.runIsolatedDatabase(async ({ getPoolFn }) => {
+  await runtime.runIsolatedDatabase(async ({ getPoolFn, databaseConfig }) => {
     await applyPendingMigrations({ getPoolFn });
     const rootPath = await mkdtemp(join(tmpdir(), 'harmoniarr-organize-'));
     try {
@@ -81,7 +84,7 @@ async function scenario(t, callback) {
       const run = await a.createOperationRun({ status: 'pending', summary: { plannedRenameCount: 1 } });
       const maintenance = createMaintenanceLockService({ getPoolFn });
       const guard = createMaintenanceLockWriteGuardService({ listActiveMaintenanceLocks: maintenance.listActiveMaintenanceLocks });
-      await callback({ getPoolFn, pool, rootPath, rootId, fileId, bytes, source, destination: file.proposedPath,
+      await callback({ getPoolFn, pool, databaseConfig, rootPath, rootId, fileId, bytes, source, destination: file.proposedPath,
         file, preview, a, b, run, maintenance, guard, withTransaction: createDatabaseTransactionRunner({ getPoolFn }) });
     } finally {
       const cleanupPath = resolve(rootPath);
@@ -154,14 +157,17 @@ async function assertUntouched(c, job, transport) {
   assert.equal(job.notifications.length, 0);
   assert.equal(job.activity.length, 0);
 }
-async function waitForFileBlock(c, holderPid) {
+async function waitForFileBlock(c, holderPid, signal) {
+  await withFixturePostgresObserver({ connectionConfig: c.databaseConfig, signal }, async (observer) => {
   for (let count = 0; count < 100; count += 1) {
-    const result = await c.pool.query(`SELECT pid FROM pg_stat_activity WHERE datname=current_database()
+    await observer.query('SELECT pg_stat_clear_snapshot()');
+    const result = await observer.query(`SELECT pid FROM pg_stat_activity WHERE datname=current_database()
       AND $1::integer=ANY(pg_blocking_pids(pid))`, [holderPid]);
     if (result.rowCount) return;
     await new Promise((done) => { setTimeout(done, 10); });
   }
   assert.fail('Expected the real file/root row-lock wait');
+  });
 }
 
 suite('Guarded organize movement with real PostgreSQL and test-owned files', () => {
@@ -280,23 +286,24 @@ suite('Guarded organize movement with real PostgreSQL and test-owned files', () 
     });
   });
 
-  test('the owning clock refresh after a real file-row lock wait rejects a now expired acquisition', { timeout: config.scenarioTimeoutMs }, async (t) => scenario(t, async (c) => {
+  test('the owning clock refresh after a real file-row lock wait rejects a now expired acquisition', { timeout: config.scenarioTimeoutMs }, async (t) => scenario(t, async (c) => withFixtureLifecycle({ signal: t.signal }, async (scope) => {
     const entered = gate(); const resume = gate();
+    scope.onRelease(() => resume.release());
     const transport = native(c);
     const job = await start(c, c.a, transport, { afterPreview: async () => { entered.release(); await resume.promise; } });
-    await entered.promise;
-    const holder = await c.pool.connect();
-    try {
-      await holder.query('BEGIN'); await holder.query('SELECT id FROM library_files WHERE id=$1 FOR UPDATE', [c.fileId]);
+    scope.track(job.done);
+    await waitForFixtureReady({ ready: entered.promise, operation: job.done, signal: scope.signal });
+    await withRollbackFixtureClient(c.pool, async (holder) => {
+      await holder.query('SELECT id FROM library_files WHERE id=$1 FOR UPDATE', [c.fileId]);
       const holderPid = (await holder.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
       await c.pool.query("UPDATE job_leases SET expires_at=clock_timestamp()+INTERVAL '700 milliseconds' WHERE lease_key=$1", [job.lease().leaseKey]);
-      resume.release(); await waitForFileBlock(c, holderPid);
-      await c.pool.query('SELECT pg_sleep(0.8)');
+      resume.release(); await waitForFileBlock(c, holderPid, scope.signal);
+      await holder.query('SELECT pg_sleep(0.8)');
       await holder.query('COMMIT'); await job.done;
       await assertUntouched(c, job, transport);
       assert.notEqual((await runRow(c)).status, 'completed');
-    } finally { await holder.query('ROLLBACK'); holder.release(); }
-  }));
+    });
+  })));
 
   test('expiry at the final catalogue CAS yields no moved count or notification after verified filesystem movement', { timeout: config.scenarioTimeoutMs }, async (t) => scenario(t, async (c) => {
     const actual = createLibraryOrganizeMutationStore();

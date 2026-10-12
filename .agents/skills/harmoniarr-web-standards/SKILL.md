@@ -85,3 +85,14 @@ wording/regex tests that merely restate a standard or the implementation. Report
 the selected practice, implemented behavior, executed evidence, and remaining
 scope separately. Preserve user instructions about branches, releases, publication,
 merges, and other external actions; standards guidance grants no authorization.
+
+For infrastructure diagnostics, keep observed readiness, successful query and
+container state separate from the cause of an earlier connection failure. Apply
+OWASP data minimization before output, preserve the original failure through
+diagnostic errors, and drain owned work before teardown. Verify actual configured
+resource bounds at every fixture entrypoint; a documented profile is not proof
+that a direct pool applies it. See the reset investigation in the evidence map.
+When changing shared fixture policy, inventory lock observers and expiry-wait
+queries beyond the initial feature cohort. Move observation to an independently
+owned client and retain real contender/holder drainage; a green narrow cohort
+does not validate other consumers of the same policy.

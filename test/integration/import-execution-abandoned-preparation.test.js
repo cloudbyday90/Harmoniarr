@@ -30,20 +30,22 @@ import { listImportExecutionRunItems, updateImportExecutionRunItem, replaceImpor
 import { createLibraryWantedReleaseStore } from '../../src/server/library/library-wanted-release-store.js';
 import { buildPublicImportCandidateExecution } from '../../src/server/import-candidates/import-candidate-execution-public-projection.js';
 import { recordAuditEvent } from '../../src/server/audit.js';
+import { waitForFixtureReady } from '../../testing/integration/fixture-lifecycle.js';
+import { createScopedFixtureGate, startScopedFixtureWork, withFixtureWorkScope }
+  from '../../testing/integration/fixture-work-scope.js';
 
 const config = resolveIntegrationTestRuntimeConfig(); let runtime; let unavailable;
-const gate = () => { let release; const promise = new Promise((resolve) => { release = resolve; }); return { promise, release }; };
 async function scenario(t, callback) {
   if (unavailable) { t.skip(unavailable); return; }
-  await runtime.runIsolatedDatabase(async ({ getPoolFn }) => {
+  await runtime.runIsolatedDatabase(async ({ getPoolFn }) => withFixtureWorkScope({ signal: t.signal }, async (scope) => {
     await applyPendingMigrations({ getPoolFn });
     const origin = await seedImportExecutionOriginFixture(t, { getPoolFn });
     const execution = createImportExecutionHandoffFixtureContext({ getPoolFn });
     const createCloser = (options = {}) => createImportExecutionPreparationClosureService({
       store: createImportExecutionPreparationClosureStore({ getPoolFn }), withTransaction: origin.withTransaction, ...options });
-    await callback({ ...origin, getPoolFn, execution, createCloser, closer: createCloser(),
+    await callback({ ...origin, getPoolFn, execution, scope, createCloser, closer: createCloser(),
       queue: createOperationQueueStore({ getPoolFn }), control: createOperationRunControlService({ getPoolFn }) });
-  });
+  }), { signal: t.signal });
 }
 const owner = (c) => ({ operationRunId: c.newerRunId, importCandidateId: c.candidate.id });
 async function read(c) {
@@ -112,12 +114,12 @@ suite('Idle future preparation closure with real PostgreSQL and native provider 
 
   test('an actual staged native beforeSend callback released after closure cannot cross or POST', { timeout: config.scenarioTimeoutMs }, async (t) => scenario(t, async (c) => {
     await c.pool.query('DELETE FROM import_execution_run_items WHERE operation_run_id=$1', [c.sourceRunId]);
-    const entered = gate(); const resume = gate();
-    const worker = runImportExecutionHandoffFixtureWorker(c.execution, owner(c), {
+    const entered = createScopedFixtureGate(c.scope); const resume = createScopedFixtureGate(c.scope);
+    const worker = startScopedFixtureWork(c.scope, (signal) => runImportExecutionHandoffFixtureWorker(c.execution, owner(c), {
       prepareDownloadDispatch: c.provider.prepareDownloadDispatch,
       markDispatchPossible: async (value) => { entered.release(); await resume.promise; return c.execution.preparation.markDispatchPossible(value); },
-    });
-    await entered.promise;
+    }, { signal }));
+    await waitForFixtureReady({ ready: entered.promise, operation: worker, signal: c.scope.signal });
     const epoch = (await read(c)).item.planningSnapshot.execution.handoff.preProviderEpoch;
     assert.equal(epoch.phase, 'preparing'); assert.ok(epoch.attemptId);
     await strand(c); assert.equal((await close(c, epoch)).closed, true);
@@ -182,11 +184,12 @@ suite('Idle future preparation closure with real PostgreSQL and native provider 
     assert.equal((await c.queue.claimNextRunnableRun({ operationTypes: ['import_candidate_execution_planning'] })).id, c.newerRunId);
     assert.equal((await close(c, input.epoch)).closed, false);
     await c.pool.query('UPDATE operation_runs SET claimed_at=NULL,claimed_by_instance_id=NULL WHERE id=$1', [c.newerRunId]);
-    const entered = gate(); const finish = gate();
+    const entered = createScopedFixtureGate(c.scope); const finish = createScopedFixtureGate(c.scope);
     const closer = c.createCloser({ recordAuditEventFn: async (event, queryable) => {
       await recordAuditEvent(event, queryable); entered.release(); await finish.promise;
     } });
-    const result = close(c, input.epoch, closer); await entered.promise;
+    const result = startScopedFixtureWork(c.scope, () => close(c, input.epoch, closer));
+    await waitForFixtureReady({ ready: entered.promise, operation: result, signal: c.scope.signal });
     assert.equal(await c.queue.claimNextRunnableRun({ operationTypes: ['import_candidate_execution_planning'] }), null);
     finish.release(); assert.equal((await result).closed, true);
     assert.equal(await c.queue.claimNextRunnableRun({ operationTypes: ['import_candidate_execution_planning'] }), null);

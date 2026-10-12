@@ -34,6 +34,7 @@ import { createLibraryOrganizeMutationStore } from '../../src/server/library/lib
 import { captureOrganizeMutation } from '../../src/server/library/library-organize-mutation-policy.js';
 import { createMediaFilesystemService } from '../../src/server/media/media-filesystem-service.js';
 import { createFixtureGate, withFixtureLifecycle } from '../../testing/integration/fixture-lifecycle.js';
+import { withFixturePostgresObserver } from '../../testing/integration/fixture-postgres-observer.js';
 import { startLibraryScanFixtureWorker } from '../../testing/integration/library-scan-worker-fixture.js';
 
 const config = resolveIntegrationTestRuntimeConfig();
@@ -61,7 +62,7 @@ const expire = (c) => c.pool.query("UPDATE job_leases SET expires_at=clock_times
 
 async function scenario(t, callback, { scoped = false, twoFiles = false, nullTags = false } = {}) {
   if (unavailable) { t.skip(unavailable); return; }
-  await runtime.runIsolatedDatabase(async ({ getPoolFn }) => {
+  await runtime.runIsolatedDatabase(async ({ getPoolFn, databaseConfig }) => {
     await applyPendingMigrations({ getPoolFn });
     const requestedRoot = await mkdtemp(join(tmpdir(), 'harmoniarr-file-match-'));
     const rootPath = await realpath(requestedRoot);
@@ -100,7 +101,7 @@ async function scenario(t, callback, { scoped = false, twoFiles = false, nullTag
         withTransaction, assertMaintenanceWriteAllowed });
       const createOwner = (writeLibraryFileMatchBatch = rawMatches.writeLibraryFileMatchBatch) => createLibraryFileMatchService({
         writeLibraryFileMatchBatch, withTransaction, assertMaintenanceWriteAllowed });
-      await withFixtureLifecycle({ signal: t.signal }, (scope) => callback({
+      await withFixtureLifecycle({ signal: t.signal }, (scope) => callback({ databaseConfig,
         getPoolFn, pool, requestedRoot, rootPath, path, seed, metadataA, metadataB, rawTags, rawMatches,
         releaseHints, a, b, run, maintenance, catalog, makeRuns, withTransaction, scanCatalogue, tagOwner,
         createOwner, owner: createOwner(), scope,
@@ -138,12 +139,15 @@ async function start(c, runs, hooks = {}) {
   return { ...job, reconciliations, lease: () => capturedLease, sidecars: () => sidecarCount };
 }
 async function waitForBlock(c, holderPid) {
+  await withFixturePostgresObserver({ connectionConfig: c.databaseConfig, signal: c.scope.signal }, async (observer) => {
   for (let count = 0; count < 100; count += 1) {
-    if ((await c.pool.query(`SELECT pid FROM pg_stat_activity WHERE datname=current_database()
+    await observer.query('SELECT pg_stat_clear_snapshot()');
+    if ((await observer.query(`SELECT pid FROM pg_stat_activity WHERE datname=current_database()
       AND $1::integer=ANY(pg_blocking_pids(pid))`, [holderPid])).rowCount) return;
     await new Promise((done) => { setTimeout(done, 10); });
   }
   assert.fail('Expected the actual PostgreSQL root/file lock wait');
+  });
 }
 
 suite('Captured source, tags and scan acquisition own file-match persistence', () => {
@@ -222,7 +226,7 @@ suite('Captured source, tags and scan acquisition own file-match persistence', (
           : 'SELECT id FROM library_files WHERE id=$1 FOR UPDATE', [lock === 'root' ? c.seed.libraryRootId : c.seed.files[0].id]);
         const holderPid = (await holder.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
         await c.pool.query("UPDATE job_leases SET expires_at=clock_timestamp()+INTERVAL '700 milliseconds' WHERE lease_key=$1", [job.lease().leaseKey]);
-        resume.release(); await waitForBlock(c, holderPid); await c.pool.query('SELECT pg_sleep(0.8)');
+        resume.release(); await waitForBlock(c, holderPid); await holder.query('SELECT pg_sleep(0.8)');
         await holder.query('COMMIT'); await job.done;
         assert.deepEqual(await snapshot(c), initial); assert.deepEqual(job.reconciliations, []);
       } finally { await holder.query('ROLLBACK'); holder.release(); }

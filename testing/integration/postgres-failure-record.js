@@ -12,8 +12,9 @@ const duration = value => Number.isFinite(value) && value >= 0 && value <= 86_40
 const version = value => Number.isSafeInteger(value) && value >= 90000 && value <= 999999 ? value : null;
 const boolean = value => typeof value === 'boolean' ? value : null;
 const exitCode = value => Number.isInteger(value) && value >= 0 && value <= 255 ? value : null;
-export function buildPostgresFailureRecord({ correlationId, source, phase, error, host, readiness, durationMs }) {
-  return Object.freeze({ version: 1, kind: 'owned_server_failure',
+const count = value => Number.isSafeInteger(value) && value >= 0 ? value : null;
+export function buildPostgresFailureRecord({ correlationId, source, phase, error, host, readiness, containerState, durationMs }) {
+  return Object.freeze({ version: 2, kind: 'owned_server_failure',
     correlationId: isCheckoutCorrelationId(correlationId) ? correlationId : null,
     source: member(source, ['testcontainer_postgres', 'external_postgres']),
     phase: member(phase, ['schema_prepare', 'database_scenario']),
@@ -30,6 +31,16 @@ export function buildPostgresFailureRecord({ correlationId, source, phase, error
       outcome: member(read(readiness, 'outcome'), ['accepting', 'unavailable', 'failed']),
       cliExitCode: exitCode(read(readiness, 'cliExitCode')),
       errors: read(readiness, 'outcome') === 'failed' ? capturePostgresDiagnosticErrors(read(readiness, 'error')) : Object.freeze([]),
+    }),
+    containerState: Object.freeze({
+      outcome: member(read(containerState, 'outcome'), ['passed', 'failed', 'unavailable']),
+      running: boolean(read(containerState, 'running')),
+      paused: boolean(read(containerState, 'paused')),
+      restarting: boolean(read(containerState, 'restarting')),
+      oomKilled: boolean(read(containerState, 'oomKilled')),
+      exitCode: exitCode(read(containerState, 'exitCode')),
+      restartCount: count(read(containerState, 'restartCount')),
+      errors: read(containerState, 'outcome') === 'failed' ? capturePostgresDiagnosticErrors(read(containerState, 'error')) : Object.freeze([]),
     }),
   });
 }

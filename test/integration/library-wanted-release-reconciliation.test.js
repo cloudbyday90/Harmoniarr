@@ -36,6 +36,10 @@ import { createMetadataArtistRefreshWorker } from '../../src/server/metadata/met
 import { createMetadataRefreshService } from '../../src/server/metadata/metadata-refresh-service.js';
 import { createFixtureGate, createFixtureWorkerObserver, waitForFixtureReady, withFixtureLifecycle }
   from '../../testing/integration/fixture-lifecycle.js';
+import { waitForFixturePostgresBlock } from '../../testing/integration/fixture-lock-observer.js';
+import { withRollbackFixtureClient } from '../../testing/integration/fixture-transaction-client.js';
+import { buildIntegrationPoolConfig } from '../../testing/integration/pool-policy.js';
+import { withFixturePostgresObserver } from '../../testing/integration/fixture-postgres-observer.js';
 
 const config = resolveIntegrationTestRuntimeConfig();
 let runtime;
@@ -61,17 +65,13 @@ function discovery(metadata) {
     blockedReason: null, releaseDate: '1994-11-07', lastSearchAt: null, nextSearchAfter: '2026-01-01T00:00:00.000Z',
     manualRequestedAt: null, searchAttemptCount: 0, researchAttemptCount: 0, evidence: { fixture: true } };
 }
-async function waitForBlock(c, holderPid) {
-  for (let count = 0; count < 100; count += 1) {
-    if ((await c.pool.query(`SELECT pid FROM pg_stat_activity WHERE datname=current_database()
-      AND $1::integer=ANY(pg_blocking_pids(pid))`, [holderPid])).rowCount) return;
-    await pause(10);
-  }
-  assert.fail('Expected an actual PostgreSQL publication/target wait');
+async function waitForBlock(c, holderPid, operation, signal = c.signal) {
+  await withFixturePostgresObserver({ connectionConfig: c.databaseConfig, signal },
+    queryable => waitForFixturePostgresBlock({ queryable, holderPid, operation, signal }));
 }
 async function scenario(t, callback) {
   if (unavailable) { t.skip(unavailable); return; }
-  await runtime.runIsolatedDatabase(async ({ getPoolFn, phaseObserver }) => {
+  await runtime.runIsolatedDatabase(async ({ getPoolFn, phaseObserver, databaseConfig }) => {
     await phaseObserver.measure('schema_prepare', () => applyPendingMigrations({ getPoolFn }));
     const context = await phaseObserver.measure('fixture_seed', async () => {
     const pool = getPoolFn();
@@ -130,7 +130,7 @@ async function scenario(t, callback) {
       assert.equal(await runs.markRunStarted({ runId: run.id, expectedLease: lease, summary }), true);
       return { runs, run, lease, input: { workerContext: { operationType, runId: run.id, expectedLease: lease } } };
     };
-    return { pool, getPoolFn, metadata, stale, users, monitoring, monitor, raw, discoveryStore, reader,
+    return { pool, getPoolFn, databaseConfig, metadata, stale, users, monitoring, monitor, raw, discoveryStore, reader,
       withTransaction, maintenance, assertMaintenanceWriteAllowed, makeRuns, makeService, open, signal: t.signal };
     });
     await phaseObserver.measure('scenario_work', () => callback(context));
@@ -192,7 +192,7 @@ suite('Current operator inputs own wanted rows and discovery links', () => {
 
   test('direct projection uses one connection, keeps disabled recipients, stable IDs and saved link evidence', { timeout: config.scenarioTimeoutMs }, async (t) => scenario(t, async (c) => {
     const previous = await state(c);
-    const singlePool = new pg.Pool({ ...c.pool.options, password: c.pool.options.password, max: 1, connectionTimeoutMillis: 1000 });
+    const singlePool = new pg.Pool({ ...c.databaseConfig, ...buildIntegrationPoolConfig(config), max: 1, connectionTimeoutMillis: 1000 });
     const oneConnection = createDatabaseTransactionRunner({ getPoolFn: () => singlePool });
     try {
       const result = await c.makeService({ withTransaction: oneConnection }).reconcileWantedReleases();
@@ -303,16 +303,17 @@ suite('Current operator inputs own wanted rows and discovery links', () => {
         await c.pool.query('UPDATE operation_runs SET cancel_requested_at=clock_timestamp() WHERE id=$1', [active.run.id]);
         await assert.rejects(owner.reconcileWantedReleases(active.input));
       } else {
-        const held = await c.pool.connect(); await held.query('BEGIN');
-        try {
+        await withFixtureLifecycle({ signal: c.signal }, async (scope) => withRollbackFixtureClient(c.pool, async (held) => {
           if (kind === 'publication_wait') await lockLibraryRequestProjection({ queryable: held });
           else await held.query('SELECT id FROM library_wanted_releases WHERE app_user_id=$1 AND metadata_release_id=$2 FOR UPDATE', [c.users[0], c.metadata.metadataReleaseId]);
           const holder = (await held.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
           await c.pool.query("UPDATE job_leases SET expires_at=clock_timestamp()+INTERVAL '500 milliseconds' WHERE lease_key=$1", [active.lease.leaseKey]);
           const pending = owner.reconcileWantedReleases(active.input);
-          await waitForBlock(c, holder); await pause(600); await held.query('COMMIT');
+          // The explicit rejection assertion owns this expected lease failure.
+          scope.track(pending.catch(() => {}));
+          await waitForBlock(c, holder, pending, scope.signal); await pause(600); await held.query('COMMIT');
           await assert.rejects(pending, (error) => error.code === 'operation_run_lease_lost');
-        } finally { await held.query('ROLLBACK'); held.release(); }
+        }));
       }
       assert.deepEqual(await state(c), original);
       await active.runs.releaseLease({ runId: active.run.id, expectedLease: active.lease, status: 'failed' });
@@ -349,7 +350,7 @@ suite('Current operator inputs own wanted rows and discovery links', () => {
         ? createLibraryDiscoveryRequestStore({ getPoolFn: () => secondPool }).replaceLibraryDiscoveryRequests({ discoveryRequests: [discovery(c.metadata)] })
         : createLibraryWantedReleaseStore({ getPoolFn: () => secondPool }).replaceLibraryWantedReleases({ wantedReleases: desired });
       scope.track(secondPromise);
-      await waitForBlock(c, holder); assert.deepEqual(secondMutations, []);
+      await waitForBlock(c, holder, secondPromise, scope.signal); assert.deepEqual(secondMutations, []);
       resume.release(); await Promise.all([firstPromise, secondPromise]);
       const current = await state(c); assert.equal(current.wanted.length, 2); assert.equal(current.links.length, 2);
       assert.equal((await c.pool.query('SELECT * FROM library_discovery_requests')).rowCount, 1);

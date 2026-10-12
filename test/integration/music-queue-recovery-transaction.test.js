@@ -18,15 +18,18 @@ import { isSkippableIntegrationRuntimeError, toIntegrationRuntimeUnavailableReas
 import { createMusicQueueRecoveryFixtureContext, seedMusicQueueRecoveryFixture as fixture, seedMusicQueueRecoveryReplacement as replacement,
   recoverMusicQueueFixture as recover, createRecoveryFixtureOwner as addOwner, createRecoveryFixtureWantedRelease as addWanted }
   from '../../testing/integration/music-queue-recovery-fixtures.js';
+import { withFixturePostgresObserver } from '../../testing/integration/fixture-postgres-observer.js';
+import { withRollbackFixtureClient } from '../../testing/integration/fixture-transaction-client.js';
+import { withFixtureLifecycle } from '../../testing/integration/fixture-lifecycle.js';
 
 const config = resolveIntegrationTestRuntimeConfig();
 let runtime; let unavailableReason;
 
 async function scenario(t, run) {
   if (unavailableReason) { t.skip(unavailableReason); return; }
-  await runtime.runIsolatedDatabase(async ({ getPoolFn }) => {
+  await runtime.runIsolatedDatabase(async ({ getPoolFn, databaseConfig }) => {
     await applyPendingMigrations({ getPoolFn });
-    await run(createMusicQueueRecoveryFixtureContext({ getPoolFn }));
+    await run({ ...createMusicQueueRecoveryFixtureContext({ getPoolFn }), databaseConfig });
   });
 }
 async function childRuns(pool) {
@@ -223,30 +226,26 @@ suite('Scoped Music Queue recovery transactions with isolated PostgreSQL', () =>
   test('parent-lock wait rereads changed source provenance before terminal history or promotion', { timeout: config.scenarioTimeoutMs }, async (t) => {
     await scenario(t, async (context) => {
       const f = await fixture(context); const next = await replacement(context, f);
-      const writer = await context.pool.connect();
       let pending;
-      let transactionOpen = false;
-      try {
-        await writer.query('BEGIN');
-        transactionOpen = true;
+      await withFixtureLifecycle({ signal: t.signal }, async (scope) => withRollbackFixtureClient(context.pool, async (writer) => {
         const writerPid = (await writer.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
         await writer.query("UPDATE import_candidates SET folder_path='Changed after capture',updated_at=NOW() WHERE id=$1", [f.candidate.id]);
         pending = recover(context, f);
-        const deadline = Date.now() + 5000;
-        let observedWait = false;
-        while (Date.now() < deadline) {
-          observedWait = (await context.pool.query(`SELECT EXISTS(SELECT 1 FROM pg_stat_activity
-            WHERE $1::int=ANY(pg_blocking_pids(pid))) AS blocked`, [writerPid])).rows[0].blocked;
-          if (observedWait) break;
-          await new Promise((resolve) => { setTimeout(resolve, 20); });
-        }
-        assert.equal(observedWait, true, 'Observe the owning database lock wait before releasing the writer');
+        scope.track(pending);
+        await withFixturePostgresObserver({ connectionConfig: context.databaseConfig, signal: scope.signal }, async (observer) => {
+          const deadline = Date.now() + 5000;
+          let observedWait = false;
+          while (Date.now() < deadline) {
+            await observer.query('SELECT pg_stat_clear_snapshot()');
+            observedWait = (await observer.query(`SELECT EXISTS(SELECT 1 FROM pg_stat_activity
+              WHERE datname=current_database() AND $1::int=ANY(pg_blocking_pids(pid))) AS blocked`, [writerPid])).rows[0].blocked;
+            if (observedWait) break;
+            await new Promise((resolve) => { setTimeout(resolve, 20); });
+          }
+          assert.equal(observedWait, true, 'Observe the owning database lock wait before releasing the writer');
+        });
         await writer.query('COMMIT');
-        transactionOpen = false;
-      } finally {
-        try { if (transactionOpen) await writer.query('ROLLBACK'); }
-        finally { writer.release(); }
-      }
+      }));
       const result = await pending;
       assert.equal(result.reason, 'recovery_observation_stale');
       const current = await context.store.getCandidate(f.candidate.id);

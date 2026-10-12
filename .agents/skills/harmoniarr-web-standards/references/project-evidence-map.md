@@ -1,5 +1,26 @@
 # Project standards-to-evidence map
 
+Fixture-reset evidence: integration/pool-policy.js owns identical explicit
+direct/app limits; postgres-integration-runtime.js also applies them to templates.
+Abandonment scenarios use registered scoped work and readiness races, retaining
+actual worker/transaction completion before isolated database teardown.
+postgres-container-state-probe.js reads only the captured fresh container using
+fixed non-shell argv, a two-second deadline and 512-byte output limit. Version-two
+failure records retain separate host, readiness and container observations, with
+allowlisted fields and no raw SQL/CLI messages. Dedicated reset design/research/
+outcome own reproduced policy defects, adverse controls and cohort evidence;
+historical connection-reset causality remains separate from fixture repairs.
+The independent fixture-postgres-observer.js also owns Wanted and recovery
+lock observation outside their held two-client pools, draining admitted reads
+before close. Expected lease failure is observed immediately; actual holder
+rollback/release precedes publication drainage. Dedicated unit and native controls
+keep this observer capability separate from application pool expansion.
+Origin resolution, lease fencing, file matching and organize fixtures use that
+same owner. Delay SQL runs on the held client instead of taking a third checkout;
+unscoped setup precedes contenders that fill remaining slots. Their separate
+32-case native proof and exact unchanged common-code hashes supplement the
+158-case cohort; combined coverage is not one complete integration execution.
+
 Two-owner union: operator-track-participant-service.js resolves both current
 owned requests/Wanted scopes. The scope verifier compares the accepted typed
 participant list, current consent/catalog and exact union manifest. Scoped

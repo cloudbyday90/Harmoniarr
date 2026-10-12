@@ -14,6 +14,7 @@ import { buildPostgresAdminConnectionConfig, withTemporaryPostgresDatabase } fro
 import { createIntegrationFixturePhaseObserver } from './integration/fixture-phase-observer.js';
 import { createPreparedPostgresTemplate } from './integration/postgres-migration-template.js';
 import { createPostgresFailureEvidence } from './integration/postgres-failure-evidence.js';
+import { buildIntegrationPoolConfig } from './integration/pool-policy.js';
 
 const { Pool } = pg;
 
@@ -22,10 +23,11 @@ export function hasConfiguredPostgresAdminConnection(env = process.env) {
   return typeof password === 'string' && password.trim().length > 0;
 }
 
-function createPoolFactory(env) {
+function createPoolFactory(env, config) {
   return (databaseConfig) => new Pool({
     ...buildPoolConfig(env),
     ...databaseConfig,
+    ...buildIntegrationPoolConfig(config),
   });
 }
 
@@ -45,7 +47,7 @@ function createDefaultPostgresContainer(config) {
 
 async function createDatabaseRuntime({ config, env, source, phaseObserver, schemaMode, signal,
   closeServer, createPreparedPostgresTemplateFn, withTemporaryPostgresDatabaseFn, failureEvidence }) {
-  const createPool = createPoolFactory(env);
+  const createPool = createPoolFactory(env, config);
   const prepared = schemaMode === 'migration_template'
     ? await createPreparedPostgresTemplateFn({ env, createPool, phaseObserver: phaseObserver.child(), signal,
       withTemporaryPostgresDatabaseFn })

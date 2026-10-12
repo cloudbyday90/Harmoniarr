@@ -10,12 +10,14 @@ import { buildPostgresFailureRecord } from './postgres-failure-record.js';
 import { createPostgresHostProbe } from './postgres-host-probe.js';
 import { createPostgresReadinessProbe, isOwnedContainerId } from './postgres-readiness-probe.js';
 import { readCheckoutProperty } from './pool-checkout-record.js';
+import { createPostgresContainerStateProbe } from './postgres-container-state-probe.js';
 
 export const postgresFailureMarker = '[postgres-fixture-failure] ';
 /** Bind evidence to one scenario, registering its canonical completion before probing. */
 export function createPostgresFailureEvidence({ mode = 'failures', source, connectionConfig,
   containerId, fresh = false, hostProbeFactory = createPostgresHostProbe,
   readinessProbeFactory = createPostgresReadinessProbe,
+  containerStateProbeFactory = createPostgresContainerStateProbe,
   onRecord = record => process.stderr.write(`${postgresFailureMarker}${JSON.stringify(record)}\n`),
   now = () => performance.now() } = {}) {
   if (!['off', 'failures'].includes(mode) || typeof onRecord !== 'function' || typeof now !== 'function') {
@@ -36,17 +38,20 @@ export function createPostgresFailureEvidence({ mode = 'failures', source, conne
           const cancelled = readCheckoutProperty(signal, 'aborted') === true;
           let host = { outcome: 'unavailable', stage: cancelled ? 'cancelled' : 'not_owned' };
           let readiness = { outcome: 'unavailable' };
+          let containerState = { outcome: 'unavailable' };
           if (owned && !cancelled) {
             const results = await Promise.allSettled([
               Promise.resolve().then(() => hostProbeFactory({ connectionConfig })()),
               Promise.resolve().then(() => readinessProbeFactory({ containerId,
                 user: readCheckoutProperty(connectionConfig, 'user'), database: readCheckoutProperty(connectionConfig, 'database') })()),
+              Promise.resolve().then(() => containerStateProbeFactory({ containerId })()),
             ]);
             host = results[0].status === 'fulfilled' ? results[0].value : { outcome: 'failed', error: results[0].reason };
             readiness = results[1].status === 'fulfilled' ? results[1].value : { outcome: 'failed', error: results[1].reason };
+            containerState = results[2].status === 'fulfilled' ? results[2].value : { outcome: 'failed', error: results[2].reason };
           }
           const ended = clock();
-          const record = buildPostgresFailureRecord({ correlationId, source, phase, error, host, readiness,
+          const record = buildPostgresFailureRecord({ correlationId, source, phase, error, host, readiness, containerState,
             durationMs: started !== null && ended !== null ? ended - started : null });
           try { Promise.resolve(onRecord(record)).catch(() => {}); } catch { /* Preserve the original failure. */ }
         }).then(completion.resolve, () => completion.resolve());
