@@ -93,6 +93,7 @@ import { createLibraryWantedSummaryService } from './library-wanted-summary-serv
 import { createLibraryWantedSummaryStore } from './library-wanted-summary-store.js';
 import { createLibraryScanWorker } from './library-scan-worker.js';
 import { createLibraryScanCatalogueService } from './library-scan-catalogue-service.js';
+import { createLibraryScanReceiptService } from './library-scan-receipt-service.js';
 import { createMediaFilesystemService } from '../media/media-filesystem-service.js';
 import { createOperationRunInterruptionGate } from '../operation-run-cancellation.js';
 import { createMaintenanceLockService } from '../recovery/maintenance-lock-service.js';
@@ -446,7 +447,9 @@ export function createLibraryModule({
     libraryEmbeddedArtworkService,
     writeOwnedLibraryFileTagSnapshot: libraryTagSnapshotService.writeOwnedLibraryFileTagSnapshot,
   }),
+  libraryScanReceiptService = createLibraryScanReceiptService(),
   libraryScanCatalogueService = createLibraryScanCatalogueService({
+    receiptService: libraryScanReceiptService,
     recordLibraryFiles: libraryCatalogStore.recordLibraryFiles,
     assertMaintenanceWriteAllowed: ({ queryable }) => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
       operationLabel: 'library scan catalogue',
@@ -454,6 +457,7 @@ export function createLibraryModule({
     }),
   }),
   libraryScanWorker = createLibraryScanWorker({
+    captureLibraryScanReceiptSnapshot: libraryScanCatalogueService.captureLibraryScanReceiptSnapshot,
     acquireLease: libraryScanRunStore.acquireLease,
     captureLibrarySidecarArtwork: librarySidecarArtworkService.captureSidecarArtwork,
     extractLibraryFileTags: libraryTagExtractionService.extractLibraryFileTags,

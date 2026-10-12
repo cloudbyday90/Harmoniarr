@@ -1,5 +1,11 @@
 # Scoped policy overrides skill outcome
 
+October 12 negative-scan maintenance extends the consumer map with original
+acquisition/revision/root binding and current-byte source reopening. The
+[scan outcome](SCAN_RECEIPT_INVALIDATION_OUTCOME.md) owns actual production worker,
+restored-media and bounded correlation proof. No new exception or provider replay
+is granted, and this reference update does not claim a new blind evaluation.
+
 October 12 receipt-ledger maintenance directs historical lookup to its indexed
 candidate-owned projection while retaining all current consent, scope, private-
 root and byte gates. The [ledger outcome](OPERATOR_TRACK_RECEIPT_LEDGER_OUTCOME.md)

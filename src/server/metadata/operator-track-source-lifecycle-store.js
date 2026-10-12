@@ -26,7 +26,8 @@ export function createOperatorTrackSourceLifecycleStore() {
     await queryable.query(`INSERT INTO media_request_events(media_request_id,event_type,details,occurred_at)
       VALUES($1::uuid,$2,$3::jsonb,NOW())`, [source.mediaRequestId,
       source.available ? 'operator_track_source_retired' : 'operator_track_source_reopened',
-      JSON.stringify({ importCandidateId: source.importCandidateId, ownerId: source.ownerId, metadataReleaseId: source.scope.metadataReleaseId })]);
+      JSON.stringify({ importCandidateId: source.importCandidateId, ownerId: source.ownerId, metadataReleaseId: source.scope.metadataReleaseId,
+        ...(!source.available && source.negativeScanRunId ? { negativeScanRunId: source.negativeScanRunId } : {}) })]);
   }
   return { transitionSource, insertEvent };
 }

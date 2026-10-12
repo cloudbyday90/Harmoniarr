@@ -6,6 +6,27 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Scan-owned negative receipt observations (2026-10-12)
+
+The [scan outcome](SCAN_RECEIPT_INVALIDATION_OUTCOME.md),
+[design](SCAN_RECEIPT_INVALIDATION_DESIGN.md) and
+[official research](SCAN_RECEIPT_INVALIDATION_RESEARCH_2026_10.md) own original
+acquisition/revision/root binding and actual contained absence checks. Catalogue,
+negative evidence and required events share one transaction; new/replaced receipts
+and restored files remain outside an old walk's authority. Production module
+wiring preserves current-byte source/Wanted reconciliation and exact scan-only
+correlation. Maintenance uses existing pause behavior; no positive cache or
+provider replay is introduced.
+
+- Validation: 125 focused cases, generated 107-migration snapshot and 133 source/
+  snapshot anchors; frozen fast gate 10,007 cases plus static checks/builds and
+  109/109 affected native cases across sixteen serial files, without failures/
+  cancellations/skips. Five skill validators/seven installed hashes pass; dependency
+  audit reports zero vulnerabilities. The outcome retains original fixture/Windows
+  lookup failures and distinguishes initial/reviewed/frozen proof.
+- Next: bounded counts/bytes/phase instrumentation for Wanted receipt verification,
+  then representative hash-cost measurement before choosing batching or a cache.
+
 ## Completed slice: Indexed owner receipt lookup (2026-10-12)
 
 The [ledger outcome](OPERATOR_TRACK_RECEIPT_LEDGER_OUTCOME.md),

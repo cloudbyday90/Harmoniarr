@@ -74,6 +74,7 @@ cases and thirteen fresh scenario variants. Use
 [official research](docs/CATALOGUE_TEST_LIFECYCLE_RESEARCH_2026_10.md).
 
 - [Planning document](docs/harmoniarr.md)
+- [Scan receipt invalidation design](docs/SCAN_RECEIPT_INVALIDATION_DESIGN.md), [official research](docs/SCAN_RECEIPT_INVALIDATION_RESEARCH_2026_10.md) and [outcome](docs/SCAN_RECEIPT_INVALIDATION_OUTCOME.md)
 - [Indexed owner receipt design](docs/OPERATOR_TRACK_RECEIPT_LEDGER_DESIGN.md), [official research](docs/OPERATOR_TRACK_RECEIPT_LEDGER_RESEARCH_2026_10.md) and [outcome](docs/OPERATOR_TRACK_RECEIPT_LEDGER_OUTCOME.md)
 - [Two-owner delivery recovery design](docs/OPERATOR_TRACK_RECOVERY_DESIGN.md), [official research](docs/OPERATOR_TRACK_RECOVERY_RESEARCH_2026_10.md) and [outcome](docs/OPERATOR_TRACK_RECOVERY_OUTCOME.md)
 - [AI workflow and shared Copilot skills](docs/AI_WORKFLOW.md)

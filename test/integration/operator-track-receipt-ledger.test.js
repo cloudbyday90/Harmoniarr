@@ -27,10 +27,12 @@ suite('Candidate-owned indexed historical track receipts', () => {
     await applyPendingMigrations({ getPoolFn }); const pool = getPoolFn();
     // Only this invocation's acknowledged fresh database is changed to its
     // pre-ledger state; the real migration runner then owns the upgrade.
-    await pool.query(`DROP TRIGGER import_candidates_track_receipts ON import_candidates;
+    await pool.query(`DROP TABLE operator_track_receipt_invalidations;
+      DROP TRIGGER import_candidates_track_receipts ON import_candidates;
       DROP TABLE operator_track_receipts;
       DROP FUNCTION sync_operator_track_receipts(); DROP FUNCTION operator_track_receipt_rows(jsonb);`);
-    await pool.query('DELETE FROM schema_migrations WHERE filename=$1', [migration]);
+    await pool.query('DELETE FROM schema_migrations WHERE filename=ANY($1::text[])',
+      [[migration, '20261012_225951_scan_owned_receipt_invalidation.sql']]);
     const first = buildTrackReceipt(); const peer = buildTrackReceipt({ metadataReleaseId: first.scope.metadataReleaseId });
     const single = await seedTrackReceiptCandidate(pool, first);
     const shared = await seedTrackReceiptCandidate(pool, { version: 2, receipts: [first, peer] });

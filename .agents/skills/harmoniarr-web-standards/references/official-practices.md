@@ -1,5 +1,14 @@
 # Official practices by boundary
 
+October 12 negative-scan guidance uses docs/SCAN_RECEIPT_INVALIDATION_RESEARCH_2026_10.md.
+PostgreSQL statement snapshots and ordered cooperating locks inform pre-walk
+revision capture and atomic catalogue/negative/event publication. OWASP significant
+transaction data binds run, acquisition, current private root and exact receipt;
+Node filesystem observations can race and grant no positive availability. W3C
+timing remains a September 1 Working Draft, separate from lease authority.
+Retain current bytes, existing maintenance pause and current acquisition-only
+event correlation. A SQL prefix/index or old negative marker is not permission.
+
 October 12 receipt guidance uses docs/OPERATOR_TRACK_RECEIPT_LEDGER_RESEARCH_2026_10.md.
 PostgreSQL multicolumn indexes and EXPLAIN inform owner/release selection and
 measured plan/buffer evidence. Trigger-maintained historical projections share

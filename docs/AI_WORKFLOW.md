@@ -72,6 +72,12 @@ unresolved causes and failed cohorts rather than prescribing generic retries.
 
 ## Repository Rules
 
+The standards skill's negative-scan references bind pre-walk revision, original
+acquisition and current contained absence, preserving current bytes and maintenance
+pause. Use actual production wiring and transaction/replay proof rather than an
+injected snapshot alone. See the [scan outcome](SCAN_RECEIPT_INVALIDATION_OUTCOME.md)
+for Windows path selection and restored-media/correlation limits.
+
 The receipt-ledger evidence map also distinguishes historical indexing from
 current availability. Use native backfill/rollback/snapshot proof and matched
 planner observations before claiming a lookup improvement. See the

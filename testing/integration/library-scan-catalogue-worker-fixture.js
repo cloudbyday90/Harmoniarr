@@ -10,10 +10,11 @@ import { createOperationRunCancellationError } from '../../src/server/operation-
 import { startLibraryScanFixtureWorker } from './library-scan-worker-fixture.js';
 
 export async function startLibraryScanCatalogueFixtureWorker({ scope, runs, runId, requestedRoot, recordLibraryScanCatalogue,
-  afterWalk, executeScanFn = executeLibraryScan, createWorkerFn } = {}) {
+  afterWalk, captureLibraryScanReceiptSnapshot = null, executeScanFn = executeLibraryScan, createWorkerFn } = {}) {
   const downstream = []; let capturedLease; let hookFailed = false; let hookFailure;
   const rememberHookFailure = (error) => { if (!hookFailed) { hookFailed = true; hookFailure = error; } };
   const callbacks = { ...runs,
+    captureLibraryScanReceiptSnapshot,
     acquireLease: async (input) => { capturedLease = await runs.acquireLease(input); return capturedLease; },
     executeScan: async (input) => {
       const result = await executeScanFn(input);

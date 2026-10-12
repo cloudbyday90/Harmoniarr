@@ -5,6 +5,16 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For negative receipt scans, prove the production module captures before its actual
+walk, compares original acquisition/revision/root, and checks contained ENOENT
+after required events. Test newer receipts, restored bytes, current-root changes,
+lease/cancellation, event rollback and replay/snapshot FK cleanup. Windows receipts
+may use process-drive-rooted paths while walks return drive-qualified paths;
+lookup must select both and host containment remains the authority. Keep current
+byte verification, maintenance pause and exact scan/acquisition event correlation.
+See docs/SCAN_RECEIPT_INVALIDATION_OUTCOME.md; pure injected input does not prove
+production wiring or that old negative history cannot suppress restored media.
+
 For indexed receipt work, prove the actual pending migration backfills supported
 history without dropping a malformed peer into a partial grant. Verify source
 transaction/event rollback, replacement/status/deletion, owner isolation and

@@ -1,5 +1,15 @@
 # Project standards-to-evidence map
 
+Negative scan receipts: library-scan-receipt-{policy,store,file-service,service}.js
+keeps an opaque pre-walk capability and exact server-generated receipt revision.
+Production library-module.js wires capture to the actual scan worker and guarded
+catalogue transaction. Candidate/receipt locks, late contained absence checks and
+required events own negative publication; revision FK cleanup removes obsolete
+observations. Wanted still checks current bytes and attaches correlation only for
+its current scan run/acquisition. The negative-scan design/research/outcome own
+worker, rollback, new/replaced/restored receipt, Windows spelling and snapshot
+proof. No positive cache or provider-replay authority is implied.
+
 Indexed historical receipts: operator-track-receipt-store.js selects by owner and
 release without expanding unrelated candidate JSON. The additive receipt-ledger
 migration derives rows from applied candidate inserts/updates and backfills under

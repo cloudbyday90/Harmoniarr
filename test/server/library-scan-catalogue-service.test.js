@@ -333,3 +333,14 @@ test('scan policy preserves a literal backslash in a POSIX filename and relative
   assert.equal(prepared.files[0].filename, filename);
   assert.equal(isCompleteScanCatalogueResult(catalogueResult(prepared.files), prepared), true);
 });
+
+test('pre-walk capture preserves maintenance pause before reading any receipt', async () => {
+  const value = fixture();
+  const service = createLibraryScanCatalogueService({ ...value.options,
+    realpathFn: async () => value.input.libraryRootPath,
+    receiptService: { capture: async () => assert.fail('Maintenance refuses receipt capture') },
+    assertMaintenanceWriteAllowed: async () => { throw Object.assign(Error('Locked'), { code: 'recovery_lock_conflict' }); },
+  });
+  await assert.rejects(service.captureLibraryScanReceiptSnapshot(value.input), error => error.pauseCode === 'maintenance_lock_active');
+  assert.equal(value.writerCalls.length, 0); assert.equal(value.events.at(-1), 'rollback');
+});

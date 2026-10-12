@@ -3,6 +3,13 @@
 Use this map when the task concerns an acquisition exception. Confirm current
 callers and data shapes with source search before editing.
 
+Negative scan observations now bind the original scan acquisition, private root
+and pre-walk receipt revision (docs/SCAN_RECEIPT_INVALIDATION_OUTCOME.md). They
+retain historical receipts and do not lower verification or grant provider replay.
+Wanted checks current bytes and saved scope; only the currently reconciling scan
+run/acquisition can annotate its source reopening. Restored media and new/replaced
+revisions cannot be overridden by an old negative observation.
+
 Historical receipt lookup now uses operator-track-receipt-store.js's indexed
 candidate-owned projection (docs/OPERATOR_TRACK_RECEIPT_LEDGER_OUTCOME.md).
 Backfill and triggers grant no new consent or availability. Preserve current

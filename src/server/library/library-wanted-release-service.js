@@ -26,6 +26,7 @@ import { createLibraryWantedReleaseStore } from './library-wanted-release-store.
 import { createLibraryWantedReleaseReader } from './library-wanted-release-reader.js';
 import { createLibraryWantedReleaseGuardStore } from './library-wanted-release-guard-store.js';
 import { createOperatorTrackSourceLifecycleService } from '../metadata/operator-track-source-lifecycle-service.js';
+import { currentScanReceiptSource } from './library-scan-receipt-policy.js';
 import { captureWantedContext, captureWantedRows, captureWantedSource, sameWantedProjection,
   isCompleteWantedReplacement } from './library-wanted-release-reconciliation-policy.js';
 
@@ -97,7 +98,9 @@ export function createLibraryWantedReleaseService({
       if (!isCompleteWantedReplacement(result, projection.wantedReleases)) {
         throw createApiError(409, 'library_wanted_projection_incomplete', 'The wanted replacement could not be verified');
       }
-      await trackSourceLifecycle.reconcileSources({ sources: (projection.source.artists ?? []).flatMap(artist => artist.trackSources ?? []),
+      const trackSources = (projection.source.artists ?? []).flatMap(artist => artist.trackSources ?? [])
+        .map(source => currentScanReceiptSource(source, prepared));
+      await trackSourceLifecycle.reconcileSources({ sources: trackSources,
         queryable, assertCurrent: recheck });
       return { wantedKeys: result.wantedKeys.map((key) => ({ appUserId: key.appUserId, metadataReleaseId: key.metadataReleaseId })),
         deletedWantedKeys: result.deletedWantedKeys.map((key) => ({ appUserId: key.appUserId, metadataReleaseId: key.metadataReleaseId })) };

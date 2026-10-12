@@ -20,6 +20,10 @@ const publicSchema = 'public';
 
 export const criticalSchemaAnchors = Object.freeze({
   columns: Object.freeze([
+    { table: 'operator_track_receipts', column: 'receipt_revision_id' },
+    { table: 'operator_track_receipts', column: 'library_path' },
+    { table: 'operator_track_receipt_invalidations', column: 'scan_acquisition_id' },
+    { table: 'operator_track_receipt_invalidations', column: 'disposition' },
     { table: 'operator_track_receipts', column: 'app_user_id' },
     { table: 'operator_track_receipts', column: 'metadata_release_id' },
     { table: 'operator_track_receipts', column: 'receipt' },
@@ -72,6 +76,9 @@ export const criticalSchemaAnchors = Object.freeze({
     { table: 'library_files', column: 'tag_extracted_modified_at' },
   ]),
   constraints: Object.freeze([
+    { table: 'operator_track_receipts', constraint: 'operator_track_receipts_revision_unique' },
+    { table: 'operator_track_receipt_invalidations', constraint: 'operator_track_receipt_invalidations_revision_fkey' },
+    { table: 'operator_track_receipt_invalidations', constraint: 'operator_track_receipt_invalidations_pkey' },
     { table: 'operator_track_receipts', constraint: 'operator_track_receipts_pkey' },
     { table: 'operator_track_receipts', constraint: 'operator_track_receipts_binding_check' },
     { table: 'operator_track_receipts', constraint: 'operator_track_receipts_import_candidate_id_fkey' },
@@ -109,6 +116,7 @@ export const criticalSchemaAnchors = Object.freeze({
     { table: 'operator_artist_reconciliation_snapshot', constraint: 'operator_artist_reconciliation_snapshot_payload_object_check' },
   ]),
   indexes: Object.freeze([
+    { index: 'operator_track_receipts_scan_path_idx' },
     { index: 'operator_track_receipts_owner_release_idx' },
     { index: 'user_push_subscriptions_invalidated_pruning_idx' },
     { index: 'notification_queue_subscription_reference_idx' },
@@ -140,6 +148,7 @@ export const criticalSchemaAnchors = Object.freeze({
     { index: 'operator_artist_reconciliation_snapshot_latest_idx' },
   ]),
   tables: Object.freeze([
+    { table: 'operator_track_receipt_invalidations' },
     { table: 'operator_track_receipts' },
     { table: 'library_external_request_release_intents' },
     { table: 'library_external_request_collections' },

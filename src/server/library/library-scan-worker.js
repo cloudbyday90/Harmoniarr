@@ -107,6 +107,7 @@ function buildScanTriggerSummary({ releaseHints, triggeredByRunId, triggerReason
 export function createLibraryScanWorker({
   acquireLease,
   captureLibrarySidecarArtwork = null,
+  captureLibraryScanReceiptSnapshot = null,
   createOperationRunLeaseHeartbeatFn = createOperationRunLeaseHeartbeat,
   executeScan = executeLibraryScan,
   extractLibraryFileTags = null,
@@ -162,6 +163,9 @@ export function createLibraryScanWorker({
         const phaseTiming = buildPhaseTiming();
         const observedFiles = [];
 
+        const receiptSnapshot = await captureLibraryScanReceiptSnapshot?.({ runId,
+          expectedLease: acquiredLease, requestedLibraryRoot: libraryRoot });
+
         phaseTiming.startPhase('filesystem_walk');
         const summary = await executeScan({
           isCancellationRequested,
@@ -183,6 +187,7 @@ export function createLibraryScanWorker({
           requestedLibraryRoot: libraryRoot,
           files: observedFiles,
           libraryRootPath: summary.libraryRoot,
+          ...(receiptSnapshot != null ? { receiptSnapshot } : {}),
         });
         const hintedCatalogFiles = applyLibraryScanReleaseHints({
           files: catalogResult.files ?? [],
@@ -277,6 +282,7 @@ export function createLibraryScanWorker({
           summary: {
             ...summary,
             observedFileCount: catalogResult.observedFileCount,
+            ...(catalogResult.missingReceiptCount ? { missingReceiptCount: catalogResult.missingReceiptCount } : {}),
             phases: phaseTiming.toJson(),
             ...triggerSummary,
           },

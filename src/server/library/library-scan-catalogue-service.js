@@ -11,12 +11,15 @@ import { isCurrentJobLeaseAcquisition } from '../job-lease-policy.js';
 import { createOperationRunCancellationError, createOperationRunPauseError } from '../operation-run-cancellation.js';
 import { captureScanCatalogue, isCompleteScanCatalogueResult } from './library-scan-catalogue-policy.js';
 import { createLibraryScanCatalogueStore } from './library-scan-catalogue-store.js';
+import { realpath } from 'node:fs/promises';
 
 export function createLibraryScanCatalogueService({
   recordLibraryFiles,
   assertMaintenanceWriteAllowed,
   store = createLibraryScanCatalogueStore(),
   withTransaction = createDatabaseTransactionRunner(),
+  receiptService = null,
+  realpathFn = realpath,
 } = {}) {
   for (const [name, fn] of Object.entries({ recordLibraryFiles, assertMaintenanceWriteAllowed, withTransaction,
     lockContext: store.lockContext, readContext: store.readContext, readClock: store.readClock })) {
@@ -41,17 +44,22 @@ export function createLibraryScanCatalogueService({
     }
   }
 
+  async function assertMaintenance({ prepared, queryable }) {
+    try {
+      await assertMaintenanceWriteAllowed({ queryable });
+    } catch (error) {
+      if (error?.code !== 'recovery_lock_conflict') throw error;
+      throw createOperationRunPauseError({ runId: prepared.runId, pauseCode: 'maintenance_lock_active',
+        message: 'Library scan is paused by a maintenance lock' });
+    }
+  }
+
   async function recordLibraryScanCatalogue(input) {
+    const receiptSnapshot = input.receiptSnapshot;
     const prepared = captureScanCatalogue(input);
     if (!prepared) throw createApiError(409, 'library_scan_catalogue_invalid', 'The scan observations are invalid');
     return withTransaction(async (queryable) => {
-      try {
-        await assertMaintenanceWriteAllowed({ queryable });
-      } catch (error) {
-        if (error?.code !== 'recovery_lock_conflict') throw error;
-        throw createOperationRunPauseError({ runId: prepared.runId, pauseCode: 'maintenance_lock_active',
-          message: 'Library scan is paused by a maintenance lock' });
-      }
+      await assertMaintenance({ prepared, queryable });
       const context = await store.lockContext({ prepared, queryable });
       await assertCurrent({ context, prepared, queryable });
       const recheck = async () => assertCurrent({
@@ -68,9 +76,29 @@ export function createLibraryScanCatalogueService({
         || (context.root && result.libraryRootId !== context.root.id)) {
         throw createApiError(409, 'library_scan_catalogue_incomplete', 'The scan catalogue update could not be verified');
       }
+      if (receiptSnapshot != null) {
+        if (!receiptService) throw createApiError(409, 'library_scan_receipt_stale', 'Scan receipt owner is unavailable');
+        const missingReceiptCount = await receiptService.recordMissing({ token: receiptSnapshot, prepared,
+          libraryRootId: result.libraryRootId, queryable,
+          assertCurrent: async () => { await assertMaintenance({ prepared, queryable }); await recheck(); } });
+        if (missingReceiptCount) result.missingReceiptCount = missingReceiptCount;
+      }
       return result;
     });
   }
 
-  return { recordLibraryScanCatalogue };
+  async function captureLibraryScanReceiptSnapshot({ runId, expectedLease, requestedLibraryRoot }) {
+    if (!receiptService) return null;
+    const prepared = captureScanCatalogue({ runId, expectedLease, requestedLibraryRoot,
+      libraryRootPath: await realpathFn(requestedLibraryRoot), files: [] });
+    if (!prepared) throw createApiError(409, 'library_scan_catalogue_invalid', 'The scan observations are invalid');
+    return withTransaction(async queryable => {
+      await assertMaintenance({ prepared, queryable });
+      await assertCurrent({ context: await store.lockContext({ prepared, queryable }), prepared, queryable });
+      const token = await receiptService.capture({ prepared, queryable });
+      await assertCurrent({ context: await store.readContext({ prepared, queryable }), prepared, queryable });
+      return token;
+    });
+  }
+  return { recordLibraryScanCatalogue, captureLibraryScanReceiptSnapshot };
 }

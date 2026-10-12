@@ -1,5 +1,12 @@
 # Practical web standards skill outcome
 
+October 12 negative-scan maintenance maps immutable pre-walk scope, original
+acquisition, current path/absence and transaction ownership to the
+[scan outcome](SCAN_RECEIPT_INVALIDATION_OUTCOME.md). References distinguish
+historical negative evidence from current bytes, preserve maintenance pause,
+and require production wiring/Windows spelling proof. This is reference maintenance
+with structural/install checks, without a new blind trial or conformance claim.
+
 October 12 receipt-ledger maintenance maps PostgreSQL indexed lookup/transactional
 projection and OWASP current-object authority to measured plan and runtime proof.
 Node process timing remains separate from EXPLAIN and W3C draft guidance. The

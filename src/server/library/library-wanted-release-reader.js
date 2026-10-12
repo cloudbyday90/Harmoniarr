@@ -85,16 +85,21 @@ export function createLibraryWantedReleaseReader({
       const desired = libraryWantedReleaseProjectionService.projectWantedReleases({ appUserId, ...inputs, libraryReleaseReconciliations: availability });
       for (const receipt of receipts) {
         if (receipt?.version !== 1 || receipt.ownerId !== appUserId || receipt.files?.length !== 1) continue;
-        let available = false; let currentRoot = null;
+        let available = false; let currentRoot = null; let missing = false;
         try {
           if (receipt.wantedReleaseId) currentRoot = await resolvePrivateTrackRoot({ ownerId: appUserId, queryable });
           const evidence = await fingerprintTrackFile(receipt.files[0].libraryPath, currentRoot ? { libraryRoot: currentRoot } : {});
           available = isDeepStrictEqual(evidence, receipt.files[0].evidence);
           if (available) trackFulfillment.push(receipt);
-        } catch (error) { if (!['ENOENT', 'ENOTDIR', 'operator_track_scope_verification_required'].includes(error?.code)) throw error; }
+        } catch (error) {
+          if (!['ENOENT', 'ENOTDIR', 'operator_track_scope_verification_required'].includes(error?.code)) throw error;
+          missing = error?.code === 'ENOENT';
+        }
         if (receipt.wantedReleaseId && receipt.importCandidateId && desired.some(row => isDeepStrictEqual(row.evidence?.operatorTrackScope, receipt.scope))) {
           trackSources.push({ ownerId: appUserId, mediaRequestId: receipt.sourceMediaRequestId, importCandidateId: receipt.importCandidateId,
-            scope: receipt.scope, available, currentRoot });
+            scope: receipt.scope, available, currentRoot,
+            ...(missing && receipt.scanInvalidation?.libraryPath === receipt.files[0].libraryPath
+              ? { negativeScanRunId: receipt.scanInvalidation.runId, negativeScanAcquisitionId: receipt.scanInvalidation.acquisitionId } : {}) });
         }
       }
       const source = capture({ ...inputs, libraryReleaseReconciliations: availability, trackFulfillment, trackSources });

@@ -2,6 +2,12 @@
 
 ## Purpose
 
+The [scan receipt design](SCAN_RECEIPT_INVALIDATION_DESIGN.md) adds receipt revision
+identity and exact-revision missing observations, with cascading obsolete-evidence
+cleanup. Historical JSON and live byte verification retain their separate roles.
+The [outcome](SCAN_RECEIPT_INVALIDATION_OUTCOME.md) owns replay, snapshot and guarded
+publication proof; this is no positive availability cache.
+
 The implemented [track receipt ledger](OPERATOR_TRACK_RECEIPT_LEDGER_DESIGN.md)
 adds a candidate-owned historical projection keyed by candidate and owner, with
 an owner/release lookup index and receipt-binding constraint. Its trigger/backfill

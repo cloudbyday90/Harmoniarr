@@ -7,6 +7,13 @@ Security source: `docs/SECURITY_POLICY.md`
 
 ## Current Status (2026-04-27)
 
+October 12 scan addition: `20261012_225951_scan_owned_receipt_invalidation.sql`
+adds UUID revision identity, generated path lookup and revision-bound negative
+observations. Replay preserves existing identities; snapshot/anchors include the
+new schema. Generated/default columns can rewrite the ledger during startup.
+See the [scan outcome](SCAN_RECEIPT_INVALIDATION_OUTCOME.md) for bounded publication,
+snapshot and replay evidence; no online zero-lock rollout is claimed.
+
 October 12, 2026 addition: `20261012_222007_operator_track_receipt_ledger.sql`
 adds historical owner/release indexing, transaction-local candidate projection
 and conservative applied-history backfill. The repo-generated snapshot and
