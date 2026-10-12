@@ -3,6 +3,12 @@
 Use this map when the task concerns an acquisition exception. Confirm current
 callers and data shapes with source search before editing.
 
+Historical receipt lookup now uses operator-track-receipt-store.js's indexed
+candidate-owned projection (docs/OPERATOR_TRACK_RECEIPT_LEDGER_OUTCOME.md).
+Backfill and triggers grant no new consent or availability. Preserve current
+owner/scope/private-root/byte checks and the reopened-source marker; scan size,
+mtime or missing-file observations cannot replace receipt identity verification.
+
 The two-owner slice in docs/OPERATOR_TRACK_UNION_OUTCOME.md supersedes the blanket
 different-subset refusal for two distinct disc-one tracks only. Require both
 owned requests/Wanted scopes, an exact captured participant set, current private

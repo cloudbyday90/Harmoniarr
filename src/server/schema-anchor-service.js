@@ -20,6 +20,9 @@ const publicSchema = 'public';
 
 export const criticalSchemaAnchors = Object.freeze({
   columns: Object.freeze([
+    { table: 'operator_track_receipts', column: 'app_user_id' },
+    { table: 'operator_track_receipts', column: 'metadata_release_id' },
+    { table: 'operator_track_receipts', column: 'receipt' },
     { table: 'job_leases', column: 'acquisition_id' },
     { table: 'notification_queue', column: 'terminal_at' },
     { table: 'user_push_subscriptions', column: 'registration_token' },
@@ -69,6 +72,9 @@ export const criticalSchemaAnchors = Object.freeze({
     { table: 'library_files', column: 'tag_extracted_modified_at' },
   ]),
   constraints: Object.freeze([
+    { table: 'operator_track_receipts', constraint: 'operator_track_receipts_pkey' },
+    { table: 'operator_track_receipts', constraint: 'operator_track_receipts_binding_check' },
+    { table: 'operator_track_receipts', constraint: 'operator_track_receipts_import_candidate_id_fkey' },
     { table: 'notification_queue', constraint: 'notification_queue_terminal_state_check' },
     { table: 'notification_queue', constraint: 'notification_queue_claim_pending_check' },
     { table: 'library_external_request_release_intents', constraint: 'external_request_release_intents_release_unique' },
@@ -103,6 +109,7 @@ export const criticalSchemaAnchors = Object.freeze({
     { table: 'operator_artist_reconciliation_snapshot', constraint: 'operator_artist_reconciliation_snapshot_payload_object_check' },
   ]),
   indexes: Object.freeze([
+    { index: 'operator_track_receipts_owner_release_idx' },
     { index: 'user_push_subscriptions_invalidated_pruning_idx' },
     { index: 'notification_queue_subscription_reference_idx' },
     { index: 'notification_queue_terminal_retention_idx' },
@@ -133,6 +140,7 @@ export const criticalSchemaAnchors = Object.freeze({
     { index: 'operator_artist_reconciliation_snapshot_latest_idx' },
   ]),
   tables: Object.freeze([
+    { table: 'operator_track_receipts' },
     { table: 'library_external_request_release_intents' },
     { table: 'library_external_request_collections' },
     { table: 'library_external_request_collection_items' },

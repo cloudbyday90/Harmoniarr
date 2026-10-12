@@ -7,6 +7,14 @@ Security source: `docs/SECURITY_POLICY.md`
 
 ## Current Status (2026-04-27)
 
+October 12, 2026 addition: `20261012_222007_operator_track_receipt_ledger.sql`
+adds historical owner/release indexing, transaction-local candidate projection
+and conservative applied-history backfill. The repo-generated snapshot and
+critical anchors include the table, binding constraints and index; the
+[ledger outcome](OPERATOR_TRACK_RECEIPT_LEDGER_OUTCOME.md) owns upgrade and real
+snapshot-trigger proof. Startup backfill excludes concurrent candidate writes;
+this is a synchronous migration, not online zero-lock deployment.
+
 - Schema direction is documented, but the initial migration package is not yet split into execution units.
 - Migration lineage now has executable validation for replay plus deterministic schema snapshot freshness through shared repo-maintenance scripts and CI contracts.
 - Fresh-install schema snapshot consumption is now also executable through the shared startup bootstrap seam and the disposable-database validation path, so the checked-in snapshot is tested as a real bootstrap artifact rather than only compared as text.

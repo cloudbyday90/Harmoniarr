@@ -5,6 +5,15 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For indexed receipt work, prove the actual pending migration backfills supported
+history without dropping a malformed peer into a partial grant. Verify source
+transaction/event rollback, replacement/status/deletion, owner isolation and
+snapshot-installed trigger behavior. Compare identical legacy/indexed results
+on the same seeded database with planner-chosen EXPLAIN/buffers; no forced index
+or elapsed-time assertion. SQL lookup timing excludes media hashing and whole
+Wanted work. See docs/OPERATOR_TRACK_RECEIPT_LEDGER_OUTCOME.md; keep current byte
+verification until a scan-owned availability contract is independently proved.
+
 Direct database fixtures now enforce the same integration pool policy as app
 fixtures, including template preparation/clones. Verify actual max/checkout
 settings instead of assuming documentation applies. Legacy direct pools omitted

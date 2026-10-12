@@ -1,5 +1,12 @@
 # Scoped policy overrides skill outcome
 
+October 12 receipt-ledger maintenance directs historical lookup to its indexed
+candidate-owned projection while retaining all current consent, scope, private-
+root and byte gates. The [ledger outcome](OPERATOR_TRACK_RECEIPT_LEDGER_OUTCOME.md)
+owns backfill/rollback/measurement proof and unchanged owner-specific reopening.
+This is consumer-reference maintenance, with the existing source/install model
+and without a new blind evaluation.
+
 October 12 recovery maintenance updates the acquisition consumer map for bounded
 two-owner checkpoints and owner-specific source retirement/reopening. Both plans,
 all accepted participants and current byte/lease evidence remain necessary;

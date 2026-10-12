@@ -1,5 +1,12 @@
 # Practical web standards skill outcome
 
+October 12 receipt-ledger maintenance maps PostgreSQL indexed lookup/transactional
+projection and OWASP current-object authority to measured plan and runtime proof.
+Node process timing remains separate from EXPLAIN and W3C draft guidance. The
+[ledger outcome](OPERATOR_TRACK_RECEIPT_LEDGER_OUTCOME.md) owns upgrade/snapshot,
+rollback and unchanged private-byte checks. This is reference maintenance with
+structure/install checks, without a new blind trial or conformance claim.
+
 October 12 delivery-recovery maintenance adds a practical distinction between
 checkpoint, fulfillment and current availability. References map complete current
 recipient plans, private-root byte checks, lease gates, source lifecycle and

@@ -2,6 +2,14 @@
 
 ## Purpose
 
+The implemented [track receipt ledger](OPERATOR_TRACK_RECEIPT_LEDGER_DESIGN.md)
+adds a candidate-owned historical projection keyed by candidate and owner, with
+an owner/release lookup index and receipt-binding constraint. Its trigger/backfill
+shares source transaction ownership; current availability remains independently
+verified. See the [outcome](OPERATOR_TRACK_RECEIPT_LEDGER_OUTCOME.md) for actual
+migration/snapshot proof and lookup limits. Historical JSON references remain
+evidence, without owner/request/release cascade rewriting.
+
 This document defines the initial PostgreSQL data model for Harmoniarr.
 
 It is a planning baseline. Column names, constraints, and indexes should be refined during implementation, but this should be the default shape unless implementation discoveries require changes.

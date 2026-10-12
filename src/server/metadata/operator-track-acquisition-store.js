@@ -7,8 +7,10 @@
 import { getPool } from '../database.js';
 import { normalizeOperatorTrackOverrideRow } from './operator-track-override-policy.js';
 import { listImportCandidateFiles } from '../import-candidates/import-candidate-repository.js';
+import { createOperatorTrackReceiptStore } from './operator-track-receipt-store.js';
 
-export function createOperatorTrackAcquisitionStore({ getPoolFn = getPool } = {}) {
+export function createOperatorTrackAcquisitionStore({ getPoolFn = getPool,
+  receiptStore = createOperatorTrackReceiptStore({ getPoolFn }) } = {}) {
   const db = queryable => queryable ?? getPoolFn();
   async function readWanted({ ids = [], metadataReleaseId = null, queryable }) {
     const result = metadataReleaseId
@@ -61,16 +63,7 @@ export function createOperatorTrackAcquisitionStore({ getPoolFn = getPool } = {}
       || jsonb_build_object('operatorTrackFulfillment',$2::jsonb) WHERE id=$1::uuid`, [importCandidateId, JSON.stringify(receipt)]);
   }
   async function listFulfillment({ ownerId, metadataReleaseIds, queryable }) {
-    const result = await db(queryable).query(`SELECT candidate.id AS import_candidate_id,receipt FROM import_candidates candidate
-      CROSS JOIN LATERAL jsonb_array_elements(CASE
-        WHEN candidate.normalized_payload #>> '{operatorTrackFulfillment,version}'='2'
-          AND jsonb_typeof(candidate.normalized_payload #> '{operatorTrackFulfillment,receipts}')='array'
-          THEN CASE WHEN jsonb_array_length(candidate.normalized_payload #> '{operatorTrackFulfillment,receipts}')=2
-            THEN candidate.normalized_payload #> '{operatorTrackFulfillment,receipts}' ELSE '[]'::jsonb END
-        ELSE jsonb_build_array(candidate.normalized_payload->'operatorTrackFulfillment') END) AS receipts(receipt)
-      WHERE candidate.status='applied' AND receipt->>'ownerId'=$1
-        AND receipt #>> '{scope,metadataReleaseId}'=ANY($2::text[]) ORDER BY candidate.id,receipt->>'ownerId'`, [ownerId, metadataReleaseIds]);
-    return result.rows.map(row => ({ ...row.receipt, importCandidateId: row.import_candidate_id }));
+    return receiptStore.listFulfillment({ ownerId, metadataReleaseIds, queryable });
   }
   return { readWanted, readRequest, readCandidate, readParticipantRequests, readDeliveryOwner,
     readCurrentConsent, readReleaseMbid, readFiles, saveFulfillment, listFulfillment };

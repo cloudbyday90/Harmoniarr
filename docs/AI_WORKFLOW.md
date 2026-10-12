@@ -72,6 +72,12 @@ unresolved causes and failed cohorts rather than prescribing generic retries.
 
 ## Repository Rules
 
+The receipt-ledger evidence map also distinguishes historical indexing from
+current availability. Use native backfill/rollback/snapshot proof and matched
+planner observations before claiming a lookup improvement. See the
+[ledger outcome](OPERATOR_TRACK_RECEIPT_LEDGER_OUTCOME.md); an index or scan size/
+mtime observation cannot replace current owner/scope/private-byte authority.
+
 The standards skill also covers recoverable file delivery: connect OWASP current
 transaction authority, PostgreSQL event/receipt ownership, Node filesystem limits
 and IETF retry semantics to observable recovery behavior. Its maintained evidence

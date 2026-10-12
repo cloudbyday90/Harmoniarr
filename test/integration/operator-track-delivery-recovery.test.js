@@ -45,6 +45,7 @@ suite('Durable private delivery recovery and owned acquisition source lifecycle'
       assert.equal(current.status, 'import_pending');
       assert.equal(current.normalizedPayload.operatorTrackDeliveryProgress.files.length, 1);
       assert.equal(Object.hasOwn(current.normalizedPayload, 'operatorTrackFulfillment'), false);
+      assert.equal((await c.pool.query('SELECT count(*)::integer AS count FROM operator_track_receipts WHERE import_candidate_id=$1', [c.candidateId])).rows[0].count, 0);
       const bytes = await readFile(first.libraryTarget.path);
       const progress = current.normalizedPayload.operatorTrackDeliveryProgress;
       await symlink(first.delivery.libraryRoot, second.delivery.libraryRoot, 'junction');
@@ -79,6 +80,7 @@ suite('Durable private delivery recovery and owned acquisition source lifecycle'
       assert.equal(current.status, 'import_pending'); assert.equal(current.normalizedPayload.operatorTrackDeliveryProgress.files.length, 2);
       assert.equal(Object.hasOwn(current.normalizedPayload, 'operatorTrackFulfillment'), false);
       assert.equal(retryMutations.length, 1); // The second staging copy already exists from the failed attempt.
+      assert.equal((await c.pool.query('SELECT count(*)::integer AS count FROM operator_track_receipts WHERE import_candidate_id=$1', [c.candidateId])).rows[0].count, 0);
       assert.equal(retryMutations[0].destinationPath, second.libraryTarget.path);
       assert.deepEqual(await readFile(first.libraryTarget.path), bytes);
       assert.equal((await c.pool.query("SELECT COUNT(*)::int count FROM media_requests WHERE request_state='needs_fetch'")).rows[0].count, 2);
@@ -88,6 +90,9 @@ suite('Durable private delivery recovery and owned acquisition source lifecycle'
       assert.equal(published.item.itemStatus, 'applied'); assert.equal(retryMutations.length, 0);
       current = await c.candidates.getImportCandidate({ importCandidateId: c.candidateId });
       assert.equal(current.status, 'applied'); assert.equal(current.normalizedPayload.operatorTrackFulfillment.receipts.length, 2);
+      const storedReceipts = (await c.pool.query('SELECT app_user_id,receipt FROM operator_track_receipts WHERE import_candidate_id=$1 ORDER BY app_user_id', [c.candidateId])).rows;
+      assert.deepEqual(storedReceipts.map(row => row.receipt).sort((a, b) => a.ownerId.localeCompare(b.ownerId)),
+        current.normalizedPayload.operatorTrackFulfillment.receipts.toSorted((a, b) => a.ownerId.localeCompare(b.ownerId)));
       assert.equal((await c.pool.query("SELECT COUNT(*)::int count FROM media_requests WHERE request_state='already_exists'")).rows[0].count, 2);
       assert.equal((await c.pool.query("SELECT COUNT(*)::int count FROM operation_runs WHERE operation_type='import_candidate_execution_planning'")).rows[0].count, 0);
       for (const file of preview.files) assert.equal((await stat(file.sourceFile.path)).isFile(), true);

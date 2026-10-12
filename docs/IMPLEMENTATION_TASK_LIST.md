@@ -6,6 +6,27 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Indexed owner receipt lookup (2026-10-12)
+
+The [ledger outcome](OPERATOR_TRACK_RECEIPT_LEDGER_OUTCOME.md),
+[design](OPERATOR_TRACK_RECEIPT_LEDGER_DESIGN.md) and
+[official research](OPERATOR_TRACK_RECEIPT_LEDGER_RESEARCH_2026_10.md) own measured
+lookup and current authority boundaries. The additive candidate-owned projection
+indexes owner/release history and backfills supported envelopes. Source and
+required-event rollback own ledger visibility; Wanted still checks actual private
+bytes and current scope. No availability cache or provider replay is introduced.
+
+- Validation: 152 focused cases, generated 106-migration snapshot and 124 source/
+  snapshot anchors. Frozen fast gate passes 9,998 tests, static checks and builds;
+  affected serial native cohort passes 100/100 across fourteen files without
+  failures/cancellations/skips. Matched synthetic lookup median 107.713ms legacy
+  versus 1.103ms indexed, with identical results and 1,289 versus three shared
+  blocks. This excludes hashing/whole-Wanted work. The outcome retains the
+  original fixture failure and measurement limits separately.
+- Next: scan-owned negative receipt invalidation, preserving complete root scope,
+  original acquisition and current receipt/path binding. Measure hash cost before
+  introducing any positive cache; size/mtime alone cannot prove byte identity.
+
 ## Completed slice: Two-owner delivery recovery (2026-10-12)
 
 The [recovery outcome](OPERATOR_TRACK_RECOVERY_OUTCOME.md),

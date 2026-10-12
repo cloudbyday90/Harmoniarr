@@ -1,5 +1,14 @@
 # Project standards-to-evidence map
 
+Indexed historical receipts: operator-track-receipt-store.js selects by owner and
+release without expanding unrelated candidate JSON. The additive receipt-ledger
+migration derives rows from applied candidate inserts/updates and backfills under
+candidate writer exclusion. Candidate JSON remains source evidence; trigger rows
+are not an availability cache. The ledger design/research/outcome own native
+upgrade, malformed-envelope, rollback, replacement/deletion, snapshot and matched
+plan proof. Wanted keeps current private-root/hash checks; scans' size/mtime and
+tombstones do not establish receipt byte identity or grant replay authority.
+
 Two-owner recovery: operator-track-delivery-progress-{policy,store,service}.js
 binds both plans and a verified delivery to the accepted participants and current
 apply acquisition. operator-track-delivery-recovery-service.js independently

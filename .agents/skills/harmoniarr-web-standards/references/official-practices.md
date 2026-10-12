@@ -1,5 +1,13 @@
 # Official practices by boundary
 
+October 12 receipt guidance uses docs/OPERATOR_TRACK_RECEIPT_LEDGER_RESEARCH_2026_10.md.
+PostgreSQL multicolumn indexes and EXPLAIN inform owner/release selection and
+measured plan/buffer evidence. Trigger-maintained historical projections share
+the source transaction, but grant no current object authority. Preserve OWASP
+current resource checks and private byte verification. Node performance timings
+and W3C draft guidance require explicit SQL/process/whole-work scope and cache,
+order and instrumentation limits; a synthetic lookup result is not an app speedup.
+
 October 12 recovery guidance uses docs/OPERATOR_TRACK_RECOVERY_RESEARCH_2026_10.md.
 OWASP transaction authorization informs current recipient/root/plan checks at
 mutation and final publication. PostgreSQL cooperating locks protect checkpoint,
