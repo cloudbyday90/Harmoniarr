@@ -419,6 +419,7 @@ export function createLibraryMediaRequestStore({
     artistName = null,
     releaseTitle = null,
     excludeRequestedForUserId = null,
+    requestedForUserId = null,
     queryable = null,
   }) {
     const pool = queryable ?? getPoolFn();
@@ -430,10 +431,11 @@ export function createLibraryMediaRequestStore({
           WHERE media_requests.musicbrainz_release_id = $1
             AND media_requests.request_state NOT IN ('cancelled', 'failed')
             AND ($2::uuid IS NULL OR media_requests.requested_for_user_id != $2)
+            ${requestedForUserId != null ? 'AND media_requests.requested_for_user_id = $3::uuid' : ''}
           ORDER BY media_requests.created_at ASC
           LIMIT 1
         `,
-        [musicbrainzReleaseId, excludeRequestedForUserId ?? null],
+        [musicbrainzReleaseId, excludeRequestedForUserId ?? null, ...(requestedForUserId != null ? [requestedForUserId] : [])],
       );
 
       if (result.rows.length > 0) {
@@ -450,10 +452,11 @@ export function createLibraryMediaRequestStore({
             AND lower(trim(media_requests.release_title)) = lower(trim($2))
             AND media_requests.request_state NOT IN ('cancelled', 'failed')
             AND ($3::uuid IS NULL OR media_requests.requested_for_user_id != $3)
+            ${requestedForUserId != null ? 'AND media_requests.requested_for_user_id = $4::uuid' : ''}
           ORDER BY media_requests.created_at ASC
           LIMIT 1
         `,
-        [artistName, releaseTitle, excludeRequestedForUserId ?? null],
+        [artistName, releaseTitle, excludeRequestedForUserId ?? null, ...(requestedForUserId != null ? [requestedForUserId] : [])],
       );
 
       if (result.rows.length > 0) {

@@ -1,5 +1,17 @@
 # Project standards-to-evidence map
 
+Two-owner union: operator-track-participant-service.js resolves both current
+owned requests/Wanted scopes. The scope verifier compares the accepted typed
+participant list, current consent/catalog and exact union manifest. Scoped
+request publication keeps recipient intent separate from one release discovery
+row. operator-track-delivery-plan-service.js derives distinct app-user roots;
+apply uses each recipient root as its filesystem boundary and retains shared
+download input through copies. Version-two receipt envelopes contain separate
+owner/request/scope/byte receipts, visible to each owned request and Wanted read.
+The union design/research/outcome own actual worker, PostgreSQL, media, rollback
+and late-change evidence. Arbitrary unions, same-file delivery and partial
+recovery remain conservative; metadata tags do not establish acoustic identity.
+
 Exact single-track acquisition: metadata/operator-track-file-policy.js binds one
 numbered file to a supported disc-one track and refuses contradictory raw paths;
 the scope verifier checks current consent/catalog and exact requested manifests

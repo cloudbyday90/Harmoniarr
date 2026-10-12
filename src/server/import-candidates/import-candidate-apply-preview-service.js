@@ -219,6 +219,7 @@ export function createImportCandidateApplyPreviewService({
 
       return {
         decision,
+        ...(filePreview.delivery ? { delivery: structuredClone(filePreview.delivery) } : {}),
         fileId: filePreview.fileId,
         filename: filePreview.filename,
         inspection,

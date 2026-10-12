@@ -26,6 +26,17 @@ export function createOperatorTrackAcquisitionStore({ getPoolFn = getPool } = {}
     const result = await db(queryable).query('SELECT normalized_payload FROM import_candidates WHERE id=$1::uuid', [importCandidateId]);
     return result.rows[0] ? { id: importCandidateId, normalizedPayload: result.rows[0].normalized_payload } : null;
   }
+  async function readParticipantRequests({ ownerIds, metadataReleaseId, queryable }) {
+    const result = await db(queryable).query(`SELECT id,requested_for_user_id,evidence FROM media_requests
+      WHERE requested_for_user_id=ANY($1::uuid[]) AND matched_metadata_release_id=$2::uuid
+        AND request_state NOT IN ('cancelled','failed')
+      ORDER BY created_at DESC,id DESC`, [ownerIds, metadataReleaseId]);
+    return result.rows;
+  }
+  async function readDeliveryOwner({ ownerId, queryable }) {
+    const result = await db(queryable).query('SELECT id,is_disabled,managed_library_relative_root FROM app_users WHERE id=$1::uuid', [ownerId]);
+    return result.rows[0] ?? null;
+  }
   async function readCurrentConsent({ ownerId, metadataReleaseId, queryable }) {
     const result = await db(queryable).query(`SELECT monitoring.is_monitored,users.is_disabled,
       COALESCE((SELECT jsonb_agg(overrides) FROM operator_track_override overrides
@@ -50,10 +61,16 @@ export function createOperatorTrackAcquisitionStore({ getPoolFn = getPool } = {}
       || jsonb_build_object('operatorTrackFulfillment',$2::jsonb) WHERE id=$1::uuid`, [importCandidateId, JSON.stringify(receipt)]);
   }
   async function listFulfillment({ ownerId, metadataReleaseIds, queryable }) {
-    const result = await db(queryable).query(`SELECT normalized_payload->'operatorTrackFulfillment' AS receipt
-      FROM import_candidates WHERE status='applied' AND normalized_payload #>> '{operatorTrackFulfillment,ownerId}'=$1
-        AND normalized_payload #>> '{operatorTrackFulfillment,scope,metadataReleaseId}'=ANY($2::text[]) ORDER BY id`, [ownerId, metadataReleaseIds]);
+    const result = await db(queryable).query(`SELECT receipt FROM import_candidates candidate
+      CROSS JOIN LATERAL jsonb_array_elements(CASE
+        WHEN candidate.normalized_payload #>> '{operatorTrackFulfillment,version}'='2'
+          AND jsonb_typeof(candidate.normalized_payload #> '{operatorTrackFulfillment,receipts}')='array'
+          THEN candidate.normalized_payload #> '{operatorTrackFulfillment,receipts}'
+        ELSE jsonb_build_array(candidate.normalized_payload->'operatorTrackFulfillment') END) AS receipts(receipt)
+      WHERE candidate.status='applied' AND receipt->>'ownerId'=$1
+        AND receipt #>> '{scope,metadataReleaseId}'=ANY($2::text[]) ORDER BY candidate.id,receipt->>'ownerId'`, [ownerId, metadataReleaseIds]);
     return result.rows.map(row => row.receipt);
   }
-  return { readWanted, readRequest, readCandidate, readCurrentConsent, readReleaseMbid, readFiles, saveFulfillment, listFulfillment };
+  return { readWanted, readRequest, readCandidate, readParticipantRequests, readDeliveryOwner,
+    readCurrentConsent, readReleaseMbid, readFiles, saveFulfillment, listFulfillment };
 }

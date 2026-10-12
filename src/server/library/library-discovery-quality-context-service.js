@@ -7,7 +7,7 @@
 
 import { isScopedQualityFallbackOverride, normalizeSavedQualityPreferences, resolveAcquisitionQualityProfileCode } from '../acquisition/acquisition-quality-evidence-policy.js';
 import { createOperatorTrackScopeVerificationService } from '../metadata/operator-track-scope-verification-service.js';
-import { getSingleTrackRequirement, refuseOperatorTrackFiles } from '../metadata/operator-track-file-policy.js';
+import { getOperatorTrackRequirements, refuseOperatorTrackFiles } from '../metadata/operator-track-file-policy.js';
 
 const PROFILE_PRIORITY = { any_available: 0, high_quality: 1, lossless_archive: 2 };
 
@@ -51,10 +51,12 @@ export function createLibraryDiscoveryQualityContextService({ getUserPreferences
       operatorTrackScopes.push({ mediaRequestId: claimedRequest.evidence.sourceMediaRequestId, scope: claimedRequest.evidence.operatorTrackScope });
     }
     if (operatorTrackScopes.length > 0) await trackScopeVerifier.assertScopesCurrent(operatorTrackScopes, { queryable });
+    let operatorTrackParticipants = null;
     if (operatorTrackScopes.some(entry => entry.scope?.mode === 'tracks')) {
-      getSingleTrackRequirement(operatorTrackScopes);
+      const tracks = getOperatorTrackRequirements(operatorTrackScopes);
       if (!claimedRequest?.evidence?.sourceMediaRequestId || !claimedRequest?.evidence?.sourceRequestedForUserId) throw refuseOperatorTrackFiles();
       if (links.length > 0 && links.some(link => !Object.hasOwn(link, 'operatorTrackScope') || link.isDisabled === true)) throw refuseOperatorTrackFiles();
+      if (tracks.length === 2) operatorTrackParticipants = await trackScopeVerifier.resolveDiscoveryParticipants(claimedRequest, { queryable });
     }
     if (links.length === 0) {
       const preferences = await readPreferences(claimedRequest?.evidence?.sourceRequestedForUserId ?? claimedRequest?.evidence?.sourceRequestedByUserId);
@@ -92,7 +94,12 @@ export function createLibraryDiscoveryQualityContextService({ getUserPreferences
     const qualityOverride = fallbackOverrideActive ? { ...strictRequirements[0].link.qualityOverride,
       ...(minimumBitrateKbps > 256 ? { minimumBitrateKbps } : {}) } : null;
     const wantedReleaseIds = links.map((link) => link.wantedReleaseId);
+    if (operatorTrackParticipants) {
+      const primary = operatorTrackParticipants.find(owner => owner.ownerId === claimedRequest.evidence.sourceRequestedForUserId)?.wantedReleaseId;
+      wantedReleaseIds.sort((a, b) => Number(b === primary) - Number(a === primary));
+    }
     return { profileCode, qualityOverride, wantedReleaseId: wantedReleaseIds[0],
+      ...(operatorTrackParticipants ? { operatorTrackParticipants } : {}),
       ...(operatorTrackScopes.length > 0 ? { operatorTrackScopes } : {}),
       ...(minimumBitrateKbps > 256 ? { minimumBitrateKbps } : {}),
       ...(wantedReleaseIds.length > 1 ? { wantedReleaseIds } : {}), sharedOperatorDiscovery: true,

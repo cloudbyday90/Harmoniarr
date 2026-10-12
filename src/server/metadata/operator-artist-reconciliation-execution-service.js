@@ -191,7 +191,12 @@ export function createOperatorArtistReconciliationExecutionService({
       libraryReleaseReconciliations.map((entry) => [entry.metadataReleaseId, entry]),
     );
     const activeRequestByReleaseId = new Map(
-      activeRequests.map((entry) => [entry.existingMatch?.releaseId ?? null, entry]).filter(([key]) => key),
+      activeRequests.filter(entry => {
+        const releaseId = entry.existingMatch?.releaseId;
+        const trackScoped = effectiveReleaseGroups.some(group => group.operatorState?.resolvedMetadataReleaseId === releaseId
+          && group.operatorState?.operatorTrackScope?.mode === 'tracks');
+        return !trackScoped || entry.requestedForUser?.id === appUserId;
+      }).map((entry) => [entry.existingMatch?.releaseId ?? null, entry]).filter(([key]) => key),
     );
     const discoveryRequestByReleaseId = new Map(
       discoveryRequests.map((entry) => [entry.metadataReleaseId, entry]),

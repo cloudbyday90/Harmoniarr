@@ -169,6 +169,10 @@ export async function listImportCandidatesBySourceMediaRequestIds(sourceMediaReq
       SELECT *
       FROM import_candidates
       WHERE normalized_payload -> 'requestOwnership' ->> 'sourceMediaRequestId' = ANY($1::text[])
+        OR (status IN ('selected','downloading','import_pending','applied') AND EXISTS (
+          SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(normalized_payload #> '{musicQueue,operatorTrackParticipants}')='array'
+            THEN normalized_payload #> '{musicQueue,operatorTrackParticipants}' ELSE '[]'::jsonb END) AS participants(participant)
+          WHERE participant->>'mediaRequestId'=ANY($1::text[])))
       ORDER BY (normalized_payload->>'compositeScore')::numeric DESC NULLS LAST, discovered_at DESC, created_at DESC, id ASC
     `,
     [sourceMediaRequestIds],

@@ -157,6 +157,7 @@ export function createOperatorArtistReconciliationRequestService({
           await publicationGuard.assertCurrent(authority);
           await acquireRequestIdentityLock({ client: queryable, requestIdentityKey: buildRequestIdentityKey({ artistName, desiredRelease }) });
           const duplicateRequest = await findSharedDuplicateRequest({ artistName,
+            ...(desiredRelease.operatorTrackScope?.mode === 'tracks' ? { requestedForUserId: prepared.appUserId } : {}),
             musicbrainzReleaseId: desiredRelease.musicbrainzReleaseId ?? null,
             releaseTitle: desiredRelease.releaseTitle ?? desiredRelease.releaseGroupTitle ?? null, queryable });
           if (duplicateRequest) return null;

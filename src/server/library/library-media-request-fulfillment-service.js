@@ -295,14 +295,15 @@ export function createLibraryMediaRequestFulfillmentService({
     const candidatesByRequestId = new Map();
 
     for (const candidate of importCandidates) {
-      const mediaRequestId = resolveCandidateSourceMediaRequestId(candidate);
-      if (!mediaRequestId) {
-        continue;
+      const participants = candidate.normalizedPayload?.musicQueue?.operatorTrackParticipants;
+      const ids = new Set([resolveCandidateSourceMediaRequestId(candidate), ...(Array.isArray(participants)
+        && ['selected', 'downloading', 'import_pending', 'applied'].includes(candidate.status) ? participants.map(owner => owner?.mediaRequestId) : [])]
+        .filter(id => typeof id === 'string' && id.length > 0));
+      for (const mediaRequestId of ids) {
+        const existing = candidatesByRequestId.get(mediaRequestId) ?? [];
+        existing.push(candidate);
+        candidatesByRequestId.set(mediaRequestId, existing);
       }
-
-      const existing = candidatesByRequestId.get(mediaRequestId) ?? [];
-      existing.push(candidate);
-      candidatesByRequestId.set(mediaRequestId, existing);
     }
 
     const linkedRequestMap = new Map();

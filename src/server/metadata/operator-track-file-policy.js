@@ -18,14 +18,27 @@ export function getCandidateTrackContext(candidate) {
   return candidate?.normalizedPayload?.musicQueue ?? candidate?.normalizedPayload?.musicQueueContext;
 }
 
-// This first slice deliberately admits one track on disc one. Shared owners must
-// request the identical subset; a full-release or different subset is not dropped.
-export function getSingleTrackRequirement(scopes) {
+// Each owner retains one disc-one requirement; only a bounded two-track union is
+// admitted. Whole-release or incompatible requirements are never discarded.
+export function getOperatorTrackRequirements(scopes) {
   if (!Array.isArray(scopes) || scopes.length === 0) throw refuseOperatorTrackFiles();
-  const first = scopes[0]?.scope;
-  if (!isSupportedOperatorTrackScope(first) || first.mode !== 'tracks') throw refuseOperatorTrackFiles();
-  if (scopes.some(entry => !isDeepStrictEqual(entry?.scope, first))) throw refuseOperatorTrackFiles();
-  return first.tracks[0];
+  const tracks = new Map();
+  for (const entry of scopes) {
+    const scope = entry?.scope;
+    if (!isSupportedOperatorTrackScope(scope) || scope.mode !== 'tracks'
+      || scope.metadataReleaseId !== scopes[0]?.scope?.metadataReleaseId) throw refuseOperatorTrackFiles();
+    const track = scope.tracks[0];
+    if (tracks.has(track.metadataTrackId) && !isDeepStrictEqual(tracks.get(track.metadataTrackId), track)) throw refuseOperatorTrackFiles();
+    tracks.set(track.metadataTrackId, track);
+  }
+  if (tracks.size > 2) throw refuseOperatorTrackFiles();
+  return [...tracks.values()].sort((a, b) => a.trackPosition - b.trackPosition);
+}
+
+export function getSingleTrackRequirement(scopes) {
+  const tracks = getOperatorTrackRequirements(scopes);
+  if (tracks.length !== 1) throw refuseOperatorTrackFiles();
+  return tracks[0];
 }
 
 export function remoteTrackFilename(file) {
@@ -39,21 +52,27 @@ export function selectOperatorTrackFiles(candidate) {
   const scopes = context.operatorTrackScopes;
   if (!Array.isArray(scopes) || scopes.length === 0) throw refuseOperatorTrackFiles();
   if (scopes.every(entry => entry?.scope?.mode === 'release')) return null;
-  const track = getSingleTrackRequirement(scopes);
-  const matches = (candidate.files ?? []).filter(file => {
-    if (!isAudioFileExtension(file.extension)) return false;
-    const match = /^(\d{1,3})[ ._-]+(.+)\.[^.]+$/u.exec(file.filename ?? '');
-    return match && Number(match[1]) === track.trackPosition && title(match[2]) === title(track.title);
+  const tracks = getOperatorTrackRequirements(scopes);
+  const files = tracks.map(track => {
+    const matches = (candidate.files ?? []).filter(file => {
+      if (!isAudioFileExtension(file.extension)) return false;
+      const match = /^(\d{1,3})[ ._-]+(.+)\.[^.]+$/u.exec(file.filename ?? '');
+      return match && Number(match[1]) === track.trackPosition && title(match[2]) === title(track.title);
+    });
+    if (matches.length !== 1) throw refuseOperatorTrackFiles();
+    const file = matches[0];
+    const remote = remoteTrackFilename(file)?.replaceAll('/', '\\');
+    const expectedRemote = file.folderPath ? `${file.folderPath.replaceAll('/', '\\')}\\${file.filename}` : file.filename;
+    if (!file.id || file.isLocked || !Number.isSafeInteger(file.sizeBytes) || file.sizeBytes <= 0
+      || remote !== expectedRemote || remote.split('\\').some(segment => segment === '..' || segment === '.')
+      || !Number.isFinite(file.lengthSeconds) || !Number.isFinite(track.lengthMs) || track.lengthMs <= 0
+      || Math.abs(file.lengthSeconds - track.lengthMs / 1000) > 2) throw refuseOperatorTrackFiles();
+    return file;
   });
-  if (matches.length !== 1) throw refuseOperatorTrackFiles();
-  const file = matches[0];
-  const remote = remoteTrackFilename(file)?.replaceAll('/', '\\');
-  const expectedRemote = file.folderPath ? `${file.folderPath.replaceAll('/', '\\')}\\${file.filename}` : file.filename;
-  if (!file.id || file.isLocked || !Number.isSafeInteger(file.sizeBytes) || file.sizeBytes <= 0
-    || remote !== expectedRemote || remote.split('\\').some(segment => segment === '..' || segment === '.')
-    || !Number.isFinite(file.lengthSeconds) || !Number.isFinite(track.lengthMs) || track.lengthMs <= 0
-    || Math.abs(file.lengthSeconds - track.lengthMs / 1000) > 2) throw refuseOperatorTrackFiles();
-  return { scope: scopes[0].scope, files: [file], bindings: [{ fileId: file.id, track: structuredClone(track) }] };
+  if (new Set(files.map(file => file.id)).size !== files.length) throw refuseOperatorTrackFiles();
+  return { scope: { ...scopes[0].scope, tracks: structuredClone(tracks) }, files,
+    sharedDelivery: tracks.length === 2,
+    bindings: files.map((file, index) => ({ fileId: file.id, track: structuredClone(tracks[index]) })) };
 }
 
 export function assertOperatorTrackManifest(selection, requestedFiles) {
@@ -76,12 +95,17 @@ export function assertOperatorTrackMedia({ track, inspection, releaseMbid }) {
 
 export function hasOwnerTrackFulfillment({ request, candidate }) {
   const scope = request?.evidence?.operatorArtistReconciliation?.operatorTrackScope;
-  const receipt = candidate?.normalizedPayload?.operatorTrackFulfillment;
+  const receipts = getOperatorTrackFulfillmentReceipts(candidate);
   const ownerId = request?.requestedForUser?.id ?? request?.requestedForUserId ?? request?.requestedByUser?.id;
-  return isSupportedOperatorTrackScope(scope) && scope.mode === 'tracks' && candidate?.status === 'applied'
+  return receipts.some(receipt => isSupportedOperatorTrackScope(scope) && scope.mode === 'tracks' && candidate?.status === 'applied'
     && receipt?.version === 1 && receipt.ownerId === ownerId && Boolean(ownerId)
     && receipt.sourceMediaRequestId === request.id && isDeepStrictEqual(receipt.scope, scope)
-    && receipt.files?.length === 1 && Boolean(receipt.files[0].libraryPath)
+    && Array.isArray(receipt.files) && receipt.files.length === 1 && Boolean(receipt.files[0]?.libraryPath)
     && /^[a-f0-9]{64}$/u.test(receipt.files[0].evidence?.sha256 ?? '') && receipt.files[0].evidence?.sizeBytes > 0
-    && isDeepStrictEqual(receipt.files[0].track, scope.tracks[0]);
+    && isDeepStrictEqual(receipt.files[0].track, scope.tracks[0]));
+}
+
+export function getOperatorTrackFulfillmentReceipts(candidate) {
+  const receipt = candidate?.normalizedPayload?.operatorTrackFulfillment;
+  return receipt?.version === 1 ? [receipt] : receipt?.version === 2 && Array.isArray(receipt.receipts) && receipt.receipts.length === 2 ? receipt.receipts : [];
 }

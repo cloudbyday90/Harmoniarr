@@ -1,5 +1,12 @@
 # Practical web standards skill design
 
+October 12 two-owner maintenance maps OWASP recipient authorization and protected
+transaction data to exact shared acquisition and separate delivery. The
+[union design](OPERATOR_TRACK_UNION_DESIGN.md) keeps request identity, shared
+provider work, private roots and outcome receipts distinct. References identify
+current-state and physical mutation owners; metadata and invocation policy stay
+unchanged. This extends the existing skill rather than creating a duplicate.
+
 October 12 single-track maintenance adds Picard format interpretation and
 verified file/receipt evidence to the practical W3C/OWASP/PostgreSQL workflow.
 The [subset design](OPERATOR_TRACK_SUBSET_DESIGN.md) connects each practice to

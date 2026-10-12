@@ -1,5 +1,14 @@
 # Official practices by boundary
 
+October 12 two-owner guidance uses docs/OPERATOR_TRACK_UNION_RESEARCH_2026_10.md.
+OWASP resource-specific authorization separates provider work from recipient
+delivery. Protected transaction data includes the complete accepted participant
+set; recapturing or dropping a peer after delayed work is not authorization.
+PostgreSQL/node-postgres ownership protects separate receipt publication on one
+client; each filesystem mutation still needs its recipient root and actual media
+checks. W3C status semantics preserve queued versus delivered/review outcomes;
+backend evidence is not rendered-accessibility certification.
+
 October 12 single-track guidance uses
 docs/OPERATOR_TRACK_SUBSET_RESEARCH_2026_10.md. Picard 3.0 distinguishes Vorbis
 recording tags from release-track tags; check the actual probe format and edition,

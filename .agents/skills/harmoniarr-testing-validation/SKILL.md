@@ -5,6 +5,17 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For two-owner unions, prove actual saved intent creates two owned requests but
+one discovery row, then one exact two-file provider manifest. Verify distinct
+private deliveries, untouched extra/sibling tracks, retained shared input,
+current primary ownership in either direction, missing/disabled/late participants
+and changed roots. Use the owning queryable for quality rechecks and receipt
+publication. Required-event failure must roll back both receipts and status;
+replacing one delivered file restores only that owner's Wanted requirement.
+Keep pre-fix intake/staging diagnostics separate from frozen final proof. See
+docs/OPERATOR_TRACK_UNION_OUTCOME.md. Same-file sharing, larger/multi-disc unions
+and partial restart/adoption/origin recovery remain conservative.
+
 For track requirements, prove current recording/medium/track-position membership,
 unsupported track MBIDs, incomplete desired sets, exact scope persistence and
 post-plan catalog changes with real saves and guarded publication. For the

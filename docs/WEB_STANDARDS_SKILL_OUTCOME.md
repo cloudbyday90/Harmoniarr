@@ -1,5 +1,13 @@
 # Practical web standards skill outcome
 
+October 12 two-owner maintenance extends concrete references with recipient-owned
+request publication, complete typed participants, exact union manifests, private
+copy delivery and separate receipts. The
+[union outcome](OPERATOR_TRACK_UNION_OUTCOME.md) owns executed evidence and limits.
+Five structural validators pass and seven installed standards/scoped files match
+source hashes; this round makes no new blind-trial or accessibility-certification
+claim. Native broad-run instability and passing isolated evidence remain distinct.
+
 October 12 single-track maintenance extends the existing skill with exact file
 manifests, actual Picard-compatible probe tags, current consent, destination-byte
 receipts and per-owner outcome checks. The

@@ -19,6 +19,8 @@
 import { posix as path } from 'node:path';
 import { createApiError } from '../auth.js';
 import { selectOperatorTrackFiles } from '../metadata/operator-track-file-policy.js';
+import { createOperatorTrackScopeVerificationService } from '../metadata/operator-track-scope-verification-service.js';
+import { createOperatorTrackDeliveryPlanService } from '../metadata/operator-track-delivery-plan-service.js';
 import { createImportCandidateCanonicalNamingService } from './import-candidate-canonical-naming-service.js';
 import { createLibraryNamingService } from '../library/library-naming-service.js';
 import { createMediaStagingSafetyService } from '../media/media-staging-safety-service.js';
@@ -92,6 +94,8 @@ export function createImportCandidatePreviewService({
   canonicalImportNamingService = createImportCandidateCanonicalNamingService(),
   getImportCandidate,
   getAppUserById = null,
+  trackScopeVerifier = createOperatorTrackScopeVerificationService(),
+  trackDeliveryPlanService = createOperatorTrackDeliveryPlanService(),
   libraryNamingService = createLibraryNamingService(),
   loadSettingsFn = loadSettings,
   mediaStagingSafetyService = createMediaStagingSafetyService(),
@@ -170,7 +174,7 @@ export function createImportCandidatePreviewService({
         'The active app user is still using the legacy settings-backed destination mapping. Move this root onto the user record to keep provisioning, permissions, and future Plex onboarding in one boundary.',
       ));
     }
-    const filePreviews = candidate.files.map((file) => {
+    let filePreviews = candidate.files.map((file) => {
       const safetyAssessment = mediaStagingSafetyService.assessCandidateFile({
         candidateId: candidate.id,
         file,
@@ -200,6 +204,11 @@ export function createImportCandidatePreviewService({
           }),
       });
     });
+    if (trackSelection?.sharedDelivery) {
+      const selection = await trackScopeVerifier.assertCandidateCurrent(candidate);
+      filePreviews = await trackDeliveryPlanService.planFilePreviews({ selection, filePreviews, relativeFolderPath, settings });
+      warnings.push(buildPathWarning('shared_track_delivery_copies', 'Each person receives only their selected track. Downloaded files are kept for this shared import.'));
+    }
 
     return {
       candidate: {

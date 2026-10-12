@@ -247,6 +247,10 @@ export function createImportCandidateApplyOperationService({
     }
     const trackSelection = await assertTrackScopeCurrent(importCandidateId, { applyPreview });
     if (trackSelection && applyPreview.files.some(file => file.recovery?.confirmedFinalizeIntent)) throw refuseOperatorTrackFiles();
+    if (trackSelection?.sharedDelivery) {
+      if (applyPreview.files.some(file => file.recovery)) throw refuseOperatorTrackFiles();
+      executionMode = 'copy';
+    }
 
     if ((applyPreview?.summary?.status ?? 'blocked') === 'blocked') {
       throw buildBlockedError(applyPreview.summary?.message ?? 'Import candidate is not ready for apply.');
@@ -269,9 +273,9 @@ export function createImportCandidateApplyOperationService({
     let operationPosition = Number.isInteger(operationPositionStart) && operationPositionStart >= 0
       ? operationPositionStart
       : 0;
-    const preferHardlink = applyPreview?.preview?.library?.reusePolicy?.sameVolumeLinkMode === 'prefer_hardlink';
+    const preferHardlink = !trackSelection?.sharedDelivery && applyPreview?.preview?.library?.reusePolicy?.sameVolumeLinkMode === 'prefer_hardlink';
     const duplicateLosslessPolicy = applyPreview?.preview?.library?.reusePolicy?.duplicateLosslessPolicy;
-    const canReuseExistingLossless = duplicateLosslessPolicy === 'reuse_existing_lossless_by_default';
+    const canReuseExistingLossless = !trackSelection?.sharedDelivery && duplicateLosslessPolicy === 'reuse_existing_lossless_by_default';
 
     function reserveOperationPosition() {
       operationPosition += 1;
@@ -432,6 +436,7 @@ export function createImportCandidateApplyOperationService({
       }
 
       const operation = {
+        ...(file.delivery ? { delivery: structuredClone(file.delivery) } : {}),
         fileId: file.fileId,
         filename: file.filename,
         libraryPath: file.libraryTarget?.path ?? null,
@@ -567,8 +572,8 @@ export function createImportCandidateApplyOperationService({
               destinationPath: file.stagingTarget?.path ?? null,
               expectedSizeBytes: file.sourceFile?.sizeBytes ?? null,
               operationPosition: operationPosition + 1,
-              removeSourceAfterSuccess: true,
-              requestedMode: 'move',
+              removeSourceAfterSuccess: !trackSelection?.sharedDelivery,
+              requestedMode: trackSelection?.sharedDelivery ? 'copy' : 'move',
               sourcePath: file.sourceFile?.path ?? null,
               startedAt: new Date().toISOString(),
               stepType: 'stage',
@@ -627,7 +632,7 @@ export function createImportCandidateApplyOperationService({
         };
         const { intent: finalizeIntent, result: finalizeMove } = await applyFilesystemMutation({
           destinationPath: file.libraryTarget.path,
-          destinationRoot: applyPreview?.preview?.library?.root,
+          destinationRoot: file.delivery?.libraryRoot ?? applyPreview?.preview?.library?.root,
           expectedSizeBytes: currentStep.expectedSizeBytes,
           fallbackMode: finalizeFallbackMode,
           file,

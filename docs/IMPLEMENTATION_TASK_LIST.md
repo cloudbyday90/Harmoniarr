@@ -6,6 +6,22 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Two-owner track delivery (2026-10-12)
+
+The [two-owner slice](OPERATOR_TRACK_UNION_OUTCOME.md) adds recipient-
+owned typed requests, one exact shared manifest, distinct current private roots
+and separate byte-backed receipts. Its
+[design](OPERATOR_TRACK_UNION_DESIGN.md) and
+[research](OPERATOR_TRACK_UNION_RESEARCH_2026_10.md) own the selected architecture
+and tradeoffs. Validation: 221 focused and 9,963 fast tests plus builds; all 142
+selected native cases have passing evidence across the broad and isolated checks.
+Both broad runs also exposed connection resets; they are preserved, not reported
+as clean gates. Source remained frozen and no bounds/assertions/skips changed.
+
+- Next: diagnose repeated native PostgreSQL connection resets during longer
+  cohorts; then partial delivery recovery, fulfilled-source retirement and safe
+  reopening when owned media is missing. Broader unions remain separate.
+
 ## Completed slice: Exact single-track acquisition (2026-10-12)
 
 The [single-track slice](OPERATOR_TRACK_SUBSET_OUTCOME.md) implements one track

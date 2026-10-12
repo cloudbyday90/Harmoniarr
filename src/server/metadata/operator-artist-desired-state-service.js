@@ -128,10 +128,10 @@ export function createOperatorArtistDesiredStateService({
       } else if (activeRequest) {
         incrementCount(summary, 'activeRequestBlockedCount');
         blockReason = 'active_request_exists';
-      } else if (discoveryRequest?.requestStatus === 'cooldown') {
+      } else if (operatorState.operatorTrackScope?.mode !== 'tracks' && discoveryRequest?.requestStatus === 'cooldown') {
         incrementCount(summary, 'cooldownBlockedCount');
         blockReason = 'cooldown_active';
-      } else if (discoveryRequest?.requestStatus === 'ready' || discoveryRequest?.requestStatus === 'blocked') {
+      } else if (operatorState.operatorTrackScope?.mode !== 'tracks' && (discoveryRequest?.requestStatus === 'ready' || discoveryRequest?.requestStatus === 'blocked')) {
         incrementCount(summary, 'queuedDiscoveryCount');
         blockReason = 'discovery_request_exists';
       } else if (operatorState.operatorTrackScope?.mode === 'unresolved') {

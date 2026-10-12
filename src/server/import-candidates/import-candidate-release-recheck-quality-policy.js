@@ -32,7 +32,10 @@ export async function buildRecheckQualityContext({ candidate, participants, quer
   if (Object.hasOwn(base ?? {}, 'operatorTrackScopes')) {
     await createOperatorTrackScopeVerificationService().assertScopesCurrent(base.operatorTrackScopes, { queryable });
   }
-  const current = await createLibraryDiscoveryQualityContextService().resolveSharedDiscoveryQualityContext({ operatorLinks: participants }, { queryable });
+  const ownership = candidate?.normalizedPayload?.requestOwnership;
+  const current = await createLibraryDiscoveryQualityContextService().resolveSharedDiscoveryQualityContext({ operatorLinks: participants,
+    evidence: { sourceMediaRequestId: ownership?.sourceMediaRequestId, sourceRequestedForUserId: ownership?.sourceRequestedForUserId,
+      ...(Object.hasOwn(base ?? {}, 'operatorTrackParticipants') ? { operatorTrackParticipants: base.operatorTrackParticipants } : {}) } }, { queryable });
   const baseProfile = Object.hasOwn(PROFILE_PRIORITY, base?.profileCode) ? base.profileCode : 'lossless_archive';
   const profileCode = PROFILE_PRIORITY[current.profileCode] > PROFILE_PRIORITY[baseProfile] ? current.profileCode : baseProfile;
   const savedConsent = participants.find((participant) => participant.wantedReleaseId === base?.qualityOverride?.wantedReleaseId);
@@ -46,6 +49,7 @@ export async function buildRecheckQualityContext({ candidate, participants, quer
     ...participants.map((participant) => participant.qualityPreferences?.minimumQuality === 'high' ? 320 : 0)) || null;
   const ids = getRecheckWantedReleaseIds(candidate);
   return { profileCode, ...(current.operatorTrackScopes ? { operatorTrackScopes: current.operatorTrackScopes } : {}),
+  ...(current.operatorTrackParticipants ? { operatorTrackParticipants: current.operatorTrackParticipants } : {}),
   qualityOverride: qualityOverride ? { ...qualityOverride,
     ...(minimumBitrateKbps > 256 ? { minimumBitrateKbps } : {}) } : null,
   ...(minimumBitrateKbps ? { minimumBitrateKbps } : {}), wantedReleaseId: ids.includes(base?.wantedReleaseId) ? base.wantedReleaseId : ids[0],

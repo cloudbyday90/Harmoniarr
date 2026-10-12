@@ -3,6 +3,15 @@
 Use this map when the task concerns an acquisition exception. Confirm current
 callers and data shapes with source search before editing.
 
+The two-owner slice in docs/OPERATOR_TRACK_UNION_OUTCOME.md supersedes the blanket
+different-subset refusal for two distinct disc-one tracks only. Require both
+owned requests/Wanted scopes, an exact captured participant set, current private
+roots and separate receipts. Recipient-owned subset publication must not be
+suppressed by another person's active request or the shared discovery row;
+whole-release deduplication retains its prior semantics. Copies retain shared
+input, and each destination root owns filesystem containment. Preserve every
+quality floor/consent; broader unions and partial delivery recovery stay blocked.
+
 | Boundary | Source area | Question to answer |
 | --- | --- | --- |
 | Exact track requirement | Catalog/scope verification, track file policy/evidence/fulfillment services, request/Wanted context and execution/apply adapters | Does current catalog membership support the exact occurrence and saved owner intent? The first supported subset is one track on disc one: unique numbered file, consistent raw path, exact provider manifest, actual recording/release/position/duration probe and destination-byte receipt. Preserve all owners/nulls and refuse incompatible scopes. Legacy candidates need typed context. Fulfillment is source-owner-specific; Wanted checks current bytes. Multi-track/disc unions and adoption/origin recovery remain conservative. See `docs/OPERATOR_TRACK_SUBSET_OUTCOME.md`; filename scoring and embedded tags are not acoustic identification. |
