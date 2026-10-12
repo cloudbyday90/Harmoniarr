@@ -299,9 +299,23 @@ through admitted renewal and captured release in library/library-external-intake
 Planning reloads the active stored request and renormalizes sourceUrl; execution
 queueing rechecks active request and maintenance at its existing service owner.
 The worker forwards normalized returned descriptors and original actor/request
-identity, preserving cancellation before and after handoff. Completion does not
-include the queued provider executor, which still detaches its own launch.
+identity, preserving cancellation before and after handoff. Planner completion
+does not include queued execution; retain the executor's separate actual handle
+when admitted execution must finish before resources are disposed.
 Application selection adds intake before discovery and the seven existing owners.
 Both native app fixtures gate persisted pending handoff then terminal planning
 before release, asserting resource/recipient/actor facts from the parent test.
-Dedicated intake documents own evidence and remaining executor/periodic limits.
+Dedicated intake documents own their evidence and remaining-worker/periodic limits.
+
+Provider ingest now owns returned executeProviderIngestRequests through renewal
+and captured release in library/library-provider-ingest-execution-worker.js.
+The service delegates tracked collection batches to their existing intake owner;
+otherwise it awaits row/derived work, request evidence and audit. Preserve partial
+counts and preparation status, active request/target authority and cancellation.
+The provider-json request service owns explicit origins/redirect/bounded responses,
+while its abort adapter's hidden settlement remains a separate limitation.
+Application captures planner then provider before discovery and the six remaining
+selected owners. Native fixture helpers locate real seed/plan/queue/read owners
+and injected loopback transport without altering production endpoints. Parent
+tests check HTTP/body persistence, actor/recipient resources, release and collection
+publication/cancellation. Dedicated provider-ingest documents own executed scope.

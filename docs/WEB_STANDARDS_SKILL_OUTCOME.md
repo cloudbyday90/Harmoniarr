@@ -598,3 +598,10 @@ completed provider work. The [intake outcome](EXTERNAL_INTAKE_LIFETIME_OUTCOME.m
 owns PostgreSQL/parent-visible fixture and structural evidence. This is narrow
 reference maintenance without a new blind trial, invocation change or standards/
 security certification.
+
+Provider ingest references locate returned execution, guarded collection/row
+persistence and nine concrete application owners. They retain transport controls,
+partial-result policy and the distinct hidden post-abort boundary. The
+[provider outcome](PROVIDER_INGEST_LIFETIME_OUTCOME.md) owns native HTTP, resource,
+publication/cancellation and structural evidence. This is narrow reference
+maintenance without a new blind trial or conformance certification.

@@ -24,6 +24,8 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
   const discoveryCloseGate = Promise.withResolvers();
   const intakeCloseEntered = Promise.withResolvers();
   const intakeCloseGate = Promise.withResolvers();
+  const providerCloseEntered = Promise.withResolvers();
+  const providerCloseGate = Promise.withResolvers();
   let resolveShutdownComplete;
   const shutdownComplete = new Promise((resolve) => {
     resolveShutdownComplete = resolve;
@@ -272,6 +274,14 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
             await intakeCloseGate.promise;
           },
         },
+        libraryProviderIngestExecutionWorker: {
+          startWorkerRun: async () => {},
+          async close() {
+            callOrder.push('provider.close');
+            providerCloseEntered.resolve();
+            await providerCloseGate.promise;
+          },
+        },
         libraryDiscoveryWorker: {
           startWorkerRun: async () => {},
           async close() {
@@ -479,8 +489,11 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
   processEmitter.emit('SIGTERM');
   try {
     await waitForFixtureReady({ ready: intakeCloseEntered.promise, operation: shutdownComplete });
-    assert.equal(callOrder.includes('discovery.close'), false); assert.equal(callOrder.includes('closePool'), false);
+    assert.equal(callOrder.includes('provider.close'), false); assert.equal(callOrder.includes('closePool'), false);
     intakeCloseGate.resolve();
+    await waitForFixtureReady({ ready: providerCloseEntered.promise, operation: shutdownComplete });
+    assert.equal(callOrder.includes('discovery.close'), false); assert.equal(callOrder.includes('closePool'), false);
+    providerCloseGate.resolve();
     await waitForFixtureReady({ ready: discoveryCloseEntered.promise, operation: shutdownComplete });
     assert.equal(callOrder.includes('execution.close'), false); assert.equal(callOrder.includes('closePool'), false);
     discoveryCloseGate.resolve();
@@ -501,7 +514,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     applyCloseGate.resolve();
     await waitForFixtureReady({ ready: organizeCloseEntered.promise, operation: shutdownComplete });
     assert.equal(callOrder.includes('scan.close'), false); assert.equal(callOrder.includes('closePool'), false);
-  } finally { intakeCloseGate.resolve(); discoveryCloseGate.resolve(); executionCloseGate.resolve(); inspectionCloseGate.resolve(); transcodeCloseGate.resolve(); applyCloseGate.resolve(); organizeCloseGate.resolve(); }
+  } finally { intakeCloseGate.resolve(); providerCloseGate.resolve(); discoveryCloseGate.resolve(); executionCloseGate.resolve(); inspectionCloseGate.resolve(); transcodeCloseGate.resolve(); applyCloseGate.resolve(); organizeCloseGate.resolve(); }
   await shutdownComplete;
 
   assert.deepEqual(callOrder, [
@@ -537,6 +550,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'stop:queue',
     'server.close',
     'intake.close',
+    'provider.close',
     'discovery.close',
     'execution.close',
     'inspection.close',

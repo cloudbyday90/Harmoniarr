@@ -16,6 +16,9 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createWorkerTaskLifecycle } from '../worker-task-lifecycle.js';
+import { withWorkerTaskCleanup } from '../worker-task-cleanup.js';
+import { drainWorkerLease } from '../worker-lease-cleanup.js';
 import { isOperationRunLeaseLostError } from '../operation-run-lease-error.js';
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
 import {
@@ -37,92 +40,29 @@ export function createLibraryProviderIngestExecutionWorker({
   releaseLease,
   renewLease,
 } = {}) {
-  const activeRunIds = new Set();
+  const lifecycle = createWorkerTaskLifecycle({ execute: runExecution });
 
   async function runExecution({ canonicalUrl, mediaRequestId, resourceType, runId, sourceIdentifier, sourceProvider, triggerSource = 'planning_complete', triggeredByUserId = null }) {
     let finalLeaseStatus = 'completed';
     let acquiredLease = null;
     let leaseHeartbeat = null;
 
-    try {
-      acquiredLease = await acquireLease({ runId });
-      if (!acquiredLease) return;
-      if (renewLease) {
-        leaseHeartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId, expectedLease: acquiredLease });
-        leaseHeartbeat.start();
-      }
+    return withWorkerTaskCleanup(async () => {
+      try {
+        acquiredLease = await acquireLease({ runId });
+        if (!acquiredLease) return;
+        if (renewLease) {
+          leaseHeartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId, expectedLease: acquiredLease });
+          leaseHeartbeat.start();
+        }
 
-      await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
-      if (await markRunStarted({
-        expectedLease: acquiredLease,
-        runId,
-        summary: {
-          canonicalUrl,
-          currentStep: 'Executing provider ingest requests',
-          mediaRequestId,
-          resourceType,
-          sourceIdentifier,
-          sourceProvider,
-          triggerSource,
-        },
-      }) === false) { finalLeaseStatus = 'failed'; return; }
-
-      const result = await executeProviderIngestRequests({
-        mediaRequestId,
-        operationRunId: runId,
-        triggerSource,
-        triggeredByUserId,
-      });
-
-      await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
-      if (await markRunCompleted({
-        expectedLease: acquiredLease,
-        runId,
-        summary: {
-          canonicalUrl,
-          currentStep: 'Provider ingest execution completed',
-          derivedIngestRequestCount: result.derivedIngestRequests?.length ?? 0,
-          executedCount: result.executedCount,
-          failedCount: result.failedCount,
-          mediaRequestId,
-          resourceType,
-          sourceIdentifier,
-          sourceProvider,
-          triggerSource,
-        },
-      }) === false) { finalLeaseStatus = 'failed'; return; }
-    } catch (error) {
-      if (!acquiredLease || isOperationRunLeaseLostError(error)) { finalLeaseStatus = 'failed'; return; }
-      if (isOperationRunPauseError(error)) {
-        finalLeaseStatus = 'paused';
-        if (await markRunPaused({
-          expectedLease: acquiredLease,
-          nextAttemptAt: error.nextRetryAt ?? null,
-          runId,
-          summary: {
-            canonicalUrl,
-            currentStep: 'Provider ingest execution paused by maintenance lock',
-            mediaRequestId,
-            pauseCode: error.pauseCode ?? null,
-            pauseMessage: error.message,
-            pauseProvider: error.pauseProvider ?? null,
-            resourceType,
-            sourceIdentifier,
-            sourceProvider,
-            triggerSource,
-          },
-        }) === false) { finalLeaseStatus = 'failed'; return; }
-        return;
-      }
-
-      if (isOperationRunCancellationError(error)) {
-        finalLeaseStatus = 'cancelled';
-        if (await markRunCancelled({
+        await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
+        if (await markRunStarted({
           expectedLease: acquiredLease,
           runId,
           summary: {
             canonicalUrl,
-            currentStep: 'Provider ingest execution cancelled',
+            currentStep: 'Executing provider ingest requests',
             mediaRequestId,
             resourceType,
             sourceIdentifier,
@@ -130,43 +70,102 @@ export function createLibraryProviderIngestExecutionWorker({
             triggerSource,
           },
         }) === false) { finalLeaseStatus = 'failed'; return; }
-        return;
-      }
 
-      finalLeaseStatus = 'failed';
-      if (await markRunFailed({
-        expectedLease: acquiredLease,
-        errorMessage: error.message,
-        runId,
-        summary: {
-          canonicalUrl,
-          currentStep: 'Provider ingest execution failed',
+        const result = await executeProviderIngestRequests({
           mediaRequestId,
-          resourceType,
-          sourceIdentifier,
-          sourceProvider,
+          operationRunId: runId,
           triggerSource,
-        },
-      }) === false) { finalLeaseStatus = 'failed'; return; }
-    } finally {
-      leaseHeartbeat?.stop();
-      activeRunIds.delete(runId);
-      if (acquiredLease) await releaseLease({ runId, status: finalLeaseStatus, expectedLease: acquiredLease });
-    }
+          triggeredByUserId,
+        });
+
+        await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
+        if (await markRunCompleted({
+          expectedLease: acquiredLease,
+          runId,
+          summary: {
+            canonicalUrl,
+            currentStep: 'Provider ingest execution completed',
+            derivedIngestRequestCount: result.derivedIngestRequests?.length ?? 0,
+            executedCount: result.executedCount,
+            failedCount: result.failedCount,
+            mediaRequestId,
+            resourceType,
+            sourceIdentifier,
+            sourceProvider,
+            triggerSource,
+          },
+        }) === false) { finalLeaseStatus = 'failed'; return; }
+      } catch (error) {
+        finalLeaseStatus = 'failed';
+        if (!acquiredLease) {
+          if (isOperationRunLeaseLostError(error) || error?.code === 'operation_run_lease_unavailable') return;
+          throw error;
+        }
+        if (isOperationRunLeaseLostError(error)) return;
+        if (isOperationRunPauseError(error)) {
+          finalLeaseStatus = 'paused';
+          if (await markRunPaused({
+            expectedLease: acquiredLease,
+            nextAttemptAt: error.nextRetryAt ?? null,
+            runId,
+            summary: {
+              canonicalUrl,
+              currentStep: 'Provider ingest execution paused by maintenance lock',
+              mediaRequestId,
+              pauseCode: error.pauseCode ?? null,
+              pauseMessage: error.message,
+              pauseProvider: error.pauseProvider ?? null,
+              resourceType,
+              sourceIdentifier,
+              sourceProvider,
+              triggerSource,
+            },
+          }) === false) { finalLeaseStatus = 'failed'; return; }
+          return;
+        }
+
+        if (isOperationRunCancellationError(error)) {
+          finalLeaseStatus = 'cancelled';
+          if (await markRunCancelled({
+            expectedLease: acquiredLease,
+            runId,
+            summary: {
+              canonicalUrl,
+              currentStep: 'Provider ingest execution cancelled',
+              mediaRequestId,
+              resourceType,
+              sourceIdentifier,
+              sourceProvider,
+              triggerSource,
+            },
+          }) === false) { finalLeaseStatus = 'failed'; return; }
+          return;
+        }
+
+        finalLeaseStatus = 'failed';
+        if (await markRunFailed({
+          expectedLease: acquiredLease,
+          errorMessage: error?.message ?? 'Provider ingest execution failed',
+          runId,
+          summary: {
+            canonicalUrl,
+            currentStep: 'Provider ingest execution failed',
+            mediaRequestId,
+            resourceType,
+            sourceIdentifier,
+            sourceProvider,
+            triggerSource,
+          },
+        }) === false) { finalLeaseStatus = 'failed'; return; }
+      }
+    }, () => drainWorkerLease({ heartbeat: leaseHeartbeat, lease: acquiredLease, releaseLease,
+      runId, status: finalLeaseStatus }));
   }
 
   async function startWorkerRun({ canonicalUrl, mediaRequestId, resourceType, runId, sourceIdentifier, sourceProvider, triggerSource = 'planning_complete', triggeredByUserId = null }) {
-    if (activeRunIds.has(runId)) {
-      return;
-    }
-
-    activeRunIds.add(runId);
-    queueMicrotask(() => {
-      void runExecution({ canonicalUrl, mediaRequestId, resourceType, runId, sourceIdentifier, sourceProvider, triggerSource, triggeredByUserId });
-    });
+    const completion = lifecycle.start({ canonicalUrl, mediaRequestId, resourceType, runId, sourceIdentifier, sourceProvider, triggerSource, triggeredByUserId });
+    return { completion };
   }
 
-  return {
-    startWorkerRun,
-  };
+  return { startWorkerRun, close: lifecycle.close };
 }

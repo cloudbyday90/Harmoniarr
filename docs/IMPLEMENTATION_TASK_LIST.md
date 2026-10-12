@@ -6,6 +6,29 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Provider ingest execution lifetime (2026-10-11)
+
+- Reproduce duplicate acquisition during held release, then own returned provider/
+  collection execution and renewal/release through shared ESM services. Preserve
+  request/target authority, partial counts, bounded collection status, cancellation
+  and transport policy. Capture planner/provider before existing discovery/import/
+  inspection/transcode/apply/organize/scan owners at startup and both app fixtures.
+  Executor cancellation fixtures await actual completion. See
+  [design](PROVIDER_INGEST_LIFETIME_DESIGN.md),
+  [research](PROVIDER_INGEST_LIFETIME_RESEARCH_2026_10.md) and
+  [outcome](PROVIDER_INGEST_LIFETIME_OUTCOME.md).
+- Focused 234/234; complete fast 9,752 plus both builds; affected native 60/60
+  across eight verified files, including six new native HTTP/SQL lifetime and
+  collection publication/cancellation cases. Zero failures/cancellations/skips;
+  no exhaustive-native or matched speedup claim.
+- Standards/testing skill maintenance, installed hashes and npm audit pass.
+  [Fresh PR assessment](OPEN_PR_APPLICABILITY_PROVIDER_INGEST_LIFETIME_2026_10_OUTCOME.md)
+  finds no eligible unreplayed patch; main only, no release or merge.
+- Next: external-request discovery completion through approved intent, candidate
+  writes and captured lease cleanup, preserving authority and no-candidate retry.
+  Remaining worker/periodic ownership precedes residual-wait removal or exhaustive
+  scheduling changes; historical SQL-reset causes remain unconfirmed.
+
 ## Completed slice: External intake planning lifetime (2026-10-11)
 
 - Reproduce duplicate acquisition during held release, then own returned planning,

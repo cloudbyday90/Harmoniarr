@@ -333,10 +333,20 @@ review, and a green subset is not completeness or remote-operation completion.
 
 External intake now returns actual completion through planning, awaited durable
 execution handoff and renewal/release. Await that handle in planning-only fixtures;
-legacy provider-execution doubles still expose an earlier release observation.
+the queued start acknowledgement alone remains earlier than actual execution.
 Gate planning, queued execution and captured release separately. Native proof
 uses both app fixtures with real stores and parent-visible normalized source,
 recipient/actor, pending execution and resource checkpoints. A completed planning
 run precedes release, and a pending child run is not provider completion. See
-docs/EXTERNAL_INTAKE_LIFETIME_OUTCOME.md; remaining executor/periodic owners keep
+docs/EXTERNAL_INTAKE_LIFETIME_OUTCOME.md; other worker/periodic owners keep
 the residual fixture wait and limit whole-app/performance claims.
+
+Provider ingest now returns actual completion through provider/collection service,
+guarded persistence and renewal/release. Await it in executor cancellation fixtures
+and gate accepted start, returned service result, terminal status and release as
+separate boundaries. Parent-visible native HTTP checkpoints use the real clients
+with an injected owned loopback transport; they do not establish live-provider or
+post-abort hidden completion. Keep partial row counts and bounded preparing/ready
+collection status distinct from worker completion. The dedicated provider-ingest
+outcome owns both app-fixture and collection publication/cancellation evidence.
+Remaining external-discovery/periodic owners keep the residual fixture delay.

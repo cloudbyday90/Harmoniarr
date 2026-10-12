@@ -547,3 +547,15 @@ execution or remote completion. Node timer timing does not establish drainage;
 explicit completion replaces guessed unit waits. TC39 permits null rejection;
 preserve it through cleanup. W3C timing remains draft observation guidance, and
 RFC 9110 uncertainty rules still apply to non-idempotent transport retries.
+
+October 11 provider-ingest guidance uses docs/PROVIDER_INGEST_LIFETIME_RESEARCH_2026_10.md.
+Official Spotify album and YouTube playlistItems references define catalog GETs;
+trace the actual identifier-based client rather than inferring arbitrary URL
+fetching. Preserve explicit origins, refused redirects and response/deadline
+bounds at the transport owner. A returned promise can end before hidden injected
+work after abort; normal-response lifetime evidence does not certify that path.
+Keep active target/cancellation checks and transactional collection publication.
+TC39 completion and driver cleanup support shared ownership; one bounded batch or
+a handled row failure can finish local execution without proving the collection
+or remote work complete. W3C timing remains draft measurement guidance and IETF
+uncertainty policy does not authorize replay during shutdown.

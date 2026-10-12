@@ -11,6 +11,7 @@ import { drainWorkerOwners } from './worker-owner-drain.js';
 export function drainApplicationWorkerOwners({ importCandidateModule, libraryModule }) {
   return drainWorkerOwners([
     libraryModule?.libraryExternalIntakeWorker,
+    libraryModule?.libraryProviderIngestExecutionWorker,
     libraryModule?.libraryDiscoveryWorker,
     importCandidateModule?.importCandidateExecutionWorker,
     importCandidateModule?.importCandidateMediaInspectionWorker,

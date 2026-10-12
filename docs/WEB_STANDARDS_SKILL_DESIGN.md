@@ -352,3 +352,10 @@ actual outbound client owner. The [intake design](EXTERNAL_INTAKE_LIFETIME_DESIG
 owns the slice; pending execution and planning completion are separate facts.
 This extends the practical skill with evidence and adverse tests while retaining
 its entrypoint, metadata and invocation policy.
+
+Provider ingest references trace bounded catalog clients and current request/
+target guards through returned service work and captured lease drainage. They
+separate a completed local batch, a ready collection, remote work and hidden
+post-abort settlement. The [provider design](PROVIDER_INGEST_LIFETIME_DESIGN.md)
+owns this slice and its native transport/publication evidence. Existing skill
+entrypoint, metadata and invocation policy remain.

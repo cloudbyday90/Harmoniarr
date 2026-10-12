@@ -74,7 +74,7 @@ test('execution worker preserves cancellation after partial provider work', asyn
   const fixture = createWorkerFixture(t, createLibraryProviderIngestExecutionWorker, {
     executeProviderIngestRequests: async () => { throw createOperationRunCancellationError({ runId: 'run-1' }); },
   });
-  await fixture.worker.startWorkerRun(run);
+  await (await fixture.worker.startWorkerRun(run)).completion;
   assert.equal((await fixture.released).status, 'cancelled');
   assert.equal(fixture.markRunCancelled.mock.callCount(), 1);
   assert.equal(fixture.markRunCompleted.mock.callCount(), 0);
@@ -90,7 +90,7 @@ test('execution worker rechecks operation cancellation before reporting completi
       return { executedCount: 1, failedCount: 0 };
     },
   });
-  await fixture.worker.startWorkerRun(run);
+  await (await fixture.worker.startWorkerRun(run)).completion;
   assert.equal((await fixture.released).status, 'cancelled');
   assert.equal(fixture.markRunCompleted.mock.callCount(), 0);
 });
