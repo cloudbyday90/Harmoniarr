@@ -337,3 +337,10 @@ from local completion. Parent-visible native checkpoints prevent swallowed
 callback assertions from serving as false proof. The
 [organize design](ORGANIZE_APPLY_LIFETIME_DESIGN.md) owns this slice; existing skill
 entrypoint, metadata and invocation policy remain.
+
+Discovery references follow queued intent through returned reconciliation,
+artwork/provider and selected-import queue handoffs, then eligible ledger cleanup.
+They preserve scoped consent and distinguish local drainage from remote completion.
+The [discovery design](DISCOVERY_DISPATCH_LIFETIME_DESIGN.md) owns implementation;
+pruning eligibility and explicit test selection are evidence-backed project rules.
+Existing skill entrypoint, metadata and invocation policy remain.

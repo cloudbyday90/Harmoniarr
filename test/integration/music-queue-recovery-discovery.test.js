@@ -15,11 +15,11 @@ import { createLibraryMusicQueueRecoveryDiscoveryService } from '../../src/serve
 import { createLibraryDiscoveryDispatchService } from '../../src/server/library/library-discovery-dispatch-service.js';
 import { createLibraryDiscoveryRequestStore } from '../../src/server/library/library-discovery-request-store.js';
 import { createLibraryDiscoveryRequestService } from '../../src/server/library/library-discovery-request-service.js';
-import { createLibraryDiscoveryWorker } from '../../src/server/library/library-discovery-worker.js';
 import { createMusicQueueRecoveryFixtureContext, seedMusicQueueRecoveryFixture, recoverMusicQueueFixture }
   from '../../testing/integration/music-queue-recovery-fixtures.js';
 import { createPostgresIntegrationRuntime } from '../../testing/postgres-integration-runtime.js';
-import { createFixtureWorkerObserver, withFixtureLifecycle } from '../../testing/integration/fixture-lifecycle.js';
+import { withFixtureLifecycle } from '../../testing/integration/fixture-lifecycle.js';
+import { startLibraryDiscoveryFixtureWorker } from '../../testing/integration/library-discovery-worker-fixture.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 import { isSkippableIntegrationRuntimeError, toIntegrationRuntimeUnavailableReason } from '../../testing/integration/runtime-availability.js';
 
@@ -61,21 +61,21 @@ async function runWorker(context, fixture, { prepare = async () => null, provide
   const callbacks = { acquireLease: runs.acquireLease,
     releaseLease: runs.releaseLease,
     isCancellationRequested: runs.isCancellationRequested, markRunStarted: runs.markRunStarted,
-    markRunCompleted: async (input) => { await runs.markRunCompleted(input); terminalOutcome = { state: 'completed', summary: input.summary }; },
-    markRunFailed: async (input) => { await runs.markRunFailed(input); terminalOutcome = { state: 'failed', error: input.errorMessage }; },
-    markRunCancelled: async (input) => { await runs.markRunCancelled(input); terminalOutcome = { state: 'cancelled' }; },
-    markRunPaused: async (input) => { await runs.markRunPaused(input); terminalOutcome = { state: 'paused' }; },
+    markRunCompleted: async (input) => { const result = await runs.markRunCompleted(input);
+      if (result !== false) terminalOutcome = { state: 'completed', summary: input.summary }; return result; },
+    markRunFailed: async (input) => { const result = await runs.markRunFailed(input);
+      if (result !== false) terminalOutcome = { state: 'failed', error: input.errorMessage }; return result; },
+    markRunCancelled: async (input) => { const result = await runs.markRunCancelled(input);
+      if (result !== false) terminalOutcome = { state: 'cancelled' }; return result; },
+    markRunPaused: async (input) => { const result = await runs.markRunPaused(input);
+      if (result !== false) terminalOutcome = { state: 'paused' }; return result; },
     dispatchDiscoveryRequests: dispatch.dispatchReadyDiscoveryRequests,
     reconcileWantedReleases: async () => globalCalls.push('wanted'), reconcileDiscoveryRequests: async () => globalCalls.push('discovery'),
     prefetchMonitoredArtistArtwork: async () => globalCalls.push('artwork'),
   };
-  const observer = createFixtureWorkerObserver({ callbacks });
-  const worker = createLibraryDiscoveryWorker({ ...callbacks, ...observer.callbacks,
-    isCancellationRequested: async (input) => scope.signal.aborted || await runs.isCancellationRequested(input),
-  });
-  scope.track(observer.finished);
-  await worker.startWorkerRun({ runId: fixture.runId, triggerSource: MUSIC_QUEUE_RECOVERY_DISCOVERY_SOURCE });
-  await observer.finished;
+  const worker = await startLibraryDiscoveryFixtureWorker({ callbacks, signal: scope.signal, track: scope.track,
+    run: { runId: fixture.runId, triggerSource: MUSIC_QUEUE_RECOVERY_DISCOVERY_SOURCE } });
+  await worker.done;
   assert.deepEqual(globalCalls, []);
   return { outcome: terminalOutcome, searches, ingestions, dispatch };
   });

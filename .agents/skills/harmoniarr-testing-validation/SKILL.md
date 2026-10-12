@@ -319,3 +319,14 @@ Application selects execution/inspection/transcode/apply/organize/scan. The
 organize lifetime outcome separates the broader native group from a strengthened
 fixture-only rerun; do not sum repeats or describe unchanged production evidence
 as a new exhaustive/matched performance result.
+
+Discovery now retains actual completion through reconciliation/artwork/provider,
+release and eligible pruning. Unit consumers and scoped recovery fixtures await
+that handle beyond callback observation; preserve guarded false returns and earlier
+callback error identity. Gate release and pruning separately, including skip rules
+after lost/refused authority or thrown cleanup. Application selects discovery
+before execution/inspection/transcode/apply/organize/scan. See the discovery
+lifetime outcome for PostgreSQL/HTTP scope and remaining owners. Verify literal
+selected test paths before launching: this Node host silently ignored an unmatched
+entry in an otherwise passing focused run. Globs require their own selection
+review, and a green subset is not completeness or remote-operation completion.

@@ -283,3 +283,13 @@ best-effort, including synchronous adapters. Application selection now includes
 organize before scan, without inferring a scan launch from notification wiring.
 Native mutation fixtures retain actual completion. The organize lifetime documents
 own real byte/catalog/resource evidence and remaining discovery/periodic work.
+
+Discovery dispatch now owns returned reconciliation/artwork/provider work through
+renewal, captured release and eligible pruning in library/library-discovery-worker.js.
+Keep scoped recovery's exclusion of global work and saved-consent/provider guards.
+Dispatch queues selected-import execution through an awaited service, without a
+proved direct worker launch. Application selection starts with discovery before
+execution, then inspection/transcode/apply/organize/scan. The discovery fixture
+registers completion before launch and preserves earlier observer errors beyond
+release. Dedicated documents own real PostgreSQL/HTTP proof, pruning eligibility
+and remaining external-intake/periodic limits.

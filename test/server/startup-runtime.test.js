@@ -20,6 +20,8 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
   const transcodeCloseGate = Promise.withResolvers();
   const organizeCloseEntered = Promise.withResolvers();
   const organizeCloseGate = Promise.withResolvers();
+  const discoveryCloseEntered = Promise.withResolvers();
+  const discoveryCloseGate = Promise.withResolvers();
   let resolveShutdownComplete;
   const shutdownComplete = new Promise((resolve) => {
     resolveShutdownComplete = resolve;
@@ -262,6 +264,11 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
         },
         libraryDiscoveryWorker: {
           startWorkerRun: async () => {},
+          async close() {
+            callOrder.push('discovery.close');
+            discoveryCloseEntered.resolve();
+            await discoveryCloseGate.promise;
+          },
         },
         libraryScanWorker: {
           startWorkerRun: async () => {},
@@ -461,6 +468,9 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
 
   processEmitter.emit('SIGTERM');
   try {
+    await waitForFixtureReady({ ready: discoveryCloseEntered.promise, operation: shutdownComplete });
+    assert.equal(callOrder.includes('execution.close'), false); assert.equal(callOrder.includes('closePool'), false);
+    discoveryCloseGate.resolve();
     await waitForFixtureReady({ ready: executionCloseEntered.promise, operation: shutdownComplete });
     assert.equal(callOrder.includes('apply.close'), false);
     assert.equal(callOrder.includes('closePool'), false);
@@ -478,7 +488,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     applyCloseGate.resolve();
     await waitForFixtureReady({ ready: organizeCloseEntered.promise, operation: shutdownComplete });
     assert.equal(callOrder.includes('scan.close'), false); assert.equal(callOrder.includes('closePool'), false);
-  } finally { executionCloseGate.resolve(); inspectionCloseGate.resolve(); transcodeCloseGate.resolve(); applyCloseGate.resolve(); organizeCloseGate.resolve(); }
+  } finally { discoveryCloseGate.resolve(); executionCloseGate.resolve(); inspectionCloseGate.resolve(); transcodeCloseGate.resolve(); applyCloseGate.resolve(); organizeCloseGate.resolve(); }
   await shutdownComplete;
 
   assert.deepEqual(callOrder, [
@@ -513,6 +523,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'stop:metadata',
     'stop:queue',
     'server.close',
+    'discovery.close',
     'execution.close',
     'inspection.close',
     'transcode.close',

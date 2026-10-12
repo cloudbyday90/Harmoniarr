@@ -527,3 +527,12 @@ persistence. W3C timing remains draft observation guidance. In fixtures, assert
 lifetime checkpoints from the parent test: a failure inside a swallowed callback
 can otherwise disappear. These checks establish the selected boundary, not global
 atomicity or whole-app/security conformance.
+
+October 11 discovery guidance uses docs/DISCOVERY_DISPATCH_LIFETIME_RESEARCH_2026_10.md.
+Returned reconciliation, artwork/provider and queue-producing work have a local
+completion boundary separate from remote search and persisted terminal status.
+Preserve scoped consent/membership and non-idempotent uncertainty policy from
+RFC 9110. Drain renewal and release before original eligible pruning; no extra
+ledger work follows thrown cleanup failure or lost/refused authority. W3C timing
+is still draft observation guidance. Explicit selected test paths must be verified
+before claiming coverage; this host's Node run ignored an unmatched selector.

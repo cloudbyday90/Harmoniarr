@@ -583,3 +583,10 @@ work and remote delivery, and route fixture proof through parent-visible
 checkpoints. The [organize outcome](ORGANIZE_APPLY_LIFETIME_OUTCOME.md) owns native
 bytes/catalog/resource evidence and structural validation. This is narrow
 reference maintenance without a new blind trial or conformance claim.
+
+Discovery references locate full completion, original pruning eligibility and
+producer-before-consumer application selection. Scoped fixture observation stays
+separate from returned execution, and literal selector validation prevents silent
+coverage omissions. The [discovery outcome](DISCOVERY_DISPATCH_LIFETIME_OUTCOME.md)
+owns PostgreSQL/HTTP and structural evidence. This is narrow reference maintenance
+without a new blind trial, invocation change or conformance certification.

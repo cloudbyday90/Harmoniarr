@@ -6,6 +6,30 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Library discovery dispatch lifetime (2026-10-11)
+
+- Reproduce duplicate acquisition during held release, then own returned
+  reconciliation/artwork/provider and queue-producing work through renewal,
+  captured release and original eligible pruning. Keep scoped recovery and
+  consent/uncertainty policy intact. Capture discovery ahead of execution/
+  inspection/transcode/apply/organize/scan at startup and both app fixtures.
+  Scoped and unit fixtures await actual completion, propagate refused marks and
+  keep errors observable. See [design](DISCOVERY_DISPATCH_LIFETIME_DESIGN.md),
+  [research](DISCOVERY_DISPATCH_LIFETIME_RESEARCH_2026_10.md) and
+  [outcome](DISCOVERY_DISPATCH_LIFETIME_OUTCOME.md).
+- Verified focused 188/188; complete fast 9,716 plus both builds; affected native
+  59/59 across 13 files, including five new PostgreSQL/HTTP lifetime cases. All
+  have zero failures/cancellations/skips. An unmatched initial focused selector
+  was corrected and excluded from coverage claims; literal paths are now checked
+  before invocation. No exhaustive-native or matched speedup claim.
+- Standards/testing skill maintenance, installed hashes and npm audit pass.
+  [Fresh PR assessment](OPEN_PR_APPLICABILITY_DISCOVERY_DISPATCH_LIFETIME_2026_10_OUTCOME.md)
+  finds no eligible unreplayed patch; main only, no release or merge.
+- Next: library external-intake planning completion and queued execution handoff,
+  preserving provider URL/resource and saved request ownership. Then remaining
+  metadata/provider workers and periodic producers before deleting residual waits
+  or changing exhaustive scheduling. Historical SQL-reset causes remain unconfirmed.
+
 ## Completed slice: Library organize apply lifetime (2026-10-11)
 
 - Reproduce duplicate acquisition during final release, then own guarded

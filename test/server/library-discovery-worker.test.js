@@ -7,18 +7,17 @@ const leaseForTest = (runId) => createOperationRunLeaseFixture({ runId, jobType:
 
 test('a scoped recovery child forwards its owning run and skips unrelated reconciliation and artwork', async () => {
   const calls = [];
-  let released;
-  const done = new Promise((resolve) => { released = resolve; });
+  const globalCalls = [];
   const worker = createLibraryDiscoveryWorker({ acquireLease: async ({ runId }) => leaseForTest(runId),
     markRunStarted: async () => {}, markRunCompleted: async () => {}, markRunFailed: async () => assert.fail('Scoped dispatch should finish'),
-    releaseLease: async () => released(),
-    reconcileWantedReleases: async () => assert.fail('A scoped child cannot reconcile unrelated wanted releases'),
-    reconcileDiscoveryRequests: async () => assert.fail('A scoped child cannot reconcile unrelated discovery requests'),
-    prefetchMonitoredArtistArtwork: async () => assert.fail('A scoped child cannot prefetch unrelated artwork'),
+    releaseLease: async () => {},
+    reconcileWantedReleases: async () => { globalCalls.push('wanted'); },
+    reconcileDiscoveryRequests: async () => { globalCalls.push('discovery'); },
+    prefetchMonitoredArtistArtwork: async () => { globalCalls.push('artwork'); },
     dispatchDiscoveryRequests: async (input) => { calls.push(input); return { attemptedCount: 1, dispatchedCount: 1 }; },
   });
-  await worker.startWorkerRun({ runId: 'scoped-run', triggerSource: 'music_queue_fallback_rediscovery' });
-  await done;
+  await (await worker.startWorkerRun({ runId: 'scoped-run', triggerSource: 'music_queue_fallback_rediscovery' })).completion;
+  assert.deepEqual(globalCalls, []);
   assert.deepEqual(calls, [{ actorUserId: null, requestMetadata: null, runId: 'scoped-run', triggerSource: 'music_queue_fallback_rediscovery' }]);
 });
 
@@ -65,14 +64,14 @@ test('createLibraryDiscoveryWorker reconciles and dispatches a protected discove
     });
   });
 
-  await worker.startWorkerRun({
+  await (await worker.startWorkerRun({
     requestMetadata: {
       ipAddress: '198.51.100.30',
       userAgent: 'HarmoniarrDiscoveryWorkerTest/1.0',
     },
     runId: 'run-3',
     triggeredByUserId: 'user-2',
-  });
+  })).completion;
 
   const completionArgs = await completion;
   const releasedLeaseArgs = await leaseReleased;
@@ -163,7 +162,7 @@ test('createLibraryDiscoveryWorker marks the run cancelled before dispatch when 
     });
   });
 
-  await worker.startWorkerRun({ runId: 'run-cancelled' });
+  await (await worker.startWorkerRun({ runId: 'run-cancelled' })).completion;
 
   const cancelledArgs = await cancelled;
   const releasedLeaseArgs = await leaseReleased;
@@ -232,7 +231,7 @@ test('createLibraryDiscoveryWorker requeues the run when a maintenance pause is 
     });
   });
 
-  await worker.startWorkerRun({ runId: 'run-paused' });
+  await (await worker.startWorkerRun({ runId: 'run-paused' })).completion;
 
   const pausedArgs = await paused;
   const releasedLeaseArgs = await leaseReleased;
@@ -291,7 +290,7 @@ test('createLibraryDiscoveryWorker calls pruneOldRuns after a completed run', as
     });
   });
 
-  await worker.startWorkerRun({ runId: 'run-prune-1' });
+  await (await worker.startWorkerRun({ runId: 'run-prune-1' })).completion;
   await pruned;
 
   assert.equal(pruneOldRuns.mock.callCount(), 1);
@@ -324,7 +323,7 @@ test('createLibraryDiscoveryWorker calls pruneOldRuns even when a run fails', as
     });
   });
 
-  await worker.startWorkerRun({ runId: 'run-prune-fail-1' });
+  await (await worker.startWorkerRun({ runId: 'run-prune-fail-1' })).completion;
   await pruned;
 
   assert.equal(pruneOldRuns.mock.callCount(), 1);
@@ -364,7 +363,7 @@ test('createLibraryDiscoveryWorker records monitored artist artwork prefetch fai
     });
   });
 
-  await worker.startWorkerRun({ runId: 'run-prefetch-warning' });
+  await (await worker.startWorkerRun({ runId: 'run-prefetch-warning' })).completion;
   const completionArgs = await completion;
 
   assert.equal(prefetchMonitoredArtistArtwork.mock.callCount(), 1);
