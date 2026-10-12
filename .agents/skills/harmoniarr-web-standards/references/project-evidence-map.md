@@ -1,5 +1,18 @@
 # Project standards-to-evidence map
 
+Track consent: metadata/operator-track-consent-policy.js derives a positive
+resolved override for the current target, retaining null group scope and refusing
+another edition. operator-artist-effective-state.js keeps descriptive counts and
+adds resolvedDesiredCount. The desired-state planner requires a positive safe
+integer count, with no old-count fallback. Execution, Wanted projection and SQL
+publication rederive the same meaning from saved source. Manual release choices
+stay independent; suppression cannot grant an exception or silently veto other
+consent. The dedicated design/research/outcome own normal and forged native
+cases and the shared owned worker fixture. Track identity syntax and declared
+resolved status do not establish catalog membership or filtered acquisition;
+trace source scope through request evidence and candidate/import owners before
+claiming either.
+
 Monitoring opt-out: metadata/operator-artist-desired-state-service.js owns broad
 policy eligibility, reused by reconciliation execution, library Wanted projection
 and operator-reconciliation-publication-service.js. Require isMonitored exactly

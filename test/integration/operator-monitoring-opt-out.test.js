@@ -9,18 +9,13 @@ import assert from 'node:assert/strict';
 import { after, before, suite, test } from 'node:test';
 import { createOperatorArtistSaveService } from '../../src/server/metadata/operator-artist-save-service.js';
 import { defaultOperatorArtistMonitoringPolicy } from '../../src/server/metadata/operator-artist-monitoring-policy.js';
-import { createOperatorArtistReconciliationWorker } from '../../src/server/metadata/operator-artist-reconciliation-worker.js';
-import { createOperatorArtistReconciliationExecutionService } from '../../src/server/metadata/operator-artist-reconciliation-execution-service.js';
-import { createOperatorArtistReconciliationRequestService } from '../../src/server/metadata/operator-artist-reconciliation-request-service.js';
-import { createOperatorArtistReconciliationRunStore } from '../../src/server/metadata/operator-artist-reconciliation-run-store.js';
-import { createLibraryDiscoveryRequestService } from '../../src/server/library/library-discovery-request-service.js';
 import { createLibraryWantedReleaseReader } from '../../src/server/library/library-wanted-release-reader.js';
-import { createOperationQueueStore } from '../../src/server/operation-queue-store.js';
 import { createDatabaseTransactionRunner } from '../../src/server/database-transaction-service.js';
 import { createPostgresIntegrationRuntime } from '../../testing/postgres-integration-runtime.js';
 import { withIntegrationApp } from '../../testing/integration/app-runtime.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
-import { readOperatorReconciliationLifetimeState, seedOperatorReconciliationLifetimeRun } from '../../testing/integration/operator-reconciliation-lifetime-fixture.js';
+import { seedOperatorReconciliationLifetimeRun } from '../../testing/integration/operator-reconciliation-lifetime-fixture.js';
+import { executeOperatorReconciliationFixtureRun } from '../../testing/integration/operator-reconciliation-execution-fixture.js';
 import { saveNewOperatorPolicy } from '../../testing/integration/operator-reconciliation-authority-fixture.js';
 
 const config = resolveIntegrationTestRuntimeConfig();
@@ -38,36 +33,8 @@ suite('Operator monitoring opt-out at request publication', () => {
   });
 
   async function executeRun(run, { forgeEligibility = false } = {}) {
-    const requests = createOperatorArtistReconciliationRequestService({
-      reconcileDiscoveryRequests: createLibraryDiscoveryRequestService().reconcileDiscoveryRequests,
-    });
-    let captured;
-    const execution = createOperatorArtistReconciliationExecutionService({
-      operatorArtistReconciliationRequestService: {
-        materializeDesiredReleaseRequests: async input => {
-          captured = structuredClone(input.publicationSource);
-          const desiredReleases = forgeEligibility
-            ? input.desiredReleases.map(release => ({ ...release, eligibleForDownstreamWork: true }))
-            : input.desiredReleases;
-          return requests.materializeDesiredReleaseRequests({ ...input, desiredReleases });
-        },
-      },
-    });
-    const worker = createOperatorArtistReconciliationWorker({
-      ...createOperatorArtistReconciliationRunStore(),
-      executeOperatorArtistReconciliation: execution.executeOperatorArtistReconciliation,
-    });
-    try {
-      const claimed = await createOperationQueueStore().claimNextRunnableRun({
-        operationTypes: ['operator_artist_reconciliation'],
-      });
-      assert.equal(claimed.id, run.id);
-      const { completion } = await worker.startWorkerRun({ ...run, runId: run.id });
-      await completion;
-    } finally {
-      await worker.close();
-    }
-    return { captured, state: await readOperatorReconciliationLifetimeState(run.id) };
+    return executeOperatorReconciliationFixtureRun(run, { transformDesiredReleases: releases =>
+      forgeEligibility ? releases.map(release => ({ ...release, eligibleForDownstreamWork: true })) : releases });
   }
 
   for (const forgeEligibility of [false, true]) {

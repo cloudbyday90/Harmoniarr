@@ -5,6 +5,19 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+Track-consent validation must distinguish suppression and declared resolved
+desire, remap review/orphan state, and binding to the selected edition. Keep
+descriptive counts while deriving resolvedDesiredCount; old total/desired counts
+cannot grant a fallback exception. Native saves must use valid identities and
+current revision, read Wanted on an owned transaction, and inspect durable
+requests/events/discovery after actual completion/close. Forge eligibility and
+explicit flags against unchanged suppression source to test the SQL guard.
+Preserve bound/unbound desired intent, independent manual release selection and
+normal broad policy. Reuse operator-reconciliation-execution-fixture.js for these
+owners; claim completion alone is insufficient. See
+`docs/OPERATOR_TRACK_CONSENT_OUTCOME.md`. Declared remap state is not live catalog
+membership or downstream per-track enforcement; trace those separately.
+
 Monitoring opt-out tests must save false through the canonical save and execute
 the queued current snapshot, awaiting actual worker completion/close before
 reading durable request/event/discovery rows. A forged eligible flag against
@@ -14,8 +27,8 @@ request preservation and primary blocker counts. Keep normal save validation:
 explicit selections/overrides require monitoring; nonempty release types are
 required. Build Wanted readers on an owned transaction queryable. Preserve the
 initial red reproduction and fixture corrections separately from final proof.
-See `docs/OPERATOR_MONITORING_OPT_OUT_OUTCOME.md`. A suppression-only override
-probe identifies a later consent question; it does not prove that native path.
+See `docs/OPERATOR_MONITORING_OPT_OUT_OUTCOME.md` for that slice's evidence;
+the subsequent track-consent outcome owns the native suppression reproduction.
 
 Metadata source writer tests should hold publication after its final check,
 observe real PostgreSQL blocking for absent selection/override/snapshot and

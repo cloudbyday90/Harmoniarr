@@ -1,5 +1,12 @@
 # Practical web standards skill outcome
 
+October 12 track-consent references locate the narrow policy, effective target
+summary, three eligibility consumers and shared native worker owner. The
+[track-consent outcome](OPERATOR_TRACK_CONSENT_OUTCOME.md) owns saved suppression,
+forged flags, valid positive intent and broad/manual independence evidence.
+Structural validators and installed hashes verify this maintenance; no new blind
+trial, invocation-policy expansion or standards conformance claim follows.
+
 October 12 opt-out references locate the shared planner, three consumers,
 canonical save validation and real current-target publication. The
 [opt-out outcome](OPERATOR_MONITORING_OPT_OUT_OUTCOME.md) owns executed saved

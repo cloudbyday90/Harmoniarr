@@ -1,5 +1,17 @@
 # Official practices by boundary
 
+October 12 track-consent guidance uses
+docs/OPERATOR_TRACK_CONSENT_RESEARCH_2026_10.md. OWASP least privilege/default
+denial and server-owned significant transaction data inform deriving exceptions
+from saved positive polarity, declared resolved remap state and current target.
+Do not trust a caller's eligibility/explicit flags or unrelated override counts.
+Retain PostgreSQL cooperative locks and node-postgres single-client ownership;
+these protect a different invariant from the consent predicate. WCAG 2.2 labels
+and programmatic status inform future rendered explanations of desired,
+suppressed and review-needed state, not backend certification. Null group scope
+is an existing project contract, not a rule from a standard. Live catalog
+membership and downstream per-track scope need their own evidence.
+
 October 12 monitoring opt-out guidance uses
 docs/OPERATOR_MONITORING_OPT_OUT_RESEARCH_2026_10.md. OWASP default denial and
 per-operation checks inform positive broad-policy consent at both planning and

@@ -16,6 +16,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { isResolvedDesiredTrackOverrideForRelease } from './operator-track-consent-policy.js';
+
 export function normalizeReleaseGroupPrimaryType(primaryType) {
   if (typeof primaryType !== 'string' || primaryType.trim().length === 0) {
     return 'other';
@@ -52,8 +54,10 @@ function createOverrideBucketsByReleaseGroup(trackOverrides = []) {
   return buckets;
 }
 
-export function summarizeTrackOverrides(trackOverrides = []) {
+export function summarizeTrackOverrides(trackOverrides = [], metadataReleaseId = null) {
   const desiredCount = trackOverrides.filter((trackOverride) => trackOverride.isDesired === true).length;
+  const resolvedDesiredCount = trackOverrides.filter((trackOverride) =>
+    isResolvedDesiredTrackOverrideForRelease(trackOverride, metadataReleaseId)).length;
   const suppressedCount = trackOverrides.filter((trackOverride) => trackOverride.isDesired === false).length;
   const reviewNeededCount = trackOverrides.filter((trackOverride) => trackOverride.remapStatus === 'review_needed').length;
   const orphanedCount = trackOverrides.filter((trackOverride) => trackOverride.remapStatus === 'orphaned').length;
@@ -62,6 +66,7 @@ export function summarizeTrackOverrides(trackOverrides = []) {
     desiredCount,
     orphanedCount,
     reviewNeededCount,
+    resolvedDesiredCount,
     suppressedCount,
     totalCount: trackOverrides.length,
   };
@@ -133,7 +138,7 @@ export function buildOperatorArtistEffectiveReleaseGroups({
         selectionOrigin: selectionState.selectionOrigin,
         selectionSource: selectionState.selectionSource,
         selectionState: selectionState.selectionState,
-        trackOverrideSummary: summarizeTrackOverrides(releaseGroupTrackOverrides),
+        trackOverrideSummary: summarizeTrackOverrides(releaseGroupTrackOverrides, resolvedRelease?.id),
       },
     };
   });

@@ -6,6 +6,31 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Operator track acquisition consent (2026-10-12)
+
+- Reproduce valid saved suppression/unresolved/other-edition exceptions and
+  forged flags. Add a narrow ESM positive/resolved/current-target policy and
+  effective resolvedDesiredCount, preserving descriptive counts and null group
+  scope. Shared planning, Wanted and final publication agree without old-count
+  fallback. Manual release intent and ordinary broad policy stay independent.
+  See [design](OPERATOR_TRACK_CONSENT_DESIGN.md),
+  [research](OPERATOR_TRACK_CONSENT_RESEARCH_2026_10.md) and
+  [outcome](OPERATOR_TRACK_CONSENT_OUTCOME.md).
+- Final focused 286/286 across 38 files; complete fast 9,912 plus both builds;
+  affected native 71/71 across eleven files, including nine new consent cases.
+  Zero final failures/cancellations/skips. Preserve 3/9 native and selected 0/2
+  request-publication red diagnostics separately. Reuse the real worker fixture;
+  no weakened bounds, exhaustive-native or speedup claim.
+- Standards/testing skills pass structural checks and installed standards hashes;
+  dependency audit reports zero vulnerabilities. The
+  [PR assessment](OPEN_PR_APPLICABILITY_TRACK_CONSENT_2026_10_OUTCOME.md)
+  finds no eligible unreplayed revision; main only, no release or merge.
+- Next: validate resolved identities against the current track catalog and trace
+  selected track scope through discovery, candidates and import verification.
+  Saved syntax/remap flags are not membership proof; current reconciliation
+  publishes release requests with snapshot references. Reproduce actual downstream
+  behavior before changing it, preserving recipient/link-owned quality rules.
+
 ## Completed slice: Operator monitoring opt-out (2026-10-12)
 
 - Reproduce acquisition after a canonical saved opt-out, then require positive

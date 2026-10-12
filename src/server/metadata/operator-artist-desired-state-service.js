@@ -78,8 +78,9 @@ export function createOperatorArtistDesiredStateService({
         incrementCount(summary, 'partialDesiredReleaseCount');
       }
 
+      const resolvedDesiredTrackCount = operatorState.trackOverrideSummary?.resolvedDesiredCount;
       const isExplicitSelection = operatorState.isExplicitSelection === true
-        || (operatorState.trackOverrideSummary?.totalCount ?? 0) > 0;
+        || (Number.isSafeInteger(resolvedDesiredTrackCount) && resolvedDesiredTrackCount > 0);
       if (isExplicitSelection) {
         incrementCount(summary, 'explicitDesiredReleaseCount');
       } else {

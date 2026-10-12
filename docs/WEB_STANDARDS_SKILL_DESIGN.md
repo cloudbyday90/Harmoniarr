@@ -1,5 +1,12 @@
 # Practical web standards skill design
 
+October 12 track-consent maintenance maps OWASP positive grants and protected
+transaction data to the saved override/target predicate and final SQL recheck.
+The [track-consent design](OPERATOR_TRACK_CONSENT_DESIGN.md) compares options and
+owns counter semantics. References separate declared remap state, actual catalog
+membership and downstream scope, with native fixtures owning durable evidence.
+This extends concrete references with existing skill metadata/invocation policy.
+
 October 12 monitoring maintenance connects OWASP default denial to shared
 eligibility and PostgreSQL publication rechecks. References distinguish broad
 monitoring from explicit intent and actual actor authorization. The

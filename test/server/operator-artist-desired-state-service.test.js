@@ -41,7 +41,7 @@ test('default monitoring policy blocks automation while positive monitoring perm
 for (const operatorState of [
   { isExplicitSelection: true, selectionState: 'selected', selectionOrigin: 'manual_inclusion' },
   { isExplicitSelection: true, selectionState: 'partial', selectionOrigin: 'manual_inclusion' },
-  { selectionState: 'partial', trackOverrideSummary: { totalCount: 1 } },
+  { selectionState: 'partial', trackOverrideSummary: { totalCount: 1, resolvedDesiredCount: 1 } },
 ]) {
   test(`explicit ${operatorState.selectionState} intent retains its broad-policy exception (${operatorState.isExplicitSelection ? 'release' : 'track override'})`, () => {
     const plan = createOperatorArtistDesiredStateService().buildDesiredStatePlan({
