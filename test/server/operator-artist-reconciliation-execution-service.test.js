@@ -85,6 +85,7 @@ test('executeOperatorArtistReconciliation loads the saved snapshot and summarize
       }],
     }),
     getOperatorArtistMonitoring: async () => ({
+      isMonitored: true,
       monitoredReleaseGroupTypes: ['album', 'ep'],
       selectionSourceMode: 'policy_only',
       wantedAutomationMode: 'future_matching',
@@ -155,6 +156,33 @@ test('executeOperatorArtistReconciliation loads the saved snapshot and summarize
   assert.equal(result.activeRequestBlockedCount, 1);
   assert.equal(result.explicitDesiredReleaseCount, 1);
   assert.equal(result.policyDesiredReleaseCount, 1);
+});
+
+test('execution reports unmonitored policy blocks without eligible acquisition targets', async () => {
+  const fixture = createReconciliationPublicationFixture();
+  let materialized;
+  const service = createOperatorArtistReconciliationExecutionService({
+    getMetadataArtist: async () => fixture.artistPayload,
+    getOperatorArtistMonitoring: async () => ({ ...fixture.monitoring, isMonitored: false }),
+    getOperatorArtistReconciliationSnapshotById: async () => fixture.input.publicationSource.snapshot,
+    listOperatorReleaseGroupSelections: async () => [], listOperatorTrackOverrides: async () => [],
+    listActiveRequestsByMetadataReleaseIds: async () => [],
+    listLibraryReleaseReconciliationsByMetadataReleaseIds: async () => [],
+    listDiscoveryRequestsByMetadataReleaseIds: async () => [],
+    operatorArtistReconciliationRequestService: {
+      materializeDesiredReleaseRequests: async input => {
+        materialized = input;
+        return { createdRequestCount: 0, createdRequestIds: [], duplicateSuppressedCount: 0, skippedRequestCount: 1 };
+      },
+    },
+  });
+  const result = await service.executeOperatorArtistReconciliation(fixture.input);
+  assert.equal(materialized.desiredReleases[0].blockReason, 'artist_unmonitored');
+  assert.equal(materialized.desiredReleases[0].eligibleForDownstreamWork, false);
+  assert.equal(result.unmonitoredBlockedCount, 1);
+  assert.equal(result.downstreamEligibleReleaseCount, 0);
+  assert.equal(result.policyDesiredReleaseCount, 1);
+  assert.equal(result.downstreamCreatedRequestCount, 0);
 });
 
 test('executeOperatorArtistReconciliation rejects missing saved snapshots', async () => {

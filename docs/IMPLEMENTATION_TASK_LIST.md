@@ -6,6 +6,31 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Operator monitoring opt-out (2026-10-12)
+
+- Reproduce acquisition after a canonical saved opt-out, then require positive
+  monitoring in shared policy eligibility and forward its primary blocker count.
+  Execution, Wanted projection and guarded publication agree; caller-forged
+  eligibility against unchanged unmonitored source refuses. Explicit monitored
+  consent and existing requests retain their behavior. See
+  [design](OPERATOR_MONITORING_OPT_OUT_DESIGN.md),
+  [research](OPERATOR_MONITORING_OPT_OUT_RESEARCH_2026_10.md) and
+  [outcome](OPERATOR_MONITORING_OPT_OUT_OUTCOME.md).
+- Focused 258/258 across 37 files; complete fast 9,884 plus both builds;
+  affected native 61/61 across nine files. Final gates have zero failures,
+  cancellations/skips. Retain pre-fix 1/4 native and focused fixture corrections
+  separately; no deadline/pool/assertion changes or exhaustive native claim.
+- Standards/testing skill structure and installed standards hashes pass;
+  dependency audit reports zero vulnerabilities. The
+  [fresh PR assessment](OPEN_PR_APPLICABILITY_MONITORING_OPT_OUT_2026_10_OUTCOME.md)
+  finds no eligible unreplayed revision. Main only, no release or merge.
+- Next: trace override polarity/remap state before granting explicit-policy
+  exceptions. A suppression-only planner probe produces an eligible release
+  under manual-only/track-only policy, with no explicit release selection and
+  zero desired tracks. Reproduce valid saved consent through native consumers
+  before changing that contract. Reader coordination/catalog partitioning stay
+  later work; historical unrelated SQL-reset causes remain unconfirmed.
+
 ## Completed slice: Metadata source writer coordination (2026-10-12)
 
 - Reproduce an original unscoped selection insert after final publication check.

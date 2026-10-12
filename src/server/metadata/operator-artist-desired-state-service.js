@@ -60,6 +60,7 @@ export function createOperatorArtistDesiredStateService({
       policyDesiredReleaseCount: 0,
       queuedDiscoveryCount: 0,
       trackOnlyBlockedCount: 0,
+      unmonitoredBlockedCount: 0,
       unresolvedReleaseCount: 0,
     };
 
@@ -131,6 +132,9 @@ export function createOperatorArtistDesiredStateService({
       } else if (discoveryRequest?.requestStatus === 'ready' || discoveryRequest?.requestStatus === 'blocked') {
         incrementCount(summary, 'queuedDiscoveryCount');
         blockReason = 'discovery_request_exists';
+      } else if (!isExplicitSelection && monitoring.isMonitored !== true) {
+        incrementCount(summary, 'unmonitoredBlockedCount');
+        blockReason = 'artist_unmonitored';
       } else if (!isExplicitSelection && monitoring.releaseScope === 'track_only') {
         incrementCount(summary, 'trackOnlyBlockedCount');
         blockReason = 'track_only_scope';

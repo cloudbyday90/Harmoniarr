@@ -1,5 +1,18 @@
 # Project standards-to-evidence map
 
+Monitoring opt-out: metadata/operator-artist-desired-state-service.js owns broad
+policy eligibility, reused by reconciliation execution, library Wanted projection
+and operator-reconciliation-publication-service.js. Require isMonitored exactly
+true for policy-derived automation and expose unmonitoredBlockedCount in the run
+summary. Existing durable blockers retain precedence; the count is not every
+possible denial. Keep explicit release and existing track-override exceptions
+distinct from product actor authorization. The save service still rejects
+explicit selections/overrides with monitoring false, and manual drafts enable it.
+The opt-out design/research/outcome document native saved-intent and forged-flag
+evidence, explicit monitored consent and existing-request preservation. An
+override's mere presence is not proof of positive consent: trace polarity/remap
+state separately before changing this existing exception.
+
 Paths below are in the active Harmoniarr repository, not bundled skill files.
 Inspect current source; the map locates owners and does not replace source
 tracing. Read the relevant boundary only.

@@ -1,5 +1,16 @@
 # Official practices by boundary
 
+October 12 monitoring opt-out guidance uses
+docs/OPERATOR_MONITORING_OPT_OUT_RESEARCH_2026_10.md. OWASP default denial and
+per-operation checks inform positive broad-policy consent at both planning and
+the protected write. PostgreSQL 18 Read Committed and cooperative transaction
+locks remain separate from the planner's decision; node-postgres requires the
+same client. WCAG 2.2 is a December 12, 2024 W3C Recommendation: predictable
+input/context and programmatic status feedback apply to a future rendered
+opt-out explanation, not a backend conformance claim. Keep saved monitoring,
+explicit intent and existing requests distinct. Native tests own durability;
+pure policy probes cannot establish whole-flow behavior or cancellation.
+
 Consulted October 3, 2026. URLs were discovered through web search, official
 navigation, and GitHub MCP and opened for review. Revalidate changing guidance
 when applying this reference. Read only the rows relevant to the requested work.

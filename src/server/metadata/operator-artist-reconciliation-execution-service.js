@@ -267,6 +267,7 @@ export function createOperatorArtistReconciliationExecutionService({
       trackOnlyBlockedCount: desiredStatePlan.summary.trackOnlyBlockedCount,
       trackOverrideCount: publicationSource.trackOverrides.length,
       unselectedReleaseGroupCount,
+      unmonitoredBlockedCount: desiredStatePlan.summary.unmonitoredBlockedCount,
       unresolvedReleaseCount: desiredStatePlan.summary.unresolvedReleaseCount,
       wantedAutomationMode: publicationSource.monitoring?.wantedAutomationMode ?? null,
     };

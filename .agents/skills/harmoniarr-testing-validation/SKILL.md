@@ -5,6 +5,18 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+Monitoring opt-out tests must save false through the canonical save and execute
+the queued current snapshot, awaiting actual worker completion/close before
+reading durable request/event/discovery rows. A forged eligible flag against
+unchanged unmonitored source must also refuse in the real publication transaction.
+Check direct Wanted projection, positive monitored explicit consent, existing
+request preservation and primary blocker counts. Keep normal save validation:
+explicit selections/overrides require monitoring; nonempty release types are
+required. Build Wanted readers on an owned transaction queryable. Preserve the
+initial red reproduction and fixture corrections separately from final proof.
+See `docs/OPERATOR_MONITORING_OPT_OUT_OUTCOME.md`. A suppression-only override
+probe identifies a later consent question; it does not prove that native path.
+
 Metadata source writer tests should hold publication after its final check,
 observe real PostgreSQL blocking for absent selection/override/snapshot and
 catalog/bulk writers, then drain both publication and writer before teardown.

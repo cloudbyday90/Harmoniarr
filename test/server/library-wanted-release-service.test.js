@@ -112,6 +112,20 @@ test('wanted-release projection uses effective desired state and retains explici
   }]);
 });
 
+for (const monitoring of [undefined, { isMonitored: false, monitoredReleaseGroupTypes: ['album'] }]) {
+  test(`direct Wanted projection blocks unmonitored policy and retains explicit intent (${monitoring ? 'saved' : 'default'})`, () => {
+    const wantedReleases = buildLibraryWantedReleaseProjection({
+      appUserId: 'user-1', artistPayload: buildArtistPayload(), monitoring,
+      releaseGroupSelections: [{ metadataReleaseGroupId: 'group-manual',
+        resolvedMetadataReleaseId: 'release-manual', selectionOrigin: 'manual_inclusion',
+        selectionSource: 'manual', selectionState: 'partial' }],
+    });
+    assert.deepEqual(wantedReleases.map(release => release.metadataReleaseId), ['release-manual']);
+    assert.equal(wantedReleases[0].evidence.selectionState, 'partial');
+    assert.equal(wantedReleases[0].evidence.selectionSource, 'manual');
+  });
+}
+
 test('wanted-release projection retains eligible policy selections and reports partial coverage from reconciliation', () => {
   const wantedReleases = buildLibraryWantedReleaseProjection({
     appUserId: 'user-1',

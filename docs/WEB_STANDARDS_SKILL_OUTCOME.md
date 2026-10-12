@@ -1,5 +1,14 @@
 # Practical web standards skill outcome
 
+October 12 opt-out references locate the shared planner, three consumers,
+canonical save validation and real current-target publication. The
+[opt-out outcome](OPERATOR_MONITORING_OPT_OUT_OUTCOME.md) owns executed saved
+intent, forged eligibility, explicit consent and preservation evidence. Polarity
+of a track override remains a separately identified follow-up. Skill metadata
+and invocation policy retain their existing contract; source/installed structure
+and hash checks validate maintenance without a new blind trial or conformance
+claim.
+
 Status: Created, installed, structurally validated, and independently trialed
 Recorded: October 3, 2026
 Design: [WEB_STANDARDS_SKILL_DESIGN.md](WEB_STANDARDS_SKILL_DESIGN.md)

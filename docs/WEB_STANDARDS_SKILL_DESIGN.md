@@ -1,5 +1,13 @@
 # Practical web standards skill design
 
+October 12 monitoring maintenance connects OWASP default denial to shared
+eligibility and PostgreSQL publication rechecks. References distinguish broad
+monitoring from explicit intent and actual actor authorization. The
+[opt-out design](OPERATOR_MONITORING_OPT_OUT_DESIGN.md) owns alternatives and
+native evidence requirements. WCAG input/status recommendations are mapped to
+future rendered feedback; backend counters alone cannot prove them. This is
+concrete reference maintenance with existing skill metadata/invocation policy.
+
 Status: Accepted for implementation
 Research date: October 3, 2026
 

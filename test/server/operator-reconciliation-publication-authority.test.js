@@ -13,6 +13,19 @@ import { captureReconciliationPublication, captureReconciliationPublicationSourc
 import { createOperatorArtistReconciliationRequestService } from '../../src/server/metadata/operator-artist-reconciliation-request-service.js';
 import { createReconciliationPublicationFixture } from '../../testing/operator-reconciliation-publication-fixtures.js';
 
+test('publication refuses forged eligibility against unchanged unmonitored source', async () => {
+  const { input, authority, desiredRelease } = createReconciliationPublicationFixture();
+  input.publicationSource = structuredClone(input.publicationSource);
+  input.publicationSource.monitoring.isMonitored = false;
+  const guard = createOperatorReconciliationPublicationService({ store: {
+    lockContext: async () => {}, readSource: async () => input.publicationSource,
+    readAuthority: async () => authority,
+  } });
+  assert.equal(desiredRelease.eligibleForDownstreamWork, true);
+  await assert.rejects(guard.assertCurrent({ prepared: guard.capture(input), desiredRelease,
+    artistName: input.artistName, queryable: {} }), { code: 'operator_artist_reconciliation_publication_stale' });
+});
+
 for (const invalid of [undefined, null, {}, { operationType: 'metadata_artist_refresh' }]) {
   test(`missing or invalid acquisition ${JSON.stringify(invalid)} refuses before checkout`, async () => {
     const fixture = createReconciliationPublicationFixture(); const service = createOperatorArtistReconciliationRequestService({ getPoolFn: () => assert.fail('invalid publication must not checkout') });
