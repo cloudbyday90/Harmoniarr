@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createMetadataSourceWriteService } from './metadata-source-write-service.js';
 import { getPool } from '../database.js';
 import {
   deleteMetadataMediaByReleaseId,
@@ -70,28 +71,16 @@ async function insertProviderSnapshots(providerSnapshots, entityIds, client) {
 }
 
 export function createMetadataService({ pool = getPool() } = {}) {
-  async function withTransaction(work) {
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      const result = await work(client);
-      await client.query('COMMIT');
-      return result;
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
-  }
+  const { withExclusiveWrite: withTransaction } = createMetadataSourceWriteService({ getPoolFn: () => pool });
 
   async function storeArtist({ artist, aliases = [], providerSnapshots = [] }) {
     assertObject(artist, 'artist');
 
+    const acceptedInput = structuredClone({ artist, aliases, providerSnapshots });
     return withTransaction(async (client) => {
-      const storedArtist = await upsertMetadataArtist(artist, client);
-      await replaceMetadataArtistAliases(storedArtist.id, normalizeArray(aliases), client);
-      await insertProviderSnapshots(providerSnapshots, {
+      const storedArtist = await upsertMetadataArtist(acceptedInput.artist, client);
+      await replaceMetadataArtistAliases(storedArtist.id, normalizeArray(acceptedInput.aliases), client);
+      await insertProviderSnapshots(acceptedInput.providerSnapshots, {
         artistId: storedArtist.id,
         defaultEntityId: storedArtist.id,
       }, client);
@@ -109,19 +98,20 @@ export function createMetadataService({ pool = getPool() } = {}) {
     assertObject(artist, 'artist');
     assertObject(releaseGroup, 'releaseGroup');
 
+    const acceptedInput = structuredClone({ artist, aliases, releaseGroup, providerSnapshots });
     return withTransaction(async (client) => {
-      const storedArtist = await upsertMetadataArtist(artist, client);
-      await replaceMetadataArtistAliases(storedArtist.id, normalizeArray(aliases), client);
+      const storedArtist = await upsertMetadataArtist(acceptedInput.artist, client);
+      await replaceMetadataArtistAliases(storedArtist.id, normalizeArray(acceptedInput.aliases), client);
 
       const storedReleaseGroup = await upsertMetadataReleaseGroup(
         {
-          ...releaseGroup,
+          ...acceptedInput.releaseGroup,
           metadataArtistId: storedArtist.id,
         },
         client,
       );
 
-      await insertProviderSnapshots(providerSnapshots, {
+      await insertProviderSnapshots(acceptedInput.providerSnapshots, {
         artistId: storedArtist.id,
         releaseGroupId: storedReleaseGroup.id,
         defaultEntityId: storedReleaseGroup.id,
@@ -146,13 +136,14 @@ export function createMetadataService({ pool = getPool() } = {}) {
     assertObject(releaseGroup, 'releaseGroup');
     assertObject(release, 'release');
 
+    const acceptedInput = structuredClone({ artist, aliases, releaseGroup, release, media, providerSnapshots });
     return withTransaction(async (client) => {
-      const storedArtist = await upsertMetadataArtist(artist, client);
-      await replaceMetadataArtistAliases(storedArtist.id, normalizeArray(aliases), client);
+      const storedArtist = await upsertMetadataArtist(acceptedInput.artist, client);
+      await replaceMetadataArtistAliases(storedArtist.id, normalizeArray(acceptedInput.aliases), client);
 
       const storedReleaseGroup = await upsertMetadataReleaseGroup(
         {
-          ...releaseGroup,
+          ...acceptedInput.releaseGroup,
           metadataArtistId: storedArtist.id,
         },
         client,
@@ -160,7 +151,7 @@ export function createMetadataService({ pool = getPool() } = {}) {
 
       const storedRelease = await upsertMetadataRelease(
         {
-          ...release,
+          ...acceptedInput.release,
           metadataReleaseGroupId: storedReleaseGroup.id,
         },
         client,
@@ -168,7 +159,7 @@ export function createMetadataService({ pool = getPool() } = {}) {
 
       await deleteMetadataMediaByReleaseId(storedRelease.id, client);
 
-      for (const medium of normalizeArray(media)) {
+      for (const medium of normalizeArray(acceptedInput.media)) {
         assertObject(medium, 'media entry');
         const storedMedium = await insertMetadataMedium(
           {
@@ -206,7 +197,7 @@ export function createMetadataService({ pool = getPool() } = {}) {
         }
       }
 
-      await insertProviderSnapshots(providerSnapshots, {
+      await insertProviderSnapshots(acceptedInput.providerSnapshots, {
         artistId: storedArtist.id,
         releaseGroupId: storedReleaseGroup.id,
         releaseId: storedRelease.id,

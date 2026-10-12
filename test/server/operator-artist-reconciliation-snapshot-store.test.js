@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createMetadataWritePool, metadataDomainCalls } from '../../testing/metadata/metadata-write-fixtures.js';
 import {
   createOperatorArtistReconciliationSnapshotStore,
 } from '../../src/server/metadata/operator-artist-reconciliation-snapshot-store.js';
@@ -16,7 +17,7 @@ test('getLatestOperatorArtistReconciliationSnapshot returns the newest snapshot 
       updated_at: new Date('2026-05-25T12:05:00.000Z'),
     }],
   }));
-  const store = createOperatorArtistReconciliationSnapshotStore({ getPoolFn: () => ({ query }) });
+  const store = createOperatorArtistReconciliationSnapshotStore({ getPoolFn: () => createMetadataWritePool(query) });
 
   const result = await store.getLatestOperatorArtistReconciliationSnapshot({
     appUserId: 'user-1',
@@ -61,7 +62,7 @@ test('getOperatorArtistReconciliationSnapshotById returns the requested snapshot
       updated_at: new Date('2026-05-25T12:06:00.000Z'),
     }],
   }));
-  const store = createOperatorArtistReconciliationSnapshotStore({ getPoolFn: () => ({ query }) });
+  const store = createOperatorArtistReconciliationSnapshotStore({ getPoolFn: () => createMetadataWritePool(query) });
 
   const result = await store.getOperatorArtistReconciliationSnapshotById({
     appUserId: 'user-1',
@@ -85,7 +86,7 @@ test('createOperatorArtistReconciliationSnapshot inserts the next revision and r
       updated_at: new Date('2026-05-25T12:10:00.000Z'),
     }],
   }));
-  const store = createOperatorArtistReconciliationSnapshotStore({ getPoolFn: () => ({ query }) });
+  const store = createOperatorArtistReconciliationSnapshotStore({ getPoolFn: () => createMetadataWritePool(query) });
 
   const result = await store.createOperatorArtistReconciliationSnapshot({
     appUserId: 'user-1',
@@ -93,11 +94,12 @@ test('createOperatorArtistReconciliationSnapshot inserts the next revision and r
     snapshotPayload: { mode: 'save', selectedReleaseCount: 5 },
   });
 
+  const domainCalls = metadataDomainCalls(query);
   assert.match(
-    query.mock.calls[0].arguments[0],
+    domainCalls[0].arguments[0],
     /COALESCE\(MAX\(snapshot_revision\), 0\) \+ 1 AS snapshot_revision/,
   );
-  assert.deepEqual(query.mock.calls[0].arguments[1], [
+  assert.deepEqual(domainCalls[0].arguments[1], [
     'user-1',
     'artist-1',
     '{"mode":"save","selectedReleaseCount":5}',
@@ -117,7 +119,7 @@ test('listOperatorArtistReconciliationSnapshots filters by owner context when re
       updated_at: new Date('2026-05-25T12:05:00.000Z'),
     }],
   }));
-  const store = createOperatorArtistReconciliationSnapshotStore({ getPoolFn: () => ({ query }) });
+  const store = createOperatorArtistReconciliationSnapshotStore({ getPoolFn: () => createMetadataWritePool(query) });
 
   const result = await store.listOperatorArtistReconciliationSnapshots({
     appUserId: 'user-1',

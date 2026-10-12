@@ -59,7 +59,7 @@ test('compact artist projection inputs preserve complete multi-operator summarie
       for (const [number, remapStatus] of [[1, 'resolved'], [2, 'review_needed'], [5, 'orphaned']]) {
         await overrides.upsertOperatorTrackOverride({ appUserId: actor, metadataArtistId: artistId,
           metadataReleaseGroupId: groupId(number), trackMbid: randomUUID(), isDesired: index === 0,
-          remapStatus, queryable: pool });
+          remapStatus });
       }
     }
     // A desired canonical edition without a reconciliation row represents missing coverage.

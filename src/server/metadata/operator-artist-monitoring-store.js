@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createMetadataSourceWriteService } from './metadata-source-write-service.js';
 import { getPool } from '../database.js';
 import {
   defaultOperatorArtistMonitoringPolicy,
@@ -25,7 +26,8 @@ import {
 export function createOperatorArtistMonitoringStore({
   getPoolFn = getPool,
 } = {}) {
-  async function listOperatorMonitoredArtists({
+
+  const writes = createMetadataSourceWriteService({ getPoolFn });  async function listOperatorMonitoredArtists({
     appUserId,
     limit = 25,
     offset = 0,
@@ -124,50 +126,52 @@ export function createOperatorArtistMonitoringStore({
     selectionSourceMode,
     wantedAutomationMode,
   }) {
-    const queryTarget = queryable ?? getPoolFn();
-    await queryTarget.query(
-      `
-        INSERT INTO operator_artist_monitoring (
-          app_user_id,
-          metadata_artist_id,
-          is_monitored,
-          monitored_release_group_types,
-          release_scope,
-          wanted_automation_mode,
-          acquisition_profile_key,
-          search_on_add_mode,
-          selection_source_mode,
-          last_reconciled_at,
-          last_saved_snapshot_at,
-          updated_at
-        )
-        VALUES ($1, $2, $3, $4::text[], $5, $6, $7, $8, $9, $10::timestamptz, $11::timestamptz, NOW())
-        ON CONFLICT (app_user_id, metadata_artist_id) DO UPDATE
-        SET is_monitored = EXCLUDED.is_monitored,
-            monitored_release_group_types = EXCLUDED.monitored_release_group_types,
-            release_scope = EXCLUDED.release_scope,
-            wanted_automation_mode = EXCLUDED.wanted_automation_mode,
-            acquisition_profile_key = EXCLUDED.acquisition_profile_key,
-            search_on_add_mode = EXCLUDED.search_on_add_mode,
-            selection_source_mode = EXCLUDED.selection_source_mode,
-            last_reconciled_at = EXCLUDED.last_reconciled_at,
-            last_saved_snapshot_at = EXCLUDED.last_saved_snapshot_at,
-            updated_at = NOW()
-      `,
-      [
-        appUserId,
-        metadataArtistId,
-        isMonitored,
-        monitoredReleaseGroupTypes,
-        releaseScope,
-        wantedAutomationMode,
-        acquisitionProfileKey,
-        searchOnAddMode,
-        selectionSourceMode,
-        lastReconciledAt,
-        lastSavedSnapshotAt,
-      ],
-    );
+    const acceptedRows = structuredClone(monitoredReleaseGroupTypes);
+    return writes.withPolicyWrite({ appUserId, metadataArtistId, queryable }, async queryTarget => {
+      await queryTarget.query(
+        `
+          INSERT INTO operator_artist_monitoring (
+            app_user_id,
+            metadata_artist_id,
+            is_monitored,
+            monitored_release_group_types,
+            release_scope,
+            wanted_automation_mode,
+            acquisition_profile_key,
+            search_on_add_mode,
+            selection_source_mode,
+            last_reconciled_at,
+            last_saved_snapshot_at,
+            updated_at
+          )
+          VALUES ($1, $2, $3, $4::text[], $5, $6, $7, $8, $9, $10::timestamptz, $11::timestamptz, NOW())
+          ON CONFLICT (app_user_id, metadata_artist_id) DO UPDATE
+          SET is_monitored = EXCLUDED.is_monitored,
+              monitored_release_group_types = EXCLUDED.monitored_release_group_types,
+              release_scope = EXCLUDED.release_scope,
+              wanted_automation_mode = EXCLUDED.wanted_automation_mode,
+              acquisition_profile_key = EXCLUDED.acquisition_profile_key,
+              search_on_add_mode = EXCLUDED.search_on_add_mode,
+              selection_source_mode = EXCLUDED.selection_source_mode,
+              last_reconciled_at = EXCLUDED.last_reconciled_at,
+              last_saved_snapshot_at = EXCLUDED.last_saved_snapshot_at,
+              updated_at = NOW()
+        `,
+        [
+          appUserId,
+          metadataArtistId,
+          isMonitored,
+          acceptedRows,
+          releaseScope,
+          wantedAutomationMode,
+          acquisitionProfileKey,
+          searchOnAddMode,
+          selectionSourceMode,
+          lastReconciledAt,
+          lastSavedSnapshotAt,
+        ],
+      );
+    });
   }
 
   async function listOperatorArtistMonitoringSnapshot({ queryable = null } = {}) {
@@ -184,14 +188,11 @@ export function createOperatorArtistMonitoringStore({
   }
 
   async function replaceOperatorArtistMonitoringSnapshot({ operatorArtistMonitoring = [] } = {}) {
-    const pool = getPoolFn();
-    const client = await pool.connect();
-
-    try {
-      await client.query('BEGIN');
+    const acceptedRows = structuredClone(operatorArtistMonitoring);
+    return writes.withExclusiveWrite(async client => {
       await client.query('DELETE FROM operator_artist_monitoring');
 
-      for (const row of operatorArtistMonitoring) {
+      for (const row of acceptedRows) {
         await client.query(
           `
             INSERT INTO operator_artist_monitoring (
@@ -228,13 +229,7 @@ export function createOperatorArtistMonitoringStore({
         );
       }
 
-      await client.query('COMMIT');
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+    });
   }
 
   return {

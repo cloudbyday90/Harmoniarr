@@ -16,9 +16,12 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { lockMetadataSourceRead } from './metadata-source-lock-store.js';
+
 /** Transaction-only persistence for serializing and checking an operator artist save. */
 export function createOperatorArtistSaveStateStore() {
   async function lockOperatorArtistSave({ appUserId, metadataArtistId, client }) {
+    await lockMetadataSourceRead({ queryable: client });
     // PostgreSQL UUID casts canonicalize equivalent spellings before hashing.
     // Lock even when no monitoring or snapshot row exists yet. A hash collision
     // can only serialize unrelated saves; the revision query retains exact IDs.

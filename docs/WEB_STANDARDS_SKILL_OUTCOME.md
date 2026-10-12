@@ -623,6 +623,14 @@ owns executed native refusal, concurrency, partial-progress and cleanup evidence
 Source/installed structural and hash validation remain the publication checks;
 this introduces no new blind skill trial or broad conformance certification.
 
+Writer references locate source admission, scoped/bulk transaction owners and
+atomic canonical selection. They distinguish audited application participation
+from privileged SQL and prohibit late shared-to-exclusive upgrades. The
+[writer outcome](METADATA_SOURCE_WRITER_COORDINATION_OUTCOME.md) owns original
+unfenced insertion, actual blocking, independent-scope progress, capture and
+rollback evidence. Source/installed structural and hash checks remain publication
+verification; no new blind trial or broad standards certification is claimed.
+
 External-request discovery references locate approved intent/current target
 guards, candidate transaction/audit, actual completion and ten concrete app owners.
 The bounded dispatch harness awaits execution rather than polling terminal status.

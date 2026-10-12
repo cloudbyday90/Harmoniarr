@@ -5,6 +5,21 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+Metadata source writer tests should hold publication after its final check,
+observe real PostgreSQL blocking for absent selection/override/snapshot and
+catalog/bulk writers, then drain both publication and writer before teardown.
+Use an independent observer from owned connection config; normal read progress
+must not require a third app checkout. Verify a different operator scope can
+still progress, borrowed autocommit refuses, caller rollback owns borrowed work,
+and failed canonical setting restores the original winner. Capture DTO mutation
+during admission at the lowest owner. See
+`docs/METADATA_SOURCE_WRITER_COORDINATION_OUTCOME.md` for scope and gate evidence.
+
+The writer-coordination cohort also exposed two legacy fixtures borrowing a pool
+as an active transaction client. Keep autocommit refusal and correct their owner
+or let the store own the transaction; do not weaken the assertion. Retain the
+102/104 candidate and 2/2 focused correction separately from final native proof.
+
 For operator request publication, test actual SQL guards after planning, identity
 contention and event insertion, including latest save, changed policy/selection/
 override/catalog, lease replacement/clock expiry, disabled actor, cancellation,

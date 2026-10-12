@@ -18,6 +18,7 @@
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createMetadataWritePool, isMetadataDomainStatement } from '../../../testing/metadata/metadata-write-fixtures.js';
 import {
   selectCanonicalRelease,
   forceCanonicalRelease,
@@ -105,9 +106,9 @@ test('forceCanonicalRelease returns null when release is not found', async () =>
   const queryResults = [{ rows: [] }];
   let callIndex = 0;
   const pool = {
-    query: async () => queryResults[callIndex++],
+    query: async sql => isMetadataDomainStatement(sql) ? queryResults[callIndex++] : { rows: [] },
   };
-  const result = await forceCanonicalRelease('nonexistent-id', { getPoolFn: async () => pool });
+  const result = await forceCanonicalRelease('nonexistent-id', { getPoolFn: async () => createMetadataWritePool(pool.query) });
   assert.equal(result, null);
 });
 
@@ -116,21 +117,22 @@ test('forceCanonicalRelease clears old canonical and sets new one, returning rel
   const pool = {
     query: async (sql, params) => {
       queries.push({ sql: sql.trim(), params });
-      if (queries.length === 1) {
+      if (sql.includes('FROM metadata_releases')) {
         return { rows: [{ metadata_release_group_id: 'rg-42' }] };
       }
       return { rows: [] };
     },
   };
-  const result = await forceCanonicalRelease('release-7', { getPoolFn: async () => pool });
+  const result = await forceCanonicalRelease('release-7', { getPoolFn: async () => createMetadataWritePool(pool.query) });
 
+  const domainQueries = queries.filter(query => isMetadataDomainStatement(query.sql));
   assert.deepEqual(result, { releaseGroupId: 'rg-42' });
-  assert.equal(queries.length, 3);
-  assert.match(queries[0].sql, /SELECT.*metadata_release_group_id.*metadata_releases/s);
-  assert.match(queries[1].sql, /UPDATE metadata_releases SET is_canonical = FALSE/);
-  assert.deepEqual(queries[1].params, ['rg-42']);
-  assert.match(queries[2].sql, /UPDATE metadata_releases SET is_canonical = TRUE/);
-  assert.deepEqual(queries[2].params, ['release-7']);
+  assert.equal(domainQueries.length, 3);
+  assert.match(domainQueries[0].sql, /SELECT.*metadata_release_group_id.*metadata_releases/s);
+  assert.match(domainQueries[1].sql, /UPDATE metadata_releases SET is_canonical = FALSE/);
+  assert.deepEqual(domainQueries[1].params, ['rg-42']);
+  assert.match(domainQueries[2].sql, /UPDATE metadata_releases SET is_canonical = TRUE/);
+  assert.deepEqual(domainQueries[2].params, ['release-7']);
 });
 
 // ── markCanonicalRelease ──────────────────────────────────────────────────────
@@ -143,9 +145,9 @@ test('markCanonicalRelease is a no-op when release group has no releases', async
       return { rows: [] };
     },
   };
-  await markCanonicalRelease('rg-empty', { getPoolFn: async () => pool });
-  // Only the SELECT should be issued, no UPDATEs
-  assert.equal(queries.length, 1);
+  await markCanonicalRelease('rg-empty', { getPoolFn: async () => createMetadataWritePool(pool.query) });
+  assert.equal(queries.filter(query => isMetadataDomainStatement(query.sql)).length, 1);
+  assert.equal(queries.some(query => query.sql.includes('UPDATE metadata_releases')), false);
 });
 
 test('markCanonicalRelease runs two UPDATEs to persist the selected canonical', async () => {
@@ -157,15 +159,16 @@ test('markCanonicalRelease runs two UPDATEs to persist the selected canonical', 
   const pool = {
     query: async (sql, params) => {
       queries.push({ sql: sql.trim(), params });
-      if (queries.length === 1) return { rows: releaseRows };
+      if (sql.includes('FROM metadata_releases')) return { rows: releaseRows };
       return { rows: [] };
     },
   };
-  await markCanonicalRelease('rg-1', { getPoolFn: async () => pool });
+  await markCanonicalRelease('rg-1', { getPoolFn: async () => createMetadataWritePool(pool.query) });
 
-  assert.equal(queries.length, 3);
-  assert.match(queries[1].sql, /UPDATE metadata_releases SET is_canonical = FALSE/);
-  assert.match(queries[2].sql, /UPDATE metadata_releases SET is_canonical = TRUE/);
+  const domainQueries = queries.filter(query => isMetadataDomainStatement(query.sql));
+  assert.equal(domainQueries.length, 3);
+  assert.match(domainQueries[1].sql, /UPDATE metadata_releases SET is_canonical = FALSE/);
+  assert.match(domainQueries[2].sql, /UPDATE metadata_releases SET is_canonical = TRUE/);
   // r2 has earlier release_date so it should win
-  assert.deepEqual(queries[2].params, ['r2']);
+  assert.deepEqual(domainQueries[2].params, ['r2']);
 });

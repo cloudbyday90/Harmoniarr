@@ -583,6 +583,19 @@ returned catalog, wanted/queue/detection and scheduler work through lease cleanu
 W3C timing remains draft observation guidance, not a schedule-policy mandate.
 TC39 permits null rejection; preserve original failures while finishing cleanup.
 
+October 12 metadata-source writer guidance uses
+docs/METADATA_SOURCE_WRITER_COORDINATION_RESEARCH_2026_10.md. PostgreSQL advisory
+locks require application participation; transaction-level admission and UUID
+scope locks must precede source rows. Use shared admission for scoped policy
+writes/publication and exclusive admission at catalog/bulk entry. Do not upgrade
+an already shared/scoped transaction or infer that raw SQL/migrations cooperate.
+One owned or borrowed transaction client must cover replacement and canonical
+clearing/setting. A transaction-only assertion refuses autocommit before mutation;
+capture mutable DTOs before admission waits. W3C timing remains draft measurement
+guidance, separate from SQL lease authority. Native blocked-backend evidence uses
+an independent owned-config observer; keep application pool bounds, cancellation
+queryable forwarding, rollback and actual worker drainage intact.
+
 October 12 operator publication authority guidance uses
 docs/OPERATOR_RECONCILIATION_PUBLICATION_AUTHORITY_RESEARCH_2026_10.md. PostgreSQL
 18 locks and READ COMMITTED inform ordered scope/run/acquisition checks and

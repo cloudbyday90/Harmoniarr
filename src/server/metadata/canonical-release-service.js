@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createMetadataSourceWriteService } from './metadata-source-write-service.js';
 import { getPool } from '../database.js';
 
 /** Country preference order for tie-breaking canonical release selection. */
@@ -103,27 +104,29 @@ export function selectCanonicalRelease(rows) {
  */
 export async function forceCanonicalRelease(releaseId, { getPoolFn = getPool } = {}) {
   const pool = await getPoolFn();
+  return createMetadataSourceWriteService({ getPoolFn: () => pool }).withExclusiveWrite(async client => {
 
-  const { rows } = await pool.query(
-    `SELECT metadata_release_group_id FROM metadata_releases WHERE id = $1 LIMIT 1`,
-    [releaseId],
-  );
+    const { rows } = await client.query(
+      `SELECT metadata_release_group_id FROM metadata_releases WHERE id = $1 LIMIT 1`,
+      [releaseId],
+    );
 
-  if (rows.length === 0) return null;
+    if (rows.length === 0) return null;
 
-  const releaseGroupId = rows[0].metadata_release_group_id;
+    const releaseGroupId = rows[0].metadata_release_group_id;
 
-  await pool.query(
-    `UPDATE metadata_releases SET is_canonical = FALSE WHERE metadata_release_group_id = $1 AND is_canonical = TRUE`,
-    [releaseGroupId],
-  );
+    await client.query(
+      `UPDATE metadata_releases SET is_canonical = FALSE WHERE metadata_release_group_id = $1 AND is_canonical = TRUE`,
+      [releaseGroupId],
+    );
 
-  await pool.query(
-    `UPDATE metadata_releases SET is_canonical = TRUE WHERE id = $1`,
-    [releaseId],
-  );
+    await client.query(
+      `UPDATE metadata_releases SET is_canonical = TRUE WHERE id = $1`,
+      [releaseId],
+    );
 
-  return { releaseGroupId };
+    return { releaseGroupId };
+  });
 }
 
 /**
@@ -142,24 +145,26 @@ export async function forceCanonicalRelease(releaseId, { getPoolFn = getPool } =
  */
 export async function markCanonicalRelease(releaseGroupId, { getPoolFn = getPool } = {}) {
   const pool = await getPoolFn();
+  return createMetadataSourceWriteService({ getPoolFn: () => pool }).withExclusiveWrite(async client => {
 
-  const { rows } = await pool.query(
-    `SELECT * FROM metadata_releases WHERE metadata_release_group_id = $1`,
-    [releaseGroupId],
-  );
+    const { rows } = await client.query(
+      `SELECT * FROM metadata_releases WHERE metadata_release_group_id = $1`,
+      [releaseGroupId],
+    );
 
-  if (rows.length === 0) return;
+    if (rows.length === 0) return;
 
-  const winner = selectCanonicalRelease(rows);
-  if (!winner) return;
+    const winner = selectCanonicalRelease(rows);
+    if (!winner) return;
 
-  await pool.query(
-    `UPDATE metadata_releases SET is_canonical = FALSE WHERE metadata_release_group_id = $1 AND is_canonical = TRUE`,
-    [releaseGroupId],
-  );
+    await client.query(
+      `UPDATE metadata_releases SET is_canonical = FALSE WHERE metadata_release_group_id = $1 AND is_canonical = TRUE`,
+      [releaseGroupId],
+    );
 
-  await pool.query(
-    `UPDATE metadata_releases SET is_canonical = TRUE WHERE id = $1`,
-    [winner.id],
-  );
+    await client.query(
+      `UPDATE metadata_releases SET is_canonical = TRUE WHERE id = $1`,
+      [winner.id],
+    );
+  });
 }

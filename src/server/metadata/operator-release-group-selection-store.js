@@ -16,13 +16,15 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createMetadataSourceWriteService } from './metadata-source-write-service.js';
 import { getPool } from '../database.js';
 import { normalizeOperatorReleaseGroupSelectionRow } from './operator-release-group-selection-policy.js';
 
 export function createOperatorReleaseGroupSelectionStore({
   getPoolFn = getPool,
 } = {}) {
-  async function listOperatorReleaseGroupSelections({
+
+  const writes = createMetadataSourceWriteService({ getPoolFn });  async function listOperatorReleaseGroupSelections({
     appUserId = null,
     metadataArtistId = null,
     queryable = null,
@@ -87,38 +89,39 @@ export function createOperatorReleaseGroupSelectionStore({
     selectionSource,
     selectionState,
   }) {
-    const queryTarget = queryable ?? getPoolFn();
-    await queryTarget.query(
-      `
-        INSERT INTO operator_release_group_selection (
-          app_user_id,
-          metadata_artist_id,
-          metadata_release_group_id,
-          selection_state,
-          resolved_metadata_release_id,
-          selection_source,
-          selection_origin,
-          updated_at
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-        ON CONFLICT (app_user_id, metadata_release_group_id) DO UPDATE
-        SET metadata_artist_id = EXCLUDED.metadata_artist_id,
-            selection_state = EXCLUDED.selection_state,
-            resolved_metadata_release_id = EXCLUDED.resolved_metadata_release_id,
-            selection_source = EXCLUDED.selection_source,
-            selection_origin = EXCLUDED.selection_origin,
-            updated_at = NOW()
-      `,
-      [
-        appUserId,
-        metadataArtistId,
-        metadataReleaseGroupId,
-        selectionState,
-        resolvedMetadataReleaseId,
-        selectionSource,
-        selectionOrigin,
-      ],
-    );
+    return writes.withPolicyWrite({ appUserId, metadataArtistId, queryable }, async queryTarget => {
+      await queryTarget.query(
+        `
+          INSERT INTO operator_release_group_selection (
+            app_user_id,
+            metadata_artist_id,
+            metadata_release_group_id,
+            selection_state,
+            resolved_metadata_release_id,
+            selection_source,
+            selection_origin,
+            updated_at
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+          ON CONFLICT (app_user_id, metadata_release_group_id) DO UPDATE
+          SET metadata_artist_id = EXCLUDED.metadata_artist_id,
+              selection_state = EXCLUDED.selection_state,
+              resolved_metadata_release_id = EXCLUDED.resolved_metadata_release_id,
+              selection_source = EXCLUDED.selection_source,
+              selection_origin = EXCLUDED.selection_origin,
+              updated_at = NOW()
+        `,
+        [
+          appUserId,
+          metadataArtistId,
+          metadataReleaseGroupId,
+          selectionState,
+          resolvedMetadataReleaseId,
+          selectionSource,
+          selectionOrigin,
+        ],
+      );
+    });
   }
 
   async function replaceOperatorArtistReleaseGroupSelections({
@@ -127,28 +130,30 @@ export function createOperatorReleaseGroupSelectionStore({
     operatorReleaseGroupSelections = [],
     queryable = null,
   }) {
-    const queryTarget = queryable ?? getPoolFn();
-    await queryTarget.query(
-      `
-        DELETE FROM operator_release_group_selection
-        WHERE app_user_id = $1
-          AND metadata_artist_id = $2
-      `,
-      [appUserId, metadataArtistId],
-    );
+    const acceptedRows = structuredClone(operatorReleaseGroupSelections);
+    return writes.withPolicyWrite({ appUserId, metadataArtistId, queryable }, async queryTarget => {
+      await queryTarget.query(
+        `
+          DELETE FROM operator_release_group_selection
+          WHERE app_user_id = $1
+            AND metadata_artist_id = $2
+        `,
+        [appUserId, metadataArtistId],
+      );
 
-    for (const selection of operatorReleaseGroupSelections) {
-      await upsertOperatorReleaseGroupSelection({
-        appUserId,
-        metadataArtistId,
-        metadataReleaseGroupId: selection.metadataReleaseGroupId,
-        queryable: queryTarget,
-        resolvedMetadataReleaseId: selection.resolvedMetadataReleaseId ?? null,
-        selectionOrigin: selection.selectionOrigin ?? null,
-        selectionSource: selection.selectionSource,
-        selectionState: selection.selectionState,
-      });
-    }
+      for (const selection of acceptedRows) {
+        await upsertOperatorReleaseGroupSelection({
+          appUserId,
+          metadataArtistId,
+          metadataReleaseGroupId: selection.metadataReleaseGroupId,
+          queryable: queryTarget,
+          resolvedMetadataReleaseId: selection.resolvedMetadataReleaseId ?? null,
+          selectionOrigin: selection.selectionOrigin ?? null,
+          selectionSource: selection.selectionSource,
+          selectionState: selection.selectionState,
+        });
+      }
+    });
   }
 
   async function listOperatorReleaseGroupSelectionsSnapshot() {
@@ -167,14 +172,11 @@ export function createOperatorReleaseGroupSelectionStore({
   async function replaceOperatorReleaseGroupSelectionsSnapshot({
     operatorReleaseGroupSelections = [],
   } = {}) {
-    const pool = getPoolFn();
-    const client = await pool.connect();
-
-    try {
-      await client.query('BEGIN');
+    const acceptedRows = structuredClone(operatorReleaseGroupSelections);
+    return writes.withExclusiveWrite(async client => {
       await client.query('DELETE FROM operator_release_group_selection');
 
-      for (const row of operatorReleaseGroupSelections) {
+      for (const row of acceptedRows) {
         await client.query(
           `
             INSERT INTO operator_release_group_selection (
@@ -201,13 +203,7 @@ export function createOperatorReleaseGroupSelectionStore({
         );
       }
 
-      await client.query('COMMIT');
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+    });
   }
 
   return {

@@ -384,3 +384,17 @@ concurrent publication and save contention use the same transaction client.
 Fixture lock observation has its own client from acknowledged connection config,
 awaited and closed separately. Keep this distinct from increasing application
 pool capacity or changing checkout/operation deadlines.
+
+Metadata writer participation now uses metadata/metadata-source-lock-store.js
+and metadata-source-write-service.js. The save-state lock entrypoint acquires
+shared admission before its scope, enrolling canonical save, queue/recovery and
+request publication in the same order. Monitoring/snapshot/selection/override
+mutators use owned or borrowed scoped transactions; bulk snapshot replacement,
+metadata service/repository artist/group/release writes and canonical choice use
+exclusive admission. Capture accepted arrays, JSON and catalog DTOs before awaits.
+Canonical selection reads and both updates share one transaction without changing
+ranking or explicit choice. Advisory coordination protects audited first-party
+paths and missing rows, not privileged raw SQL or mixed late-upgrade callbacks.
+The dedicated design/research/outcome own native blocked-writer, independent-scope,
+borrowed refusal and canonical rollback proof. Other projection readers retain
+their existing owners until separately enrolled and tested.

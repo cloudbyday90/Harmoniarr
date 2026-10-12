@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createMetadataSourceWriteService } from './metadata-source-write-service.js';
 import { getPool } from '../database.js';
 
 function resolveQueryable(queryable) {
@@ -23,56 +24,58 @@ function resolveQueryable(queryable) {
 }
 
 export async function upsertMetadataArtist(artist, queryable) {
-  const db = resolveQueryable(queryable);
-  const result = await db.query(
-    `
-      INSERT INTO metadata_artists (
-        source_provider,
-        source_artist_id,
-        musicbrainz_artist_id,
-        name,
-        sort_name,
-        disambiguation,
-        country,
-        artist_type,
-        begin_date,
-        end_date,
-        raw_payload,
-        fetched_at,
-        updated_at
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12, NOW())
-      ON CONFLICT (source_provider, source_artist_id) DO UPDATE
-      SET musicbrainz_artist_id = EXCLUDED.musicbrainz_artist_id,
-          name = EXCLUDED.name,
-          sort_name = EXCLUDED.sort_name,
-          disambiguation = EXCLUDED.disambiguation,
-          country = EXCLUDED.country,
-          artist_type = EXCLUDED.artist_type,
-          begin_date = EXCLUDED.begin_date,
-          end_date = EXCLUDED.end_date,
-          raw_payload = EXCLUDED.raw_payload,
-          fetched_at = EXCLUDED.fetched_at,
-          updated_at = NOW()
-      RETURNING *
-    `,
-    [
-      artist.sourceProvider,
-      artist.sourceArtistId,
-      artist.musicbrainzArtistId ?? null,
-      artist.name,
-      artist.sortName ?? null,
-      artist.disambiguation ?? null,
-      artist.country ?? null,
-      artist.artistType ?? null,
-      artist.beginDate ?? null,
-      artist.endDate ?? null,
-      artist.rawPayload ? JSON.stringify(artist.rawPayload) : null,
-      artist.fetchedAt ?? null,
-    ],
-  );
+  const accepted = structuredClone(artist);
+  return createMetadataSourceWriteService().withExclusiveWrite(async db => {
+    const result = await db.query(
+      `
+        INSERT INTO metadata_artists (
+          source_provider,
+          source_artist_id,
+          musicbrainz_artist_id,
+          name,
+          sort_name,
+          disambiguation,
+          country,
+          artist_type,
+          begin_date,
+          end_date,
+          raw_payload,
+          fetched_at,
+          updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12, NOW())
+        ON CONFLICT (source_provider, source_artist_id) DO UPDATE
+        SET musicbrainz_artist_id = EXCLUDED.musicbrainz_artist_id,
+            name = EXCLUDED.name,
+            sort_name = EXCLUDED.sort_name,
+            disambiguation = EXCLUDED.disambiguation,
+            country = EXCLUDED.country,
+            artist_type = EXCLUDED.artist_type,
+            begin_date = EXCLUDED.begin_date,
+            end_date = EXCLUDED.end_date,
+            raw_payload = EXCLUDED.raw_payload,
+            fetched_at = EXCLUDED.fetched_at,
+            updated_at = NOW()
+        RETURNING *
+      `,
+      [
+        accepted.sourceProvider,
+        accepted.sourceArtistId,
+        accepted.musicbrainzArtistId ?? null,
+        accepted.name,
+        accepted.sortName ?? null,
+        accepted.disambiguation ?? null,
+        accepted.country ?? null,
+        accepted.artistType ?? null,
+        accepted.beginDate ?? null,
+        accepted.endDate ?? null,
+        accepted.rawPayload ? JSON.stringify(accepted.rawPayload) : null,
+        accepted.fetchedAt ?? null,
+      ],
+    );
 
-  return result.rows[0];
+    return result.rows[0];
+  }, { queryable });
 }
 
 export async function replaceMetadataArtistAliases(metadataArtistId, aliases, queryable) {
@@ -97,112 +100,116 @@ export async function replaceMetadataArtistAliases(metadataArtistId, aliases, qu
 }
 
 export async function upsertMetadataReleaseGroup(releaseGroup, queryable) {
-  const db = resolveQueryable(queryable);
-  const result = await db.query(
-    `
-      INSERT INTO metadata_release_groups (
-        metadata_artist_id,
-        source_provider,
-        source_release_group_id,
-        musicbrainz_release_group_id,
-        title,
-        primary_type,
-        secondary_types,
-        first_release_date,
-        disambiguation,
-        raw_payload,
-        fetched_at,
-        updated_at
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7::text[], $8, $9, $10::jsonb, $11, NOW())
-      ON CONFLICT (source_provider, source_release_group_id) DO UPDATE
-      SET metadata_artist_id = EXCLUDED.metadata_artist_id,
-          musicbrainz_release_group_id = EXCLUDED.musicbrainz_release_group_id,
-          title = EXCLUDED.title,
-          primary_type = EXCLUDED.primary_type,
-          secondary_types = EXCLUDED.secondary_types,
-          first_release_date = EXCLUDED.first_release_date,
-          disambiguation = EXCLUDED.disambiguation,
-          raw_payload = EXCLUDED.raw_payload,
-          fetched_at = EXCLUDED.fetched_at,
-          updated_at = NOW()
-      RETURNING *
-    `,
-    [
-      releaseGroup.metadataArtistId,
-      releaseGroup.sourceProvider,
-      releaseGroup.sourceReleaseGroupId,
-      releaseGroup.musicbrainzReleaseGroupId ?? null,
-      releaseGroup.title,
-      releaseGroup.primaryType ?? null,
-      releaseGroup.secondaryTypes ?? [],
-      releaseGroup.firstReleaseDate ?? null,
-      releaseGroup.disambiguation ?? null,
-      releaseGroup.rawPayload ? JSON.stringify(releaseGroup.rawPayload) : null,
-      releaseGroup.fetchedAt ?? null,
-    ],
-  );
+  const accepted = structuredClone(releaseGroup);
+  return createMetadataSourceWriteService().withExclusiveWrite(async db => {
+    const result = await db.query(
+      `
+        INSERT INTO metadata_release_groups (
+          metadata_artist_id,
+          source_provider,
+          source_release_group_id,
+          musicbrainz_release_group_id,
+          title,
+          primary_type,
+          secondary_types,
+          first_release_date,
+          disambiguation,
+          raw_payload,
+          fetched_at,
+          updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7::text[], $8, $9, $10::jsonb, $11, NOW())
+        ON CONFLICT (source_provider, source_release_group_id) DO UPDATE
+        SET metadata_artist_id = EXCLUDED.metadata_artist_id,
+            musicbrainz_release_group_id = EXCLUDED.musicbrainz_release_group_id,
+            title = EXCLUDED.title,
+            primary_type = EXCLUDED.primary_type,
+            secondary_types = EXCLUDED.secondary_types,
+            first_release_date = EXCLUDED.first_release_date,
+            disambiguation = EXCLUDED.disambiguation,
+            raw_payload = EXCLUDED.raw_payload,
+            fetched_at = EXCLUDED.fetched_at,
+            updated_at = NOW()
+        RETURNING *
+      `,
+      [
+        accepted.metadataArtistId,
+        accepted.sourceProvider,
+        accepted.sourceReleaseGroupId,
+        accepted.musicbrainzReleaseGroupId ?? null,
+        accepted.title,
+        accepted.primaryType ?? null,
+        accepted.secondaryTypes ?? [],
+        accepted.firstReleaseDate ?? null,
+        accepted.disambiguation ?? null,
+        accepted.rawPayload ? JSON.stringify(accepted.rawPayload) : null,
+        accepted.fetchedAt ?? null,
+      ],
+    );
 
-  return result.rows[0];
+    return result.rows[0];
+  }, { queryable });
 }
 
 export async function upsertMetadataRelease(release, queryable) {
-  const db = resolveQueryable(queryable);
-  const result = await db.query(
-    `
-      INSERT INTO metadata_releases (
-        metadata_release_group_id,
-        source_provider,
-        source_release_id,
-        musicbrainz_release_id,
-        title,
-        status,
-        release_date,
-        country,
-        barcode,
-        disambiguation,
-        track_count,
-        medium_count,
-        raw_payload,
-        fetched_at,
-        updated_at
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14, NOW())
-      ON CONFLICT (source_provider, source_release_id) DO UPDATE
-      SET metadata_release_group_id = EXCLUDED.metadata_release_group_id,
-          musicbrainz_release_id = EXCLUDED.musicbrainz_release_id,
-          title = EXCLUDED.title,
-          status = EXCLUDED.status,
-          release_date = EXCLUDED.release_date,
-          country = EXCLUDED.country,
-          barcode = EXCLUDED.barcode,
-          disambiguation = EXCLUDED.disambiguation,
-          track_count = EXCLUDED.track_count,
-          medium_count = EXCLUDED.medium_count,
-          raw_payload = EXCLUDED.raw_payload,
-          fetched_at = EXCLUDED.fetched_at,
-          updated_at = NOW()
-      RETURNING *
-    `,
-    [
-      release.metadataReleaseGroupId,
-      release.sourceProvider,
-      release.sourceReleaseId,
-      release.musicbrainzReleaseId ?? null,
-      release.title,
-      release.status ?? null,
-      release.releaseDate ?? null,
-      release.country ?? null,
-      release.barcode ?? null,
-      release.disambiguation ?? null,
-      release.trackCount ?? null,
-      release.mediumCount ?? null,
-      release.rawPayload ? JSON.stringify(release.rawPayload) : null,
-      release.fetchedAt ?? null,
-    ],
-  );
+  const accepted = structuredClone(release);
+  return createMetadataSourceWriteService().withExclusiveWrite(async db => {
+    const result = await db.query(
+      `
+        INSERT INTO metadata_releases (
+          metadata_release_group_id,
+          source_provider,
+          source_release_id,
+          musicbrainz_release_id,
+          title,
+          status,
+          release_date,
+          country,
+          barcode,
+          disambiguation,
+          track_count,
+          medium_count,
+          raw_payload,
+          fetched_at,
+          updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14, NOW())
+        ON CONFLICT (source_provider, source_release_id) DO UPDATE
+        SET metadata_release_group_id = EXCLUDED.metadata_release_group_id,
+            musicbrainz_release_id = EXCLUDED.musicbrainz_release_id,
+            title = EXCLUDED.title,
+            status = EXCLUDED.status,
+            release_date = EXCLUDED.release_date,
+            country = EXCLUDED.country,
+            barcode = EXCLUDED.barcode,
+            disambiguation = EXCLUDED.disambiguation,
+            track_count = EXCLUDED.track_count,
+            medium_count = EXCLUDED.medium_count,
+            raw_payload = EXCLUDED.raw_payload,
+            fetched_at = EXCLUDED.fetched_at,
+            updated_at = NOW()
+        RETURNING *
+      `,
+      [
+        accepted.metadataReleaseGroupId,
+        accepted.sourceProvider,
+        accepted.sourceReleaseId,
+        accepted.musicbrainzReleaseId ?? null,
+        accepted.title,
+        accepted.status ?? null,
+        accepted.releaseDate ?? null,
+        accepted.country ?? null,
+        accepted.barcode ?? null,
+        accepted.disambiguation ?? null,
+        accepted.trackCount ?? null,
+        accepted.mediumCount ?? null,
+        accepted.rawPayload ? JSON.stringify(accepted.rawPayload) : null,
+        accepted.fetchedAt ?? null,
+      ],
+    );
 
-  return result.rows[0];
+    return result.rows[0];
+  }, { queryable });
 }
 
 export async function deleteMetadataMediaByReleaseId(metadataReleaseId, queryable) {

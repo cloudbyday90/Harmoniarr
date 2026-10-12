@@ -6,6 +6,32 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Metadata source writer coordination (2026-10-12)
+
+- Reproduce an original unscoped selection insert after final publication check.
+  Enroll supported scoped policy and exclusive catalog/bulk writers through narrow
+  ESM admission/transaction services. Capture mutable inputs before waits; refuse
+  autocommit borrowing and make canonical clearing/setting atomic. Shared
+  admission precedes save/queue/recovery/publication scopes. See
+  [design](METADATA_SOURCE_WRITER_COORDINATION_DESIGN.md),
+  [research](METADATA_SOURCE_WRITER_COORDINATION_RESEARCH_2026_10.md) and
+  [outcome](METADATA_SOURCE_WRITER_COORDINATION_OUTCOME.md).
+- Focused 355/355; complete fast 9,864 plus both builds; final affected native
+  104/104 across nineteen verified files, including seventeen new writer cases.
+  Zero failures/cancellations/skips. Retain 102/104 candidate and 2/2 fixture
+  correction; source/unit hashes remain unchanged, with corrected fixture
+  lint/hygiene and final native proof. No weakened deadlines, pool capacity,
+  assertions, exhaustive-native or matched speedup claim.
+- Standards/testing skill structure and installed hashes pass; npm audit reports
+  zero vulnerabilities. [Fresh PR assessment](OPEN_PR_APPLICABILITY_METADATA_SOURCE_WRITERS_2026_10_OUTCOME.md)
+  finds no eligible unreplayed revision; main only, no release or merge.
+- Next: respect unmonitored state in policy-only automated request planning,
+  preserving explicit selections. A direct planner probe still emits one eligible
+  policy release with isMonitored false; verify the saved intent through native
+  consumers before changing behavior. Projection-reader participation/catalog
+  partitioning remain later work; historical unrelated SQL-reset causes stay
+  unconfirmed.
+
 ## Completed slice: Operator reconciliation publication authority (2026-10-12)
 
 - Reproduce stale request publication after a newer canonical save. Capture

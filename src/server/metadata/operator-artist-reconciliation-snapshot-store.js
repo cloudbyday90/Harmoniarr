@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createMetadataSourceWriteService } from './metadata-source-write-service.js';
 import { getPool } from '../database.js';
 
 function normalizeSnapshotRow(row) {
@@ -40,7 +41,8 @@ function normalizeSnapshotRow(row) {
 export function createOperatorArtistReconciliationSnapshotStore({
   getPoolFn = getPool,
 } = {}) {
-  async function getOperatorArtistReconciliationSnapshotById({
+
+  const writes = createMetadataSourceWriteService({ getPoolFn });  async function getOperatorArtistReconciliationSnapshotById({
     appUserId,
     metadataArtistId,
     snapshotId,
@@ -87,34 +89,36 @@ export function createOperatorArtistReconciliationSnapshotStore({
     queryable = null,
     snapshotPayload,
   }) {
-    const queryTarget = queryable ?? getPoolFn();
-    const result = await queryTarget.query(
-      `
-        WITH next_revision AS (
-          SELECT COALESCE(MAX(snapshot_revision), 0) + 1 AS snapshot_revision
-          FROM operator_artist_reconciliation_snapshot
-          WHERE app_user_id = $1
-            AND metadata_artist_id = $2
-        )
-        INSERT INTO operator_artist_reconciliation_snapshot (
-          app_user_id,
-          metadata_artist_id,
-          snapshot_revision,
-          snapshot_payload,
-          updated_at
-        )
-        SELECT $1, $2, next_revision.snapshot_revision, $3::jsonb, NOW()
-        FROM next_revision
-        RETURNING *
-      `,
-      [
-        appUserId,
-        metadataArtistId,
-        JSON.stringify(snapshotPayload ?? {}),
-      ],
-    );
+    const snapshotJson = JSON.stringify(snapshotPayload ?? {});
+    return writes.withPolicyWrite({ appUserId, metadataArtistId, queryable }, async queryTarget => {
+      const result = await queryTarget.query(
+        `
+          WITH next_revision AS (
+            SELECT COALESCE(MAX(snapshot_revision), 0) + 1 AS snapshot_revision
+            FROM operator_artist_reconciliation_snapshot
+            WHERE app_user_id = $1
+              AND metadata_artist_id = $2
+          )
+          INSERT INTO operator_artist_reconciliation_snapshot (
+            app_user_id,
+            metadata_artist_id,
+            snapshot_revision,
+            snapshot_payload,
+            updated_at
+          )
+          SELECT $1, $2, next_revision.snapshot_revision, $3::jsonb, NOW()
+          FROM next_revision
+          RETURNING *
+        `,
+        [
+          appUserId,
+          metadataArtistId,
+          snapshotJson,
+        ],
+      );
 
-    return normalizeSnapshotRow(result.rows[0]);
+      return normalizeSnapshotRow(result.rows[0]);
+    });
   }
 
   async function listOperatorArtistReconciliationSnapshots({

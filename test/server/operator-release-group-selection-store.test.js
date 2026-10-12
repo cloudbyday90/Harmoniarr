@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createMetadataWritePool, metadataDomainCalls } from '../../testing/metadata/metadata-write-fixtures.js';
 import { createOperatorReleaseGroupSelectionStore } from '../../src/server/metadata/operator-release-group-selection-store.js';
 
 test('getOperatorReleaseGroupSelection returns stored selection state', async (t) => {
@@ -15,7 +16,7 @@ test('getOperatorReleaseGroupSelection returns stored selection state', async (t
       selection_state: 'partial',
     }],
   }));
-  const store = createOperatorReleaseGroupSelectionStore({ getPoolFn: () => ({ query }) });
+  const store = createOperatorReleaseGroupSelectionStore({ getPoolFn: () => createMetadataWritePool(query) });
 
   const result = await store.getOperatorReleaseGroupSelection({
     appUserId: 'user-1',
@@ -51,7 +52,7 @@ test('getOperatorReleaseGroupSelection returns null when no row exists', async (
 
 test('upsertOperatorReleaseGroupSelection stores the selection policy', async (t) => {
   const query = t.mock.fn(async () => ({ rows: [] }));
-  const store = createOperatorReleaseGroupSelectionStore({ getPoolFn: () => ({ query }) });
+  const store = createOperatorReleaseGroupSelectionStore({ getPoolFn: () => createMetadataWritePool(query) });
 
   await store.upsertOperatorReleaseGroupSelection({
     appUserId: 'user-1',
@@ -63,8 +64,9 @@ test('upsertOperatorReleaseGroupSelection stores the selection policy', async (t
     selectionState: 'selected',
   });
 
-  assert.match(query.mock.calls[0].arguments[0], /INSERT INTO operator_release_group_selection/);
-  assert.deepEqual(query.mock.calls[0].arguments[1], [
+  const domainCalls = metadataDomainCalls(query);
+  assert.match(domainCalls[0].arguments[0], /INSERT INTO operator_release_group_selection/);
+  assert.deepEqual(domainCalls[0].arguments[1], [
     'user-1',
     'artist-1',
     'release-group-1',
@@ -87,7 +89,7 @@ test('listOperatorReleaseGroupSelections filters by operator and artist when req
       selection_state: 'selected',
     }],
   }));
-  const store = createOperatorReleaseGroupSelectionStore({ getPoolFn: () => ({ query }) });
+  const store = createOperatorReleaseGroupSelectionStore({ getPoolFn: () => createMetadataWritePool(query) });
 
   const result = await store.listOperatorReleaseGroupSelections({
     appUserId: 'user-1',
@@ -120,11 +122,12 @@ test('replaceOperatorReleaseGroupSelectionsSnapshot replaces the backup snapshot
     }],
   });
 
+  const domainCalls = metadataDomainCalls(query);
   assert.equal(query.mock.calls[0].arguments[0], 'BEGIN');
-  assert.equal(query.mock.calls[1].arguments[0], 'DELETE FROM operator_release_group_selection');
-  assert.match(query.mock.calls[2].arguments[0], /INSERT INTO operator_release_group_selection/);
-  assert.equal(query.mock.calls[3].arguments[0], 'COMMIT');
-  assert.deepEqual(query.mock.calls[2].arguments[1], [
+  assert.equal(domainCalls[0].arguments[0], 'DELETE FROM operator_release_group_selection');
+  assert.match(domainCalls[1].arguments[0], /INSERT INTO operator_release_group_selection/);
+  assert.equal(query.mock.calls.at(-1).arguments[0], 'COMMIT');
+  assert.deepEqual(domainCalls[1].arguments[1], [
     'user-1',
     'artist-1',
     'release-group-1',
@@ -139,7 +142,7 @@ test('replaceOperatorReleaseGroupSelectionsSnapshot replaces the backup snapshot
 test('replaceOperatorArtistReleaseGroupSelections replaces only one operator artist selection set', async (t) => {
   const query = t.mock.fn(async () => ({ rows: [] }));
   const store = createOperatorReleaseGroupSelectionStore({
-    getPoolFn: () => ({ query }),
+    getPoolFn: () => createMetadataWritePool(query),
   });
 
   await store.replaceOperatorArtistReleaseGroupSelections({
@@ -154,10 +157,11 @@ test('replaceOperatorArtistReleaseGroupSelections replaces only one operator art
     }],
   });
 
-  assert.match(query.mock.calls[0].arguments[0], /DELETE FROM operator_release_group_selection/);
-  assert.deepEqual(query.mock.calls[0].arguments[1], ['user-1', 'artist-1']);
-  assert.match(query.mock.calls[1].arguments[0], /INSERT INTO operator_release_group_selection/);
-  assert.deepEqual(query.mock.calls[1].arguments[1], [
+  const domainCalls = metadataDomainCalls(query);
+  assert.match(domainCalls[0].arguments[0], /DELETE FROM operator_release_group_selection/);
+  assert.deepEqual(domainCalls[0].arguments[1], ['user-1', 'artist-1']);
+  assert.match(domainCalls[1].arguments[0], /INSERT INTO operator_release_group_selection/);
+  assert.deepEqual(domainCalls[1].arguments[1], [
     'user-1',
     'artist-1',
     'release-group-1',

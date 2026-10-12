@@ -389,3 +389,11 @@ remaining writer coordination. The
 [authority design](OPERATOR_RECONCILIATION_PUBLICATION_AUTHORITY_DESIGN.md)
 owns alternatives and scope. This is practical reference maintenance; skill
 metadata, invocation policy and the existing entrypoint remain unchanged.
+
+Metadata writer maintenance traces shared/exclusive admission across the actual
+save/queue/recovery/publication entrypoints and standalone/catalog/bulk writers.
+It requires captured mutable inputs, transaction ownership and observed blocked
+backends for missing-row claims. The
+[writer design](METADATA_SOURCE_WRITER_COORDINATION_DESIGN.md) owns alternatives
+and exclusion limits. This extends concrete references without a new skill
+entrypoint, metadata change or invocation-policy expansion.

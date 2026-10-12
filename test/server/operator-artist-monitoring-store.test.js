@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createMetadataWritePool, metadataDomainCalls } from '../../testing/metadata/metadata-write-fixtures.js';
 import { createOperatorArtistMonitoringStore } from '../../src/server/metadata/operator-artist-monitoring-store.js';
 
 test('getOperatorArtistMonitoring returns stored operator monitoring state', async (t) => {
@@ -19,7 +20,7 @@ test('getOperatorArtistMonitoring returns stored operator monitoring state', asy
       wanted_automation_mode: 'future_matching',
     }],
   }));
-  const store = createOperatorArtistMonitoringStore({ getPoolFn: () => ({ query }) });
+  const store = createOperatorArtistMonitoringStore({ getPoolFn: () => createMetadataWritePool(query) });
 
   const result = await store.getOperatorArtistMonitoring({
     appUserId: 'user-1',
@@ -66,7 +67,7 @@ test('listOperatorMonitoredArtists returns compact monitored artist rows ordered
       wanted_automation_mode: 'future_matching',
     }],
   }));
-  const store = createOperatorArtistMonitoringStore({ getPoolFn: () => ({ query }) });
+  const store = createOperatorArtistMonitoringStore({ getPoolFn: () => createMetadataWritePool(query) });
 
   const result = await store.listOperatorMonitoredArtists({
     appUserId: 'user-1',
@@ -120,7 +121,7 @@ test('listOperatorArtistMonitoringByMetadataArtist returns monitored operators f
       wanted_automation_mode: 'current_and_future_matching',
     }],
   }));
-  const store = createOperatorArtistMonitoringStore({ getPoolFn: () => ({ query }) });
+  const store = createOperatorArtistMonitoringStore({ getPoolFn: () => createMetadataWritePool(query) });
 
   const result = await store.listOperatorArtistMonitoringByMetadataArtist({
     metadataArtistId: 'artist-1',
@@ -175,7 +176,7 @@ test('getOperatorArtistMonitoring returns defaults when no row exists', async ()
 
 test('upsertOperatorArtistMonitoring stores the current operator policy', async (t) => {
   const query = t.mock.fn(async () => ({ rows: [] }));
-  const store = createOperatorArtistMonitoringStore({ getPoolFn: () => ({ query }) });
+  const store = createOperatorArtistMonitoringStore({ getPoolFn: () => createMetadataWritePool(query) });
 
   await store.upsertOperatorArtistMonitoring({
     acquisitionProfileKey: 'apple_friendly_portable',
@@ -191,8 +192,9 @@ test('upsertOperatorArtistMonitoring stores the current operator policy', async 
     wantedAutomationMode: 'current_and_future_matching',
   });
 
-  assert.match(query.mock.calls[0].arguments[0], /INSERT INTO operator_artist_monitoring/);
-  assert.deepEqual(query.mock.calls[0].arguments[1], [
+  const domainCalls = metadataDomainCalls(query);
+  assert.match(domainCalls[0].arguments[0], /INSERT INTO operator_artist_monitoring/);
+  assert.deepEqual(domainCalls[0].arguments[1], [
     'user-1',
     'artist-1',
     true,
@@ -231,11 +233,12 @@ test('replaceOperatorArtistMonitoringSnapshot replaces the backup snapshot trans
     }],
   });
 
+  const domainCalls = metadataDomainCalls(query);
   assert.equal(query.mock.calls[0].arguments[0], 'BEGIN');
-  assert.equal(query.mock.calls[1].arguments[0], 'DELETE FROM operator_artist_monitoring');
-  assert.match(query.mock.calls[2].arguments[0], /INSERT INTO operator_artist_monitoring/);
-  assert.equal(query.mock.calls[3].arguments[0], 'COMMIT');
-  assert.deepEqual(query.mock.calls[2].arguments[1], [
+  assert.equal(domainCalls[0].arguments[0], 'DELETE FROM operator_artist_monitoring');
+  assert.match(domainCalls[1].arguments[0], /INSERT INTO operator_artist_monitoring/);
+  assert.equal(query.mock.calls.at(-1).arguments[0], 'COMMIT');
+  assert.deepEqual(domainCalls[1].arguments[1], [
     'user-1',
     'artist-1',
     true,

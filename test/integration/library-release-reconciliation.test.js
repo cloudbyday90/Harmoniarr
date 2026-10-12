@@ -380,8 +380,8 @@ suite('Original scan acquisition owns serialized global release reconciliation',
       writeOwnedLibraryFileMatchBatch: matchOwner.writeOwnedLibraryFileMatchBatch }).matchLibraryFiles({
       ...c.context(producerRun.id, producerLease), files: [{ ...c.first.files[0], tagPayload: normalizedTags }] });
     const artist = (await c.pool.query('SELECT * FROM metadata_artists WHERE id=$1', [c.metadataA.metadataArtistId])).rows[0];
-    await upsertMetadataArtist({ sourceProvider: artist.source_provider, sourceArtistId: artist.source_artist_id,
-      musicbrainzArtistId: artist.musicbrainz_artist_id, name: 'Changed label only' }, c.pool);
+    await c.withTransaction((queryable) => upsertMetadataArtist({ sourceProvider: artist.source_provider, sourceArtistId: artist.source_artist_id,
+      musicbrainzArtistId: artist.musicbrainz_artist_id, name: 'Changed label only' }, queryable));
     const organizeRuns = c.makeRuns('organize-cooperator', 'library_organize_apply');
     const organizeRun = await organizeRuns.createOperationRun({ status: 'pending' });
     const organizeLease = await organizeRuns.acquireLease({ runId: organizeRun.id });

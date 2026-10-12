@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createMetadataWritePool, metadataDomainCalls } from '../../testing/metadata/metadata-write-fixtures.js';
 import { createOperatorTrackOverrideStore } from '../../src/server/metadata/operator-track-override-store.js';
 
 test('getOperatorTrackOverride resolves track-mbid keyed overrides', async (t) => {
@@ -20,7 +21,7 @@ test('getOperatorTrackOverride resolves track-mbid keyed overrides', async (t) =
       track_title_snapshot: 'Example Song',
     }],
   }));
-  const store = createOperatorTrackOverrideStore({ getPoolFn: () => ({ query }) });
+  const store = createOperatorTrackOverrideStore({ getPoolFn: () => createMetadataWritePool(query) });
 
   const result = await store.getOperatorTrackOverride({
     appUserId: 'user-1',
@@ -47,7 +48,7 @@ test('getOperatorTrackOverride resolves track-mbid keyed overrides', async (t) =
 
 test('getOperatorTrackOverride resolves fallback recording identity overrides', async (t) => {
   const query = t.mock.fn(async () => ({ rows: [] }));
-  const store = createOperatorTrackOverrideStore({ getPoolFn: () => ({ query }) });
+  const store = createOperatorTrackOverrideStore({ getPoolFn: () => createMetadataWritePool(query) });
 
   const result = await store.getOperatorTrackOverride({
     appUserId: 'user-1',
@@ -93,15 +94,16 @@ test('upsertOperatorTrackOverride replaces by logical identity and inserts the n
     trackTitleSnapshot: 'Example Song',
   });
 
+  const domainCalls = metadataDomainCalls(query);
   assert.equal(query.mock.calls[0].arguments[0], 'BEGIN');
-  assert.match(query.mock.calls[1].arguments[0], /DELETE FROM operator_track_override/);
-  assert.deepEqual(query.mock.calls[1].arguments[1], [
+  assert.match(domainCalls[0].arguments[0], /DELETE FROM operator_track_override/);
+  assert.deepEqual(domainCalls[0].arguments[1], [
     'user-1',
     'release-group-1',
     '22222222-2222-4222-8222-222222222222',
   ]);
-  assert.match(query.mock.calls[2].arguments[0], /INSERT INTO operator_track_override/);
-  assert.equal(query.mock.calls[3].arguments[0], 'COMMIT');
+  assert.match(domainCalls[1].arguments[0], /INSERT INTO operator_track_override/);
+  assert.equal(query.mock.calls.at(-1).arguments[0], 'COMMIT');
   assert.equal(release.mock.callCount(), 1);
 });
 
@@ -123,7 +125,7 @@ test('listOperatorTrackOverrides filters by operator and artist when requested',
       track_title_snapshot: 'Example Song',
     }],
   }));
-  const store = createOperatorTrackOverrideStore({ getPoolFn: () => ({ query }) });
+  const store = createOperatorTrackOverrideStore({ getPoolFn: () => createMetadataWritePool(query) });
 
   const result = await store.listOperatorTrackOverrides({
     appUserId: 'user-1',
@@ -161,17 +163,18 @@ test('replaceOperatorTrackOverridesSnapshot replaces the snapshot transactionall
     }],
   });
 
+  const domainCalls = metadataDomainCalls(query);
   assert.equal(query.mock.calls[0].arguments[0], 'BEGIN');
-  assert.equal(query.mock.calls[1].arguments[0], 'DELETE FROM operator_track_override');
-  assert.match(query.mock.calls[2].arguments[0], /INSERT INTO operator_track_override/);
-  assert.equal(query.mock.calls[3].arguments[0], 'COMMIT');
+  assert.equal(domainCalls[0].arguments[0], 'DELETE FROM operator_track_override');
+  assert.match(domainCalls[1].arguments[0], /INSERT INTO operator_track_override/);
+  assert.equal(query.mock.calls.at(-1).arguments[0], 'COMMIT');
   assert.equal(release.mock.callCount(), 1);
 });
 
 test('replaceOperatorArtistTrackOverrides replaces one operator artist override set without nested transactions', async (t) => {
   const query = t.mock.fn(async () => ({ rows: [] }));
   const store = createOperatorTrackOverrideStore({
-    getPoolFn: () => ({ query }),
+    getPoolFn: () => createMetadataWritePool(query),
   });
 
   await store.replaceOperatorArtistTrackOverrides({
@@ -191,13 +194,14 @@ test('replaceOperatorArtistTrackOverrides replaces one operator artist override 
     }],
   });
 
-  assert.match(query.mock.calls[0].arguments[0], /DELETE FROM operator_track_override/);
-  assert.deepEqual(query.mock.calls[0].arguments[1], ['user-1', 'artist-1']);
-  assert.match(query.mock.calls[1].arguments[0], /DELETE FROM operator_track_override/);
-  assert.deepEqual(query.mock.calls[1].arguments[1], [
+  const domainCalls = metadataDomainCalls(query);
+  assert.match(domainCalls[0].arguments[0], /DELETE FROM operator_track_override/);
+  assert.deepEqual(domainCalls[0].arguments[1], ['user-1', 'artist-1']);
+  assert.match(domainCalls[1].arguments[0], /DELETE FROM operator_track_override/);
+  assert.deepEqual(domainCalls[1].arguments[1], [
     'user-1',
     'release-group-1',
     '22222222-2222-4222-8222-222222222222',
   ]);
-  assert.match(query.mock.calls[2].arguments[0], /INSERT INTO operator_track_override/);
+  assert.match(domainCalls[2].arguments[0], /INSERT INTO operator_track_override/);
 });
