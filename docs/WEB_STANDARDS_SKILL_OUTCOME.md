@@ -612,3 +612,11 @@ The bounded dispatch harness awaits execution rather than polling terminal statu
 The [external discovery outcome](EXTERNAL_REQUEST_DISCOVERY_LIFETIME_OUTCOME.md)
 owns native HTTP, publication refusal, resource and structural evidence. This is
 narrow reference maintenance without a new blind trial or conformance claim.
+
+Metadata refresh references locate captured wanted authority, returned catalog/
+scheduler work and eleven concrete application owners, with production metadata
+input traced explicitly. They separate durable operator queue intent from child
+execution and qualified vendor guidance from observed local behavior. The
+[refresh outcome](METADATA_ARTIST_REFRESH_LIFETIME_OUTCOME.md) owns provider HTTP,
+schedule/resource, fencing and structural evidence. This is narrow reference
+maintenance without a new blind trial or conformance certification.

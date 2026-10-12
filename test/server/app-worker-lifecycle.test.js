@@ -57,9 +57,10 @@ test('app drain waits for apply before scan, drains scan after apply null and pr
   assert.equal(settled, true);
 });
 
-test('application drain captures all ten receivers and attempts every known owner after intake null', async () => {
+test('application drain captures all eleven receivers and attempts every known owner after metadata null', async () => {
   const gate = Promise.withResolvers(); const entered = Promise.withResolvers(); const calls = [];
-  const intake = { close() { assert.equal(this, intake); calls.push('intake'); entered.resolve(); return gate.promise; } };
+  const metadata = { close() { assert.equal(this, metadata); calls.push('metadata'); entered.resolve(); return gate.promise; } };
+  const intake = { close() { assert.equal(this, intake); calls.push('intake'); throw new Error('intake fallout'); } };
   const provider = { close() { assert.equal(this, provider); calls.push('provider'); throw new Error('provider fallout'); } };
   const requestDiscovery = { close() { assert.equal(this, requestDiscovery); calls.push('requestDiscovery'); throw new Error('request discovery fallout'); } };
   const discovery = { close() { assert.equal(this, discovery); calls.push('discovery'); throw new Error('discovery fallout'); } };
@@ -71,12 +72,13 @@ test('application drain captures all ten receivers and attempts every known owne
   const organize = { close() { assert.equal(this, organize); calls.push('organize'); throw new Error('organize fallout'); } };
   const application = { importCandidateModule: { importCandidateExecutionWorker: execution, importCandidateMediaInspectionWorker: inspection,
     importCandidateTranscodeWorker: transcode, importCandidateApplyWorker: apply },
+    metadataModule: { metadataArtistRefreshWorker: metadata },
     libraryModule: { libraryExternalIntakeWorker: intake, libraryProviderIngestExecutionWorker: provider, libraryExternalRequestDiscoveryWorker: requestDiscovery,
       libraryDiscoveryWorker: discovery, libraryOrganizeApplyWorker: organize, libraryScanWorker: scan } };
   const pending = drainApplicationWorkerOwners(application); void pending.catch(() => {}); await entered.promise;
-  application.importCandidateModule = {}; application.libraryModule = {};
-  assert.deepEqual(calls, ['intake']); gate.reject(null);
-  await assert.rejects(pending, error => error === null); assert.deepEqual(calls, ['intake', 'provider', 'requestDiscovery', 'discovery', 'execution', 'inspection', 'transcode', 'apply', 'organize', 'scan']);
+  application.importCandidateModule = {}; application.libraryModule = {}; application.metadataModule = {};
+  assert.deepEqual(calls, ['metadata']); gate.reject(null);
+  await assert.rejects(pending, error => error === null); assert.deepEqual(calls, ['metadata', 'intake', 'provider', 'requestDiscovery', 'discovery', 'execution', 'inspection', 'transcode', 'apply', 'organize', 'scan']);
 });
 
 for (const primary of [new Error('inspection cleanup'), null]) {
@@ -115,6 +117,18 @@ for (const primary of [new Error('request discovery cleanup'), null]) {
     } };
     await assert.rejects(drainApplicationWorkerOwners(application), error => error === primary);
     assert.deepEqual(calls, ['requestDiscovery', 'discovery', 'scan']);
+  });
+}
+
+for (const primary of [new Error('metadata cleanup'), null]) {
+  test(`metadata ${primary === null ? 'null' : 'Error'} stays primary while all following library owners drain`, async () => {
+    const calls = [];
+    const application = { metadataModule: { metadataArtistRefreshWorker: { close: async () => { calls.push('metadata'); throw primary; } } }, libraryModule: {
+      libraryExternalIntakeWorker: { close: async () => { calls.push('intake'); throw new Error('intake fallout'); } },
+      libraryScanWorker: { close: async () => { calls.push('scan'); } },
+    } };
+    await assert.rejects(drainApplicationWorkerOwners(application), error => error === primary);
+    assert.deepEqual(calls, ['metadata', 'intake', 'scan']);
   });
 }
 

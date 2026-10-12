@@ -571,3 +571,14 @@ acquired-unavailable lease status during this lifetime change. RFC 9110 uncertai
 does not authorize search POST replay or automatic download. W3C timing is still
 draft observation guidance; a 15-second owned dispatch deadline replaces status
 polling without treating timeout/cancellation as proof that remote work stopped.
+
+October 12 metadata-refresh guidance uses
+docs/METADATA_ARTIST_REFRESH_LIFETIME_RESEARCH_2026_10.md. MusicBrainz FAQ identifies
+its own unreviewed status; its navigation supplies rate-limit guidance referring
+to 2012 rules that may change. Keep source status/access limits explicit and retain
+existing identification, per-instance request queue and jitter policy without
+claiming whole-egress compliance. OWASP authority stays at the mutation owner;
+captured/cloned worker context is separate from mere queued acceptance. Retain
+returned catalog, wanted/queue/detection and scheduler work through lease cleanup.
+W3C timing remains draft observation guidance, not a schedule-policy mandate.
+TC39 permits null rejection; preserve original failures while finishing cleanup.

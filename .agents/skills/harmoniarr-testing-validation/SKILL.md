@@ -363,3 +363,15 @@ and worker before disposal while preserving original Error/null. The dedicated
 external-request discovery outcome owns executed evidence and limits. Other
 workers/periodic producers still prevent removing residual delay or claiming
 complete application drainage or exhaustive speedup.
+
+Metadata artist refresh now returns actual completion through provider/catalog/
+wanted/queue/detection and returned scheduling, then renewal/release. Preserve
+captured worker context and cancellation hooks, and distinguish queued operator
+reconciliation from executed child work. Gate provider response, schedule write
+and release separately in both app fixtures, using parent-visible catalog/date/
+resource assertions. Unmonitoring during lookup must exercise existing schedule
+clearing. Wanted projection's native fixture retains actual worker completion
+beyond its release observer. Startup explicitly supplies metadataModule so the
+eleven-owner snapshot includes metadata; fixture whole-application input alone
+does not prove production wiring. The metadata refresh outcome owns executed
+scope and remaining reconciliation/periodic limits; keep residual fixture delay.

@@ -333,3 +333,17 @@ Parent tests verify candidate/file/audit ownership, release/resource lifetime an
 cancellation/retargeting publication refusal. The dispatch harness retains its
 15-second bound, retains worker completion beyond claim/tick completion, reads status once and drains before
 disposal. Dedicated documents own scope and remaining metadata/periodic limits.
+
+Metadata artist refresh now owns returned refresh and scheduling through renewal/
+release in metadata/metadata-artist-refresh-worker.js. Catalog refresh clones
+accepted worker context before provider awaits and forwards it to wanted authority;
+materialization, operator queue intent and detection are awaited at existing
+owners. Scheduling rechecks operator monitoring and records dates or clears a
+now-unmonitored artist's schedule. Application explicitly captures metadata owner
+first, then the ten library/import owners; startup must pass metadataModule to
+the shared adapter, while fixtures already pass the full application. Native
+fixtures keep production provider validation and inject only an owned HTTP
+transport, then gate actual catalog/schedule/release and parent-visible resources.
+Wanted projection's fixture awaits actual metadata completion beyond release
+observation. Dedicated documents own native fencing/lifetime scope; queued
+operator reconciliation and other workers/periodic producers remain separate.

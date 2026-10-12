@@ -345,6 +345,13 @@ The [external discovery design](EXTERNAL_REQUEST_DISCOVERY_LIFETIME_DESIGN.md)
 owns this slice's native authorization/lifetime evidence. Existing skill entrypoint,
 metadata and invocation policy remain.
 
+Metadata refresh maintenance traces captured context, returned provider/catalog/
+queue and schedule work into lease drainage, including the explicit startup
+metadata-module input. Provider guidance status and access limits remain visible;
+per-instance queueing and normal-response tests do not certify whole-egress or
+hidden-abort behavior. The [refresh design](METADATA_ARTIST_REFRESH_LIFETIME_DESIGN.md)
+owns this slice. Existing skill entrypoint, metadata and invocation policy remain.
+
 Discovery references follow queued intent through returned reconciliation,
 artwork/provider and selected-import queue handoffs, then eligible ledger cleanup.
 They preserve scoped consent and distinguish local drainage from remote completion.

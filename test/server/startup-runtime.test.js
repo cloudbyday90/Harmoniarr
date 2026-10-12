@@ -28,6 +28,8 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
   const providerCloseGate = Promise.withResolvers();
   const requestDiscoveryCloseEntered = Promise.withResolvers();
   const requestDiscoveryCloseGate = Promise.withResolvers();
+  const metadataCloseEntered = Promise.withResolvers();
+  const metadataCloseGate = Promise.withResolvers();
   let resolveShutdownComplete;
   const shutdownComplete = new Promise((resolve) => {
     resolveShutdownComplete = resolve;
@@ -322,6 +324,11 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
         },
         metadataArtistRefreshWorker: {
           startWorkerRun: async () => {},
+          async close() {
+            callOrder.push('metadata.close');
+            metadataCloseEntered.resolve();
+            await metadataCloseGate.promise;
+          },
         },
       },
       pushModule: {
@@ -498,6 +505,9 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
 
   processEmitter.emit('SIGTERM');
   try {
+    await waitForFixtureReady({ ready: metadataCloseEntered.promise, operation: shutdownComplete });
+    assert.equal(callOrder.includes('intake.close'), false); assert.equal(callOrder.includes('closePool'), false);
+    metadataCloseGate.resolve();
     await waitForFixtureReady({ ready: intakeCloseEntered.promise, operation: shutdownComplete });
     assert.equal(callOrder.includes('provider.close'), false); assert.equal(callOrder.includes('closePool'), false);
     intakeCloseGate.resolve();
@@ -527,7 +537,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     applyCloseGate.resolve();
     await waitForFixtureReady({ ready: organizeCloseEntered.promise, operation: shutdownComplete });
     assert.equal(callOrder.includes('scan.close'), false); assert.equal(callOrder.includes('closePool'), false);
-  } finally { intakeCloseGate.resolve(); providerCloseGate.resolve(); requestDiscoveryCloseGate.resolve(); discoveryCloseGate.resolve(); executionCloseGate.resolve(); inspectionCloseGate.resolve(); transcodeCloseGate.resolve(); applyCloseGate.resolve(); organizeCloseGate.resolve(); }
+  } finally { metadataCloseGate.resolve(); intakeCloseGate.resolve(); providerCloseGate.resolve(); requestDiscoveryCloseGate.resolve(); discoveryCloseGate.resolve(); executionCloseGate.resolve(); inspectionCloseGate.resolve(); transcodeCloseGate.resolve(); applyCloseGate.resolve(); organizeCloseGate.resolve(); }
   await shutdownComplete;
 
   assert.deepEqual(callOrder, [
@@ -562,6 +572,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'stop:metadata',
     'stop:queue',
     'server.close',
+    'metadata.close',
     'intake.close',
     'provider.close',
     'requestDiscovery.close',

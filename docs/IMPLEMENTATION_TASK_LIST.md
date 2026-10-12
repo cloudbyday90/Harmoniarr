@@ -6,6 +6,31 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Metadata artist refresh lifetime (2026-10-12)
+
+- Reproduce duplicate acquisition during held release, then own returned catalog/
+  wanted/queue/detection, scheduling and renewal/release through shared ESM
+  services. Preserve captured worker context, fencing, cancellation hooks and
+  monitored/unmonitored scheduling. Add explicit metadata input at startup and
+  capture eleven owners in the shared fixture/runtime adapter. Wanted native
+  consumers await actual completion beyond release. See
+  [design](METADATA_ARTIST_REFRESH_LIFETIME_DESIGN.md),
+  [research](METADATA_ARTIST_REFRESH_LIFETIME_RESEARCH_2026_10.md) and
+  [outcome](METADATA_ARTIST_REFRESH_LIFETIME_OUTCOME.md).
+- Focused 186/186; complete fast 9,791 plus both builds; affected native 42/42
+  across seven verified files, including five new HTTP/SQL schedule/resource
+  cases. Zero failures/cancellations/skips. No source changes after complete
+  gates, repeated new-file probe, exhaustive-native or matched speedup claim.
+- Standards/testing skill maintenance, installed hashes and npm audit pass.
+  [Fresh PR assessment](OPEN_PR_APPLICABILITY_METADATA_REFRESH_LIFETIME_2026_10_OUTCOME.md)
+  finds no eligible unreplayed patch; main only, no release or merge. Provider
+  documentation access/status limits remain explicit.
+- Next: operator artist reconciliation completion through captured snapshot,
+  current policy, guarded writes and lease finalization. Preserve revision/user/
+  artist authority and recovery; remaining worker/periodic ownership precedes
+  residual-wait removal or exhaustive scheduling changes. Historical SQL-reset
+  causes remain unconfirmed.
+
 ## Completed slice: External request discovery lifetime (2026-10-12)
 
 - Reproduce duplicate acquisition during held release, then own approved lookup/

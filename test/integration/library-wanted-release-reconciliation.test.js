@@ -276,7 +276,9 @@ suite('Current operator inputs own wanted rows and discovery links', () => {
         await refresh.refreshArtistCatalogById({ musicBrainzArtistId: c.metadata.musicBrainzArtistId, runId: 'history-only' });
         assert.deepEqual(contexts.pop(), {});
       }
-      await worker.startWorkerRun({ runId: run.id, metadataArtistId: c.metadata.metadataArtistId, musicBrainzArtistId: c.metadata.musicBrainzArtistId });
+      const { completion } = await worker.startWorkerRun({ runId: run.id, metadataArtistId: c.metadata.metadataArtistId, musicBrainzArtistId: c.metadata.musicBrainzArtistId });
+      await completion;
+      await worker.close();
       await done.promise;
       assert.equal(contexts[0].workerContext.operationType, operationType); assert.equal(contexts[0].workerContext.runId, run.id);
       assert.equal(typeof contexts[0].workerContext.expectedLease.acquisitionId, 'string');
