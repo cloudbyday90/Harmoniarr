@@ -330,3 +330,13 @@ lifetime outcome for PostgreSQL/HTTP scope and remaining owners. Verify literal
 selected test paths before launching: this Node host silently ignored an unmatched
 entry in an otherwise passing focused run. Globs require their own selection
 review, and a green subset is not completeness or remote-operation completion.
+
+External intake now returns actual completion through planning, awaited durable
+execution handoff and renewal/release. Await that handle in planning-only fixtures;
+legacy provider-execution doubles still expose an earlier release observation.
+Gate planning, queued execution and captured release separately. Native proof
+uses both app fixtures with real stores and parent-visible normalized source,
+recipient/actor, pending execution and resource checkpoints. A completed planning
+run precedes release, and a pending child run is not provider completion. See
+docs/EXTERNAL_INTAKE_LIFETIME_OUTCOME.md; remaining executor/periodic owners keep
+the residual fixture wait and limit whole-app/performance claims.

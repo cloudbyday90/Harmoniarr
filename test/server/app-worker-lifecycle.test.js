@@ -57,9 +57,10 @@ test('app drain waits for apply before scan, drains scan after apply null and pr
   assert.equal(settled, true);
 });
 
-test('application drain captures all seven receivers and attempts every known owner after discovery null', async () => {
+test('application drain captures all eight receivers and attempts every known owner after intake null', async () => {
   const gate = Promise.withResolvers(); const entered = Promise.withResolvers(); const calls = [];
-  const discovery = { close() { assert.equal(this, discovery); calls.push('discovery'); entered.resolve(); return gate.promise; } };
+  const intake = { close() { assert.equal(this, intake); calls.push('intake'); entered.resolve(); return gate.promise; } };
+  const discovery = { close() { assert.equal(this, discovery); calls.push('discovery'); throw new Error('discovery fallout'); } };
   const execution = { close() { assert.equal(this, execution); calls.push('execution'); throw new Error('execution fallout'); } };
   const inspection = { close() { assert.equal(this, inspection); calls.push('inspection'); throw new Error('inspection fallout'); } };
   const transcode = { close() { assert.equal(this, transcode); calls.push('transcode'); throw new Error('transcode fallout'); } };
@@ -68,11 +69,11 @@ test('application drain captures all seven receivers and attempts every known ow
   const organize = { close() { assert.equal(this, organize); calls.push('organize'); throw new Error('organize fallout'); } };
   const application = { importCandidateModule: { importCandidateExecutionWorker: execution, importCandidateMediaInspectionWorker: inspection,
     importCandidateTranscodeWorker: transcode, importCandidateApplyWorker: apply },
-    libraryModule: { libraryDiscoveryWorker: discovery, libraryOrganizeApplyWorker: organize, libraryScanWorker: scan } };
+    libraryModule: { libraryExternalIntakeWorker: intake, libraryDiscoveryWorker: discovery, libraryOrganizeApplyWorker: organize, libraryScanWorker: scan } };
   const pending = drainApplicationWorkerOwners(application); void pending.catch(() => {}); await entered.promise;
   application.importCandidateModule = {}; application.libraryModule = {};
-  assert.deepEqual(calls, ['discovery']); gate.reject(null);
-  await assert.rejects(pending, error => error === null); assert.deepEqual(calls, ['discovery', 'execution', 'inspection', 'transcode', 'apply', 'organize', 'scan']);
+  assert.deepEqual(calls, ['intake']); gate.reject(null);
+  await assert.rejects(pending, error => error === null); assert.deepEqual(calls, ['intake', 'discovery', 'execution', 'inspection', 'transcode', 'apply', 'organize', 'scan']);
 });
 
 for (const primary of [new Error('inspection cleanup'), null]) {

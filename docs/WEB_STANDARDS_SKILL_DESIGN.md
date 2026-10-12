@@ -344,3 +344,11 @@ They preserve scoped consent and distinguish local drainage from remote completi
 The [discovery design](DISCOVERY_DISPATCH_LIFETIME_DESIGN.md) owns implementation;
 pruning eligibility and explicit test selection are evidence-backed project rules.
 Existing skill entrypoint, metadata and invocation policy remain.
+
+External intake reference maintenance traces stored request normalization and
+guarded queue ownership through actual local completion. WHATWG parsing and
+OWASP destination policy remain distinct: transport/redirect controls need their
+actual outbound client owner. The [intake design](EXTERNAL_INTAKE_LIFETIME_DESIGN.md)
+owns the slice; pending execution and planning completion are separate facts.
+This extends the practical skill with evidence and adverse tests while retaining
+its entrypoint, metadata and invocation policy.

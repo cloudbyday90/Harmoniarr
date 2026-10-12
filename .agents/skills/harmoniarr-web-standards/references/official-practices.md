@@ -536,3 +536,14 @@ RFC 9110. Drain renewal and release before original eligible pruning; no extra
 ledger work follows thrown cleanup failure or lost/refused authority. W3C timing
 is still draft observation guidance. Explicit selected test paths must be verified
 before claiming coverage; this host's Node run ignored an unmatched selector.
+
+October 11 external-intake guidance uses docs/EXTERNAL_INTAKE_LIFETIME_RESEARCH_2026_10.md.
+WHATWG defines URL parsing; OWASP destination policy requires tracing actual
+clients, redirects and connection-time enforcement. A parsed allowlisted provider
+descriptor alone is not full SSRF proof. Keep stored active-request checks and
+normalized source forwarding at their existing owners. Await the local durable
+queue handoff and renewal/release completion without inferring child provider
+execution or remote completion. Node timer timing does not establish drainage;
+explicit completion replaces guessed unit waits. TC39 permits null rejection;
+preserve it through cleanup. W3C timing remains draft observation guidance, and
+RFC 9110 uncertainty rules still apply to non-idempotent transport retries.

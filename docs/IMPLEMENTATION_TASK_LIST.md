@@ -6,6 +6,29 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: External intake planning lifetime (2026-10-11)
+
+- Reproduce duplicate acquisition during held release, then own returned planning,
+  durable execution handoff and renewal/release through shared ESM services.
+  Preserve active stored request, normalized source, actor/recipient authority,
+  cancellation and guarded marks. Add concrete intake drainage before the seven
+  existing owners at startup and both app fixtures. Replace three guessed unit
+  waits with actual completion. See [design](EXTERNAL_INTAKE_LIFETIME_DESIGN.md),
+  [research](EXTERNAL_INTAKE_LIFETIME_RESEARCH_2026_10.md) and
+  [outcome](EXTERNAL_INTAKE_LIFETIME_OUTCOME.md).
+- Focused 190/190; complete fast 9,733 plus both builds; affected native 54/54
+  across seven verified files, including four new real PostgreSQL lifetime cases.
+  All have zero failures/cancellations/skips. Separate probe repeats are excluded
+  from unique coverage; no exhaustive-native or matched speedup claim.
+- Standards/testing skill maintenance, installed hashes and npm audit pass.
+  [Fresh PR assessment](OPEN_PR_APPLICABILITY_EXTERNAL_INTAKE_LIFETIME_2026_10_OUTCOME.md)
+  finds no eligible unreplayed patch; main only, no release or merge.
+- Next: provider-ingest execution completion through provider/collection work,
+  guarded progress and lease finalization, preserving request authority and
+  cancellation. Remaining workers/periodic producers precede residual-wait
+  removal or exhaustive scheduling changes; historical SQL-reset causes remain
+  unconfirmed.
+
 ## Completed slice: Library discovery dispatch lifetime (2026-10-11)
 
 - Reproduce duplicate acquisition during held release, then own returned

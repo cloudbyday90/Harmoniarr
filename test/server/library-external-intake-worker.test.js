@@ -48,7 +48,7 @@ test('startWorkerRun requeues the run when a maintenance pause is requested', as
     });
   });
 
-  await worker.startWorkerRun({
+  const { completion } = await worker.startWorkerRun({
     canonicalUrl: 'https://open.spotify.com/playlist/abc',
     mediaRequestId: 'req-paused',
     resourceType: 'playlist',
@@ -57,6 +57,8 @@ test('startWorkerRun requeues the run when a maintenance pause is requested', as
     sourceProvider: 'spotify',
   });
 
+  await completion;
+  await worker.close();
   const pausedArgs = await paused;
   const releasedLeaseArgs = await leaseReleased;
 
@@ -121,7 +123,7 @@ test('startWorkerRun queues planning via microtask and completes run on success'
     renewLease: null,
   });
 
-  worker.startWorkerRun({
+  const { completion } = await worker.startWorkerRun({
     canonicalUrl: 'https://open.spotify.com/playlist/abc',
     mediaRequestId: 'req-1',
     resourceType: 'playlist',
@@ -130,9 +132,8 @@ test('startWorkerRun queues planning via microtask and completes run on success'
     sourceProvider: 'spotify',
   });
 
-  await new Promise((resolve) => {
-    setTimeout(resolve, 10);
-  });
+  await completion;
+  await worker.close();
 
   assert.equal(acquireLease.mock.callCount(), 1);
   assert.equal(markRunStarted.mock.callCount(), 1);
@@ -164,7 +165,7 @@ test('startWorkerRun marks run failed on planning error', async (t) => {
     renewLease: null,
   });
 
-  worker.startWorkerRun({
+  const { completion } = await worker.startWorkerRun({
     canonicalUrl: 'https://open.spotify.com/album/xyz',
     mediaRequestId: 'req-2',
     resourceType: 'release',
@@ -173,9 +174,8 @@ test('startWorkerRun marks run failed on planning error', async (t) => {
     sourceProvider: 'spotify',
   });
 
-  await new Promise((resolve) => {
-    setTimeout(resolve, 10);
-  });
+  await completion;
+  await worker.close();
 
   assert.equal(markRunFailed.mock.callCount(), 1);
   assert.equal(markRunCompleted.mock.callCount(), 0);
@@ -203,12 +203,12 @@ test('startWorkerRun is idempotent for the same runId', async (t) => {
     renewLease: null,
   });
 
-  worker.startWorkerRun({ canonicalUrl: 'x', mediaRequestId: 'req-3', resourceType: 'release', runId: 'run-3', sourceIdentifier: 'z', sourceProvider: 'spotify' });
-  worker.startWorkerRun({ canonicalUrl: 'x', mediaRequestId: 'req-3', resourceType: 'release', runId: 'run-3', sourceIdentifier: 'z', sourceProvider: 'spotify' });
+  const { completion } = await worker.startWorkerRun({ canonicalUrl: 'x', mediaRequestId: 'req-3', resourceType: 'release', runId: 'run-3', sourceIdentifier: 'z', sourceProvider: 'spotify' });
+  const duplicate = await worker.startWorkerRun({ canonicalUrl: 'x', mediaRequestId: 'req-3', resourceType: 'release', runId: 'run-3', sourceIdentifier: 'z', sourceProvider: 'spotify' });
 
-  await new Promise((resolve) => {
-    setTimeout(resolve, 20);
-  });
+  assert.equal(duplicate.completion, completion);
+  await completion;
+  await worker.close();
 
   assert.equal(acquireLease.mock.callCount(), 1);
   assert.equal(markRunCompleted.mock.callCount(), 1);

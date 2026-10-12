@@ -590,3 +590,11 @@ separate from returned execution, and literal selector validation prevents silen
 coverage omissions. The [discovery outcome](DISCOVERY_DISPATCH_LIFETIME_OUTCOME.md)
 owns PostgreSQL/HTTP and structural evidence. This is narrow reference maintenance
 without a new blind trial, invocation change or conformance certification.
+
+External intake references locate stored source normalization, active request
+and guarded queue owners, then local handoff and captured lease drainage. They
+distinguish parsing from outbound SSRF enforcement and pending execution from
+completed provider work. The [intake outcome](EXTERNAL_INTAKE_LIFETIME_OUTCOME.md)
+owns PostgreSQL/parent-visible fixture and structural evidence. This is narrow
+reference maintenance without a new blind trial, invocation change or standards/
+security certification.

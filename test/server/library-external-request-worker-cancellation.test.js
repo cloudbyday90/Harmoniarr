@@ -46,7 +46,7 @@ test('planning worker marks cancellation before execution queueing as cancelled,
     planExternalMediaRequest: async () => plannedResult,
     queueExternalMediaRequestExecution: async () => { throw createOperationRunCancellationError({ runId: 'run-1' }); },
   });
-  await fixture.worker.startWorkerRun(run);
+  await (await fixture.worker.startWorkerRun(run)).completion;
   assert.deepEqual(await fixture.released, { expectedLease: leaseForTest('run-1'), runId: 'run-1', status: 'cancelled' });
   assert.equal(fixture.markRunCancelled.mock.callCount(), 1);
   assert.equal(fixture.markRunCompleted.mock.callCount(), 0);
@@ -64,7 +64,7 @@ test('planning worker rechecks operation cancellation before scheduling executio
     },
     queueExternalMediaRequestExecution,
   });
-  await fixture.worker.startWorkerRun(run);
+  await (await fixture.worker.startWorkerRun(run)).completion;
   assert.equal((await fixture.released).status, 'cancelled');
   assert.equal(queueExternalMediaRequestExecution.mock.callCount(), 0);
   assert.equal(fixture.markRunCompleted.mock.callCount(), 0);

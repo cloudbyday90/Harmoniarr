@@ -10,6 +10,7 @@ import { drainWorkerOwners } from './worker-owner-drain.js';
 /** Capture owned workers; apply can enqueue scan work before its own completion. */
 export function drainApplicationWorkerOwners({ importCandidateModule, libraryModule }) {
   return drainWorkerOwners([
+    libraryModule?.libraryExternalIntakeWorker,
     libraryModule?.libraryDiscoveryWorker,
     importCandidateModule?.importCandidateExecutionWorker,
     importCandidateModule?.importCandidateMediaInspectionWorker,

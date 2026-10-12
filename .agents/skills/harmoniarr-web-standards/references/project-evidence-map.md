@@ -293,3 +293,15 @@ execution, then inspection/transcode/apply/organize/scan. The discovery fixture
 registers completion before launch and preserves earlier observer errors beyond
 release. Dedicated documents own real PostgreSQL/HTTP proof, pruning eligibility
 and remaining external-intake/periodic limits.
+
+External intake planning now owns returned planning and durable queue handoff
+through admitted renewal and captured release in library/library-external-intake-worker.js.
+Planning reloads the active stored request and renormalizes sourceUrl; execution
+queueing rechecks active request and maintenance at its existing service owner.
+The worker forwards normalized returned descriptors and original actor/request
+identity, preserving cancellation before and after handoff. Completion does not
+include the queued provider executor, which still detaches its own launch.
+Application selection adds intake before discovery and the seven existing owners.
+Both native app fixtures gate persisted pending handoff then terminal planning
+before release, asserting resource/recipient/actor facts from the parent test.
+Dedicated intake documents own evidence and remaining executor/periodic limits.
