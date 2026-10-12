@@ -5,6 +5,16 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+Operator artist reconciliation now returns actual completion and terminal close.
+See `docs/OPERATOR_ARTIST_RECONCILIATION_LIFETIME_OUTCOME.md`: native tests hold
+scoped snapshot reads, required request-event transactions, real discovery
+reconciliation and release across both app fixtures. Assert resources and durable
+evidence outside swallowed callbacks. Parallel-task rejection must wait for all
+returned sibling reads, including the traced nested batches; preserve first
+observed Error/null. This does not certify hidden detached work or mutation-time
+policy/lease fencing. Keep each transaction on one client and retain per-release
+atomicity, cancellation checkpoints, deadlines and remaining fixture delay.
+
 ## Default Approach
 
 Run the smallest focused tests that prove the changed behavior, then broaden based on blast radius. Before commit or push, run the validation level appropriate to the risk.

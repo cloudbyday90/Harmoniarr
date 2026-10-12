@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { runParallelTasksAndDrain } from '../parallel-task-drain.js';
 import { createApiError } from '../auth.js';
 import { createLibraryDiscoveryRequestStore } from '../library/library-discovery-request-store.js';
 import { createLibraryMediaRequestStore } from '../library/library-media-request-store.js';
@@ -123,12 +124,12 @@ export function createOperatorArtistReconciliationExecutionService({
   } = {}) {
     await throwIfCancelled();
 
-    const [artistPayload, monitoring, snapshot, releaseSelections, trackOverrides] = await Promise.all([
-      readMetadataArtist({ artistId: metadataArtistId }),
-      readOperatorArtistMonitoring({ appUserId, metadataArtistId }),
-      readSnapshotById({ appUserId, metadataArtistId, snapshotId }),
-      readReleaseSelections({ appUserId, metadataArtistId }),
-      readTrackOverrides({ appUserId, metadataArtistId }),
+    const [artistPayload, monitoring, snapshot, releaseSelections, trackOverrides] = await runParallelTasksAndDrain([
+      () => readMetadataArtist({ artistId: metadataArtistId }),
+      () => readOperatorArtistMonitoring({ appUserId, metadataArtistId }),
+      () => readSnapshotById({ appUserId, metadataArtistId, snapshotId }),
+      () => readReleaseSelections({ appUserId, metadataArtistId }),
+      () => readTrackOverrides({ appUserId, metadataArtistId }),
     ]);
 
     if (!snapshot) {
@@ -173,10 +174,10 @@ export function createOperatorArtistReconciliationExecutionService({
       ),
     ];
 
-    const [libraryReleaseReconciliations, activeRequests, discoveryRequests] = await Promise.all([
-      readLibraryReleaseReconciliations({ metadataReleaseIds: desiredReleaseIds }),
-      readActiveRequests({ metadataReleaseIds: desiredReleaseIds }),
-      readDiscoveryRequests({ metadataReleaseIds: desiredReleaseIds }),
+    const [libraryReleaseReconciliations, activeRequests, discoveryRequests] = await runParallelTasksAndDrain([
+      () => readLibraryReleaseReconciliations({ metadataReleaseIds: desiredReleaseIds }),
+      () => readActiveRequests({ metadataReleaseIds: desiredReleaseIds }),
+      () => readDiscoveryRequests({ metadataReleaseIds: desiredReleaseIds }),
     ]);
 
     const reconciliationByReleaseId = new Map(

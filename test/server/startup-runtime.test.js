@@ -30,6 +30,8 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
   const requestDiscoveryCloseGate = Promise.withResolvers();
   const metadataCloseEntered = Promise.withResolvers();
   const metadataCloseGate = Promise.withResolvers();
+  const reconciliationCloseEntered = Promise.withResolvers();
+  const reconciliationCloseGate = Promise.withResolvers();
   let resolveShutdownComplete;
   const shutdownComplete = new Promise((resolve) => {
     resolveShutdownComplete = resolve;
@@ -308,6 +310,11 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
         },
       },
       metadataModule: {
+        operatorArtistReconciliationWorker: {
+          async close() {
+            callOrder.push('reconciliation.close'); reconciliationCloseEntered.resolve(); await reconciliationCloseGate.promise;
+          },
+        },
         operatorArtistReconciliationRecoverySweepService: { recoverFailedRuns: async () => ({ recoveredCount: 0 }) },
         metadataArtistRefreshService: {
           startMetadataArtistRefresh: async () => ({ accepted: true }),
@@ -508,6 +515,9 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     await waitForFixtureReady({ ready: metadataCloseEntered.promise, operation: shutdownComplete });
     assert.equal(callOrder.includes('intake.close'), false); assert.equal(callOrder.includes('closePool'), false);
     metadataCloseGate.resolve();
+    await waitForFixtureReady({ ready: reconciliationCloseEntered.promise, operation: shutdownComplete });
+    assert.equal(callOrder.includes('intake.close'), false); assert.equal(callOrder.includes('closePool'), false);
+    reconciliationCloseGate.resolve();
     await waitForFixtureReady({ ready: intakeCloseEntered.promise, operation: shutdownComplete });
     assert.equal(callOrder.includes('provider.close'), false); assert.equal(callOrder.includes('closePool'), false);
     intakeCloseGate.resolve();
@@ -537,7 +547,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     applyCloseGate.resolve();
     await waitForFixtureReady({ ready: organizeCloseEntered.promise, operation: shutdownComplete });
     assert.equal(callOrder.includes('scan.close'), false); assert.equal(callOrder.includes('closePool'), false);
-  } finally { metadataCloseGate.resolve(); intakeCloseGate.resolve(); providerCloseGate.resolve(); requestDiscoveryCloseGate.resolve(); discoveryCloseGate.resolve(); executionCloseGate.resolve(); inspectionCloseGate.resolve(); transcodeCloseGate.resolve(); applyCloseGate.resolve(); organizeCloseGate.resolve(); }
+  } finally { metadataCloseGate.resolve(); reconciliationCloseGate.resolve(); intakeCloseGate.resolve(); providerCloseGate.resolve(); requestDiscoveryCloseGate.resolve(); discoveryCloseGate.resolve(); executionCloseGate.resolve(); inspectionCloseGate.resolve(); transcodeCloseGate.resolve(); applyCloseGate.resolve(); organizeCloseGate.resolve(); }
   await shutdownComplete;
 
   assert.deepEqual(callOrder, [
@@ -573,6 +583,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'stop:queue',
     'server.close',
     'metadata.close',
+    'reconciliation.close',
     'intake.close',
     'provider.close',
     'requestDiscovery.close',

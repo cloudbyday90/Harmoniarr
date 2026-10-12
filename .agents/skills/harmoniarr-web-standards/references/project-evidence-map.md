@@ -347,3 +347,18 @@ transport, then gate actual catalog/schedule/release and parent-visible resource
 Wanted projection's fixture awaits actual metadata completion beyond release
 observation. Dedicated documents own native fencing/lifetime scope; queued
 operator reconciliation and other workers/periodic producers remain separate.
+
+Operator reconciliation now exposes actual completion/terminal close through
+metadata/operator-artist-reconciliation-worker.js. It preserves captured actor,
+artist, snapshot revision and cancellation forwarding. parallel-task-drain.js
+drains both execution read batches and the reached artist-payload, monitoring
+and snapshot-by-ID batches, retaining the first observed Error/null. Other
+parallel read paths need their own audit. Request materialization awaits each
+identity lock, request/required event transaction and returned discovery
+reconciliation, but does not receive a worker lease or recompare all policy at
+publication. Do not label completion as new mutation-time authorization fencing.
+Application captures this owner after metadata refresh and before the ten library/
+import owners. Native lifetime fixtures hold real snapshot, event, discovery and
+release, check resources outside best-effort callbacks, and verify scoped lookup,
+revision, cancellation and transaction rollback. Dedicated design/research/
+outcome documents own evidence and the policy/lease follow-up.

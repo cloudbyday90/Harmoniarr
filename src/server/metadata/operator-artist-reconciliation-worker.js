@@ -16,6 +16,9 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createWorkerTaskLifecycle } from '../worker-task-lifecycle.js';
+import { withWorkerTaskCleanup } from '../worker-task-cleanup.js';
+import { drainWorkerLease } from '../worker-lease-cleanup.js';
 import { isOperationRunLeaseLostError } from '../operation-run-lease-error.js';
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
 import {
@@ -39,7 +42,7 @@ export function createOperatorArtistReconciliationWorker({
   releaseLease,
   renewLease,
 } = {}) {
-  const activeRunIds = new Set();
+  const tasks = createWorkerTaskLifecycle({ execute: runReconciliation });
 
   async function runReconciliation({
     appUserId,
@@ -54,110 +57,113 @@ export function createOperatorArtistReconciliationWorker({
     let acquiredLease = null;
     let leaseHeartbeat = null;
 
-    try {
-      acquiredLease = await acquireLease({ runId });
-      if (!acquiredLease) return;
-      if (renewLease) {
-        leaseHeartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId, expectedLease: acquiredLease });
-        leaseHeartbeat.start();
-      }
+    return withWorkerTaskCleanup(async () => {
+      try {
+        acquiredLease = await acquireLease({ runId });
+        if (!acquiredLease) return;
+        if (renewLease) {
+          leaseHeartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId, expectedLease: acquiredLease });
+          leaseHeartbeat.start();
+        }
 
-      await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
-      if (await markRunStarted({
-        expectedLease: acquiredLease,
-        runId,
-        summary: {
-          appUserId,
-          artistName,
-          currentStep: 'Reconciling operator artist snapshot',
-          metadataArtistId,
-          snapshotId,
-          snapshotRevision,
-          triggerSource,
-        },
-      }) === false) { finalLeaseStatus = 'failed'; return; }
-
-      const result = await executeOperatorArtistReconciliation({
-        appUserId,
-        metadataArtistId,
-        snapshotId,
-        snapshotRevision,
-        throwIfCancelled: () => throwIfOperationRunCancellationRequested({ isCancellationRequested, runId }),
-      });
-
-      if (await markRunCompleted({
-        expectedLease: acquiredLease,
-        runId,
-        summary: {
-          appUserId,
-          artistName,
-          currentStep: 'Artist reconciliation completed',
-          metadataArtistId,
-          ...result,
-          triggerSource,
-        },
-      }) === false) { finalLeaseStatus = 'failed'; return; }
-    } catch (error) {
-      if (!acquiredLease || isOperationRunLeaseLostError(error)) { finalLeaseStatus = 'failed'; return; }
-      if (isOperationRunPauseError(error)) {
-        finalLeaseStatus = 'paused';
-        if (await markRunPaused({
-          expectedLease: acquiredLease,
-          nextAttemptAt: error.nextRetryAt ?? null,
-          runId,
-          summary: {
-            appUserId,
-            artistName,
-            currentStep: 'Artist reconciliation paused by maintenance lock',
-            metadataArtistId,
-            pauseCode: error.pauseCode ?? null,
-            pauseMessage: error.message,
-            pauseProvider: error.pauseProvider ?? null,
-            snapshotId,
-            snapshotRevision,
-            triggerSource,
-          },
-        }) === false) { finalLeaseStatus = 'failed'; return; }
-        return;
-      }
-
-      if (isOperationRunCancellationError(error)) {
-        finalLeaseStatus = 'cancelled';
-        if (await markRunCancelled({
+        await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
+        if (await markRunStarted({
           expectedLease: acquiredLease,
           runId,
           summary: {
             appUserId,
             artistName,
-            currentStep: 'Artist reconciliation cancelled',
+            currentStep: 'Reconciling operator artist snapshot',
             metadataArtistId,
             snapshotId,
             snapshotRevision,
             triggerSource,
           },
         }) === false) { finalLeaseStatus = 'failed'; return; }
-        return;
-      }
 
-      finalLeaseStatus = 'failed';
-      if (await markRunFailed({
-        expectedLease: acquiredLease,
-        errorMessage: error.message,
-        runId,
-        summary: {
+        const result = await executeOperatorArtistReconciliation({
           appUserId,
-          artistName,
           metadataArtistId,
           snapshotId,
           snapshotRevision,
-          triggerSource,
-        },
-      }) === false) { finalLeaseStatus = 'failed'; return; }
-    } finally {
-      leaseHeartbeat?.stop();
-      activeRunIds.delete(runId);
-      if (acquiredLease) await releaseLease({ runId, status: finalLeaseStatus, expectedLease: acquiredLease });
-    }
+          throwIfCancelled: () => throwIfOperationRunCancellationRequested({ isCancellationRequested, runId }),
+        });
+
+        if (await markRunCompleted({
+          expectedLease: acquiredLease,
+          runId,
+          summary: {
+            appUserId,
+            artistName,
+            currentStep: 'Artist reconciliation completed',
+            metadataArtistId,
+            ...result,
+            triggerSource,
+          },
+        }) === false) { finalLeaseStatus = 'failed'; return; }
+      } catch (error) {
+        if (!acquiredLease) {
+          finalLeaseStatus = 'failed';
+          if (error?.code === 'operation_run_lease_unavailable' || isOperationRunLeaseLostError(error)) return;
+          throw error;
+        }
+        if (isOperationRunLeaseLostError(error)) { finalLeaseStatus = 'failed'; return; }
+        if (isOperationRunPauseError(error)) {
+          finalLeaseStatus = 'paused';
+          if (await markRunPaused({
+            expectedLease: acquiredLease,
+            nextAttemptAt: error.nextRetryAt ?? null,
+            runId,
+            summary: {
+              appUserId,
+              artistName,
+              currentStep: 'Artist reconciliation paused by maintenance lock',
+              metadataArtistId,
+              pauseCode: error.pauseCode ?? null,
+              pauseMessage: error.message,
+              pauseProvider: error.pauseProvider ?? null,
+              snapshotId,
+              snapshotRevision,
+              triggerSource,
+            },
+          }) === false) { finalLeaseStatus = 'failed'; return; }
+          return;
+        }
+
+        if (isOperationRunCancellationError(error)) {
+          finalLeaseStatus = 'cancelled';
+          if (await markRunCancelled({
+            expectedLease: acquiredLease,
+            runId,
+            summary: {
+              appUserId,
+              artistName,
+              currentStep: 'Artist reconciliation cancelled',
+              metadataArtistId,
+              snapshotId,
+              snapshotRevision,
+              triggerSource,
+            },
+          }) === false) { finalLeaseStatus = 'failed'; return; }
+          return;
+        }
+
+        finalLeaseStatus = 'failed';
+        if (await markRunFailed({
+          expectedLease: acquiredLease,
+          errorMessage: error?.message ?? 'Operator artist reconciliation failed',
+          runId,
+          summary: {
+            appUserId,
+            artistName,
+            metadataArtistId,
+            snapshotId,
+            snapshotRevision,
+            triggerSource,
+          },
+        }) === false) { finalLeaseStatus = 'failed'; return; }
+      }
+    }, () => drainWorkerLease({ heartbeat: leaseHeartbeat, lease: acquiredLease, releaseLease, runId, status: finalLeaseStatus }));
   }
 
   async function startWorkerRun({
@@ -169,25 +175,11 @@ export function createOperatorArtistReconciliationWorker({
     snapshotRevision,
     triggerSource = 'save',
   }) {
-    if (activeRunIds.has(runId)) {
-      return;
-    }
-
-    activeRunIds.add(runId);
-    queueMicrotask(() => {
-      void runReconciliation({
-        appUserId,
-        artistName,
-        metadataArtistId,
-        runId,
-        snapshotId,
-        snapshotRevision,
-        triggerSource,
-      });
-    });
+    return { completion: tasks.start({ appUserId, artistName, metadataArtistId, runId, snapshotId, snapshotRevision, triggerSource }) };
   }
 
   return {
     startWorkerRun,
+    close: tasks.close,
   };
 }

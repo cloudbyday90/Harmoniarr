@@ -6,6 +6,29 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Operator artist reconciliation lifetime (2026-10-12)
+
+- Reproduce held-release duplicate admission and fail-fast sibling read escape.
+  Own returned execution/status/renewal/release through shared ESM lifecycle,
+  and drain both input batches plus their traced nested reads. Preserve captured
+  actor/snapshot, cancellation, scoped revision validation and request/event
+  transactions. Capture twelve concrete application owners in production and
+  both app fixtures. See [design](OPERATOR_ARTIST_RECONCILIATION_LIFETIME_DESIGN.md),
+  [research](OPERATOR_ARTIST_RECONCILIATION_LIFETIME_RESEARCH_2026_10.md) and
+  [outcome](OPERATOR_ARTIST_RECONCILIATION_LIFETIME_OUTCOME.md).
+- Focused 264/264; complete fast 9,824 plus both builds; affected native 60/60
+  across thirteen verified files, including eight new request/discovery/resource/
+  refusal/rollback cases. Zero failures/cancellations/skips. Stable source gates
+  ran once; no exhaustive-native or matched speedup claim.
+- Standards/testing skill maintenance, installed hashes and npm audit pass.
+  [Fresh PR assessment](OPEN_PR_APPLICABILITY_OPERATOR_RECONCILIATION_LIFETIME_2026_10_OUTCOME.md)
+  finds no eligible unreplayed revision; main only, no release or merge.
+- Next: mutation-time snapshot/current-policy/lease fencing in request
+  materialization. Scoped read validation and worker status authority alone do
+  not supply that transaction guard. Preserve save-lock order, duplicate handling,
+  required events and cancellation. Remaining worker/periodic ownership still
+  precedes residual-wait removal; historical SQL-reset causes remain unconfirmed.
+
 ## Completed slice: Metadata artist refresh lifetime (2026-10-12)
 
 - Reproduce duplicate acquisition during held release, then own returned catalog/

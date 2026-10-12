@@ -582,3 +582,16 @@ captured/cloned worker context is separate from mere queued acceptance. Retain
 returned catalog, wanted/queue/detection and scheduler work through lease cleanup.
 W3C timing remains draft observation guidance, not a schedule-policy mandate.
 TC39 permits null rejection; preserve original failures while finishing cleanup.
+
+October 12 operator-reconciliation guidance uses
+docs/OPERATOR_ARTIST_RECONCILIATION_LIFETIME_RESEARCH_2026_10.md. TC39 allSettled
+owns returned parallel tasks through sibling failures; preserve first observed
+rejection, including null, and ordered successful values. Trace nested batches
+at the actual called read paths; changing an outer Promise.all alone cannot own
+hidden sibling work. Driver transactions still require one client and sequential
+request/event publication. Pool end does not own future worker queries. OWASP
+relationship checks apply at their owning boundary: actor-scoped snapshot lookup
+and revision validation do not establish mutation-time policy or lease authority.
+Keep those security claims distinct from lifecycle completion. W3C timing remains
+draft observation guidance; retain its source status and avoid speedup claims
+from unmatched or overlapping gates.

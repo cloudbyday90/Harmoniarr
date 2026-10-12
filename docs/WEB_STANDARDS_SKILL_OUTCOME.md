@@ -606,6 +606,15 @@ partial-result policy and the distinct hidden post-abort boundary. The
 publication/cancellation and structural evidence. This is narrow reference
 maintenance without a new blind trial or conformance certification.
 
+Operator reconciliation references now locate completion, the narrow parallel
+task helper and twelve captured application owners. They explicitly distinguish
+scoped snapshot/revision validation from publication authority. The
+[reconciliation outcome](OPERATOR_ARTIST_RECONCILIATION_LIFETIME_OUTCOME.md)
+owns executed read, request/event, discovery, resource and rollback evidence.
+Source and installed copies are structurally validated and hash-compared before
+publication. This is reference maintenance; no new skill entrypoint, blind trial
+or standards-conformance certification is claimed.
+
 External-request discovery references locate approved intent/current target
 guards, candidate transaction/audit, actual completion and ten concrete app owners.
 The bounded dispatch harness awaits execution rather than polling terminal status.

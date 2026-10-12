@@ -373,3 +373,11 @@ separate a completed local batch, a ready collection, remote work and hidden
 post-abort settlement. The [provider design](PROVIDER_INGEST_LIFETIME_DESIGN.md)
 owns this slice and its native transport/publication evidence. Existing skill
 entrypoint, metadata and invocation policy remain.
+
+Operator reconciliation maintenance follows actual completion through returned
+parallel reads, nested read batches, request/event transactions and discovery
+reconciliation. It preserves first observed Error/null after sibling settlement
+and distinguishes snapshot identity/revision checks from mutation-time policy and
+lease fencing. The [reconciliation design](OPERATOR_ARTIST_RECONCILIATION_LIFETIME_DESIGN.md)
+owns this slice. This updates concrete references; skill metadata and invocation
+policy stay unchanged, without a new blind trial or conformance claim.

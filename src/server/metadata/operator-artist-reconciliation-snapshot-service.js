@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { runParallelTasksAndDrain } from '../parallel-task-drain.js';
 import { getPool } from '../database.js';
 import { createOperatorArtistReconciliationSnapshotStore } from './operator-artist-reconciliation-snapshot-store.js';
 
@@ -108,9 +109,9 @@ export function createOperatorArtistReconciliationSnapshotService({
     metadataArtistId,
     snapshotId,
   }) {
-    await Promise.all([
-      ensureUserExists(appUserId),
-      ensureArtistExists(metadataArtistId),
+    await runParallelTasksAndDrain([
+      () => ensureUserExists(appUserId),
+      () => ensureArtistExists(metadataArtistId),
     ]);
 
     return operatorArtistReconciliationSnapshotStore.getOperatorArtistReconciliationSnapshotById({

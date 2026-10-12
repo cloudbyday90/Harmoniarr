@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { runParallelTasksAndDrain } from '../parallel-task-drain.js';
 import { getPool } from '../database.js';
 import {
   defaultOperatorArtistMonitoringPolicy,
@@ -166,9 +167,9 @@ export function createOperatorArtistMonitoringService({
   }
 
   async function getOperatorArtistMonitoring({ appUserId, metadataArtistId }) {
-    await Promise.all([
-      ensureUserExists(appUserId),
-      ensureArtistExists(metadataArtistId),
+    await runParallelTasksAndDrain([
+      () => ensureUserExists(appUserId),
+      () => ensureArtistExists(metadataArtistId),
     ]);
 
     return operatorArtistMonitoringStore.getOperatorArtistMonitoring({

@@ -7,10 +7,11 @@
 
 import { drainWorkerOwners } from './worker-owner-drain.js';
 
-/** Capture owned workers; apply can enqueue scan work before its own completion. */
+/** Capture producers before consumers; metadata refresh can queue artist reconciliation. */
 export function drainApplicationWorkerOwners({ importCandidateModule, libraryModule, metadataModule }) {
   return drainWorkerOwners([
     metadataModule?.metadataArtistRefreshWorker,
+    metadataModule?.operatorArtistReconciliationWorker,
     libraryModule?.libraryExternalIntakeWorker,
     libraryModule?.libraryProviderIngestExecutionWorker,
     libraryModule?.libraryExternalRequestDiscoveryWorker,

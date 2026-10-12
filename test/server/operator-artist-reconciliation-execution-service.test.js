@@ -2,6 +2,34 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createOperatorArtistReconciliationExecutionService } from '../../src/server/metadata/operator-artist-reconciliation-execution-service.js';
 
+for (const batch of ['inputs', 'requests']) {
+  for (const primary of [new Error('parallel read'), null]) {
+    test(`reconciliation drains ${batch} siblings before reporting ${primary === null ? 'null' : 'Error'}`, async () => {
+      const gate = Promise.withResolvers(); const entered = Promise.withResolvers(); let settled = false; let materialized = false;
+      const held = async () => { entered.resolve(); await gate.promise; return []; };
+      const fail = async () => { throw primary; };
+      const service = createOperatorArtistReconciliationExecutionService({
+        getMetadataArtist: batch === 'inputs' ? fail : async () => ({ artist: { name: 'Artist' }, releaseGroups: [], releases: [] }),
+        getOperatorArtistMonitoring: async () => null,
+        getOperatorArtistReconciliationSnapshotById: async () => {
+          if (batch === 'inputs') await held(); return { id: 'snapshot', snapshotRevision: 4 };
+        },
+        listOperatorReleaseGroupSelections: async () => [], listOperatorTrackOverrides: async () => [],
+        listActiveRequestsByMetadataReleaseIds: batch === 'requests' ? fail : async () => [],
+        listDiscoveryRequestsByMetadataReleaseIds: batch === 'requests' ? held : async () => [],
+        listLibraryReleaseReconciliationsByMetadataReleaseIds: async () => [],
+        operatorArtistReconciliationRequestService: { materializeDesiredReleaseRequests: async () => { materialized = true; return {}; } },
+      });
+      const pending = service.executeOperatorArtistReconciliation({ appUserId: 'operator', metadataArtistId: 'artist', snapshotId: 'snapshot', snapshotRevision: 4 });
+      void pending.then(() => { settled = true; }, () => { settled = true; });
+      await entered.promise;
+      try { await new Promise(resolve => { setImmediate(resolve); }); assert.equal(settled, false); assert.equal(materialized, false); }
+      finally { gate.resolve(); await pending.catch(() => {}); }
+      await assert.rejects(pending, error => error === primary); assert.equal(materialized, false);
+    });
+  }
+}
+
 test('executeOperatorArtistReconciliation loads the saved snapshot and summarizes operator state', async () => {
   const throwIfCancelled = async () => {};
   const service = createOperatorArtistReconciliationExecutionService({

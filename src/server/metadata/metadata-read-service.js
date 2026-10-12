@@ -20,6 +20,7 @@ import { mapMetadataReleaseGroup as mapReleaseGroup } from './metadata-release-g
 import { mapMetadataRelease as mapRelease } from './metadata-release-presentation.js';
 import { normalizeMetadataArtistReadView } from './metadata-artist-read-view.js';
 import { createMetadataArtistProjectionStore } from './metadata-artist-projection-store.js';
+import { runParallelTasksAndDrain } from '../parallel-task-drain.js';
 import { getPool } from '../database.js';
 import { createMetadataMonitoredArtistStore } from './metadata-monitored-artist-store.js';
 import { createMetadataReleaseDetectionService } from './metadata-release-detection-service.js';
@@ -133,12 +134,12 @@ export function createMetadataReadService({
       throw createMetadataNotFoundError('artist', 'unknown');
     }
 
-    const [aliases, detectionEventsPage, monitoring, releaseGroups, releases] = await Promise.all([
-      listMetadataArtistAliases(artist.id, pool),
-      metadataReleaseDetectionService.listDetectionEventsPageForArtist({ metadataArtistId: artist.id }),
-      metadataMonitoredArtistStore.getArtistMonitoringStatus(artist.id),
-      listMetadataReleaseGroupsByArtistId(artist.id, pool),
-      listMetadataReleasesByArtistId(artist.id, pool),
+    const [aliases, detectionEventsPage, monitoring, releaseGroups, releases] = await runParallelTasksAndDrain([
+      () => listMetadataArtistAliases(artist.id, pool),
+      () => metadataReleaseDetectionService.listDetectionEventsPageForArtist({ metadataArtistId: artist.id }),
+      () => metadataMonitoredArtistStore.getArtistMonitoringStatus(artist.id),
+      () => listMetadataReleaseGroupsByArtistId(artist.id, pool),
+      () => listMetadataReleasesByArtistId(artist.id, pool),
     ]);
 
     return {

@@ -57,9 +57,10 @@ test('app drain waits for apply before scan, drains scan after apply null and pr
   assert.equal(settled, true);
 });
 
-test('application drain captures all eleven receivers and attempts every known owner after metadata null', async () => {
+test('application drain captures all twelve receivers and attempts every known owner after metadata null', async () => {
   const gate = Promise.withResolvers(); const entered = Promise.withResolvers(); const calls = [];
   const metadata = { close() { assert.equal(this, metadata); calls.push('metadata'); entered.resolve(); return gate.promise; } };
+  const reconciliation = { close() { assert.equal(this, reconciliation); calls.push('reconciliation'); throw new Error('reconciliation fallout'); } };
   const intake = { close() { assert.equal(this, intake); calls.push('intake'); throw new Error('intake fallout'); } };
   const provider = { close() { assert.equal(this, provider); calls.push('provider'); throw new Error('provider fallout'); } };
   const requestDiscovery = { close() { assert.equal(this, requestDiscovery); calls.push('requestDiscovery'); throw new Error('request discovery fallout'); } };
@@ -72,13 +73,13 @@ test('application drain captures all eleven receivers and attempts every known o
   const organize = { close() { assert.equal(this, organize); calls.push('organize'); throw new Error('organize fallout'); } };
   const application = { importCandidateModule: { importCandidateExecutionWorker: execution, importCandidateMediaInspectionWorker: inspection,
     importCandidateTranscodeWorker: transcode, importCandidateApplyWorker: apply },
-    metadataModule: { metadataArtistRefreshWorker: metadata },
+    metadataModule: { metadataArtistRefreshWorker: metadata, operatorArtistReconciliationWorker: reconciliation },
     libraryModule: { libraryExternalIntakeWorker: intake, libraryProviderIngestExecutionWorker: provider, libraryExternalRequestDiscoveryWorker: requestDiscovery,
       libraryDiscoveryWorker: discovery, libraryOrganizeApplyWorker: organize, libraryScanWorker: scan } };
   const pending = drainApplicationWorkerOwners(application); void pending.catch(() => {}); await entered.promise;
   application.importCandidateModule = {}; application.libraryModule = {}; application.metadataModule = {};
   assert.deepEqual(calls, ['metadata']); gate.reject(null);
-  await assert.rejects(pending, error => error === null); assert.deepEqual(calls, ['metadata', 'intake', 'provider', 'requestDiscovery', 'discovery', 'execution', 'inspection', 'transcode', 'apply', 'organize', 'scan']);
+  await assert.rejects(pending, error => error === null); assert.deepEqual(calls, ['metadata', 'reconciliation', 'intake', 'provider', 'requestDiscovery', 'discovery', 'execution', 'inspection', 'transcode', 'apply', 'organize', 'scan']);
 });
 
 for (const primary of [new Error('inspection cleanup'), null]) {
@@ -91,6 +92,19 @@ for (const primary of [new Error('inspection cleanup'), null]) {
     }, libraryModule: { libraryScanWorker: { close: async () => { calls.push('scan'); throw new Error('scan fallout'); } } } };
     await assert.rejects(drainApplicationWorkerOwners(application), error => error === primary);
     assert.deepEqual(calls, ['execution', 'inspection', 'apply', 'scan']);
+  });
+}
+
+for (const primary of [new Error('reconciliation cleanup'), null]) {
+  test(`reconciliation ${primary === null ? 'null' : 'Error'} stays primary while following library owners drain`, async () => {
+    const calls = [];
+    const application = { metadataModule: { metadataArtistRefreshWorker: { close: async () => { calls.push('metadata'); } },
+      operatorArtistReconciliationWorker: { close: async () => { calls.push('reconciliation'); throw primary; } } }, libraryModule: {
+      libraryDiscoveryWorker: { close: async () => { calls.push('discovery'); throw new Error('discovery fallout'); } },
+      libraryScanWorker: { close: async () => { calls.push('scan'); } },
+    } };
+    await assert.rejects(drainApplicationWorkerOwners(application), error => error === primary);
+    assert.deepEqual(calls, ['metadata', 'reconciliation', 'discovery', 'scan']);
   });
 }
 
