@@ -441,3 +441,10 @@ and fixed-cardinality OTel principles. The
 [verification design](WANTED_RECEIPT_VERIFICATION_DESIGN.md) owns the modular
 collector/verifier alternatives. This update adds no exporter or general audit
 requirement; fresh protected-boundary checks continue to own authority.
+
+Root-lookup reference maintenance adds same-client joined-context and missing/
+JSON-null/default semantics, with the
+[root design](WANTED_ROOT_LOOKUP_DESIGN.md) owning alternatives. Keep actual
+query-count/byte evidence separate from performance claims and register profiling
+completion through cancellation. Entry-point metadata and invocation policy stay
+unchanged; this extends the existing server-diagnostics route.

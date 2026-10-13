@@ -103,3 +103,9 @@ The acquisition map now locates the modular Wanted receipt verifier and separate
 optional diagnostics from current owner/scope/byte authority and required audit.
 The [verification outcome](WANTED_RECEIPT_VERIFICATION_OUTCOME.md) owns application
 proof. Maintained/installed structure and hashes pass; no new blind trial is claimed.
+
+The map also locates fresh joined owner/root context, preserving absent/default
+versus explicit-null settings and disabled-owner/private-root refusal. The
+[root outcome](WANTED_ROOT_LOOKUP_OUTCOME.md) owns attributed scaling and retained
+failures; query consolidation grants no consent or historical availability.
+Maintained/installed structure and hashes pass without a new blind trial.

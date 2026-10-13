@@ -9,6 +9,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { realpath } from 'node:fs/promises';
 import { getPool } from '../database.js';
 import { loadSettings } from '../settings.js';
+import { getDefaultSettings } from '../validators/settings-validator.js';
 import { buildUserMusicRootPath } from '../paths/user-music-root-service.js';
 import { createOperatorTrackAcquisitionStore } from './operator-track-acquisition-store.js';
 import { refuseOperatorTrackFiles } from './operator-track-file-policy.js';
@@ -17,11 +18,19 @@ const normalize = value => typeof value === 'string' ? value.replaceAll('\\', '/
 const within = (filePath, root) => path.resolve(normalize(filePath)).toLowerCase().startsWith(`${path.resolve(normalize(root)).toLowerCase()}/`);
 
 export function createOperatorTrackDeliveryPlanService({ getPoolFn = getPool,
-  store = createOperatorTrackAcquisitionStore({ getPoolFn }), loadSettingsFn = loadSettings, realpathFn = realpath } = {}) {
+  store = createOperatorTrackAcquisitionStore({ getPoolFn }), loadSettingsFn = loadSettings, realpathFn = realpath,
+  useCombinedRootRead = true } = {}) {
   async function resolvePrivateOwnerRoot({ ownerId, queryable = null, settings = null }) {
-    const currentSettings = settings ?? await loadSettingsFn(queryable ?? getPoolFn());
-    const musicRoot = currentSettings.paths?.music;
-    const owner = await store.readDeliveryOwner({ ownerId, queryable });
+    let musicRoot; let owner;
+    if (settings === null && useCombinedRootRead === true && loadSettingsFn === loadSettings && typeof store.readOwnerRootContext === 'function') {
+      const context = await store.readOwnerRootContext({ ownerId, queryable });
+      owner = context?.owner;
+      musicRoot = context?.hasMusicRootSetting ? context.musicRoot : getDefaultSettings().paths.music;
+    } else {
+      const currentSettings = settings ?? await loadSettingsFn(queryable ?? getPoolFn());
+      musicRoot = currentSettings.paths?.music;
+      owner = await store.readDeliveryOwner({ ownerId, queryable });
+    }
     if (!musicRoot || !owner || owner.is_disabled === true || !owner.managed_library_relative_root) throw refuseOperatorTrackFiles();
     const root = buildUserMusicRootPath({ musicRoot, relativeRoot: owner.managed_library_relative_root });
     try {

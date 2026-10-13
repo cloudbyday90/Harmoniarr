@@ -12,12 +12,13 @@ import { createLibraryWantedReleaseService } from '../../src/server/library/libr
 import { seedOperatorReconciliationLifetimeRun } from './operator-reconciliation-lifetime-fixture.js';
 import { executeOperatorReconciliationFixtureRun } from './operator-reconciliation-execution-fixture.js';
 
-export async function seedOperatorTrackUnionFixture() {
+export async function seedOperatorTrackUnionFixture({ durationSeconds = 2 } = {}) {
+  if (![2, 30].includes(durationSeconds)) throw new TypeError('Unknown controlled track duration');
   const fixture = await seedOperatorReconciliationLifetimeRun();
   const pool = getPool();
-  await pool.query('UPDATE metadata_tracks SET length_ms=2000 WHERE id=$1', [fixture.metadata.metadataTrackId]);
+  await pool.query('UPDATE metadata_tracks SET length_ms=$2 WHERE id=$1', [fixture.metadata.metadataTrackId, durationSeconds * 1000]);
   await pool.query(`INSERT INTO metadata_tracks(metadata_medium_id,metadata_recording_id,position,title,length_ms)
-    VALUES($1,$2,2,'Second track',2000),($1,$2,3,'Unrequested third',2000)`, [fixture.metadata.metadataMediumId, fixture.metadata.metadataRecordingId]);
+    VALUES($1,$2,2,'Second track',$3),($1,$2,3,'Unrequested third',$3)`, [fixture.metadata.metadataMediumId, fixture.metadata.metadataRecordingId, durationSeconds * 1000]);
   await pool.query('UPDATE metadata_releases SET track_count=3 WHERE id=$1', [fixture.metadata.metadataReleaseId]);
   const recording = (await pool.query('SELECT musicbrainz_recording_id FROM metadata_recordings WHERE id=$1', [fixture.metadata.metadataRecordingId])).rows[0].musicbrainz_recording_id;
   const saves = createOperatorArtistSaveService({ getOperatorArtistProjection: async () => null,

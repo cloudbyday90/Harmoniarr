@@ -6,6 +6,26 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Wanted root lookup consolidation (October 2026)
+
+The [root lookup design](WANTED_ROOT_LOOKUP_DESIGN.md),
+[official research](WANTED_ROOT_LOOKUP_RESEARCH_2026_10.md) and
+[outcome](WANTED_ROOT_LOOKUP_OUTCOME.md) own a fresh joined owner/music-setting
+read and fixed reader phases. Missing setting/default and explicit JSON null
+remain distinct; custom sources, owner eligibility, current roots/bytes and every
+guarded write/event recheck retain their existing contracts. No cache or query
+parallelism. At 48 historical receipts, query calls drop from 113 to 65 while
+actual hash/byte work and complete projection DTOs stay identical.
+
+- Validation: 51 focused cases, frozen fast gate 10,022 cases/static checks/builds
+  and 117/117 affected native cases across eighteen serial files pass. Five skill
+  validators/seven installed hashes and zero-vulnerability dependency audit pass.
+  The outcome retains initial expectation errors/timeout and separately reviewed
+  isolation, final samples and unchanged code hashes.
+- Next: profile bounded fingerprint stream buffer sizes with current evidence,
+  identical bytes, memory bounds and alternating samples. Preserve all fresh
+  protected-boundary checks; do not introduce a hash cache.
+
 ## Completed slice: Wanted receipt verification diagnostics (2026-10-12)
 
 The [verification design](WANTED_RECEIPT_VERIFICATION_DESIGN.md),

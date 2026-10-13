@@ -51,7 +51,7 @@ export function createLibraryWantedReleaseReader({
       ?? createOperatorTrackOverrideStore({ getPoolFn: () => queryable }).listOperatorTrackOverrides;
     const readAvailability = listLibraryReleaseReconciliationsByMetadataReleaseIds
       ?? createLibraryReleaseReconciliationStore({ getPoolFn: () => queryable }).listReconciliationsByMetadataReleaseIds;
-    const snapshot = await readMonitoring({ queryable });
+    const snapshot = await verificationObserver.measure('monitoring_read', () => readMonitoring({ queryable }));
     if (!Array.isArray(snapshot)) throw invalid();
     const monitored = capture({ rows: snapshot.filter((row) => row?.isMonitored === true
       && typeof row.appUserId === 'string' && row.appUserId.length > 0
@@ -62,7 +62,7 @@ export function createLibraryWantedReleaseReader({
       const { appUserId, metadataArtistId } = monitoring;
       let payload;
       try {
-        payload = await readArtist({ artistId: metadataArtistId, queryable });
+        payload = await verificationObserver.measure('metadata_read', () => readArtist({ artistId: metadataArtistId, queryable }));
       } catch (error) {
         if (error?.code !== 'metadata_not_found' || error?.status !== 404) throw error;
         results.push({ wantedReleases: [], source: capture({ monitoring, missingMetadataArtist: true }) });
@@ -71,18 +71,19 @@ export function createLibraryWantedReleaseReader({
       if (!payload || payload.artist?.id !== metadataArtistId
         || !Array.isArray(payload.releaseGroups) || !Array.isArray(payload.releases)) throw invalid();
       const artistPayload = capture({ artistPayload: payload }).artistPayload;
-      const selections = capture({ rows: await readSelections({ appUserId, metadataArtistId, queryable }) }).rows;
-      const overrides = capture({ rows: await readOverrides({ appUserId, metadataArtistId, queryable }) }).rows;
+      const selections = capture({ rows: await verificationObserver.measure('selections_read', () => readSelections({ appUserId, metadataArtistId, queryable })) }).rows;
+      const overrides = capture({ rows: await verificationObserver.measure('overrides_read', () => readOverrides({ appUserId, metadataArtistId, queryable })) }).rows;
       if (!Array.isArray(selections) || !Array.isArray(overrides)) throw invalid();
       const inputs = capture({ monitoring, artistPayload, releaseGroupSelections: selections, trackOverrides: overrides });
       const metadataReleaseIds = [...new Set((inputs.artistPayload?.releases ?? []).map((release) => release?.id)
         .filter((id) => typeof id === 'string' && id.length > 0))];
       const availability = metadataReleaseIds.length
-        ? await readAvailability({ metadataReleaseIds, queryable }) : [];
+        ? await verificationObserver.measure('availability_read', () => readAvailability({ metadataReleaseIds, queryable })) : [];
       if (!Array.isArray(availability)) throw invalid();
       const readFulfillment = listTrackFulfillment ?? createOperatorTrackAcquisitionStore({ getPoolFn: () => queryable }).listFulfillment;
       const needsTrackFulfillment = inputs.trackOverrides.some(override => override.isDesired === true);
-      const receipts = needsTrackFulfillment && metadataReleaseIds.length ? await readFulfillment({ ownerId: appUserId, metadataReleaseIds, queryable }) : [];
+      const receipts = needsTrackFulfillment && metadataReleaseIds.length
+        ? await verificationObserver.measure('receipts_read', () => readFulfillment({ ownerId: appUserId, metadataReleaseIds, queryable })) : [];
       const trackFulfillment = [];
       const trackSources = [];
       verificationObserver.increment('receiptRows', receipts.length);

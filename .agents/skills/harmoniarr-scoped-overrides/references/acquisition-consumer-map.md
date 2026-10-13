@@ -9,6 +9,12 @@ counts only when explicitly enabled. See docs/WANTED_RECEIPT_VERIFICATION_OUTCOM
 Keep current owner/scope/private-root checks at every guard; optional diagnostic
 failure cannot replace domain Error/null or required transactional audit.
 
+The root-context store consolidates only the current owner and music setting.
+Preserve setting absence versus explicit null, disabled-owner refusal and actual
+root containment on every receipt. Reduced round trips grant no recipient consent
+or historical availability. See docs/WANTED_ROOT_LOOKUP_OUTCOME.md for scaling
+profiles and the retained current-byte/event guards.
+
 Negative scan observations now bind the original scan acquisition, private root
 and pre-walk receipt revision (docs/SCAN_RECEIPT_INVALIDATION_OUTCOME.md). They
 retain historical receipts and do not lower verification or grant provider replay.

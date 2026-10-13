@@ -5,6 +5,16 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+Root-lookup profiling must retain identical projections and actual hash/byte work
+with alternating samples on one borrowed client. Historical duplicate receipts
+are not distinct-track acquisition coverage. Keep query counts separate from
+whole-projection speed and nested phase totals. Register actual app-scenario
+completion beyond test-runner timeout, close new query/hash admission, drain and
+retain original Error/null before fixture disposal. Avoid redundant warm-ups
+when real apply already hashed the media; preserve timed samples and existing
+resource bounds. See docs/WANTED_ROOT_LOOKUP_OUTCOME.md for the failed initial
+largest profile and separately reviewed/frozen evidence.
+
 For negative receipt scans, prove the production module captures before its actual
 walk, compares original acquisition/revision/root, and checks contained ENOENT
 after required events. Test newer receipts, restored bytes, current-root changes,

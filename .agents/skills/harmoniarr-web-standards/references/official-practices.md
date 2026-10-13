@@ -736,3 +736,10 @@ fixed dimensions, without implying an OTel SDK or exporter. Actual streamed-byte
 counts distinguish performed work from receipt size. A positive historical hash
 or stat observation cannot replace fresh current bytes at a protected write/event
 boundary. Retain required audit semantics separately from optional diagnostics.
+
+Wanted root lookup applies docs/WANTED_ROOT_LOOKUP_RESEARCH_2026_10.md: driver
+same-client/bound-value contracts and PostgreSQL left-join semantics support one
+fresh context statement. Missing settings and JSON null are different inputs.
+Vendor measurement caveats require query-count/result/byte proof alongside local
+timings; fewer queries alone do not promise a whole-projection speedup. W3C remains
+draft timing guidance and OWASP keeps identifiers/SQL/errors out of diagnostics.

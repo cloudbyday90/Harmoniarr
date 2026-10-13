@@ -8,9 +8,11 @@ import { getPool } from '../database.js';
 import { normalizeOperatorTrackOverrideRow } from './operator-track-override-policy.js';
 import { listImportCandidateFiles } from '../import-candidates/import-candidate-repository.js';
 import { createOperatorTrackReceiptStore } from './operator-track-receipt-store.js';
+import { createOperatorTrackRootContextStore } from './operator-track-root-context-store.js';
 
 export function createOperatorTrackAcquisitionStore({ getPoolFn = getPool,
-  receiptStore = createOperatorTrackReceiptStore({ getPoolFn }) } = {}) {
+  receiptStore = createOperatorTrackReceiptStore({ getPoolFn }),
+  rootContextStore = createOperatorTrackRootContextStore({ getPoolFn }) } = {}) {
   const db = queryable => queryable ?? getPoolFn();
   async function readWanted({ ids = [], metadataReleaseId = null, queryable }) {
     const result = metadataReleaseId
@@ -39,6 +41,7 @@ export function createOperatorTrackAcquisitionStore({ getPoolFn = getPool,
     const result = await db(queryable).query('SELECT id,is_disabled,managed_library_relative_root FROM app_users WHERE id=$1::uuid', [ownerId]);
     return result.rows[0] ?? null;
   }
+  async function readOwnerRootContext(input) { return rootContextStore.readOwnerRootContext(input); }
   async function readCurrentConsent({ ownerId, metadataReleaseId, queryable }) {
     const result = await db(queryable).query(`SELECT monitoring.is_monitored,users.is_disabled,
       COALESCE((SELECT jsonb_agg(overrides) FROM operator_track_override overrides
@@ -65,6 +68,6 @@ export function createOperatorTrackAcquisitionStore({ getPoolFn = getPool,
   async function listFulfillment({ ownerId, metadataReleaseIds, queryable }) {
     return receiptStore.listFulfillment({ ownerId, metadataReleaseIds, queryable });
   }
-  return { readWanted, readRequest, readCandidate, readParticipantRequests, readDeliveryOwner,
+  return { readWanted, readRequest, readCandidate, readParticipantRequests, readDeliveryOwner, readOwnerRootContext,
     readCurrentConsent, readReleaseMbid, readFiles, saveFulfillment, listFulfillment };
 }

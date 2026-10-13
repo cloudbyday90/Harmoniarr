@@ -696,6 +696,13 @@ OpenTelemetry fixed-cardinality principles. The
 rollback and timing limits. Five structure validations and seven installed-file
 hash comparisons pass; these are maintenance proof, not a new blind skill trial.
 
+Root-context references now connect parameterized one-client reads and explicit
+setting presence to current owner/private-root authority. The
+[root outcome](WANTED_ROOT_LOOKUP_OUTCOME.md) records the initial timeout, profiling
+drainage correction, query/byte comparisons and validation. Five structure checks
+and seven installed-file hashes pass. No new blind skill trial or standards
+certification is claimed.
+
 Operator reconciliation references now locate completion, the narrow parallel
 task helper and twelve captured application owners. They explicitly distinguish
 scoped snapshot/revision validation from publication authority. The

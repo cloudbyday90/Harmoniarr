@@ -536,3 +536,12 @@ docs/WANTED_RECEIPT_VERIFICATION_OUTCOME.md owns generated two-owner FLAC profil
 late replacement and required-event rollback. Seven rereads in that workload do
 not establish a portable speedup or justify cross-guard caching. Nested phases
 overlap; representative receipt-count/file-size profiling is the next decision.
+
+Root-context profiling now uses docs/WANTED_ROOT_LOOKUP_OUTCOME.md. A joined
+owner/music-setting read distinguishes a missing setting's default from explicit
+JSON null; custom loaders and explicit settings retain their existing contracts.
+It does not cache roots or hashes. Actual query/byte/phase samples use one borrowed
+client and alternating order on controlled historical receipts, not new distinct-
+track acquisition. Register the whole app scenario through completion, close
+profiling admission on cancellation and drain before database/server cleanup.
+The original largest-profile timeout remains separate from reviewed/frozen proof.

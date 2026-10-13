@@ -72,6 +72,14 @@ unresolved causes and failed cohorts rather than prescribing generic retries.
 
 ## Repository Rules
 
+Root-lookup reference maintenance preserves absent/default versus explicit-null
+setting semantics and current owner/private-root authority in one statement.
+Its profiling workflow registers actual app completion through cancellation,
+drains before database cleanup and avoids redundant warm-up work without reducing
+timed samples. The [root outcome](WANTED_ROOT_LOOKUP_OUTCOME.md) retains failed,
+reviewed and frozen evidence separately; lower query counts do not certify a
+portable whole-projection or CI speedup.
+
 The standards skill now routes server performance work through Node timing/stream
 contracts, W3C draft timing guidance, OWASP logging failure/privacy controls and
 OpenTelemetry cardinality principles. Its fixed-dimension actual-byte workflow
