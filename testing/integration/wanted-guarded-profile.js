@@ -16,32 +16,42 @@ import { createMaintenanceLockService } from '../../src/server/recovery/maintena
 import { createMaintenanceLockWriteGuardService } from '../../src/server/recovery/maintenance-lock-write-guard-service.js';
 import { withRollbackFixtureClient } from './fixture-transaction-client.js';
 import { createWantedWorkloadMemorySampler } from './wanted-workload-memory.js';
+import { createWantedGuardedCostObserver } from './wanted-guarded-cost-observer.js';
 
 /** Complete guarded service work on an active rollback-owned transaction, never a cache. */
 export async function profileWantedGuardedReconciliation(pool, { readMethod = 'reusable', signal,
-  gc = global.gc, afterProjection = null, receiptGrouping = false } = {}) {
+  gc = global.gc, afterProjection = null, receiptGrouping = false, costDiagnostics = false } = {}) {
   readMethod = resolveOperatorTrackReadMethod(readMethod);
   const readBufferBytes = resolveOperatorTrackReadBuffer(undefined, readMethod);
   if (typeof gc !== 'function') throw new TypeError('Guarded workload measurement requires explicit GC');
   if (afterProjection !== null && typeof afterProjection !== 'function') throw new TypeError('Invalid guarded profile hook');
   if (typeof receiptGrouping !== 'boolean') throw new TypeError('Invalid receipt grouping profile');
+  if (typeof costDiagnostics !== 'boolean') throw new TypeError('Invalid guarded cost diagnostics');
   signal?.throwIfAborted();
   return withRollbackFixtureClient(pool, async client => {
     let queryCount = 0; let queryMs = 0; let queryActive = false; let record; let distinctPerProjection = 0;
     const allPaths = new Set(); let projectionPaths; const projectionDigests = [];
+    const costs = costDiagnostics ? createWantedGuardedCostObserver() : null;
     const queryable = { async query(...args) {
       signal?.throwIfAborted(); assert.equal(queryActive, false, 'Guarded queries must remain serial');
       queryActive = true; queryCount++; const started = performance.now();
-      try { const result = await client.query(...args); signal?.throwIfAborted(); return result; }
+      try {
+        const work = () => client.query(...args);
+        const result = costs ? await costs.query(args[0], work) : await work();
+        signal?.throwIfAborted(); return result;
+      }
       finally { queryActive = false; queryMs += performance.now() - started; }
     } };
     let memory;
     const reader = createLibraryWantedReleaseReader({ groupReceiptVerification: receiptGrouping, fingerprintTrackFile: async (path, options) => {
       signal?.throwIfAborted(); const binding = JSON.stringify([options.libraryRoot, path]);
       allPaths.add(binding); projectionPaths.add(binding);
-      const result = await fingerprintOperatorTrackFile(path, { ...options, readMethod, readBufferBytes,
-        onBytesRead: amount => { options.onBytesRead?.(amount); memory.observeBytes(amount); } });
-      signal?.throwIfAborted(); return result;
+      const close = costs?.openWindow('fingerprint');
+      try {
+        const result = await fingerprintOperatorTrackFile(path, { ...options, readMethod, readBufferBytes,
+          onBytesRead: amount => { options.onBytesRead?.(amount); memory.observeBytes(amount); } });
+        signal?.throwIfAborted(); return result;
+      } finally { close?.(); }
     } });
     const maintenance = createMaintenanceLockService({ getPoolFn: () => queryable });
     const guard = createMaintenanceLockWriteGuardService({ listActiveMaintenanceLocks: maintenance.listActiveMaintenanceLocks });
@@ -49,9 +59,13 @@ export async function profileWantedGuardedReconciliation(pool, { readMethod = 'r
       withTransaction: work => work(queryable),
       projectionReader: { readWantedReleaseProjection: async input => {
         projectionPaths = new Set();
-        const result = await reader.readWantedReleaseProjection(input);
+        const close = costs?.openWindow('projection'); let result;
+        try { result = await reader.readWantedReleaseProjection(input); }
+        finally { close?.(); }
         distinctPerProjection += projectionPaths.size;
-        projectionDigests.push(createHash('sha256').update(JSON.stringify(result)).digest('hex'));
+        const closeDigest = costs?.openWindow('digest');
+        try { projectionDigests.push(createHash('sha256').update(JSON.stringify(result)).digest('hex')); }
+        finally { closeDigest?.(); }
         await afterProjection?.({ count: projectionDigests.length });
         return result;
       } },
@@ -63,6 +77,7 @@ export async function profileWantedGuardedReconciliation(pool, { readMethod = 'r
     finally { observation = memory.finish(); }
     return { result, projectionDigests, queryCount, queryMs, readMethod, readBufferBytes, receiptGrouping,
       elapsedMs: performance.now() - started, diagnostics: record, memory: observation,
+      costDiagnostics, costs: costs?.snapshot() ?? null,
       pathWork: { distinctPrivateBindings: allPaths.size, distinctPerProjection,
         repeatedWithinProjections: record.counters.fingerprintCalls - distinctPerProjection } };
   });
@@ -74,9 +89,9 @@ export function compareWantedGuardedSamples(first, second) {
   assert.deepEqual(first.pathWork, second.pathWork);
 }
 
-export function summarizeWantedGuardedSample({ readMethod, readBufferBytes, receiptGrouping, queryCount, queryMs, elapsedMs,
+export function summarizeWantedGuardedSample({ readMethod, readBufferBytes, receiptGrouping, costDiagnostics, costs, queryCount, queryMs, elapsedMs,
   memory, pathWork, diagnostics }) {
-  return { readMethod, readBufferBytes, receiptGrouping, queryCount, queryMs, elapsedMs, memory, pathWork,
+  return { readMethod, readBufferBytes, receiptGrouping, costDiagnostics, costs, queryCount, queryMs, elapsedMs, memory, pathWork,
     counters: diagnostics.counters, phases: diagnostics.phases };
 }
 

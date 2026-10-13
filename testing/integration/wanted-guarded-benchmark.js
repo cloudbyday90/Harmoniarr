@@ -15,8 +15,10 @@ import { withWantedProfileClient } from './wanted-profile-client.js';
 import { compareWantedGuardedSamples, compareWantedClosedGroupSamples, profileWantedGuardedReconciliation, summarizeWantedGuardedSample } from './wanted-guarded-profile.js';
 
 export async function measureWantedGuardedWorkload({ signal, onProgress = () => {}, onSample = () => {},
-  profiles = ['sine', 'noise'], receiptCounts = [16, 48, 96], pairs = 2, gc = global.gc, groupingComparison = false } = {}) {
-  if (typeof groupingComparison !== 'boolean' || typeof gc !== 'function' || typeof onProgress !== 'function' || typeof onSample !== 'function'
+  profiles = ['sine', 'noise'], receiptCounts = [16, 48, 96], pairs = 2, gc = global.gc,
+  groupingComparison = false, rootCostComparison = false } = {}) {
+  if (typeof groupingComparison !== 'boolean' || typeof rootCostComparison !== 'boolean' || (groupingComparison && rootCostComparison)
+    || typeof gc !== 'function' || typeof onProgress !== 'function' || typeof onSample !== 'function'
     || ![1, 2].includes(pairs) || !Array.isArray(profiles) || !profiles.length || profiles.length > 2
     || new Set(profiles).size !== profiles.length || profiles.some(p => !['sine', 'noise'].includes(p))
     || !Array.isArray(receiptCounts) || !receiptCounts.length || receiptCounts.length > 3
@@ -42,7 +44,9 @@ export async function measureWantedGuardedWorkload({ signal, onProgress = () => 
           const fileSizes = fileStats.map(info => info.size);
           await withWantedProfileClient(c.pool, async borrowed => {
             const samples = [];
-            const options = groupingComparison ? [{ readMethod: 'reusable', receiptGrouping: false }, { readMethod: 'reusable', receiptGrouping: true }]
+            const options = rootCostComparison ? [{ readMethod: 'reusable', receiptGrouping: true, costDiagnostics: false },
+              { readMethod: 'reusable', receiptGrouping: true, costDiagnostics: true }]
+              : groupingComparison ? [{ readMethod: 'reusable', receiptGrouping: false }, { readMethod: 'reusable', receiptGrouping: true }]
               : [{ readMethod: 'stream', receiptGrouping: false }, { readMethod: 'reusable', receiptGrouping: false }];
             for (const option of (pair % 2 ? options.reverse() : options)) {
               const result = await profileWantedGuardedReconciliation(borrowed, { ...option, signal: scope.signal, gc });
@@ -55,6 +59,16 @@ export async function measureWantedGuardedWorkload({ signal, onProgress = () => 
               assert.equal(result.pathWork.distinctPerProjection, 2 * counters.projectionReads);
               assert.deepEqual(result.result.wantedKeys, []);
               assert.equal(result.memory.unavailable, false);
+              if (option.costDiagnostics) {
+                assert.equal(result.costs.queries.rootContext.count, result.diagnostics.phases.root_resolution.calls);
+                assert.equal(result.costs.queries.rootContext.count, receipts * 2 * counters.projectionReads);
+                assert.equal(result.costs.queries.rootContext.count + result.costs.queries.other.count, result.queryCount);
+                assert.equal(result.costs.memoryWindows.projection.count, counters.projectionReads);
+                assert.equal(result.costs.memoryWindows.digest.count, counters.projectionReads);
+                assert.equal(result.costs.memoryWindows.fingerprint.count, counters.fingerprintCalls);
+                for (const window of Object.values(result.costs.memoryWindows)) assert.equal(window.unavailable, 0);
+                assert.equal(result.costs.timingUnavailable, false);
+              }
               samples.push(result);
             }
             if (groupingComparison) {

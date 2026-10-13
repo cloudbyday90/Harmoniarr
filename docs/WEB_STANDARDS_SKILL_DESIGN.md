@@ -1,5 +1,11 @@
 # Practical web standards skill design
 
+October 13 root-cost maintenance applies PostgreSQL snapshot semantics, Node
+process memory, W3C draft timing and OWASP diagnostic privacy to an opt-in fixed
+observer. The [design](WANTED_ROOT_COST_PROFILE_DESIGN.md) requires exact-work
+controls and distinguishes observation from allocation/authorization authority.
+Existing entrypoint, UI metadata and invocation policy remain unchanged.
+
 October 13 closed-group maintenance maps Node filesystem observations and current
 OWASP authorization to two actual byte reads and independent member roots. The
 [closed-group design](WANTED_CLOSED_RECEIPT_GROUP_DESIGN.md) preserves exact

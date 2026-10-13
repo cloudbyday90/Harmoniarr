@@ -55,6 +55,7 @@ test('invalid method, missing GC and pre-cancellation refuse measurement admissi
   const pool = { connect: () => assert.fail('No measurement client admitted') };
   await assert.rejects(profileWantedGuardedReconciliation(pool, { readMethod: 'private', gc: () => {} }), TypeError);
   await assert.rejects(profileWantedGuardedReconciliation(pool, { gc: null }), TypeError);
+  await assert.rejects(profileWantedGuardedReconciliation(pool, { costDiagnostics: 'yes', gc: () => {} }), TypeError);
   const controller = new AbortController(); controller.abort(null);
   await assert.rejects(profileWantedGuardedReconciliation(pool, { gc: () => {}, signal: controller.signal }), error => error === null);
 });

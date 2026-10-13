@@ -6,6 +6,23 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Wanted root-query and heap cost profile (2026-10-13)
+
+The [design](WANTED_ROOT_COST_PROFILE_DESIGN.md),
+[official research](WANTED_ROOT_COST_PROFILE_RESEARCH_2026_10.md) and
+[outcome](WANTED_ROOT_COST_PROFILE_OUTCOME.md) own opt-in fixed query/memory
+diagnostics and exact-work diagnostics-off/on controls. Current authorization,
+every independent root read and both full hashes remain intact. The large
+experiment stays outside ordinary discovery; signed memory windows cannot
+attribute allocation ownership or establish a leak.
+
+- Validation: ten focused cases, 24 exact-work comparison samples, the affected
+  two-file native cohort and frozen 10,077-case fast gate pass. The outcome
+  separates observer overhead, signed memory observations and final gate scope.
+- Next: inventory current owner/music-root writers and publication coordination;
+  prove late committed disabled-owner/root changes before adopting bounded
+  opening/closing owner/requirement root reads. Keep both hashes and event guards.
+
 ## Completed slice: Closed single-binding receipt groups (2026-10-13)
 
 The [closed-group design](WANTED_CLOSED_RECEIPT_GROUP_DESIGN.md),

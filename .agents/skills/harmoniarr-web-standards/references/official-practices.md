@@ -774,6 +774,13 @@ to private monotonic durations. OWASP minimization excludes projection digests a
 domain identities from summaries. Preserve real fresh guards and individual
 receipt authority before evaluating grouping, even when duplicate work is large.
 
+Root-cost guidance uses docs/WANTED_ROOT_COST_PROFILE_RESEARCH_2026_10.md.
+PostgreSQL Read Committed statement snapshots can observe later committed
+revocation; Repeatable Read is not a shortcut to current authorization. Keep
+same-client transactions, fixed private numeric observations and matched
+diagnostics-off/on controls. Signed process-memory changes include GC and
+unrelated work; W3C draft timing does not supply allocation attribution.
+
 Closed-group guidance uses docs/WANTED_CLOSED_RECEIPT_GROUP_RESEARCH_2026_10.md.
 Node mtime mutation and filesystem races defeat timestamp-based positive reuse;
 two actual full reads close a bounded exact binding with current per-member

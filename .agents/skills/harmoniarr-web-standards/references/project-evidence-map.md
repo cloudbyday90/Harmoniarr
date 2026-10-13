@@ -584,6 +584,14 @@ projection. docs/WANTED_GUARDED_WORKLOAD_OUTCOME.md separates pre-commit service
 work from commit/app latency and mixed heap/timing from isolated probe results.
 Keep the large experiment outside normal discovery; counts cannot authorize caches.
 
+Root-cost profiling uses wanted-guarded-cost-observer.js under testing/integration/
+and --root-costs on the existing explicit measurement script. Fixed query buckets
+must match real canonical root-resolution calls; private exact-result controls
+prove diagnostics retain work. docs/WANTED_ROOT_COST_PROFILE_OUTCOME.md separates
+SQL time, overlapping memory windows and observer overhead. This diagnostic
+contract grants no read batching or root cache; current writer/lock and late
+revocation proof remain prerequisites for an authority change.
+
 Closed groups now use wanted-receipt-group-policy.js and
 wanted-closed-receipt-group-service.js in src/server/library/. Only one exact
 positive owner/requirement/scope/path/evidence batch of 3–128 JSON rows qualifies.

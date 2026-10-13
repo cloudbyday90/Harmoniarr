@@ -5,6 +5,14 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For root-cost profiling, use the explicit --root-costs benchmark with matched
+closed-group diagnostics-off/on samples. Actual native root-store query counts
+must match root-resolution calls; statement drift refuses attribution. Keep
+signed process-memory windows, periodic peaks and observer overhead separate;
+nested windows cannot be summed or treated as allocation ownership. Preserve
+all current reads/hashes and original Error/null. See
+docs/WANTED_ROOT_COST_PROFILE_OUTCOME.md before considering read batching.
+
 Closed receipt groups need opening and closing full hashes with independent
 current-root reads and captured source identity, not metadata reuse. Prove real
 same-size/same-time in-place mutation, source/root changes, negative/mixed/budget

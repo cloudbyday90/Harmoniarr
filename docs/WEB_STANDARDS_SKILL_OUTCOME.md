@@ -1,5 +1,11 @@
 # Practical web standards skill outcome
 
+October 13 root-cost maintenance adds current-state snapshot limits and fixed
+query/memory-window evidence to the existing standards references. The
+[outcome](WANTED_ROOT_COST_PROFILE_OUTCOME.md) records actual native and matched
+diagnostic controls. Skill structure/install checks remain distinct from runtime
+proof, a new blind trial, or standards/security certification.
+
 October 13 closed-group maintenance maps same-marker mutation and late source/
 root/content refusal to actual closure proof. The
 [closed-group outcome](WANTED_CLOSED_RECEIPT_GROUP_OUTCOME.md) separates candidate

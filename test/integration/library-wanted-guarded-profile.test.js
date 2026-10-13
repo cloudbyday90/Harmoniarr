@@ -40,9 +40,24 @@ suite('Bounded full guarded Wanted profiling on actual private media', () => {
             assert.equal(samples[0].diagnostics.counters.hashedBytes, sizes.reduce((a, b) => a + b, 0) * 8 * 7);
             assert.equal(samples[0].pathWork.distinctPerProjection, 14);
             assert.equal(samples[0].pathWork.repeatedWithinProjections, 98);
+            const closed = [];
+            for (const costDiagnostics of [false, true]) closed.push(await profileWantedGuardedReconciliation(borrowed, {
+              costDiagnostics, receiptGrouping: true, signal: scope.signal, gc: () => {} }));
+            compareWantedGuardedSamples(...closed);
+            assert.equal(closed[0].costs, null);
+            const { costs } = closed[1];
+            assert.equal(costs.queries.rootContext.count, 224);
+            assert.equal(costs.queries.rootContext.count, closed[1].diagnostics.phases.root_resolution.calls);
+            assert.equal(costs.queries.rootContext.count + costs.queries.other.count, closed[1].queryCount);
+            assert.equal(costs.memoryWindows.rootQuery.count, 224);
+            assert.equal(costs.memoryWindows.projection.count, 7);
+            assert.equal(costs.memoryWindows.fingerprint.count, 28);
+            assert.equal(costs.memoryWindows.digest.count, 7);
+            for (const window of Object.values(costs.memoryWindows)) assert.equal(window.unavailable, 0);
+            assert.equal(costs.timingUnavailable, false);
             const original = await readFile(files[0]);
             try {
-              await assert.rejects(profileWantedGuardedReconciliation(borrowed, { signal: scope.signal, gc: () => {},
+              await assert.rejects(profileWantedGuardedReconciliation(borrowed, { costDiagnostics: true, signal: scope.signal, gc: () => {},
                 afterProjection: async ({ count }) => { if (count === 1) await writeFile(files[0], 'Controlled late byte change'); } }),
               { code: 'library_wanted_projection_stale' });
             } finally { await writeFile(files[0], original); }
@@ -56,7 +71,7 @@ suite('Bounded full guarded Wanted profiling on actual private media', () => {
           try {
             await writeFile(files[0], 'Controlled missing evidence');
             await withWantedProfileClient(c.pool, borrowed => assert.rejects(profileWantedGuardedReconciliation(borrowed, {
-              signal: scope.signal, gc: () => {} }), error => error.message.includes('Controlled guarded source event')));
+              costDiagnostics: true, signal: scope.signal, gc: () => {} }), error => error.message.includes('Controlled guarded source event')));
           } finally { await writeFile(files[0], original); }
           assert.deepEqual((await c.pool.query('SELECT * FROM library_wanted_releases ORDER BY id')).rows, beforeRows);
           assert.deepEqual((await c.pool.query('SELECT * FROM media_request_events ORDER BY id')).rows, eventsBefore);

@@ -6,6 +6,11 @@ This repository includes a shared `.agents/` directory for GitHub Copilot agent 
 
 The goal is to keep reusable AI workflow guidance versioned alongside the project so UI review, frontend implementation, browser testing, and related tasks follow the same repo conventions.
 
+The [root-cost outcome](WANTED_ROOT_COST_PROFILE_OUTCOME.md) maps current-state
+snapshot semantics, fixed private observations and diagnostics-off/on controls
+into the standards/testing skills. Signed memory windows cannot establish
+allocation ownership, and timing cannot authorize reducing current root reads.
+
 The [closed-group outcome](WANTED_CLOSED_RECEIPT_GROUP_OUTCOME.md) maps bounded
 source capture, opening/closing full bytes and per-member current roots to the
 standards/scoped/testing references. Same-marker mutation defeats metadata reuse;

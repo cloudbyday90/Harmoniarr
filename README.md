@@ -4,6 +4,14 @@ Harmoniarr is a self-hosted, Docker-hosted music library manager inspired by Lid
 
 The repository contains the Node.js ESM server, Vue client, PostgreSQL schema, automated validation, and design documents. The platform is under active development toward its first release.
 
+Opt-in Wanted root-cost profiling separates root SQL from broader root-resolution
+work and records fixed process-memory windows. See the
+[design](docs/WANTED_ROOT_COST_PROFILE_DESIGN.md),
+[official research](docs/WANTED_ROOT_COST_PROFILE_RESEARCH_2026_10.md) and
+[outcome](docs/WANTED_ROOT_COST_PROFILE_OUTCOME.md). Run it explicitly with
+`node --expose-gc scripts/measure-wanted-guarded-workload.js --output <local JSON> --root-costs`;
+its matched controls preserve every current authorization read and both hashes.
+
 Harmoniarr is being planned as a self-hosted FOSS application with no SLA or operational warranty. The docs in this repository describe intended behavior and design direction, not a hosted-service support commitment.
 
 For development, run the focused tests for the changed domain, then
