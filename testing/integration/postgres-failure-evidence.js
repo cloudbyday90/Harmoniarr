@@ -11,13 +11,16 @@ import { createPostgresHostProbe } from './postgres-host-probe.js';
 import { createPostgresReadinessProbe, isOwnedContainerId } from './postgres-readiness-probe.js';
 import { readCheckoutProperty } from './pool-checkout-record.js';
 import { createPostgresContainerStateProbe } from './postgres-container-state-probe.js';
+import { createPostgresStartupLogProbe } from './postgres-startup-log-probe.js';
+import { capturePgStartupContext } from './pg-startup-log-policy.js';
 
 export const postgresFailureMarker = '[postgres-fixture-failure] ';
 /** Bind evidence to one scenario, registering its canonical completion before probing. */
 export function createPostgresFailureEvidence({ mode = 'failures', source, connectionConfig,
-  containerId, fresh = false, hostProbeFactory = createPostgresHostProbe,
+  containerId, fresh = false, startupLogging = false, hostProbeFactory = createPostgresHostProbe,
   readinessProbeFactory = createPostgresReadinessProbe,
   containerStateProbeFactory = createPostgresContainerStateProbe,
+  startupLogProbeFactory = createPostgresStartupLogProbe,
   onRecord = record => process.stderr.write(`${postgresFailureMarker}${JSON.stringify(record)}\n`),
   now = () => performance.now() } = {}) {
   if (!['off', 'failures'].includes(mode) || typeof onRecord !== 'function' || typeof now !== 'function') {
@@ -28,30 +31,36 @@ export function createPostgresFailureEvidence({ mode = 'failures', source, conne
   return {
     createCapture({ correlationId, signal } = {}) {
       let capturing;
-      return function captureServerFailure(error, phase = 'database_scenario', checkoutId) {
+      return function captureServerFailure(error, phase = 'database_scenario', checkoutId, startupContext) {
         if (mode === 'off') return Promise.resolve();
         if (capturing) return capturing;
         const completion = Promise.withResolvers();
         capturing = completion.promise;
+        const privateContext = capturePgStartupContext(startupContext);
         Promise.resolve().then(async () => {
           const started = clock();
           const cancelled = readCheckoutProperty(signal, 'aborted') === true;
           let host = { outcome: 'unavailable', stage: cancelled ? 'cancelled' : 'not_owned' };
           let readiness = { outcome: 'unavailable' };
           let containerState = { outcome: 'unavailable' };
+          let serverStartup = startupContext ? { outcome: 'unavailable' } : undefined;
           if (owned && !cancelled) {
             const results = await Promise.allSettled([
               Promise.resolve().then(() => hostProbeFactory({ connectionConfig })()),
               Promise.resolve().then(() => readinessProbeFactory({ containerId,
                 user: readCheckoutProperty(connectionConfig, 'user'), database: readCheckoutProperty(connectionConfig, 'database') })()),
               Promise.resolve().then(() => containerStateProbeFactory({ containerId })()),
+              Promise.resolve().then(() => startupLogging && privateContext
+                ? startupLogProbeFactory({ containerId, context: privateContext })() : undefined),
             ]);
             host = results[0].status === 'fulfilled' ? results[0].value : { outcome: 'failed', error: results[0].reason };
             readiness = results[1].status === 'fulfilled' ? results[1].value : { outcome: 'failed', error: results[1].reason };
             containerState = results[2].status === 'fulfilled' ? results[2].value : { outcome: 'failed', error: results[2].reason };
+            if (startupContext) serverStartup = results[3].status === 'fulfilled'
+              ? results[3].value ?? { outcome: 'unavailable' } : { outcome: 'failed' };
           }
           const ended = clock();
-          const record = buildPostgresFailureRecord({ correlationId, checkoutId, source, phase, error, host, readiness, containerState,
+          const record = buildPostgresFailureRecord({ correlationId, checkoutId, source, phase, error, host, readiness, containerState, serverStartup,
             durationMs: started !== null && ended !== null ? ended - started : null });
           try { Promise.resolve(onRecord(record)).catch(() => {}); } catch { /* Preserve the original failure. */ }
         }).then(completion.resolve, () => completion.resolve());

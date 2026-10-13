@@ -6,6 +6,13 @@ This repository includes a shared `.agents/` directory for GitHub Copilot agent 
 
 The goal is to keep reusable AI workflow guidance versioned alongside the project so UI review, frontend implementation, browser testing, and related tasks follow the same repo conventions.
 
+The [server-startup design](POSTGRES_STARTUP_SERVER_DESIGN.md) adds private
+marker/session correlation, structured source-location checks and explicit
+pre-authentication uncertainty to the maintained standards/testing skills.
+The [outcome](POSTGRES_STARTUP_SERVER_OUTCOME.md) owns native evidence and
+capture/cleanup limits. Do not publish raw server identity or relabel older
+failed collections after a successful control.
+
 The [source-noop design](WANTED_SOURCE_NOOP_DESIGN.md) extends the maintained
 standards/testing skills with exact current-row proof, optional-lock fallback
 and transaction lifetime. Preserve final full authority and both hashes at

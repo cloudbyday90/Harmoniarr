@@ -6,10 +6,12 @@
  */
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { types } from 'node:util';
 import pg from 'pg';
 import PgConnection from 'pg/lib/connection.js';
 import pgPackage from 'pg/package.json' with { type: 'json' };
 import { buildPgConnectionRecord, capturePgTargetIdentity, comparePgTargetIdentity } from './pg-connection-record.js';
+import { capturePgStartupContext } from './pg-startup-log-policy.js';
 
 // These are internal driver surfaces, not the public pool.connect event. Refuse
 // instrumentation after an unreviewed driver upgrade; ordinary checkout remains.
@@ -21,7 +23,7 @@ function supportedDriver() {
 }
 const supported = supportedDriver();
 
-export function observeOwnedPgConnections({ pool, expectedConfig, now }) {
+export function observeOwnedPgConnections({ pool, expectedConfig, now, startupLogging = false }) {
   const expected = capturePgTargetIdentity(expectedConfig);
   const available = supported && pool instanceof pg.Pool && pool.Client === pg.Client;
   const initial = available ? 'not_observed' : 'unsupported_driver';
@@ -44,12 +46,13 @@ export function observeOwnedPgConnections({ pool, expectedConfig, now }) {
   return {
     begin() {
       const start = clock(); const data = { observation: initial }; const listeners = [];
-      let finished = false; let restoreStartup = null;
+      let finished = false; let restoreStartup = null; let startupContext = null;
       const finish = () => {
         finished = true;
         for (const [emitter, event, listener] of listeners) emitter.removeListener(event, listener);
         restoreStartup?.(); restoreStartup = null;
         listeners.length = 0; active.delete(finish);
+        startupContext = null;
       };
       function mark(stage, field) {
         if (finished || Object.hasOwn(data, field)) return;
@@ -72,7 +75,22 @@ export function observeOwnedPgConnections({ pool, expectedConfig, now }) {
             const startupDescriptor = Object.getOwnPropertyDescriptor(connection, 'startup');
             const startup = connection.startup;
             function observedStartup(...args) {
-              const result = Reflect.apply(startup, this, args);
+              let submitted = args;
+              if (!finished && this === connection && startupLogging === true && data.targetMatch === 'matched') {
+                try {
+                  const packet = args[0];
+                  // Installed pg emits a plain packet. Preserve explicit application names and unsupported shapes.
+                  const fields = packet && !types.isProxy(packet) && Object.getPrototypeOf(packet) === Object.prototype
+                    ? Object.getOwnPropertyDescriptors(packet) : null;
+                  if (fields && Object.values(fields).every(d => Object.hasOwn(d, 'value'))
+                    && !fields.application_name?.value && fields.user?.value === expected.user && fields.database?.value === expected.database) {
+                    const context = capturePgStartupContext({ marker: `hxi_${randomUUID()}`, clientId: data.clientId,
+                      user: expected.user, database: expected.database });
+                    if (context) { startupContext = context; submitted = [{ ...packet, application_name: context.marker }, ...args.slice(1)]; }
+                  }
+                } catch { /* Optional marker preparation must not replace the startup call. */ }
+              }
+              const result = Reflect.apply(startup, this, submitted);
               if (this === connection) mark('startup_dispatched', 'startupDispatchedMs');
               return result;
             }
@@ -107,6 +125,7 @@ export function observeOwnedPgConnections({ pool, expectedConfig, now }) {
           try { return run(); } finally { dispatchOwner = previous; }
         },
         snapshot: () => buildPgConnectionRecord(data),
+        captureStartupContext: () => startupContext,
         finish,
       };
     },

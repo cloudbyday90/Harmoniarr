@@ -11,6 +11,38 @@ import PgConnection from 'pg/lib/connection.js';
 import { buildPgConnectionRecord, capturePgTargetIdentity, comparePgTargetIdentity } from '../../testing/integration/pg-connection-record.js';
 import { observeOwnedPgConnections } from '../../testing/integration/owned-pg-connection-observer.js';
 
+test('owned unnamed startup packets get a private marker without changing credentials, results or explicit names', async () => {
+  const config = { host: 'private-host', port: 5432, user: 'private_user', database: 'private_db' };
+  for (const application_name of [undefined, 'explicit-private-name']) {
+    const pool = new pg.Pool(config); const observer = observeOwnedPgConnections({ pool, expectedConfig: config, now: () => 0, startupLogging: true });
+    const checkout = observer.begin(); const client = checkout.dispatch(() => new pool.Client(pool.options));
+    const bytes = []; const stream = client.connection.stream; const write = stream.write;
+    stream.write = value => { bytes.push(value); return true; };
+    const packet = { user: config.user, database: config.database, options: '-c statement_timeout=1000', ...(application_name ? { application_name } : {}) };
+    try {
+      assert.equal(client.connection.startup(packet), undefined); assert.equal(bytes.length, 1);
+      const context = checkout.captureStartupContext();
+      if (application_name) { assert.equal(context, null); assert.ok(bytes[0].includes(Buffer.from(application_name))); }
+      else { assert.match(context.marker, /^hxi_/u); assert.equal(context.user, config.user); assert.equal(context.database, config.database);
+        assert.ok(bytes[0].includes(Buffer.from(context.marker))); assert.equal(packet.application_name, undefined); }
+      assert.equal(JSON.stringify(checkout.snapshot()).includes('private'), false);
+      checkout.finish(); assert.equal(checkout.captureStartupContext(), null); assert.equal(Object.hasOwn(client.connection, 'startup'), false);
+    } finally { stream.write = write; checkout.finish(); observer.restore(); stream.destroy(); await pool.end(); }
+  }
+});
+
+test('unsupported startup accessors are evaluated only by the original serializer and retain its Error/null', async () => {
+  const config = { host: 'private-host', port: 5432, user: 'private_user', database: 'private_db' };
+  for (const primary of [new Error('original startup accessor'), null]) {
+    const pool = new pg.Pool(config); const observer = observeOwnedPgConnections({ pool, expectedConfig: config, now: () => 0, startupLogging: true });
+    const checkout = observer.begin(); const client = checkout.dispatch(() => new pool.Client(pool.options)); let reads = 0;
+    try {
+      assert.throws(() => client.connection.startup({ get user() { reads++; throw primary; }, database: config.database }), error => error === primary);
+      assert.equal(reads, 1); assert.equal(checkout.captureStartupContext(), null);
+    } finally { checkout.finish(); observer.restore(); client.connection.stream.destroy(); await pool.end(); }
+  }
+});
+
 test('connection records minimize hostile fields and reject unbounded timings/stages', () => {
   const input = new Proxy({ observation: 'observed', targetMatch: 'mismatched', lastStage: 'private',
     constructedMs: 3, transportConnectedMs: -1, backendReadyMs: Infinity, password: 'private' }, {

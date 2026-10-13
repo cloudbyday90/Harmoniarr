@@ -137,6 +137,7 @@ export async function createIntegrationAppRuntime({
         source,
         captureServerFailure,
         captureCheckoutFailure,
+          startupLogging,
       }) => {
         const scenarioWorkspaceDir = join(runtimeWorkspace.workspaceDir, scenarioName);
         let scenarioFailed = true;
@@ -159,7 +160,7 @@ export async function createIntegrationAppRuntime({
         }, async () => {
           await scenarioObserver.measure('pool_close', () => closePool()).catch(() => {});
           try { return await withAppPoolCheckoutDiagnostics({ getPoolFn: getPool,
-            phaseObserver: scenarioObserver, source, expectedConfig: databaseConfig,
+              phaseObserver: scenarioObserver, source, expectedConfig: databaseConfig, startupLogging,
             captureFailure: captureCheckoutFailure, onRecord: checkoutRecord }, async observedGetPool => {
             await observePostgresFixtureFailure(captureServerFailure, 'schema_prepare', () => scenarioObserver.measure('schema_prepare', () => observeAppSchemaPreparation({
               prepareDatabaseFn, getPoolFn: observedGetPool, observer: checkoutObserver, source, phaseObserver: scenarioObserver,
@@ -228,7 +229,7 @@ export async function withIntegrationApp({
     return await withPostgresIntegrationRuntimeFn({
       config,
       phaseObserver,
-      run: async ({ databaseConfig, databaseName, source, captureServerFailure, captureCheckoutFailure }) => {
+      run: async ({ databaseConfig, databaseName, source, captureServerFailure, captureCheckoutFailure, startupLogging }) => {
         await closePool().catch(() => {});
 
         return withEnvironmentVariables({
@@ -246,7 +247,7 @@ export async function withIntegrationApp({
         }, async () => {
           await closePool().catch(() => {});
           try { return await withAppPoolCheckoutDiagnostics({ getPoolFn: getPool,
-            phaseObserver, source, expectedConfig: databaseConfig,
+              phaseObserver, source, expectedConfig: databaseConfig, startupLogging,
             captureFailure: captureCheckoutFailure, onRecord: checkoutRecord }, async observedGetPool => {
             await observePostgresFixtureFailure(captureServerFailure, 'schema_prepare', () => phaseObserver.measure('schema_prepare', () => observeAppSchemaPreparation({
               prepareDatabaseFn, getPoolFn: observedGetPool, observer: checkoutObserver, source, phaseObserver,

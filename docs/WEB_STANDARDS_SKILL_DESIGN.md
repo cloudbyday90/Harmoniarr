@@ -1,5 +1,11 @@
 # Practical web standards skill design
 
+October 13 server-startup maintenance maps PostgreSQL JSON/source contracts,
+Docker NAT, OWASP minimized output and W3C clock distinctions to concrete
+fixture owners. The [design](POSTGRES_STARTUP_SERVER_DESIGN.md) preserves
+unnamed-marker scope, explicit names and unassociated early windows. Extend
+the existing diagnostic references without changing invocation metadata.
+
 October 13 source-noop maintenance adds a practical method for locked existing
 rows, queryable/transaction scope, optional NOWAIT/savepoint recovery and final
 publication authority. The [design](WANTED_SOURCE_NOOP_DESIGN.md) maps SQL,

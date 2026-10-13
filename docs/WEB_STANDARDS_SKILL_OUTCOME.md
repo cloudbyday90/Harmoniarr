@@ -1,5 +1,11 @@
 # Practical web standards skill outcome
 
+October 13 server-startup references map private client/session association,
+actual uninitialized receipt/omitted SQLSTATE fields and canonical failure
+drainage to the [outcome](POSTGRES_STARTUP_SERVER_OUTCOME.md). Structure/install
+verification is distinct from native application evidence and does not claim a
+new blind skill trial or general standards/security certification.
+
 October 13 source-noop reference maintenance maps exact positive-row locks,
 busy-row fallback, original failures and fewer projection/hash boundaries to
 the [outcome](WANTED_SOURCE_NOOP_OUTCOME.md). Native application evidence and

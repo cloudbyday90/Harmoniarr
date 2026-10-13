@@ -5,6 +5,17 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+Server startup evidence needs fresh default PostgreSQL 18 ownership, structured
+JSON/source locations and a private unnamed-client startup marker. A unique
+authorization record binds the original client to one PID/session; only ordered
+records from that session can describe earlier receipt/authentication. Zero
+SQLSTATE is omitted, and early receipt has an uninitialized backend type. Keep
+pre-auth/NAT windows unassociated, explicit app names unchanged and unknown/
+clipped evidence honest. Capture context before scheduling, drain failure-only
+bounded probes before cleanup and preserve Error/null. See
+docs/POSTGRES_STARTUP_SERVER_OUTCOME.md; historical failures are not diagnosed
+by successful new controls.
+
 Source no-op validation needs exact owned already-existing positive rows locked
 until outer publication ends, private queryable/transaction authority, native
 busy-row savepoint recovery and transaction-reuse refusal. Keep the actual-write

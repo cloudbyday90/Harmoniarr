@@ -832,3 +832,13 @@ decline an optional busy-row proof; it does not remove table waits or existing
 fallback contention. Preserve actual-write/required-event and final authority
 checks, both hashes per retained verification boundary, and conservative missing/
 negative/custom fallback. W3C draft duration guidance is separate from SQL proof.
+
+October 13 server-startup guidance uses
+docs/POSTGRES_STARTUP_SERVER_RESEARCH_2026_10.md. PostgreSQL structured logs and
+reviewed source locations separate receipt, authentication, authorization and
+ready/setup. A random private startup marker can correlate authorization to a
+PID/session, while pre-authentication receipt and NAT tuples can remain unknown.
+Preserve explicit application names, original startup outcomes and owned failure
+completion. OWASP data minimization requires fixed output, not raw log rows,
+identities, query text or markers. Read/output limits do not bound temporary log
+disk growth. W3C monotonic durations are distinct from server wall-clock components.

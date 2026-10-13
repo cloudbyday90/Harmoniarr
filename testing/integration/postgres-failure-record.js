@@ -6,6 +6,7 @@
  */
 
 import { capturePostgresDiagnosticErrors, isCheckoutCorrelationId, readCheckoutProperty as read } from './pool-checkout-record.js';
+import { buildPgStartupServerRecord } from './pg-startup-server-record.js';
 
 const member = (value, allowed, fallback = 'unknown') => allowed.includes(value) ? value : fallback;
 const duration = value => Number.isFinite(value) && value >= 0 && value <= 86_400_000 ? value : null;
@@ -13,8 +14,9 @@ const version = value => Number.isSafeInteger(value) && value >= 90000 && value 
 const boolean = value => typeof value === 'boolean' ? value : null;
 const exitCode = value => Number.isInteger(value) && value >= 0 && value <= 255 ? value : null;
 const count = value => Number.isSafeInteger(value) && value >= 0 ? value : null;
-export function buildPostgresFailureRecord({ correlationId, checkoutId, source, phase, error, host, readiness, containerState, durationMs }) {
-  return Object.freeze({ version: phase === 'pool_checkout' ? 3 : 2, kind: 'owned_server_failure',
+export function buildPostgresFailureRecord({ correlationId, checkoutId, source, phase, error, host, readiness, containerState, durationMs, serverStartup }) {
+  return Object.freeze({ version: phase === 'pool_checkout' ? serverStartup === undefined ? 3 : 4 : 2, kind: 'owned_server_failure',
+    ...(phase === 'pool_checkout' && serverStartup !== undefined ? { serverStartup: buildPgStartupServerRecord(serverStartup) } : {}),
     ...(phase === 'pool_checkout' ? { checkoutId: isCheckoutCorrelationId(checkoutId) ? checkoutId : null } : {}),
     correlationId: isCheckoutCorrelationId(correlationId) ? correlationId : null,
     source: member(source, ['testcontainer_postgres', 'external_postgres']),

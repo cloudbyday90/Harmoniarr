@@ -166,6 +166,11 @@ The [official PostgreSQL logging guidance](https://www.postgresql.org/docs/18/ru
 supports this diagnostic follow-up; no logging setting or deadline changed here.
 This repeated validation failure takes priority over further performance work.
 
+That follow-up now has its own [design](POSTGRES_STARTUP_SERVER_DESIGN.md) and
+[outcome](POSTGRES_STARTUP_SERVER_OUTCOME.md). Its native controls prove private
+authorization/session association and explicit unassociated pre-auth windows;
+they do not retroactively diagnose this collection's original failed checkout.
+
 After that, profile and design a guarded no-change Wanted/link replacement path. The
 current write store always invokes complete projection checks before DELETE and
 link sync, even when their DML will change no rows. Inspect all writers and prove

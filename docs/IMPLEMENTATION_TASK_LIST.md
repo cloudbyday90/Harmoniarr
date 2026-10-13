@@ -6,6 +6,23 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Owned server startup evidence (2026-10-13)
+
+The [design](POSTGRES_STARTUP_SERVER_DESIGN.md),
+[official research](POSTGRES_STARTUP_SERVER_RESEARCH_2026_10.md) and
+[outcome](POSTGRES_STARTUP_SERVER_OUTCOME.md) own failure-only structured JSON
+capture for fresh default PostgreSQL 18 fixtures. Private authorization markers
+bind original clients to ordered server sessions; early receipts remain
+unassociated when proof is missing. Explicit application names, original errors,
+resource bounds and both actual app entrypoints are preserved. Final frozen
+17-case native proof, 10,114-case fast gate, both builds, dependency audit and
+skill structure/install checks pass. Historical timeout causality remains unknown.
+
+- Next: collect a fresh, separately labeled guarded source-noop workload under
+  these diagnostics to capture a recurrence before changing connection policy.
+  Then investigate guarded no-change Wanted/link publication with writer and
+  absent-row proof, retaining actual-write/event and complete final byte guards.
+
 ## Completed slice: Locked positive Wanted source no-ops (2026-10-13)
 
 The [design](WANTED_SOURCE_NOOP_DESIGN.md),

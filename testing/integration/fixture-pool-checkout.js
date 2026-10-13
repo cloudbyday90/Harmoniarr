@@ -13,7 +13,7 @@ import { observeOwnedPgConnections } from './owned-pg-connection-observer.js';
 export const fixtureCheckoutMarker = '[fixture-pool-checkout] ';
 
 /** Decorate only an owned instance, retaining the concrete pool and driver API. */
-export function observeFixturePoolCheckouts({ pool, poolKind, source, phaseObserver, expectedConfig,
+export function observeFixturePoolCheckouts({ pool, poolKind, source, phaseObserver, expectedConfig, startupLogging = false,
   mode = 'failures', captureFailure = null,
   onRecord = record => process.stderr.write(`${fixtureCheckoutMarker}${JSON.stringify(record)}\n`),
   now = () => performance.now() } = {}) {
@@ -25,15 +25,15 @@ export function observeFixturePoolCheckouts({ pool, poolKind, source, phaseObser
   if (typeof pool?.connect !== 'function') throw new TypeError('Fixture checkout requires an owned pool');
   const descriptor = Object.getOwnPropertyDescriptor(pool, 'connect');
   const original = pool.connect;
-  const connections = observeOwnedPgConnections({ pool, expectedConfig, now });
+  const connections = observeOwnedPgConnections({ pool, expectedConfig, now, startupLogging });
   const captures = new Set(); let ordinaryRecords = 0; let failureRecords = 0;
   function clock() { try { const n = now(); return Number.isFinite(n) ? n : null; } catch { return null; } }
   function publish(record) {
     if (record.outcome === 'failed' ? failureRecords++ >= 16 : ordinaryRecords++ >= 128) return;
     try { Promise.resolve(onRecord(record)).catch(() => {}); } catch { /* Optional telemetry is not authority. */ }
   }
-  function capture(error, checkoutId) {
-    const pending = Promise.resolve().then(() => captureFailure?.(error, checkoutId)).catch(() => {});
+  function capture(error, checkoutId, startupContext) {
+    const pending = Promise.resolve().then(() => captureFailure?.(error, checkoutId, startupContext)).catch(() => {});
     captures.add(pending); void pending.then(() => captures.delete(pending));
     return pending;
   }
@@ -55,7 +55,8 @@ export function observeFixturePoolCheckouts({ pool, poolKind, source, phaseObser
     return { dispatch: run => connection.dispatch(run),
       requested: () => { requested ??= capturePoolCheckoutSnapshot(pool); },
       passed: () => { if (mode === 'all') emit('passed'); connection.finish(); },
-      failed: error => { emit('failed', error); connection.finish(); return capture(error, checkoutId); } };
+      failed: error => { emit('failed', error); const context = connection.captureStartupContext();
+        connection.finish(); return capture(error, checkoutId, context); } };
   }
   function connect(...args) {
     if (this !== pool) return Reflect.apply(original, this, args);

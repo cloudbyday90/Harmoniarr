@@ -4,6 +4,14 @@ Harmoniarr is a self-hosted, Docker-hosted music library manager inspired by Lid
 
 The repository contains the Node.js ESM server, Vue client, PostgreSQL schema, automated validation, and design documents. The platform is under active development toward its first release.
 
+Fresh default PostgreSQL 18 test fixtures can capture a bounded server startup
+window for the original unnamed cold client. Private marker/session association
+keeps raw identities out of output; early unassociated receipts remain unknown.
+See the [design](docs/POSTGRES_STARTUP_SERVER_DESIGN.md),
+[research](docs/POSTGRES_STARTUP_SERVER_RESEARCH_2026_10.md) and
+[outcome](docs/POSTGRES_STARTUP_SERVER_OUTCOME.md). Production configuration and
+fixture connection deadlines remain unchanged.
+
 Canonical Wanted can skip a source transition only after a live owned row lock
 proves that an available source is already existing. Actual writes/events and
 the final complete verification remain guarded. See the

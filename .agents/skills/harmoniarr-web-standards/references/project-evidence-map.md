@@ -647,3 +647,15 @@ stay guarded. docs/WANTED_SOURCE_NOOP_OUTCOME.md owns production default wiring,
 native commit/rollback, final byte/owner/lease/cancellation, required-event failure
 and matched private results. --source-noops preserves the original compatibility
 matrix and uses a distinct comparator for fewer complete projections/hashes.
+
+Owned server startup uses postgres-startup-config.js, pg-startup-log-policy.js,
+pg-startup-server-record.js and postgres-startup-log-probe.js under
+testing/integration/. The existing client observer adds private markers only to
+unnamed matched original clients; the runtime and both app entrypoints forward
+the captured context into canonical failure evidence. The known owned JSON file
+is read only on failure, with byte/row/command bounds. Source-location and unique
+authorization checks prevent query lookalikes or foreign sessions from becoming
+client proof; pre-auth windows remain unassociated. The
+docs/POSTGRES_STARTUP_SERVER_OUTCOME.md owns real configuration/marker, held
+startup, both entrypoints, cleanup and original-error evidence. This diagnoses
+newly observed stages, not the cause of earlier uncaptured server startup.

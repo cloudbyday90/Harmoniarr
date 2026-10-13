@@ -16,6 +16,7 @@ import { createPreparedPostgresTemplate } from './integration/postgres-migration
 import { createPostgresFailureEvidence } from './integration/postgres-failure-evidence.js';
 import { buildIntegrationPoolConfig } from './integration/pool-policy.js';
 import { observeFixturePoolCheckouts, resolveFixtureCheckoutMode } from './integration/fixture-pool-checkout.js';
+import { supportsPostgresStartupImage, postgresStartupCommand } from './integration/postgres-startup-config.js';
 
 const { Pool } = pg;
 
@@ -32,12 +33,13 @@ function createPoolFactory(env, config) {
   });
 }
 
-function createDefaultPostgresContainer(config) {
+function createDefaultPostgresContainer(config, { startupLogging = false } = {}) {
   const container = new PostgreSqlContainer(config.postgresImage)
     .withStartupTimeout(config.startupTimeoutMs)
     .withDatabase('harmoniarr')
     .withUsername('harmoniarr')
     .withPassword('harmoniarr');
+  if (startupLogging) container.withCommand([...postgresStartupCommand]);
 
   if (config.useContainerReuse) {
     return container.withReuse();
@@ -48,7 +50,7 @@ function createDefaultPostgresContainer(config) {
 
 async function createDatabaseRuntime({ config, env, source, phaseObserver, schemaMode, signal,
   closeServer, createPreparedPostgresTemplateFn, withTemporaryPostgresDatabaseFn, failureEvidence,
-  checkoutMode, checkoutRecord }) {
+  checkoutMode, checkoutRecord, startupLogging = false }) {
   const createPool = createPoolFactory(env, config);
   const prepared = schemaMode === 'migration_template'
     ? await createPreparedPostgresTemplateFn({ env, createPool, phaseObserver: phaseObserver.child(), signal,
@@ -77,17 +79,17 @@ async function createDatabaseRuntime({ config, env, source, phaseObserver, schem
       const captureCheckout = failureEvidence.createCapture({ correlationId: observer.correlationId, signal: caseSignal });
       let checkoutFailed = false;
       const captureServerFailure = (error, phase) => checkoutFailed ? Promise.resolve() : captureScenario(error, phase);
-      const captureCheckoutFailure = (error, checkoutId) => {
-        checkoutFailed = true; return captureCheckout(error, 'pool_checkout', checkoutId);
+      const captureCheckoutFailure = (error, checkoutId, startupContext) => {
+        checkoutFailed = true; return captureCheckout(error, 'pool_checkout', checkoutId, startupContext);
       };
       const execute = async (context) => {
         const pool = typeof context.getPoolFn === 'function' ? context.getPoolFn() : null;
         const diagnostics = typeof pool?.connect === 'function' ? observeFixturePoolCheckouts({ pool,
           poolKind: 'scenario_pool', source, expectedConfig: context.databaseConfig,
-          phaseObserver: observer, mode: checkoutMode,
+          phaseObserver: observer, mode: checkoutMode, startupLogging,
           captureFailure: captureCheckoutFailure, ...(checkoutRecord ? { onRecord: checkoutRecord } : {}) }) : null;
         let failed = false; let failure; let result;
-        try { result = await run({ ...context, source, schemaMode, phaseObserver: observer,
+        try { result = await run({ ...context, source, schemaMode, startupLogging, phaseObserver: observer,
           captureServerFailure, captureCheckoutFailure }); } catch (error) { failed = true; failure = error; }
         try { await diagnostics?.restore(); } catch (error) { if (!failed) { failed = true; failure = error; } }
         if (failed) throw failure;
@@ -119,6 +121,7 @@ export async function createPostgresIntegrationRuntime({
   const checkoutMode = resolveFixtureCheckoutMode(env);
   if (checkoutRecord !== null && typeof checkoutRecord !== 'function') throw new TypeError('Invalid fixture checkout sink');
   const fresh = createPostgresContainer === createDefaultPostgresContainer && !config.useContainerReuse;
+  const startupLogging = fresh && evidenceMode === 'failures' && checkoutMode !== 'off' && supportsPostgresStartupImage(config.postgresImage);
   if (hasConfiguredPostgresAdminConnection(env)) {
     return createDatabaseRuntime({ config, env, source: 'external_postgres', phaseObserver, schemaMode, signal,
       closeServer: async () => {}, createPreparedPostgresTemplateFn, withTemporaryPostgresDatabaseFn,
@@ -126,7 +129,7 @@ export async function createPostgresIntegrationRuntime({
       failureEvidence: failureEvidenceFactory({ mode: evidenceMode, source: 'external_postgres' }) });
   }
 
-  const container = await phaseObserver.measure('container_start', () => createPostgresContainer(config).start());
+  const container = await phaseObserver.measure('container_start', () => createPostgresContainer(config, { startupLogging }).start());
   const containerEnv = {
     PGDATABASE: container.getDatabase(),
     PGHOST: container.getHost(),
@@ -140,9 +143,9 @@ export async function createPostgresIntegrationRuntime({
   try {
     return await createDatabaseRuntime({ config, env: containerEnv, source: 'testcontainer_postgres', phaseObserver,
       schemaMode, signal, closeServer, createPreparedPostgresTemplateFn, withTemporaryPostgresDatabaseFn,
-      checkoutMode, checkoutRecord,
+      checkoutMode, checkoutRecord, startupLogging,
       failureEvidence: failureEvidenceFactory({ mode: evidenceMode,
-        source: 'testcontainer_postgres', fresh, containerId: container.getId?.(),
+        source: 'testcontainer_postgres', fresh, startupLogging, containerId: container.getId?.(),
         connectionConfig: buildPostgresAdminConnectionConfig(containerEnv) }) });
   } catch (error) { await closeServer().catch(() => {}); throw error; }
 }
