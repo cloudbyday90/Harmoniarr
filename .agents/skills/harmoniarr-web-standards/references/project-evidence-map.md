@@ -545,3 +545,12 @@ client and alternating order on controlled historical receipts, not new distinct
 track acquisition. Register the whole app scenario through completion, close
 profiling admission on cancellation and drain before database/server cleanup.
 The original largest-profile timeout remains separate from reviewed/frozen proof.
+
+Current fingerprinting now uses operator-track-fingerprint-policy.js and
+operator-track-fingerprint-stream-service.js. Keep 64 KiB by default; the isolated
+larger-buffer experiment trades lower median time for higher sampled memory.
+Explicit stream close precedes after-stat/root checks. Actual file/held-close and
+real delivery/Wanted controls own proof; configured buffer size is not a memory
+cap. docs/TRACK_FINGERPRINT_STREAM_OUTCOME.md records sampling/GC/cache limits and
+the reusable-buffer follow-up. Probe failure/cancellation must drain the captured
+child; incomplete close retains the owned workspace rather than deleting files.

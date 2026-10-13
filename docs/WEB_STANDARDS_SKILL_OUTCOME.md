@@ -703,6 +703,12 @@ drainage correction, query/byte comparisons and validation. Five structure check
 and seven installed-file hashes pass. No new blind skill trial or standards
 certification is claimed.
 
+Fingerprint references now locate bounded read options, actual close and current
+file/root checks. The [stream outcome](TRACK_FINGERPRINT_STREAM_OUTCOME.md) owns
+isolated memory/timing samples and actual publication proof; it retains 64 KiB
+instead of promoting speed alone. Structure/install proof is distinct from a
+new blind skill trial or full conformance claim.
+
 Operator reconciliation references now locate completion, the narrow parallel
 task helper and twelve captured application owners. They explicitly distinguish
 scoped snapshot/revision validation from publication authority. The

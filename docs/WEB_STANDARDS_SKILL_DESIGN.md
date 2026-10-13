@@ -448,3 +448,9 @@ JSON-null/default semantics, with the
 query-count/byte evidence separate from performance claims and register profiling
 completion through cancellation. Entry-point metadata and invocation policy stay
 unchanged; this extends the existing server-diagnostics route.
+
+Fingerprint references add measured-memory and explicit stream/process-close
+boundaries through the [stream design](TRACK_FINGERPRINT_STREAM_DESIGN.md).
+Keep size thresholds, sampled peaks, domain evidence and performance decisions
+distinct. This is narrow maintenance of the existing diagnostic route; metadata
+and invocation policy remain unchanged.

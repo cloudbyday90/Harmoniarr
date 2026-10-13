@@ -5,6 +5,16 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+Fingerprint buffer validation needs actual file/hash/byte equality for each
+bounded option, changed-file/private-root refusal and delayed success/Error/null
+close controls. Treat high-water marks as thresholds and sampled process peaks
+as observations; do not sum external and ArrayBuffers or promote elapsed time
+alone. Isolated probes own close/termination and retain files after unverified
+quiescence. Keep hash-only profiling separate from real apply/Wanted guard proof
+and whole-app/CI claims. See docs/TRACK_FINGERPRINT_STREAM_OUTCOME.md; targeted
+large-media integration proof can avoid repeating an unchanged full scaling
+experiment when it adds no new authority evidence.
+
 Root-lookup profiling must retain identical projections and actual hash/byte work
 with alternating samples on one borrowed client. Historical duplicate receipts
 are not distinct-track acquisition coverage. Keep query counts separate from

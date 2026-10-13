@@ -4,13 +4,16 @@
  * This program is free software: licensed under GPL-3.0-or-later.
  * See LICENSE for details.
  */
-import { createReadStream } from 'node:fs';
-import { createHash } from 'node:crypto';
 import { lstat, realpath, stat } from 'node:fs/promises';
 import { isAbsolute, relative, sep } from 'node:path';
 import { refuseOperatorTrackFiles } from './operator-track-file-policy.js';
+import { createOperatorTrackFingerprintStreamService } from './operator-track-fingerprint-stream-service.js';
+import { resolveOperatorTrackReadBuffer } from './operator-track-fingerprint-policy.js';
 
-export async function fingerprintOperatorTrackFile(filePath, { libraryRoot = null, onBytesRead = null } = {}) {
+const streamService = createOperatorTrackFingerprintStreamService();
+
+export async function fingerprintOperatorTrackFile(filePath, { libraryRoot = null, onBytesRead = null, readBufferBytes } = {}) {
+  const acceptedBuffer = resolveOperatorTrackReadBuffer(readBufferBytes);
   let canonical;
   const assertPrivate = async () => {
     if (!libraryRoot) return;
@@ -23,18 +26,9 @@ export async function fingerprintOperatorTrackFile(filePath, { libraryRoot = nul
   await assertPrivate();
   const before = await stat(filePath);
   if (!before.isFile()) throw new Error('Track evidence requires a regular file');
-  const hash = createHash('sha256');
-  for await (const chunk of createReadStream(filePath)) {
-    hash.update(chunk);
-    if (typeof onBytesRead === 'function') {
-      try {
-        const result = onBytesRead(chunk.length);
-        if (result && typeof result.then === 'function') Promise.resolve(result).catch(() => {});
-      } catch { /* Optional byte telemetry only. */ }
-    }
-  }
+  const sha256 = await streamService.hashFile({ filePath, readBufferBytes: acceptedBuffer, onBytesRead });
   const after = await stat(filePath);
   await assertPrivate();
   if (before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ino !== after.ino) throw new Error('Track changed while collecting evidence');
-  return { sizeBytes: after.size, sha256: hash.digest('hex') };
+  return { sizeBytes: after.size, sha256 };
 }

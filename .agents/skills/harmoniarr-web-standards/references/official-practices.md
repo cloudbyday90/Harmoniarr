@@ -743,3 +743,10 @@ fresh context statement. Missing settings and JSON null are different inputs.
 Vendor measurement caveats require query-count/result/byte proof alongside local
 timings; fewer queries alone do not promise a whole-projection speedup. W3C remains
 draft timing guidance and OWASP keeps identifiers/SQL/errors out of diagnostics.
+
+October 13 fingerprint guidance uses docs/TRACK_FINGERPRINT_STREAM_RESEARCH_2026_10.md.
+Node read-buffer thresholds do not establish process-memory caps. Sample RSS,
+heap, external and ArrayBuffers separately; ArrayBuffers are already included in
+external memory. Pair timing with actual hashes/bytes and owned completion/close.
+Preserve primary Error/null through cleanup, and keep W3C draft timing and OWASP
+data-minimized diagnostics separate from domain authority or required audit.

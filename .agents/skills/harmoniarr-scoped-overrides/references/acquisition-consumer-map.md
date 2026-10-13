@@ -15,6 +15,12 @@ root containment on every receipt. Reduced round trips grant no recipient consen
 or historical availability. See docs/WANTED_ROOT_LOOKUP_OUTCOME.md for scaling
 profiles and the retained current-byte/event guards.
 
+Current-byte evidence uses the bounded fingerprint stream service with observed
+completion/close before after-stat/private-root checks. Retaining the 64 KiB
+default follows measured memory tradeoffs; larger internal experiment buffers do
+not weaken owner/scope checks or authorize historical hash reuse. See
+docs/TRACK_FINGERPRINT_STREAM_OUTCOME.md for actual file and publication controls.
+
 Negative scan observations now bind the original scan acquisition, private root
 and pre-walk receipt revision (docs/SCAN_RECEIPT_INVALIDATION_OUTCOME.md). They
 retain historical receipts and do not lower verification or grant provider replay.

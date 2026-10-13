@@ -109,3 +109,8 @@ versus explicit-null settings and disabled-owner/private-root refusal. The
 [root outcome](WANTED_ROOT_LOOKUP_OUTCOME.md) owns attributed scaling and retained
 failures; query consolidation grants no consent or historical availability.
 Maintained/installed structure and hashes pass without a new blind trial.
+
+The map now locates explicit fingerprint completion/close and retained fresh
+root/stat checks. The [stream outcome](TRACK_FINGERPRINT_STREAM_OUTCOME.md) owns
+memory tradeoffs and scope-specific current-byte publication proof. Larger
+internal buffers grant no recipient consent or historical availability.

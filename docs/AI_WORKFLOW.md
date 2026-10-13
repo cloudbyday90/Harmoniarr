@@ -72,6 +72,12 @@ unresolved causes and failed cohorts rather than prescribing generic retries.
 
 ## Repository Rules
 
+Fingerprint reference maintenance pairs Node buffer/close contracts with sampled
+memory, W3C draft durations and OWASP data minimization. A configured threshold
+is not a process-memory cap, and a faster hash-only sample does not certify whole
+Wanted/CI performance. The [stream outcome](TRACK_FINGERPRINT_STREAM_OUTCOME.md)
+owns actual file/process/publication evidence and the retained default.
+
 Root-lookup reference maintenance preserves absent/default versus explicit-null
 setting semantics and current owner/private-root authority in one statement.
 Its profiling workflow registers actual app completion through cancellation,

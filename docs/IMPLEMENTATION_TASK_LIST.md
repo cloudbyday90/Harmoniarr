@@ -6,6 +6,25 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Current fingerprint stream ownership (2026-10-13)
+
+The [stream design](TRACK_FINGERPRINT_STREAM_DESIGN.md),
+[official research](TRACK_FINGERPRINT_STREAM_RESEARCH_2026_10.md) and
+[outcome](TRACK_FINGERPRINT_STREAM_OUTCOME.md) own bounded ESM stream/policy
+modules, observed close and fresh root/stat/hash checks. Thirty-six isolated
+samples retain identical evidence/bytes. Larger buffers reduce local noise-file
+median time but increase sampled memory, so 64 KiB remains the default. No cache,
+whole-file allocation, public setting, migration or weaker publication guard.
+
+- Validation: 17 focused cases, 36 isolated samples, frozen fast gate 10,032
+  cases/static checks/builds and 112/112 affected native cases across eighteen
+  serial files pass. Five skill validators/seven installed hashes and zero-
+  vulnerability dependency audit pass. The outcome separates hash-only timing/
+  memory from actual authority proof and preserves sampling/GC/scaling limits.
+- Next: independently compare a bounded reusable read buffer with current streams,
+  retaining handle/close ownership, original Error/null, current evidence/race
+  refusal, measured memory and every publication recheck.
+
 ## Completed slice: Wanted root lookup consolidation (October 2026)
 
 The [root lookup design](WANTED_ROOT_LOOKUP_DESIGN.md),
