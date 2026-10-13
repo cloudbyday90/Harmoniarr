@@ -125,3 +125,7 @@ same scenario/resource limits and retry-free refusal. Do not assume media or CPU
 is the cause merely from the outer seed checkpoint. Then establish all-writer/
 absent-row authority before an empty DELETE or unchanged link path can skip a
 projection; retain real writes/events, clocks and final byte/job authority.
+
+The subsequent [seed phase outcome](WANTED_SEED_PHASE_OUTCOME.md) splits that
+owner and measures redundant preparation. Its separately labeled current runs
+do not change this slice's failed/full and selected evidence.

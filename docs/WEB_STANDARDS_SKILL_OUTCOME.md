@@ -1,5 +1,10 @@
 # Practical web standards skill outcome
 
+October 13 seed-phase reference maintenance maps monotonic nested spans, bounded
+private output and actual worker preview ownership to the
+[outcome](WANTED_SEED_PHASE_OUTCOME.md). Structural/install checks are distinct
+from executed application evidence; no new blind trial or standards certification.
+
 October 13 workload replay reference maintenance teaches prerequisite diagnosis,
 recorded selected/full scope and minimized failure locations. The separate
 [outcome](WANTED_WORKLOAD_REPLAY_OUTCOME.md) owns executed application evidence.

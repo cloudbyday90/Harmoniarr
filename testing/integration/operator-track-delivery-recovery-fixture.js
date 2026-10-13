@@ -20,19 +20,23 @@ import { createImportCandidateApplyRunStore } from '../../src/server/import-cand
 import { createImportCandidateApplyWorker } from '../../src/server/import-candidates/import-candidate-apply-worker.js';
 import { listImportApplyRunItems, replaceImportApplyRunItems, updateImportApplyRunItem } from '../../src/server/import-candidates/import-candidate-apply-repository.js';
 import { listImportOperations } from '../../src/server/import-candidates/import-candidate-operation-repository.js';
+import { disabledWantedSeedObserver } from './wanted-seed-observer.js';
+import { observeWantedSeedMedia } from './wanted-seed-media-observer.js';
 
-export async function seedTrackDeliveryRecoveryFixture(workspaceDir, { mediaProfile = 'sine', durationSeconds = 2 } = {}) {
+export async function seedTrackDeliveryRecoveryFixture(workspaceDir, { mediaProfile = 'sine', durationSeconds = 2,
+  seedObserver = disabledWantedSeedObserver } = {}) {
   if (!['sine', 'noise'].includes(mediaProfile)) throw new TypeError('Unknown controlled FLAC profile');
   const pool = getPool(); const paths = Object.fromEntries(['downloads', 'staging', 'music'].map(key => [key, join(workspaceDir, key)]));
   await mkdir(join(paths.downloads, 'union'), { recursive: true }); await mkdir(paths.staging, { recursive: true }); await mkdir(paths.music, { recursive: true });
   await persistSettings(Object.entries(paths).map(([settingKey, value]) => ({ namespace: 'paths', settingKey, value: libraryAddRuntimePath(value) })), null, pool);
-  const fixture = await seedOperatorTrackUnionFixture({ durationSeconds });
+  const fixture = await seedObserver.measure('consent', 1, () => seedOperatorTrackUnionFixture({ durationSeconds }));
   const quality = await createLibraryDiscoveryQualityContextService().resolveSharedDiscoveryQualityContext({ metadataReleaseId: fixture.metadata.metadataReleaseId,
     evidence: { sourceMediaRequestId: fixture.primary.id, sourceRequestedForUserId: fixture.user.id },
     operatorLinks: fixture.wanted.map(wanted => ({ wantedReleaseId: wanted.id, appUserId: wanted.app_user_id,
       operatorTrackScope: wanted.evidence.operatorTrackScope, qualityPreferences: {} })) });
   const releaseMbid = (await pool.query('SELECT musicbrainz_release_id FROM metadata_releases WHERE id=$1', [fixture.metadata.metadataReleaseId])).rows[0].musicbrainz_release_id;
-  const media = createLibraryAddMediaFixture({ getFixtureRoot: () => workspaceDir }); const unavailable = await media.verifyTooling();
+  const media = observeWantedSeedMedia(createLibraryAddMediaFixture({ getFixtureRoot: () => workspaceDir }), { observer: seedObserver });
+  const unavailable = await media.verifyTooling();
   if (unavailable) throw new Error(unavailable);
   const files = [];
   for (const participant of quality.operatorTrackParticipants) {
@@ -47,6 +51,7 @@ export async function seedTrackDeliveryRecoveryFixture(workspaceDir, { mediaProf
   }
   const third = join(paths.downloads, 'union', '03 Unrequested third.flac'); await writeFile(third, 'Keep the unrequested sibling');
   files.push({ filename: '03 Unrequested third.flac', extension: 'flac', sizeBytes: (await stat(third)).size, lengthSeconds: 2, isLocked: false });
+  const prepared = await seedObserver.measure('candidate_prepare', 1, async () => {
   const seeded = await seedImportCandidateFixture({ queryable: pool, candidateOverrides: { status: 'pending', folderPath: 'union',
     sourceSearchId: 'recovery-union-search', normalizedPayload: { musicQueue: quality,
       requestOwnership: { sourceMediaRequestId: fixture.primary.id, sourceRequestedForUserId: fixture.user.id } } }, files });
@@ -55,16 +60,23 @@ export async function seedTrackDeliveryRecoveryFixture(workspaceDir, { mediaProf
   const inspection = createMediaInspectionService({ mediaCommandService: { runCommand: ({ binary, args }) => media.mediaCommand(binary, args) } });
   const naming = createImportCandidatePreviewService({ getImportCandidate: candidates.getImportCandidate });
   const preview = createImportCandidateApplyPreviewService({ previewImportCandidate: naming.previewImportCandidate, mediaInspectionService: inspection });
-  return { ...fixture, pool, paths, third, candidateId: seeded.id, candidates, inspection, preview };
+  return { candidateId: seeded.id, candidates, inspection, preview };
+  });
+  return { ...fixture, pool, paths, third, ...prepared };
 }
 
-export async function runTrackDeliveryApply(c, operationService, { markApplied = c.candidates.markImportCandidateApplied } = {}) {
+export async function runTrackDeliveryApply(c, operationService, { markApplied = c.candidates.markImportCandidateApplied,
+  onPreview = null } = {}) {
+  if (onPreview !== null && typeof onPreview !== 'function') throw new TypeError('Invalid fixture preview observer');
   const runs = createImportCandidateApplyRunStore();
   const run = await runs.createOperationRun({ requestedCandidateCount: 1, importCandidateIds: [c.candidateId] });
   const worker = createImportCandidateApplyWorker({ ...runs,
     buildImportPendingCandidateSummary: async () => ({ counts: { ready: 1, totalImportPending: 1 }, importPendingCandidates: [{
       ...await c.candidates.getImportCandidate({ importCandidateId: c.candidateId }), importStatus: { code: 'ready', message: 'Current typed delivery' } }] }),
-    previewImportCandidateApply: c.preview.previewImportCandidateApply,
+    previewImportCandidateApply: onPreview === null ? c.preview.previewImportCandidateApply : async (...args) => {
+      const preview = await c.preview.previewImportCandidateApply(...args);
+      await onPreview(preview); return preview;
+    },
     applyImportCandidatePreview: operationService.applyImportCandidatePreview,
     markImportCandidateApplied: markApplied,
     listImportApplyRunItems, replaceImportApplyRunItems, updateImportApplyRunItem, listImportOperations,

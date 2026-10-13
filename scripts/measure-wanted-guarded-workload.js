@@ -5,18 +5,25 @@
  * See LICENSE for details.
  */
 import { writeFile } from 'node:fs/promises';
-import { measureWantedGuardedWorkload } from '../testing/integration/wanted-guarded-benchmark.js';
-import { measureWantedDistinctBindings } from '../testing/integration/wanted-distinct-binding-benchmark.js';
 import { parseWantedWorkloadCommand } from '../testing/integration/wanted-workload-command-policy.js';
 import { runWantedWorkloadMeasurement } from '../testing/integration/wanted-workload-runner.js';
 
 const selection = parseWantedWorkloadCommand(process.argv.slice(2));
 const controller = new AbortController();
+const measure = async input => {
+  if (typeof global.gc !== 'function') throw new TypeError('Guarded workload measurement requires explicit GC');
+  if (selection.distinct) {
+    const { measureWantedDistinctBindings } = await import('../testing/integration/wanted-distinct-binding-benchmark.js');
+    return measureWantedDistinctBindings(input);
+  }
+  const { measureWantedGuardedWorkload } = await import('../testing/integration/wanted-guarded-benchmark.js');
+  return measureWantedGuardedWorkload(input);
+};
 const cancel = () => controller.abort(new Error('Guarded workload measurement cancelled'));
 process.on('SIGINT', cancel); process.on('SIGTERM', cancel);
 try {
   const result = await runWantedWorkloadMeasurement({ selection,
-    measure: selection.distinct ? measureWantedDistinctBindings : measureWantedGuardedWorkload,
+    measure,
     signal: controller.signal,
     onProgress: record => process.stdout.write(`${JSON.stringify({ kind: 'wanted_guarded_progress', ...record })}\n`) });
   if (result.failed) {

@@ -4,6 +4,14 @@ Harmoniarr is a self-hosted, Docker-hosted music library manager inspired by Lid
 
 The repository contains the Node.js ESM server, Vue client, PostgreSQL schema, automated validation, and design documents. The platform is under active development toward its first release.
 
+Wanted seed profiling now separates consent, generated/inspected media, actual
+apply and receipt verification with bounded private-data-free phase records.
+Distinct fixtures retain the actual worker preview and avoid a redundant earlier
+preview; `--seed-preview separate` keeps the conservative comparator. See the
+[design](docs/WANTED_SEED_PHASE_DESIGN.md),
+[research](docs/WANTED_SEED_PHASE_RESEARCH_2026_10.md) and
+[outcome](docs/WANTED_SEED_PHASE_OUTCOME.md). Canonical verification remains.
+
 Guarded workload commands support explicit reviewed selections and safe failure
 locations. The full default matrix is unchanged; selected artifacts record their
 smaller scope. For focused source comparison use

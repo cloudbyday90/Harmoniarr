@@ -1,5 +1,14 @@
 # Official practices by boundary
 
+October 13 seed-phase guidance uses docs/WANTED_SEED_PHASE_RESEARCH_2026_10.md.
+W3C draft/Node monotonic observation supports nested timing; OWASP data
+minimization supports fixed labels, numeric spans and bounded artifact tails.
+Await returned observation, preserve primary Error/null and keep operation
+payloads private. The current worker preview can replace redundant preparation,
+not its own current inspection or byte/publication guards. FFmpeg multi-output
+guidance is a deferred media-shape candidate; no cache or batching follows from
+source guidance alone. Verify actual installed tool/runtime versions separately.
+
 October 13 guarded-workload replay guidance uses
 docs/WANTED_WORKLOAD_REPLAY_RESEARCH_2026_10.md. W3C draft timing and Node
 monotonic measurements inform separate service/runner scopes; OWASP logging

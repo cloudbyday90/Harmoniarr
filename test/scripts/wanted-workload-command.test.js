@@ -30,8 +30,8 @@ test('legacy workload commands keep full dimensions and original comparator sele
 
 test('explicit workload selection records reduced scope and forwards only reviewed options', () => {
   const result = selected();
-  assert.deepEqual(result.plan, { scope: 'selected', profiles: ['sine'], bindingCounts: [2], pairs: 1, expectedSamples: 2 });
-  assert.deepEqual(result.options, { profiles: ['sine'], bindingCounts: [2], pairs: 1, sourceNoopComparison: true });
+  assert.deepEqual(result.plan, { scope: 'selected', profiles: ['sine'], bindingCounts: [2], pairs: 1, seedPreviewMode: 'worker', expectedSamples: 2 });
+  assert.deepEqual(result.options, { profiles: ['sine'], bindingCounts: [2], pairs: 1, seedPreviewMode: 'worker', sourceNoopComparison: true });
   assert.throws(() => result.plan.profiles.push('noise'), TypeError);
   assert.throws(() => { result.options.pairs = 2; }, TypeError);
 });
@@ -41,7 +41,8 @@ test('ambiguous, duplicate, unsupported and incomplete commands refuse before me
     ['--profiles', 'sine,sine'], ['--profiles', 'sine,'], ['--profiles', 'private'],
     ['--bindings', '2'], ['--source-noops', '--bindings', '16'], ['--source-noops', '--bindings', '2,2'],
     ['--pairs', '3'], ['--pairs', '01'], ['--pairs'], ['--pairs', '1', '--pairs', '2'],
-    ['--output', 'other.json'], ['--unknown'], ['--profiles', '--pairs', '1']]) {
+    ['--output', 'other.json'], ['--unknown'], ['--profiles', '--pairs', '1'], ['--seed-preview', 'separate'],
+    ['--source-noops', '--seed-preview', 'cached']]) {
     assert.throws(() => parseWantedWorkloadCommand([...base, ...tail]), TypeError);
   }
   for (const args of [[], ['--output', ' '], ['--output'], new Array(2), [null]]) {
@@ -140,6 +141,6 @@ test('CLI missing explicit GC writes an incomplete selected artifact and safe fa
     assert.equal(report.version, 2); assert.equal(report.completed, false);
     assert.equal(report.plan.scope, 'selected'); assert.equal(report.plan.expectedSamples, 2);
     assert.deepEqual(report.samples, []); assert.equal(report.failure.errorClass, 'TypeError');
-    assert.ok(report.failure.frames.some(frame => frame.file === 'testing/integration/wanted-distinct-binding-policy.js'));
+    assert.ok(report.failure.frames.some(frame => frame.file === 'scripts/measure-wanted-guarded-workload.js'));
   } finally { await rm(directory, { recursive: true, force: true }); }
 });

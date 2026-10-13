@@ -9,6 +9,7 @@ import { performance } from 'node:perf_hooks';
 import { createEarlyFailureRecord } from '../reporters/early-failure-format.js';
 import { wantedWorkloadExpectedKeys, wantedWorkloadSampleKey } from './wanted-workload-command-policy.js';
 import { readCheckoutProperty as read } from './pool-checkout-record.js';
+import { captureWantedSeedRecord } from './wanted-seed-observer.js';
 
 function captureCheckpoint(input) {
   const stage = read(input, 'stage'); const mediaProfile = read(input, 'mediaProfile');
@@ -23,11 +24,20 @@ function captureCheckpoint(input) {
 export async function runWantedWorkloadMeasurement({ selection, measure, signal,
   onProgress = () => {}, now = () => performance.now(), projectRoot = process.cwd() }) {
   const samples = []; const remaining = wantedWorkloadExpectedKeys(selection);
+  const seedPhases = []; let seedPhasesClipped = false;
   const started = now(); let failed = false; let error; let lastCheckpoint = null;
   try {
     signal?.throwIfAborted();
     await measure({ ...selection.options, signal, onProgress,
       onCheckpoint: row => { lastCheckpoint = captureCheckpoint(row) ?? lastCheckpoint; },
+      onSeedRecord: row => {
+        const record = captureWantedSeedRecord(row);
+        if (!record) return;
+        const mediaProfile = read(row, 'mediaProfile'); const bindings = read(row, 'bindings'); const pair = read(row, 'pair');
+        if (seedPhases.length === 256) { seedPhases.shift(); seedPhasesClipped = true; }
+        seedPhases.push({ ...record, mediaProfile: ['sine', 'noise'].includes(mediaProfile) ? mediaProfile : null,
+          bindings: [2, 4, 8].includes(bindings) ? bindings : null, pair: [0, 1].includes(pair) ? pair : null });
+      },
       onSample: row => {
         assert.ok(remaining.delete(wantedWorkloadSampleKey(selection, row)), 'Unexpected or duplicate workload sample');
         samples.push(row);
@@ -39,6 +49,7 @@ export async function runWantedWorkloadMeasurement({ selection, measure, signal,
   const report = { version: 2, kind: selection.kind, completed: !failed, node: process.version,
     plan: selection.plan, measurementMs: Number.isFinite(elapsed) && elapsed >= 0 ? elapsed : null,
     lastCheckpoint,
+    seedPhases, seedPhasesClipped,
     failure: failed ? createEarlyFailureRecord({ type: 'test:fail', data: { details: { error: { cause: error } } } }, { projectRoot }) : null,
     samples };
   return { failed, error, report };

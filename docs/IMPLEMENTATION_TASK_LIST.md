@@ -6,6 +6,18 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Wanted fixture seed phases (2026-10-13)
+
+- Narrow ESM modules separate seed observation, media calls, receipt validation
+  and actual worker preview capture; the default distinct fixture omits only a
+  measured redundant preparatory preview. The CLI imports benchmarks lazily.
+- The [outcome](WANTED_SEED_PHASE_OUTCOME.md) records instrumented baseline,
+  optimized largest selection and native/stable gates separately. Resource
+  limits and canonical inspection/hash/write checks remain.
+- Next: evaluate scenario-owned media execution to remove per-command container
+  startup while retaining every actual inspection, private mount/network bounds
+  and returned process/fixture drainage. Do not introduce an inspection cache.
+
 ## Completed slice: Guarded workload replay and command evidence (2026-10-13)
 
 - Two narrow ESM modules add explicit reviewed command selection, recorded full/

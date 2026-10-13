@@ -14,12 +14,15 @@ import { assertWantedDistinctSample, assertWantedDistinctWorkloadOptions, wanted
 import { compareWantedBoundedRootSamples, profileWantedGuardedReconciliation,
   summarizeWantedGuardedSample } from './wanted-guarded-profile.js';
 import { compareWantedSourceNoopSamples } from './wanted-source-noop-profile-policy.js';
+import { createWantedSeedObserver } from './wanted-seed-observer.js';
 
 export async function measureWantedDistinctBindings({ signal, onProgress = () => {}, onSample = () => {},
   profiles = ['sine', 'noise'], bindingCounts = wantedDistinctBindingCounts, pairs = 2, gc = global.gc,
-  sourceNoopComparison = false, onCheckpoint = () => {} } = {}) {
+  sourceNoopComparison = false, onCheckpoint = () => {}, onSeedRecord = () => {}, seedPreviewMode = 'worker' } = {}) {
   if (typeof sourceNoopComparison !== 'boolean') throw new TypeError('Invalid source no-op comparison');
   if (typeof onCheckpoint !== 'function') throw new TypeError('Invalid workload checkpoint observer');
+  if (typeof onSeedRecord !== 'function') throw new TypeError('Invalid seed record observer');
+  if (!['worker', 'separate'].includes(seedPreviewMode)) throw new TypeError('Invalid seed preview mode');
   const checkpoint = async record => { try { await onCheckpoint(record); } catch { /* Optional diagnostic sink. */ } };
   assertWantedDistinctWorkloadOptions({ signal, profiles, bindingCounts, pairs, gc, onProgress, onSample });
   const config = resolveIntegrationTestRuntimeConfig(); const rows = [];
@@ -36,8 +39,9 @@ export async function measureWantedDistinctBindings({ signal, onProgress = () =>
         withPostgresIntegrationRuntimeFn: ({ run, phaseObserver }) => runtime.runIsolatedDatabase(run, { phaseObserver, signal: caseSignal }),
         run: input => withFixtureLifecycle({ signal: caseSignal }, async scope => {
           await checkpoint({ ...location, stage: 'seed' });
-          const c = await seedWantedDistinctBindingProfile(input.workspaceDir, { bindings, mediaProfile,
-            durationSeconds: mediaProfile === 'noise' ? 30 : 2, signal: scope.signal });
+          const seedObserver = createWantedSeedObserver({ onRecord: record => onSeedRecord({ ...record, ...location }) });
+          const c = await seedObserver.measure('seed_total', null, () => seedWantedDistinctBindingProfile(input.workspaceDir, { bindings, mediaProfile,
+            durationSeconds: mediaProfile === 'noise' ? 30 : 2, signal: scope.signal, seedObserver, seedPreviewMode }));
           await checkpoint({ ...location, stage: 'profile_client' });
           await withWantedProfileClient(c.pool, async borrowed => {
             const samples = [];

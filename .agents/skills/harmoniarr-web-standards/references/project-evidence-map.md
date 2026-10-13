@@ -1,5 +1,13 @@
 # Project standards-to-evidence map
 
+Wanted seed owners: wanted-seed-{observer,media-observer}.js observe returned
+phase/command work with numeric nesting and safe output. The distinct receipt
+fixture retains physical identity/scopes/history proof; distinct apply retains
+the actual worker preview and guarded canonical completion. The seed design/
+research/outcome distinguish measured redundant preparation, failed command
+imports and qualified native timing. Any shared media executor still needs
+private read-only inspection mounts, network isolation and process drainage.
+
 Guarded workload command: wanted-workload-command-policy.js owns reviewed
 selection/full scope; wanted-workload-runner.js retains planned sample membership,
 private Error/null and bounded early-failure frames. The distinct-binding

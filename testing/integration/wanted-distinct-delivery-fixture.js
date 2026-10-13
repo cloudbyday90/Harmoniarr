@@ -11,12 +11,14 @@ import { createLibraryDiscoveryQualityContextService } from '../../src/server/li
 import { createImportCandidateService } from '../../src/server/import-candidates/import-candidate-service.js';
 import { createImportCandidatePreviewService } from '../../src/server/import-candidates/import-candidate-preview-service.js';
 import { createImportCandidateApplyPreviewService } from '../../src/server/import-candidates/import-candidate-apply-preview-service.js';
-import { createImportCandidateApplyOperationService } from '../../src/server/import-candidates/import-candidate-apply-operation-service.js';
 import { seedImportCandidateFixture } from './import-candidate-fixtures.js';
-import { runTrackDeliveryApply } from './operator-track-delivery-recovery-fixture.js';
+import { applyWantedDistinctFixture } from './wanted-distinct-apply-fixture.js';
+import { disabledWantedSeedObserver } from './wanted-seed-observer.js';
+import { observeWantedSeedMedia } from './wanted-seed-media-observer.js';
 
 export async function seedWantedDistinctDelivery({ pool, paths, media, inspection, fixture,
-  context, mediaProfile, durationSeconds, signal }) {
+  context, mediaProfile, durationSeconds, signal, seedObserver = disabledWantedSeedObserver, seedPreviewMode = 'worker' }) {
+  media = observeWantedSeedMedia(media, { observer: seedObserver, context });
   signal?.throwIfAborted();
   const folder = `distinct-binding-${context}`; const directory = join(paths.downloads, folder);
   await mkdir(directory, { recursive: true });
@@ -45,6 +47,7 @@ export async function seedWantedDistinctDelivery({ pool, paths, media, inspectio
   const third = join(directory, '03 Unrequested third.flac'); await writeFile(third, 'Keep the unrequested sibling');
   files.push({ filename: '03 Unrequested third.flac', extension: 'flac', sizeBytes: (await stat(third)).size,
     lengthSeconds: 2, isLocked: false });
+  const prepared = await seedObserver.measure('candidate_prepare', context, async () => {
   const candidate = await seedImportCandidateFixture({ queryable: pool, candidateOverrides: { status: 'pending',
     folderPath: folder, sourceSearchId: folder, normalizedPayload: { musicQueue: quality,
       requestOwnership: { sourceMediaRequestId: fixture.primary.id, sourceRequestedForUserId: fixture.user.id } } }, files });
@@ -53,9 +56,10 @@ export async function seedWantedDistinctDelivery({ pool, paths, media, inspectio
   await candidates.markImportCandidateImportPending({ importCandidateId: candidate.id });
   const naming = createImportCandidatePreviewService({ getImportCandidate: candidates.getImportCandidate });
   const preview = createImportCandidateApplyPreviewService({ previewImportCandidate: naming.previewImportCandidate, mediaInspectionService: inspection });
-  const input = { ...fixture, pool, paths, third, candidateId: candidate.id, candidates, inspection, preview };
-  const planned = await preview.previewImportCandidateApply({ importCandidateId: candidate.id });
-  const applied = await runTrackDeliveryApply(input, createImportCandidateApplyOperationService({ mediaInspectionService: inspection }));
+  return { candidateId: candidate.id, candidates, preview };
+  });
+  const input = { ...fixture, pool, paths, third, ...prepared, inspection };
+  const { planned, applied } = await applyWantedDistinctFixture(input, { context, seedObserver, seedPreviewMode });
   assert.equal(applied.item.itemStatus, 'applied'); signal?.throwIfAborted();
   return { ...input, planned };
 }

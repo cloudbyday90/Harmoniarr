@@ -1,5 +1,10 @@
 # Practical web standards skill design
 
+October 13 seed-phase maintenance adds nested owned measurement, private record
+minimization and actual worker preview evidence to existing references. The
+[design](WANTED_SEED_PHASE_DESIGN.md) keeps current canonical inspection separate
+from redundant fixture preparation. Invocation metadata is unchanged.
+
 October 13 workload replay maintenance connects verified prerequisites, explicit
 scope and approved phase/failure evidence to the existing standards/testing
 skills. Use the [design](WANTED_WORKLOAD_REPLAY_DESIGN.md) and focused testing

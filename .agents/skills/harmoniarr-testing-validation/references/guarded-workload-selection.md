@@ -28,3 +28,14 @@ failed. Keep historical, prerequisite-failed, full-replay and selected-native
 collections separate. Work counts are structural; local timing/memory is
 descriptive. See `docs/WANTED_WORKLOAD_REPLAY_OUTCOME.md` and its research/design;
 the Wanted publication proposal still needs all-writer/absence proof.
+
+Seed phase evidence: benchmark artifacts retain a 256-record approved tail with
+explicit clipping, numeric nested spans and context. Read only nonoverlapping
+phase durations when explaining cost. Actual inspections follow the active
+context even when a shared service was constructed for the first context.
+The default distinct fixture captures the actual worker preview; use
+`--seed-preview separate` for the earlier preparatory path. Validate exact worker
+plan/file/receipt/scope evidence and native helper callers before removing work.
+Lazy command imports should refuse invalid input/missing GC before loading the
+app. See docs/WANTED_SEED_PHASE_OUTCOME.md; a passing largest selection does not
+diagnose an older timeout, and current inspection cannot become a cache.

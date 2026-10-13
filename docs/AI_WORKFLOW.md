@@ -6,6 +6,12 @@ This repository includes a shared `.agents/` directory for GitHub Copilot agent 
 
 The goal is to keep reusable AI workflow guidance versioned alongside the project so UI review, frontend implementation, browser testing, and related tasks follow the same repo conventions.
 
+The [seed phase outcome](WANTED_SEED_PHASE_OUTCOME.md) extends the maintained
+testing/standards workflow with nested owned measurements and actual worker
+preview evidence. Remove measured redundant preparation without caching a current
+inspection or weakening publication checks. Keep parent/child spans separate and
+do not label a later passing selection as a historical timeout diagnosis.
+
 The [guarded workload replay](WANTED_WORKLOAD_REPLAY_OUTCOME.md) adds verified
 media prerequisites, explicit selected/full dimensions and safe failure frames
 to the maintained testing/standards workflow. Diagnose the smallest useful scope;
