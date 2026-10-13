@@ -6,6 +6,20 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Original PostgreSQL connection boundary (2026-10-13)
+
+The [design](POSTGRES_CONNECTION_BOUNDARY_DESIGN.md),
+[official research](POSTGRES_CONNECTION_BOUNDARY_RESEARCH_2026_10.md) and
+[outcome](POSTGRES_CONNECTION_BOUNDARY_OUTCOME.md) add version-checked owned
+client milestones and private fixture-target comparison. Production pool policy,
+authorization and byte verification remain. Eight remaining noise 48/96 samples,
+8/8 native controls, the 10,092-case fast gate, builds and dependency audit pass;
+historical failed evidence retains its unknown cause in that outcome.
+
+- Next: profile increasing distinct private file/requirement bindings separately
+  from duplicate receipts, preserving exact results, real bytes, all current
+  authority and both hashes. Use original-client evidence if a checkout recurs.
+
 ## Completed slice: Bounded root reads in Wanted publication (2026-10-13)
 
 The [design](WANTED_BOUNDED_ROOT_READ_DESIGN.md),

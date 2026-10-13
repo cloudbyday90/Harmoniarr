@@ -103,6 +103,13 @@ queries beyond the initial feature cohort. Move observation to an independently
 owned client and retain real contender/holder drainage; a green narrow cohort
 does not validate other consumers of the same policy.
 
+For a cold checkout, observe the original owned client's target match and startup
+milestones; a healthy replacement connection cannot locate its stall. Review
+internal driver surfaces against installed versions, preserve lazy creation and
+both acquisition APIs, and leave queued/reused clients unassociated without a
+proved mapping. TLS stream creation, completed handshake and backend readiness
+are separate evidence. Follow the connection-boundary entry in the evidence map.
+
 For performance diagnostics, follow the receipt-verification entry in the
 evidence map: count actual work with fixed dimensions, preserve original
 Error/null through optional sinks, and distinguish overlapping phases from wall

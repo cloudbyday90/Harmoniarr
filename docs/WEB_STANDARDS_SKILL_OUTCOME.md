@@ -1,5 +1,11 @@
 # Practical web standards skill outcome
 
+October 13 connection-boundary maintenance teaches version-aware owned startup
+observation, acknowledged target comparison and conservative queue attribution.
+The [outcome](POSTGRES_CONNECTION_BOUNDARY_OUTCOME.md) separates native behavior,
+workload comparisons and historical uncertainty. Skill structure/install checks
+remain separate from a new blind trial or standards/security certification.
+
 October 13 bounded-root maintenance maps scope expiry, transaction replacement,
 guard conditions and current byte/root refusal to actual native proof. The
 [outcome](WANTED_BOUNDED_ROOT_READ_OUTCOME.md) separates initial control, final

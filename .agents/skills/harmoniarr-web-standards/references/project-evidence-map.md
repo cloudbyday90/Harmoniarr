@@ -618,3 +618,12 @@ negative and custom compatibility cases retain serial behavior. The
 docs/WANTED_CLOSED_RECEIPT_GROUP_OUTCOME.md maps canonical wiring, real same-marker
 mutation, dense data-descriptor capture and source-event rollback. No metadata
 cache or cross-guard/owner/invocation reuse; root-query/heap costs remain explicit.
+
+Cold checkout evidence uses owned-pg-connection-observer.js and
+pg-connection-record.js under testing/integration/, composed by the existing
+owned checkout observer and both app entrypoints. Exact driver versions gate
+owned constructor/protocol surfaces. Synchronous construction binds one client;
+queue promotion/reuse remains unassociated. Private acknowledged target matching,
+startup dispatch, TLS creation/handshake and backend readiness are distinct.
+docs/POSTGRES_CONNECTION_BOUNDARY_OUTCOME.md owns native hold/success and remaining
+noise-profile evidence. Healthy later probes cannot diagnose the old failed run.

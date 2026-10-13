@@ -804,3 +804,12 @@ authority. OWASP authorization/logging require current owning checks and fixed
 private metrics; maintainer transaction ownership does not freeze host bytes.
 Keep W3C draft timing separate from conformance and candidate measurements from
 later reviewed code. More root queries and higher heap are costs, not hidden gains.
+
+October 13 connection-boundary guidance uses
+docs/POSTGRES_CONNECTION_BOUNDARY_RESEARCH_2026_10.md. Maintainer public connect
+events follow successful startup; reviewed installed source locates cold client
+construction and protocol stages. Node TLS secureConnect differs from pg stream
+creation and certificate authorization. Privately compare resolved target scalars
+with acknowledged fixture config, never emit config/payloads, and refuse internal
+adapters after an unreviewed version upgrade. W3C draft duration principles and
+OWASP failure-isolated fixed fields support evidence, not retrospective causality.

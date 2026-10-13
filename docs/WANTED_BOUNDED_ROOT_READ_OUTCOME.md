@@ -1,5 +1,10 @@
 # Bounded Wanted root-read outcome
 
+The subsequent [connection-boundary outcome](POSTGRES_CONNECTION_BOUNDARY_OUTCOME.md)
+adds original-client diagnostics and a separate completed eight-sample noise
+48/96 collection. The failed original collection and separate noise-16 control
+below retain their original scope and unknown failure cause.
+
 October 13, 2026. Canonical Wanted publication now uses two fresh root statements
 per eligible closed receipt group under proved transaction authority. Both full
 hashes, captured sources and all publication/event guards remain.

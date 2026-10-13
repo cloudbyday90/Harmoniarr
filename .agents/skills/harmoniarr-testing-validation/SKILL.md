@@ -5,6 +5,15 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+Cold connection validation needs the original driver client, privately compared
+acknowledged target and pre-pool-ready startup milestones. Prove a real startup
+hold, matched successful promise/query-callback clients, method/listener restore
+and Error/null preservation. Queued/reused clients remain unassociated; separate
+TLS stream creation from handshake completion and backend readiness. Internal
+adapters must refuse unreviewed driver versions. Historical healthy probes do
+not diagnose failures captured before this instrumentation. See
+docs/POSTGRES_CONNECTION_BOUNDARY_OUTCOME.md for native and workload scope.
+
 Bounded root validation requires real held authority, enabled unconditional
 statement guards, exact function/column contract and an invocation token bound
 to current transaction/queryable. Prove expiry during closing work, fabrication,

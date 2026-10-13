@@ -8,11 +8,12 @@ import { randomUUID } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 import { capturePoolCheckoutSnapshot, readCheckoutProperty } from './pool-checkout-record.js';
 import { buildFixtureCheckoutRecord } from './fixture-checkout-record.js';
+import { observeOwnedPgConnections } from './owned-pg-connection-observer.js';
 
 export const fixtureCheckoutMarker = '[fixture-pool-checkout] ';
 
 /** Decorate only an owned instance, retaining the concrete pool and driver API. */
-export function observeFixturePoolCheckouts({ pool, poolKind, source, phaseObserver,
+export function observeFixturePoolCheckouts({ pool, poolKind, source, phaseObserver, expectedConfig,
   mode = 'failures', captureFailure = null,
   onRecord = record => process.stderr.write(`${fixtureCheckoutMarker}${JSON.stringify(record)}\n`),
   now = () => performance.now() } = {}) {
@@ -24,6 +25,7 @@ export function observeFixturePoolCheckouts({ pool, poolKind, source, phaseObser
   if (typeof pool?.connect !== 'function') throw new TypeError('Fixture checkout requires an owned pool');
   const descriptor = Object.getOwnPropertyDescriptor(pool, 'connect');
   const original = pool.connect;
+  const connections = observeOwnedPgConnections({ pool, expectedConfig, now });
   const captures = new Set(); let ordinaryRecords = 0; let failureRecords = 0;
   function clock() { try { const n = now(); return Number.isFinite(n) ? n : null; } catch { return null; } }
   function publish(record) {
@@ -36,6 +38,7 @@ export function observeFixturePoolCheckouts({ pool, poolKind, source, phaseObser
     return pending;
   }
   function begin() {
+    const connection = connections.begin();
     const checkoutId = randomUUID(); const started = clock(); const before = capturePoolCheckoutSnapshot(pool);
     const correlationId = readCheckoutProperty(phaseObserver, 'correlationId');
     let phase;
@@ -44,14 +47,15 @@ export function observeFixturePoolCheckouts({ pool, poolKind, source, phaseObser
     function emit(outcome, error) {
       const ended = outcome === 'started' ? null : clock();
       publish(buildFixtureCheckoutRecord({ checkoutId, poolKind, source, phase,
-        correlationId, before, requested,
+        correlationId, before, requested, connection: connection.snapshot(),
         settled: outcome === 'started' ? null : capturePoolCheckoutSnapshot(pool), outcome, error,
         durationMs: started !== null && ended !== null ? ended - started : null }));
     }
     if (mode === 'all') emit('started');
-    return { requested: () => { requested ??= capturePoolCheckoutSnapshot(pool); },
-      passed: () => { if (mode === 'all') emit('passed'); },
-      failed: error => { emit('failed', error); return capture(error, checkoutId); } };
+    return { dispatch: run => connection.dispatch(run),
+      requested: () => { requested ??= capturePoolCheckoutSnapshot(pool); },
+      passed: () => { if (mode === 'all') emit('passed'); connection.finish(); },
+      failed: error => { emit('failed', error); connection.finish(); return capture(error, checkoutId); } };
   }
   function connect(...args) {
     if (this !== pool) return Reflect.apply(original, this, args);
@@ -66,11 +70,11 @@ export function observeFixturePoolCheckouts({ pool, poolKind, source, phaseObser
           queueMicrotask(() => { Reflect.apply(callback, receiver, values); });
         });
       };
-      try { const result = Reflect.apply(original, this, args); observation.requested(); return result; }
+      try { const result = observation.dispatch(() => Reflect.apply(original, this, args)); observation.requested(); return result; }
       catch (error) { if (!callbackEntered) void observation.failed(error); throw error; }
     }
     let pending;
-    try { pending = Reflect.apply(original, this, args); observation.requested(); }
+    try { pending = observation.dispatch(() => Reflect.apply(original, this, args)); observation.requested(); }
     catch (error) { void observation.failed(error); throw error; }
     return pending.then(client => { observation.passed(); return client; }, async error => {
       await observation.failed(error); throw error;
@@ -82,6 +86,7 @@ export function observeFixturePoolCheckouts({ pool, poolKind, source, phaseObser
     async restore() {
       // Capture may admit another capture while draining; do not leave it behind.
       while (captures.size) await Promise.allSettled([...captures]);
+      connections.restore();
       if (pool.connect !== connect) throw new Error('Fixture checkout observer ownership changed');
       if (descriptor) Object.defineProperty(pool, 'connect', descriptor);
       else delete pool.connect;

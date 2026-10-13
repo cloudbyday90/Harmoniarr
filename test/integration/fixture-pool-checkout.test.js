@@ -5,6 +5,7 @@
  * See LICENSE for details.
  */
 import assert from 'node:assert/strict';
+import pg from 'pg';
 import { createServer } from 'node:net';
 import { createServer as createHttpServer } from 'node:http';
 import { after, before, suite, test } from 'node:test';
@@ -17,6 +18,7 @@ import { createPostgresHostProbe } from '../../testing/integration/postgres-host
 import { createFixturePhaseObserver } from '../../testing/integration/fixture-phase-observer.js';
 import { createFixtureGate, waitForFixtureReady } from '../../testing/integration/fixture-lifecycle.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
+import { observeFixturePoolCheckouts } from '../../testing/integration/fixture-pool-checkout.js';
 
 const config = resolveIntegrationTestRuntimeConfig();
 let runtime; let checkouts; let servers; let primary; let poolUnderTest; let held; let entered;
@@ -74,6 +76,12 @@ suite('Owned fixture checkout capture across direct migration and later discover
         assert.equal(failed.before.total, 0); assert.equal(failed.requested.total, 1);
         assert.equal(failed.requested.waiting, 0); assert.equal(failed.settled.total, 0);
         assert.equal(failed.errors[0].code, null); assert.equal(failed.errors[0].errorClass, 'Error');
+        assert.equal(failed.version, 2); assert.equal(failed.connection.observation, 'observed');
+        assert.equal(failed.connection.targetMatch, 'mismatched');
+        assert.equal(failed.connection.lastStage, 'startup_dispatched');
+        assert.ok(failed.connection.transportConnectedMs >= failed.connection.constructedMs);
+        assert.ok(failed.connection.startupDispatchedMs >= failed.connection.transportConnectedMs);
+        assert.equal(failed.connection.backendReadyMs, null);
       });
       assert.equal(poolUnderTest.ended, true); assert.equal(Object.hasOwn(poolUnderTest, 'connect'), false);
     } finally {
@@ -116,6 +124,7 @@ suite('Owned fixture checkout capture across direct migration and later discover
         const failed = checkouts.find(r => r.outcome === 'failed');
         assert.equal(failed.before.total, 2); assert.equal(failed.before.idle, 0);
         assert.equal(failed.requested.waiting, 1); assert.equal(failed.settled.waiting, 0);
+        assert.equal(failed.connection.observation, 'not_observed');
         held.release(); await pending; assert.equal(caught, true);
         assertEvidence('application_pool', 'scenario_work');
         assert.equal(poolUnderTest.ended, true); assert.equal(Object.hasOwn(poolUnderTest, 'connect'), false);
@@ -139,5 +148,35 @@ suite('Owned fixture checkout capture across direct migration and later discover
       const next = await pool.connect(); try { assert.equal(next, client); } finally { next.release(); }
     }));
     assert.deepEqual(checkouts, []); assert.deepEqual(servers, []);
+  });
+
+  test('actual cold clients reach authentication/readiness with matched fixture identity on promise and query callback paths', {
+    timeout: config.scenarioTimeoutMs,
+  }, async () => {
+    reset(); await runtime.runIsolatedDatabase(async ({ databaseConfig, phaseObserver }) => {
+      const pool = new pg.Pool({ ...databaseConfig, max: 2, connectionTimeoutMillis: 10_000 });
+      const records = []; const descriptor = Object.getOwnPropertyDescriptor(pool, 'Client');
+      const diagnostics = observeFixturePoolCheckouts({ pool, expectedConfig: databaseConfig,
+        poolKind: 'scenario_pool', source: 'testcontainer_postgres', phaseObserver, mode: 'all', onRecord: r => records.push(r) });
+      try {
+        const first = await pool.connect();
+        try { assert.equal((await first.query('SELECT 1 AS value')).rows[0].value, 1); }
+        finally { first.release(true); }
+        const value = await new Promise((resolve, reject) => {
+          pool.query('SELECT 2 AS value', (error, result) => error ? reject(error) : resolve(result));
+        });
+        assert.equal(value.rows[0].value, 2);
+        const completed = records.filter(r => r.outcome === 'passed'); assert.equal(completed.length, 2);
+        for (const { connection } of completed) {
+          assert.equal(connection.observation, 'observed'); assert.equal(connection.targetMatch, 'matched');
+          assert.equal(connection.lastStage, 'backend_ready');
+          assert.ok(connection.authenticationRequestedMs >= connection.transportConnectedMs);
+          assert.ok(connection.backendReadyMs >= connection.authenticationAcceptedMs);
+        }
+        assert.notEqual(completed[0].connection.clientId, completed[1].connection.clientId);
+        assert.equal(JSON.stringify(records).includes(databaseConfig.database), false);
+      } finally { await diagnostics.restore(); await pool.end(); }
+      assert.deepEqual(Object.getOwnPropertyDescriptor(pool, 'Client'), descriptor);
+    });
   });
 });

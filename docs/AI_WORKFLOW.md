@@ -6,6 +6,12 @@ This repository includes a shared `.agents/` directory for GitHub Copilot agent 
 
 The goal is to keep reusable AI workflow guidance versioned alongside the project so UI review, frontend implementation, browser testing, and related tasks follow the same repo conventions.
 
+The [connection-boundary outcome](POSTGRES_CONNECTION_BOUNDARY_OUTCOME.md)
+extends the standards/testing method with original-client startup observation,
+private target comparison and exact driver-version review. Keep queued clients
+unassociated, TLS creation distinct from handshake completion, and healthy later
+probes separate from historical causality. Reuse the maintained standards skill.
+
 The [bounded-root outcome](WANTED_BOUNDED_ROOT_READ_OUTCOME.md) adds the method
 for proved transaction/queryable authority, unconditional guards and two fresh
 root/hash phases. Skills preserve standalone/custom fallback, private exact-work

@@ -1,5 +1,11 @@
 # Practical web standards skill design
 
+October 13 connection-boundary maintenance adds original-client milestone and
+private target comparison guidance to the existing standards/testing skills.
+The [design](POSTGRES_CONNECTION_BOUNDARY_DESIGN.md) maps maintainer APIs/source,
+Node TLS/timing, W3C draft principles and OWASP privacy to narrow fixture owners.
+No new duplicate skill, global hooks or invocation-policy change is needed.
+
 October 13 bounded-root maintenance connects transaction identity, actual
 unconditional writer guards and ephemeral authority to two fresh root phases.
 The [design](WANTED_BOUNDED_ROOT_READ_DESIGN.md) keeps both hashes, exact receipt

@@ -83,7 +83,8 @@ async function createDatabaseRuntime({ config, env, source, phaseObserver, schem
       const execute = async (context) => {
         const pool = typeof context.getPoolFn === 'function' ? context.getPoolFn() : null;
         const diagnostics = typeof pool?.connect === 'function' ? observeFixturePoolCheckouts({ pool,
-          poolKind: 'scenario_pool', source, phaseObserver: observer, mode: checkoutMode,
+          poolKind: 'scenario_pool', source, expectedConfig: context.databaseConfig,
+          phaseObserver: observer, mode: checkoutMode,
           captureFailure: captureCheckoutFailure, ...(checkoutRecord ? { onRecord: checkoutRecord } : {}) }) : null;
         let failed = false; let failure; let result;
         try { result = await run({ ...context, source, schemaMode, phaseObserver: observer,

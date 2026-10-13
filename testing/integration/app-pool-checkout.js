@@ -6,13 +6,13 @@
  */
 import { observeFixturePoolCheckouts, resolveFixtureCheckoutMode } from './fixture-pool-checkout.js';
 
-export async function withAppPoolCheckoutDiagnostics({ getPoolFn, phaseObserver, source,
+export async function withAppPoolCheckoutDiagnostics({ getPoolFn, phaseObserver, source, expectedConfig,
   captureFailure, onRecord, env = process.env }, run) {
   const mode = resolveFixtureCheckoutMode(env); const owners = new Map();
   function observedGetPool() {
     const pool = getPoolFn();
     if (!owners.has(pool)) owners.set(pool, observeFixturePoolCheckouts({ pool, poolKind: 'application_pool',
-      phaseObserver, source, captureFailure, mode, ...(onRecord ? { onRecord } : {}) }));
+      phaseObserver, source, expectedConfig, captureFailure, mode, ...(onRecord ? { onRecord } : {}) }));
     return pool;
   }
   let failed = false; let failure; let result;
