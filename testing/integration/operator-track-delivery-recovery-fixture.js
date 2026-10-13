@@ -21,7 +21,8 @@ import { createImportCandidateApplyWorker } from '../../src/server/import-candid
 import { listImportApplyRunItems, replaceImportApplyRunItems, updateImportApplyRunItem } from '../../src/server/import-candidates/import-candidate-apply-repository.js';
 import { listImportOperations } from '../../src/server/import-candidates/import-candidate-operation-repository.js';
 
-export async function seedTrackDeliveryRecoveryFixture(workspaceDir) {
+export async function seedTrackDeliveryRecoveryFixture(workspaceDir, { mediaProfile = 'sine' } = {}) {
+  if (!['sine', 'noise'].includes(mediaProfile)) throw new TypeError('Unknown controlled FLAC profile');
   const pool = getPool(); const paths = Object.fromEntries(['downloads', 'staging', 'music'].map(key => [key, join(workspaceDir, key)]));
   await mkdir(join(paths.downloads, 'union'), { recursive: true }); await mkdir(paths.staging, { recursive: true }); await mkdir(paths.music, { recursive: true });
   await persistSettings(Object.entries(paths).map(([settingKey, value]) => ({ namespace: 'paths', settingKey, value: libraryAddRuntimePath(value) })), null, pool);
@@ -37,8 +38,10 @@ export async function seedTrackDeliveryRecoveryFixture(workspaceDir) {
   for (const participant of quality.operatorTrackParticipants) {
     const track = participant.scope.tracks[0]; const filename = `0${track.trackPosition} ${track.title}.flac`;
     const source = join(paths.downloads, 'union', filename);
-    await media.mediaCommand('ffmpeg', ['-v', 'error', '-nostdin', '-y', '-f', 'lavfi', '-i', 'sine=frequency=1000:sample_rate=44100',
-      '-t', '2', '-ac', '2', '-c:a', 'flac', '-metadata', `title=${track.title}`, '-metadata', `track=${track.trackPosition}`, '-metadata', 'disc=1',
+    const signal = mediaProfile === 'noise' ? 'anoisesrc=color=white:seed=42:sample_rate=192000' : 'sine=frequency=1000:sample_rate=44100';
+    const encoding = mediaProfile === 'noise' ? ['-sample_fmt', 's32', '-compression_level', '0'] : [];
+    await media.mediaCommand('ffmpeg', ['-v', 'error', '-nostdin', '-y', '-f', 'lavfi', '-i', signal,
+      '-t', '2', '-ac', '2', '-c:a', 'flac', ...encoding, '-metadata', `title=${track.title}`, '-metadata', `track=${track.trackPosition}`, '-metadata', 'disc=1',
       '-metadata', `MUSICBRAINZ_TRACKID=${track.recordingMbid}`, '-metadata', `MUSICBRAINZ_ALBUMID=${releaseMbid}`, source], { readonly: false });
     files.push({ filename, extension: 'flac', sizeBytes: (await stat(source)).size, lengthSeconds: 2, isLocked: false });
   }

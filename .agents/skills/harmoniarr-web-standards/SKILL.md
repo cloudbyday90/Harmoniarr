@@ -102,3 +102,8 @@ When changing shared fixture policy, inventory lock observers and expiry-wait
 queries beyond the initial feature cohort. Move observation to an independently
 owned client and retain real contender/holder drainage; a green narrow cohort
 does not validate other consumers of the same policy.
+
+For performance diagnostics, follow the receipt-verification entry in the
+evidence map: count actual work with fixed dimensions, preserve original
+Error/null through optional sinks, and distinguish overlapping phases from wall
+time. An observed repeated hash is not permission to cache across a write guard.

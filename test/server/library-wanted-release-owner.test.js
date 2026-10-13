@@ -11,6 +11,7 @@ import { createLibraryWantedReleaseReader } from '../../src/server/library/libra
 import { createLibraryWantedReleaseStore } from '../../src/server/library/library-wanted-release-store.js';
 import { captureWantedContext, captureWantedRows, captureWantedSource, sameWantedProjection, isCompleteWantedReplacement } from '../../src/server/library/library-wanted-release-reconciliation-policy.js';
 import { MUSIC_QUEUE_RECOVERY_DISCOVERY_SOURCE } from '../../src/server/import-candidates/music-queue-recovery-policy.js';
+import { createWantedVerificationObserver } from '../../src/server/library/library-wanted-verification-observer.js';
 
 const uuid = (value) => `60000000-0000-4000-8000-${String(value).padStart(12, '0')}`;
 const NOW = Date.parse('2026-10-10T13:00:00.000Z');
@@ -62,6 +63,30 @@ function fixture(operationType = 'library_scan', overrides = {}) {
     setRows(value) { rows = value; }, setSource(value) { source = value; }, setClock(value) { clock = value; }, afterRead(work) { afterRead = work; },
     get reads() { return reads; }, get source() { return source; }, get committed() { return committed; } };
 }
+
+test('diagnostic construction failure leaves guarded reconciliation unchanged', async () => {
+  for (const createVerificationObserver of [() => { throw null; }, () => ({ enabled: true }), () => undefined]) {
+    const value = fixture('library_scan', { createVerificationObserver });
+    const result = await value.service.reconcileWantedReleases(value.input);
+    assert.equal(result.wantedKeys.length, 2); assert.equal(value.events.includes('commit'), true);
+  }
+});
+
+test('diagnostic sink failure preserves the original projection Error/null and rollback', async () => {
+  for (const error of [new Error('Original projection failure'), null]) {
+    const records = []; const value = fixture('library_scan', {
+      createVerificationObserver: () => createWantedVerificationObserver({ enabled: true, onRecord: record => { records.push(record); throw new Error('Sink failure'); } }),
+      projectionReader: { readWantedReleaseProjection: async () => { throw error; } },
+    });
+    let caught = false;
+    try { await value.service.reconcileWantedReleases(value.input); }
+    catch (actual) { caught = true; assert.equal(actual, error); }
+    assert.equal(caught, true); assert.equal(value.events.includes('rollback'), true);
+    assert.equal(value.events.includes('commit'), false); assert.equal(records.length, 1);
+    assert.equal(records[0].outcome, 'failed'); assert.equal(records[0].counters.projectionReads, 1);
+    assert.equal(records[0].phases.reconciliation.calls, 1);
+  }
+});
 
 for (const type of ['library_scan', 'library_discovery_dispatch', 'metadata_artist_refresh']) {
   test(`${type} original acquisition owns same-client wanted replacement and link handoff`, async () => {

@@ -726,3 +726,13 @@ and revision validation do not establish mutation-time policy or lease authority
 Keep those security claims distinct from lifecycle completion. W3C timing remains
 draft observation guidance; retain its source status and avoid speedup claims
 from unmatched or overlapping gates.
+
+October 12 Wanted verification guidance uses
+docs/WANTED_RECEIPT_VERIFICATION_RESEARCH_2026_10.md. Node process-relative timing
+owns runtime durations; W3C High Resolution Time remains a Working Draft.
+OWASP minimizes paths, identities and raw failures before output and requires
+logging-failure controls. OpenTelemetry's stable cardinality guidance supports
+fixed dimensions, without implying an OTel SDK or exporter. Actual streamed-byte
+counts distinguish performed work from receipt size. A positive historical hash
+or stat observation cannot replace fresh current bytes at a protected write/event
+boundary. Retain required audit semantics separately from optional diagnostics.

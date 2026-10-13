@@ -27,6 +27,7 @@ import { createLibraryWantedReleaseReader } from './library-wanted-release-reade
 import { createLibraryWantedReleaseGuardStore } from './library-wanted-release-guard-store.js';
 import { createOperatorTrackSourceLifecycleService } from '../metadata/operator-track-source-lifecycle-service.js';
 import { currentScanReceiptSource } from './library-scan-receipt-policy.js';
+import { createWantedVerificationObserver, disabledWantedVerificationObserver } from './library-wanted-verification-observer.js';
 import { captureWantedContext, captureWantedRows, captureWantedSource, sameWantedProjection,
   isCompleteWantedReplacement } from './library-wanted-release-reconciliation-policy.js';
 
@@ -38,6 +39,7 @@ export function createLibraryWantedReleaseService({
   assertMaintenanceWriteAllowed,
   withTransaction = createDatabaseTransactionRunner({ getPoolFn }),
   trackSourceLifecycle = createOperatorTrackSourceLifecycleService(),
+  createVerificationObserver = createWantedVerificationObserver,
 } = {}) {
   for (const [name, fn] of Object.entries({ assertMaintenanceWriteAllowed, withTransaction,
     replaceLibraryWantedReleases: libraryWantedReleaseStore.replaceLibraryWantedReleases,
@@ -62,8 +64,9 @@ export function createLibraryWantedReleaseService({
     }
   }
 
-  async function readProjection(queryable) {
-    const input = await projectionReader.readWantedReleaseProjection({ queryable });
+  async function readProjection(queryable, observer, phase) {
+    observer.increment('projectionReads');
+    const input = await observer.measure(phase, () => projectionReader.readWantedReleaseProjection({ queryable, verificationObserver: observer }));
     const wantedReleases = captureWantedRows(input?.wantedReleases); const source = captureWantedSource(input?.source);
     if (!wantedReleases || !source) throw createApiError(409, 'library_wanted_projection_invalid', 'Wanted projection could not be verified');
     return Object.freeze({ wantedReleases, source });
@@ -72,39 +75,47 @@ export function createLibraryWantedReleaseService({
   async function reconcileWantedReleases(input = {}) {
     const prepared = captureWantedContext(input);
     if (!prepared) throw createApiError(409, 'library_wanted_projection_invalid', 'The original wanted operation context is invalid');
-    return withTransaction(async (queryable) => {
-      await queryable.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
-      try {
-        await assertMaintenanceWriteAllowed({ queryable });
-      } catch (error) {
-        if (error?.code !== 'recovery_lock_conflict') throw error;
-        if (prepared.mode === 'direct') throw error;
-        throw createOperationRunPauseError({ runId: prepared.runId, pauseCode: 'maintenance_lock_active',
-          message: 'Wanted reconciliation is paused by maintenance' });
-      }
-      await assertCurrent({ prepared, context: await store.lockContext({ prepared, queryable }), queryable });
-      const projection = await readProjection(queryable);
-      const recheck = async () => {
-        const current = await readProjection(queryable);
-        await assertCurrent({ prepared, context: await store.readContext({ prepared, queryable }), queryable });
-        if (!sameWantedProjection(current, projection)) {
-          throw createApiError(409, 'library_wanted_projection_stale', 'Saved policy or availability changed during wanted reconciliation');
+    let observer = disabledWantedVerificationObserver;
+    try {
+      const candidate = createVerificationObserver();
+      if (candidate && ['increment', 'measure', 'finish'].every(name => typeof candidate[name] === 'function')) observer = candidate;
+    } catch { /* Optional diagnostic construction. */ }
+    try {
+      const completed = await observer.measure('reconciliation', () => withTransaction(async (queryable) => {
+        await queryable.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
+        try {
+          await assertMaintenanceWriteAllowed({ queryable });
+        } catch (error) {
+          if (error?.code !== 'recovery_lock_conflict') throw error;
+          if (prepared.mode === 'direct') throw error;
+          throw createOperationRunPauseError({ runId: prepared.runId, pauseCode: 'maintenance_lock_active',
+            message: 'Wanted reconciliation is paused by maintenance' });
         }
-      };
-      const result = await libraryWantedReleaseStore.replaceLibraryWantedReleases({
-        wantedReleases: projection.wantedReleases, queryable, beforeWrite: recheck,
-      });
-      await recheck();
-      if (!isCompleteWantedReplacement(result, projection.wantedReleases)) {
-        throw createApiError(409, 'library_wanted_projection_incomplete', 'The wanted replacement could not be verified');
-      }
-      const trackSources = (projection.source.artists ?? []).flatMap(artist => artist.trackSources ?? [])
-        .map(source => currentScanReceiptSource(source, prepared));
-      await trackSourceLifecycle.reconcileSources({ sources: trackSources,
-        queryable, assertCurrent: recheck });
-      return { wantedKeys: result.wantedKeys.map((key) => ({ appUserId: key.appUserId, metadataReleaseId: key.metadataReleaseId })),
-        deletedWantedKeys: result.deletedWantedKeys.map((key) => ({ appUserId: key.appUserId, metadataReleaseId: key.metadataReleaseId })) };
-    });
+        await assertCurrent({ prepared, context: await store.lockContext({ prepared, queryable }), queryable });
+        const projection = await readProjection(queryable, observer, 'initial_projection');
+        const recheck = async () => {
+          const current = await readProjection(queryable, observer, 'recheck_projection');
+          await assertCurrent({ prepared, context: await store.readContext({ prepared, queryable }), queryable });
+          if (!sameWantedProjection(current, projection)) {
+            throw createApiError(409, 'library_wanted_projection_stale', 'Saved policy or availability changed during wanted reconciliation');
+          }
+        };
+        const result = await observer.measure('replacement', () => libraryWantedReleaseStore.replaceLibraryWantedReleases({
+          wantedReleases: projection.wantedReleases, queryable, beforeWrite: recheck,
+        }));
+        await recheck();
+        if (!isCompleteWantedReplacement(result, projection.wantedReleases)) {
+          throw createApiError(409, 'library_wanted_projection_incomplete', 'The wanted replacement could not be verified');
+        }
+        const trackSources = (projection.source.artists ?? []).flatMap(artist => artist.trackSources ?? [])
+          .map(source => currentScanReceiptSource(source, prepared));
+        await observer.measure('source_lifecycle', () => trackSourceLifecycle.reconcileSources({ sources: trackSources,
+          queryable, assertCurrent: recheck }));
+        return { wantedKeys: result.wantedKeys.map((key) => ({ appUserId: key.appUserId, metadataReleaseId: key.metadataReleaseId })),
+          deletedWantedKeys: result.deletedWantedKeys.map((key) => ({ appUserId: key.appUserId, metadataReleaseId: key.metadataReleaseId })) };
+      }));
+      observer.finish('completed'); return completed;
+    } catch (error) { observer.finish('failed'); throw error; }
   }
 
   return { reconcileWantedReleases };

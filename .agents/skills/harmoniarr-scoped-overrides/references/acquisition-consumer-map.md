@@ -3,6 +3,12 @@
 Use this map when the task concerns an acquisition exception. Confirm current
 callers and data shapes with source search before editing.
 
+Wanted receipt diagnostics extract fresh verification into
+library-wanted-receipt-verification-service.js and collect bounded actual-byte
+counts only when explicitly enabled. See docs/WANTED_RECEIPT_VERIFICATION_OUTCOME.md.
+Keep current owner/scope/private-root checks at every guard; optional diagnostic
+failure cannot replace domain Error/null or required transactional audit.
+
 Negative scan observations now bind the original scan acquisition, private root
 and pre-walk receipt revision (docs/SCAN_RECEIPT_INVALIDATION_OUTCOME.md). They
 retain historical receipts and do not lower verification or grant provider replay.

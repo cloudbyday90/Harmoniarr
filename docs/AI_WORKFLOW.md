@@ -72,6 +72,13 @@ unresolved causes and failed cohorts rather than prescribing generic retries.
 
 ## Repository Rules
 
+The standards skill now routes server performance work through Node timing/stream
+contracts, W3C draft timing guidance, OWASP logging failure/privacy controls and
+OpenTelemetry cardinality principles. Its fixed-dimension actual-byte workflow
+preserves fresh guarded verification. The [Wanted verification outcome](WANTED_RECEIPT_VERIFICATION_OUTCOME.md)
+owns application measurements and limits; skill structure validation is separate
+from a new blind behavioral evaluation or standards certification.
+
 The standards skill's negative-scan references bind pre-walk revision, original
 acquisition and current contained absence, preserving current bytes and maintenance
 pause. Use actual production wiring and transaction/replay proof rather than an

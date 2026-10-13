@@ -98,3 +98,8 @@ policy remain unchanged. Repository and installed structure pass
 SHA-256 after reference sync. Application evidence and its limits
 belong in the separate [recovery outcome](MUSIC_QUEUE_FALLBACK_RECOVERY_OUTCOME.md).
 No new blind behavioral skill trial is claimed.
+
+The acquisition map now locates the modular Wanted receipt verifier and separates
+optional diagnostics from current owner/scope/byte authority and required audit.
+The [verification outcome](WANTED_RECEIPT_VERIFICATION_OUTCOME.md) owns application
+proof. Maintained/installed structure and hashes pass; no new blind trial is claimed.

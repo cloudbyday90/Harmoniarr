@@ -433,3 +433,11 @@ backends for missing-row claims. The
 [writer design](METADATA_SOURCE_WRITER_COORDINATION_DESIGN.md) owns alternatives
 and exclusion limits. This extends concrete references without a new skill
 entrypoint, metadata change or invocation-policy expansion.
+
+Wanted verification adds an explicit performance-diagnostics route to the
+existing entrypoint and maintains focused evidence/source references. Follow
+Node timing and stream contracts, W3C draft status, OWASP failure/privacy controls
+and fixed-cardinality OTel principles. The
+[verification design](WANTED_RECEIPT_VERIFICATION_DESIGN.md) owns the modular
+collector/verifier alternatives. This update adds no exporter or general audit
+requirement; fresh protected-boundary checks continue to own authority.

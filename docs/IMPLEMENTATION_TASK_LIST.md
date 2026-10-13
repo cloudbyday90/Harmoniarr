@@ -6,6 +6,26 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Wanted receipt verification diagnostics (2026-10-12)
+
+The [verification design](WANTED_RECEIPT_VERIFICATION_DESIGN.md),
+[official research](WANTED_RECEIPT_VERIFICATION_RESEARCH_2026_10.md) and
+[outcome](WANTED_RECEIPT_VERIFICATION_OUTCOME.md) own fixed-dimension opt-in
+observation and actual streamed-byte counts. A modular ESM receipt verifier
+preserves current private roots/bytes and all owning transaction write/event
+rechecks. Diagnostic failures preserve domain Error/null; required audit remains
+atomic. Controlled two-owner FLAC scenarios show seven projection reads/fourteen
+hashes per healthy reconciliation, with explicit warm/order/scaling limits.
+
+- Validation: frozen fast gate passes 10,016 cases plus static checks/builds;
+  111/111 affected native cases pass across seventeen serial files without
+  failures/cancellations/skips. Five skill validators/seven installed hashes and
+  zero-vulnerability dependency audit pass. The outcome retains initial evidence
+  and explicit measurement/scope limits separately.
+- Next: profile database/root lookup and realistic byte work at increasing receipt
+  counts with alternating samples before selecting bounded per-projection batching.
+  Preserve all fresh guard rereads; do not introduce cross-guard hash reuse.
+
 ## Completed slice: Scan-owned negative receipt observations (2026-10-12)
 
 The [scan outcome](SCAN_RECEIPT_INVALIDATION_OUTCOME.md),

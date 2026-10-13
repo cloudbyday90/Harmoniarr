@@ -689,6 +689,13 @@ partial-result policy and the distinct hidden post-abort boundary. The
 publication/cancellation and structural evidence. This is narrow reference
 maintenance without a new blind trial or conformance certification.
 
+Wanted verification adds a narrow performance-diagnostics route: Node clocks and
+actual streamed bytes, W3C draft timing status, OWASP data/failure controls and
+OpenTelemetry fixed-cardinality principles. The
+[verification outcome](WANTED_RECEIPT_VERIFICATION_OUTCOME.md) owns actual media,
+rollback and timing limits. Five structure validations and seven installed-file
+hash comparisons pass; these are maintenance proof, not a new blind skill trial.
+
 Operator reconciliation references now locate completion, the narrow parallel
 task helper and twelve captured application owners. They explicitly distinguish
 scoped snapshot/revision validation from publication authority. The

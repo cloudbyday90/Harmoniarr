@@ -526,3 +526,13 @@ paths and missing rows, not privileged raw SQL or mixed late-upgrade callbacks.
 The dedicated design/research/outcome own native blocked-writer, independent-scope,
 borrowed refusal and canonical rollback proof. Other projection readers retain
 their existing owners until separately enrolled and tested.
+
+Wanted receipt performance observation now uses library-wanted-verification-observer.js
+and library-wanted-receipt-verification-service.js. Enable the private summary only
+with HARMONIARR_WANTED_VERIFICATION_DIAGNOSTICS=1. Count actual hashed chunks and
+fresh reads; omit paths/hashes/domain IDs and preserve original Error/null through
+clock/sink failures. Existing write/event guards and owning queryables remain.
+docs/WANTED_RECEIPT_VERIFICATION_OUTCOME.md owns generated two-owner FLAC profiles,
+late replacement and required-event rollback. Seven rereads in that workload do
+not establish a portable speedup or justify cross-guard caching. Nested phases
+overlap; representative receipt-count/file-size profiling is the next decision.
