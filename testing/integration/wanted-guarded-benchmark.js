@@ -12,12 +12,14 @@ import { resolveIntegrationTestRuntimeConfig } from './runtime-config.js';
 import { withFixtureLifecycle } from './fixture-lifecycle.js';
 import { seedWantedRootProfile } from './wanted-root-profile-fixture.js';
 import { withWantedProfileClient } from './wanted-profile-client.js';
-import { compareWantedGuardedSamples, compareWantedClosedGroupSamples, profileWantedGuardedReconciliation, summarizeWantedGuardedSample } from './wanted-guarded-profile.js';
+import { compareWantedGuardedSamples, compareWantedClosedGroupSamples, compareWantedBoundedRootSamples,
+  profileWantedGuardedReconciliation, summarizeWantedGuardedSample } from './wanted-guarded-profile.js';
 
 export async function measureWantedGuardedWorkload({ signal, onProgress = () => {}, onSample = () => {},
   profiles = ['sine', 'noise'], receiptCounts = [16, 48, 96], pairs = 2, gc = global.gc,
-  groupingComparison = false, rootCostComparison = false } = {}) {
-  if (typeof groupingComparison !== 'boolean' || typeof rootCostComparison !== 'boolean' || (groupingComparison && rootCostComparison)
+  groupingComparison = false, rootCostComparison = false, boundedRootComparison = false } = {}) {
+  if ([groupingComparison, rootCostComparison, boundedRootComparison].some(value => typeof value !== 'boolean')
+    || [groupingComparison, rootCostComparison, boundedRootComparison].filter(Boolean).length > 1
     || typeof gc !== 'function' || typeof onProgress !== 'function' || typeof onSample !== 'function'
     || ![1, 2].includes(pairs) || !Array.isArray(profiles) || !profiles.length || profiles.length > 2
     || new Set(profiles).size !== profiles.length || profiles.some(p => !['sine', 'noise'].includes(p))
@@ -44,7 +46,9 @@ export async function measureWantedGuardedWorkload({ signal, onProgress = () => 
           const fileSizes = fileStats.map(info => info.size);
           await withWantedProfileClient(c.pool, async borrowed => {
             const samples = [];
-            const options = rootCostComparison ? [{ readMethod: 'reusable', receiptGrouping: true, costDiagnostics: false },
+            const options = boundedRootComparison ? [{ readMethod: 'reusable', receiptGrouping: true, rootReadMode: 'member' },
+              { readMethod: 'reusable', receiptGrouping: true, rootReadMode: 'bounded' }]
+              : rootCostComparison ? [{ readMethod: 'reusable', receiptGrouping: true, costDiagnostics: false },
               { readMethod: 'reusable', receiptGrouping: true, costDiagnostics: true }]
               : groupingComparison ? [{ readMethod: 'reusable', receiptGrouping: false }, { readMethod: 'reusable', receiptGrouping: true }]
               : [{ readMethod: 'stream', receiptGrouping: false }, { readMethod: 'reusable', receiptGrouping: false }];
@@ -71,7 +75,9 @@ export async function measureWantedGuardedWorkload({ signal, onProgress = () => 
               }
               samples.push(result);
             }
-            if (groupingComparison) {
+            if (boundedRootComparison) {
+              compareWantedBoundedRootSamples(samples.find(s => s.rootReadMode === 'member'), samples.find(s => s.rootReadMode === 'bounded'));
+            } else if (groupingComparison) {
               compareWantedClosedGroupSamples(samples.find(s => !s.receiptGrouping), samples.find(s => s.receiptGrouping));
             } else compareWantedGuardedSamples(...samples);
             for (const sample of samples) {

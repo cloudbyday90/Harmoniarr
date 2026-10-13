@@ -774,6 +774,14 @@ to private monotonic durations. OWASP minimization excludes projection digests a
 domain identities from summaries. Preserve real fresh guards and individual
 receipt authority before evaluating grouping, even when duplicate work is large.
 
+Bounded-root guidance uses docs/WANTED_BOUNDED_ROOT_READ_RESEARCH_2026_10.md.
+Transaction identity differs from connection identity; enabled triggers can still
+have a condition. Verify actual held authority, unconditional guard/function
+contract and current origin/isolation before reducing reads. Bind ephemeral
+invocation authority and retain fresh opening/closing roots and full bytes.
+Private fixed metrics and exact paired results support qualified performance
+claims; neither SQL locks nor W3C draft timing establish immutable host files.
+
 Root-authority guidance uses docs/WANTED_ROOT_AUTHORITY_COORDINATION_RESEARCH_2026_10.md.
 PostgreSQL statement admission joins ordinary writers to transaction authority
 before tuple mutation, including missing settings/upserts. Reuse existing lock

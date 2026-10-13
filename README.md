@@ -4,6 +4,14 @@ Harmoniarr is a self-hosted, Docker-hosted music library manager inspired by Lid
 
 The repository contains the Node.js ESM server, Vue client, PostgreSQL schema, automated validation, and design documents. The platform is under active development toward its first release.
 
+Wanted publication can resolve each eligible closed receipt group's current
+root once before each full hash, using proved transaction-bound authority.
+Standalone/custom paths retain independent roots. See the
+[design](docs/WANTED_BOUNDED_ROOT_READ_DESIGN.md),
+[official research](docs/WANTED_BOUNDED_ROOT_READ_RESEARCH_2026_10.md) and
+[outcome](docs/WANTED_BOUNDED_ROOT_READ_OUTCOME.md). The explicit
+`--bounded-roots` benchmark compares exact outcomes and identical hash/byte work.
+
 Root-input database writers now join Wanted's existing transaction-wide
 publication lock before tuple mutation. See the
 [design](docs/WANTED_ROOT_AUTHORITY_COORDINATION_DESIGN.md),

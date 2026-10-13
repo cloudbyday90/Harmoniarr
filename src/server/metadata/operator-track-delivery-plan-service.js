@@ -20,10 +20,11 @@ const within = (filePath, root) => path.resolve(normalize(filePath)).toLowerCase
 export function createOperatorTrackDeliveryPlanService({ getPoolFn = getPool,
   store = createOperatorTrackAcquisitionStore({ getPoolFn }), loadSettingsFn = loadSettings, realpathFn = realpath,
   useCombinedRootRead = true } = {}) {
-  async function resolvePrivateOwnerRoot({ ownerId, queryable = null, settings = null }) {
+  async function resolvePrivateOwnerRoot({ ownerId, queryable = null, settings = null, expectedTransactionId = null }) {
     let musicRoot; let owner;
     if (settings === null && useCombinedRootRead === true && loadSettingsFn === loadSettings && typeof store.readOwnerRootContext === 'function') {
-      const context = await store.readOwnerRootContext({ ownerId, queryable });
+      const context = await store.readOwnerRootContext({ ownerId, queryable,
+        ...(expectedTransactionId ? { expectedTransactionId } : {}) });
       owner = context?.owner;
       musicRoot = context?.hasMusicRootSetting ? context.musicRoot : getDefaultSettings().paths.music;
     } else {

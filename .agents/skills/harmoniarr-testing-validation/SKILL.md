@@ -5,6 +5,14 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+Bounded root validation requires real held authority, enabled unconditional
+statement guards, exact function/column contract and an invocation token bound
+to current transaction/queryable. Prove expiry during closing work, fabrication,
+connection reuse, absent-owner transaction mismatch, same-transaction root changes
+and same-marker bytes. Compare exact private projections and identical hash/byte
+work against member roots with equal proof overhead. Custom/standalone paths stay
+conservative. See docs/WANTED_BOUNDED_ROOT_READ_OUTCOME.md; timings are not caps.
+
 Root-authority coordination must prove a real publisher held after its final
 source check, statement-writer blocking and commit/rollback release. Use an
 independent owned observer when both pool clients are held. Test writer-first

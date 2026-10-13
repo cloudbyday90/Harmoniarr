@@ -6,6 +6,24 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Bounded root reads in Wanted publication (2026-10-13)
+
+The [design](WANTED_BOUNDED_ROOT_READ_DESIGN.md),
+[official research](WANTED_BOUNDED_ROOT_READ_RESEARCH_2026_10.md) and
+[outcome](WANTED_BOUNDED_ROOT_READ_OUTCOME.md) own scoped transaction/guard
+proof and two fresh root statements per eligible closed group. Both full hashes,
+source identity and publication/event guards remain. Standalone/custom roots
+retain independent reads; no root value is cached.
+
+- Validation: 82/82 native cases across fifteen files and the frozen 10,085-case
+  fast gate pass. Twelve tonal samples and a separate two-sample noise control
+  preserve exact results/bytes; the full benchmark remains incomplete after a
+  correlated cold-checkout failure. The outcome retains every evidence scope.
+- Next: capture the original cold connection/startup boundary and target identity
+  for the correlated fresh-pool failure, then complete missing noise profiles
+  without relaxing limits. Preserve the failed collection and separate control.
+  Measure distinct bindings before broader grouping or further check reductions.
+
 ## Completed slice: Wanted root-authority writer coordination (2026-10-13)
 
 The [design](WANTED_ROOT_AUTHORITY_COORDINATION_DESIGN.md),

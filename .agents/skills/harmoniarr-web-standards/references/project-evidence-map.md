@@ -584,6 +584,14 @@ projection. docs/WANTED_GUARDED_WORKLOAD_OUTCOME.md separates pre-commit service
 work from commit/app latency and mixed heap/timing from isolated probe results.
 Keep the large experiment outside normal discovery; counts cannot authorize caches.
 
+Bounded roots use wanted-root-read-authority-{policy,store,service}.js and the
+closed-group/verifier/reader services under src/server/library/. The owning
+Wanted service scopes a proved token; canonical root-context statements validate
+transaction identity before either full hash. docs/WANTED_BOUNDED_ROOT_READ_OUTCOME.md
+maps scope/transaction/guard/byte refusal, conservative adapters and exact
+same-hash comparisons. --bounded-roots is an opt-in matched benchmark; no root
+value is cached across owners, guards or invocations.
+
 Root-authority coordination uses library-root-authority-lock-store.js and the
 Wanted guard store, plus migration 20261013_155026_wanted_root_authority_coordination.sql.
 BEFORE STATEMENT root-input writers join the existing projection lock; active

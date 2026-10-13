@@ -1,5 +1,10 @@
 # Practical web standards skill design
 
+October 13 bounded-root maintenance connects transaction identity, actual
+unconditional writer guards and ephemeral authority to two fresh root phases.
+The [design](WANTED_BOUNDED_ROOT_READ_DESIGN.md) keeps both hashes, exact receipt
+capture and conservative adapters. Existing skill metadata/policy remain.
+
 October 13 root-authority maintenance maps statement admission, transaction
 ownership and current object authority to existing projection coordination.
 The [design](WANTED_ROOT_AUTHORITY_COORDINATION_DESIGN.md) distinguishes queued

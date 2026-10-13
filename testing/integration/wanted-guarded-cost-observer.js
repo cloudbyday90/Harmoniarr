@@ -9,10 +9,12 @@ import { performance } from 'node:perf_hooks';
 const fields = Object.freeze(['rss', 'heapUsed', 'external', 'arrayBuffers']);
 const windows = Object.freeze(['rootQuery', 'projection', 'fingerprint', 'digest']);
 const rootStatement = `SELECT owner.id,owner.is_disabled,owner.managed_library_relative_root,
+  root_transaction.transaction_id,
   root_setting.setting_key IS NOT NULL AS has_music_root_setting,root_setting.setting_value AS music_root
-  FROM app_users owner LEFT JOIN app_settings root_setting
+  FROM (SELECT pg_catalog.pg_current_xact_id_if_assigned()::text AS transaction_id) root_transaction
+  LEFT JOIN app_users owner ON owner.id=$1::uuid LEFT JOIN app_settings root_setting
   ON root_setting.namespace='paths' AND root_setting.setting_key='music'
-  WHERE owner.id=$1::uuid`.replace(/\s+/g, ' ').trim();
+  `.replace(/\s+/g, ' ').trim();
 
 /** Benchmark-only fixed aggregates. Never retain query text, values, rows or domain inputs. */
 export function createWantedGuardedCostObserver({ now = () => performance.now(),

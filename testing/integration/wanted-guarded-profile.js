@@ -20,13 +20,14 @@ import { createWantedGuardedCostObserver } from './wanted-guarded-cost-observer.
 
 /** Complete guarded service work on an active rollback-owned transaction, never a cache. */
 export async function profileWantedGuardedReconciliation(pool, { readMethod = 'reusable', signal,
-  gc = global.gc, afterProjection = null, receiptGrouping = false, costDiagnostics = false } = {}) {
+  gc = global.gc, afterProjection = null, receiptGrouping = false, costDiagnostics = false, rootReadMode = 'compatibility' } = {}) {
   readMethod = resolveOperatorTrackReadMethod(readMethod);
   const readBufferBytes = resolveOperatorTrackReadBuffer(undefined, readMethod);
   if (typeof gc !== 'function') throw new TypeError('Guarded workload measurement requires explicit GC');
   if (afterProjection !== null && typeof afterProjection !== 'function') throw new TypeError('Invalid guarded profile hook');
   if (typeof receiptGrouping !== 'boolean') throw new TypeError('Invalid receipt grouping profile');
   if (typeof costDiagnostics !== 'boolean') throw new TypeError('Invalid guarded cost diagnostics');
+  if (!['bounded', 'member', 'compatibility'].includes(rootReadMode)) throw new TypeError('Invalid root profile mode');
   signal?.throwIfAborted();
   return withRollbackFixtureClient(pool, async client => {
     let queryCount = 0; let queryMs = 0; let queryActive = false; let record; let distinctPerProjection = 0;
@@ -43,7 +44,8 @@ export async function profileWantedGuardedReconciliation(pool, { readMethod = 'r
       finally { queryActive = false; queryMs += performance.now() - started; }
     } };
     let memory;
-    const reader = createLibraryWantedReleaseReader({ groupReceiptVerification: receiptGrouping, fingerprintTrackFile: async (path, options) => {
+    const reader = createLibraryWantedReleaseReader({ groupReceiptVerification: receiptGrouping,
+      allowBoundedRootReads: rootReadMode === 'bounded', fingerprintTrackFile: async (path, options) => {
       signal?.throwIfAborted(); const binding = JSON.stringify([options.libraryRoot, path]);
       allPaths.add(binding); projectionPaths.add(binding);
       const close = costs?.openWindow('fingerprint');
@@ -55,7 +57,7 @@ export async function profileWantedGuardedReconciliation(pool, { readMethod = 'r
     } });
     const maintenance = createMaintenanceLockService({ getPoolFn: () => queryable });
     const guard = createMaintenanceLockWriteGuardService({ listActiveMaintenanceLocks: maintenance.listActiveMaintenanceLocks });
-    const wanted = createLibraryWantedReleaseService({ assertMaintenanceWriteAllowed: guard.assertNoActiveWriteLocks,
+    const wanted = createLibraryWantedReleaseService({ rootReadMode, assertMaintenanceWriteAllowed: guard.assertNoActiveWriteLocks,
       withTransaction: work => work(queryable),
       projectionReader: { readWantedReleaseProjection: async input => {
         projectionPaths = new Set();
@@ -77,7 +79,7 @@ export async function profileWantedGuardedReconciliation(pool, { readMethod = 'r
     finally { observation = memory.finish(); }
     return { result, projectionDigests, queryCount, queryMs, readMethod, readBufferBytes, receiptGrouping,
       elapsedMs: performance.now() - started, diagnostics: record, memory: observation,
-      costDiagnostics, costs: costs?.snapshot() ?? null,
+      costDiagnostics, rootReadMode, costs: costs?.snapshot() ?? null,
       pathWork: { distinctPrivateBindings: allPaths.size, distinctPerProjection,
         repeatedWithinProjections: record.counters.fingerprintCalls - distinctPerProjection } };
   });
@@ -89,9 +91,9 @@ export function compareWantedGuardedSamples(first, second) {
   assert.deepEqual(first.pathWork, second.pathWork);
 }
 
-export function summarizeWantedGuardedSample({ readMethod, readBufferBytes, receiptGrouping, costDiagnostics, costs, queryCount, queryMs, elapsedMs,
+export function summarizeWantedGuardedSample({ readMethod, readBufferBytes, receiptGrouping, costDiagnostics, costs, rootReadMode, queryCount, queryMs, elapsedMs,
   memory, pathWork, diagnostics }) {
-  return { readMethod, readBufferBytes, receiptGrouping, costDiagnostics, costs, queryCount, queryMs, elapsedMs, memory, pathWork,
+  return { readMethod, readBufferBytes, receiptGrouping, costDiagnostics, costs, rootReadMode, queryCount, queryMs, elapsedMs, memory, pathWork,
     counters: diagnostics.counters, phases: diagnostics.phases };
 }
 
@@ -104,4 +106,16 @@ export function compareWantedClosedGroupSamples(serial, grouped) {
   assert.equal(grouped.diagnostics.counters.fingerprintCalls, grouped.diagnostics.counters.closedReceiptGroups * 2);
   assert.equal(grouped.queryCount - serial.queryCount, grouped.diagnostics.counters.groupedReceiptRows);
   assert.equal(grouped.pathWork.distinctPerProjection, serial.pathWork.distinctPerProjection);
+}
+
+export function compareWantedBoundedRootSamples(member, bounded) {
+  assert.deepEqual(member.result, bounded.result); assert.deepEqual(member.projectionDigests, bounded.projectionDigests);
+  for (const name of Object.keys(member.diagnostics.counters)) {
+    if (!['boundedRootGroups', 'boundedRootReceiptRows'].includes(name)) assert.equal(member.diagnostics.counters[name], bounded.diagnostics.counters[name]);
+  }
+  assert.deepEqual(member.pathWork, bounded.pathWork);
+  assert.equal(bounded.diagnostics.counters.boundedRootGroups, bounded.diagnostics.counters.closedReceiptGroups);
+  assert.equal(bounded.diagnostics.phases.root_resolution.calls, bounded.diagnostics.counters.closedReceiptGroups * 2);
+  assert.equal(member.queryCount - bounded.queryCount,
+    member.diagnostics.phases.root_resolution.calls - bounded.diagnostics.phases.root_resolution.calls);
 }

@@ -37,10 +37,12 @@ export function createLibraryWantedReleaseReader({
   fingerprintTrackFile = fingerprintOperatorTrackFile,
   resolvePrivateTrackRoot,
   groupReceiptVerification,
+  allowBoundedRootReads,
 } = {}) {
   const receiptVerifier = createWantedReceiptVerificationService({ fingerprintTrackFile, resolvePrivateTrackRoot,
+    ...(allowBoundedRootReads === undefined ? {} : { allowBoundedRootReads }),
     ...(groupReceiptVerification === undefined ? {} : { allowGroupedReceipts: groupReceiptVerification }) });
-  async function readWantedReleaseProjection({ queryable, verificationObserver = disabledWantedVerificationObserver }) {
+  async function readWantedReleaseProjection({ queryable, verificationObserver = disabledWantedVerificationObserver, rootReadAuthority }) {
     if (typeof queryable?.query !== 'function') throw new TypeError('Wanted projection requires a transaction queryable');
     const metadataReader = createMetadataReadService({ pool: queryable });
     const readArtist = getMetadataArtist ?? metadataReader.getArtistWantedProjection;
@@ -89,7 +91,8 @@ export function createLibraryWantedReleaseReader({
       const trackSources = [];
       verificationObserver.increment('receiptRows', receipts.length);
       const desired = libraryWantedReleaseProjectionService.projectWantedReleases({ appUserId, ...inputs, libraryReleaseReconciliations: availability });
-      const verified = await receiptVerifier.tryVerifyGroup({ receipts, ownerId: appUserId, queryable, observer: verificationObserver });
+      const verified = await receiptVerifier.tryVerifyGroup({ receipts, ownerId: appUserId, queryable,
+        observer: verificationObserver, rootReadAuthority });
       for (const [index, receipt] of receipts.entries()) {
         const { eligible, available, currentRoot, missing } = verified?.[index]
           ?? await receiptVerifier.verify({ receipt, ownerId: appUserId, queryable, observer: verificationObserver });

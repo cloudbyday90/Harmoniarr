@@ -10,7 +10,7 @@ import { performance } from 'node:perf_hooks';
 const counterNames = ['projectionReads', 'receiptRows', 'eligibleReceipts', 'ineligibleReceipts', 'availableReceipts',
   'missingReceipts', 'mismatchedReceipts', 'refusedReceipts', 'unexpectedErrors', 'fingerprintCalls',
   'fingerprintCompleted', 'fingerprintFailures', 'hashedBytes', 'groupedReceiptRows', 'closedReceiptGroups',
-  'receiptGroupingFallbacks', 'receiptGroupRefusals'];
+  'receiptGroupingFallbacks', 'receiptGroupRefusals', 'boundedRootGroups', 'boundedRootReceiptRows'];
 const phaseNames = ['reconciliation', 'initial_projection', 'recheck_projection', 'root_resolution', 'fingerprint', 'replacement', 'source_lifecycle',
   'monitoring_read', 'metadata_read', 'selections_read', 'overrides_read', 'availability_read', 'receipts_read'];
 const maximum = Number.MAX_SAFE_INTEGER;

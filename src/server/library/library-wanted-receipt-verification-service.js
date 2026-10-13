@@ -12,11 +12,14 @@ import { createWantedClosedReceiptGroupService } from './wanted-closed-receipt-g
 
 export function createWantedReceiptVerificationService({ fingerprintTrackFile = fingerprintOperatorTrackFile,
   resolvePrivateTrackRoot,
+  allowBoundedRootReads = fingerprintTrackFile === fingerprintOperatorTrackFile,
   allowGroupedReceipts = fingerprintTrackFile === fingerprintOperatorTrackFile && resolvePrivateTrackRoot === undefined } = {}) {
   if (typeof allowGroupedReceipts !== 'boolean') throw new TypeError('Invalid receipt grouping setting');
+  if (typeof allowBoundedRootReads !== 'boolean') throw new TypeError('Invalid bounded root setting');
   const rootResolver = resolvePrivateTrackRoot === undefined
     ? createOperatorTrackDeliveryPlanService().resolvePrivateOwnerRoot : resolvePrivateTrackRoot;
-  const readRoot = ({ ownerId, queryable, observer }) => observer.measure('root_resolution', () => rootResolver({ ownerId, queryable }));
+  const readRoot = ({ ownerId, queryable, observer, expectedTransactionId = null }) => observer.measure('root_resolution',
+    () => rootResolver({ ownerId, queryable, ...(expectedTransactionId ? { expectedTransactionId } : {}) }));
   async function fingerprint(receipt, currentRoot, observer) {
     const options = { ...(currentRoot ? { libraryRoot: currentRoot } : {}),
       ...(observer.enabled ? { onBytesRead: amount => observer.increment('hashedBytes', amount) } : {}) };
@@ -47,5 +50,6 @@ export function createWantedReceiptVerificationService({ fingerprintTrackFile = 
   }
   const groups = createWantedClosedReceiptGroupService({ readRoot, fingerprint });
   return { verify, tryVerifyGroup: ({ observer = disabledWantedVerificationObserver, ...input } = {}) =>
-    groups.tryVerifyGroup({ ...input, observer, enabled: allowGroupedReceipts }) };
+    groups.tryVerifyGroup({ ...input, observer, enabled: allowGroupedReceipts,
+      allowBoundedRoots: allowBoundedRootReads && resolvePrivateTrackRoot === undefined }) };
 }

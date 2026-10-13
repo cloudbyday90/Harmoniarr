@@ -6,6 +6,11 @@ This repository includes a shared `.agents/` directory for GitHub Copilot agent 
 
 The goal is to keep reusable AI workflow guidance versioned alongside the project so UI review, frontend implementation, browser testing, and related tasks follow the same repo conventions.
 
+The [bounded-root outcome](WANTED_BOUNDED_ROOT_READ_OUTCOME.md) adds the method
+for proved transaction/queryable authority, unconditional guards and two fresh
+root/hash phases. Skills preserve standalone/custom fallback, private exact-work
+comparisons and the distinction between connection identity and current authority.
+
 The [root-authority outcome](WANTED_ROOT_AUTHORITY_COORDINATION_OUTCOME.md)
 maps database writer participation, active transaction admission and current
 post-wait reads to standards/testing guidance. Keep broad settings contention

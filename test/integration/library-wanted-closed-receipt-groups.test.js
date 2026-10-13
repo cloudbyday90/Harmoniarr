@@ -45,6 +45,7 @@ suite('Closed duplicate receipt groups through actual Wanted publication', () =>
         assert.deepEqual((await canonical.reconcileWantedReleases()).wantedKeys, []);
         assert.equal(records.at(-1).counters.closedReceiptGroups, 14); assert.equal(records.at(-1).counters.groupedReceiptRows, 112);
         assert.equal(records.at(-1).counters.fingerprintCalls, 28);
+        assert.equal(records.at(-1).counters.boundedRootGroups, 14); assert.equal(records.at(-1).phases.root_resolution.calls, 28);
         const beforeWanted = (await c.pool.query('SELECT * FROM library_wanted_releases ORDER BY id')).rows;
         const beforeEvents = (await c.pool.query('SELECT * FROM media_request_events ORDER BY id')).rows;
         const originals = new Map(await Promise.all(files.map(async path => [path, await readFile(path)])));

@@ -1,5 +1,11 @@
 # Practical web standards skill outcome
 
+October 13 bounded-root maintenance maps scope expiry, transaction replacement,
+guard conditions and current byte/root refusal to actual native proof. The
+[outcome](WANTED_BOUNDED_ROOT_READ_OUTCOME.md) separates initial control, final
+source and matched measurements. Structure/install checks remain distinct from
+a new blind trial or standards/security certification.
+
 October 13 root-authority maintenance maps before-statement writer admission,
 enabled/function-content anchors and post-wait current reads to native evidence.
 The [outcome](WANTED_ROOT_AUTHORITY_COORDINATION_OUTCOME.md) retains commit,
