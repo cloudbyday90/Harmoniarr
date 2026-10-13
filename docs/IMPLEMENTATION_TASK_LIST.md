@@ -6,6 +6,26 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Closed single-binding receipt groups (2026-10-13)
+
+The [closed-group design](WANTED_CLOSED_RECEIPT_GROUP_DESIGN.md),
+[official research](WANTED_CLOSED_RECEIPT_GROUP_RESEARCH_2026_10.md) and
+[outcome](WANTED_CLOSED_RECEIPT_GROUP_OUTCOME.md) own bounded exact positive groups
+with opening/closing full hashes and independent current roots for each member.
+Canonical default wiring retains every source identity and fresh publication
+guard; mixed/unsupported/negative and compatibility cases remain serial.
+Twenty-four pre-review comparisons retain exact private result/digest sequences:
+at 96 receipts actual hashes fall from 672 to 28, with more root queries and
+higher heap growth. Final malformed-array review and gates have separate hashes.
+
+- Validation: 25 focused cases, 24 candidate samples, the reviewed frozen
+  10,073-case fast gate and 114/114 serial native cases across twenty files pass.
+  The outcome separates same-marker mutation, array-review red/correction,
+  pre-review timings and final source hashes.
+- Next: profile root-query/heap cost before designing bounded owner/requirement
+  root-read batching. Prove current authorization, late root/disabled-owner
+  refusal and exact results; retain closing full reads and every publication guard.
+
 ## Completed slice: Larger guarded Wanted workloads (2026-10-13)
 
 The [guarded design](WANTED_GUARDED_WORKLOAD_DESIGN.md),

@@ -8,17 +8,21 @@ import { writeFile } from 'node:fs/promises';
 import { measureWantedGuardedWorkload } from '../testing/integration/wanted-guarded-benchmark.js';
 
 const args = process.argv.slice(2);
-if (args.length !== 2 || args[0] !== '--output') throw new TypeError('Usage: node --expose-gc scripts/measure-wanted-guarded-workload.js --output <local JSON>');
+if (![2, 3].includes(args.length) || args[0] !== '--output' || (args.length === 3 && args[2] !== '--receipt-groups')) {
+  throw new TypeError('Usage: node --expose-gc scripts/measure-wanted-guarded-workload.js --output <local JSON> [--receipt-groups]');
+}
+const groupingComparison = args.length === 3;
 const samples = []; const controller = new AbortController();
 const cancel = () => controller.abort(new Error('Guarded workload measurement cancelled'));
 process.on('SIGINT', cancel); process.on('SIGTERM', cancel);
 let completed = false;
 try {
-  await measureWantedGuardedWorkload({ signal: controller.signal, onSample: row => { samples.push(row); },
+  await measureWantedGuardedWorkload({ groupingComparison, signal: controller.signal, onSample: row => { samples.push(row); },
     onProgress: record => process.stdout.write(`${JSON.stringify({ kind: 'wanted_guarded_progress', ...record })}\n`) });
   completed = true;
 } catch { process.exitCode = 1; process.stderr.write('Guarded workload measurement did not complete\n'); }
 finally {
   process.removeListener('SIGINT', cancel); process.removeListener('SIGTERM', cancel);
-  await writeFile(args[1], JSON.stringify({ version: 1, kind: 'wanted_guarded_workload', completed, node: process.version, samples }, null, 2));
+  await writeFile(args[1], JSON.stringify({ version: 1, kind: groupingComparison ? 'wanted_closed_receipt_groups' : 'wanted_guarded_workload',
+    completed, node: process.version, samples }, null, 2));
 }

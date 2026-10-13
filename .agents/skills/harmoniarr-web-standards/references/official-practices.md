@@ -773,3 +773,11 @@ fields overlap and sampling costs work; W3C timing remains draft guidance applie
 to private monotonic durations. OWASP minimization excludes projection digests and
 domain identities from summaries. Preserve real fresh guards and individual
 receipt authority before evaluating grouping, even when duplicate work is large.
+
+Closed-group guidance uses docs/WANTED_CLOSED_RECEIPT_GROUP_RESEARCH_2026_10.md.
+Node mtime mutation and filesystem races defeat timestamp-based positive reuse;
+two actual full reads close a bounded exact binding with current per-member
+authority. OWASP authorization/logging require current owning checks and fixed
+private metrics; maintainer transaction ownership does not freeze host bytes.
+Keep W3C draft timing separate from conformance and candidate measurements from
+later reviewed code. More root queries and higher heap are costs, not hidden gains.

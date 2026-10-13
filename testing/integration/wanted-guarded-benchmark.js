@@ -12,11 +12,11 @@ import { resolveIntegrationTestRuntimeConfig } from './runtime-config.js';
 import { withFixtureLifecycle } from './fixture-lifecycle.js';
 import { seedWantedRootProfile } from './wanted-root-profile-fixture.js';
 import { withWantedProfileClient } from './wanted-profile-client.js';
-import { compareWantedGuardedSamples, profileWantedGuardedReconciliation, summarizeWantedGuardedSample } from './wanted-guarded-profile.js';
+import { compareWantedGuardedSamples, compareWantedClosedGroupSamples, profileWantedGuardedReconciliation, summarizeWantedGuardedSample } from './wanted-guarded-profile.js';
 
 export async function measureWantedGuardedWorkload({ signal, onProgress = () => {}, onSample = () => {},
-  profiles = ['sine', 'noise'], receiptCounts = [16, 48, 96], pairs = 2, gc = global.gc } = {}) {
-  if (typeof gc !== 'function' || typeof onProgress !== 'function' || typeof onSample !== 'function'
+  profiles = ['sine', 'noise'], receiptCounts = [16, 48, 96], pairs = 2, gc = global.gc, groupingComparison = false } = {}) {
+  if (typeof groupingComparison !== 'boolean' || typeof gc !== 'function' || typeof onProgress !== 'function' || typeof onSample !== 'function'
     || ![1, 2].includes(pairs) || !Array.isArray(profiles) || !profiles.length || profiles.length > 2
     || new Set(profiles).size !== profiles.length || profiles.some(p => !['sine', 'noise'].includes(p))
     || !Array.isArray(receiptCounts) || !receiptCounts.length || receiptCounts.length > 3
@@ -42,20 +42,24 @@ export async function measureWantedGuardedWorkload({ signal, onProgress = () => 
           const fileSizes = fileStats.map(info => info.size);
           await withWantedProfileClient(c.pool, async borrowed => {
             const samples = [];
-            for (const readMethod of (pair % 2 ? ['reusable', 'stream'] : ['stream', 'reusable'])) {
-              const result = await profileWantedGuardedReconciliation(borrowed, { readMethod, signal: scope.signal, gc });
+            const options = groupingComparison ? [{ readMethod: 'reusable', receiptGrouping: false }, { readMethod: 'reusable', receiptGrouping: true }]
+              : [{ readMethod: 'stream', receiptGrouping: false }, { readMethod: 'reusable', receiptGrouping: false }];
+            for (const option of (pair % 2 ? options.reverse() : options)) {
+              const result = await profileWantedGuardedReconciliation(borrowed, { ...option, signal: scope.signal, gc });
               const { counters } = result.diagnostics;
               assert.equal(result.diagnostics.outcome, 'completed'); assert.ok(counters.projectionReads > 1);
-              assert.equal(counters.fingerprintCalls, receipts * counters.projectionReads);
-              assert.equal(counters.availableReceipts, counters.fingerprintCalls);
-              assert.equal(counters.hashedBytes, fileSizes.reduce((a, b) => a + b, 0) * (receipts / 2) * counters.projectionReads);
+              assert.equal(counters.fingerprintCalls, (option.receiptGrouping ? 4 : receipts) * counters.projectionReads);
+              assert.equal(counters.availableReceipts, receipts * counters.projectionReads);
+              assert.equal(counters.hashedBytes, fileSizes.reduce((a, b) => a + b, 0) * (option.receiptGrouping ? 2 : receipts / 2) * counters.projectionReads);
               assert.equal(result.pathWork.distinctPrivateBindings, 2);
               assert.equal(result.pathWork.distinctPerProjection, 2 * counters.projectionReads);
               assert.deepEqual(result.result.wantedKeys, []);
               assert.equal(result.memory.unavailable, false);
               samples.push(result);
             }
-            compareWantedGuardedSamples(...samples);
+            if (groupingComparison) {
+              compareWantedClosedGroupSamples(samples.find(s => !s.receiptGrouping), samples.find(s => s.receiptGrouping));
+            } else compareWantedGuardedSamples(...samples);
             for (const sample of samples) {
               const row = { mediaProfile, receipts, pair, fileSizes, ...summarizeWantedGuardedSample(sample) };
               rows.push(row); await onSample(row);

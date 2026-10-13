@@ -27,6 +27,14 @@ on one owned handle, with descriptor/path binding and after-close root/stat
 checks. Preserve current saved scope, bytes and every publication guard; lower
 sampled allocation grants no consent, hash cache or provider replay.
 
+Closed groups add bounded positive sharing only inside one exact owner/requirement/
+scope/path/evidence batch. Opening and closing full bytes, per-member current
+roots and source comparison precede every individual result; negative/mixed and
+unsupported cases remain serial. docs/WANTED_CLOSED_RECEIPT_GROUP_OUTCOME.md
+proves same-marker byte mutation refusal and required-event rollback, while
+retaining every publication guard. This grants no scoped exception, provider
+replay or cross-owner/guard/invocation cache.
+
 Negative scan observations now bind the original scan acquisition, private root
 and pre-walk receipt revision (docs/SCAN_RECEIPT_INVALIDATION_OUTCOME.md). They
 retain historical receipts and do not lower verification or grant provider replay.

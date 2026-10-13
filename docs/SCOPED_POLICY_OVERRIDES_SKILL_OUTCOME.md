@@ -1,5 +1,11 @@
 # Scoped policy overrides skill outcome
 
+October 13 closed-group maintenance maps exact positive receipt binding to
+opening/closing full bytes and independent current roots. The
+[closed-group outcome](WANTED_CLOSED_RECEIPT_GROUP_OUTCOME.md) preserves individual
+sources, conservative fallback, original failures and required-event rollback.
+Reference maintenance grants no new consent, replay or cross-guard/owner cache.
+
 October 12 negative-scan maintenance extends the consumer map with original
 acquisition/revision/root binding and current-byte source reopening. The
 [scan outcome](SCAN_RECEIPT_INVALIDATION_OUTCOME.md) owns actual production worker,

@@ -8,7 +8,6 @@
 import { createApiError } from '../auth.js';
 import { createOperatorTrackAcquisitionStore } from '../metadata/operator-track-acquisition-store.js';
 import { fingerprintOperatorTrackFile } from '../metadata/operator-track-file-evidence-service.js';
-import { createOperatorTrackDeliveryPlanService } from '../metadata/operator-track-delivery-plan-service.js';
 import { isDeepStrictEqual } from 'node:util';
 import { createMetadataReadService } from '../metadata/metadata-read-service.js';
 import { createOperatorArtistMonitoringStore } from '../metadata/operator-artist-monitoring-store.js';
@@ -36,9 +35,11 @@ export function createLibraryWantedReleaseReader({
   libraryWantedReleaseProjectionService = createLibraryWantedReleaseProjectionService(),
   listTrackFulfillment = null,
   fingerprintTrackFile = fingerprintOperatorTrackFile,
-  resolvePrivateTrackRoot = createOperatorTrackDeliveryPlanService().resolvePrivateOwnerRoot,
+  resolvePrivateTrackRoot,
+  groupReceiptVerification,
 } = {}) {
-  const receiptVerifier = createWantedReceiptVerificationService({ fingerprintTrackFile, resolvePrivateTrackRoot });
+  const receiptVerifier = createWantedReceiptVerificationService({ fingerprintTrackFile, resolvePrivateTrackRoot,
+    ...(groupReceiptVerification === undefined ? {} : { allowGroupedReceipts: groupReceiptVerification }) });
   async function readWantedReleaseProjection({ queryable, verificationObserver = disabledWantedVerificationObserver }) {
     if (typeof queryable?.query !== 'function') throw new TypeError('Wanted projection requires a transaction queryable');
     const metadataReader = createMetadataReadService({ pool: queryable });
@@ -88,9 +89,10 @@ export function createLibraryWantedReleaseReader({
       const trackSources = [];
       verificationObserver.increment('receiptRows', receipts.length);
       const desired = libraryWantedReleaseProjectionService.projectWantedReleases({ appUserId, ...inputs, libraryReleaseReconciliations: availability });
-      for (const receipt of receipts) {
-        const { eligible, available, currentRoot, missing } = await receiptVerifier.verify({ receipt, ownerId: appUserId, queryable,
-          observer: verificationObserver });
+      const verified = await receiptVerifier.tryVerifyGroup({ receipts, ownerId: appUserId, queryable, observer: verificationObserver });
+      for (const [index, receipt] of receipts.entries()) {
+        const { eligible, available, currentRoot, missing } = verified?.[index]
+          ?? await receiptVerifier.verify({ receipt, ownerId: appUserId, queryable, observer: verificationObserver });
         if (!eligible) continue;
         if (available) trackFulfillment.push(receipt);
         if (receipt.wantedReleaseId && receipt.importCandidateId && desired.some(row => isDeepStrictEqual(row.evidence?.operatorTrackScope, receipt.scope))) {

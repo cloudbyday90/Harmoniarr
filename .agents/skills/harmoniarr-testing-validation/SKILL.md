@@ -5,6 +5,15 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+Closed receipt groups need opening and closing full hashes with independent
+current-root reads and captured source identity, not metadata reuse. Prove real
+same-size/same-time in-place mutation, source/root changes, negative/mixed/budget
+fallback, sparse/accessor-array refusal and original Error/null/held completion.
+Canonical default wiring must execute actual publication/event rollback. Keep
+candidate measurements and later capture-boundary revisions on separate hashes;
+changed hash/query work cannot use the serial-versus-reader equality assertion.
+See docs/WANTED_CLOSED_RECEIPT_GROUP_OUTCOME.md for scope and mixed heap/timing.
+
 Guarded workload profiling belongs in an explicit benchmark, not an automatically
 repeated large scaling suite. Compare full results/projection digests privately
 on one connection with a fresh rollback-owned transaction per sample. Include

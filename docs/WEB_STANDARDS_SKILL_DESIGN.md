@@ -1,5 +1,11 @@
 # Practical web standards skill design
 
+October 13 closed-group maintenance maps Node filesystem observations and current
+OWASP authorization to two actual byte reads and independent member roots. The
+[closed-group design](WANTED_CLOSED_RECEIPT_GROUP_DESIGN.md) preserves exact
+source identities and existing guards. Bounded capture, compatibility fallback
+and private metrics extend the existing skill without changing invocation policy.
+
 October 13 guarded-workload maintenance maps same-client/rollback contracts,
 Node memory observations, W3C draft timing and OWASP minimization to an explicit
 pre-commit benchmark. The [guarded design](WANTED_GUARDED_WORKLOAD_DESIGN.md)

@@ -6,6 +6,12 @@ This repository includes a shared `.agents/` directory for GitHub Copilot agent 
 
 The goal is to keep reusable AI workflow guidance versioned alongside the project so UI review, frontend implementation, browser testing, and related tasks follow the same repo conventions.
 
+The [closed-group outcome](WANTED_CLOSED_RECEIPT_GROUP_OUTCOME.md) maps bounded
+source capture, opening/closing full bytes and per-member current roots to the
+standards/scoped/testing references. Same-marker mutation defeats metadata reuse;
+closed positives require exact source agreement, with serial compatibility/
+negative fallback. Candidate timings and later array-boundary review stay separate.
+
 The [guarded workload outcome](WANTED_GUARDED_WORKLOAD_OUTCOME.md) adds explicit
 same-client rollback profiling to maintained standards/testing references. Full
 projection comparisons remain private; fixed work/memory fields distinguish

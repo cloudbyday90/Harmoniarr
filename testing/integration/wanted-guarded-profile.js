@@ -19,11 +19,12 @@ import { createWantedWorkloadMemorySampler } from './wanted-workload-memory.js';
 
 /** Complete guarded service work on an active rollback-owned transaction, never a cache. */
 export async function profileWantedGuardedReconciliation(pool, { readMethod = 'reusable', signal,
-  gc = global.gc, afterProjection = null } = {}) {
+  gc = global.gc, afterProjection = null, receiptGrouping = false } = {}) {
   readMethod = resolveOperatorTrackReadMethod(readMethod);
   const readBufferBytes = resolveOperatorTrackReadBuffer(undefined, readMethod);
   if (typeof gc !== 'function') throw new TypeError('Guarded workload measurement requires explicit GC');
   if (afterProjection !== null && typeof afterProjection !== 'function') throw new TypeError('Invalid guarded profile hook');
+  if (typeof receiptGrouping !== 'boolean') throw new TypeError('Invalid receipt grouping profile');
   signal?.throwIfAborted();
   return withRollbackFixtureClient(pool, async client => {
     let queryCount = 0; let queryMs = 0; let queryActive = false; let record; let distinctPerProjection = 0;
@@ -35,7 +36,7 @@ export async function profileWantedGuardedReconciliation(pool, { readMethod = 'r
       finally { queryActive = false; queryMs += performance.now() - started; }
     } };
     let memory;
-    const reader = createLibraryWantedReleaseReader({ fingerprintTrackFile: async (path, options) => {
+    const reader = createLibraryWantedReleaseReader({ groupReceiptVerification: receiptGrouping, fingerprintTrackFile: async (path, options) => {
       signal?.throwIfAborted(); const binding = JSON.stringify([options.libraryRoot, path]);
       allPaths.add(binding); projectionPaths.add(binding);
       const result = await fingerprintOperatorTrackFile(path, { ...options, readMethod, readBufferBytes,
@@ -60,7 +61,7 @@ export async function profileWantedGuardedReconciliation(pool, { readMethod = 'r
     const started = performance.now(); let result; let observation;
     try { result = await wanted.reconcileWantedReleases(); }
     finally { observation = memory.finish(); }
-    return { result, projectionDigests, queryCount, queryMs, readMethod, readBufferBytes,
+    return { result, projectionDigests, queryCount, queryMs, readMethod, readBufferBytes, receiptGrouping,
       elapsedMs: performance.now() - started, diagnostics: record, memory: observation,
       pathWork: { distinctPrivateBindings: allPaths.size, distinctPerProjection,
         repeatedWithinProjections: record.counters.fingerprintCalls - distinctPerProjection } };
@@ -73,8 +74,19 @@ export function compareWantedGuardedSamples(first, second) {
   assert.deepEqual(first.pathWork, second.pathWork);
 }
 
-export function summarizeWantedGuardedSample({ readMethod, readBufferBytes, queryCount, queryMs, elapsedMs,
+export function summarizeWantedGuardedSample({ readMethod, readBufferBytes, receiptGrouping, queryCount, queryMs, elapsedMs,
   memory, pathWork, diagnostics }) {
-  return { readMethod, readBufferBytes, queryCount, queryMs, elapsedMs, memory, pathWork,
+  return { readMethod, readBufferBytes, receiptGrouping, queryCount, queryMs, elapsedMs, memory, pathWork,
     counters: diagnostics.counters, phases: diagnostics.phases };
+}
+
+export function compareWantedClosedGroupSamples(serial, grouped) {
+  assert.deepEqual(serial.result, grouped.result); assert.deepEqual(serial.projectionDigests, grouped.projectionDigests);
+  for (const name of ['projectionReads', 'receiptRows', 'eligibleReceipts', 'availableReceipts']) {
+    assert.equal(serial.diagnostics.counters[name], grouped.diagnostics.counters[name]);
+  }
+  assert.equal(grouped.diagnostics.counters.groupedReceiptRows, serial.diagnostics.counters.eligibleReceipts);
+  assert.equal(grouped.diagnostics.counters.fingerprintCalls, grouped.diagnostics.counters.closedReceiptGroups * 2);
+  assert.equal(grouped.queryCount - serial.queryCount, grouped.diagnostics.counters.groupedReceiptRows);
+  assert.equal(grouped.pathWork.distinctPerProjection, serial.pathWork.distinctPerProjection);
 }

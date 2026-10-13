@@ -1,5 +1,11 @@
 # Practical web standards skill outcome
 
+October 13 closed-group maintenance maps same-marker mutation and late source/
+root/content refusal to actual closure proof. The
+[closed-group outcome](WANTED_CLOSED_RECEIPT_GROUP_OUTCOME.md) separates candidate
+measurements, malformed-array review and final gates. Structure/install checks
+remain distinct from a new blind trial or standards/security certification.
+
 October 13 guarded-workload maintenance maps matched rollback samples and private
 projection comparisons to fixed work/memory observations. The
 [guarded outcome](WANTED_GUARDED_WORKLOAD_OUTCOME.md) retains mixed timing/heap

@@ -583,3 +583,13 @@ compare full result/projection digests privately and count repeated bindings per
 projection. docs/WANTED_GUARDED_WORKLOAD_OUTCOME.md separates pre-commit service
 work from commit/app latency and mixed heap/timing from isolated probe results.
 Keep the large experiment outside normal discovery; counts cannot authorize caches.
+
+Closed groups now use wanted-receipt-group-policy.js and
+wanted-closed-receipt-group-service.js in src/server/library/. Only one exact
+positive owner/requirement/scope/path/evidence batch of 3–128 JSON rows qualifies.
+Every member gets current roots before opening and closing full bytes; changed
+content/source/root refuses before positives. Singles/pairs, unsupported/mixed/
+negative and custom compatibility cases retain serial behavior. The
+docs/WANTED_CLOSED_RECEIPT_GROUP_OUTCOME.md maps canonical wiring, real same-marker
+mutation, dense data-descriptor capture and source-event rollback. No metadata
+cache or cross-guard/owner/invocation reuse; root-query/heap costs remain explicit.
