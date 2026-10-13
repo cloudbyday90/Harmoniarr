@@ -4,6 +4,14 @@ Harmoniarr is a self-hosted, Docker-hosted music library manager inspired by Lid
 
 The repository contains the Node.js ESM server, Vue client, PostgreSQL schema, automated validation, and design documents. The platform is under active development toward its first release.
 
+Root-input database writers now join Wanted's existing transaction-wide
+publication lock before tuple mutation. See the
+[design](docs/WANTED_ROOT_AUTHORITY_COORDINATION_DESIGN.md),
+[official research](docs/WANTED_ROOT_AUTHORITY_COORDINATION_RESEARCH_2026_10.md)
+and [outcome](docs/WANTED_ROOT_AUTHORITY_COORDINATION_OUTCOME.md) for current
+revocation semantics, settings contention, enabled schema anchors and native
+proof. Every current root read and both full content hashes remain.
+
 Opt-in Wanted root-cost profiling separates root SQL from broader root-resolution
 work and records fixed process-memory windows. See the
 [design](docs/WANTED_ROOT_COST_PROFILE_DESIGN.md),

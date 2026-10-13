@@ -584,6 +584,15 @@ projection. docs/WANTED_GUARDED_WORKLOAD_OUTCOME.md separates pre-commit service
 work from commit/app latency and mixed heap/timing from isolated probe results.
 Keep the large experiment outside normal discovery; counts cannot authorize caches.
 
+Root-authority coordination uses library-root-authority-lock-store.js and the
+Wanted guard store, plus migration 20261013_155026_wanted_root_authority_coordination.sql.
+BEFORE STATEMENT root-input writers join the existing projection lock; active
+transaction admission precedes fresh projection reads. schema-trigger-anchor-store.js
+checks enabled trigger/function content through migration and snapshot comparison.
+docs/WANTED_ROOT_AUTHORITY_COORDINATION_OUTCOME.md owns native late-writer,
+writer-first, rollback and login-progress evidence. Root reads/hashes remain;
+privileged maintenance and earlier tuple-lock transactions need their own contract.
+
 Root-cost profiling uses wanted-guarded-cost-observer.js under testing/integration/
 and --root-costs on the existing explicit measurement script. Fixed query buckets
 must match real canonical root-resolution calls; private exact-result controls

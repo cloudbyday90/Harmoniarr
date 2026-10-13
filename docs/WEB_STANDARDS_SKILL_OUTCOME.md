@@ -1,5 +1,11 @@
 # Practical web standards skill outcome
 
+October 13 root-authority maintenance maps before-statement writer admission,
+enabled/function-content anchors and post-wait current reads to native evidence.
+The [outcome](WANTED_ROOT_AUTHORITY_COORDINATION_OUTCOME.md) retains commit,
+rollback and compatibility scope. Structure/install checks remain distinct from
+runtime proof, a new blind trial or standards/security certification.
+
 October 13 root-cost maintenance adds current-state snapshot limits and fixed
 query/memory-window evidence to the existing standards references. The
 [outcome](WANTED_ROOT_COST_PROFILE_OUTCOME.md) records actual native and matched

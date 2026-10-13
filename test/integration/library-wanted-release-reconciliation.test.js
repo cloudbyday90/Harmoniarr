@@ -212,7 +212,7 @@ suite('Current operator inputs own wanted rows and discovery links', () => {
   }));
 
   test('policy, selections, overrides, availability, metadata and recipient phantoms refuse a stale input frame', { timeout: config.scenarioTimeoutMs }, async (t) => {
-    for (const change of ['monitoring', 'profile', 'selection', 'override', 'availability', 'metadata', 'new_monitor', 'new_artist', 'artist_delete', 'user_delete']) await scenario(t, async (c) => withFixtureLifecycle({ signal: c.signal }, async (scope) => {
+    for (const change of ['monitoring', 'profile', 'selection', 'override', 'availability', 'metadata', 'new_monitor', 'new_artist', 'artist_delete']) await scenario(t, async (c) => withFixtureLifecycle({ signal: c.signal }, async (scope) => {
       const active = await c.open(); const entered = gate({ signal: scope.signal }); const resume = gate({ signal: scope.signal });
       scope.onRelease(() => resume.release());
       const owner = c.makeService({ afterRead: async ({ index }) => { if (index === 1) { entered.release(); await resume.promise; } } });
@@ -241,7 +241,6 @@ suite('Current operator inputs own wanted rows and discovery links', () => {
       if (change === 'new_monitor') await c.monitor(c.users[0], c.stale);
       if (change === 'new_artist') { const added = await seedMetadataReleaseFixture({ queryable: c.pool }); await c.monitor(c.users[0], added); }
       if (change === 'artist_delete') await c.pool.query('DELETE FROM metadata_artists WHERE id=$1', [c.metadata.metadataArtistId]);
-      if (change === 'user_delete') await c.pool.query('DELETE FROM app_users WHERE id=$1', [c.users[1]]);
       current = await state(c);
       } catch (error) { mutationError = error; }
       finally { resume.release(); }
@@ -251,6 +250,30 @@ suite('Current operator inputs own wanted rows and discovery links', () => {
       await active.runs.releaseLease({ runId: active.run.id, expectedLease: active.lease, status: 'failed' });
     }));
   });
+
+  test('a current recipient deletion waits for admitted publication, then cascades its committed rows and links', {
+    timeout: config.scenarioTimeoutMs,
+  }, async t => scenario(t, async c => withFixtureLifecycle({ signal: c.signal }, async scope => {
+    const active = await c.open(); const entered = gate({ signal: scope.signal }); const resume = gate({ signal: scope.signal });
+    scope.onRelease(() => resume.release()); let holderPid; let deletion;
+    const publisher = c.makeService({ afterReplace: async ({ queryable }) => {
+      holderPid = (await queryable.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+      entered.release(); await resume.promise;
+    } });
+    const pending = publisher.reconcileWantedReleases(active.input); scope.track(pending);
+    try {
+      await waitForFixtureReady({ ready: entered.promise, operation: pending, signal: scope.signal });
+      deletion = c.pool.query('DELETE FROM app_users WHERE id=$1', [c.users[1]]); scope.track(deletion);
+      await waitForBlock(c, holderPid, deletion, scope.signal); resume.release();
+      const result = await pending; assert.equal(result.wantedKeys.length, 2);
+      assert.equal((await deletion).rowCount, 1);
+      const current = await state(c); assert.equal(current.wanted.length, 1); assert.equal(current.links.length, 1);
+      assert.equal(current.wanted[0].app_user_id, c.users[0]);
+    } finally {
+      resume.release(); await Promise.allSettled([pending, deletion]);
+      await active.runs.releaseLease({ runId: active.run.id, expectedLease: active.lease, status: 'completed' });
+    }
+  })));
 
   test('discovery and metadata workers forward original authority while direct refresh and explicit selection remain valid', { timeout: config.scenarioTimeoutMs }, async (t) => scenario(t, async (c) => {
     for (const operationType of ['library_discovery_dispatch', 'metadata_artist_refresh']) {

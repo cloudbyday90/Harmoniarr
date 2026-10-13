@@ -6,6 +6,12 @@ This repository includes a shared `.agents/` directory for GitHub Copilot agent 
 
 The goal is to keep reusable AI workflow guidance versioned alongside the project so UI review, frontend implementation, browser testing, and related tasks follow the same repo conventions.
 
+The [root-authority outcome](WANTED_ROOT_AUTHORITY_COORDINATION_OUTCOME.md)
+maps database writer participation, active transaction admission and current
+post-wait reads to standards/testing guidance. Keep broad settings contention
+explicit, validate enabled function-content anchors, and preserve every root
+read and both hashes until a separate batching decision is proved.
+
 The [root-cost outcome](WANTED_ROOT_COST_PROFILE_OUTCOME.md) maps current-state
 snapshot semantics, fixed private observations and diagnostics-off/on controls
 into the standards/testing skills. Signed memory windows cannot establish

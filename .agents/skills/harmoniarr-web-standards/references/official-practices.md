@@ -774,6 +774,14 @@ to private monotonic durations. OWASP minimization excludes projection digests a
 domain identities from summaries. Preserve real fresh guards and individual
 receipt authority before evaluating grouping, even when duplicate work is large.
 
+Root-authority guidance uses docs/WANTED_ROOT_AUTHORITY_COORDINATION_RESEARCH_2026_10.md.
+PostgreSQL statement admission joins ordinary writers to transaction authority
+before tuple mutation, including missing settings/upserts. Reuse existing lock
+order and distinguish queued revocation from cancelling admitted work. Broad
+settings contention is a declared tradeoff; enabled trigger/function anchors
+and real commit/rollback tests establish coverage. SQL coordination does not
+freeze host bytes or grant a reduction in current root reads.
+
 Root-cost guidance uses docs/WANTED_ROOT_COST_PROFILE_RESEARCH_2026_10.md.
 PostgreSQL Read Committed statement snapshots can observe later committed
 revocation; Repeatable Read is not a shortcut to current authorization. Keep

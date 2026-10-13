@@ -79,7 +79,10 @@ suite('Wanted projection root-context scaling and current authority', () => {
             const wanted = createLibraryWantedReleaseService({ assertMaintenanceWriteAllowed: async () => {}, projectionReader: {
               readWantedReleaseProjection: async input => {
                 const projection = await reader.readWantedReleaseProjection(input);
-                if (++reads === 1) await c.pool.query("UPDATE app_settings SET setting_value='null'::jsonb WHERE namespace='paths' AND setting_key='music'");
+                // Deliberate drift on the owning transaction remains detectable.
+                // An external writer now waits for publication instead; waiting
+                // for it inside this callback would form a circular fixture gate.
+                if (++reads === 1) await input.queryable.query("UPDATE app_settings SET setting_value='null'::jsonb WHERE namespace='paths' AND setting_key='music'");
                 return projection;
               },
             } });

@@ -8,7 +8,7 @@
 import { normalizeJobLease } from '../job-lease-store.js';
 import { lockJobLeaseKey } from '../job-lease-lock-store.js';
 import { writableExecutionRunSql } from '../import-candidates/import-execution-origin-sql.js';
-import { lockLibraryRequestProjection } from './library-request-projection-lock-store.js';
+import { lockLibraryRootAuthority } from './library-root-authority-lock-store.js';
 
 export function createLibraryWantedReleaseGuardStore() {
   async function readRun({ prepared, queryable, lock = false }) {
@@ -30,7 +30,7 @@ export function createLibraryWantedReleaseGuardStore() {
       await readRun({ prepared, queryable, lock: true });
       await lockJobLeaseKey({ leaseKey: prepared.expectedLease.leaseKey, queryable });
     }
-    await lockLibraryRequestProjection({ queryable });
+    await lockLibraryRootAuthority({ queryable });
     return readContext({ prepared, queryable });
   }
 

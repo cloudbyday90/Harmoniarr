@@ -5,6 +5,15 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+Root-authority coordination must prove a real publisher held after its final
+source check, statement-writer blocking and commit/rollback release. Use an
+independent owned observer when both pool clients are held. Test writer-first
+committed revocation on a fresh post-admission statement, missing/null settings,
+unrelated login progress, pending migration and snapshot-installed enabled
+anchors. Compare function bodies without collapsing literal whitespace; named
+disabled/changed triggers are not guards. Preserve both hashes and every root
+read until separate batching proof. See docs/WANTED_ROOT_AUTHORITY_COORDINATION_OUTCOME.md.
+
 For root-cost profiling, use the explicit --root-costs benchmark with matched
 closed-group diagnostics-off/on samples. Actual native root-store query counts
 must match root-resolution calls; statement drift refuses attribution. Keep

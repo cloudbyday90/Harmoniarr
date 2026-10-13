@@ -16,9 +16,15 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { inspectSchemaTriggerAnchors } from './schema-trigger-anchor-store.js';
+
 const publicSchema = 'public';
 
 export const criticalSchemaAnchors = Object.freeze({
+  triggers: Object.freeze([
+    { table: 'app_users', trigger: 'app_users_root_authority_admission' },
+    { table: 'app_settings', trigger: 'app_settings_root_authority_admission' },
+  ]),
   columns: Object.freeze([
     { table: 'operator_track_receipts', column: 'receipt_revision_id' },
     { table: 'operator_track_receipts', column: 'library_path' },
@@ -300,6 +306,7 @@ export async function inspectSchemaAnchors({
   }
 
   return {
+    triggers: await inspectSchemaTriggerAnchors({ anchors: anchors.triggers ?? [], client }),
     columns: buildAnchorRecordMap(columns, ({ anchor }) => anchorKey(['column', anchor.table, anchor.column])),
     constraints: buildAnchorRecordMap(constraints, ({ anchor }) => anchorKey(['constraint', anchor.table, anchor.constraint])),
     indexes: buildAnchorRecordMap(indexes, ({ anchor }) => anchorKey(['index', anchor.index])),
@@ -310,7 +317,7 @@ export async function inspectSchemaAnchors({
 function collectMissingAnchors(snapshot) {
   const missing = [];
 
-  for (const groupName of ['tables', 'columns', 'constraints', 'indexes']) {
+  for (const groupName of ['tables', 'columns', 'constraints', 'indexes', 'triggers']) {
     for (const [key, record] of Object.entries(snapshot[groupName] ?? {})) {
       if (!record.actual) {
         missing.push(`${groupName}:${key}`);
@@ -324,7 +331,7 @@ function collectMissingAnchors(snapshot) {
 function collectAnchorMismatches(left, right) {
   const mismatches = [];
 
-  for (const groupName of ['tables', 'columns', 'constraints', 'indexes']) {
+  for (const groupName of ['tables', 'columns', 'constraints', 'indexes', 'triggers']) {
     const leftGroup = left[groupName] ?? {};
     const rightGroup = right[groupName] ?? {};
     const keys = new Set([...Object.keys(leftGroup), ...Object.keys(rightGroup)]);

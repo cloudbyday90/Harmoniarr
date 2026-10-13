@@ -1,5 +1,11 @@
 # Practical web standards skill design
 
+October 13 root-authority maintenance maps statement admission, transaction
+ownership and current object authority to existing projection coordination.
+The [design](WANTED_ROOT_AUTHORITY_COORDINATION_DESIGN.md) distinguishes queued
+revocation, broad settings contention and host-file closure. Trigger anchors
+and native blocking proof extend the existing skill without new invocation policy.
+
 October 13 root-cost maintenance applies PostgreSQL snapshot semantics, Node
 process memory, W3C draft timing and OWASP diagnostic privacy to an opt-in fixed
 observer. The [design](WANTED_ROOT_COST_PROFILE_DESIGN.md) requires exact-work

@@ -6,6 +6,24 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Wanted root-authority writer coordination (2026-10-13)
+
+The [design](WANTED_ROOT_AUTHORITY_COORDINATION_DESIGN.md),
+[official research](WANTED_ROOT_AUTHORITY_COORDINATION_RESEARCH_2026_10.md) and
+[outcome](WANTED_ROOT_AUTHORITY_COORDINATION_OUTCOME.md) own before-statement
+root-input DML participation on the existing projection lock. Current roots
+and both hashes remain; ordinary later writers wait until publication ends.
+Active transaction admission and enabled/function-content anchors cover the
+108-migration snapshot. Settings-wide contention is a declared tradeoff.
+
+- Validation: corrected 85/85 native cases across sixteen files, final 2/2
+  artifact controls, 108 migrations/135 anchors and the frozen 10,081-case fast
+  gate pass. The outcome retains rejected fixtures and comment-only artifact
+  revision evidence separately; overlapping controls are not added as unique cases.
+- Next: design bounded same-owner/requirement opening/closing root reads within
+  the proved publication boundary, with conservative standalone/custom fallback.
+  Prove exact outcomes, late authority, hash/byte equality and reduced query work.
+
 ## Completed slice: Wanted root-query and heap cost profile (2026-10-13)
 
 The [design](WANTED_ROOT_COST_PROFILE_DESIGN.md),
