@@ -574,3 +574,12 @@ counters precede first-failure server capture, which drains before descriptor
 restoration/pool cleanup. docs/POSTGRES_CHECKOUT_CAPTURE_OUTCOME.md separates cold
 connection and queued-claim controls from historical intermittent causality.
 Direct Clients/template/ad hoc pools remain outside automatic observation.
+
+Guarded profiling now uses wanted-guarded-profile.js, wanted-guarded-benchmark.js,
+wanted-profile-client.js and wanted-workload-memory.js under testing/integration/,
+with scripts/measure-wanted-guarded-workload.js as the explicit entrypoint.
+Same-client rollback samples execute actual maintenance/write/link/event guards,
+compare full result/projection digests privately and count repeated bindings per
+projection. docs/WANTED_GUARDED_WORKLOAD_OUTCOME.md separates pre-commit service
+work from commit/app latency and mixed heap/timing from isolated probe results.
+Keep the large experiment outside normal discovery; counts cannot authorize caches.

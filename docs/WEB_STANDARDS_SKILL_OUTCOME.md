@@ -1,5 +1,11 @@
 # Practical web standards skill outcome
 
+October 13 guarded-workload maintenance maps matched rollback samples and private
+projection comparisons to fixed work/memory observations. The
+[guarded outcome](WANTED_GUARDED_WORKLOAD_OUTCOME.md) retains mixed timing/heap
+results and denies grouping/cache authority from duplicate counts alone.
+Structure/install checks remain separate from runtime proof or certification.
+
 October 13 checkout maintenance maps concrete callback/promise acquisition and
 phase context to pre-cleanup, data-minimized evidence. The
 [checkout outcome](POSTGRES_CHECKOUT_CAPTURE_OUTCOME.md) separates controlled

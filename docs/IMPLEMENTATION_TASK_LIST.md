@@ -6,6 +6,26 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Larger guarded Wanted workloads (2026-10-13)
+
+The [guarded design](WANTED_GUARDED_WORKLOAD_DESIGN.md),
+[official research](WANTED_GUARDED_WORKLOAD_RESEARCH_2026_10.md) and
+[outcome](WANTED_GUARDED_WORKLOAD_OUTCOME.md) own an opt-in, same-client rollback
+benchmark across 16/48/96 historical receipts. Twenty-four samples retain exact
+complete results, projection digests, queries and byte work. At 96 receipts,
+seven projections perform 672 hashes, including 658 repeated bindings within
+projections. The largest noise median is locally lower with reusable reads;
+tonal timing/heap observations prevent a universal speed/memory claim.
+
+- Validation: nine focused controls, 24 frozen explicit samples, the frozen
+  10,061-case fast gate and 18/18 serial native cases across five files pass.
+  The outcome separates initial controls, failed launcher invocation, repeated
+  evidence and full-gate/performance limits.
+- Next: design bounded per-projection grouping with individual receipt evidence,
+  current owner/root/path binding, late-change/refusal and rollback controls
+  before adoption. Keep every fresh publication reread; no positive cross-guard,
+  owner or invocation cache.
+
 ## Completed slice: Owned PostgreSQL checkout capture (2026-10-13)
 
 The [checkout design](POSTGRES_CHECKOUT_CAPTURE_DESIGN.md),

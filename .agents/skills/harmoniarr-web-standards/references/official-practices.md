@@ -765,3 +765,11 @@ authenticated query and counters remain separate observations. Apply OWASP field
 minimization/failure isolation and W3C draft monotonic-duration guidance; record
 before probes, own restoration and preserve original failure. Do not infer
 historical causality or log SQL/options/messages for apparent visibility.
+
+Guarded workload guidance uses docs/WANTED_GUARDED_WORKLOAD_RESEARCH_2026_10.md.
+Maintainer same-client transactions and PostgreSQL rollback contracts support
+matched pre-commit measurements, not commit durability claims. Node sampled-memory
+fields overlap and sampling costs work; W3C timing remains draft guidance applied
+to private monotonic durations. OWASP minimization excludes projection digests and
+domain identities from summaries. Preserve real fresh guards and individual
+receipt authority before evaluating grouping, even when duplicate work is large.

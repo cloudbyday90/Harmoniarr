@@ -14,7 +14,7 @@ import { createWantedVerificationObserver } from '../../src/server/library/libra
 import { fingerprintOperatorTrackFile } from '../../src/server/metadata/operator-track-file-evidence-service.js';
 
 export async function seedWantedRootProfile(workspaceDir, { receiptCandidates, mediaProfile, durationSeconds }) {
-  if (![1, 8, 24].includes(receiptCandidates)) throw new TypeError('Unknown controlled receipt cardinality');
+  if (![1, 8, 24, 48].includes(receiptCandidates)) throw new TypeError('Unknown controlled receipt cardinality');
   const c = await seedTrackDeliveryRecoveryFixture(workspaceDir, { mediaProfile, durationSeconds });
   const preview = await c.preview.previewImportCandidateApply({ importCandidateId: c.candidateId });
   const applied = await runTrackDeliveryApply(c, createImportCandidateApplyOperationService({ mediaInspectionService: c.inspection }));

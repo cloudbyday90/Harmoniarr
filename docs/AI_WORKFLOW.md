@@ -6,6 +6,12 @@ This repository includes a shared `.agents/` directory for GitHub Copilot agent 
 
 The goal is to keep reusable AI workflow guidance versioned alongside the project so UI review, frontend implementation, browser testing, and related tasks follow the same repo conventions.
 
+The [guarded workload outcome](WANTED_GUARDED_WORKLOAD_OUTCOME.md) adds explicit
+same-client rollback profiling to maintained standards/testing references. Full
+projection comparisons remain private; fixed work/memory fields distinguish
+duplicate receipt observations from fresh guard reads. Mixed local timings and
+heap growth cannot grant cache/grouping authority or a universal speed claim.
+
 The [checkout outcome](POSTGRES_CHECKOUT_CAPTURE_OUTCOME.md) maps driver contracts,
 Node context, PostgreSQL observations, OWASP minimization and W3C draft timing to
 owned pool boundaries. Standards/testing references preserve callback acquisition,

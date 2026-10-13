@@ -5,6 +5,15 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+Guarded workload profiling belongs in an explicit benchmark, not an automatically
+repeated large scaling suite. Compare full results/projection digests privately
+on one connection with a fresh rollback-owned transaction per sample. Include
+real maintenance/write/link/source-event guards; distinguish their seven rereads,
+distinct bindings per projection and duplicate historical receipts. Separate
+setup/GC/rollback from elapsed work, record sampled memory fields independently,
+and retain mixed timing/heap results. Never infer grouping authority from duplicate
+counts. See docs/WANTED_GUARDED_WORKLOAD_OUTCOME.md for bounded plans and proof.
+
 Checkout diagnostics must observe promise and callback acquisition on owned pool
 instances, including pool.query's callback path, without eager app-pool creation.
 Keep admission-phase context isolated through nested/concurrent work even when

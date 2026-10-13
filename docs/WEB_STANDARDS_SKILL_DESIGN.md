@@ -1,5 +1,11 @@
 # Practical web standards skill design
 
+October 13 guarded-workload maintenance maps same-client/rollback contracts,
+Node memory observations, W3C draft timing and OWASP minimization to an explicit
+pre-commit benchmark. The [guarded design](WANTED_GUARDED_WORKLOAD_DESIGN.md)
+keeps production authority and normal validation bounded while separating
+duplicate bindings from distinct files/guards. Invocation policy is unchanged.
+
 October 13 checkout maintenance maps maintainer promise/callback contracts, stable
 Node context, PostgreSQL observations and OWASP bounded logging to concrete
 owned-pool admission/capture/restoration. The
