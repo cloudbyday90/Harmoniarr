@@ -7,14 +7,14 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { terminateOwnedProcessTree } from './owned-process-tree.js';
-import { resolveOperatorTrackReadBuffer } from '../../src/server/metadata/operator-track-fingerprint-policy.js';
+import { resolveOperatorTrackReadBuffer, resolveOperatorTrackReadMethod } from '../../src/server/metadata/operator-track-fingerprint-policy.js';
 
-export async function runFingerprintBufferProbe({ filePath, libraryRoot, readBufferBytes, signal,
+export async function runFingerprintBufferProbe({ filePath, libraryRoot, readBufferBytes, readMethod, signal,
   spawnFn = spawn, terminateFn = terminateOwnedProcessTree, onTermination = () => {} } = {}) {
-  signal?.throwIfAborted(); resolveOperatorTrackReadBuffer(readBufferBytes);
+  signal?.throwIfAborted(); resolveOperatorTrackReadBuffer(readBufferBytes); const method = resolveOperatorTrackReadMethod(readMethod);
   if (typeof filePath !== 'string' || typeof libraryRoot !== 'string' || !filePath || !libraryRoot) throw new TypeError('Invalid fingerprint probe paths');
   const env = Object.fromEntries(['PATH', 'SystemRoot', 'TEMP', 'TMP', 'LANG'].filter(key => process.env[key] !== undefined).map(key => [key, process.env[key]]));
-  const child = spawnFn(process.execPath, ['--expose-gc', fileURLToPath(new URL('./fingerprint-buffer-probe.js', import.meta.url)), filePath, libraryRoot, String(readBufferBytes)],
+  const child = spawnFn(process.execPath, ['--expose-gc', fileURLToPath(new URL('./fingerprint-buffer-probe.js', import.meta.url)), filePath, libraryRoot, String(readBufferBytes), method],
     { shell: false, windowsHide: true, detached: process.platform !== 'win32', env, stdio: ['ignore', 'pipe', 'pipe'] });
   let failed = false; let failure; let output = ''; let outputBytes = 0; let stop; let didClose = false; let markIncomplete;
   const incomplete = new Promise(resolve => { markIncomplete = resolve; });

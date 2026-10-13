@@ -750,3 +750,10 @@ heap, external and ArrayBuffers separately; ArrayBuffers are already included in
 external memory. Pair timing with actual hashes/bytes and owned completion/close.
 Preserve primary Error/null through cleanup, and keep W3C draft timing and OWASP
 data-minimized diagnostics separate from domain authority or required audit.
+
+Reusable fingerprint guidance uses docs/TRACK_FINGERPRINT_REUSABLE_RESEARCH_2026_10.md.
+Stable Node FileHandle reads return actual counts into caller-owned buffers; hash
+only filled bytes, handle short reads and bound work by captured size. Close the
+owned handle explicitly and preserve primary Error/null. Compare descriptor and
+pathname evidence before/after current bytes without claiming atomic directory
+confinement. Memory/timing observations remain qualified and data-minimized.

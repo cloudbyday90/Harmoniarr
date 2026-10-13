@@ -114,3 +114,8 @@ The map now locates explicit fingerprint completion/close and retained fresh
 root/stat checks. The [stream outcome](TRACK_FINGERPRINT_STREAM_OUTCOME.md) owns
 memory tradeoffs and scope-specific current-byte publication proof. Larger
 internal buffers grant no recipient consent or historical availability.
+
+The map now locates bounded reusable reads and descriptor/path binding before
+current byte verification. The [reusable outcome](TRACK_FINGERPRINT_REUSABLE_OUTCOME.md)
+owns the selected default and scoped proof; current consent and every protected
+publication boundary still control authority. This is reference maintenance.

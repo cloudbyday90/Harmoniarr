@@ -454,3 +454,9 @@ boundaries through the [stream design](TRACK_FINGERPRINT_STREAM_DESIGN.md).
 Keep size thresholds, sampled peaks, domain evidence and performance decisions
 distinct. This is narrow maintenance of the existing diagnostic route; metadata
 and invocation policy remain unchanged.
+
+Reusable-read maintenance connects stable FileHandle contracts and descriptor/
+pathname evidence to bounded actual bytes and original-error close ownership.
+The [reusable design](TRACK_FINGERPRINT_REUSABLE_DESIGN.md) owns alternatives and
+scope limits. This extends the existing diagnostics/filesystem route without
+changing invocation metadata or adding a generic audit requirement.

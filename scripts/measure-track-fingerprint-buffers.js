@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { createLibraryAddMediaFixture } from '../testing/integration/library-add-media-fixtures.js';
 import { runFingerprintBufferProbe } from '../testing/integration/fingerprint-buffer-process.js';
-import { OPERATOR_TRACK_READ_BUFFER_OPTIONS } from '../src/server/metadata/operator-track-fingerprint-policy.js';
+import { OPERATOR_TRACK_READ_BUFFER_OPTIONS, OPERATOR_TRACK_READ_METHODS } from '../src/server/metadata/operator-track-fingerprint-policy.js';
 import { fingerprintOperatorTrackFile } from '../src/server/metadata/operator-track-file-evidence-service.js';
 
 const args = process.argv.slice(2);
@@ -32,12 +32,13 @@ try {
       '-t', noise ? '30' : '2', '-ac', '2', '-c:a', 'flac', ...(noise ? ['-sample_fmt', 's32', '-compression_level', '0'] : []),
       '-metadata', 'title=Controlled fingerprint profile', path], { readonly: false });
     controller.signal.throwIfAborted();
-    const expected = await fingerprintOperatorTrackFile(path, { libraryRoot: workspace, readBufferBytes: 64 * 1024 });
+    const expected = await fingerprintOperatorTrackFile(path, { libraryRoot: workspace, readBufferBytes: 64 * 1024, readMethod: 'stream' });
     for (let round = 0; round < 6; round++) {
-      const sizes = [...OPERATOR_TRACK_READ_BUFFER_OPTIONS]; const offset = round % sizes.length;
-      for (const readBufferBytes of [...sizes.slice(offset), ...sizes.slice(0, offset)]) {
+      const options = OPERATOR_TRACK_READ_METHODS.flatMap(readMethod => OPERATOR_TRACK_READ_BUFFER_OPTIONS.map(readBufferBytes => ({ readMethod, readBufferBytes })));
+      const offset = round % options.length;
+      for (const { readBufferBytes, readMethod } of [...options.slice(offset), ...options.slice(0, offset)]) {
         controller.signal.throwIfAborted(); safeCleanup = false;
-        const result = await runFingerprintBufferProbe({ filePath: path, libraryRoot: workspace, readBufferBytes, signal: controller.signal,
+        const result = await runFingerprintBufferProbe({ filePath: path, libraryRoot: workspace, readBufferBytes, readMethod, signal: controller.signal,
           onTermination: ({ quiescent }) => { safeCleanup = quiescent; } });
         safeCleanup = true;
         assert.deepEqual(result.evidence, expected); assert.equal(result.hashedBytes, expected.sizeBytes * result.passes);
@@ -48,7 +49,7 @@ try {
   }
   controller.signal.throwIfAborted();
   await writeFile(args[1], JSON.stringify({ version: 1, node: process.version, samples: rows }, null, 2));
-  const recorded = JSON.parse(await readFile(args[1], 'utf8')); assert.equal(recorded.samples.length, 36);
+  const recorded = JSON.parse(await readFile(args[1], 'utf8')); assert.equal(recorded.samples.length, 72);
   console.log(JSON.stringify({ profiles: 2, samples: rows.length, outputWritten: true }));
 } finally {
   process.removeListener('SIGINT', cancel); process.removeListener('SIGTERM', cancel);

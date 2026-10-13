@@ -6,10 +6,11 @@
  */
 import { performance } from 'node:perf_hooks';
 import { fingerprintOperatorTrackFile } from '../../src/server/metadata/operator-track-file-evidence-service.js';
-import { resolveOperatorTrackReadBuffer } from '../../src/server/metadata/operator-track-fingerprint-policy.js';
+import { resolveOperatorTrackReadBuffer, resolveOperatorTrackReadMethod } from '../../src/server/metadata/operator-track-fingerprint-policy.js';
 
-const [filePath, libraryRoot, bufferArgument] = process.argv.slice(2);
+const [filePath, libraryRoot, bufferArgument, methodArgument] = process.argv.slice(2);
 const readBufferBytes = resolveOperatorTrackReadBuffer(Number(bufferArgument));
+const readMethod = resolveOperatorTrackReadMethod(methodArgument);
 if (!filePath || !libraryRoot || typeof global.gc !== 'function') throw new Error('Invalid fingerprint probe invocation');
 global.gc();
 const fields = ['rss', 'heapUsed', 'external', 'arrayBuffers'];
@@ -19,7 +20,7 @@ function sample() { const usage = process.memoryUsage(); memorySamples++; for (c
 const timer = setInterval(sample, 5); timer.unref(); const started = performance.now();
 try {
   for (let pass = 0; pass < 4; pass++) {
-    const current = await fingerprintOperatorTrackFile(filePath, { libraryRoot, readBufferBytes, onBytesRead: amount => {
+    const current = await fingerprintOperatorTrackFile(filePath, { libraryRoot, readBufferBytes, readMethod, onBytesRead: amount => {
       chunks++; hashedBytes += amount; sinceSample += amount;
       if (chunks === 1 || sinceSample >= 1024 * 1024) { sample(); sinceSample = 0; }
     } });
@@ -28,6 +29,6 @@ try {
   }
 } finally { clearInterval(timer); sample(); }
 const elapsedMs = performance.now() - started;
-process.stdout.write(JSON.stringify({ evidence, readBufferBytes, passes: 4, chunks, hashedBytes, elapsedMs, memorySamples,
+process.stdout.write(JSON.stringify({ evidence, readBufferBytes, readMethod, passes: 4, chunks, hashedBytes, elapsedMs, memorySamples,
   baseline: Object.fromEntries(fields.map(field => [field, baseline[field]])), peak,
   peakDelta: Object.fromEntries(fields.map(field => [field, Math.max(0, peak[field] - baseline[field])])) }));

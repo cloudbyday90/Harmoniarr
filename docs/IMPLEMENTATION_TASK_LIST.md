@@ -6,6 +6,27 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Bounded reusable fingerprint reads (2026-10-13)
+
+The [reusable design](TRACK_FINGERPRINT_REUSABLE_DESIGN.md),
+[official research](TRACK_FINGERPRINT_REUSABLE_RESEARCH_2026_10.md) and
+[outcome](TRACK_FINGERPRINT_REUSABLE_OUTCOME.md) own sequential reads on one
+read-only handle and one bounded zero-filled buffer. Default composition selects
+reusable/256 KiB; explicit stream retains 64 KiB. Descriptor/path binding, short
+read/EOF/growth refusal, close ownership and every root/publication recheck remain.
+Seventy-two isolated samples retain identical evidence/bytes and support the
+observed memory/performance tradeoff with explicit platform/cache/sampling limits.
+
+- Validation: 26 focused cases and the 10,041-case frozen fast gate pass. The
+  affected serial native cohort passes 110/112; two PostgreSQL connection timeouts
+  and the separate 17/17 diagnostic run remain explicit in the outcome. The isolated
+  comparison is not whole-app/CI proof.
+- Next: capture the actual failed PostgreSQL checkout/connection and correlated
+  fixture phase/server evidence before cleanup, preserving resource bounds and
+  primary failure. A later healthy server or isolated pass cannot diagnose it.
+  Then profile larger guarded Wanted workloads before considering bounded
+  grouping; retain fresh guard reads and refuse positive historical hash caches.
+
 ## Completed slice: Current fingerprint stream ownership (2026-10-13)
 
 The [stream design](TRACK_FINGERPRINT_STREAM_DESIGN.md),

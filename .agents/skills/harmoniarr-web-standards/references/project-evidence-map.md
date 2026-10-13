@@ -546,11 +546,22 @@ track acquisition. Register the whole app scenario through completion, close
 profiling admission on cancellation and drain before database/server cleanup.
 The original largest-profile timeout remains separate from reviewed/frozen proof.
 
-Current fingerprinting now uses operator-track-fingerprint-policy.js and
-operator-track-fingerprint-stream-service.js. Keep 64 KiB by default; the isolated
+The preceding stream experiment uses operator-track-fingerprint-policy.js and
+operator-track-fingerprint-stream-service.js. Its default is 64 KiB; the isolated
 larger-buffer experiment trades lower median time for higher sampled memory.
 Explicit stream close precedes after-stat/root checks. Actual file/held-close and
 real delivery/Wanted controls own proof; configured buffer size is not a memory
 cap. docs/TRACK_FINGERPRINT_STREAM_OUTCOME.md records sampling/GC/cache limits and
 the reusable-buffer follow-up. Probe failure/cancellation must drain the captured
 child; incomplete close retains the owned workspace rather than deleting files.
+
+Reusable current reads now use operator-track-fingerprint-read-service.js and
+the injectable file-evidence facade, defaulting to 256 KiB. Match descriptor
+size/mtime/inode/device before reading and after bounded short-read handling;
+close before pathname/root rechecks. Internal stream selection retains 64 KiB.
+docs/TRACK_FINGERPRINT_REUSABLE_OUTCOME.md owns poisoned-tail, identity substitution,
+EOF/growth/close controls and qualified 72-sample comparison. These checks grant
+no historical availability or kernel-atomic directory guarantee. Preserve all
+guard rereads. The 110/112 native cohort and separate 17/17 diagnostic subset
+remain distinct; capture actual failed PostgreSQL connections/checkouts before
+broader guarded-workload scaling. An isolated pass cannot diagnose a prior timeout.

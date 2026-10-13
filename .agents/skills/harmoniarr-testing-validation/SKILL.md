@@ -5,6 +5,14 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+Reusable-file validation must prove one bounded buffer, short reads/poisoned
+tails, captured descriptor/path identity, early EOF/growth and awaited close with
+primary Error/null preserved. A same-size/same-time replacement must refuse before
+byte observation when descriptor identity differs. Keep actual root/path rechecks
+and publication refusal/replay; internal stream/64 KiB remains a comparator.
+See docs/TRACK_FINGERPRINT_REUSABLE_OUTCOME.md for qualified memory/timing and
+default composition proof. Isolated hash benefit is not whole-Wanted/CI proof.
+
 Fingerprint buffer validation needs actual file/hash/byte equality for each
 bounded option, changed-file/private-root refusal and delayed success/Error/null
 close controls. Treat high-water marks as thresholds and sampled process peaks

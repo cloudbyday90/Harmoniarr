@@ -8,27 +8,37 @@ import { lstat, realpath, stat } from 'node:fs/promises';
 import { isAbsolute, relative, sep } from 'node:path';
 import { refuseOperatorTrackFiles } from './operator-track-file-policy.js';
 import { createOperatorTrackFingerprintStreamService } from './operator-track-fingerprint-stream-service.js';
-import { resolveOperatorTrackReadBuffer } from './operator-track-fingerprint-policy.js';
+import { createOperatorTrackFingerprintReadService } from './operator-track-fingerprint-read-service.js';
+import { resolveOperatorTrackReadBuffer, resolveOperatorTrackReadMethod, captureOperatorTrackFileStat, assertOperatorTrackFileStatCurrent } from './operator-track-fingerprint-policy.js';
 
-const streamService = createOperatorTrackFingerprintStreamService();
+export function createOperatorTrackFileEvidenceService({ streamService = createOperatorTrackFingerprintStreamService(),
+  readService = createOperatorTrackFingerprintReadService(), statFn = stat } = {}) {
 
-export async function fingerprintOperatorTrackFile(filePath, { libraryRoot = null, onBytesRead = null, readBufferBytes } = {}) {
-  const acceptedBuffer = resolveOperatorTrackReadBuffer(readBufferBytes);
-  let canonical;
-  const assertPrivate = async () => {
-    if (!libraryRoot) return;
-    const root = await realpath(libraryRoot); const file = await realpath(filePath);
-    const delta = relative(root, file);
-    if (!delta || delta === '..' || delta.startsWith(`..${sep}`) || isAbsolute(delta)
-      || (await lstat(filePath)).isSymbolicLink() || (canonical && canonical !== file)) throw refuseOperatorTrackFiles();
-    canonical = file;
-  };
-  await assertPrivate();
-  const before = await stat(filePath);
-  if (!before.isFile()) throw new Error('Track evidence requires a regular file');
-  const sha256 = await streamService.hashFile({ filePath, readBufferBytes: acceptedBuffer, onBytesRead });
-  const after = await stat(filePath);
-  await assertPrivate();
-  if (before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ino !== after.ino) throw new Error('Track changed while collecting evidence');
-  return { sizeBytes: after.size, sha256 };
+  async function fingerprintOperatorTrackFile(filePath, { libraryRoot = null, onBytesRead = null, readBufferBytes, readMethod } = {}) {
+    const method = resolveOperatorTrackReadMethod(readMethod);
+    const acceptedBuffer = resolveOperatorTrackReadBuffer(readBufferBytes, method);
+    let canonical;
+    const assertPrivate = async () => {
+      if (!libraryRoot) return;
+      const root = await realpath(libraryRoot); const file = await realpath(filePath);
+      const delta = relative(root, file);
+      if (!delta || delta === '..' || delta.startsWith(`..${sep}`) || isAbsolute(delta)
+        || (await lstat(filePath)).isSymbolicLink() || (canonical && canonical !== file)) throw refuseOperatorTrackFiles();
+      canonical = file;
+    };
+    await assertPrivate();
+    const before = await statFn(filePath);
+    if (!before.isFile()) throw new Error('Track evidence requires a regular file');
+    const expected = captureOperatorTrackFileStat(before);
+    const service = method === 'reusable' ? readService : streamService;
+    const sha256 = await service.hashFile({ filePath, readBufferBytes: acceptedBuffer, expectedStat: expected, onBytesRead });
+    const after = await statFn(filePath);
+    await assertPrivate();
+    if (!after.isFile()) throw new Error('Track changed while collecting evidence');
+    assertOperatorTrackFileStatCurrent(expected, captureOperatorTrackFileStat(after));
+    return { sizeBytes: after.size, sha256 };
+  }
+  return { fingerprintOperatorTrackFile };
 }
+
+export const fingerprintOperatorTrackFile = createOperatorTrackFileEvidenceService().fingerprintOperatorTrackFile;

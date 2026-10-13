@@ -17,7 +17,7 @@ import { createWantedVerificationObserver } from '../../src/server/library/libra
 import { withFixtureLifecycle } from '../../testing/integration/fixture-lifecycle.js';
 
 const config = resolveIntegrationTestRuntimeConfig(); let runtime; let pending;
-suite('Current large-media fingerprint streams through real delivery and Wanted guards', () => {
+suite('Current large-media fingerprinting through real delivery and Wanted guards', () => {
   before(async () => { runtime = await createPostgresIntegrationRuntime({ config, env: {} }); }, { timeout: config.suiteSetupTimeoutMs });
   after(async () => { await Promise.allSettled(pending ? [pending] : []); await runtime?.cleanup(); }, { timeout: config.suiteTeardownTimeoutMs });
   test('actual large private deliveries retain fresh rechecks and late-byte refusal without required-event publication', { timeout: config.scenarioTimeoutMs }, async context => {

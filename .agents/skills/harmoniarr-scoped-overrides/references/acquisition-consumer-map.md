@@ -21,6 +21,12 @@ default follows measured memory tradeoffs; larger internal experiment buffers do
 not weaken owner/scope checks or authorize historical hash reuse. See
 docs/TRACK_FINGERPRINT_STREAM_OUTCOME.md for actual file and publication controls.
 
+The reusable-read outcome supersedes the default-buffer decision above:
+docs/TRACK_FINGERPRINT_REUSABLE_OUTCOME.md selects a bounded 256 KiB read buffer
+on one owned handle, with descriptor/path binding and after-close root/stat
+checks. Preserve current saved scope, bytes and every publication guard; lower
+sampled allocation grants no consent, hash cache or provider replay.
+
 Negative scan observations now bind the original scan acquisition, private root
 and pre-walk receipt revision (docs/SCAN_RECEIPT_INVALIDATION_OUTCOME.md). They
 retain historical receipts and do not lower verification or grant provider replay.

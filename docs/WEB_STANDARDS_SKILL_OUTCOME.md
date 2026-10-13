@@ -709,6 +709,12 @@ isolated memory/timing samples and actual publication proof; it retains 64 KiB
 instead of promoting speed alone. Structure/install proof is distinct from a
 new blind skill trial or full conformance claim.
 
+Reusable-read references supersede the earlier stream default with 256 KiB on
+one owned handle, preserving current root/path/byte and publication checks.
+The [reusable outcome](TRACK_FINGERPRINT_REUSABLE_OUTCOME.md) owns short-read,
+substitution, cleanup and qualified comparison proof. Structure/install checks
+remain separate from a new blind skill trial or full conformance certification.
+
 Operator reconciliation references now locate completion, the narrow parallel
 task helper and twelve captured application owners. They explicitly distinguish
 scoped snapshot/revision validation from publication authority. The

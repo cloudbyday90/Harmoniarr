@@ -72,6 +72,13 @@ unresolved causes and failed cohorts rather than prescribing generic retries.
 
 ## Repository Rules
 
+Reusable-read references now bind captured descriptor/path evidence and actual
+bytes on one read-only handle, with bounded short-read work and awaited close.
+The [reusable outcome](TRACK_FINGERPRINT_REUSABLE_OUTCOME.md) owns the selected
+256 KiB default, qualified isolated memory/timing and refusal/publication proof.
+Current root/guard checks stay; descriptor binding is not a kernel-atomic
+directory-confinement or whole-application speedup claim.
+
 Fingerprint reference maintenance pairs Node buffer/close contracts with sampled
 memory, W3C draft durations and OWASP data minimization. A configured threshold
 is not a process-memory cap, and a faster hash-only sample does not certify whole

@@ -8,6 +8,7 @@ import { createReadStream } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { finished } from 'node:stream/promises';
 import { resolveOperatorTrackReadBuffer } from './operator-track-fingerprint-policy.js';
+import { observeOperatorTrackBytes } from './operator-track-byte-observer.js';
 
 export function createOperatorTrackFingerprintStreamService({ createReadStreamFn = createReadStream } = {}) {
   async function hashFile({ filePath, readBufferBytes, onBytesRead = null }) {
@@ -21,12 +22,7 @@ export function createOperatorTrackFingerprintStreamService({ createReadStreamFn
     try {
       for await (const chunk of stream) {
         hash.update(chunk);
-        if (typeof onBytesRead === 'function') {
-          try {
-            const result = onBytesRead(chunk.length);
-            if (result && typeof result.then === 'function') Promise.resolve(result).catch(() => {});
-          } catch { /* Optional byte telemetry only. */ }
-        }
+        observeOperatorTrackBytes(onBytesRead, chunk.length);
       }
       sha256 = hash.digest('hex');
     } catch (error) { remember(error); }
