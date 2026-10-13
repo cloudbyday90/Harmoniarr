@@ -104,6 +104,11 @@ was reimplemented, no PR merged, and no release created.
 
 ## Next recommended work
 
+The subsequent [distinct-binding outcome](WANTED_DISTINCT_BINDING_PROFILE_OUTCOME.md)
+completes the explicit 2/4/8 file/requirement profile and locates repeated full
+source-lifecycle projections. It retains all authority/hashes and proposes
+separate current no-op transition classification as the next design.
+
 Extend the explicit guarded workload with increasing distinct private file and
 requirement bindings, separating those counts from duplicate historical receipts.
 Measure real hashes/bytes, current-root and seven projection guards, latency and

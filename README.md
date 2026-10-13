@@ -4,6 +4,14 @@ Harmoniarr is a self-hosted, Docker-hosted music library manager inspired by Lid
 
 The repository contains the Node.js ESM server, Vue client, PostgreSQL schema, automated validation, and design documents. The platform is under active development toward its first release.
 
+The explicit guarded workload now measures 2/4/8 distinct private files and
+saved requirements with fixed receipt history. Run
+`node --expose-gc scripts/measure-wanted-guarded-workload.js --output <local JSON> --distinct-bindings`.
+See the [design](docs/WANTED_DISTINCT_BINDING_PROFILE_DESIGN.md),
+[official research](docs/WANTED_DISTINCT_BINDING_PROFILE_RESEARCH_2026_10.md) and
+[outcome](docs/WANTED_DISTINCT_BINDING_PROFILE_OUTCOME.md). Per-source guards grow
+full projection/hash work; the profile preserves them.
+
 Owned fixture checkout diagnostics now capture the original cold client's
 transport/startup milestones and a private target-match result. See the
 [design](docs/POSTGRES_CONNECTION_BOUNDARY_DESIGN.md),

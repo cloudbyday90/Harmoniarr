@@ -627,3 +627,13 @@ queue promotion/reuse remains unassociated. Private acknowledged target matching
 startup dispatch, TLS creation/handshake and backend readiness are distinct.
 docs/POSTGRES_CONNECTION_BOUNDARY_OUTCOME.md owns native hold/success and remaining
 noise-profile evidence. Healthy later probes cannot diagnose the old failed run.
+
+Distinct bindings use wanted-distinct-consent-fixture.js,
+wanted-distinct-delivery-fixture.js, wanted-distinct-binding-fixture.js and
+wanted-distinct-binding-policy.js under testing/integration/. The separate
+benchmark module composes the existing guarded profiler via --distinct-bindings.
+Actual saved scopes and receipt paths match 2/4/8 real files across two owners
+and disjoint artist/release contexts; each binding has three historical rows.
+Every source guard remains, giving bindings+5 complete projections and 2BP
+hashes. docs/WANTED_DISTINCT_BINDING_PROFILE_OUTCOME.md owns actual mutation/
+event rollback, independent sample results and the measured optimization owner.

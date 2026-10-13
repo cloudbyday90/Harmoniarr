@@ -6,6 +6,23 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Distinct private Wanted binding profile (2026-10-13)
+
+The [design](WANTED_DISTINCT_BINDING_PROFILE_DESIGN.md),
+[official research](WANTED_DISTINCT_BINDING_PROFILE_RESEARCH_2026_10.md) and
+[outcome](WANTED_DISTINCT_BINDING_PROFILE_OUTCOME.md) own the opt-in 2/4/8 distinct
+delivery workload. Canonical saves/applies precede fixed receipt copies; exact
+bytes, physical paths and saved scopes are checked. Satisfied-source projection
+reads grow as bindings plus five; current authorization and both hashes remain.
+All 24 explicit comparisons and the bounded native guard/rollback case pass.
+The 10,095-case fast gate, both builds and zero-vulnerability dependency audit
+also pass. Final evidence and scope are in the separate outcome.
+
+- Next: design transaction-owned current source classification for proven no-op
+  transitions, retaining actual-write/event guards, the final full comparison,
+  both hashes and conservative fallback. Repeat matched distinct-binding
+  measurements only after separate concurrency/mutation/rollback proof.
+
 ## Completed slice: Original PostgreSQL connection boundary (2026-10-13)
 
 The [design](POSTGRES_CONNECTION_BOUNDARY_DESIGN.md),

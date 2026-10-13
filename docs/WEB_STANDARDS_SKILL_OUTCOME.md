@@ -1,5 +1,11 @@
 # Practical web standards skill outcome
 
+October 13 distinct-binding maintenance maps actual paths/scopes/context counts,
+full-source rechecks and private matched work to the maintained skill references.
+The [outcome](WANTED_DISTINCT_BINDING_PROFILE_OUTCOME.md) separates native guard
+proof, explicit large measurements and pure policy feedback. Structure/install
+checks do not establish a new blind trial or standards/security certification.
+
 October 13 connection-boundary maintenance teaches version-aware owned startup
 observation, acknowledged target comparison and conservative queue attribution.
 The [outcome](POSTGRES_CONNECTION_BOUNDARY_OUTCOME.md) separates native behavior,

@@ -5,6 +5,15 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+Distinct-binding profiles must grow actual canonical deliveries and saved scopes,
+count real paths/device-inodes separately from historical receipt copies, and
+declare owner/context dimensions. Satisfied-source guards perform bindings+5
+projections; do not assume the two-binding profile's seven reads are constant.
+Preserve exact private result/digest comparisons and both full hashes per group
+per projection. Keep the large workload explicit, use bounded native mutation/
+required-event rollback proof, and keep pure policy tests free of app imports.
+See docs/WANTED_DISTINCT_BINDING_PROFILE_OUTCOME.md for evidence and limitations.
+
 Cold connection validation needs the original driver client, privately compared
 acknowledged target and pre-pool-ready startup milestones. Prove a real startup
 hold, matched successful promise/query-callback clients, method/listener restore

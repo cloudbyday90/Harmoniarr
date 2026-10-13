@@ -1,5 +1,11 @@
 # Practical web standards skill design
 
+October 13 distinct-binding maintenance separates canonical saved requirements,
+real deliveries and receipt history in the existing standards/testing guidance.
+The [design](WANTED_DISTINCT_BINDING_PROFILE_DESIGN.md) retains per-source full
+projection guards and maps measured cost to its owner before optimization.
+Pure policy admission tests remain separate from application/native evidence.
+
 October 13 connection-boundary maintenance adds original-client milestone and
 private target comparison guidance to the existing standards/testing skills.
 The [design](POSTGRES_CONNECTION_BOUNDARY_DESIGN.md) maps maintainer APIs/source,

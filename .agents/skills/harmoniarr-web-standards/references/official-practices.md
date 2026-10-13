@@ -813,3 +813,12 @@ creation and certificate authorization. Privately compare resolved target scalar
 with acknowledged fixture config, never emit config/payloads, and refuse internal
 adapters after an unreviewed version upgrade. W3C draft duration principles and
 OWASP failure-isolated fixed fields support evidence, not retrospective causality.
+
+October 13 distinct-binding guidance uses
+docs/WANTED_DISTINCT_BINDING_PROFILE_RESEARCH_2026_10.md. Maintainer same-client
+transactions and PostgreSQL rollback support matched guarded service samples.
+State actual physical binding, saved requirement, owner, context and historical
+receipt cardinalities separately. Node memory fields overlap and sampled growth
+does not identify allocation owners; W3C monotonic timing is still draft guidance.
+OWASP fixed private output and preserved failures do not authorize caching or
+removing guards. Count per-source full projections when evaluating scaling.

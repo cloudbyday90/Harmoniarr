@@ -6,6 +6,12 @@ This repository includes a shared `.agents/` directory for GitHub Copilot agent 
 
 The goal is to keep reusable AI workflow guidance versioned alongside the project so UI review, frontend implementation, browser testing, and related tasks follow the same repo conventions.
 
+The [distinct-binding outcome](WANTED_DISTINCT_BINDING_PROFILE_OUTCOME.md)
+extends standards/testing guidance with actual private paths, saved requirement
+and monitored-context counts separate from duplicate receipt history. Per-source
+guards increase full-projection work; measure that behavior before optimizing it.
+Pure admission policy tests avoid loading the application graph.
+
 The [connection-boundary outcome](POSTGRES_CONNECTION_BOUNDARY_OUTCOME.md)
 extends the standards/testing method with original-client startup observation,
 private target comparison and exact driver-version review. Keep queued clients
