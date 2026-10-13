@@ -14,7 +14,7 @@ export const earlyFailureMarker = '[harmoniarr-test-failure] ';
 
 const allowedClasses = new Set([
   'AbortError', 'AggregateError', 'AssertionError', 'Error', 'RangeError',
-  'ReferenceError', 'SyntaxError', 'TypeError', 'URIError',
+  'ReferenceError', 'SyntaxError', 'TypeError', 'URIError', 'TimeoutError',
 ]);
 const allowedCodes = new Set([
   'ABORT_ERR', 'ECONNREFUSED', 'ECONNRESET', 'ERR_ASSERTION', 'ERR_TEST_FAILURE',
@@ -106,7 +106,7 @@ function failureCategory(wrapper, code, errorClass) {
   if (typeof failureType === 'string' && allowedFailureCategories.has(failureType)) {
     return allowedFailureCategories.get(failureType);
   }
-  if (code === 'ERR_TEST_TIMEOUT' || code === 'ETIMEDOUT') return 'timeout';
+  if (code === 'ERR_TEST_TIMEOUT' || code === 'ETIMEDOUT' || errorClass === 'TimeoutError') return 'timeout';
   if (code === 'ABORT_ERR' || code === 'operation_run_cancelled') return 'cancelled';
   if (code === 'ECONNREFUSED' || code === 'ECONNRESET') return 'connection';
   if (['23503', '23505', '40001', '40P01', '57P01'].includes(code)) return 'database';

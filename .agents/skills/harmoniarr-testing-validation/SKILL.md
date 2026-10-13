@@ -5,6 +5,11 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For guarded workload selection or failure diagnosis, read
+[the focused reference](references/guarded-workload-selection.md). It owns media
+prerequisites, recorded full/selected scope and approved phase/failure evidence;
+retain historical failures and unchanged private comparison/resource contracts.
+
 Server startup evidence needs fresh default PostgreSQL 18 ownership, structured
 JSON/source locations and a private unnamed-client startup marker. A unique
 authorization record binds the original client to one PID/session; only ordered

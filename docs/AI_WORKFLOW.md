@@ -6,6 +6,13 @@ This repository includes a shared `.agents/` directory for GitHub Copilot agent 
 
 The goal is to keep reusable AI workflow guidance versioned alongside the project so UI review, frontend implementation, browser testing, and related tasks follow the same repo conventions.
 
+The [guarded workload replay](WANTED_WORKLOAD_REPLAY_OUTCOME.md) adds verified
+media prerequisites, explicit selected/full dimensions and safe failure frames
+to the maintained testing/standards workflow. Diagnose the smallest useful scope;
+retain the full matrix as a separate milestone, with original failed collections
+unchanged. Consult the [next production proposal](WANTED_PUBLICATION_NO_CHANGE_PROPOSAL.md)
+before skipping any Wanted/delete/link publication guard.
+
 The [server-startup design](POSTGRES_STARTUP_SERVER_DESIGN.md) adds private
 marker/session correlation, structured source-location checks and explicit
 pre-authentication uncertainty to the maintained standards/testing skills.

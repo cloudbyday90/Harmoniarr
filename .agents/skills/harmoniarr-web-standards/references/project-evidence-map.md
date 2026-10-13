@@ -1,5 +1,13 @@
 # Project standards-to-evidence map
 
+Guarded workload command: wanted-workload-command-policy.js owns reviewed
+selection/full scope; wanted-workload-runner.js retains planned sample membership,
+private Error/null and bounded early-failure frames. The distinct-binding
+benchmark awaits approved phase sinks outside timed service work. The replay
+design/research/outcome keep prerequisite failure, full collection and selected
+native evidence separate. A phase is an operation location, not root cause;
+the publication proposal still needs all-writer and absent-row proof.
+
 Negative scan receipts: library-scan-receipt-{policy,store,file-service,service}.js
 keeps an opaque pre-walk capability and exact server-generated receipt revision.
 Production library-module.js wires capture to the actual scan worker and guarded

@@ -1,5 +1,11 @@
 # Practical web standards skill design
 
+October 13 workload replay maintenance connects verified prerequisites, explicit
+scope and approved phase/failure evidence to the existing standards/testing
+skills. Use the [design](WANTED_WORKLOAD_REPLAY_DESIGN.md) and focused testing
+reference; preserve private comparison and resource contracts. Invocation
+metadata is unchanged; this is a narrow correction based on actual failed runs.
+
 October 13 server-startup maintenance maps PostgreSQL JSON/source contracts,
 Docker NAT, OWASP minimized output and W3C clock distinctions to concrete
 fixture owners. The [design](POSTGRES_STARTUP_SERVER_DESIGN.md) preserves

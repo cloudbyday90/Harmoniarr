@@ -1,5 +1,11 @@
 # Practical web standards skill outcome
 
+October 13 workload replay reference maintenance teaches prerequisite diagnosis,
+recorded selected/full scope and minimized failure locations. The separate
+[outcome](WANTED_WORKLOAD_REPLAY_OUTCOME.md) owns executed application evidence.
+Skill structure/install checks are separate from those results; no new blind
+trial or general standards/security certification is claimed.
+
 October 13 server-startup references map private client/session association,
 actual uninitialized receipt/omitted SQLSTATE fields and canonical failure
 drainage to the [outcome](POSTGRES_STARTUP_SERVER_OUTCOME.md). Structure/install

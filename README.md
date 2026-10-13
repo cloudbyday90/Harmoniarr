@@ -4,6 +4,15 @@ Harmoniarr is a self-hosted, Docker-hosted music library manager inspired by Lid
 
 The repository contains the Node.js ESM server, Vue client, PostgreSQL schema, automated validation, and design documents. The platform is under active development toward its first release.
 
+Guarded workload commands support explicit reviewed selections and safe failure
+locations. The full default matrix is unchanged; selected artifacts record their
+smaller scope. For focused source comparison use
+`node --expose-gc scripts/measure-wanted-guarded-workload.js --output <local JSON> --source-noops --profiles sine --bindings 2 --pairs 1`.
+Verify local ffmpeg/ffprobe or configure a verified local media image first.
+See the [replay design](docs/WANTED_WORKLOAD_REPLAY_DESIGN.md),
+[research](docs/WANTED_WORKLOAD_REPLAY_RESEARCH_2026_10.md) and
+[outcome](docs/WANTED_WORKLOAD_REPLAY_OUTCOME.md).
+
 Fresh default PostgreSQL 18 test fixtures can capture a bounded server startup
 window for the original unnamed cold client. Private marker/session association
 keeps raw identities out of output; early unassociated receipts remain unknown.

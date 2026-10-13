@@ -6,6 +6,16 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Guarded workload replay and command evidence (2026-10-13)
+
+- Two narrow ESM modules add explicit reviewed command selection, recorded full/
+  selected scope, exact planned sample membership and safe partial failure frames.
+- The full source-no-op replay and final selected CLI evidence are recorded in
+  [their own outcome](WANTED_WORKLOAD_REPLAY_OUTCOME.md); failed collections remain
+  separate. No pool/deadline/scheduling/production guard changed.
+- Next: follow the outcome's measured phase before changing resource policy or
+  promoting the [Wanted publication proposal](WANTED_PUBLICATION_NO_CHANGE_PROPOSAL.md).
+
 ## Completed slice: Owned server startup evidence (2026-10-13)
 
 The [design](POSTGRES_STARTUP_SERVER_DESIGN.md),

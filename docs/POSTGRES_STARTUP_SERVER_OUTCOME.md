@@ -136,3 +136,7 @@ changed, but Wanted algorithm/hash work did not. Next collect a fresh, separatel
 labeled guarded workload to capture any recurrence under the new evidence before
 changing pool policy or scheduling. Then design guarded no-change Wanted/link
 publication, retaining writer/absent-row proof and final complete byte authority.
+
+The subsequent [workload replay outcome](WANTED_WORKLOAD_REPLAY_OUTCOME.md)
+records a new collection under this instrumentation and its own command changes.
+It preserves this slice's evidence and the earlier failed matrix separately.

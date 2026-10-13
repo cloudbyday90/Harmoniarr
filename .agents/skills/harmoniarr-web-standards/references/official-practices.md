@@ -1,5 +1,14 @@
 # Official practices by boundary
 
+October 13 guarded-workload replay guidance uses
+docs/WANTED_WORKLOAD_REPLAY_RESEARCH_2026_10.md. W3C draft timing and Node
+monotonic measurements inform separate service/runner scopes; OWASP logging
+informs fixed failure frames and private payload exclusion. Explicit selections
+must record their dimensions and cannot replace a full matrix. PostgreSQL/driver
+ownership preserves original private comparisons and cleanup. Verify media
+prerequisites, retain failed collections and use approved phase checkpoints
+before changing resource policy or skipping production publication guards.
+
 October 12 negative-scan guidance uses docs/SCAN_RECEIPT_INVALIDATION_RESEARCH_2026_10.md.
 PostgreSQL statement snapshots and ordered cooperating locks inform pre-walk
 revision capture and atomic catalogue/negative/event publication. OWASP significant
