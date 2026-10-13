@@ -28,7 +28,7 @@ export function createPostgresFailureEvidence({ mode = 'failures', source, conne
   return {
     createCapture({ correlationId, signal } = {}) {
       let capturing;
-      return function captureServerFailure(error, phase = 'database_scenario') {
+      return function captureServerFailure(error, phase = 'database_scenario', checkoutId) {
         if (mode === 'off') return Promise.resolve();
         if (capturing) return capturing;
         const completion = Promise.withResolvers();
@@ -51,7 +51,7 @@ export function createPostgresFailureEvidence({ mode = 'failures', source, conne
             containerState = results[2].status === 'fulfilled' ? results[2].value : { outcome: 'failed', error: results[2].reason };
           }
           const ended = clock();
-          const record = buildPostgresFailureRecord({ correlationId, source, phase, error, host, readiness, containerState,
+          const record = buildPostgresFailureRecord({ correlationId, checkoutId, source, phase, error, host, readiness, containerState,
             durationMs: started !== null && ended !== null ? ended - started : null });
           try { Promise.resolve(onRecord(record)).catch(() => {}); } catch { /* Preserve the original failure. */ }
         }).then(completion.resolve, () => completion.resolve());

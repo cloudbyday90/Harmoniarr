@@ -6,6 +6,25 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Owned PostgreSQL checkout capture (2026-10-13)
+
+The [checkout design](POSTGRES_CHECKOUT_CAPTURE_DESIGN.md),
+[official research](POSTGRES_CHECKOUT_CAPTURE_RESEARCH_2026_10.md) and
+[outcome](POSTGRES_CHECKOUT_CAPTURE_OUTCOME.md) own bounded instance observation
+for direct/app promise and callback acquisition, correlated phase/counter records,
+first-failure server evidence and awaited restoration. Lazy setup, concrete
+clients/releases and existing resource bounds remain. This closes observation
+gaps without diagnosing the preceding two intermittent timeouts.
+
+- Validation: 54 reviewed focused controls, 15 initial native controls and the
+  frozen 10,055-case fast gate pass. The frozen serial native cohort passes 65/65
+  across twelve files. The outcome keeps repeats, initial corrections, controlled
+  faults and historical timeout causality separate.
+- Next: use any naturally recurring failure's correlated checkout/server evidence
+  to choose connection-establishment or pool-wait investigation. Then resume
+  matched guarded Wanted workloads; no blind retry, capacity/deadline increase
+  or positive historical hash cache.
+
 ## Completed slice: Bounded reusable fingerprint reads (2026-10-13)
 
 The [reusable design](TRACK_FINGERPRINT_REUSABLE_DESIGN.md),

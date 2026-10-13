@@ -1,5 +1,11 @@
 # Practical web standards skill design
 
+October 13 checkout maintenance maps maintainer promise/callback contracts, stable
+Node context, PostgreSQL observations and OWASP bounded logging to concrete
+owned-pool admission/capture/restoration. The
+[checkout design](POSTGRES_CHECKOUT_CAPTURE_DESIGN.md) preserves lazy setup and
+original failures. This maintains existing references and invocation policy.
+
 October 12 two-owner maintenance maps OWASP recipient authorization and protected
 transaction data to exact shared acquisition and separate delivery. The
 [union design](OPERATOR_TRACK_UNION_DESIGN.md) keeps request identity, shared

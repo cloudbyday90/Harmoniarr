@@ -75,6 +75,7 @@ cases and thirteen fresh scenario variants. Use
 
 - [Planning document](docs/harmoniarr.md)
 - [Reusable fingerprint design](docs/TRACK_FINGERPRINT_REUSABLE_DESIGN.md), [official research](docs/TRACK_FINGERPRINT_REUSABLE_RESEARCH_2026_10.md) and [outcome](docs/TRACK_FINGERPRINT_REUSABLE_OUTCOME.md)
+- [PostgreSQL checkout capture design](docs/POSTGRES_CHECKOUT_CAPTURE_DESIGN.md), [official research](docs/POSTGRES_CHECKOUT_CAPTURE_RESEARCH_2026_10.md) and [outcome](docs/POSTGRES_CHECKOUT_CAPTURE_OUTCOME.md)
 - [Track fingerprint stream design](docs/TRACK_FINGERPRINT_STREAM_DESIGN.md), [official research](docs/TRACK_FINGERPRINT_STREAM_RESEARCH_2026_10.md) and [outcome](docs/TRACK_FINGERPRINT_STREAM_OUTCOME.md)
 - [Wanted root lookup design](docs/WANTED_ROOT_LOOKUP_DESIGN.md), [official research](docs/WANTED_ROOT_LOOKUP_RESEARCH_2026_10.md) and [outcome](docs/WANTED_ROOT_LOOKUP_OUTCOME.md)
 - [Wanted receipt verification design](docs/WANTED_RECEIPT_VERIFICATION_DESIGN.md), [official research](docs/WANTED_RECEIPT_VERIFICATION_RESEARCH_2026_10.md) and [outcome](docs/WANTED_RECEIPT_VERIFICATION_OUTCOME.md)

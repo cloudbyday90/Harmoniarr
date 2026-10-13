@@ -14,6 +14,30 @@ import {
 } from '../../testing/postgres-integration-runtime.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 
+test('an earlier scenario capture cannot consume the first checkout capture or duplicate its later fallback', async () => {
+  const primary = new Error('original'); const records = []; let created = 0;
+  const pool = { connect: () => Promise.reject(primary) };
+  const runtime = await createPostgresIntegrationRuntime({ env: { PGPASSWORD: 'controlled' },
+    checkoutRecord: () => {},
+    failureEvidenceFactory: () => ({ createCapture: () => {
+      const captureId = created++;
+      return async (error, phase, checkoutId) => { records.push({ captureId, error, phase, checkoutId }); };
+    } }),
+    withTemporaryPostgresDatabaseFn: ({ run }) => run({ getPoolFn: () => pool }),
+  });
+  try {
+    await runtime.runIsolatedDatabase(async ({ captureServerFailure, getPoolFn }) => {
+      await captureServerFailure(null, 'schema_prepare');
+      await assert.rejects(getPoolFn().connect(), error => error === primary);
+      await captureServerFailure(primary, 'database_scenario');
+    });
+    assert.equal(records.length, 2); assert.equal(records[0].error, null);
+    assert.notEqual(records[0].captureId, records[1].captureId);
+    assert.equal(records[1].error, primary); assert.equal(records[1].phase, 'pool_checkout');
+    assert.match(records[1].checkoutId, /^[a-f0-9-]{36}$/u);
+  } finally { await runtime.cleanup(); }
+});
+
 for (const source of ['external', 'container', 'template']) {
   test(`${source} direct pools enforce the integration policy over ambient pool settings`, async () => {
     const config = resolveIntegrationTestRuntimeConfig(); let checked = false;

@@ -757,3 +757,11 @@ only filled bytes, handle short reads and bound work by captured size. Close the
 owned handle explicitly and preserve primary Error/null. Compare descriptor and
 pathname evidence before/after current bytes without claiming atomic directory
 confinement. Memory/timing observations remain qualified and data-minimized.
+
+October 13 checkout capture uses docs/POSTGRES_CHECKOUT_CAPTURE_RESEARCH_2026_10.md.
+Maintainer promise/callback and counter contracts require query acquisition
+observation too; stable Node context isolates admission phases. PostgreSQL readiness,
+authenticated query and counters remain separate observations. Apply OWASP field
+minimization/failure isolation and W3C draft monotonic-duration guidance; record
+before probes, own restoration and preserve original failure. Do not infer
+historical causality or log SQL/options/messages for apparent visibility.

@@ -565,3 +565,12 @@ no historical availability or kernel-atomic directory guarantee. Preserve all
 guard rereads. The 110/112 native cohort and separate 17/17 diagnostic subset
 remain distinct; capture actual failed PostgreSQL connections/checkouts before
 broader guarded-workload scaling. An isolated pass cannot diagnose a prior timeout.
+
+Checkout capture uses fixture-pool-checkout.js, fixture-checkout-record.js and
+app-pool-checkout.js under testing/integration/. Only owned instance connect is
+decorated; query acquisition uses the callback API. Lazy setup and concrete
+pool/client/release identity remain. Async phase context captures admission;
+counters precede first-failure server capture, which drains before descriptor
+restoration/pool cleanup. docs/POSTGRES_CHECKOUT_CAPTURE_OUTCOME.md separates cold
+connection and queued-claim controls from historical intermittent causality.
+Direct Clients/template/ad hoc pools remain outside automatic observation.

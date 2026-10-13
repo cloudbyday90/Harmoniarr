@@ -8,6 +8,22 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createFixturePhaseObserver, createIntegrationFixturePhaseObserver } from '../../testing/integration/fixture-phase-observer.js';
+import { createFixtureGate } from '../../testing/integration/fixture-lifecycle.js';
+
+test('active phase context isolates overlapping/nested work even with timing disabled', async () => {
+  const observer = createFixturePhaseObserver({ enabled: false }); const gate = createFixtureGate();
+  const entered = createFixtureGate(); const other = observer.child();
+  const first = observer.measure('schema_prepare', async () => {
+    entered.release(); await gate.promise; assert.equal(observer.currentPhase(), 'schema_prepare');
+    await observer.measure('fixture_seed', () => assert.equal(observer.currentPhase(), 'fixture_seed'));
+    assert.equal(observer.currentPhase(), 'schema_prepare');
+    await other.measure('scenario_work', () => { assert.equal(other.currentPhase(), 'scenario_work');
+      assert.equal(observer.currentPhase(), undefined); });
+  });
+  try { await entered.promise; await observer.measure('scenario_work', () => assert.equal(observer.currentPhase(), 'scenario_work')); }
+  finally { gate.release(); await first; }
+  assert.equal(observer.currentPhase(), undefined);
+});
 
 test('fixture phases preserve results and errors while measuring approved outcomes with a monotonic clock', async () => {
   const records = []; const ticks = [10, 17, 20, 31, 35, 40];

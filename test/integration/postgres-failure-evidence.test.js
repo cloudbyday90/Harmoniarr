@@ -180,8 +180,9 @@ suite('Owned PostgreSQL failure evidence before fixture teardown', () => {
       records = []; diagnosticPool = null; hold = createFixtureGate({ signal: t.signal });
       ready = createFixtureGate({ signal: t.signal });
       const previousDatabase = process.env.PGDATABASE;
-      const checkoutRecords = []; let primary; let application;
+      const checkoutRecords = []; const fixtureCheckoutRecords = []; let primary; let application;
       const options = { config, checkoutObserver: createPoolCheckoutObserver({ onRecord: record => checkoutRecords.push(record) }),
+        checkoutRecord: record => fixtureCheckoutRecords.push(record),
         createAppFn: () => assert.fail('Failed schema preparation created the application'),
         prepareDatabaseFn: async ({ getPoolFn }) => {
           const originalPassword = process.env.PGPASSWORD;
@@ -201,11 +202,14 @@ suite('Owned PostgreSQL failure evidence before fixture teardown', () => {
       void pending.catch(() => {});
       try {
         await waitForFixtureReady({ ready: ready.promise, operation: pending, signal: t.signal });
-        assert.equal(primary.code, '28P01'); assert.equal(getPool().ending, false);
+        assert.equal(primary, undefined); assert.equal(getPool().ending, false);
         assert.notEqual(process.env.PGDATABASE, previousDatabase);
-        assert.equal(records.length, 0); assert.equal(checkoutRecords.length, 1);
+        assert.equal(records.length, 0); assert.equal(checkoutRecords.length, 0);
+        assert.equal(fixtureCheckoutRecords.length, 1); assert.equal(fixtureCheckoutRecords[0].errors[0].code, '28P01');
         hold.release(); await assert.rejects(pending, error => error === primary);
-        assert.equal(records.length, 1); assert.equal(records[0].phase, 'schema_prepare');
+        assert.equal(primary.code, '28P01'); assert.equal(checkoutRecords.length, 1);
+        assert.equal(records.length, 1); assert.equal(records[0].phase, 'pool_checkout');
+        assert.equal(records[0].checkoutId, fixtureCheckoutRecords[0].checkoutId);
         assert.equal(records[0].correlationId, checkoutRecords[0].correlationId);
         assert.equal(records[0].host.outcome, 'passed'); assert.equal(records[0].readiness.outcome, 'accepting');
         assert.equal(process.env.PGDATABASE, previousDatabase);

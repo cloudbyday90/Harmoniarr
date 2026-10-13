@@ -7,6 +7,9 @@
 
 import { randomUUID } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
+import { AsyncLocalStorage } from 'node:async_hooks';
+
+const phaseContext = new AsyncLocalStorage();
 
 const phases = new Set(['container_start', 'container_stop', 'database_connect', 'database_create',
   'pool_create', 'schema_prepare', 'fixture_seed', 'application_create', 'scenario_work',
@@ -41,10 +44,11 @@ export function createFixturePhaseObserver({ enabled = true, onRecord = null,
 
   async function measure(phase, operation) {
     if (!phases.has(phase) || typeof operation !== 'function') throw new TypeError('Invalid fixture phase operation');
-    if (!enabled) return operation();
+    const execute = () => phaseContext.run({ correlationId, phase }, operation);
+    if (!enabled) return execute();
     const started = readClock();
     let outcome = 'passed';
-    try { return await operation(); }
+    try { return await execute(); }
     catch (error) {
       try { outcome = error?.name === 'AbortError' ? 'cancelled' : 'failed'; }
       catch { outcome = 'failed'; }
@@ -56,7 +60,12 @@ export function createFixturePhaseObserver({ enabled = true, onRecord = null,
     return createFixturePhaseObserver({ enabled, onRecord, now, parentId: correlationId });
   }
 
-  return { measure, child, correlationId };
+  function currentPhase() {
+    const context = phaseContext.getStore();
+    return context?.correlationId === correlationId ? context.phase : undefined;
+  }
+
+  return { measure, child, correlationId, currentPhase };
 }
 
 export function createIntegrationFixturePhaseObserver({ env = process.env,

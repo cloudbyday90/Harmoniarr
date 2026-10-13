@@ -21,6 +21,7 @@ import { createIntegrationPoolCheckoutObserver, observeAppSchemaPreparation } fr
 import { withIntegrationAppWorkerDrain } from './app-worker-lifecycle.js';
 import { observePostgresFixtureFailure } from './postgres-failure-evidence.js';
 import { buildIntegrationPoolEnvironment } from './pool-policy.js';
+import { withAppPoolCheckoutDiagnostics } from './app-pool-checkout.js';
 
 const packageJsonPath = resolve(import.meta.dirname, '../../package.json');
 const SCENARIO_SHUTDOWN_DRAIN_MS = 150;
@@ -98,6 +99,7 @@ export async function createIntegrationAppRuntime({
   postgresRuntimeFactory = createPostgresIntegrationRuntime,
   phaseObserver = createIntegrationFixturePhaseObserver(),
   checkoutObserver = createIntegrationPoolCheckoutObserver(),
+  checkoutRecord = null,
 } = {}) {
   const runtimeWorkspace = await phaseObserver.measure('workspace_create', async () => clientDistDir
     ? {
@@ -134,6 +136,7 @@ export async function createIntegrationAppRuntime({
         databaseName,
         source,
         captureServerFailure,
+        captureCheckoutFailure,
       }) => {
         const scenarioWorkspaceDir = join(runtimeWorkspace.workspaceDir, scenarioName);
         let scenarioFailed = true;
@@ -155,10 +158,12 @@ export async function createIntegrationAppRuntime({
           VAPID_PUBLIC_KEY: TEST_VAPID_PUBLIC_KEY,
         }, async () => {
           await scenarioObserver.measure('pool_close', () => closePool()).catch(() => {});
-          try {
+          try { return await withAppPoolCheckoutDiagnostics({ getPoolFn: getPool,
+            phaseObserver: scenarioObserver, source, captureFailure: captureCheckoutFailure, onRecord: checkoutRecord }, async observedGetPool => {
             await observePostgresFixtureFailure(captureServerFailure, 'schema_prepare', () => scenarioObserver.measure('schema_prepare', () => observeAppSchemaPreparation({
-              prepareDatabaseFn, getPoolFn: getPool, observer: checkoutObserver, source, phaseObserver: scenarioObserver,
+              prepareDatabaseFn, getPoolFn: observedGetPool, observer: checkoutObserver, source, phaseObserver: scenarioObserver,
             })));
+            observedGetPool();
             const application = await scenarioObserver.measure('application_create', () => createAppFn({
               clientDistDir: runtimeWorkspace.clientDistDir,
               packageJsonPath,
@@ -174,7 +179,7 @@ export async function createIntegrationAppRuntime({
                 config,
                 databaseConfig,
                 databaseName,
-                getPoolFn: getPool,
+                getPoolFn: observedGetPool,
                 postgresSource: source,
                 backupsDir: join(scenarioWorkspaceDir, 'backups'),
                 workspaceDir: scenarioWorkspaceDir,
@@ -188,6 +193,7 @@ export async function createIntegrationAppRuntime({
             )));
             scenarioFailed = false;
             return result;
+          });
           } finally {
             await scenarioObserver.measure('shutdown_drain', () => waitForScenarioShutdownDrain());
             await scenarioObserver.measure('pool_close', () => closePool()).catch(() => {});
@@ -209,6 +215,7 @@ export async function withIntegrationApp({
   withPostgresIntegrationRuntimeFn = withPostgresIntegrationRuntime,
   phaseObserver = createIntegrationFixturePhaseObserver(),
   checkoutObserver = createIntegrationPoolCheckoutObserver(),
+  checkoutRecord = null,
 } = {}) {
   if (typeof run !== 'function') {
     throw new Error('run is required');
@@ -220,7 +227,7 @@ export async function withIntegrationApp({
     return await withPostgresIntegrationRuntimeFn({
       config,
       phaseObserver,
-      run: async ({ databaseConfig, databaseName, source, captureServerFailure }) => {
+      run: async ({ databaseConfig, databaseName, source, captureServerFailure, captureCheckoutFailure }) => {
         await closePool().catch(() => {});
 
         return withEnvironmentVariables({
@@ -237,10 +244,12 @@ export async function withIntegrationApp({
           VAPID_PUBLIC_KEY: TEST_VAPID_PUBLIC_KEY,
         }, async () => {
           await closePool().catch(() => {});
-          try {
+          try { return await withAppPoolCheckoutDiagnostics({ getPoolFn: getPool,
+            phaseObserver, source, captureFailure: captureCheckoutFailure, onRecord: checkoutRecord }, async observedGetPool => {
             await observePostgresFixtureFailure(captureServerFailure, 'schema_prepare', () => phaseObserver.measure('schema_prepare', () => observeAppSchemaPreparation({
-              prepareDatabaseFn, getPoolFn: getPool, observer: checkoutObserver, source, phaseObserver,
+              prepareDatabaseFn, getPoolFn: observedGetPool, observer: checkoutObserver, source, phaseObserver,
             })));
+            observedGetPool();
             const application = await phaseObserver.measure('application_create', () => createAppFn({
               clientDistDir: runtimeWorkspace.clientDistDir,
               packageJsonPath,
@@ -255,7 +264,7 @@ export async function withIntegrationApp({
                 }),
                 databaseConfig,
                 databaseName,
-                getPoolFn: getPool,
+                getPoolFn: observedGetPool,
                 postgresSource: source,
                 backupsDir: join(runtimeWorkspace.workspaceDir, 'backups'),
                 workspaceDir: runtimeWorkspace.workspaceDir,
@@ -267,6 +276,7 @@ export async function withIntegrationApp({
                 phaseObserver,
               },
             )));
+          });
           } finally {
             await phaseObserver.measure('shutdown_drain', () => waitForScenarioShutdownDrain());
             await phaseObserver.measure('pool_close', () => closePool()).catch(() => {});

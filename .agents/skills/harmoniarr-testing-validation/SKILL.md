@@ -5,6 +5,15 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+Checkout diagnostics must observe promise and callback acquisition on owned pool
+instances, including pool.query's callback path, without eager app-pool creation.
+Keep admission-phase context isolated through nested/concurrent work even when
+timing is off. Record dispatched counters before awaiting first-failure capture,
+retain Error/null, drain capture and restore descriptors before cleanup. Bounded
+records/probes and healthy snapshots do not diagnose historical timeouts; native
+controls must separate cold connection failure from observed queue pressure.
+See docs/POSTGRES_CHECKOUT_CAPTURE_OUTCOME.md for scope and separate gate evidence.
+
 Reusable-file validation must prove one bounded buffer, short reads/poisoned
 tails, captured descriptor/path identity, early EOF/growth and awaited close with
 primary Error/null preserved. A same-size/same-time replacement must refuse before

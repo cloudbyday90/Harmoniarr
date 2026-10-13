@@ -15,6 +15,7 @@ import { createIntegrationFixturePhaseObserver } from './integration/fixture-pha
 import { createPreparedPostgresTemplate } from './integration/postgres-migration-template.js';
 import { createPostgresFailureEvidence } from './integration/postgres-failure-evidence.js';
 import { buildIntegrationPoolConfig } from './integration/pool-policy.js';
+import { observeFixturePoolCheckouts, resolveFixtureCheckoutMode } from './integration/fixture-pool-checkout.js';
 
 const { Pool } = pg;
 
@@ -46,7 +47,8 @@ function createDefaultPostgresContainer(config) {
 }
 
 async function createDatabaseRuntime({ config, env, source, phaseObserver, schemaMode, signal,
-  closeServer, createPreparedPostgresTemplateFn, withTemporaryPostgresDatabaseFn, failureEvidence }) {
+  closeServer, createPreparedPostgresTemplateFn, withTemporaryPostgresDatabaseFn, failureEvidence,
+  checkoutMode, checkoutRecord }) {
   const createPool = createPoolFactory(env, config);
   const prepared = schemaMode === 'migration_template'
     ? await createPreparedPostgresTemplateFn({ env, createPool, phaseObserver: phaseObserver.child(), signal,
@@ -71,8 +73,25 @@ async function createDatabaseRuntime({ config, env, source, phaseObserver, schem
     },
     async runIsolatedDatabase(run, { phaseObserver: observer = phaseObserver.child(), signal: caseSignal } = {}) {
       if (typeof run !== 'function') throw new TypeError('Database scenario requires a callback');
-      const captureServerFailure = failureEvidence.createCapture({ correlationId: observer.correlationId, signal: caseSignal });
-      const execute = (context) => run({ ...context, source, schemaMode, phaseObserver: observer, captureServerFailure });
+      const captureScenario = failureEvidence.createCapture({ correlationId: observer.correlationId, signal: caseSignal });
+      const captureCheckout = failureEvidence.createCapture({ correlationId: observer.correlationId, signal: caseSignal });
+      let checkoutFailed = false;
+      const captureServerFailure = (error, phase) => checkoutFailed ? Promise.resolve() : captureScenario(error, phase);
+      const captureCheckoutFailure = (error, checkoutId) => {
+        checkoutFailed = true; return captureCheckout(error, 'pool_checkout', checkoutId);
+      };
+      const execute = async (context) => {
+        const pool = typeof context.getPoolFn === 'function' ? context.getPoolFn() : null;
+        const diagnostics = typeof pool?.connect === 'function' ? observeFixturePoolCheckouts({ pool,
+          poolKind: 'scenario_pool', source, phaseObserver: observer, mode: checkoutMode,
+          captureFailure: captureCheckoutFailure, ...(checkoutRecord ? { onRecord: checkoutRecord } : {}) }) : null;
+        let failed = false; let failure; let result;
+        try { result = await run({ ...context, source, schemaMode, phaseObserver: observer,
+          captureServerFailure, captureCheckoutFailure }); } catch (error) { failed = true; failure = error; }
+        try { await diagnostics?.restore(); } catch (error) { if (!failed) { failed = true; failure = error; } }
+        if (failed) throw failure;
+        return result;
+      };
       if (prepared) return prepared.runIsolatedDatabase(execute, { phaseObserver: observer, signal: caseSignal, onFailure: captureServerFailure });
       return withTemporaryPostgresDatabaseFn({ createPool, env, phaseObserver: observer, signal: caseSignal, run: execute,
         onFailure: captureServerFailure });
@@ -90,15 +109,19 @@ export async function createPostgresIntegrationRuntime({
   schemaMode = 'empty',
   signal,
   failureEvidenceFactory = createPostgresFailureEvidence,
+  checkoutRecord = null,
 } = {}) {
   if (!['empty', 'migration_template'].includes(schemaMode)) throw new TypeError('Invalid PostgreSQL fixture schema mode');
   if (signal?.aborted) throw signal.reason;
   const evidenceMode = env.HARMONIARR_INTEGRATION_SERVER_DIAGNOSTICS ?? 'failures';
   if (!['off', 'failures'].includes(evidenceMode)) throw new TypeError('Invalid PostgreSQL server diagnostic setting');
+  const checkoutMode = resolveFixtureCheckoutMode(env);
+  if (checkoutRecord !== null && typeof checkoutRecord !== 'function') throw new TypeError('Invalid fixture checkout sink');
   const fresh = createPostgresContainer === createDefaultPostgresContainer && !config.useContainerReuse;
   if (hasConfiguredPostgresAdminConnection(env)) {
     return createDatabaseRuntime({ config, env, source: 'external_postgres', phaseObserver, schemaMode, signal,
       closeServer: async () => {}, createPreparedPostgresTemplateFn, withTemporaryPostgresDatabaseFn,
+      checkoutMode, checkoutRecord,
       failureEvidence: failureEvidenceFactory({ mode: evidenceMode, source: 'external_postgres' }) });
   }
 
@@ -116,6 +139,7 @@ export async function createPostgresIntegrationRuntime({
   try {
     return await createDatabaseRuntime({ config, env: containerEnv, source: 'testcontainer_postgres', phaseObserver,
       schemaMode, signal, closeServer, createPreparedPostgresTemplateFn, withTemporaryPostgresDatabaseFn,
+      checkoutMode, checkoutRecord,
       failureEvidence: failureEvidenceFactory({ mode: evidenceMode,
         source: 'testcontainer_postgres', fresh, containerId: container.getId?.(),
         connectionConfig: buildPostgresAdminConnectionConfig(containerEnv) }) });
@@ -150,7 +174,7 @@ export async function withPostgresIntegrationRuntime({
 
   let result; let failed = false; let failure;
   try {
-    result = await runtime.runIsolatedDatabase(run, { signal });
+    result = await runtime.runIsolatedDatabase(run, { signal, phaseObserver });
   } catch (error) { failed = true; failure = error; }
   try { await runtime.cleanup(); }
   catch (error) { if (!failed) { failed = true; failure = error; } }

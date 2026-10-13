@@ -6,6 +6,12 @@ This repository includes a shared `.agents/` directory for GitHub Copilot agent 
 
 The goal is to keep reusable AI workflow guidance versioned alongside the project so UI review, frontend implementation, browser testing, and related tasks follow the same repo conventions.
 
+The [checkout outcome](POSTGRES_CHECKOUT_CAPTURE_OUTCOME.md) maps driver contracts,
+Node context, PostgreSQL observations, OWASP minimization and W3C draft timing to
+owned pool boundaries. Standards/testing references preserve callback acquisition,
+lazy setup, pre-cleanup evidence and original failure; a healthy later snapshot
+cannot explain an old timeout.
+
 ## What `.agents/` Is For
 
 - Shared Copilot skills and reference material used by the VS Code agent workflow.

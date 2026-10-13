@@ -13,11 +13,12 @@ const version = value => Number.isSafeInteger(value) && value >= 90000 && value 
 const boolean = value => typeof value === 'boolean' ? value : null;
 const exitCode = value => Number.isInteger(value) && value >= 0 && value <= 255 ? value : null;
 const count = value => Number.isSafeInteger(value) && value >= 0 ? value : null;
-export function buildPostgresFailureRecord({ correlationId, source, phase, error, host, readiness, containerState, durationMs }) {
-  return Object.freeze({ version: 2, kind: 'owned_server_failure',
+export function buildPostgresFailureRecord({ correlationId, checkoutId, source, phase, error, host, readiness, containerState, durationMs }) {
+  return Object.freeze({ version: phase === 'pool_checkout' ? 3 : 2, kind: 'owned_server_failure',
+    ...(phase === 'pool_checkout' ? { checkoutId: isCheckoutCorrelationId(checkoutId) ? checkoutId : null } : {}),
     correlationId: isCheckoutCorrelationId(correlationId) ? correlationId : null,
     source: member(source, ['testcontainer_postgres', 'external_postgres']),
-    phase: member(phase, ['schema_prepare', 'database_scenario', 'test_file']),
+    phase: member(phase, ['schema_prepare', 'database_scenario', 'test_file', 'pool_checkout']),
     errors: capturePostgresDiagnosticErrors(error), durationMs: duration(durationMs),
     host: Object.freeze({
       outcome: member(read(host, 'outcome'), ['passed', 'failed', 'unavailable']),

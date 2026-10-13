@@ -1,5 +1,11 @@
 # Practical web standards skill outcome
 
+October 13 checkout maintenance maps concrete callback/promise acquisition and
+phase context to pre-cleanup, data-minimized evidence. The
+[checkout outcome](POSTGRES_CHECKOUT_CAPTURE_OUTCOME.md) separates controlled
+proof from historical causality. Structure/install checks remain distinct from
+runtime evidence; no duplicate skill, new blind trial or certification.
+
 October 12 negative-scan maintenance maps immutable pre-walk scope, original
 acquisition, current path/absence and transaction ownership to the
 [scan outcome](SCAN_RECEIPT_INVALIDATION_OUTCOME.md). References distinguish
