@@ -149,8 +149,9 @@ suite('Wanted root authority through actual publication and database writers', (
           assert.deepEqual(await saved(pool), baseline);
         } else { await pending; assert.equal((await writer).rowCount, 1); }
         if (index === 0) {
-          assert.equal(record.counters.closedReceiptGroups, 14); assert.equal(record.counters.fingerprintCalls, 28);
-          assert.equal(record.phases.root_resolution.calls, 28); assert.equal(record.counters.boundedRootGroups, 14);
+          assert.equal(record.counters.sourceNoops, 2); assert.equal(record.counters.projectionReads, 5);
+          assert.equal(record.counters.closedReceiptGroups, 10); assert.equal(record.counters.fingerprintCalls, 20);
+          assert.equal(record.phases.root_resolution.calls, 20); assert.equal(record.counters.boundedRootGroups, 10);
         }
         if (change.unavailable) await withRollbackFixtureClient(pool, async client => {
           await lockLibraryRootAuthority({ queryable: client });

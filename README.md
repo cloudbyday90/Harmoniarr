@@ -4,13 +4,21 @@ Harmoniarr is a self-hosted, Docker-hosted music library manager inspired by Lid
 
 The repository contains the Node.js ESM server, Vue client, PostgreSQL schema, automated validation, and design documents. The platform is under active development toward its first release.
 
+Canonical Wanted can skip a source transition only after a live owned row lock
+proves that an available source is already existing. Actual writes/events and
+the final complete verification remain guarded. See the
+[design](docs/WANTED_SOURCE_NOOP_DESIGN.md),
+[research](docs/WANTED_SOURCE_NOOP_RESEARCH_2026_10.md) and
+[outcome](docs/WANTED_SOURCE_NOOP_OUTCOME.md). Compare against compatibility with
+`node --expose-gc scripts/measure-wanted-guarded-workload.js --output <local JSON> --source-noops`.
+
 The explicit guarded workload now measures 2/4/8 distinct private files and
 saved requirements with fixed receipt history. Run
 `node --expose-gc scripts/measure-wanted-guarded-workload.js --output <local JSON> --distinct-bindings`.
 See the [design](docs/WANTED_DISTINCT_BINDING_PROFILE_DESIGN.md),
 [official research](docs/WANTED_DISTINCT_BINDING_PROFILE_RESEARCH_2026_10.md) and
 [outcome](docs/WANTED_DISTINCT_BINDING_PROFILE_OUTCOME.md). Per-source guards grow
-full projection/hash work; the profile preserves them.
+full projection/hash work in compatibility mode; this profile preserves them.
 
 Owned fixture checkout diagnostics now capture the original cold client's
 transport/startup milestones and a private target-match result. See the

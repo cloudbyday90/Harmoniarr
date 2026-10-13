@@ -6,6 +6,12 @@ This repository includes a shared `.agents/` directory for GitHub Copilot agent 
 
 The goal is to keep reusable AI workflow guidance versioned alongside the project so UI review, frontend implementation, browser testing, and related tasks follow the same repo conventions.
 
+The [source-noop design](WANTED_SOURCE_NOOP_DESIGN.md) extends the maintained
+standards/testing skills with exact current-row proof, optional-lock fallback
+and transaction lifetime. Preserve final full authority and both hashes at
+retained boundaries; compare fewer reads using a distinct private comparator.
+The [outcome](WANTED_SOURCE_NOOP_OUTCOME.md) owns executed evidence and limits.
+
 The [distinct-binding outcome](WANTED_DISTINCT_BINDING_PROFILE_OUTCOME.md)
 extends standards/testing guidance with actual private paths, saved requirement
 and monitored-context counts separate from duplicate receipt history. Per-source

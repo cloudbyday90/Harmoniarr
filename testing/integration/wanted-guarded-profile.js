@@ -20,13 +20,16 @@ import { createWantedGuardedCostObserver } from './wanted-guarded-cost-observer.
 
 /** Complete guarded service work on an active rollback-owned transaction, never a cache. */
 export async function profileWantedGuardedReconciliation(pool, { readMethod = 'reusable', signal,
-  gc = global.gc, afterProjection = null, receiptGrouping = false, costDiagnostics = false, rootReadMode = 'compatibility' } = {}) {
+  gc = global.gc, afterProjection = null, receiptGrouping = false, costDiagnostics = false, rootReadMode = 'compatibility',
+  sourceTransitionMode = 'compatibility', captureDurable = false } = {}) {
   readMethod = resolveOperatorTrackReadMethod(readMethod);
   const readBufferBytes = resolveOperatorTrackReadBuffer(undefined, readMethod);
   if (typeof gc !== 'function') throw new TypeError('Guarded workload measurement requires explicit GC');
   if (afterProjection !== null && typeof afterProjection !== 'function') throw new TypeError('Invalid guarded profile hook');
   if (typeof receiptGrouping !== 'boolean') throw new TypeError('Invalid receipt grouping profile');
   if (typeof costDiagnostics !== 'boolean') throw new TypeError('Invalid guarded cost diagnostics');
+  if (typeof captureDurable !== 'boolean') throw new TypeError('Invalid durable profile capture');
+  if (!['locked-noop', 'compatibility'].includes(sourceTransitionMode)) throw new TypeError('Invalid source transition profile mode');
   if (!['bounded', 'member', 'compatibility'].includes(rootReadMode)) throw new TypeError('Invalid root profile mode');
   signal?.throwIfAborted();
   return withRollbackFixtureClient(pool, async client => {
@@ -57,7 +60,7 @@ export async function profileWantedGuardedReconciliation(pool, { readMethod = 'r
     } });
     const maintenance = createMaintenanceLockService({ getPoolFn: () => queryable });
     const guard = createMaintenanceLockWriteGuardService({ listActiveMaintenanceLocks: maintenance.listActiveMaintenanceLocks });
-    const wanted = createLibraryWantedReleaseService({ rootReadMode, assertMaintenanceWriteAllowed: guard.assertNoActiveWriteLocks,
+    const wanted = createLibraryWantedReleaseService({ rootReadMode, sourceTransitionMode, assertMaintenanceWriteAllowed: guard.assertNoActiveWriteLocks,
       withTransaction: work => work(queryable),
       projectionReader: { readWantedReleaseProjection: async input => {
         projectionPaths = new Set();
@@ -77,9 +80,18 @@ export async function profileWantedGuardedReconciliation(pool, { readMethod = 'r
     const started = performance.now(); let result; let observation;
     try { result = await wanted.reconcileWantedReleases(); }
     finally { observation = memory.finish(); }
-    return { result, projectionDigests, queryCount, queryMs, readMethod, readBufferBytes, receiptGrouping,
-      elapsedMs: performance.now() - started, diagnostics: record, memory: observation,
-      costDiagnostics, rootReadMode, costs: costs?.snapshot() ?? null,
+    const elapsedMs = performance.now() - started; const durable = captureDurable ? {} : null;
+    if (durable) for (const table of ['library_wanted_releases', 'library_discovery_request_wanted_release_links', 'media_requests', 'media_request_events']) {
+      // Private evidence outside timing. Keep request identity; generated event/Wanted IDs and clocks vary per sample.
+      signal?.throwIfAborted();
+      durable[table] = (await client.query(`SELECT to_jsonb(row) - 'updated_at' - 'occurred_at' - 'created_at'
+        ${table === 'media_requests' ? '' : "- 'id'"} AS value FROM ${table} row`)).rows
+        .map(row => JSON.stringify(row.value)).sort();
+      signal?.throwIfAborted();
+    }
+    return { result, projectionDigests, durable, queryCount, queryMs, readMethod, readBufferBytes, receiptGrouping,
+      elapsedMs, diagnostics: record, memory: observation,
+      costDiagnostics, rootReadMode, sourceTransitionMode, costs: costs?.snapshot() ?? null,
       pathWork: { distinctPrivateBindings: allPaths.size, distinctPerProjection,
         repeatedWithinProjections: record.counters.fingerprintCalls - distinctPerProjection } };
   });
@@ -91,9 +103,9 @@ export function compareWantedGuardedSamples(first, second) {
   assert.deepEqual(first.pathWork, second.pathWork);
 }
 
-export function summarizeWantedGuardedSample({ readMethod, readBufferBytes, receiptGrouping, costDiagnostics, costs, rootReadMode, queryCount, queryMs, elapsedMs,
+export function summarizeWantedGuardedSample({ readMethod, readBufferBytes, receiptGrouping, costDiagnostics, costs, rootReadMode, sourceTransitionMode, queryCount, queryMs, elapsedMs,
   memory, pathWork, diagnostics }) {
-  return { readMethod, readBufferBytes, receiptGrouping, costDiagnostics, costs, rootReadMode, queryCount, queryMs, elapsedMs, memory, pathWork,
+  return { readMethod, readBufferBytes, receiptGrouping, costDiagnostics, costs, rootReadMode, sourceTransitionMode, queryCount, queryMs, elapsedMs, memory, pathWork,
     counters: diagnostics.counters, phases: diagnostics.phases };
 }
 

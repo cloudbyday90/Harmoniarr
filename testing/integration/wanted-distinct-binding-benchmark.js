@@ -13,9 +13,12 @@ import { withWantedProfileClient } from './wanted-profile-client.js';
 import { assertWantedDistinctSample, assertWantedDistinctWorkloadOptions, wantedDistinctBindingCounts } from './wanted-distinct-binding-policy.js';
 import { compareWantedBoundedRootSamples, profileWantedGuardedReconciliation,
   summarizeWantedGuardedSample } from './wanted-guarded-profile.js';
+import { compareWantedSourceNoopSamples } from './wanted-source-noop-profile-policy.js';
 
 export async function measureWantedDistinctBindings({ signal, onProgress = () => {}, onSample = () => {},
-  profiles = ['sine', 'noise'], bindingCounts = wantedDistinctBindingCounts, pairs = 2, gc = global.gc } = {}) {
+  profiles = ['sine', 'noise'], bindingCounts = wantedDistinctBindingCounts, pairs = 2, gc = global.gc,
+  sourceNoopComparison = false } = {}) {
+  if (typeof sourceNoopComparison !== 'boolean') throw new TypeError('Invalid source no-op comparison');
   assertWantedDistinctWorkloadOptions({ signal, profiles, bindingCounts, pairs, gc, onProgress, onSample });
   const config = resolveIntegrationTestRuntimeConfig(); const rows = [];
   const runtime = await createPostgresIntegrationRuntime({ config, env: {} });
@@ -31,12 +34,19 @@ export async function measureWantedDistinctBindings({ signal, onProgress = () =>
             durationSeconds: mediaProfile === 'noise' ? 30 : 2, signal: scope.signal });
           await withWantedProfileClient(c.pool, async borrowed => {
             const samples = [];
-            for (const rootReadMode of (pair % 2 ? ['bounded', 'member'] : ['member', 'bounded'])) {
+            const modes = sourceNoopComparison ? ['compatibility', 'locked-noop'] : ['member', 'bounded'];
+            if (pair % 2) modes.reverse();
+            for (const mode of modes) {
+              const rootReadMode = sourceNoopComparison ? 'bounded' : mode;
+              const sourceTransitionMode = sourceNoopComparison ? mode : 'compatibility';
               const sample = await profileWantedGuardedReconciliation(borrowed, { readMethod: 'reusable',
-                receiptGrouping: true, rootReadMode, signal: scope.signal, gc });
-              assertWantedDistinctSample(sample, { bindings, fileSizes: c.fileSizes }); samples.push(sample);
+                receiptGrouping: true, rootReadMode, sourceTransitionMode, captureDurable: sourceNoopComparison, signal: scope.signal, gc });
+              if (!sourceNoopComparison) assertWantedDistinctSample(sample, { bindings, fileSizes: c.fileSizes });
+              samples.push(sample);
             }
-            compareWantedBoundedRootSamples(samples.find(s => s.rootReadMode === 'member'), samples.find(s => s.rootReadMode === 'bounded'));
+            if (sourceNoopComparison) compareWantedSourceNoopSamples(samples.find(s => s.sourceTransitionMode === 'compatibility'),
+              samples.find(s => s.sourceTransitionMode === 'locked-noop'), { bindings, fileSizes: c.fileSizes });
+            else compareWantedBoundedRootSamples(samples.find(s => s.rootReadMode === 'member'), samples.find(s => s.rootReadMode === 'bounded'));
             for (const sample of samples) {
               const row = { mediaProfile, pair, ...c.dimensions, fileSizes: c.fileSizes, ...summarizeWantedGuardedSample(sample) };
               rows.push(row); await onSample(row);

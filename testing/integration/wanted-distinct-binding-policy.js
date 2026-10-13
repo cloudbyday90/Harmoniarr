@@ -25,8 +25,8 @@ export function assertWantedDistinctFixtureOptions({ bindings, mediaProfile, dur
     || durationSeconds !== (mediaProfile === 'noise' ? 30 : 2)) throw new TypeError('Invalid distinct-binding fixture');
 }
 
-export function assertWantedDistinctSample(sample, { bindings, fileSizes }) {
-  const projections = bindings + 5; const receipts = bindings * wantedDistinctReceiptsPerBinding;
+export function assertWantedDistinctSample(sample, { bindings, fileSizes, projections = bindings + 5 }) {
+  const receipts = bindings * wantedDistinctReceiptsPerBinding;
   const { counters, phases, outcome } = sample.diagnostics;
   assert.equal(outcome, 'completed'); assert.equal(counters.projectionReads, projections);
   assert.equal(counters.receiptRows, receipts * projections); assert.equal(counters.eligibleReceipts, receipts * projections);

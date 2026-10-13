@@ -123,6 +123,12 @@ required events, a final full comparison and both hashes at every retained
 verification boundary. Measure the same distinct-binding workload afterwards.
 Do not replace current behavior based only on phase totals.
 
+That follow-up now has a separate
+[source-noop design](WANTED_SOURCE_NOOP_DESIGN.md) and
+[outcome](WANTED_SOURCE_NOOP_OUTCOME.md). It preserves this compatibility
+baseline and proves a narrower positive-row skip with its own native and matched
+evidence; the measurements above remain the original profile's results.
+
 ## Final gate and repository evidence
 
 Artifacts are under ignored .tmp/wanted-distinct-bindings-2026-10-13/:

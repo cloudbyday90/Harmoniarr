@@ -5,10 +5,19 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+Source no-op validation needs exact owned already-existing positive rows locked
+until outer publication ends, private queryable/transaction authority, native
+busy-row savepoint recovery and transaction-reuse refusal. Keep the actual-write
+and final complete projection/lease/cancellation guards with fresh opening and
+closing hashes. Compare private request/event/link results and all retained
+projection digests; hash work intentionally differs from compatibility and
+cannot use the unchanged-work comparator. Keep the large --source-noops matrix
+explicit. See docs/WANTED_SOURCE_NOOP_OUTCOME.md for scope and failed candidates.
+
 Distinct-binding profiles must grow actual canonical deliveries and saved scopes,
 count real paths/device-inodes separately from historical receipt copies, and
-declare owner/context dimensions. Satisfied-source guards perform bindings+5
-projections; do not assume the two-binding profile's seven reads are constant.
+declare owner/context dimensions. Compatibility satisfied-source guards perform
+bindings+5 projections; count proved no-ops separately in the optimized path.
 Preserve exact private result/digest comparisons and both full hashes per group
 per projection. Keep the large workload explicit, use bounded native mutation/
 required-event rollback proof, and keep pure policy tests free of app imports.

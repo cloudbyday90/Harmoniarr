@@ -822,3 +822,13 @@ receipt cardinalities separately. Node memory fields overlap and sampled growth
 does not identify allocation owners; W3C monotonic timing is still draft guidance.
 OWASP fixed private output and preserved failures do not authorize caching or
 removing guards. Count per-source full projections when evaluating scaling.
+
+October 13 source-noop guidance uses
+docs/WANTED_SOURCE_NOOP_RESEARCH_2026_10.md. A snapshot alone cannot prove that a
+later conditional UPDATE will remain a no-op. Lock the exact existing owned row
+in the same live transaction, bind its original source before awaiting, and
+retain locks through final publication. NOWAIT plus savepoint recovery can
+decline an optional busy-row proof; it does not remove table waits or existing
+fallback contention. Preserve actual-write/required-event and final authority
+checks, both hashes per retained verification boundary, and conservative missing/
+negative/custom fallback. W3C draft duration guidance is separate from SQL proof.

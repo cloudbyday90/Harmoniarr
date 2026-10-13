@@ -1,5 +1,11 @@
 # Practical web standards skill design
 
+October 13 source-noop maintenance adds a practical method for locked existing
+rows, queryable/transaction scope, optional NOWAIT/savepoint recovery and final
+publication authority. The [design](WANTED_SOURCE_NOOP_DESIGN.md) maps SQL,
+OWASP and W3C timing guidance to actual code owners. Extend existing references
+and testing guidance; keep invocation metadata and the installed skill shape.
+
 October 13 distinct-binding maintenance separates canonical saved requirements,
 real deliveries and receipt history in the existing standards/testing guidance.
 The [design](WANTED_DISTINCT_BINDING_PROFILE_DESIGN.md) retains per-source full

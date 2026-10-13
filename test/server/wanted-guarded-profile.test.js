@@ -56,13 +56,15 @@ test('invalid method, missing GC and pre-cancellation refuse measurement admissi
   await assert.rejects(profileWantedGuardedReconciliation(pool, { readMethod: 'private', gc: () => {} }), TypeError);
   await assert.rejects(profileWantedGuardedReconciliation(pool, { gc: null }), TypeError);
   await assert.rejects(profileWantedGuardedReconciliation(pool, { costDiagnostics: 'yes', gc: () => {} }), TypeError);
+  await assert.rejects(profileWantedGuardedReconciliation(pool, { sourceTransitionMode: 'private', gc: () => {} }), TypeError);
+  await assert.rejects(profileWantedGuardedReconciliation(pool, { captureDurable: 'yes', gc: () => {} }), TypeError);
   const controller = new AbortController(); controller.abort(null);
   await assert.rejects(profileWantedGuardedReconciliation(pool, { gc: () => {}, signal: controller.signal }), error => error === null);
 });
 
 test('saved summaries explicitly select measurement fields and omit private results/digests/extra keys', () => {
   const result = summarizeWantedGuardedSample({ readMethod: 'reusable', queryCount: 5,
-    result: { ownerId: 'private' }, projectionDigests: ['private'], extra: 'private', diagnostics: {
+    result: { ownerId: 'private' }, projectionDigests: ['private'], durable: { requests: 'private' }, extra: 'private', diagnostics: {
       correlationId: 'private', counters: { projectionReads: 7 }, phases: {} } });
   assert.equal(JSON.stringify(result).includes('private'), false); assert.equal(result.queryCount, 5);
 });

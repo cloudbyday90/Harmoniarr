@@ -1,5 +1,11 @@
 # Practical web standards skill outcome
 
+October 13 source-noop reference maintenance maps exact positive-row locks,
+busy-row fallback, original failures and fewer projection/hash boundaries to
+the [outcome](WANTED_SOURCE_NOOP_OUTCOME.md). Native application evidence and
+skill structure/install checks are distinct; this narrow maintenance does not
+claim a new blind trial or standards/security certification.
+
 October 13 distinct-binding maintenance maps actual paths/scopes/context counts,
 full-source rechecks and private matched work to the maintained skill references.
 The [outcome](WANTED_DISTINCT_BINDING_PROFILE_OUTCOME.md) separates native guard

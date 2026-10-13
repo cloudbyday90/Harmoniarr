@@ -37,6 +37,7 @@ export function createLibraryWantedReleaseService({
   libraryWantedReleaseStore = createLibraryWantedReleaseStore({ getPoolFn }),
   projectionReader,
   rootReadMode = projectionReader === undefined ? 'bounded' : 'compatibility',
+  sourceTransitionMode = 'locked-noop',
   store = createLibraryWantedReleaseGuardStore(),
   assertMaintenanceWriteAllowed,
   withTransaction = createDatabaseTransactionRunner({ getPoolFn }),
@@ -45,6 +46,7 @@ export function createLibraryWantedReleaseService({
 } = {}) {
   projectionReader ??= createLibraryWantedReleaseReader();
   if (!['bounded', 'member', 'compatibility'].includes(rootReadMode)) throw new TypeError('Invalid Wanted root read mode');
+  if (!['locked-noop', 'compatibility'].includes(sourceTransitionMode)) throw new TypeError('Invalid Wanted source transition mode');
   for (const [name, fn] of Object.entries({ assertMaintenanceWriteAllowed, withTransaction,
     replaceLibraryWantedReleases: libraryWantedReleaseStore.replaceLibraryWantedReleases,
     readWantedReleaseProjection: projectionReader.readWantedReleaseProjection,
@@ -117,7 +119,8 @@ export function createLibraryWantedReleaseService({
         const trackSources = (projection.source.artists ?? []).flatMap(artist => artist.trackSources ?? [])
           .map(source => currentScanReceiptSource(source, prepared));
         await observer.measure('source_lifecycle', () => trackSourceLifecycle.reconcileSources({ sources: trackSources,
-          queryable, assertCurrent: recheck }));
+          queryable, assertCurrent: recheck, verificationObserver: observer,
+          rootReadAuthority: sourceTransitionMode === 'locked-noop' ? authority : undefined }));
         return { wantedKeys: result.wantedKeys.map((key) => ({ appUserId: key.appUserId, metadataReleaseId: key.metadataReleaseId })),
           deletedWantedKeys: result.deletedWantedKeys.map((key) => ({ appUserId: key.appUserId, metadataReleaseId: key.metadataReleaseId })) };
         };

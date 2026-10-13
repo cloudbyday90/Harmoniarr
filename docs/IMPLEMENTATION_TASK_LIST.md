@@ -6,6 +6,25 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Locked positive Wanted source no-ops (2026-10-13)
+
+The [design](WANTED_SOURCE_NOOP_DESIGN.md),
+[official research](WANTED_SOURCE_NOOP_RESEARCH_2026_10.md) and
+[outcome](WANTED_SOURCE_NOOP_OUTCOME.md) own a narrow ESM current-row proof.
+Exact owned already-existing positive sources can skip conditional source DML
+and its full projection; busy/missing/negative/custom/expired paths retain guards.
+Actual writes/events and final complete byte/job authority remain. The new native
+proof and the separate six-case regression cohort pass. The 10,100-case fast gate,
+both builds, dependency audit and separate four-sample noise control pass on
+frozen code. The original matrix stopped after ten tonal samples at a cold
+checkout; its captured startup gap and unknown cause remain in the outcome.
+
+- Next: capture bounded server-side startup/authentication/setup durations for
+  the original cold fixture client. A repeated checkout failed after transport/
+  startup dispatch without authentication response; preserve failed evidence and
+  limits. Then profile current target/link equality for a guarded no-change
+  Wanted replacement, including writer/absent-row proof and retained final guards.
+
 ## Completed slice: Distinct private Wanted binding profile (2026-10-13)
 
 The [design](WANTED_DISTINCT_BINDING_PROFILE_DESIGN.md),

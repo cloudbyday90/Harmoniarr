@@ -637,3 +637,13 @@ and disjoint artist/release contexts; each binding has three historical rows.
 Every source guard remains, giving bindings+5 complete projections and 2BP
 hashes. docs/WANTED_DISTINCT_BINDING_PROFILE_OUTCOME.md owns actual mutation/
 event rollback, independent sample results and the measured optimization owner.
+
+Positive source no-ops use operator-track-source-noop-store.js under
+src/server/metadata/, called only by the default lifecycle with canonical Wanted's
+private transaction authority. Exact owned already-existing positive rows get
+FOR NO KEY UPDATE NOWAIT inside a savepoint. Current transaction mismatch,
+missing/mismatched rows and busy locks decline the skip; custom/fulfillment paths
+stay guarded. docs/WANTED_SOURCE_NOOP_OUTCOME.md owns production default wiring,
+native commit/rollback, final byte/owner/lease/cancellation, required-event failure
+and matched private results. --source-noops preserves the original compatibility
+matrix and uses a distinct comparator for fewer complete projections/hashes.
