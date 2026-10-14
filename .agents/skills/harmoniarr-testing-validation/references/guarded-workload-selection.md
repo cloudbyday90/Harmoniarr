@@ -54,3 +54,16 @@ adoption. Native tests must
 prove changed-media reinspection, read-only mount denial and real held-exec
 retirement. Keep every canonical inspection and private comparator. See
 docs/OWNED_MEDIA_EXECUTOR_OUTCOME.md for the selected measurements and limits.
+
+For owned transport cost, add `--media-diagnostics on` to the explicit owned
+distinct/source workload; off is the default. Twelve fixed CLI phases expose
+bounded counts and monotonic aggregate durations after actual close. Completed
+CLI inspection does not certify configuration validation, and ownerCleanupSafe
+does not certify whole-app drainage. Keep local-tools/no-owner summaries distinct,
+invalid clocks untimed, clipped budgets explicit and original Error/null through
+held optional sinks. Serial transport windows can be summed; overlapping seed,
+caller queue and close windows cannot be added again. Exec time includes CLI/
+daemon/codec/stdio, not just ffprobe CPU. Native invocation counts and exact
+canonical comparisons precede interpreting a one-pair off/on timing. See
+docs/MEDIA_TRANSPORT_PHASE_OUTCOME.md; the read-only API proposal still needs
+daemon/context/version, bounded body and owned disposal proof.

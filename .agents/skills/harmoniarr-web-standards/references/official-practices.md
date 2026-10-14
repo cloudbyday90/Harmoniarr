@@ -1,5 +1,14 @@
 # Official practices by boundary
 
+October 14 transport-phase guidance uses
+docs/MEDIA_TRANSPORT_PHASE_RESEARCH_2026_10.md. Node process-relative timing and
+W3C draft monotonic durations support returned-work windows; OWASP data minimization
+supports fixed bounded aggregates and failure tests. Docker CLI/control reads map
+to Engine API work, but control elapsed time is not wholly avoidable host startup.
+Preserve every current inspection, original failure and cleanup owner. A proposed
+local read adapter requires acknowledged context/daemon/version and bounded HTTP/
+agent disposal before promotion; do not infer permission to expose a daemon.
+
 October 14 inspection-owner guidance uses
 docs/OWNED_MEDIA_EXECUTOR_RESEARCH_2026_10.md. Docker exec lifetime belongs to its
 container; a killed host CLI cannot certify stopped work. Admit the canonical

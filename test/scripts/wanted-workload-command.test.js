@@ -30,8 +30,8 @@ test('legacy workload commands keep full dimensions and original comparator sele
 
 test('explicit workload selection records reduced scope and forwards only reviewed options', () => {
   const result = selected();
-  assert.deepEqual(result.plan, { scope: 'selected', profiles: ['sine'], bindingCounts: [2], pairs: 1, seedPreviewMode: 'worker', mediaExecutionMode: 'per-command', expectedSamples: 2 });
-  assert.deepEqual(result.options, { profiles: ['sine'], bindingCounts: [2], pairs: 1, seedPreviewMode: 'worker', mediaExecutionMode: 'per-command', sourceNoopComparison: true });
+  assert.deepEqual(result.plan, { scope: 'selected', profiles: ['sine'], bindingCounts: [2], pairs: 1, seedPreviewMode: 'worker', mediaExecutionMode: 'per-command', mediaDiagnostics: false, expectedSamples: 2 });
+  assert.deepEqual(result.options, { profiles: ['sine'], bindingCounts: [2], pairs: 1, seedPreviewMode: 'worker', mediaExecutionMode: 'per-command', mediaDiagnostics: false, sourceNoopComparison: true });
   assert.throws(() => result.plan.profiles.push('noise'), TypeError);
   assert.throws(() => { result.options.pairs = 2; }, TypeError);
 });
@@ -42,11 +42,21 @@ test('ambiguous, duplicate, unsupported and incomplete commands refuse before me
     ['--bindings', '2'], ['--source-noops', '--bindings', '16'], ['--source-noops', '--bindings', '2,2'],
     ['--pairs', '3'], ['--pairs', '01'], ['--pairs'], ['--pairs', '1', '--pairs', '2'],
     ['--output', 'other.json'], ['--unknown'], ['--profiles', '--pairs', '1'], ['--seed-preview', 'separate'],
-    ['--source-noops', '--seed-preview', 'cached'], ['--media-execution', 'owned'], ['--source-noops', '--media-execution', 'shared']]) {
+    ['--source-noops', '--seed-preview', 'cached'], ['--media-execution', 'owned'], ['--source-noops', '--media-execution', 'shared'],
+    ['--source-noops', '--media-diagnostics', 'on'], ['--media-diagnostics', 'off'],
+    ['--source-noops', '--media-execution', 'owned', '--media-diagnostics', 'cached']]) {
     assert.throws(() => parseWantedWorkloadCommand([...base, ...tail]), TypeError);
   }
   for (const args of [[], ['--output', ' '], ['--output'], new Array(2), [null]]) {
     assert.throws(() => parseWantedWorkloadCommand(args), TypeError);
+  }
+});
+
+test('transport diagnostics are opt-in and recorded only for reviewed owned workloads', () => {
+  for (const mode of ['on', 'off']) {
+    const result = parseWantedWorkloadCommand([...base, '--source-noops', '--media-execution', 'owned', '--media-diagnostics', mode]);
+    assert.equal(result.plan.mediaDiagnostics, mode === 'on'); assert.equal(result.options.mediaDiagnostics, mode === 'on');
+    assert.equal(result.plan.expectedSamples, 24);
   }
 });
 

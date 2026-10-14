@@ -129,3 +129,8 @@ locked-noop timeout as a separate phase investigation. Reversed-order evidence
 and cleanup-owner audits precede broader default/reusable-app promotion. See the separate
 [design](OWNED_MEDIA_EXECUTOR_DESIGN.md) and
 [official October research](OWNED_MEDIA_EXECUTOR_RESEARCH_2026_10.md).
+
+The subsequent [transport phase outcome](MEDIA_TRANSPORT_PHASE_OUTCOME.md) now
+implements optional bounded round-trip counters/timing and identifies twenty-five
+container inspection reads as the next API prototype. Its completed small/native
+evidence does not diagnose or replace this earlier incomplete largest collection.

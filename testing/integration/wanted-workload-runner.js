@@ -10,6 +10,7 @@ import { createEarlyFailureRecord } from '../reporters/early-failure-format.js';
 import { wantedWorkloadExpectedKeys, wantedWorkloadSampleKey } from './wanted-workload-command-policy.js';
 import { readCheckoutProperty as read } from './pool-checkout-record.js';
 import { captureWantedSeedRecord } from './wanted-seed-observer.js';
+import { captureMediaTransportSummary } from './media-transport-phase-policy.js';
 
 function captureCheckpoint(input) {
   const stage = read(input, 'stage'); const mediaProfile = read(input, 'mediaProfile');
@@ -25,10 +26,18 @@ export async function runWantedWorkloadMeasurement({ selection, measure, signal,
   onProgress = () => {}, now = () => performance.now(), projectRoot = process.cwd() }) {
   const samples = []; const remaining = wantedWorkloadExpectedKeys(selection);
   const seedPhases = []; let seedPhasesClipped = false;
+  const mediaTransports = []; let mediaTransportsClipped = false;
   const started = now(); let failed = false; let error; let lastCheckpoint = null;
   try {
     signal?.throwIfAborted();
     await measure({ ...selection.options, signal, onProgress,
+      onMediaTransport: row => {
+        if (!selection.options.mediaDiagnostics) return;
+        const record = captureMediaTransportSummary(row);
+        if (!record) return;
+        if (mediaTransports.length === 12) { mediaTransports.shift(); mediaTransportsClipped = true; }
+        mediaTransports.push(record);
+      },
       onCheckpoint: row => { lastCheckpoint = captureCheckpoint(row) ?? lastCheckpoint; },
       onSeedRecord: row => {
         const record = captureWantedSeedRecord(row);
@@ -49,7 +58,7 @@ export async function runWantedWorkloadMeasurement({ selection, measure, signal,
   const report = { version: 2, kind: selection.kind, completed: !failed, node: process.version,
     plan: selection.plan, measurementMs: Number.isFinite(elapsed) && elapsed >= 0 ? elapsed : null,
     lastCheckpoint,
-    seedPhases, seedPhasesClipped,
+    seedPhases, seedPhasesClipped, mediaTransports, mediaTransportsClipped,
     failure: failed ? createEarlyFailureRecord({ type: 'test:fail', data: { details: { error: { cause: error } } } }, { projectRoot }) : null,
     samples };
   return { failed, error, report };

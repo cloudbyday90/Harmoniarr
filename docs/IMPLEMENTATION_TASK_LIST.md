@@ -6,6 +6,18 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Bounded media transport phase evidence (2026-10-14)
+
+- Fixed aggregate observation/public capture/release modules instrument the owned
+  CLI transport with optional `--media-diagnostics on|off`. Original commands,
+  current checks, failures, limits and cleanup authority remain.
+- The [outcome](MEDIA_TRANSPORT_PHASE_OUTCOME.md) records native call-count proof
+  and a completed off/on canonical selection. Twenty-five container reads took
+  3,433.852 ms; timing does not prove that all of that cost is removable.
+- Next: implement the [read-only API proposal](MEDIA_CONTROL_READ_API_PROPOSAL.md)
+  with acknowledged daemon/context/version, bounded HTTP and owned disposal proof.
+  Keep exec/mutations on CLI and leave broader/default promotion deferred.
+
 ## Completed slice: Scenario-owned media inspection pilot (2026-10-14)
 
 - Narrow ESM policy/transport/lifetime helpers keep current ffprobe work in one

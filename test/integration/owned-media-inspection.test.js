@@ -15,6 +15,7 @@ import { createLibraryAddMediaFixture } from '../../testing/integration/library-
 import { createOwnedMediaInspectionExecutor } from '../../testing/integration/owned-media-inspection-executor.js';
 import { createOwnedMediaDockerTransport } from '../../testing/integration/owned-media-docker-transport.js';
 import { mediaInspectionPrefix } from '../../testing/integration/owned-media-inspection-policy.js';
+import { createMediaTransportObserver } from '../../testing/integration/media-transport-phase-observer.js';
 
 const executeFile = promisify(execFile); const active = new Set();
 after(async () => { await Promise.allSettled([...active]); }, { timeout: 90_000 });
@@ -22,7 +23,8 @@ function scenario(t, options, work) {
   const operation = (async () => {
     const root = await mkdtemp(join(tmpdir(), 'harmoniarr-owned-media-')); const calls = []; let id; let original;
     const media = createLibraryAddMediaFixture({ getFixtureRoot: () => root });
-    const executor = createOwnedMediaInspectionExecutor({ workspaceDir: root, signal: t.signal,
+    const transportObserver = createMediaTransportObserver();
+    const executor = createOwnedMediaInspectionExecutor({ workspaceDir: root, signal: t.signal, transportObserver,
       createTransport: input => createOwnedMediaDockerTransport({ ...input, commandTimeoutMs: options.hang ? 500 : 30_000,
         executeFileFn: async (binary, args, commandOptions) => {
           calls.push(args);
@@ -40,7 +42,19 @@ function scenario(t, options, work) {
     try { await media.generateAudio(source); await work({ root, source, args, media, executor, calls, id: () => id, original: () => original }); }
     catch (error) { failed = true; failure = error; }
     try { await executor.close(); } catch (error) { if (!failed) { failed = true; failure = error; } }
-    if (executor.canRemoveWorkspace()) await rm(root, { recursive: true, force: true });
+    if (!failed) {
+      try {
+        const snapshot = transportObserver.snapshot();
+        assert.equal(snapshot.phases.reduce((sum, row) => sum + row.started, 0), calls.length);
+        assert.ok(snapshot.phases.every(row => row.pending === 0));
+        const command = snapshot.phases.find(row => row.phase === 'command_exec');
+        assert.equal(command.started, calls.filter(argsRow => argsRow[0] === 'exec').length);
+        assert.equal(command.failed, options.hang || original ? 1 : 0);
+        assert.ok(!JSON.stringify(snapshot).includes(root)); assert.ok(!JSON.stringify(snapshot).includes(id));
+      } catch (error) { failed = true; failure = error; }
+    }
+    try { if (executor.canRemoveWorkspace()) await rm(root, { recursive: true, force: true }); }
+    catch (error) { if (!failed) { failed = true; failure = error; } }
     if (failed) throw failure;
   })();
   active.add(operation); operation.then(() => active.delete(operation), () => active.delete(operation)); return operation;

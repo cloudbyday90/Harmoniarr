@@ -4,6 +4,13 @@ Harmoniarr is a self-hosted, Docker-hosted music library manager inspired by Lid
 
 The repository contains the Node.js ESM server, Vue client, PostgreSQL schema, automated validation, and design documents. The platform is under active development toward its first release.
 
+Owned media workload diagnostics can separate twelve fixed Docker transport
+phases with `--media-execution owned --media-diagnostics on`. Reports retain
+bounded aggregate counts/durations after cleanup, excluding private command data.
+See the [design](docs/MEDIA_TRANSPORT_PHASE_DESIGN.md),
+[official research](docs/MEDIA_TRANSPORT_PHASE_RESEARCH_2026_10.md) and
+[measured outcome](docs/MEDIA_TRANSPORT_PHASE_OUTCOME.md) before changing transport.
+
 The explicit distinct/source workload supports `--media-execution owned` for one
 scenario-owned read-only ffprobe container. Every inspection still executes;
 generation keeps per-command isolation. Per-command remains the default during

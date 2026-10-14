@@ -6,6 +6,13 @@ This repository includes a shared `.agents/` directory for GitHub Copilot agent 
 
 The goal is to keep reusable AI workflow guidance versioned alongside the project so UI review, frontend implementation, browser testing, and related tasks follow the same repo conventions.
 
+The [transport phase outcome](MEDIA_TRANSPORT_PHASE_OUTCOME.md) extends the
+testing/standards method with bounded actual CLI counts and monotonic aggregate
+windows. Preserve Error/null and drain post-close observation. Separate exec
+round-trip work from codec CPU and total command/setup time; do not credit an
+observer with speed from an unmatched one-pair timing. Use measured control reads
+to scope the next API proposal, preserving every current ownership check.
+
 The [owned media executor](OWNED_MEDIA_EXECUTOR_OUTCOME.md) extends existing
 testing and standards skills with bounded two-file admission, serial current
 inspection, acknowledged read-only container ownership and verified retirement.

@@ -6,10 +6,11 @@
  */
 import { captureMediaInspectionPolicy, mediaExecutorError } from './owned-media-inspection-policy.js';
 import { createOwnedMediaDockerTransport } from './owned-media-docker-transport.js';
+import { disabledMediaTransportObserver } from './media-transport-phase-observer.js';
 
 /** A lazy serial scenario owner; close seals admission synchronously and drains returned work. */
 export function createOwnedMediaInspectionExecutor({ workspaceDir, image = process.env.HARMONIARR_INTEGRATION_MEDIA_IMAGE,
-  signal, createTransport = createOwnedMediaDockerTransport } = {}) {
+  signal, createTransport = createOwnedMediaDockerTransport, transportObserver = disabledMediaTransportObserver } = {}) {
   if (typeof createTransport !== 'function') throw new TypeError('Invalid media executor transport');
   let sealed = false; let pending = 0; let tail = Promise.resolve(); let failed = false; let failure;
   let capture; let start; let transport; let retirement; let closing; let cleanupSafe = true;
@@ -25,7 +26,7 @@ export function createOwnedMediaInspectionExecutor({ workspaceDir, image = proce
       const policy = await (capture ??= captureMediaInspectionPolicy(workspaceDir));
       await policy.map(binary, args, options);
       await (start ??= (async () => {
-        transport = createTransport({ image, root: policy.root }); cleanupSafe = false;
+        transport = createTransport({ image, root: policy.root, transportObserver }); cleanupSafe = false;
         await transport.start();
       })());
       signal?.throwIfAborted();

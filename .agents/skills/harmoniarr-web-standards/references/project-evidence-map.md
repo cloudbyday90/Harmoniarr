@@ -1,5 +1,13 @@
 # Project standards-to-evidence map
 
+Owned transport evidence: media-transport-{phase-policy,phase-observer,release}.js
+keeps fixed bounded aggregates, minimized report capture and post-close sink
+drainage. owned-media-docker-transport.js labels actual returned native calls;
+the explicit workload records optional diagnostics and bounded owner summaries.
+The transport documents distinguish CLI/daemon/codec/stdio round trips from CPU
+and whole-command setup, preserve Error/null and identify a read-only API
+prototype without granting cache or ownership-check removal authority.
+
 Wanted seed owners: wanted-seed-{observer,media-observer}.js observe returned
 phase/command work with numeric nesting and safe output. The distinct receipt
 fixture retains physical identity/scopes/history proof; distinct apply retains

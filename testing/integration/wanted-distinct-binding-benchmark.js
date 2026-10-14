@@ -16,15 +16,20 @@ import { compareWantedBoundedRootSamples, profileWantedGuardedReconciliation,
 import { compareWantedSourceNoopSamples } from './wanted-source-noop-profile-policy.js';
 import { createWantedSeedObserver } from './wanted-seed-observer.js';
 import { createOwnedMediaInspectionExecutor } from './owned-media-inspection-executor.js';
+import { createMediaTransportObserver, disabledMediaTransportObserver } from './media-transport-phase-observer.js';
+import { closeMediaTransport } from './media-transport-release.js';
 
 export async function measureWantedDistinctBindings({ signal, onProgress = () => {}, onSample = () => {},
   profiles = ['sine', 'noise'], bindingCounts = wantedDistinctBindingCounts, pairs = 2, gc = global.gc,
-  sourceNoopComparison = false, onCheckpoint = () => {}, onSeedRecord = () => {}, seedPreviewMode = 'worker', mediaExecutionMode = 'per-command' } = {}) {
+  sourceNoopComparison = false, onCheckpoint = () => {}, onSeedRecord = () => {}, seedPreviewMode = 'worker', mediaExecutionMode = 'per-command',
+  mediaDiagnostics = false, onMediaTransport = () => {} } = {}) {
   if (typeof sourceNoopComparison !== 'boolean') throw new TypeError('Invalid source no-op comparison');
   if (typeof onCheckpoint !== 'function') throw new TypeError('Invalid workload checkpoint observer');
   if (typeof onSeedRecord !== 'function') throw new TypeError('Invalid seed record observer');
   if (!['worker', 'separate'].includes(seedPreviewMode)) throw new TypeError('Invalid seed preview mode');
   if (!['owned', 'per-command'].includes(mediaExecutionMode)) throw new TypeError('Invalid media execution mode');
+  if (typeof mediaDiagnostics !== 'boolean' || (mediaDiagnostics && mediaExecutionMode !== 'owned')
+    || typeof onMediaTransport !== 'function') throw new TypeError('Invalid media diagnostics');
   const checkpoint = async record => { try { await onCheckpoint(record); } catch { /* Optional diagnostic sink. */ } };
   assertWantedDistinctWorkloadOptions({ signal, profiles, bindingCounts, pairs, gc, onProgress, onSample });
   const config = resolveIntegrationTestRuntimeConfig(); const rows = [];
@@ -44,10 +49,12 @@ export async function measureWantedDistinctBindings({ signal, onProgress = () =>
         run: input => withFixtureLifecycle({ signal: caseSignal }, async scope => {
           await checkpoint({ ...location, stage: 'seed' });
           const seedObserver = createWantedSeedObserver({ onRecord: record => onSeedRecord({ ...record, ...location }) });
+          const transportObserver = mediaDiagnostics ? createMediaTransportObserver() : disabledMediaTransportObserver;
           if (mediaExecutionMode === 'owned' && process.env.HARMONIARR_INTEGRATION_MEDIA_IMAGE) {
-            inspectionExecutor = createOwnedMediaInspectionExecutor({ workspaceDir: input.workspaceDir, signal: scope.signal });
-            scope.onRelease(() => seedObserver.measure('media_executor_close', null, () => inspectionExecutor.close()));
+            inspectionExecutor = createOwnedMediaInspectionExecutor({ workspaceDir: input.workspaceDir, signal: scope.signal, transportObserver });
           }
+          if (inspectionExecutor || mediaDiagnostics) scope.onRelease(() => closeMediaTransport({ executor: inspectionExecutor,
+            seedObserver, transportObserver, location, enabled: mediaDiagnostics, onRecord: onMediaTransport }));
           const c = await seedObserver.measure('seed_total', null, () => seedWantedDistinctBindingProfile(input.workspaceDir, { bindings, mediaProfile,
             durationSeconds: mediaProfile === 'noise' ? 30 : 2, signal: scope.signal, seedObserver, seedPreviewMode, inspectionExecutor }));
           await checkpoint({ ...location, stage: 'profile_client' });

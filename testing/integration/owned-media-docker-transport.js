@@ -8,6 +8,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import { mediaExecutorError } from './owned-media-inspection-policy.js';
+import { disabledMediaTransportObserver } from './media-transport-phase-observer.js';
 
 const executeFile = promisify(execFile);
 const label = 'io.harmoniarr.fixture.media-owner';
@@ -15,16 +16,17 @@ const idPattern = /^[a-f0-9]{64}$/u;
 const imagePattern = /^sha256:[a-f0-9]{64}$/u;
 
 /** Bounded CLI transport: ownership comes only from an acknowledged complete ID. */
-export function createOwnedMediaDockerTransport({ image, root, executeFileFn = executeFile, commandTimeoutMs = 30_000 } = {}) {
+export function createOwnedMediaDockerTransport({ image, root, executeFileFn = executeFile, commandTimeoutMs = 30_000,
+  transportObserver = disabledMediaTransportObserver } = {}) {
   if (!image || typeof executeFileFn !== 'function' || !Number.isSafeInteger(commandTimeoutMs)
-    || commandTimeoutMs < 1 || commandTimeoutMs > 30_000) throw new TypeError('Invalid media transport');
+    || commandTimeoutMs < 1 || commandTimeoutMs > 30_000 || typeof transportObserver?.measure !== 'function') throw new TypeError('Invalid media transport');
   const token = randomUUID(); let id; let imageId; let trusted = false;
-  const invoke = (args, options = {}) => executeFileFn('docker', args, {
+  const invoke = (phase, args, options = {}) => transportObserver.measure(phase, () => executeFileFn('docker', args, {
     timeout: 30_000, maxBuffer: 2 * 1024 * 1024, windowsHide: true, shell: false, ...options,
-  });
-  async function inspect() {
+  }));
+  async function inspect(phase) {
     if (!id) throw mediaExecutorError('fixture_media_owner_unknown');
-    const { stdout } = await invoke(['inspect', id]); const [state] = JSON.parse(stdout);
+    const { stdout } = await invoke(phase, ['inspect', id]); const [state] = JSON.parse(stdout);
     const mount = state?.HostConfig?.Mounts;
     if (state?.Id !== id || state.Image !== imageId || state.Config?.Labels?.[label] !== token
       || JSON.stringify(state.Config?.Entrypoint) !== '["sleep"]' || JSON.stringify(state.Config?.Cmd) !== '["infinity"]'
@@ -41,40 +43,40 @@ export function createOwnedMediaDockerTransport({ image, root, executeFileFn = e
   }
   return Object.freeze({
     async start() {
-      imageId = (await invoke(['image', 'inspect', image, '--format', '{{.Id}}'])).stdout.trim();
+      imageId = (await invoke('image_inspect', ['image', 'inspect', image, '--format', '{{.Id}}'])).stdout.trim();
       if (!imagePattern.test(imageId)) throw mediaExecutorError('fixture_media_image_refused');
-      const reply = await invoke(['create', '--network', 'none', '--read-only', '--no-healthcheck', '--cap-drop', 'ALL',
+      const reply = await invoke('owner_create', ['create', '--network', 'none', '--read-only', '--no-healthcheck', '--cap-drop', 'ALL',
         '--security-opt', 'no-new-privileges', '--restart', 'no', '--label', `${label}=${token}`,
         '--entrypoint', 'sleep', '--mount', `type=bind,source=${root},target=/fixtures,readonly,bind-recursive=disabled`, imageId, 'infinity']);
       const acknowledged = reply.stdout.trim();
       if (!idPattern.test(acknowledged)) throw mediaExecutorError('fixture_media_owner_unknown');
       id = acknowledged;
-      await inspect();
-      await invoke(['start', id]);
-      if ((await inspect()).State?.Running !== true) throw mediaExecutorError('fixture_media_not_running');
+      await inspect('start_inspect');
+      await invoke('owner_start', ['start', id]);
+      if ((await inspect('start_inspect')).State?.Running !== true) throw mediaExecutorError('fixture_media_not_running');
     },
     async run(args, signal) {
-      const before = await inspect();
+      const before = await inspect('command_inspect_before');
       if (before.State?.Running !== true || before.ExecIDs?.length) throw mediaExecutorError('fixture_media_not_quiescent');
-      const result = await invoke(['exec', id, 'ffprobe', ...args], { timeout: commandTimeoutMs, ...(signal ? { signal } : {}) });
-      const after = await inspect();
+      const result = await invoke('command_exec', ['exec', id, 'ffprobe', ...args], { timeout: commandTimeoutMs, ...(signal ? { signal } : {}) });
+      const after = await inspect('command_inspect_after');
       if (after.State?.Running !== true || after.ExecIDs?.length) throw mediaExecutorError('fixture_media_not_quiescent');
       return result;
     },
     async retire() {
       // Never target an inferred name or an ID whose original configuration was not validated.
       if (!trusted) throw mediaExecutorError('fixture_media_owner_unknown');
-      const before = await inspect();
+      const before = await inspect('retire_inspect_before');
       if (before.State?.Running) {
         let stopError; let failed = false;
-        try { await invoke(['stop', '--time', '0', id]); } catch (error) { failed = true; stopError = error; }
-        const after = await inspect();
+        try { await invoke('owner_stop', ['stop', '--time', '0', id]); } catch (error) { failed = true; stopError = error; }
+        const after = await inspect('retire_inspect_after');
         if (after.State?.Running !== false) throw failed ? stopError : mediaExecutorError('fixture_media_not_quiescent');
       } else if (before.State?.Running !== false) throw mediaExecutorError('fixture_media_not_quiescent');
     },
     async remove() {
-      if (!trusted || (await inspect()).State?.Running !== false) throw mediaExecutorError('fixture_media_not_quiescent');
-      await invoke(['rm', id]);
+      if (!trusted || (await inspect('remove_inspect_before')).State?.Running !== false) throw mediaExecutorError('fixture_media_not_quiescent');
+      await invoke('owner_remove', ['rm', id]);
     },
   });
 }
