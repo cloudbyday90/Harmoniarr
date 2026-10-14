@@ -197,21 +197,21 @@ jobs:
           echo "verification_asset_name=harmoniarr-release-verification.txt" >> "$GITHUB_OUTPUT"
 
       - name: Upload Compose override artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: harmoniarr-release-compose.override.yaml
           path: supply-chain/harmoniarr-release-compose.override.yaml
           if-no-files-found: error
 
       - name: Upload verification note artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: harmoniarr-release-verification.txt
           path: supply-chain/harmoniarr-release-verification.txt
           if-no-files-found: error
 
       - name: Upload release metadata artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: harmoniarr-release-metadata.json
           path: supply-chain/harmoniarr-release-metadata.json
@@ -297,7 +297,7 @@ jobs:
         run: node scripts/verify-published-image-provenance.js
 
       - name: Upload attestation verification artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: harmoniarr-image-attestation.json
           path: supply-chain/image-attestation.json
@@ -305,7 +305,7 @@ jobs:
 
       - name: Upload baseline attestation verification artifact
         if: ${{ steps.baseline.outputs.baseline_enabled == 'true' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: harmoniarr-baseline-image-attestation.json
           path: supply-chain/baseline-image-attestation.json
@@ -358,7 +358,7 @@ jobs:
         run: npm run validate:docker-smoke-evidence
 
       - name: Upload published-image smoke evidence artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: harmoniarr-docker-smoke-released-image.json
           path: supply-chain/harmoniarr-docker-smoke-released-image.json
@@ -379,14 +379,14 @@ jobs:
         run: npm run validate:docker-smoke-evidence
 
       - name: Upload published-image browser smoke evidence artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: harmoniarr-docker-smoke-browser-operator.json
           path: supply-chain/harmoniarr-docker-smoke-browser-operator.json
           if-no-files-found: error
 
       - name: Upload published-image browser smoke screenshots artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: harmoniarr-docker-smoke-browser-screenshots
           path: supply-chain/browser-smoke-screenshots
@@ -451,7 +451,7 @@ jobs:
         run: npm run validate:docker-smoke-evidence
 
       - name: Upload upgrade-path smoke evidence artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: harmoniarr-docker-smoke-upgrade-path.json
           path: supply-chain/harmoniarr-docker-smoke-upgrade-path.json
@@ -552,7 +552,7 @@ jobs:
         run: npm run write:docker-deployment-summary
 
       - name: Upload deployment summary artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: harmoniarr-docker-deployment-summary.json
           path: supply-chain/harmoniarr-docker-deployment-summary.json
@@ -686,7 +686,7 @@ jobs:
         run: node scripts/promote-release-image-tags.js
 
       - name: Upload verified tag promotion evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: harmoniarr-release-tag-promotion.json
           path: supply-chain/release-tag-promotion.json
@@ -751,7 +751,7 @@ jobs:
         run: node scripts/release-draft-lifecycle.js --mode finalize
 
       - name: Upload immutable publication evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: harmoniarr-release-publication.json
           path: supply-chain/release-publication.json
