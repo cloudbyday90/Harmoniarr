@@ -4,6 +4,13 @@ Harmoniarr is a self-hosted, Docker-hosted music library manager inspired by Lid
 
 The repository contains the Node.js ESM server, Vue client, PostgreSQL schema, automated validation, and design documents. The platform is under active development toward its first release.
 
+The explicit distinct/source workload supports `--media-execution owned` for one
+scenario-owned read-only ffprobe container. Every inspection still executes;
+generation keeps per-command isolation. Per-command remains the default during
+this pilot. See the [design](docs/OWNED_MEDIA_EXECUTOR_DESIGN.md),
+[official research](docs/OWNED_MEDIA_EXECUTOR_RESEARCH_2026_10.md) and
+[outcome](docs/OWNED_MEDIA_EXECUTOR_OUTCOME.md) for ownership, evidence and limits.
+
 Wanted seed profiling now separates consent, generated/inspected media, actual
 apply and receipt verification with bounded private-data-free phase records.
 Distinct fixtures retain the actual worker preview and avoid a redundant earlier

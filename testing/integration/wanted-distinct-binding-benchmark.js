@@ -15,14 +15,16 @@ import { compareWantedBoundedRootSamples, profileWantedGuardedReconciliation,
   summarizeWantedGuardedSample } from './wanted-guarded-profile.js';
 import { compareWantedSourceNoopSamples } from './wanted-source-noop-profile-policy.js';
 import { createWantedSeedObserver } from './wanted-seed-observer.js';
+import { createOwnedMediaInspectionExecutor } from './owned-media-inspection-executor.js';
 
 export async function measureWantedDistinctBindings({ signal, onProgress = () => {}, onSample = () => {},
   profiles = ['sine', 'noise'], bindingCounts = wantedDistinctBindingCounts, pairs = 2, gc = global.gc,
-  sourceNoopComparison = false, onCheckpoint = () => {}, onSeedRecord = () => {}, seedPreviewMode = 'worker' } = {}) {
+  sourceNoopComparison = false, onCheckpoint = () => {}, onSeedRecord = () => {}, seedPreviewMode = 'worker', mediaExecutionMode = 'per-command' } = {}) {
   if (typeof sourceNoopComparison !== 'boolean') throw new TypeError('Invalid source no-op comparison');
   if (typeof onCheckpoint !== 'function') throw new TypeError('Invalid workload checkpoint observer');
   if (typeof onSeedRecord !== 'function') throw new TypeError('Invalid seed record observer');
   if (!['worker', 'separate'].includes(seedPreviewMode)) throw new TypeError('Invalid seed preview mode');
+  if (!['owned', 'per-command'].includes(mediaExecutionMode)) throw new TypeError('Invalid media execution mode');
   const checkpoint = async record => { try { await onCheckpoint(record); } catch { /* Optional diagnostic sink. */ } };
   assertWantedDistinctWorkloadOptions({ signal, profiles, bindingCounts, pairs, gc, onProgress, onSample });
   const config = resolveIntegrationTestRuntimeConfig(); const rows = [];
@@ -34,14 +36,20 @@ export async function measureWantedDistinctBindings({ signal, onProgress = () =>
       signal?.throwIfAborted();
       const caseSignal = AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(config.scenarioTimeoutMs)]);
       const location = { mediaProfile, bindings, pair };
+      let inspectionExecutor;
       await checkpoint({ ...location, stage: 'scenario_start' });
       await withIntegrationApp({ config,
+        workspaceCleanupGuard: () => !inspectionExecutor || inspectionExecutor.canRemoveWorkspace(),
         withPostgresIntegrationRuntimeFn: ({ run, phaseObserver }) => runtime.runIsolatedDatabase(run, { phaseObserver, signal: caseSignal }),
         run: input => withFixtureLifecycle({ signal: caseSignal }, async scope => {
           await checkpoint({ ...location, stage: 'seed' });
           const seedObserver = createWantedSeedObserver({ onRecord: record => onSeedRecord({ ...record, ...location }) });
+          if (mediaExecutionMode === 'owned' && process.env.HARMONIARR_INTEGRATION_MEDIA_IMAGE) {
+            inspectionExecutor = createOwnedMediaInspectionExecutor({ workspaceDir: input.workspaceDir, signal: scope.signal });
+            scope.onRelease(() => seedObserver.measure('media_executor_close', null, () => inspectionExecutor.close()));
+          }
           const c = await seedObserver.measure('seed_total', null, () => seedWantedDistinctBindingProfile(input.workspaceDir, { bindings, mediaProfile,
-            durationSeconds: mediaProfile === 'noise' ? 30 : 2, signal: scope.signal, seedObserver, seedPreviewMode }));
+            durationSeconds: mediaProfile === 'noise' ? 30 : 2, signal: scope.signal, seedObserver, seedPreviewMode, inspectionExecutor }));
           await checkpoint({ ...location, stage: 'profile_client' });
           await withWantedProfileClient(c.pool, async borrowed => {
             const samples = [];

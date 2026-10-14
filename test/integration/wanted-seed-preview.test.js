@@ -18,18 +18,25 @@ import { profileWantedGuardedReconciliation } from '../../testing/integration/wa
 import { compareWantedSourceNoopSamples } from '../../testing/integration/wanted-source-noop-profile-policy.js';
 import { withWantedProfileClient } from '../../testing/integration/wanted-profile-client.js';
 import { fingerprintOperatorTrackFile } from '../../src/server/metadata/operator-track-file-evidence-service.js';
+import { createOwnedMediaInspectionExecutor } from '../../testing/integration/owned-media-inspection-executor.js';
 
 const config = resolveIntegrationTestRuntimeConfig(); let runtime; const active = new Set();
 suite('Actual worker previews own Wanted fixture evidence', () => {
   before(async () => { runtime = await createPostgresIntegrationRuntime({ config, env: {} }); }, { timeout: config.suiteSetupTimeoutMs });
   after(async () => { await Promise.allSettled([...active]); await runtime?.cleanup(); }, { timeout: config.suiteTeardownTimeoutMs });
   test('four independent files retain accepted worker plans, complete receipts and guarded private comparisons', { timeout: config.scenarioTimeoutMs }, async t => {
+    let inspectionExecutor;
     const work = withIntegrationApp({ config,
+      workspaceCleanupGuard: () => !inspectionExecutor || inspectionExecutor.canRemoveWorkspace(),
       withPostgresIntegrationRuntimeFn: ({ run, phaseObserver }) => runtime.runIsolatedDatabase(run, { phaseObserver, signal: t.signal }),
       run: input => withFixtureLifecycle({ signal: t.signal }, async scope => {
         const rows = []; const observer = createWantedSeedObserver({ onRecord: row => rows.push(row) });
+        if (process.env.HARMONIARR_INTEGRATION_MEDIA_IMAGE) {
+          inspectionExecutor = createOwnedMediaInspectionExecutor({ workspaceDir: input.workspaceDir, signal: scope.signal });
+          scope.onRelease(() => inspectionExecutor.close());
+        }
         const c = await observer.measure('seed_total', null, () => seedWantedDistinctBindingProfile(input.workspaceDir,
-          { bindings: 4, mediaProfile: 'sine', durationSeconds: 2, signal: scope.signal, seedObserver: observer }));
+          { bindings: 4, mediaProfile: 'sine', durationSeconds: 2, signal: scope.signal, seedObserver: observer, inspectionExecutor }));
         assert.deepEqual(c.dimensions, { bindings: 4, requirements: 4, owners: 2, contexts: 2, receiptsPerBinding: 3, receipts: 12 });
         const settled = rows.filter(row => row.event === 'settled');
         assert.equal(settled.filter(row => row.phase === 'delivery_preview').length, 0);

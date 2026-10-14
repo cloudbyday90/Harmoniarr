@@ -12,7 +12,7 @@ const modes = new Map([
   ['--root-costs', ['wanted_root_costs', 'costDiagnostics', [false, true]]],
   ['', ['wanted_guarded_workload', 'readMethod', ['stream', 'reusable']]],
 ]);
-const usage = 'Usage: node --expose-gc scripts/measure-wanted-guarded-workload.js --output <local JSON> [--source-noops|--distinct-bindings|--bounded-roots|--receipt-groups|--root-costs] [--profiles sine,noise] [--bindings 2,4,8] [--pairs 1|2] [--seed-preview worker|separate]';
+const usage = 'Usage: node --expose-gc scripts/measure-wanted-guarded-workload.js --output <local JSON> [--source-noops|--distinct-bindings|--bounded-roots|--receipt-groups|--root-costs] [--profiles sine,noise] [--bindings 2,4,8] [--pairs 1|2] [--seed-preview worker|separate] [--media-execution owned|per-command]';
 const invalid = () => new TypeError(usage);
 
 function list(value, allowed) {
@@ -32,7 +32,7 @@ export function parseWantedWorkloadCommand(args) {
       if (mode) throw invalid();
       mode = arg;
     } else {
-      if (!['--output', '--profiles', '--bindings', '--pairs', '--seed-preview'].includes(arg) || values.has(arg)
+      if (!['--output', '--profiles', '--bindings', '--pairs', '--seed-preview', '--media-execution'].includes(arg) || values.has(arg)
         || !args[i + 1] || args[i + 1].startsWith('--')) throw invalid();
       values.set(arg, args[++i]);
     }
@@ -42,6 +42,8 @@ export function parseWantedWorkloadCommand(args) {
   if (!distinct && values.has('--bindings')) throw invalid();
   const seedPreviewMode = values.get('--seed-preview') ?? 'worker';
   if (!['worker', 'separate'].includes(seedPreviewMode) || (!distinct && values.has('--seed-preview'))) throw invalid();
+  const mediaExecutionMode = values.get('--media-execution') ?? 'per-command';
+  if (!['owned', 'per-command'].includes(mediaExecutionMode) || (!distinct && values.has('--media-execution'))) throw invalid();
   const profiles = Object.freeze(list(values.get('--profiles') ?? 'sine,noise', ['sine', 'noise']));
   const bindingCounts = Object.freeze(list(values.get('--bindings') ?? '2,4,8', ['2', '4', '8']).map(Number));
   const pairs = values.get('--pairs') ?? '2';
@@ -50,9 +52,9 @@ export function parseWantedWorkloadCommand(args) {
   const scope = profiles.join(',') === 'sine,noise' && (!distinct || bindingCounts.join(',') === '2,4,8') && pairs === '2'
     ? 'full' : 'selected';
   const [kind, variantField, variants] = modes.get(mode);
-  const plan = Object.freeze({ scope, profiles, ...dimensions, pairs: Number(pairs), ...(distinct ? { seedPreviewMode } : {}),
+  const plan = Object.freeze({ scope, profiles, ...dimensions, pairs: Number(pairs), ...(distinct ? { seedPreviewMode, mediaExecutionMode } : {}),
     expectedSamples: profiles.length * (distinct ? bindingCounts.length : 3) * Number(pairs) * 2 });
-  const options = Object.freeze({ profiles, ...dimensions, pairs: Number(pairs), ...(distinct ? { seedPreviewMode } : {}),
+  const options = Object.freeze({ profiles, ...dimensions, pairs: Number(pairs), ...(distinct ? { seedPreviewMode, mediaExecutionMode } : {}),
     ...(distinct ? mode === '--source-noops' ? { sourceNoopComparison: true } : {}
       : { groupingComparison: mode === '--receipt-groups', rootCostComparison: mode === '--root-costs', boundedRootComparison: mode === '--bounded-roots' }) });
   return Object.freeze({ output: values.get('--output'), kind, distinct, plan, options,

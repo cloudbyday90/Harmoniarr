@@ -15,15 +15,15 @@ import { validateWantedDistinctReceipts } from './wanted-distinct-receipt-fixtur
 import { applyWantedDistinctFixture } from './wanted-distinct-apply-fixture.js';
 
 export async function seedWantedDistinctBindingProfile(workspaceDir, { bindings, mediaProfile, durationSeconds, signal,
-  seedObserver = disabledWantedSeedObserver, seedPreviewMode = 'worker' }) {
+  seedObserver = disabledWantedSeedObserver, seedPreviewMode = 'worker', inspectionExecutor = null }) {
   assertWantedDistinctFixtureOptions({ bindings, mediaProfile, durationSeconds }); signal?.throwIfAborted();
-  const first = await seedTrackDeliveryRecoveryFixture(workspaceDir, { mediaProfile, durationSeconds, seedObserver });
+  const first = await seedTrackDeliveryRecoveryFixture(workspaceDir, { mediaProfile, durationSeconds, seedObserver, inspectionExecutor });
   signal?.throwIfAborted();
   const { planned, applied } = await applyWantedDistinctFixture(first, { seedObserver, seedPreviewMode });
   assert.equal(applied.item.itemStatus, 'applied'); signal?.throwIfAborted();
   const deliveries = [{ ...first, planned }]; const { pool, paths, inspection } = first;
   const owners = [first.user, first.other];
-  const media = createLibraryAddMediaFixture({ getFixtureRoot: () => workspaceDir });
+  const media = createLibraryAddMediaFixture({ getFixtureRoot: () => workspaceDir, inspectionExecutor });
   for (let context = 2; context <= bindings / 2; context++) {
     const fixture = await seedObserver.measure('consent', context, () => seedWantedDistinctConsent({ pool, owners, context, durationSeconds, signal }));
     deliveries.push(await seedWantedDistinctDelivery({ pool, paths, inspection, media, fixture,

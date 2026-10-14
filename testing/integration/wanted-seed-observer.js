@@ -9,7 +9,7 @@ import { performance } from 'node:perf_hooks';
 import { readCheckoutProperty as read } from './pool-checkout-record.js';
 
 const phases = new Set(['seed_total', 'consent', 'tooling', 'media_generate', 'media_inspect',
-  'candidate_prepare', 'delivery_preview', 'delivery_apply', 'receipt_history', 'receipt_validate']);
+  'candidate_prepare', 'delivery_preview', 'delivery_apply', 'receipt_history', 'receipt_validate', 'media_executor_close']);
 const ordinal = value => Number.isSafeInteger(value) && value > 0 && value <= 1_000_000;
 
 export function captureWantedSeedRecord(input) {

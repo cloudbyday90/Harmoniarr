@@ -1,5 +1,13 @@
 # Official practices by boundary
 
+October 14 inspection-owner guidance uses
+docs/OWNED_MEDIA_EXECUTOR_RESEARCH_2026_10.md. Docker exec lifetime belongs to its
+container; a killed host CLI cannot certify stopped work. Admit the canonical
+two-file preview within a bounded serial executor, verify acknowledged identity
+and effective read-only/no-network configuration, disable inherited app health
+checks, then stop/verify/remove before workspace disposal. OWASP approved output
+and W3C draft monotonic timing remain evidence rules, not inspection-cache authority.
+
 October 13 seed-phase guidance uses docs/WANTED_SEED_PHASE_RESEARCH_2026_10.md.
 W3C draft/Node monotonic observation supports nested timing; OWASP data
 minimization supports fixed labels, numeric spans and bounded artifact tails.

@@ -1,0 +1,80 @@
+/*
+ * Harmoniarr - Soulseek-native music library management
+ * Copyright (C) 2026 Harmoniarr Contributors
+ * This program is free software: licensed under GPL-3.0-or-later.
+ * See LICENSE for details.
+ */
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { randomUUID } from 'node:crypto';
+import { mediaExecutorError } from './owned-media-inspection-policy.js';
+
+const executeFile = promisify(execFile);
+const label = 'io.harmoniarr.fixture.media-owner';
+const idPattern = /^[a-f0-9]{64}$/u;
+const imagePattern = /^sha256:[a-f0-9]{64}$/u;
+
+/** Bounded CLI transport: ownership comes only from an acknowledged complete ID. */
+export function createOwnedMediaDockerTransport({ image, root, executeFileFn = executeFile, commandTimeoutMs = 30_000 } = {}) {
+  if (!image || typeof executeFileFn !== 'function' || !Number.isSafeInteger(commandTimeoutMs)
+    || commandTimeoutMs < 1 || commandTimeoutMs > 30_000) throw new TypeError('Invalid media transport');
+  const token = randomUUID(); let id; let imageId; let trusted = false;
+  const invoke = (args, options = {}) => executeFileFn('docker', args, {
+    timeout: 30_000, maxBuffer: 2 * 1024 * 1024, windowsHide: true, shell: false, ...options,
+  });
+  async function inspect() {
+    if (!id) throw mediaExecutorError('fixture_media_owner_unknown');
+    const { stdout } = await invoke(['inspect', id]); const [state] = JSON.parse(stdout);
+    const mount = state?.HostConfig?.Mounts;
+    if (state?.Id !== id || state.Image !== imageId || state.Config?.Labels?.[label] !== token
+      || JSON.stringify(state.Config?.Entrypoint) !== '["sleep"]' || JSON.stringify(state.Config?.Cmd) !== '["infinity"]'
+      || JSON.stringify(state.Config?.Healthcheck?.Test) !== '["NONE"]'
+      || state.HostConfig?.NetworkMode !== 'none' || state.HostConfig?.ReadonlyRootfs !== true
+      || state.HostConfig?.RestartPolicy?.Name !== 'no' || state.HostConfig?.Privileged !== false
+      || !state.HostConfig?.CapDrop?.includes('ALL') || !state.HostConfig?.SecurityOpt?.includes('no-new-privileges')
+      || !Array.isArray(mount) || mount.length !== 1 || mount[0].Type !== 'bind' || mount[0].Source !== root
+      || mount[0].Target !== '/fixtures' || mount[0].ReadOnly !== true || mount[0].BindOptions?.NonRecursive !== true
+      || !Array.isArray(state.Mounts) || state.Mounts.length !== 1 || state.Mounts[0].Destination !== '/fixtures'
+      || state.Mounts[0].RW !== false || (state.ExecIDs !== null && !Array.isArray(state.ExecIDs))) throw mediaExecutorError('fixture_media_owner_changed');
+    trusted = true;
+    return state;
+  }
+  return Object.freeze({
+    async start() {
+      imageId = (await invoke(['image', 'inspect', image, '--format', '{{.Id}}'])).stdout.trim();
+      if (!imagePattern.test(imageId)) throw mediaExecutorError('fixture_media_image_refused');
+      const reply = await invoke(['create', '--network', 'none', '--read-only', '--no-healthcheck', '--cap-drop', 'ALL',
+        '--security-opt', 'no-new-privileges', '--restart', 'no', '--label', `${label}=${token}`,
+        '--entrypoint', 'sleep', '--mount', `type=bind,source=${root},target=/fixtures,readonly,bind-recursive=disabled`, imageId, 'infinity']);
+      const acknowledged = reply.stdout.trim();
+      if (!idPattern.test(acknowledged)) throw mediaExecutorError('fixture_media_owner_unknown');
+      id = acknowledged;
+      await inspect();
+      await invoke(['start', id]);
+      if ((await inspect()).State?.Running !== true) throw mediaExecutorError('fixture_media_not_running');
+    },
+    async run(args, signal) {
+      const before = await inspect();
+      if (before.State?.Running !== true || before.ExecIDs?.length) throw mediaExecutorError('fixture_media_not_quiescent');
+      const result = await invoke(['exec', id, 'ffprobe', ...args], { timeout: commandTimeoutMs, ...(signal ? { signal } : {}) });
+      const after = await inspect();
+      if (after.State?.Running !== true || after.ExecIDs?.length) throw mediaExecutorError('fixture_media_not_quiescent');
+      return result;
+    },
+    async retire() {
+      // Never target an inferred name or an ID whose original configuration was not validated.
+      if (!trusted) throw mediaExecutorError('fixture_media_owner_unknown');
+      const before = await inspect();
+      if (before.State?.Running) {
+        let stopError; let failed = false;
+        try { await invoke(['stop', '--time', '0', id]); } catch (error) { failed = true; stopError = error; }
+        const after = await inspect();
+        if (after.State?.Running !== false) throw failed ? stopError : mediaExecutorError('fixture_media_not_quiescent');
+      } else if (before.State?.Running !== false) throw mediaExecutorError('fixture_media_not_quiescent');
+    },
+    async remove() {
+      if (!trusted || (await inspect()).State?.Running !== false) throw mediaExecutorError('fixture_media_not_quiescent');
+      await invoke(['rm', id]);
+    },
+  });
+}

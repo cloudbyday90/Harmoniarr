@@ -23,7 +23,7 @@ import { listImportOperations } from '../../src/server/import-candidates/import-
 import { disabledWantedSeedObserver } from './wanted-seed-observer.js';
 import { observeWantedSeedMedia } from './wanted-seed-media-observer.js';
 
-export async function seedTrackDeliveryRecoveryFixture(workspaceDir, { mediaProfile = 'sine', durationSeconds = 2,
+export async function seedTrackDeliveryRecoveryFixture(workspaceDir, { mediaProfile = 'sine', durationSeconds = 2, inspectionExecutor = null,
   seedObserver = disabledWantedSeedObserver } = {}) {
   if (!['sine', 'noise'].includes(mediaProfile)) throw new TypeError('Unknown controlled FLAC profile');
   const pool = getPool(); const paths = Object.fromEntries(['downloads', 'staging', 'music'].map(key => [key, join(workspaceDir, key)]));
@@ -35,7 +35,7 @@ export async function seedTrackDeliveryRecoveryFixture(workspaceDir, { mediaProf
     operatorLinks: fixture.wanted.map(wanted => ({ wantedReleaseId: wanted.id, appUserId: wanted.app_user_id,
       operatorTrackScope: wanted.evidence.operatorTrackScope, qualityPreferences: {} })) });
   const releaseMbid = (await pool.query('SELECT musicbrainz_release_id FROM metadata_releases WHERE id=$1', [fixture.metadata.metadataReleaseId])).rows[0].musicbrainz_release_id;
-  const media = observeWantedSeedMedia(createLibraryAddMediaFixture({ getFixtureRoot: () => workspaceDir }), { observer: seedObserver });
+  const media = observeWantedSeedMedia(createLibraryAddMediaFixture({ getFixtureRoot: () => workspaceDir, inspectionExecutor }), { observer: seedObserver });
   const unavailable = await media.verifyTooling();
   if (unavailable) throw new Error(unavailable);
   const files = [];

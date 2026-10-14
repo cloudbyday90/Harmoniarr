@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { join } from 'node:path';
 import { createServer } from 'node:http';
-import { access } from 'node:fs/promises';
-import { buildIntegrationBackupEnvironment, createIntegrationAppRuntime } from '../../testing/integration/app-runtime.js';
+import { access, rm } from 'node:fs/promises';
+import { buildIntegrationBackupEnvironment, createIntegrationAppRuntime, withIntegrationApp } from '../../testing/integration/app-runtime.js';
 import { createFixturePhaseObserver } from '../../testing/integration/fixture-phase-observer.js';
 
 test('integration runtime assigns backups to its scenario workspace', () => {
@@ -68,3 +68,16 @@ test('runtime workspace cleanup still runs when PostgreSQL runtime teardown reje
   await assert.rejects(runtime.cleanup(), (error) => error === secondary);
   await assert.rejects(access(f.workspace()), { code: 'ENOENT' });
 });
+
+for (const primary of [new Error('controlled-primary'), null, undefined]) {
+  test(`functional app retains an uncertain workspace and original ${primary === undefined ? 'cleanup refusal' : primary === null ? 'null' : 'Error'}`, async () => {
+    const f = runtimeFixture(); let workspace;
+    try {
+      await assert.rejects(withIntegrationApp({ ...f.options, workspaceCleanupGuard: () => false,
+        withPostgresIntegrationRuntimeFn: ({ run }) => run({ databaseConfig: { database: 'fixture', host: '127.0.0.1', port: 1, user: 'fixture' }, source: 'fake' }),
+        run: input => { workspace = input.workspaceDir; if (primary !== undefined) throw primary; return 'complete'; },
+      }), error => primary === undefined ? error.code === 'fixture_workspace_not_quiescent' : error === primary);
+      await access(workspace);
+    } finally { if (workspace) await rm(workspace, { recursive: true, force: true }); }
+  });
+}

@@ -5,8 +5,13 @@ phase/command work with numeric nesting and safe output. The distinct receipt
 fixture retains physical identity/scopes/history proof; distinct apply retains
 the actual worker preview and guarded canonical completion. The seed design/
 research/outcome distinguish measured redundant preparation, failed command
-imports and qualified native timing. Any shared media executor still needs
-private read-only inspection mounts, network isolation and process drainage.
+imports and qualified native timing. The optional owned-media modules split
+accepted-root/current-file policy, bounded Docker transport and executor lifetime.
+Acknowledged image/container identity, read-only mounts and network isolation
+are checked. Failed commands retire and verify their owner; canonical close
+drains admitted work before removal. Functional app cleanup retains uncertain
+workspaces. The executor documents distinguish its explicit pilot/selected proof
+from reusable-fixture or full-CI adoption.
 
 Guarded workload command: wanted-workload-command-policy.js owns reviewed
 selection/full scope; wanted-workload-runner.js retains planned sample membership,

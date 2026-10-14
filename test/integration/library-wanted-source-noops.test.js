@@ -26,6 +26,7 @@ import { tryLockedOperatorTrackSourceNoop } from '../../src/server/metadata/oper
 import { createOperatorTrackSourceLifecycleService } from '../../src/server/metadata/operator-track-source-lifecycle-service.js';
 import { createOperationRunStore } from '../../src/server/operation-run-store.js';
 import { createJobLeaseStore } from '../../src/server/job-lease-store.js';
+import { createOwnedMediaInspectionExecutor } from '../../testing/integration/owned-media-inspection-executor.js';
 
 const config = resolveIntegrationTestRuntimeConfig(); let runtime; const active = new Set();
 async function saved(pool) {
@@ -43,10 +44,16 @@ suite('Transaction-held positive source no-ops through canonical Wanted', () => 
   test('four real bindings prove exact no-ops, retained final authority, write/event rollback and lock lifetime', {
     timeout: config.scenarioTimeoutMs,
   }, async t => {
+    let inspectionExecutor;
     const operation = withIntegrationApp({ config,
+      workspaceCleanupGuard: () => !inspectionExecutor || inspectionExecutor.canRemoveWorkspace(),
       withPostgresIntegrationRuntimeFn: ({ run, phaseObserver }) => runtime.runIsolatedDatabase(run, { phaseObserver, signal: t.signal }),
       run: input => withFixtureLifecycle({ signal: t.signal }, async scope => {
-        const c = await seedWantedDistinctBindingProfile(input.workspaceDir, { bindings: 4, mediaProfile: 'sine', durationSeconds: 2, signal: scope.signal });
+        if (process.env.HARMONIARR_INTEGRATION_MEDIA_IMAGE) {
+          inspectionExecutor = createOwnedMediaInspectionExecutor({ workspaceDir: input.workspaceDir, signal: scope.signal });
+          scope.onRelease(() => inspectionExecutor.close());
+        }
+        const c = await seedWantedDistinctBindingProfile(input.workspaceDir, { bindings: 4, mediaProfile: 'sine', durationSeconds: 2, signal: scope.signal, inspectionExecutor });
         const { pool } = c; const baseline = await saved(pool);
         t.diagnostic(`PostgreSQL ${(await pool.query('SHOW server_version')).rows[0].server_version}`);
         const receipts = (await pool.query('SELECT receipt FROM operator_track_receipts ORDER BY app_user_id,import_candidate_id')).rows;

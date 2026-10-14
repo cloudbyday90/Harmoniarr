@@ -20,13 +20,14 @@ export const libraryAddRuntimePath = (value) => process.platform === 'win32' ? v
 
 /** Every media invocation is scoped to the scenario's own directory and has no provider/network access. */
 export function createLibraryAddMediaFixture({ getFixtureRoot, isToolingReady = () => true,
-  mediaImage = process.env.HARMONIARR_INTEGRATION_MEDIA_IMAGE } = {}) {
+  mediaImage = process.env.HARMONIARR_INTEGRATION_MEDIA_IMAGE, inspectionExecutor = null } = {}) {
   function mountedPath(pathValue) {
     const scoped = relative(resolve(getFixtureRoot()), resolve(pathValue));
     assert.ok(scoped && scoped !== '..' && !scoped.startsWith(`..${sep}`) && !isAbsolute(scoped), 'media fixture must stay in the test-owned workspace');
     return `/fixtures/${scoped.split(sep).join('/')}`;
   }
   async function mediaCommand(binary, args, { readonly = true } = {}) {
+    if (inspectionExecutor && binary === 'ffprobe') return inspectionExecutor.run(binary, args, { readonly });
     if (!mediaImage) return executeFile(binary, args, { timeout: 20_000, maxBuffer: 2 * 1024 * 1024 });
     const mappedArgs = args.map((value) => typeof value === 'string' && isAbsolute(value) ? mountedPath(value) : value);
     return executeFile('docker', ['run', '--rm', '--network', 'none', '--entrypoint', binary, '--mount',

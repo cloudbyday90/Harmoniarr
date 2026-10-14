@@ -6,6 +6,20 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Scenario-owned media inspection pilot (2026-10-14)
+
+- Narrow ESM policy/transport/lifetime helpers keep current ffprobe work in one
+  acknowledged read-only/no-network owner. Bounded two-file admission serves the
+  real concurrent preview through serial native commands; failures retire it.
+- The [outcome](OWNED_MEDIA_EXECUTOR_OUTCOME.md) separates initial failures, final
+  native proof and selected measurements. Uncertain cleanup retains the workspace;
+  generation, production guards and resource bounds remain.
+- Next: measure bounded Docker transport/control and close phases before evaluating
+  a persistent Engine API connection. The completed small owned selection had a
+  shorter seed but slower whole command; default promotion remains deferred.
+  Preserve current inspection and cleanup authority; investigate the largest
+  locked-noop timeout separately. No inspection cache or release is authorized.
+
 ## Completed slice: Wanted fixture seed phases (2026-10-13)
 
 - Narrow ESM modules separate seed observation, media calls, receipt validation

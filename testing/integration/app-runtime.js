@@ -218,15 +218,17 @@ export async function withIntegrationApp({
   phaseObserver = createIntegrationFixturePhaseObserver(),
   checkoutObserver = createIntegrationPoolCheckoutObserver(),
   checkoutRecord = null,
+  workspaceCleanupGuard = () => true,
 } = {}) {
   if (typeof run !== 'function') {
     throw new Error('run is required');
   }
+  if (typeof workspaceCleanupGuard !== 'function') throw new TypeError('Invalid workspace cleanup guard');
 
   const runtimeWorkspace = await phaseObserver.measure('workspace_create', () => createRuntimeWorkspace());
-
+  let failed = false; let failure; let result;
   try {
-    return await withPostgresIntegrationRuntimeFn({
+    result = await withPostgresIntegrationRuntimeFn({
       config,
       phaseObserver,
       run: async ({ databaseConfig, databaseName, source, captureServerFailure, captureCheckoutFailure, startupLogging }) => {
@@ -287,8 +289,14 @@ export async function withIntegrationApp({
         });
       },
     });
-  } finally {
+  } catch (error) { failed = true; failure = error; }
+  finally {
     await phaseObserver.measure('pool_close', () => closePool()).catch(() => {});
-    await phaseObserver.measure('workspace_remove', () => rm(runtimeWorkspace.workspaceDir, { force: true, recursive: true })).catch(() => {});
+    let safe = false;
+    try { safe = await workspaceCleanupGuard() === true; } catch { /* Retain the original body failure and uncertain workspace. */ }
+    if (safe) await phaseObserver.measure('workspace_remove', () => rm(runtimeWorkspace.workspaceDir, { force: true, recursive: true })).catch(() => {});
+    else if (!failed) { failed = true; failure = Object.assign(new Error('Fixture workspace cleanup requires verified quiescence'), { code: 'fixture_workspace_not_quiescent' }); }
   }
+  if (failed) throw failure;
+  return result;
 }

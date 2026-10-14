@@ -141,3 +141,8 @@ retain every canonical reinspection and per-file metadata. Media batching still
 needs independent-file/metadata proof. Defer the
 [publication no-change proposal](WANTED_PUBLICATION_NO_CHANGE_PROPOSAL.md) until
 fixture lifetime/cost is understood; do not relax final hash/write guards.
+
+The October 14 [owned inspection outcome](OWNED_MEDIA_EXECUTOR_OUTCOME.md) now
+implements that candidate as an explicit read-only pilot with bounded concurrent
+admission, serial execution and verified container retirement. Its failures and
+selected evidence remain separate from this earlier collection.

@@ -30,8 +30,8 @@ test('legacy workload commands keep full dimensions and original comparator sele
 
 test('explicit workload selection records reduced scope and forwards only reviewed options', () => {
   const result = selected();
-  assert.deepEqual(result.plan, { scope: 'selected', profiles: ['sine'], bindingCounts: [2], pairs: 1, seedPreviewMode: 'worker', expectedSamples: 2 });
-  assert.deepEqual(result.options, { profiles: ['sine'], bindingCounts: [2], pairs: 1, seedPreviewMode: 'worker', sourceNoopComparison: true });
+  assert.deepEqual(result.plan, { scope: 'selected', profiles: ['sine'], bindingCounts: [2], pairs: 1, seedPreviewMode: 'worker', mediaExecutionMode: 'per-command', expectedSamples: 2 });
+  assert.deepEqual(result.options, { profiles: ['sine'], bindingCounts: [2], pairs: 1, seedPreviewMode: 'worker', mediaExecutionMode: 'per-command', sourceNoopComparison: true });
   assert.throws(() => result.plan.profiles.push('noise'), TypeError);
   assert.throws(() => { result.options.pairs = 2; }, TypeError);
 });
@@ -42,11 +42,19 @@ test('ambiguous, duplicate, unsupported and incomplete commands refuse before me
     ['--bindings', '2'], ['--source-noops', '--bindings', '16'], ['--source-noops', '--bindings', '2,2'],
     ['--pairs', '3'], ['--pairs', '01'], ['--pairs'], ['--pairs', '1', '--pairs', '2'],
     ['--output', 'other.json'], ['--unknown'], ['--profiles', '--pairs', '1'], ['--seed-preview', 'separate'],
-    ['--source-noops', '--seed-preview', 'cached']]) {
+    ['--source-noops', '--seed-preview', 'cached'], ['--media-execution', 'owned'], ['--source-noops', '--media-execution', 'shared']]) {
     assert.throws(() => parseWantedWorkloadCommand([...base, ...tail]), TypeError);
   }
   for (const args of [[], ['--output', ' '], ['--output'], new Array(2), [null]]) {
     assert.throws(() => parseWantedWorkloadCommand(args), TypeError);
+  }
+});
+
+test('owned media execution is an explicit recorded distinct/source pilot', () => {
+  for (const mode of ['--distinct-bindings', '--source-noops']) {
+    const result = parseWantedWorkloadCommand([...base, mode, '--media-execution', 'owned']);
+    assert.equal(result.plan.mediaExecutionMode, 'owned'); assert.equal(result.options.mediaExecutionMode, 'owned');
+    assert.equal(result.plan.expectedSamples, 24); assert.equal(result.plan.scope, 'full');
   }
 });
 

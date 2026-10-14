@@ -39,3 +39,18 @@ plan/file/receipt/scope evidence and native helper callers before removing work.
 Lazy command imports should refuse invalid input/missing GC before loading the
 app. See docs/WANTED_SEED_PHASE_OUTCOME.md; a passing largest selection does not
 diagnose an older timeout, and current inspection cannot become a cache.
+
+For the read-only Docker inspection pilot, select `--media-execution owned` on
+distinct/source workloads; per-command remains the default comparator. With no
+image, local-tool behavior remains unchanged. Capture a complete acknowledged
+container ID and verify effective image/root/mount/network identity. Close
+admission, drain admitted startup/exec, and verify stopped state after a failed
+exec before removal. Killing the host CLI is insufficient. Preserve Error/null
+and retain the workspace after unknown creation or uncertain cleanup; the
+functional app cleanup guard is per invocation. Verify the current
+root identity again after owner removal; a replacement directory cannot inherit
+cleanup authority. Audit reusable app fixtures' separate workspace owner before
+adoption. Native tests must
+prove changed-media reinspection, read-only mount denial and real held-exec
+retirement. Keep every canonical inspection and private comparator. See
+docs/OWNED_MEDIA_EXECUTOR_OUTCOME.md for the selected measurements and limits.

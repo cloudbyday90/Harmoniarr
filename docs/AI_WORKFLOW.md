@@ -6,6 +6,13 @@ This repository includes a shared `.agents/` directory for GitHub Copilot agent 
 
 The goal is to keep reusable AI workflow guidance versioned alongside the project so UI review, frontend implementation, browser testing, and related tasks follow the same repo conventions.
 
+The [owned media executor](OWNED_MEDIA_EXECUTOR_OUTCOME.md) extends existing
+testing and standards skills with bounded two-file admission, serial current
+inspection, acknowledged read-only container ownership and verified retirement.
+Preserve the first failure and retain uncertain workspaces. The CLI pilot is
+explicit; broader fixture adoption requires auditing each cleanup owner. Official
+Docker/Node lifecycle guidance complements W3C draft timing and OWASP safe output.
+
 The [seed phase outcome](WANTED_SEED_PHASE_OUTCOME.md) extends the maintained
 testing/standards workflow with nested owned measurements and actual worker
 preview evidence. Remove measured redundant preparation without caching a current
