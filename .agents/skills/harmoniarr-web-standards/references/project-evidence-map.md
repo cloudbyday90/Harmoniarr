@@ -756,5 +756,13 @@ testing/postgres-integration-runtime.js, with the existing helper retaining its
 direct-call default. The postgres-database-release.test.js files under test/server/
 and test/integration/ prove stage failures, held final close, real PostgreSQL DROP
 permission refusal, retained OID and sibling availability. See
-docs/POSTGRES_DATABASE_RELEASE_OUTCOME.md. Lower-runtime admission/drainage is
-distinct from this failure-propagation change and existing app/template barriers.
+docs/POSTGRES_DATABASE_RELEASE_OUTCOME.md. The next entry completes lower-runtime
+admission/drainage separately from strict propagation and app/template barriers.
+
+Shared PostgreSQL lifetime now composes fixture-runtime-lifetime.js from
+testing/postgres-integration-runtime.js. The postgres-runtime-lifetime.test.js
+files under test/server/ and test/integration/ cover immediate admission/close,
+full returned tails, mixed Error/null and successful siblings, late refusal and
+server retirement after drainage. See docs/POSTGRES_RUNTIME_LIFETIME_OUTCOME.md
+for native checkout-context proof, independent workspace limits and the separate
+post-start metadata/setup ownership follow-up.

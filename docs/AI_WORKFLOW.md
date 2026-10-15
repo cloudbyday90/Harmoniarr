@@ -6,6 +6,14 @@ This repository includes a shared `.agents/` directory for GitHub Copilot agent 
 
 The goal is to keep reusable AI workflow guidance versioned alongside the project so UI review, frontend implementation, browser testing, and related tasks follow the same repo conventions.
 
+The [shared runtime lifetime outcome](POSTGRES_RUNTIME_LIFETIME_OUTCOME.md)
+extends the existing standards/testing method: register actual delegate promises
+before scheduling, seal admission synchronously, and drain all outcomes before
+resource release. Test a rejected sibling alongside a held successful tail;
+scenario errors and canonical cleanup results have separate owners. A reporter
+timeout or abort signal is not quiescence. Keep the reused lifetime module narrow
+and retain independent database/server/workspace authority.
+
 The [strict database-release outcome](POSTGRES_DATABASE_RELEASE_OUTCOME.md)
 extends the existing standards/testing method: prove behavior through the actual
 helper and changed entrypoint, distinguish primary failure from later cleanup,

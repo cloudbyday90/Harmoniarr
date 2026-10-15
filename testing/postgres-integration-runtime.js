@@ -17,6 +17,7 @@ import { createPostgresFailureEvidence } from './integration/postgres-failure-ev
 import { buildIntegrationPoolConfig } from './integration/pool-policy.js';
 import { observeFixturePoolCheckouts, resolveFixtureCheckoutMode } from './integration/fixture-pool-checkout.js';
 import { supportsPostgresStartupImage, postgresStartupCommand } from './integration/postgres-startup-config.js';
+import { createFixtureRuntimeLifetime } from './integration/fixture-runtime-lifetime.js';
 
 const { Pool } = pg;
 
@@ -56,48 +57,51 @@ async function createDatabaseRuntime({ config, env, source, phaseObserver, schem
     ? await createPreparedPostgresTemplateFn({ env, createPool, phaseObserver: phaseObserver.child(), signal,
       withTemporaryPostgresDatabaseFn })
     : null;
-  let cleanupPromise;
+  const lifetime = createFixtureRuntimeLifetime(); let cleanupPromise;
   return {
     config, source, schemaMode,
     cleanup() {
       if (!cleanupPromise) {
-        cleanupPromise = (async () => {
+        cleanupPromise = lifetime.close(async () => {
           let failed = false; let failure;
           try { await prepared?.cleanup(); }
           catch (error) { failed = true; failure = error; }
           try { await closeServer(); }
           catch (error) { if (!failed) { failed = true; failure = error; } }
           if (failed) throw failure;
-        })();
+        });
         cleanupPromise.catch(() => {});
       }
       return cleanupPromise;
     },
-    async runIsolatedDatabase(run, { phaseObserver: observer = phaseObserver.child(), signal: caseSignal } = {}) {
-      if (typeof run !== 'function') throw new TypeError('Database scenario requires a callback');
-      const captureScenario = failureEvidence.createCapture({ correlationId: observer.correlationId, signal: caseSignal });
-      const captureCheckout = failureEvidence.createCapture({ correlationId: observer.correlationId, signal: caseSignal });
-      let checkoutFailed = false;
-      const captureServerFailure = (error, phase) => checkoutFailed ? Promise.resolve() : captureScenario(error, phase);
-      const captureCheckoutFailure = (error, checkoutId, startupContext) => {
-        checkoutFailed = true; return captureCheckout(error, 'pool_checkout', checkoutId, startupContext);
-      };
-      const execute = async (context) => {
-        const pool = typeof context.getPoolFn === 'function' ? context.getPoolFn() : null;
-        const diagnostics = typeof pool?.connect === 'function' ? observeFixturePoolCheckouts({ pool,
-          poolKind: 'scenario_pool', source, expectedConfig: context.databaseConfig,
-          phaseObserver: observer, mode: checkoutMode, startupLogging,
-          captureFailure: captureCheckoutFailure, ...(checkoutRecord ? { onRecord: checkoutRecord } : {}) }) : null;
-        let failed = false; let failure; let result;
-        try { result = await run({ ...context, source, schemaMode, startupLogging, phaseObserver: observer,
-          captureServerFailure, captureCheckoutFailure }); } catch (error) { failed = true; failure = error; }
-        try { await diagnostics?.restore(); } catch (error) { if (!failed) { failed = true; failure = error; } }
-        if (failed) throw failure;
-        return result;
-      };
-      if (prepared) return prepared.runIsolatedDatabase(execute, { phaseObserver: observer, signal: caseSignal, onFailure: captureServerFailure });
-      return withTemporaryPostgresDatabaseFn({ createPool, env, strictCleanup: true, phaseObserver: observer, signal: caseSignal, run: execute,
-        onFailure: captureServerFailure });
+    runIsolatedDatabase(run, options = {}) {
+      return lifetime.run(async () => {
+        const { phaseObserver: observer = phaseObserver.child(), signal: caseSignal } = options;
+        if (typeof run !== 'function') throw new TypeError('Database scenario requires a callback');
+        const captureScenario = failureEvidence.createCapture({ correlationId: observer.correlationId, signal: caseSignal });
+        const captureCheckout = failureEvidence.createCapture({ correlationId: observer.correlationId, signal: caseSignal });
+        let checkoutFailed = false;
+        const captureServerFailure = (error, phase) => checkoutFailed ? Promise.resolve() : captureScenario(error, phase);
+        const captureCheckoutFailure = (error, checkoutId, startupContext) => {
+          checkoutFailed = true; return captureCheckout(error, 'pool_checkout', checkoutId, startupContext);
+        };
+        const execute = async (context) => {
+          const pool = typeof context.getPoolFn === 'function' ? context.getPoolFn() : null;
+          const diagnostics = typeof pool?.connect === 'function' ? observeFixturePoolCheckouts({ pool,
+            poolKind: 'scenario_pool', source, expectedConfig: context.databaseConfig,
+            phaseObserver: observer, mode: checkoutMode, startupLogging,
+            captureFailure: captureCheckoutFailure, ...(checkoutRecord ? { onRecord: checkoutRecord } : {}) }) : null;
+          let failed = false; let failure; let result;
+          try { result = await run({ ...context, source, schemaMode, startupLogging, phaseObserver: observer,
+            captureServerFailure, captureCheckoutFailure }); } catch (error) { failed = true; failure = error; }
+          try { await diagnostics?.restore(); } catch (error) { if (!failed) { failed = true; failure = error; } }
+          if (failed) throw failure;
+          return result;
+        };
+        if (prepared) return prepared.runIsolatedDatabase(execute, { phaseObserver: observer, signal: caseSignal, onFailure: captureServerFailure });
+        return withTemporaryPostgresDatabaseFn({ createPool, env, strictCleanup: true, phaseObserver: observer, signal: caseSignal, run: execute,
+          onFailure: captureServerFailure });
+      });
     },
   };
 }

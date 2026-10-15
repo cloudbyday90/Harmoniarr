@@ -951,3 +951,11 @@ owning entrypoint while preserving original Error/null and direct-tool scope.
 W3C's Privacy Principles Statement and OWASP exclusions guide minimized evidence;
 they do not prescribe the project's fixture cleanup policy or grant authority
 over a borrowed server, unrelated database or uncertain workspace.
+
+October 15 shared-runtime lifetime guidance uses
+docs/POSTGRES_RUNTIME_LIFETIME_RESEARCH_2026_10.md. Node reporter completion and
+abort signals do not prove work stopped. ECMAScript allSettled waits for every
+outcome without cancelling inputs; await full PostgreSQL delegate tails before
+the existing bounded Testcontainers stop. Preserve separate scenario/cleanup
+failures, borrowed ownership and W3C/OWASP minimized evidence. A lifecycle barrier
+does not establish quiescence for hidden detached work or self-awaiting cleanup.

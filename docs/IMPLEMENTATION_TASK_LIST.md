@@ -6,6 +6,21 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Shared PostgreSQL admission and drainage (2026-10-15)
+
+- Reused the existing lifetime module for synchronous shared admission sealing
+  and full-operation drainage before template/server teardown. Scenario and
+  cleanup promises retain separate outcomes and canonical cleanup identity.
+- Native empty/template owners prove continued queries, a failed body plus a
+  successful held release tail, late refusal and exact container retirement.
+  Existing checkout attribution and strict-release/stop/template proof pass.
+- Separate [design](POSTGRES_RUNTIME_LIFETIME_DESIGN.md),
+  [official research/options](POSTGRES_RUNTIME_LIFETIME_RESEARCH_2026_10.md) and
+  [outcome](POSTGRES_RUNTIME_LIFETIME_OUTCOME.md) record evidence and limits.
+- Next: review the owned post-start metadata/setup guard. Getter failure before
+  the current release try/catch can bypass bounded server cleanup. Preserve
+  original failures and exact ownership; do not add retries or wider disposal.
+
 ## Completed slice: Strict shared temporary-database release (2026-10-15)
 
 - Shared empty-schema delegation selects the existing strict policy, preserving
@@ -17,9 +32,8 @@ Database model source: `docs/DATABASE_MODEL.md`
 - Separate [design](POSTGRES_DATABASE_RELEASE_DESIGN.md),
   [official research/options](POSTGRES_DATABASE_RELEASE_RESEARCH_2026_10.md) and
   [outcome](POSTGRES_DATABASE_RELEASE_OUTCOME.md) own evidence and limits.
-- Next: evaluate shared empty-runtime admission sealing and actual database-tail
-  drainage before server teardown. Reuse existing lifetime ownership where
-  appropriate; keep original failures and independent workspace guards.
+- The shared admission/drainage follow-up is completed above, preserving original
+  failures and independent workspace guards.
 
 ## Completed slice: PostgreSQL runtime stop-failure propagation (2026-10-15)
 

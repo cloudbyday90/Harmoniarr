@@ -91,3 +91,8 @@ applicable random PR or stale PR was available to implement, rebase or merge.
 No PR comment or other external message was sent.
 
 See [design](POSTGRES_DATABASE_RELEASE_DESIGN.md).
+
+The subsequent [shared runtime lifetime outcome](POSTGRES_RUNTIME_LIFETIME_OUTCOME.md)
+completes that admission/drainage follow-up, reusing the existing owner and proving
+real database tails settle before the server stops. Post-start setup ownership
+is a separate next review.

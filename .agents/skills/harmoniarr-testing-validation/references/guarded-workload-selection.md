@@ -164,3 +164,13 @@ proof. Direct helper compatibility and existing parent/template policies remain
 separate. Drain actual registered operations before fixture disposal. See
 docs/POSTGRES_DATABASE_RELEASE_OUTCOME.md for the bounded cohort and the distinct
 lower-runtime admission/drainage follow-up.
+
+Shared PostgreSQL admission now reuses fixture-runtime-lifetime.js. Register full
+delegate promises before queued work, seal synchronously and drain all outcomes
+before template/server release. Prove immediate close, two held tails and late
+refusal in both schema/source modes; a rejected sibling cannot grant teardown.
+Keep scenario Error/null separate from the canonical cleanup result. Native
+queries and target drops must precede the final held tail and verified owner
+retirement; retain checkout attribution across queued admission. Do not treat
+runner timeout or cancellation as completion. See
+docs/POSTGRES_RUNTIME_LIFETIME_OUTCOME.md for proof and post-start setup limits.
