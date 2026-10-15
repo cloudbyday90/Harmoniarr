@@ -46,11 +46,11 @@ function abandonedOutputError() {
 
 export async function runPostgresTestFile({ file, cwd = process.cwd(), env = process.env, signal,
   stdout = process.stdout, stderr = process.stderr, onCancel = () => {}, onTermination = () => {},
-  spawnFn = spawn, terminateFn = terminateOwnedProcessTree } = {}) {
+  spawnFn = spawn, terminateFn = terminateOwnedProcessTree, cohortEvidence = false } = {}) {
   assertSignal(signal);
   if (signal?.aborted) throw signal.reason;
   if (typeof file !== 'string' || !file.trim() || file.includes('\0') || file.startsWith('-')
-    || typeof cwd !== 'string' || !env || typeof env !== 'object'
+    || typeof cwd !== 'string' || !env || typeof env !== 'object' || typeof cohortEvidence !== 'boolean'
     || ![stdout, stderr].every((output) => typeof output?.write === 'function')
     || ![spawnFn, terminateFn, onCancel, onTermination].every((fn) => typeof fn === 'function')) {
     throw new TypeError('Invalid PostgreSQL test file process input');
@@ -61,7 +61,8 @@ export async function runPostgresTestFile({ file, cwd = process.cwd(), env = pro
   try {
     child = spawnFn(process.execPath, ['--test', '--test-concurrency=1', '--test-reporter=spec',
       '--test-reporter=./testing/reporters/early-failure-reporter.js',
-      '--test-reporter-destination=stdout', '--test-reporter-destination=stderr', file],
+      '--test-reporter-destination=stdout', '--test-reporter-destination=stderr',
+      ...(cohortEvidence ? ['--test-reporter=./testing/reporters/postgres-cohort-reporter.js', '--test-reporter-destination=stderr'] : []), file],
     { cwd, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'], shell: false,
       windowsHide: true, detached: process.platform !== 'win32' });
   } catch (error) {

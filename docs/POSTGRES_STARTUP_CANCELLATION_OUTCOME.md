@@ -92,6 +92,9 @@ Include reversed ordering on this hardened baseline before considering defaults.
 Hosted Ubuntu canonical-media evidence
 remains a separate prerequisite before media-default promotion.
 
+The subsequent [complete cohort comparison](POSTGRES_COHORT_COMPARISON_OUTCOME.md)
+implements that measurement follow-up without changing default scheduling.
+
 Opening and final GitHub MCP collection reads found zero open PRs. No applicable
 random or stale PR was available to implement or rebase. No PR comment, merge or
 other external message occurred.

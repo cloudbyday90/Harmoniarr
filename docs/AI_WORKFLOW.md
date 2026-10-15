@@ -6,6 +6,14 @@ This repository includes a shared `.agents/` directory for GitHub Copilot agent 
 
 The goal is to keep reusable AI workflow guidance versioned alongside the project so UI review, frontend implementation, browser testing, and related tasks follow the same repo conventions.
 
+The [complete PostgreSQL comparison](POSTGRES_COHORT_COMPARISON_OUTCOME.md)
+extends the existing standards/testing method with reproducible evidence: freeze
+current source, keep case/ownership boundaries, counterbalance profiles and file
+order, and require native case signatures, zero skips and equal work counts.
+Validate reporter contracts on installed Node and distinguish cumulative summaries
+from file summaries. Keep inclusive phase durations separate from elapsed time;
+artifact failure or partial native completion cannot produce a saving claim.
+
 The [startup cancellation outcome](POSTGRES_STARTUP_CANCELLATION_OUTCOME.md)
 extends the existing standards/testing method with cooperative checkpoints:
 await actual acquisition, check before publication, then clean through the

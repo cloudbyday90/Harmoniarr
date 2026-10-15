@@ -782,3 +782,13 @@ release, original Error/null, actual-failure precedence and borrowed-server
 survival. See docs/POSTGRES_STARTUP_CANCELLATION_OUTCOME.md. Published runtimes
 retain explicit cleanup; no persistent abort listener or detached disposal is
 introduced. The preceding guard outcome records the original reproduction.
+
+Complete cohort measurement uses postgres-cohort-policy.js,
+postgres-cohort-evidence.js and postgres-cohort-comparison.js under
+testing/integration/, the fixed postgres-cohort-reporter.js and the explicit
+scripts/measure-postgres-cohort.js command. Native case signatures, final counts,
+selected phase work and actual shared registration/release are distinct from
+elapsed time. Counterbalanced forward/reverse profiles refuse partial, changed,
+skipped or unreleased work before claiming comparability. See
+docs/POSTGRES_COHORT_COMPARISON_OUTCOME.md; source hashes, actual native assertions
+and local pair measurements do not replace broader CI or cross-profile SQL digests.

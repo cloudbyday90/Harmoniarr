@@ -977,3 +977,12 @@ owner. Preserve actual setup failure over simultaneous cancellation and exact
 Error/null over cleanup fallout. This project policy does not imply that abort
 stops Testcontainers I/O. W3C's Statement and informative OWASP guidance still
 require scoped applicability; avoid recording raw connection or abort payloads.
+
+October 15 complete-cohort measurement guidance uses
+docs/POSTGRES_COHORT_COMPARISON_RESEARCH_2026_10.md. Node's native final summaries
+and process isolation own case/result evidence; custom reporters must be checked
+on the installed Node version. W3C High Resolution Time 3 is a 2026-09-01 Working
+Draft: use monotonic durations without adding nested spans or comparing absolute
+timestamps from separate processes. The fixed counterbalanced comparison is a
+project method, not a W3C mandate or statistically established speedup. OWASP
+exclusions apply to public artifacts; ignored native logs are not access control.

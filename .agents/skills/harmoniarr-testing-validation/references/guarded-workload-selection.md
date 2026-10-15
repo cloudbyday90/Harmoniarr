@@ -193,3 +193,19 @@ held release, borrowed-server survival and post-publication explicit ownership.
 Native controls should hold an actual prepared template before returning it and
 verify its identity/drop independently. Abort notification alone grants no
 quiescence or retirement proof. See docs/POSTGRES_STARTUP_CANCELLATION_OUTCOME.md.
+
+For the full audited PostgreSQL cohort, use the explicit measure:postgres-cohort
+command with verified immutable PostgreSQL/media image IDs. Keep isolated/shared
+forward and shared/isolated reverse execution on identical source. Require native
+root summaries, exact per-file case/outcome digests, zero skips/TODOs and matching
+scenario/schema/release work counts. Compare parent registrations to actual CREATE
+counts and require every registration released with zero reaping. A missing or
+duplicate report, source drift or failed sink cannot yield a successful saving.
+Probe the installed Node reporter boundary: per-file and root summaries differ,
+suite events are separate from test counts, and inherited NODE_TEST_CONTEXT must
+be removed, not set to an empty string. Await output callbacks and final log close.
+Two local pairs are descriptive; keep defaults and dedicated lifecycle/migration
+owners separate. See docs/POSTGRES_COHORT_COMPARISON_OUTCOME.md.
+Audit phase coverage before attributing cost: the recovery file currently creates
+fourteen databases without schema_prepare/scenario_work wrappers. Zero recorded
+spans are unknown attribution, not proof that no preparation/scenario work ran.

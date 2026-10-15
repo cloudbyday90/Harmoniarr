@@ -6,6 +6,21 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Complete PostgreSQL cohort comparison (2026-10-15)
+
+- Added an explicit modular ESM comparison command around the existing serial
+  native process/parent owners, with fixed forward/reverse counterbalancing,
+  bounded case/phase evidence, exact source checks and strict cleanup counts.
+- All four 44-case profiles pass with identical signatures/work counts and zero
+  skips. Shared profiles release all 107 registrations without reaping. Local
+  savings are 39.35% forward and 21.19% reverse; defaults remain unchanged.
+- Separate [design](POSTGRES_COHORT_COMPARISON_DESIGN.md),
+  [official research/options](POSTGRES_COHORT_COMPARISON_RESEARCH_2026_10.md) and
+  [outcome](POSTGRES_COHORT_COMPARISON_OUTCOME.md) record evidence and limits.
+- Next: instrument recovery's fourteen currently unwrapped migration/scenario
+  invocations, then assess the existing template mechanism with unchanged cases,
+  fresh seeds and dedicated untemplated migration proof.
+
 ## Completed slice: Shared PostgreSQL startup cancellation (2026-10-15)
 
 - Added cooperative checks after acknowledged start and before runtime
@@ -16,9 +31,9 @@ Database model source: `docs/DATABASE_MODEL.md`
 - Separate [design](POSTGRES_STARTUP_CANCELLATION_DESIGN.md),
   [official research/options](POSTGRES_STARTUP_CANCELLATION_RESEARCH_2026_10.md)
   and [outcome](POSTGRES_STARTUP_CANCELLATION_OUTCOME.md) record evidence and limits.
-- Next: measure the existing five-file shared PostgreSQL cohort against the same
-  serial isolated cohort, separating startup/schema/scenario/release cost before
-  any default scheduling change. Keep dedicated lifecycle/migration tests isolated.
+- Its complete five-file, forward/reverse shared-versus-isolated comparison is
+  completed above; dedicated lifecycle/migration owners and default scheduling
+  remain separate from local measurement.
 
 ## Completed slice: Owned PostgreSQL post-start setup guard (2026-10-15)
 

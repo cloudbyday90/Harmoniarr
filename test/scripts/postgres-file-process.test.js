@@ -66,6 +66,15 @@ test('exit and runner close cannot bypass asynchronous output write completion',
   } finally { completeWrite?.(); f.finish(); await pending; }
 });
 
+test('cohort evidence opts into one fixed reporter while invalid policy starts no process', async () => {
+  const f = fixture(); const pending = runPostgresTestFile({ ...f.input, cohortEvidence: true }); f.finish(); await pending;
+  assert.deepEqual(f.calls[0].args.slice(-3), ['--test-reporter=./testing/reporters/postgres-cohort-reporter.js',
+    '--test-reporter-destination=stderr', f.input.file]);
+  const invalid = fixture();
+  await assert.rejects(runPostgresTestFile({ ...invalid.input, cohortEvidence: 'true' }), TypeError);
+  assert.equal(invalid.calls.length, 0);
+});
+
 test('pre-aborted Error and null reasons launch no owned process', async () => {
   for (const reason of [new Error('Controlled cancellation'), null]) {
     const f = fixture(); const controller = new AbortController(); controller.abort(reason);

@@ -4,6 +4,14 @@ Harmoniarr is a self-hosted, Docker-hosted music library manager inspired by Lid
 
 The repository contains the Node.js ESM server, Vue client, PostgreSQL schema, automated validation, and design documents. The platform is under active development toward its first release.
 
+An explicit `npm run measure:postgres-cohort` command compares the complete
+five-file PostgreSQL cohort in both profile/file orders, verifying native cases,
+work counts, source identity and cleanup. See its
+[design](docs/POSTGRES_COHORT_COMPARISON_DESIGN.md),
+[official research and tradeoffs](docs/POSTGRES_COHORT_COMPARISON_RESEARCH_2026_10.md)
+and [outcome](docs/POSTGRES_COHORT_COMPARISON_OUTCOME.md) for local measurements,
+immutable image prerequisites and the separate default-scheduling decision.
+
 Shared PostgreSQL startup now checks cancellation after acquisition and before
 runtime publication, awaiting the current cleanup owner and preserving the
 original result. See the [design](docs/POSTGRES_STARTUP_CANCELLATION_DESIGN.md),
