@@ -792,3 +792,12 @@ elapsed time. Counterbalanced forward/reverse profiles refuse partial, changed,
 skipped or unreleased work before claiming comparability. See
 docs/POSTGRES_COHORT_COMPARISON_OUTCOME.md; source hashes, actual native assertions
 and local pair measurements do not replace broader CI or cross-profile SQL digests.
+
+Recovery schema preparation and callback lifetime now belong to
+testing/integration/music-queue-recovery-scenario.js; its separate schema policy
+selects only reviewed modes. The canonical transaction suite uses that adapter,
+and music-queue-recovery-template-adoption.test.js proves real committed recovery
+isolation, Error/null and reopened-source refusal. Compare native case signatures
+and fourteen scenarios while accounting separately for one extra template.
+See docs/RECOVERY_SCHEMA_TEMPLATE_OUTCOME.md. Policy promotion and final shared
+selection evidence remain separate from the measured explicit-mode candidate.

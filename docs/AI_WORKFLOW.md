@@ -6,6 +6,14 @@ This repository includes a shared `.agents/` directory for GitHub Copilot agent 
 
 The goal is to keep reusable AI workflow guidance versioned alongside the project so UI review, frontend implementation, browser testing, and related tasks follow the same repo conventions.
 
+The [recovery schema outcome](RECOVERY_SCHEMA_TEMPLATE_OUTCOME.md) extends the
+standards/testing method: close phase-coverage gaps at the actual scenario owner,
+reuse migration/template services, and preserve exact native case bodies. Compare
+explicit modes on frozen source while accounting for the extra template database.
+Prove real committed state/fault isolation and reopened-source refusal. A scoped
+default promotion gets a separate final freeze and shared-cohort verification;
+preserve the measured candidate rather than relabelling its source identity.
+
 The [complete PostgreSQL comparison](POSTGRES_COHORT_COMPARISON_OUTCOME.md)
 extends the existing standards/testing method with reproducible evidence: freeze
 current source, keep case/ownership boundaries, counterbalance profiles and file

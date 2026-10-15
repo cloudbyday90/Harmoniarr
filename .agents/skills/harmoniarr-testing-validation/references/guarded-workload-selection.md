@@ -206,6 +206,20 @@ suite events are separate from test counts, and inherited NODE_TEST_CONTEXT must
 be removed, not set to an empty string. Await output callbacks and final log close.
 Two local pairs are descriptive; keep defaults and dedicated lifecycle/migration
 owners separate. See docs/POSTGRES_COHORT_COMPARISON_OUTCOME.md.
-Audit phase coverage before attributing cost: the recovery file currently creates
-fourteen databases without schema_prepare/scenario_work wrappers. Zero recorded
-spans are unknown attribution, not proof that no preparation/scenario work ran.
+Audit phase coverage before attributing cost: the prior comparison recorded
+fourteen recovery databases without schema_prepare/scenario_work wrappers. Zero
+recorded spans were unknown attribution. The recovery entry below completes
+that instrumentation and evaluates its scoped schema policy separately.
+
+Recovery schema comparison uses the canonical music-queue-recovery-scenario.js
+adapter and scoped schema policy under testing/integration/. Keep actual pool/
+signal ownership, fourteen schema/scenario calls and byte-identical nine-case
+bodies. Compare empty/template/template/empty on one frozen instrumented source;
+the template intentionally adds one CREATE/drop and one preparation, so compare
+scenario counts and native case signatures rather than demanding equal total
+CREATE counts. Prove genuine committed recovery/event and clone-local fault
+isolation, Error/null and reopened-source refusal before context work. Retain
+untemplated migration acceptance and independent fresh seeds/pools. If changing
+only the suite default after measurement, freeze final source separately and
+validate the default through the existing shared cohort without relabelling
+candidate timing. See docs/RECOVERY_SCHEMA_TEMPLATE_OUTCOME.md.

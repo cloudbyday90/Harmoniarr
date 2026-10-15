@@ -6,6 +6,22 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Recovery schema timing and scoped templates (2026-10-15)
+
+- Added a small recovery policy/scenario adapter around existing schema/runtime
+  owners. All fourteen preparations and callbacks are timed; nine native case
+  bodies remain byte-identical, with current pool/signal and strict cleanup.
+- Both-order explicit-mode comparisons pass: local savings are 63.83% and 48.69%.
+  Native committed-state/fault isolation and reopened-source refusal pass before
+  selecting the template default for this transaction suite only.
+- Final five-file shared selection passes 44 cases, with 108 registrations fully
+  released, zero reaping and unchanged recovery case signatures. Separate
+  [design](RECOVERY_SCHEMA_TEMPLATE_DESIGN.md),
+  [official research/options](RECOVERY_SCHEMA_TEMPLATE_RESEARCH_2026_10.md) and
+  [outcome](RECOVERY_SCHEMA_TEMPLATE_OUTCOME.md) retain candidate/final evidence.
+- Next: audit and instrument the recovery execution suite's direct migration
+  calls and actual worker completion/close before evaluating another adoption.
+
 ## Completed slice: Complete PostgreSQL cohort comparison (2026-10-15)
 
 - Added an explicit modular ESM comparison command around the existing serial
@@ -17,9 +33,8 @@ Database model source: `docs/DATABASE_MODEL.md`
 - Separate [design](POSTGRES_COHORT_COMPARISON_DESIGN.md),
   [official research/options](POSTGRES_COHORT_COMPARISON_RESEARCH_2026_10.md) and
   [outcome](POSTGRES_COHORT_COMPARISON_OUTCOME.md) record evidence and limits.
-- Next: instrument recovery's fourteen currently unwrapped migration/scenario
-  invocations, then assess the existing template mechanism with unchanged cases,
-  fresh seeds and dedicated untemplated migration proof.
+- Its recovery instrumentation/template-adoption follow-up is completed above,
+  retaining fresh seeds and dedicated untemplated migration proof.
 
 ## Completed slice: Shared PostgreSQL startup cancellation (2026-10-15)
 

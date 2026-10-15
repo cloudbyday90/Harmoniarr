@@ -8,30 +8,28 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, suite, test } from 'node:test';
-import { applyPendingMigrations } from '../../src/server/migrations.js';
 import { captureRecoveryObservation, MUSIC_QUEUE_RECOVERY_EXECUTION_SOURCE, MUSIC_QUEUE_RECOVERY_DISCOVERY_SOURCE }
   from '../../src/server/import-candidates/music-queue-recovery-policy.js';
 import { replaceImportExecutionRunItems } from '../../src/server/import-candidates/import-candidate-execution-repository.js';
 import { createPostgresIntegrationRuntime } from '../../testing/postgres-integration-runtime.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 import { isSkippableIntegrationRuntimeError, toIntegrationRuntimeUnavailableReason } from '../../testing/integration/runtime-availability.js';
-import { createMusicQueueRecoveryFixtureContext, seedMusicQueueRecoveryFixture as fixture, seedMusicQueueRecoveryReplacement as replacement,
+import { seedMusicQueueRecoveryFixture as fixture, seedMusicQueueRecoveryReplacement as replacement,
   recoverMusicQueueFixture as recover, createRecoveryFixtureOwner as addOwner, createRecoveryFixtureWantedRelease as addWanted }
   from '../../testing/integration/music-queue-recovery-fixtures.js';
 import { withFixturePostgresObserver } from '../../testing/integration/fixture-postgres-observer.js';
 import { withRollbackFixtureClient } from '../../testing/integration/fixture-transaction-client.js';
 import { withFixtureLifecycle } from '../../testing/integration/fixture-lifecycle.js';
 import { runParallelTasksAndDrain } from '../../src/server/parallel-task-drain.js';
+import { withMusicQueueRecoveryScenario } from '../../testing/integration/music-queue-recovery-scenario.js';
+import { resolveMusicQueueRecoverySchemaMode } from '../../testing/integration/music-queue-recovery-schema-policy.js';
 
 const config = resolveIntegrationTestRuntimeConfig();
 let runtime; let unavailableReason;
 
 async function scenario(t, run) {
   if (unavailableReason) { t.skip(unavailableReason); return; }
-  await runtime.runIsolatedDatabase(async ({ getPoolFn, databaseConfig }) => {
-    await applyPendingMigrations({ getPoolFn });
-    await run({ ...createMusicQueueRecoveryFixtureContext({ getPoolFn }), databaseConfig });
-  });
+  return withMusicQueueRecoveryScenario(runtime, t, run);
 }
 async function childRuns(pool) {
   return (await pool.query(`SELECT id,status,summary,next_attempt_at FROM operation_runs
@@ -44,7 +42,8 @@ async function episodeCount(pool, candidateId) {
 
 suite('Scoped Music Queue recovery transactions with isolated PostgreSQL', () => {
   before(async () => {
-    try { runtime = await createPostgresIntegrationRuntime({ config }); }
+    const schemaMode = resolveMusicQueueRecoverySchemaMode();
+    try { runtime = await createPostgresIntegrationRuntime({ config, schemaMode }); }
     catch (error) { if (!isSkippableIntegrationRuntimeError(error)) throw error; unavailableReason = toIntegrationRuntimeUnavailableReason(error); }
   }, { timeout: config.suiteSetupTimeoutMs });
   after(async () => { await runtime?.cleanup(); }, { timeout: config.suiteTeardownTimeoutMs });

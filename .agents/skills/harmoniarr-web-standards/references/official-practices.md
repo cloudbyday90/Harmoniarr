@@ -986,3 +986,12 @@ Draft: use monotonic durations without adding nested spans or comparing absolute
 timestamps from separate processes. The fixed counterbalanced comparison is a
 project method, not a W3C mandate or statistically established speedup. OWASP
 exclusions apply to public artifacts; ignored native logs are not access control.
+
+October 15 recovery schema guidance uses
+docs/RECOVERY_SCHEMA_TEMPLATE_RESEARCH_2026_10.md. PostgreSQL 18 cloning requires
+an idle source and does not inherit database-level settings/permissions. Reuse
+the current sealed identity owner and configured clone pools; copy migration
+state, not scenario users/runs/events. Keep Node's actual completion and primary
+Error/null, W3C's Working Draft timing limits and informative OWASP exclusions
+separate from a project-specific template-adoption decision. An extra template
+CREATE is intentional work, not an unmatched-case failure or a security grant.

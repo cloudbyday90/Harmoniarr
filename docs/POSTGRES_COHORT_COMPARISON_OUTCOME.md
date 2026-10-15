@@ -137,6 +137,10 @@ before choosing template adoption; keep production and default scheduling scope
 separate. Hosted Ubuntu canonical-media evidence remains a separate prerequisite
 before media-default promotion.
 
+The subsequent [recovery schema outcome](RECOVERY_SCHEMA_TEMPLATE_OUTCOME.md)
+completes its timing/template evaluation follow-up. The 107-create, fourteen
+unwrapped-recovery observations above remain historical pre-adoption evidence.
+
 Opening and final GitHub MCP collection reads found zero open PRs. No random or
 stale PR was available to implement or rebase. No PR comment, merge or other
 external message occurred.
