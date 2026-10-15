@@ -125,3 +125,7 @@ verify original failure/retention behavior there before broader default adoption
 Then review a manually dispatched Ubuntu lane result. See the separate
 [design](LINUX_CANONICAL_MEDIA_DESIGN.md) and
 [official research/options](LINUX_CANONICAL_MEDIA_RESEARCH_2026_10.md).
+
+The subsequent [PostgreSQL cleanup outcome](POSTGRES_RUNTIME_CLEANUP_OUTCOME.md)
+completes server-stop failure propagation with separate native ownership proof.
+Its strict temporary-database release follow-up remains a separate boundary.

@@ -6,6 +6,15 @@ This repository includes a shared `.agents/` directory for GitHub Copilot agent 
 
 The goal is to keep reusable AI workflow guidance versioned alongside the project so UI review, frontend implementation, browser testing, and related tasks follow the same repo conventions.
 
+The [PostgreSQL cleanup outcome](POSTGRES_RUNTIME_CLEANUP_OUTCOME.md) extends
+the existing standards/testing skills with separate failure and resource-authority
+proof. Exercise Error/null, a held stop and canonical promise identity in fast
+contracts; use bounded native cases to show whether the actual server remains
+live. A rejected release grants no shutdown or deletion proof. Preserve sticky
+workspace guards and borrowed-server ownership; do not add retries or replace
+primary failures with a new aggregate. Source status and applicability remain
+explicit across W3C, OWASP, ECMAScript, Node and Testcontainers guidance.
+
 The [Linux canonical lane](LINUX_CANONICAL_MEDIA_OUTCOME.md) extends the existing
 standards/testing method: require complete native summaries plus actual media
 phase counts, reject green skips, drain after evidence failure and preserve

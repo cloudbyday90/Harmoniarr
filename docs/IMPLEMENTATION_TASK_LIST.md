@@ -6,6 +6,22 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: PostgreSQL runtime stop-failure propagation (2026-10-15)
+
+- Corrected the shared cleanup condition without introducing another lifecycle
+  abstraction. Empty and template modes preserve held completion, one promise,
+  one stop attempt and original Error/null.
+- Container-free contracts and existing app/workspace checks pass; two real
+  PostgreSQL cases prove continued server activity after controlled stop refusal
+  and separate exact-owner retirement. Uncertain workspace guards remain intact.
+- Separate [design](POSTGRES_RUNTIME_CLEANUP_DESIGN.md),
+  [research/options](POSTGRES_RUNTIME_CLEANUP_RESEARCH_2026_10.md) and
+  [outcome](POSTGRES_RUNTIME_CLEANUP_OUTCOME.md) record evidence and limits.
+- Next: make shared empty-schema temporary-database release failures observable
+  after reviewing the helper's legacy best-effort default. Keep server ownership,
+  primary failures and existing resource limits. Manual Ubuntu media evidence is
+  still required before considering default media-mode promotion.
+
 ## Completed slice: Explicit Linux canonical media lane (2026-10-15)
 
 - Modular ESM admission, local daemon/image preflight, native event drainage and
@@ -16,9 +32,8 @@ Database model source: `docs/DATABASE_MODEL.md`
 - Separate [design](LINUX_CANONICAL_MEDIA_DESIGN.md),
   [research](LINUX_CANONICAL_MEDIA_RESEARCH_2026_10.md) and
   [outcome](LINUX_CANONICAL_MEDIA_OUTCOME.md) retain failed probes and scope.
-- Next: fix shared empty-schema PostgreSQL cleanup swallowing server-stop
-  failure, preserving original Error/null and uncertain workspace retention.
-  Review manual Ubuntu evidence before any default media-mode promotion.
+- The server-stop follow-up is completed in the cleanup slice above. Review
+  manual Ubuntu evidence before any default media-mode promotion.
 
 ## Completed slice: Canonical media rollout decision (2026-10-15)
 

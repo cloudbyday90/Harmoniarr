@@ -742,3 +742,11 @@ client proof; pre-auth windows remain unassociated. The
 docs/POSTGRES_STARTUP_SERVER_OUTCOME.md owns real configuration/marker, held
 startup, both entrypoints, cleanup and original-error evidence. This diagnoses
 newly observed stages, not the cause of earlier uncaptured server startup.
+
+Shared PostgreSQL stop failure belongs to testing/postgres-integration-runtime.js.
+The dedicated postgres-runtime-cleanup.test.js files under test/server/ and
+test/integration/ prove held completion, primary Error/null, canonical promise
+identity and a still-live real server after controlled refusal. App/workspace
+owners retain separate quiescence authority. See
+docs/POSTGRES_RUNTIME_CLEANUP_OUTCOME.md; strict temporary-database release and
+hosted Ubuntu media validation are distinct, still-open follow-ups.

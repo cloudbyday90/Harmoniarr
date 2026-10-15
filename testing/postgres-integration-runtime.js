@@ -66,7 +66,7 @@ async function createDatabaseRuntime({ config, env, source, phaseObserver, schem
           try { await prepared?.cleanup(); }
           catch (error) { failed = true; failure = error; }
           try { await closeServer(); }
-          catch (error) { if (prepared && !failed) { failed = true; failure = error; } }
+          catch (error) { if (!failed) { failed = true; failure = error; } }
           if (failed) throw failure;
         })();
         cleanupPromise.catch(() => {});

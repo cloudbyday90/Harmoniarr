@@ -144,3 +144,13 @@ replay, mount the acknowledged owned volume's daemon path at the identical Linux
 path; retain failed/uncertain volumes. The manual workflow remains selected.
 See docs/LINUX_CANONICAL_MEDIA_OUTCOME.md for successful full Linux replay and
 the separate unexecuted hosted-Ubuntu/shared PostgreSQL stop-failure boundaries.
+
+Shared PostgreSQL cleanup must preserve one promise/stop attempt and original
+Error/null in both schema modes. Use held container-free controls for precedence
+and two native cases for real server activity after controlled pre-stop refusal;
+independently close the observer and retire only the captured test owner. A
+rejected stop does not certify shutdown or authorize removal of uncertain media
+roots. Keep sticky workspace guards separate from PostgreSQL's own storage.
+Register actual native completion beyond runner timeout. The helper's legacy
+best-effort temporary-database release is a distinct follow-up; do not claim it
+is strict from a successful stop. See docs/POSTGRES_RUNTIME_CLEANUP_OUTCOME.md.

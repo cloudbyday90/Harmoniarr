@@ -933,3 +933,12 @@ Preserve explicit application names, original startup outcomes and owned failure
 completion. OWASP data minimization requires fixed output, not raw log rows,
 identities, query text or markers. Read/output limits do not bound temporary log
 disk growth. W3C monotonic durations are distinct from server wall-clock components.
+
+October 15 runtime-cleanup guidance uses
+docs/POSTGRES_RUNTIME_CLEANUP_RESEARCH_2026_10.md. Node test completion is not
+resource quiescence; Testcontainers bounded stop promises must be awaited and
+their rejection retained in either schema mode. ECMAScript permits null throws;
+preserve the primary value through later release errors. Apply W3C Privacy
+Principles (Statement) and OWASP minimization to evidence, without claiming
+fixture-specific mandates or WCAG conformance. Failure propagation and permission
+to remove independently owned storage require separate evidence.
