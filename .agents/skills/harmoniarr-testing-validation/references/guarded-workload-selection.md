@@ -108,3 +108,17 @@ mount during cleanup and prove stop/removal before deletion. The functional
 fixture and default media execution remain unchanged. See
 docs/REUSABLE_WORKSPACE_CLEANUP_OUTCOME.md before adopting an executor in a
 reusable canonical cohort; no timer or successful sibling grants cleanup.
+
+The Add to library canonical cohort now has a per-scenario adapter. Select it
+explicitly with HARMONIARR_LIBRARY_ADD_MEDIA_EXECUTION=owned-api and an existing
+HARMONIARR_INTEGRATION_MEDIA_IMAGE; per-command remains default and local tools
+retain their existing path. Optional HARMONIARR_LIBRARY_ADD_MEDIA_DIAGNOSTICS=on
+emits fixed aggregates after close. Resolve invalid/imageless choices before
+PostgreSQL. Close after app/worker drainage inside the actual child predicate,
+with fallback close for earlier runtime failure; never reuse a scenario owner
+or clear its adapter before the returned database tail. Preserve Error/null and
+sticky child/parent retention. Compare the same literal file/test in reversed
+order and retain all actual inspections, byte equality, replay and refusal
+assertions. Full cohort and selected timing are different scopes; API owner
+startup can outweigh savings at low inspection counts. See
+docs/LIBRARY_ADD_MEDIA_PILOT_OUTCOME.md before proposing default adoption.

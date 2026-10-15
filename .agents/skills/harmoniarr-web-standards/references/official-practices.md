@@ -1,5 +1,14 @@
 # Official practices by boundary
 
+October 15 canonical media guidance uses
+docs/LIBRARY_ADD_MEDIA_PILOT_RESEARCH_2026_10.md. Docker read-only media mounts
+and reviewed local API reads apply at the scenario's actual directory owner.
+Node reported test completion is not resource drainage; await app work, canonical
+executor close and the returned database tail. W3C draft monotonic timing and
+OWASP aggregate output guide measurements, not cache authority or a global
+rollout. Bootstrap/lifecycle costs can outweigh four short inspections. Keep
+explicit cohort selection, reversed-order evidence and all current-byte checks.
+
 October 15 reusable cleanup guidance uses
 docs/REUSABLE_WORKSPACE_CLEANUP_RESEARCH_2026_10.md. Node unique directories,
 canonical paths and exact stat identity inform current filesystem ownership;

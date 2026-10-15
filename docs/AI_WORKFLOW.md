@@ -6,6 +6,15 @@ This repository includes a shared `.agents/` directory for GitHub Copilot agent 
 
 The goal is to keep reusable AI workflow guidance versioned alongside the project so UI review, frontend implementation, browser testing, and related tasks follow the same repo conventions.
 
+The [canonical media pilot](LIBRARY_ADD_MEDIA_PILOT_OUTCOME.md) extends the
+existing standards/testing skills with an explicit per-scenario rollout method:
+resolve options before startup, bind the actual child root, close after app
+drainage in the deletion predicate and await the returned database tail before
+reuse. Preserve private results/current bytes and compare reversed-order selected
+samples before changing defaults. W3C timing, Docker resource authority and OWASP
+minimal diagnostics remain separate evidence boundaries. Maintain these existing
+skills instead of adding another overlapping standards checklist.
+
 The [reusable workspace outcome](REUSABLE_WORKSPACE_CLEANUP_OUTCOME.md) extends
 the maintained testing/standards method with separate directory and admission
 owners. Await actual returned database work before runtime cleanup; retain unsafe

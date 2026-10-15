@@ -18,25 +18,29 @@ import { listImportCandidateFileDecisions, upsertImportCandidateFileDecision } f
 import { createIntegrationAppRuntime } from '../../testing/integration/app-runtime.js';
 import { bootstrapAdminSession, loginWithPassword } from '../../testing/integration/auth-helpers.js';
 import { seedMetadataReleaseFixture } from '../../testing/integration/metadata-fixtures.js';
-import { createLibraryAddMediaFixture, createLibraryAddFixtureUser, seedOwnedLibraryAddFixture,
+import { createLibraryAddFixtureUser, seedOwnedLibraryAddFixture,
   runLibraryAddFixtureWorker } from '../../testing/integration/library-add-media-fixtures.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 import { isSkippableIntegrationRuntimeError, toIntegrationRuntimeUnavailableReason } from '../../testing/integration/runtime-availability.js';
 import { createSessionHttpClient } from '../../testing/server/http-session-client.js';
+import { createLibraryAddMediaScenario, resolveLibraryAddMediaOptions } from '../../testing/integration/library-add-media-scenario.js';
 
 const config = resolveIntegrationTestRuntimeConfig();
 const actionPath = (id) => `/api/v1/missing-music/decisions/${id}/add-to-library`;
 const detailPath = (id) => `/api/v1/missing-music/decisions/${id}`;
 let runtime;
 let module;
-let fixtureRoot;
 let unavailableReason;
 let mediaUnavailableReason;
 let inspectionHook;
-const mediaFixture = createLibraryAddMediaFixture({ getFixtureRoot: () => fixtureRoot });
+const mediaOptions = resolveLibraryAddMediaOptions();
+const mediaScenario = createLibraryAddMediaScenario({ ...mediaOptions,
+  onRecord: mediaOptions.diagnostics ? record => console.log(`Library-add media: ${JSON.stringify(record)}`) : null });
+const { mediaFixture } = mediaScenario;
+const runScenario = (...args) => mediaScenario.runScenario(runtime, ...args);
 
 async function seed(pool, owner, workspaceDir, options = {}) {
-  fixtureRoot = workspaceDir; inspectionHook = null;
+  inspectionHook = null;
   return seedOwnedLibraryAddFixture({ pool, owner, workspaceDir, mediaFixture, ...options });
 }
 async function guardInput(fixture, owner, actor) {
@@ -75,7 +79,7 @@ suite('Canonical prepared Add to library with PostgreSQL and test-owned measured
 
   test('no-stop-history prepared download appears in action paging, resolves own authority and durably adds original measured bytes', { timeout: config.scenarioTimeoutMs }, async (t) => {
     if (unavailableReason || mediaUnavailableReason) { t.skip(unavailableReason || mediaUnavailableReason); return; }
-    await runtime.runScenario(async ({ client, baseUrl, getPoolFn, workspaceDir }) => {
+    await runScenario(async ({ client, baseUrl, getPoolFn, workspaceDir }) => {
       await bootstrapAdminSession(client); const pool = getPoolFn();
       const owner = await createLibraryAddFixtureUser(client, pool, 'prepared-owner');
       const outsider = await createLibraryAddFixtureUser(client, pool, 'prepared-outsider');
@@ -116,7 +120,7 @@ suite('Canonical prepared Add to library with PostgreSQL and test-owned measured
 
   test('required start audit and queue insertion failures roll back saved context without candidate reopen or recovery history', { timeout: config.scenarioTimeoutMs }, async (t) => {
     if (unavailableReason) { t.skip(unavailableReason); return; }
-    await runtime.runScenario(async ({ client, getPoolFn, workspaceDir }) => {
+    await runScenario(async ({ client, getPoolFn, workspaceDir }) => {
       const admin = (await bootstrapAdminSession(client)).payload.user; const pool = getPoolFn();
       const owner = await createLibraryAddFixtureUser(client, pool, 'prepared-atomic'); const fixture = await seed(pool, owner, workspaceDir, { audio: false });
       const input = await guardInput(fixture, owner, admin); const original = input.prepared.candidate.normalizedPayload;
@@ -137,7 +141,7 @@ suite('Canonical prepared Add to library with PostgreSQL and test-owned measured
 
   test('current write snapshots refuse candidate, decision, account and link drift and defer unguarded work', { timeout: config.scenarioTimeoutMs }, async (t) => {
     if (unavailableReason) { t.skip(unavailableReason); return; }
-    await runtime.runScenario(async ({ client, getPoolFn, workspaceDir }) => {
+    await runScenario(async ({ client, getPoolFn, workspaceDir }) => {
       const admin = (await bootstrapAdminSession(client)).payload.user; const pool = getPoolFn();
       const owner = await createLibraryAddFixtureUser(client, pool, 'prepared-drift'); const fixture = await seed(pool, owner, workspaceDir, { audio: false });
       const input = await guardInput(fixture, owner, admin);
@@ -166,7 +170,7 @@ suite('Canonical prepared Add to library with PostgreSQL and test-owned measured
 
   test('shared recipient acceptance races coalesce one exact guarded run while a late participant refuses old acquired scope', { timeout: config.scenarioTimeoutMs }, async (t) => {
     if (unavailableReason) { t.skip(unavailableReason); return; }
-    await runtime.runScenario(async ({ client, getPoolFn, workspaceDir }) => {
+    await runScenario(async ({ client, getPoolFn, workspaceDir }) => {
       const admin = (await bootstrapAdminSession(client)).payload.user; const pool = getPoolFn();
       const owner = await createLibraryAddFixtureUser(client, pool, 'prepared-shared-one'); const other = await createLibraryAddFixtureUser(client, pool, 'prepared-shared-two');
       const fixture = await seed(pool, owner, workspaceDir, { audio: false });
@@ -187,7 +191,7 @@ suite('Canonical prepared Add to library with PostgreSQL and test-owned measured
 
   test('actual worker refuses policy or provenance drift and an unmarked legacy job before changing original files', { timeout: config.scenarioTimeoutMs }, async (t) => {
     if (unavailableReason || mediaUnavailableReason) { t.skip(unavailableReason || mediaUnavailableReason); return; }
-    await runtime.runScenario(async ({ client, getPoolFn, workspaceDir }) => {
+    await runScenario(async ({ client, getPoolFn, workspaceDir }) => {
       await bootstrapAdminSession(client); const pool = getPoolFn();
       for (const [variant, username] of [['strict_current_policy', 'prepared-strict'], ['preview_provenance_drift', 'prepared-preview-drift'], ['removed_marker', 'prepared-unmarked']]) {
         const owner = await createLibraryAddFixtureUser(client, pool, username); const fixture = await seed(pool, owner, workspaceDir);
@@ -211,7 +215,7 @@ suite('Canonical prepared Add to library with PostgreSQL and test-owned measured
 
   test('real low media, collisions and differing staging or reuse bytes cannot become a prepared safe-add bypass', { timeout: config.scenarioTimeoutMs }, async (t) => {
     if (unavailableReason || mediaUnavailableReason) { t.skip(unavailableReason || mediaUnavailableReason); return; }
-    await runtime.runScenario(async ({ client, getPoolFn, workspaceDir }) => {
+    await runScenario(async ({ client, getPoolFn, workspaceDir }) => {
       await bootstrapAdminSession(client); const pool = getPoolFn();
       const lowOwner = await createLibraryAddFixtureUser(client, pool, 'prepared-low');
       const low = await seed(pool, lowOwner, workspaceDir, { extension: 'mp3', bitrate: 128 });

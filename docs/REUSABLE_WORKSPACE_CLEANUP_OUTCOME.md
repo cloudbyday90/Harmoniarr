@@ -97,3 +97,7 @@ Next adopt an explicit owned API executor in one reusable canonical media cohort
 Register actual close before evaluating its guard, retain every current media/
 receipt/byte/private comparison, and compare a selected baseline before broader
 default adoption. Full Engine exec/lifecycle migration remains separate.
+
+That next item is now implemented as an explicit option in the
+[canonical media pilot outcome](LIBRARY_ADD_MEDIA_PILOT_OUTCOME.md), which owns
+its subsequent baseline, complete-cohort validation and recommendation.

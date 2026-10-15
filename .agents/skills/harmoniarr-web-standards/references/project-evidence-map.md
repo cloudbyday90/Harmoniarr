@@ -1,5 +1,13 @@
 # Project standards-to-evidence map
 
+Canonical media pilot: library-add-media-scenario.js binds stable app/seed
+adapters to one fresh returned scenario, closes its executor in the post-drain
+child predicate and rejects concurrent reuse. Its fallback preserves Error/null;
+the existing workspace owner retains unsafe child and parent evidence. Unit
+held-close/database-tail and real directory controls complement the unchanged
+six canonical Add to library cases in both modes. Separate pilot design,
+research and outcome record explicit options, measurements and default limits.
+
 Reusable workspace evidence: fixture-runtime-lifetime.js seals admission and
 drains the returned isolated-database operation; fixture-workspace-owner.js owns
 unique contained children, exact current directory identity and sticky parent

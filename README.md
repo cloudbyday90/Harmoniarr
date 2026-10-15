@@ -4,6 +4,13 @@ Harmoniarr is a self-hosted, Docker-hosted music library manager inspired by Lid
 
 The repository contains the Node.js ESM server, Vue client, PostgreSQL schema, automated validation, and design documents. The platform is under active development toward its first release.
 
+The canonical Add to library cohort now supports explicit scenario-owned API
+media inspection while keeping every authorization, rollback and current-byte
+check. The per-command default remains available. See its
+[design](docs/LIBRARY_ADD_MEDIA_PILOT_DESIGN.md),
+[official research](docs/LIBRARY_ADD_MEDIA_PILOT_RESEARCH_2026_10.md) and
+[outcome](docs/LIBRARY_ADD_MEDIA_PILOT_OUTCOME.md) for measured rollout limits.
+
 Reusable app fixtures now guard both scenario and parent workspace cleanup,
 drain admitted database work and retain uncertain children. Fresh per-invocation
 directories isolate repeated labels. See the

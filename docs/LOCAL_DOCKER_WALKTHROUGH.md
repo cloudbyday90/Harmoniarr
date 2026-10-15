@@ -12,6 +12,10 @@ another successful no-cache rebuild, healthy startup and existing-admin bootstra
 check after the test-infrastructure change. It retains this walkthrough's data
 and does not claim a new live-provider or release validation.
 
+The subsequent [canonical media pilot outcome](LIBRARY_ADD_MEDIA_PILOT_OUTCOME.md)
+records another no-cache build, healthy startup and existing-admin bootstrap
+check on October 15, retaining the same local walkthrough state.
+
 It is intentionally separate from the canonical deployment baseline in `compose.yaml`.
 
 ## What It Does

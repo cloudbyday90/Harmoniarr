@@ -6,6 +6,19 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Canonical media executor pilot (2026-10-15)
+
+- Narrow per-scenario ESM adapters opt one reusable canonical cohort into owned
+  local API inspection, close after app drainage and preserve existing child/
+  parent authority. Every canonical assertion and inspection remains.
+- Separate [design](LIBRARY_ADD_MEDIA_PILOT_DESIGN.md),
+  [research](LIBRARY_ADD_MEDIA_PILOT_RESEARCH_2026_10.md) and
+  [outcome](LIBRARY_ADD_MEDIA_PILOT_OUTCOME.md) record focused comparisons and
+  complete six-case native scope. The default remains per-command.
+- Next: measure a second reversed-order complete cohort pair before deciding
+  whether this cohort should default to owned API inspection. Keep broader
+  migration and Engine exec/lifecycle API work separate.
+
 ## Completed slice: Reusable workspace cleanup authority (2026-10-15)
 
 - Narrow ESM lifetime/directory owners now seal admission, drain actual isolated
