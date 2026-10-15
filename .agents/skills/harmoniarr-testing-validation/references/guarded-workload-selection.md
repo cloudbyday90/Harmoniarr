@@ -183,3 +183,13 @@ exact retirement before the original setup failure returns. Keep adapter fault
 injection separate from actual transport incidents and cancellation checkpoints.
 See docs/POSTGRES_STARTUP_GUARD_OUTCOME.md; no new disposal service or retry is
 needed for this guard boundary.
+
+Startup cancellation needs checkpoints after acknowledged acquisition and just
+before runtime publication. Do not race away actual start/preparation: observe
+its returned completion, preserve actual setup failure over a simultaneous abort,
+then release through the current owner. A returned runtime owns template/server
+cleanup; the outer guard must not stop again. Prove Error/null, held acquisition,
+held release, borrowed-server survival and post-publication explicit ownership.
+Native controls should hold an actual prepared template before returning it and
+verify its identity/drop independently. Abort notification alone grants no
+quiescence or retirement proof. See docs/POSTGRES_STARTUP_CANCELLATION_OUTCOME.md.

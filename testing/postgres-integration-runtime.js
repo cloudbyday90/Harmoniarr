@@ -126,32 +126,36 @@ export async function createPostgresIntegrationRuntime({
   if (checkoutRecord !== null && typeof checkoutRecord !== 'function') throw new TypeError('Invalid fixture checkout sink');
   const fresh = createPostgresContainer === createDefaultPostgresContainer && !config.useContainerReuse;
   const startupLogging = fresh && evidenceMode === 'failures' && checkoutMode !== 'off' && supportsPostgresStartupImage(config.postgresImage);
-  if (hasConfiguredPostgresAdminConnection(env)) {
-    return createDatabaseRuntime({ config, env, source: 'external_postgres', phaseObserver, schemaMode, signal,
-      closeServer: async () => {}, createPreparedPostgresTemplateFn, withTemporaryPostgresDatabaseFn,
-      checkoutMode, checkoutRecord,
-      failureEvidence: failureEvidenceFactory({ mode: evidenceMode, source: 'external_postgres' }) });
-  }
-
-  const container = await phaseObserver.measure('container_start', () => createPostgresContainer(config, { startupLogging }).start());
-  const closeServer = () => phaseObserver.measure('container_stop', () => container.stop({ timeout: config.containerStopTimeoutMs }));
+  const borrowed = hasConfiguredPostgresAdminConnection(env);
+  const source = borrowed ? 'external_postgres' : 'testcontainer_postgres';
+  let closeServer = async () => {}; let runtime;
   try {
-    const containerEnv = {
-      PGDATABASE: container.getDatabase(),
-      PGHOST: container.getHost(),
-      PGMAINTENANCE_DB: 'postgres',
-      PGPASSWORD: container.getPassword(),
-      PGPORT: String(container.getPort()),
-      PGUSER: container.getUsername(),
-    };
-    return await createDatabaseRuntime({ config, env: containerEnv, source: 'testcontainer_postgres', phaseObserver,
+    let runtimeEnv = env; let ownedEvidence;
+    if (!borrowed) {
+      const container = await phaseObserver.measure('container_start', () => createPostgresContainer(config, { startupLogging }).start());
+      closeServer = () => phaseObserver.measure('container_stop', () => container.stop({ timeout: config.containerStopTimeoutMs }));
+      if (signal?.aborted) throw signal.reason;
+      runtimeEnv = {
+        PGDATABASE: container.getDatabase(),
+        PGHOST: container.getHost(),
+        PGMAINTENANCE_DB: 'postgres',
+        PGPASSWORD: container.getPassword(),
+        PGPORT: String(container.getPort()),
+        PGUSER: container.getUsername(),
+      };
+      ownedEvidence = { fresh, startupLogging, containerId: container.getId?.(),
+        connectionConfig: buildPostgresAdminConnectionConfig(runtimeEnv) };
+    }
+    runtime = await createDatabaseRuntime({ config, env: runtimeEnv, source, phaseObserver,
       schemaMode, signal, closeServer, createPreparedPostgresTemplateFn, withTemporaryPostgresDatabaseFn,
-      checkoutMode, checkoutRecord, startupLogging,
-      failureEvidence: failureEvidenceFactory({ mode: evidenceMode,
-        source: 'testcontainer_postgres', fresh, startupLogging, containerId: container.getId?.(),
-        connectionConfig: buildPostgresAdminConnectionConfig(containerEnv) }) });
+      checkoutMode, checkoutRecord, startupLogging: !borrowed && startupLogging,
+      failureEvidence: failureEvidenceFactory({ mode: evidenceMode, source, ...ownedEvidence }) });
+    if (signal?.aborted) throw signal.reason;
+    return runtime;
   } catch (error) {
-    try { await closeServer(); } catch { /* Preserve the original setup failure through synchronous or asynchronous stop errors. */ }
+    // Once created, the runtime owns template/server release. Never stop it a second time here.
+    try { if (runtime) await runtime.cleanup(); else await closeServer(); }
+    catch { /* Preserve the original setup/cancellation value through sync or async release errors. */ }
     throw error;
   }
 }

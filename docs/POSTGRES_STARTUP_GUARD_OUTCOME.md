@@ -80,6 +80,10 @@ original Error/null and actual completion. Preserve the distinct borrowed/templa
 cleanup contracts and do not race cancellation against resource disposal. Hosted
 Ubuntu canonical media evidence remains separate before media-default promotion.
 
+The subsequent [startup cancellation outcome](POSTGRES_STARTUP_CANCELLATION_OUTCOME.md)
+completes that checkpoint/release follow-up. The original probe above remains
+historical evidence from before the correction.
+
 Initial and final GitHub MCP collection reads found zero open PRs. No applicable
 random PR or stale PR was available to implement or rebase. No PR comment, merge
 or other external message occurred.

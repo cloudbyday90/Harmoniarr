@@ -967,3 +967,13 @@ bounded stop and catch synchronous as well as asynchronous fallout, preserving
 the original ECMAScript thrown value including null. W3C/OWASP minimized evidence
 does not require raw connection metadata. A failed start or borrowed connection
 does not grant authority over unacknowledged or unrelated containers.
+
+October 15 startup-cancellation guidance uses
+docs/POSTGRES_STARTUP_CANCELLATION_RESEARCH_2026_10.md. WHATWG DOM's checkpoints
+and Node AbortSignal reasons support cooperative cancellation around awaited
+operations without signal support. Await actual acquisition, check before
+publication, and release only acknowledged resources through their current
+owner. Preserve actual setup failure over simultaneous cancellation and exact
+Error/null over cleanup fallout. This project policy does not imply that abort
+stops Testcontainers I/O. W3C's Statement and informative OWASP guidance still
+require scoped applicability; avoid recording raw connection or abort payloads.

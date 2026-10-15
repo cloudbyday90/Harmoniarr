@@ -4,12 +4,19 @@ Harmoniarr is a self-hosted, Docker-hosted music library manager inspired by Lid
 
 The repository contains the Node.js ESM server, Vue client, PostgreSQL schema, automated validation, and design documents. The platform is under active development toward its first release.
 
+Shared PostgreSQL startup now checks cancellation after acquisition and before
+runtime publication, awaiting the current cleanup owner and preserving the
+original result. See the [design](docs/POSTGRES_STARTUP_CANCELLATION_DESIGN.md),
+[official research and tradeoffs](docs/POSTGRES_STARTUP_CANCELLATION_RESEARCH_2026_10.md)
+and [outcome](docs/POSTGRES_STARTUP_CANCELLATION_OUTCOME.md) for native ownership
+proof and the next targeted validation recommendation.
+
 Shared PostgreSQL startup now guards connection-metadata capture and awaits
 owned cleanup on setup failure while preserving original failures. See the
 [design](docs/POSTGRES_STARTUP_GUARD_DESIGN.md),
 [official research and tradeoffs](docs/POSTGRES_STARTUP_GUARD_RESEARCH_2026_10.md)
 and [outcome](docs/POSTGRES_STARTUP_GUARD_OUTCOME.md) for native retirement proof
-and the next in-flight cancellation review.
+and the original cancellation probe, addressed in the outcome above.
 
 Shared PostgreSQL fixtures now seal admission and drain full database operations
 before template/server teardown, using the existing lifetime owner. See the

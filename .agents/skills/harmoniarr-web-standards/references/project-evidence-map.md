@@ -773,3 +773,12 @@ files under test/server/ and test/integration/ cover getter/coercion failures,
 held real stop, primary Error/null, synchronous fallout and exact retirement.
 See docs/POSTGRES_STARTUP_GUARD_OUTCOME.md. In-flight cancellation is distinct
 from this failure guard; the parent-server owner keeps its separate policy.
+
+Shared startup cancellation is now guarded by the same ESM owner in
+testing/postgres-integration-runtime.js after container acknowledgement and at
+runtime publication. The postgres-startup-cancellation.test.js files under
+test/server/ and test/integration/ cover held start/template return, canonical
+release, original Error/null, actual-failure precedence and borrowed-server
+survival. See docs/POSTGRES_STARTUP_CANCELLATION_OUTCOME.md. Published runtimes
+retain explicit cleanup; no persistent abort listener or detached disposal is
+introduced. The preceding guard outcome records the original reproduction.

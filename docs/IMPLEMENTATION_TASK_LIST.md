@@ -6,6 +6,20 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Shared PostgreSQL startup cancellation (2026-10-15)
+
+- Added cooperative checks after acknowledged start and before runtime
+  publication. Await actual acquisition and current-owner release; no abort
+  race, duplicate stop or automatic disposal after successful publication.
+- Fast contracts preserve Error/null, actual setup failure and borrowed-server
+  ownership; bounded native controls hold actual start/template return and release.
+- Separate [design](POSTGRES_STARTUP_CANCELLATION_DESIGN.md),
+  [official research/options](POSTGRES_STARTUP_CANCELLATION_RESEARCH_2026_10.md)
+  and [outcome](POSTGRES_STARTUP_CANCELLATION_OUTCOME.md) record evidence and limits.
+- Next: measure the existing five-file shared PostgreSQL cohort against the same
+  serial isolated cohort, separating startup/schema/scenario/release cost before
+  any default scheduling change. Keep dedicated lifecycle/migration tests isolated.
+
 ## Completed slice: Owned PostgreSQL post-start setup guard (2026-10-15)
 
 - Extended the existing ESM owner across metadata extraction and port coercion;
@@ -17,8 +31,8 @@ Database model source: `docs/DATABASE_MODEL.md`
 - Separate [design](POSTGRES_STARTUP_GUARD_DESIGN.md),
   [official research/options](POSTGRES_STARTUP_GUARD_RESEARCH_2026_10.md) and
   [outcome](POSTGRES_STARTUP_GUARD_OUTCOME.md) record evidence and limits.
-- Next: evaluate in-flight startup cancellation checkpoints, owned release and
-  original Error/null before runtime publication, without abandoning actual work.
+- Its in-flight cancellation follow-up is completed above, preserving owned
+  release and original Error/null without abandoning actual acquisition.
 
 ## Completed slice: Shared PostgreSQL admission and drainage (2026-10-15)
 

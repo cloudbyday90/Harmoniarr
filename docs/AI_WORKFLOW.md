@@ -6,6 +6,15 @@ This repository includes a shared `.agents/` directory for GitHub Copilot agent 
 
 The goal is to keep reusable AI workflow guidance versioned alongside the project so UI review, frontend implementation, browser testing, and related tasks follow the same repo conventions.
 
+The [startup cancellation outcome](POSTGRES_STARTUP_CANCELLATION_OUTCOME.md)
+extends the existing standards/testing method with cooperative checkpoints:
+await actual acquisition, check before publication, then clean through the
+acknowledged current owner. A returned runtime owns template/server release;
+the outer startup guard must not dispose it again. Preserve actual setup failure
+over simultaneous cancellation, and exact abort Error/null over release fallout.
+Use held native acquisition and prepared-template returns to prove ordering;
+retain explicit caller cleanup after publication and borrowed-server boundaries.
+
 The [post-start setup guard outcome](POSTGRES_STARTUP_GUARD_OUTCOME.md) extends
 the standards/testing method: begin release ownership immediately after resource
 acknowledgement, including metadata/coercion before runtime publication. Test
