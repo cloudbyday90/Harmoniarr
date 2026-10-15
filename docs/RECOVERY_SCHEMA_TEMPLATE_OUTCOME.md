@@ -129,6 +129,11 @@ considering template or shared-parent admission for that file. Do not infer its
 authority from this transaction-only result. Hosted Ubuntu canonical-media
 evidence remains separate before media-default promotion.
 
+That execution instrumentation/worker-lifetime follow-up is now completed in
+[its separate outcome](RECOVERY_EXECUTION_SCHEMA_OUTCOME.md), with an independent
+suite policy and separate candidate/final evidence. The historical measurements
+above remain the transaction-only collection.
+
 Opening and final GitHub MCP collection reads found zero open PRs. No random or
 stale PR was available to implement or rebase. No PR comment, merge or other
 external message occurred. Existing standards/testing skills receive focused

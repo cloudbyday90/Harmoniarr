@@ -6,6 +6,25 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Recovery execution schema timing and templates (2026-10-15)
+
+- Reused the recovery ESM scenario adapter with the actual fixture signal and an
+  independent execution schema policy; all seven original case bodies are intact.
+- Native provider/release holds prove terminal status and released lease precede
+  actual completion. Error/null cancellation retains the live database until
+  drain; the next clone has fresh recovery/transfer/lease state.
+- Both-order comparisons pass with local savings of 39.60% and 47.20%, supporting
+  this suite's template default with an explicit empty comparator. Global defaults
+  and the shared-parent allowlist are unchanged. See the separate
+  [design](RECOVERY_EXECUTION_SCHEMA_DESIGN.md),
+  [official research/options](RECOVERY_EXECUTION_SCHEMA_RESEARCH_2026_10.md) and
+  [outcome](RECOVERY_EXECUTION_SCHEMA_OUTCOME.md) for final validation scope.
+- Final validation passes 10,367 fast cases and 57 native executions across
+  controls, paired comparisons and the final default/transaction selection,
+  with zero skips. Both builds/static checks pass; production audit is clean.
+- Next: audit/instrument recovery discovery's direct migration setup and custom
+  service/clock/worker owners before evaluating another scoped adoption.
+
 ## Completed slice: Recovery schema timing and scoped templates (2026-10-15)
 
 - Added a small recovery policy/scenario adapter around existing schema/runtime
@@ -19,8 +38,8 @@ Database model source: `docs/DATABASE_MODEL.md`
   [design](RECOVERY_SCHEMA_TEMPLATE_DESIGN.md),
   [official research/options](RECOVERY_SCHEMA_TEMPLATE_RESEARCH_2026_10.md) and
   [outcome](RECOVERY_SCHEMA_TEMPLATE_OUTCOME.md) retain candidate/final evidence.
-- Next: audit and instrument the recovery execution suite's direct migration
-  calls and actual worker completion/close before evaluating another adoption.
+- Its execution instrumentation and actual-worker template-adoption follow-up
+  is completed above, retaining original cases and separate suite policy.
 
 ## Completed slice: Complete PostgreSQL cohort comparison (2026-10-15)
 

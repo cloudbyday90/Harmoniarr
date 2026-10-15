@@ -360,8 +360,10 @@ end is insufficient. Unknown/replacement identities are refusals, not prefix-bas
 cleanup targets. See `docs/POSTGRES_TEST_LAUNCHER_DESIGN.md` and its outcome for
 measured scope and process/platform limits.
 
-Wanted/recovery adoption keeps Wanted's private template and recovery's empty
-migration path. Register the scan fixture's actual completion before launch;
+The initial Wanted/recovery adoption retained Wanted's private template and
+recovery's empty migration path. Current scoped transaction/execution template
+policies and their separate evidence are in references/guarded-workload-selection.md.
+Register the scan fixture's actual completion before launch;
 lease-release observation is earlier. Drain competing returned recovery work
 through first Error/null. Close parent admission before failure diagnostics,
 then capture only the acknowledged fresh server's independent query/readiness/
@@ -370,7 +372,7 @@ evidence. Measure matched code/order/reporters/image/schema/bounds and report
 command versus adapter wall separately; one baseline-first pair is not a CI
 speedup. See docs/WANTED_RECOVERY_SHARED_POSTGRES_OUTCOME.md. Further allowlist
 expansion still needs creation/ownership/drainage proof; no global parallelism,
-cross-run reuse or recovery schema caching is implied.
+cross-run reuse or other recovery schema caching is implied by that initial adoption.
 
 The audited extension uses scoped gates and actual worker/task drainage before
 temporary media or database teardown. Defer captured lease SQL until held

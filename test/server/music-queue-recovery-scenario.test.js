@@ -32,6 +32,7 @@ test('recovery adapter binds current database/pool/signal and measures actual pr
   const entered = Promise.withResolvers(); const hold = Promise.withResolvers(); const f = fixture(); let settled = false;
   const pending = withMusicQueueRecoveryScenario(f.runtime, f.t, async context => {
     assert.equal(context.pool, f.pool); assert.equal(context.databaseConfig, f.databaseConfig);
+    assert.equal(context.fixtureSignal, f.controller.signal);
     assert.equal(context.databaseName, f.databaseName); entered.resolve(); await hold.promise; return 42;
   }, f.dependencies);
   const observed = pending.then(() => { settled = true; }, () => { settled = true; });

@@ -6,7 +6,8 @@
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { resolveMusicQueueRecoverySchemaMode } from '../../testing/integration/music-queue-recovery-schema-policy.js';
+import { resolveMusicQueueRecoverySchemaMode, resolveMusicQueueRecoveryExecutionSchemaMode }
+  from '../../testing/integration/music-queue-recovery-schema-policy.js';
 
 test('recovery schema policy selects the template default and retains an explicit empty comparator', () => {
   assert.equal(resolveMusicQueueRecoverySchemaMode({ env: {} }), 'migration_template');
@@ -22,4 +23,23 @@ test('invalid recovery schema policy refuses instead of silently changing fixtur
   }
   for (const env of [null, [], false]) assert.throws(() => resolveMusicQueueRecoverySchemaMode({ env }), TypeError);
   assert.throws(() => resolveMusicQueueRecoverySchemaMode({ env: {}, defaultMode: 'shared' }), TypeError);
+});
+test('execution selects the template default and keeps an independent explicit policy from recovery transactions', () => {
+  assert.equal(resolveMusicQueueRecoveryExecutionSchemaMode({ env: {} }), 'migration_template');
+  for (const mode of ['empty', 'migration_template']) {
+    assert.equal(resolveMusicQueueRecoveryExecutionSchemaMode({ env: {}, defaultMode: mode }), mode);
+    const env = Object.freeze({ HARMONIARR_INTEGRATION_RECOVERY_EXECUTION_SCHEMA_MODE: mode,
+      HARMONIARR_INTEGRATION_RECOVERY_SCHEMA_MODE: mode === 'empty' ? 'migration_template' : 'empty' });
+    assert.equal(resolveMusicQueueRecoveryExecutionSchemaMode({ env }), mode);
+    assert.notEqual(resolveMusicQueueRecoverySchemaMode({ env }), mode);
+  }
+  assert.equal(resolveMusicQueueRecoveryExecutionSchemaMode({ env: { HARMONIARR_INTEGRATION_RECOVERY_SCHEMA_MODE: 'invalid' } }), 'migration_template');
+});
+test('invalid execution mode refuses before allocation without reflecting configured contents', () => {
+  for (const mode of ['', 'EMPTY', null, false, [], 'private-password']) {
+    assert.throws(() => resolveMusicQueueRecoveryExecutionSchemaMode({ env: { HARMONIARR_INTEGRATION_RECOVERY_EXECUTION_SCHEMA_MODE: mode } }),
+      error => error instanceof TypeError && !error.message.includes('private-password'));
+  }
+  for (const env of [null, [], false]) assert.throws(() => resolveMusicQueueRecoveryExecutionSchemaMode({ env }), TypeError);
+  assert.throws(() => resolveMusicQueueRecoveryExecutionSchemaMode({ env: {}, defaultMode: 'shared' }), TypeError);
 });

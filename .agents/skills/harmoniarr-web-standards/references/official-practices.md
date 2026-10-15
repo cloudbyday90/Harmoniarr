@@ -995,3 +995,12 @@ state, not scenario users/runs/events. Keep Node's actual completion and primary
 Error/null, W3C's Working Draft timing limits and informative OWASP exclusions
 separate from a project-specific template-adoption decision. An extra template
 CREATE is intentional work, not an unmatched-case failure or a security grant.
+
+October 15 recovery execution guidance uses
+docs/RECOVERY_EXECUTION_SCHEMA_RESEARCH_2026_10.md. Node test-result reporting
+does not await extraneous asynchronous work. Trace the actual returned worker
+handle and directly awaited service before changing fixture disposal. Prove
+provider/release ordering at parent-visible checkpoints, including a live
+database after terminal status and released lease. PostgreSQL cloning and W3C
+monotonic timing do not grant drainage authority; keep those separate from
+the scoped template choice and OWASP-minimized published evidence.

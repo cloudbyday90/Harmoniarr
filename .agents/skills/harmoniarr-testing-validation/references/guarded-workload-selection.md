@@ -223,3 +223,15 @@ untemplated migration acceptance and independent fresh seeds/pools. If changing
 only the suite default after measurement, freeze final source separately and
 validate the default through the existing shared cohort without relabelling
 candidate timing. See docs/RECOVERY_SCHEMA_TEMPLATE_OUTCOME.md.
+
+Recovery execution uses the same scenario adapter, forwarding fixtureSignal to
+the existing actual-completion helper, with its own independent schema policy.
+Audit the full seven-case file before comparing modes. Gate real provider work
+and returned lease release separately: terminal status and a released lease are
+earlier than completion. Preserve Error/null during cancellation, prove the
+database remains live until drain, then verify the next clone has no users,
+runs, events, transfers or leases and can execute fresh work. Keep untemplated
+migration acceptance and the shared-parent allowlist separate. Report native
+control, explicit-mode comparison and final-default scopes independently; source
+drift or incomplete release invalidates a saving. See
+docs/RECOVERY_EXECUTION_SCHEMA_OUTCOME.md.

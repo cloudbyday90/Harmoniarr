@@ -16,6 +16,6 @@ export async function withMusicQueueRecoveryScenario(runtime, t, run, {
   return runtime.runIsolatedDatabase(async ({ getPoolFn, databaseConfig, databaseName, phaseObserver }) => {
     await prepareSchema({ getPoolFn, phaseObserver, signal: t?.signal });
     return phaseObserver.measure('scenario_work', () => run({ ...createContext({ getPoolFn }),
-      databaseConfig, databaseName, phaseObserver }));
+      databaseConfig, databaseName, phaseObserver, fixtureSignal: t?.signal }));
   }, { signal: t?.signal });
 }

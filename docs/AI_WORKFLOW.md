@@ -6,6 +6,14 @@ This repository includes a shared `.agents/` directory for GitHub Copilot agent 
 
 The goal is to keep reusable AI workflow guidance versioned alongside the project so UI review, frontend implementation, browser testing, and related tasks follow the same repo conventions.
 
+The [recovery execution design](RECOVERY_EXECUTION_SCHEMA_DESIGN.md) extends the
+same standards/testing method to real workers: audit existing returned-completion
+ownership before introducing a new lifecycle. Gate provider and lease-release
+boundaries independently; terminal status/released lease do not certify drain.
+Reuse the scenario adapter, isolate suite policy, and preserve original case
+bodies and Error/null while proving database availability through completion.
+Keep native controls, measured candidate and final-default evidence separate.
+
 The [recovery schema outcome](RECOVERY_SCHEMA_TEMPLATE_OUTCOME.md) extends the
 standards/testing method: close phase-coverage gaps at the actual scenario owner,
 reuse migration/template services, and preserve exact native case bodies. Compare

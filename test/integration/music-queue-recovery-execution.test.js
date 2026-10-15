@@ -8,7 +8,6 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, suite, test } from 'node:test';
-import { applyPendingMigrations } from '../../src/server/migrations.js';
 import { createOperationRunStore } from '../../src/server/operation-run-store.js';
 import { createImportCandidateExecutionReconciliationService } from '../../src/server/import-candidates/import-candidate-execution-reconciliation-service.js';
 import { MUSIC_QUEUE_RECOVERY_EXECUTION_SOURCE } from '../../src/server/import-candidates/music-queue-recovery-policy.js';
@@ -16,22 +15,21 @@ import { listImportExecutionRunItems, updateImportExecutionRunItem } from '../..
 import { createPostgresIntegrationRuntime } from '../../testing/postgres-integration-runtime.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 import { isSkippableIntegrationRuntimeError, toIntegrationRuntimeUnavailableReason } from '../../testing/integration/runtime-availability.js';
-import { createMusicQueueRecoveryFixtureContext, seedMusicQueueRecoveryFixture as fixture,
+import { seedMusicQueueRecoveryFixture as fixture,
   seedMusicQueueRecoveryReplacement as replacement, recoverMusicQueueFixture as recover }
   from '../../testing/integration/music-queue-recovery-fixtures.js';
 
 import { createRecoveryExecutionOwners as owners, runMusicQueueRecoveryExecutionWorker as runWorker }
   from '../../testing/integration/music-queue-recovery-execution-fixtures.js';
+import { withMusicQueueRecoveryScenario } from '../../testing/integration/music-queue-recovery-scenario.js';
+import { resolveMusicQueueRecoveryExecutionSchemaMode } from '../../testing/integration/music-queue-recovery-schema-policy.js';
 
 const config = resolveIntegrationTestRuntimeConfig();
 let runtime; let unavailableReason;
 
 async function scenario(t, run) {
   if (unavailableReason) { t.skip(unavailableReason); return; }
-  await runtime.runIsolatedDatabase(async ({ getPoolFn }) => {
-    await applyPendingMigrations({ getPoolFn });
-    await run({ ...createMusicQueueRecoveryFixtureContext({ getPoolFn }), fixtureSignal: t.signal });
-  });
+  return withMusicQueueRecoveryScenario(runtime, t, run);
 }
 async function makeChild(context, options = {}) {
   const f = await fixture(context, options);
@@ -50,7 +48,8 @@ async function freshOrigin(context, seeded) {
 
 suite('Scoped recovery execution and reconciliation with isolated PostgreSQL', () => {
   before(async () => {
-    try { runtime = await createPostgresIntegrationRuntime({ config }); }
+    const schemaMode = resolveMusicQueueRecoveryExecutionSchemaMode();
+    try { runtime = await createPostgresIntegrationRuntime({ config, schemaMode }); }
     catch (error) { if (!isSkippableIntegrationRuntimeError(error)) throw error; unavailableReason = toIntegrationRuntimeUnavailableReason(error); }
   }, { timeout: config.suiteSetupTimeoutMs });
   after(async () => { await runtime?.cleanup(); }, { timeout: config.suiteTeardownTimeoutMs });
