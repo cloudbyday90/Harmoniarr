@@ -81,3 +81,88 @@ for (const primary of [new Error('controlled-primary'), null, undefined]) {
     } finally { if (workspace) await rm(workspace, { recursive: true, force: true }); }
   });
 }
+
+const gate = () => { let release; const promise = new Promise(resolve => { release = resolve; }); return { promise, release }; };
+
+test('reusable cleanup drains held guards and database teardown, then refuses late scenarios', async () => {
+  const f = runtimeFixture(); const entered = gate(); const guardHold = gate(); const dropping = gate(); const databaseHold = gate();
+  const factory = f.options.postgresRuntimeFactory;
+  f.options.postgresRuntimeFactory = async (...args) => {
+    const pg = await factory(...args);
+    return { ...pg, runIsolatedDatabase: async (...input) => { const result = await pg.runIsolatedDatabase(...input);
+      dropping.release(); await databaseHold.promise; return result; } };
+  };
+  const runtime = await createIntegrationAppRuntime(f.options); let child;
+  const pending = runtime.runScenario(input => { child = input.workspaceDir; return 'complete'; }, {
+    workspaceCleanupGuard: async () => { entered.release(); return guardHold.promise; },
+  });
+  try {
+    await entered.promise; const closing = runtime.cleanup(); assert.equal(runtime.cleanup(), closing);
+    await assert.rejects(runtime.runScenario(() => assert.fail()), { code: 'fixture_runtime_closed' });
+    await access(child); assert.equal(f.calls.includes('postgres:cleanup'), false);
+    guardHold.release(true); await dropping.promise;
+    await assert.rejects(access(child), { code: 'ENOENT' }); await access(f.workspace());
+    assert.equal(f.calls.includes('postgres:cleanup'), false);
+    databaseHold.release(); assert.equal(await pending, 'complete'); await closing;
+    await assert.rejects(access(f.workspace()), { code: 'ENOENT' });
+  } finally { guardHold.release(true); databaseHold.release(); await pending.catch(() => {}); await runtime.cleanup(); }
+});
+
+for (const primary of [new Error('original-reusable'), null]) {
+  test(`reusable child and root retention preserve original ${primary === null ? 'null' : 'Error'} through a later teardown failure`, async () => {
+    const f = runtimeFixture({ cleanupError: new Error('secondary-teardown') }); const runtime = await createIntegrationAppRuntime(f.options); let child;
+    try {
+      await assert.rejects(runtime.runScenario(input => { child = input.workspaceDir; throw primary; }, {
+        workspaceCleanupGuard: () => false,
+      }), error => error === primary);
+      await assert.rejects(runtime.cleanup(), error => error === primary); await access(child); await access(f.workspace());
+      assert.equal(f.calls.filter(call => call === 'postgres:cleanup').length, 1);
+    } finally { await rm(f.workspace(), { force: true, recursive: true }); }
+  });
+}
+
+test('a runtime-wide guard protects child deletion as well as the outer workspace', async () => {
+  const f = runtimeFixture(); const runtime = await createIntegrationAppRuntime({ ...f.options, workspaceCleanupGuard: () => false }); let child;
+  try {
+    await assert.rejects(runtime.runScenario(input => { child = input.workspaceDir; }), { code: 'fixture_workspace_not_quiescent' });
+    await assert.rejects(runtime.cleanup(), { code: 'fixture_workspace_not_quiescent' }); await access(child); await access(f.workspace());
+  } finally { await rm(f.workspace(), { recursive: true, force: true }); }
+});
+
+test('reusable intentional failure artifacts survive outer cleanup', async () => {
+  const f = runtimeFixture(); f.options.config.keepArtifactsOnFailure = true;
+  const runtime = await createIntegrationAppRuntime(f.options); let child;
+  try {
+    await assert.rejects(runtime.runScenario(input => { child = input.workspaceDir; throw null; }), error => error === null);
+    await runtime.cleanup(); await access(child); await access(f.workspace());
+  } finally { await rm(f.workspace(), { recursive: true, force: true }); }
+});
+
+test('invalid cleanup guards and scenario path names refuse before native scenario work', async () => {
+  const f = runtimeFixture();
+  await assert.rejects(createIntegrationAppRuntime({ ...f.options, workspaceCleanupGuard: false,
+    postgresRuntimeFactory: () => assert.fail() }), TypeError);
+  const runtime = await createIntegrationAppRuntime(f.options);
+  try {
+    for (const scenarioName of ['../escape', '.', '/absolute', 'nested/path', 'C:\\outside', 'bad:name', '']) {
+      await assert.rejects(runtime.runScenario(() => assert.fail(), { scenarioName }), TypeError);
+    }
+    await assert.rejects(runtime.runScenario(() => assert.fail(), { workspaceCleanupGuard: null }), TypeError);
+    assert.equal(f.calls.includes('prepare'), false);
+  } finally { await runtime.cleanup(); }
+});
+
+test('startup failure keeps original null and applies the outer guard to its captured workspace', async () => {
+  for (const allowed of [true, false]) {
+    const f = runtimeFixture(); let root;
+    const observer = f.options.phaseObserver;
+    try {
+      await assert.rejects(createIntegrationAppRuntime({ ...f.options, workspaceCleanupGuard: () => allowed,
+        phaseObserver: { ...observer, measure: async (phase, work) => {
+          const result = await observer.measure(phase, work); if (phase === 'workspace_create') root = result.workspaceDir; return result;
+        } }, postgresRuntimeFactory: async () => { throw null; },
+      }), error => error === null);
+      if (allowed) await assert.rejects(access(root), { code: 'ENOENT' }); else await access(root);
+    } finally { if (root) await rm(root, { recursive: true, force: true }); }
+  }
+});

@@ -6,6 +6,20 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Reusable workspace cleanup authority (2026-10-15)
+
+- Narrow ESM lifetime/directory owners now seal admission, drain actual isolated
+  database work, await runtime/scenario predicates and preserve retained children
+  through parent cleanup. Fresh directories isolate same-name scenarios; current
+  root/child identity and original Error/null remain authoritative.
+- The [design](REUSABLE_WORKSPACE_CLEANUP_DESIGN.md),
+  [research](REUSABLE_WORKSPACE_CLEANUP_RESEARCH_2026_10.md) and
+  [outcome](REUSABLE_WORKSPACE_CLEANUP_OUTCOME.md) separate baseline reproduction,
+  focused controls and real PostgreSQL/Docker/worker-lifetime evidence.
+- Next: adopt an explicit owned API executor in one reusable canonical media
+  cohort, measure its selected baseline and retain every current/private guard.
+  Keep execution defaults and resource policy unchanged during that pilot.
+
 ## Completed slice: Largest API selection and Linux socket proof (2026-10-14)
 
 - The noise/eight-binding/one-pair selection completed both exact canonical

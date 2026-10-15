@@ -96,3 +96,15 @@ Unknown creation or failed cleanup retains that workspace. This proves Linux
 socket reads on the observed daemon, not Linux media path/lifecycle deployment
 or whole-CI speed. See docs/MEDIA_API_SCALE_OUTCOME.md; audit reusable scenario
 and outer cleanup owners before executor adoption there.
+
+Reusable app fixtures now have runtime and per-scenario workspace predicates.
+Await both applicable predicates and actual isolated-database completion before
+runtime release. Fresh same-name children must not alias; unsafe or intentionally
+retained children veto parent removal. Preserve original Error/null through
+later release failure, keep safe artifact retention distinct from refusal and
+recheck canonical parent/child directory identity before recursive removal.
+Use the explicit reusable-workspace-cleanup native cohort to hold a real media
+mount during cleanup and prove stop/removal before deletion. The functional
+fixture and default media execution remain unchanged. See
+docs/REUSABLE_WORKSPACE_CLEANUP_OUTCOME.md before adopting an executor in a
+reusable canonical cohort; no timer or successful sibling grants cleanup.

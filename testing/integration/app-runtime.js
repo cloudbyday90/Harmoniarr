@@ -22,6 +22,8 @@ import { withIntegrationAppWorkerDrain } from './app-worker-lifecycle.js';
 import { observePostgresFixtureFailure } from './postgres-failure-evidence.js';
 import { buildIntegrationPoolEnvironment } from './pool-policy.js';
 import { withAppPoolCheckoutDiagnostics } from './app-pool-checkout.js';
+import { createFixtureRuntimeLifetime } from './fixture-runtime-lifetime.js';
+import { assertFixtureScenarioName, captureFixtureWorkspaceOwner } from './fixture-workspace-owner.js';
 
 const packageJsonPath = resolve(import.meta.dirname, '../../package.json');
 const SCENARIO_SHUTDOWN_DRAIN_MS = 150;
@@ -100,38 +102,48 @@ export async function createIntegrationAppRuntime({
   phaseObserver = createIntegrationFixturePhaseObserver(),
   checkoutObserver = createIntegrationPoolCheckoutObserver(),
   checkoutRecord = null,
+  workspaceCleanupGuard = () => true,
 } = {}) {
+  if (typeof workspaceCleanupGuard !== 'function') throw new TypeError('Invalid workspace cleanup guard');
   const runtimeWorkspace = await phaseObserver.measure('workspace_create', async () => clientDistDir
     ? {
         clientDistDir,
         workspaceDir: await mkdtemp(join(tmpdir(), 'harmoniarr-integration-')),
       }
     : await createRuntimeWorkspace());
-  let postgresRuntime;
+  const workspaces = await captureFixtureWorkspaceOwner(runtimeWorkspace.workspaceDir);
+  const lifetime = createFixtureRuntimeLifetime(); let postgresRuntime;
 
   try {
     postgresRuntime = await postgresRuntimeFactory({ config, phaseObserver });
   } catch (error) {
-    await phaseObserver.measure('workspace_remove', () => rm(runtimeWorkspace.workspaceDir, { force: true, recursive: true })).catch(() => {});
+    try { await workspaces.finish({ release: async () => {}, guard: workspaceCleanupGuard, observer: phaseObserver }); }
+    catch { /* Preserve the original startup failure and retain uncertain workspaces. */ }
     throw error;
   }
 
   return {
     config,
-    async cleanup() {
-      await phaseObserver.measure('pool_close', () => closePool()).catch(() => {});
-      try { await postgresRuntime.cleanup(); }
-      finally { await phaseObserver.measure('workspace_remove', () => rm(runtimeWorkspace.workspaceDir, { force: true, recursive: true })).catch(() => {}); }
+    cleanup() {
+      return lifetime.close(() => workspaces.finish({ guard: workspaceCleanupGuard, observer: phaseObserver, release: async () => {
+        await phaseObserver.measure('pool_close', () => closePool()).catch(() => {});
+        await postgresRuntime.cleanup();
+      } }));
     },
-    async runScenario(run, {
+    runScenario(run, {
       scenarioName = 'integration_scenario',
       phaseObserver: scenarioObserver = phaseObserver.child(),
+      workspaceCleanupGuard: scenarioCleanupGuard = () => true,
     } = {}) {
       if (typeof run !== 'function') {
-        throw new Error('run is required');
+        return Promise.reject(new Error('run is required'));
       }
+      try {
+        assertFixtureScenarioName(scenarioName);
+        if (typeof scenarioCleanupGuard !== 'function') throw new TypeError('Invalid workspace cleanup guard');
+      } catch (error) { return Promise.reject(error); }
 
-      return postgresRuntime.runIsolatedDatabase(async ({
+      return lifetime.run(() => postgresRuntime.runIsolatedDatabase(async ({
         databaseConfig,
         databaseName,
         source,
@@ -139,72 +151,68 @@ export async function createIntegrationAppRuntime({
         captureCheckoutFailure,
           startupLogging,
       }) => {
-        const scenarioWorkspaceDir = join(runtimeWorkspace.workspaceDir, scenarioName);
-        let scenarioFailed = true;
-
-        await scenarioObserver.measure('workspace_create', () => mkdir(scenarioWorkspaceDir, { recursive: true }));
-        await scenarioObserver.measure('pool_close', () => closePool()).catch(() => {});
-
-        return withEnvironmentVariables({
-          HARMONIARR_CONTACT_EMAIL: 'integration-tests@example.invalid',
-          ...buildIntegrationBackupEnvironment(scenarioWorkspaceDir),
-          ...buildIntegrationPoolEnvironment(config),
-          PGDATABASE: databaseConfig.database,
-          PGHOST: databaseConfig.host,
-          PGPASSWORD: databaseConfig.password ?? null,
-          PGPORT: String(databaseConfig.port),
-          PGUSER: databaseConfig.user,
-          VAPID_CONTACT: 'mailto:integration-tests@example.invalid',
-          VAPID_PRIVATE_KEY: TEST_VAPID_PRIVATE_KEY,
-          VAPID_PUBLIC_KEY: TEST_VAPID_PUBLIC_KEY,
-        }, async () => {
+        return workspaces.withScenario({ name: scenarioName,
+          guard: async () => await workspaceCleanupGuard() === true && await scenarioCleanupGuard() === true,
+          keepArtifactsOnFailure: config.keepArtifactsOnFailure, observer: scenarioObserver }, async scenarioWorkspaceDir => {
           await scenarioObserver.measure('pool_close', () => closePool()).catch(() => {});
-          try { return await withAppPoolCheckoutDiagnostics({ getPoolFn: getPool,
-              phaseObserver: scenarioObserver, source, expectedConfig: databaseConfig, startupLogging,
-            captureFailure: captureCheckoutFailure, onRecord: checkoutRecord }, async observedGetPool => {
-            await observePostgresFixtureFailure(captureServerFailure, 'schema_prepare', () => scenarioObserver.measure('schema_prepare', () => observeAppSchemaPreparation({
-              prepareDatabaseFn, getPoolFn: observedGetPool, observer: checkoutObserver, source, phaseObserver: scenarioObserver,
-            })));
-            observedGetPool();
-            const application = await scenarioObserver.measure('application_create', () => createAppFn({
-              clientDistDir: runtimeWorkspace.clientDistDir,
-              packageJsonPath,
-            }));
-            const result = await withIntegrationAppWorkerDrain({ application, phaseObserver: scenarioObserver },
-              () => scenarioObserver.measure('http_scenario', () => withServer(
-              application.app,
-              async (baseUrl) => scenarioObserver.measure('scenario_work', () => observePostgresFixtureFailure(captureServerFailure, 'database_scenario', () => run({
-                baseUrl,
-                client: createSessionHttpClient(baseUrl, {
-                  requestTimeoutMs: config.httpRequestTimeoutMs,
-                }),
-                config,
-                databaseConfig,
-                databaseName,
-                getPoolFn: observedGetPool,
-                postgresSource: source,
-                backupsDir: join(scenarioWorkspaceDir, 'backups'),
-                workspaceDir: scenarioWorkspaceDir,
-                phaseObserver: scenarioObserver,
-              }))),
-              {
-                closeTimeoutMs: config.suiteTeardownTimeoutMs,
-                listenTimeoutMs: config.poolConnectionTimeoutMs,
-                phaseObserver: scenarioObserver,
-              },
-            )));
-            scenarioFailed = false;
-            return result;
-          });
-          } finally {
-            await scenarioObserver.measure('shutdown_drain', () => waitForScenarioShutdownDrain());
+
+          return withEnvironmentVariables({
+            HARMONIARR_CONTACT_EMAIL: 'integration-tests@example.invalid',
+            ...buildIntegrationBackupEnvironment(scenarioWorkspaceDir),
+            ...buildIntegrationPoolEnvironment(config),
+            PGDATABASE: databaseConfig.database,
+            PGHOST: databaseConfig.host,
+            PGPASSWORD: databaseConfig.password ?? null,
+            PGPORT: String(databaseConfig.port),
+            PGUSER: databaseConfig.user,
+            VAPID_CONTACT: 'mailto:integration-tests@example.invalid',
+            VAPID_PRIVATE_KEY: TEST_VAPID_PRIVATE_KEY,
+            VAPID_PUBLIC_KEY: TEST_VAPID_PUBLIC_KEY,
+          }, async () => {
             await scenarioObserver.measure('pool_close', () => closePool()).catch(() => {});
-            if (!config.keepArtifactsOnFailure || !scenarioFailed) {
-              await scenarioObserver.measure('workspace_remove', () => rm(scenarioWorkspaceDir, { force: true, recursive: true })).catch(() => {});
+            try { return await withAppPoolCheckoutDiagnostics({ getPoolFn: getPool,
+                phaseObserver: scenarioObserver, source, expectedConfig: databaseConfig, startupLogging,
+              captureFailure: captureCheckoutFailure, onRecord: checkoutRecord }, async observedGetPool => {
+              await observePostgresFixtureFailure(captureServerFailure, 'schema_prepare', () => scenarioObserver.measure('schema_prepare', () => observeAppSchemaPreparation({
+                prepareDatabaseFn, getPoolFn: observedGetPool, observer: checkoutObserver, source, phaseObserver: scenarioObserver,
+              })));
+              observedGetPool();
+              const application = await scenarioObserver.measure('application_create', () => createAppFn({
+                clientDistDir: runtimeWorkspace.clientDistDir,
+                packageJsonPath,
+              }));
+              const result = await withIntegrationAppWorkerDrain({ application, phaseObserver: scenarioObserver },
+                () => scenarioObserver.measure('http_scenario', () => withServer(
+                application.app,
+                async (baseUrl) => scenarioObserver.measure('scenario_work', () => observePostgresFixtureFailure(captureServerFailure, 'database_scenario', () => run({
+                  baseUrl,
+                  client: createSessionHttpClient(baseUrl, {
+                    requestTimeoutMs: config.httpRequestTimeoutMs,
+                  }),
+                  config,
+                  databaseConfig,
+                  databaseName,
+                  getPoolFn: observedGetPool,
+                  postgresSource: source,
+                  backupsDir: join(scenarioWorkspaceDir, 'backups'),
+                  workspaceDir: scenarioWorkspaceDir,
+                  phaseObserver: scenarioObserver,
+                }))),
+                {
+                  closeTimeoutMs: config.suiteTeardownTimeoutMs,
+                  listenTimeoutMs: config.poolConnectionTimeoutMs,
+                  phaseObserver: scenarioObserver,
+                },
+              )));
+              return result;
+            });
+            } finally {
+              await scenarioObserver.measure('shutdown_drain', () => waitForScenarioShutdownDrain());
+              await scenarioObserver.measure('pool_close', () => closePool()).catch(() => {});
             }
-          }
+          });
         });
-      }, { phaseObserver: scenarioObserver });
+      }, { phaseObserver: scenarioObserver }));
     },
   };
 }

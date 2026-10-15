@@ -105,3 +105,8 @@ before offering an owned executor there. The functional `withIntegrationApp`
 guard does not cover those separate reusable owners. This is the next controlled
 adoption step; global API promotion and a full Engine exec/lifecycle migration
 remain deferred.
+
+Subsequent implementation: the [reusable cleanup outcome](REUSABLE_WORKSPACE_CLEANUP_OUTCOME.md)
+records guarded child/parent ownership, admitted database drainage, current
+directory checks and native held-media proof. The next step is a selected opt-in
+executor adoption, preserving every existing verification and execution default.

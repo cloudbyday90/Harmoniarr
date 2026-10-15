@@ -1,5 +1,15 @@
 # Official practices by boundary
 
+October 15 reusable cleanup guidance uses
+docs/REUSABLE_WORKSPACE_CLEANUP_RESEARCH_2026_10.md. Node unique directories,
+canonical paths and exact stat identity inform current filesystem ownership;
+OWASP controlled-name/storage guidance applies by analogy to fixture labels.
+Keep child and parent authority separate, await actual returned resource/database
+completion and preserve Error/null through failed release. W3C draft timing
+measures elapsed work; a fixed delay is not quiescence. A successful later
+predicate cannot clear an earlier retained child. Directory checks are not an
+atomic OS deletion handle against arbitrary host writers.
+
 October 14 scale/socket guidance uses docs/MEDIA_API_SCALE_RESEARCH_2026_10.md.
 Docker bind sources belong to the daemon host; a read-only socket mount does
 not create GET-only daemon authorization. Keep this privileged access in a

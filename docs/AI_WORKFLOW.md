@@ -6,6 +6,15 @@ This repository includes a shared `.agents/` directory for GitHub Copilot agent 
 
 The goal is to keep reusable AI workflow guidance versioned alongside the project so UI review, frontend implementation, browser testing, and related tasks follow the same repo conventions.
 
+The [reusable workspace outcome](REUSABLE_WORKSPACE_CLEANUP_OUTCOME.md) extends
+the maintained testing/standards method with separate directory and admission
+owners. Await actual returned database work before runtime cleanup; retain unsafe
+children through parent cleanup and preserve primary Error/null through failed
+release. Both runtime and scenario predicates must grant child removal. A safe
+later sibling or a fixed delay cannot authorize deletion of an earlier retained
+child. Use fresh contained directories and recheck root/child identity; distinguish
+intentional safe artifacts from unknown quiescence before executor adoption.
+
 The [scale/Linux socket outcome](MEDIA_API_SCALE_OUTCOME.md) extends the same
 standards/testing skills with a completed largest selected collection and a
 trusted explicit Unix-socket proof runner. A read-only socket bind is privileged

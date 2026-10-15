@@ -1,5 +1,14 @@
 # Project standards-to-evidence map
 
+Reusable workspace evidence: fixture-runtime-lifetime.js seals admission and
+drains the returned isolated-database operation; fixture-workspace-owner.js owns
+unique contained children, exact current directory identity and sticky parent
+retention. app-runtime.js wires both predicates and releases resources while
+preserving original failures. Pure replacement/hold controls and native real
+PostgreSQL/Docker mount proof are separated in the reusable cleanup outcome.
+Intentional callback artifacts differ from unknown quiescence; neither a safe
+sibling nor outer cleanup can erase a retained child. Executor defaults remain.
+
 Scale/Linux socket evidence: media-linux-proof-{policy,runner}.js separates
 acknowledged runner configuration from attached CLI/retirement lifetime;
 media-linux-socket-scenario.js compares actual Linux CLI/API/host daemon identity
