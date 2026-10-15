@@ -4,6 +4,13 @@ Harmoniarr is a self-hosted, Docker-hosted music library manager inspired by Lid
 
 The repository contains the Node.js ESM server, Vue client, PostgreSQL schema, automated validation, and design documents. The platform is under active development toward its first release.
 
+The largest noise/eight-binding owned API selection now completes its canonical
+comparison. A separate explicit native lane proves Linux socket reads against
+acknowledged running/active-exec/stopped owner states. Defaults remain unchanged.
+See the [design](docs/MEDIA_API_SCALE_DESIGN.md),
+[official research](docs/MEDIA_API_SCALE_RESEARCH_2026_10.md) and
+[outcome](docs/MEDIA_API_SCALE_OUTCOME.md) before expanding fixture adoption.
+
 Owned workloads can opt into local Engine inspection with `--media-execution
 owned --media-inspection api`. Versioned, bounded GETs preserve every current
 owner check; exec and lifecycle mutations stay on CLI. Defaults remain unchanged.

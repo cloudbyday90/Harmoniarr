@@ -82,3 +82,17 @@ Use reversed-order selected canonical comparisons, preserving exact results,
 receipts/digests/bytes and resource bounds. Small successful samples do not
 diagnose old largest-profile failures or prove Linux socket/whole-CI behavior.
 See docs/MEDIA_INSPECTION_API_OUTCOME.md before broader or default adoption.
+
+The largest API selection now has a completed noise/eight-binding/one-pair
+collection; retain old incomplete collections as unresolved history, not a
+matched speed comparator. `test/integration/media-linux-socket.test.js` is an
+explicit native lane requiring an existing media image and immutable
+HARMONIARR_INTEGRATION_LINUX_READER_IMAGE. Its trusted runner receives the actual
+Unix socket and a minimal private bundle, never host credentials or production
+mounts. A read-only socket bind still grants privileged daemon access. Compare
+private daemon identity and acknowledged running/active-exec/stopped snapshots,
+seal/drain readers and verify whole-runner retirement before workspace deletion.
+Unknown creation or failed cleanup retains that workspace. This proves Linux
+socket reads on the observed daemon, not Linux media path/lifecycle deployment
+or whole-CI speed. See docs/MEDIA_API_SCALE_OUTCOME.md; audit reusable scenario
+and outer cleanup owners before executor adoption there.

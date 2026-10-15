@@ -1,5 +1,14 @@
 # Official practices by boundary
 
+October 14 scale/socket guidance uses docs/MEDIA_API_SCALE_RESEARCH_2026_10.md.
+Docker bind sources belong to the daemon host; a read-only socket mount does
+not create GET-only daemon authorization. Keep this privileged access in a
+trusted explicit proof runner with a minimal bundle, matched private daemon and
+owned stop/removal. Node test isolation and W3C draft monotonic timing inform
+separate native/selected/fast scopes; a completed largest selection neither
+diagnoses old failures nor replaces Linux filesystem/lifecycle coverage. Verify
+annotated action tags through their target commit and retain full SHA pins.
+
 October 14 local API guidance uses docs/MEDIA_INSPECTION_API_RESEARCH_2026_10.md.
 Docker context precedence and privileged daemon access require target pinning
 and private CLI/API daemon/capability matching before container creation. Node

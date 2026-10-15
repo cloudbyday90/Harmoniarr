@@ -6,6 +6,20 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Largest API selection and Linux socket proof (2026-10-14)
+
+- The noise/eight-binding/one-pair selection completed both exact canonical
+  samples with forty current media inspections and unchanged resource policy.
+- New narrow ESM proof policy/lifetime/scenario modules and an explicit native
+  lane compare Linux CLI/API/host daemon identity and exact running/active-exec/
+  stopped snapshots. Trusted socket access stays outside production/media owners.
+- Separate [design](MEDIA_API_SCALE_DESIGN.md),
+  [research](MEDIA_API_SCALE_RESEARCH_2026_10.md) and
+  [outcome](MEDIA_API_SCALE_OUTCOME.md) preserve historical failures and scope.
+  Open PR #43's two pinned SARIF action changes were replayed locally.
+- Next: audit reusable `createIntegrationAppRuntime` scenario and outer workspace
+  cleanup, then add scoped guards before offering an owned executor there.
+
 ## Completed slice: Local read-only media inspection API (2026-10-14)
 
 - Narrow ESM endpoint, HTTP and inspection reader modules pin CLI/API to one

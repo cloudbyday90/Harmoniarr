@@ -108,3 +108,9 @@ this adapter with the same guards and failure checkpoints, then prove native
 Linux socket behavior before expanding adoption. Neither a larger pool nor a
 longer deadline is part of that recommendation. Private logs, source hashes and
 selected artifacts remain ignored under `.tmp/media-read-api-2026-10-14/`.
+
+Subsequent evidence: the [scale/Linux socket outcome](MEDIA_API_SCALE_OUTCOME.md)
+records a completed largest selection and an explicit native Unix-socket read
+proof. It preserves the earlier incomplete collections and separates Linux read
+coverage from media filesystem/lifecycle deployment. Reusable fixture cleanup
+ownership is the next adoption boundary.

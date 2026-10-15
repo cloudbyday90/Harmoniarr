@@ -6,6 +6,15 @@ This repository includes a shared `.agents/` directory for GitHub Copilot agent 
 
 The goal is to keep reusable AI workflow guidance versioned alongside the project so UI review, frontend implementation, browser testing, and related tasks follow the same repo conventions.
 
+The [scale/Linux socket outcome](MEDIA_API_SCALE_OUTCOME.md) extends the same
+standards/testing skills with a completed largest selected collection and a
+trusted explicit Unix-socket proof runner. A read-only socket bind is privileged
+daemon access, not GET-only authorization. Compare private acknowledged stable
+states and drain/verify whole runners before workspace deletion; preserve original
+Error/null and retain uncertain roots. This is Linux read evidence on the observed
+daemon, not full Linux media lifecycle coverage or old-timeout diagnosis. Audit
+reusable scenario and outer cleanup owners before executor adoption there.
+
 The [local inspection API outcome](MEDIA_INSPECTION_API_OUTCOME.md) extends the
 existing standards and testing skills with effective context precedence, pinned
 CLI/API target and private daemon/version comparison before creation. Keep one

@@ -1,5 +1,15 @@
 # Project standards-to-evidence map
 
+Scale/Linux socket evidence: media-linux-proof-{policy,runner}.js separates
+acknowledged runner configuration from attached CLI/retirement lifetime;
+media-linux-socket-scenario.js compares actual Linux CLI/API/host daemon identity
+and current snapshots, closes the reader and minimizes stdout. The explicit
+native test holds running/active/stopped media states and retains uncertain
+workspaces. A separate fixture Dockerfile copies the reviewed existing CLI via
+named contexts; production/media containers receive no socket. The scale design/
+research/outcome own the successful largest selected comparison and precise
+Linux read boundary. Reusable app cleanup owners still require their own audit.
+
 Local inspection API: media-docker-{endpoint-policy,json-reader,inspection-reader}.js
 owns effective target resolution/pinning, local socket policy, reviewed API 1.56,
 private daemon matching, bounded GET consumption and canonical agent disposal.
