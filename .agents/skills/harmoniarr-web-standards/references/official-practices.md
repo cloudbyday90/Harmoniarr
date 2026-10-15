@@ -1,5 +1,13 @@
 # Official practices by boundary
 
+October 15 media rollout guidance uses
+docs/LIBRARY_ADD_MEDIA_ROLLOUT_RESEARCH_2026_10.md. Node native module hooks can
+prove a test-only dependency boundary in a fresh process; retain compatible
+exports and actual media/cleanup behavior while separating SQL fixtures. W3C
+draft elapsed timing and OWASP fixed output do not turn module counts or a loaded
+host's command-time difference into whole-CI performance evidence. Docker API
+compatibility and Linux canonical proof remain separate adoption requirements.
+
 October 15 canonical media guidance uses
 docs/LIBRARY_ADD_MEDIA_PILOT_RESEARCH_2026_10.md. Docker read-only media mounts
 and reviewed local API reads apply at the scenario's actual directory owner.

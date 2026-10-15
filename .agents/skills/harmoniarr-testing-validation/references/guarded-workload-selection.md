@@ -122,3 +122,14 @@ order and retain all actual inspections, byte equality, replay and refusal
 assertions. Full cohort and selected timing are different scopes; API owner
 startup can outweigh savings at low inspection counts. See
 docs/LIBRARY_ADD_MEDIA_PILOT_OUTCOME.md before proposing default adoption.
+
+The reverse complete cohort now also passes, but host/setup variation and missing
+Linux canonical image-backed coverage keep the default conservative. Separate
+media tools/pure options from SQL fixtures, retaining legacy named exports and
+actual command/lifetime contracts. A fresh-process resolution guard proves the
+adapter avoids application/database modules except its small task-cleanup
+utility; module-count reduction is not whole-suite speed evidence. Keep the
+unchanged-code timing pair separate from final extracted-code native proof.
+Before default adoption, require the explicit Linux lane's full six cases with
+no prerequisite skips, supported Engine and verified owner cleanup. See
+docs/LIBRARY_ADD_MEDIA_ROLLOUT_OUTCOME.md; do not substitute more local repetitions.

@@ -6,56 +6,15 @@
  */
 
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { mkdir, stat } from 'node:fs/promises';
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { join } from 'node:path';
 import { createOperationQueueStore } from '../../src/server/operation-queue-store.js';
 import { persistSettings } from '../../src/server/settings.js';
 import { seedImportCandidateFixture } from './import-candidate-fixtures.js';
 import { seedMetadataReleaseFixture } from './metadata-fixtures.js';
+import { createLibraryAddMediaFixture, libraryAddRuntimePath } from './library-add-media-tools.js';
 
-const executeFile = promisify(execFile);
-export const libraryAddRuntimePath = (value) => process.platform === 'win32' ? value.replace(/^[a-z]:/iu, '').replaceAll('\\', '/') : value;
-
-/** Every media invocation is scoped to the scenario's own directory and has no provider/network access. */
-export function createLibraryAddMediaFixture({ getFixtureRoot, isToolingReady = () => true,
-  mediaImage = process.env.HARMONIARR_INTEGRATION_MEDIA_IMAGE, inspectionExecutor = null } = {}) {
-  function mountedPath(pathValue) {
-    const scoped = relative(resolve(getFixtureRoot()), resolve(pathValue));
-    assert.ok(scoped && scoped !== '..' && !scoped.startsWith(`..${sep}`) && !isAbsolute(scoped), 'media fixture must stay in the test-owned workspace');
-    return `/fixtures/${scoped.split(sep).join('/')}`;
-  }
-  async function mediaCommand(binary, args, { readonly = true } = {}) {
-    if (inspectionExecutor && binary === 'ffprobe') return inspectionExecutor.run(binary, args, { readonly });
-    if (!mediaImage) return executeFile(binary, args, { timeout: 20_000, maxBuffer: 2 * 1024 * 1024 });
-    const mappedArgs = args.map((value) => typeof value === 'string' && isAbsolute(value) ? mountedPath(value) : value);
-    return executeFile('docker', ['run', '--rm', '--network', 'none', '--entrypoint', binary, '--mount',
-      `type=bind,source=${resolve(getFixtureRoot())},target=/fixtures${readonly ? ',readonly' : ''}`, mediaImage, ...mappedArgs],
-    { timeout: 30_000, maxBuffer: 2 * 1024 * 1024 });
-  }
-  async function generateAudio(pathValue, bitrate = null) {
-    await mkdir(dirname(pathValue), { recursive: true });
-    await mediaCommand('ffmpeg', ['-v', 'error', '-nostdin', '-y', '-f', 'lavfi', '-i', 'sine=frequency=1000:sample_rate=44100',
-      '-t', '2', '-ac', '2', '-metadata', 'artist=Controlled fixture', '-metadata', 'album=Controlled release',
-      '-metadata', 'title=Controlled song', '-metadata', 'track=1', ...(bitrate ? ['-c:a', 'libmp3lame', '-b:a', `${bitrate}k`] : ['-c:a', 'pcm_s16le']), pathValue], { readonly: false });
-  }
-  async function verifyTooling() {
-    try {
-      if (mediaImage) {
-        const identity = await executeFile('docker', ['image', 'inspect', mediaImage, '--format', '{{.Id}}']);
-        const version = await executeFile('docker', ['run', '--rm', '--network', 'none', '--entrypoint', 'ffprobe', mediaImage, '-version']);
-        console.log(`Local media fixture: ${mediaImage} ${identity.stdout.trim()}; ${version.stdout.split('\n')[0]}`);
-      } else {
-        await executeFile('ffprobe', ['-version']); await executeFile('ffmpeg', ['-version']);
-      }
-      return null;
-    } catch { return 'Local ffmpeg/ffprobe fixture unavailable; configure HARMONIARR_INTEGRATION_MEDIA_IMAGE or install local tools'; }
-  }
-  const getTooling = async () => ({ status: isToolingReady() ? 'healthy' : 'degraded',
-    details: { ffprobeAvailable: isToolingReady(), ffmpegAvailable: isToolingReady() } });
-  return { generateAudio, getTooling, mediaCommand, verifyTooling };
-}
+export { createLibraryAddMediaFixture, libraryAddRuntimePath };
 
 export async function createLibraryAddFixtureUser(client, pool, username, preferences = { minimumQuality: 'high', preferredFormat: 'any' }) {
   const response = await client.requestJson('/api/v1/users', { method: 'POST', json: { username, password: 'InitialPass123!', role: 'requester' } });

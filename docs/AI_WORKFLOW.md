@@ -6,6 +6,13 @@ This repository includes a shared `.agents/` directory for GitHub Copilot agent 
 
 The goal is to keep reusable AI workflow guidance versioned alongside the project so UI review, frontend implementation, browser testing, and related tasks follow the same repo conventions.
 
+The [media rollout outcome](LIBRARY_ADD_MEDIA_ROLLOUT_OUTCOME.md) keeps actual
+dependency boundaries separate from performance claims. Pure policies/media
+tools should not import SQL fixtures for convenience. Use fresh-process native
+resolution proof, preserve legacy exports and keep unchanged-code measurements
+separate from final extracted-code validation. Repeated local timings cannot
+replace a missing Linux canonical lane or justify removing current inspections.
+
 The [canonical media pilot](LIBRARY_ADD_MEDIA_PILOT_OUTCOME.md) extends the
 existing standards/testing skills with an explicit per-scenario rollout method:
 resolve options before startup, bind the actual child root, close after app

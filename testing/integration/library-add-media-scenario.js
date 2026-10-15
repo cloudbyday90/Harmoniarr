@@ -6,19 +6,12 @@
  */
 import { performance } from 'node:perf_hooks';
 import { withWorkerTaskCleanup } from '../../src/server/worker-task-cleanup.js';
-import { createLibraryAddMediaFixture } from './library-add-media-fixtures.js';
+import { createLibraryAddMediaFixture } from './library-add-media-tools.js';
 import { createOwnedMediaInspectionExecutor } from './owned-media-inspection-executor.js';
 import { createMediaTransportObserver, disabledMediaTransportObserver } from './media-transport-phase-observer.js';
+import { resolveLibraryAddMediaOptions } from './library-add-media-options.js';
 
-/** One cohort's explicit opt-in; validate before PostgreSQL or media startup. */
-export function resolveLibraryAddMediaOptions(environment = process.env) {
-  const mode = environment.HARMONIARR_LIBRARY_ADD_MEDIA_EXECUTION ?? 'per-command';
-  const diagnostics = environment.HARMONIARR_LIBRARY_ADD_MEDIA_DIAGNOSTICS ?? 'off';
-  const mediaImage = environment.HARMONIARR_INTEGRATION_MEDIA_IMAGE;
-  if (!['per-command', 'owned-api'].includes(mode) || !['off', 'on'].includes(diagnostics)
-    || (mode === 'owned-api' && !mediaImage?.trim())) throw new TypeError('Invalid library-add media selection');
-  return { mode, mediaImage, diagnostics: diagnostics === 'on' };
-}
+export { resolveLibraryAddMediaOptions };
 
 /** Stable app adapters, with an independent inspection owner for each returned scenario. */
 export function createLibraryAddMediaScenario({ mode = 'per-command', mediaImage,

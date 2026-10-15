@@ -140,3 +140,7 @@ migration separate. Existing defaults, resource bounds and historical incomplete
 large-workload evidence remain unchanged. See the separate
 [design](LIBRARY_ADD_MEDIA_PILOT_DESIGN.md) and
 [official research/options](LIBRARY_ADD_MEDIA_PILOT_RESEARCH_2026_10.md).
+
+The [subsequent rollout outcome](LIBRARY_ADD_MEDIA_ROLLOUT_OUTCOME.md) completes
+the reversed pair, retains the explicit default decision and separates media/
+policy imports from the SQL fixture without changing its function bodies.

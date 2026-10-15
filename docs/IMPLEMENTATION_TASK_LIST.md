@@ -6,6 +6,20 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Canonical media rollout decision (2026-10-15)
+
+- Reversed the complete unchanged pilot cohort; both modes retained eight real
+  generated files, 27 inspections and all six canonical cases. Host/setup
+  variation remains explicit; per-command is still the default.
+- Extracted Node-only media tooling and pure options with legacy exports;
+  native import observation drops the adapter graph from 75 to 13 project modules.
+- Separate [design](LIBRARY_ADD_MEDIA_ROLLOUT_DESIGN.md),
+  [research](LIBRARY_ADD_MEDIA_ROLLOUT_RESEARCH_2026_10.md) and
+  [outcome](LIBRARY_ADD_MEDIA_ROLLOUT_OUTCOME.md) own the decision and validation.
+- Next: explicit Linux canonical image-backed validation with reviewed Engine
+  capability, all six cases, no prerequisite skips and verified cleanup before
+  considering default adoption. More local timing alone cannot supply that proof.
+
 ## Completed slice: Canonical media executor pilot (2026-10-15)
 
 - Narrow per-scenario ESM adapters opt one reusable canonical cohort into owned

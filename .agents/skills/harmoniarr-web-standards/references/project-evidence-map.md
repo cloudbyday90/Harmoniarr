@@ -1,5 +1,12 @@
 # Project standards-to-evidence map
 
+Media rollout: library-add-media-{tools,options}.js separates Node-only execution/
+path helpers and pure choice policy from SQL seeding. Legacy fixture/adapter
+exports remain compatible. The native fresh-process resolution guard refuses
+application/database imports while allowing the adapter's shared task cleanup.
+Separate rollout documents distinguish the unchanged-code reversed pair from
+final extracted-code proof and the missing Linux canonical default-adoption lane.
+
 Canonical media pilot: library-add-media-scenario.js binds stable app/seed
 adapters to one fresh returned scenario, closes its executor in the post-drain
 child predicate and rejects concurrent reuse. Its fallback preserves Error/null;
