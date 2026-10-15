@@ -748,5 +748,13 @@ The dedicated postgres-runtime-cleanup.test.js files under test/server/ and
 test/integration/ prove held completion, primary Error/null, canonical promise
 identity and a still-live real server after controlled refusal. App/workspace
 owners retain separate quiescence authority. See
-docs/POSTGRES_RUNTIME_CLEANUP_OUTCOME.md; strict temporary-database release and
-hosted Ubuntu media validation are distinct, still-open follow-ups.
+docs/POSTGRES_RUNTIME_CLEANUP_OUTCOME.md. The following database-release entry
+completes its strict-release follow-up; hosted Ubuntu evidence remains separate.
+
+Shared database release uses strictCleanup at the empty-schema delegation in
+testing/postgres-integration-runtime.js, with the existing helper retaining its
+direct-call default. The postgres-database-release.test.js files under test/server/
+and test/integration/ prove stage failures, held final close, real PostgreSQL DROP
+permission refusal, retained OID and sibling availability. See
+docs/POSTGRES_DATABASE_RELEASE_OUTCOME.md. Lower-runtime admission/drainage is
+distinct from this failure-propagation change and existing app/template barriers.

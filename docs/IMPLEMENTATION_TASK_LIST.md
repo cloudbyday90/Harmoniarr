@@ -6,6 +6,21 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Strict shared temporary-database release (2026-10-15)
+
+- Shared empty-schema delegation selects the existing strict policy, preserving
+  earlier Error/null and continuing later cleanup stages. Direct helper
+  compatibility, template policies, server ownership and limits stay intact.
+- Real PostgreSQL DROP permission refusals exercise successful and null-primary
+  scenarios, held final completion, retained target identity, sibling availability
+  and independent test-owned recovery. Fast contracts cover every release stage.
+- Separate [design](POSTGRES_DATABASE_RELEASE_DESIGN.md),
+  [official research/options](POSTGRES_DATABASE_RELEASE_RESEARCH_2026_10.md) and
+  [outcome](POSTGRES_DATABASE_RELEASE_OUTCOME.md) own evidence and limits.
+- Next: evaluate shared empty-runtime admission sealing and actual database-tail
+  drainage before server teardown. Reuse existing lifetime ownership where
+  appropriate; keep original failures and independent workspace guards.
+
 ## Completed slice: PostgreSQL runtime stop-failure propagation (2026-10-15)
 
 - Corrected the shared cleanup condition without introducing another lifecycle
@@ -17,10 +32,8 @@ Database model source: `docs/DATABASE_MODEL.md`
 - Separate [design](POSTGRES_RUNTIME_CLEANUP_DESIGN.md),
   [research/options](POSTGRES_RUNTIME_CLEANUP_RESEARCH_2026_10.md) and
   [outcome](POSTGRES_RUNTIME_CLEANUP_OUTCOME.md) record evidence and limits.
-- Next: make shared empty-schema temporary-database release failures observable
-  after reviewing the helper's legacy best-effort default. Keep server ownership,
-  primary failures and existing resource limits. Manual Ubuntu media evidence is
-  still required before considering default media-mode promotion.
+- The strict empty-schema database-release follow-up is completed above. Manual
+  Ubuntu media evidence is still required before default media-mode promotion.
 
 ## Completed slice: Explicit Linux canonical media lane (2026-10-15)
 

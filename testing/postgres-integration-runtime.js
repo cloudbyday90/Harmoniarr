@@ -96,7 +96,7 @@ async function createDatabaseRuntime({ config, env, source, phaseObserver, schem
         return result;
       };
       if (prepared) return prepared.runIsolatedDatabase(execute, { phaseObserver: observer, signal: caseSignal, onFailure: captureServerFailure });
-      return withTemporaryPostgresDatabaseFn({ createPool, env, phaseObserver: observer, signal: caseSignal, run: execute,
+      return withTemporaryPostgresDatabaseFn({ createPool, env, strictCleanup: true, phaseObserver: observer, signal: caseSignal, run: execute,
         onFailure: captureServerFailure });
     },
   };

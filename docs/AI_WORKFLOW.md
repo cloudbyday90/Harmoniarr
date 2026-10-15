@@ -6,6 +6,14 @@ This repository includes a shared `.agents/` directory for GitHub Copilot agent 
 
 The goal is to keep reusable AI workflow guidance versioned alongside the project so UI review, frontend implementation, browser testing, and related tasks follow the same repo conventions.
 
+The [strict database-release outcome](POSTGRES_DATABASE_RELEASE_OUTCOME.md)
+extends the existing standards/testing method: prove behavior through the actual
+helper and changed entrypoint, distinguish primary failure from later cleanup,
+and await the final returned release tail. Native permission-refusal proof must
+also inspect retained target identity and an unrelated sibling; a reported error
+does not prove deletion. Keep direct-tool compatibility and server/workspace
+authority separate from strict failure reporting.
+
 The [PostgreSQL cleanup outcome](POSTGRES_RUNTIME_CLEANUP_OUTCOME.md) extends
 the existing standards/testing skills with separate failure and resource-authority
 proof. Exercise Error/null, a held stop and canonical promise identity in fast

@@ -4,12 +4,19 @@ Harmoniarr is a self-hosted, Docker-hosted music library manager inspired by Lid
 
 The repository contains the Node.js ESM server, Vue client, PostgreSQL schema, automated validation, and design documents. The platform is under active development toward its first release.
 
+Shared empty-schema fixtures now report temporary-database release failures
+through the existing strict lifecycle. See the
+[design](docs/POSTGRES_DATABASE_RELEASE_DESIGN.md),
+[official research and tradeoffs](docs/POSTGRES_DATABASE_RELEASE_RESEARCH_2026_10.md)
+and [outcome](docs/POSTGRES_DATABASE_RELEASE_OUTCOME.md) for native permission-
+refusal proof and the next admission/drainage review.
+
 Shared PostgreSQL cleanup now reports server-stop failure in either schema mode,
 preserving original failures and independent workspace guards. See its
 [design](docs/POSTGRES_RUNTIME_CLEANUP_DESIGN.md),
 [official research and options](docs/POSTGRES_RUNTIME_CLEANUP_RESEARCH_2026_10.md)
 and [outcome](docs/POSTGRES_RUNTIME_CLEANUP_OUTCOME.md) for native evidence and
-the next strict database-release review.
+server-stop ownership limits.
 
 An explicit Linux canonical media lane now requires all six cases, zero skips,
 27 current inspections and verified media-owner cleanup. A manual-only Ubuntu

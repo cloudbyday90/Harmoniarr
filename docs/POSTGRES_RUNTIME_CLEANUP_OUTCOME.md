@@ -79,3 +79,7 @@ promoting media defaults.
 
 See [design](POSTGRES_RUNTIME_CLEANUP_DESIGN.md) and
 [official research, pros/cons and stack](POSTGRES_RUNTIME_CLEANUP_RESEARCH_2026_10.md).
+
+The subsequent [strict database-release outcome](POSTGRES_DATABASE_RELEASE_OUTCOME.md)
+completes that shared empty-schema selection with real PostgreSQL permission-
+refusal evidence. Lower-runtime admission/drainage remains a separate follow-up.

@@ -942,3 +942,12 @@ preserve the primary value through later release errors. Apply W3C Privacy
 Principles (Statement) and OWASP minimization to evidence, without claiming
 fixture-specific mandates or WCAG conformance. Failure propagation and permission
 to remove independently owned storage require separate evidence.
+
+October 15 strict database-release guidance uses
+docs/POSTGRES_DATABASE_RELEASE_RESEARCH_2026_10.md. PostgreSQL owner permission
+and active sessions can refuse DROP; awaiting node-postgres end/query operations
+must not turn that failure into success. Select existing strict policy at the
+owning entrypoint while preserving original Error/null and direct-tool scope.
+W3C's Privacy Principles Statement and OWASP exclusions guide minimized evidence;
+they do not prescribe the project's fixture cleanup policy or grant authority
+over a borrowed server, unrelated database or uncertain workspace.

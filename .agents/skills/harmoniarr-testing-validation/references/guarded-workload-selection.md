@@ -151,6 +151,16 @@ and two native cases for real server activity after controlled pre-stop refusal;
 independently close the observer and retire only the captured test owner. A
 rejected stop does not certify shutdown or authorize removal of uncertain media
 roots. Keep sticky workspace guards separate from PostgreSQL's own storage.
-Register actual native completion beyond runner timeout. The helper's legacy
-best-effort temporary-database release is a distinct follow-up; do not claim it
-is strict from a successful stop. See docs/POSTGRES_RUNTIME_CLEANUP_OUTCOME.md.
+Register actual native completion beyond runner timeout. Server stop and strict
+temporary-database release need distinct proof; a successful stop alone cannot
+prove release. See docs/POSTGRES_RUNTIME_CLEANUP_OUTCOME.md and the next entry.
+
+Shared empty-schema delegation now selects strict temporary-database cleanup.
+Test each release-stage Error/null through the actual helper and changed runtime,
+including held final completion and primary-error precedence over server stop.
+Use native DROP permission refusal to prove retained target OID, successful
+sibling queries and test-owner-only recovery; error reporting is not deletion
+proof. Direct helper compatibility and existing parent/template policies remain
+separate. Drain actual registered operations before fixture disposal. See
+docs/POSTGRES_DATABASE_RELEASE_OUTCOME.md for the bounded cohort and the distinct
+lower-runtime admission/drainage follow-up.
