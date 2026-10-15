@@ -152,3 +152,46 @@ test('a running exec refuses admission even when the container is healthy', () =
   await transport.start(); await assert.rejects(transport.run(['-version']), { code: 'fixture_media_not_quiescent' });
   assert.equal(control.calls.some(args => args[0] === 'exec'), false); await transport.retire(); await transport.remove();
 }));
+
+test('API reads retain the identical owner, isolation and active-exec policy', () => fixture(async ({ root }) => {
+  for (const options of [{}, { activeExec: true }, { changeIdentity: true }, { createReply: 'partial-id' }]) {
+    const control = dockerControl(root, options); let closed = false;
+    const transport = createOwnedMediaDockerTransport({ root, image: 'fixture:local', ...control, inspectionReadMode: 'api',
+      createInspectionReader: async () => ({ inspect: async id => JSON.parse((await control.executeFileFn('docker', ['inspect', id],
+        { timeout: 30_000, maxBuffer: 2 * 1024 * 1024, windowsHide: true, shell: false })).stdout)[0],
+      close: async () => { closed = true; } }),
+    });
+    if (options.changeIdentity || options.createReply) {
+      await assert.rejects(transport.start()); await assert.rejects(transport.retire()); await assert.rejects(transport.remove());
+      assert.equal(control.calls.some(args => ['stop', 'rm'].includes(args[0])), false);
+    } else {
+      await transport.start();
+      if (options.activeExec) await assert.rejects(transport.run(['-version']), { code: 'fixture_media_not_quiescent' });
+      else assert.equal((await transport.run([...mediaInspectionPrefix, '/fixtures/current.flac'])).stdout, 'current');
+      await transport.retire(); await transport.remove();
+    }
+    await transport.closeReader(); assert.equal(closed, true);
+  }
+}));
+
+for (const reason of [new Error('original-read-failure'), null]) {
+  test(`failed cleanup disposes the reader without replacing original ${reason === null ? 'null' : 'Error'}`, () => fixture(async ({ root, args }) => {
+    let closed = false; const cleanup = new Error('cleanup');
+    const executor = createOwnedMediaInspectionExecutor({ workspaceDir: root, inspectionReadMode: 'api', createTransport: () => ({
+      start: async () => {}, run: async () => { throw reason; }, retire: async () => { throw cleanup; }, remove: () => assert.fail(),
+      closeReader: async () => { closed = true; throw null; },
+    }) });
+    await assert.rejects(executor.run('ffprobe', args), error => error === reason);
+    await assert.rejects(executor.close(), error => error === cleanup); assert.equal(closed, true); assert.equal(executor.canRemoveWorkspace(), false);
+  }));
+}
+
+test('a refused API bootstrap never creates an owner and canonical close can release the unchanged root', () => fixture(async ({ root, args }) => {
+  const refused = new Error('unsupported-endpoint'); const calls = [];
+  const executor = createOwnedMediaInspectionExecutor({ workspaceDir: root, image: 'fixture:local', inspectionReadMode: 'api',
+    createTransport: input => createOwnedMediaDockerTransport({ ...input, executeFileFn: async (...argv) => { calls.push(argv); },
+      createInspectionReader: async () => { throw refused; } }),
+  });
+  await assert.rejects(executor.run('ffprobe', args), error => error === refused); await executor.close();
+  assert.equal(calls.length, 0); assert.equal(executor.canRemoveWorkspace(), true);
+}));

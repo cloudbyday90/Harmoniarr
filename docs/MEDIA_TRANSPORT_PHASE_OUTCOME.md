@@ -108,3 +108,8 @@ source, schema, dependency, branch, release or tag changed. Existing testing and
 standards skills are maintained; structural/byte checks do not claim a new blind
 trial or standards certification. See separate [design](MEDIA_TRANSPORT_PHASE_DESIGN.md)
 and [official October research](MEDIA_TRANSPORT_PHASE_RESEARCH_2026_10.md).
+
+Subsequent implementation: the [local inspection API outcome](MEDIA_INSPECTION_API_OUTCOME.md)
+owns the bounded read adapter, version-two seventeen-phase hybrid semantics,
+native controls and reversed-order selected evidence. The twelve-phase CLI
+measurements above remain their original collection, not API measurements.

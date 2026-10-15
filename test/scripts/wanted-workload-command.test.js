@@ -30,8 +30,8 @@ test('legacy workload commands keep full dimensions and original comparator sele
 
 test('explicit workload selection records reduced scope and forwards only reviewed options', () => {
   const result = selected();
-  assert.deepEqual(result.plan, { scope: 'selected', profiles: ['sine'], bindingCounts: [2], pairs: 1, seedPreviewMode: 'worker', mediaExecutionMode: 'per-command', mediaDiagnostics: false, expectedSamples: 2 });
-  assert.deepEqual(result.options, { profiles: ['sine'], bindingCounts: [2], pairs: 1, seedPreviewMode: 'worker', mediaExecutionMode: 'per-command', mediaDiagnostics: false, sourceNoopComparison: true });
+  assert.deepEqual(result.plan, { scope: 'selected', profiles: ['sine'], bindingCounts: [2], pairs: 1, seedPreviewMode: 'worker', mediaExecutionMode: 'per-command', mediaDiagnostics: false, inspectionReadMode: 'cli', expectedSamples: 2 });
+  assert.deepEqual(result.options, { profiles: ['sine'], bindingCounts: [2], pairs: 1, seedPreviewMode: 'worker', mediaExecutionMode: 'per-command', mediaDiagnostics: false, inspectionReadMode: 'cli', sourceNoopComparison: true });
   assert.throws(() => result.plan.profiles.push('noise'), TypeError);
   assert.throws(() => { result.options.pairs = 2; }, TypeError);
 });
@@ -57,6 +57,16 @@ test('transport diagnostics are opt-in and recorded only for reviewed owned work
     const result = parseWantedWorkloadCommand([...base, '--source-noops', '--media-execution', 'owned', '--media-diagnostics', mode]);
     assert.equal(result.plan.mediaDiagnostics, mode === 'on'); assert.equal(result.options.mediaDiagnostics, mode === 'on');
     assert.equal(result.plan.expectedSamples, 24);
+  }
+});
+
+test('API inspection is an explicit owned-only selection forwarded into the plan', () => {
+  const input = [...base, '--source-noops', '--media-execution', 'owned', '--media-inspection', 'api'];
+  const result = parseWantedWorkloadCommand(input);
+  assert.equal(result.plan.inspectionReadMode, 'api'); assert.equal(result.options.inspectionReadMode, 'api');
+  for (const tail of [['--media-inspection', 'api'], ['--source-noops', '--media-inspection', 'api'],
+    ['--source-noops', '--media-execution', 'owned', '--media-inspection', 'remote']]) {
+    assert.throws(() => parseWantedWorkloadCommand([...base, ...tail]), TypeError);
   }
 });
 

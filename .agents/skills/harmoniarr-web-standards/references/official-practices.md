@@ -1,5 +1,15 @@
 # Official practices by boundary
 
+October 14 local API guidance uses docs/MEDIA_INSPECTION_API_RESEARCH_2026_10.md.
+Docker context precedence and privileged daemon access require target pinning
+and private CLI/API daemon/capability matching before container creation. Node
+HTTP requires actual response consumption and owned keep-alive disposal; a timer
+notification alone is not termination. Keep local-only allowlisted versioned GETs,
+bounded complete JSON and original Error/null through socket/agent close. W3C
+draft timing and OWASP output minimization inform evidence, not daemon-side
+read-only credentials or current ownership authority. Count hybrid operations
+separately from spawned CLI calls and keep platform/default promotion explicit.
+
 October 14 transport-phase guidance uses
 docs/MEDIA_TRANSPORT_PHASE_RESEARCH_2026_10.md. Node process-relative timing and
 W3C draft monotonic durations support returned-work windows; OWASP data minimization

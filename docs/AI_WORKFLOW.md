@@ -6,6 +6,14 @@ This repository includes a shared `.agents/` directory for GitHub Copilot agent 
 
 The goal is to keep reusable AI workflow guidance versioned alongside the project so UI review, frontend implementation, browser testing, and related tasks follow the same repo conventions.
 
+The [local inspection API outcome](MEDIA_INSPECTION_API_OUTCOME.md) extends the
+existing standards and testing skills with effective context precedence, pinned
+CLI/API target and private daemon/version comparison before creation. Keep one
+bounded admitted GET and owned agent/socket disposal; HTTP success is not owner
+or cleanup authority. Version-two hybrid phase counts are operations, not all
+CLI launches. Compare acknowledged stable native states and reversed-order
+selected canonical work before promotion; retain original Error/null.
+
 The [transport phase outcome](MEDIA_TRANSPORT_PHASE_OUTCOME.md) extends the
 testing/standards method with bounded actual CLI counts and monotonic aggregate
 windows. Preserve Error/null and drain post-close observation. Separate exec

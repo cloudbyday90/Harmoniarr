@@ -8,7 +8,8 @@ import { readCheckoutProperty as read } from './pool-checkout-record.js';
 
 export const mediaTransportPhases = Object.freeze(['image_inspect', 'owner_create', 'start_inspect', 'owner_start',
   'command_inspect_before', 'command_exec', 'command_inspect_after', 'retire_inspect_before', 'owner_stop',
-  'retire_inspect_after', 'remove_inspect_before', 'owner_remove']);
+  'retire_inspect_after', 'remove_inspect_before', 'owner_remove', 'reader_context', 'reader_version_cli',
+  'reader_identity_cli', 'reader_version_api', 'reader_identity_api']);
 export const mediaTransportObservationLimit = 10_000;
 export const mediaTransportDurationLimitMs = 86_400_000;
 const count = value => Number.isSafeInteger(value) && value >= 0 && value <= mediaTransportObservationLimit;
@@ -18,7 +19,7 @@ const array = value => { try { return Array.isArray(value); } catch { return fal
 /** Read each approved property once; arbitrary diagnostics never enter public reports. */
 export function captureMediaTransportSnapshot(input) {
   const version = read(input, 'version'); const clipped = read(input, 'clipped'); const phases = read(input, 'phases');
-  if (version !== 1 || typeof clipped !== 'boolean' || !array(phases) || read(phases, 'length') !== mediaTransportPhases.length) return null;
+  if (version !== 2 || typeof clipped !== 'boolean' || !array(phases) || read(phases, 'length') !== mediaTransportPhases.length) return null;
   const rows = [];
   for (let i = 0; i < mediaTransportPhases.length; i++) {
     const row = read(phases, i); const phase = read(row, 'phase');
@@ -41,8 +42,9 @@ export function captureMediaTransportSummary(input) {
   const backend = read(input, 'backend'); const ownerCleanupSafe = read(input, 'ownerCleanupSafe');
   const raw = read(input, 'snapshot');
   if (!['sine', 'noise'].includes(mediaProfile) || ![2, 4, 8].includes(bindings) || ![0, 1].includes(pair)) return null;
-  const snapshot = backend === 'docker_cli' ? captureMediaTransportSnapshot(raw) : null;
-  if (backend === 'docker_cli' ? !snapshot || typeof ownerCleanupSafe !== 'boolean'
+  const docker = ['docker_cli', 'docker_hybrid'].includes(backend);
+  const snapshot = docker ? captureMediaTransportSnapshot(raw) : null;
+  if (docker ? !snapshot || typeof ownerCleanupSafe !== 'boolean'
     : backend !== 'local_tools' || raw !== null || ownerCleanupSafe !== null) return null;
   return Object.freeze({ mediaProfile, bindings, pair, backend, ownerCleanupSafe, snapshot });
 }

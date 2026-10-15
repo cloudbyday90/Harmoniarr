@@ -4,10 +4,18 @@ Harmoniarr is a self-hosted, Docker-hosted music library manager inspired by Lid
 
 The repository contains the Node.js ESM server, Vue client, PostgreSQL schema, automated validation, and design documents. The platform is under active development toward its first release.
 
-Owned media workload diagnostics can separate twelve fixed Docker transport
+Owned workloads can opt into local Engine inspection with `--media-execution
+owned --media-inspection api`. Versioned, bounded GETs preserve every current
+owner check; exec and lifecycle mutations stay on CLI. Defaults remain unchanged.
+See the [design](docs/MEDIA_INSPECTION_API_DESIGN.md),
+[October research](docs/MEDIA_INSPECTION_API_RESEARCH_2026_10.md) and
+[outcome](docs/MEDIA_INSPECTION_API_OUTCOME.md) for evidence and remaining scope.
+
+Owned media workload diagnostics can separate seventeen fixed transport
 phases with `--media-execution owned --media-diagnostics on`. Reports retain
 bounded aggregate counts/durations after cleanup, excluding private command data.
-See the [design](docs/MEDIA_TRANSPORT_PHASE_DESIGN.md),
+Version-two snapshots distinguish bootstrap CLI/API work and hybrid summaries.
+See the preceding [design](docs/MEDIA_TRANSPORT_PHASE_DESIGN.md),
 [official research](docs/MEDIA_TRANSPORT_PHASE_RESEARCH_2026_10.md) and
 [measured outcome](docs/MEDIA_TRANSPORT_PHASE_OUTCOME.md) before changing transport.
 

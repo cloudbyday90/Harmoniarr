@@ -12,7 +12,7 @@ const modes = new Map([
   ['--root-costs', ['wanted_root_costs', 'costDiagnostics', [false, true]]],
   ['', ['wanted_guarded_workload', 'readMethod', ['stream', 'reusable']]],
 ]);
-const usage = 'Usage: node --expose-gc scripts/measure-wanted-guarded-workload.js --output <local JSON> [--source-noops|--distinct-bindings|--bounded-roots|--receipt-groups|--root-costs] [--profiles sine,noise] [--bindings 2,4,8] [--pairs 1|2] [--seed-preview worker|separate] [--media-execution owned|per-command] [--media-diagnostics on|off]';
+const usage = 'Usage: node --expose-gc scripts/measure-wanted-guarded-workload.js --output <local JSON> [--source-noops|--distinct-bindings|--bounded-roots|--receipt-groups|--root-costs] [--profiles sine,noise] [--bindings 2,4,8] [--pairs 1|2] [--seed-preview worker|separate] [--media-execution owned|per-command] [--media-diagnostics on|off] [--media-inspection cli|api]';
 const invalid = () => new TypeError(usage);
 
 function list(value, allowed) {
@@ -32,7 +32,7 @@ export function parseWantedWorkloadCommand(args) {
       if (mode) throw invalid();
       mode = arg;
     } else {
-      if (!['--output', '--profiles', '--bindings', '--pairs', '--seed-preview', '--media-execution', '--media-diagnostics'].includes(arg) || values.has(arg)
+      if (!['--output', '--profiles', '--bindings', '--pairs', '--seed-preview', '--media-execution', '--media-diagnostics', '--media-inspection'].includes(arg) || values.has(arg)
         || !args[i + 1] || args[i + 1].startsWith('--')) throw invalid();
       values.set(arg, args[++i]);
     }
@@ -47,6 +47,8 @@ export function parseWantedWorkloadCommand(args) {
   const diagnosticMode = values.get('--media-diagnostics') ?? 'off';
   if (!['on', 'off'].includes(diagnosticMode) || (values.has('--media-diagnostics') && (!distinct || mediaExecutionMode !== 'owned'))) throw invalid();
   const mediaDiagnostics = diagnosticMode === 'on';
+  const inspectionReadMode = values.get('--media-inspection') ?? 'cli';
+  if (!['cli', 'api'].includes(inspectionReadMode) || (values.has('--media-inspection') && (!distinct || mediaExecutionMode !== 'owned'))) throw invalid();
   const profiles = Object.freeze(list(values.get('--profiles') ?? 'sine,noise', ['sine', 'noise']));
   const bindingCounts = Object.freeze(list(values.get('--bindings') ?? '2,4,8', ['2', '4', '8']).map(Number));
   const pairs = values.get('--pairs') ?? '2';
@@ -55,9 +57,9 @@ export function parseWantedWorkloadCommand(args) {
   const scope = profiles.join(',') === 'sine,noise' && (!distinct || bindingCounts.join(',') === '2,4,8') && pairs === '2'
     ? 'full' : 'selected';
   const [kind, variantField, variants] = modes.get(mode);
-  const plan = Object.freeze({ scope, profiles, ...dimensions, pairs: Number(pairs), ...(distinct ? { seedPreviewMode, mediaExecutionMode, mediaDiagnostics } : {}),
+  const plan = Object.freeze({ scope, profiles, ...dimensions, pairs: Number(pairs), ...(distinct ? { seedPreviewMode, mediaExecutionMode, mediaDiagnostics, inspectionReadMode } : {}),
     expectedSamples: profiles.length * (distinct ? bindingCounts.length : 3) * Number(pairs) * 2 });
-  const options = Object.freeze({ profiles, ...dimensions, pairs: Number(pairs), ...(distinct ? { seedPreviewMode, mediaExecutionMode, mediaDiagnostics } : {}),
+  const options = Object.freeze({ profiles, ...dimensions, pairs: Number(pairs), ...(distinct ? { seedPreviewMode, mediaExecutionMode, mediaDiagnostics, inspectionReadMode } : {}),
     ...(distinct ? mode === '--source-noops' ? { sourceNoopComparison: true } : {}
       : { groupingComparison: mode === '--receipt-groups', rootCostComparison: mode === '--root-costs', boundedRootComparison: mode === '--bounded-roots' }) });
   return Object.freeze({ output: values.get('--output'), kind, distinct, plan, options,

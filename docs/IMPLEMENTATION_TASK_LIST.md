@@ -6,6 +6,20 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Local read-only media inspection API (2026-10-14)
+
+- Narrow ESM endpoint, HTTP and inspection reader modules pin CLI/API to one
+  acknowledged local daemon and preserve current owner/config/state validation.
+  Explicit `--media-inspection api` retains CLI exec/lifecycle operations and
+  conservative cleanup. The default comparator remains unchanged.
+- Separate [design](MEDIA_INSPECTION_API_DESIGN.md),
+  [research](MEDIA_INSPECTION_API_RESEARCH_2026_10.md) and
+  [outcome](MEDIA_INSPECTION_API_OUTCOME.md) record controls, selected measurements,
+  practical standards/testing skill updates and local replay of open PR #42.
+- Next: collect the previously incomplete noise/eight-binding selection through
+  this adapter and prove native Linux socket behavior before broader adoption.
+  Preserve historical failures, exact private guards and resource policy.
+
 ## Completed slice: Bounded media transport phase evidence (2026-10-14)
 
 - Fixed aggregate observation/public capture/release modules instrument the owned

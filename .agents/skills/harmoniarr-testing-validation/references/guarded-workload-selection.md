@@ -56,7 +56,7 @@ retirement. Keep every canonical inspection and private comparator. See
 docs/OWNED_MEDIA_EXECUTOR_OUTCOME.md for the selected measurements and limits.
 
 For owned transport cost, add `--media-diagnostics on` to the explicit owned
-distinct/source workload; off is the default. Twelve fixed CLI phases expose
+distinct/source workload; off is the default. Seventeen fixed operation phases expose
 bounded counts and monotonic aggregate durations after actual close. Completed
 CLI inspection does not certify configuration validation, and ownerCleanupSafe
 does not certify whole-app drainage. Keep local-tools/no-owner summaries distinct,
@@ -65,5 +65,20 @@ held optional sinks. Serial transport windows can be summed; overlapping seed,
 caller queue and close windows cannot be added again. Exec time includes CLI/
 daemon/codec/stdio, not just ffprobe CPU. Native invocation counts and exact
 canonical comparisons precede interpreting a one-pair off/on timing. See
-docs/MEDIA_TRANSPORT_PHASE_OUTCOME.md; the read-only API proposal still needs
-daemon/context/version, bounded body and owned disposal proof.
+docs/MEDIA_TRANSPORT_PHASE_OUTCOME.md for the earlier twelve-phase CLI collection.
+
+Select `--media-inspection api` only with the explicit owned workload and an
+existing image; absent image refuses before PostgreSQL startup. CLI remains the
+default. Resolve environment/context precedence, pin every CLI call to the same
+local endpoint and privately match daemon/version before creation. Version-two
+snapshots add bootstrap CLI/API phases and `docker_hybrid` summaries; total
+operation counts are not all CLI launches. Prove bounded fragmented/oversized/
+malformed/stalled/early-close/aborted responses, same-owner configuration checks,
+canonical reader disposal and Error/null retention. Native API/CLI comparisons
+need acknowledged stable states, including active ExecIDs and stopped state;
+sequential reads across an unacknowledged start are not equivalent snapshots.
+Keep changed-media, read-only denial and actual exec-timeout retirement controls.
+Use reversed-order selected canonical comparisons, preserving exact results,
+receipts/digests/bytes and resource bounds. Small successful samples do not
+diagnose old largest-profile failures or prove Linux socket/whole-CI behavior.
+See docs/MEDIA_INSPECTION_API_OUTCOME.md before broader or default adoption.

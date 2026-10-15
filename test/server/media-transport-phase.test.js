@@ -23,7 +23,7 @@ test('transport counters expose held work and immutable snapshots, then settle r
   let tick = 20; const hold = gate(); const observer = createMediaTransportObserver({ now: () => tick }); const output = { stdout: 'private-output' };
   const work = observer.measure('command_exec', async () => { await hold.promise; return output; });
   const held = observer.snapshot(); assert.equal(phase(held).pending, 1); assert.equal(phase(held).completed, 0);
-  assert.equal(captureMediaTransportSnapshot(held).phases.length, 12);
+  assert.equal(captureMediaTransportSnapshot(held).phases.length, 17);
   assert.throws(() => { phase(held).pending = 10; }, TypeError);
   tick = 32; hold.release(); assert.equal(await work, output);
   const settled = phase(observer.snapshot()); assert.equal(settled.totalMs, 12); assert.equal(settled.timed, 1);
@@ -57,7 +57,7 @@ test('fixed storage clips observation counts while every additional command stil
   for (let i = 0; i <= mediaTransportObservationLimit; i++) await observer.measure('command_exec', () => { commands++; });
   const snapshot = captureMediaTransportSnapshot(observer.snapshot());
   assert.equal(commands, mediaTransportObservationLimit + 1); assert.equal(ticks, mediaTransportObservationLimit * 2);
-  assert.equal(snapshot.phases.length, 12); assert.equal(snapshot.clipped, true);
+  assert.equal(snapshot.phases.length, 17); assert.equal(snapshot.clipped, true);
   assert.equal(phase(snapshot).completed, mediaTransportObservationLimit);
 });
 

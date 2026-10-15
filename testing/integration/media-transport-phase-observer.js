@@ -35,6 +35,6 @@ export function createMediaTransportObserver({ now = () => performance.now() } =
       }
     }
   }
-  return Object.freeze({ measure, snapshot: () => Object.freeze({ version: 1, clipped,
+  return Object.freeze({ measure, snapshot: () => Object.freeze({ version: 2, clipped,
     phases: Object.freeze([...rows.values()].map(row => Object.freeze({ ...row }))) }) });
 }

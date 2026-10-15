@@ -9,6 +9,7 @@ import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import { mediaExecutorError } from './owned-media-inspection-policy.js';
 import { disabledMediaTransportObserver } from './media-transport-phase-observer.js';
+import { createMediaDockerInspectionReader } from './media-docker-inspection-reader.js';
 
 const executeFile = promisify(execFile);
 const label = 'io.harmoniarr.fixture.media-owner';
@@ -17,16 +18,21 @@ const imagePattern = /^sha256:[a-f0-9]{64}$/u;
 
 /** Bounded CLI transport: ownership comes only from an acknowledged complete ID. */
 export function createOwnedMediaDockerTransport({ image, root, executeFileFn = executeFile, commandTimeoutMs = 30_000,
-  transportObserver = disabledMediaTransportObserver } = {}) {
+  transportObserver = disabledMediaTransportObserver, inspectionReadMode = 'cli',
+  createInspectionReader = createMediaDockerInspectionReader } = {}) {
   if (!image || typeof executeFileFn !== 'function' || !Number.isSafeInteger(commandTimeoutMs)
-    || commandTimeoutMs < 1 || commandTimeoutMs > 30_000 || typeof transportObserver?.measure !== 'function') throw new TypeError('Invalid media transport');
-  const token = randomUUID(); let id; let imageId; let trusted = false;
+    || commandTimeoutMs < 1 || commandTimeoutMs > 30_000 || typeof transportObserver?.measure !== 'function'
+    || !['cli', 'api'].includes(inspectionReadMode) || typeof createInspectionReader !== 'function') throw new TypeError('Invalid media transport');
+  const token = randomUUID(); let id; let imageId; let trusted = false; let reader; let creationAdmitted = false;
+  let env = inspectionReadMode === 'api' ? Object.freeze({ ...process.env }) : undefined;
   const invoke = (phase, args, options = {}) => transportObserver.measure(phase, () => executeFileFn('docker', args, {
-    timeout: 30_000, maxBuffer: 2 * 1024 * 1024, windowsHide: true, shell: false, ...options,
+    timeout: 30_000, maxBuffer: 2 * 1024 * 1024, windowsHide: true, shell: false, ...(env ? { env } : {}), ...options,
   }));
   async function inspect(phase) {
     if (!id) throw mediaExecutorError('fixture_media_owner_unknown');
-    const { stdout } = await invoke(phase, ['inspect', id]); const [state] = JSON.parse(stdout);
+    // Both readers pass through exactly the same current ownership/configuration policy.
+    const state = reader ? await transportObserver.measure(phase, () => reader.inspect(id))
+      : JSON.parse((await invoke(phase, ['inspect', id])).stdout)[0];
     const mount = state?.HostConfig?.Mounts;
     if (state?.Id !== id || state.Image !== imageId || state.Config?.Labels?.[label] !== token
       || JSON.stringify(state.Config?.Entrypoint) !== '["sleep"]' || JSON.stringify(state.Config?.Cmd) !== '["infinity"]'
@@ -43,8 +49,11 @@ export function createOwnedMediaDockerTransport({ image, root, executeFileFn = e
   }
   return Object.freeze({
     async start() {
+      if (inspectionReadMode === 'api') reader = await createInspectionReader({ invoke, env, transportObserver,
+        setEnvironment: pinned => { env = pinned; } });
       imageId = (await invoke('image_inspect', ['image', 'inspect', image, '--format', '{{.Id}}'])).stdout.trim();
       if (!imagePattern.test(imageId)) throw mediaExecutorError('fixture_media_image_refused');
+      creationAdmitted = true;
       const reply = await invoke('owner_create', ['create', '--network', 'none', '--read-only', '--no-healthcheck', '--cap-drop', 'ALL',
         '--security-opt', 'no-new-privileges', '--restart', 'no', '--label', `${label}=${token}`,
         '--entrypoint', 'sleep', '--mount', `type=bind,source=${root},target=/fixtures,readonly,bind-recursive=disabled`, imageId, 'infinity']);
@@ -64,6 +73,7 @@ export function createOwnedMediaDockerTransport({ image, root, executeFileFn = e
       return result;
     },
     async retire() {
+      if (inspectionReadMode === 'api' && !creationAdmitted) return;
       // Never target an inferred name or an ID whose original configuration was not validated.
       if (!trusted) throw mediaExecutorError('fixture_media_owner_unknown');
       const before = await inspect('retire_inspect_before');
@@ -75,8 +85,10 @@ export function createOwnedMediaDockerTransport({ image, root, executeFileFn = e
       } else if (before.State?.Running !== false) throw mediaExecutorError('fixture_media_not_quiescent');
     },
     async remove() {
+      if (inspectionReadMode === 'api' && !creationAdmitted) return;
       if (!trusted || (await inspect('remove_inspect_before')).State?.Running !== false) throw mediaExecutorError('fixture_media_not_quiescent');
       await invoke('owner_remove', ['rm', id]);
     },
+    closeReader: () => reader?.close(),
   });
 }

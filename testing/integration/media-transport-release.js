@@ -11,7 +11,7 @@ export async function closeMediaTransport({ executor, seedObserver, transportObs
   try { if (executor) await seedObserver.measure('media_executor_close', null, () => executor.close()); }
   finally {
     if (enabled) {
-      try { await onRecord({ ...location, backend: executor ? 'docker_cli' : 'local_tools',
+      try { await onRecord({ ...location, backend: executor ? executor.inspectionReadMode === 'api' ? 'docker_hybrid' : 'docker_cli' : 'local_tools',
         ownerCleanupSafe: executor ? executor.canRemoveWorkspace() : null,
         snapshot: executor ? transportObserver.snapshot() : null }); } catch { /* Optional diagnostic sink. */ }
     }

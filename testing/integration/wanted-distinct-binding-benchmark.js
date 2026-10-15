@@ -22,12 +22,14 @@ import { closeMediaTransport } from './media-transport-release.js';
 export async function measureWantedDistinctBindings({ signal, onProgress = () => {}, onSample = () => {},
   profiles = ['sine', 'noise'], bindingCounts = wantedDistinctBindingCounts, pairs = 2, gc = global.gc,
   sourceNoopComparison = false, onCheckpoint = () => {}, onSeedRecord = () => {}, seedPreviewMode = 'worker', mediaExecutionMode = 'per-command',
-  mediaDiagnostics = false, onMediaTransport = () => {} } = {}) {
+  mediaDiagnostics = false, onMediaTransport = () => {}, inspectionReadMode = 'cli' } = {}) {
   if (typeof sourceNoopComparison !== 'boolean') throw new TypeError('Invalid source no-op comparison');
   if (typeof onCheckpoint !== 'function') throw new TypeError('Invalid workload checkpoint observer');
   if (typeof onSeedRecord !== 'function') throw new TypeError('Invalid seed record observer');
   if (!['worker', 'separate'].includes(seedPreviewMode)) throw new TypeError('Invalid seed preview mode');
   if (!['owned', 'per-command'].includes(mediaExecutionMode)) throw new TypeError('Invalid media execution mode');
+  if (!['cli', 'api'].includes(inspectionReadMode) || (inspectionReadMode === 'api'
+    && (mediaExecutionMode !== 'owned' || !process.env.HARMONIARR_INTEGRATION_MEDIA_IMAGE))) throw new TypeError('Invalid media inspection mode');
   if (typeof mediaDiagnostics !== 'boolean' || (mediaDiagnostics && mediaExecutionMode !== 'owned')
     || typeof onMediaTransport !== 'function') throw new TypeError('Invalid media diagnostics');
   const checkpoint = async record => { try { await onCheckpoint(record); } catch { /* Optional diagnostic sink. */ } };
@@ -51,7 +53,7 @@ export async function measureWantedDistinctBindings({ signal, onProgress = () =>
           const seedObserver = createWantedSeedObserver({ onRecord: record => onSeedRecord({ ...record, ...location }) });
           const transportObserver = mediaDiagnostics ? createMediaTransportObserver() : disabledMediaTransportObserver;
           if (mediaExecutionMode === 'owned' && process.env.HARMONIARR_INTEGRATION_MEDIA_IMAGE) {
-            inspectionExecutor = createOwnedMediaInspectionExecutor({ workspaceDir: input.workspaceDir, signal: scope.signal, transportObserver });
+            inspectionExecutor = createOwnedMediaInspectionExecutor({ workspaceDir: input.workspaceDir, signal: scope.signal, transportObserver, inspectionReadMode });
           }
           if (inspectionExecutor || mediaDiagnostics) scope.onRelease(() => closeMediaTransport({ executor: inspectionExecutor,
             seedObserver, transportObserver, location, enabled: mediaDiagnostics, onRecord: onMediaTransport }));

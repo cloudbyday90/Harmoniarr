@@ -7,6 +7,11 @@ The October 2026 [no-cache rebuild design](LOCAL_DOCKER_REBUILD_2026_10_DESIGN.m
 [outcome](LOCAL_DOCKER_REBUILD_2026_10_OUTCOME.md) record preserved-state and
 isolated packaged validation, including the remaining early-filter status issue.
 
+The later [local inspection API outcome](MEDIA_INSPECTION_API_OUTCOME.md) records
+another successful no-cache rebuild, healthy startup and existing-admin bootstrap
+check after the test-infrastructure change. It retains this walkthrough's data
+and does not claim a new live-provider or release validation.
+
 It is intentionally separate from the canonical deployment baseline in `compose.yaml`.
 
 ## What It Does

@@ -40,7 +40,7 @@ export const releaseImageSummarySteps = Object.freeze({
 });
 
 export const releaseImageEvidenceStep = Object.freeze({
-  action: 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
+  action: 'actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9',
   artifactName: 'harmoniarr-docker-smoke-released-image.json',
   name: 'Upload published-image smoke evidence artifact',
   path: 'supply-chain/harmoniarr-docker-smoke-released-image.json',
@@ -60,14 +60,14 @@ export const releaseImageBrowserSmokeEvidenceVerificationStep = Object.freeze({
 });
 
 export const releaseImageBrowserSmokeEvidenceStep = Object.freeze({
-  action: 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
+  action: 'actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9',
   artifactName: 'harmoniarr-docker-smoke-browser-operator.json',
   name: 'Upload published-image browser smoke evidence artifact',
   path: 'supply-chain/harmoniarr-docker-smoke-browser-operator.json',
 });
 
 export const releaseImageBrowserSmokeScreenshotEvidenceStep = Object.freeze({
-  action: 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
+  action: 'actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9',
   artifactName: 'harmoniarr-docker-smoke-browser-screenshots',
   name: 'Upload published-image browser smoke screenshots artifact',
   path: 'supply-chain/browser-smoke-screenshots',
@@ -117,7 +117,7 @@ export const releaseImageUpgradeValidationStep = Object.freeze({
 });
 
 export const releaseImageUpgradeEvidenceStep = Object.freeze({
-  action: 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
+  action: 'actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9',
   artifactName: 'harmoniarr-docker-smoke-upgrade-path.json',
   name: 'Upload upgrade-path smoke evidence artifact',
   path: 'supply-chain/harmoniarr-docker-smoke-upgrade-path.json',
@@ -148,7 +148,7 @@ export const releaseImageDeploymentSummaryStep = Object.freeze({
 });
 
 export const releaseImageDeploymentSummaryArtifactStep = Object.freeze({
-  action: 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
+  action: 'actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9',
   artifactName: 'harmoniarr-docker-deployment-summary.json',
   name: 'Upload deployment summary artifact',
   path: 'supply-chain/harmoniarr-docker-deployment-summary.json',

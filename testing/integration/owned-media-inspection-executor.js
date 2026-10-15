@@ -10,8 +10,9 @@ import { disabledMediaTransportObserver } from './media-transport-phase-observer
 
 /** A lazy serial scenario owner; close seals admission synchronously and drains returned work. */
 export function createOwnedMediaInspectionExecutor({ workspaceDir, image = process.env.HARMONIARR_INTEGRATION_MEDIA_IMAGE,
-  signal, createTransport = createOwnedMediaDockerTransport, transportObserver = disabledMediaTransportObserver } = {}) {
-  if (typeof createTransport !== 'function') throw new TypeError('Invalid media executor transport');
+  signal, createTransport = createOwnedMediaDockerTransport, transportObserver = disabledMediaTransportObserver,
+  inspectionReadMode = 'cli' } = {}) {
+  if (typeof createTransport !== 'function' || !['cli', 'api'].includes(inspectionReadMode)) throw new TypeError('Invalid media executor transport');
   let sealed = false; let pending = 0; let tail = Promise.resolve(); let failed = false; let failure;
   let capture; let start; let transport; let retirement; let closing; let cleanupSafe = true;
   const retire = () => retirement ??= Promise.resolve().then(() => transport.retire());
@@ -26,7 +27,7 @@ export function createOwnedMediaInspectionExecutor({ workspaceDir, image = proce
       const policy = await (capture ??= captureMediaInspectionPolicy(workspaceDir));
       await policy.map(binary, args, options);
       await (start ??= (async () => {
-        transport = createTransport({ image, root: policy.root, transportObserver }); cleanupSafe = false;
+        transport = createTransport({ image, root: policy.root, transportObserver, inspectionReadMode }); cleanupSafe = false;
         await transport.start();
       })());
       signal?.throwIfAborted();
@@ -47,10 +48,15 @@ export function createOwnedMediaInspectionExecutor({ workspaceDir, image = proce
     sealed = true;
     return closing ??= (async () => {
       await tail;
-      if (transport) { await retire(); await transport.remove(); }
+      let cleanupFailed = false; let cleanupError;
+      try { if (transport) { await retire(); await transport.remove(); } }
+      catch (error) { cleanupFailed = true; cleanupError = error; }
+      try { await transport?.closeReader?.(); }
+      catch (error) { if (!cleanupFailed) { cleanupFailed = true; cleanupError = error; } }
+      if (cleanupFailed) throw cleanupError;
       if (capture) await (await capture).assertRoot();
       cleanupSafe = true;
     })();
   }
-  return Object.freeze({ run, close, canRemoveWorkspace: () => cleanupSafe });
+  return Object.freeze({ run, close, inspectionReadMode, canRemoveWorkspace: () => cleanupSafe });
 }

@@ -1,5 +1,16 @@
 # Project standards-to-evidence map
 
+Local inspection API: media-docker-{endpoint-policy,json-reader,inspection-reader}.js
+owns effective target resolution/pinning, local socket policy, reviewed API 1.56,
+private daemon matching, bounded GET consumption and canonical agent disposal.
+The existing transport shares its current ownership/config validator across
+CLI/API reads and retains CLI exec/lifecycle mutations. The executor disposes
+readers on failed retirement and retains uncertain workspaces. Controlled HTTP,
+native stable CLI/API comparisons, active ExecIDs and canonical reversed-order
+selections map to the separate API design/research/outcome. Version-two seventeen
+phase snapshots distinguish `docker_hybrid`; aggregate operations are not all
+CLI invocations. Defaults, SQL, hashes and publication checks remain conservative.
+
 Owned transport evidence: media-transport-{phase-policy,phase-observer,release}.js
 keeps fixed bounded aggregates, minimized report capture and post-close sink
 drainage. owned-media-docker-transport.js labels actual returned native calls;

@@ -1,7 +1,9 @@
 # Read-only media container inspection API proposal
 
-This is the next implementation proposal, not an installed or measured API
-client. [Transport phase evidence](MEDIA_TRANSPORT_PHASE_OUTCOME.md) identifies
+This proposal is now implemented as an explicit local-only pilot; see its
+[design](MEDIA_INSPECTION_API_DESIGN.md), [research](MEDIA_INSPECTION_API_RESEARCH_2026_10.md)
+and [outcome](MEDIA_INSPECTION_API_OUTCOME.md). Broader/default adoption remains
+separate. The original [transport phase evidence](MEDIA_TRANSPORT_PHASE_OUTCOME.md) identifies
 twenty-five container inspection reads in a completed ten-inspection selection.
 They took 3,433.852 ms of returned CLI time. A persistent local connection could
 remove host CLI startup while preserving each actual current-state read.
