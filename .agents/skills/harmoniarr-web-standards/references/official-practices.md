@@ -1,5 +1,15 @@
 # Official practices by boundary
 
+October 15 Linux canonical guidance uses
+docs/LINUX_CANONICAL_MEDIA_RESEARCH_2026_10.md. Node TestsStream has per-file and
+cumulative summaries; require the latter plus complete current inspection/owner
+records, not a zero exit or textual pass line. Use actual daemon-host paths for
+nested binds and treat the trusted socket runner as privileged. Keep manual CI,
+W3C draft elapsed timing and OWASP fixed output distinct from hosted-platform
+certification. Drain after evidence failure; inherited eval flags are not cleared
+by an empty execArgv option. Keep successful media cleanup separate from an
+unverified database-stop error path.
+
 October 15 media rollout guidance uses
 docs/LIBRARY_ADD_MEDIA_ROLLOUT_RESEARCH_2026_10.md. Node native module hooks can
 prove a test-only dependency boundary in a fresh process; retain compatible

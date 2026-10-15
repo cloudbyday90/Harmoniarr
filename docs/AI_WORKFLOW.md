@@ -6,6 +6,14 @@ This repository includes a shared `.agents/` directory for GitHub Copilot agent 
 
 The goal is to keep reusable AI workflow guidance versioned alongside the project so UI review, frontend implementation, browser testing, and related tasks follow the same repo conventions.
 
+The [Linux canonical lane](LINUX_CANONICAL_MEDIA_OUTCOME.md) extends the existing
+standards/testing method: require complete native summaries plus actual media
+phase counts, reject green skips, drain after evidence failure and preserve
+original Error/null. Node run execArgv appends inherited eval options, so use a
+file entrypoint and refuse eval. A Desktop runner needs the actual same-path
+daemon workspace; socket access remains privileged. Keep Linux replay, manual
+hosted-CI results and shared PostgreSQL failure propagation separate.
+
 The [media rollout outcome](LIBRARY_ADD_MEDIA_ROLLOUT_OUTCOME.md) keeps actual
 dependency boundaries separate from performance claims. Pure policies/media
 tools should not import SQL fixtures for convenience. Use fresh-process native

@@ -113,3 +113,7 @@ large automatic scaling matrix. Use that result to decide cohort default adoptio
 full Engine exec/lifecycle API migration remains a separate design. See the
 [design](LIBRARY_ADD_MEDIA_ROLLOUT_DESIGN.md) and
 [official research/options](LIBRARY_ADD_MEDIA_ROLLOUT_RESEARCH_2026_10.md).
+
+The [subsequent Linux lane outcome](LINUX_CANONICAL_MEDIA_OUTCOME.md) implements
+the explicit selected lane and records a full Linux replay, manual workflow and
+the remaining shared PostgreSQL cleanup/hosted-Ubuntu boundaries.

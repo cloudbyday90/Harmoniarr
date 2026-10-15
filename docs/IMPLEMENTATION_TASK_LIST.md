@@ -6,6 +6,20 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Explicit Linux canonical media lane (2026-10-15)
+
+- Modular ESM admission, local daemon/image preflight, native event drainage and
+  CLI enforce six canonical cases, zero skips and complete current media work.
+- Final real Linux replay passed with eight generated files, 27 inspections and
+  three safely removed media owners. A manual-only Ubuntu workflow adds no
+  automatic integration workload. Hosted-CI success is not claimed.
+- Separate [design](LINUX_CANONICAL_MEDIA_DESIGN.md),
+  [research](LINUX_CANONICAL_MEDIA_RESEARCH_2026_10.md) and
+  [outcome](LINUX_CANONICAL_MEDIA_OUTCOME.md) retain failed probes and scope.
+- Next: fix shared empty-schema PostgreSQL cleanup swallowing server-stop
+  failure, preserving original Error/null and uncertain workspace retention.
+  Review manual Ubuntu evidence before any default media-mode promotion.
+
 ## Completed slice: Canonical media rollout decision (2026-10-15)
 
 - Reversed the complete unchanged pilot cohort; both modes retained eight real

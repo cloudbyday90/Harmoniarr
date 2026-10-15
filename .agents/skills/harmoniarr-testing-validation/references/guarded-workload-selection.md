@@ -133,3 +133,14 @@ unchanged-code timing pair separate from final extracted-code native proof.
 Before default adoption, require the explicit Linux lane's full six cases with
 no prerequisite skips, supported Engine and verified owner cleanup. See
 docs/LIBRARY_ADD_MEDIA_ROLLOUT_OUTCOME.md; do not substitute more local repetitions.
+
+The explicit `validate:linux-canonical-media` lane now requires Linux/Node 24,
+an existing immutable image, reviewed local API/daemon identity before PostgreSQL,
+one cumulative six-case summary with no skips, and six exact current media/
+cleanup records. Drain native events after malformed evidence and preserve
+Error/null; never force-exit a fixture. Use file entrypoints: Node run execArgv
+appends inherited eval flags, so an empty option does not clear them. For Desktop
+replay, mount the acknowledged owned volume's daemon path at the identical Linux
+path; retain failed/uncertain volumes. The manual workflow remains selected.
+See docs/LINUX_CANONICAL_MEDIA_OUTCOME.md for successful full Linux replay and
+the separate unexecuted hosted-Ubuntu/shared PostgreSQL stop-failure boundaries.

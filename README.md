@@ -4,6 +4,13 @@ Harmoniarr is a self-hosted, Docker-hosted music library manager inspired by Lid
 
 The repository contains the Node.js ESM server, Vue client, PostgreSQL schema, automated validation, and design documents. The platform is under active development toward its first release.
 
+An explicit Linux canonical media lane now requires all six cases, zero skips,
+27 current inspections and verified media-owner cleanup. A manual-only Ubuntu
+workflow keeps it selected. See its
+[design](docs/LINUX_CANONICAL_MEDIA_DESIGN.md),
+[research](docs/LINUX_CANONICAL_MEDIA_RESEARCH_2026_10.md) and
+[outcome](docs/LINUX_CANONICAL_MEDIA_OUTCOME.md) for the native replay and limits.
+
 The reversed complete media cohort passed in both modes. Its API option remains
 explicit while Linux canonical coverage is pending. Media tools and option
 policy now load independently of SQL fixtures. See the rollout

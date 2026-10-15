@@ -1,0 +1,16 @@
+*
+!package.json
+!package-lock.json
+!.npmrc
+!src/
+!src/server/
+!src/server/**
+!src/shared/
+!src/shared/**
+!testing/
+!testing/**
+!test/
+!test/integration/
+!test/integration/missing-music-add-to-library.test.js
+!scripts/
+!scripts/validate-linux-canonical-media.js

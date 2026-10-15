@@ -1,5 +1,14 @@
 # Project standards-to-evidence map
 
+Linux canonical lane: linux-canonical-media-{policy,preflight,lane}.js owns strict
+selection, bounded native summary/media evidence, read-only daemon/image checks
+and actual event/environment lifetime. The CLI rejects filters and eval entry;
+the manual Ubuntu workflow checks capabilities before building. Native Desktop
+Linux replay uses the same acknowledged daemon/runner volume path and proves
+six current canonical cases, zero skips and three media-owner removals. Separate
+documents retain early failures, original Error/null/held-stream controls and
+the unexecuted hosted-CI/shared PostgreSQL stop-failure boundary.
+
 Media rollout: library-add-media-{tools,options}.js separates Node-only execution/
 path helpers and pure choice policy from SQL seeding. Legacy fixture/adapter
 exports remain compatible. The native fresh-process resolution guard refuses
