@@ -6,6 +6,14 @@ This repository includes a shared `.agents/` directory for GitHub Copilot agent 
 
 The goal is to keep reusable AI workflow guidance versioned alongside the project so UI review, frontend implementation, browser testing, and related tasks follow the same repo conventions.
 
+The [post-start setup guard outcome](POSTGRES_STARTUP_GUARD_OUTCOME.md) extends
+the standards/testing method: begin release ownership immediately after resource
+acknowledgement, including metadata/coercion before runtime publication. Test
+Error/null through synchronous and asynchronous cleanup fallout. A held real
+stop must keep startup pending; close independent observers before verifying
+exact owner retirement. Failed acquisition grants no authority over an unknown
+resource, and borrowed-server ownership remains separate.
+
 The [shared runtime lifetime outcome](POSTGRES_RUNTIME_LIFETIME_OUTCOME.md)
 extends the existing standards/testing method: register actual delegate promises
 before scheduling, seal admission synchronously, and drain all outcomes before

@@ -6,6 +6,20 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Owned PostgreSQL post-start setup guard (2026-10-15)
+
+- Extended the existing ESM owner across metadata extraction and port coercion;
+  startup failure awaits one bounded stop without replacing original Error/null.
+  Synchronous observation failures cannot replace that primary result either.
+- Native host/coercion faults prove pending startup, a live query during held
+  stop, physical retirement and no template/scenario dispatch. Existing native
+  lifetime/stop contracts and focused app/workspace ownership remain intact.
+- Separate [design](POSTGRES_STARTUP_GUARD_DESIGN.md),
+  [official research/options](POSTGRES_STARTUP_GUARD_RESEARCH_2026_10.md) and
+  [outcome](POSTGRES_STARTUP_GUARD_OUTCOME.md) record evidence and limits.
+- Next: evaluate in-flight startup cancellation checkpoints, owned release and
+  original Error/null before runtime publication, without abandoning actual work.
+
 ## Completed slice: Shared PostgreSQL admission and drainage (2026-10-15)
 
 - Reused the existing lifetime module for synchronous shared admission sealing
@@ -17,9 +31,8 @@ Database model source: `docs/DATABASE_MODEL.md`
 - Separate [design](POSTGRES_RUNTIME_LIFETIME_DESIGN.md),
   [official research/options](POSTGRES_RUNTIME_LIFETIME_RESEARCH_2026_10.md) and
   [outcome](POSTGRES_RUNTIME_LIFETIME_OUTCOME.md) record evidence and limits.
-- Next: review the owned post-start metadata/setup guard. Getter failure before
-  the current release try/catch can bypass bounded server cleanup. Preserve
-  original failures and exact ownership; do not add retries or wider disposal.
+- The post-start metadata/setup guard follow-up is completed above, preserving
+  original failures, exact ownership and existing disposal bounds.
 
 ## Completed slice: Strict shared temporary-database release (2026-10-15)
 

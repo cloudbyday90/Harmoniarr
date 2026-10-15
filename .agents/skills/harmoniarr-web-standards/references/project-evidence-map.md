@@ -764,5 +764,12 @@ testing/postgres-integration-runtime.js. The postgres-runtime-lifetime.test.js
 files under test/server/ and test/integration/ cover immediate admission/close,
 full returned tails, mixed Error/null and successful siblings, late refusal and
 server retirement after drainage. See docs/POSTGRES_RUNTIME_LIFETIME_OUTCOME.md
-for native checkout-context proof, independent workspace limits and the separate
-post-start metadata/setup ownership follow-up.
+for native checkout-context proof and independent workspace limits. The next
+entry completes its separate post-start metadata/setup follow-up.
+
+Shared post-start setup ownership belongs to the guarded metadata/evidence/schema
+block in testing/postgres-integration-runtime.js. The postgres-runtime-startup.test.js
+files under test/server/ and test/integration/ cover getter/coercion failures,
+held real stop, primary Error/null, synchronous fallout and exact retirement.
+See docs/POSTGRES_STARTUP_GUARD_OUTCOME.md. In-flight cancellation is distinct
+from this failure guard; the parent-server owner keeps its separate policy.

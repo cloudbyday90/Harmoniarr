@@ -959,3 +959,11 @@ outcome without cancelling inputs; await full PostgreSQL delegate tails before
 the existing bounded Testcontainers stop. Preserve separate scenario/cleanup
 failures, borrowed ownership and W3C/OWASP minimized evidence. A lifecycle barrier
 does not establish quiescence for hidden detached work or self-awaiting cleanup.
+
+October 15 post-start ownership guidance uses
+docs/POSTGRES_STARTUP_GUARD_RESEARCH_2026_10.md. Testcontainers metadata access
+follows acknowledged start, so place it under the existing cleanup owner. Await
+bounded stop and catch synchronous as well as asynchronous fallout, preserving
+the original ECMAScript thrown value including null. W3C/OWASP minimized evidence
+does not require raw connection metadata. A failed start or borrowed connection
+does not grant authority over unacknowledged or unrelated containers.

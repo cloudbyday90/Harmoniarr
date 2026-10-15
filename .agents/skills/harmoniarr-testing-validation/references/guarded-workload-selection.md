@@ -174,3 +174,12 @@ queries and target drops must precede the final held tail and verified owner
 retirement; retain checkout attribution across queued admission. Do not treat
 runner timeout or cancellation as completion. See
 docs/POSTGRES_RUNTIME_LIFETIME_OUTCOME.md for proof and post-start setup limits.
+
+Owned startup must guard metadata/coercion immediately after acknowledgement.
+Use held stop and Error/null controls, including synchronous observer fallout,
+and refuse cleanup authority after unreturned acquisition or borrowed-server
+failure. Native proof needs a live query during the held stop, observer close and
+exact retirement before the original setup failure returns. Keep adapter fault
+injection separate from actual transport incidents and cancellation checkpoints.
+See docs/POSTGRES_STARTUP_GUARD_OUTCOME.md; no new disposal service or retry is
+needed for this guard boundary.

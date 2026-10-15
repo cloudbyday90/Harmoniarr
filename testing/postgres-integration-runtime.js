@@ -134,24 +134,26 @@ export async function createPostgresIntegrationRuntime({
   }
 
   const container = await phaseObserver.measure('container_start', () => createPostgresContainer(config, { startupLogging }).start());
-  const containerEnv = {
-    PGDATABASE: container.getDatabase(),
-    PGHOST: container.getHost(),
-    PGMAINTENANCE_DB: 'postgres',
-    PGPASSWORD: container.getPassword(),
-    PGPORT: String(container.getPort()),
-    PGUSER: container.getUsername(),
-  };
-
   const closeServer = () => phaseObserver.measure('container_stop', () => container.stop({ timeout: config.containerStopTimeoutMs }));
   try {
+    const containerEnv = {
+      PGDATABASE: container.getDatabase(),
+      PGHOST: container.getHost(),
+      PGMAINTENANCE_DB: 'postgres',
+      PGPASSWORD: container.getPassword(),
+      PGPORT: String(container.getPort()),
+      PGUSER: container.getUsername(),
+    };
     return await createDatabaseRuntime({ config, env: containerEnv, source: 'testcontainer_postgres', phaseObserver,
       schemaMode, signal, closeServer, createPreparedPostgresTemplateFn, withTemporaryPostgresDatabaseFn,
       checkoutMode, checkoutRecord, startupLogging,
       failureEvidence: failureEvidenceFactory({ mode: evidenceMode,
         source: 'testcontainer_postgres', fresh, startupLogging, containerId: container.getId?.(),
         connectionConfig: buildPostgresAdminConnectionConfig(containerEnv) }) });
-  } catch (error) { await closeServer().catch(() => {}); throw error; }
+  } catch (error) {
+    try { await closeServer(); } catch { /* Preserve the original setup failure through synchronous or asynchronous stop errors. */ }
+    throw error;
+  }
 }
 
 export async function withPostgresIntegrationRuntime({

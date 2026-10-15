@@ -85,3 +85,7 @@ comment, merge or other external message occurred.
 
 See [design](POSTGRES_RUNTIME_LIFETIME_DESIGN.md) and
 [official research, options and pros/cons](POSTGRES_RUNTIME_LIFETIME_RESEARCH_2026_10.md).
+
+The subsequent [post-start guard outcome](POSTGRES_STARTUP_GUARD_OUTCOME.md)
+completes that metadata/setup ownership follow-up. In-flight startup cancellation
+is a separate next review; this lifetime slice's historical evidence is unchanged.
