@@ -14,6 +14,14 @@ inherited database authority and retain strict prerequisites. Publish completion
 after owning steps return and progress sinks drain; cancellation during the final
 sink still refuses success. Default adoption requires separate evidence.
 
+The [capability preflight design](INTEGRATION_PREFLIGHT_DESIGN.md) adds a bounded
+image/tool gate before database admission. Select fixed version commands, verify
+acknowledged container identity/configuration before execution and retirement,
+and await cleanup even after cancellation. Preserve Error/null and refuse
+unknown ownership. Image metadata alone does not establish binary capability;
+the reviewed PostgreSQL reference policy remains separate from content identity.
+Keep --plan Docker-free and complete-command evidence distinct from selected runs.
+
 The [shared recovery cohort design](RECOVERY_SHARED_COHORT_DESIGN.md) extends
 the existing method from per-suite templates to reviewed parent admission.
 Inventory every source/clone creation and actual returned worker/service tail;

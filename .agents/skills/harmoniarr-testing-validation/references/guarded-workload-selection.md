@@ -283,3 +283,16 @@ Startup-server controls need the reviewed PostgreSQL 18 Alpine reference, with
 an inspected digest-qualified reference for immutable use. Bare opaque IDs stay
 unsupported by the current logging capability policy. Verify resolved ID/OS and
 keep real version-four association assertions; do not relax the capability guard.
+
+The complete coordinator now calls integration-test-preflight.js before database
+admission. integration-preflight-policy.js permits only five version commands;
+integration-tool-probe.js owns acknowledged create/inspect/attached start/verified
+stop/remove. Never replace remote retirement with CLI timeout or --rm assumptions.
+Probes have no host/socket bind or network, use non-root/read-only/cap-drop and
+cover PostgreSQL's declared volume with a bounded tmpfs. Refuse unexpected image
+volumes. Keep work cancellation separate from cleanup; recheck cancellation after
+final removal and preserve first Error/null. Pin PostgreSQL through its reviewed
+reference and actual local digest/ID match, not an opaque-ID capability grant.
+See docs/INTEGRATION_PREFLIGHT_OUTCOME.md for native negative/cancel/positive and
+fresh complete-command evidence. Version probes do not certify later functional
+socket/media/database behavior, image publisher trust or reserved host capacity.

@@ -9,12 +9,18 @@ Use `npm run test:integration:coordinated -- --plan` to inspect its exact file
 plan. It runs the audited seven-file PostgreSQL cohort once, then every other
 file in serial isolation, requiring native evidence with no skips. Supply the
 existing media/Linux reader image prerequisites for their native tests; the
-reader requires both Node 24 and the Docker CLI. Startup diagnostics use the
-reviewed PostgreSQL 18 Alpine reference, optionally pinned with its digest. The
+reader requires both Node 24 and the Docker CLI. The coordinator now verifies
+five fixed tool versions in constrained temporary containers before PostgreSQL;
+media and reader inputs must be local immutable image IDs. Startup diagnostics use the
+reviewed PostgreSQL 18 Alpine reference; preflight verifies its local digest
+reference before execution. A digest-qualified input is supported too. The
 default serial command remains unchanged. See the
 [design](docs/INTEGRATION_COORDINATOR_DESIGN.md),
 [official research and tradeoffs](docs/INTEGRATION_COORDINATOR_RESEARCH_2026_10.md)
 and [outcome](docs/INTEGRATION_COORDINATOR_OUTCOME.md).
+See the separate [capability preflight design](docs/INTEGRATION_PREFLIGHT_DESIGN.md)
+and [validation outcome](docs/INTEGRATION_PREFLIGHT_OUTCOME.md) for image pinning,
+owned retirement and complete-invocation evidence.
 
 The opt-in shared PostgreSQL cohort now includes all three Music Queue recovery
 files, retaining native file processes, private templates/databases and actual

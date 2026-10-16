@@ -171,6 +171,11 @@ speedup or authorize default promotion; record that decision separately.
 
 ## Next work
 
+The follow-up is implemented separately in
+[capability preflight design](INTEGRATION_PREFLIGHT_DESIGN.md); its
+[outcome](INTEGRATION_PREFLIGHT_OUTCOME.md) owns the later complete-invocation
+evidence. The failures and composite scope above remain this collection's record.
+
 First add capability preflight before PostgreSQL/native scenario admission:
 verify the configured immutable images and required Node, Docker CLI, ffmpeg and
 ffprobe tools through acknowledged test owners with bounded commands and strict

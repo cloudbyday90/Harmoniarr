@@ -1032,3 +1032,12 @@ canonical path checks and pinned shell-free argument arrays establish the local
 selection boundary; OWASP argument-injection guidance still requires validation.
 Reuse actual child close and output drainage. W3C draft monotonic durations are
 local observations, not evidence of complete coverage or reserved host capacity.
+
+October 15 capability-preflight guidance uses
+docs/INTEGRATION_PREFLIGHT_RESEARCH_2026_10.md. Docker create acknowledges an
+unstarted owner; validate its current command/configuration before start and
+retirement. Separate immutable image identity from executed binary capability
+and reviewed PostgreSQL source policy. OWASP validation applies to argument
+injection even without a shell. Avoid daemon/socket authority for version-only
+probes. CLI close/timeout is not proof that the remote container has stopped;
+await current-owner stopped/exec checks and removal before database admission.

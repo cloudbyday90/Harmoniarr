@@ -30,7 +30,8 @@ try {
       }
       await write(process.stdout, `[integration-coordinator] ${JSON.stringify({ version: report.version,
         complete: report.complete, failed: report.failed, files: report.files, completed: report.completed,
-        counts: report.counts, durationMs: report.durationMs, ownership: report.ownership })}`);
+        counts: report.counts, durationMs: report.durationMs, ownership: report.ownership,
+        prerequisites: report.prerequisites })}`);
     } });
   }
 } catch (error) {

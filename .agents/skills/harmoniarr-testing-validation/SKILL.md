@@ -392,6 +392,11 @@ and inspect `-- --plan` first. The complete canonical file inventory must be
 covered exactly once: one reviewed shared cohort, then sorted isolated files.
 Require native root evidence with zero skips and shared release before completed
 publication; clear inherited database/parent credentials and cross-run reuse.
+The coordinator's preflight requires immutable local media/reader IDs, inspected
+Linux identities, five fixed tool versions and the reviewed PostgreSQL 18 Alpine
+reference (resolved to a verified digest). Await acknowledged probe retirement
+before database work; --plan performs no Docker work. See
+docs/INTEGRATION_PREFLIGHT_OUTCOME.md for full-command and refusal evidence.
 See references/guarded-workload-selection.md for ownership and failure limits.
 
 Client utility or composable:

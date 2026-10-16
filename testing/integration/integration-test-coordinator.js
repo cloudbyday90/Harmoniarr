@@ -10,15 +10,17 @@ import { resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { createIntegrationTestPlan, discoverIntegrationTestFiles, integrationCoordinatorRefusal } from './integration-test-plan.js';
 import { createIntegrationTestEnvironment } from './integration-test-environment.js';
+import { preflightIntegrationTests } from './integration-test-preflight.js';
 import { runIntegrationTestFile } from './integration-test-file.js';
 import { runSharedPostgresTests } from './postgres-test-launcher.js';
 import { cohortCountNames, validateCohortFileEvidence } from './postgres-cohort-evidence.js';
 
 export async function runIntegrationTests({ cwd = process.cwd(), env = process.env, signal,
   stdout = process.stdout, stderr = process.stderr, onUpdate = async () => {},
-  discoverFiles = discoverIntegrationTestFiles, runShared = runSharedPostgresTests, runFile = runIntegrationTestFile } = {}) {
+  discoverFiles = discoverIntegrationTestFiles, preflight = preflightIntegrationTests,
+  runShared = runSharedPostgresTests, runFile = runIntegrationTestFile } = {}) {
   if (signal?.aborted) throw signal.reason;
-  const environment = createIntegrationTestEnvironment(env); const root = await realpath(cwd);
+  let environment = createIntegrationTestEnvironment(env); const root = await realpath(cwd);
   const files = await discoverFiles({ cwd: root }); const plan = createIntegrationTestPlan(files);
   const started = performance.now(); const completed = new Set();
   const report = { version: 1, complete: false, failed: false, files: files.length, completed: 0,
@@ -36,6 +38,8 @@ export async function runIntegrationTests({ cwd = process.cwd(), env = process.e
   }
   try {
     if (signal?.aborted) throw signal.reason;
+    const prerequisites = await preflight({ env: environment, signal });
+    environment = createIntegrationTestEnvironment(prerequisites.env); report.prerequisites = prerequisites.evidence;
     await publish([]);
     for (const step of plan) {
       if (signal?.aborted) throw signal.reason;

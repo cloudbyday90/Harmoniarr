@@ -6,6 +6,31 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Complete integration capability preflight (2026-10-15)
+
+- Added separate ESM capability policy, owned version-probe and preflight services.
+  The coordinated command validates local Linux identities, pins the reviewed
+  PostgreSQL reference and executes five bounded version commands before any
+  PostgreSQL server or test-file admission. --plan stays Docker-free.
+- Version owners use acknowledged complete IDs and verified current security/
+  command configuration, no host/socket binds, no network, non-root/read-only
+  execution and no image pull. Cancellation drains actual work and retirement;
+  original Error/null survives secondary cleanup failure.
+- Native bad-reader, correct-reader and cancellation controls prove fail-fast
+  behavior and zero remaining acknowledged probe owners. One actual full CLI
+  invocation passes all 127 files/561 cases, zero skips, with all 131 shared
+  registrations released and none reaped. Source fingerprints and all 127 case
+  signatures match. All 10,439 fast cases, static checks and both builds pass.
+  Complete final-code evidence is recorded in the separate
+  [outcome](INTEGRATION_PREFLIGHT_OUTCOME.md), with
+  [design/tradeoffs](INTEGRATION_PREFLIGHT_DESIGN.md) and
+  [official research](INTEGRATION_PREFLIGHT_RESEARCH_2026_10.md).
+- Next: move the full Wanted root timing matrix (94.801 seconds for six cases
+  in this invocation) to
+  an explicit benchmark command while retaining bounded safety/equivalence
+  coverage in routine integration. Default coordinator adoption remains a
+  separate scheduling/performance decision.
+
 ## Delivered slice: Opt-in complete integration coordinator (2026-10-15)
 
 - Added a thin CLI and four ESM planning/environment/evidence/coordinator modules.
@@ -20,13 +45,14 @@ Database model source: `docs/DATABASE_MODEL.md`
   discography fixture passing an autocommit pool as a transaction and an opaque
   PostgreSQL ID lacking reviewed startup capability. Corrected prerequisites and
   removed only the invalid seed argument; all production guards/assertions remain.
-- Full coordinator CLI success is not yet proved. No accepted selected results
-  are replayed as a green full invocation. Separate
+- This original collection did not prove full coordinator CLI success; the
+  capability-preflight follow-up above now does. No accepted selected results
+  were replayed as a green full invocation. Separate
   [design](INTEGRATION_COORDINATOR_DESIGN.md),
   [official research/options](INTEGRATION_COORDINATOR_RESEARCH_2026_10.md) and
   [outcome](INTEGRATION_COORDINATOR_OUTCOME.md) retain exact source/scope evidence.
-- Next: add owned image/tool/reference capability preflight before expensive
-  native admission, then a fresh complete CLI proof before default adoption.
+- The owned image/tool/reference preflight and fresh complete CLI proof are
+  delivered above. Default adoption remains a separate decision.
   Following that, move the six-profile/four-pair Wanted timing matrix (142.187 s
   here) to an explicit benchmark lane while retaining bounded safety/equivalence
   checks in routine integration. No silent omission or asserted CI saving.

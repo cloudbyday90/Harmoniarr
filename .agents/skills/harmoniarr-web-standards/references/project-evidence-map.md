@@ -842,3 +842,11 @@ focused tests cover canonical inventory, redirected directories, environment
 canaries, held cleanup/progress, final-sink cancellation and native skip refusal.
 See docs/INTEGRATION_COORDINATOR_OUTCOME.md for actual full-command evidence and
 limits; no default promotion or new browser accessibility claim follows.
+
+Integration capability admission is owned by integration-test-preflight.js with
+integration-preflight-policy.js and integration-tool-probe.js. Container-free
+controls cover version/ref/image policy, held command/retirement, ownership drift,
+first Error/null, final-removal cancellation and no database admission after
+refusal. Native controls exercise the actual bad/correct readers and cancellation
+after acknowledged creation. See docs/INTEGRATION_PREFLIGHT_OUTCOME.md for exact
+scope and complete-CLI evidence; these checks do not grant W3C certification.

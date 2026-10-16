@@ -27,6 +27,7 @@ function fixture() {
   const calls = []; const updates = [];
   const options = { env: { PATH: process.env.PATH, PGPASSWORD: 'external-private-canary', NODE_OPTIONS: '--private-canary' },
     stdout: sink(), stderr: sink(), discoverFiles: async () => files,
+    preflight: async ({ env }) => ({ env, evidence: { controlled: true } }),
     onUpdate: async report => { updates.push(report); }, runFile: async input => { calls.push(input); return result(); },
     runShared: async ({ resolveFiles, runFile, env, ...rest }) => {
       for (const file of await resolveFiles()) await runFile({ ...rest, file, env: { ...env, PGPASSWORD: 'parent-private-canary' } });
@@ -136,6 +137,37 @@ test('incomplete discovery refuses before any owner allocation', async () => {
   f.options.runShared = () => assert.fail('Invalid discovery allocated a server');
   await assert.rejects(runIntegrationTests(f.options), { code: 'fixture_integration_coverage_refused' });
   assert.deepEqual(f.calls, []); assert.deepEqual(f.updates, []);
+});
+
+for (const primary of [new Error('Controlled prerequisite failure'), null]) {
+  test(`preflight ${primary === null ? 'null' : 'Error'} refuses all PostgreSQL/file admission`, async () => {
+    const f = fixture(); f.options.preflight = async () => { throw primary; };
+    f.options.runShared = () => assert.fail('Prerequisite failure admitted PostgreSQL');
+    await assert.rejects(runIntegrationTests(f.options), error => error === primary);
+    assert.deepEqual(f.calls, []); assert.equal(f.updates.at(-1).failed, true); assert.equal(f.updates.at(-1).completed, 0);
+  });
+}
+
+test('resolved prerequisite settings reach every child without inherited database authority', async () => {
+  const f = fixture(); const image = 'postgres:18-alpine@sha256:' + 'd'.repeat(64);
+  f.options.preflight = async ({ env }) => ({ env: { ...env, HARMONIARR_INTEGRATION_POSTGRES_IMAGE: image,
+    PGPASSWORD: 'preflight-private-canary' }, evidence: { controlled: true } });
+  const report = await runIntegrationTests(f.options);
+  assert.equal(f.calls.every(input => input.env.HARMONIARR_INTEGRATION_POSTGRES_IMAGE === image), true);
+  assert.equal(f.calls.slice(7).every(input => !Object.hasOwn(input.env, 'PGPASSWORD')), true);
+  assert.equal(JSON.stringify(report).includes('private-canary'), false);
+});
+
+test('held preflight and cancellation prevent database admission until actual return', async t => {
+  const f = fixture(); const entered = createFixtureGate(); const hold = createFixtureGate(); const controller = new AbortController();
+  f.options.preflight = async ({ env }) => { entered.release(); await hold.promise; return { env, evidence: {} }; };
+  f.options.runShared = () => assert.fail('Cancelled preflight admitted PostgreSQL');
+  const pending = runIntegrationTests({ ...f.options, signal: controller.signal }); pending.catch(() => {});
+  try {
+    await waitForFixtureReady({ ready: entered.promise, operation: pending, signal: t.signal });
+    assert.deepEqual(f.calls, []); assert.deepEqual(f.updates, []); controller.abort(null); hold.release();
+    await assert.rejects(pending, error => error === null); assert.deepEqual(f.calls, []);
+  } finally { hold.release(); await pending.catch(() => {}); }
 });
 
 test('real native process evidence records all cases and refuses prerequisite skips', async () => {
