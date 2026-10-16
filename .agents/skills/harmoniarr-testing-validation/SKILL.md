@@ -387,6 +387,13 @@ the retained failed candidate and matched-order measurement limitations.
 
 ## Validation Matrix
 
+For complete opt-in orchestration, use `npm run test:integration:coordinated`
+and inspect `-- --plan` first. The complete canonical file inventory must be
+covered exactly once: one reviewed shared cohort, then sorted isolated files.
+Require native root evidence with zero skips and shared release before completed
+publication; clear inherited database/parent credentials and cross-run reuse.
+See references/guarded-workload-selection.md for ownership and failure limits.
+
 Client utility or composable:
 
 - Focused: `node --test test/client/<matching>.test.js`

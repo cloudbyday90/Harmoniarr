@@ -257,3 +257,29 @@ signatures/work counts and all shared registrations released without reaping in
 both profile/file orders. Existing adverse parent and held-worker controls still
 own refusal/drain proof. See docs/RECOVERY_SHARED_COHORT_OUTCOME.md; this opt-in
 selection does not change default complete-gate scheduling or certify hosted CI.
+
+Complete integration orchestration uses integration-test-plan/environment/file/
+coordinator.js under testing/integration and the thin run-integration-tests.js
+CLI. Keep the same full glob, independently verify every canonical file and
+refuse missing cohort members, duplicates, escaped aliases and arbitrary CLI
+selection flags. One reviewed shared step precedes sorted isolated files; this
+grouping changes global file order. Reuse actual process/tree/parent owners and
+native reporter evidence, refusing skips even after exit zero. Publish shared
+completion only after full owner return and strict registration/release checks.
+Await progress before later admission and check cancellation after the final
+sink too. Preserve original Error/null and incomplete coverage after failure;
+no retry or forced exit grants success. See docs/INTEGRATION_COORDINATOR_OUTCOME.md
+for executed scope; opt-in complete coverage alone does not promote defaults or
+establish a matched whole-gate performance saving.
+Before a long native collection, verify required binaries as well as image
+identity/OS. The socket reader needs Node 24 and Docker CLI; a generic Node image
+is insufficient. Preserve failed complete-command evidence and distinguish
+selected diagnostic/remainder coverage from a passing or resumed full CLI run.
+Guarded metadata fixture writes must not pass an autocommit pool as a borrowed
+transaction. Omit queryable to use the existing store-owned transaction, or pass
+an actual active client. Preserve production LOCK/authority and all functional
+assertions; freeze fixture repairs separately and reuse only unaffected evidence.
+Startup-server controls need the reviewed PostgreSQL 18 Alpine reference, with
+an inspected digest-qualified reference for immutable use. Bare opaque IDs stay
+unsupported by the current logging capability policy. Verify resolved ID/OS and
+keep real version-four association assertions; do not relax the capability guard.

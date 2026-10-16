@@ -1025,3 +1025,10 @@ Docker's resource constraints distinguish consumption ceilings from capacity:
 CPU shares do not reserve CPU. Disposable test containers isolate test state,
 while host contention remains a separate operational concern. Avoid attributing
 a startup stall to load or changing resource bounds inside a matched comparison.
+
+October 15 complete-coordinator guidance uses
+docs/INTEGRATION_COORDINATOR_RESEARCH_2026_10.md. Built-in Node filesystem glob,
+canonical path checks and pinned shell-free argument arrays establish the local
+selection boundary; OWASP argument-injection guidance still requires validation.
+Reuse actual child close and output drainage. W3C draft monotonic durations are
+local observations, not evidence of complete coverage or reserved host capacity.

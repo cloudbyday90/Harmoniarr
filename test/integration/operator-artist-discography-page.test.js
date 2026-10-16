@@ -52,7 +52,7 @@ test('operator display pages preserve full effective state while restricting hyd
         metadataReleaseGroupId: offPageId, selectionSource: 'manual', selectionState: 'selected' });
       for (const groupId of [firstId, offPageId]) await overrides.upsertOperatorTrackOverride({
         appUserId: actor, metadataArtistId: artistId, metadataReleaseGroupId: groupId,
-        trackMbid: randomUUID(), isDesired: actor === actorB, remapStatus: actor === actorA ? 'review_needed' : 'resolved', queryable: pool,
+        trackMbid: randomUUID(), isDesired: actor === actorB, remapStatus: actor === actorA ? 'review_needed' : 'resolved',
       });
     }
     const readService = createMetadataReadService({ pool, metadataReleaseDetectionService: {

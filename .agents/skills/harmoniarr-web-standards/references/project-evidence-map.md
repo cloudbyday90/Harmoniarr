@@ -832,3 +832,13 @@ launcher and execution/discovery template controls own adverse identity/process/
 worker boundaries; the full CLI compares all seven files in both orders. See
 docs/RECOVERY_SHARED_COHORT_OUTCOME.md for measured scope and default-scheduling
 limits; no new registry, persistent server or parallelism is introduced.
+
+Complete integration planning and environment isolation belong to
+testing/integration/integration-test-plan.js and integration-test-environment.js.
+integration-test-file.js reuses native process/reporter owners; the coordinator
+checks exact order/coverage and shared release before completed publication.
+run-integration-tests.js accepts only a complete run or read-only --plan. Its
+focused tests cover canonical inventory, redirected directories, environment
+canaries, held cleanup/progress, final-sink cancellation and native skip refusal.
+See docs/INTEGRATION_COORDINATOR_OUTCOME.md for actual full-command evidence and
+limits; no default promotion or new browser accessibility claim follows.

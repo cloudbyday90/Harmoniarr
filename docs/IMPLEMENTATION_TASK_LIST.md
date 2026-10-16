@@ -6,6 +6,31 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Delivered slice: Opt-in complete integration coordinator (2026-10-15)
+
+- Added a thin CLI and four ESM planning/environment/evidence/coordinator modules.
+  The exact plan covers 127 files: one reviewed seven-file shared step, then 120
+  isolated serial files. Reused process/tree/parent/reporting owners; default
+  scheduling, assertions, pools and deadlines remain unchanged.
+- All 10,407 fast cases, both builds, static checks and 66 focused checks pass.
+  Successful native coverage spans all 127 unique files/561 cases across recorded
+  scopes, without duplicate/omitted files or skipped accepted coverage. The shared
+  step releases all 131 registrations without reaping.
+- Retained failed scopes for a Node-only reader lacking Docker CLI, an existing
+  discography fixture passing an autocommit pool as a transaction and an opaque
+  PostgreSQL ID lacking reviewed startup capability. Corrected prerequisites and
+  removed only the invalid seed argument; all production guards/assertions remain.
+- Full coordinator CLI success is not yet proved. No accepted selected results
+  are replayed as a green full invocation. Separate
+  [design](INTEGRATION_COORDINATOR_DESIGN.md),
+  [official research/options](INTEGRATION_COORDINATOR_RESEARCH_2026_10.md) and
+  [outcome](INTEGRATION_COORDINATOR_OUTCOME.md) retain exact source/scope evidence.
+- Next: add owned image/tool/reference capability preflight before expensive
+  native admission, then a fresh complete CLI proof before default adoption.
+  Following that, move the six-profile/four-pair Wanted timing matrix (142.187 s
+  here) to an explicit benchmark lane while retaining bounded safety/equivalence
+  checks in routine integration. No silent omission or asserted CI saving.
+
 ## Completed slice: Recovery admission to shared PostgreSQL cohort (2026-10-15)
 
 - Audited execution/discovery source/clone registration and actual worker/child
@@ -24,11 +49,9 @@ Database model source: `docs/DATABASE_MODEL.md`
 - Separate [design](RECOVERY_SHARED_COHORT_DESIGN.md),
   [official research/options](RECOVERY_SHARED_COHORT_RESEARCH_2026_10.md) and
   [outcome](RECOVERY_SHARED_COHORT_OUTCOME.md) document evidence and limits.
-- Next: create an opt-in complete integration coordinator that runs the audited
-  cohort once and every remaining native file in unchanged serial isolation.
-  Prove no omitted/duplicate files and complete failure/cancellation drainage
-  before considering a default change. Test containers already isolate data;
-  dedicated runner capacity is separate from unexplained startup diagnostics.
+- Its opt-in complete coordinator is delivered above with separate validation
+  scope and a retained default-adoption prerequisite. Dedicated runner capacity
+  remains separate from unexplained startup diagnostics.
 
 ## Completed slice: Recovery discovery schema timing and templates (2026-10-15)
 

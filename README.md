@@ -4,6 +4,18 @@ Harmoniarr is a self-hosted, Docker-hosted music library manager inspired by Lid
 
 The repository contains the Node.js ESM server, Vue client, PostgreSQL schema, automated validation, and design documents. The platform is under active development toward its first release.
 
+`npm run test:integration:coordinated` is the opt-in complete integration runner.
+Use `npm run test:integration:coordinated -- --plan` to inspect its exact file
+plan. It runs the audited seven-file PostgreSQL cohort once, then every other
+file in serial isolation, requiring native evidence with no skips. Supply the
+existing media/Linux reader image prerequisites for their native tests; the
+reader requires both Node 24 and the Docker CLI. Startup diagnostics use the
+reviewed PostgreSQL 18 Alpine reference, optionally pinned with its digest. The
+default serial command remains unchanged. See the
+[design](docs/INTEGRATION_COORDINATOR_DESIGN.md),
+[official research and tradeoffs](docs/INTEGRATION_COORDINATOR_RESEARCH_2026_10.md)
+and [outcome](docs/INTEGRATION_COORDINATOR_OUTCOME.md).
+
 The opt-in shared PostgreSQL cohort now includes all three Music Queue recovery
 files, retaining native file processes, private templates/databases and actual
 worker drainage. See the [design](docs/RECOVERY_SHARED_COHORT_DESIGN.md),

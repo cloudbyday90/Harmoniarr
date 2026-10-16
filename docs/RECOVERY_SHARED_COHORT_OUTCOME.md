@@ -126,17 +126,15 @@ Recommended stack: reviewed allowlist → one fresh parent → private file proc
 reserved/committed OID → fresh template/clone/pool → actual worker completion →
 strict release → child close/output drain → worker absence → parent reconciliation.
 
-Next: create an opt-in complete integration coordinator around the existing
-owners. The current default command is a direct serial Node glob, so there is
-no existing coordinator to switch. Discover the complete selected file set,
-route exactly the audited seven files through one freshly owned parent and
-leave every other native file isolated and serial. Prove no duplicate/omitted
-files, selection order, failure/cancellation drainage and explicit environment
-boundaries before running the complete integration gate or considering a
-default change. Keep the original cold-start failure as a separate diagnostic
-follow-up; a successful collection does not establish its cause. Existing test
-containers already provide private test state. A dedicated runner/host remains
-the stronger capacity option if contention repeatedly blocks validation.
+The subsequent opt-in complete coordinator implementation and its full-command
+evidence are recorded in the separate
+[coordinator outcome](INTEGRATION_COORDINATOR_OUTCOME.md). It reuses these owners,
+discovers the complete file set and retains isolated serial execution for every
+other native file. Default adoption remains a separate decision. Keep the
+original cold-start failure as a diagnostic follow-up; successful later
+collections do not establish its cause. Existing test containers already provide
+private test state. A dedicated runner/host remains the stronger capacity option
+if contention repeatedly blocks validation.
 
 See [design](RECOVERY_SHARED_COHORT_DESIGN.md) and
 [official research/options](RECOVERY_SHARED_COHORT_RESEARCH_2026_10.md).

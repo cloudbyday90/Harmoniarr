@@ -6,6 +6,14 @@ This repository includes a shared `.agents/` directory for GitHub Copilot agent 
 
 The goal is to keep reusable AI workflow guidance versioned alongside the project so UI review, frontend implementation, browser testing, and related tasks follow the same repo conventions.
 
+The [complete integration coordinator design](INTEGRATION_COORDINATOR_DESIGN.md)
+turns reviewed cohort admission into an explicit complete-file plan. Verify
+discovery against an independent inventory, canonical containment and exact-once
+coverage before native admission. Reuse process/parent/evidence owners; sanitize
+inherited database authority and retain strict prerequisites. Publish completion
+after owning steps return and progress sinks drain; cancellation during the final
+sink still refuses success. Default adoption requires separate evidence.
+
 The [shared recovery cohort design](RECOVERY_SHARED_COHORT_DESIGN.md) extends
 the existing method from per-suite templates to reviewed parent admission.
 Inventory every source/clone creation and actual returned worker/service tail;
