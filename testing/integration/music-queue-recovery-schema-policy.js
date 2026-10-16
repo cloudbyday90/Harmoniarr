@@ -20,3 +20,6 @@ export function resolveMusicQueueRecoverySchemaMode({ env = process.env, default
 export function resolveMusicQueueRecoveryExecutionSchemaMode({ env = process.env, defaultMode = 'migration_template' } = {}) {
   return resolveMode(env, 'HARMONIARR_INTEGRATION_RECOVERY_EXECUTION_SCHEMA_MODE', defaultMode);
 }
+export function resolveMusicQueueRecoveryDiscoverySchemaMode({ env = process.env, defaultMode = 'migration_template' } = {}) {
+  return resolveMode(env, 'HARMONIARR_INTEGRATION_RECOVERY_DISCOVERY_SCHEMA_MODE', defaultMode);
+}

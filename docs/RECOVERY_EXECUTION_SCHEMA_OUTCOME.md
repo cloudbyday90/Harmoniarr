@@ -128,6 +128,12 @@ service context plus an actual discovery worker. Preserve its clock/rediscovery
 policy and provider/preparation/ingestion/lease boundaries before evaluating a
 separate template or shared-parent adoption. Execution's proof grants neither.
 
+The discovery instrumentation/template follow-up is now completed in
+[its separate outcome](RECOVERY_DISCOVERY_SCHEMA_OUTCOME.md), preserving its
+custom clock and original assertions. The historical execution measurements
+above retain their own scope/source identities; shared-parent admission is still
+a separate follow-up.
+
 Private evidence remains ignored under `.tmp/recovery-execution-2026-10-15/`.
 
 See [design](RECOVERY_EXECUTION_SCHEMA_DESIGN.md) and

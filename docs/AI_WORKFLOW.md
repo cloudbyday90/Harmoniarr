@@ -6,6 +6,13 @@ This repository includes a shared `.agents/` directory for GitHub Copilot agent 
 
 The goal is to keep reusable AI workflow guidance versioned alongside the project so UI review, frontend implementation, browser testing, and related tasks follow the same repo conventions.
 
+The [recovery discovery design](RECOVERY_DISCOVERY_SCHEMA_DESIGN.md) extends the
+same method to custom contexts and post-release work. Preserve domain clocks and
+saved deadline controls while using monotonic spans for measurement. Extract the
+existing setup/worker once, gate preparation/provider/ingestion/release/pruning,
+and prove actual completion plus clean next-clone state. Keep scoped mode choices,
+candidate timing and final-default validation separate from shared-parent rollout.
+
 The [recovery execution design](RECOVERY_EXECUTION_SCHEMA_DESIGN.md) extends the
 same standards/testing method to real workers: audit existing returned-completion
 ownership before introducing a new lifecycle. Gate provider and lease-release

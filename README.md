@@ -4,6 +4,14 @@ Harmoniarr is a self-hosted, Docker-hosted music library manager inspired by Lid
 
 The repository contains the Node.js ESM server, Vue client, PostgreSQL schema, automated validation, and design documents. The platform is under active development toward its first release.
 
+Music Queue recovery discovery now measures all fourteen schema/scenario calls
+and selects its own migration-template default, preserving its custom clock and
+actual ingestion/release/pruning lifetime. See the
+[design](docs/RECOVERY_DISCOVERY_SCHEMA_DESIGN.md),
+[official research and tradeoffs](docs/RECOVERY_DISCOVERY_SCHEMA_RESEARCH_2026_10.md)
+and [outcome](docs/RECOVERY_DISCOVERY_SCHEMA_OUTCOME.md) for isolated-state proof,
+both-order local comparisons and the explicit empty-schema comparator.
+
 Music Queue recovery execution now times all seven schema/scenario callbacks and
 uses a separate migration-template policy with actual worker completion retained.
 See its [design](docs/RECOVERY_EXECUTION_SCHEMA_DESIGN.md),

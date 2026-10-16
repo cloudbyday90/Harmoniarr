@@ -6,79 +6,32 @@
  */
 
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
 import { after, before, suite, test } from 'node:test';
-import { applyPendingMigrations } from '../../src/server/migrations.js';
 import { createMusicQueueRecoveryService } from '../../src/server/import-candidates/music-queue-recovery-service.js';
 import { MUSIC_QUEUE_RECOVERY_DISCOVERY_SOURCE } from '../../src/server/import-candidates/music-queue-recovery-policy.js';
-import { createLibraryMusicQueueRecoveryDiscoveryService } from '../../src/server/library/library-music-queue-recovery-discovery-service.js';
-import { createLibraryDiscoveryDispatchService } from '../../src/server/library/library-discovery-dispatch-service.js';
-import { createLibraryDiscoveryRequestStore } from '../../src/server/library/library-discovery-request-store.js';
 import { createLibraryDiscoveryRequestService } from '../../src/server/library/library-discovery-request-service.js';
-import { createMusicQueueRecoveryFixtureContext, seedMusicQueueRecoveryFixture, recoverMusicQueueFixture }
+import { seedMusicQueueRecoveryFixture, recoverMusicQueueFixture }
   from '../../testing/integration/music-queue-recovery-fixtures.js';
 import { createPostgresIntegrationRuntime } from '../../testing/postgres-integration-runtime.js';
-import { withFixtureLifecycle } from '../../testing/integration/fixture-lifecycle.js';
-import { startLibraryDiscoveryFixtureWorker } from '../../testing/integration/library-discovery-worker-fixture.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 import { isSkippableIntegrationRuntimeError, toIntegrationRuntimeUnavailableReason } from '../../testing/integration/runtime-availability.js';
+
+import { withMusicQueueRecoveryScenario } from '../../testing/integration/music-queue-recovery-scenario.js';
+import { resolveMusicQueueRecoveryDiscoverySchemaMode } from '../../testing/integration/music-queue-recovery-schema-policy.js';
+import { createMusicQueueRecoveryDiscoveryFixtureContext, runMusicQueueRecoveryDiscoveryWorker as runWorker }
+  from '../../testing/integration/music-queue-recovery-discovery-fixtures.js';
 
 const config = resolveIntegrationTestRuntimeConfig();
 let runtime; let unavailableReason;
 async function scenario(t, run) {
   if (unavailableReason) { t.skip(unavailableReason); return; }
-  await runtime.runIsolatedDatabase(async ({ getPoolFn }) => {
-    await applyPendingMigrations({ getPoolFn });
-    const context = createMusicQueueRecoveryFixtureContext({ getPoolFn });
-    context.service = createMusicQueueRecoveryService({ store: context.store, withTransaction: context.withTransaction,
-      assertMaintenanceWriteAllowed: context.assertMaintenanceWriteAllowed, createExecutionRun: context.executionRuns.createOperationRun,
-      createDiscoveryRun: context.discoveryRuns.createOperationRun, rediscoveryDelayMs: 0, getNow: () => new Date(Date.now() - 50) });
-    context.requestStore = createLibraryDiscoveryRequestStore({ getPoolFn, withTransaction: context.withTransaction, recoveryStore: context.store });
-    context.scoped = createLibraryMusicQueueRecoveryDiscoveryService({ store: context.store, withTransaction: context.withTransaction,
-      assertMaintenanceWriteAllowed: context.assertMaintenanceWriteAllowed });
-    context.fixtureSignal = t.signal;
-    await run(context);
-  });
+  return withMusicQueueRecoveryScenario(runtime, t, run, { createContext: createMusicQueueRecoveryDiscoveryFixtureContext });
 }
 async function queued(context, options = {}) {
   const fixture = await seedMusicQueueRecoveryFixture(context, options);
   const result = await recoverMusicQueueFixture(context, fixture);
   assert.equal(result.reason, 'rediscovery_scheduled', JSON.stringify(result));
   return { ...fixture, runId: result.rediscovery.discoveryRunId };
-}
-async function runWorker(context, fixture, { prepare = async () => null, provider = async () => ({ id: randomUUID() }),
-  signal = context.fixtureSignal } = {}) {
-  return withFixtureLifecycle({ signal }, async (scope) => {
-  const searches = []; const ingestions = []; const globalCalls = [];
-  const dispatch = createLibraryDiscoveryDispatchService({ loadSettingsFn: async () => ({ library: { discoveryBatchSize: 5 } }),
-    libraryDiscoveryRequestStore: context.requestStore, musicQueueRecoveryDiscoveryService: context.scoped,
-    getReleaseTracklistExpectationsFn: prepare,
-    slskdService: { startSearch: async (input) => { searches.push(input); return provider(input); } },
-    importCandidateService: { ingestSlskdSearchResponses: async (input) => { ingestions.push(input); return { candidateCount: 0, fileCount: 0 }; } },
-  });
-  let terminalOutcome;
-  const runs = context.discoveryRuns;
-  const callbacks = { acquireLease: runs.acquireLease,
-    releaseLease: runs.releaseLease,
-    isCancellationRequested: runs.isCancellationRequested, markRunStarted: runs.markRunStarted,
-    markRunCompleted: async (input) => { const result = await runs.markRunCompleted(input);
-      if (result !== false) terminalOutcome = { state: 'completed', summary: input.summary }; return result; },
-    markRunFailed: async (input) => { const result = await runs.markRunFailed(input);
-      if (result !== false) terminalOutcome = { state: 'failed', error: input.errorMessage }; return result; },
-    markRunCancelled: async (input) => { const result = await runs.markRunCancelled(input);
-      if (result !== false) terminalOutcome = { state: 'cancelled' }; return result; },
-    markRunPaused: async (input) => { const result = await runs.markRunPaused(input);
-      if (result !== false) terminalOutcome = { state: 'paused' }; return result; },
-    dispatchDiscoveryRequests: dispatch.dispatchReadyDiscoveryRequests,
-    reconcileWantedReleases: async () => globalCalls.push('wanted'), reconcileDiscoveryRequests: async () => globalCalls.push('discovery'),
-    prefetchMonitoredArtistArtwork: async () => globalCalls.push('artwork'),
-  };
-  const worker = await startLibraryDiscoveryFixtureWorker({ callbacks, signal: scope.signal, track: scope.track,
-    run: { runId: fixture.runId, triggerSource: MUSIC_QUEUE_RECOVERY_DISCOVERY_SOURCE } });
-  await worker.done;
-  assert.deepEqual(globalCalls, []);
-  return { outcome: terminalOutcome, searches, ingestions, dispatch };
-  });
 }
 async function reconcile(context) {
   const service = createLibraryDiscoveryRequestService({ getPoolFn: context.getPoolFn, libraryDiscoveryRequestStore: context.requestStore,
@@ -92,7 +45,8 @@ const requestState = (context, fixture) => context.requestStore.getDownloadRecov
 
 suite('Guarded delayed Music Queue discovery with PostgreSQL and controlled provider adapters', () => {
   before(async () => {
-    try { runtime = await createPostgresIntegrationRuntime({ config }); }
+    const schemaMode = resolveMusicQueueRecoveryDiscoverySchemaMode();
+    try { runtime = await createPostgresIntegrationRuntime({ config, schemaMode }); }
     catch (error) { if (!isSkippableIntegrationRuntimeError(error)) throw error; unavailableReason = toIntegrationRuntimeUnavailableReason(error); }
   }, { timeout: config.suiteSetupTimeoutMs });
   after(async () => { await runtime?.cleanup(); }, { timeout: config.suiteTeardownTimeoutMs });

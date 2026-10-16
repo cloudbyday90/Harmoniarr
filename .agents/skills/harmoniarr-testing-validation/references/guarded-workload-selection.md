@@ -235,3 +235,14 @@ migration acceptance and the shared-parent allowlist separate. Report native
 control, explicit-mode comparison and final-default scopes independently; source
 drift or incomplete release invalidates a saving. See
 docs/RECOVERY_EXECUTION_SCHEMA_OUTCOME.md.
+
+Recovery discovery uses the same adapter with an extracted custom context and
+worker fixture. Keep its moving wall clock/delay, future-deadline control and
+global-work exclusions intact; monotonic instrumentation must not replace domain
+time. Hold preparation/provider/returned ingestion/release/pruning separately,
+including a live database after terminal status and released lease. Drain actual
+pruning after Error/null cancellation before disposal, then prove next-clone
+reservation/lease isolation and fresh dispatch. Compare all nine cases/fourteen
+scenarios on frozen code and validate any promoted default separately. Existing
+template identity/refusal controls still apply; this grants no shared-parent
+admission or live-provider completion. See docs/RECOVERY_DISCOVERY_SCHEMA_OUTCOME.md.

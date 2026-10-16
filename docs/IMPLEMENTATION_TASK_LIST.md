@@ -6,6 +6,26 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Recovery discovery schema timing and templates (2026-10-15)
+
+- Extracted the custom context/controlled worker into a small ESM fixture module,
+  reusing the scenario adapter and independent mode policy. All nine original
+  case bodies, fourteen scenarios, domain clocks and deadline controls remain.
+- Native preparation/provider/ingestion/release/pruning gates prove actual
+  completion beyond terminal status/released lease, exact Error/null cancellation
+  and fresh next-clone reservation/lease state.
+- Both-order comparisons pass with local savings of 55.14% and 50.20%, supporting
+  the scoped template default with an explicit empty comparator. See separate
+  [design](RECOVERY_DISCOVERY_SCHEMA_DESIGN.md),
+  [official research/options](RECOVERY_DISCOVERY_SCHEMA_RESEARCH_2026_10.md) and
+  [outcome](RECOVERY_DISCOVERY_SCHEMA_OUTCOME.md) for final validation scope.
+- Final validation passes 10,369 fast cases and 74 native executions across
+  controls, paired comparisons and all three recovery defaults, with zero skips.
+  Both builds/static checks pass; production dependency audit reports no known
+  vulnerabilities. The shared-parent allowlist remains unchanged.
+- Next: audit execution/discovery parent registration and actual child/worker
+  drainage before a full seven-file shared PostgreSQL cohort comparison.
+
 ## Completed slice: Recovery execution schema timing and templates (2026-10-15)
 
 - Reused the recovery ESM scenario adapter with the actual fixture signal and an
@@ -22,8 +42,8 @@ Database model source: `docs/DATABASE_MODEL.md`
 - Final validation passes 10,367 fast cases and 57 native executions across
   controls, paired comparisons and the final default/transaction selection,
   with zero skips. Both builds/static checks pass; production audit is clean.
-- Next: audit/instrument recovery discovery's direct migration setup and custom
-  service/clock/worker owners before evaluating another scoped adoption.
+- Its discovery instrumentation/custom-clock/worker-lifetime follow-up is now
+  completed above with a separate scoped policy and measured/default evidence.
 
 ## Completed slice: Recovery schema timing and scoped templates (2026-10-15)
 

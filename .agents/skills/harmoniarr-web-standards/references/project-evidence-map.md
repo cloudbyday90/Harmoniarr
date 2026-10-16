@@ -812,3 +812,13 @@ awaited reconciliation has no additional detached owner. See
 docs/RECOVERY_EXECUTION_SCHEMA_OUTCOME.md; unchanged case bodies, mode comparison
 and final-default validation do not authorize shared-parent allowlist expansion
 or prove live-provider download completion.
+
+Recovery discovery's custom context and controlled worker belong to
+testing/integration/music-queue-recovery-discovery-fixtures.js, reusing the shared
+recovery scenario adapter and an independent schema policy. The native
+music-queue-recovery-discovery-template.test.js gates preparation/provider/
+ingestion/release/pruning, proving live database retention through post-release
+cancellation and subsequent fresh reservation/lease state. Original discovery
+cases retain future-deadline, consent/provenance, uncertainty, supersession and
+reconciliation guards. See docs/RECOVERY_DISCOVERY_SCHEMA_OUTCOME.md for separate
+candidate/final evidence; default promotion grants no shared-parent admission.

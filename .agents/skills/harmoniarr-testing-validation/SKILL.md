@@ -361,8 +361,8 @@ cleanup targets. See `docs/POSTGRES_TEST_LAUNCHER_DESIGN.md` and its outcome for
 measured scope and process/platform limits.
 
 The initial Wanted/recovery adoption retained Wanted's private template and
-recovery's empty migration path. Current scoped transaction/execution template
-policies and their separate evidence are in references/guarded-workload-selection.md.
+recovery's empty migration path. Current scoped transaction/execution/discovery
+template policies and separate evidence are in references/guarded-workload-selection.md.
 Register the scan fixture's actual completion before launch;
 lease-release observation is earlier. Drain competing returned recovery work
 through first Error/null. Close parent admission before failure diagnostics,

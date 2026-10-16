@@ -1004,3 +1004,12 @@ provider/release ordering at parent-visible checkpoints, including a live
 database after terminal status and released lease. PostgreSQL cloning and W3C
 monotonic timing do not grant drainage authority; keep those separate from
 the scoped template choice and OWASP-minimized published evidence.
+
+October 15 recovery discovery guidance uses
+docs/RECOVERY_DISCOVERY_SCHEMA_RESEARCH_2026_10.md. Keep domain wall-clock/delay
+semantics distinct from monotonic performance spans. Node's actual returned work
+must include ingestion and post-release pruning; reporting, terminal status and
+lease release are earlier boundaries. Prove held stages at the parent and retain
+Error/null cancellation until actual drain before reusing database resources.
+PostgreSQL's source/clone constraints and informative OWASP exclusions apply
+independently; this project fixture policy is not W3C certification.
