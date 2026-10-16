@@ -1,5 +1,16 @@
 # Guarded workload selection and failure evidence
 
+Queued checkout attribution now uses owned-pg-queue-observer.js and a reviewed
+pg/pg-pool version guard. Map the actual PendingItem before promotion; releasing
+work's async context cannot supply ownership. Distinguish queued, creating,
+acquire-entry and delivered offsets, and retain unobserved cold milestones for
+reuse. Native controls must prove queued new promise/callback clients, query
+reuse and a connecting client's failure promoting another stalled cold client.
+Keep held queue timeout and both app entrypoints. Unsupported/custom methods,
+ambiguous queues and finished items must not borrow another owner. See
+docs/POSTGRES_QUEUED_CHECKOUT_OUTCOME.md; selected healthy controls cannot diagnose
+the original HTTP unknown-phase or startup/authentication failure.
+
 Root scaling uses --root-lookups in the existing CLI: sine/noise, 1/8/24
 historical candidate histories (2/16/48 receipts), four counterbalanced pairs,
 48 samples. --profiles or --pairs 1|2 yields selected coverage. Verify media/

@@ -1,5 +1,15 @@
 # Project standards-to-evidence map
 
+Queued acquisition: testing/integration/owned-pg-queue-observer.js maps native
+PendingItems through creation/acquire entry; pg-observer-driver.js reviews exact
+installed driver versions and native methods. pg-acquisition-record.js emits
+only approved stages/offsets/kinds in version-three fixture checkout records.
+Native fixture-pool-checkout tests hold both clients, promote queued cold promise
+and callback work, reuse through query, and fail an original connecting client
+to observe the next cold startup. Unit controls cover unknown/finished/ambiguous
+owners and descriptor restoration. Keep startup/authentication and HTTP phase
+limits in docs/POSTGRES_QUEUED_CHECKOUT_OUTCOME.md; no production policy changed.
+
 Wanted root lanes share wanted-root-profile-{comparison,scenario,authority}.js
 and wanted-root-lookup-benchmark.js. One canonical routine case owns actual
 paired-reader/current-authority proof; --root-lookups owns all six scaling

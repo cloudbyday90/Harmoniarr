@@ -49,7 +49,11 @@ See docs/WANTED_DISTINCT_BINDING_PROFILE_OUTCOME.md for evidence and limitations
 Cold connection validation needs the original driver client, privately compared
 acknowledged target and pre-pool-ready startup milestones. Prove a real startup
 hold, matched successful promise/query-callback clients, method/listener restore
-and Error/null preservation. Queued/reused clients remain unassociated; separate
+and Error/null preservation. Queued cold clients require the exact PendingItem
+mapping in owned-pg-queue-observer.js, not release-time async context. Version-three
+checkout records distinguish queued/create/acquire-entry/delivery; reuse gets no
+invented cold milestones. Unknown mappings remain unassociated. See
+docs/POSTGRES_QUEUED_CHECKOUT_OUTCOME.md for native controls and scope. Separate
 TLS stream creation from handshake completion and backend readiness. Internal
 adapters must refuse unreviewed driver versions. Historical healthy probes do
 not diagnose failures captured before this instrumentation. See

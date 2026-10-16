@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 16 [queued-checkout rebuild outcome](LOCAL_DOCKER_QUEUED_CHECKOUT_OUTCOME.md)
+records a fresh-builder no-cache build, healthy preserved-state startup,
+existing-admin bootstrap and readiness-only provider validation. Provider health
+remains attention; readiness does not establish a new accepted transfer.
+
 This walkthrough gives you one disposable local Docker path for exploring the current app without hand-editing a host `.env` file or using the first-run bootstrap form manually.
 
 The October 2026 [no-cache rebuild design](LOCAL_DOCKER_REBUILD_2026_10_DESIGN.md),

@@ -1,5 +1,13 @@
 # Official practices by boundary
 
+October 16 queued-checkout guidance uses
+docs/POSTGRES_QUEUED_CHECKOUT_RESEARCH_2026_10.md. The public Pool API documents
+next-tick idle handoff and FIFO waiting; neither counters nor the releasing async
+context identifies a pending caller. Use exact reviewed pending-item ownership,
+bounded OWASP-minimized records and W3C draft-inspired monotonic offsets. Driver
+internal entry, callback delivery and PostgreSQL readiness are different stages.
+Keep unsupported/malformed mappings unknown and historic failures separate.
+
 October 16 root-lane guidance uses docs/WANTED_ROOT_TEST_LANES_RESEARCH_2026_10.md.
 Node selection/timeouts do not prove I/O drainage. Preserve PostgreSQL rollback
 and resource owners, fixed CLI options and private equality/work proof before

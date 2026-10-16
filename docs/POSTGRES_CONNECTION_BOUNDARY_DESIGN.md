@@ -1,5 +1,9 @@
 # PostgreSQL cold connection boundary design
 
+The later [queued-checkout design](POSTGRES_QUEUED_CHECKOUT_DESIGN.md) extends
+this original synchronous-only association through reviewed PendingItem identity.
+The original evidence and limitations below describe the earlier implementation.
+
 Date: 2026-10-13. Scope: owned integration fixture diagnostics. No production
 pool, schema, timeout, capacity, retry, release or scheduling changes.
 

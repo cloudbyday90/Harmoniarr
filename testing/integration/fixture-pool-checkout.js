@@ -9,6 +9,7 @@ import { performance } from 'node:perf_hooks';
 import { capturePoolCheckoutSnapshot, readCheckoutProperty } from './pool-checkout-record.js';
 import { buildFixtureCheckoutRecord } from './fixture-checkout-record.js';
 import { observeOwnedPgConnections } from './owned-pg-connection-observer.js';
+import { observeOwnedPgQueue } from './owned-pg-queue-observer.js';
 
 export const fixtureCheckoutMarker = '[fixture-pool-checkout] ';
 
@@ -25,6 +26,7 @@ export function observeFixturePoolCheckouts({ pool, poolKind, source, phaseObser
   if (typeof pool?.connect !== 'function') throw new TypeError('Fixture checkout requires an owned pool');
   const descriptor = Object.getOwnPropertyDescriptor(pool, 'connect');
   const original = pool.connect;
+  const queue = observeOwnedPgQueue({ pool, now, runUnobserved: run => connections.unobserved(run) });
   const connections = observeOwnedPgConnections({ pool, expectedConfig, now, startupLogging });
   const captures = new Set(); let ordinaryRecords = 0; let failureRecords = 0;
   function clock() { try { const n = now(); return Number.isFinite(n) ? n : null; } catch { return null; } }
@@ -39,6 +41,7 @@ export function observeFixturePoolCheckouts({ pool, poolKind, source, phaseObser
   }
   function begin() {
     const connection = connections.begin();
+    const acquisition = queue.begin(connection);
     const checkoutId = randomUUID(); const started = clock(); const before = capturePoolCheckoutSnapshot(pool);
     const correlationId = readCheckoutProperty(phaseObserver, 'correlationId');
     let phase;
@@ -47,16 +50,16 @@ export function observeFixturePoolCheckouts({ pool, poolKind, source, phaseObser
     function emit(outcome, error) {
       const ended = outcome === 'started' ? null : clock();
       publish(buildFixtureCheckoutRecord({ checkoutId, poolKind, source, phase,
-        correlationId, before, requested, connection: connection.snapshot(),
+        correlationId, before, requested, connection: connection.snapshot(), acquisition: acquisition.snapshot(),
         settled: outcome === 'started' ? null : capturePoolCheckoutSnapshot(pool), outcome, error,
         durationMs: started !== null && ended !== null ? ended - started : null }));
     }
     if (mode === 'all') emit('started');
-    return { dispatch: run => connection.dispatch(run),
+    return { dispatch: run => acquisition.dispatch(run),
       requested: () => { requested ??= capturePoolCheckoutSnapshot(pool); },
-      passed: () => { if (mode === 'all') emit('passed'); connection.finish(); },
+      passed: () => { acquisition.delivered(); if (mode === 'all') emit('passed'); acquisition.finish(); connection.finish(); },
       failed: error => { emit('failed', error); const context = connection.captureStartupContext();
-        connection.finish(); return capture(error, checkoutId, context); } };
+        acquisition.finish(); connection.finish(); return capture(error, checkoutId, context); } };
   }
   function connect(...args) {
     if (this !== pool) return Reflect.apply(original, this, args);
@@ -87,10 +90,14 @@ export function observeFixturePoolCheckouts({ pool, poolKind, source, phaseObser
     async restore() {
       // Capture may admit another capture while draining; do not leave it behind.
       while (captures.size) await Promise.allSettled([...captures]);
-      connections.restore();
-      if (pool.connect !== connect) throw new Error('Fixture checkout observer ownership changed');
-      if (descriptor) Object.defineProperty(pool, 'connect', descriptor);
-      else delete pool.connect;
+      let failed = false; let failure;
+      for (const restore of [() => queue.restore(), () => connections.restore(), () => {
+        if (pool.connect !== connect) throw new Error('Fixture checkout observer ownership changed');
+        if (descriptor) Object.defineProperty(pool, 'connect', descriptor); else delete pool.connect;
+      }]) {
+        try { restore(); } catch (error) { if (!failed) { failed = true; failure = error; } }
+      }
+      if (failed) throw failure;
     },
   };
 }

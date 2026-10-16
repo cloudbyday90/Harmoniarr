@@ -5,23 +5,16 @@
  * See LICENSE for details.
  */
 import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 import { types } from 'node:util';
 import pg from 'pg';
 import PgConnection from 'pg/lib/connection.js';
-import pgPackage from 'pg/package.json' with { type: 'json' };
+import { supportsPgObserverDriver } from './pg-observer-driver.js';
 import { buildPgConnectionRecord, capturePgTargetIdentity, comparePgTargetIdentity } from './pg-connection-record.js';
 import { capturePgStartupContext } from './pg-startup-log-policy.js';
 
 // These are internal driver surfaces, not the public pool.connect event. Refuse
 // instrumentation after an unreviewed driver upgrade; ordinary checkout remains.
-function supportedDriver() {
-  try {
-    const metadata = JSON.parse(readFileSync(new URL('../package.json', import.meta.resolve('pg-pool')), 'utf8'));
-    return pgPackage.version === '8.23.0' && metadata.version === '3.14.0';
-  } catch { return false; }
-}
-const supported = supportedDriver();
+const supported = supportsPgObserverDriver();
 
 export function observeOwnedPgConnections({ pool, expectedConfig, now, startupLogging = false }) {
   const expected = capturePgTargetIdentity(expectedConfig);
@@ -35,8 +28,8 @@ export function observeOwnedPgConnections({ pool, expectedConfig, now, startupLo
   const Client = available ? new Proxy(original, {
     construct(target, args, newTarget) {
       const client = Reflect.construct(target, args, newTarget);
-      // A queued checkout can create a client later in another release's context.
-      // Never attribute that client to the releasing or another waiting checkout.
+      // The owned queue adapter re-enters only the exact PendingItem's owner.
+      // Standalone callers retain synchronous construction-only observation.
       try { dispatchOwner?.attach(client); } catch { /* Diagnostics cannot break driver construction. */ }
       return client;
     },
@@ -44,6 +37,10 @@ export function observeOwnedPgConnections({ pool, expectedConfig, now, startupLo
   if (available) Object.defineProperty(pool, 'Client', { ...descriptor, value: Client });
 
   return {
+    unobserved(run) {
+      const previous = dispatchOwner; dispatchOwner = null;
+      try { return run(); } finally { dispatchOwner = previous; }
+    },
     begin() {
       const start = clock(); const data = { observation: initial }; const listeners = [];
       let finished = false; let restoreStartup = null; let startupContext = null;

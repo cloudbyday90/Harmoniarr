@@ -1,5 +1,12 @@
 # AI Workflow And Shared Copilot Skills
 
+The [queued-checkout design](POSTGRES_QUEUED_CHECKOUT_DESIGN.md) makes waiter
+ownership explicit at the reviewed driver boundary. Treat ambient async phase,
+queue promotion, client startup and caller delivery as distinct evidence. The
+maintained testing and web-standards skills route to native adverse controls,
+bounded records, version review and the retained failed collections. Improve
+those focused skills instead of adding a duplicate general standards checklist.
+
 The [Wanted root lane design](WANTED_ROOT_TEST_LANES_DESIGN.md) separates routine
 current-authority/equal-work proof from explicit scaling repetition. Share actual
 scenario/comparator/guard owners, preserve all full matrix samples, and prove

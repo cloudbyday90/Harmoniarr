@@ -6,6 +6,26 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Delivered slice: Explicit queued checkout ownership (2026-10-16)
+
+- Add owned, version-reviewed PendingItem mapping through client creation and
+  acquire entry. Version-three records distinguish queue/create/acquire/delivery
+  and leave reused cold histories unobserved. Preserve original driver APIs,
+  privacy, Error/null, descriptor ownership and current resource bounds.
+- All 10,461 fast cases, both builds and seven selected native files/31 cases
+  pass. Retain the first candidate's later readiness-probe failure and the prior
+  failed broad collections; this is no complete 127-file gate claim.
+- Maintain the existing testing and standards skills with actual ownership,
+  native adverse controls and unknown-evidence limits. See the
+  [design and tradeoffs](POSTGRES_QUEUED_CHECKOUT_DESIGN.md),
+  [official research](POSTGRES_QUEUED_CHECKOUT_RESEARCH_2026_10.md) and
+  [outcome](POSTGRES_QUEUED_CHECKOUT_OUTCOME.md).
+- The requested [no-cache walkthrough rebuild](LOCAL_DOCKER_QUEUED_CHECKOUT_OUTCOME.md)
+  passes with preserved data/admin, verified confinement and readiness-only proof;
+  provider health remains attention. No release or PR merge was created.
+- Next: separate original startup write completion from server receipt/authentication,
+  then address HTTP request-phase attribution before scheduling/capacity changes.
+
 ## Delivered slice: Wanted root correctness and explicit scaling lanes (2026-10-16)
 
 - Retain one routine native case with paired projection/query/hash work and all

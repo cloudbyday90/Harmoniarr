@@ -106,8 +106,10 @@ does not validate other consumers of the same policy.
 For a cold checkout, observe the original owned client's target match and startup
 milestones; a healthy replacement connection cannot locate its stall. Review
 internal driver surfaces against installed versions, preserve lazy creation and
-both acquisition APIs, and leave queued/reused clients unassociated without a
-proved mapping. TLS stream creation, completed handshake and backend readiness
+both acquisition APIs, and bind queued creation only through the reviewed exact
+PendingItem mapping. Unknown mappings and reused cold histories stay unassociated.
+Queue admission, acquire entry and caller delivery are distinct from PostgreSQL
+startup. TLS stream creation, completed handshake and backend readiness
 are separate evidence. Follow the connection-boundary entry in the evidence map.
 
 For performance diagnostics, follow the receipt-verification entry in the
