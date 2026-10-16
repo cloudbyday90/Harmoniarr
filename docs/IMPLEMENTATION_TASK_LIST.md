@@ -6,6 +6,30 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Completed slice: Recovery admission to shared PostgreSQL cohort (2026-10-15)
+
+- Audited execution/discovery source/clone registration and actual worker/child
+  drainage, then appended only those canonical files to the opt-in allowlist.
+  Comparison cardinality now follows the reviewed cohort; all seven native
+  files remain byte-identical, with unchanged pool/deadline/schema bounds.
+- Four complete profiles pass 240 cases with matching signatures/work. Each
+  shared profile releases all 131 registrations without reaping. Local elapsed
+  savings are 28.96% forward and 22.36% reverse; defaults remain unchanged.
+- Retained the first failed collection (9/11 unchanged Wanted cases, zero
+  completed samples) separately from an eleven-case diagnostic and the later
+  successful collection. Original startup failure remains unexplained.
+- All 10,372 fast cases, both builds, 80 focused cases, nine native adverse
+  controls and the production dependency audit pass. Existing standards/testing
+  skills are maintained; GitHub MCP found no open PR to implement or rebase.
+- Separate [design](RECOVERY_SHARED_COHORT_DESIGN.md),
+  [official research/options](RECOVERY_SHARED_COHORT_RESEARCH_2026_10.md) and
+  [outcome](RECOVERY_SHARED_COHORT_OUTCOME.md) document evidence and limits.
+- Next: create an opt-in complete integration coordinator that runs the audited
+  cohort once and every remaining native file in unchanged serial isolation.
+  Prove no omitted/duplicate files and complete failure/cancellation drainage
+  before considering a default change. Test containers already isolate data;
+  dedicated runner capacity is separate from unexplained startup diagnostics.
+
 ## Completed slice: Recovery discovery schema timing and templates (2026-10-15)
 
 - Extracted the custom context/controlled worker into a small ESM fixture module,
@@ -23,8 +47,8 @@ Database model source: `docs/DATABASE_MODEL.md`
   controls, paired comparisons and all three recovery defaults, with zero skips.
   Both builds/static checks pass; production dependency audit reports no known
   vulnerabilities. The shared-parent allowlist remains unchanged.
-- Next: audit execution/discovery parent registration and actual child/worker
-  drainage before a full seven-file shared PostgreSQL cohort comparison.
+- Its shared-parent admission and full seven-file comparison follow-up is
+  completed above, with default complete-gate scheduling unchanged.
 
 ## Completed slice: Recovery execution schema timing and templates (2026-10-15)
 

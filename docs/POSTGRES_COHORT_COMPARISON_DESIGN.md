@@ -2,6 +2,11 @@
 
 Date: 2026-10-15. Scope: the existing five-file opt-in cohort, not default CI.
 
+This captures the original five-file experiment. The current seven-file
+admission/comparison is documented in the separate
+[recovery shared-cohort design](RECOVERY_SHARED_COHORT_DESIGN.md) and
+[outcome](RECOVERY_SHARED_COHORT_OUTCOME.md); retain this experiment's own scope.
+
 ## Decision
 
 Add an explicit measurement command around runPostgresTestFile and

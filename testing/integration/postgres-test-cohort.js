@@ -14,6 +14,8 @@ export const sharedPostgresTestCohort = Object.freeze([
   'test/integration/library-release-reconciliation.test.js',
   'test/integration/library-tag-snapshot.test.js',
   'test/integration/music-queue-recovery-transaction.test.js',
+  'test/integration/music-queue-recovery-execution.test.js',
+  'test/integration/music-queue-recovery-discovery.test.js',
 ]);
 
 export async function resolvePostgresTestCohort({ args = [], cwd = process.cwd() } = {}) {

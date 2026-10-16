@@ -349,7 +349,8 @@ strict refusal, not absence. Avoid repeating a passing cohort after promotion
 when the final complete gate already exercises its changed default.
 
 `npm run test:integration:shared-postgres` is an opt-in serial Wanted/catalogue/
-release-reconciliation/tag-snapshot/Music Queue recovery transaction cohort. It owns one fresh server, preserving
+release-reconciliation/tag-snapshot/Music Queue recovery transaction/execution/
+discovery cohort. It owns one fresh server, preserving
 isolated file processes, databases
 and pools. The default complete gate is unchanged. Do not expand its allowlist
 until every fixture-created database has the parent reserve/CREATE/OID commit

@@ -95,7 +95,8 @@ test('pre-aborted launcher starts nothing and worker probes treat only ESRCH as 
 });
 test('public cohort refuses arbitrary or duplicate file selection before allocating server resources', async () => {
   for (const args of [['test/integration/parent-postgres-launcher.test.js'],
-    ['test/integration/music-queue-recovery-execution.test.js'],
+    ['test/integration/music-queue-recovery-execution-template.test.js'],
+    ['test/integration/music-queue-recovery-discovery-template.test.js'],
     [sharedPostgresTestCohort[0], sharedPostgresTestCohort[0]], ['--test-force-exit']]) {
     const f = fixture();
     await assert.rejects(runSharedPostgresTests({ ...f.input, resolveFiles: resolvePostgresTestCohort, args }), TypeError);
@@ -112,5 +113,13 @@ test('public selection admits the audited recovery suite and preserves requested
   assert.equal(files.length, 2);
   assert.match(files[0], /library-wanted-release-reconciliation\.test\.js$/u);
   assert.match(files[1], /music-queue-recovery-transaction\.test\.js$/u);
-  assert.equal(sharedPostgresTestCohort.at(-1), args[1]);
+  assert.equal(sharedPostgresTestCohort[4], args[1]);
+});
+
+test('default seven-file cohort admits audited execution/discovery and preserves explicit reverse selection order', async () => {
+  const args = ['test/integration/music-queue-recovery-discovery.test.js', 'test/integration/music-queue-recovery-execution.test.js'];
+  const all = await resolvePostgresTestCohort(); const selected = await resolvePostgresTestCohort({ args });
+  assert.equal(all.length, 7); assert.equal(sharedPostgresTestCohort.length, 7);
+  assert.deepEqual(sharedPostgresTestCohort.slice(-2), args.toReversed());
+  for (const [index, path] of args.entries()) assert.equal(selected[index], all[path.includes('discovery.') ? 6 : 5]);
 });

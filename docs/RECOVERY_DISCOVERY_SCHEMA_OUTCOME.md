@@ -129,13 +129,13 @@ Recommended stack: scoped mode → verified migration-only source → fresh clon
 pool → idempotent schema check → unchanged context/domain clock → actual dispatch/
 ingestion/release/pruning completion → unchanged assertions → strict awaited release.
 
-Next: audit execution/discovery parent registration and child drainage before
-admitting them to the existing shared PostgreSQL cohort. Both canonical suites
-use the common runtime, but the current allowlist still contains only the prior
-five files. Require current reserve/CREATE/OID commit/release, actual child close,
-no outstanding workers, exact case/work signatures and zero reaping; then compare
-the proposed full seven-file cohort in both orders. Do not infer admission or a
-global scheduling change from the scoped template results.
+The subsequent execution/discovery parent-registration and child-drain audit,
+seven-file allowlist admission and full both-order comparison are recorded in
+the separate [shared cohort outcome](RECOVERY_SHARED_COHORT_OUTCOME.md).
+That work retains current reserve/CREATE/OID commit/release, actual child close,
+registered worker-absence, exact case/work signatures and zero-reaping checks.
+This earlier scoped template collection alone grants no admission or global
+scheduling change.
 
 Private evidence remains ignored under `.tmp/recovery-discovery-2026-10-15/`.
 

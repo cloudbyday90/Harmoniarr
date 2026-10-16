@@ -12,6 +12,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { comparePostgresCohort } from '../../testing/integration/postgres-cohort-comparison.js';
 import { createPostgresCohortEnvironment } from '../../testing/integration/postgres-cohort-policy.js';
+import { sharedPostgresTestCohort } from '../../testing/integration/postgres-test-cohort.js';
 import { cohortEvidenceMarker, createCohortLines, createCohortPhases, validateCohortFileEvidence } from '../../testing/integration/postgres-cohort-evidence.js';
 import { waitForFixtureReady } from '../../testing/integration/fixture-lifecycle.js';
 
@@ -25,7 +26,7 @@ function evidence() {
 }
 function fixture() {
   const calls = []; const updates = []; let shared = false; let closing = false;
-  const files = ['one', 'two', 'three', 'four', 'five'].map(name => resolve('test/integration/' + name + '.test.js'));
+  const files = sharedPostgresTestCohort.map(file => resolve(file));
   const sink = new Writable({ write(_chunk, _encoding, callback) { callback(); } });
   const options = { env: environment, stdout: sink, stderr: sink, resolveFiles: async () => files,
     fingerprint: async () => ({ files: 1, sha256: 'controlled' }),
@@ -42,7 +43,7 @@ function fixture() {
       shared = true; const owner = await createServer({ env });
       try { for (const file of await resolveFiles()) await runFile({ file, env }); }
       finally { closing = true; await owner.close(); closing = false; shared = false; }
-      return { files: 5, completed: 5, registered: 5, released: 5, reaped: 0 };
+      return { files: files.length, completed: files.length, registered: files.length, released: files.length, reaped: 0 };
     },
     createServer: async ({ phaseObserver }) => {
       await phaseObserver.measure('container_start', () => {});
@@ -52,7 +53,7 @@ function fixture() {
   return { options, calls, updates, files };
 }
 
-test('cohort comparison preserves all five files in counterbalanced profile and reversed file order after release', async () => {
+test('cohort comparison preserves all seven files in counterbalanced profile and reversed file order after release', async () => {
   const f = fixture(); const report = await comparePostgresCohort(f.options);
   assert.equal(report.complete, true); assert.equal(report.samples.length, 4); assert.equal(report.pairs.length, 2);
   assert.deepEqual(report.samples.map(({ mode, order }) => [mode, order]),
@@ -82,7 +83,7 @@ for (const stage of ['pre_abort', 'file', 'sink']) for (const primary of [new Er
     if (stage === 'file') f.options.runFile = async () => { throw primary; };
     if (stage === 'sink') f.options.onUpdate = async () => { throw primary; };
     await assert.rejects(comparePostgresCohort({ ...f.options, signal: controller.signal }), error => error === primary);
-    assert.equal(f.calls.length, stage === 'sink' ? 5 : 0);
+    assert.equal(f.calls.length, stage === 'sink' ? f.files.length : 0);
   });
 }
 
@@ -92,10 +93,10 @@ for (const fault of ['missing', 'duplicate', 'skip', 'case', 'work', 'source', '
     if (fault === 'source') f.options.fingerprint = async () => ({ sha256: ++hashes > 3 ? 'changed' : 'original' });
     else if (fault === 'reaped' || fault === 'unreleased') {
       const shared = f.options.runShared;
-      f.options.runShared = async options => ({ ...await shared(options), ...(fault === 'reaped' ? { reaped: 1 } : { released: 4 }) });
+      f.options.runShared = async options => ({ ...await shared(options), ...(fault === 'reaped' ? { reaped: 1 } : { released: f.files.length - 1 }) });
     } else f.options.runFile = async options => {
       calls++;
-      if (calls <= 5) return runFile(options);
+      if (calls <= f.files.length) return runFile(options);
       const value = evidence();
       if (fault === 'skip') value.counts.skipped = 1;
       if (fault === 'case') value.caseDigest = 'c'.repeat(64);
@@ -115,9 +116,17 @@ test('comparison awaits a held partial-artifact sink before admitting the next n
   f.options.onUpdate = async () => { if (first) { first = false; entered.resolve(); await hold.promise; } };
   const pending = comparePostgresCohort(f.options); const observed = pending.catch(() => {});
   try {
-    await waitForFixtureReady({ ready: entered.promise, operation: pending }); assert.equal(f.calls.length, 5);
+    await waitForFixtureReady({ ready: entered.promise, operation: pending }); assert.equal(f.calls.length, f.files.length);
     hold.resolve(); assert.equal((await pending).complete, true);
   } finally { hold.resolve(); await observed; }
+});
+
+for (const size of [6, 8]) test(`complete comparison refuses ${size} files before fingerprinting or native admission`, async () => {
+  const f = fixture(); let fingerprinted = false;
+  f.options.resolveFiles = async () => Array.from({ length: size }, (_, index) => f.files[index % f.files.length]);
+  f.options.fingerprint = async () => { fingerprinted = true; assert.fail('Invalid selection fingerprinted'); };
+  await assert.rejects(comparePostgresCohort(f.options), { code: 'fixture_cohort_evidence_refused' });
+  assert.equal(fingerprinted, false); assert.deepEqual(f.calls, []); assert.deepEqual(f.updates, []);
 });
 
 test('framing handles split UTF-8 and refuses oversized lines without retaining private text', () => {

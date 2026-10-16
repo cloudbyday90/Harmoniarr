@@ -9,7 +9,7 @@ import { performance } from 'node:perf_hooks';
 import { relative } from 'node:path';
 import { runPostgresTestFile } from './postgres-file-process.js';
 import { runSharedPostgresTests } from './postgres-test-launcher.js';
-import { resolvePostgresTestCohort } from './postgres-test-cohort.js';
+import { resolvePostgresTestCohort, sharedPostgresTestCohort } from './postgres-test-cohort.js';
 import { createOwnedPostgresServer } from './owned-postgres-server.js';
 import { createIntegrationFixturePhaseObserver } from './fixture-phase-observer.js';
 import { createPostgresCohortEnvironment, fingerprintPostgresCohortSource, postgresCohortPlan } from './postgres-cohort-policy.js';
@@ -31,7 +31,8 @@ export async function comparePostgresCohort({ cwd = process.cwd(), env = process
   runFile = runPostgresTestFile, runShared = runSharedPostgresTests, createServer = createOwnedPostgresServer } = {}) {
   if (signal?.aborted) throw signal.reason;
   const environment = createPostgresCohortEnvironment(env); const files = await resolveFiles({ cwd });
-  if (files.length !== 5) throw cohortRefusal();
+  const fileCount = sharedPostgresTestCohort.length;
+  if (files.length !== fileCount) throw cohortRefusal();
   const source = await fingerprint(cwd); const report = { version: 1, complete: false, source, samples: [] };
   let expectedCases; let expectedWork;
   try {
@@ -70,14 +71,14 @@ export async function comparePostgresCohort({ cwd = process.cwd(), env = process
       const durationMs = performance.now() - started;
       if (signal?.aborted) throw signal.reason;
       if (JSON.stringify(await fingerprint(cwd)) !== JSON.stringify(source)) throw cohortRefusal();
-      if (outcomes.length !== 5 || !Number.isFinite(durationMs) || durationMs < 0) throw cohortRefusal();
-      const servers = selection.mode === 'shared' ? 1 : 5;
+      if (outcomes.length !== fileCount || !Number.isFinite(durationMs) || durationMs < 0) throw cohortRefusal();
+      const servers = selection.mode === 'shared' ? 1 : fileCount;
       for (const phase of ['container_start', 'container_stop']) {
         if (phases[phase].count !== servers || phases[phase].failed) throw cohortRefusal();
       }
       if (!phases.database_create.count || phases.database_create.failed || phases.database_drop.failed || phases.template_drop.failed
         || phases.database_create.count !== phases.database_drop.count + phases.template_drop.count) throw cohortRefusal();
-      if (ownership && (ownership.files !== 5 || ownership.completed !== 5 || ownership.registered !== ownership.released
+      if (ownership && (ownership.files !== fileCount || ownership.completed !== fileCount || ownership.registered !== ownership.released
         || ownership.reaped !== 0 || ownership.registered !== phases.database_create.count)) throw cohortRefusal();
       const cases = signature(outcomes); const work = workSignature(phases);
       expectedCases ??= cases; expectedWork ??= work;

@@ -4,6 +4,13 @@ Harmoniarr is a self-hosted, Docker-hosted music library manager inspired by Lid
 
 The repository contains the Node.js ESM server, Vue client, PostgreSQL schema, automated validation, and design documents. The platform is under active development toward its first release.
 
+The opt-in shared PostgreSQL cohort now includes all three Music Queue recovery
+files, retaining native file processes, private templates/databases and actual
+worker drainage. See the [design](docs/RECOVERY_SHARED_COHORT_DESIGN.md),
+[official research and tradeoffs](docs/RECOVERY_SHARED_COHORT_RESEARCH_2026_10.md)
+and [outcome](docs/RECOVERY_SHARED_COHORT_OUTCOME.md) for seven-file admission,
+complete comparison evidence and unchanged default complete-gate scheduling.
+
 Music Queue recovery discovery now measures all fourteen schema/scenario calls
 and selects its own migration-template default, preserving its custom clock and
 actual ingestion/release/pruning lifetime. See the
@@ -26,9 +33,9 @@ and use the existing migration-only template with fresh clone state. See the
 and [outcome](docs/RECOVERY_SCHEMA_TEMPLATE_OUTCOME.md) for scoped adoption,
 both-order local evidence and the retained explicit empty-schema comparator.
 
-An explicit `npm run measure:postgres-cohort` command compares the complete
-five-file PostgreSQL cohort in both profile/file orders, verifying native cases,
-work counts, source identity and cleanup. See its
+The explicit `npm run measure:postgres-cohort` command compares the current
+seven-file PostgreSQL cohort in both profile/file orders, verifying native cases,
+work counts, source identity and cleanup. Its original five-file collection has a separate
 [design](docs/POSTGRES_COHORT_COMPARISON_DESIGN.md),
 [official research and tradeoffs](docs/POSTGRES_COHORT_COMPARISON_RESEARCH_2026_10.md)
 and [outcome](docs/POSTGRES_COHORT_COMPARISON_OUTCOME.md) for local measurements,

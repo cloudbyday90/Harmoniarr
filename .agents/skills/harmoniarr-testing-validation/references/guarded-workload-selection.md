@@ -246,3 +246,14 @@ reservation/lease isolation and fresh dispatch. Compare all nine cases/fourteen
 scenarios on frozen code and validate any promoted default separately. Existing
 template identity/refusal controls still apply; this grants no shared-parent
 admission or live-provider completion. See docs/RECOVERY_DISCOVERY_SCHEMA_OUTCOME.md.
+
+The audited shared cohort now includes execution/discovery as the sixth/seventh
+canonical files. Keep raw-server adoption controls excluded. Both use the common
+reserve/CREATE/OID commit/assert/drop/release owners and registered actual worker
+completion; direct reconciliation is awaited. The complete comparison derives
+its cardinality from the reviewed allowlist and refuses partial/extra selections
+before native work. Require all seven unchanged native files, matching per-file
+signatures/work counts and all shared registrations released without reaping in
+both profile/file orders. Existing adverse parent and held-worker controls still
+own refusal/drain proof. See docs/RECOVERY_SHARED_COHORT_OUTCOME.md; this opt-in
+selection does not change default complete-gate scheduling or certify hosted CI.

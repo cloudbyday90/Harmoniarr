@@ -1013,3 +1013,15 @@ lease release are earlier boundaries. Prove held stages at the parent and retain
 Error/null cancellation until actual drain before reusing database resources.
 PostgreSQL's source/clone constraints and informative OWASP exclusions apply
 independently; this project fixture policy is not W3C certification.
+
+October 15 seven-file shared-cohort guidance uses
+docs/RECOVERY_SHARED_COHORT_RESEARCH_2026_10.md. Node's child close covers process
+end and stdio closure; retain separate output-callback drainage and registered
+worker-absence checks before parent reconciliation. Neither exit nor a signal
+acknowledgement authorizes database reuse. Keep PostgreSQL name/OID ownership,
+sealed source and explicit clone configuration, W3C draft duration limits and
+OWASP credential exclusions distinct from the reviewed allowlist decision.
+Docker's resource constraints distinguish consumption ceilings from capacity:
+CPU shares do not reserve CPU. Disposable test containers isolate test state,
+while host contention remains a separate operational concern. Avoid attributing
+a startup stall to load or changing resource bounds inside a matched comparison.

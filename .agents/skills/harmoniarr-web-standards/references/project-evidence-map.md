@@ -822,3 +822,13 @@ cancellation and subsequent fresh reservation/lease state. Original discovery
 cases retain future-deadline, consent/provenance, uncertainty, supersession and
 reconciliation guards. See docs/RECOVERY_DISCOVERY_SCHEMA_OUTCOME.md for separate
 candidate/final evidence; default promotion grants no shared-parent admission.
+
+Execution/discovery shared-parent admission is audited in
+docs/RECOVERY_SHARED_COHORT_DESIGN.md. Only canonical files are appended to
+postgres-test-cohort.js; raw-server adoption controls remain excluded. The
+complete comparison uses that reviewed cohort's cardinality while preserving
+exact native case/work and strict registration/release checks. Existing parent
+launcher and execution/discovery template controls own adverse identity/process/
+worker boundaries; the full CLI compares all seven files in both orders. See
+docs/RECOVERY_SHARED_COHORT_OUTCOME.md for measured scope and default-scheduling
+limits; no new registry, persistent server or parallelism is introduced.

@@ -2,6 +2,11 @@
 
 Date: 2026-10-15. Work stays on main without a release, tag, branch or PR merge.
 
+This records the original five-file collection and its frozen source. The
+current seven-file allowlist/CLI is documented in the separate
+[recovery shared-cohort outcome](RECOVERY_SHARED_COHORT_OUTCOME.md); its results
+do not relabel the historical measurements below.
+
 ## Delivered implementation
 
 `npm run measure:postgres-cohort` runs the complete existing five-file allowlist

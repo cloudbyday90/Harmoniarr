@@ -6,6 +6,14 @@ This repository includes a shared `.agents/` directory for GitHub Copilot agent 
 
 The goal is to keep reusable AI workflow guidance versioned alongside the project so UI review, frontend implementation, browser testing, and related tasks follow the same repo conventions.
 
+The [shared recovery cohort design](RECOVERY_SHARED_COHORT_DESIGN.md) extends
+the existing method from per-suite templates to reviewed parent admission.
+Inventory every source/clone creation and actual returned worker/service tail;
+reuse their current owners and adverse controls. Keep raw-server control files
+outside the allowlist, derive comparison cardinality from its reviewed source,
+and require complete native signatures/work/release in both profile/file orders.
+Earlier five-file measurements remain historical evidence with their own hashes.
+
 The [recovery discovery design](RECOVERY_DISCOVERY_SCHEMA_DESIGN.md) extends the
 same method to custom contexts and post-release work. Preserve domain clocks and
 saved deadline controls while using monotonic spans for measurement. Extract the
