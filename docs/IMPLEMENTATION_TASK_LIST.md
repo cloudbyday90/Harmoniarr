@@ -6,6 +6,27 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Delivered slice: Wanted root correctness and explicit scaling lanes (2026-10-16)
+
+- Retain one routine native case with paired projection/query/hash work and all
+  original current-authority guards. Share four focused ESM helper modules.
+- Existing workload CLI gains --root-lookups: six original media/history
+  scenarios, four counterbalanced pairs and 48 exact sample keys. Old modes and
+  defaults remain unchanged; reduced selections are marked selected.
+- Fresh baseline passes six cases in 122.032 seconds; the new routine case
+  passes in 22.748 seconds. Full benchmark passes all six scenarios/48 samples,
+  matching every baseline work row. All 10,452 fast cases and both builds pass.
+  Evidence is recorded in the [outcome](WANTED_ROOT_TEST_LANES_OUTCOME.md), with
+  [design/tradeoffs](WANTED_ROOT_TEST_LANES_DESIGN.md) and
+  [official research](WANTED_ROOT_TEST_LANES_RESEARCH_2026_10.md).
+- Keep all 127 canonical files. Intended native case count is 561 to 556;
+  scaling repetition moves to the explicit lane with no hidden skip/filter.
+- The full invocation and selected remainder hit checkout failures in unchanged
+  atomic-creation/scan-receipt tests. Separate diagnostics pass all 6/5 cases;
+  they do not repair the failed full collection. No limit or assertion changed.
+  Next: trace original queued handoff/phase and observed startup gap with honest
+  clipped/unassociated evidence before further scheduling/performance changes.
+
 ## Completed slice: Complete integration capability preflight (2026-10-15)
 
 - Added separate ESM capability policy, owned version-probe and preflight services.
@@ -25,7 +46,7 @@ Database model source: `docs/DATABASE_MODEL.md`
   [outcome](INTEGRATION_PREFLIGHT_OUTCOME.md), with
   [design/tradeoffs](INTEGRATION_PREFLIGHT_DESIGN.md) and
   [official research](INTEGRATION_PREFLIGHT_RESEARCH_2026_10.md).
-- Next: move the full Wanted root timing matrix (94.801 seconds for six cases
+- Follow-up above: move the full Wanted root timing matrix (94.801 seconds for six cases
   in this invocation) to
   an explicit benchmark command while retaining bounded safety/equivalence
   coverage in routine integration. Default coordinator adoption remains a

@@ -116,3 +116,7 @@ library file matching 50.620 seconds, Missing Music add-to-library 42.702 second
 and operator track delivery recovery 41.011 seconds. File durations guide the
 next investigation; they are not additive ownership-attributed phase costs or a
 promise that removing timing repetitions saves all of that wall time.
+
+That follow-up has a separate [lane design](WANTED_ROOT_TEST_LANES_DESIGN.md)
+and [outcome](WANTED_ROOT_TEST_LANES_OUTCOME.md), which own later source/coverage
+evidence. The measurements above remain this collection's historical record.

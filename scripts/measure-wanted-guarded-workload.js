@@ -12,6 +12,10 @@ const selection = parseWantedWorkloadCommand(process.argv.slice(2));
 const controller = new AbortController();
 const measure = async input => {
   if (typeof global.gc !== 'function') throw new TypeError('Guarded workload measurement requires explicit GC');
+  if (selection.kind === 'wanted_root_lookups') {
+    const { measureWantedRootLookups } = await import('../testing/integration/wanted-root-lookup-benchmark.js');
+    return measureWantedRootLookups(input);
+  }
   if (selection.distinct) {
     const { measureWantedDistinctBindings } = await import('../testing/integration/wanted-distinct-binding-benchmark.js');
     return measureWantedDistinctBindings(input);

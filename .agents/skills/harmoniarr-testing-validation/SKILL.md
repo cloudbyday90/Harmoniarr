@@ -5,6 +5,13 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+Wanted root correctness stays in library-wanted-root-profile.test.js as one
+native paired-reader/current-authority case. Its full scaling matrix is explicit:
+`npm run measure:wanted-guarded-workload -- --root-lookups --output <local JSON>`.
+Require six scenarios/48 unique samples, private projection and unchanged query/
+hash/phase-call proof before summaries, and actual cleanup through first Error/null.
+Reduced selections are selected evidence. See docs/WANTED_ROOT_TEST_LANES_OUTCOME.md.
+
 For guarded workload selection or failure diagnosis, read
 [the focused reference](references/guarded-workload-selection.md). It owns media
 prerequisites, recorded full/selected scope and approved phase/failure evidence;

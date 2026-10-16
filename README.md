@@ -22,6 +22,14 @@ See the separate [capability preflight design](docs/INTEGRATION_PREFLIGHT_DESIGN
 and [validation outcome](docs/INTEGRATION_PREFLIGHT_OUTCOME.md) for image pinning,
 owned retirement and complete-invocation evidence.
 
+Routine Wanted root checks retain one paired-reader/current-authority case.
+Run all six scaling profiles and 48 samples explicitly with
+`npm run measure:wanted-guarded-workload -- --root-lookups --output .tmp/wanted-root-lookups.json`.
+Verify local media/PostgreSQL prerequisites first. Smaller selections are marked
+selected; create the output directory before running. See the [design](docs/WANTED_ROOT_TEST_LANES_DESIGN.md),
+[official research](docs/WANTED_ROOT_TEST_LANES_RESEARCH_2026_10.md) and
+[outcome](docs/WANTED_ROOT_TEST_LANES_OUTCOME.md).
+
 The opt-in shared PostgreSQL cohort now includes all three Music Queue recovery
 files, retaining native file processes, private templates/databases and actual
 worker drainage. See the [design](docs/RECOVERY_SHARED_COHORT_DESIGN.md),

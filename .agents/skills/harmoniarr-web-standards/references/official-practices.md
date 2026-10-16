@@ -1,5 +1,15 @@
 # Official practices by boundary
 
+October 16 root-lane guidance uses docs/WANTED_ROOT_TEST_LANES_RESEARCH_2026_10.md.
+Node selection/timeouts do not prove I/O drainage. Preserve PostgreSQL rollback
+and resource owners, fixed CLI options and private equality/work proof before
+bounded summaries. W3C draft monotonic timing is descriptive; moving repetitions
+between lanes is not an algorithmic or whole-CI speed claim.
+The same research includes current node-postgres Pool API guidance: total/idle/
+waiting metrics and FIFO/release semantics do not identify a stalled caller or
+justify a pool increase from one snapshot. Keep later healthy probes distinct
+from original queued/startup evidence and report clipped/unassociated records.
+
 October 15 Linux canonical guidance uses
 docs/LINUX_CANONICAL_MEDIA_RESEARCH_2026_10.md. Node TestsStream has per-file and
 cumulative summaries; require the latter plus complete current inspection/owner

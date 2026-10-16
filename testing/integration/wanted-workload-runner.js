@@ -12,13 +12,14 @@ import { readCheckoutProperty as read } from './pool-checkout-record.js';
 import { captureWantedSeedRecord } from './wanted-seed-observer.js';
 import { captureMediaTransportSummary } from './media-transport-phase-policy.js';
 
-function captureCheckpoint(input) {
+function captureCheckpoint(input, rootLookups) {
   const stage = read(input, 'stage'); const mediaProfile = read(input, 'mediaProfile');
   const bindings = read(input, 'bindings'); const pair = read(input, 'pair'); const mode = read(input, 'mode');
   if (!['server_start', 'scenario_start', 'seed', 'profile_client', 'sample', 'comparison', 'scenario_cleanup', 'server_cleanup'].includes(stage)) return null;
   return Object.freeze({ stage, mediaProfile: ['sine', 'noise'].includes(mediaProfile) ? mediaProfile : null,
-    bindings: [2, 4, 8].includes(bindings) ? bindings : null, pair: [0, 1].includes(pair) ? pair : null,
-    mode: ['compatibility', 'locked-noop', 'member', 'bounded'].includes(mode) ? mode : null });
+    bindings: [2, 4, 8].includes(bindings) ? bindings : null, pair: (rootLookups ? [0, 1, 2, 3] : [0, 1]).includes(pair) ? pair : null,
+    mode: (rootLookups ? ['legacy', 'joined'] : ['compatibility', 'locked-noop', 'member', 'bounded']).includes(mode) ? mode : null,
+    ...(rootLookups ? { receipts: [2, 16, 48].includes(read(input, 'receipts')) ? read(input, 'receipts') : null } : {}) });
 }
 
 /** Measure already-guarded summaries; retain the original failure privately. */
@@ -38,7 +39,7 @@ export async function runWantedWorkloadMeasurement({ selection, measure, signal,
         if (mediaTransports.length === 12) { mediaTransports.shift(); mediaTransportsClipped = true; }
         mediaTransports.push(record);
       },
-      onCheckpoint: row => { lastCheckpoint = captureCheckpoint(row) ?? lastCheckpoint; },
+      onCheckpoint: row => { lastCheckpoint = captureCheckpoint(row, selection.kind === 'wanted_root_lookups') ?? lastCheckpoint; },
       onSeedRecord: row => {
         const record = captureWantedSeedRecord(row);
         if (!record) return;

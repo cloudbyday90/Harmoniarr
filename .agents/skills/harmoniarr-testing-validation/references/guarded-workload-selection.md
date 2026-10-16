@@ -1,5 +1,27 @@
 # Guarded workload selection and failure evidence
 
+Root scaling uses --root-lookups in the existing CLI: sine/noise, 1/8/24
+historical candidate histories (2/16/48 receipts), four counterbalanced pairs,
+48 samples. --profiles or --pairs 1|2 yields selected coverage. Verify media/
+PostgreSQL tooling first; this CLI does not inherit automatic coordinator
+preflight. Keep its --expose-gc contract; root comparison adds no GC/warm-up.
+Routine native proof retains one sine/two-second/one-candidate pair and all
+authority guards. Both lanes share wanted-root-profile-{scenario,comparison,
+authority}.js and preserve whole private projection, hash/byte/query/root-call
+equality. Historical receipts are not distinct acquired-track authority. Await
+startup/scenario/progress/cleanup, retain bounds and preserve first Error/null,
+including final-cleanup cancellation. See docs/WANTED_ROOT_TEST_LANES_OUTCOME.md
+for baseline, full benchmark, routine and complete-gate evidence; no skip/filter
+or selected sample set establishes a full matrix.
+
+The October 16 root-lane broad run failed in unchanged atomic-creation and
+scan-receipt files. Retain the unobserved queued wait/unknown phase separately
+from the matched client's startup-dispatched/no-authentication gap and clipped
+server window. Their later six/five-case diagnostics pass but do not diagnose or
+repair the original failures. Do not sum selected scopes into a passing full
+invocation or enlarge bounds. The outcome records unrun fresh scope explicitly;
+trace actual queued handoff/phase and original startup before scheduling changes.
+
 Use this reference for Wanted workload collection or a timeout diagnosis, not
 ordinary styling/unit changes. Start from the actual CLI policy and benchmark
 owners; do not use a selected measurement as a replacement for correctness tests.

@@ -1,5 +1,16 @@
 # Project standards-to-evidence map
 
+Wanted root lanes share wanted-root-profile-{comparison,scenario,authority}.js
+and wanted-root-lookup-benchmark.js. One canonical routine case owns actual
+paired-reader/current-authority proof; --root-lookups owns all six scaling
+profiles/48 exact keys. Pure mutation/selection and held startup/scenario/progress/
+cleanup controls retain first Error/null and incomplete-output honesty. See
+docs/WANTED_ROOT_TEST_LANES_OUTCOME.md for actual native scope and baseline work
+equivalence. This adds no skip flag or browser conformance claim.
+Its complete/remainder collections retained failures in unchanged atomic-
+creation/scan-receipt files. Later passing diagnostics do not erase queued-wait
+or startup-dispatched/no-authentication evidence; original causes remain unknown.
+
 Linux canonical lane: linux-canonical-media-{policy,preflight,lane}.js owns strict
 selection, bounded native summary/media evidence, read-only daemon/image checks
 and actual event/environment lifetime. The CLI rejects filters and eval entry;

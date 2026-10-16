@@ -1,5 +1,11 @@
 # AI Workflow And Shared Copilot Skills
 
+The [Wanted root lane design](WANTED_ROOT_TEST_LANES_DESIGN.md) separates routine
+current-authority/equal-work proof from explicit scaling repetition. Share actual
+scenario/comparator/guard owners, preserve all full matrix samples, and prove
+exact full/selected membership and awaited cleanup through first Error/null.
+Report both lanes together; moving repetitions is not an algorithmic speedup.
+
 ## Purpose
 
 This repository includes a shared `.agents/` directory for GitHub Copilot agent workflows in VS Code.
