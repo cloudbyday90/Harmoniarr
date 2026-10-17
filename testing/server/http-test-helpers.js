@@ -6,6 +6,7 @@
  */
 
 import express from 'express';
+import { observeOwnedHttpRequestPhases } from './owned-http-request-phase.js';
 
 function defaultJsonErrorHandler(error, _request, response, _next) {
   response.status(Number.isInteger(error?.status) ? error.status : 500).json({
@@ -60,6 +61,7 @@ export async function withServer(app, callback, {
     listenTimeoutMs,
     'HTTP test server startup',
   ));
+  const requestPhases = observeOwnedHttpRequestPhases({ server, phaseObserver });
 
   let scenarioFailed = false;
   let result; let failure;
@@ -88,6 +90,8 @@ export async function withServer(app, callback, {
     ));
   } catch (error) {
     if (!scenarioFailed) { scenarioFailed = true; failure = error; }
+  } finally {
+    requestPhases.restore();
   }
   if (scenarioFailed) throw failure;
   return result;

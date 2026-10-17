@@ -9,7 +9,7 @@ import { buildPgConnectionRecord } from './pg-connection-record.js';
 import { buildPgAcquisitionRecord } from './pg-acquisition-record.js';
 
 const phases = new Set(['schema_prepare', 'template_prepare', 'fixture_seed', 'application_create',
-  'scenario_work', 'http_scenario', 'app_worker_drain', 'shutdown_drain']);
+  'scenario_work', 'http_scenario', 'http_request', 'app_worker_drain', 'shutdown_drain']);
 
 export function buildFixtureCheckoutRecord({ checkoutId, poolKind, phase, connection, acquisition, ...input }) {
   const base = buildPoolCheckoutRecord(input);

@@ -5,6 +5,15 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+HTTP fixture attribution belongs at the owned server request boundary. The
+server/request/response dispatch adapters preserve native listener order, body
+callbacks and Error/null; they do not infer context from client-side measures or
+headers. Factory-owned phase scopes retire on response finish/close or cleanup;
+nested measures inherit expiry and late work stays unknown. Prove native POST
+body/end, disconnect, nested/concurrent ownership, exact restoration and both
+app entrypoints' real checkout records, including timing-disabled context. See
+docs/FIXTURE_HTTP_PHASE_OUTCOME.md for actual gate scope and retained failures.
+
 Wanted root correctness stays in library-wanted-root-profile.test.js as one
 native paired-reader/current-authority case. Its full scaling matrix is explicit:
 `npm run measure:wanted-guarded-workload -- --root-lookups --output <local JSON>`.

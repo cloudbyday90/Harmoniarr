@@ -77,7 +77,11 @@ regression guidance. The previous
 [no-cache walkthrough rebuild](LOCAL_DOCKER_QUEUED_CHECKOUT_OUTCOME.md) remains
 separate evidence; this testing-only slice does not change image inputs.
 
-Next: bind fixture HTTP phase context at the actual server request boundary,
+The [HTTP phase follow-up](FIXTURE_HTTP_PHASE_OUTCOME.md) now records the next
+implementation and its own validation scope. The historical evidence above
+remains unchanged.
+
+Next at this slice: bind fixture HTTP phase context at the actual server request boundary,
 preserving concurrent/nested ownership and avoiding phase assignment to unrelated
 background work. Then use the richer evidence in a fresh full-gate investigation
 before scheduling or capacity changes.

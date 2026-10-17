@@ -15,6 +15,7 @@ import { createIntegrationAppRuntime, withIntegrationApp } from '../../testing/i
 import { createPoolCheckoutObserver, poolCheckoutMarker } from '../../testing/integration/app-checkout-observer.js';
 import { createFixturePhaseObserver } from '../../testing/integration/fixture-phase-observer.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
+import { getPool } from '../../src/server/database.js';
 
 const config = resolveIntegrationTestRuntimeConfig();
 let runtime;
@@ -74,21 +75,39 @@ suite('app fixture first-checkout diagnostics', () => {
 
   test('both native app entry points correlate one checkout and keep schema, HTTP and pool APIs working', {
     timeout: config.scenarioTimeoutMs,
-  }, async () => {
-    const records = []; const phases = [];
+  }, async (t) => {
+    const previousMode = process.env.HARMONIARR_INTEGRATION_POOL_DIAGNOSTICS;
+    process.env.HARMONIARR_INTEGRATION_POOL_DIAGNOSTICS = 'all';
+    t.after(() => {
+      if (previousMode === undefined) delete process.env.HARMONIARR_INTEGRATION_POOL_DIAGNOSTICS;
+      else process.env.HARMONIARR_INTEGRATION_POOL_DIAGNOSTICS = previousMode;
+    });
+    const records = []; const phases = []; const ownedRecords = [];
     const phaseObserver = createFixturePhaseObserver({ onRecord: r => phases.push(r) });
     const checkoutObserver = createPoolCheckoutObserver({ mode: 'all', onRecord: capture(records) });
-    const createAppFn = () => ({ app: createServer((_request, response) => response.end('ready')) });
+    const createAppFn = () => ({ app: createServer((request, response) => {
+      request.resume();
+      request.on('end', () => {
+        getPool().query('SELECT 1::integer AS value', (error, result) => {
+          response.statusCode = error ? 500 : 200;
+          response.end(error ? 'failed' : String(result.rows[0].value));
+        });
+      });
+    }) });
     const run = async ({ baseUrl, getPoolFn }) => {
-      assert.equal(await (await fetch(baseUrl)).text(), 'ready');
+      const response = await fetch(baseUrl, { method: 'POST', body: 'private-payload',
+        headers: { traceparent: 'private-trace', cookie: 'private-cookie' } });
+      assert.equal(response.status, 200); assert.equal(await response.text(), '1');
       const result = await getPoolFn().query('SELECT COUNT(*)::integer AS count FROM schema_migrations');
       assert.ok(result.rows[0].count > 0);
     };
     const app = await createIntegrationAppRuntime({ config, phaseObserver, checkoutObserver, createAppFn,
+      checkoutRecord: record => ownedRecords.push(record),
       postgresRuntimeFactory: async () => ({ runIsolatedDatabase: (...args) => runtime.runIsolatedDatabase(...args),
         cleanup: async () => {} }) });
     try { await app.runScenario(run); } finally { await app.cleanup(); }
     await withIntegrationApp({ config, phaseObserver, checkoutObserver, createAppFn, run,
+      checkoutRecord: record => ownedRecords.push(record),
       withPostgresIntegrationRuntimeFn: ({ run: execute }) => runtime.runIsolatedDatabase(execute) });
     assert.deepEqual(records.map(r => r.outcome), ['started', 'passed', 'started', 'passed']);
     for (const record of records.filter(r => r.outcome === 'passed')) {
@@ -96,5 +115,10 @@ suite('app fixture first-checkout diagnostics', () => {
       assert.equal(record.lastServerPhase, 'isolated_database_admitted');
       assert.ok(phases.some(p => p.correlationId === record.correlationId && p.phase === 'schema_prepare'));
     }
+    const http = ownedRecords.filter(record => record.phase === 'http_request' && record.outcome === 'passed');
+    assert.equal(http.length, 2); assert.equal(new Set(http.map(record => record.correlationId)).size, 2);
+    assert.ok(http.every(record => record.poolKind === 'application_pool' && record.before.max === config.poolMax));
+    assert.ok(ownedRecords.some(record => record.phase === 'scenario_work' && record.outcome === 'passed'));
+    assert.equal(JSON.stringify(ownedRecords).includes('private'), false);
   });
 });

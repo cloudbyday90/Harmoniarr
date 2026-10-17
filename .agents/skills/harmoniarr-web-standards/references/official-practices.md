@@ -1,5 +1,13 @@
 # Official practices by boundary
 
+October 16 HTTP phase guidance uses docs/FIXTURE_HTTP_PHASE_RESEARCH_2026_10.md.
+Node AsyncLocalStorage.run restores synchronous context but retains async
+descendants; retire the owned request scope explicitly at response finish/close.
+Native body events need request/response dispatch ownership beyond server handler
+entry. W3C Trace Context Recommendation privacy/security guidance does not require
+adding headers to this internal fixture or establish protocol conformance.
+Follow OWASP minimization: approved UUID/phase only, no URL/body/cookie/trace input.
+
 October 16 startup-write guidance uses
 docs/POSTGRES_STARTUP_WRITE_RESEARCH_2026_10.md. Node socket return and callback
 are local flow/completion boundaries; PostgreSQL AuthenticationOk and ReadyForQuery

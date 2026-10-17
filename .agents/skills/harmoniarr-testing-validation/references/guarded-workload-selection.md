@@ -1,5 +1,15 @@
 # Guarded workload selection and failure evidence
 
+HTTP phase ownership uses factory-owned retired scopes in fixture-phase-observer.js
+and owned-http-{request-phase,phase-dispatch}.js at the withServer boundary.
+Server handler entry alone is insufficient: a native body end event can execute
+in the transport context. Bind the admitted request/response emitters to the same
+scope, preserve receivers/results/once listeners, and retire on finish/close or
+restoration without overwriting later owners. Nested measurements inherit expiry;
+one retired request cannot borrow a live concurrent request. Checkouts retain
+their admission phase even if the response later ends. No request metadata or
+tracing headers are needed. See docs/FIXTURE_HTTP_PHASE_OUTCOME.md.
+
 Startup write observation lives in owned-pg-startup-write.js and its minimized
 record builder. Connection record v2 keeps return and callback outcomes separate;
 the outer checkout stays v3. The reviewed startup packet is plain string data,

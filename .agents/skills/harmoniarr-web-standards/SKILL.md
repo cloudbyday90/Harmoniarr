@@ -103,6 +103,13 @@ queries beyond the initial feature cohort. Move observation to an independently
 owned client and retain real contender/holder drainage; a green narrow cohort
 does not validate other consumers of the same policy.
 
+For fixture HTTP attribution, bind the owned native server/request/response
+dispatch context, including body events. Use synchronous run semantics and
+explicit finish/close retirement so late or unrelated work stays unknown.
+Client-side context and tracing headers do not establish server ownership.
+Preserve listener ordering, Error/null and exact descriptors without overwriting
+later owners. The HTTP phase entry in the evidence map owns the native controls.
+
 For a cold checkout, observe the original owned client's target match and startup
 milestones; a healthy replacement connection cannot locate its stall. Review
 internal driver surfaces against installed versions, preserve lazy creation and

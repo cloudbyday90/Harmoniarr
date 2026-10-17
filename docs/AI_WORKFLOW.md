@@ -1,5 +1,12 @@
 # AI Workflow And Shared Copilot Skills
 
+The [HTTP phase design](FIXTURE_HTTP_PHASE_DESIGN.md) binds context at the owned
+server/request/response boundary, including body callbacks. Retire scopes on
+response finish/close, preserve native dispatch and leave late/unrelated work
+unknown. Client-side measurements and headers do not establish server ownership.
+Use the existing testing and standards skills for native controls and actual
+selected/full gate evidence.
+
 The [startup-write design](POSTGRES_STARTUP_WRITE_DESIGN.md) separates native
 write return/backpressure, callback completion and PostgreSQL protocol progress.
 Keep exact owned-client/queue association, temporary instance decoration and

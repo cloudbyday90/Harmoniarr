@@ -1,5 +1,14 @@
 # Project standards-to-evidence map
 
+HTTP fixture phase: fixture-phase-observer.js creates factory-owned retired
+scopes; testing/server/owned-http-phase-dispatch.js preserves native emitter
+dispatch and descriptors. owned-http-request-phase.js binds the server boundary
+and each admitted request/response through finish/close. withServer composes and
+retires those owners after shutdown. Focused native HTTP controls prove body/end,
+disconnect, nested/concurrent scopes and late expiry; app-checkout-diagnostics
+exercises real PostgreSQL callback queries through both app entrypoints.
+See docs/FIXTURE_HTTP_PHASE_OUTCOME.md for selected/full evidence and limitations.
+
 Original startup write: owned-pg-startup-write.js temporarily observes one native
 stream write during reviewed connection.startup. pg-startup-write-record.js
 separates return/backpressure, callback and sanitized failure in connection v2.

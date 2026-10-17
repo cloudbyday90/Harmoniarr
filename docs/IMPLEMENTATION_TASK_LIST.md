@@ -6,6 +6,28 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Delivered slice: Owned HTTP request phase attribution (2026-10-16)
+
+- Bind approved http_request context at the owned native server boundary and
+  admitted request/response emitters, including POST body end. Retired factory
+  scopes isolate nested/concurrent requests and leave late work unknown.
+- Preserve listener order/once semantics, receivers/results, original Error/null
+  and descriptor ownership. Refuse custom/accessor dispatch without inspecting
+  request metadata. Both app entrypoints retain real callback query attribution.
+- All 37 focused cases, three selected native app diagnostics cases and 10,489
+  fast cases pass; both builds, static checks and skill validation pass. A fresh
+  complete invocation passes all 127 files/558 cases and releases all 131 shared
+  registrations without reaping. Its exact scope is recorded in the
+  [outcome](FIXTURE_HTTP_PHASE_OUTCOME.md), separately from earlier broad failures.
+- See the [design and tradeoffs](FIXTURE_HTTP_PHASE_DESIGN.md) and
+  [official research](FIXTURE_HTTP_PHASE_RESEARCH_2026_10.md). Maintain the focused
+  testing and standards skills with actual boundary controls. No open PR was
+  available to apply locally; no release or PR merge is created.
+- Next: benchmark the existing media-scenario helper's per-command/owned-api modes
+  in automatic library-add, the slowest file here at 94.285 seconds. Preserve all
+  eight cases, bytes, outcomes, authority and cleanup; no broader scheduling or
+  capacity change follows from these descriptive timings alone.
+
 ## Delivered slice: Original PostgreSQL startup write completion (2026-10-16)
 
 - Add focused ESM write-observer and bounded record modules under the original
