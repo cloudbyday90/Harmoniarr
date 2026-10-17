@@ -1,5 +1,15 @@
 # Guarded workload selection and failure evidence
 
+Automatic library-add media uses the existing library-add-media-scenario adapter
+with per-command as default and explicit owned-api selection. Preserve all eight
+native callbacks/assertions except the wrapper call, and compare their bodies
+privately. Require complete eight-case roots, equal per-scenario generation/
+inspection counts, reviewed image/Engine capability and verified cleanup in
+counterbalanced complete pairs. Keep fresh unchanged baselines separate from
+final-source comparisons. API transport must have no failed/pending/clipped/
+untimed evidence; absent per-command transport is not zero native work. See
+docs/AUTOMATIC_LIBRARY_ADD_MEDIA_OUTCOME.md before default or cohort expansion.
+
 HTTP phase ownership uses factory-owned retired scopes in fixture-phase-observer.js
 and owned-http-{request-phase,phase-dispatch}.js at the withServer boundary.
 Server handler entry alone is insufficient: a native body end event can execute

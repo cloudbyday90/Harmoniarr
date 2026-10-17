@@ -6,6 +6,30 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Delivered slice: Scoped automatic library-add media comparison (2026-10-17)
+
+- Replace the automatic file's mutable media root with the existing ESM scenario
+  adapter. Keep all eight native test bodies and actual authority/current-byte
+  assertions. Per-command stays default; owned-api is explicit. No shared or
+  production service, schema, image, resource or scheduling change is needed.
+- The unchanged baseline passes in 122.972 seconds. Four final-source ABBA runs
+  each pass eight cases with exactly 18 generations and 59 inspections. Owned
+  samples create/remove four owners with verified cleanup and complete transport
+  evidence. Wall/scenario timing varies; no reliable causal speedup is established.
+- Ten focused cases, nine additional native safety cases and all 10,489 fast
+  cases pass; both builds and static checks pass. This is 17 distinct native cases
+  across three selected paths, not a fresh complete 127-file invocation.
+- See the separate [design and tradeoffs](AUTOMATIC_LIBRARY_ADD_MEDIA_DESIGN.md),
+  [official research](AUTOMATIC_LIBRARY_ADD_MEDIA_RESEARCH_2026_10.md) and
+  [outcome](AUTOMATIC_LIBRARY_ADD_MEDIA_OUTCOME.md). The existing testing and
+  standards skills retain equal-work, cleanup and evidence-scope requirements.
+  Opening/closing GitHub MCP reads find no open PR to apply or rebase. No release,
+  tag, branch or PR merge is created.
+- Next: attribute original before-hook tooling/runtime setup at actual completion
+  boundaries and review command timeout/drain ownership. Explain the variable
+  parent-wall/returned-scenario gap before default changes or Linux expansion;
+  preserve original work, bounds, failure identity and complete native evidence.
+
 ## Delivered slice: Owned HTTP request phase attribution (2026-10-16)
 
 - Bind approved http_request context at the owned native server boundary and

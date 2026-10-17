@@ -1,5 +1,11 @@
 # AI Workflow And Shared Copilot Skills
 
+The [automatic library-add media design](AUTOMATIC_LIBRARY_ADD_MEDIA_DESIGN.md)
+reuses the existing scoped adapter for a complete eight-case comparison. Keep
+native assertions/current bytes intact, require equal generation/inspection work
+and verified cleanup, and separate command/scenario timing from whole-CI claims.
+The testing and standards references own the actual final-source evidence.
+
 The [HTTP phase design](FIXTURE_HTTP_PHASE_DESIGN.md) binds context at the owned
 server/request/response boundary, including body callbacks. Retire scopes on
 response finish/close, preserve native dispatch and leave late/unrelated work

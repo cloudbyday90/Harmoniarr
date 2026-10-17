@@ -19,18 +19,23 @@ import { replaceImportExecutionRunItems } from '../../src/server/import-candidat
 import { listImportCandidateFileDecisions, upsertImportCandidateFileDecision } from '../../src/server/import-candidates/import-candidate-file-decision-repository.js';
 import { createIntegrationAppRuntime } from '../../testing/integration/app-runtime.js';
 import { bootstrapAdminSession } from '../../testing/integration/auth-helpers.js';
-import { createLibraryAddMediaFixture, createLibraryAddFixtureUser, seedOwnedLibraryAddFixture,
+import { createLibraryAddFixtureUser, seedOwnedLibraryAddFixture,
   runLibraryAddFixtureWorker } from '../../testing/integration/library-add-media-fixtures.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 import { isSkippableIntegrationRuntimeError, toIntegrationRuntimeUnavailableReason } from '../../testing/integration/runtime-availability.js';
+import { createLibraryAddMediaScenario, resolveLibraryAddMediaOptions } from '../../testing/integration/library-add-media-scenario.js';
 
 const config = resolveIntegrationTestRuntimeConfig();
-let runtime; let module; let fixtureRoot; let unavailableReason; let mediaUnavailableReason;
+let runtime; let module; let unavailableReason; let mediaUnavailableReason;
 let inspectionHook; let gateHook; let controlledGate = false; let recoveryCalls = []; let recoveryDecisions = [];
-const mediaFixture = createLibraryAddMediaFixture({ getFixtureRoot: () => fixtureRoot });
+const mediaOptions = resolveLibraryAddMediaOptions();
+const mediaScenario = createLibraryAddMediaScenario({ ...mediaOptions,
+  onRecord: mediaOptions.diagnostics ? record => console.log(`Automatic library-add media: ${JSON.stringify(record)}`) : null });
+const { mediaFixture } = mediaScenario;
+const runScenario = (...args) => mediaScenario.runScenario(runtime, ...args);
 const actualGate = createImportCandidateSafeAutoAddQualityGateService();
 async function seed(pool, owner, workspaceDir, options = {}) {
-  fixtureRoot = workspaceDir; inspectionHook = null; gateHook = null; controlledGate = false; recoveryCalls = []; recoveryDecisions = [];
+  inspectionHook = null; gateHook = null; controlledGate = false; recoveryCalls = []; recoveryDecisions = [];
   return seedOwnedLibraryAddFixture({ pool, owner, workspaceDir, mediaFixture, ...options });
 }
 const start = (fixture) => module.importCandidateAutoApplyRunService.startSafeApplyRunAfterDownloadCompleted({ importCandidateId: fixture.candidateId });
@@ -83,7 +88,7 @@ suite('Automatic Music Queue library addition with PostgreSQL and test-owned mea
 
   test('completed-transfer transition queues atomic system-owned current work and the real worker moves original WAV bytes', { timeout: config.scenarioTimeoutMs }, async (t) => {
     if (unavailableReason || mediaUnavailableReason) { t.skip(unavailableReason || mediaUnavailableReason); return; }
-    await runtime.runScenario(async ({ client, getPoolFn, workspaceDir }) => {
+    await runScenario(async ({ client, getPoolFn, workspaceDir }) => {
       await bootstrapAdminSession(client); const pool = getPoolFn();
       const owner = await createLibraryAddFixtureUser(client, pool, 'automatic-owner');
       const fixture = await seed(pool, owner, workspaceDir, { status: 'downloading' });
@@ -131,7 +136,7 @@ suite('Automatic Music Queue library addition with PostgreSQL and test-owned mea
 
   test('required audit and queue rejection roll back fresh context and automatic marker with no reopen history', { timeout: config.scenarioTimeoutMs }, async (t) => {
     if (unavailableReason) { t.skip(unavailableReason); return; }
-    await runtime.runScenario(async ({ client, getPoolFn, workspaceDir }) => {
+    await runScenario(async ({ client, getPoolFn, workspaceDir }) => {
       await bootstrapAdminSession(client); const pool = getPoolFn(); const owner = await createLibraryAddFixtureUser(client, pool, 'automatic-atomic');
       const fixture = await seed(pool, owner, workspaceDir, { audio: false }); const input = await preparedInput(fixture, owner);
       for (const [table, name, condition] of [['audit_events', 'automatic_audit', "NEW.event_type='import_candidate_apply_started'"],
@@ -151,7 +156,7 @@ suite('Automatic Music Queue library addition with PostgreSQL and test-owned mea
 
   test('fresh short acceptance refuses maintenance, account, participant, candidate, decision and policy changes', { timeout: config.scenarioTimeoutMs }, async (t) => {
     if (unavailableReason) { t.skip(unavailableReason); return; }
-    await runtime.runScenario(async ({ client, getPoolFn, workspaceDir }) => {
+    await runScenario(async ({ client, getPoolFn, workspaceDir }) => {
       await bootstrapAdminSession(client); const pool = getPoolFn(); const owner = await createLibraryAddFixtureUser(client, pool, 'automatic-drift');
       const fixture = await seed(pool, owner, workspaceDir, { audio: false }); const input = await preparedInput(fixture, owner);
       const maintenance = (await pool.query("INSERT INTO maintenance_locks(lock_type,status,reason,acquired_at) VALUES('maintenance','active','Controlled refusal',NOW()) RETURNING id")).rows[0];
@@ -173,7 +178,7 @@ suite('Automatic Music Queue library addition with PostgreSQL and test-owned mea
 
   test('shared automatic and explicit starters serialize one guarded run; unrelated sources are not adopted', { timeout: config.scenarioTimeoutMs }, async (t) => {
     if (unavailableReason) { t.skip(unavailableReason); return; }
-    await runtime.runScenario(async ({ client, getPoolFn, workspaceDir }) => {
+    await runScenario(async ({ client, getPoolFn, workspaceDir }) => {
       await bootstrapAdminSession(client); const pool = getPoolFn(); const owner = await createLibraryAddFixtureUser(client, pool, 'automatic-shared-one');
       const other = await createLibraryAddFixtureUser(client, pool, 'automatic-shared-two');
       const fixture = await seed(pool, owner, workspaceDir, { audio: false }); const otherWantedId = await makeShared(pool, fixture, other);
@@ -196,7 +201,7 @@ suite('Automatic Music Queue library addition with PostgreSQL and test-owned mea
 
   test('durable automatic source and authority refuse context or marker removal, owner deletion or participating-owner retargeting, and preview drift', { timeout: config.scenarioTimeoutMs }, async (t) => {
     if (unavailableReason || mediaUnavailableReason) { t.skip(unavailableReason || mediaUnavailableReason); return; }
-    await runtime.runScenario(async ({ client, getPoolFn, workspaceDir }) => {
+    await runScenario(async ({ client, getPoolFn, workspaceDir }) => {
       await bootstrapAdminSession(client); const pool = getPoolFn();
       for (const [variant, username] of [['context', 'auto-context'], ['marker', 'auto-marker'], ['anchor', 'auto-anchor'],
         ['owner', 'auto-owner'], ['owner_delete', 'auto-owner-delete'], ['owner_participant', 'auto-owner-participant'], ['disabled', 'auto-disabled'],
@@ -251,7 +256,7 @@ suite('Automatic Music Queue library addition with PostgreSQL and test-owned mea
 
   test('queued current strict policy and consent revocation refuse mutation while genuine quality stops reach the owning recovery', { timeout: config.scenarioTimeoutMs }, async (t) => {
     if (unavailableReason || mediaUnavailableReason) { t.skip(unavailableReason || mediaUnavailableReason); return; }
-    await runtime.runScenario(async ({ client, getPoolFn, workspaceDir }) => {
+    await runScenario(async ({ client, getPoolFn, workspaceDir }) => {
       await bootstrapAdminSession(client); const pool = getPoolFn();
       const owner = await createLibraryAddFixtureUser(client, pool, 'automatic-strict'); const fixture = await seed(pool, owner, workspaceDir);
       const preview = await module.importCandidateApplyPreviewService.previewImportCandidateApply({ importCandidateId: fixture.candidateId });
@@ -291,7 +296,7 @@ suite('Automatic Music Queue library addition with PostgreSQL and test-owned mea
 
   test('measured low media and collisions refuse preparation; real differing staging and reusable bytes remain untouched', { timeout: config.scenarioTimeoutMs }, async (t) => {
     if (unavailableReason || mediaUnavailableReason) { t.skip(unavailableReason || mediaUnavailableReason); return; }
-    await runtime.runScenario(async ({ client, getPoolFn, workspaceDir }) => {
+    await runScenario(async ({ client, getPoolFn, workspaceDir }) => {
       await bootstrapAdminSession(client); const pool = getPoolFn(); const lowOwner = await createLibraryAddFixtureUser(client, pool, 'automatic-low');
       const low = await seed(pool, lowOwner, workspaceDir, { extension: 'mp3', bitrate: 128 });
       assert.equal((await start(low)).started, false);
@@ -349,7 +354,7 @@ suite('Automatic Music Queue library addition with PostgreSQL and test-owned mea
 
   test('malformed raw authority never compares equal to accepted null ownership or singleton membership in read, coalescing or worker guards', { timeout: config.scenarioTimeoutMs }, async (t) => {
     if (unavailableReason) { t.skip(unavailableReason); return; }
-    await runtime.runScenario(async ({ client, getPoolFn, workspaceDir }) => {
+    await runScenario(async ({ client, getPoolFn, workspaceDir }) => {
       await bootstrapAdminSession(client); const pool = getPoolFn(); const owner = await createLibraryAddFixtureUser(client, pool, 'auto-authority-parity');
       const fixture = await seed(pool, owner, workspaceDir, { audio: false });
       await pool.query("UPDATE import_candidates SET normalized_payload=jsonb_set(normalized_payload,'{requestOwnership}','null') WHERE id=$1", [fixture.candidateId]);

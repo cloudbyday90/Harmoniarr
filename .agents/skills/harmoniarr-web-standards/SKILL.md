@@ -127,3 +127,7 @@ For performance diagnostics, follow the receipt-verification entry in the
 evidence map: count actual work with fixed dimensions, preserve original
 Error/null through optional sinks, and distinguish overlapping phases from wall
 time. An observed repeated hash is not permission to cache across a write guard.
+For media fixture reuse, follow the automatic library-add entry: preserve current
+inspection bytes, compare complete equal-work cohorts and keep each scenario's
+root/command/reader lifetime owned through verified cleanup. Local timing does
+not establish hosted-runner capability or permission to change defaults.

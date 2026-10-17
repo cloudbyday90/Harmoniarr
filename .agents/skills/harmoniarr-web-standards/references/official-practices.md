@@ -1,5 +1,13 @@
 # Official practices by boundary
 
+October 17 automatic library-add guidance uses
+docs/AUTOMATIC_LIBRARY_ADD_MEDIA_RESEARCH_2026_10.md. Docker root read-only and
+mount read-only are separate controls; local daemon authority remains privileged.
+Use Node close/stdio completion, unchanged ffprobe output interpretation, W3C
+draft monotonic elapsed measurements and OWASP-minimized aggregate reporting.
+Reuse reviewed scenario/inspection owners and preserve every native assertion;
+counterbalanced equal-work evidence is local, not whole-CI or hosted-Ubuntu proof.
+
 October 16 HTTP phase guidance uses docs/FIXTURE_HTTP_PHASE_RESEARCH_2026_10.md.
 Node AsyncLocalStorage.run restores synchronous context but retains async
 descendants; retire the owned request scope explicitly at response finish/close.

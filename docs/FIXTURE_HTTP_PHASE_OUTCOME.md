@@ -68,6 +68,10 @@ matches the repository version.
 
 ## Next recommended efficiency work
 
+The [automatic media follow-up](AUTOMATIC_LIBRARY_ADD_MEDIA_OUTCOME.md) records
+its own implementation and comparison. The historical measurements below stay
+separate from that later source and collection.
+
 The slowest file in this collection is music-queue-automatic-library-add.test.js:
 eight cases in 94.285 seconds. Its observed scenario_work total is 79.511 seconds,
 versus 6.521 seconds for schema_prepare, 2.259 for container_start and 1.044 for

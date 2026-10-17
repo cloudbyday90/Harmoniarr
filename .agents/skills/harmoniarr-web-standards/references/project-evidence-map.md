@@ -1,5 +1,14 @@
 # Project standards-to-evidence map
 
+Automatic library-add media: music-queue-automatic-library-add.test.js reuses
+library-add-media-scenario.js instead of a mutable fixtureRoot. The pure options
+keep per-command default and explicit image-backed owned-api; only ffprobe uses
+the existing inspection executor. Existing app/worker/database/workspace owners
+drain before cleanup. Preserve eight native test bodies with only wrapper-call
+substitution, per-scenario work counts and complete counterbalanced roots. Native
+owned-media controls cover current reinspection, write refusal and retirement.
+See docs/AUTOMATIC_LIBRARY_ADD_MEDIA_OUTCOME.md for actual scope and limits.
+
 HTTP fixture phase: fixture-phase-observer.js creates factory-owned retired
 scopes; testing/server/owned-http-phase-dispatch.js preserves native emitter
 dispatch and descriptors. owned-http-request-phase.js binds the server boundary
