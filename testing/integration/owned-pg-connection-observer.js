@@ -11,6 +11,7 @@ import PgConnection from 'pg/lib/connection.js';
 import { supportsPgObserverDriver } from './pg-observer-driver.js';
 import { buildPgConnectionRecord, capturePgTargetIdentity, comparePgTargetIdentity } from './pg-connection-record.js';
 import { capturePgStartupContext } from './pg-startup-log-policy.js';
+import { observeOwnedPgStartupWrite } from './owned-pg-startup-write.js';
 
 // These are internal driver surfaces, not the public pool.connect event. Refuse
 // instrumentation after an unreviewed driver upgrade; ordinary checkout remains.
@@ -43,9 +44,10 @@ export function observeOwnedPgConnections({ pool, expectedConfig, now, startupLo
     },
     begin() {
       const start = clock(); const data = { observation: initial }; const listeners = [];
-      let finished = false; let restoreStartup = null; let startupContext = null;
+      let finished = false; let restoreStartup = null; let startupContext = null; let startupWrite = null;
       const finish = () => {
         finished = true;
+        startupWrite?.finish();
         for (const [emitter, event, listener] of listeners) emitter.removeListener(event, listener);
         restoreStartup?.(); restoreStartup = null;
         listeners.length = 0; active.delete(finish);
@@ -71,6 +73,9 @@ export function observeOwnedPgConnections({ pool, expectedConfig, now, startupLo
             mark('constructed', 'constructedMs'); active.add(finish);
             const startupDescriptor = Object.getOwnPropertyDescriptor(connection, 'startup');
             const startup = connection.startup;
+            startupWrite = observeOwnedPgStartupWrite({ connection, now: () => {
+              const end = clock(); return start !== null && end !== null ? end - start : null;
+            } });
             function observedStartup(...args) {
               let submitted = args;
               if (!finished && this === connection && startupLogging === true && data.targetMatch === 'matched') {
@@ -87,7 +92,7 @@ export function observeOwnedPgConnections({ pool, expectedConfig, now, startupLo
                   }
                 } catch { /* Optional marker preparation must not replace the startup call. */ }
               }
-              const result = Reflect.apply(startup, this, submitted);
+              const result = startupWrite.dispatch(startup, this, submitted);
               if (this === connection) mark('startup_dispatched', 'startupDispatchedMs');
               return result;
             }
@@ -121,7 +126,7 @@ export function observeOwnedPgConnections({ pool, expectedConfig, now, startupLo
           const previous = dispatchOwner; dispatchOwner = owner;
           try { return run(); } finally { dispatchOwner = previous; }
         },
-        snapshot: () => buildPgConnectionRecord(data),
+        snapshot: () => buildPgConnectionRecord({ ...data, startupWrite: startupWrite?.snapshot() }),
         captureStartupContext: () => startupContext,
         finish,
       };

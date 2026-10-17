@@ -1,5 +1,15 @@
 # Official practices by boundary
 
+October 16 startup-write guidance uses
+docs/POSTGRES_STARTUP_WRITE_RESEARCH_2026_10.md. Node socket return and callback
+are local flow/completion boundaries; PostgreSQL AuthenticationOk and ReadyForQuery
+are distinct protocol evidence. Do not infer receipt or TCP acknowledgement from
+local success. Apply W3C draft monotonic offsets within one clock domain and
+OWASP data minimization before output. Native method/stream and plain packet
+guards keep auth/query writes and accessor-triggered traffic outside observation.
+Capture diagnostic scalar fields once before validation/emission: a changing
+getter must not replace an approved enum, boolean or opaque ID after approval.
+
 October 16 queued-checkout guidance uses
 docs/POSTGRES_QUEUED_CHECKOUT_RESEARCH_2026_10.md. The public Pool API documents
 next-tick idle handoff and FIFO waiting; neither counters nor the releasing async

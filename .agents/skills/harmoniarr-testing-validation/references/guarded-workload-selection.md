@@ -1,5 +1,17 @@
 # Guarded workload selection and failure evidence
 
+Startup write observation lives in owned-pg-startup-write.js and its minimized
+record builder. Connection record v2 keeps return and callback outcomes separate;
+the outer checkout stays v3. The reviewed startup packet is plain string data,
+and only the original native stream's write is temporarily decorated. Reject
+accessors/custom coercions without evaluating them before native serialization;
+restore immediately, preserve Error/null and ignore late/duplicate callbacks.
+Use native held-startup/no-auth and successful query controls as well as a real
+socket-error comparator. Local callback success is not remote receipt, even if
+an independent server probe succeeds. See docs/POSTGRES_STARTUP_WRITE_OUTCOME.md.
+Include changing-getter controls for touched record builders: output must use
+the same scalar accepted by validation, without rereading an accessor afterward.
+
 Queued checkout attribution now uses owned-pg-queue-observer.js and a reviewed
 pg/pg-pool version guard. Map the actual PendingItem before promotion; releasing
 work's async context cannot supply ownership. Distinguish queued, creating,

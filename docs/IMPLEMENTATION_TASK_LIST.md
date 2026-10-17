@@ -6,6 +6,28 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Delivered slice: Original PostgreSQL startup write completion (2026-10-16)
+
+- Add focused ESM write-observer and bounded record modules under the original
+  owned client. Observe only reviewed native startup/plain packets/socket methods;
+  restore immediately and leave auth/query traffic unchanged. Connection records
+  become version two; existing outer checkout/server contracts remain unchanged.
+- Distinguish write return/backpressure, local callback completion, server receipt
+  and authentication. Preserve Error/null, wire bytes, receivers, descriptors and
+  later owners. Capture output scalars once to prevent changing-getter leakage.
+- All 44 focused cases, 10,475 fast cases, both builds and seven selected native
+  files/31 cases pass on final bytes. Retain the
+  separate pre-final collection and historical broad failures; 120 canonical
+  integration files were not freshly rerun in this slice.
+- Update the existing testing and standards skills with actual controls and
+  unknown-evidence limits. See the [design and tradeoffs](POSTGRES_STARTUP_WRITE_DESIGN.md),
+  [official research](POSTGRES_STARTUP_WRITE_RESEARCH_2026_10.md) and
+  [outcome](POSTGRES_STARTUP_WRITE_OUTCOME.md). No open PR was available to apply;
+  no release or PR merge is created.
+- Next: bind fixture HTTP phase context at the actual server request boundary,
+  preserving concurrent/nested ownership, then investigate a fresh complete gate
+  before changing scheduling or capacity.
+
 ## Delivered slice: Explicit queued checkout ownership (2026-10-16)
 
 - Add owned, version-reviewed PendingItem mapping through client creation and

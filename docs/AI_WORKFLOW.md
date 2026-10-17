@@ -1,5 +1,11 @@
 # AI Workflow And Shared Copilot Skills
 
+The [startup-write design](POSTGRES_STARTUP_WRITE_DESIGN.md) separates native
+write return/backpressure, callback completion and PostgreSQL protocol progress.
+Keep exact owned-client/queue association, temporary instance decoration and
+bounded evidence. Real socket errors and held startup are complementary controls;
+local completion must not promote unassociated server records or historic failures.
+
 The [queued-checkout design](POSTGRES_QUEUED_CHECKOUT_DESIGN.md) makes waiter
 ownership explicit at the reviewed driver boundary. Treat ambient async phase,
 queue promotion, client startup and caller delivery as distinct evidence. The

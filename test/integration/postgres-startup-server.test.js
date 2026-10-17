@@ -126,6 +126,10 @@ suite('Owned PostgreSQL server startup capture', () => {
         assert.ok(record.receiptRowsInWindow >= 1);
         const failed = checkoutRecords.find(r => r.outcome === 'failed');
         assert.equal(failed.connection.targetMatch, 'matched'); assert.equal(failed.connection.lastStage, 'startup_dispatched');
+        assert.equal(failed.connection.startupWrite.observation, 'observed');
+        assert.equal(failed.connection.startupWrite.returnOutcome, 'returned');
+        assert.equal(failed.connection.startupWrite.callbackOutcome, 'passed');
+        assert.equal(failed.connection.authenticationRequestedMs, null);
         assert.equal(failed.before.total, 0); assert.equal(failed.requested.waiting, 0); assert.equal(failed.settled.total, 0);
       } finally {
         await observer.restore(); await pool.end(); for (const socket of sockets) socket.destroy();

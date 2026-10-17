@@ -59,6 +59,14 @@ adapters must refuse unreviewed driver versions. Historical healthy probes do
 not diagnose failures captured before this instrumentation. See
 docs/POSTGRES_CONNECTION_BOUNDARY_OUTCOME.md for native and workload scope.
 
+Local startup write evidence uses the reviewed native method, plain string-only
+packet and native Socket/TLSSocket capability. Scope stream.write decoration to
+the synchronous startup call; auth/query traffic must keep its original method.
+Prove held/error/late callbacks, original wire bytes and Error/null, then actual
+held startup and successful query paths. Return/backpressure, callback completion,
+server receipt and authentication remain separate. See
+docs/POSTGRES_STARTUP_WRITE_OUTCOME.md; unavailable evidence never grants progress.
+
 Bounded root validation requires real held authority, enabled unconditional
 statement guards, exact function/column contract and an invocation token bound
 to current transaction/queryable. Prove expiry during closing work, fabrication,

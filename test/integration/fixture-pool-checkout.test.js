@@ -81,6 +81,9 @@ suite('Owned fixture checkout capture across direct migration and later discover
         assert.equal(failed.version, 3); assert.equal(failed.connection.observation, 'observed');
         assert.equal(failed.connection.targetMatch, 'mismatched');
         assert.equal(failed.connection.lastStage, 'startup_dispatched');
+        assert.equal(failed.connection.version, 2);
+        assert.equal(failed.connection.startupWrite.returnOutcome, 'returned');
+        assert.equal(failed.connection.startupWrite.callbackOutcome, 'passed');
         assert.ok(failed.connection.transportConnectedMs >= failed.connection.constructedMs);
         assert.ok(failed.connection.startupDispatchedMs >= failed.connection.transportConnectedMs);
         assert.equal(failed.connection.backendReadyMs, null);
@@ -254,6 +257,9 @@ suite('Owned fixture checkout capture across direct migration and later discover
       assert.equal(queued.acquisition.acquireEnteredMs, null); assert.equal(queued.acquisition.deliveredMs, null);
       assert.equal(queued.connection.observation, 'observed'); assert.equal(queued.connection.targetMatch, 'matched');
       assert.equal(queued.connection.lastStage, 'startup_dispatched');
+      assert.equal(queued.connection.startupWrite.observation, 'observed');
+      assert.equal(queued.connection.startupWrite.returnOutcome, 'returned');
+      assert.equal(queued.connection.startupWrite.callbackOutcome, 'passed');
       assert.equal(queued.connection.authenticationRequestedMs, null); assert.equal(queued.connection.backendReadyMs, null);
       assert.equal(new Set(failures.map(record => record.connection.clientId)).size, 3);
       assert.equal(JSON.stringify(records).includes('private'), false);
@@ -279,7 +285,8 @@ suite('Owned fixture checkout capture across direct migration and later discover
         poolKind: 'scenario_pool', source: 'testcontainer_postgres', phaseObserver, mode: 'all', onRecord: r => records.push(r) });
       try {
         const first = await pool.connect();
-        try { assert.equal((await first.query('SELECT 1 AS value')).rows[0].value, 1); }
+        try { assert.equal(Object.hasOwn(first.connection.stream, 'write'), false);
+          assert.equal((await first.query('SELECT 1 AS value')).rows[0].value, 1); }
         finally { first.release(true); }
         const value = await new Promise((resolve, reject) => {
           pool.query('SELECT 2 AS value', (error, result) => error ? reject(error) : resolve(result));
@@ -289,6 +296,11 @@ suite('Owned fixture checkout capture across direct migration and later discover
         for (const { connection } of completed) {
           assert.equal(connection.observation, 'observed'); assert.equal(connection.targetMatch, 'matched');
           assert.equal(connection.lastStage, 'backend_ready');
+          assert.equal(connection.version, 2); assert.equal(connection.startupWrite.observation, 'observed');
+          assert.equal(connection.startupWrite.returnOutcome, 'returned');
+          assert.equal(connection.startupWrite.callbackOutcome, 'passed');
+          assert.ok(connection.startupWrite.returnedMs >= connection.startupWrite.attemptedMs);
+          assert.ok(connection.startupWrite.callbackMs >= connection.startupWrite.attemptedMs);
           assert.ok(connection.authenticationRequestedMs >= connection.transportConnectedMs);
           assert.ok(connection.backendReadyMs >= connection.authenticationAcceptedMs);
         }

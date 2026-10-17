@@ -78,6 +78,10 @@ readiness-only proof separately from integration validation.
 
 ## Recommendation stack and next item
 
+The subsequent [startup-write outcome](POSTGRES_STARTUP_WRITE_OUTCOME.md) adds
+the local write boundary recommended below. Its final evidence and remaining
+HTTP phase scope are recorded separately from this earlier collection.
+
 Keep explicit version-reviewed pending ownership, bounded sanitized records,
 fixed resource limits and targeted native adverse controls. The benefit is
 original-client evidence across queued promotion; the cost is internal-driver

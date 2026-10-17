@@ -1,5 +1,14 @@
 # Project standards-to-evidence map
 
+Original startup write: owned-pg-startup-write.js temporarily observes one native
+stream write during reviewed connection.startup. pg-startup-write-record.js
+separates return/backpressure, callback and sanitized failure in connection v2.
+The existing pool/queue owners still own client association and teardown. Unit
+controls compare private wire bytes and native error events, hold callbacks and
+refuse custom/accessor inputs; native fixture/startup-server controls separate
+local completion from unassociated server receipt and absent authentication.
+See docs/POSTGRES_STARTUP_WRITE_OUTCOME.md for actual scope and retained failures.
+
 Queued acquisition: testing/integration/owned-pg-queue-observer.js maps native
 PendingItems through creation/acquire entry; pg-observer-driver.js reviews exact
 installed driver versions and native methods. pg-acquisition-record.js emits

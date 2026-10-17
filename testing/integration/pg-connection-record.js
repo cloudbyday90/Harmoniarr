@@ -5,6 +5,7 @@
  * See LICENSE for details.
  */
 import { isCheckoutCorrelationId, readCheckoutProperty } from './pool-checkout-record.js';
+import { buildPgStartupWriteRecord } from './pg-startup-write-record.js';
 
 const stages = new Set(['constructed', 'transport_connected', 'tls_stream_created', 'tls_connected',
   'startup_dispatched', 'authentication_requested', 'authentication_accepted', 'backend_ready']);
@@ -13,18 +14,21 @@ const fields = ['constructedMs', 'transportConnectedMs', 'tlsStreamCreatedMs', '
 
 export function buildPgConnectionRecord(input) {
   const read = key => readCheckoutProperty(input, key);
+  const observation = read('observation'); const clientId = read('clientId');
+  const targetMatch = read('targetMatch'); const lastStage = read('lastStage');
   const timings = Object.fromEntries(fields.map(key => {
     const value = read(key);
     return [key, Number.isFinite(value) && value >= 0 && value <= 86_400_000 ? value : null];
   }));
   return Object.freeze({
-    version: 1,
-    observation: ['observed', 'not_observed', 'unsupported_driver', 'adapter_unavailable'].includes(read('observation'))
-      ? read('observation') : 'not_observed',
-    clientId: isCheckoutCorrelationId(read('clientId')) ? read('clientId') : null,
-    targetMatch: ['matched', 'mismatched'].includes(read('targetMatch')) ? read('targetMatch') : 'unavailable',
-    lastStage: stages.has(read('lastStage')) ? read('lastStage') : 'unknown',
+    version: 2,
+    observation: ['observed', 'not_observed', 'unsupported_driver', 'adapter_unavailable'].includes(observation)
+      ? observation : 'not_observed',
+    clientId: isCheckoutCorrelationId(clientId) ? clientId : null,
+    targetMatch: ['matched', 'mismatched'].includes(targetMatch) ? targetMatch : 'unavailable',
+    lastStage: stages.has(lastStage) ? lastStage : 'unknown',
     ...timings,
+    startupWrite: buildPgStartupWriteRecord(read('startupWrite')),
   });
 }
 

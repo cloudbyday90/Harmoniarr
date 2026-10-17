@@ -111,6 +111,10 @@ PendingItem mapping. Unknown mappings and reused cold histories stay unassociate
 Queue admission, acquire entry and caller delivery are distinct from PostgreSQL
 startup. TLS stream creation, completed handshake and backend readiness
 are separate evidence. Follow the connection-boundary entry in the evidence map.
+For startup-write diagnostics, preserve the native packet bytes and scope method
+decoration to the original synchronous call. Separate write return/backpressure
+from callback completion and server receipt. Refuse custom/accessor packets or
+streams, restore without overwriting later owners, and ignore late callbacks.
 
 For performance diagnostics, follow the receipt-verification entry in the
 evidence map: count actual work with fixed dimensions, preserve original
