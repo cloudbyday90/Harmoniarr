@@ -1,5 +1,10 @@
 # AI Workflow And Shared Copilot Skills
 
+The [library-add setup design](LIBRARY_ADD_SETUP_TIMING_DESIGN.md) follows actual
+tooling and runtime completion with the existing observer. Keep native work and
+unavailable semantics unchanged, correlate nested phases and require complete
+native evidence before treating a resolved verification as usable tooling.
+
 The [automatic library-add media design](AUTOMATIC_LIBRARY_ADD_MEDIA_DESIGN.md)
 reuses the existing scoped adapter for a complete eight-case comparison. Keep
 native assertions/current bytes intact, require equal generation/inspection work

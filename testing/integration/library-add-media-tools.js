@@ -10,13 +10,14 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdir } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
+import { verifyLibraryAddMediaTooling } from './library-add-media-tooling.js';
 
 const executeFile = promisify(execFile);
 export const libraryAddRuntimePath = (value) => process.platform === 'win32' ? value.replace(/^[a-z]:/iu, '').replaceAll('\\', '/') : value;
 
 /** Every media invocation is scoped to the scenario's own directory and has no provider/network access. */
 export function createLibraryAddMediaFixture({ getFixtureRoot, isToolingReady = () => true,
-  mediaImage = process.env.HARMONIARR_INTEGRATION_MEDIA_IMAGE, inspectionExecutor = null } = {}) {
+  mediaImage = process.env.HARMONIARR_INTEGRATION_MEDIA_IMAGE, inspectionExecutor = null, phaseObserver = null } = {}) {
   function mountedPath(pathValue) {
     const scoped = relative(resolve(getFixtureRoot()), resolve(pathValue));
     assert.ok(scoped && scoped !== '..' && !scoped.startsWith(`..${sep}`) && !isAbsolute(scoped), 'media fixture must stay in the test-owned workspace');
@@ -36,18 +37,7 @@ export function createLibraryAddMediaFixture({ getFixtureRoot, isToolingReady = 
       '-t', '2', '-ac', '2', '-metadata', 'artist=Controlled fixture', '-metadata', 'album=Controlled release',
       '-metadata', 'title=Controlled song', '-metadata', 'track=1', ...(bitrate ? ['-c:a', 'libmp3lame', '-b:a', `${bitrate}k`] : ['-c:a', 'pcm_s16le']), pathValue], { readonly: false });
   }
-  async function verifyTooling() {
-    try {
-      if (mediaImage) {
-        const identity = await executeFile('docker', ['image', 'inspect', mediaImage, '--format', '{{.Id}}']);
-        const version = await executeFile('docker', ['run', '--rm', '--network', 'none', '--entrypoint', 'ffprobe', mediaImage, '-version']);
-        console.log(`Local media fixture: ${mediaImage} ${identity.stdout.trim()}; ${version.stdout.split('\n')[0]}`);
-      } else {
-        await executeFile('ffprobe', ['-version']); await executeFile('ffmpeg', ['-version']);
-      }
-      return null;
-    } catch { return 'Local ffmpeg/ffprobe fixture unavailable; configure HARMONIARR_INTEGRATION_MEDIA_IMAGE or install local tools'; }
-  }
+  const verifyTooling = () => verifyLibraryAddMediaTooling({ mediaImage, phaseObserver });
   const getTooling = async () => ({ status: isToolingReady() ? 'healthy' : 'degraded',
     details: { ffprobeAvailable: isToolingReady(), ffmpegAvailable: isToolingReady() } });
   return { generateAudio, getTooling, mediaCommand, verifyTooling };

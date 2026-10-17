@@ -16,12 +16,12 @@ export { resolveLibraryAddMediaOptions };
 /** Stable app adapters, with an independent inspection owner for each returned scenario. */
 export function createLibraryAddMediaScenario({ mode = 'per-command', mediaImage,
   createExecutor = createOwnedMediaInspectionExecutor, createMediaFixture = createLibraryAddMediaFixture,
-  onRecord = null } = {}) {
+  onRecord = null, phaseObserver = null } = {}) {
   resolveLibraryAddMediaOptions({ HARMONIARR_LIBRARY_ADD_MEDIA_EXECUTION: mode, HARMONIARR_INTEGRATION_MEDIA_IMAGE: mediaImage });
   if (typeof createExecutor !== 'function' || typeof createMediaFixture !== 'function'
     || (onRecord !== null && typeof onRecord !== 'function')) throw new TypeError('Invalid library-add media adapters');
   let active = null;
-  const prerequisite = createMediaFixture({ mediaImage });
+  const prerequisite = createMediaFixture({ mediaImage, phaseObserver });
   function current() {
     if (!active?.fixture) throw new Error('Library-add media requires an active scenario');
     return active;

@@ -27,6 +27,8 @@ prerequisites, recorded full/selected scope and approved phase/failure evidence;
 retain historical failures and unchanged private comparison/resource contracts.
 That reference also owns the eight-case automatic library-add media comparison:
 unchanged test bodies, equal work, complete counterbalanced samples and cleanup.
+For its before-hook investigation, that reference distinguishes original tooling/
+runtime completion, unavailable returns and raw phase versus aggregate evidence.
 
 Server startup evidence needs fresh default PostgreSQL 18 ownership, structured
 JSON/source locations and a private unnamed-client startup marker. A unique

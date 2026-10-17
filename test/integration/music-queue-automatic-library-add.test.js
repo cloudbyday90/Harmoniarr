@@ -24,12 +24,14 @@ import { createLibraryAddFixtureUser, seedOwnedLibraryAddFixture,
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 import { isSkippableIntegrationRuntimeError, toIntegrationRuntimeUnavailableReason } from '../../testing/integration/runtime-availability.js';
 import { createLibraryAddMediaScenario, resolveLibraryAddMediaOptions } from '../../testing/integration/library-add-media-scenario.js';
+import { createIntegrationFixturePhaseObserver } from '../../testing/integration/fixture-phase-observer.js';
 
 const config = resolveIntegrationTestRuntimeConfig();
 let runtime; let module; let unavailableReason; let mediaUnavailableReason;
 let inspectionHook; let gateHook; let controlledGate = false; let recoveryCalls = []; let recoveryDecisions = [];
 const mediaOptions = resolveLibraryAddMediaOptions();
-const mediaScenario = createLibraryAddMediaScenario({ ...mediaOptions,
+const phaseObserver = createIntegrationFixturePhaseObserver();
+const mediaScenario = createLibraryAddMediaScenario({ ...mediaOptions, phaseObserver,
   onRecord: mediaOptions.diagnostics ? record => console.log(`Automatic library-add media: ${JSON.stringify(record)}`) : null });
 const { mediaFixture } = mediaScenario;
 const runScenario = (...args) => mediaScenario.runScenario(runtime, ...args);
@@ -57,9 +59,9 @@ async function makeShared(pool, fixture, other) {
 
 suite('Automatic Music Queue library addition with PostgreSQL and test-owned measured files', () => {
   before(async () => {
-    mediaUnavailableReason = await mediaFixture.verifyTooling();
+    mediaUnavailableReason = await phaseObserver.measure('media_tooling', () => mediaFixture.verifyTooling());
     try {
-      runtime = await createIntegrationAppRuntime({ config, createAppFn: (options) => createApp({ ...options,
+      runtime = await phaseObserver.measure('runtime_setup', () => createIntegrationAppRuntime({ config, phaseObserver, createAppFn: (options) => createApp({ ...options,
         createImportCandidateModule: (dependencies) => {
           const inspection = createMediaInspectionService({ getMediaToolingStatus: mediaFixture.getTooling,
             mediaCommandService: { runCommand: ({ binary, args }) => mediaFixture.mediaCommand(binary, args) } });
@@ -81,10 +83,10 @@ suite('Automatic Music Queue library addition with PostgreSQL and test-owned mea
               handleImportCandidateRejectedTransfer: async () => ({ recovered: false }) },
           }); return module;
         },
-      }) });
+      }) }));
     } catch (error) { if (!isSkippableIntegrationRuntimeError(error)) throw error; unavailableReason = toIntegrationRuntimeUnavailableReason(error); }
   }, { timeout: config.suiteSetupTimeoutMs });
-  after(async () => { await runtime?.cleanup(); }, { timeout: config.suiteTeardownTimeoutMs });
+  after(async () => { await phaseObserver.measure('runtime_cleanup', () => runtime?.cleanup()); }, { timeout: config.suiteTeardownTimeoutMs });
 
   test('completed-transfer transition queues atomic system-owned current work and the real worker moves original WAV bytes', { timeout: config.scenarioTimeoutMs }, async (t) => {
     if (unavailableReason || mediaUnavailableReason) { t.skip(unavailableReason || mediaUnavailableReason); return; }

@@ -1,5 +1,13 @@
 # Project standards-to-evidence map
 
+Library-add setup: library-add-media-tooling.js observes the original image/version
+commands through an injected fixture observer. The automatic suite owns outer
+media_tooling/runtime_setup/runtime_cleanup and supplies the same runtime root.
+Held-command controls prove completion ordering, stopped admission on Error/null,
+disabled clock/sink and unchanged unavailable semantics. Passed helper completion
+is not tooling availability or verified remote retirement. See
+docs/LIBRARY_ADD_SETUP_TIMING_OUTCOME.md for actual native evidence and limits.
+
 Automatic library-add media: music-queue-automatic-library-add.test.js reuses
 library-add-media-scenario.js instead of a mutable fixtureRoot. The pure options
 keep per-command default and explicit image-backed owned-api; only ffprobe uses

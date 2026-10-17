@@ -126,6 +126,10 @@ while measuring the original work, without extra probes, skipped verification,
 caching or larger deadlines. Establish a complete equal-work comparison before
 another optimization or Linux cohort expansion.
 
+The subsequent [setup timing outcome](LIBRARY_ADD_SETUP_TIMING_OUTCOME.md)
+records this investigation on its own source and keeps the comparison above
+separate from later observations.
+
 GitHub MCP discovery and a fresh closing PR-collection read both returned zero
 open PRs. There is none to randomly select, apply, close or rebase. Work stays on
 main; no release, tag, branch, PR merge or deployment-image rebuild is created.

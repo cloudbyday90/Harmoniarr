@@ -6,6 +6,31 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Delivered slice: Original library-add setup timing (2026-10-17)
+
+- Extract the original media prerequisite commands into a narrow ESM tooling
+  module. Reuse one fixture observer for image/version, outer tooling, returned
+  runtime setup and cleanup. Keep command order/arguments, unavailable semantics,
+  all eight native bodies, existing cohort format and execution defaults.
+- Both automatic modes pass with 18 generations/59 inspections. Tooling takes
+  about 1.28 seconds and runtime setup about four seconds in these observations;
+  nested timing is not additive or a diagnosis of earlier variable wall gaps.
+  The unchanged six-case cohort also passes: 14 distinct native cases across two
+  paths, with the automatic eight repeated in the second mode.
+- All 40 focused and 10,497 fast cases pass, along with both builds and static
+  checks. Preserve the unrun other 125 native paths and prior failures separately.
+  See the [design and tradeoffs](LIBRARY_ADD_SETUP_TIMING_DESIGN.md),
+  [official research](LIBRARY_ADD_SETUP_TIMING_RESEARCH_2026_10.md) and
+  [outcome](LIBRARY_ADD_SETUP_TIMING_OUTCOME.md). Existing testing/standards skills
+  retain actual completion, availability and raw-evidence distinctions.
+- Opening/closing GitHub MCP reads find no open PR to select or rebase. Work
+  stays on main; no release, tag, branch or PR merge is created.
+- Next: replace unbounded prerequisite version execution with acknowledged
+  ownership and verified retirement before adding timeout policy. Evaluate the
+  existing integration-tool-probe owner for immutable image commands and actual
+  close for local tools. Qualify changed work with native adverse controls;
+  retain unavailable semantics, original failure identity and safe cleanup.
+
 ## Delivered slice: Scoped automatic library-add media comparison (2026-10-17)
 
 - Replace the automatic file's mutable media root with the existing ESM scenario

@@ -1,5 +1,15 @@
 # Guarded workload selection and failure evidence
 
+For automatic library-add setup, use the shared fixture observer's media_tooling,
+media_image_inspect, media_version, runtime_setup and runtime_cleanup records.
+The suite supplies one observer to its prerequisite helper and runtime. A passed
+tooling phase means the helper resolved; it may return an unavailable reason.
+Require native zero-skip evidence for availability. These raw diagnostic phases
+do not extend version-one cohort aggregates. Keep nested durations separate and
+do not infer setup or module-loading causes from parent-wall subtraction alone.
+The original unbounded version probe still needs owned remote retirement before
+adding CLI timeout policy. See docs/LIBRARY_ADD_SETUP_TIMING_OUTCOME.md.
+
 Automatic library-add media uses the existing library-add-media-scenario adapter
 with per-command as default and explicit owned-api selection. Preserve all eight
 native callbacks/assertions except the wrapper call, and compare their bodies

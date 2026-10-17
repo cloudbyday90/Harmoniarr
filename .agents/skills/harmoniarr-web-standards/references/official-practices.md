@@ -1,5 +1,11 @@
 # Official practices by boundary
 
+October 17 setup timing uses docs/LIBRARY_ADD_SETUP_TIMING_RESEARCH_2026_10.md.
+Use actual returned command/runtime completion and process-relative durations;
+do not sum nested phases or infer causes from residual wall time. Node signal
+delivery and Docker client completion do not certify remote retirement. Keep
+OWASP-minimized records and distinguish unavailable returns from thrown failure.
+
 October 17 automatic library-add guidance uses
 docs/AUTOMATIC_LIBRARY_ADD_MEDIA_RESEARCH_2026_10.md. Docker root read-only and
 mount read-only are separate controls; local daemon authority remains privileged.

@@ -131,3 +131,5 @@ For media fixture reuse, follow the automatic library-add entry: preserve curren
 inspection bytes, compare complete equal-work cohorts and keep each scenario's
 root/command/reader lifetime owned through verified cleanup. Local timing does
 not establish hosted-runner capability or permission to change defaults.
+Use the setup entry for original tooling/runtime timing and the distinction
+between helper completion, tooling availability and verified remote retirement.
