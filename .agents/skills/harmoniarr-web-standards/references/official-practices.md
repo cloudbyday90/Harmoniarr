@@ -1,5 +1,12 @@
 # Official practices by boundary
 
+October 19 default-CSRF guidance uses docs/CSRF_DEFAULT_PROTECTION_RESEARCH_2026_10.md.
+OWASP session-bound token validation and explicit Strict/HttpOnly cookie practices
+own different boundaries. W3C Fetch Metadata is a Working Draft, not a mandate to
+replace existing tokens. Trace current route exceptions, saved/environment
+precedence and load-failure caches before changing defaults; do not label a
+cookie-bearing direct HTTP request as a demonstrated foreign-site browser attack.
+
 October 19 runtime guidance uses docs/RUNTIME_DEPENDENCY_RESEARCH_2026_10.md.
 OWASP recommends server CSRF validation; W3C Fetch Metadata remains a Working
 Draft and provides additional request context. Neither makes disabled token

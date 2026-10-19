@@ -44,9 +44,9 @@ function parseBoolean(value, fallback = false, fieldName = 'boolean setting') {
 }
 
 export function resolveCsrfProtectionMode(value = process.env[csrfProtectionModeEnvVar]) {
-  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
-  if (!normalized) {
-    return csrfProtectionModes.disabled;
+  const normalized = value == null ? '' : typeof value === 'string' ? value.trim().toLowerCase() : null;
+  if (normalized === '') {
+    return csrfProtectionModes.required;
   }
 
   if (normalized === csrfProtectionModes.required || normalized === csrfProtectionModes.disabled) {
@@ -54,7 +54,7 @@ export function resolveCsrfProtectionMode(value = process.env[csrfProtectionMode
   }
 
   throw new Error(
-    `Invalid ${csrfProtectionModeEnvVar} value: ${value}. Expected "${csrfProtectionModes.required}" or "${csrfProtectionModes.disabled}".`,
+    `Invalid ${csrfProtectionModeEnvVar} value: ${typeof value === 'string' ? value : typeof value}. Expected "${csrfProtectionModes.required}" or "${csrfProtectionModes.disabled}".`,
   );
 }
 
@@ -75,7 +75,7 @@ export function resolveDeploymentSecurityPolicy({ env = process.env, settings = 
 
   return {
     csrfProtectionMode: resolveCsrfProtectionMode(
-      securitySettings.csrfProtectionMode ?? env[csrfProtectionModeEnvVar],
+      securitySettings.csrfProtectionMode ?? env[csrfProtectionModeEnvVar] ?? null,
     ),
     enforceHttps: resolveHttpsEnforcementEnabled(
       securitySettings.enforceHttps ?? env[enforceHttpsEnvVar],

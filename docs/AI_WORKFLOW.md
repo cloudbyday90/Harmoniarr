@@ -1,5 +1,11 @@
 # AI Workflow And Shared Copilot Skills
 
+The [default CSRF design](CSRF_DEFAULT_PROTECTION_DESIGN.md) adds a practical
+security-default workflow to the maintained standards skill: distinguish absent
+configuration from explicit saved intent, inspect first-load caches and verify
+actual protected writes plus real client submission. Preserve public auth
+exceptions and keep direct HTTP proof separate from browser exploitability.
+
 The [runtime qualification design](RUNTIME_DEPENDENCY_QUALIFICATION_DESIGN.md)
 extends the existing testing and web-standards skills with old-base PR delta
 application, effective CSRF-mode checks, real durable refusal and production-built

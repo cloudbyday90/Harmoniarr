@@ -69,3 +69,11 @@ reloads that would conceal router failure. Bind source/lock and built assets
 before/after; programmatic focus plus Enter does not prove sequential Tab order
 or whole WCAG conformance. A language-server upgrade needs initialize, an actual
 document request, shutdown and process close using the retained compiler API.
+
+Default protection now has dedicated evidence in
+docs/CSRF_DEFAULT_PROTECTION_OUTCOME.md. Seed old saved/missing settings before
+app creation rather than enabling required mode during a supposed default test.
+Prove bootstrap/login/refresh exceptions, token rotation and a real UI mutation;
+the successful headerless opt-out control must remain intentional. Borrow/release
+the schema-preparation wrapper's client; that wrapper exposes connect, not the
+entire pool query API. Report changed fixtures and rejected candidates separately.

@@ -88,7 +88,7 @@ const settingsSaveState = computed(() => buildSettingsSaveState({
         <header class="hx-card-header">
           <div>
             <h3 class="hx-card-title">Remote access protections</h3>
-            <p class="hx-card-subtitle">Only change these when Harmoniarr is safely available over HTTPS.</p>
+            <p class="hx-card-subtitle">Keep cross-site request protection required. Enable the HTTPS options after your proxy and certificate are working.</p>
           </div>
         </header>
         <div class="hx-card-body">
@@ -117,7 +117,7 @@ const settingsSaveState = computed(() => buildSettingsSaveState({
             </SettingsFormGroup>
             <SettingsFormGroup
               title="Cross-site requests"
-              description="Require protection only when other websites can reach this Harmoniarr instance."
+              description="Required by default. Disable only for an intentionally restricted local installation."
             >
               <div class="hx-field">
                 <label class="hx-field-label" for="settings-csrf-protection">Cross-site request protection</label>

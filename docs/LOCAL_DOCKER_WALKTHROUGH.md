@@ -1,5 +1,11 @@
 # Harmoniarr Local Docker Walkthrough
 
+The walkthrough explicitly opts out of CSRF protection in compose.walkthrough.yaml
+for its loopback-only local setup. The application default is required; a saved
+security setting takes precedence over environment. Review existing opt-outs
+before using a broader deployment. See the
+[default-protection design](CSRF_DEFAULT_PROTECTION_DESIGN.md).
+
 The October 16 [queued-checkout rebuild outcome](LOCAL_DOCKER_QUEUED_CHECKOUT_OUTCOME.md)
 records a fresh-builder no-cache build, healthy preserved-state startup,
 existing-admin bootstrap and readiness-only provider validation. Provider health

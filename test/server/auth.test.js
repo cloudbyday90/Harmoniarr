@@ -178,8 +178,8 @@ test('requireFreshAdminSession composes forced re-auth and admin checks through 
   assert.equal(session.appUserId, 'user-4');
 });
 
-test('resolveCsrfProtectionMode defaults to disabled and accepts an explicit disabled mode', () => {
-  assert.equal(resolveCsrfProtectionMode(undefined), csrfProtectionModes.disabled);
+test('resolveCsrfProtectionMode defaults to required and accepts an explicit disabled mode', () => {
+  assert.equal(resolveCsrfProtectionMode(undefined), csrfProtectionModes.required);
   assert.equal(resolveCsrfProtectionMode(' disabled '), csrfProtectionModes.disabled);
 });
 

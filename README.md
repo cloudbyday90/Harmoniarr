@@ -532,6 +532,16 @@ SLSKD_APPDATA=/srv/slskd/config
 
 `HARMONIARR_CSRF_PROTECTION` defaults to `required`. Set it to `disabled` only for tightly trusted local-only or separately network-restricted deployments where you are intentionally accepting the CSRF tradeoff. A reverse proxy can reduce exposure and enforce network boundaries, but it is not a general substitute for CSRF protection by itself.
 
+A saved `security.csrfProtectionMode` takes precedence over that environment
+setting. Upgrades without a saved CSRF value inherit required protection;
+existing saved `disabled` values remain explicit opt-outs. Review those values
+in Settings > System & security when upgrading. Blank configuration resolves
+to required and malformed types are rejected. Cookie-authenticated scripts must
+send the session's CSRF token in `X-CSRF-Token` for protected mutations; the
+shared application clients already do this. Bootstrap, login and session refresh
+keep their existing narrow exceptions. See the
+[default-protection design](docs/CSRF_DEFAULT_PROTECTION_DESIGN.md).
+
 `PUID` and `PGID` now select the container user through Compose itself. Ensure the bound host paths are writable by that UID/GID pair; the default runtime path no longer tries to `chown` host mounts during startup.
 
 The default Compose baselines now also run with a read-only container root filesystem. Writable state is limited to the explicit bind mounts and tmpfs mounts declared in the Compose files.

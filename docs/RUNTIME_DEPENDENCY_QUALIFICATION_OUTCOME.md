@@ -92,6 +92,9 @@ qualified. No PR merge, branch, tag or release was created by this work.
 
 ## Next recommendation
 
+The subsequent [default CSRF outcome](CSRF_DEFAULT_PROTECTION_OUTCOME.md) addresses
+this recommendation and records explicit-opt-out compatibility and final proof.
+
 Reconcile default CSRF behavior with the [security policy](SECURITY_POLICY.md).
 resolveCsrfProtectionMode currently returns disabled for an unset value; the
 policy calls for protected cookie-authenticated writes by default and an

@@ -48,7 +48,7 @@ async function requireCsrfProtection(client) {
   assert.equal(configured.payload.settings.security.csrfProtectionMode, 'required');
 }
 
-test('native settings mutations reject anonymous callers and invalid CSRF under required protection without durable changes', {
+test('native default settings mutations reject anonymous callers and invalid CSRF without durable changes', {
   timeout: config.scenarioTimeoutMs,
 }, () => scenario(async ({ client, getPoolFn }) => {
   const beforeRows = await readSettingsRows(getPoolFn);
@@ -57,7 +57,6 @@ test('native settings mutations reject anonymous callers and invalid CSRF under 
   assert.equal(anonymous.payload.error.code, 'auth_required');
   assert.deepEqual(await readSettingsRows(getPoolFn), beforeRows);
   assert.equal((await bootstrapAdminSession(client)).response.status, 201);
-  await requireCsrfProtection(client);
   const protectedRows = await readSettingsRows(getPoolFn);
   for (const headers of [{}, { 'x-csrf-token': 'deliberately-invalid' }]) {
     const response = await client.requestJson('/api/v1/settings', { method: 'PUT', json: patch, csrf: false, headers });
@@ -68,9 +67,45 @@ test('native settings mutations reject anonymous callers and invalid CSRF under 
   const valid = await client.requestJson('/api/v1/settings', { method: 'PUT', json: patch });
   assert.equal(valid.response.status, 200);
   assert.equal(valid.payload.settings.system.logLevel, 'debug');
+  assert.equal(valid.payload.settings.security.csrfProtectionMode, 'required');
   assert.deepEqual(await readSettingsRows(getPoolFn), [
     ...protectedRows, { namespace: 'system', setting_key: 'logLevel', setting_value: 'debug' },
   ]);
+}));
+
+test('native default protection preserves public login and refresh while refusing logout without its session token', {
+  timeout: config.scenarioTimeoutMs,
+}, () => scenario(async ({ baseUrl, client, getPoolFn }) => {
+  assert.equal((await bootstrapAdminSession(client)).response.status, 201);
+  const rowsBefore = await getPoolFn().query('SELECT id FROM refresh_tokens WHERE is_revoked = FALSE');
+  const deniedLogout = await client.requestJson('/api/v1/auth/logout', { method: 'POST', csrf: false });
+  assert.equal(deniedLogout.response.status, 403);
+  assert.equal(deniedLogout.payload.error.code, 'csrf_required');
+  assert.deepEqual((await getPoolFn().query('SELECT id FROM refresh_tokens WHERE is_revoked = FALSE')).rows, rowsBefore.rows);
+
+  const oldToken = client.getCsrfToken();
+  const refresh = await client.requestJson('/api/v1/auth/refresh', { method: 'POST', csrf: false });
+  assert.equal(refresh.response.status, 200);
+  assert.notEqual(client.getCsrfToken(), oldToken);
+  const stale = await client.requestJson('/api/v1/settings', {
+    method: 'PUT', csrf: false, headers: { 'x-csrf-token': oldToken }, json: patch,
+  });
+  assert.equal(stale.response.status, 403);
+  assert.equal(stale.payload.error.code, 'csrf_invalid');
+  assert.deepEqual(await readSettingsRows(getPoolFn), []);
+
+  const second = createSessionHttpClient(baseUrl);
+  const login = await second.requestJson('/api/v1/auth/login', {
+    method: 'POST', csrf: false, json: { username: 'admin', password: 'IntegrationPass123!' },
+  });
+  assert.equal(login.response.status, 200);
+  const otherSessionToken = await client.requestJson('/api/v1/settings', {
+    method: 'PUT', csrf: false, headers: { 'x-csrf-token': second.getCsrfToken() }, json: patch,
+  });
+  assert.equal(otherSessionToken.response.status, 403);
+  assert.equal(otherSessionToken.payload.error.code, 'csrf_invalid');
+  assert.deepEqual(await readSettingsRows(getPoolFn), []);
+  assert.equal((await client.requestJson('/api/v1/auth/logout', { method: 'POST' })).response.status, 200);
 }));
 
 test('native current role is rechecked before an issued session can mutate admin settings', {

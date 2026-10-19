@@ -1,5 +1,15 @@
 # Project standards-to-evidence map
 
+Default CSRF: deployment-security-service.js requires missing/blank values and
+rejects malformed types; explicit saved/environment opt-outs retain precedence.
+deployment-security-service.test.js covers isolated environments and cached load
+failure. runtime-http-contract.test.js proves the unset default, rotation and
+cross-session refusal before persisted changes. csrf-settings-upgrade.test.js
+seeds legacy settings before app creation and verifies missing-row adoption,
+retained opt-out and re-enablement. csrf-default-browser-verification.test.js
+compares a headerless refusal with an actual UI/token save. See
+docs/CSRF_DEFAULT_PROTECTION_OUTCOME.md for final gates, failures and limits.
+
 Runtime qualification: runtime-http-contract.test.js saves required CSRF mode
 through the actual settings route, then checks native missing/invalid tokens,
 current role and revoked-session replay against unchanged PostgreSQL rows.

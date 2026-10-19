@@ -6,6 +6,23 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Delivered slice: Required default CSRF protection (2026-10-19)
+
+- Require existing session-bound CSRF protection when configuration is absent or
+  blank; reject malformed values rather than producing an implicit opt-out.
+  Preserve explicit saved/environment modes, their precedence and public auth
+  exceptions. Existing databases without a row inherit required on startup.
+- Add policy, native legacy-startup and token-lifecycle coverage plus actual
+  browser settings submission. Update upgrade guidance and security copy.
+  See the [design](CSRF_DEFAULT_PROTECTION_DESIGN.md),
+  [research/tradeoffs](CSRF_DEFAULT_PROTECTION_RESEARCH_2026_10.md) and
+  [outcome](CSRF_DEFAULT_PROTECTION_OUTCOME.md) for final evidence and limits.
+- Evaluate random [PR 50](OPEN_PR_50_LOCAL_EVALUATION_OUTCOME.md) locally and
+  restore its package pair after the exact published Router candidate still
+  reproduces the reported composition exception. No PR merge or release.
+- Next: fix TestsStream end-listener ownership with focused native reporter
+  completion/drainage proof; keep default scheduling and warning limits intact.
+
 ## Delivered slice: Runtime dependency qualification (2026-10-19)
 
 - Qualify Express 5.3.0 and Vue 3.5.44 against actual HTTP/session/settings and

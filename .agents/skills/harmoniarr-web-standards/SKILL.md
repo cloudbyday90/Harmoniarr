@@ -16,6 +16,10 @@ limits; a compiler version check does not prove language-server compatibility.
 The runtime-qualification entry covers actual protected writes and built lazy
 navigation. Establish the effective CSRF mode before testing refusal; report
 default-policy gaps separately from dependency compatibility.
+For security-default changes, use the CSRF entry in the evidence map: distinguish
+missing state from a saved opt-out, inspect cached failure behavior and prove
+durable refusal plus actual client submission. Direct HTTP proof alone does not
+establish arbitrary cross-site browser exploitability.
 
 ## Establish the journey and applicable sources
 
