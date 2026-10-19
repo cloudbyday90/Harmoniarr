@@ -6,6 +6,23 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Delivered slice: Native reporter ownership (2026-10-19)
+
+- Reproduce TestsStream's 11 end-listener warning without PostgreSQL. Replace
+  two custom cohort-enabled consumers with one modular ESM reporter and a shared
+  bounded cohort accumulator; keep native spec and default warnings intact.
+- Prove held early failure, exact cohort equivalence, strict refusal, source
+  EOF/Error/null/return and existing subprocess/output drainage. See the
+  [design](TEST_REPORTER_OWNERSHIP_DESIGN.md),
+  [official research/tradeoffs](TEST_REPORTER_OWNERSHIP_RESEARCH_2026_10.md) and
+  [outcome](TEST_REPORTER_OWNERSHIP_OUTCOME.md) for executed scope and limits.
+- Evaluate random [PR 45](OPEN_PR_45_LOCAL_EVALUATION_OUTCOME.md) locally against
+  actual lint/build, database/TLS, browser and bridged Vue/TypeScript tooling
+  consumers. Update the existing testing/standards AI skills with that method.
+- Next: qualify one maintained Node 24 baseline across host/CI/Docker. Recheck
+  the announced October 21 security release before choosing a pin. Review the
+  retained runtime build-tool dependency closure separately; no release here.
+
 ## Delivered slice: Required default CSRF protection (2026-10-19)
 
 - Require existing session-bound CSRF protection when configuration is absent or
@@ -20,8 +37,8 @@ Database model source: `docs/DATABASE_MODEL.md`
 - Evaluate random [PR 50](OPEN_PR_50_LOCAL_EVALUATION_OUTCOME.md) locally and
   restore its package pair after the exact published Router candidate still
   reproduces the reported composition exception. No PR merge or release.
-- Next: fix TestsStream end-listener ownership with focused native reporter
-  completion/drainage proof; keep default scheduling and warning limits intact.
+- Follow-up delivered: [TestsStream reporter ownership](TEST_REPORTER_OWNERSHIP_OUTCOME.md)
+  with focused native completion/drainage proof and unchanged warning limits.
 
 ## Delivered slice: Runtime dependency qualification (2026-10-19)
 

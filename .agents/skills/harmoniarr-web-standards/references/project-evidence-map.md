@@ -1,5 +1,14 @@
 # Project standards-to-evidence map
 
+Reporter ownership belongs to testing/reporters/integration-evidence-reporter.js
+and postgres-cohort-accumulator.js, composed by postgres-file-process.js. Native
+spec retains its own destination. The integration-evidence-reporter and early-
+failure-reporter script tests own one-pass/EOF/error/return, held native failure,
+strict equivalence and an ordinary default-threshold warning control. Selected
+real PostgreSQL/browser evidence is in docs/TEST_REPORTER_OWNERSHIP_OUTCOME.md;
+it does not prove all Node versions or whole-CI speed. PR 45's separate outcome
+owns real Vue/TypeScript bridge, browser, database and build-tool qualification.
+
 Default CSRF: deployment-security-service.js requires missing/blank values and
 rejects malformed types; explicit saved/environment opt-outs retain precedence.
 deployment-security-service.test.js covers isolated environments and cached load

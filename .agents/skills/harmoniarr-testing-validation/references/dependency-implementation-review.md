@@ -57,6 +57,14 @@ control, then a separate search for application applicability. Keep a working
 dependency when the candidate introduces that failure; avoid blanket wrappers
 or private vendor patches without a product need.
 
+For Vue tooling, distinguish the language server's document/HTML features from
+TypeScript-plugin script/template types. Probe real requests with the retained
+compiler and bridge actual tsserver/request responses; do not substitute a mock
+or expect every semantic hover from Vue's service. Await protocol exit writes
+before ending stdin, then verify shutdown and process close. A private harness
+import/shutdown error is not evidence of a dependency regression. PR 45's example
+is docs/OPEN_PR_45_LOCAL_EVALUATION_OUTCOME.md.
+
 For HTTP qualification, use actual sessions and PostgreSQL rows. Establish the
 effective security mode explicitly; a default-disabled fixture cannot prove
 required CSRF refusal. Verify missing/invalid tokens, role changes, revocation,

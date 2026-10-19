@@ -129,6 +129,15 @@ Validate reporter contracts on installed Node and distinguish cumulative summari
 from file summaries. Keep inclusive phase durations separate from elapsed time;
 artifact failure or partial native completion cannot produce a saving claim.
 
+The [reporter ownership design](TEST_REPORTER_OWNERSHIP_DESIGN.md) adds a focused
+method for TestsStream warnings: reproduce composition without PostgreSQL, share
+one bounded custom consumer and preserve native spec/default warning behavior.
+Prove early held-test output, exact cohort equivalence, EOF/Error/null/return and
+real process/output close. The existing standards/testing skills contain this
+workflow and real Vue/TypeScript bridge qualification; avoid interpreting a
+private probe's import or shutdown error as a vendor regression. The
+[outcome](TEST_REPORTER_OWNERSHIP_OUTCOME.md) owns actual scope and limitations.
+
 The [startup cancellation outcome](POSTGRES_STARTUP_CANCELLATION_OUTCOME.md)
 extends the existing standards/testing method with cooperative checkpoints:
 await actual acquisition, check before publication, then clean through the

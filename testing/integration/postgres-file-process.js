@@ -60,9 +60,9 @@ export async function runPostgresTestFile({ file, cwd = process.cwd(), env = pro
   let child;
   try {
     child = spawnFn(process.execPath, ['--test', '--test-concurrency=1', '--test-reporter=spec',
-      '--test-reporter=./testing/reporters/early-failure-reporter.js',
+      `--test-reporter=./testing/reporters/${cohortEvidence ? 'integration-evidence' : 'early-failure'}-reporter.js`,
       '--test-reporter-destination=stdout', '--test-reporter-destination=stderr',
-      ...(cohortEvidence ? ['--test-reporter=./testing/reporters/postgres-cohort-reporter.js', '--test-reporter-destination=stderr'] : []), file],
+      file],
     { cwd, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'], shell: false,
       windowsHide: true, detached: process.platform !== 'win32' });
   } catch (error) {

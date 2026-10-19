@@ -92,8 +92,7 @@ separate controls. Intentional disabled settings remain opt-outs and should be
 reviewed by operators on upgrade. No new Origin/Fetch Metadata policy, cookie
 format, cryptography, auth exceptions, production image or release is introduced.
 
-Next, fix the repeatedly observed TestsStream end-listener ownership warning
-with a focused reproducer and lifecycle checks. Keep listener-limit increases
-and warning suppression out of that fix; reduce redundant validation work only
-after proving reporter completion and cleanup. Requalify Router independently
-when a suitable candidate is available.
+The [subsequent reporter outcome](TEST_REPORTER_OWNERSHIP_OUTCOME.md) resolves the
+repeated TestsStream end-listener warning with a focused reproducer, combined
+owned reporting and native lifecycle proof. Default warning limits remain.
+Requalify Router independently when a suitable candidate is available.

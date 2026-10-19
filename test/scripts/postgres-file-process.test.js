@@ -68,7 +68,8 @@ test('exit and runner close cannot bypass asynchronous output write completion',
 
 test('cohort evidence opts into one fixed reporter while invalid policy starts no process', async () => {
   const f = fixture(); const pending = runPostgresTestFile({ ...f.input, cohortEvidence: true }); f.finish(); await pending;
-  assert.deepEqual(f.calls[0].args.slice(-3), ['--test-reporter=./testing/reporters/postgres-cohort-reporter.js',
+  assert.deepEqual(f.calls[0].args, ['--test', '--test-concurrency=1', '--test-reporter=spec',
+    '--test-reporter=./testing/reporters/integration-evidence-reporter.js', '--test-reporter-destination=stdout',
     '--test-reporter-destination=stderr', f.input.file]);
   const invalid = fixture();
   await assert.rejects(runPostgresTestFile({ ...invalid.input, cohortEvidence: 'true' }), TypeError);

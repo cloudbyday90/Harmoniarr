@@ -221,13 +221,13 @@ test('reporter yields a failure before requesting a later blocked event', async 
   }
 });
 
-test('native Node reports approved failure details while a later case remains held, preserving separate TAP and exit status', { timeout: 15_000 }, async (t) => {
+for (const reporterName of ['early-failure', 'integration-evidence']) test(`native ${reporterName} reports failure while a later case remains held, preserving separate TAP and exit status`, { timeout: 15_000 }, async (t) => {
   // The owned CLI must start as a runner, rather than inherit this test worker's
   // internal child serialization mode. Other environment values remain unchanged.
   const { NODE_TEST_CONTEXT: _nodeTestContext, ...childEnv } = process.env;
   const child = spawn(process.execPath, [
     '--test', '--test-isolation=none', '--test-concurrency=1',
-    '--test-reporter=tap', '--test-reporter=./testing/reporters/early-failure-reporter.js',
+    '--test-reporter=tap', `--test-reporter=./testing/reporters/${reporterName}-reporter.js`,
     '--test-reporter-destination=stdout', '--test-reporter-destination=stderr', fixtureFile,
   ], { cwd: projectRoot, env: childEnv, stdio: ['ignore', 'pipe', 'pipe', 'ipc'], windowsHide: true });
   let nativeOutput = '';
@@ -283,7 +283,18 @@ test('native Node reports approved failure details while a later case remains he
   assert.equal(released, true);
   assert.equal(nativeOutput.includes('# tests 2'), true);
   assert.equal(nativeOutput.includes('private-message-canary'), true);
-  assert.equal(boundedOutput.trim().split('\n').length, 1);
+  const lines = boundedOutput.trim().split('\n');
+  assert.equal(lines.length, reporterName === 'integration-evidence' ? 2 : 1);
+  assert.equal(boundedOutput.includes('MaxListenersExceededWarning'), false);
+  if (reporterName === 'integration-evidence') {
+    const marker = '[postgres-cohort-evidence] ';
+    assert.equal(lines[1].startsWith(marker), true);
+    const evidence = JSON.parse(lines[1].slice(marker.length));
+    assert.equal(evidence.counts.tests, 2);
+    assert.equal(evidence.counts.failed, 1);
+    assert.equal(evidence.counts.passed, 1);
+    assert.equal(evidence.success, false);
+  }
 });
 
 test('default isolated Node worker emits approved failure before its held HTTP case completes', { timeout: 15_000 }, async (t) => {

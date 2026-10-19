@@ -1,5 +1,13 @@
 # Official practices by boundary
 
+October 19 reporter guidance uses docs/TEST_REPORTER_OWNERSHIP_RESEARCH_2026_10.md.
+Node compose/stream/event contracts own listener and completion behavior; do not
+remove another owner's listeners or hide warnings. OWASP informs bounded private
+diagnostics; W3C High Resolution Time is a Working Draft about elapsed clocks,
+not reporter or security certification. Installed Node and latest docs differ.
+Vendor language-tooling guidance assigns script/template types to the TypeScript
+plugin and document/HTML features to Vue's service; qualify their actual bridge.
+
 October 19 default-CSRF guidance uses docs/CSRF_DEFAULT_PROTECTION_RESEARCH_2026_10.md.
 OWASP session-bound token validation and explicit Strict/HttpOnly cookie practices
 own different boundaries. W3C Fetch Metadata is a Working Draft, not a mandate to

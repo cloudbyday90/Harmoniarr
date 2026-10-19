@@ -9,6 +9,10 @@ Turn applicable official practices into observable behavior in the requested
 journey. Select relevant standards; do not expand ordinary work into a blanket
 accessibility/security audit or a framework migration.
 
+For native reporter diagnostics, use the reporter-ownership entry in the evidence
+map. Trace composition before attributing a listener warning to an app leak;
+preserve unrelated warnings, bounded data and actual EOF/close ownership.
+
 For dependency changes, distinguish official public contracts from reviewed
 private implementations and test actual consumers. The driver-review entry in
 the evidence map covers transitive serializer versions and native coverage
