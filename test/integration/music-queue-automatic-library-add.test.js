@@ -58,8 +58,8 @@ async function makeShared(pool, fixture, other) {
 }
 
 suite('Automatic Music Queue library addition with PostgreSQL and test-owned measured files', () => {
-  before(async () => {
-    mediaUnavailableReason = await phaseObserver.measure('media_tooling', () => mediaFixture.verifyTooling());
+  before(async t => {
+    mediaUnavailableReason = await phaseObserver.measure('media_tooling', () => mediaFixture.verifyTooling({ signal: t.signal }));
     try {
       runtime = await phaseObserver.measure('runtime_setup', () => createIntegrationAppRuntime({ config, phaseObserver, createAppFn: (options) => createApp({ ...options,
         createImportCandidateModule: (dependencies) => {

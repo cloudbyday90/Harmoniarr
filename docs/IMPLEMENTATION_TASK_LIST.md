@@ -6,6 +6,31 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Delivered slice: Acknowledged prerequisite probe ownership (2026-10-19)
+
+- Add a narrow ESM command owner with bounded output/termination and actual
+  callback-plus-stdio close. Image tooling pins an inspected immutable Linux ID
+  and reuses the existing integration probe for confined acknowledged creation
+  and uncancelled retirement. Preserve unavailable semantics and Error/null.
+- Three new native controls pass; the original automatic eight and canonical six
+  cases also pass with unchanged bodies. Automatic work stays 18 generations/
+  59 inspections. This is 17 selected native cases; the canonical inventory is
+  now 128 files/intended 561 cases, with 125 paths not freshly rerun.
+- All 56 focused and 10,507 fast cases pass, along with both builds and static
+  checks. Keep changed probe work and historical timing/failure evidence separate.
+  See the [design and tradeoffs](LIBRARY_ADD_PROBE_OWNERSHIP_DESIGN.md),
+  [official research](LIBRARY_ADD_PROBE_OWNERSHIP_RESEARCH_2026_10.md) and
+  [outcome](LIBRARY_ADD_PROBE_OWNERSHIP_OUTCOME.md). Testing/standards skills retain
+  identity, actual close and native-versus-controlled evidence limits.
+- Random [PR 46 local evaluation](OPEN_PR_46_LOCAL_EVALUATION_OUTCOME.md) applied
+  its exact two package files, installed them and observed the pg 8.23.1 driver
+  gate refusal. Original bytes/lock are restored; pg 8.23.0 passes again. No dependency
+  change, PR merge/closure, branch, tag or release is created.
+- Next: review the actual pg 8.23.1/pg-pool internals against the queue/connection/
+  startup adapters and run their native controls before changing the exact guard
+  or reconsidering the four runtime dependency updates. Do not bypass the gate
+  on semver alone or combine that qualification with original-dependency proof.
+
 ## Delivered slice: Original library-add setup timing (2026-10-17)
 
 - Extract the original media prerequisite commands into a narrow ESM tooling

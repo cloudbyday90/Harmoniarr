@@ -7,8 +7,15 @@ tooling phase means the helper resolved; it may return an unavailable reason.
 Require native zero-skip evidence for availability. These raw diagnostic phases
 do not extend version-one cohort aggregates. Keep nested durations separate and
 do not infer setup or module-loading causes from parent-wall subtraction alone.
-The original unbounded version probe still needs owned remote retirement before
-adding CLI timeout policy. See docs/LIBRARY_ADD_SETUP_TIMING_OUTCOME.md.
+Prerequisites now use fixture-probe-command for bounded output/termination and
+actual callback-plus-stdio close. Image version work reuses integration-tool-probe:
+pin the inspected Linux identity, await create acknowledgement, validate the full
+ID/token/configuration and retire with uncancelled commands. Never infer a cleanup
+target after unknown creation or treat signal delivery as retirement. Local tools
+stay serial and preserve unavailable semantics. See
+docs/LIBRARY_ADD_PROBE_OWNERSHIP_OUTCOME.md; older timing evidence has different
+command work. Dependency patch updates must still pass installed driver guards;
+do not widen reviewed pg internals solely because semver suggests compatibility.
 
 Automatic library-add media uses the existing library-add-media-scenario adapter
 with per-command as default and explicit owned-api selection. Preserve all eight

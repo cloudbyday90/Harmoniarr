@@ -125,6 +125,9 @@ original Error/null within owners and no unverified cleanup. This changes probe
 work, so qualify it separately with native adverse controls rather than label it
 an equal-work optimization. Keep the present timing records as the baseline.
 
+The subsequent [prerequisite ownership outcome](LIBRARY_ADD_PROBE_OWNERSHIP_OUTCOME.md)
+records that implementation and its changed command work separately.
+
 Opening GitHub MCP repository/PR discovery and a fresh closing collection read
 both returned zero open PRs to apply, close or rebase. Work remains on main; no release,
 tag, branch, merge or deployment-image rebuild is created.

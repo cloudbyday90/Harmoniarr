@@ -1,5 +1,14 @@
 # Project standards-to-evidence map
 
+Prerequisite ownership: fixture-probe-command.js awaits callback and actual close,
+with SIGKILL termination requests and bounded output. library-add-media-tooling.js
+pins an inspected Linux image and reuses integration-tool-probe for identity,
+confinement and uncancelled retirement. Native local-child controls cover timeout,
+abort/null, overflow and spawn failure; Docker controls prove successful removal,
+cancellation after create and failure after attached completion. Held active-remote
+retirement is a controlled unit proof, not a new native running-container claim.
+See docs/LIBRARY_ADD_PROBE_OWNERSHIP_OUTCOME.md and the separate PR 46 evaluation.
+
 Library-add setup: library-add-media-tooling.js observes the original image/version
 commands through an injected fixture observer. The automatic suite owns outer
 media_tooling/runtime_setup/runtime_cleanup and supplies the same runtime root.

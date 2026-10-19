@@ -1,5 +1,10 @@
 # AI Workflow And Shared Copilot Skills
 
+The [prerequisite ownership design](LIBRARY_ADD_PROBE_OWNERSHIP_DESIGN.md) reuses
+the acknowledged container probe and awaits actual command/stdio close. Keep
+cleanup uncancelled, unknown identities retained and dependency compatibility
+guards intact when a randomly selected PR is tested locally.
+
 The [library-add setup design](LIBRARY_ADD_SETUP_TIMING_DESIGN.md) follows actual
 tooling and runtime completion with the existing observer. Keep native work and
 unavailable semantics unchanged, correlate nested phases and require complete

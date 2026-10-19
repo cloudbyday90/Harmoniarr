@@ -1,5 +1,12 @@
 # Official practices by boundary
 
+October 19 prerequisite guidance uses
+docs/LIBRARY_ADD_PROBE_OWNERSHIP_RESEARCH_2026_10.md. Node close includes stdio;
+timeout/abort and killed do not prove completion. Docker create acknowledgement
+and verified ID/configuration own remote retirement. Keep cleanup uncancelled,
+unknown artifacts retained, original Error/null and OWASP-minimized records.
+Changed probe work cannot claim an equal-work or whole-CI speed improvement.
+
 October 17 setup timing uses docs/LIBRARY_ADD_SETUP_TIMING_RESEARCH_2026_10.md.
 Use actual returned command/runtime completion and process-relative durations;
 do not sum nested phases or infer causes from residual wall time. Node signal

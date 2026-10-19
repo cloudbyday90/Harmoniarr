@@ -133,3 +133,5 @@ root/command/reader lifetime owned through verified cleanup. Local timing does
 not establish hosted-runner capability or permission to change defaults.
 Use the setup entry for original tooling/runtime timing and the distinction
 between helper completion, tooling availability and verified remote retirement.
+The prerequisite entry requires actual process/stdio close and acknowledged
+container identity before cleanup; termination requests alone are insufficient.

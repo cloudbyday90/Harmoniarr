@@ -56,8 +56,8 @@ const post = (client, id, key) => client.requestJson(actionPath(id), { method: '
   ...(key ? { headers: { 'Idempotency-Key': key } } : {}) });
 
 suite('Canonical prepared Add to library with PostgreSQL and test-owned measured files', () => {
-  before(async () => {
-    mediaUnavailableReason = await mediaFixture.verifyTooling();
+  before(async t => {
+    mediaUnavailableReason = await mediaFixture.verifyTooling({ signal: t.signal });
     try {
       runtime = await createIntegrationAppRuntime({ config, createAppFn: (options) => createApp({ ...options,
         createImportCandidateModule: (dependencies) => {

@@ -37,7 +37,7 @@ export function createLibraryAddMediaFixture({ getFixtureRoot, isToolingReady = 
       '-t', '2', '-ac', '2', '-metadata', 'artist=Controlled fixture', '-metadata', 'album=Controlled release',
       '-metadata', 'title=Controlled song', '-metadata', 'track=1', ...(bitrate ? ['-c:a', 'libmp3lame', '-b:a', `${bitrate}k`] : ['-c:a', 'pcm_s16le']), pathValue], { readonly: false });
   }
-  const verifyTooling = () => verifyLibraryAddMediaTooling({ mediaImage, phaseObserver });
+  const verifyTooling = ({ signal } = {}) => verifyLibraryAddMediaTooling({ mediaImage, phaseObserver, signal });
   const getTooling = async () => ({ status: isToolingReady() ? 'healthy' : 'degraded',
     details: { ffprobeAvailable: isToolingReady(), ffmpegAvailable: isToolingReady() } });
   return { generateAudio, getTooling, mediaCommand, verifyTooling };
