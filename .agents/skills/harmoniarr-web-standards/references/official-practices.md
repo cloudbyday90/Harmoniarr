@@ -1,5 +1,13 @@
 # Official practices by boundary
 
+October 19 runtime guidance uses docs/RUNTIME_DEPENDENCY_RESEARCH_2026_10.md.
+OWASP recommends server CSRF validation; W3C Fetch Metadata remains a Working
+Draft and provides additional request context. Neither makes disabled token
+enforcement secure. W3C WCAG Understanding is informative: focused-link Enter
+activation is narrower than sequential focus-order conformance. Vendor lazy
+route guidance differs from async-setup/Suspense composition; reproduce the
+reported router trigger separately from actual built application navigation.
+
 October 19 TLS identity guidance uses docs/POSTGRES_TLS_IDENTITY_RESEARCH_2026_10.md.
 Node default verification, RFC 9525 SAN identity and PostgreSQL key permissions
 own distinct boundaries. Testcontainers withSSL handles key setup; retain

@@ -1,5 +1,13 @@
 # AI Workflow And Shared Copilot Skills
 
+The [runtime qualification design](RUNTIME_DEPENDENCY_QUALIFICATION_DESIGN.md)
+extends the existing testing and web-standards skills with old-base PR delta
+application, effective CSRF-mode checks, real durable refusal and production-built
+lazy navigation. Preserve upstream-trigger versus application scope, source and
+asset fingerprints, and actual LSP request/shutdown proof. This is a practical
+extension of the maintained standards skill, using W3C, OWASP and framework
+guidance with explicit source status and evidence limits.
+
 The [native TLS design](POSTGRES_TLS_IDENTITY_DESIGN.md) keeps real SAN/trust
 verification, buffered local startup, authenticated handshake and database
 readiness distinct. Existing testing/standards skills now route to actual

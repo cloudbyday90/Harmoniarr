@@ -13,6 +13,9 @@ For dependency changes, distinguish official public contracts from reviewed
 private implementations and test actual consumers. The driver-review entry in
 the evidence map covers transitive serializer versions and native coverage
 limits; a compiler version check does not prove language-server compatibility.
+The runtime-qualification entry covers actual protected writes and built lazy
+navigation. Establish the effective CSRF mode before testing refusal; report
+default-policy gaps separately from dependency compatibility.
 
 ## Establish the journey and applicable sources
 

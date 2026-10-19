@@ -18,6 +18,9 @@ focused validation workflow, not authorization for an unrelated major migration.
    test the earliest meaningful consumer. Retain failure evidence; restore both
    package files and reinstall before testing the restored baseline. A compiler
    version command alone does not prove language-server initialization.
+   For an old PR base, apply only its reviewed JSON delta against current files;
+   reject conflicting leaves. Replacing its whole lockfile can silently undo
+   previously qualified upgrades. Record partial group adoption explicitly.
 5. Extend exact reviewed tuples only after implementation review. Include
    serialization dependencies when observing serialized startup writes. Preserve
    class/method refusal, Error/null, timeout and cleanup semantics. An unsupported
@@ -45,3 +48,24 @@ Await raw and replacement TLS socket close, restore owned hooks, then retire the
 server before removing certificate files. Retain workspaces after uncertain
 creation/retirement. Controlled held-cleanup tests do not establish active native
 cancellation coverage. PR 44's parser/cover/tag evidence remains a separate scope.
+
+## Runtime and development-tool consumers
+
+The runtime example is docs/RUNTIME_DEPENDENCY_QUALIFICATION_DESIGN.md and its
+outcome. A reproducible vendor issue needs its exact trigger and a negative
+control, then a separate search for application applicability. Keep a working
+dependency when the candidate introduces that failure; avoid blanket wrappers
+or private vendor patches without a product need.
+
+For HTTP qualification, use actual sessions and PostgreSQL rows. Establish the
+effective security mode explicitly; a default-disabled fixture cannot prove
+required CSRF refusal. Verify missing/invalid tokens, role changes, revocation,
+unchanged refused writes and a valid persisted mutation. Report a policy/default
+gap separately from the upgraded dependency's compatibility result.
+
+For lazy navigation, exercise the actual built application with rendered links,
+new chunk requests, child replacement and history. A per-document marker detects
+reloads that would conceal router failure. Bind source/lock and built assets
+before/after; programmatic focus plus Enter does not prove sequential Tab order
+or whole WCAG conformance. A language-server upgrade needs initialize, an actual
+document request, shutdown and process close using the retained compiler API.

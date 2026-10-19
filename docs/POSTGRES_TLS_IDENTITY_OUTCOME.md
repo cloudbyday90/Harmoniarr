@@ -106,7 +106,11 @@ direct TLS/ALPN, revocation, expired certificates and active native handshake
 cancellation remain separate unperformed cases. Bootstrap administration can use
 plaintext; these tests do not enforce TLS for every production connection.
 
-Next, qualify the remaining Express/Vue/router updates in
+The subsequent [runtime qualification](RUNTIME_DEPENDENCY_QUALIFICATION_OUTCOME.md)
+addresses the recommended Express/Vue/router follow-up and records its partial
+adoption, reproduced vendor failure and next security-default work.
+
+The original recommendation was to qualify the remaining Express/Vue/router updates in
 [PR 49](https://github.com/cloudbyday90/Harmoniarr/pull/49) on actual request/session/
 CSRF and nested asynchronous navigation behavior. TestsStream listener ownership
 is an independent follow-up. No PR merge, closure, rebase, tag, release or

@@ -1,5 +1,15 @@
 # Project standards-to-evidence map
 
+Runtime qualification: runtime-http-contract.test.js saves required CSRF mode
+through the actual settings route, then checks native missing/invalid tokens,
+current role and revoked-session replay against unchanged PostgreSQL rows.
+runtime-navigation-browser-verification.test.js uses production-built lazy
+Settings children, rendered link keyboard activation, current-link state,
+child replacement and history with a stable document marker and no page errors.
+These selected checks do not certify default CSRF enforcement, sequential Tab
+order, assistive technology or all routes. See
+docs/RUNTIME_DEPENDENCY_QUALIFICATION_OUTCOME.md and the separate PR 47 outcome.
+
 Native TLS identity: postgres-tls-fixture.js reuses PostgreSQL runtime ownership
 and Testcontainers withSSL; fixture JSON contains public test leaf keys, CA and
 deliberate SAN/trust negatives. pg-tls-attempt.js uses original native connection

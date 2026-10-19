@@ -6,6 +6,29 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Delivered slice: Runtime dependency qualification (2026-10-19)
+
+- Qualify Express 5.3.0 and Vue 3.5.44 against actual HTTP/session/settings and
+  built nested navigation owners. Retain Router 5.2.0 after reproducing upstream
+  issue 2851 with the proposed Vue/Router pair and a wrapping-element control.
+  The app does not currently use that exact Suspense trigger.
+- Add native required-CSRF/current-role/revoked-session refusal and persisted
+  write coverage, plus real lazy child/history/keyboard browser coverage.
+  Reuse existing ESM fixtures and keep source/lock and asset fingerprints.
+  See the [design](RUNTIME_DEPENDENCY_QUALIFICATION_DESIGN.md),
+  [official research and tradeoffs](RUNTIME_DEPENDENCY_RESEARCH_2026_10.md) and
+  [outcome](RUNTIME_DEPENDENCY_QUALIFICATION_OUTCOME.md) for final scope and limits.
+- Retain random [PR 47's local language-server update](OPEN_PR_47_LOCAL_EVALUATION_OUTCOME.md)
+  after actual initialize/document-hover/shutdown/process-close proof. Preserve
+  current TypeScript, pg and media-parser versions when applying the older PR.
+- Extend maintained testing/web-standards AI skills with the practical workflow;
+  keep W3C draft/informative guidance distinct from vendor and OWASP advice.
+- Next: reconcile the default-disabled CSRF resolver with SECURITY_POLICY.md's
+  default-protected browser-write posture. Design explicit opt-out, saved-setting
+  precedence and existing-install migration before changing defaults; verify
+  actual fresh and upgraded installations plus bootstrap/refresh exceptions.
+  TestsStream listener ownership and Router requalification remain separate.
+
 ## Delivered slice: Native PostgreSQL TLS identity (2026-10-19)
 
 - Add modular ESM TLS fixtures using existing PostgreSQL/Testcontainers owners,
