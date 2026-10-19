@@ -5,6 +5,11 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For implementation-sensitive dependency upgrades and local PR evaluation, use
+[dependency implementation review](references/dependency-implementation-review.md).
+Review published bytes/transitive owners, preserve failed candidates and test the
+actual consumer before expanding exact support guards or broader validation.
+
 HTTP fixture attribution belongs at the owned server request boundary. The
 server/request/response dispatch adapters preserve native listener order, body
 callbacks and Error/null; they do not infer context from client-side measures or

@@ -1,5 +1,11 @@
 # AI Workflow And Shared Copilot Skills
 
+The [driver implementation review](POSTGRES_DRIVER_8231_DESIGN.md) qualifies
+published pg/queue/serializer bytes before changing exact support policy.
+Use the testing skill's dependency-review reference and the standards evidence
+map for actual consumer/native proof, restored failed PR candidates and source
+freezes that include package JSON. Keep TLS and untested runtime paths explicit.
+
 The [prerequisite ownership design](LIBRARY_ADD_PROBE_OWNERSHIP_DESIGN.md) reuses
 the acknowledged container probe and awaits actual command/stdio close. Keep
 cleanup uncancelled, unknown identities retained and dependency compatibility

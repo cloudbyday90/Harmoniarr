@@ -9,6 +9,11 @@ Turn applicable official practices into observable behavior in the requested
 journey. Select relevant standards; do not expand ordinary work into a blanket
 accessibility/security audit or a framework migration.
 
+For dependency changes, distinguish official public contracts from reviewed
+private implementations and test actual consumers. The driver-review entry in
+the evidence map covers transitive serializer versions and native coverage
+limits; a compiler version check does not prove language-server compatibility.
+
 ## Establish the journey and applicable sources
 
 Trace the rendered control, actor/recipient authority, HTTP request, owning

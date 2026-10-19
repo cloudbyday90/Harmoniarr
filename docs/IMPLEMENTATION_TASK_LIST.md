@@ -6,6 +6,28 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Delivered slice: Reviewed PostgreSQL patch qualification (2026-10-19)
+
+- Qualify pg 8.23.1 and its required subtree against published artifacts and
+  immutable upstream source. Retain pg-pool 3.14.0; explicitly review protocol
+  1.16.1 alongside the driver. Keep exact version/method guards and modular ESM
+  observers; do not widen versions on semver alone.
+- Add native mixed-bind/config-reuse and named-empty-statement controls. Preserve
+  existing queue, connection, startup, cancellation and retirement behavior.
+  The [driver outcome](POSTGRES_DRIVER_8231_OUTCOME.md) records final evidence,
+  source identity and the retained initial lint failure.
+- Random [PR 48](OPEN_PR_48_LOCAL_EVALUATION_OUTCOME.md) was applied locally;
+  actual language-server initialization failed with TypeScript 7.0.2. Restore
+  its package pair and verify initialization with 6.0.3. Keep the remaining
+  Express/Vue/router changes from PR 46 pending. No PR is merged or released.
+- Improve existing testing/standards AI skills with the scoped dependency-review
+  workflow. See the [design](POSTGRES_DRIVER_8231_DESIGN.md) and
+  [recommendations/tradeoffs](POSTGRES_DRIVER_8231_RESEARCH_2026_10.md).
+- Next: add native trusted-certificate TLS identity controls for IP/DNS match
+  and mismatch, secureConnect milestones and handshake-failure retirement while
+  keeping certificate verification enabled. Then qualify PR 46's remaining
+  request/router boundaries independently.
+
 ## Delivered slice: Acknowledged prerequisite probe ownership (2026-10-19)
 
 - Add a narrow ESM command owner with bounded output/termination and actual

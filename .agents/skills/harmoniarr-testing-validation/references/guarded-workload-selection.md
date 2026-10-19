@@ -16,6 +16,10 @@ stay serial and preserve unavailable semantics. See
 docs/LIBRARY_ADD_PROBE_OWNERSHIP_OUTCOME.md; older timing evidence has different
 command work. Dependency patch updates must still pass installed driver guards;
 do not widen reviewed pg internals solely because semver suggests compatibility.
+The subsequent pg 8.23.1 review includes pg-pool 3.14.0 and pg-protocol 1.16.1;
+see docs/POSTGRES_DRIVER_8231_OUTCOME.md and the dependency implementation review
+reference. PR 48's actual LSP initialization failed and its package files were
+restored. Keep selected native driver proof separate from earlier full gates.
 
 Automatic library-add media uses the existing library-add-media-scenario adapter
 with per-command as default and explicit owned-api selection. Preserve all eight

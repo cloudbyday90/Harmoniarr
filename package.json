@@ -136,7 +136,7 @@
   "dependencies": {
     "express": "^5.2.1",
     "music-metadata": "^11.16.0",
-    "pg": "^8.23.0",
+    "pg": "^8.23.1",
     "sharp": "^0.35.5",
     "vue": "^3.5.43",
     "vue-router": "^5.2.0",

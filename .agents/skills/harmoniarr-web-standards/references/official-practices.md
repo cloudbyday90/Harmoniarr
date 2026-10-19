@@ -1,5 +1,14 @@
 # Official practices by boundary
 
+October 19 dependency guidance uses
+docs/POSTGRES_DRIVER_8231_RESEARCH_2026_10.md. Public FIFO/release documentation
+does not promise internal PendingItem identity. Compare published package bytes
+and immutable upstream source, review transitive serializer owners and retain
+exact-version/method refusal. W3C draft monotonic guidance and OWASP bounded
+logging inform diagnostics; neither certifies the dependency or platform.
+Vendor TypeScript migration guidance and real LSP initialization support keeping
+6.0.3 when a direct 7.0.2 replacement breaks the installed tooling consumer.
+
 October 19 prerequisite guidance uses
 docs/LIBRARY_ADD_PROBE_OWNERSHIP_RESEARCH_2026_10.md. Node close includes stdio;
 timeout/abort and killed do not prove completion. Docker create acknowledgement

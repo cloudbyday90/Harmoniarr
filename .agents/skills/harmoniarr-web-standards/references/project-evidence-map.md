@@ -1,5 +1,15 @@
 # Project standards-to-evidence map
 
+Driver review: pg-observer-driver-policy.js admits the exact pg/pg-pool/protocol
+tuple after published-byte and immutable upstream comparison. Existing queue,
+connection and startup observers retain method/instance ownership guards. The
+pg-driver-contract native file exercises mixed large binds, query-config reuse,
+named empty statements and Sync state; existing native owner files cover queued
+promotion, app entrypoints, held startup and cancellation retirement. Plaintext
+controls do not establish TLS certificate identity. See
+docs/POSTGRES_DRIVER_8231_OUTCOME.md. Random PR 48 failed real installed LSP
+initialization and was restored; version output alone was insufficient.
+
 Prerequisite ownership: fixture-probe-command.js awaits callback and actual close,
 with SIGKILL termination requests and bounded output. library-add-media-tooling.js
 pins an inspected Linux image and reuses integration-tool-probe for identity,

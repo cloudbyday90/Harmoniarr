@@ -123,3 +123,7 @@ same evaluated head.
 
 Work stays on main. No release, tag, branch, PR merge/closure/comment, provider
 message or deployment-image rebuild is created.
+
+The recommended driver review was subsequently handled in the separate
+[pg 8.23.1 outcome](POSTGRES_DRIVER_8231_OUTCOME.md). This document's probe results
+remain evidence for the original dependency lock, with their own source identity.

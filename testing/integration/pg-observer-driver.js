@@ -7,12 +7,14 @@
 import { readFileSync } from 'node:fs';
 import pg from 'pg';
 import pgPackage from 'pg/package.json' with { type: 'json' };
+import { supportsPgObserverVersions } from './pg-observer-driver-policy.js';
 
 // Internal adapters are reviewed together against these installed implementations.
 export function supportsPgObserverDriver() {
   try {
     const metadata = JSON.parse(readFileSync(new URL('../package.json', import.meta.resolve('pg-pool')), 'utf8'));
-    return pgPackage.version === '8.23.0' && metadata.version === '3.14.0';
+    const protocol = JSON.parse(readFileSync(new URL('../package.json', import.meta.resolve('pg-protocol')), 'utf8'));
+    return supportsPgObserverVersions(pgPackage.version, metadata.version, protocol.version);
   } catch { return false; }
 }
 

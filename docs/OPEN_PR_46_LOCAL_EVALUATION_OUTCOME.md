@@ -32,3 +32,12 @@ cases, 10,507 fast cases and both builds passed. Closing GitHub MCP metadata
 confirms the PR remains open at the evaluated head. The next recommendation is
 the separate driver implementation/native-contract review described in the
 [probe outcome](LIBRARY_ADD_PROBE_OWNERSHIP_OUTCOME.md).
+
+## Subsequent driver review
+
+The separate [pg 8.23.1 design](POSTGRES_DRIVER_8231_DESIGN.md) reviews actual
+published driver, queue and protocol implementations rather than bypassing this
+rejection. Its [outcome](POSTGRES_DRIVER_8231_OUTCOME.md) qualifies the pg-only
+subtree on new source. It does not apply this PR's Express/Vue/router changes or
+reuse the original-dependency validation as new-dependency evidence. PR 46 remains
+open; this document's initial exact-group evaluation and restoration are retained.
