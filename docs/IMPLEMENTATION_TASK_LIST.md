@@ -6,6 +6,26 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Delivered slice: Native PostgreSQL TLS identity (2026-10-19)
+
+- Add modular ESM TLS fixtures using existing PostgreSQL/Testcontainers owners,
+  fixture-local public test keys and Node's default certificate verifier.
+  Cover IP/DNS SAN match/mismatch and unknown CA, actual pg_stat_ssl queries,
+  separate stream/handshake/startup milestones and raw/TLS socket retirement.
+- Keep queued local startup distinct from authenticated delivery. Retain
+  certificate workspaces after uncertain runtime creation or retirement.
+  See the [design](POSTGRES_TLS_IDENTITY_DESIGN.md),
+  [official sources and tradeoffs](POSTGRES_TLS_IDENTITY_RESEARCH_2026_10.md) and
+  [outcome](POSTGRES_TLS_IDENTITY_OUTCOME.md) for exact final evidence and limits.
+- Evaluate random [PR 44](OPEN_PR_44_LOCAL_EVALUATION_OUTCOME.md) locally against
+  actual parser, default cover selection and native tag snapshots. Keep its
+  dependency evidence separate from TLS identity tests. No PR merge or release.
+- Extend existing testing and web-standards skills with the actual native TLS
+  ordering, trust boundaries and retained-uncertainty workflow.
+- Next: qualify the remaining Express/Vue/router group in PR 49 against actual
+  request/session/CSRF handling and nested asynchronous navigation. Existing
+  TestsStream end-listener warnings also remain an independent validation task.
+
 ## Delivered slice: Reviewed PostgreSQL patch qualification (2026-10-19)
 
 - Qualify pg 8.23.1 and its required subtree against published artifacts and

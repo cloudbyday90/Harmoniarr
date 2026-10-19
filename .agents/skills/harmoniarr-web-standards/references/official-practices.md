@@ -1,5 +1,13 @@
 # Official practices by boundary
 
+October 19 TLS identity guidance uses docs/POSTGRES_TLS_IDENTITY_RESEARCH_2026_10.md.
+Node default verification, RFC 9525 SAN identity and PostgreSQL key permissions
+own distinct boundaries. Testcontainers withSSL handles key setup; retain
+rejectUnauthorized=true even though its general example disables it. W3C draft
+monotonic guidance informs durations; browser Secure Contexts does not establish
+database identity. pg queues local startup on sslconnect before secureConnect:
+do not turn that buffered dispatch into certificate/authentication success.
+
 October 19 dependency guidance uses
 docs/POSTGRES_DRIVER_8231_RESEARCH_2026_10.md. Public FIFO/release documentation
 does not promise internal PendingItem identity. Compare published package bytes

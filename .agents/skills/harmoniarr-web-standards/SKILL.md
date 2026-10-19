@@ -123,6 +123,13 @@ PendingItem mapping. Unknown mappings and reused cold histories stay unassociate
 Queue admission, acquire entry and caller delivery are distinct from PostgreSQL
 startup. TLS stream creation, completed handshake and backend readiness
 are separate evidence. Follow the connection-boundary entry in the evidence map.
+For native TLS identity work, retain the default verifier, explicit rejection
+and fixture-local CA. Test DNS/IP SAN match and mismatch plus untrusted chains;
+configuration targetMatch is not authenticated identity. pg buffers startup on
+sslconnect before secureConnect. Successful local dispatch or write completion
+does not prove authenticated delivery; inspect authorized and real query results
+separately. Await actual raw/TLS close and retain files after uncertain server
+retirement. The TLS entry in the evidence map records native and controlled scope.
 For startup-write diagnostics, preserve the native packet bytes and scope method
 decoration to the original synchronous call. Separate write return/backpressure
 from callback completion and server receipt. Refuse custom/accessor packets or

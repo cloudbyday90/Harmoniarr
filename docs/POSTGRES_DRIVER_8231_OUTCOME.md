@@ -94,3 +94,7 @@ and mismatching IP/DNS destinations, actual secureConnect evidence and owned
 retirement after handshake failure. Keep verification enabled. Then reconsider
 PR 46's remaining Express/Vue/router changes against request/navigation behavior.
 There is no deployment-image rebuild or release in this commit.
+
+The subsequent [native TLS outcome](POSTGRES_TLS_IDENTITY_OUTCOME.md) supplies
+separate positive/negative certificate-identity evidence. This document's older
+plaintext selection and source hash remain unchanged historical evidence.

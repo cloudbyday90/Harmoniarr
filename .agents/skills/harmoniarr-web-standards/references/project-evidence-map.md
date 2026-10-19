@@ -1,5 +1,15 @@
 # Project standards-to-evidence map
 
+Native TLS identity: postgres-tls-fixture.js reuses PostgreSQL runtime ownership
+and Testcontainers withSSL; fixture JSON contains public test leaf keys, CA and
+deliberate SAN/trust negatives. pg-tls-attempt.js uses original native connection
+methods and Node's default verifier, captures stream/handshake/startup milestones,
+executes pg_stat_ssl and awaits raw/TLS close before restoration. Native controls
+cover actual IP/DNS identities and unknown CA. Unit controls cover fixture key/
+SAN intent, held retirement, Error/null and retained uncertain files. See
+docs/POSTGRES_TLS_IDENTITY_OUTCOME.md for limits; configuration targetMatch and a
+buffered startup write are not authenticated server identity.
+
 Driver review: pg-observer-driver-policy.js admits the exact pg/pg-pool/protocol
 tuple after published-byte and immutable upstream comparison. Existing queue,
 connection and startup observers retain method/instance ownership guards. The

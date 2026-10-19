@@ -10,6 +10,13 @@ For implementation-sensitive dependency upgrades and local PR evaluation, use
 Review published bytes/transitive owners, preserve failed candidates and test the
 actual consumer before expanding exact support guards or broader validation.
 
+Native PostgreSQL TLS identity proof uses postgres-tls-fixture.js and
+pg-tls-attempt.js with fixture-local public test keys, default Node verification,
+actual IP/DNS acceptance/refusal, real pg_stat_ssl queries and socket close.
+pg queues startup on sslconnect before secureConnect; buffered local dispatch
+must not imply authenticated delivery. See docs/POSTGRES_TLS_IDENTITY_OUTCOME.md
+for actual scope, retained uncertain workspaces and unperformed TLS coverage.
+
 HTTP fixture attribution belongs at the owned server request boundary. The
 server/request/response dispatch adapters preserve native listener order, body
 callbacks and Error/null; they do not infer context from client-side measures or

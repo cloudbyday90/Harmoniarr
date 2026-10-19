@@ -1,5 +1,11 @@
 # AI Workflow And Shared Copilot Skills
 
+The [native TLS design](POSTGRES_TLS_IDENTITY_DESIGN.md) keeps real SAN/trust
+verification, buffered local startup, authenticated handshake and database
+readiness distinct. Existing testing/standards skills now route to actual
+positive/negative native controls and retirement evidence. Retain uncertain
+certificate workspaces; do not infer browser security from database TLS.
+
 The [driver implementation review](POSTGRES_DRIVER_8231_DESIGN.md) qualifies
 published pg/queue/serializer bytes before changing exact support policy.
 Use the testing skill's dependency-review reference and the standards evidence

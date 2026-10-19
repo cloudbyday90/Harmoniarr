@@ -35,3 +35,13 @@ docs/POSTGRES_DRIVER_8231_OUTCOME.md. Random PR 48 demonstrates why real consume
 initialization matters; PR 46's pg subtree can be reviewed independently of its
 other Express/Vue/router upgrades. Next native TLS work must verify actual
 certificate identity, not just TLS stream creation or an injected success flag.
+
+The subsequent TLS implementation is documented in
+docs/POSTGRES_TLS_IDENTITY_OUTCOME.md. Keep real certificate/name and unknown-CA
+controls separate from X509 fixture checks. Native pg queues startup before the
+handshake: retain that local milestone on failure while requiring absent
+secureConnect/authentication/readiness. Verify authorized separately on success.
+Await raw and replacement TLS socket close, restore owned hooks, then retire the
+server before removing certificate files. Retain workspaces after uncertain
+creation/retirement. Controlled held-cleanup tests do not establish active native
+cancellation coverage. PR 44's parser/cover/tag evidence remains a separate scope.
