@@ -90,4 +90,8 @@ probe attempts and native/browser reports. Private artifacts are not committed.
 
 Retain the candidate: the final selected native/browser gates passed. Keep the
 existing modular ESM/Vue/PostgreSQL stack and warning/cleanup contracts. The PR
-is evaluated locally without merge; no release, tag or new branch is created.
+was evaluated locally without merge. The qualified package pair was verified
+on remote main at dd167de3c182a3d0583f704e2ab21d5dc5380ffc, then redundant PR 45
+was closed under the existing PR-cleanup instruction. GitHub MCP confirms closed
+and merged=false with the same reviewed head. Its branch remains; no release, tag
+or new branch is created.
