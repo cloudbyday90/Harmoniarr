@@ -1,5 +1,12 @@
 # Project standards-to-evidence map
 
+Node canonical validation belongs to scripts/node-baseline-policy.js and its
+thin check-node-baseline.js CLI, called by canonical validation and shared CI
+setup. The node-baseline-policy tests cover actual runtime/configuration drift
+and loader ownership. docs/NODE_24_BASELINE_OUTCOME.md records project-scoped
+Windows and actual Linux image evidence; do not infer OS-wide installation,
+hosted-CI completion, arm64 qualification or a future advisory's mitigation.
+
 Reporter ownership belongs to testing/reporters/integration-evidence-reporter.js
 and postgres-cohort-accumulator.js, composed by postgres-file-process.js. Native
 spec retains its own destination. The integration-evidence-reporter and early-

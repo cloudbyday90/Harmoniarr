@@ -16,3 +16,6 @@ runs:
     - name: Verify project npm
       shell: bash
       run: npm --version
+    - name: Verify project Node baseline
+      shell: bash
+      run: node scripts/check-node-baseline.js

@@ -6,6 +6,22 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Delivered slice: Canonical Node 24 baseline (2026-10-19)
+
+- Align .nvmrc/CI selection, package floors and digest-pinned Docker defaults on
+  published Node 24.22.0. Match builder/runtime Alpine 3.23. Add a small ESM
+  canonical validation guard while retaining the wider supported Node 24 range.
+- Qualify a checksum-verified project-scoped Windows executable and the actual
+  Linux image; keep OS-wide installation, hosted CI and architecture limits
+  explicit. See the [design](NODE_24_BASELINE_DESIGN.md),
+  [official sources/tradeoffs](NODE_24_BASELINE_RESEARCH_2026_10.md) and
+  [outcome](NODE_24_BASELINE_OUTCOME.md) for executed evidence.
+- Re-evaluate random [PR 50](OPEN_PR_50_NODE_BASELINE_EVALUATION_OUTCOME.md) under
+  the new baseline, retain its composition failure and restore Router 5.2.0.
+- Next: qualify the announced October 21 Node security release once actually
+  published. No version/advisory details or mitigation are invented in advance.
+  Review the runtime build-tool peer closure as a separate follow-up.
+
 ## Delivered slice: Native reporter ownership (2026-10-19)
 
 - Reproduce TestsStream's 11 end-listener warning without PostgreSQL. Replace
@@ -19,9 +35,9 @@ Database model source: `docs/DATABASE_MODEL.md`
 - Evaluate random [PR 45](OPEN_PR_45_LOCAL_EVALUATION_OUTCOME.md) locally against
   actual lint/build, database/TLS, browser and bridged Vue/TypeScript tooling
   consumers. Update the existing testing/standards AI skills with that method.
-- Next: qualify one maintained Node 24 baseline across host/CI/Docker. Recheck
-  the announced October 21 security release before choosing a pin. Review the
-  retained runtime build-tool dependency closure separately; no release here.
+- Follow-up delivered: [Node 24.22.0 baseline qualification](NODE_24_BASELINE_OUTCOME.md).
+  The announced October 21 security patch and runtime build-tool closure remain
+  separate follow-ups; no release here.
 
 ## Delivered slice: Required default CSRF protection (2026-10-19)
 

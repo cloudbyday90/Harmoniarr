@@ -4,6 +4,16 @@ Harmoniarr is a self-hosted, Docker-hosted music library manager inspired by Lid
 
 The repository contains the Node.js ESM server, Vue client, PostgreSQL schema, automated validation, and design documents. The platform is under active development toward its first release.
 
+Canonical development/CI validation uses Node **24.22.0** from `.nvmrc` and npm
+**12.0.2**. Select that Node version with your version manager or a verified local
+installation before `npm ci` and `npm run validate:fast`. `npm run check:node-baseline`
+checks the active runtime, engine floors and digest-pinned Docker defaults.
+The package support range allows later Node 24 versions; canonical validation
+requires the exact pin so evidence stays reproducible. The
+[baseline design](docs/NODE_24_BASELINE_DESIGN.md) and
+[qualification outcome](docs/NODE_24_BASELINE_OUTCOME.md) explain scope and
+the pending October 21 security-release follow-up.
+
 `npm run test:integration:coordinated` is the opt-in complete integration runner.
 Use `npm run test:integration:coordinated -- --plan` to inspect its exact file
 plan. It runs the audited seven-file PostgreSQL cohort once, then every other

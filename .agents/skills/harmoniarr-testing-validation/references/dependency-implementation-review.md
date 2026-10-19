@@ -4,6 +4,14 @@ Use when a dependency update crosses a private adapter, serializer, language
 server, native binary or other implementation-sensitive boundary. This is a
 focused validation workflow, not authorization for an unrelated major migration.
 
+For Node baselines, distinguish the active executable, exact canonical validation
+pin and supported package range. A project-scoped PATH does not replace the OS
+installation; a Docker tag/digest does not prove its packaged runtime executes.
+Keep builder/runtime libc families compatible and verify actual image ID plus
+Node/npm at fresh start and restart. A scheduled security announcement is not a
+published patch. The worked example is docs/NODE_24_BASELINE_OUTCOME.md; preserve
+failed candidate and CI-contract evidence before freezing the corrected source.
+
 1. Discover the current PR and official source URLs through MCP metadata/search.
    Record immutable head/base, actual installed versions and lock integrity.
    Separate vendor/public contracts from private implementation assumptions.

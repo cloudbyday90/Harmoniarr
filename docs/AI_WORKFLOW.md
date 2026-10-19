@@ -1,5 +1,14 @@
 # AI Workflow And Shared Copilot Skills
 
+The [Node baseline design](NODE_24_BASELINE_DESIGN.md) extends the maintained
+testing/standards workflow with active-executable versus canonical-pin versus
+supported-range distinctions. Discover official release/checksum and image
+metadata, keep future security announcements dated, and verify actual packaged
+Node/npm plus image identity at fresh start/restart. Project-scoped qualification
+does not replace the OS installation or prove hosted-CI/other-architecture
+completion. Preserve failed CI contracts and package candidates before freezing
+the corrected source. The [outcome](NODE_24_BASELINE_OUTCOME.md) owns actual scope.
+
 The [default CSRF design](CSRF_DEFAULT_PROTECTION_DESIGN.md) adds a practical
 security-default workflow to the maintained standards skill: distinguish absent
 configuration from explicit saved intent, inspect first-load caches and verify

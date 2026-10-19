@@ -1,5 +1,11 @@
 # Official practices by boundary
 
+October 19 Node baseline guidance uses docs/NODE_24_BASELINE_RESEARCH_2026_10.md.
+Vendor release/checksum, Docker digest/platform and CI version selection own
+different boundaries. Checksum comparison is not PGP verification; an announced
+future security release is not an installed mitigation. Keep W3C draft timing
+guidance separate from runtime/image qualification and OWASP image practices.
+
 October 19 reporter guidance uses docs/TEST_REPORTER_OWNERSHIP_RESEARCH_2026_10.md.
 Node compose/stream/event contracts own listener and completion behavior; do not
 remove another owner's listeners or hide warnings. OWASP informs bounded private

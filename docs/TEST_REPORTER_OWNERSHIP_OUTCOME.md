@@ -77,8 +77,9 @@ integration/browser case, screen-reader behavior, WCAG conformance, Linux image
 qualification or compatibility with all Node versions. npm audit is one check,
 not a security certification. No branch, tag, release or PR merge is created.
 
-Next qualify a common maintained Node 24 baseline across host/CI/Docker; consult
-the [dated runtime recommendation](TEST_REPORTER_OWNERSHIP_RESEARCH_2026_10.md)
-before selecting a version, including the announced October 21 security release.
+The subsequent [Node 24.22.0 outcome](NODE_24_BASELINE_OUTCOME.md) qualifies a
+common project/CI/Docker baseline with project-scoped host execution and actual
+packaged Linux proof. The announced October 21 security patch remains future
+work; consult the [dated recommendation](NODE_24_BASELINE_RESEARCH_2026_10.md).
 Separately review the production build-tool dependency closure observed during
 [PR 45 qualification](OPEN_PR_45_LOCAL_EVALUATION_OUTCOME.md).
