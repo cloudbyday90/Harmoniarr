@@ -1,5 +1,11 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 19 [runtime closure rebuild outcome](LOCAL_DOCKER_RUNTIME_CLOSURE_OUTCOME.md)
+records a no-cache build, healthy preserved-state startup, existing-admin bootstrap
+and readiness-only provider validation. It also retains separate isolated
+fresh/restart browser proof with service workers enabled. Provider status remains
+attention; this does not establish a newly accepted transfer.
+
 The walkthrough explicitly opts out of CSRF protection in compose.walkthrough.yaml
 for its loopback-only local setup. The application default is required; a saved
 security setting takes precedence over environment. Review existing opt-outs

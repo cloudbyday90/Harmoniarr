@@ -6,6 +6,28 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Delivered slice: Production dependency closure and form-safe PWA reload (2026-10-19)
+
+- Classify Vue/Router as client build dependencies, preserving every resolved
+  artifact/version/integrity and all five server production roots. Existing
+  full builders and production omit=dev installs own the corrected boundary.
+- Compare actual immutable-image packages and client assets, then exercise
+  packaged UI and lifecycle behavior. See the
+  [design](RUNTIME_DEPENDENCY_CLOSURE_DESIGN.md),
+  [official research/tradeoffs](RUNTIME_DEPENDENCY_CLOSURE_RESEARCH_2026_10.md) and
+  [outcome](RUNTIME_DEPENDENCY_CLOSURE_OUTCOME.md) for actual evidence and scope.
+- Fresh random [PR 50 review](OPEN_PR_50_RUNTIME_CLOSURE_REVIEW.md) selects the
+  unchanged rejected head; no repeated identical installation or PR merge.
+- Fix the independent first-install service worker reload found during packaged
+  login validation. Keep explicit local update intent and prove draft/focus
+  retention across real first claim and sibling activation. See the
+  [reload design](PWA_SERVICE_WORKER_RELOAD_DESIGN.md) and
+  [outcome](PWA_SERVICE_WORKER_RELOAD_OUTCOME.md).
+- Next: use Docker-owned loopback port allocation for the smoke harness to
+  remove its probe/release/bind race. Separately remove server-builder's
+  unnecessary npm ci after proving byte-identical ESM output and packaged behavior.
+  Qualify the announced October 21 Node security patch once actually published.
+
 ## Delivered slice: Canonical Node 24 baseline (2026-10-19)
 
 - Align .nvmrc/CI selection, package floors and digest-pinned Docker defaults on
@@ -20,7 +42,8 @@ Database model source: `docs/DATABASE_MODEL.md`
   the new baseline, retain its composition failure and restore Router 5.2.0.
 - Next: qualify the announced October 21 Node security release once actually
   published. No version/advisory details or mitigation are invented in advance.
-  Review the runtime build-tool peer closure as a separate follow-up.
+  [Runtime build-tool closure](RUNTIME_DEPENDENCY_CLOSURE_OUTCOME.md) is now
+  delivered separately.
 
 ## Delivered slice: Native reporter ownership (2026-10-19)
 

@@ -1,5 +1,20 @@
 # Official practices by boundary
 
+For service worker changes, consult the current W3C Service Workers draft and
+browser-maintainer lifecycle guidance, recording status/date. controllerchange
+also follows first claim; it does not grant permission to reload a form. Trace
+the local update request, keep sibling drafts and test real enabled workers.
+See docs/PWA_SERVICE_WORKER_RELOAD_DESIGN.md for the October 19 sources, options
+and old-page/new-worker compatibility limit; the per-page policy is not mandated
+by W3C.
+
+October 19 runtime-closure guidance uses
+docs/RUNTIME_DEPENDENCY_CLOSURE_RESEARCH_2026_10.md. npm classification and physical
+omission, Vue/Vite production bundles and OWASP multi-stage deployment advice
+own different boundaries. W3C draft timing does not determine package ownership.
+Verify actual deployed imports/assets rather than treating logical npm output
+or a devDependency label as proof of physical absence or vulnerability repair.
+
 October 19 Node baseline guidance uses docs/NODE_24_BASELINE_RESEARCH_2026_10.md.
 Vendor release/checksum, Docker digest/platform and CI version selection own
 different boundaries. Checksum comparison is not PGP verification; an announced

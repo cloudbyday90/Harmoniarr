@@ -4,6 +4,14 @@ Use when a dependency update crosses a private adapter, serializer, language
 server, native binary or other implementation-sensitive boundary. This is a
 focused validation workflow, not authorization for an unrelated major migration.
 
+For runtime package closure, trace actual Node imports and deployment shape:
+browser runtime code inside static bundles need not remain an installed server
+package; SSR has different needs. Preserve all artifact metadata while changing
+classification. npm ls is logical evidence, not physical package absence. Use
+old-image refusal, new-image inventory and actual packaged UI/lifecycle proof;
+retain native optional dependencies rather than broadly pruning peer/optional
+trees. The worked example is docs/RUNTIME_DEPENDENCY_CLOSURE_OUTCOME.md.
+
 For Node baselines, distinguish the active executable, exact canonical validation
 pin and supported package range. A project-scoped PATH does not replace the OS
 installation; a Docker tag/digest does not prove its packaged runtime executes.

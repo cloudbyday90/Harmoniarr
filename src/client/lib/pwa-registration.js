@@ -54,6 +54,7 @@ const SW_PATH = '/service-worker.js';
 export function createPwaRegistration({ nav = navigator, win = window, swPath = SW_PATH } = {}) {
   /** @type {ServiceWorkerRegistration | null} */
   let _registration = null;
+  let _reloadRequested = false;
   let _isRefreshing = false;
 
   /**
@@ -84,9 +85,10 @@ export function createPwaRegistration({ nav = navigator, win = window, swPath = 
         });
       });
 
-      // Reload when a new SW takes over (fires after SKIP_WAITING completes).
+      // Initial clients.claim() and updates from another tab also fire this event.
+      // Preserve this page's form state unless it explicitly requested a reload.
       nav.serviceWorker.addEventListener('controllerchange', () => {
-        if (_isRefreshing) return;
+        if (!_reloadRequested || _isRefreshing) return;
         _isRefreshing = true;
         win.location.reload();
       });
@@ -108,8 +110,13 @@ export function createPwaRegistration({ nav = navigator, win = window, swPath = 
    */
   function applyUpdate() {
     const waiting = _registration?.waiting;
-    if (waiting) {
+    if (!waiting || _reloadRequested || _isRefreshing) return;
+    _reloadRequested = true;
+    try {
       waiting.postMessage({ type: 'SKIP_WAITING' });
+    } catch (error) {
+      _reloadRequested = false;
+      throw error;
     }
   }
 

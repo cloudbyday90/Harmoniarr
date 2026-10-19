@@ -1,5 +1,20 @@
 # Project standards-to-evidence map
 
+Service worker reload ownership lives in src/client/lib/pwa-registration.js.
+The unit cases prove requested/absent/failed dispatch and one reload; the native
+browser pwa-registration-browser-verification case holds real shell precaching,
+then checks document/text/focus across first claim and sibling activation. Normal
+app fixtures block workers, so retain separate enabled-worker and packaged login
+proof. See docs/PWA_SERVICE_WORKER_RELOAD_OUTCOME.md; a minimal native page does
+not certify the whole app, every browser or future cache migration compatibility.
+
+Runtime package closure belongs to package.json/package-lock.json and the existing
+Docker builder/runtime installs. scripts/build-server.js copies ESM server source;
+vite.config.js builds the client assets. The static-serving decision and actual
+before/after package inventory, unchanged assets and packaged browser proof are
+in docs/RUNTIME_DEPENDENCY_CLOSURE_OUTCOME.md. This is not SSR qualification or a
+new policy registry; a repeated unchanged failed PR head need not be reinstalled.
+
 Node canonical validation belongs to scripts/node-baseline-policy.js and its
 thin check-node-baseline.js CLI, called by canonical validation and shared CI
 setup. The node-baseline-policy tests cover actual runtime/configuration drift

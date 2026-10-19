@@ -1,5 +1,20 @@
 # AI Workflow And Shared Copilot Skills
 
+The [service worker reload design](PWA_SERVICE_WORKER_RELOAD_DESIGN.md) adds a
+native browser control to the standards skill: distinguish first claim and a
+sibling update from this page's explicit reload request. Hold installation until
+a draft exists, then verify document identity, text and focus. App fixtures that
+block workers cannot prove that behavior; retain an enabled packaged login check.
+
+The [runtime closure design](RUNTIME_DEPENDENCY_CLOSURE_DESIGN.md) adds a practical
+deployment-ownership method: distinguish browser runtime code in a static bundle
+from Node-installed packages, trace actual server imports and preserve artifact
+identities while changing classification. Logical npm output does not prove
+physical omission. Use old-image refusal, new-image package/assets comparison
+and actual packaged UI/lifecycle proof. The maintained testing/standards skills
+record this method without adding a policy registry or duplicating manifest text
+in unit tests. The [outcome](RUNTIME_DEPENDENCY_CLOSURE_OUTCOME.md) owns results.
+
 The [Node baseline design](NODE_24_BASELINE_DESIGN.md) extends the maintained
 testing/standards workflow with active-executable versus canonical-pin versus
 supported-range distinctions. Discover official release/checksum and image

@@ -258,7 +258,20 @@ describe('createPwaRegistration: applyUpdate', () => {
 // ── controllerchange triggers page reload ─────────────────────────────────────
 
 describe('createPwaRegistration: controllerchange reload', () => {
-  it('reloads the page when controllerchange fires', async () => {
+  it('preserves the page when the first service worker claims it', async () => {
+    const win = makeWin();
+    const registration = makeRegistration();
+    const nav = makeNav({ registration, controller: null });
+    const handle = createPwaRegistration({ nav, win });
+    await handle.init();
+
+    nav.serviceWorker.controller = makeWorker('activated');
+    nav.serviceWorker._fireControllerChange();
+
+    assert.equal(win.reloaded, false);
+  });
+
+  it('preserves the page when another tab activates an update', async () => {
     const win = makeWin();
     const registration = makeRegistration();
     const nav = makeNav({ registration, controller: {} });
@@ -268,23 +281,74 @@ describe('createPwaRegistration: controllerchange reload', () => {
 
     nav.serviceWorker._fireControllerChange();
 
-    assert.equal(win.reloaded, true);
+    assert.equal(win.reloaded, false);
   });
 
   it('reloads only once even if controllerchange fires multiple times', async () => {
     let reloadCount = 0;
     const win = { location: { reload() { reloadCount++; } } };
-    const registration = makeRegistration();
+    const waiting = makeWorker('installed');
+    waiting.postMessage = () => {};
+    const registration = makeRegistration({ waiting });
     const nav = makeNav({ registration, controller: {} });
 
     const handle = createPwaRegistration({ nav, win });
     await handle.init({ onUpdateAvailable: () => {} });
+    handle.applyUpdate();
+
+    assert.equal(reloadCount, 0);
 
     nav.serviceWorker._fireControllerChange();
     nav.serviceWorker._fireControllerChange();
     nav.serviceWorker._fireControllerChange();
 
     assert.equal(reloadCount, 1);
+  });
+
+  it('still applies a requested update after the first claim', async () => {
+    const win = makeWin();
+    const registration = makeRegistration();
+    const nav = makeNav({ registration, controller: null });
+    const handle = createPwaRegistration({ nav, win });
+    await handle.init();
+    nav.serviceWorker.controller = makeWorker('activated');
+    nav.serviceWorker._fireControllerChange();
+    assert.equal(win.reloaded, false);
+
+    const waiting = makeWorker('installed');
+    waiting.postMessage = () => {};
+    registration.waiting = waiting;
+    handle.applyUpdate();
+    nav.serviceWorker._fireControllerChange();
+    assert.equal(win.reloaded, true);
+  });
+
+  it('does not arm a reload when no update is waiting', async () => {
+    const win = makeWin();
+    const nav = makeNav({ registration: makeRegistration() });
+    const handle = createPwaRegistration({ nav, win });
+    await handle.init();
+    handle.applyUpdate();
+    nav.serviceWorker._fireControllerChange();
+    assert.equal(win.reloaded, false);
+  });
+
+  it('preserves a message failure and permits a later successful update', async () => {
+    const win = makeWin();
+    const failure = new Error('Message dispatch failed');
+    const waiting = makeWorker('installed');
+    waiting.postMessage = () => { throw failure; };
+    const nav = makeNav({ registration: makeRegistration({ waiting }) });
+    const handle = createPwaRegistration({ nav, win });
+    await handle.init();
+    assert.throws(() => handle.applyUpdate(), error => error === failure);
+    nav.serviceWorker._fireControllerChange();
+    assert.equal(win.reloaded, false);
+
+    waiting.postMessage = () => {};
+    handle.applyUpdate();
+    nav.serviceWorker._fireControllerChange();
+    assert.equal(win.reloaded, true);
   });
 });
 

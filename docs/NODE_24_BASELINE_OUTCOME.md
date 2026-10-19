@@ -107,6 +107,8 @@ by this Node-specific guard. Neither digest is a freshness/advisory oracle.
 
 The October 21 Node security release remains announced future work as of this
 October 19 consultation. This is not its mitigation. Recheck its actual published
-version/advisories and qualify the Node 24 patch as the next priority. Afterwards
-review the production build-tool peers retained through Router/unplugin.
+version/advisories and qualify the Node 24 patch as the next priority. The
+subsequent [runtime closure outcome](RUNTIME_DEPENDENCY_CLOSURE_OUTCOME.md)
+addresses the independently actionable build-tool peers while that patch is
+still pending.
 No release, tag, new branch or PR merge is created.
