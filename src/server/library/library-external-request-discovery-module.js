@@ -20,6 +20,8 @@ import { createOperationRunInterruptionGate } from '../operation-run-cancellatio
 import { createLibraryExternalRequestDiscoveryRunStore } from './library-external-request-discovery-run-store.js';
 import { createLibraryExternalRequestDiscoveryService } from './library-external-request-discovery-service.js';
 import { createLibraryExternalRequestDiscoveryWorker } from './library-external-request-discovery-worker.js';
+import { createSlskdSearchContinuationService } from '../slskd/slskd-search-continuation-service.js';
+import { createDatabaseTransactionRunner } from '../database-transaction-service.js';
 
 export function createLibraryExternalRequestDiscoveryModule({
   assertMaintenanceWriteAllowed,
@@ -32,6 +34,8 @@ export function createLibraryExternalRequestDiscoveryModule({
   reviewStore,
   runStore = createLibraryExternalRequestDiscoveryRunStore({ getPoolFn }),
   slskdService,
+  searchContinuationService = createSlskdSearchContinuationService({ slskdService,
+    withTransaction: createDatabaseTransactionRunner({ getPoolFn }) }),
 } = {}) {
   const isCancellationRequested = createOperationRunInterruptionGate({
     isCancellationRequested: runStore.isCancellationRequested,
@@ -47,6 +51,7 @@ export function createLibraryExternalRequestDiscoveryModule({
     mediaRequestStore,
     reviewStore,
     slskdService,
+    searchContinuationService,
   });
   const libraryExternalRequestDiscoveryWorker = createLibraryExternalRequestDiscoveryWorker({
     ...runStore,

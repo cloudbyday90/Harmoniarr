@@ -18,6 +18,26 @@ test('ordinary reconciliation preserves a scoped refusal even after its deadline
 });
 import { createLibraryDiscoveryRequestService } from '../../src/server/library/library-discovery-request-service.js';
 
+test('guarded search continuation survives reconciliation without extending the normal six-hour cooldown', async () => {
+  let requests;
+  const marker = '2026-10-20T12:00:00Z';
+  const row = { metadata_artist_id: 'artist', metadata_release_group_id: 'group', metadata_release_id: 'release',
+    wanted_status: 'missing', search_mode: 'automatic', last_search_at: marker, search_attempt_count: 0,
+    prior_evidence: { lastDispatchAttemptedAt: marker,
+      searchContinuation: { state: 'pending', claimMarker: marker, searchAttemptCount: 0, nextSearchAfter: '2026-10-20T12:00:30Z' } } };
+  let now = new Date('2026-10-20T12:00:20Z');
+  const service = createLibraryDiscoveryRequestService({ getNow: () => now,
+    getPoolFn: () => ({ query: async () => ({ rows: [row] }) }),
+    libraryDiscoveryRequestStore: { replaceLibraryDiscoveryRequests: async input => { requests = input.discoveryRequests; } } });
+  await service.reconcileDiscoveryRequests();
+  assert.equal(requests[0].requestStatus, 'cooldown'); assert.equal(requests[0].nextSearchAfter, '2026-10-20T12:00:30.000Z');
+  now = new Date('2026-10-20T12:00:31Z');
+  await service.reconcileDiscoveryRequests(); assert.equal(requests[0].requestStatus, 'ready');
+  row.prior_evidence.searchContinuation.claimMarker = 'replaced';
+  await service.reconcileDiscoveryRequests(); assert.equal(requests[0].requestStatus, 'cooldown');
+  assert.equal(requests[0].nextSearchAfter, '2026-10-20T18:00:00.000Z');
+});
+
 test('an explicit null track requirement remains blocked without consuming the search budget', async () => {
   let observed;
   const service = createLibraryDiscoveryRequestService({ getPoolFn: () => ({ query: async () => ({ rows: [{

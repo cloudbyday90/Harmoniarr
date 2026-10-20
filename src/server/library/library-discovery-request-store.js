@@ -471,7 +471,7 @@ export function createLibraryDiscoveryRequestStore({
       `
         UPDATE library_discovery_requests
         SET
-          evidence = ${recoveryRunId ? "jsonb_set(COALESCE(evidence, '{}'::jsonb),'{downloadRecoveryRediscovery,state}','\"completed\"'::jsonb)" : "COALESCE(evidence, '{}'::jsonb)"} || jsonb_build_object(
+          evidence = (${recoveryRunId ? "jsonb_set(COALESCE(evidence, '{}'::jsonb),'{downloadRecoveryRediscovery,state}','\"completed\"'::jsonb)" : "COALESCE(evidence, '{}'::jsonb)"} - 'searchContinuation') || jsonb_build_object(
             'dispatchStrategy', 'slskd_search_dispatch',
             'lastDispatchFailure', NULL,
             'lastSearchId', $1::text,

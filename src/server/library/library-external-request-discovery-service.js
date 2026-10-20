@@ -33,6 +33,7 @@ export function createLibraryExternalRequestDiscoveryService({
   mediaRequestStore,
   reviewStore,
   slskdService,
+  searchContinuationService = null,
 } = {}) {
   async function discoverExternalRequestRelease({
     intentId,
@@ -53,7 +54,11 @@ export function createLibraryExternalRequestDiscoveryService({
       }
       const request = await mediaRequestStore.getMediaRequestById({ mediaRequestId, queryable });
       const target = await getAppUserById({ userId: intent.requestedForUserId, queryable });
+      const currentIntent = await reviewStore.getIntentById({ intentId, queryable });
       if (!request || request.requestKind !== 'external_url' || request.requestState !== 'needs_fetch'
+        || !currentIntent || currentIntent.requestedForUserId !== intent.requestedForUserId
+        || currentIntent.metadataReleaseId !== intent.metadataReleaseId
+        || (currentIntent.operationRunId && currentIntent.operationRunId !== operationRunId)
         || request.requestedForUser?.id !== intent.requestedForUserId
         || target?.id !== intent.requestedForUserId
         || !buildMediaRequestTargetEligibility(target).eligible) {
@@ -74,14 +79,18 @@ export function createLibraryExternalRequestDiscoveryService({
       ? await getReleaseTracklistExpectationsFn({ metadataReleaseId: intent.metadataReleaseId })
       : null;
     await assertCurrentTarget();
-    // Each intent starts its own search: candidate identity and placement remain target-owned.
-    const search = await slskdService.startSearch({ query });
+    const search = searchContinuationService
+      ? await searchContinuationService.getOrStartSearch({ owner: { externalRequestIntentId: intent.id }, query,
+        context: { operationRunId, mediaRequestId, metadataReleaseId: intent.metadataReleaseId,
+          requestedForUserId: intent.requestedForUserId }, assertCurrent: assertCurrentTarget })
+      : await slskdService.startSearch({ query });
     await assertCurrentTarget();
     const result = await importCandidateService.ingestSlskdSearchResponses({
       actorUserId: triggeredByUserId,
       albumTitle: intent.releaseTitle,
-      assertSearchCurrent: assertCurrentTarget,
-      beforePersistCandidates: assertCurrentTarget,
+      assertSearchCurrent: search.assertSearchCurrent ?? assertCurrentTarget,
+      beforePersistCandidates: search.assertSearchCurrent ?? assertCurrentTarget,
+      ...(search.searchBinding ? { searchBinding: search.searchBinding } : {}),
       discoveryScope: { metadataReleaseId: intent.metadataReleaseId },
       expectedDurationSeconds: expectations?.expectedDurationSeconds ?? null,
       expectedTrackCount: expectations?.expectedTrackCount ?? null,

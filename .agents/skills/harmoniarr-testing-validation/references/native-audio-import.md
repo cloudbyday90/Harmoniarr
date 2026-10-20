@@ -58,3 +58,12 @@ evidence and no successful no-match cooldown/exhaustion. The existing native
 audio lane verifies actual ordinary provider ingestion/publication; it does not
 force the released provider's internal finalization race. Keep those claims
 separate. See docs/SLSKD_SEARCH_PUBLICATION_DESIGN.md.
+
+Continuation qualification reserves a caller UUID in real PostgreSQL before the
+actual native search POST. Recreate the service and read the same IDs; require
+one native POST per query and separately observed acceptance. Use cheap controls
+for uncertain response, expiry and configuration drift; a successful native read
+does not inject those faults. The focused SQL/HTTP cohort owns reservation
+uniqueness, rollback, pending cooldown durability, target isolation and worker
+completion. Keep per-track best-effort exhaustion and new explicit-intent recovery
+separate from continuation of an unchanged album/approved-release search.

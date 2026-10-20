@@ -101,6 +101,9 @@ import { createMaintenanceLockWriteGuardService } from '../recovery/maintenance-
 import { createLibraryMusicQueueRediscoveryService } from './library-music-queue-rediscovery-service.js';
 import { createLibraryInitialSearchService } from './library-initial-search-service.js';
 import { createLibraryFallbackQualityService } from './library-fallback-quality-service.js';
+import { createSlskdSearchContinuationService } from '../slskd/slskd-search-continuation-service.js';
+import { createLibraryDiscoverySearchService } from './library-discovery-search-service.js';
+import { createLibraryDiscoverySearchAuthorityStore } from './library-discovery-search-authority-store.js';
 
 export function createLibraryModule({
   artworkAssignmentService = null,
@@ -141,7 +144,13 @@ export function createLibraryModule({
       operationLabel: 'guarded recovery search handoff', queryable,
     }),
   }),
+  discoverySearchAuthorityStore = createLibraryDiscoverySearchAuthorityStore(),
+  libraryDiscoverySearchService = createLibraryDiscoverySearchService({
+    continuationService: createSlskdSearchContinuationService({ slskdService }), authorityStore: discoverySearchAuthorityStore,
+  }),
   libraryDiscoveryDispatchService = createLibraryDiscoveryDispatchService({
+    libraryDiscoverySearchService,
+    discoverySearchAuthorityStore,
     enableTrackFallback,
     getReleaseTracklistExpectationsFn: async ({ metadataReleaseId }) => {
       const trackRows = await listMetadataTracksByReleaseId(metadataReleaseId);

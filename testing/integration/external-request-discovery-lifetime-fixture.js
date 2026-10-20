@@ -40,12 +40,18 @@ export async function seedExternalDiscoveryLifetimeRun() {
 /** Native loopback HTTP exercises real slskd client/service; no Soulseek daemon is contacted. */
 export async function createExternalDiscoveryHttpFixture({ signal }) {
   const responseGate = createFixtureGate({ signal }); const entered = createFixtureGate({ signal });
-  const searchId = randomUUID(); const requests = []; const queries = [];
+  let searchId = randomUUID(); const requests = []; const queries = [];
   const server = createServer((request, response) => {
     requests.push({ method: request.method, path: request.url });
     if (request.method === 'POST' && request.url === '/api/v0/searches') {
       let body = ''; request.on('data', chunk => { body += chunk; });
-      request.on('end', () => { queries.push(JSON.parse(body).searchText); response.writeHead(200, { 'content-type': 'application/json' }); response.end(JSON.stringify({ id: searchId })); });
+      request.on('end', () => {
+        const input = JSON.parse(body); searchId = input.id ?? searchId; queries.push(input.searchText);
+        response.writeHead(200, { 'content-type': 'application/json' }); response.end(JSON.stringify({ id: searchId, searchText: input.searchText }));
+      });
+    } else if (request.method === 'GET' && request.url.startsWith(`/api/v0/searches/${searchId}?`)) {
+      request.resume(); response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ id: searchId, searchText: queries.at(-1) }));
     } else if (request.method === 'GET' && request.url === `/api/v0/searches/${searchId}/responses`) {
       request.resume(); entered.release();
       void responseGate.promise.then(() => {
@@ -57,8 +63,9 @@ export async function createExternalDiscoveryHttpFixture({ signal }) {
     } else { request.resume(); response.writeHead(404); response.end(); }
   });
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
-  const client = createSlskdClient({ baseUrl: `http://127.0.0.1:${server.address().port}`, allowedHosts: ['127.0.0.1'], apiKey: 'synthetic-owned-key' });
-  return { service: createSlskdService({ slskdClient: client }), searchId, requests, queries,
+  const config = { baseUrl: `http://127.0.0.1:${server.address().port}`, allowedHosts: ['127.0.0.1'], apiKey: 'synthetic-owned-key' };
+  const client = createSlskdClient(config);
+  return { service: createSlskdService({ slskdClient: client, getClientConfig: async () => config }), get searchId() { return searchId; }, requests, queries,
     entered: entered.promise, release: responseGate.release,
     async close() { responseGate.release(); await new Promise((resolve, reject) => { server.close(error => error ? reject(error) : resolve()); }); } };
 }

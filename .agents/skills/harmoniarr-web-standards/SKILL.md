@@ -10,6 +10,8 @@ For native query and compressed peer-response qualification, read
 identity, bounded input and provenance to actual provider acceptance.
 That reference also owns completed-state/body publication gaps: bounded waiting,
 truthful empty results, current authority and separate native/ordering evidence.
+It also owns durable search continuation, uncertain POST outcomes and the worker
+claim/cooldown path that must make a saved reservation reachable after restart.
 
 For canonical search through ingestion and acquisition, use
 [discovery provenance](references/discovery-provenance.md). It distinguishes

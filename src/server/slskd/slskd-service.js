@@ -23,6 +23,7 @@ import { normalizeSlskdDownloadTransfer as normalizeTransfer } from './slskd-dow
 import { createSlskdDownloadDispatchService } from './slskd-download-dispatch-service.js';
 import { assertSlskdProviderBindingCurrent } from './slskd-download-protocol-policy.js';
 import { defaultSlskdBaseUrl } from '../integrations/slskd/slskd-config.js';
+import { assertSlskdSearchBinding, searchUuidPattern, slskdSearchProviderFingerprint } from './slskd-search-binding-policy.js';
 
 function normalizeSearchText(value) {
   if (typeof value !== 'string') {
@@ -330,14 +331,23 @@ export function createSlskdService({
     return queryable ? getClientConfig({ queryable }) : getClientConfig();
   }
 
-  async function withClient(operation) {
+  async function withClient(operation, { searchBinding = null } = {}) {
     const config = await getRuntimeConfig();
     if (config?.enabled === false) {
       throw buildUnavailableProviderError(config);
     }
 
+    if (searchBinding !== null) assertSlskdSearchBinding({ config, searchBinding });
     const client = slskdClient ?? createSlskdClientFn(config);
-    return operation(client);
+    const result = await operation(client);
+    if (searchBinding !== null) assertSlskdSearchBinding({ config: await getRuntimeConfig(), searchBinding });
+    return result;
+  }
+
+  async function getSearchBinding({ queryable } = {}) {
+    const config = await getRuntimeConfig({ queryable });
+    if (config?.enabled === false) throw buildUnavailableProviderError(config);
+    return slskdSearchProviderFingerprint(config);
   }
 
   function effectiveDownloadConfig(config = {}) {
@@ -405,7 +415,9 @@ export function createSlskdService({
   }
 
   async function startSearch({
+    id,
     query,
+    searchBinding = null,
     fileLimit,
     filterResponses,
     maximumPeerQueueLength,
@@ -413,6 +425,7 @@ export function createSlskdService({
     responseLimit,
     searchTimeoutMs,
   }) {
+    if (id !== undefined && !searchUuidPattern.test(id)) throw createApiError(400, 'validation_error', 'Search id must be a UUID');
     const normalizedQuery = normalizeSearchText(query);
     const normalizedFileLimit = normalizeInteger(fileLimit, {
       fallback: 10000,
@@ -449,6 +462,7 @@ export function createSlskdService({
     const payload = await observeSlskdProviderCall(
       providerHealthRecorder,
       () => withClient((client) => client.startSearch({
+        ...(id === undefined ? {} : { id }),
         query: normalizedQuery,
         fileLimit: normalizedFileLimit,
         filterResponses: normalizedFilterResponses,
@@ -456,13 +470,13 @@ export function createSlskdService({
         minimumPeerUploadSpeed: normalizedMinimumPeerUploadSpeed,
         responseLimit: normalizedResponseLimit,
         searchTimeoutMs: normalizedSearchTimeoutMs,
-      })),
+      }), { searchBinding }),
     );
 
     return normalizeSearchState(payload);
   }
 
-  async function getSearchState({ searchId, includeResponses = false }) {
+  async function getSearchState({ searchId, includeResponses = false, searchBinding = null }) {
     const normalizedSearchId = normalizeSearchId(searchId);
     const normalizedIncludeResponses = normalizeBoolean(includeResponses, false);
     const payload = await observeSlskdProviderCall(
@@ -470,17 +484,17 @@ export function createSlskdService({
       () => withClient((client) => client.getSearchState({
         searchId: normalizedSearchId,
         includeResponses: normalizedIncludeResponses,
-      })),
+      }), { searchBinding }),
     );
 
     return normalizeSearchState(payload);
   }
 
-  async function getSearchResponses({ searchId }) {
+  async function getSearchResponses({ searchId, searchBinding = null }) {
     const normalizedSearchId = normalizeSearchId(searchId);
     const payload = await observeSlskdProviderCall(
       providerHealthRecorder,
-      () => withClient((client) => client.getSearchResponses({ searchId: normalizedSearchId })),
+      () => withClient((client) => client.getSearchResponses({ searchId: normalizedSearchId }), { searchBinding }),
     );
 
     return {
@@ -617,6 +631,7 @@ export function createSlskdService({
     getDownload,
     getDownloads,
     getSearchResponses,
+    getSearchBinding,
     getSearchState,
     startSearch,
     validateAuthentication,

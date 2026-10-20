@@ -1,5 +1,11 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 20 [durable-search rebuild outcome](LOCAL_DOCKER_SEARCH_CONTINUATION_OUTCOME.md)
+records the current no-cache image, preserved data/admin, the new search-intent
+migration and passing readiness-only check. The separate
+[continuation outcome](SLSKD_SEARCH_CONTINUATION_OUTCOME.md) verifies supplied
+UUIDs, reads through recreated services and one native POST per query.
+
 The October 20 [search-publication rebuild outcome](LOCAL_DOCKER_SEARCH_PUBLICATION_OUTCOME.md)
 records the current no-cache image, three intended server-file changes,
 preserved data/admin and passing readiness-only check. The separate

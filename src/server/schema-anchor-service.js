@@ -26,6 +26,9 @@ export const criticalSchemaAnchors = Object.freeze({
     { table: 'app_settings', trigger: 'app_settings_root_authority_admission' },
   ]),
   columns: Object.freeze([
+    { table: 'slskd_search_intents', column: 'provider_fingerprint' },
+    { table: 'slskd_search_intents', column: 'expires_at' },
+    { table: 'slskd_search_intents', column: 'accepted_at' },
     { table: 'activity_events', column: 'event_type' },
     { table: 'operator_track_receipts', column: 'receipt_revision_id' },
     { table: 'operator_track_receipts', column: 'library_path' },
@@ -83,6 +86,11 @@ export const criticalSchemaAnchors = Object.freeze({
     { table: 'library_files', column: 'tag_extracted_modified_at' },
   ]),
   constraints: Object.freeze([
+    { table: 'slskd_search_intents', constraint: 'slskd_search_intents_owner_check' },
+    { table: 'slskd_search_intents', constraint: 'slskd_search_intents_fingerprint_check' },
+    { table: 'slskd_search_intents', constraint: 'slskd_search_intents_expiry_check' },
+    { table: 'slskd_search_intents', constraint: 'slskd_search_intents_discovery_request_id_fkey' },
+    { table: 'slskd_search_intents', constraint: 'slskd_search_intents_external_request_intent_id_fkey' },
     { table: 'activity_events', constraint: 'activity_events_event_type_check' },
     { table: 'operator_track_receipts', constraint: 'operator_track_receipts_revision_unique' },
     { table: 'operator_track_receipt_invalidations', constraint: 'operator_track_receipt_invalidations_revision_fkey' },
@@ -124,6 +132,8 @@ export const criticalSchemaAnchors = Object.freeze({
     { table: 'operator_artist_reconciliation_snapshot', constraint: 'operator_artist_reconciliation_snapshot_payload_object_check' },
   ]),
   indexes: Object.freeze([
+    { index: 'slskd_search_intents_discovery_unique' },
+    { index: 'slskd_search_intents_external_unique' },
     { index: 'operator_track_receipts_scan_path_idx' },
     { index: 'operator_track_receipts_owner_release_idx' },
     { index: 'user_push_subscriptions_invalidated_pruning_idx' },

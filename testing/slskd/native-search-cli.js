@@ -37,7 +37,8 @@ if (phase === 'idle') {
   assert.equal(calls.filter(call => call.method === 'POST').length, 1);
   assert.equal(calls.find(call => call.method === 'POST').status, 200);
   result = { search, calls };
-} else if (phase === 'state') result = await service.getSearchState(input);
+} else if (phase === 'binding') result = await service.getSearchBinding();
+else if (phase === 'state') result = await service.getSearchState(input);
 else if (phase === 'responses') result = await service.getSearchResponses(input);
 else if (phase === 'finish') {
   result = await waitForNativePartialState(() => service.getSearchState(input), value => value.isComplete);

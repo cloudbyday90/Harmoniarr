@@ -18,7 +18,9 @@ test('a scoped recovery child forwards its owning run and skips unrelated reconc
   });
   await (await worker.startWorkerRun({ runId: 'scoped-run', triggerSource: 'music_queue_fallback_rediscovery' })).completion;
   assert.deepEqual(globalCalls, []);
-  assert.deepEqual(calls, [{ actorUserId: null, requestMetadata: null, runId: 'scoped-run', triggerSource: 'music_queue_fallback_rediscovery' }]);
+  const { assertSearchCurrent, ...dispatch } = calls[0];
+  await assertSearchCurrent();
+  assert.deepEqual(dispatch, { actorUserId: null, requestMetadata: null, runId: 'scoped-run', triggerSource: 'music_queue_fallback_rediscovery' });
 });
 
 test('createLibraryDiscoveryWorker reconciles and dispatches a protected discovery run', async (t) => {
@@ -92,7 +94,9 @@ test('createLibraryDiscoveryWorker reconciles and dispatches a protected discove
   assert.equal(reconcileDiscoveryRequests.mock.callCount(), 1);
   assert.equal(prefetchMonitoredArtistArtwork.mock.callCount(), 1);
   assert.equal(dispatchDiscoveryRequests.mock.callCount(), 1);
-  assert.deepEqual(dispatchDiscoveryRequests.mock.calls[0].arguments[0], {
+  const { assertSearchCurrent, ...dispatch } = dispatchDiscoveryRequests.mock.calls[0].arguments[0];
+  await assertSearchCurrent();
+  assert.deepEqual(dispatch, {
     actorUserId: 'user-2',
     requestMetadata: {
       ipAddress: '198.51.100.30',

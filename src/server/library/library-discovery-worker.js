@@ -133,6 +133,7 @@ export function createLibraryDiscoveryWorker({
 
         const summary = await dispatchDiscoveryRequests({
           actorUserId: triggeredByUserId,
+          assertSearchCurrent: () => throwIfOperationRunCancellationRequested({ isCancellationRequested, runId }),
           requestMetadata,
           ...(scopedRecovery ? { runId, triggerSource } : {}),
         });

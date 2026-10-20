@@ -7850,3 +7850,64 @@ SET migration_key = EXCLUDED.migration_key,
     error_message = NULL,
     application_version = NULL,
     updated_at = NOW();
+
+-- Migration: 20261020_185244_durable_slskd_search_intents.sql
+-- Checksum: 1dec5a797ae37ccbbfbd9ce0a30e3ca2b110b5e07573679a57a1a1c0137893fc
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+-- This program is free software: licensed under GPL-3.0-or-later.
+-- See LICENSE for details. Forward-only migration.
+BEGIN;
+
+CREATE TABLE slskd_search_intents (
+  id uuid PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
+  discovery_request_id uuid REFERENCES library_discovery_requests(id) ON DELETE CASCADE,
+  external_request_intent_id uuid REFERENCES library_external_request_release_intents(id) ON DELETE CASCADE,
+  intent_fingerprint text NOT NULL,
+  provider_fingerprint text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT NOW(),
+  expires_at timestamptz NOT NULL,
+  accepted_at timestamptz,
+  CONSTRAINT slskd_search_intents_owner_check CHECK (
+    num_nonnulls(discovery_request_id, external_request_intent_id) = 1
+  ),
+  CONSTRAINT slskd_search_intents_fingerprint_check CHECK (
+    intent_fingerprint ~ '^[0-9a-f]{64}$' AND provider_fingerprint ~ '^[0-9a-f]{64}$'
+  ),
+  CONSTRAINT slskd_search_intents_expiry_check CHECK (expires_at > created_at)
+);
+
+CREATE UNIQUE INDEX slskd_search_intents_discovery_unique
+  ON slskd_search_intents (discovery_request_id, intent_fingerprint)
+  WHERE discovery_request_id IS NOT NULL;
+CREATE UNIQUE INDEX slskd_search_intents_external_unique
+  ON slskd_search_intents (external_request_intent_id, intent_fingerprint)
+  WHERE external_request_intent_id IS NOT NULL;
+
+COMMIT;
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20261020_185244',
+  '20261020_185244_durable_slskd_search_intents.sql',
+  'durable_slskd_search_intents',
+  '1dec5a797ae37ccbbfbd9ce0a30e3ca2b110b5e07573679a57a1a1c0137893fc',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();

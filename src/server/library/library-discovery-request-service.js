@@ -309,8 +309,13 @@ function mapDiscoveryRow(row, { automaticCooldownMs, now }) {
     };
   }
 
+  const continuation = priorEvidence.searchContinuation;
+  const continuationDeadline = continuation?.state === 'pending'
+    && continuation?.claimMarker === priorEvidence.lastDispatchAttemptedAt
+    && continuation?.searchAttemptCount === searchAttemptCount
+    ? toIsoStringOrNull(continuation.nextSearchAfter) : null;
   const automaticState = resolveAutomaticState({
-    cooldownDeadline,
+    cooldownDeadline: continuationDeadline ? new Date(continuationDeadline) : cooldownDeadline,
     now,
     releaseDateDeadline,
   });

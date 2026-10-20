@@ -1058,9 +1058,10 @@ export function createImportCandidateService({
     musicQueueContext = null,
     requestOwnership = null,
     requestMetadata = null,
+    searchBinding = null,
     searchId,
   }) {
-    const searchResponses = await waitForSearchResponses({ searchId, assertCurrent: assertSearchCurrent });
+    const searchResponses = await waitForSearchResponses({ searchId, assertCurrent: assertSearchCurrent, searchBinding });
     // Feed the G6 candidate source filter from the operator-controlled ignore
     // list (the "act" side of the learn->act loop). An explicit ignoredUsernames
     // argument still wins; otherwise the current ignore list is resolved here so

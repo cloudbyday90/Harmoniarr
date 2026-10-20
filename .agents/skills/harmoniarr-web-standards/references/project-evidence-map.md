@@ -1,5 +1,14 @@
 # Project standards-to-evidence map
 
+Durable search continuation uses slskd-search-continuation-service.js,
+slskd-search-intent-store.js and slskd-search-binding-policy.js, with the library
+search service/authority store. UUID reservation
+and pending cooldown commit before POST; owner/intent uniqueness, bound reads,
+current claims and locked persistence guard resumption. The focused SQL/HTTP
+cohort separates uncertain acceptance/rollback from the released provider's
+supplied-ID/read qualification. See
+[the outcome](../../../../docs/SLSKD_SEARCH_CONTINUATION_OUTCOME.md).
+
 Search publication is owned by import-candidates/slskd-search-response-service.js.
 Its fast ordering controls distinguish completed state, finalized empty results,
 late bodies, bounded unavailability and cancelled authority. Candidate ingestion

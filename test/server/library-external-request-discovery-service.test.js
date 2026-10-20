@@ -79,7 +79,7 @@ test('external discovery rechecks cancellation during response polling before an
   assert.equal(getSearchState.mock.callCount(), 0);
 });
 
-for (const scenario of ['cancelled', 'retargeted', 'disabled', 'plex_ineligible', 'missing_target']) {
+for (const scenario of ['cancelled', 'retargeted', 'disabled', 'plex_ineligible', 'missing_target', 'replaced_run']) {
   test(`external discovery refuses a ${scenario} target before contacting the search provider`, async (t) => {
     const fixture = createFixture(t);
     if (scenario === 'cancelled') fixture.state.request.requestState = 'cancelled';
@@ -87,6 +87,7 @@ for (const scenario of ['cancelled', 'retargeted', 'disabled', 'plex_ineligible'
     if (scenario === 'disabled') fixture.state.target.isDisabled = true;
     if (scenario === 'plex_ineligible') fixture.state.target.plexProfile = { accessPolicy: { requestTargetingEligible: false } };
     if (scenario === 'missing_target') fixture.state.target = null;
+    if (scenario === 'replaced_run') fixture.state.intent.operationRunId = 'different-run';
     await assert.rejects(discover(fixture), { code: 'operation_run_cancelled' });
     assert.equal(fixture.dependencies.slskdService.startSearch.mock.callCount(), 0);
   });

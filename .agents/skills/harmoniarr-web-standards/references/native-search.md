@@ -43,3 +43,18 @@ waiting and retain the locked persistence guard. Do not retry the search POST.
 Unavailable evidence must fail before candidate/audit publication and successful
 no-match cooldown/exhaustion. Separate deterministic ordering controls from the
 ordinary native case; the latter does not force an internal vendor database race.
+
+For durable continuation, use
+[the design](../../../../docs/SLSKD_SEARCH_CONTINUATION_DESIGN.md) and
+[official tradeoffs](../../../../docs/SLSKD_SEARCH_CONTINUATION_RESEARCH_2026_10.md).
+First verify the released API accepts caller-owned IDs. Commit the UUID and
+owner/context/configuration binding before POST; only its reservation creator
+may submit. Existing reservations use GET after restart or uncertain acceptance.
+An absent record, expired continuation or changed connection never grants another
+POST. Preserve ambiguity after a crash before sending; do not claim exactly once.
+Trace the actual worker's claim and reconciliation cooldown too: persist pending
+continuation before network work, match its claim/attempt, and clear it on durable
+success. Retain current authority and locked publication checks. Prove real SQL
+uniqueness/rollback, held HTTP acceptance, cancellation/configuration drift, and
+native supplied-ID/read continuation as separate boundaries. Do not turn a native
+ordinary success into proof of a lost-response fault that was not injected.

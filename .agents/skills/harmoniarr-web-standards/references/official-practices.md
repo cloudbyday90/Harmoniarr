@@ -1,5 +1,13 @@
 # Official practices by boundary
 
+Durable search uses
+[continuation research](../../../../docs/SLSKD_SEARCH_CONTINUATION_RESEARCH_2026_10.md).
+The released provider's caller UUID enables correlation, not automatic POST
+idempotence. IETF informs uncertain mutation handling, PostgreSQL owns local
+reservation/constraint semantics, OWASP informs current execution authority and
+W3C provenance informs attribution by inference. Verify worker claim/cooldown
+reachability and keep expiry separate from permission to submit a new intent.
+
 Search finalization uses
 [publication research](../../../../docs/SLSKD_SEARCH_PUBLICATION_RESEARCH_2026_10.md).
 Inspect the released vendor's state/count/final-body order; completion flags are

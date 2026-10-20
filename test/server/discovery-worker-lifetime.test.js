@@ -186,7 +186,8 @@ test('reconciliation, artwork and provider promises are owned in order while clo
     reconcileWantedReleases: async input => { assert.deepEqual(input.workerContext.expectedLease, lease()); calls.push('wanted'); },
     reconcileDiscoveryRequests: async () => { calls.push('reconcile'); },
     prefetchMonitoredArtistArtwork: async () => { calls.push('artwork'); artworkEntered.resolve(); await artworkGate.promise; return { cachedCount: 1 }; },
-    dispatchDiscoveryRequests: async input => { calls.push('provider'); assert.deepEqual(input, { actorUserId: 'actor', requestMetadata: { controlled: true } });
+    dispatchDiscoveryRequests: async input => { calls.push('provider'); const { assertSearchCurrent, ...dispatch } = input;
+      await assertSearchCurrent(); assert.deepEqual(dispatch, { actorUserId: 'actor', requestMetadata: { controlled: true } });
       entered.resolve(); await gate.promise; return { attemptedCount: 1, dispatchedCount: 1 }; },
     releaseLease: async () => { released = true; },
   }));
@@ -206,7 +207,9 @@ test('scoped recovery forwards its run identity and excludes global work', async
     dispatchDiscoveryRequests: async input => { forwarded = input; return { attemptedCount: 1, dispatchedCount: 1 }; },
   }));
   await (await worker.startWorkerRun({ runId: 'discovery', triggerSource: MUSIC_QUEUE_RECOVERY_DISCOVERY_SOURCE })).completion; await worker.close();
-  assert.deepEqual(calls, []); assert.deepEqual(forwarded, { actorUserId: null, requestMetadata: null, runId: 'discovery', triggerSource: MUSIC_QUEUE_RECOVERY_DISCOVERY_SOURCE });
+  const { assertSearchCurrent, ...dispatch } = forwarded;
+  await assertSearchCurrent();
+  assert.deepEqual(calls, []); assert.deepEqual(dispatch, { actorUserId: null, requestMetadata: null, runId: 'discovery', triggerSource: MUSIC_QUEUE_RECOVERY_DISCOVERY_SOURCE });
 });
 
 test('null artwork failure stays best-effort with a fixed message, while artwork lease loss forbids dispatch/pruning', async () => {

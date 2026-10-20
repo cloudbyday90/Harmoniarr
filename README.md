@@ -10,6 +10,12 @@ response bodies. See the [design](docs/SLSKD_SEARCH_PUBLICATION_DESIGN.md),
 [validation outcome](docs/SLSKD_SEARCH_PUBLICATION_OUTCOME.md) for bounded polling,
 truthful empty results and cancellation checks.
 
+Discovery now reserves provider UUIDs before submission and continues saved
+searches across retries/restarts. See the [design](docs/SLSKD_SEARCH_CONTINUATION_DESIGN.md),
+[official tradeoffs](docs/SLSKD_SEARCH_CONTINUATION_RESEARCH_2026_10.md) and
+[outcome](docs/SLSKD_SEARCH_CONTINUATION_OUTCOME.md) for ownership, uncertainty,
+expiry and native continuation evidence.
+
 Canonical development/CI validation uses Node **24.22.0** from `.nvmrc` and npm
 **12.0.2**. Select that Node version with your version manager or a verified local
 installation before `npm ci` and `npm run validate:fast`. `npm run check:node-baseline`

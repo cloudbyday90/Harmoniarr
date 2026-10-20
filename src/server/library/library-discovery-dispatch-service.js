@@ -33,6 +33,8 @@ import { createApiError } from '../auth.js';
 import { getOperatorTrackRequirements } from '../metadata/operator-track-file-policy.js';
 import { MUSIC_QUEUE_RECOVERY_DISCOVERY_SOURCE } from '../import-candidates/music-queue-recovery-policy.js';
 import { buildSharedFormatPreferences, createLibraryDiscoveryQualityContextService } from './library-discovery-quality-context-service.js';
+import { isOperationRunCancellationError, isOperationRunPauseError } from '../operation-run-cancellation.js';
+import { isOperationRunLeaseLostError } from '../operation-run-lease-error.js';
 
 export const DEFAULT_DISCOVERY_SETTINGS = Object.freeze({
   automaticCooldownMs: 6 * 60 * 60 * 1000,
@@ -80,6 +82,8 @@ export function createLibraryDiscoveryDispatchService({
   importCandidateAutoSelectionService = null,
   importCandidateService = null,
   libraryDiscoveryRequestStore = createLibraryDiscoveryRequestStore(),
+  libraryDiscoverySearchService = null,
+  discoverySearchAuthorityStore = null,
   musicQueueRecoveryDiscoveryService = null,
   musicQueueRecoveryDiscoveryHandoffService = null,
   loadSettingsFn = loadSettings,
@@ -271,6 +275,7 @@ export function createLibraryDiscoveryDispatchService({
     requestMetadata,
     requestOwnership,
     tracklistExpectations,
+    assertSearchCurrent,
   }) {
     const summary = {
       candidateCount: 0,
@@ -299,8 +304,13 @@ export function createLibraryDiscoveryDispatchService({
     for (const { query, trackTitle } of trackQueries) {
       summary.queryCount += 1;
       try {
-        const search = await slskdService.startSearch({ query });
+        const search = libraryDiscoverySearchService
+          ? await libraryDiscoverySearchService.startSearch({ claimedRequest, query,
+            context: { purpose: 'track_fallback', trackTitle, qualityContext, requestOwnership }, assertCurrent: assertSearchCurrent })
+          : await slskdService.startSearch({ query });
         const ingestionResult = await importCandidateService.ingestSlskdSearchResponses({
+          ...(search.searchBinding ? { searchBinding: search.searchBinding, assertSearchCurrent: search.assertSearchCurrent,
+            beforePersistCandidates: search.assertSearchCurrent } : {}),
           actorUserId,
           albumTitle,
           expectedTrackTitles: [trackTitle],
@@ -353,7 +363,8 @@ export function createLibraryDiscoveryDispatchService({
           dispatchedSearch.autoDownloadStart = autoDownloadStartResult;
         }
         summary.dispatchedSearches.push(dispatchedSearch);
-      } catch {
+      } catch (error) {
+        if (isOperationRunCancellationError(error) || isOperationRunPauseError(error) || isOperationRunLeaseLostError(error)) throw error;
         // A single failing per-track search must not abort the remaining tracks
         // or the surrounding album-exhaustion handling.
       }
@@ -367,6 +378,7 @@ export function createLibraryDiscoveryDispatchService({
     requestMetadata = null,
     runId = null,
     triggerSource = null,
+    assertSearchCurrent = async () => {},
   } = {}) {
     const scopedRecovery = triggerSource === MUSIC_QUEUE_RECOVERY_DISCOVERY_SOURCE;
     if (scopedRecovery && (!runId || !musicQueueRecoveryDiscoveryService)) {
@@ -498,9 +510,14 @@ export function createLibraryDiscoveryDispatchService({
         }
         if (scopedRecovery) await musicQueueRecoveryDiscoveryService.assertScopedDiscoveryCurrent({ runId, prepared: recoveryPrepared });
         searchAttempted = true;
-        const search = await slskdService.startSearch({
-          query: searchQuery,
-        });
+        const assertCurrent = async () => {
+          await assertSearchCurrent();
+          if (scopedRecovery) await musicQueueRecoveryDiscoveryService.assertScopedDiscoveryCurrent({ runId, prepared: recoveryPrepared });
+        };
+        const search = libraryDiscoverySearchService
+          ? await libraryDiscoverySearchService.startSearch({ claimedRequest, query: searchQuery,
+            context: { purpose: 'album', discoveryScope, qualityContext, requestOwnership: ownership }, assertCurrent })
+          : await slskdService.startSearch({ query: searchQuery });
         await recordProviderRecoverySearchStarted({ claimedRequest });
         const requestOwnership = ownership;
 
@@ -520,6 +537,8 @@ export function createLibraryDiscoveryDispatchService({
         if (selectedTracks) tracklistExpectations = { expectedTrackTitles: selectedTracks.map(track => track.title), expectedTrackCount: selectedTracks.length,
           expectedDurationSeconds: selectedTracks.reduce((total, track) => total + track.lengthMs / 1000, 0) };
         const ingestionResult = await importCandidateService.ingestSlskdSearchResponses({
+          ...(search.searchBinding ? { searchBinding: search.searchBinding, assertSearchCurrent: search.assertSearchCurrent,
+            beforePersistCandidates: search.assertSearchCurrent } : {}),
           actorUserId,
           albumTitle: claimedRequest.releaseTitle ?? claimedRequest.releaseGroupTitle ?? null,
           expectedTrackTitles: tracklistExpectations?.expectedTrackTitles ?? null,
@@ -633,6 +652,7 @@ export function createLibraryDiscoveryDispatchService({
             requestMetadata,
             requestOwnership,
             tracklistExpectations,
+            assertSearchCurrent,
           });
 
           if (trackFallbackSummary.queryCount > 0) {
@@ -663,6 +683,7 @@ export function createLibraryDiscoveryDispatchService({
           });
         }
       } catch (error) {
+        if (isOperationRunCancellationError(error) || isOperationRunPauseError(error) || isOperationRunLeaseLostError(error)) throw error;
         if (scopedRecovery && !searchAttempted && error?.code === 'music_queue_recovery_not_current') {
           await musicQueueRecoveryDiscoveryService.retireScopedDiscovery({ runId, knownDispatchAttemptedAt: recoveryPrepared.dispatchedAt });
           throw error;
@@ -680,6 +701,10 @@ export function createLibraryDiscoveryDispatchService({
           searchQuery,
           ...(scopedRecovery ? { recoveryRunId: runId } : {}),
         });
+        if (!scopedRecovery && error?.code === 'slskd_search_responses_not_ready' && discoverySearchAuthorityStore) {
+          await discoverySearchAuthorityStore.deferContinuation({ claimedRequest,
+            nextSearchAfter: new Date(getNow().getTime() + 30_000).toISOString() });
+        }
       }
     }
 

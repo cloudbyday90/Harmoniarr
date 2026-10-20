@@ -17,6 +17,7 @@ export function createNativeSearchBridge({ docker, fixtureId }, fixtures) {
   return {
     assertIdle: async () => { assert.equal(searches.length, 0); assert.deepEqual(await call('idle'), { searches: 0 }); },
     service: {
+      getSearchBinding: () => call('binding'),
       startSearch: async input => {
         assert.ok(nativeSearchPlans.some(plan => plan.query === input.query), JSON.stringify(input));
         const plan = resolveNativeSearchPlan(input.query);

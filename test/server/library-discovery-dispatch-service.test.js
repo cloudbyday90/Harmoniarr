@@ -10,6 +10,23 @@ function createLibraryDiscoveryDispatchService(options = {}) {
   return buildLibraryDiscoveryDispatchService({ loadSettingsFn: async () => ({}), ...options });
 }
 
+for (const code of ['operation_run_cancelled', 'operation_run_paused', 'operation_run_lease_lost']) {
+  test(`discovery propagates ${code} without recording ordinary failure or continuing another query`, async () => {
+    const failure = Object.assign(new Error('Interrupted'), { code });
+    let claims = 0;
+    const service = createLibraryDiscoveryDispatchService({
+      libraryDiscoveryRequestStore: {
+        claimNextReadyAutomaticDiscoveryRequest: async () => { claims++; return { artistName: 'Artist', releaseTitle: 'Album', metadataReleaseId: 'release' }; },
+        recordDiscoverySearchFailure: async () => assert.fail('Interruption is owned by the worker'),
+      },
+      slskdService: { startSearch: async () => { throw failure; } },
+      importCandidateService: { ingestSlskdSearchResponses: async () => assert.fail('Interrupted search cannot ingest') },
+    });
+    await assert.rejects(service.dispatchReadyDiscoveryRequests(), error => error === failure);
+    assert.equal(claims, 1);
+  });
+}
+
 test('unpublished provider results record dispatch failure without consuming a successful zero-candidate attempt', async (t) => {
   const recordDiscoverySearchFailure = t.mock.fn(async () => {});
   const recordDiscoverySearchSuccess = t.mock.fn(async () => assert.fail('Unpublished results are not successful discovery'));

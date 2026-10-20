@@ -134,11 +134,12 @@ async function readRuns(pool, type = discoveryType) {
 function createDiscoveryHarness(context, { waitForResponses = async () => {} } = {}) {
   const searches = [];
   const slskdService = {
-    async startSearch({ query }) {
-      const id = randomUUID();
+    async getSearchBinding() { return 'a'.repeat(64); },
+    async startSearch({ id = randomUUID(), query }) {
       searches.push({ id, query });
-      return { id };
+      return { id, query };
     },
+    async getSearchState({ searchId }) { return searches.find(search => search.id === searchId); },
     async getSearchResponses({ searchId }) {
       await waitForResponses();
       return {

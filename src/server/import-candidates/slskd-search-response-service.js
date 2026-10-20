@@ -37,11 +37,11 @@ export function createSlskdSearchResponseService({
   assertBoundedInteger(publicationPollAttempts, 10, 'publicationPollAttempts');
   assertBoundedInteger(pollIntervalMs, 10000, 'pollIntervalMs');
 
-  async function waitForSearchResponses({ searchId, assertCurrent = null }) {
+  async function waitForSearchResponses({ searchId, assertCurrent = null, searchBinding = null }) {
     const checkCurrent = async () => { if (assertCurrent) await assertCurrent(); };
     async function read(method, input) {
       await checkCurrent();
-      const result = await slskdService[method](input);
+      const result = await slskdService[method]({ ...input, ...(searchBinding === null ? {} : { searchBinding }) });
       await checkCurrent();
       return result;
     }
