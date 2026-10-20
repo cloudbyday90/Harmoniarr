@@ -6,6 +6,21 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Delivered slice: Docker-owned smoke ports (2026-10-19)
+
+- Replace smoke publication with one Docker-assigned loopback mapping. Resolve
+  the acknowledged service container after each start; refuse unexpected bindings
+  before HTTP and retain separate phase endpoints/current-port sessions.
+- See the [design](DOCKER_SMOKE_PORT_DESIGN.md),
+  [official research/tradeoffs](DOCKER_SMOKE_PORT_RESEARCH_2026_10.md) and
+  [outcome](DOCKER_SMOKE_PORT_OUTCOME.md) for executed evidence and scope.
+- Apply refreshed random [PR 48](OPEN_PR_48_DOCKER_PORT_EVALUATION.md) locally:
+  TypeScript 7 still fails current language-server initialization. Restore the
+  package pair and prove the retained Vue/TypeScript bridge; no merge.
+- Next build improvement: remove server-builder's unnecessary npm ci after
+  proving identical copied ESM output and packaged behavior. Recheck and qualify
+  the announced October 21 Node security patch when actually published.
+
 ## Delivered slice: Production dependency closure and form-safe PWA reload (2026-10-19)
 
 - Classify Vue/Router as client build dependencies, preserving every resolved
@@ -23,8 +38,8 @@ Database model source: `docs/DATABASE_MODEL.md`
   retention across real first claim and sibling activation. See the
   [reload design](PWA_SERVICE_WORKER_RELOAD_DESIGN.md) and
   [outcome](PWA_SERVICE_WORKER_RELOAD_OUTCOME.md).
-- Next: use Docker-owned loopback port allocation for the smoke harness to
-  remove its probe/release/bind race. Separately remove server-builder's
+- Follow-up delivered: [Docker-owned loopback allocation](DOCKER_SMOKE_PORT_OUTCOME.md)
+  replaces the smoke harness probe/release/bind gap. Separately remove server-builder's
   unnecessary npm ci after proving byte-identical ESM output and packaged behavior.
   Qualify the announced October 21 Node security patch once actually published.
 

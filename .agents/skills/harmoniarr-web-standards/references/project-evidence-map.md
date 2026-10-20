@@ -1,5 +1,12 @@
 # Project standards-to-evidence map
 
+Smoke port ownership belongs to compose.smoke.yaml, docker-smoke-endpoint.js and
+docker-smoke-validation.js. Parser/command controls reject extra or wider bindings;
+scenario controls prove current-port sessions and cleanup after either phase's
+refusal. docs/DOCKER_SMOKE_PORT_OUTCOME.md owns native config, fresh/restart and
+upgrade evidence. This local-Docker policy does not alter general deployment ports
+or qualify other validators and remote Docker contexts.
+
 Service worker reload ownership lives in src/client/lib/pwa-registration.js.
 The unit cases prove requested/absent/failed dispatch and one reload; the native
 browser pwa-registration-browser-verification case holds real shell precaching,

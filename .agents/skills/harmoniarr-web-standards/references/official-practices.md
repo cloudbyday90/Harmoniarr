@@ -1,5 +1,11 @@
 # Official practices by boundary
 
+October 19 smoke-port guidance uses docs/DOCKER_SMOKE_PORT_RESEARCH_2026_10.md.
+Docker allocation, Compose replacement and inspected publication are separate
+from W3C Secure Contexts' potentially trustworthy loopback origin (a Candidate
+Recommendation Draft). OWASP informs exposure reduction; neither guidance grants
+TLS or authentication. Verify every restarted/upgraded endpoint before HTTP.
+
 For service worker changes, consult the current W3C Service Workers draft and
 browser-maintainer lifecycle guidance, recording status/date. controllerchange
 also follows first claim; it does not grant permission to reload a form. Trace

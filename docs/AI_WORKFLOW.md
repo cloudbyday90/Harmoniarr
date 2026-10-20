@@ -1,5 +1,11 @@
 # AI Workflow And Shared Copilot Skills
 
+The testing skill now routes Docker smoke networking to its focused
+published-port reference. Check merged Compose config, acknowledge the exact
+service container, refuse unexpected bindings before HTTP, and resolve again
+after restart or upgrade. The [port design](DOCKER_SMOKE_PORT_DESIGN.md) connects
+official Docker/OWASP/W3C guidance to this concrete workflow and its limits.
+
 The [service worker reload design](PWA_SERVICE_WORKER_RELOAD_DESIGN.md) adds a
 native browser control to the standards skill: distinguish first claim and a
 sibling update from this page's explicit reload request. Hold installation until

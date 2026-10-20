@@ -24,6 +24,12 @@ Service worker activation preserves in-progress forms unless this page requests
 an update. The [reload outcome](docs/PWA_SERVICE_WORKER_RELOAD_OUTCOME.md) records
 the first-install login fix and enabled-worker regression coverage.
 
+Fresh-install and upgrade Docker smoke validators require Compose 2.24.4+ and
+use a smoke-only overlay with Docker-assigned loopback ports. Each phase reports
+its inspected endpoint; restart or upgrade can change it. See the
+[port design](docs/DOCKER_SMOKE_PORT_DESIGN.md) and
+[validation outcome](docs/DOCKER_SMOKE_PORT_OUTCOME.md).
+
 `npm run test:integration:coordinated` is the opt-in complete integration runner.
 Use `npm run test:integration:coordinated -- --plan` to inspect its exact file
 plan. It runs the audited seven-file PostgreSQL cohort once, then every other

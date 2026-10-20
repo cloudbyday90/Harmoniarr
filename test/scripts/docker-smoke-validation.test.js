@@ -489,6 +489,7 @@ function createRunCommandStub({
   postgresIdentity = 'harmoniarr|harmoniarr',
   postgresPersistenceCount = '1',
   postgresReadyMessage = '127.0.0.1:5432 - accepting connections',
+  publishedPorts = [4300, 4301],
   restartLogs = '[harmoniarr-entrypoint] starting embedded PostgreSQL on 127.0.0.1:5432\n[harmoniarr-entrypoint] preparing database state',
 } = {}) {
   const calls = [];
@@ -519,7 +520,14 @@ function createRunCommandStub({
     }
 
     if (isComposeCommand && args.includes('ps') && (args.includes('-q') || args.includes('-aq')) && args.at(-1) === 'harmoniarr') {
-      return { exitCode: 0, stderr: '', stdout: 'container-123\n' };
+      return { exitCode: 0, stderr: '', stdout: `${'a'.repeat(63)}${successfulStartupCount}\n` };
+    }
+
+    if (args[0] === 'inspect' && args.includes('{{json .NetworkSettings.Ports}}')) {
+      const port = publishedPorts[Math.min(successfulStartupCount - 1, publishedPorts.length - 1)];
+      return { exitCode: 0, stderr: '', stdout: JSON.stringify({
+        '3000/tcp': [{ HostIp: '127.0.0.1', HostPort: String(port) }],
+      }) };
     }
 
     if (args[0] === 'inspect' && args.includes('{{json .HostConfig.ReadonlyRootfs}}')) {
@@ -614,7 +622,7 @@ test('validateDockerFreshInstall verifies ffmpeg and ffprobe in the running imag
       pendingMigrations: 0,
       service: 'ok',
     }),
-    getAvailablePortFn: async () => 4300,
+
     makeDirectoryLayoutFn: async () => ({
       appData: '/tmp/appdata',
       downloads: '/tmp/downloads',
@@ -686,7 +694,7 @@ test('validateDockerFreshInstall does not inherit HARMONIARR_IMAGE unless imageR
       pendingMigrations: 0,
       service: 'ok',
     }),
-    getAvailablePortFn: async () => 4300,
+
     makeDirectoryLayoutFn: async () => ({
       appData: '/tmp/appdata',
       downloads: '/tmp/downloads',
@@ -734,7 +742,7 @@ test('validateDockerFreshInstall fails when a tooling version probe returns no v
         pendingMigrations: 0,
         service: 'ok',
       }),
-      getAvailablePortFn: async () => 4301,
+
       makeDirectoryLayoutFn: async () => ({
         appData: '/tmp/appdata',
         downloads: '/tmp/downloads',
@@ -765,7 +773,7 @@ test('validateDockerFreshInstall fails when the existing-data restart reinitiali
         pendingMigrations: 0,
         service: 'ok',
       }),
-      getAvailablePortFn: async () => 4303,
+
       makeDirectoryLayoutFn: async () => ({
         appData: '/tmp/appdata',
         downloads: '/tmp/downloads',
@@ -797,7 +805,7 @@ test('validateDockerFreshInstall fails when the invalid-startup scenario does no
         pendingMigrations: 0,
         service: 'ok',
       }),
-      getAvailablePortFn: async () => 4302,
+
       makeDirectoryLayoutFn: async () => ({
         appData: '/tmp/appdata',
         downloads: '/tmp/downloads',
@@ -827,7 +835,7 @@ test('validateDockerFreshInstall accepts a final 143 exit code for invalid start
       pendingMigrations: 0,
       service: 'ok',
     }),
-    getAvailablePortFn: async () => 4304,
+
     makeDirectoryLayoutFn: async () => ({
       appData: '/tmp/appdata',
       downloads: '/tmp/downloads',
@@ -854,7 +862,7 @@ test('validateDockerFreshInstall validates backup export and restore preview/app
 
   const result = await validateDockerFreshInstall({
     fetchFn,
-    getAvailablePortFn: async () => 4304,
+
     makeDirectoryLayoutFn: async () => ({
       appData: '/tmp/appdata',
       downloads: '/tmp/downloads',
@@ -892,7 +900,7 @@ test('validateDockerFreshInstall validates delegated request music summary and n
 
   const result = await validateDockerFreshInstall({
     fetchFn,
-    getAvailablePortFn: async () => 4306,
+
     makeDirectoryLayoutFn: async () => ({
       appData: '/tmp/appdata',
       downloads: '/tmp/downloads',
@@ -928,7 +936,7 @@ test('validateDockerUpgradePath validates persisted settings across a baseline-t
   const result = await validateDockerUpgradePath({
     baselineImageRef: 'ghcr.io/example/harmoniarr:v0.0.9',
     fetchFn,
-    getAvailablePortFn: async () => 4305,
+
     makeDirectoryLayoutFn: async () => ({
       appData: '/tmp/appdata',
       downloads: '/tmp/downloads',
@@ -963,13 +971,71 @@ test('validateDockerUpgradePath validates persisted settings across a baseline-t
 
 function createHookTestOptions({ fetchFn, runCommandFn } = {}) {
   return { fetchFn: fetchFn ?? (async () => createFetchResponse({ ok: true, pendingMigrations: 0, service: 'ok' })),
-    getAvailablePortFn: async () => 4307, processEnv: {}, projectName: 'harmoniarr-hooks-test',
+    processEnv: {}, projectName: 'harmoniarr-hooks-test',
     mkdtempFn: async () => '/tmp/harmoniarr-docker-smoke-hooks', removeFn: async () => {},
     makeDirectoryLayoutFn: async () => ({ appData: '/tmp/appdata', downloads: '/tmp/downloads',
       music: '/tmp/music', staging: '/tmp/staging', transcodeTemp: '/tmp/transcode-temp' }),
     runCommandFn: runCommandFn ?? createRunCommandStub().runCommandFn,
     startupValidationFailureScenario: null,
   };
+}
+
+for (const [name, scenario] of [['fresh/restart', validateDockerFreshInstall], ['baseline/upgrade', validateDockerUpgradePath]]) {
+  test(`${name} resolves each allocated port before HTTP and creates sessions on the current endpoint`, async () => {
+    const api = createSmokeApiFetchStub();
+    const commands = createRunCommandStub({ publishedPorts: [45123, 45124] });
+    const hooks = [];
+    const fetchPorts = new Set();
+    const result = await scenario({ ...createHookTestOptions({ runCommandFn: commands.runCommandFn,
+      fetchFn: async (url, options) => {
+        const starts = commands.calls.filter(call => call.args.includes('up')).length;
+        const port = Number(new URL(url).port);
+        assert.equal(port, starts === 1 ? 45123 : 45124);
+        assert.equal(commands.calls.filter(call => call.args.includes('{{json .NetworkSettings.Ports}}')).length, starts);
+        fetchPorts.add(port);
+        return api.fetchFn(url, options);
+      } }),
+      baselineImageRef: 'sha256:baseline', candidateImageRef: 'sha256:candidate',
+      verifyExistingDataRestart: true, startupValidationFailureScenario: null,
+      verifyBackupRestoreFlow: true, verifyRequestMusicFlow: true,
+      verifyRuntimeFn: async ({ env, endpoint }) => {
+        assert.equal(env.HARMONIARR_PORT, String(endpoint.port));
+        hooks.push(endpoint);
+      },
+    });
+    assert.deepEqual([...fetchPorts], [45123, 45124]);
+    assert.deepEqual(hooks.map(endpoint => endpoint.port), [45123, 45124]);
+    assert.notEqual(hooks[0].containerId, hooks[1].containerId);
+    assert.equal(result.port, 45124);
+    assert.deepEqual((result.freshInstall ?? result.baselineRuntime).endpoint, hooks[0]);
+    assert.deepEqual((result.existingDataRestart ?? result.upgradedRuntime).endpoint, hooks[1]);
+    for (const commandCall of commands.calls.filter(call => call.args[0] === 'compose')) {
+      assert.ok(commandCall.args.some(arg => arg.endsWith('compose.smoke.yaml')));
+      assert.equal(commandCall.env.HARMONIARR_PORT, '0');
+    }
+  });
+
+  for (const refusalAt of [1, 2]) test(`${name} refuses a wider binding in phase ${refusalAt} before HTTP and still cleans up`, async () => {
+    const api = createSmokeApiFetchStub();
+    const commands = createRunCommandStub();
+    let inspections = 0;
+    let requestsAtRefusal;
+    await assert.rejects(scenario({ ...createHookTestOptions({ fetchFn: api.fetchFn,
+      runCommandFn: async request => {
+        if (request.args.includes('{{json .NetworkSettings.Ports}}') && ++inspections === refusalAt) {
+          requestsAtRefusal = api.calls.length;
+          return { exitCode: 0, stdout: JSON.stringify({ '3000/tcp': [{ HostIp: '0.0.0.0', HostPort: '45123' }] }) };
+        }
+        return commands.runCommandFn(request);
+      } }),
+      baselineImageRef: 'sha256:baseline', candidateImageRef: 'sha256:candidate',
+      verifyExistingDataRestart: true,
+    }), /one assigned loopback/u);
+    assert.equal(inspections, refusalAt);
+    assert.equal(api.calls.length, requestsAtRefusal);
+    if (refusalAt === 1) assert.equal(api.calls.length, 0);
+    assert.ok(commands.calls.some(call => call.args.includes('down') && call.args.includes('--volumes')));
+  });
 }
 
 test('fresh install and restart verify each actual runtime and retain separate acceptance results', async () => {

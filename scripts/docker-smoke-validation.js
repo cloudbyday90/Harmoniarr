@@ -6,15 +6,14 @@
  * See LICENSE file for details.
  */
 
-import { once } from 'node:events';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
-import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createSessionHttpClient } from '../src/shared/http-session-client.js';
 import { runBufferedCommand } from './process-runtime.js';
 import { cleanupDockerSmokeWorkspace } from './docker-smoke-cleanup.js';
+import { resolveDockerSmokeEndpoint } from './docker-smoke-endpoint.js';
 
 const rootDir = fileURLToPath(new URL('..', import.meta.url));
 const embeddedPostgresInitLogSnippet = 'initializing embedded PostgreSQL cluster at';
@@ -682,24 +681,6 @@ async function validateUpgradeSettingsPersistence({
   };
 }
 
-async function getAvailablePort() {
-  const server = createServer();
-
-  server.listen(0, '127.0.0.1');
-  await once(server, 'listening');
-
-  const address = server.address();
-  const port = typeof address === 'object' && address ? address.port : null;
-  server.close();
-  await once(server, 'close');
-
-  if (!Number.isInteger(port)) {
-    throw new Error('Unable to allocate an available host port for the Docker smoke test');
-  }
-
-  return port;
-}
-
 async function ensureDirectoryLayout({ baseDir, mkdirFn = mkdir } = {}) {
   const directories = {
     appData: resolve(baseDir, 'appdata'),
@@ -1268,7 +1249,6 @@ async function validateStartupRefusal({
 function buildValidationEnvironment({
   directories,
   imageRef,
-  port,
   processEnv = process.env,
 } = {}) {
   const baseProcessEnv = { ...processEnv };
@@ -1283,7 +1263,7 @@ function buildValidationEnvironment({
     HARMONIARR_DOWNLOADS: directories.downloads,
     ...(imageRef ? { HARMONIARR_IMAGE: imageRef } : {}),
     HARMONIARR_MUSIC: directories.music,
-    HARMONIARR_PORT: String(port),
+    HARMONIARR_PORT: '0',
     HARMONIARR_STAGING: directories.staging,
     HARMONIARR_TRANSCODE_TEMP: directories.transcodeTemp,
     POSTGRES_DB: processEnv.POSTGRES_DB ?? 'harmoniarr',
@@ -1296,7 +1276,6 @@ export async function validateDockerFreshInstall({
   buildImage = true,
   composeFilePath = resolve(rootDir, 'compose.yaml'),
   fetchFn = fetch,
-  getAvailablePortFn = getAvailablePort,
   imageRef,
   makeDirectoryLayoutFn = ensureDirectoryLayout,
   mkdtempFn = mkdtemp,
@@ -1317,13 +1296,12 @@ export async function validateDockerFreshInstall({
   verifyRuntimeFn = null,
 } = {}) {
   const workspaceRoot = await mkdtempFn(resolve(tempRootDir, 'harmoniarr-docker-smoke-'));
-  const port = await getAvailablePortFn();
+  let endpoint;
   const directories = await makeDirectoryLayoutFn({ baseDir: workspaceRoot });
-  const composeArgs = ['compose', '-f', composeFilePath, '-p', projectName];
+  const composeArgs = ['compose', '-f', composeFilePath, '-f', resolve(rootDir, 'compose.smoke.yaml'), '-p', projectName];
   const env = buildValidationEnvironment({
     directories,
     imageRef,
-    port,
     processEnv,
   });
 
@@ -1335,6 +1313,8 @@ export async function validateDockerFreshInstall({
       runCommandFn,
     });
 
+    endpoint = await resolveDockerSmokeEndpoint({ composeArgs, env, runCommandFn });
+    let port = endpoint.port;
     const freshInstall = await validateRunningStack({
       composeArgs,
       env,
@@ -1345,6 +1325,7 @@ export async function validateDockerFreshInstall({
       runCommandFn,
     });
 
+    freshInstall.endpoint = endpoint;
     let backupRestoreFlow = null;
     let embeddedPostgresPersistence = null;
     let existingDataRestart = null;
@@ -1367,7 +1348,8 @@ export async function validateDockerFreshInstall({
 
     // Seed continuity fixtures only after the optional first-admin bootstrap.
     if (verifyRuntimeFn) {
-      freshInstall.acceptance = await verifyRuntimeFn({ composeArgs, env, runCommandFn, phase: 'fresh-install' });
+      freshInstall.acceptance = await verifyRuntimeFn({ composeArgs, env: { ...env, HARMONIARR_PORT: String(port) },
+        endpoint, runCommandFn, phase: 'fresh-install' });
     }
 
     if (verifyBackupRestoreFlow) {
@@ -1415,6 +1397,8 @@ export async function validateDockerFreshInstall({
         runCommandFn,
       });
 
+      endpoint = await resolveDockerSmokeEndpoint({ composeArgs, env, runCommandFn });
+      port = endpoint.port;
       existingDataRestart = await validateRunningStack({
         composeArgs,
         env,
@@ -1424,8 +1408,10 @@ export async function validateDockerFreshInstall({
         port,
         runCommandFn,
       });
+      existingDataRestart.endpoint = endpoint;
       if (verifyRuntimeFn) {
-        existingDataRestart.acceptance = await verifyRuntimeFn({ composeArgs, env, runCommandFn, phase: 'existing-data-restart' });
+        existingDataRestart.acceptance = await verifyRuntimeFn({ composeArgs, env: { ...env, HARMONIARR_PORT: String(port) },
+          endpoint, runCommandFn, phase: 'existing-data-restart' });
       }
       embeddedPostgresPersistence = await verifyEmbeddedPostgresPersistenceProbe({
         composeArgs,
@@ -1479,7 +1465,6 @@ export async function validateDockerUpgradePath({
   candidateImageRef = null,
   composeFilePath = resolve(rootDir, 'compose.yaml'),
   fetchFn = fetch,
-  getAvailablePortFn = getAvailablePort,
   makeDirectoryLayoutFn = ensureDirectoryLayout,
   mkdtempFn = mkdtemp,
   processEnv = process.env,
@@ -1498,19 +1483,17 @@ export async function validateDockerUpgradePath({
   }
 
   const workspaceRoot = await mkdtempFn(resolve(tempRootDir, 'harmoniarr-docker-upgrade-'));
-  const port = await getAvailablePortFn();
+  let endpoint;
   const directories = await makeDirectoryLayoutFn({ baseDir: workspaceRoot });
-  const composeArgs = ['compose', '-f', composeFilePath, '-p', projectName];
+  const composeArgs = ['compose', '-f', composeFilePath, '-f', resolve(rootDir, 'compose.smoke.yaml'), '-p', projectName];
   const baselineEnv = buildValidationEnvironment({
     directories,
     imageRef: baselineImageRef,
-    port,
     processEnv,
   });
   const candidateEnv = buildValidationEnvironment({
     directories,
     imageRef: candidateImageRef,
-    port,
     processEnv,
   });
 
@@ -1522,19 +1505,22 @@ export async function validateDockerUpgradePath({
       runCommandFn,
     });
 
+    endpoint = await resolveDockerSmokeEndpoint({ composeArgs, env: baselineEnv, runCommandFn });
+    const baselinePort = endpoint.port;
     const baselineRuntime = await validateRunningStack({
       composeArgs,
       env: baselineEnv,
       expectEmbeddedPostgresInitialization: true,
       expectBootstrapLog: true,
       fetchFn,
-      port,
+      port: baselinePort,
       runCommandFn,
     });
 
+    baselineRuntime.endpoint = endpoint;
     const baselineClient = createValidationSessionClient({
       fetchFn,
-      port,
+      port: baselinePort,
       requestTimeoutMs,
     });
 
@@ -1548,7 +1534,8 @@ export async function validateDockerUpgradePath({
       settingsPatch: settingsProbe,
     });
     if (verifyRuntimeFn) {
-      baselineRuntime.acceptance = await verifyRuntimeFn({ composeArgs, env: baselineEnv, runCommandFn, phase: 'baseline' });
+      baselineRuntime.acceptance = await verifyRuntimeFn({ composeArgs,
+        env: { ...baselineEnv, HARMONIARR_PORT: String(baselinePort) }, endpoint, runCommandFn, phase: 'baseline' });
     }
 
     await stopComposeProject({
@@ -1565,6 +1552,8 @@ export async function validateDockerUpgradePath({
       runCommandFn,
     });
 
+    endpoint = await resolveDockerSmokeEndpoint({ composeArgs, env: candidateEnv, runCommandFn });
+    const port = endpoint.port;
     const upgradedRuntime = await validateRunningStack({
       composeArgs,
       env: candidateEnv,
@@ -1574,8 +1563,10 @@ export async function validateDockerUpgradePath({
       port,
       runCommandFn,
     });
+    upgradedRuntime.endpoint = endpoint;
     if (verifyRuntimeFn) {
-      upgradedRuntime.acceptance = await verifyRuntimeFn({ composeArgs, env: candidateEnv, runCommandFn, phase: 'upgraded' });
+      upgradedRuntime.acceptance = await verifyRuntimeFn({ composeArgs,
+        env: { ...candidateEnv, HARMONIARR_PORT: String(port) }, endpoint, runCommandFn, phase: 'upgraded' });
     }
     const settingsPersistence = await validateUpgradeSettingsPersistence({
       fetchFn,

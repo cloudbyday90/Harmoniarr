@@ -5,6 +5,10 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For Docker smoke networking, read [published-port ownership](references/docker-smoke-ports.md).
+It covers complete port replacement, acknowledged service identity, per-phase
+endpoint resolution and refusal before HTTP, with native cleanup evidence.
+
 For TestsStream warnings or reporter composition changes, use
 [reporter ownership](references/reporter-ownership.md). Trace actual fan-out,
 preserve default warnings and prove EOF, Error/null and native output drainage.

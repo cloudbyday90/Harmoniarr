@@ -1,0 +1,8 @@
+# Disposable smoke validation only. Requires Docker Compose >= 2.24.4.
+# Replace, rather than append to, the deployment's published ports.
+services:
+  harmoniarr:
+    ports: !override
+      - target: 3000
+        host_ip: 127.0.0.1
+        protocol: tcp
