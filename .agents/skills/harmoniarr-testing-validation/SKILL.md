@@ -5,6 +5,10 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For native retry exhaustion and changed-size negotiation refusal, read
+[native refusal](references/native-refusal.md). It owns bounded failed attempts,
+absence of a mismatched file connection and final incomplete-only storage.
+
 For actual provider default retries and nonzero-offset recovery, read
 [native resume](references/native-resume.md). It distinguishes native retries
 from application POST ownership and requires verified prefixes and final hashes.

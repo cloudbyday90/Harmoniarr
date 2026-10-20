@@ -1,5 +1,13 @@
 # AI Workflow And Shared Copilot Skills
 
+The [native refusal design](NATIVE_REFUSAL_DESIGN.md) extends testing and standards
+references with exception-specific retry ownership. An attempt cap does not make
+every error retryable. Verify real attempt counts, refusal before file connection,
+unchanged receipt identity and exact incomplete prefixes after producer retirement.
+Drain admitted prefix reads and EOF callbacks while preserving original Error/null.
+The [outcome](NATIVE_REFUSAL_OUTCOME.md) separates transport-failure qualification
+from source authentication, decoding and canonical import.
+
 The [native resume design](NATIVE_RESUME_DESIGN.md) adds a focused testing-skill
 reference and standards evidence mapping for default retries, bounded token
 capabilities and verified nonzero offsets. Discover actual native options;

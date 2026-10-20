@@ -6,6 +6,28 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Delivered slice: Native exhaustion and changed-size refusal (2026-10-20)
+
+- Add a separate opt-in ESM refusal lane with unchanged provider defaults.
+  Bound EOF failure to three total attempts and reject a changed acknowledged
+  size on the second request before another file connection.
+- Verify stable batch/receipt identity, failed classification, GET-only recovery,
+  one application POST and exact hashed incomplete-only storage after native task
+  retirement and acknowledged provider shutdown. See the
+  [design](NATIVE_REFUSAL_DESIGN.md),
+  [research/tradeoffs](NATIVE_REFUSAL_RESEARCH_2026_10.md) and
+  [outcome](NATIVE_REFUSAL_OUTCOME.md).
+- Add focused capability/offset/EOF/cancellation controls, update maintained
+  testing/web standards skills, select affected native regressions and rebuild
+  the walkthrough without cache while preserving data/admin.
+- Recheck random [PR 48](OPEN_PR_48_NATIVE_REFUSAL_EVALUATION.md); its unchanged
+  incompatible candidate remains unapplied after lock/consumer-input verification.
+  No production/schema/dependency change, release or PR merge.
+- Next: a bounded native valid-audio acquisition through media inspection and
+  canonical import, with a same-size corrupt-payload refusal control. Keep it
+  isolated and opt-in; successful synthetic bytes do not establish that journey
+  or authenticate a same-size changed remote source.
+
 ## Delivered slice: Native default retry and resume (2026-10-20)
 
 - Add an opt-in ESM resume lane with unchanged released provider defaults.

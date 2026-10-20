@@ -87,6 +87,14 @@ application POST. See the [design](docs/NATIVE_RESUME_DESIGN.md),
 [research/tradeoffs](docs/NATIVE_RESUME_RESEARCH_2026_10.md) and
 [outcome](docs/NATIVE_RESUME_OUTCOME.md).
 
+Run npm run validate:native-slskd-refusal with those 0.26.1 immutable-image/version
+inputs for three-attempt EOF exhaustion and changed-size negotiation refusal.
+This separate opt-in lane checks failed receipts, GET-only recovery, absence of
+a mismatched file connection and incomplete-only files after provider retirement.
+See the [design](docs/NATIVE_REFUSAL_DESIGN.md),
+[research/tradeoffs](docs/NATIVE_REFUSAL_RESEARCH_2026_10.md) and
+[outcome](docs/NATIVE_REFUSAL_OUTCOME.md).
+
 Service worker activation preserves in-progress forms unless this page requests
 an update. The [reload outcome](docs/PWA_SERVICE_WORKER_RELOAD_OUTCOME.md) records
 the first-install login fix and enabled-worker regression coverage.

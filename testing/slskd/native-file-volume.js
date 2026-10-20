@@ -15,7 +15,7 @@ export async function acknowledgeNativeFileVolume({ provider, fixture, projectNa
   const mounts = value => value.Mounts.filter(mount => mount.Type === 'volume');
   const writer = mounts(provider); const reader = mounts(fixture);
   const specs = [{ key: 'completed', writer: '/data/downloads', reader: '/downloads' },
-    ...(['partial', 'resume'].includes(mode) ? [{ key: 'incomplete', writer: '/data/incomplete', reader: '/incomplete' }] : [])];
+    ...(['partial', 'resume', 'refusal'].includes(mode) ? [{ key: 'incomplete', writer: '/data/incomplete', reader: '/incomplete' }] : [])];
   assert.equal(writer.length, specs.length); assert.equal(reader.length, specs.length);
   for (const spec of specs) {
     const write = writer.find(mount => mount.Destination === spec.writer);
@@ -30,5 +30,5 @@ export async function acknowledgeNativeFileVolume({ provider, fixture, projectNa
     assert.deepEqual(volume.Options, nativeFileVolumeOptions);
   }
   return { sharedReadOnlyInspector: true, boundedTmpfs: true, bytesLimit: 4 * 1024 * 1024,
-    ...(['partial', 'resume'].includes(mode) ? { incompleteReadOnlyInspector: true, incompleteBytesLimit: 4 * 1024 * 1024 } : {}) };
+    ...(['partial', 'resume', 'refusal'].includes(mode) ? { incompleteReadOnlyInspector: true, incompleteBytesLimit: 4 * 1024 * 1024 } : {}) };
 }

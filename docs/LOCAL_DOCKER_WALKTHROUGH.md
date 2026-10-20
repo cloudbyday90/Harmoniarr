@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 20 [native-refusal rebuild outcome](LOCAL_DOCKER_NATIVE_REFUSAL_OUTCOME.md)
+records the latest no-cache image, preserved data/admin and readiness-only check.
+Native refusal uses private disposable projects with no published ports;
+walkthrough provider attention remains a separate operational follow-up.
+
 The October 20 [native-resume rebuild outcome](LOCAL_DOCKER_NATIVE_RESUME_OUTCOME.md)
 records the latest no-cache image, preserved data/admin and passing readiness-only
 check. Default retry qualification uses separate private disposable storage;

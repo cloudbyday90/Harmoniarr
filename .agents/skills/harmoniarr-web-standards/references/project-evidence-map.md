@@ -1,5 +1,10 @@
 # Project standards-to-evidence map
 
+Native refusal belongs to testing/slskd/native-refusal-* and
+test/native/slskd-refusal.test.js. The [outcome](../../../../docs/NATIVE_REFUSAL_OUTCOME.md)
+owns actual exhaustion versus size-mismatch attempt counts, failed receipt/GET
+recovery and incomplete-only file proof after producer retirement.
+
 Native default resume uses testing/slskd/native-resume-* and
 test/native/slskd-resume.test.js for bounded second-attempt capabilities, verified
 nonzero offsets and effective native options. The

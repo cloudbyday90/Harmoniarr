@@ -1,5 +1,10 @@
 # Official practices by boundary
 
+Native exhaustion/changed-size decisions use the
+[refusal research](../../../../docs/NATIVE_REFUSAL_RESEARCH_2026_10.md). Released
+exception policy, IETF POST uncertainty, Node EOF/close, OWASP isolation and W3C
+provenance inform distinct claims. An attempt cap does not make every error retryable.
+
 Native default retries use the
 [resume research](../../../../docs/NATIVE_RESUME_RESEARCH_2026_10.md): released
 vendor semantics, IETF mutation uncertainty, W3C provenance and OWASP/Docker
