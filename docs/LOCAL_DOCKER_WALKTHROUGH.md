@@ -1,5 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 20 [discovery rebuild outcome](LOCAL_DOCKER_NATIVE_DISCOVERY_OUTCOME.md)
+records the newest no-cache image, identical runtime inventories, preserved data/
+admin and passing readiness-only check. The [discovery outcome](NATIVE_DISCOVERY_COMMAND_OUTCOME.md)
+adds canonical Find matches and actual reconciliation/client/ingestion before
+native acquisition. Owned HTTP search responses remain a separate boundary from
+native Soulseek search; walkthrough provider attention remains an operational follow-up.
+
 The October 20 [canonical-command rebuild outcome](LOCAL_DOCKER_NATIVE_CANONICAL_OUTCOME.md)
 records the latest no-cache image, preserved data/admin, one applied migration
 and passing readiness-only check. The [canonical native outcome](NATIVE_CANONICAL_COMMAND_OUTCOME.md)

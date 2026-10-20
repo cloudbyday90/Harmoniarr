@@ -5,6 +5,10 @@ description: "Apply and verify web standards for Harmoniarr UI commands, forms, 
 
 # Harmoniarr Web Standards
 
+For canonical search through ingestion and acquisition, use
+[discovery provenance](references/discovery-provenance.md). It distinguishes
+durable intent, actual client/worker ingestion and native transfer evidence.
+
 For provider media publication, use
 [native audio boundaries](references/native-audio-import.md). It maps W3C
 provenance, IETF mutation ownership, OWASP content validation and vendor probing

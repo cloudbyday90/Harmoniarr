@@ -24,6 +24,9 @@ Use this reference for the provider-to-library boundary, alongside the
 
 ffprobe establishes observed stream metadata or refusal, not a full decode,
 remote-source authentication, WCAG coverage or private-protocol certification.
+The newer [discovery method](discovery-provenance.md) replaces candidate-row
+seeding with canonical Find matches, actual reconciliation/client/ingestion and
+separate owned HTTP search-response evidence.
 The current [canonical command outcome](../../../../docs/NATIVE_CANONICAL_COMMAND_OUTCOME.md)
 adds actual authenticated selection/start and the real planner/worker. Controlled
 search results still do not prove live discovery or rendered command interaction.

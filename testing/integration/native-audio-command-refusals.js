@@ -37,7 +37,7 @@ export async function qualifyNativeAudioCommandRefusals({ client, baseUrl, pool,
   } finally { await pool.query('UPDATE app_users SET is_disabled=false WHERE id=$1', [fixture.owner.id]); }
   assert.equal((await pool.query("SELECT count(*)::int count FROM import_candidate_events WHERE event_type='import_candidate_selected'")).rows[0].count, 0);
   assert.equal((await pool.query("SELECT count(*)::int count FROM operation_runs WHERE operation_type='import_candidate_execution_planning'")).rows[0].count, 0);
-  assert.equal((await pool.query("SELECT count(*)::int count FROM import_candidates WHERE status='pending'")).rows[0].count, 2);
+  assert.equal((await pool.query("SELECT count(*)::int count FROM import_candidates WHERE status='pending'")).rows[0].count, fixtures.length * 2);
   await assert.rejects(pool.query("INSERT INTO activity_events (event_type) VALUES ('unregistered_fixture_event')"),
     { code: '23514', constraint: 'activity_events_event_type_check' });
   return { refusals, selectionEvents: 0, executionRuns: 0, unknownActivityTypeRefused: true };

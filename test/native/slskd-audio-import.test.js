@@ -21,15 +21,18 @@ import { createLibraryAddMediaScenario } from '../../testing/integration/library
 import { startCanonicalNativeAudio } from '../../testing/integration/native-audio-commands.js';
 import { qualifyNativeAudioCommandRefusals } from '../../testing/integration/native-audio-command-refusals.js';
 import { runCanonicalNativeAudioExecution } from '../../testing/integration/native-audio-execution.js';
-import { seedNativeAudioCandidates } from '../../testing/integration/native-audio-candidates.js';
+import { prepareNativeAudioDiscovery } from '../../testing/integration/native-audio-candidates.js';
+import { discoverCanonicalNativeAudio } from '../../testing/integration/native-audio-discovery-commands.js';
+import { withAudioSearchResponses } from '../../testing/slskd/search-response-fixture.js';
 import { qualifyNativeAudioPublication } from '../../testing/integration/native-audio-publication.js';
 import { createNativeAudioBridge } from '../../testing/slskd/native-audio-bridge.js';
 import { requireNativeSlskdImages, withNativeSlskdProvider } from '../../testing/slskd/native-provider-runtime.js';
 import { fingerprintPostgresCohortSource } from '../../testing/integration/postgres-cohort-policy.js';
 
-test('canonical selected-match commands retain durable ownership through native audio transfer and valid/corrupt import', { timeout: 300_000 }, async t => {
+test('canonical discovery and selected-match commands retain ownership through native audio transfer and valid/corrupt import', { timeout: 300_000 }, async t => {
   const source = await fingerprintPostgresCohortSource(); const images = requireNativeSlskdImages();
-  let module; let bridge; let library;
+  let module; let bridge; let library; let searchService;
+  const search = name => (...args) => { assert.ok(searchService); return searchService[name](...args); };
   const commandRecordings = [];
   const awaitQueuedActivity = async () => { assert.ok(commandRecordings.length); assert.deepEqual(await commandRecordings.shift(), { recorded: true }); };
   const media = createLibraryAddMediaScenario({ mode: 'owned-api', mediaImage: images.applicationImage });
@@ -41,14 +44,19 @@ test('canonical selected-match commands retain durable ownership through native 
       if (event.eventType === 'music_queue_download_queued') commandRecordings.push(recording);
       return recording;
     } }),
-    createLibraryModule: dependencies => { library = createLibraryModule(dependencies); return library; },
+    createLibraryModule: dependencies => {
+      library = createLibraryModule({ ...dependencies, slskdService: { ...dependencies.slskdService, startSearch: search('startSearch') } });
+      return library;
+    },
     createImportCandidateModule: dependencies => {
       const mediaInspectionService = createMediaInspectionService({ getMediaToolingStatus: media.mediaFixture.getTooling,
         mediaCommandService: { runCommand: ({ binary, args }) => media.mediaFixture.mediaCommand(binary, args) } });
       const remote = name => (...args) => { assert.ok(bridge); return bridge.service[name](...args); };
       module = createImportCandidateModule({ ...dependencies, getMediaToolingStatus: media.mediaFixture.getTooling, mediaInspectionService,
         slskdTransferSnapshotService: createSlskdTransferSnapshotService({ getDownloads: remote('getDownloads'), getBoundDownloads: remote('getBoundDownloads') }),
-        slskdService: { ...dependencies.slskdService, prepareDownloadDispatch: remote('prepareDownloadDispatch'),
+        slskdService: { ...dependencies.slskdService, startSearch: search('startSearch'),
+          getSearchState: search('getSearchState'), getSearchResponses: search('getSearchResponses'),
+          browseUserDirectory: search('browseUserDirectory'), prepareDownloadDispatch: remote('prepareDownloadDispatch'),
           getDownloadBatchEvidence: remote('getDownloadBatchEvidence'), getBoundDownloads: remote('getBoundDownloads'), getDownloads: remote('getDownloads') } });
       return module;
     },
@@ -57,24 +65,28 @@ test('canonical selected-match commands retain durable ownership through native 
   try {
     await media.runScenario(runtime, async ({ client, baseUrl, getPoolFn, workspaceDir }) => {
       await bootstrapAdminSession(client);
-      const { fixtures } = await seedNativeAudioCandidates({ client, getPoolFn, workspaceDir });
-      const commandRefusals = await qualifyNativeAudioCommandRefusals({ client, baseUrl, pool: getPoolFn(), fixtures });
-      result = await withNativeSlskdProvider({ ...images, signal: t.signal, mode: 'audio', expectedVersion: '0.26.1.0', runScenario: async native => {
-        bridge = createNativeAudioBridge(native);
-        const commands = [];
-        for (const fixture of fixtures) {
-          const command = await startCanonicalNativeAudio({ client, pool: getPoolFn(), fixture, awaitQueuedActivity });
-          fixture.operationRunId = command.operationRunId;
-          commands.push(command);
-          await runCanonicalNativeAudioExecution({ client, pool: getPoolFn(), module, fixture });
-        }
-        await bridge.call('published');
-        const details = [];
-        for (const fixture of fixtures) details.push(await module.importCandidateExecutionSummaryService.buildImportCandidateExecutionRunDetail({ runId: fixture.operationRunId }));
-        const transport = await bridge.exportCompleted(fixtures[0].paths.downloads);
-        const publications = [];
-        for (const [index, fixture] of fixtures.entries()) publications.push(await qualifyNativeAudioPublication({ module, library, pool: getPoolFn(), fixture, detail: details[index] }));
-        return { complete: true, commandRefusals, commands, transport, publications };
+      const fixtures = await prepareNativeAudioDiscovery({ client, pool: getPoolFn(), workspaceDir, library });
+      result = await withAudioSearchResponses({ fixtures, runScenario: async (service, assertSearchIdle) => {
+        searchService = service;
+        const discovery = await discoverCanonicalNativeAudio({ client, baseUrl, pool: getPoolFn(), library, fixtures, assertSearchIdle });
+        const commandRefusals = await qualifyNativeAudioCommandRefusals({ client, baseUrl, pool: getPoolFn(), fixtures });
+        return withNativeSlskdProvider({ ...images, signal: t.signal, mode: 'audio', expectedVersion: '0.26.1.0', runScenario: async native => {
+          bridge = createNativeAudioBridge(native);
+          const commands = [];
+          for (const fixture of fixtures) {
+            const command = await startCanonicalNativeAudio({ client, pool: getPoolFn(), fixture, awaitQueuedActivity });
+            fixture.operationRunId = command.operationRunId;
+            commands.push(command);
+            await runCanonicalNativeAudioExecution({ client, pool: getPoolFn(), module, fixture });
+          }
+          await bridge.call('published');
+          const details = [];
+          for (const fixture of fixtures) details.push(await module.importCandidateExecutionSummaryService.buildImportCandidateExecutionRunDetail({ runId: fixture.operationRunId }));
+          const transport = await bridge.exportCompleted(fixtures[0].paths.downloads);
+          const publications = [];
+          for (const [index, fixture] of fixtures.entries()) publications.push(await qualifyNativeAudioPublication({ module, library, pool: getPoolFn(), fixture, detail: details[index] }));
+          return { complete: true, discovery, commandRefusals, commands, transport, publications };
+        } });
       } });
     }, { scenarioName: 'native_audio_import' });
   } finally { await runtime.cleanup(); }

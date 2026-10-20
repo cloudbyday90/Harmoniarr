@@ -1,5 +1,14 @@
 # Project standards-to-evidence map
 
+Canonical Find matches now precedes selected-match acquisition in the audio lane.
+native-audio-candidates.js prepares only metadata, saved monitoring and paths;
+native-audio-discovery-commands.js exercises real intent/queue/worker/ingestion.
+The owned search-response-fixture.js uses the actual slskd HTTP client/service.
+Read [discovery provenance](discovery-provenance.md) for authority, replay and
+evidence boundaries, and its [outcome](../../../../docs/NATIVE_DISCOVERY_COMMAND_OUTCOME.md)
+for executed scope. Owned HTTP response ingestion remains distinct from native
+Soulseek search messages and from rendered command submission.
+
 Canonical native commands now replace selected/ready fixture writes in the audio
 lane. native-audio-commands.js, native-audio-command-refusals.js and
 native-audio-execution.js under testing/integration own actual sessions/routes,

@@ -7,14 +7,21 @@ an internal-network provider and an isolated network-disabled media reader.
 
 - Declare bounded valid audio and an equal-size corrupt control. Both must
   complete actual provider transfer before content acceptance is compared.
-- The audio lane now seeds pending results only. Exercise actual authenticated
+- The audio lane now starts from metadata and durable monitoring. Actual wanted/
+  discovery reconciliation, authenticated Find matches, queue/worker and real
+  client/ingestion create candidates. No candidate or discovery result is seeded.
+  Two equal sources exercise actual manual selection policy. Verify initial-intent
+  audit, actor/target, same-key replay, distinct-key repeated intent, coalescing and
+  refused scope/CSRF/disabled/forged-target commands before search transport.
+  See docs/NATIVE_DISCOVERY_COMMAND_OUTCOME.md. Exercise actual authenticated
   Missing Music selection/start, real planner, queued execution and worker.
   Prove same-key replay, different-key active-work refusal, actor/recipient and
   CSRF/disabled/own-scope refusals before any provider work. Refresh the actual
   decision and bounded Downloader handoff. See docs/NATIVE_CANONICAL_COMMAND_OUTCOME.md.
 - Inject the real transfer snapshot owner as well as the provider service.
   Preserve current-binding checks and await durable beforeSend before POST.
-  Controlled result discovery still does not prove live search or browser commands.
+  Owned HTTP search responses prove the real client and ingestion, not native
+  Soulseek search messages, public-network search or browser command submission.
 - Capture actual completed receipt observations before stopping the provider.
   Await task retirement, acknowledge shutdown, then inspect exact read-only
   native files. Export only fixed manifest paths into an exclusive workspace;

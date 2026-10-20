@@ -74,12 +74,14 @@ user-command results use accessible status/error feedback.
 
 ## Prove the completed journey
 
-Native acquisition qualification now uses test/native/slskd-audio-import.test.js:
-pending controlled results, real authenticated selection/start, the actual planner
-and worker, native bytes and canonical publication. See
-docs/NATIVE_CANONICAL_COMMAND_OUTCOME.md. Trace visible Activity through its
+Native acquisition qualification uses test/native/slskd-audio-import.test.js:
+saved monitoring/metadata, actual wanted/discovery reconciliation, authenticated
+Find matches, real client and ingestion, selection/start, actual planners/workers,
+native bytes and canonical publication. See docs/NATIVE_DISCOVERY_COMMAND_OUTCOME.md.
+Trace visible Activity through its
 allowlist, database CHECK and rendered policy too; a callback stub can accept an
-event that the real application discards. Controlled results are not live discovery.
+event that the real application discards. Owned HTTP search responses qualify
+ingestion; they do not prove native Soulseek search or browser submission.
 
 Test the owning boundaries: state eligibility and safe projection, actor versus
 target, disabled/out-of-scope decisions, same-key replay, active-work conflicts,
