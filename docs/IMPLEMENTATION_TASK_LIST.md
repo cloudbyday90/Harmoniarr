@@ -6,6 +6,27 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Delivered slice: Native truncated-transfer isolation (2026-10-20)
+
+- Add a separate opt-in ESM partial-transfer lane with a successful control,
+  one-byte-short EOF and TCP reset after actual incomplete-file receipt.
+  Isolate one total provider attempt without changing product retry defaults.
+- Prove failed native receipts and existing classifier refusal, GET-only recovery
+  without another POST, retired native tasks/provider, exact complete/incomplete
+  trees, prefix hashes and two bounded read-only-inspected tmpfs volumes.
+  See the [design](NATIVE_PARTIAL_TRANSFER_DESIGN.md),
+  [research/tradeoffs](NATIVE_PARTIAL_TRANSFER_RESEARCH_2026_10.md) and
+  [outcome](NATIVE_PARTIAL_TRANSFER_OUTCOME.md).
+- Pass 10,585 fast tests and four native cases / nine scenarios on frozen source;
+  rebuild the walkthrough without cache and preserve data/admin. Update focused
+  testing/web standards skill references. No production/schema/dependency change.
+- Re-evaluate random [PR 48](OPEN_PR_48_NATIVE_PARTIAL_EVALUATION.md): the unchanged
+  incompatible candidate remains unapplied; reuse retained actual consumer
+  evidence after verifying complete lock and consumer inputs. No PR merge/rebase.
+- Next: bounded native default-retry/resume qualification with explicit offsets,
+  exact receipt/batch identity and final hashes, while retaining one application
+  POST. Walkthrough provider attention remains a separate operational follow-up.
+
 ## Delivered slice: Native deterministic file completion (2026-10-20)
 
 - Add a separate opt-in actual-provider file lane, narrow ESM peer/negotiation/

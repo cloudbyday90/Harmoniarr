@@ -1,5 +1,12 @@
 # Official practices by boundary
 
+Native partial-transfer guidance uses docs/NATIVE_PARTIAL_TRANSFER_RESEARCH_2026_10.md.
+Distinguish Node FIN/RST and local write callbacks from remote file receipt;
+inspect the actual released retry loop and cleanup order. Docker/OWASP inform
+read-only bounded storage, RFC 9110 limits resend, and W3C provenance informs
+attribution by inference. None turns a failed terminal receipt into successful
+completion or proves library import, accessibility or default resume behavior.
+
 Native file completion uses docs/NATIVE_FILE_TRANSFER_RESEARCH_2026_10.md.
 Released binary protocol, Node backpressure/close, Docker storage access and
 OWASP resource guidance own distinct boundaries. W3C provenance informs source

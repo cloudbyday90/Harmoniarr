@@ -5,6 +5,11 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For native EOF/RST failures, read
+[partial transfers](references/native-partial-transfer.md). It owns single-attempt
+fault isolation, observed incomplete prefixes, failed receipt classification and
+final file checks after acknowledged provider retirement.
+
 For completed native file bytes and filesystem identity, read
 [native file transfer](references/native-file-transfer.md). It owns the framed/raw
 transition, one-file token capabilities, bounded sends and separate read-only

@@ -27,10 +27,11 @@ export async function inspectCompletedNativeFiles(files, root = '/downloads') {
   return results;
 }
 
-export async function assertNativeFileTree(files, root = '/downloads') {
+export async function assertNativeFileTree(files, root = '/downloads', maxDepth = 1) {
+  if (!Number.isSafeInteger(maxDepth) || maxDepth < 0 || maxDepth > 2) throw new TypeError('Invalid native tree depth');
   const paths = [];
   async function visit(directory, prefix = '', depth = 0) {
-    assert.ok(depth <= 1);
+    assert.ok(depth <= maxDepth);
     for (const entry of await readdir(directory, { withFileTypes: true })) {
       const relative = prefix + entry.name;
       if (entry.isDirectory()) await visit(directory + '/' + entry.name, relative + '/', depth + 1);

@@ -1,5 +1,15 @@
 # AI Workflow And Shared Copilot Skills
 
+The [partial-transfer design](NATIVE_PARTIAL_TRANSFER_DESIGN.md) extends existing
+testing and standards skills with single-fault attribution and retired-producer
+filesystem proof. Discover the released retry semantics before configuring a
+fault lane; await an actual incomplete-file prefix before reset, preserve original
+Error/null during cancellation, and drain admitted work before cleanup. Receipt
+failure, native task retirement and final file isolation need separate evidence.
+The [outcome](NATIVE_PARTIAL_TRANSFER_OUTCOME.md) records focused/fast/native proof
+and its default-retry scope limit. Reuse unchanged rejected PR evidence only
+after checking candidate identity, complete lock bytes and actual consumer inputs.
+
 The [native file-transfer design](NATIVE_FILE_TRANSFER_DESIGN.md) extends testing
 and standards skill references with framed/raw protocol separation, one-file
 token ownership, bounded sends and read-only publication checks. The released

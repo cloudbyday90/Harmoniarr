@@ -69,6 +69,16 @@ and file publication; music decoding and library import remain separate. See the
 [research/tradeoffs](docs/NATIVE_FILE_TRANSFER_RESEARCH_2026_10.md) and
 [outcome](docs/NATIVE_FILE_TRANSFER_OUTCOME.md).
 
+Run `npm run validate:native-slskd-partial` with the same 0.26.1 immutable-image/
+version inputs for native EOF and TCP reset faults, alongside a successful file
+control. This separate opt-in lane uses one provider attempt, verifies failed
+receipt classification and GET-only recovery, then stops the provider before
+checking exact complete/incomplete file trees and hashes. Default retry/resume
+remains a separate follow-up. See the
+[design](docs/NATIVE_PARTIAL_TRANSFER_DESIGN.md),
+[research/tradeoffs](docs/NATIVE_PARTIAL_TRANSFER_RESEARCH_2026_10.md) and
+[outcome](docs/NATIVE_PARTIAL_TRANSFER_OUTCOME.md).
+
 Service worker activation preserves in-progress forms unless this page requests
 an update. The [reload outcome](docs/PWA_SERVICE_WORKER_RELOAD_OUTCOME.md) records
 the first-install login fix and enabled-worker regression coverage.

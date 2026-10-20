@@ -1,5 +1,12 @@
 # Project standards-to-evidence map
 
+Native EOF/RST proof belongs to testing/slskd/native-partial-* modules and the
+shared bounded native-file-read.js. The explicit slskd-partial.test.js lane uses
+real partial files, current receipt/classification/recovery owners, native client
+retirement and acknowledged provider stop before final file checks. See
+docs/NATIVE_PARTIAL_TRANSFER_OUTCOME.md; confirmed admission is not completion,
+and selected one-attempt fault proof does not qualify default retries or resume.
+
 Native byte completion belongs to peer-input.js, soulseek-peer.js, the bounded
 sender/data modules and native-file-inspection.js in testing/slskd. The opt-in
 slskd-files.test.js lane proves actual receipts, hashes and path/descriptor

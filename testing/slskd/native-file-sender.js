@@ -11,10 +11,15 @@ import { nativeFileChunk, nativeTransferFiles } from './native-file-data.js';
 
 /** Pipeline applies backpressure and awaits write callbacks; receipt/file proof remains separate. */
 export async function sendNativeFile(socket, file) {
+  return writeNativeFilePrefix(socket, file, file.size);
+}
+
+export async function writeNativeFilePrefix(socket, file, length) {
   if (!nativeTransferFiles.includes(file)) throw new TypeError('An owned native file is required');
+  if (!Number.isSafeInteger(length) || length < 1 || length > file.size) throw new TypeError('Invalid fixture send length');
   function* chunks() {
-    for (let offset = 0; offset < file.size; offset += 16_384) {
-      yield nativeFileChunk(file, offset, Math.min(16_384, file.size - offset));
+    for (let offset = 0; offset < length; offset += 16_384) {
+      yield nativeFileChunk(file, offset, Math.min(16_384, length - offset));
     }
   }
   // The downloader closes its socket after reading the declared length.

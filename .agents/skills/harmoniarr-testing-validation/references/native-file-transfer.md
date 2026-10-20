@@ -1,5 +1,9 @@
 # Native file-transfer qualification
 
+For truncated payloads and disconnects, read
+[native partial transfers](native-partial-transfer.md). It separates admission,
+failed completion, actual prefix receipt and post-retirement file isolation.
+
 Use `validate:native-slskd-files` for actual binary completion and published-file
 evidence. Read docs/NATIVE_FILE_TRANSFER_DESIGN.md and its outcome. Keep normal
 queue admission and the long timeout lane separate from this explicit mode.

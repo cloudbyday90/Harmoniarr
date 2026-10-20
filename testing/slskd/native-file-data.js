@@ -16,11 +16,12 @@ export function nativeFileChunk(file, offset, length) {
   return Buffer.from(Array.from({ length }, (_, index) => ((offset + index) * 31 + file.seed) & 255));
 }
 
-export function nativeFileDigest(file) {
+export function nativeFileDigest(file, length = file.size) {
   if (!nativeTransferFiles.includes(file)) throw new TypeError('An owned native file is required');
+  if (!Number.isSafeInteger(length) || length < 1 || length > file.size) throw new TypeError('Invalid fixture digest length');
   const digest = createHash('sha256');
-  for (let offset = 0; offset < file.size; offset += 16_384) {
-    digest.update(nativeFileChunk(file, offset, Math.min(16_384, file.size - offset)));
+  for (let offset = 0; offset < length; offset += 16_384) {
+    digest.update(nativeFileChunk(file, offset, Math.min(16_384, length - offset)));
   }
   return digest.digest('hex');
 }

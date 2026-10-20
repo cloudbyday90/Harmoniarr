@@ -1,5 +1,11 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 20 [partial-transfer rebuild outcome](LOCAL_DOCKER_NATIVE_PARTIAL_OUTCOME.md)
+records the latest no-cache image, preserved data/admin and passing readiness-only
+check. The independent native fault lane proves incomplete-file isolation in
+private disposable storage after stopping its provider. Walkthrough provider
+attention remains a separate operational follow-up.
+
 The October 20 [native-file rebuild outcome](LOCAL_DOCKER_NATIVE_FILE_OUTCOME.md)
 records the latest no-cache image, preserved data/admin and passing readiness-only
 check. The independent native file lane publishes no ports and uses disposable
