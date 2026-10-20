@@ -17,16 +17,14 @@ COPY src/shared ./src/shared
 RUN --mount=type=cache,target=/root/.npm npm ci \
     && npm run build:client
 
-FROM node-base AS server-builder
+FROM ${NODE_IMAGE} AS server-builder
 WORKDIR /build
 
-COPY package.json package-lock.json .npmrc ./
+COPY package.json ./
 COPY scripts/build-server.js ./scripts/build-server.js
 COPY src/server ./src/server
-COPY src/shared ./src/shared
 
-RUN --mount=type=cache,target=/root/.npm npm ci \
-    && npm run build:server
+RUN --network=none node scripts/build-server.js
 
 FROM ${RUNTIME_IMAGE} AS runtime
 

@@ -6,6 +6,22 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Delivered slice: Dependency-free server assembly (2026-10-20)
+
+- Run the existing ESM copy script directly from the pinned Node image, with
+  network access disabled for assembly and only the inputs it consumes.
+  Compare the original/candidate stages and final packaged artifacts.
+- See the [design](SERVER_BUILDER_DESIGN.md),
+  [official research/tradeoffs](SERVER_BUILDER_RESEARCH_2026_10.md) and
+  [outcome](SERVER_BUILDER_OUTCOME.md) for executed validation and limits.
+- Apply refreshed random [PR 51](OPEN_PR_51_SERVER_BUILDER_EVALUATION.md) locally.
+  Native candidate 0.26.1.0 and original 0.26.0.0 both fail the current exact
+  download-version guard. Restore the overlay; no provider upgrade or PR merge.
+- Next: qualify actual stable provider wire-version forms and batch/receipt
+  behavior while preserving strict durable attempt binding. Fix the demonstrated
+  baseline gap before adopting the provider upgrade or claiming download readiness.
+  Independently qualify the announced October 21 Node security patch when published.
+
 ## Delivered slice: Docker-owned smoke ports (2026-10-19)
 
 - Replace smoke publication with one Docker-assigned loopback mapping. Resolve
@@ -17,8 +33,8 @@ Database model source: `docs/DATABASE_MODEL.md`
 - Apply refreshed random [PR 48](OPEN_PR_48_DOCKER_PORT_EVALUATION.md) locally:
   TypeScript 7 still fails current language-server initialization. Restore the
   package pair and prove the retained Vue/TypeScript bridge; no merge.
-- Next build improvement: remove server-builder's unnecessary npm ci after
-  proving identical copied ESM output and packaged behavior. Recheck and qualify
+- Follow-up delivered: [dependency-free server assembly](SERVER_BUILDER_OUTCOME.md)
+  removes the unused install with copied ESM and packaged proof. Recheck and qualify
   the announced October 21 Node security patch when actually published.
 
 ## Delivered slice: Production dependency closure and form-safe PWA reload (2026-10-19)

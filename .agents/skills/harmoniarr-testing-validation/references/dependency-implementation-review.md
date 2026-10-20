@@ -1,5 +1,21 @@
 # Dependency implementation review
 
+For removal of a build-stage install, trace the actual assembler imports first.
+Prove exact path/hash/mode output, retained ESM scope and absent project packages
+in an acknowledged network-disabled container. Distinguish RUN isolation from
+base/frontend resolution and other stages' networking. The server-builder
+worked example is docs/SERVER_BUILDER_OUTCOME.md; skipped work does not establish
+an equal-condition whole-CI speedup or a smaller final runtime image.
+Retain a separately tagged baseline before replacing a mutable local image tag.
+If that reference is lost, preserve the failed collection and distinguish an
+artifact-verified reconstruction from the original immutable image identity.
+
+For provider image updates, read the real authenticated version response from
+both old/new images before qualifying a transport guard. Healthy startup/API
+alone does not prove download preparation or receipts. Preserve exact reported
+forms and baseline failures; do not infer SemVer from the image tag or broadly
+strip suffixes/components. See docs/OPEN_PR_51_SERVER_BUILDER_EVALUATION.md.
+
 Use when a dependency update crosses a private adapter, serializer, language
 server, native binary or other implementation-sensitive boundary. This is a
 focused validation workflow, not authorization for an unrelated major migration.

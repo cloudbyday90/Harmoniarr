@@ -1,5 +1,12 @@
 # AI Workflow And Shared Copilot Skills
 
+The [server-builder design](SERVER_BUILDER_DESIGN.md) adds exact artifact/mode
+comparison and absent-project-dependency controls to the maintained testing and
+standards skills. Distinguish isolated assembly from other build network owners.
+For provider updates, compare real version responses from old/new images: startup
+and API health can pass while download admission fails on both. Preserve those
+results rather than broadening a transport guard to fit an image tag.
+
 The testing skill now routes Docker smoke networking to its focused
 published-port reference. Check merged Compose config, acknowledge the exact
 service container, refuse unexpected bindings before HTTP, and resolve again

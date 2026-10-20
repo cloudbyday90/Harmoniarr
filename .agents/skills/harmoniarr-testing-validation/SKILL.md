@@ -13,7 +13,7 @@ For TestsStream warnings or reporter composition changes, use
 [reporter ownership](references/reporter-ownership.md). Trace actual fan-out,
 preserve default warnings and prove EOF, Error/null and native output drainage.
 
-For implementation-sensitive dependency upgrades and local PR evaluation, use
+For implementation-sensitive dependency upgrades, build-install removal and local PR evaluation, use
 [dependency implementation review](references/dependency-implementation-review.md).
 Review published bytes/transitive owners, preserve failed candidates and test the
 actual consumer before expanding exact support guards or broader validation.

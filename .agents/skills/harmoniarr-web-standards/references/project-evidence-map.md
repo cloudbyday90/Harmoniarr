@@ -1,5 +1,12 @@
 # Project standards-to-evidence map
 
+Server assembly belongs to Dockerfile's independent server-builder stage and
+scripts/build-server.js. docs/SERVER_BUILDER_OUTCOME.md owns exact output/mode,
+missing-project-dependency controls and final packaged evidence. The separate
+PR 51 outcome retains both native four-component version refusals; a passing
+startup/API check does not grant download compatibility or justify broad version
+normalization. Preserve that baseline gap as a distinct next task.
+
 Smoke port ownership belongs to compose.smoke.yaml, docker-smoke-endpoint.js and
 docker-smoke-validation.js. Parser/command controls reject extra or wider bindings;
 scenario controls prove current-port sessions and cleanup after either phase's

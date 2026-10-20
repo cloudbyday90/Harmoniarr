@@ -1,5 +1,11 @@
 # Official practices by boundary
 
+October 20 builder guidance uses docs/SERVER_BUILDER_RESEARCH_2026_10.md. Docker
+stage ownership, RUN networking and COPY cache inputs differ from Node's builtin
+assembly API. W3C draft monotonic timing informs local observations, not security
+or whole-build speed claims. OWASP multi-stage guidance does not require an
+unused dependency install or certify that provider upgrades are compatible.
+
 October 19 smoke-port guidance uses docs/DOCKER_SMOKE_PORT_RESEARCH_2026_10.md.
 Docker allocation, Compose replacement and inspected publication are separate
 from W3C Secure Contexts' potentially trustworthy loopback origin (a Candidate

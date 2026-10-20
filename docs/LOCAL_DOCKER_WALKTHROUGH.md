@@ -1,5 +1,11 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 20 [server-builder rebuild outcome](LOCAL_DOCKER_SERVER_BUILDER_OUTCOME.md)
+records the latest no-cache image, healthy preserved-state startup, existing-admin
+bootstrap and readiness-only check. Provider attention remains an operational
+follow-up; the separate native PR evaluation found a baseline version-admission
+gap without establishing the cause of that walkthrough status.
+
 The October 19 [runtime closure rebuild outcome](LOCAL_DOCKER_RUNTIME_CLOSURE_OUTCOME.md)
 records a no-cache build, healthy preserved-state startup, existing-admin bootstrap
 and readiness-only provider validation. It also retains separate isolated

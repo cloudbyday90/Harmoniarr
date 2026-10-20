@@ -20,6 +20,15 @@ client bundle into the production image. The deployed Node app uses its five
 server dependencies. See the [runtime closure outcome](docs/RUNTIME_DEPENDENCY_CLOSURE_OUTCOME.md)
 for actual package absence, unchanged browser assets and packaged validation.
 
+Server assembly uses Node builtins in an independent, network-disabled build
+stage, with no project dependency install. See the
+[design](docs/SERVER_BUILDER_DESIGN.md),
+[official research and tradeoffs](docs/SERVER_BUILDER_RESEARCH_2026_10.md) and
+[outcome](docs/SERVER_BUILDER_OUTCOME.md) for exact artifact and runtime proof.
+The separate [PR 51 evaluation](docs/OPEN_PR_51_SERVER_BUILDER_EVALUATION.md)
+found a provider wire-version compatibility gap in both the current pin and
+candidate; startup health alone does not establish download readiness.
+
 Service worker activation preserves in-progress forms unless this page requests
 an update. The [reload outcome](docs/PWA_SERVICE_WORKER_RELOAD_OUTCOME.md) records
 the first-install login fix and enabled-worker regression coverage.
