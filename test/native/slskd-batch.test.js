@@ -14,7 +14,8 @@ import { fingerprintPostgresCohortSource } from '../../testing/integration/postg
 
 test('isolated native slskd accepts exact batches and recovers completed response loss without another POST', { timeout: 120_000 }, async t => {
   const source = await fingerprintPostgresCohortSource();
-  const result = await withNativeSlskdProvider({ ...requireNativeSlskdImages(), signal: t.signal });
+  const expectedVersion = process.env.HARMONIARR_NATIVE_SLSKD_VERSION ?? '0.26.0.0';
+  const result = await withNativeSlskdProvider({ ...requireNativeSlskdImages(), signal: t.signal, expectedVersion });
   assert.deepEqual(await fingerprintPostgresCohortSource(), source);
   assert.equal(result.complete, true); assert.equal(result.cleanupVerified, true);
   assert.equal(result.scenarios.length, 2);

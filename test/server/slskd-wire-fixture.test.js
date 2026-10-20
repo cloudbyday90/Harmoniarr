@@ -15,7 +15,8 @@ import { tmpdir } from 'node:os';
 import test from 'node:test';
 import { createWireDecoder, wireFrame, wireInteger, wireReader, wireString } from '../../testing/slskd/wire-codec.js';
 import { openSoulseekFixture } from '../../testing/slskd/soulseek-fixture.js';
-import { nativeFiles, nativePeer } from '../../testing/slskd/fixture-data.js';
+import { nativeFiles, nativePeer, nativeTimeoutFile } from '../../testing/slskd/fixture-data.js';
+import { openOwnedTcpServer } from '../../testing/slskd/owned-tcp-server.js';
 import { requireNativeSlskdImages, withNativeSlskdProvider } from '../../testing/slskd/native-provider-runtime.js';
 import { removeOwnedDockerWorkspace } from '../../scripts/docker-smoke-cleanup.js';
 
@@ -92,6 +93,32 @@ test('unauthenticated or unknown peer requests cannot resolve an address', { tim
   authenticated.socket.write(login()); await authenticated.next();
   authenticated.socket.write(wireFrame(3, wireString('unowned-peer'))); await authenticated.closed;
   assert.equal(fixture.snapshot().addresses, 0); assert.equal(fixture.snapshot().refused, 2);
+});
+
+test('cancellation fixture withholds the first ACK and permits exactly one explicit repeat of its sole file', { timeout: 5000 }, async t => {
+  const fixture = await openSoulseekFixture({ username, password, mode: 'cancellation' }); t.after(() => fixture.close());
+  const peer = await client(t, fixture.peerPort);
+  const init = Buffer.concat([Buffer.from([1]), wireString(username), wireString('P'), wireInteger(12)]);
+  const request = token => wireFrame(40, wireInteger(0), wireInteger(token), wireString(nativeTimeoutFile.filename), Buffer.alloc(8));
+  peer.socket.write(Buffer.concat([wireInteger(init.length), init, request(44), request(45)]));
+  const queued = wireReader(await peer.next());
+  assert.equal(queued.integer(), 41); assert.equal(queued.integer(), 45); assert.equal(queued.byte(), 0);
+  assert.equal(queued.text(), 'Queued'); queued.end();
+  assert.deepEqual(fixture.snapshot().requests, [nativeTimeoutFile.filename, nativeTimeoutFile.filename]);
+  peer.socket.write(request(46)); await peer.closed;
+  assert.equal(fixture.snapshot().refused, 1);
+});
+
+test('unreviewed fixture modes, versions and unbounded idle settings refuse before listener or Docker admission', async () => {
+  for (const idleTimeout of [0, -1, Infinity, 240001, '240000']) {
+    await assert.rejects(openOwnedTcpServer({ idleTimeout }), TypeError);
+  }
+  await assert.rejects(openSoulseekFixture({ username, password, mode: 'unreviewed' }), TypeError);
+  for (const options of [{ mode: 'unreviewed' }, { expectedVersion: '0.26.2.0' }, { mode: 'cancellation' }]) {
+    let executed = false;
+    await assert.rejects(withNativeSlskdProvider({ ...options, execute: () => { executed = true; } }), TypeError);
+    assert.equal(executed, false);
+  }
 });
 
 test('fixture close retires held partial sockets and closes admission before returning', { timeout: 5000 }, async t => {

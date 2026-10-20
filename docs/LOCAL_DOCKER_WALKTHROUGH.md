@@ -1,5 +1,9 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 20 [slskd qualification rebuild outcome](LOCAL_DOCKER_SLSKD_0261_OUTCOME.md)
+records the latest no-cache image, preserved admin/data and readiness-only pass.
+The isolated provider lanes remain separate from walkthrough provider attention.
+
 The October 20 [native-fixture rebuild outcome](LOCAL_DOCKER_NATIVE_FIXTURE_OUTCOME.md)
 records the latest no-cache image, preserved data/admin and readiness-only pass.
 The separate opt-in native fixture publishes no ports and proves stable-provider

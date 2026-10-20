@@ -62,7 +62,7 @@ test('verified legacy selection retains the existing direct endpoint and receipt
 });
 
 test('future and malformed provider versions refuse before any POST', async () => {
-  for (const version of ['0.26.1', '0.26.1.0', '0.27.0', '0.26.0.1', '0.26.0-dev', null, { version: '0.26.0' }]) {
+  for (const version of ['0.26.1', '0.26.2.0', '0.27.0', '0.26.0.1', '0.26.0-dev', null, { version: '0.26.0' }]) {
     const h = harness({ version });
     await assert.rejects(h.service.prepareDownloadDispatch(), { code: 'slskd_download_version_unsupported' });
     assert.equal(h.calls.some((call) => call.request.method === 'POST'), false);
@@ -70,7 +70,7 @@ test('future and malformed provider versions refuse before any POST', async () =
 });
 
 test('supported batch version forms cannot replace the exact saved dispatch binding', async () => {
-  for (const version of ['0.26.0', '0.26.0.0']) {
+  for (const version of ['0.26.0', '0.26.0.0', '0.26.1.0']) {
     const h = harness({ version });
     const dispatch = await h.service.prepareDownloadDispatch();
     const saved = h.attempt(dispatch.binding);
@@ -250,7 +250,7 @@ test('a pinned local configuration assertion uses its caller-owned transaction w
   assert.equal(providerReads, readsBefore);
 });
 
-for (const version of ['0.25.1', '0.26.0', '0.26.0.0']) {
+for (const version of ['0.25.1', '0.26.0', '0.26.0.0', '0.26.1.0']) {
   test(`controlled ${version} dispatch awaits final configuration and beforeSend before its single POST`, async () => {
     const events = [];
     let reads = 0;

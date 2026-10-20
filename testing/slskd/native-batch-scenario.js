@@ -15,7 +15,7 @@ import { createDownloadAttempt, evaluateDownloadReceipt } from '../../src/server
 import { createSlskdDownloadHandoffReconciliationService } from '../../src/server/slskd/slskd-download-handoff-reconciliation-service.js';
 import { nativeFiles, nativePeer } from './fixture-data.js';
 
-const { apiKey } = JSON.parse(await readFile('/run/fixture.json', 'utf8'));
+const { apiKey, expectedVersion } = JSON.parse(await readFile('/run/fixture.json', 'utf8'));
 const config = { baseUrl: 'http://provider:5030', apiKey, requestTimeoutMs: 2000 };
 async function eventually(read, accepted) {
   const deadline = performance.now() + 15_000;
@@ -48,7 +48,7 @@ for (const lost of [false, true]) {
       return response;
     } }) });
   const dispatch = await service.prepareDownloadDispatch();
-  assert.equal(dispatch.binding.version, '0.26.0.0');
+  assert.equal(dispatch.binding.version, expectedVersion);
   const files = nativeFiles.slice(lost ? 2 : 0, lost ? 4 : 2);
   const attempt = createDownloadAttempt({ providerBinding: dispatch.binding, importCandidateId: randomUUID(),
     operationRunId: randomUUID(), username: nativePeer, requestedFiles: files, sourceObservation: { username: nativePeer } });

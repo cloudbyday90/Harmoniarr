@@ -45,7 +45,12 @@ async function acknowledgeService({ id, image, projectName, networkId, inspect }
 }
 
 export async function withNativeSlskdProvider({ applicationImage, providerImage, signal,
-  rootDir = process.cwd(), execute = executeFixtureProbeCommand, runScenario = null } = {}) {
+  rootDir = process.cwd(), execute = executeFixtureProbeCommand, runScenario = null,
+  mode = 'batch', expectedVersion = '0.26.0.0' } = {}) {
+  if (!['batch', 'cancellation'].includes(mode) || !['0.26.0.0', '0.26.1.0'].includes(expectedVersion)) {
+    throw new TypeError('Unreviewed native fixture mode or version');
+  }
+  if (mode === 'cancellation' && typeof runScenario !== 'function') throw new TypeError('Cancellation requires its explicit scenario');
   requireNativeSlskdImages({ HARMONIARR_NATIVE_APP_IMAGE: applicationImage, HARMONIARR_NATIVE_SLSKD_IMAGE: providerImage });
   const projectName = 'harmoniarrnative' + randomUUID().replaceAll('-', '');
   const workspaceRoot = await mkdtemp(resolve(tmpdir(), prefix));
@@ -58,8 +63,9 @@ export async function withNativeSlskdProvider({ applicationImage, providerImage,
   let failed = false; let failure; let result; let closed; let cleanupVerified = false; let startupAcknowledged = false;
   try {
     await writeFile(resolve(workspaceRoot, 'fixture.json'), JSON.stringify({ username: secrets.soulseekUsername,
-      password: secrets.soulseekPassword, apiKey: secrets.apiKey }), { mode: 0o600 });
-    await writeFile(resolve(workspaceRoot, 'slskd.yml'), renderManagedSlskdConfig(secrets), { mode: 0o600 });
+      password: secrets.soulseekPassword, apiKey: secrets.apiKey, mode, expectedVersion }), { mode: 0o600 });
+    const inactivity = mode === 'cancellation' ? '  connection:\n    timeout:\n      inactivity: 240000\n' : '';
+    await writeFile(resolve(workspaceRoot, 'slskd.yml'), renderManagedSlskdConfig(secrets) + inactivity, { mode: 0o600 });
     await writeFile(resolve(workspaceRoot, 'compose.json'), JSON.stringify(nativeProviderCompose({ rootDir,
       workspaceRoot, applicationImage, providerImage })), { mode: 0o600 });
     await docker([...composeArgs, 'up', '--no-build', '--pull', 'never', '--detach', '--wait', '--wait-timeout', '20']);

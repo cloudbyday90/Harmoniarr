@@ -1,5 +1,12 @@
 # Project standards-to-evidence map
 
+Native timeout qualification belongs to testing/slskd/native-timeout-step.js,
+native-timeout-runner.js and test/native/slskd-timeout.test.js. Keep the old-image
+control, actual three-minute guard, terminal database receipt and internal-list
+retirement separate. See docs/SLSKD_0261_QUALIFICATION_DESIGN.md and its outcome.
+The default short receipt lane remains separate. No UI or accessibility claim
+follows from a provider binary test.
+
 Native slskd admission belongs to testing/slskd's bounded wire codec, socket
 factory, protocol policy, Docker runtime and actual-client scenario. The explicit
 test/native lane owns real 201/receipt and GET-recovery proof; routine fast tests

@@ -1,5 +1,16 @@
 # AI Workflow And Shared Copilot Skills
 
+The [0.26.1 design](SLSKD_0261_QUALIFICATION_DESIGN.md) extends the existing
+testing and web standards skills with native timeout qualification. Select the
+changed released boundary rather than an earlier default peer timeout; separate
+database terminal state, internal task retirement and explicit fixture retry.
+Keep the three-minute lane opt-in, preserve failed harness evidence, and retain
+GET-only recovery for uncertain product POSTs. The
+[research stack](SLSKD_0261_RESEARCH_2026_10.md) maps W3C, IETF, OWASP and Docker
+guidance to actual owners without implying broad conformance.
+The [outcome](SLSKD_0261_QUALIFICATION_OUTCOME.md) records old/new native behavior,
+separate source captures, retained failures and the corrected fast gate.
+
 The [native provider design](NATIVE_SLSKD_FIXTURE_DESIGN.md) adds a focused
 qualification reference to the testing skill and standards evidence map. Match
 released binary protocols, verify actual native receipt identity and keep queue

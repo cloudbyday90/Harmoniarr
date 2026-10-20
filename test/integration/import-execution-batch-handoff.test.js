@@ -33,7 +33,7 @@ async function scenario(t, run) {
     await run({ ...createImportExecutionHandoffFixtureContext({ getPoolFn }), fixtureSignal: t.signal });
   });
 }
-async function provider(t, { response = 'direct', version = '0.26.0.0' } = {}) {
+async function provider(t, { response = 'direct', version = '0.26.1.0' } = {}) {
   const state = { posts: 0, legacyPosts: 0, batchReads: 0, detailReads: 0, batch: null, response, version };
   const server = createServer(async (request, reply) => {
     const send = (payload, status = 200) => { reply.writeHead(status, { 'Content-Type': 'application/json' }); reply.end(JSON.stringify(payload)); };
@@ -76,7 +76,7 @@ suite('Caller-owned batch handoffs through real PostgreSQL and a controlled HTTP
     await runImportExecutionHandoffFixtureWorker(context, f, remote.worker);
     const item = await context.store.getItem(f);
     assert.equal(item.planningSnapshot.execution.handoff.attempt.version, 2);
-    assert.equal(item.planningSnapshot.execution.handoff.attempt.providerBinding.version, '0.26.0.0');
+    assert.equal(item.planningSnapshot.execution.handoff.attempt.providerBinding.version, '0.26.1.0');
     assert.equal(item.planningSnapshot.execution.handoff.attempt.attemptId, remote.state.batch.id);
     assert.equal(item.planningSnapshot.execution.handoff.state, 'confirmed');
     assert.equal((await context.store.getCandidate(f.importCandidateId)).status, 'downloading');

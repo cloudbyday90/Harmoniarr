@@ -28,17 +28,19 @@ stage, with no project dependency install. See the
 The pinned provider's observed 0.26.0.0 wire version now selects the reviewed
 batch transport while retaining its raw durable identity. See the
 [design](docs/SLSKD_WIRE_VERSION_DESIGN.md) and
-[validation outcome](docs/SLSKD_WIRE_VERSION_OUTCOME.md). The
-[PR 51 evaluation](docs/OPEN_PR_51_SERVER_BUILDER_EVALUATION.md) also found the
-candidate's 0.26.1.0 form; that upgrade remains blocked pending separate
-qualification. Startup health alone does not establish download readiness.
+[validation outcome](docs/SLSKD_WIRE_VERSION_OUTCOME.md). The separate
+[0.26.1 qualification design](docs/SLSKD_0261_QUALIFICATION_DESIGN.md) covers
+the exact 0.26.1.0 wire form, native timeout cancellation and explicit retry.
+See its [qualification outcome](docs/SLSKD_0261_QUALIFICATION_OUTCOME.md).
+Startup health alone does not establish download readiness.
 
 The explicit native provider lane runs slskd against an owned protocol fixture,
 with no public account or published ports. Select canonical Node and local images:
 
 ```powershell
 $env:HARMONIARR_NATIVE_APP_IMAGE = (docker image inspect --format '{{.Id}}' harmoniarr:walkthrough-local).Trim()
-$env:HARMONIARR_NATIVE_SLSKD_IMAGE = (docker image inspect --format '{{.Id}}' slskd/slskd:0.26.0).Trim()
+$env:HARMONIARR_NATIVE_SLSKD_IMAGE = (docker image inspect --format '{{.Id}}' slskd/slskd:0.26.1).Trim()
+$env:HARMONIARR_NATIVE_SLSKD_VERSION = '0.26.1.0'
 npm run validate:native-slskd
 ```
 
@@ -50,6 +52,13 @@ imports. It is opt-in and adds no Docker startup to the fast gate. See the
 [design](docs/NATIVE_SLSKD_FIXTURE_DESIGN.md),
 [official research and tradeoffs](docs/NATIVE_SLSKD_FIXTURE_RESEARCH_2026_10.md) and
 [outcome](docs/NATIVE_SLSKD_FIXTURE_OUTCOME.md).
+
+With those same immutable-image/version inputs, run
+`npm run validate:native-slskd-timeout` to exercise the released three-minute
+enqueue guard and one explicitly requested new batch. Use 0.26.0 / 0.26.0.0
+for the old-image control. This separate opt-in lane takes over three minutes
+per image and is excluded from routine fast tests. See the
+[research and tradeoffs](docs/SLSKD_0261_RESEARCH_2026_10.md).
 
 Service worker activation preserves in-progress forms unless this page requests
 an update. The [reload outcome](docs/PWA_SERVICE_WORKER_RELOAD_OUTCOME.md) records

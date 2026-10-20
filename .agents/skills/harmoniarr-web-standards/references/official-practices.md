@@ -1,5 +1,12 @@
 # Official practices by boundary
 
+For native timeout/cancellation qualification, consult
+docs/SLSKD_0261_RESEARCH_2026_10.md. Read the actual released timeout and linked
+library inactivity behavior before choosing the fixture. RFC 9110 still limits
+automatic POST retries; a fixture's explicit new batch does not change product
+policy. OWASP Docker guidance informs non-root/read-only/resource limits. W3C
+version/provenance guidance informs evidence attribution, not task retirement.
+
 Native provider guidance uses docs/NATIVE_SLSKD_FIXTURE_RESEARCH_2026_10.md.
 Read the actual linked library tag for binary framing and queue acknowledgements.
 Node owns socket close semantics, Docker/OWASP inform isolation and RFC 9110

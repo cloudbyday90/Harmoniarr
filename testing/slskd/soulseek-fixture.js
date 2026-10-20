@@ -9,20 +9,23 @@ import { createHash } from 'node:crypto';
 import { isIPv4 } from 'node:net';
 import { openOwnedTcpServer } from './owned-tcp-server.js';
 import { createWireDecoder, wireReader, wireFrame, wireInteger, wireString } from './wire-codec.js';
-import { nativePeer, nativeFiles } from './fixture-data.js';
+import { nativePeer, nativeFiles, nativeTimeoutFile } from './fixture-data.js';
 
 const byte = value => Buffer.from([value]);
 // Released client startup/status messages that require no response in this fixture.
 const notifications = new Set([2, 18, 32, 35, 36, 71, 100, 126, 127, 141]);
 
 export async function openSoulseekFixture({ username, password, address = '127.0.0.1',
-  host = '127.0.0.1', serverPort = 0, peerPort = 0 } = {}) {
+  host = '127.0.0.1', serverPort = 0, peerPort = 0, mode = 'batch' } = {}) {
+  if (!['batch', 'cancellation'].includes(mode)) throw new TypeError('Unknown native fixture mode');
   if (!isIPv4(address) || typeof username !== 'string' || !username || typeof password !== 'string' || !password) {
     throw new TypeError('An owned IPv4 fixture and credentials are required');
   }
   const ip = Buffer.from(address.split('.').map(Number).reverse());
   const stats = { logins: 0, addresses: 0, peerConnections: 0, requests: [], refused: 0 };
-  const filenames = new Set(nativeFiles.map(file => file.filename));
+  const cancellation = mode === 'cancellation';
+  const filenames = new Set((cancellation ? [nativeTimeoutFile] : nativeFiles).map(file => file.filename));
+  const idleTimeout = cancellation ? 240_000 : 30_000;
   const refuse = () => { stats.refused += 1; };
   function attach(socket, handle) {
     let messages = 0;
@@ -35,7 +38,7 @@ export async function openSoulseekFixture({ username, password, address = '127.0
     });
     socket.on('end', () => { try { decoder.end(); } catch { refuse(); } });
   }
-  const peer = await openOwnedTcpServer({ host, port: peerPort, onDrop: refuse, onSocket(socket) {
+  const peer = await openOwnedTcpServer({ host, port: peerPort, idleTimeout, onDrop: refuse, onSocket(socket) {
     let initialized = false;
     attach(socket, payload => {
       const reader = wireReader(payload);
@@ -48,16 +51,18 @@ export async function openSoulseekFixture({ username, password, address = '127.0
       const token = reader.integer(); const filename = reader.text();
       // TransferRequest includes an int64 size even when it is zero/unspecified.
       reader.integer(); reader.integer(); reader.end();
-      if (!filenames.has(filename) || stats.requests.includes(filename) || stats.requests.length >= nativeFiles.length) {
+      if (!filenames.has(filename) || (cancellation ? stats.requests.length >= 2
+        : stats.requests.includes(filename) || stats.requests.length >= nativeFiles.length)) {
         throw new Error('Unexpected fixture file');
       }
       stats.requests.push(filename);
+      if (cancellation && stats.requests.length === 1) return; // Deliberately withhold only the first ACK.
       socket.write(wireFrame(41, wireInteger(token), byte(0), wireString('Queued')));
     });
   } });
   let central;
   try {
-    central = await openOwnedTcpServer({ host, port: serverPort, onDrop: refuse, onSocket(socket) {
+    central = await openOwnedTcpServer({ host, port: serverPort, idleTimeout, onDrop: refuse, onSocket(socket) {
       let authenticated = false;
       attach(socket, payload => {
         const reader = wireReader(payload); const code = reader.integer();

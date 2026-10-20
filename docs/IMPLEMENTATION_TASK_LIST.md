@@ -6,6 +6,25 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Delivered slice: Native slskd 0.26.1 timeout qualification (2026-10-20)
+
+- Compare released 0.26.0/0.26.1 binaries at the actual three-minute enqueue
+  guard, with internal retirement and explicit same-file retry evidence.
+  Keep the dedicated timeout lane out of routine fast validation.
+- Admit only the observed 0.26.1.0 wire identity and update the managed image
+  example. Preserve raw binding, future/canary refusal and GET-only uncertainty
+  recovery in existing modular ESM owners.
+- See the [design](SLSKD_0261_QUALIFICATION_DESIGN.md),
+  [research/tradeoffs](SLSKD_0261_RESEARCH_2026_10.md) and
+  [outcome](SLSKD_0261_QUALIFICATION_OUTCOME.md). The independent random
+  [PR 52](OPEN_PR_52_0261_EVALUATION.md) updates only the controlled fixture's
+  Node image after actual API/copy validation. No PR merge or release.
+- Update the testing/web standards skill references for changed-boundary proof,
+  explicit retry ownership and source attribution. Rebuild the local walkthrough
+  without cache while preserving data/admin.
+- Next: deterministic native file-byte transfer and completed receipt/path
+  identity proof. Qualify the announced Node security patches when published.
+
 ## Delivered slice: Isolated native provider receipts (2026-10-20)
 
 - Add a separate opt-in native lane with actual slskd and a narrow owned

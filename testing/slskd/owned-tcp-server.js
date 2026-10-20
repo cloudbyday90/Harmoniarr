@@ -8,7 +8,8 @@
 import { createServer } from 'node:net';
 
 /** Close admission, destroy owned sockets, and await their actual close events. */
-export async function openOwnedTcpServer({ onSocket, host = '127.0.0.1', port = 0, onDrop = () => {} }) {
+export async function openOwnedTcpServer({ onSocket, host = '127.0.0.1', port = 0, onDrop = () => {}, idleTimeout = 30_000 }) {
+  if (!Number.isSafeInteger(idleTimeout) || idleTimeout < 1 || idleTimeout > 240_000) throw new TypeError('Invalid owned socket idle bound');
   const sockets = new Map();
   let closing = null;
   const server = createServer(socket => {
@@ -16,7 +17,7 @@ export async function openOwnedTcpServer({ onSocket, host = '127.0.0.1', port = 
     sockets.set(socket, closed);
     socket.once('close', () => sockets.delete(socket));
     socket.on('error', () => { /* Socket failures terminate this owned connection. */ });
-    socket.setTimeout(30_000, () => socket.destroy());
+    socket.setTimeout(idleTimeout, () => socket.destroy());
     try { onSocket(socket); } catch { socket.destroy(); }
   });
   server.maxConnections = 8;

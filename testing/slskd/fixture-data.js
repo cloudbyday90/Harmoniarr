@@ -6,6 +6,8 @@
  */
 
 export const nativePeer = 'fixture-peer';
+
+export const nativeTimeoutFile = Object.freeze({ filename: 'Fixture\\timeout.flac', size: 567 });
 export const nativeFiles = Object.freeze([
   Object.freeze({ filename: 'Fixture\\direct-one.flac', size: 123 }),
   Object.freeze({ filename: 'Fixture\\direct-two.flac', size: 234 }),
