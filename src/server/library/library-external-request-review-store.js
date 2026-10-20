@@ -8,6 +8,7 @@
 
 import { getPool } from '../database.js';
 import { getExternalSearchRecoveryMessage } from '../../shared/external-request-search-recovery-policy.js';
+import { projectExternalRequestSearchDiagnostics } from '../../shared/external-request-search-diagnostics.js';
 
 const intentSelect = `
   SELECT intent.*, release.title AS release_title, artist.name AS artist_name,
@@ -16,7 +17,13 @@ const intentSelect = `
       AND run.summary->>'externalSearchSuperseded' IS DISTINCT FROM 'true'
       AND (run.summary->>'failureCode' <> 'external_request_discovery_no_candidates'
         OR (run.summary->>'searchOutcome'='published_empty' AND run.summary->'candidateCount'='0'::jsonb))
-      THEN run.summary->>'failureCode' END AS search_failure_code
+      THEN run.summary->>'failureCode' END AS search_failure_code,
+    CASE WHEN run.operation_type='library_external_request_discovery' AND run.status='failed'
+      AND run.summary->>'intentId'=intent.id::text AND run.summary->>'mediaRequestId'=intent.media_request_id::text
+      AND run.summary->>'externalSearchSuperseded' IS DISTINCT FROM 'true'
+      AND run.summary->>'failureCode'='external_request_discovery_no_candidates'
+      AND run.summary->'candidateCount'='0'::jsonb AND run.summary->>'searchOutcome' IS DISTINCT FROM 'published_empty'
+      THEN run.summary->'ingestionDiagnostics' END AS search_diagnostics
   FROM library_external_request_release_intents intent
   JOIN metadata_releases release ON release.id = intent.metadata_release_id
   JOIN metadata_release_groups release_group ON release_group.id = release.metadata_release_group_id
@@ -25,6 +32,7 @@ const intentSelect = `
 `;
 
 function mapIntent(row) {
+  const diagnostics = projectExternalRequestSearchDiagnostics(row?.search_diagnostics);
   return row ? {
     id: row.id,
     mediaRequestId: row.media_request_id,
@@ -38,6 +46,7 @@ function mapIntent(row) {
     ...(row.last_empty_search_at != null ? { lastEmptySearchAt: row.last_empty_search_at,
       emptySearchRecoveryCount: row.empty_search_recovery_count } : {}),
     status: row.run_status ?? null,
+    ...(diagnostics ? { searchDiagnostics: diagnostics } : {}),
     ...(getExternalSearchRecoveryMessage(row.search_failure_code) ? { searchFailureCode: row.search_failure_code } : {}),
     artistName: row.artist_name,
     releaseTitle: row.release_title,

@@ -21,6 +21,7 @@ import { createOperationRunControlService } from '../../src/server/operation-run
 import { createOperationQueueStore } from '../../src/server/operation-queue-store.js';
 import { withWorkerTaskCleanup } from '../../src/server/worker-task-cleanup.js';
 import { createSessionHttpClient } from '../../testing/server/http-session-client.js';
+import { createSourceUserIgnoreService } from '../../src/server/activity/source-user-ignore-service.js';
 
 const config = resolveIntegrationTestRuntimeConfig(); let runtime;
 const path = f => `/api/v1/library/media-requests/${f.request.id}/external-review/intents/${f.intent.id}/search-again`;
@@ -67,6 +68,54 @@ async function waitForBlocked(c, pid, signal) {
 suite('approved external search recovery with PostgreSQL, sessions and native HTTP', () => {
   before(async () => { runtime = await createIntegrationAppRuntime({ config }); }, { timeout: config.suiteSetupTimeoutMs });
   after(async () => { await runtime?.cleanup(); }, { timeout: config.suiteTeardownTimeoutMs });
+
+  test('ignored-source evidence survives actual HTTP ingestion and current review without authorizing another search', { timeout: config.scenarioTimeoutMs }, async t => scenario(async c => {
+    const f = c.fixture; const provider = await createExternalDiscoveryHttpFixture({ signal: t.signal });
+    await c.pool.query("INSERT INTO source_user_ignore_entries(username_key,username) VALUES ('owned-peer','owned-peer')");
+    const module = createLibraryExternalRequestDiscoveryModule({ slskdService: provider.service,
+      importCandidateService: createImportCandidateService({ pool: c.pool, slskdService: provider.service,
+        listIgnoredUsernamesFn: createSourceUserIgnoreService().listIgnoredUsernamesForFilter }),
+      getAppUserById: createAppUserService().getAppUserById, reviewStore: createLibraryExternalRequestReviewStore(),
+      mediaRequestStore: createLibraryMediaRequestStore() });
+    const worker = module.libraryExternalRequestDiscoveryWorker;
+    const execute = async () => {
+      const claim = await createOperationQueueStore().claimNextRunnableRun({ operationTypes: ['library_external_request_discovery'] });
+      assert.equal(claim.id, f.run.id);
+      await (await worker.startWorkerRun({ intentId: f.intent.id, mediaRequestId: f.request.id,
+        runId: f.run.id, triggeredByUserId: c.admin.id })).completion;
+    };
+    const review = async () => (await c.client.requestJson(reviewPath(f))).payload.intents[0];
+    return withWorkerTaskCleanup(async () => {
+      provider.release(); await execute();
+      const row = (await c.pool.query('SELECT summary,status FROM operation_runs WHERE id=$1', [f.run.id])).rows[0];
+      assert.equal(row.status, 'failed'); assert.equal(row.summary.searchOutcome, null);
+      assert.equal(row.summary.ingestionDiagnostics.ignoredUserResponseCount, 1);
+      const first = await review();
+      assert.equal(first.searchDiagnostics.responseCount, 1); assert.equal(first.searchDiagnostics.responseFileCount, 1);
+      assert.equal(first.searchRecovery, undefined);
+      assert.doesNotMatch(JSON.stringify(first.searchDiagnostics), /owned-peer|Foil|Amber/);
+      assert.equal((await recover(c, 'filtered-is-not-empty')).response.status, 409);
+      assert.equal((await c.pool.query('SELECT last_empty_search_at,empty_search_recovery_count FROM library_external_request_release_intents WHERE id=$1', [f.intent.id])).rows[0].last_empty_search_at, null);
+      // A persisted object is not trusted as a public DTO.
+      await c.pool.query(`UPDATE operation_runs SET summary=jsonb_set(summary,'{ingestionDiagnostics}',
+        summary->'ingestionDiagnostics'||'{"username":"private-peer","reasonCodes":["private"]}'::jsonb) WHERE id=$1`, [f.run.id]);
+      assert.doesNotMatch(JSON.stringify((await review()).searchDiagnostics), /private/);
+      for (const change of [{ intentId: randomUUID() }, { mediaRequestId: randomUUID() }, { externalSearchSuperseded: true }, { searchOutcome: 'published_empty' }]) {
+        await c.pool.query('UPDATE operation_runs SET summary=$2::jsonb WHERE id=$1', [f.run.id, JSON.stringify({ ...row.summary, ...change })]);
+        assert.equal((await review()).searchDiagnostics, undefined);
+      }
+      await c.pool.query('UPDATE operation_runs SET summary=$2::jsonb WHERE id=$1', [f.run.id, JSON.stringify(row.summary)]);
+      // An intentional correction plus ordinary Retry rechecks the same provider UUID.
+      await c.pool.query('DELETE FROM source_user_ignore_entries');
+      await createOperationRunControlService().requestOperationRunRetry({ runId: f.run.id });
+      assert.equal((await review()).searchDiagnostics, undefined);
+      await execute();
+      assert.equal((await review()).status, 'completed'); assert.equal((await review()).searchDiagnostics, undefined);
+      assert.equal(provider.queries.length, 1);
+      assert.equal((await c.pool.query('SELECT count(*)::int AS n FROM import_candidates')).rows[0].n, 1);
+      assert.equal((await c.pool.query('SELECT empty_search_recovery_count FROM library_external_request_release_intents WHERE id=$1', [f.intent.id])).rows[0].empty_search_recovery_count, 0);
+    }, async () => { await worker.close(); await provider.close(); });
+  }));
 
   test('published empty searches enforce durable cooldown and two fresh commands across expiry, replay and retries', { timeout: config.scenarioTimeoutMs }, async t => scenario(async c => {
     const f = c.fixture; const provider = await createExternalDiscoveryHttpFixture({ signal: t.signal, empty: true });

@@ -24,6 +24,7 @@ import {
 } from '../operation-run-cancellation.js';
 import { buildDiscoverySearchQuery } from './library-discovery-search-query.js';
 import { createLibraryExternalEmptySearchStore } from './library-external-empty-search-store.js';
+import { projectExternalRequestSearchDiagnostics } from '../../shared/external-request-search-diagnostics.js';
 
 export function createLibraryExternalRequestDiscoveryService({
   assertMaintenanceWriteAllowed = async () => {},
@@ -114,8 +115,11 @@ export function createLibraryExternalRequestDiscoveryService({
       },
       searchId: search.id,
     });
+    const diagnostics = result.candidateCount === 0 && result.searchOutcome !== 'published_empty'
+      ? projectExternalRequestSearchDiagnostics(result.ingestionDiagnostics) : null;
     return {
       candidateCount: result.candidateCount,
+      ...(diagnostics ? { ingestionDiagnostics: diagnostics } : {}),
       fileCount: result.fileCount,
       ...(result.searchOutcome === 'published_empty' ? { searchOutcome: 'published_empty' } : {}),
       intentId,

@@ -16,6 +16,8 @@ Use it for shared and approved external-search recovery, expected-run consent,
 retry supersession races and recipient eligibility lock waits.
 For confirmed empty-search recovery, use [empty-search policy](references/empty-search-policy.md)
 to trace qualified evidence, durable resource budgets and replay before refusal.
+For no-candidate filtering explanations, use [search diagnostics](references/search-diagnostics.md)
+to preserve evidence units, confidentiality, current-job binding and correction ownership.
 
 For canonical search through ingestion and acquisition, use
 [discovery provenance](references/discovery-provenance.md). It distinguishes

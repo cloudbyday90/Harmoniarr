@@ -17,7 +17,7 @@ const reviewPath = `${detailPath}/external-review`;
 const commandPath = `${reviewPath}/intents/${intentId}/search-again`;
 function deferred() { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; }
 
-async function fixtures(context, { loseFirstResponse = false, failRefresh = false, policy = null } = {}) {
+async function fixtures(context, { loseFirstResponse = false, failRefresh = false, policy = null, filteredReview = false, diagnostics = null } = {}) {
   let accepted = false; let enabled = true; const calls = []; const held = deferred();
   const user = { id: '22222222-2222-4333-8444-555555555555', username: 'Household listener', role: 'requester' };
   await context.route(`**${detailPath}`, route => route.fulfill({ json: { ok: true, mediaRequest: { id: requestId,
@@ -37,7 +37,8 @@ async function fixtures(context, { loseFirstResponse = false, failRefresh = fals
     await route.fulfill({ json: { items: [], preparation: { canRecover: false, action: null }, intents: [{ id: intentId,
       requestedForUserId: user.id, artistName: 'Prepared Artist', releaseTitle: 'Prepared Album',
       operationRunId: accepted ? newRunId : oldRunId, status: accepted ? 'pending' : 'failed',
-      ...(!accepted ? { searchRecovery: { canSearchAgain: enabled && !policy?.blockedReason, expectedOperationRunId: oldRunId,
+      ...(diagnostics ? { searchDiagnostics: diagnostics } : {}),
+      ...(!accepted && !filteredReview ? { searchRecovery: { canSearchAgain: enabled && !policy?.blockedReason, expectedOperationRunId: oldRunId,
         ...(policy ? { policy } : {}),
         message: getExternalSearchRecoveryMessage('slskd_search_continuation_expired') } } : {}) }] } });
   });
@@ -49,12 +50,42 @@ async function fixtures(context, { loseFirstResponse = false, failRefresh = fals
     await route.fulfill({ status: 202, json: { searchRecovery: { outcome: 'queued', mediaRequestId: requestId, intentId,
       previousOperationRunId: oldRunId, operationRunId: newRunId, reusedExistingRun: calls.length > 1 } } });
   });
-  return { calls, release: held.resolve, setEnabled: value => { enabled = value; }, setPolicy: value => { policy = value; } };
+  return { calls, release: held.resolve, setEnabled: value => { enabled = value; }, setPolicy: value => { policy = value; },
+    setDiagnostics: value => { diagnostics = value; } };
 }
 
 suite('approved external search recovery browser interaction', () => {
   before(async () => { runtime = await createBrowserSmokeRuntime({ config }); }, { timeout: config.suiteSetupTimeoutMs });
   after(async () => { await runtime?.cleanup(); }, { timeout: config.suiteTeardownTimeoutMs });
+
+  test('filtered-result details offer private, keyboard-accessible correction guidance without queuing work', { timeout: config.scenarioTimeoutMs }, async () => {
+    await runtime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      const fixture = await fixtures(browserContext, { filteredReview: true, diagnostics: { provider: 'slskd', candidateCount: 0,
+        responseCount: 1, responseFileCount: 1, ignoredUserResponseCount: 1, username: 'private-peer', reasonCodes: ['private'] } });
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto(`${baseUrl}/app/requests/${requestId}`, { waitUntil: 'domcontentloaded' });
+      const panel = page.getByRole('article', { name: 'Review external music' });
+      const details = panel.getByRole('region', { name: 'Search result details for Prepared Artist — Prepared Album' });
+      await details.getByRole('heading', { name: 'No usable candidates' }).waitFor();
+      assert.match(await details.textContent(), /1 provider response included 1 file/);
+      assert.doesNotMatch(await details.textContent(), /private|quality/);
+      assert.equal(await panel.getByRole('button', { name: /^Search again/ }).count(), 0);
+      const link = details.getByRole('link', { name: 'Review ignored sources', exact: true });
+      await link.focus(); await page.keyboard.press('Tab'); await page.keyboard.press('Shift+Tab');
+      await assertVisibleFocusOutline(link, 'Diagnostic correction navigation needs visible keyboard focus');
+      assert.ok((await link.boundingBox()).height >= 44);
+      await mkdir('.tmp/external-search-diagnostics-2026-10-20', { recursive: true });
+      await details.screenshot({ path: '.tmp/external-search-diagnostics-2026-10-20/filtering-mobile.png' });
+      await link.press('Enter'); await page.waitForURL('**/app/activity/ignored');
+      await page.goBack(); await details.waitFor();
+      fixture.setDiagnostics(null);
+      const refresh = panel.getByRole('button', { name: 'Refresh review', exact: true });
+      await refresh.focus(); await refresh.press('Enter'); await details.waitFor({ state: 'hidden' });
+      await assertLocatorFocused(refresh, 'Diagnostic refresh must retain invoking focus');
+      assert.equal(fixture.calls.length, 0);
+    }, { scenarioName: 'external_search_filter_diagnostics' });
+  });
 
   test('cooldown and exhaustion explain unavailable fresh searches and refresh preserves focus', { timeout: config.scenarioTimeoutMs }, async () => {
     await runtime.runScenario(async ({ baseUrl, browserContext, page }) => {

@@ -47,7 +47,8 @@ export function createLibraryExternalRequestDiscoveryWorker({
     let finalLeaseStatus = 'completed';
     let acquiredLease = null;
     let heartbeat = null;
-    const summary = { intentId, mediaRequestId, triggerSource, failureCode: null, searchOutcome: null, candidateCount: null };
+    const summary = { intentId, mediaRequestId, triggerSource, failureCode: null, searchOutcome: null,
+      candidateCount: null, ingestionDiagnostics: null };
     return withWorkerTaskCleanup(async () => {
       try {
         acquiredLease = await acquireLease({ runId });

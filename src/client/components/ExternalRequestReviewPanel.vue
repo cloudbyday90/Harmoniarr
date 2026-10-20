@@ -12,6 +12,7 @@ import { useExternalRequestReview } from '../composables/useExternalRequestRevie
 import ExternalCollectionReviewControls from './ExternalCollectionReviewControls.vue';
 import ExternalRequestReviewItem from './ExternalRequestReviewItem.vue';
 import ExternalRequestSearchRecovery from './ExternalRequestSearchRecovery.vue';
+import ExternalRequestSearchDiagnostics from './ExternalRequestSearchDiagnostics.vue';
 
 const props = defineProps({ mediaRequest: { type: Object, required: true } });
 const emit = defineEmits(['updated']);
@@ -113,6 +114,7 @@ function belongsToPreviousTarget(intent) {
             <span>{{ intent.artistName }} · {{ intent.releaseTitle }}</span>
             <span class="hx-pill">{{ intentStatus(intent.status) }}</span>
             <p v-if="belongsToPreviousTarget(intent)" class="hx-text-muted">Accepted for a previous target. Create a separate request to search for the current target.</p>
+            <ExternalRequestSearchDiagnostics :intent="intent" />
             <ExternalRequestSearchRecovery :media-request-id="mediaRequest.id" :recipient-id="mediaRequest.requestedForUser?.id"
               :intent="intent" :busy="busy" :refresh-review="refreshRecoveredSearch"
               @pending="setRecoveryPending(intent.id, $event)" @updated="emit('updated')" />

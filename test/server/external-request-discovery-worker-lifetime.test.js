@@ -52,7 +52,7 @@ test('handler returns queued acceptance before discovery/persistence while close
   } finally { gate.resolve(); await accepted.completion; await closing; }
   assert.equal(released, true);
   assert.deepEqual(completed, { runId: run.runId, expectedLease: lease(), summary: { intentId: run.intentId,
-    mediaRequestId: run.mediaRequestId, triggerSource: 'operator_review', failureCode: null, searchOutcome: null,
+    mediaRequestId: run.mediaRequestId, triggerSource: 'operator_review', failureCode: null, searchOutcome: null, ingestionDiagnostics: null,
     ...result, currentStep: 'Candidates ready for import review' } });
 });
 

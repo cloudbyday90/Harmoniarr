@@ -87,6 +87,6 @@ rebased; no new branch, version, tag or release was created.
 
 Confirmed zero-result recovery is now implemented in the
 [separate outcome](EXTERNAL_EMPTY_SEARCH_OUTCOME.md), with durable cooldown/budget,
-qualified publication evidence and policy-aware replay. Next: expose bounded
-filtering reasons when responses produce no usable candidates, so the operator
-can correct metadata/quality decisions before requesting more provider work.
+qualified publication evidence and policy-aware replay. Bounded filtering reasons
+now have a [separate outcome](EXTERNAL_SEARCH_DIAGNOSTICS_OUTCOME.md). Next: apply
+unit-aware diagnostic counts to Missing Music's canonical review surface.

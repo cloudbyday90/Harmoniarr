@@ -81,7 +81,7 @@ consumer checks match the retained failing TypeScript 7 candidate and passing
 TypeScript 6 control. No dependency, separate branch, PR merge, release, version
 or tag was created.
 
-Next: expose bounded reasons when provider responses produce no usable candidates
-after filtering. Link that evidence to the existing release/quality decisions so
-an operator can correct the cause before requesting more provider work. Keep this
-distinct from confirmed empty searches; do not silently reset their budget.
+Bounded filtering explanations are now implemented in the
+[separate outcome](EXTERNAL_SEARCH_DIAGNOSTICS_OUTCOME.md), with observed causes,
+fixed correction navigation and unchanged empty-search budget. Next: replace
+Missing Music's mixed response/file filtered total with separate cause counts.

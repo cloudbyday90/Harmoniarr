@@ -3,6 +3,22 @@ import test from 'node:test';
 import { createLibraryExternalRequestDiscoveryService } from '../../src/server/library/library-external-request-discovery-service.js';
 import { createImportCandidateService } from '../../src/server/import-candidates/import-candidate-service.js';
 
+test('external discovery carries only bounded filtered-result evidence and omits it for successful or published empty searches', async t => {
+  const fixture = createFixture(t);
+  const diagnostics = { provider: 'slskd', candidateCount: 0, responseCount: 1, responseFileCount: 1, ignoredUserResponseCount: 1,
+    username: 'private-peer', filename: 'private-file', reasonCodes: ['private'] };
+  fixture.dependencies.importCandidateService.ingestSlskdSearchResponses.mock.mockImplementation(async () => ({
+    candidateCount: 0, fileCount: 0, ingestionDiagnostics: diagnostics,
+  }));
+  const first = await discover(fixture);
+  assert.equal(first.ingestionDiagnostics.ignoredUserResponseCount, 1);
+  assert.doesNotMatch(JSON.stringify(first), /private/);
+  for (const result of [{ candidateCount: 1 }, { candidateCount: 0, searchOutcome: 'published_empty' }]) {
+    fixture.dependencies.importCandidateService.ingestSlskdSearchResponses.mock.mockImplementation(async () => ({ ...result, ingestionDiagnostics: diagnostics }));
+    assert.equal((await discover(fixture)).ingestionDiagnostics, undefined);
+  }
+});
+
 function createFixture(t) {
   const state = {
     intent: { id: 'intent-a', mediaRequestId: 'request-a', metadataReleaseId: 'release', requestedForUserId: 'target-a', artistName: 'Artist', releaseTitle: 'Release', releaseGroupId: 'group' },

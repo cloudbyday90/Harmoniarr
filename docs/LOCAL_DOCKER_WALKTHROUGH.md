@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 20 [search-diagnostics rebuild](LOCAL_DOCKER_EXTERNAL_SEARCH_DIAGNOSTICS_OUTCOME.md)
+records the current no-cache image, preserved admin/data and passing readiness.
+The [feature outcome](EXTERNAL_SEARCH_DIAGNOSTICS_OUTCOME.md) covers bounded
+filtering explanations, current-job evidence and keyboard correction guidance.
+
 The October 20 [empty-search policy rebuild](LOCAL_DOCKER_EXTERNAL_EMPTY_SEARCH_OUTCOME.md)
-records the current no-cache image, one new migration, preserved admin/data and
+records the preceding no-cache image, one new migration, preserved admin/data and
 passing readiness. The [feature outcome](EXTERNAL_EMPTY_SEARCH_OUTCOME.md) covers
 durable cooldown/budget, qualified empty results, replay and rendered policy.
 
