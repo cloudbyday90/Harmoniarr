@@ -5,6 +5,12 @@ description: "Apply and verify web standards for Harmoniarr UI commands, forms, 
 
 # Harmoniarr Web Standards
 
+For provider media publication, use
+[native audio boundaries](references/native-audio-import.md). It maps W3C
+provenance, IETF mutation ownership, OWASP content validation and vendor probing
+to separate observable checks without implying general standards conformance.
+
+
 Turn applicable official practices into observable behavior in the requested
 journey. Select relevant standards; do not expand ordinary work into a blanket
 accessibility/security audit or a framework migration.

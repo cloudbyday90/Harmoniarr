@@ -6,6 +6,25 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Delivered slice: Native audio through canonical import (2026-10-20)
+
+- Add an opt-in native WAV/corrupt-control lane with real leased execution,
+  durable handoff, actual receipt summary, ffprobe, safe auto-add/apply, required
+  system audit and scheduled catalogue worker. Refuse corrupt publication after
+  successful equal-size transport. See the [design](NATIVE_AUDIO_IMPORT_DESIGN.md),
+  [research/tradeoffs](NATIVE_AUDIO_IMPORT_RESEARCH_2026_10.md) and
+  [outcome](NATIVE_AUDIO_IMPORT_OUTCOME.md).
+- Add twelve fast byte/capability/dispatch/export controls. Keep private native
+  networking, bounded read-only publication proof and strict resource cleanup.
+  Extend maintained testing/web standards skills with the boundary method.
+- Rebuild without cache and preserve data/admin; see the
+  [Docker outcome](LOCAL_DOCKER_NATIVE_AUDIO_OUTCOME.md). Recheck random
+  [PR 48](OPEN_PR_48_NATIVE_AUDIO_EVALUATION.md); unchanged incompatibility
+  prevents adoption. No production/schema/dependency or release change.
+- Next: qualify a canonical Music Queue selected-match action into the native
+  audio pipeline, replacing seeded ready eligibility. Keep full decoding and
+  valid same-size remote-source authentication as distinct claims.
+
 ## Delivered slice: Native exhaustion and changed-size refusal (2026-10-20)
 
 - Add a separate opt-in ESM refusal lane with unchanged provider defaults.

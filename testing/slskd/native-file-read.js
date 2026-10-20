@@ -16,7 +16,14 @@ const identity = stat => [stat.dev, stat.ino, stat.size, stat.mtimeNs, stat.ctim
 
 /** Shared bounded descriptor/path read for declared full and partial fixture files. */
 export async function inspectNativeBytes(root, file, { parts, minBytes, maxBytes, digestForLength }) {
-  if (!nativeTransferFiles.includes(file) || !Array.isArray(parts) || parts.length < 2 || parts.length > 3
+  if (!nativeTransferFiles.includes(file)) throw new TypeError('Invalid owned native read');
+  return inspectDeclaredNativeBytes(root, file, { parts, minBytes, maxBytes, digestForLength });
+}
+
+/** Callers own the declared manifest; shared descriptor checks do not grant a file capability. */
+export async function inspectDeclaredNativeBytes(root, file, { parts, minBytes, maxBytes, digestForLength }) {
+  if (!Number.isSafeInteger(file?.size) || file.size < 1 || file.size > 4194304 || typeof digestForLength !== 'function'
+    || !Array.isArray(parts) || parts.length < 2 || parts.length > 3
     || parts.some(part => !/^[a-zA-Z0-9.-]+$/u.test(part) || part === '..' || part === '.')
     || !Number.isSafeInteger(minBytes) || !Number.isSafeInteger(maxBytes)
     || minBytes < 1 || maxBytes < minBytes || maxBytes > file.size) throw new TypeError('Invalid owned native read');

@@ -1,5 +1,13 @@
 # Official practices by boundary
 
+Native audio publication uses the
+[audio research](../../../../docs/NATIVE_AUDIO_IMPORT_RESEARCH_2026_10.md):
+ffprobe stream/error observations, OWASP content validation by inference,
+RFC 9110 mutation ownership and W3C provenance by inference. Equal-size corrupt
+content must be refused after transport completion. Preserve the distinction
+between probing, decoding, original-source identity and catalogue publication.
+
+
 Native exhaustion/changed-size decisions use the
 [refusal research](../../../../docs/NATIVE_REFUSAL_RESEARCH_2026_10.md). Released
 exception policy, IETF POST uncertainty, Node EOF/close, OWASP isolation and W3C

@@ -48,11 +48,11 @@ async function acknowledgeService({ id, image, projectName, networkId, inspect }
 export async function withNativeSlskdProvider({ applicationImage, providerImage, signal,
   rootDir = process.cwd(), execute = executeFixtureProbeCommand, runScenario = null,
   mode = 'batch', expectedVersion = '0.26.0.0' } = {}) {
-  if (!['batch', 'cancellation', 'files', 'partial', 'resume', 'refusal'].includes(mode) || !['0.26.0.0', '0.26.1.0'].includes(expectedVersion)) {
+  if (!['batch', 'cancellation', 'files', 'partial', 'resume', 'refusal', 'audio'].includes(mode) || !['0.26.0.0', '0.26.1.0'].includes(expectedVersion)) {
     throw new TypeError('Unreviewed native fixture mode or version');
   }
   if (mode === 'cancellation' && typeof runScenario !== 'function') throw new TypeError('Cancellation requires its explicit scenario');
-  if (['partial', 'resume', 'refusal'].includes(mode) && typeof runScenario !== 'function') throw new TypeError('File fault modes require their explicit scenario');
+  if (['partial', 'resume', 'refusal', 'audio'].includes(mode) && typeof runScenario !== 'function') throw new TypeError('File modes require their explicit scenario');
   requireNativeSlskdImages({ HARMONIARR_NATIVE_APP_IMAGE: applicationImage, HARMONIARR_NATIVE_SLSKD_IMAGE: providerImage });
   const projectName = 'harmoniarrnative' + randomUUID().replaceAll('-', '');
   const workspaceRoot = await mkdtemp(resolve(tmpdir(), prefix));
@@ -89,7 +89,7 @@ export async function withNativeSlskdProvider({ applicationImage, providerImage,
     assert.ok(['x64', 'arm64'].includes(runtime.arch));
     assert.equal(runtime.lock, hash(await readFile(resolve(rootDir, 'package-lock.json'))));
     assert.equal(runtime.policy, hash(await readFile(resolve(rootDir, 'src/server/slskd/slskd-download-protocol-policy.js'))));
-    const storage = ['files', 'partial', 'resume', 'refusal'].includes(mode) ? await acknowledgeNativeFileVolume({ provider: await inspect(providerId), fixture: await inspect(fixtureId),
+    const storage = ['files', 'partial', 'resume', 'refusal', 'audio'].includes(mode) ? await acknowledgeNativeFileVolume({ provider: await inspect(providerId), fixture: await inspect(fixtureId),
       projectName, mode, inspectVolume: async name => JSON.parse(await docker(['volume', 'inspect', name]))[0] }) : null;
     result = runScenario ? await runScenario({ docker, fixtureId, providerId }) : JSON.parse(await docker(['exec', fixtureId, 'node', '/app/testing/slskd/native-batch-scenario.js']));
     result = { ...result, runtime, applicationImage, providerImage, ...(storage ? { storage } : {}) };

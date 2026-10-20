@@ -1,5 +1,14 @@
 # Project standards-to-evidence map
 
+Native audio-to-import qualification belongs in
+test/native/slskd-audio-import.test.js and narrow testing/slskd/native-audio-*
+and testing/integration/native-audio-* helpers. The
+[outcome](../../../../docs/NATIVE_AUDIO_IMPORT_OUTCOME.md) records real durable
+handoff, actual media inspection/apply/audit and canonical scan evidence for
+equal-size valid/corrupt payloads. Focused server controls own export and token
+refusal. Read the [boundary method](native-audio-import.md) before extending it.
+
+
 Native refusal belongs to testing/slskd/native-refusal-* and
 test/native/slskd-refusal.test.js. The [outcome](../../../../docs/NATIVE_REFUSAL_OUTCOME.md)
 owns actual exhaustion versus size-mismatch attempt counts, failed receipt/GET

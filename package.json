@@ -72,6 +72,7 @@
     "test:integration:serial": "npm run test:integration",
     "validate:native-slskd": "node --test --test-concurrency=1 test/native/slskd-batch.test.js",
     "validate:native-slskd-files": "node --test --test-concurrency=1 test/native/slskd-files.test.js",
+    "validate:native-slskd-audio": "node --test --test-concurrency=1 test/native/slskd-audio-import.test.js",
     "validate:native-slskd-partial": "node --test --test-concurrency=1 test/native/slskd-partial.test.js",
     "validate:native-slskd-resume": "node --test --test-concurrency=1 test/native/slskd-resume.test.js",
     "validate:native-slskd-refusal": "node --test --test-concurrency=1 test/native/slskd-refusal.test.js",

@@ -1,5 +1,15 @@
 # AI Workflow And Shared Copilot Skills
 
+The [native audio design](NATIVE_AUDIO_IMPORT_DESIGN.md) extends the existing
+testing and web standards skills with a practical boundary method: discover
+official sources, label their authority and inferred application, then tie each
+claim to its actual owner. Native receipt, exported hash, ffprobe observation,
+canonical apply, catalogue and required audit are separate evidence. The
+[outcome](NATIVE_AUDIO_IMPORT_OUTCOME.md) records equal-size valid/corrupt controls,
+real SQL workers and the retained source/canonical refusal distinction. Keep
+the native lane opt-in; fast capability/export controls support routine work.
+
+
 The [native refusal design](NATIVE_REFUSAL_DESIGN.md) extends testing and standards
 references with exception-specific retry ownership. An attempt cap does not make
 every error retryable. Verify real attempt counts, refusal before file connection,

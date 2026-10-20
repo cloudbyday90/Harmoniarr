@@ -95,6 +95,15 @@ See the [design](docs/NATIVE_REFUSAL_DESIGN.md),
 [research/tradeoffs](docs/NATIVE_REFUSAL_RESEARCH_2026_10.md) and
 [outcome](docs/NATIVE_REFUSAL_OUTCOME.md).
 
+Run npm run validate:native-slskd-audio with those 0.26.1 immutable images for
+actual native WAV completion through durable execution, media inspection,
+automatic canonical apply and catalogue scan. An equal-size corrupt WAV must
+complete transport but publish no library file. This isolated PostgreSQL/media
+lane is opt-in; twelve byte/capability/export controls stay in the fast gate.
+See the [design](docs/NATIVE_AUDIO_IMPORT_DESIGN.md),
+[research/tradeoffs](docs/NATIVE_AUDIO_IMPORT_RESEARCH_2026_10.md) and
+[outcome](docs/NATIVE_AUDIO_IMPORT_OUTCOME.md).
+
 Service worker activation preserves in-progress forms unless this page requests
 an update. The [reload outcome](docs/PWA_SERVICE_WORKER_RELOAD_OUTCOME.md) records
 the first-install login fix and enabled-worker regression coverage.

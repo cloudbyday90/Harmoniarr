@@ -13,6 +13,7 @@ import { nativePeer } from './fixture-data.js';
 import { openFixturePeer } from './soulseek-peer.js';
 import { openNativeResumePeer } from './native-resume-peer.js';
 import { openNativeRefusalPeer } from './native-refusal-peer.js';
+import { openNativeAudioPeer } from './native-audio-peer.js';
 
 const byte = value => Buffer.from([value]);
 // Released client startup/status messages that require no response in this fixture.
@@ -20,7 +21,7 @@ const notifications = new Set([2, 18, 32, 35, 36, 71, 100, 126, 127, 141]);
 
 export async function openSoulseekFixture({ username, password, address = '127.0.0.1',
   host = '127.0.0.1', serverPort = 0, peerPort = 0, mode = 'batch', beforeReset } = {}) {
-  if (!['batch', 'cancellation', 'files', 'partial', 'resume', 'refusal'].includes(mode)) throw new TypeError('Unknown native fixture mode');
+  if (!['batch', 'cancellation', 'files', 'partial', 'resume', 'refusal', 'audio'].includes(mode)) throw new TypeError('Unknown native fixture mode');
   if (['partial', 'resume', 'refusal'].includes(mode) && typeof beforeReset !== 'function') throw new TypeError('File fault modes require an incomplete-file checkpoint');
   if (!isIPv4(address) || typeof username !== 'string' || !username || typeof password !== 'string' || !password) {
     throw new TypeError('An owned IPv4 fixture and credentials are required');
@@ -41,7 +42,7 @@ export async function openSoulseekFixture({ username, password, address = '127.0
     });
     socket.on('end', () => { try { decoder.end(); } catch { refuse(); } });
   }
-  const openPeer = mode === 'refusal' ? openNativeRefusalPeer : mode === 'resume' ? openNativeResumePeer : openFixturePeer;
+  const openPeer = mode === 'audio' ? openNativeAudioPeer : mode === 'refusal' ? openNativeRefusalPeer : mode === 'resume' ? openNativeResumePeer : openFixturePeer;
   const peer = await openPeer({ username, host, port: peerPort, idleTimeout, mode, stats, refuse, beforeReset });
   let central;
   try {

@@ -5,6 +5,11 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For native media-to-import qualification, read
+[native audio import](references/native-audio-import.md). It separates successful
+transport from actual content inspection, canonical apply and catalogue publication.
+
+
 For native retry exhaustion and changed-size negotiation refusal, read
 [native refusal](references/native-refusal.md). It owns bounded failed attempts,
 absence of a mismatched file connection and final incomplete-only storage.

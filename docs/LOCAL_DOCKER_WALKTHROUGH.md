@@ -1,5 +1,11 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 20 [native-audio rebuild outcome](LOCAL_DOCKER_NATIVE_AUDIO_OUTCOME.md)
+records the latest no-cache image, preserved data/admin and passing readiness-only
+check. The independent [native audio outcome](NATIVE_AUDIO_IMPORT_OUTCOME.md)
+qualifies actual valid/corrupt media through canonical import and catalogue;
+walkthrough provider attention remains an operational follow-up.
+
 The October 20 [native-refusal rebuild outcome](LOCAL_DOCKER_NATIVE_REFUSAL_OUTCOME.md)
 records the latest no-cache image, preserved data/admin and readiness-only check.
 Native refusal uses private disposable projects with no published ports;

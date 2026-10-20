@@ -9,7 +9,7 @@ import { resolve } from 'node:path';
 import { nativeFileVolumeOptions } from './native-file-volume.js';
 
 export function nativeProviderCompose({ rootDir, workspaceRoot, applicationImage, providerImage, mode = 'batch' }) {
-  const files = ['files', 'partial', 'resume', 'refusal'].includes(mode);
+  const files = ['files', 'partial', 'resume', 'refusal', 'audio'].includes(mode);
   const partial = ['partial', 'resume', 'refusal'].includes(mode);
   const bind = (source, target) => ({ type: 'bind', source, target, read_only: true });
   const common = { restart: 'no', user: '1000:1000', read_only: true,
