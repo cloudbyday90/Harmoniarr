@@ -19,6 +19,7 @@
 <script setup>
 import { computed } from 'vue';
 import { RouterLink } from 'vue-router';
+import { buildOperationSearchRecovery } from '../lib/operation-search-recovery-presentation.js';
 import OperationRunDrilldownPanel from './OperationRunDrilldownPanel.vue';
 import OperationStatusBadge from './OperationStatusBadge.vue';
 import {
@@ -81,6 +82,7 @@ const props = defineProps({
 const emit = defineEmits(['request-cancel', 'request-retry']);
 
 const lease = computed(() => props.run?.lease ?? null);
+const searchRecovery = computed(() => buildOperationSearchRecovery(props.run));
 const canCancel = computed(() => canRequestOperationRunCancellation(props.run));
 const canRetry = computed(() => canRequestOperationRunRetry(props.run));
 const workflowTarget = computed(() => buildOperationRunLinkTarget({
@@ -136,6 +138,9 @@ function runDuration(run) {
         <RouterLink v-if="workflowTarget" class="hx-btn" :to="workflowTarget.to">
           {{ workflowTarget.label }}
         </RouterLink>
+        <RouterLink v-if="searchRecovery" class="hx-btn" :to="searchRecovery.to">
+          {{ searchRecovery.label }}
+        </RouterLink>
       </div>
     </header>
 
@@ -170,7 +175,7 @@ function runDuration(run) {
           </article>
           <article class="operations-insight-card">
             <p class="ops-section-label">What to do next</p>
-            <strong>{{ getOperationRunNextStep(run) }}</strong>
+            <strong>{{ searchRecovery?.message ?? getOperationRunNextStep(run) }}</strong>
           </article>
         </div>
 

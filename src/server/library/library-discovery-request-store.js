@@ -798,6 +798,9 @@ export function createLibraryDiscoveryRequestStore({
                 - 'downloadRecoveryExhausted'
                 - 'downloadRecoveryRediscovery'
                 - 'searchExhausted'
+                - 'lastDispatchFailure'
+                - 'searchContinuation'
+                - 'lastDispatchAttemptedAt'
             ) || jsonb_build_object(
               'musicQueueRediscovery',
               jsonb_build_object(

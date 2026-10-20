@@ -17,6 +17,7 @@
  */
 
 import { createApiError } from '../auth.js';
+import { getSearchContinuationRecoveryMessage } from '../../shared/search-continuation-recovery.js';
 import { createRuntimeReporter } from '../runtime-reporter.js';
 import { canRequestMusicQueueRediscovery, isMusicQueueRediscoveryInProgress } from './acquisition-rediscovery-policy.js';
 import { canAllowAcquisitionFallbackQuality, evaluateReleaseQualityEvidence, isAwaitingRediscoveryQualityEvidence, isScopedQualityFallbackOverride } from './acquisition-quality-evidence-policy.js';
@@ -165,6 +166,8 @@ function buildSearchEvidence(release) {
   const discoveryRequest = release.discoveryRequest ?? {};
   return {
     blockedReason: discoveryRequest.blockedReason ?? null,
+    ...(discoveryRequest.requestStatus === 'blocked' && getSearchContinuationRecoveryMessage(discoveryRequest.blockedReason)
+      ? { continuationFailureCode: discoveryRequest.blockedReason } : {}),
     lastSearchAt: discoveryRequest.lastSearchAt ?? null,
     nextSearchAfter: discoveryRequest.nextSearchAfter ?? null,
     searchAttemptCount: discoveryRequest.searchAttemptCount ?? 0,

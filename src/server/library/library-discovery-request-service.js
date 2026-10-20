@@ -17,6 +17,7 @@
  */
 
 import { getPool } from '../database.js';
+import { getSearchContinuationRecoveryMessage } from '../../shared/search-continuation-recovery.js';
 import {
   normalizeMetadataReleaseDateForDateColumn,
   parseMetadataReleaseDateInstant,
@@ -166,6 +167,16 @@ function mapDiscoveryRow(row, { automaticCooldownMs, now }) {
   if (row.blocked_reason === 'recovery_scope_changed' || priorEvidence.downloadRecoveryRediscovery?.state === 'guard_refused') {
     return {
       blockedReason: 'recovery_scope_changed', evidence: priorEvidence,
+      lastSearchAt: toIsoStringOrNull(row.last_search_at), manualRequestedAt: toIsoStringOrNull(row.manual_requested_at),
+      metadataArtistId: row.metadata_artist_id, metadataReleaseGroupId: row.metadata_release_group_id,
+      metadataReleaseId: row.metadata_release_id, releaseDate, wantedStatus: row.wanted_status, searchMode,
+      nextSearchAfter: null, requestStatus: 'blocked', researchAttemptCount, searchAttemptCount,
+    };
+  }
+
+  if (searchMode === 'automatic' && getSearchContinuationRecoveryMessage(row.blocked_reason)) {
+    return {
+      blockedReason: row.blocked_reason, evidence: priorEvidence,
       lastSearchAt: toIsoStringOrNull(row.last_search_at), manualRequestedAt: toIsoStringOrNull(row.manual_requested_at),
       metadataArtistId: row.metadata_artist_id, metadataReleaseGroupId: row.metadata_release_group_id,
       metadataReleaseId: row.metadata_release_id, releaseDate, wantedStatus: row.wanted_status, searchMode,

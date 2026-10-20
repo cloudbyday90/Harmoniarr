@@ -38,6 +38,7 @@ import {
 import { bootstrapAdminThroughUi } from '../../testing/browser/operator-browser-helpers.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 import { deriveMusicQueueStatus } from '../../src/server/acquisition/acquisition-pipeline-status-service.js';
+import { getSearchContinuationRecoveryMessage } from '../../src/shared/search-continuation-recovery.js';
 import { installMetadataBrowserFixtures, seedMetadataImportReviewWorkspace } from '../../testing/browser/metadata-browser-fixtures.js';
 import { buildImportReviewCandidate, buildImportReviewExecutionRun, buildImportReviewRunSummary, openImportReviewRunHistory } from '../../testing/browser/import-review-browser-helpers.js';
 
@@ -62,7 +63,7 @@ function buildRecoveryStatus(phase) {
   return { code: status.code, label: status.label, message: status.message, nextAction: status.nextAction, tone: status.tone };
 }
 
-function buildDecision({ accountStatus = 'active', downloadStarted = false, preparedDownload = false, addAvailable = true, libraryRecoveryReason = null, libraryAddQueued = false, recheckAvailable = true, matchSelected = false, qualityChoiceCode = null, recoveryPhase = null, searchInitial = false, findMatchesAvailable = searchInitial, searchQueued = false, searchStopped = false } = {}) {
+function buildDecision({ accountStatus = 'active', downloadStarted = false, preparedDownload = false, addAvailable = true, libraryRecoveryReason = null, libraryAddQueued = false, recheckAvailable = true, matchSelected = false, qualityChoiceCode = null, recoveryPhase = null, searchInitial = false, findMatchesAvailable = searchInitial, searchQueued = false, searchStopped = false, searchFailureCode = null } = {}) {
   const recoveryStatus = buildRecoveryStatus(recoveryPhase);
   return {
     ...(recoveryPhase ? { state: ['trying_next_match', 'searching', 'retrying_search'].includes(recoveryStatus.code) ? 'searching' : recoveryStatus.code === 'downloading' ? 'downloading' : 'action' } : {}),
@@ -99,7 +100,9 @@ function buildDecision({ accountStatus = 'active', downloadStarted = false, prep
       : qualityChoiceCode
       ? { code: 'quality_choice_needed', label: 'Quality choice needed', message: 'The best match does not clearly satisfy the selected quality preference.', nextAction: 'review_quality_choice', tone: 'warning' }
       : searchStopped
-      ? { code: 'no_matches_left', label: 'Search stopped', message: 'No acceptable matches remain.', nextAction: 'try_again', tone: 'warning' }
+      ? searchFailureCode
+        ? deriveMusicQueueStatus({ release: { missingTrackCount: 10 }, search: { status: 'blocked', continuationFailureCode: searchFailureCode } })
+        : { code: 'no_matches_left', label: 'Search stopped', message: 'No acceptable matches remain.', nextAction: 'try_again', tone: 'warning' }
       : downloadStarted
       ? {
         label: 'Download preparation started',
@@ -158,6 +161,7 @@ async function installMissingMusicFixture(browserContext, requests, {
   recoveryPhase = null,
   searchInitial = false,
   searchStopped = false,
+  searchFailureCode = null,
 } = {}) {
   const state = {
     downloadStartRequest: null,
@@ -195,8 +199,10 @@ async function installMissingMusicFixture(browserContext, requests, {
     searchAgainFailure: false,
     searchAgainRequest: null,
     searchAgainRequestCount: 0,
+    searchAgainResponseWait: null,
     searchQueued: false,
     searchStopped,
+    searchFailureCode,
     qualityChoiceCode,
     recoveryPhase,
     qualityFallbackAvailable: qualityChoiceCode === 'below_minimum',
@@ -323,6 +329,7 @@ async function installMissingMusicFixture(browserContext, requests, {
           body: JSON.stringify({ ok: false, error: { code: 'unexpected_error', message: 'Private provider /mnt/downloads source identity' } }) });
         return;
       }
+      if (state.searchAgainResponseWait) await state.searchAgainResponseWait;
       state.searchQueued = true;
       state.searchAgainAvailable = false;
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true,
@@ -424,6 +431,7 @@ async function installMissingMusicFixture(browserContext, requests, {
           findMatchesAvailable: state.findMatchesAvailable,
           searchQueued: state.searchQueued,
           searchStopped: state.searchStopped,
+          searchFailureCode: state.searchFailureCode,
         }),
         matchChoices: state.preparedDownload || state.matchSelected || state.searchStopped || state.qualityChoiceCode || state.recoveryPhase || state.searchInitial || state.libraryRecoveryReason
           ? []
@@ -561,6 +569,37 @@ suite('Missing Music decision detail browser acceptance', () => {
     });
   });
 
+  test('Background Jobs saved-search recovery opens current Missing Music actions by keyboard', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) { t.skip(runtimeUnavailableReason); return; }
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      const code = 'slskd_search_continuation_unavailable';
+      const fixture = await installMissingMusicFixture(browserContext, [], { searchStopped: true, searchFailureCode: code });
+      const run = { id: 'saved-search-job', operationType: 'library_discovery_dispatch', status: 'completed',
+        startedAt: '2026-10-20T12:00:00Z', finishedAt: '2026-10-20T12:00:01Z',
+        summary: { attemptedCount: 1, failedCount: 1, dispatchedCount: 0, failures: [{ code }] } };
+      await browserContext.route('**/api/v1/operations/**', async route => {
+        assert.equal(route.request().method(), 'GET', 'Reviewing recovery must not mutate a job');
+        const payload = new URL(route.request().url()).pathname.endsWith('/history')
+          ? { runs: [run] } : { operationRun: { run, auditEvents: [] } };
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, ...payload }) });
+      });
+      await page.goto(baseUrl + '/app/activity/operations?runId=saved-search-job', { waitUntil: 'domcontentloaded' });
+      const panel = page.locator('#operation-run-detail-panel');
+      await panel.getByText(/Some saved searches need a new search/).waitFor();
+      const link = panel.getByRole('link', { name: 'Review searches in Missing Music', exact: true });
+      await link.focus(); await assertVisibleFocusOutline(link, 'Recovery navigation needs a visible keyboard focus');
+      await link.press('Enter');
+      await page.getByRole('link', { name: 'Open status details for Autechre — Amber' }).waitFor();
+      assert.equal(new URL(page.url()).pathname, '/app/missing');
+      assert.equal(fixture.searchAgainRequestCount, 0, 'Opening the recovery list grants no new search');
+      await page.getByRole('link', { name: 'Open status details for Autechre — Amber' }).click();
+      await page.locator('.missing-music-inspector').getByText(getSearchContinuationRecoveryMessage(code), { exact: true }).waitFor();
+    }, { scenarioName: 'missing_music_saved_search_job_recovery' });
+  });
+
   test('queues Search again, refreshes both decision surfaces, and retains the snapshot on safe refresh failure', {
     timeout: integrationRuntimeConfig.scenarioTimeoutMs,
   }, async (t) => {
@@ -570,13 +609,25 @@ suite('Missing Music decision detail browser acceptance', () => {
       const pageErrors = [];
       page.on('pageerror', (error) => pageErrors.push(error.message));
       await bootstrapAdminThroughUi(page, { baseUrl });
-      const fixture = await installMissingMusicFixture(browserContext, requests, { searchStopped: true });
+      const failureCode = 'slskd_search_continuation_expired';
+      const fixture = await installMissingMusicFixture(browserContext, requests, { searchStopped: true, searchFailureCode: failureCode });
       await page.goto(baseUrl + '/app/missing/wanted-amber', { waitUntil: 'domcontentloaded' });
       const inspector = page.locator('.missing-music-inspector');
+      await inspector.getByText(getSearchContinuationRecoveryMessage(failureCode), { exact: true }).waitFor();
       const searchButton = inspector.getByRole('button', { exact: true, name: 'Search again' });
       await searchButton.focus();
       await assertVisibleFocusOutline(searchButton, 'Search again should expose its keyboard focus');
-      await searchButton.press('Enter');
+      let releaseSearch;
+      fixture.searchAgainResponseWait = new Promise(complete => { releaseSearch = complete; });
+      try {
+        await searchButton.press('Enter');
+        const pending = inspector.getByRole('button', { exact: true, name: 'Queueing…' });
+        await pending.waitFor();
+        assert.equal(await pending.isDisabled(), true);
+        const feedback = inspector.getByRole('status').filter({ hasText: 'Queueing a new search…' });
+        await feedback.waitFor();
+        assert.equal(await feedback.evaluate(element => Boolean(element.closest('[aria-busy="true"]'))), false);
+      } finally { releaseSearch(); }
       await inspector.getByText('Search queued', { exact: true }).waitFor();
       await inspector.getByText('A new search is queued. Acquisition will follow the saved automation policy.', { exact: true }).waitFor();
       await assertLocatorFocused(inspector.getByRole('heading', { exact: true, name: 'Current status' }), 'the completed command should focus the updated state');

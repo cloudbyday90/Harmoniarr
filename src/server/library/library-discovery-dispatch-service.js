@@ -35,6 +35,7 @@ import { MUSIC_QUEUE_RECOVERY_DISCOVERY_SOURCE } from '../import-candidates/musi
 import { buildSharedFormatPreferences, createLibraryDiscoveryQualityContextService } from './library-discovery-quality-context-service.js';
 import { isOperationRunCancellationError, isOperationRunPauseError } from '../operation-run-cancellation.js';
 import { isOperationRunLeaseLostError } from '../operation-run-lease-error.js';
+import { getSearchContinuationRecoveryMessage } from '../../shared/search-continuation-recovery.js';
 
 export const DEFAULT_DISCOVERY_SETTINGS = Object.freeze({
   automaticCooldownMs: 6 * 60 * 60 * 1000,
@@ -694,7 +695,9 @@ export function createLibraryDiscoveryDispatchService({
           metadataReleaseId: claimedRequest.metadataReleaseId,
         };
         failures.push(failure);
-        await libraryDiscoveryRequestStore.recordDiscoverySearchFailure({
+        if (!scopedRecovery && getSearchContinuationRecoveryMessage(failure.code) && discoverySearchAuthorityStore) {
+          await discoverySearchAuthorityStore.stopContinuation({ claimedRequest, errorCode: failure.code });
+        } else await libraryDiscoveryRequestStore.recordDiscoverySearchFailure({
           errorCode: failure.code,
           errorMessage: failure.message,
           metadataReleaseId: claimedRequest.metadataReleaseId,

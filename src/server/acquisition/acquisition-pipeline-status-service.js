@@ -17,6 +17,7 @@
  */
 
 import { QUALITY_DECISION_CODES } from './acquisition-quality-policy-service.js';
+import { getSearchContinuationRecoveryMessage } from '../../shared/search-continuation-recovery.js';
 import { buildAcquisitionAddBlockerRepair } from './acquisition-add-blocker-repair.js';
 import { IMPORT_CANDIDATE_ADD_BLOCKER_CODES } from '../import-candidates/import-candidate-add-blocker.js';
 
@@ -415,12 +416,13 @@ export function deriveMusicQueueStatus({
     });
   }
 
-  if (search.status === 'failed') {
-    return buildStatus(MUSIC_QUEUE_STATUS_CODES.FAILED, {
+  if (search.status === 'failed' || getSearchContinuationRecoveryMessage(search.continuationFailureCode)) {
+    const recoveryMessage = getSearchContinuationRecoveryMessage(search.continuationFailureCode);
+    return { ...buildStatus(MUSIC_QUEUE_STATUS_CODES.FAILED, {
       detail: search.blockedReason ?? null,
       nextAction: MUSIC_QUEUE_ACTION_CODES.TRY_AGAIN,
       progressStep: 'search',
-    });
+    }), ...(recoveryMessage ? { message: recoveryMessage } : {}) };
   }
 
   if (search.status === 'completed' && getCount(search.searchAttemptCount) > 0) {

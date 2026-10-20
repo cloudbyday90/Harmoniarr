@@ -58,3 +58,22 @@ success. Retain current authority and locked publication checks. Prove real SQL
 uniqueness/rollback, held HTTP acceptance, cancellation/configuration drift, and
 native supplied-ID/read continuation as separate boundaries. Do not turn a native
 ordinary success into proof of a lost-response fault that was not injected.
+
+For operator recovery, read [the design](../../../../docs/SEARCH_RECOVERY_DESIGN.md)
+and [current source tradeoffs](../../../../docs/SEARCH_RECOVERY_RESEARCH_2026_10.md).
+An expired or absent search is an actionable stop, not an automatic retry grant.
+Use the schema's actual blocked state and a bounded failure projection. Fence the
+stop to the current claim, preserve it through reconciliation, and clear the old
+claim marker when committing explicit Search again intent. Retain the previous
+provider reservation; admit one new UUID only for the new generation. Reuse the
+canonical target/maintenance/lock/audit/replay command instead of adding a second
+queue. A historical Background Jobs recovery link only opens current decisions.
+Do not apply shared-release consent to an approved external-request owner.
+
+Prove stop and stale-stop refusal with real PostgreSQL, same-key HTTP replay,
+unchanged no-match budget and old/new provider UUIDs. In the browser, prove the
+read-only job handoff, keyboard activation, pending feedback outside busy state,
+and focus after the refreshed result. Screen-reader announcements and complete
+WCAG conformance require separate evidence. The owning native test is
+`test/integration/missing-music-search-again.test.js`; the rendered recovery cases
+are in `test/browser/missing-music-decision-detail-browser-acceptance.test.js`.

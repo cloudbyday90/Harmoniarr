@@ -13,6 +13,12 @@ import { seedMissingMusicPaginationRows } from '../../testing/integration/missin
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 import { isSkippableIntegrationRuntimeError, toIntegrationRuntimeUnavailableReason } from '../../testing/integration/runtime-availability.js';
 import { createSessionHttpClient } from '../../testing/server/http-session-client.js';
+import { createLibraryDiscoverySearchAuthorityStore } from '../../src/server/library/library-discovery-search-authority-store.js';
+import { createLibraryDiscoveryRequestStore } from '../../src/server/library/library-discovery-request-store.js';
+import { createLibraryDiscoverySearchService } from '../../src/server/library/library-discovery-search-service.js';
+import { createSlskdSearchContinuationService } from '../../src/server/slskd/slskd-search-continuation-service.js';
+import { createSlskdSearchIntentStore } from '../../src/server/slskd/slskd-search-intent-store.js';
+import { createDatabaseTransactionRunner } from '../../src/server/database-transaction-service.js';
 
 const config = resolveIntegrationTestRuntimeConfig();
 let runtime;
@@ -61,6 +67,72 @@ suite('Missing Music Search again through PostgreSQL sessions and durable intent
     }
   }, { timeout: config.suiteSetupTimeoutMs });
   after(async () => { await runtime?.cleanup(); }, { timeout: config.suiteTeardownTimeoutMs });
+
+  test('expired and absent saved searches require explicit intent, preserve replay, and refuse a stale stop', { timeout: config.scenarioTimeoutMs }, async (t) => {
+    if (unavailableReason) { t.skip(unavailableReason); return; }
+    await runtime.runScenario(async ({ client, getPoolFn }) => {
+      const admin = (await bootstrapAdminSession(client)).payload.user;
+      const pool = getPoolFn();
+      const authorityStore = createLibraryDiscoverySearchAuthorityStore({ getPoolFn });
+      const requestStore = createLibraryDiscoveryRequestStore({ getPoolFn });
+      const provider = new Map(); let posts = 0;
+      const slskdService = { getSearchBinding: async () => 'a'.repeat(64),
+        startSearch: async ({ id, query }) => { posts++; provider.set(id, { id, query }); return provider.get(id); },
+        getSearchState: async ({ searchId }) => {
+          if (!provider.has(searchId)) throw Object.assign(new Error('Private provider error'), { details: { status: 404 } });
+          return provider.get(searchId);
+        } };
+      for (const code of ['slskd_search_continuation_expired', 'slskd_search_continuation_unavailable']) {
+        const original = await seedStoppedRelease(pool, admin.id);
+        let now = new Date('2026-10-20T12:00:00Z');
+        const marker = '2026-10-20T12:00:00+00:00';
+        await pool.query(`UPDATE library_discovery_requests SET request_status='cooldown',blocked_reason='automatic_cooldown',
+          search_attempt_count=0,research_attempt_count=0,evidence=$2::jsonb WHERE id=$1`, [original.discoveryId, JSON.stringify({
+          lastDispatchAttemptedAt: marker, musicQueueRediscovery: { requestedAt: '2026-10-19T12:00:00Z' },
+        })]);
+        const claimedRequest = { discoveryRequestId: original.discoveryId, metadataReleaseId: original.metadataReleaseId,
+          searchAttemptCount: 0, evidence: { lastDispatchAttemptedAt: marker, musicQueueRediscovery: { requestedAt: '2026-10-19T12:00:00Z' } } };
+        const createSearch = () => createLibraryDiscoverySearchService({ authorityStore,
+          continuationService: createSlskdSearchContinuationService({ slskdService, getNow: () => now, expiresAfterMs: 1000,
+            store: createSlskdSearchIntentStore({ getPoolFn }), withTransaction: createDatabaseTransactionRunner({ getPoolFn }) }) });
+        const input = { claimedRequest, query: 'Artist Album', context: { purpose: 'album' }, assertCurrent: async () => {} };
+        const first = await createSearch().startSearch(input);
+        if (code.endsWith('_expired')) now = new Date(now.getTime() + 1001);
+        else provider.delete(first.id);
+        await assert.rejects(createSearch().startSearch(input), error => error.code === code);
+        assert.equal(await authorityStore.stopContinuation({ claimedRequest, errorCode: code }), true);
+        const stopped = (await pool.query('SELECT * FROM library_discovery_requests WHERE id=$1', [original.discoveryId])).rows[0];
+        assert.equal(stopped.request_status, 'blocked'); assert.equal(stopped.next_search_after, null);
+        assert.equal(stopped.search_attempt_count, 0); assert.equal(stopped.evidence.searchContinuation, undefined);
+        assert.equal(await requestStore.claimNextReadyAutomaticDiscoveryRequest({ dispatchedAt: now.toISOString(), nextSearchAfter: now.toISOString() }), null);
+        const detail = await client.requestJson(`/api/v1/missing-music/decisions/${original.wantedReleaseId}`);
+        assert.equal(detail.payload.permissions.canSearchAgain, true);
+        assert.match(detail.payload.decision.status.message, /Choose Search again/);
+        assert.equal(detail.payload.decision.state, 'action');
+        assert.doesNotMatch(JSON.stringify(detail.payload), /Private provider|providerFingerprint|lastDispatchAttemptedAt/);
+        const beforePosts = posts;
+        const request = () => client.requestJson(path(original.wantedReleaseId), { method: 'POST', headers: { 'idempotency-key': code } });
+        const accepted = await request(); assert.equal(accepted.response.status, 200, JSON.stringify(accepted.payload));
+        assert.deepEqual((await request()).payload, accepted.payload);
+        const reset = (await pool.query('SELECT * FROM library_discovery_requests WHERE id=$1', [original.discoveryId])).rows[0];
+        assert.equal(reset.request_status, 'ready'); assert.equal(reset.evidence.lastDispatchFailure, undefined);
+        assert.equal(reset.evidence.lastDispatchAttemptedAt, undefined);
+        assert.equal(await authorityStore.stopContinuation({ claimedRequest, errorCode: code }), false);
+        assert.equal(posts, beforePosts, 'The command queues intent without submitting provider work');
+        const current = await requestStore.claimNextReadyAutomaticDiscoveryRequest({ dispatchedAt: new Date().toISOString(), nextSearchAfter: new Date(Date.now() + 3600_000).toISOString() });
+        const renewed = await createSearch().startSearch({ ...input, claimedRequest: current });
+        assert.notEqual(renewed.id, first.id);
+        assert.equal(posts, beforePosts + 1);
+        assert.equal((await createSearch().startSearch({ ...input, claimedRequest: current })).id, renewed.id);
+        assert.equal(posts, beforePosts + 1, 'Reading the new reservation must not submit again');
+        assert.equal((await pool.query('SELECT count(*)::int AS count FROM slskd_search_intents WHERE discovery_request_id=$1', [original.discoveryId])).rows[0].count, 2);
+        // Retire this controlled request so the next case owns the only eligible claim.
+        await pool.query("UPDATE library_discovery_requests SET request_status='blocked',next_search_after=NULL WHERE id=$1", [original.discoveryId]);
+      }
+      assert.equal(posts, 4);
+      assert.equal((await pool.query("SELECT count(*)::int AS count FROM audit_events WHERE event_type='missing_music_search_again_requested'")).rows[0].count, 2);
+    }, { scenarioName: 'missing_music_continuation_recovery' });
+  });
 
   test('administrator search addresses a recipient beyond 500 rows and replay retains only that target intent', { timeout: config.scenarioTimeoutMs }, async (t) => {
     if (unavailableReason) { t.skip(unavailableReason); return; }

@@ -16,6 +16,12 @@ searches across retries/restarts. See the [design](docs/SLSKD_SEARCH_CONTINUATIO
 [outcome](docs/SLSKD_SEARCH_CONTINUATION_OUTCOME.md) for ownership, uncertainty,
 expiry and native continuation evidence.
 
+Expired or absent shared searches now stop with an explicit Search again action
+in Missing Music; Background Jobs links to the current decision. See the
+[recovery design](docs/SEARCH_RECOVERY_DESIGN.md),
+[recommendation stack](docs/SEARCH_RECOVERY_RESEARCH_2026_10.md) and
+[tested outcome](docs/SEARCH_RECOVERY_OUTCOME.md).
+
 Canonical development/CI validation uses Node **24.22.0** from `.nvmrc` and npm
 **12.0.2**. Select that Node version with your version manager or a verified local
 installation before `npm ci` and `npm run validate:fast`. `npm run check:node-baseline`

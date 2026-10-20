@@ -72,8 +72,9 @@ exhaustion retains its existing terminal policy and has no separate continuation
 scheduler. Native owned search does not establish public-network discovery,
 remote-source authenticity, full decoding or general standards conformance.
 
-Next: surface expired/absent search bindings as bounded recovery state in Missing
-Music/Background Jobs, and route an explicit new-search intent through existing
-guarded rediscovery commands. Preserve read continuation for ordinary retries;
-test new-intent authorization, replay and W3C status/focus behavior. No release,
+Shared release recovery is now implemented in the separate
+[recovery outcome](SEARCH_RECOVERY_OUTCOME.md), including bounded Missing Music
+state, a Background Jobs handoff, explicit Search again intent, replay and browser
+status/focus evidence. Next: the equivalent explicit command for approved
+external-request discovery, whose intent/run authority is separate. No release,
 tag, new application branch or PR merge is created here.
