@@ -8,7 +8,7 @@
 import { createWireDecoder, wireReader } from './wire-codec.js';
 
 /** One bounded framed initialization, then either framed messages or 12 raw negotiation bytes. */
-export function createPeerInput({ username, onInit, onMessage, onTransfer }) {
+export function createPeerInput({ username, onInit, onMessage, onTransfer, acceptOffset = (_token, offset) => offset === 0n }) {
   const header = Buffer.alloc(4); const raw = Buffer.alloc(12);
   let headerBytes = 0; let init = null; let initBytes = 0; let kind = null; let token; let rawBytes = 0; let failed = false;
   const messages = createWireDecoder(onMessage);
@@ -40,8 +40,10 @@ export function createPeerInput({ username, onInit, onMessage, onTransfer }) {
         if (rawBytes + rest.length > raw.length) throw new RangeError('Extra transfer negotiation bytes');
         rest.copy(raw, rawBytes); rawBytes += rest.length;
         if (rawBytes === raw.length && rest.length > 0) {
-          if (raw.readUInt32LE() !== token || raw.readBigUInt64LE(4) !== 0n) throw new Error('Invalid transfer token or offset');
-          onTransfer(token);
+          const resumeOffset = raw.readBigUInt64LE(4);
+          if (raw.readUInt32LE() !== token || resumeOffset > BigInt(Number.MAX_SAFE_INTEGER)
+            || acceptOffset(token, resumeOffset) !== true) throw new Error('Invalid transfer token or offset');
+          onTransfer(token, Number(resumeOffset));
         }
       } catch (error) { failed = true; throw error; }
     },

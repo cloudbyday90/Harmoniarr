@@ -1,5 +1,15 @@
 # AI Workflow And Shared Copilot Skills
 
+The [native resume design](NATIVE_RESUME_DESIGN.md) adds a focused testing-skill
+reference and standards evidence mapping for default retries, bounded token
+capabilities and verified nonzero offsets. Discover actual native options;
+separate provider attempts from application POST ownership. Record local requeue
+when observed, require stable receipt identity, inspect real prefixes before sends,
+and retain producer retirement before final hashes. The
+[outcome](NATIVE_RESUME_OUTCOME.md) distinguishes unchanged-source success from
+retry exhaustion and hostile-source integrity. Keep failed harness evidence and
+do not repeat passing inventories after correcting an invocation-only input.
+
 The [partial-transfer design](NATIVE_PARTIAL_TRANSFER_DESIGN.md) extends existing
 testing and standards skills with single-fault attribution and retired-producer
 filesystem proof. Discover the released retry semantics before configuring a

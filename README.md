@@ -79,6 +79,14 @@ remains a separate follow-up. See the
 [research/tradeoffs](docs/NATIVE_PARTIAL_TRANSFER_RESEARCH_2026_10.md) and
 [outcome](docs/NATIVE_PARTIAL_TRANSFER_OUTCOME.md).
 
+Run `npm run validate:native-slskd-resume` with those 0.26.1 immutable-image/
+version inputs to qualify default provider retry after EOF/reset. This opt-in lane
+records local requeue when observed, verifies offsets against actual prefixes,
+and checks full hashes after the second native attempt while keeping one
+application POST. See the [design](docs/NATIVE_RESUME_DESIGN.md),
+[research/tradeoffs](docs/NATIVE_RESUME_RESEARCH_2026_10.md) and
+[outcome](docs/NATIVE_RESUME_OUTCOME.md).
+
 Service worker activation preserves in-progress forms unless this page requests
 an update. The [reload outcome](docs/PWA_SERVICE_WORKER_RELOAD_OUTCOME.md) records
 the first-install login fix and enabled-worker regression coverage.

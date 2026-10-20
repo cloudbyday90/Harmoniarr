@@ -1,5 +1,11 @@
 # Project standards-to-evidence map
 
+Native default resume uses testing/slskd/native-resume-* and
+test/native/slskd-resume.test.js for bounded second-attempt capabilities, verified
+nonzero offsets and effective native options. The
+[outcome](../../../../docs/NATIVE_RESUME_OUTCOME.md) separates stable receipt/GET
+recovery and final file hashes from hostile-source integrity proof.
+
 Native EOF/RST proof belongs to testing/slskd/native-partial-* modules and the
 shared bounded native-file-read.js. The explicit slskd-partial.test.js lane uses
 real partial files, current receipt/classification/recovery owners, native client

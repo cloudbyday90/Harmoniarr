@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 20 [native-resume rebuild outcome](LOCAL_DOCKER_NATIVE_RESUME_OUTCOME.md)
+records the latest no-cache image, preserved data/admin and passing readiness-only
+check. Default retry qualification uses separate private disposable storage;
+walkthrough provider attention remains an operational follow-up.
+
 The October 20 [partial-transfer rebuild outcome](LOCAL_DOCKER_NATIVE_PARTIAL_OUTCOME.md)
 records the latest no-cache image, preserved data/admin and passing readiness-only
 check. The independent native fault lane proves incomplete-file isolation in

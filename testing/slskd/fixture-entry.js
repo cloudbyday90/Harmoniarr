@@ -14,7 +14,7 @@ const { username, password, mode } = JSON.parse(await readFile('/run/fixture.jso
 const addresses = Object.values(networkInterfaces()).flat().filter(row => row.family === 'IPv4' && !row.internal);
 if (addresses.length !== 1) throw new Error('Native fixture requires exactly one private interface');
 const fixture = await openSoulseekFixture({ username, password, address: addresses[0].address,
-  host: '0.0.0.0', serverPort: 2271, peerPort: 2272, mode, ...(mode === 'partial' ? { beforeReset: waitForNativePartial } : {}) });
+  host: '0.0.0.0', serverPort: 2271, peerPort: 2272, mode, ...(['partial', 'resume'].includes(mode) ? { beforeReset: waitForNativePartial } : {}) });
 console.log(JSON.stringify({ kind: 'ready' }));
 let stopping = false;
 async function stop() {

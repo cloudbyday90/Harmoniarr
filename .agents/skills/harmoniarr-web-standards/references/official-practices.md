@@ -1,5 +1,11 @@
 # Official practices by boundary
 
+Native default retries use the
+[resume research](../../../../docs/NATIVE_RESUME_RESEARCH_2026_10.md): released
+vendor semantics, IETF mutation uncertainty, W3C provenance and OWASP/Docker
+isolation. Default configuration, native retry, application POST and remote
+source identity are distinct claims; verify each owning boundary.
+
 Native partial-transfer guidance uses docs/NATIVE_PARTIAL_TRANSFER_RESEARCH_2026_10.md.
 Distinguish Node FIN/RST and local write callbacks from remote file receipt;
 inspect the actual released retry loop and cleanup order. Docker/OWASP inform

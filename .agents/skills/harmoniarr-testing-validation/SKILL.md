@@ -5,6 +5,10 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For actual provider default retries and nonzero-offset recovery, read
+[native resume](references/native-resume.md). It distinguishes native retries
+from application POST ownership and requires verified prefixes and final hashes.
+
 For native EOF/RST failures, read
 [partial transfers](references/native-partial-transfer.md). It owns single-attempt
 fault isolation, observed incomplete prefixes, failed receipt classification and

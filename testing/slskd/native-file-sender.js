@@ -15,11 +15,17 @@ export async function sendNativeFile(socket, file) {
 }
 
 export async function writeNativeFilePrefix(socket, file, length) {
+  return writeNativeFileRange(socket, file, 0, length);
+}
+
+export async function writeNativeFileRange(socket, file, start, end = file.size) {
   if (!nativeTransferFiles.includes(file)) throw new TypeError('An owned native file is required');
-  if (!Number.isSafeInteger(length) || length < 1 || length > file.size) throw new TypeError('Invalid fixture send length');
+  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || end <= start || end > file.size) {
+    throw new TypeError('Invalid fixture send range');
+  }
   function* chunks() {
-    for (let offset = 0; offset < length; offset += 16_384) {
-      yield nativeFileChunk(file, offset, Math.min(16_384, length - offset));
+    for (let offset = start; offset < end; offset += 16_384) {
+      yield nativeFileChunk(file, offset, Math.min(16_384, end - offset));
     }
   }
   // The downloader closes its socket after reading the declared length.

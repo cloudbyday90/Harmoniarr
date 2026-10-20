@@ -6,6 +6,27 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Delivered slice: Native default retry and resume (2026-10-20)
+
+- Add an opt-in ESM resume lane with unchanged released provider defaults.
+  Bound each file to two native invocations, retain one application POST and
+  reject premature/replayed tokens and offsets outside the owned prefix.
+- Record observed requeue and require second-attempt success with stable receipt/batch
+  identity, verified actual prefixes, exact suffix bytes and full final hashes
+  after acknowledged provider retirement. Keep incomplete storage empty.
+  See the [design](NATIVE_RESUME_DESIGN.md),
+  [research/tradeoffs](NATIVE_RESUME_RESEARCH_2026_10.md) and
+  [outcome](NATIVE_RESUME_OUTCOME.md).
+- Update the maintained testing/web standards skills, qualify affected native
+  regressions on frozen code, and rebuild the walkthrough without cache while
+  preserving data/admin. No production, schema or dependency change.
+- Recheck random [PR 48](OPEN_PR_48_NATIVE_RESUME_EVALUATION.md); the unchanged
+  incompatible candidate remains unapplied after input/lock verification.
+- Next: native retry exhaustion and changed-size refusal, retaining one
+  application POST and proving no successful receipt or completed payload.
+  Same-size hostile source changes and walkthrough provider attention remain
+  separate limits.
+
 ## Delivered slice: Native truncated-transfer isolation (2026-10-20)
 
 - Add a separate opt-in ESM partial-transfer lane with a successful control,

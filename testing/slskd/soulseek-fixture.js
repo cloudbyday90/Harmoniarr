@@ -11,6 +11,7 @@ import { openOwnedTcpServer } from './owned-tcp-server.js';
 import { createWireDecoder, wireReader, wireFrame, wireInteger, wireString } from './wire-codec.js';
 import { nativePeer } from './fixture-data.js';
 import { openFixturePeer } from './soulseek-peer.js';
+import { openNativeResumePeer } from './native-resume-peer.js';
 
 const byte = value => Buffer.from([value]);
 // Released client startup/status messages that require no response in this fixture.
@@ -18,13 +19,13 @@ const notifications = new Set([2, 18, 32, 35, 36, 71, 100, 126, 127, 141]);
 
 export async function openSoulseekFixture({ username, password, address = '127.0.0.1',
   host = '127.0.0.1', serverPort = 0, peerPort = 0, mode = 'batch', beforeReset } = {}) {
-  if (!['batch', 'cancellation', 'files', 'partial'].includes(mode)) throw new TypeError('Unknown native fixture mode');
-  if (mode === 'partial' && typeof beforeReset !== 'function') throw new TypeError('Partial mode requires an incomplete-file checkpoint');
+  if (!['batch', 'cancellation', 'files', 'partial', 'resume'].includes(mode)) throw new TypeError('Unknown native fixture mode');
+  if (['partial', 'resume'].includes(mode) && typeof beforeReset !== 'function') throw new TypeError('File fault modes require an incomplete-file checkpoint');
   if (!isIPv4(address) || typeof username !== 'string' || !username || typeof password !== 'string' || !password) {
     throw new TypeError('An owned IPv4 fixture and credentials are required');
   }
   const ip = Buffer.from(address.split('.').map(Number).reverse());
-  const stats = { logins: 0, addresses: 0, peerConnections: 0, fileConnections: 0, requests: [], sentFiles: [], partialFiles: [], refused: 0 };
+  const stats = { logins: 0, addresses: 0, peerConnections: 0, fileConnections: 0, requests: [], sentFiles: [], partialFiles: [], resumeFiles: [], refused: 0 };
   const idleTimeout = mode === 'cancellation' ? 240_000 : 30_000;
   const refuse = () => { stats.refused += 1; };
   function attach(socket, handle) {
@@ -38,7 +39,8 @@ export async function openSoulseekFixture({ username, password, address = '127.0
     });
     socket.on('end', () => { try { decoder.end(); } catch { refuse(); } });
   }
-  const peer = await openFixturePeer({ username, host, port: peerPort, idleTimeout, mode, stats, refuse, beforeReset });
+  const openPeer = mode === 'resume' ? openNativeResumePeer : openFixturePeer;
+  const peer = await openPeer({ username, host, port: peerPort, idleTimeout, mode, stats, refuse, beforeReset });
   let central;
   try {
     central = await openOwnedTcpServer({ host, port: serverPort, idleTimeout, onDrop: refuse, onSocket(socket) {
@@ -71,6 +73,7 @@ export async function openSoulseekFixture({ username, password, address = '127.0
   return {
     serverPort: central.port, peerPort: peer.port,
     snapshot: () => ({ ...stats, requests: [...stats.requests], sentFiles: [...stats.sentFiles], partialFiles: stats.partialFiles.map(row => ({ ...row })),
+      resumeFiles: stats.resumeFiles.map(row => ({ ...row })),
       activeSockets: central.active() + peer.active() }),
     close() { closing ??= Promise.all([central.close(), peer.close()]).then(() => undefined); return closing; },
   };
