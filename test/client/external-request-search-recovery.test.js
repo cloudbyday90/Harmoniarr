@@ -8,6 +8,20 @@ import { canRequestOperationRunRetry } from '../../src/shared/operation-run-desc
 
 const result = input => ({ searchRecovery: { outcome: 'queued', ...input, previousOperationRunId: input.expectedOperationRunId, operationRunId: 'new-run' } });
 
+for (const [code, expected] of [['external_request_search_cooldown', /cooldown/], ['external_request_search_exhausted', /limit/]]) {
+  test(`${code} is a definite bounded refusal and can be retried with a new command after review`, async t => {
+    const keys = [];
+    const command = useExternalRequestSearchRecovery({ mediaRequestId: 'request', recipientId: 'target', intentId: 'intent',
+      execute: async input => { keys.push(input.idempotencyKey); throw Object.assign(new Error('private provider details'), { status: 409, code }); } });
+    t.after(command.destroy);
+    await command.searchAgain({ expectedOperationRunId: 'old-run' });
+    assert.equal(command.hasUncertainIntent.value, false);
+    assert.match(command.errorMessage.value, expected); assert.doesNotMatch(command.errorMessage.value, /private/);
+    await command.searchAgain({ expectedOperationRunId: 'old-run' });
+    assert.notEqual(keys[0], keys[1]);
+  });
+}
+
 test('uncertain submission retains the exact intent, old run and key across a changed read projection', async t => {
   const calls = []; let keys = 0;
   const command = useExternalRequestSearchRecovery({ mediaRequestId: 'request', recipientId: 'target', intentId: 'intent',

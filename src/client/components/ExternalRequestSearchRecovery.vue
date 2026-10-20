@@ -47,6 +47,17 @@ async function searchAgain() {
   <section v-if="intent.searchRecovery || command.statusMessage.value || command.errorMessage.value" class="hx-external-search-recovery" :aria-label="`Search recovery for ${releaseName}`">
     <h4 ref="heading" tabindex="-1">Search recovery</h4>
     <p v-if="intent.searchRecovery" class="hx-text-muted">{{ intent.searchRecovery.message }}</p>
+    <template v-if="intent.searchRecovery?.policy">
+      <p v-if="intent.searchRecovery.policy.blockedReason === 'exhausted'" class="hx-text-muted">
+        The fresh-search limit has been reached. Review the approved release and provider health.
+      </p>
+      <p v-else-if="intent.searchRecovery.policy.blockedReason === 'cooldown'" class="hx-text-muted">
+        Search again is available after
+        <time :datetime="intent.searchRecovery.policy.nextSearchAfter">{{ new Date(intent.searchRecovery.policy.nextSearchAfter).toLocaleString() }}</time>.
+        Refresh the review after this time.
+      </p>
+      <p class="hx-text-muted">{{ intent.searchRecovery.policy.remainingSearches }} fresh {{ intent.searchRecovery.policy.remainingSearches === 1 ? 'search' : 'searches' }} remaining for this approved release.</p>
+    </template>
     <div :aria-busy="command.isPending.value ? 'true' : undefined">
       <button v-if="intent.searchRecovery?.canSearchAgain || command.hasUncertainIntent.value" type="button" class="hx-btn"
         :disabled="busy || command.isPending.value"

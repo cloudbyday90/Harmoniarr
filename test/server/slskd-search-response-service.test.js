@@ -47,14 +47,14 @@ test('response endpoint publication after a completed snapshot is accepted', asy
 
 test('a finalized zero-result search returns promptly after confirming the response endpoint', async (t) => {
   const fixture = createFixture(t, [completed]);
-  assert.equal(await fixture.service.waitForSearchResponses({ searchId }), empty);
+  assert.deepEqual(await fixture.service.waitForSearchResponses({ searchId }), { ...empty, searchOutcome: 'published_empty' });
   assert.equal(fixture.slskdService.getSearchState.mock.callCount(), 1);
   assert.equal(fixture.slskdService.getSearchResponses.mock.callCount(), 2);
 });
 
 test('zero counts before finalization keep waiting until the final empty publication', async (t) => {
   const fixture = createFixture(t, [{ ...completed, endedAt: null }, completed]);
-  assert.equal(await fixture.service.waitForSearchResponses({ searchId }), empty);
+  assert.deepEqual(await fixture.service.waitForSearchResponses({ searchId }), { ...empty, searchOutcome: 'published_empty' });
   assert.equal(fixture.slskdService.getSearchState.mock.callCount(), 2);
 });
 

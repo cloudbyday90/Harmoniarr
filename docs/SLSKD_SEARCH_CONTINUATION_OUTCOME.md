@@ -76,6 +76,7 @@ Shared release recovery is now implemented in the separate
 [recovery outcome](SEARCH_RECOVERY_OUTCOME.md), including bounded Missing Music
 state, a Background Jobs handoff, explicit Search again intent, replay and browser
 status/focus evidence. The separate [external recovery outcome](EXTERNAL_SEARCH_RECOVERY_OUTCOME.md)
-now qualifies the approved intent/run command too. Next: explicit fresh searches
-after completed zero-result external discovery. No release,
+now qualifies the approved intent/run command too. The
+[empty-search outcome](EXTERNAL_EMPTY_SEARCH_OUTCOME.md) adds durable cooldown and
+budget after confirmed zero results. Next: actionable candidate-filtering reasons. No release,
 tag, new application branch or PR merge is created here.

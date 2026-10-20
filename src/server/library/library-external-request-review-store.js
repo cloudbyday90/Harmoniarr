@@ -14,6 +14,8 @@ const intentSelect = `
     release.metadata_release_group_id, run.status AS run_status,
     CASE WHEN run.operation_type='library_external_request_discovery'
       AND run.summary->>'externalSearchSuperseded' IS DISTINCT FROM 'true'
+      AND (run.summary->>'failureCode' <> 'external_request_discovery_no_candidates'
+        OR (run.summary->>'searchOutcome'='published_empty' AND run.summary->'candidateCount'='0'::jsonb))
       THEN run.summary->>'failureCode' END AS search_failure_code
   FROM library_external_request_release_intents intent
   JOIN metadata_releases release ON release.id = intent.metadata_release_id
@@ -33,6 +35,8 @@ function mapIntent(row) {
     approvedByUserId: row.approved_by_user_id,
     createdAt: row.created_at,
     operationRunId: row.operation_run_id,
+    ...(row.last_empty_search_at != null ? { lastEmptySearchAt: row.last_empty_search_at,
+      emptySearchRecoveryCount: row.empty_search_recovery_count } : {}),
     status: row.run_status ?? null,
     ...(getExternalSearchRecoveryMessage(row.search_failure_code) ? { searchFailureCode: row.search_failure_code } : {}),
     artistName: row.artist_name,

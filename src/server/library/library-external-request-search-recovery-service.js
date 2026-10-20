@@ -13,6 +13,9 @@ import { buildMediaRequestTargetEligibility } from '../media-request-target-elig
 import { canRecoverExternalSearchRun, getExternalSearchRecoveryMessage } from '../../shared/external-request-search-recovery-policy.js';
 import { createLibraryExternalRequestReviewAccessService, normalizeExternalReviewId as uuid } from './library-external-request-review-access-service.js';
 import { createLibraryExternalRequestSearchRecoveryStore } from './library-external-request-search-recovery-store.js';
+import { createLibraryExternalEmptySearchStore } from './library-external-empty-search-store.js';
+import { getExternalEmptySearchPolicy } from '../../shared/external-empty-search-policy.js';
+import { getPool } from '../database.js';
 
 function conflict() {
   return createApiError(409, 'external_request_search_recovery_conflict', 'This approved search changed. Refresh the review before requesting a new search.');
@@ -21,6 +24,7 @@ function conflict() {
 export function createLibraryExternalRequestSearchRecoveryService({ reviewStore, mediaRequestStore,
   discoveryRunStore, getAppUserById, assertMaintenanceWriteAllowed,
   store = createLibraryExternalRequestSearchRecoveryStore(),
+  emptySearchStore = createLibraryExternalEmptySearchStore(), getPoolFn = getPool,
   lockEligibility = lockAppUserEligibility, withTransaction = createDatabaseTransactionRunner(),
   recordAuditEventFn = recordAuditEvent } = {}) {
   const access = createLibraryExternalRequestReviewAccessService({ mediaRequestStore, getAppUserById });
@@ -29,11 +33,17 @@ export function createLibraryExternalRequestSearchRecoveryService({ reviewStore,
     if (!review.intents?.some(intent => getExternalSearchRecoveryMessage(intent.searchFailureCode))) return review;
     const target = request.requestedForUser?.id ? await getAppUserById({ userId: request.requestedForUser.id }) : null;
     const eligible = buildMediaRequestTargetEligibility(target).eligible;
+    const now = review.intents.some(intent => intent.lastEmptySearchAt != null)
+      ? await emptySearchStore.getDatabaseTime(getPoolFn()) : null;
     return { ...review, intents: review.intents.map(intent => {
       const message = getExternalSearchRecoveryMessage(intent.searchFailureCode);
       if (!message || intent.status !== 'failed') return intent;
+      const policy = getExternalEmptySearchPolicy({ ...intent, now });
       return { ...intent, searchRecovery: { message, expectedOperationRunId: intent.operationRunId,
-        canSearchAgain: eligible && request.requestedForUser?.id === intent.requestedForUserId } };
+        ...(policy ? { policy } : {}),
+        canSearchAgain: eligible && !policy?.blockedReason
+          && (intent.searchFailureCode !== 'external_request_discovery_no_candidates' || policy !== null)
+          && request.requestedForUser?.id === intent.requestedForUserId } };
     }) };
   }
 
@@ -65,6 +75,15 @@ export function createLibraryExternalRequestSearchRecoveryService({ reviewStore,
         throw conflict();
       }
       if (!canRecoverExternalSearchRun(current) || await discoveryRunStore.getActiveRunByIntentId(intentId, queryable)) throw conflict();
+      const policy = getExternalEmptySearchPolicy({ ...intent,
+        now: intent.lastEmptySearchAt != null ? await emptySearchStore.getDatabaseTime(queryable) : null });
+      if (current.summary.failureCode === 'external_request_discovery_no_candidates' && !policy) throw conflict();
+      if (policy?.blockedReason) {
+        throw createApiError(409, `external_request_search_${policy.blockedReason}`,
+          policy.blockedReason === 'cooldown' ? 'This approved release is waiting for its search cooldown. Refresh the review after the displayed time.'
+            : 'The fresh-search limit for this approved release has been reached. Review the approved release and provider health.');
+      }
+      if (policy && !await emptySearchStore.consumeRecovery({ intentId, queryable })) throw conflict();
       const run = await discoveryRunStore.createOperationRun({ intentId, mediaRequestId, triggeredByUserId: actorUserId,
         triggerSource: 'operator_search_recovery', searchRecoveryOfRunId: current.id, queryable });
       await reviewStore.setIntentRun({ intentId, operationRunId: run.id, queryable });
@@ -72,7 +91,8 @@ export function createLibraryExternalRequestSearchRecoveryService({ reviewStore,
       await recordAuditEventFn({ actorType: 'app_user', actorUserId, eventType: 'external_request_search_again_requested',
         entityType: 'media_request', entityId: mediaRequestId, summary: 'New search queued for an approved external release',
         details: { intentId, metadataReleaseId: intent.metadataReleaseId, requestedForUserId: recipientId,
-          previousOperationRunId: current.id, operationRunId: run.id },
+          previousOperationRunId: current.id, operationRunId: run.id,
+          ...(policy ? { emptySearchRecoveryCount: intent.emptySearchRecoveryCount + 1 } : {}) },
         ipAddress: requestMetadata?.ipAddress ?? null, userAgent: requestMetadata?.userAgent ?? null }, queryable);
       return result(run.id, false);
     });

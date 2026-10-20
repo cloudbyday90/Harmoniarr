@@ -22,6 +22,7 @@ const publicCodes = new Set([
   'external_collection_restart_unavailable', 'external_collection_blocked',
   'external_collection_legacy_approvals',
   'external_request_search_recovery_conflict', 'external_request_intent_not_found',
+  'external_request_search_cooldown', 'external_request_search_exhausted',
 ]);
 
 export function normalizeExternalRequestReviewError(error) {

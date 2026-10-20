@@ -68,6 +68,72 @@ suite('approved external search recovery with PostgreSQL, sessions and native HT
   before(async () => { runtime = await createIntegrationAppRuntime({ config }); }, { timeout: config.suiteSetupTimeoutMs });
   after(async () => { await runtime?.cleanup(); }, { timeout: config.suiteTeardownTimeoutMs });
 
+  test('published empty searches enforce durable cooldown and two fresh commands across expiry, replay and retries', { timeout: config.scenarioTimeoutMs }, async t => scenario(async c => {
+    const f = c.fixture; const provider = await createExternalDiscoveryHttpFixture({ signal: t.signal, empty: true });
+    const module = createLibraryExternalRequestDiscoveryModule({ slskdService: provider.service,
+      importCandidateService: createImportCandidateService({ pool: c.pool, slskdService: provider.service }),
+      getAppUserById: createAppUserService().getAppUserById, reviewStore: createLibraryExternalRequestReviewStore(),
+      mediaRequestStore: createLibraryMediaRequestStore() });
+    const worker = module.libraryExternalRequestDiscoveryWorker;
+    const run = async runId => {
+      const claimed = await createOperationQueueStore().claimNextRunnableRun({ operationTypes: ['library_external_request_discovery'] });
+      assert.equal(claimed?.id, runId);
+      await (await worker.startWorkerRun({ intentId: f.intent.id,
+        mediaRequestId: f.request.id, runId, triggeredByUserId: c.admin.id })).completion;
+    };
+    const policy = async () => (await c.client.requestJson(reviewPath(f))).payload.intents[0].searchRecovery;
+    const ageObservation = () => c.pool.query(`UPDATE library_external_request_release_intents
+      SET last_empty_search_at=clock_timestamp()-interval '6 hours 1 second' WHERE id=$1`, [f.intent.id]);
+    return withWorkerTaskCleanup(async () => {
+      provider.release(); await run(f.run.id);
+      const first = (await c.pool.query('SELECT status,summary FROM operation_runs WHERE id=$1', [f.run.id])).rows[0];
+      assert.equal(first.status, 'failed'); assert.equal(first.summary.searchOutcome, 'published_empty');
+      assert.equal(first.summary.candidateCount, 0);
+      assert.equal((await policy()).policy.blockedReason, 'cooldown');
+      assert.equal((await policy()).canSearchAgain, false);
+      assert.equal((await recover(c, 'early')).payload.error.code, 'external_request_search_cooldown');
+      await assertRunCount(c, 1);
+      const observation = (await c.pool.query('SELECT last_empty_search_at FROM library_external_request_release_intents WHERE id=$1', [f.intent.id])).rows[0].last_empty_search_at;
+      // Ordinary retry reads the same saved provider search and cannot reset its observation.
+      await createOperationRunControlService().requestOperationRunRetry({ runId: f.run.id });
+      await run(f.run.id);
+      assert.equal((await c.pool.query('SELECT last_empty_search_at FROM library_external_request_release_intents WHERE id=$1', [f.intent.id])).rows[0].last_empty_search_at.toISOString(), observation.toISOString());
+      assert.equal(provider.queries.length, 1);
+      // A later missing saved search cannot bypass a prior empty-search cooldown.
+      provider.removeSearch();
+      await createOperationRunControlService().requestOperationRunRetry({ runId: f.run.id });
+      await run(f.run.id);
+      assert.equal((await recover(c, 'early-expired')).payload.error.code, 'external_request_search_cooldown');
+      await ageObservation();
+      assert.equal((await policy()).canSearchAgain, true);
+      const replies = await Promise.all([recover(c, 'fresh-one'), recover(c, 'fresh-duplicate')]);
+      assert.deepEqual(replies.map(reply => reply.response.status), [202, 202]);
+      const secondRunId = replies[0].payload.searchRecovery.operationRunId;
+      assert.equal(secondRunId, replies[1].payload.searchRecovery.operationRunId);
+      await assertRunCount(c, 2);
+      await run(secondRunId);
+      assert.equal((await policy()).policy.remainingSearches, 1);
+      assert.equal((await policy()).policy.blockedReason, 'cooldown');
+      assert.equal((await recover(c, 'fresh-one')).response.status, 202);
+      assert.equal((await recover(c, 'terminal-predecessor')).payload.searchRecovery.operationRunId, secondRunId);
+      await ageObservation();
+      const third = await recover(c, 'fresh-two', secondRunId); assert.equal(third.response.status, 202);
+      const thirdRunId = third.payload.searchRecovery.operationRunId; await run(thirdRunId);
+      await ageObservation();
+      assert.equal((await policy()).policy.blockedReason, 'exhausted');
+      assert.equal((await policy()).policy.remainingSearches, 0);
+      assert.equal((await policy()).canSearchAgain, false);
+      assert.equal((await recover(c, 'exhausted', thirdRunId)).payload.error.code, 'external_request_search_exhausted');
+      assert.equal((await recover(c, 'fresh-two', secondRunId)).response.status, 202);
+      assert.equal((await recover(c, 'terminal-final-replay', secondRunId)).payload.searchRecovery.operationRunId, thirdRunId);
+      await assertRunCount(c, 3);
+      assert.equal(provider.queries.length, 3);
+      assert.equal((await c.pool.query('SELECT count(*)::int AS n FROM slskd_search_intents WHERE external_request_intent_id=$1', [f.intent.id])).rows[0].n, 3);
+      assert.equal((await c.pool.query("SELECT count(*)::int AS n FROM audit_events WHERE event_type='external_request_search_again_requested'")).rows[0].n, 2);
+      assert.equal((await c.pool.query('SELECT count(*)::int AS n FROM import_candidates')).rows[0].n, 0);
+    }, async () => { await worker.close(); await provider.close(); });
+  }));
+
   for (const code of [expired, 'slskd_search_continuation_unavailable']) {
     test(`${code}: explicit concurrent commands queue one fresh provider search and retain both reservations`, { timeout: config.scenarioTimeoutMs }, async t => scenario(async c => {
       const f = c.fixture; const provider = await createExternalDiscoveryHttpFixture({ signal: t.signal });
@@ -166,12 +232,16 @@ suite('approved external search recovery with PostgreSQL, sessions and native HT
 
   test('required audit failure rolls back replacement run, intent pointer and old-run supersession', { timeout: config.scenarioTimeoutMs }, async () => scenario(async c => {
     await failRun(c); const failure = new Error('controlled required audit failure');
+    await c.pool.query(`UPDATE library_external_request_release_intents SET last_empty_search_run_id=$2,
+      last_empty_search_at=clock_timestamp()-interval '7 hours' WHERE id=$1`, [c.fixture.intent.id, c.fixture.run.id]);
     await assert.rejects(service(c, { recordAuditEventFn: async () => { throw failure; } }).searchAgain(command(c)), error => error === failure);
     await assertRunCount(c, 1);
     const intent = await createLibraryExternalRequestReviewStore().getIntentById({ intentId: c.fixture.intent.id });
     assert.equal(intent.operationRunId, c.fixture.run.id);
+    assert.equal(intent.emptySearchRecoveryCount, 0);
     assert.equal((await c.pool.query('SELECT summary FROM operation_runs WHERE id=$1', [c.fixture.run.id])).rows[0].summary.externalSearchSuperseded, undefined);
     assert.equal((await recover(c, 'after-rollback')).response.status, 202); await assertRunCount(c, 2);
+    assert.equal((await createLibraryExternalRequestReviewStore().getIntentById({ intentId: c.fixture.intent.id })).emptySearchRecoveryCount, 1);
   }));
 
   test('a stale ordinary Retry waiting behind recovery is refused by the changed row at UPDATE', { timeout: config.scenarioTimeoutMs }, async t => scenario(async c => {

@@ -26,6 +26,9 @@ export const criticalSchemaAnchors = Object.freeze({
     { table: 'app_settings', trigger: 'app_settings_root_authority_admission' },
   ]),
   columns: Object.freeze([
+    { table: 'library_external_request_release_intents', column: 'last_empty_search_run_id' },
+    { table: 'library_external_request_release_intents', column: 'last_empty_search_at' },
+    { table: 'library_external_request_release_intents', column: 'empty_search_recovery_count' },
     { table: 'slskd_search_intents', column: 'provider_fingerprint' },
     { table: 'slskd_search_intents', column: 'expires_at' },
     { table: 'slskd_search_intents', column: 'accepted_at' },
@@ -86,6 +89,8 @@ export const criticalSchemaAnchors = Object.freeze({
     { table: 'library_files', column: 'tag_extracted_modified_at' },
   ]),
   constraints: Object.freeze([
+    { table: 'library_external_request_release_intents', constraint: 'external_empty_search_observation' },
+    { table: 'library_external_request_release_intents', constraint: 'external_empty_search_budget' },
     { table: 'slskd_search_intents', constraint: 'slskd_search_intents_owner_check' },
     { table: 'slskd_search_intents', constraint: 'slskd_search_intents_fingerprint_check' },
     { table: 'slskd_search_intents', constraint: 'slskd_search_intents_expiry_check' },

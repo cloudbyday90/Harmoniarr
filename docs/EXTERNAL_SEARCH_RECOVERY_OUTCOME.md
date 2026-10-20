@@ -85,8 +85,8 @@ candidate and passing TypeScript 6.0.3 Vue control. The new random draw and curr
 research are recorded in the research document. No PR was merged, closed or
 rebased; no new branch, version, tag or release was created.
 
-Next: give genuine completed zero-result external searches an explicit fresh-search
-action with deliberate cooldown/budget policy. They currently report
-`external_request_discovery_no_candidates`; job Retry reads the same saved search,
-which does not initiate a new query. Reuse this command infrastructure while
-keeping zero results distinct from unavailable evidence and provider failures.
+Confirmed zero-result recovery is now implemented in the
+[separate outcome](EXTERNAL_EMPTY_SEARCH_OUTCOME.md), with durable cooldown/budget,
+qualified publication evidence and policy-aware replay. Next: expose bounded
+filtering reasons when responses produce no usable candidates, so the operator
+can correct metadata/quality decisions before requesting more provider work.

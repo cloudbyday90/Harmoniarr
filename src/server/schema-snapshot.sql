@@ -7911,3 +7911,47 @@ SET migration_key = EXCLUDED.migration_key,
     error_message = NULL,
     application_version = NULL,
     updated_at = NOW();
+
+-- Migration: 20261020_204500_external_empty_search_policy.sql
+-- Checksum: d597e7fde7e99abbcbb6e6b45e45d0d2b03fff8fd9bc104f37b030fb5eab7677
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+-- Licensed under GPL-3.0-or-later. See LICENSE.
+
+ALTER TABLE library_external_request_release_intents
+  ADD COLUMN last_empty_search_run_id uuid,
+  ADD COLUMN last_empty_search_at timestamptz,
+  ADD COLUMN empty_search_recovery_count integer NOT NULL DEFAULT 0,
+  ADD CONSTRAINT external_empty_search_observation CHECK
+    ((last_empty_search_run_id IS NULL) = (last_empty_search_at IS NULL)),
+  ADD CONSTRAINT external_empty_search_budget CHECK
+    (empty_search_recovery_count BETWEEN 0 AND 2
+      AND (empty_search_recovery_count = 0 OR last_empty_search_at IS NOT NULL));
+
+-- The observation deliberately survives operation-run history retention.
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20261020_204500',
+  '20261020_204500_external_empty_search_policy.sql',
+  'external_empty_search_policy',
+  'd597e7fde7e99abbcbb6e6b45e45d0d2b03fff8fd9bc104f37b030fb5eab7677',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();

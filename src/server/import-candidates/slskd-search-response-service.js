@@ -71,7 +71,7 @@ export function createSlskdSearchResponseService({
       if (observedResponseCount || state?.isComplete === true) {
         result = await read('getSearchResponses', { searchId });
         if (hasResponses(result)) return result;
-        if (!observedResponseCount && isPublishedEmptySearch(state)) return result;
+        if (!observedResponseCount && isPublishedEmptySearch(state)) return { ...result, searchOutcome: 'published_empty' };
       }
       if (!publicationStarted && state?.isComplete === true) {
         publicationStarted = true;

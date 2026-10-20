@@ -85,15 +85,26 @@ test('duplicate in-process starts execute one discovery run', async (t) => {
   assert.equal(fixture.dependencies.discoverExternalRequestRelease.mock.callCount(), 1);
 });
 
-test('an empty discovery result remains actionable through explicit background-job retry', async (t) => {
+test('filtered candidate absence is distinct from a confirmed empty provider search', async (t) => {
   const fixture = createFixture(t, async () => ({ candidateCount: 0, fileCount: 0 }));
   await (await fixture.worker.startWorkerRun(args)).completion;
   assert.deepEqual(await fixture.released, { expectedLease: leaseForTest('run'), runId: 'run', status: 'failed' });
   const failure = fixture.dependencies.markRunFailed.mock.calls[0].arguments[0];
   assert.match(failure.summary.currentStep, /No candidates found/);
   assert.equal(failure.summary.failureCode, 'external_request_discovery_no_candidates');
+  assert.equal(failure.summary.searchOutcome, null);
+  assert.doesNotMatch(failure.errorMessage, /Search again/);
   assert.equal(fixture.dependencies.markRunCompleted.mock.callCount(), 0);
   assert.equal(canRequestOperationRunRetry({ operationType: 'library_external_request_discovery', status: 'failed' }), true);
+});
+
+test('a confirmed empty search directs review to deliberate search policy', async t => {
+  const fixture = createFixture(t, async () => ({ candidateCount: 0, fileCount: 0, searchOutcome: 'published_empty' }));
+  await (await fixture.worker.startWorkerRun(args)).completion;
+  const failure = fixture.dependencies.markRunFailed.mock.calls[0].arguments[0];
+  assert.equal(failure.summary.searchOutcome, 'published_empty');
+  assert.match(failure.errorMessage, /Search again/);
+  assert.equal(fixture.dependencies.markRunStarted.mock.calls[0].arguments[0].summary.failureCode, null);
 });
 
 test('a worker cannot release or fail another worker’s active lease', async (t) => {

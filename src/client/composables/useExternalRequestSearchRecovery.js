@@ -52,7 +52,11 @@ export function useExternalRequestSearchRecovery({ mediaRequestId, intentId, rec
       if (!disposed && owner === generation) {
         if (definite) clearIntent(); else hasUncertainIntent.value = true;
         statusMessage.value = '';
-        errorMessage.value = error?.status === 409 && definite
+        errorMessage.value = error?.code === 'external_request_search_cooldown'
+          ? 'This approved release is waiting for its search cooldown. Refresh the review to see the next search time.'
+          : error?.code === 'external_request_search_exhausted'
+            ? 'The fresh-search limit has been reached. Review the approved release and provider health.'
+            : error?.status === 409 && definite
           ? 'This approved search changed. Refresh the review before requesting another search.'
           : definite ? 'This search request was refused. Refresh the review and check your access before trying again.'
             : 'The result is uncertain. Retry the saved search request to resolve it safely.';

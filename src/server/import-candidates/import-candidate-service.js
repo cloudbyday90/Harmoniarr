@@ -1149,7 +1149,8 @@ export function createImportCandidateService({
 
     const storedCandidates = await withTransaction(async (client) => {
       if (beforePersistCandidates) {
-        await beforePersistCandidates({ queryable: client });
+        await beforePersistCandidates({ queryable: client,
+          ...(searchResponses.searchOutcome === 'published_empty' ? { searchOutcome: 'published_empty' } : {}) });
       }
       await lockExistingIngestionParentsFn({ candidates: enrichedCandidates, queryable: client });
       const stored = [];
@@ -1200,6 +1201,7 @@ export function createImportCandidateService({
       sourceSearchId: searchResponses.searchId,
       candidateCount: storedCandidates.length,
       fileCount: storedFileCount,
+      ...(searchResponses.searchOutcome === 'published_empty' ? { searchOutcome: 'published_empty' } : {}),
       ingestionDiagnostics,
       candidates: storedCandidates,
     };

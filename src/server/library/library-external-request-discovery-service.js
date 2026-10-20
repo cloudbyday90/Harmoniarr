@@ -23,6 +23,7 @@ import {
   throwIfOperationRunCancellationRequested,
 } from '../operation-run-cancellation.js';
 import { buildDiscoverySearchQuery } from './library-discovery-search-query.js';
+import { createLibraryExternalEmptySearchStore } from './library-external-empty-search-store.js';
 
 export function createLibraryExternalRequestDiscoveryService({
   assertMaintenanceWriteAllowed = async () => {},
@@ -34,6 +35,7 @@ export function createLibraryExternalRequestDiscoveryService({
   reviewStore,
   slskdService,
   searchContinuationService = null,
+  emptySearchStore = createLibraryExternalEmptySearchStore(),
 } = {}) {
   async function discoverExternalRequestRelease({
     intentId,
@@ -89,7 +91,12 @@ export function createLibraryExternalRequestDiscoveryService({
       actorUserId: triggeredByUserId,
       albumTitle: intent.releaseTitle,
       assertSearchCurrent: search.assertSearchCurrent ?? assertCurrentTarget,
-      beforePersistCandidates: search.assertSearchCurrent ?? assertCurrentTarget,
+      beforePersistCandidates: async ({ queryable, searchOutcome }) => {
+        await (search.assertSearchCurrent ?? assertCurrentTarget)({ queryable });
+        if (searchOutcome === 'published_empty') {
+          await emptySearchStore.recordPublishedEmptySearch({ intentId, operationRunId, queryable });
+        }
+      },
       ...(search.searchBinding ? { searchBinding: search.searchBinding } : {}),
       discoveryScope: { metadataReleaseId: intent.metadataReleaseId },
       expectedDurationSeconds: expectations?.expectedDurationSeconds ?? null,
@@ -110,6 +117,7 @@ export function createLibraryExternalRequestDiscoveryService({
     return {
       candidateCount: result.candidateCount,
       fileCount: result.fileCount,
+      ...(result.searchOutcome === 'published_empty' ? { searchOutcome: 'published_empty' } : {}),
       intentId,
       mediaRequestId,
       metadataReleaseId: intent.metadataReleaseId,

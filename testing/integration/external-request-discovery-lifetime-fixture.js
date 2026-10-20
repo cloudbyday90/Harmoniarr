@@ -38,7 +38,7 @@ export async function seedExternalDiscoveryLifetimeRun() {
 }
 
 /** Native loopback HTTP exercises real slskd client/service; no Soulseek daemon is contacted. */
-export async function createExternalDiscoveryHttpFixture({ signal }) {
+export async function createExternalDiscoveryHttpFixture({ signal, empty = false }) {
   const responseGate = createFixtureGate({ signal }); const entered = createFixtureGate({ signal });
   let searchId = randomUUID(); let searchAvailable = true; const requests = []; const queries = [];
   const server = createServer((request, response) => {
@@ -52,11 +52,13 @@ export async function createExternalDiscoveryHttpFixture({ signal }) {
     } else if (request.method === 'GET' && request.url.startsWith(`/api/v0/searches/${searchId}?`)) {
       if (!searchAvailable) { request.resume(); response.writeHead(404); response.end(); return; }
       request.resume(); response.writeHead(200, { 'content-type': 'application/json' });
-      response.end(JSON.stringify({ id: searchId, searchText: queries.at(-1) }));
+      response.end(JSON.stringify({ id: searchId, searchText: queries.at(-1),
+        ...(empty ? { state: 'Completed', isComplete: true, endedAt: '2026-10-20T00:00:00Z',
+          responseCount: 0, fileCount: 0, lockedFileCount: 0 } : {}) }));
     } else if (request.method === 'GET' && request.url === `/api/v0/searches/${searchId}/responses`) {
       request.resume(); entered.release();
       void responseGate.promise.then(() => {
-        response.writeHead(200, { 'content-type': 'application/json' }); response.end(JSON.stringify([{
+        response.writeHead(200, { 'content-type': 'application/json' }); response.end(JSON.stringify(empty ? [] : [{
           username: 'owned-peer', hasFreeUploadSlot: true, queueLength: 0, uploadSpeed: 2048,
           files: [{ filename: 'Autechre\\Amber\\01 Foil.flac', size: 42000000, length: 322, bitDepth: 16, sampleRate: 44100 }],
         }]));
@@ -68,6 +70,7 @@ export async function createExternalDiscoveryHttpFixture({ signal }) {
   const client = createSlskdClient(config);
   return { service: createSlskdService({ slskdClient: client, getClientConfig: async () => config }), get searchId() { return searchId; }, requests, queries,
     removeSearch: () => { searchAvailable = false; },
+    setEmpty: value => { empty = value; },
     entered: entered.promise, release: responseGate.release,
     async close() { responseGate.release(); await new Promise((resolve, reject) => { server.close(error => error ? reject(error) : resolve()); }); } };
 }

@@ -64,6 +64,6 @@ created.
 Approved external-request expiry/absence recovery is now implemented in the
 [separate outcome](EXTERNAL_SEARCH_RECOVERY_OUTCOME.md), including current
 recipient/intent locks, atomic new-run/audit handling, durable replay and a native
-stale Retry refusal. Next: explicit fresh searches after genuine zero-result
-completion, preserving deliberate cooldown/budget policy and the distinction
-between no matches and unavailable evidence.
+stale Retry refusal. Confirmed empty external searches now have their own
+[cooldown/budget outcome](EXTERNAL_EMPTY_SEARCH_OUTCOME.md). Next: make bounded
+candidate-filtering reasons actionable without conflating them with empty searches.

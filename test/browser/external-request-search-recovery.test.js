@@ -17,7 +17,7 @@ const reviewPath = `${detailPath}/external-review`;
 const commandPath = `${reviewPath}/intents/${intentId}/search-again`;
 function deferred() { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; }
 
-async function fixtures(context, { loseFirstResponse = false, failRefresh = false } = {}) {
+async function fixtures(context, { loseFirstResponse = false, failRefresh = false, policy = null } = {}) {
   let accepted = false; let enabled = true; const calls = []; const held = deferred();
   const user = { id: '22222222-2222-4333-8444-555555555555', username: 'Household listener', role: 'requester' };
   await context.route(`**${detailPath}`, route => route.fulfill({ json: { ok: true, mediaRequest: { id: requestId,
@@ -37,7 +37,8 @@ async function fixtures(context, { loseFirstResponse = false, failRefresh = fals
     await route.fulfill({ json: { items: [], preparation: { canRecover: false, action: null }, intents: [{ id: intentId,
       requestedForUserId: user.id, artistName: 'Prepared Artist', releaseTitle: 'Prepared Album',
       operationRunId: accepted ? newRunId : oldRunId, status: accepted ? 'pending' : 'failed',
-      ...(!accepted ? { searchRecovery: { canSearchAgain: enabled, expectedOperationRunId: oldRunId,
+      ...(!accepted ? { searchRecovery: { canSearchAgain: enabled && !policy?.blockedReason, expectedOperationRunId: oldRunId,
+        ...(policy ? { policy } : {}),
         message: getExternalSearchRecoveryMessage('slskd_search_continuation_expired') } } : {}) }] } });
   });
   await context.route(`**${commandPath}`, async route => {
@@ -48,12 +49,37 @@ async function fixtures(context, { loseFirstResponse = false, failRefresh = fals
     await route.fulfill({ status: 202, json: { searchRecovery: { outcome: 'queued', mediaRequestId: requestId, intentId,
       previousOperationRunId: oldRunId, operationRunId: newRunId, reusedExistingRun: calls.length > 1 } } });
   });
-  return { calls, release: held.resolve, setEnabled: value => { enabled = value; } };
+  return { calls, release: held.resolve, setEnabled: value => { enabled = value; }, setPolicy: value => { policy = value; } };
 }
 
 suite('approved external search recovery browser interaction', () => {
   before(async () => { runtime = await createBrowserSmokeRuntime({ config }); }, { timeout: config.suiteSetupTimeoutMs });
   after(async () => { await runtime?.cleanup(); }, { timeout: config.suiteTeardownTimeoutMs });
+
+  test('cooldown and exhaustion explain unavailable fresh searches and refresh preserves focus', { timeout: config.scenarioTimeoutMs }, async () => {
+    await runtime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      const deadline = '2026-10-21T06:00:00.000Z';
+      const fixture = await fixtures(browserContext, { policy: { blockedReason: 'cooldown', remainingSearches: 2, nextSearchAfter: deadline } });
+      await page.goto(`${baseUrl}/app/requests/${requestId}`, { waitUntil: 'domcontentloaded' });
+      const panel = page.getByRole('article', { name: 'Review external music' });
+      await panel.getByText('Refresh the review after this time.', { exact: false }).waitFor();
+      assert.equal(await panel.locator('time').getAttribute('datetime'), deadline);
+      assert.equal(await panel.getByRole('button', { name: /^Search again for/ }).count(), 0);
+      await panel.getByText('2 fresh searches remaining for this approved release.', { exact: true }).waitFor();
+      const refresh = panel.getByRole('button', { name: 'Refresh review', exact: true });
+      fixture.setPolicy({ blockedReason: null, remainingSearches: 2, nextSearchAfter: deadline });
+      await refresh.focus(); await refresh.press('Enter');
+      await panel.getByRole('button', { name: /^Search again for/ }).waitFor();
+      await assertLocatorFocused(refresh, 'Refresh must not move focus when a fresh search becomes available');
+      fixture.setPolicy({ blockedReason: 'exhausted', remainingSearches: 0, nextSearchAfter: deadline });
+      await refresh.press('Enter');
+      await panel.getByText('The fresh-search limit has been reached. Review the approved release and provider health.', { exact: true }).waitFor();
+      assert.equal(await panel.getByRole('button', { name: /^Search again for/ }).count(), 0);
+      await assertLocatorFocused(refresh, 'Exhaustion refresh must retain the invoking focus');
+      assert.equal(fixture.calls.length, 0);
+    }, { scenarioName: 'external_empty_search_policy' });
+  });
 
   test('job review handoff, keyboard pending feedback and uncertain replay retain one saved command', { timeout: config.scenarioTimeoutMs }, async () => {
     await runtime.runScenario(async ({ baseUrl, browserContext, page }) => {

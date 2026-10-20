@@ -47,7 +47,7 @@ export function createLibraryExternalRequestDiscoveryWorker({
     let finalLeaseStatus = 'completed';
     let acquiredLease = null;
     let heartbeat = null;
-    const summary = { intentId, mediaRequestId, triggerSource };
+    const summary = { intentId, mediaRequestId, triggerSource, failureCode: null, searchOutcome: null, candidateCount: null };
     return withWorkerTaskCleanup(async () => {
       try {
         acquiredLease = await acquireLease({ runId });
@@ -64,12 +64,14 @@ export function createLibraryExternalRequestDiscoveryWorker({
           finalLeaseStatus = 'failed';
           if (await markRunFailed({
             expectedLease: acquiredLease,
-            errorMessage: 'No candidates were found. Review the approved release and retry this background job when ready.',
+            errorMessage: result.searchOutcome === 'published_empty'
+              ? getExternalSearchRecoveryMessage('external_request_discovery_no_candidates')
+              : 'No usable candidates were found. Review the approved release and provider results.',
             runId,
             summary: {
               ...summary,
               ...result,
-              currentStep: 'No candidates found; review and retry discovery',
+              currentStep: 'No candidates found; review the approved release',
               failureCode: 'external_request_discovery_no_candidates',
             },
           }) === false) { finalLeaseStatus = 'failed'; return; }
