@@ -1,5 +1,12 @@
 # Official practices by boundary
 
+October 20 provider guidance uses docs/SLSKD_WIRE_VERSION_RESEARCH_2026_10.md.
+Read the released version/controller implementation and actual authenticated
+wire response. RFC 9110 governs retry semantics; OWASP informs strict response
+validation. W3C data version/provenance guidance is an explicit design inference,
+not transport certification. Preserve raw saved identity and distinguish native
+API refusal from controlled-provider receipt success.
+
 October 20 builder guidance uses docs/SERVER_BUILDER_RESEARCH_2026_10.md. Docker
 stage ownership, RUN networking and COPY cache inputs differ from Node's builtin
 assembly API. W3C draft monotonic timing informs local observations, not security

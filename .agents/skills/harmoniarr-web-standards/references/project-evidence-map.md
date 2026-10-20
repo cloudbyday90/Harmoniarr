@@ -1,5 +1,12 @@
 # Project standards-to-evidence map
 
+Stable provider wire admission belongs to slskd-download-protocol-policy.js.
+The exact 0.26.0.0 entry fixes current preparation while keeping old bindings,
+future/canary refusal and raw version identity. docs/SLSKD_WIRE_VERSION_OUTCOME.md
+owns policy/dispatch, PostgreSQL/controlled-HTTP receipts and real isolated slskd
+checks with their separate scopes. Neither a four-component shape nor native
+health authorizes accepting a future release or resending an uncertain POST.
+
 Server assembly belongs to Dockerfile's independent server-builder stage and
 scripts/build-server.js. docs/SERVER_BUILDER_OUTCOME.md owns exact output/mode,
 missing-project-dependency controls and final packaged evidence. The separate

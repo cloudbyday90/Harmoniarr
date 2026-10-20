@@ -1,5 +1,11 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 20 [wire-version rebuild outcome](LOCAL_DOCKER_WIRE_VERSION_OUTCOME.md)
+records the latest no-cache image, preserved data/admin and passing readiness-only
+check. The pinned provider's stable wire form now passes preparation; native
+successful transfer qualification and the walkthrough's attention status remain
+separate follow-ups.
+
 The October 20 [server-builder rebuild outcome](LOCAL_DOCKER_SERVER_BUILDER_OUTCOME.md)
 records the latest no-cache image, healthy preserved-state startup, existing-admin
 bootstrap and readiness-only check. Provider attention remains an operational

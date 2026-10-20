@@ -9,7 +9,8 @@ import { createHash } from 'node:crypto';
 import { createApiError } from '../auth.js';
 import { defaultSlskdBaseUrl, normalizeSlskdBaseUrl } from '../integrations/slskd/slskd-config.js';
 
-const protocols = new Map([['0.25.1', 'legacy'], ['0.26.0', 'batch']]);
+// Keep exact wire identities: 0.26.0's stable image reports four components.
+const protocols = new Map([['0.25.1', 'legacy'], ['0.26.0', 'batch'], ['0.26.0.0', 'batch']]);
 const fingerprintPattern = /^[0-9a-f]{64}$/u;
 
 export function selectSlskdDownloadProtocol(version) {

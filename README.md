@@ -25,9 +25,13 @@ stage, with no project dependency install. See the
 [design](docs/SERVER_BUILDER_DESIGN.md),
 [official research and tradeoffs](docs/SERVER_BUILDER_RESEARCH_2026_10.md) and
 [outcome](docs/SERVER_BUILDER_OUTCOME.md) for exact artifact and runtime proof.
-The separate [PR 51 evaluation](docs/OPEN_PR_51_SERVER_BUILDER_EVALUATION.md)
-found a provider wire-version compatibility gap in both the current pin and
-candidate; startup health alone does not establish download readiness.
+The pinned provider's observed 0.26.0.0 wire version now selects the reviewed
+batch transport while retaining its raw durable identity. See the
+[design](docs/SLSKD_WIRE_VERSION_DESIGN.md) and
+[validation outcome](docs/SLSKD_WIRE_VERSION_OUTCOME.md). The
+[PR 51 evaluation](docs/OPEN_PR_51_SERVER_BUILDER_EVALUATION.md) also found the
+candidate's 0.26.1.0 form; that upgrade remains blocked pending separate
+qualification. Startup health alone does not establish download readiness.
 
 Service worker activation preserves in-progress forms unless this page requests
 an update. The [reload outcome](docs/PWA_SERVICE_WORKER_RELOAD_OUTCOME.md) records

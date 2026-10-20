@@ -15,6 +15,11 @@ both old/new images before qualifying a transport guard. Healthy startup/API
 alone does not prove download preparation or receipts. Preserve exact reported
 forms and baseline failures; do not infer SemVer from the image tag or broadly
 strip suffixes/components. See docs/OPEN_PR_51_SERVER_BUILDER_EVALUATION.md.
+The stable wire fix in docs/SLSKD_WIRE_VERSION_OUTCOME.md admits one exact
+observed value while preserving raw saved identity. Prove binding mismatch
+refusal, no fallback/re-dispatch and durable rollback separately. Label real
+provider authentication/version/API evidence separately from successful
+controlled-HTTP receipts; offline provider refusal is not enqueue acceptance.
 
 Use when a dependency update crosses a private adapter, serializer, language
 server, native binary or other implementation-sensitive boundary. This is a

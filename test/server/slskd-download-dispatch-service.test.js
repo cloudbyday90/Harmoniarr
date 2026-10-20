@@ -7,7 +7,7 @@ import { createDownloadAttempt, evaluateDownloadReceipt } from '../../src/server
 import { createSlskdDownloadHandoffReconciliationService } from '../../src/server/slskd/slskd-download-handoff-reconciliation-service.js';
 import { createSlskdTransferSnapshotService } from '../../src/server/slskd/slskd-transfer-snapshot-service.js';
 
-function harness({ version = '0.26.0', respond = null } = {}) {
+function harness({ version = '0.26.0.0', respond = null } = {}) {
   const config = { baseUrl: 'http://localhost:5030', apiKey: 'test-key', providerMode: 'external' };
   const calls = [];
   const fetchImpl = async (url, request) => {
@@ -62,10 +62,25 @@ test('verified legacy selection retains the existing direct endpoint and receipt
 });
 
 test('future and malformed provider versions refuse before any POST', async () => {
-  for (const version of ['0.26.1', '0.27.0', '0.26.0-dev', null, { version: '0.26.0' }]) {
+  for (const version of ['0.26.1', '0.26.1.0', '0.27.0', '0.26.0.1', '0.26.0-dev', null, { version: '0.26.0' }]) {
     const h = harness({ version });
     await assert.rejects(h.service.prepareDownloadDispatch(), { code: 'slskd_download_version_unsupported' });
     assert.equal(h.calls.some((call) => call.request.method === 'POST'), false);
+  }
+});
+
+test('supported batch version forms cannot replace the exact saved dispatch binding', async () => {
+  for (const version of ['0.26.0', '0.26.0.0']) {
+    const h = harness({ version });
+    const dispatch = await h.service.prepareDownloadDispatch();
+    const saved = h.attempt(dispatch.binding);
+    saved.providerBinding.version = version === '0.26.0' ? '0.26.0.0' : '0.26.0';
+    let boundaries = 0;
+    await assert.rejects(dispatch.enqueue({ attempt: saved, beforeSend: () => { boundaries += 1; } }),
+      { code: 'slskd_download_attempt_binding_invalid' });
+    assert.equal(boundaries, 0);
+    assert.equal(h.calls.length, 1);
+    assert.equal(h.calls[0].request.method, 'GET');
   }
 });
 
@@ -235,8 +250,8 @@ test('a pinned local configuration assertion uses its caller-owned transaction w
   assert.equal(providerReads, readsBefore);
 });
 
-for (const version of ['0.25.1', '0.26.0']) {
-  test(`native ${version} dispatch awaits final configuration and beforeSend before its single POST`, async () => {
+for (const version of ['0.25.1', '0.26.0', '0.26.0.0']) {
+  test(`controlled ${version} dispatch awaits final configuration and beforeSend before its single POST`, async () => {
     const events = [];
     let reads = 0;
     let finishConfig;
@@ -256,10 +271,11 @@ for (const version of ['0.25.1', '0.26.0']) {
       assert.equal(request.method, 'POST');
       events.push('post');
       const body = JSON.parse(request.body);
-      const files = version === '0.26.0' ? body.files : body;
+      const batch = version !== '0.25.1';
+      const files = batch ? body.files : body;
       const transfers = files.map((file) => ({ ...file, id: randomUUID(), username: 'peer', direction: 'Download',
-        state: 'Queued, Locally', removed: false, ...(version === '0.26.0' ? { batchId: body.id } : {}) }));
-      return version === '0.26.0'
+        state: 'Queued, Locally', removed: false, ...(batch ? { batchId: body.id } : {}) }));
+      return batch
         ? Response.json({ batch: { id: body.id, username: 'peer', direction: 'Download', transfers }, failures: [] }, { status: 201 })
         : Response.json({ Enqueued: transfers, Failed: [] }, { status: 201 });
     } }) });
@@ -285,7 +301,7 @@ for (const version of ['0.25.1', '0.26.0']) {
     assert.equal(events.filter((event) => event === 'post').length, 1);
   });
 
-  test(`native ${version} beforeSend rejection sends no POST and preserves the original receipt-free attempt`, async () => {
+  test(`controlled ${version} beforeSend rejection sends no POST and preserves the original receipt-free attempt`, async () => {
     const h = harness({ version });
     const dispatch = await h.service.prepareDownloadDispatch();
     const attempt = h.attempt(dispatch.binding);
@@ -303,7 +319,7 @@ for (const version of ['0.25.1', '0.26.0']) {
     assert.deepEqual(attempt.receipts, []);
   });
 
-  test(`native ${version} final configuration refusal never calls beforeSend or POST`, async () => {
+  test(`controlled ${version} final configuration refusal never calls beforeSend or POST`, async () => {
     const h = harness({ version });
     const dispatch = await h.service.prepareDownloadDispatch();
     const attempt = h.attempt(dispatch.binding);
@@ -316,7 +332,7 @@ for (const version of ['0.25.1', '0.26.0']) {
     assert.deepEqual(attempt.receipts, []);
   });
 
-  test(`native ${version} a lost response after beforeSend retains uncertainty without a receipt or another POST`, async () => {
+  test(`controlled ${version} a lost response after beforeSend retains uncertainty without a receipt or another POST`, async () => {
     const events = [];
     const h = harness({ version, respond: async (call) => {
       if (call.request.method === 'POST') {

@@ -6,6 +6,21 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Delivered slice: Stable provider wire-version admission (2026-10-20)
+
+- Admit only the observed stable 0.26.0.0 wire string as batch, retaining raw
+  binding identity, old saved forms and future/canary refusal. Keep the existing
+  modular dispatch, beforeSend, receipt and uncertainty owners.
+- See the [design](SLSKD_WIRE_VERSION_DESIGN.md),
+  [official research/tradeoffs](SLSKD_WIRE_VERSION_RESEARCH_2026_10.md) and
+  [outcome](SLSKD_WIRE_VERSION_OUTCOME.md) for actual evidence and limits.
+- Apply random [PR 48](OPEN_PR_48_WIRE_VERSION_EVALUATION.md) locally; retain the
+  TypeScript 7 language-server failure and passing restored TypeScript 6 control.
+- Next: add a wholly isolated native provider/peer fixture for successful batch
+  admission and exact receipt reads before qualifying slskd 0.26.1. Keep its
+  canary/future forms blocked. Qualify the announced Node security patch once
+  published; no patch version or remediation is invented in advance.
+
 ## Delivered slice: Dependency-free server assembly (2026-10-20)
 
 - Run the existing ESM copy script directly from the pinned Node image, with
@@ -17,9 +32,9 @@ Database model source: `docs/DATABASE_MODEL.md`
 - Apply refreshed random [PR 51](OPEN_PR_51_SERVER_BUILDER_EVALUATION.md) locally.
   Native candidate 0.26.1.0 and original 0.26.0.0 both fail the current exact
   download-version guard. Restore the overlay; no provider upgrade or PR merge.
-- Next: qualify actual stable provider wire-version forms and batch/receipt
-  behavior while preserving strict durable attempt binding. Fix the demonstrated
-  baseline gap before adopting the provider upgrade or claiming download readiness.
+- Follow-up delivered: [stable wire admission](SLSKD_WIRE_VERSION_OUTCOME.md)
+  fixes the demonstrated baseline preparation gap. Native successful admission
+  and receipt qualification remain separate from controlled-provider proof.
   Independently qualify the announced October 21 Node security patch when published.
 
 ## Delivered slice: Docker-owned smoke ports (2026-10-19)

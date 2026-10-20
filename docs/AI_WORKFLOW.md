@@ -1,5 +1,11 @@
 # AI Workflow And Shared Copilot Skills
 
+The [provider wire-version design](SLSKD_WIRE_VERSION_DESIGN.md) adds a narrow
+qualification method to the maintained testing/standards skills: discover the
+released source and native response, admit only the reviewed exact form, retain
+raw durable identity and prove uncertain POST recovery without re-dispatch.
+Keep controlled-provider receipt evidence separate from native API checks.
+
 The [server-builder design](SERVER_BUILDER_DESIGN.md) adds exact artifact/mode
 comparison and absent-project-dependency controls to the maintained testing and
 standards skills. Distinguish isolated assembly from other build network owners.
