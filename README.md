@@ -60,6 +60,15 @@ for the old-image control. This separate opt-in lane takes over three minutes
 per image and is excluded from routine fast tests. See the
 [research and tradeoffs](docs/SLSKD_0261_RESEARCH_2026_10.md).
 
+Run `npm run validate:native-slskd-files` with the same immutable-image/version
+inputs for deterministic native file completion. This separate opt-in lane checks
+exact successful receipts, byte counts, content hashes and filesystem identity
+through a read-only inspector mount. The synthetic .bin payloads prove transport
+and file publication; music decoding and library import remain separate. See the
+[design](docs/NATIVE_FILE_TRANSFER_DESIGN.md),
+[research/tradeoffs](docs/NATIVE_FILE_TRANSFER_RESEARCH_2026_10.md) and
+[outcome](docs/NATIVE_FILE_TRANSFER_OUTCOME.md).
+
 Service worker activation preserves in-progress forms unless this page requests
 an update. The [reload outcome](docs/PWA_SERVICE_WORKER_RELOAD_OUTCOME.md) records
 the first-install login fix and enabled-worker regression coverage.

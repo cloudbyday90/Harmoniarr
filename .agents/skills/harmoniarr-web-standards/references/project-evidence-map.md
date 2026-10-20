@@ -1,5 +1,12 @@
 # Project standards-to-evidence map
 
+Native byte completion belongs to peer-input.js, soulseek-peer.js, the bounded
+sender/data modules and native-file-inspection.js in testing/slskd. The opt-in
+slskd-files.test.js lane proves actual receipts, hashes and path/descriptor
+identity through the inspected read-only tmpfs mount. See
+docs/NATIVE_FILE_TRANSFER_OUTCOME.md; direct/lost-response admission remains
+separate from media decoding, partial transfer, cancellation/resume and import.
+
 Native timeout qualification belongs to testing/slskd/native-timeout-step.js,
 native-timeout-runner.js and test/native/slskd-timeout.test.js. Keep the old-image
 control, actual three-minute guard, terminal database receipt and internal-list

@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 20 [native-file rebuild outcome](LOCAL_DOCKER_NATIVE_FILE_OUTCOME.md)
+records the latest no-cache image, preserved data/admin and passing readiness-only
+check. The independent native file lane publishes no ports and uses disposable
+storage. Walkthrough provider attention remains a separate operational follow-up.
+
 The October 20 [slskd qualification rebuild outcome](LOCAL_DOCKER_SLSKD_0261_OUTCOME.md)
 records the latest no-cache image, preserved admin/data and readiness-only pass.
 The isolated provider lanes remain separate from walkthrough provider attention.

@@ -14,8 +14,13 @@ import { createSlskdClient } from '../../src/server/integrations/slskd/slskd-cli
 import { createDownloadAttempt, evaluateDownloadReceipt } from '../../src/server/slskd/slskd-download-attempt-policy.js';
 import { createSlskdDownloadHandoffReconciliationService } from '../../src/server/slskd/slskd-download-handoff-reconciliation-service.js';
 import { nativeFiles, nativePeer } from './fixture-data.js';
+import { nativeTransferFiles } from './native-file-data.js';
+import { inspectCompletedNativeFiles, assertNativeFileTree } from './native-completed-files.js';
 
-const { apiKey, expectedVersion } = JSON.parse(await readFile('/run/fixture.json', 'utf8'));
+const { apiKey, expectedVersion, mode } = JSON.parse(await readFile('/run/fixture.json', 'utf8'));
+const completed = mode === 'files';
+const manifest = completed ? nativeTransferFiles : nativeFiles;
+const expectedState = completed ? 'Completed, Succeeded' : 'Queued, Remotely';
 const config = { baseUrl: 'http://provider:5030', apiKey, requestTimeoutMs: 2000 };
 async function eventually(read, accepted) {
   const deadline = performance.now() + 15_000;
@@ -49,7 +54,7 @@ for (const lost of [false, true]) {
     } }) });
   const dispatch = await service.prepareDownloadDispatch();
   assert.equal(dispatch.binding.version, expectedVersion);
-  const files = nativeFiles.slice(lost ? 2 : 0, lost ? 4 : 2);
+  const files = manifest.slice(lost ? 2 : 0, lost ? 4 : 2);
   const attempt = createDownloadAttempt({ providerBinding: dispatch.binding, importCandidateId: randomUUID(),
     operationRunId: randomUUID(), username: nativePeer, requestedFiles: files, sourceObservation: { username: nativePeer } });
   const original = structuredClone(attempt);
@@ -64,7 +69,7 @@ for (const lost of [false, true]) {
   assert.equal(posts, 1); assert.equal(postStatus, 201); assert.equal(beforeSend, 1);
   assert.deepEqual(attempt, original);
   const batch = await eventually(() => service.getDownloadBatchEvidence({ attempt }),
-    value => value.transfers?.length === 2 && value.transfers.every(row => row.state === 'Queued, Remotely'));
+    value => value.transfers?.length === 2 && value.transfers.every(row => row.state === expectedState));
   assert.equal(batch.id, attempt.attemptId);
   const reconciliation = createSlskdDownloadHandoffReconciliationService({ getDownloadBatchEvidence: service.getDownloadBatchEvidence });
   const proof = await reconciliation.findMatchingTransfers({ attempt, ...attempt });
@@ -82,15 +87,19 @@ for (const lost of [false, true]) {
     const transfer = await service.getBoundDownload(request);
     assert.equal(transfer.id, receipt.id);
     assert.equal(transfer.batchId, attempt.attemptId);
-    assert.equal(transfer.state, 'Queued, Remotely');
-    assert.equal(transfer.bytesTransferred, 0);
+    assert.equal(transfer.state, expectedState);
+    assert.equal(transfer.bytesTransferred, completed ? receipt.size : 0);
+    if (completed) { assert.equal(transfer.exception, null); assert.ok(transfer.endedAt); }
     for (const change of [{ filename: 'Other.flac' }, { size: receipt.size + 1 },
       { batchId: randomUUID() }, { id: randomUUID() }, { username: 'unowned-peer' }]) {
       assert.equal(await service.getBoundDownload({ ...request, ...change }), null);
     }
   }
   assert.equal(posts, 1);
+  const publishedFiles = completed ? await inspectCompletedNativeFiles(files) : null;
   scenarios.push({ lostResponse: lost, postStatus, posts, beforeSend, receipts: receipts.length, exactReadsVerified: true,
-    state: 'Queued, Remotely', bytesTransferred: 0, rawVersion: dispatch.binding.version });
+    state: expectedState, bytesTransferred: completed ? files.reduce((sum, file) => sum + file.size, 0) : 0,
+    rawVersion: dispatch.binding.version, ...(publishedFiles ? { publishedFiles } : {}) });
 }
+if (completed) await assertNativeFileTree(manifest);
 console.log(JSON.stringify({ complete: true, scenarios }));

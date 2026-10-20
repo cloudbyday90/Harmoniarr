@@ -1,5 +1,9 @@
 # Native provider qualification
 
+For completed bytes and published-file identity, use
+[native file transfer](native-file-transfer.md). Queued zero-byte proof and the
+three-minute timeout lane retain their independent scopes.
+
 Use the explicit `npm run validate:native-slskd` lane for actual slskd batch
 admission and exact receipts. It is separate from fast tests and PostgreSQL/HTTP
 authority fixtures. Read docs/NATIVE_SLSKD_FIXTURE_DESIGN.md and its outcome.

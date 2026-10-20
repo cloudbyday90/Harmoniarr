@@ -6,6 +6,26 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Delivered slice: Native deterministic file completion (2026-10-20)
+
+- Add a separate opt-in actual-provider file lane, narrow ESM peer/negotiation/
+  sender/data/inspection modules and a bounded shared tmpfs volume with read-only
+  inspection. Keep production services, dependencies and default test inventory
+  unchanged.
+- Prove four exact native files and hashes, successful receipt/byte identities,
+  distinct filesystem identities and GET-only recovery after response loss.
+  Retain separate zero-byte queue and timeout scopes, strict cleanup and bounded
+  adverse controls. See the [design](NATIVE_FILE_TRANSFER_DESIGN.md),
+  [research/tradeoffs](NATIVE_FILE_TRANSFER_RESEARCH_2026_10.md) and
+  [outcome](NATIVE_FILE_TRANSFER_OUTCOME.md).
+- Re-evaluate the only open random [PR 48](OPEN_PR_48_NATIVE_FILE_EVALUATION.md):
+  unchanged rejected candidate remains unapplied; a fresh current language-server
+  consumer control passes. No PR merge/rebase or release.
+- Rebuild the walkthrough without cache, preserve data/admin and update focused
+  testing/web standards skill references for the actual new boundaries.
+- Next: bounded native truncated-transfer/disconnect refusal, proving incomplete
+  payloads cannot become successful completed receipts or completed files.
+
 ## Delivered slice: Native slskd 0.26.1 timeout qualification (2026-10-20)
 
 - Compare released 0.26.0/0.26.1 binaries at the actual three-minute enqueue

@@ -1,5 +1,11 @@
 # Official practices by boundary
 
+Native file completion uses docs/NATIVE_FILE_TRANSFER_RESEARCH_2026_10.md.
+Released binary protocol, Node backpressure/close, Docker storage access and
+OWASP resource guidance own distinct boundaries. W3C provenance informs source
+attribution by inference. A terminal receipt before file movement does not grant
+filesystem completion, music decoding, library availability or general conformance.
+
 For native timeout/cancellation qualification, consult
 docs/SLSKD_0261_RESEARCH_2026_10.md. Read the actual released timeout and linked
 library inactivity behavior before choosing the fixture. RFC 9110 still limits

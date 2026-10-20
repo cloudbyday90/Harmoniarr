@@ -5,6 +5,11 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For completed native file bytes and filesystem identity, read
+[native file transfer](references/native-file-transfer.md). It owns the framed/raw
+transition, one-file token capabilities, bounded sends and separate read-only
+publication proof. Synthetic binary payloads do not establish music import.
+
 For real slskd batch/receipt qualification, read
 [native provider qualification](references/native-provider-fixture.md). It owns
 the account-free internal-network fixture, exact native identity, queued-state

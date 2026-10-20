@@ -1,5 +1,13 @@
 # AI Workflow And Shared Copilot Skills
 
+The [native file-transfer design](NATIVE_FILE_TRANSFER_DESIGN.md) extends testing
+and standards skill references with framed/raw protocol separation, one-file
+token ownership, bounded sends and read-only publication checks. The released
+provider records success before moving the file, so verify file publication and
+identity separately. The [outcome](NATIVE_FILE_TRANSFER_OUTCOME.md) distinguishes
+synthetic-byte proof from music/import, selected native modes from unrelated
+inventory, and the unchanged rejected PR candidate from a fresh consumer control.
+
 The [0.26.1 design](SLSKD_0261_QUALIFICATION_DESIGN.md) extends the existing
 testing and web standards skills with native timeout qualification. Select the
 changed released boundary rather than an earlier default peer timeout; separate
