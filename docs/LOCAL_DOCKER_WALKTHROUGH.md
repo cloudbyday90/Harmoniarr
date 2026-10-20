@@ -1,5 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 20 [canonical-command rebuild outcome](LOCAL_DOCKER_NATIVE_CANONICAL_OUTCOME.md)
+records the latest no-cache image, preserved data/admin, one applied migration
+and passing readiness-only check. The [canonical native outcome](NATIVE_CANONICAL_COMMAND_OUTCOME.md)
+qualifies authenticated selection/start through real eligibility and native
+publication; [queued Activity](QUEUED_DOWNLOAD_ACTIVITY_OUTCOME.md) now persists
+and renders preparation separately from provider acceptance.
+
 The October 20 [native-audio rebuild outcome](LOCAL_DOCKER_NATIVE_AUDIO_OUTCOME.md)
 records the latest no-cache image, preserved data/admin and passing readiness-only
 check. The independent [native audio outcome](NATIVE_AUDIO_IMPORT_OUTCOME.md)

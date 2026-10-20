@@ -24,4 +24,12 @@ Use this reference for the provider-to-library boundary, alongside the
 
 ffprobe establishes observed stream metadata or refusal, not a full decode,
 remote-source authentication, WCAG coverage or private-protocol certification.
-Canonical user action/discovery remains separate when eligibility is seeded.
+The current [canonical command outcome](../../../../docs/NATIVE_CANONICAL_COMMAND_OUTCOME.md)
+adds actual authenticated selection/start and the real planner/worker. Controlled
+search results still do not prove live discovery or rendered command interaction.
+Trace command Activity through emitted type, service admission, database CHECK,
+feed filtering and the rendered link policy. Replayed intent must retain one
+queued event; explicit preparation and provider acceptance are distinct stages.
+Observe optional Activity completion outside its swallowed-failure boundary.
+The focused browser check proves the queued link's focus and filter behavior;
+it does not establish general WCAG conformance.

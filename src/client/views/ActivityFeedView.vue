@@ -100,6 +100,7 @@ function getFilterLabel(filter) {
 
 function getActivityEventLinkTarget(event, sectionId) {
   return sectionId === 'attention' || event?.eventType === 'artist_policy_saved'
+    || event?.eventType === 'music_queue_download_queued'
     || event?.eventType === 'request_cancelled' || event?.eventType === 'request_reassigned'
     ? buildActivityEventLinkTarget(event)
     : null;

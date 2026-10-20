@@ -6,6 +6,25 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Delivered slice: Canonical native acquisition and queued Activity (2026-10-20)
+
+- Replace selected/ready-run fixture bypasses with real Missing Music
+  selection/start routes, durable command replay, current eligibility and the
+  configured execution worker. Retain native valid/corrupt inspection/import.
+  See the [design](NATIVE_CANONICAL_COMMAND_DESIGN.md),
+  [research/tradeoffs](NATIVE_CANONICAL_COMMAND_RESEARCH_2026_10.md) and
+  [outcome](NATIVE_CANONICAL_COMMAND_OUTCOME.md).
+- Fix the reproduced rejection of music_queue_download_queued through service,
+  additive migration, generated snapshot, schema anchors and rendered timeline.
+  Preserve explicit queue preparation versus provider acceptance. See the
+  [Activity design](QUEUED_DOWNLOAD_ACTIVITY_DESIGN.md) and
+  [outcome](QUEUED_DOWNLOAD_ACTIVITY_OUTCOME.md).
+- Keep the lane opt-in, extend maintained skills and validate actual authorization,
+  audit, database constraint and focused browser behavior. Rebuild the walkthrough
+  without cache, preserve data/admin and leave incompatible PR 48 unapplied.
+- Next: canonical Find matches/discovery ingestion into this pipeline, replacing
+  seeded search results. Live accounts/search and full decoding remain separate.
+
 ## Delivered slice: Native audio through canonical import (2026-10-20)
 
 - Add an opt-in native WAV/corrupt-control lane with real leased execution,

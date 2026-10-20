@@ -68,8 +68,17 @@ suite('Activity Music Queue lifecycle browser verification', () => {
           body: JSON.stringify({
             checkedAt: '2026-07-25T22:00:00.000Z',
             ok: true,
-            total: 3,
+            total: 4,
             events: [{
+              id: 'event-queued',
+              eventType: 'music_queue_download_queued',
+              entityArtist: 'Autechre',
+              entityId: 'wanted-queued',
+              entityTitle: 'Amber',
+              entityType: 'wanted_release',
+              extraPayload: { wantedReleaseId: 'wanted-queued' },
+              occurredAt: '2026-07-25T21:59:30.000Z',
+            }, {
               id: 'event-retrying',
               eventType: 'music_queue_match_retrying',
               entityArtist: 'Boards of Canada',
@@ -107,12 +116,20 @@ suite('Activity Music Queue lifecycle browser verification', () => {
       await page.getByText('A download failed. Harmoniarr is trying the next best match.').waitFor();
       await page.getByText('No good matches left: Geogaddi by Boards of Canada').waitFor();
       await page.getByText('Harmoniarr will search again later.').waitFor();
+      const queued = page.getByRole('listitem').filter({ hasText: 'Download queued: Amber by Autechre' });
+      await queued.getByText('Download preparation is queued. The provider has not accepted this release yet.').waitFor();
 
       await page.getByLabel('Show activity').selectOption('needs_attention');
       await page.getByText('Download needs attention: The Campfire Headphase by Boards of Canada').waitFor();
       await page.getByText('Trying the next best match: Music Has the Right to Children by Boards of Canada').waitFor({ state: 'hidden' });
+      await queued.waitFor({ state: 'hidden' });
 
       await page.getByLabel('Show activity').selectOption('downloads');
+      await queued.waitFor();
+      const link = queued.getByRole('link', { name: 'Open in Missing Music' });
+      assert.equal(await link.getAttribute('href'), '/app/missing/wanted-queued');
+      await link.focus();
+      assert.equal(await link.evaluate(element => element === element.ownerDocument.activeElement), true);
       const recovery = page.getByRole('listitem').filter({
         hasText: 'Trying the next best match: Music Has the Right to Children by Boards of Canada',
       });

@@ -143,6 +143,12 @@ export function getActivityEventLabel(event, currentUserId = null) {
         : 'a release';
       return `Match selected: ${releaseDesc}`;
     }
+    case 'music_queue_download_queued': {
+      const releaseDesc = title
+        ? (artist ? `${title} by ${artist}` : title)
+        : 'a release';
+      return `Download queued: ${releaseDesc}`;
+    }
     case 'music_queue_download_started': {
       const releaseDesc = title
         ? (artist ? `${title} by ${artist}` : title)
@@ -243,8 +249,12 @@ export function getActivityEventDetail(event) {
 
   if (event.eventType === 'music_queue_match_selected') {
     return event.extraPayload?.selectionMode === 'manual'
-      ? 'You selected this match. Harmoniarr will continue the download automatically.'
+      ? 'You selected this match. Start its download from Missing Music when you are ready.'
       : 'Harmoniarr selected the best available match and will continue automatically.';
+  }
+
+  if (event.eventType === 'music_queue_download_queued') {
+    return 'Download preparation is queued. The provider has not accepted this release yet.';
   }
 
   if (event.eventType === 'music_queue_download_started') {
@@ -344,6 +354,7 @@ export function getActivityEventIcon(eventType) {
     case 'music_queue_match_selected':
       return 'checkmark';
     case 'music_queue_download_started':
+    case 'music_queue_download_queued':
       return 'download';
     case 'music_queue_audio_checked':
     case 'music_queue_audio_warning':

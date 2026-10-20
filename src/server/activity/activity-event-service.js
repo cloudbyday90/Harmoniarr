@@ -38,6 +38,7 @@ const allowedEventTypes = new Set([
   'music_queue_download_failed',
   'music_queue_import_blocked',
   'music_queue_match_selected',
+  'music_queue_download_queued',
   'music_queue_download_started',
   'music_queue_audio_checked',
   'music_queue_audio_warning',

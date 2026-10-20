@@ -7,9 +7,14 @@ an internal-network provider and an isolated network-disabled media reader.
 
 - Declare bounded valid audio and an equal-size corrupt control. Both must
   complete actual provider transfer before content acceptance is compared.
+- The audio lane now seeds pending results only. Exercise actual authenticated
+  Missing Music selection/start, real planner, queued execution and worker.
+  Prove same-key replay, different-key active-work refusal, actor/recipient and
+  CSRF/disabled/own-scope refusals before any provider work. Refresh the actual
+  decision and bounded Downloader handoff. See docs/NATIVE_CANONICAL_COMMAND_OUTCOME.md.
 - Inject the real transfer snapshot owner as well as the provider service.
   Preserve current-binding checks and await durable beforeSend before POST.
-  Seeded eligibility is not canonical user action or discovery coverage.
+  Controlled result discovery still does not prove live search or browser commands.
 - Capture actual completed receipt observations before stopping the provider.
   Await task retirement, acknowledge shutdown, then inspect exact read-only
   native files. Export only fixed manifest paths into an exclusive workspace;
@@ -24,3 +29,11 @@ an internal-network provider and an isolated network-disabled media reader.
 - Drain actual worker/process/socket/database/container owners on failure too.
   Retain failed prototypes separately. Metadata probing does not prove full
   decoding or authenticate a same-size changed but valid remote source.
+
+For command Activity, trace producer through service allowlist, database CHECK,
+feed projection and rendered link policy. A mocked callback does not prove event
+admission. Observe/await the actual optional recording result in the parent test;
+assert queued event and required audit separately, without changing production
+best-effort semantics. Verify snapshot/migration anchors, unknown-type refusal
+and browser visibility/focus/filtering. Explicit queued preparation stays visible
+between automatic milestones and must not imply provider acceptance.

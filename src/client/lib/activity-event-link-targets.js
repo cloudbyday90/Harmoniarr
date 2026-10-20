@@ -37,6 +37,7 @@ export function buildActivityEventLinkTarget(event = {}) {
     'music_queue_quality_blocked',
     'quality_fallback_allowed',
     'music_queue_match_selected',
+    'music_queue_download_queued',
     'music_queue_download_started',
     'music_queue_audio_checked',
     'music_queue_audio_warning',

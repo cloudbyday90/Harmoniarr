@@ -1,5 +1,15 @@
 # Project standards-to-evidence map
 
+Canonical native commands now replace selected/ready fixture writes in the audio
+lane. native-audio-commands.js, native-audio-command-refusals.js and
+native-audio-execution.js under testing/integration own actual sessions/routes,
+replay, refusal and the configured worker. The
+[outcome](../../../../docs/NATIVE_CANONICAL_COMMAND_OUTCOME.md) separates controlled
+result discovery from live search. Queued Activity's service/CHECK/rendered-policy
+fix and focused browser scope are in the
+[Activity outcome](../../../../docs/QUEUED_DOWNLOAD_ACTIVITY_OUTCOME.md).
+
+
 Native audio-to-import qualification belongs in
 test/native/slskd-audio-import.test.js and narrow testing/slskd/native-audio-*
 and testing/integration/native-audio-* helpers. The

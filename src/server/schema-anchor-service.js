@@ -26,6 +26,7 @@ export const criticalSchemaAnchors = Object.freeze({
     { table: 'app_settings', trigger: 'app_settings_root_authority_admission' },
   ]),
   columns: Object.freeze([
+    { table: 'activity_events', column: 'event_type' },
     { table: 'operator_track_receipts', column: 'receipt_revision_id' },
     { table: 'operator_track_receipts', column: 'library_path' },
     { table: 'operator_track_receipt_invalidations', column: 'scan_acquisition_id' },
@@ -82,6 +83,7 @@ export const criticalSchemaAnchors = Object.freeze({
     { table: 'library_files', column: 'tag_extracted_modified_at' },
   ]),
   constraints: Object.freeze([
+    { table: 'activity_events', constraint: 'activity_events_event_type_check' },
     { table: 'operator_track_receipts', constraint: 'operator_track_receipts_revision_unique' },
     { table: 'operator_track_receipt_invalidations', constraint: 'operator_track_receipt_invalidations_revision_fkey' },
     { table: 'operator_track_receipt_invalidations', constraint: 'operator_track_receipt_invalidations_pkey' },
@@ -154,6 +156,7 @@ export const criticalSchemaAnchors = Object.freeze({
     { index: 'operator_artist_reconciliation_snapshot_latest_idx' },
   ]),
   tables: Object.freeze([
+    { table: 'activity_events' },
     { table: 'operator_track_receipt_invalidations' },
     { table: 'operator_track_receipts' },
     { table: 'library_external_request_release_intents' },

@@ -32,6 +32,7 @@ function getTimelineCategory(eventType) {
   switch (eventType) {
     case 'download_completed':
     case 'music_queue_match_selected':
+    case 'music_queue_download_queued':
     case 'music_queue_download_started':
     case 'music_queue_search_queued':
     case 'music_queue_search_started':

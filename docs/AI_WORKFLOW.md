@@ -1,5 +1,16 @@
 # AI Workflow And Shared Copilot Skills
 
+The [canonical native design](NATIVE_CANONICAL_COMMAND_DESIGN.md) extends the
+testing, canonical-actions and web standards skills with actual route-to-worker
+qualification. Start from pending controlled results and preserve sessions,
+CSRF, current target authority, durable replay and the real planner. The
+[Activity fix](QUEUED_DOWNLOAD_ACTIVITY_DESIGN.md) demonstrates why emitted types
+must be traced through service admission, database CHECK and rendered link policy.
+A callback stub does not prove persistence. Observe optional recording completion
+in the parent test while preserving best-effort production behavior; require
+command audit separately. See the [outcome](NATIVE_CANONICAL_COMMAND_OUTCOME.md).
+
+
 The [native audio design](NATIVE_AUDIO_IMPORT_DESIGN.md) extends the existing
 testing and web standards skills with a practical boundary method: discover
 official sources, label their authority and inferred application, then tie each

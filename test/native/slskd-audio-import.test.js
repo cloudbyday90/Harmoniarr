@@ -11,26 +11,36 @@ import { writeFile } from 'node:fs/promises';
 import { createApp } from '../../src/server/app.js';
 import { createImportCandidateModule } from '../../src/server/import-candidates/import-candidate-module.js';
 import { createLibraryModule } from '../../src/server/library/library-module.js';
+import { createMissingMusicModule } from '../../src/server/missing-music/missing-music-module.js';
 import { createMediaInspectionService } from '../../src/server/media/media-inspection-service.js';
 import { createSlskdTransferSnapshotService } from '../../src/server/slskd/slskd-transfer-snapshot-service.js';
 import { createIntegrationAppRuntime } from '../../testing/integration/app-runtime.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 import { bootstrapAdminSession } from '../../testing/integration/auth-helpers.js';
 import { createLibraryAddMediaScenario } from '../../testing/integration/library-add-media-scenario.js';
-import { runImportExecutionHandoffFixtureWorker } from '../../testing/integration/import-execution-handoff-fixtures.js';
+import { startCanonicalNativeAudio } from '../../testing/integration/native-audio-commands.js';
+import { qualifyNativeAudioCommandRefusals } from '../../testing/integration/native-audio-command-refusals.js';
+import { runCanonicalNativeAudioExecution } from '../../testing/integration/native-audio-execution.js';
 import { seedNativeAudioCandidates } from '../../testing/integration/native-audio-candidates.js';
 import { qualifyNativeAudioPublication } from '../../testing/integration/native-audio-publication.js';
 import { createNativeAudioBridge } from '../../testing/slskd/native-audio-bridge.js';
 import { requireNativeSlskdImages, withNativeSlskdProvider } from '../../testing/slskd/native-provider-runtime.js';
 import { fingerprintPostgresCohortSource } from '../../testing/integration/postgres-cohort-policy.js';
 
-test('native valid and equal-size corrupt audio preserve durable receipts while canonical import accepts only inspected media', { timeout: 300_000 }, async t => {
+test('canonical selected-match commands retain durable ownership through native audio transfer and valid/corrupt import', { timeout: 300_000 }, async t => {
   const source = await fingerprintPostgresCohortSource(); const images = requireNativeSlskdImages();
   let module; let bridge; let library;
+  const commandRecordings = [];
+  const awaitQueuedActivity = async () => { assert.ok(commandRecordings.length); assert.deepEqual(await commandRecordings.shift(), { recorded: true }); };
   const media = createLibraryAddMediaScenario({ mode: 'owned-api', mediaImage: images.applicationImage });
   assert.equal(await media.mediaFixture.verifyTooling({ signal: t.signal }), null);
   const config = resolveIntegrationTestRuntimeConfig();
   const runtime = await createIntegrationAppRuntime({ config, createAppFn: options => createApp({ ...options,
+    createMissingMusicModule: dependencies => createMissingMusicModule({ ...dependencies, recordActivityEventFn: event => {
+      const recording = dependencies.recordActivityEventFn(event);
+      if (event.eventType === 'music_queue_download_queued') commandRecordings.push(recording);
+      return recording;
+    } }),
     createLibraryModule: dependencies => { library = createLibraryModule(dependencies); return library; },
     createImportCandidateModule: dependencies => {
       const mediaInspectionService = createMediaInspectionService({ getMediaToolingStatus: media.mediaFixture.getTooling,
@@ -45,15 +55,18 @@ test('native valid and equal-size corrupt audio preserve durable receipts while 
   }) });
   let result;
   try {
-    await media.runScenario(runtime, async ({ client, getPoolFn, workspaceDir }) => {
+    await media.runScenario(runtime, async ({ client, baseUrl, getPoolFn, workspaceDir }) => {
       await bootstrapAdminSession(client);
-      const { context, fixtures } = await seedNativeAudioCandidates({ client, getPoolFn, workspaceDir });
+      const { fixtures } = await seedNativeAudioCandidates({ client, getPoolFn, workspaceDir });
+      const commandRefusals = await qualifyNativeAudioCommandRefusals({ client, baseUrl, pool: getPoolFn(), fixtures });
       result = await withNativeSlskdProvider({ ...images, signal: t.signal, mode: 'audio', expectedVersion: '0.26.1.0', runScenario: async native => {
         bridge = createNativeAudioBridge(native);
+        const commands = [];
         for (const fixture of fixtures) {
-          await runImportExecutionHandoffFixtureWorker(context, fixture, { prepareDownloadDispatch: bridge.service.prepareDownloadDispatch });
-          const item = await context.store.getItem(fixture);
-          assert.equal(item.planningSnapshot.execution.handoff.state, 'confirmed', JSON.stringify(item.planningSnapshot.execution));
+          const command = await startCanonicalNativeAudio({ client, pool: getPoolFn(), fixture, awaitQueuedActivity });
+          fixture.operationRunId = command.operationRunId;
+          commands.push(command);
+          await runCanonicalNativeAudioExecution({ client, pool: getPoolFn(), module, fixture });
         }
         await bridge.call('published');
         const details = [];
@@ -61,13 +74,14 @@ test('native valid and equal-size corrupt audio preserve durable receipts while 
         const transport = await bridge.exportCompleted(fixtures[0].paths.downloads);
         const publications = [];
         for (const [index, fixture] of fixtures.entries()) publications.push(await qualifyNativeAudioPublication({ module, library, pool: getPoolFn(), fixture, detail: details[index] }));
-        return { complete: true, transport, publications };
+        return { complete: true, commandRefusals, commands, transport, publications };
       } });
     }, { scenarioName: 'native_audio_import' });
   } finally { await runtime.cleanup(); }
   assert.deepEqual(await fingerprintPostgresCohortSource(), source);
   assert.equal(result.cleanupVerified, true); assert.equal(result.fixture.fileConnections, 2);
   assert.equal(result.fixture.sentFiles.length, 2); assert.equal(result.fixture.refused, 0);
+  assert.equal(commandRecordings.length, 0);
   if (process.env.HARMONIARR_NATIVE_SLSKD_EVIDENCE_PATH) {
     await writeFile(process.env.HARMONIARR_NATIVE_SLSKD_EVIDENCE_PATH, JSON.stringify({ source, ...result }, null, 2), { flag: 'wx' });
   }

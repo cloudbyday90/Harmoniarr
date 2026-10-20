@@ -95,6 +95,13 @@ See the [design](docs/NATIVE_REFUSAL_DESIGN.md),
 [research/tradeoffs](docs/NATIVE_REFUSAL_RESEARCH_2026_10.md) and
 [outcome](docs/NATIVE_REFUSAL_OUTCOME.md).
 
+The native audio lane now starts with pending controlled matches and uses real
+authenticated Missing Music selection/start, command replay, the actual planner
+and queued execution worker. It verifies authorization/CSRF/account refusals,
+required actor audit and persisted Download queued Activity before native transfer.
+See the [canonical command outcome](docs/NATIVE_CANONICAL_COMMAND_OUTCOME.md)
+and [queued Activity fix](docs/QUEUED_DOWNLOAD_ACTIVITY_OUTCOME.md).
+
 Run npm run validate:native-slskd-audio with those 0.26.1 immutable images for
 actual native WAV completion through durable execution, media inspection,
 automatic canonical apply and catalogue scan. An equal-size corrupt WAV must
