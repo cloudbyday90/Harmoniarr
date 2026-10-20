@@ -32,7 +32,7 @@ export async function discoverCanonicalNativeAudio({ client, baseUrl, pool, libr
   assert.equal((await pool.query("SELECT count(*)::int count FROM operation_runs WHERE operation_type='library_discovery_dispatch'")).rows[0].count, 0);
   assert.equal((await pool.query('SELECT count(*)::int count FROM import_candidates')).rows[0].count, 0);
   assert.ok(fixtures.every(fixture => !fixture.searchId), 'Refused commands must not reach search transport');
-  assertSearchIdle();
+  await assertSearchIdle();
   const commands = [];
   for (const fixture of fixtures) {
     const before = await client.requestJson(root(fixture));
@@ -61,7 +61,8 @@ export async function discoverCanonicalNativeAudio({ client, baseUrl, pool, libr
   await completion;
   const run = await library.libraryDiscoveryRunStore.getRunById(claimed.id);
   assert.equal(run.status, 'completed', JSON.stringify(run));
-  assert.equal(run.dispatchedCount, fixtures.length); assert.equal(run.failedCount, 0);
+  const persisted = (await pool.query('SELECT summary FROM operation_runs WHERE id=$1', [claimed.id])).rows[0];
+  assert.equal(run.dispatchedCount, fixtures.length, JSON.stringify({ run, summary: persisted.summary })); assert.equal(run.failedCount, 0);
   assert.equal(run.candidateCount, fixtures.length * 2); assert.equal(run.fileCount, fixtures.length * 2);
   for (const fixture of fixtures) {
     const candidates = (await pool.query('SELECT id,username,status,normalized_payload FROM import_candidates WHERE source_search_id=$1', [fixture.searchId])).rows;

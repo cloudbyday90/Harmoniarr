@@ -97,11 +97,15 @@ See the [design](docs/NATIVE_REFUSAL_DESIGN.md),
 
 The native audio lane now starts with saved monitoring and metadata, then uses
 canonical Find matches, real wanted/discovery reconciliation, queued worker,
-slskd HTTP client and candidate ingestion. Owned HTTP search responses remain
-separate from native Soulseek file transfer. See the
+slskd HTTP client and candidate ingestion. The provider now emits native global
+queries and accepts bounded compressed peer responses from the owned fixture;
+controlled HTTP search responses have been removed. See the
+[native search design](docs/NATIVE_SEARCH_DESIGN.md),
+[research/stack](docs/NATIVE_SEARCH_RESEARCH_2026_10.md) and
+[outcome](docs/NATIVE_SEARCH_OUTCOME.md). The preceding
 [discovery design](docs/NATIVE_DISCOVERY_COMMAND_DESIGN.md),
 [official research and stack](docs/NATIVE_DISCOVERY_COMMAND_RESEARCH_2026_10.md)
-and [discovery outcome](docs/NATIVE_DISCOVERY_COMMAND_OUTCOME.md).
+and [discovery outcome](docs/NATIVE_DISCOVERY_COMMAND_OUTCOME.md) record that earlier boundary.
 It uses real
 authenticated Missing Music selection/start, command replay, the actual planner
 and queued execution worker. It verifies authorization/CSRF/account refusals,

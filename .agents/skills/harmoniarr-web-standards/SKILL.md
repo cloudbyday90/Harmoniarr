@@ -5,6 +5,10 @@ description: "Apply and verify web standards for Harmoniarr UI commands, forms, 
 
 # Harmoniarr Web Standards
 
+For native query and compressed peer-response qualification, read
+[native search](references/native-search.md). It connects reviewed protocol
+identity, bounded input and provenance to actual provider acceptance.
+
 For canonical search through ingestion and acquisition, use
 [discovery provenance](references/discovery-provenance.md). It distinguishes
 durable intent, actual client/worker ingestion and native transfer evidence.

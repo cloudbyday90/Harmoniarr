@@ -102,7 +102,7 @@ export async function withNativeSlskdProvider({ applicationImage, providerImage,
     const logs = await docker([...composeArgs, 'logs', '--no-color', '--no-log-prefix', 'fixture'], null);
     closed = logs.split(/\r?\n/u).filter(Boolean).map(line => JSON.parse(line)).find(row => row.kind === 'closed');
     if (!failed) {
-      assert.equal(closed?.activeSockets, 0); assert.equal(closed.refused, 0);
+      assert.equal(closed?.activeSockets, 0); assert.equal(closed.refused, 0, JSON.stringify(closed));
       const id = await docker([...composeArgs, 'ps', '--all', '-q', 'fixture'], null);
       const stopped = JSON.parse(await docker(['inspect', id], null))[0];
       assert.equal(stopped.State.Running, false); assert.equal(stopped.State.ExitCode, 0);

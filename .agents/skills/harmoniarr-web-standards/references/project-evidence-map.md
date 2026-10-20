@@ -1,9 +1,16 @@
 # Project standards-to-evidence map
 
+The newer [native search method](native-search.md) replaces controlled HTTP
+responses with actual slskd global queries and compressed peer responses.
+native-search-codec/responder/cli/bridge.js under testing/slskd own bounded wire
+bytes, authenticated endpoint/token routing, actual API observations and socket
+retirement. See the [outcome](../../../../docs/NATIVE_SEARCH_OUTCOME.md).
+
 Canonical Find matches now precedes selected-match acquisition in the audio lane.
 native-audio-candidates.js prepares only metadata, saved monitoring and paths;
 native-audio-discovery-commands.js exercises real intent/queue/worker/ingestion.
-The owned search-response-fixture.js uses the actual slskd HTTP client/service.
+The earlier owned HTTP fixture used the actual slskd HTTP client/service and has
+now been replaced by native-search modules.
 Read [discovery provenance](discovery-provenance.md) for authority, replay and
 evidence boundaries, and its [outcome](../../../../docs/NATIVE_DISCOVERY_COMMAND_OUTCOME.md)
 for executed scope. Owned HTTP response ingestion remains distinct from native

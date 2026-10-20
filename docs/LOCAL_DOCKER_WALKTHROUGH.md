@@ -1,7 +1,14 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 20 [native search rebuild outcome](LOCAL_DOCKER_NATIVE_SEARCH_OUTCOME.md)
+records the latest no-cache image, identical runtime inventory, preserved data/
+admin and passing readiness-only check. The [native search outcome](NATIVE_SEARCH_OUTCOME.md)
+qualifies real global queries and compressed peer responses before canonical
+ingestion/acquisition. Public-network search and existing provider attention
+remain separate from this isolated owned proof.
+
 The October 20 [discovery rebuild outcome](LOCAL_DOCKER_NATIVE_DISCOVERY_OUTCOME.md)
-records the newest no-cache image, identical runtime inventories, preserved data/
+records the preceding no-cache image, identical runtime inventories, preserved data/
 admin and passing readiness-only check. The [discovery outcome](NATIVE_DISCOVERY_COMMAND_OUTCOME.md)
 adds canonical Find matches and actual reconciliation/client/ingestion before
 native acquisition. Owned HTTP search responses remain a separate boundary from

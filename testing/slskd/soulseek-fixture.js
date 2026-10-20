@@ -14,6 +14,7 @@ import { openFixturePeer } from './soulseek-peer.js';
 import { openNativeResumePeer } from './native-resume-peer.js';
 import { openNativeRefusalPeer } from './native-refusal-peer.js';
 import { openNativeAudioPeer } from './native-audio-peer.js';
+import { createNativeSearchResponder } from './native-search-responder.js';
 
 const byte = value => Buffer.from([value]);
 // Released client startup/status messages that require no response in this fixture.
@@ -28,9 +29,13 @@ export async function openSoulseekFixture({ username, password, address = '127.0
   }
   const ip = Buffer.from(address.split('.').map(Number).reverse());
   const stats = { logins: 0, addresses: 0, peerConnections: 0, fileConnections: 0, requests: [], sentFiles: [], partialFiles: [], resumeFiles: [],
-    refusalFiles: [], changedSizeResponses: [], refused: 0 };
+    refusalFiles: [], changedSizeResponses: [], searchRequests: [], searchResponses: [], refusalReasons: [], refused: 0 };
   const idleTimeout = mode === 'cancellation' ? 240_000 : 30_000;
-  const refuse = () => { stats.refused += 1; };
+  const refuse = error => {
+    stats.refused += 1;
+    if (error instanceof Error && stats.refusalReasons.length < 8) stats.refusalReasons.push(error.message);
+  };
+  const search = mode === 'audio' ? createNativeSearchResponder({ stats, refuse }) : null;
   function attach(socket, handle) {
     let messages = 0;
     const decoder = createWireDecoder(payload => {
@@ -38,16 +43,16 @@ export async function openSoulseekFixture({ username, password, address = '127.0
       handle(payload);
     });
     socket.on('data', chunk => {
-      try { decoder.push(chunk); } catch { refuse(); socket.destroy(); }
+      try { decoder.push(chunk); } catch (error) { refuse(error); socket.destroy(); }
     });
-    socket.on('end', () => { try { decoder.end(); } catch { refuse(); } });
+    socket.on('end', () => { try { decoder.end(); } catch (error) { refuse(error); } });
   }
   const openPeer = mode === 'audio' ? openNativeAudioPeer : mode === 'refusal' ? openNativeRefusalPeer : mode === 'resume' ? openNativeResumePeer : openFixturePeer;
   const peer = await openPeer({ username, host, port: peerPort, idleTimeout, mode, stats, refuse, beforeReset });
   let central;
   try {
     central = await openOwnedTcpServer({ host, port: serverPort, idleTimeout, onDrop: refuse, onSocket(socket) {
-      let authenticated = false;
+      let authenticated = false; let listenPort = null;
       attach(socket, payload => {
         const reader = wireReader(payload); const code = reader.integer();
         if (code === 1 && !authenticated) {
@@ -58,7 +63,18 @@ export async function openSoulseekFixture({ username, password, address = '127.0
           authenticated = true; stats.logins += 1;
           socket.write(wireFrame(1, byte(1), wireString('Owned native fixture'), ip, wireString(hash), byte(0)));
         } else if (!authenticated) throw new Error('Fixture login is required');
-        else if (code === 3) {
+        else if (code === 2 && search) {
+          const announcedPort = reader.integer(); reader.end();
+          if ((listenPort !== null && listenPort !== announcedPort) || announcedPort < 1024 || announcedPort > 65535) throw new Error('Unowned native search endpoint');
+          listenPort = announcedPort;
+        } else if (code === 26 && search) {
+          const token = reader.integer(); const query = reader.text(); reader.end();
+          void search.dispatch({ socket, port: listenPort, token, query });
+        } else if (code === 36 && search) {
+          const target = reader.text(); reader.end();
+          if (target !== username) throw new Error('Unowned statistics target');
+          socket.write(wireFrame(36, wireString(target), wireInteger(0), Buffer.alloc(8), wireInteger(0), wireInteger(0)));
+        } else if (code === 3) {
           const target = reader.text(); reader.end();
           if (target !== nativePeer) throw new Error('Unexpected fixture peer');
           stats.addresses += 1;
@@ -78,7 +94,9 @@ export async function openSoulseekFixture({ username, password, address = '127.0
     snapshot: () => ({ ...stats, requests: [...stats.requests], sentFiles: [...stats.sentFiles], partialFiles: stats.partialFiles.map(row => ({ ...row })),
       resumeFiles: stats.resumeFiles.map(row => ({ ...row })),
       refusalFiles: stats.refusalFiles.map(row => ({ ...row })), changedSizeResponses: stats.changedSizeResponses.map(row => ({ ...row })),
-      activeSockets: central.active() + peer.active() }),
-    close() { closing ??= Promise.all([central.close(), peer.close()]).then(() => undefined); return closing; },
+      searchRequests: stats.searchRequests.map(row => ({ ...row })), searchResponses: stats.searchResponses.map(row => ({ ...row })),
+      refusalReasons: [...stats.refusalReasons],
+      activeSockets: central.active() + peer.active() + (search?.active() ?? 0) }),
+    close() { closing ??= Promise.all([central.close(), peer.close(), search?.close()]).then(() => undefined); return closing; },
   };
 }

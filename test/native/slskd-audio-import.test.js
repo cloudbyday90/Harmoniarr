@@ -23,7 +23,7 @@ import { qualifyNativeAudioCommandRefusals } from '../../testing/integration/nat
 import { runCanonicalNativeAudioExecution } from '../../testing/integration/native-audio-execution.js';
 import { prepareNativeAudioDiscovery } from '../../testing/integration/native-audio-candidates.js';
 import { discoverCanonicalNativeAudio } from '../../testing/integration/native-audio-discovery-commands.js';
-import { withAudioSearchResponses } from '../../testing/slskd/search-response-fixture.js';
+import { createNativeSearchBridge } from '../../testing/slskd/native-search-bridge.js';
 import { qualifyNativeAudioPublication } from '../../testing/integration/native-audio-publication.js';
 import { createNativeAudioBridge } from '../../testing/slskd/native-audio-bridge.js';
 import { requireNativeSlskdImages, withNativeSlskdProvider } from '../../testing/slskd/native-provider-runtime.js';
@@ -56,7 +56,7 @@ test('canonical discovery and selected-match commands retain ownership through n
         slskdTransferSnapshotService: createSlskdTransferSnapshotService({ getDownloads: remote('getDownloads'), getBoundDownloads: remote('getBoundDownloads') }),
         slskdService: { ...dependencies.slskdService, startSearch: search('startSearch'),
           getSearchState: search('getSearchState'), getSearchResponses: search('getSearchResponses'),
-          browseUserDirectory: search('browseUserDirectory'), prepareDownloadDispatch: remote('prepareDownloadDispatch'),
+          prepareDownloadDispatch: remote('prepareDownloadDispatch'),
           getDownloadBatchEvidence: remote('getDownloadBatchEvidence'), getBoundDownloads: remote('getBoundDownloads'), getDownloads: remote('getDownloads') } });
       return module;
     },
@@ -66,33 +66,38 @@ test('canonical discovery and selected-match commands retain ownership through n
     await media.runScenario(runtime, async ({ client, baseUrl, getPoolFn, workspaceDir }) => {
       await bootstrapAdminSession(client);
       const fixtures = await prepareNativeAudioDiscovery({ client, pool: getPoolFn(), workspaceDir, library });
-      result = await withAudioSearchResponses({ fixtures, runScenario: async (service, assertSearchIdle) => {
-        searchService = service;
-        const discovery = await discoverCanonicalNativeAudio({ client, baseUrl, pool: getPoolFn(), library, fixtures, assertSearchIdle });
+      result = await withNativeSlskdProvider({ ...images, signal: t.signal, mode: 'audio', expectedVersion: '0.26.1.0', runScenario: async native => {
+        bridge = createNativeAudioBridge(native);
+        const nativeSearch = createNativeSearchBridge(native, fixtures);
+        searchService = nativeSearch.service;
+        const discovery = await discoverCanonicalNativeAudio({ client, baseUrl, pool: getPoolFn(), library, fixtures, assertSearchIdle: nativeSearch.assertIdle });
         const commandRefusals = await qualifyNativeAudioCommandRefusals({ client, baseUrl, pool: getPoolFn(), fixtures });
-        return withNativeSlskdProvider({ ...images, signal: t.signal, mode: 'audio', expectedVersion: '0.26.1.0', runScenario: async native => {
-          bridge = createNativeAudioBridge(native);
-          const commands = [];
-          for (const fixture of fixtures) {
-            const command = await startCanonicalNativeAudio({ client, pool: getPoolFn(), fixture, awaitQueuedActivity });
-            fixture.operationRunId = command.operationRunId;
-            commands.push(command);
-            await runCanonicalNativeAudioExecution({ client, pool: getPoolFn(), module, fixture });
-          }
-          await bridge.call('published');
-          const details = [];
-          for (const fixture of fixtures) details.push(await module.importCandidateExecutionSummaryService.buildImportCandidateExecutionRunDetail({ runId: fixture.operationRunId }));
-          const transport = await bridge.exportCompleted(fixtures[0].paths.downloads);
-          const publications = [];
-          for (const [index, fixture] of fixtures.entries()) publications.push(await qualifyNativeAudioPublication({ module, library, pool: getPoolFn(), fixture, detail: details[index] }));
-          return { complete: true, discovery, commandRefusals, commands, transport, publications };
-        } });
+        const commands = [];
+        for (const fixture of fixtures) {
+          const command = await startCanonicalNativeAudio({ client, pool: getPoolFn(), fixture, awaitQueuedActivity });
+          fixture.operationRunId = command.operationRunId;
+          commands.push(command);
+          await runCanonicalNativeAudioExecution({ client, pool: getPoolFn(), module, fixture });
+        }
+        await bridge.call('published');
+        const details = [];
+        for (const fixture of fixtures) details.push(await module.importCandidateExecutionSummaryService.buildImportCandidateExecutionRunDetail({ runId: fixture.operationRunId }));
+        const searchTransport = await nativeSearch.finish();
+        const transport = await bridge.exportCompleted(fixtures[0].paths.downloads);
+        const publications = [];
+        for (const [index, fixture] of fixtures.entries()) publications.push(await qualifyNativeAudioPublication({ module, library, pool: getPoolFn(), fixture, detail: details[index] }));
+        return { complete: true, discovery, commandRefusals, commands, searchTransport, transport, publications };
       } });
     }, { scenarioName: 'native_audio_import' });
   } finally { await runtime.cleanup(); }
   assert.deepEqual(await fingerprintPostgresCohortSource(), source);
   assert.equal(result.cleanupVerified, true); assert.equal(result.fixture.fileConnections, 2);
   assert.equal(result.fixture.sentFiles.length, 2); assert.equal(result.fixture.refused, 0);
+  assert.equal(result.fixture.searchRequests.length, 2); assert.equal(result.fixture.searchResponses.length, 4);
+  for (const nativeResult of result.searchTransport.searches) {
+    assert.ok(result.fixture.searchRequests.some(request => request.query === nativeResult.query && request.token === nativeResult.token));
+    assert.equal(result.fixture.searchResponses.filter(response => response.query === nativeResult.query && response.token === nativeResult.token).length, 2);
+  }
   assert.equal(commandRecordings.length, 0);
   if (process.env.HARMONIARR_NATIVE_SLSKD_EVIDENCE_PATH) {
     await writeFile(process.env.HARMONIARR_NATIVE_SLSKD_EVIDENCE_PATH, JSON.stringify({ source, ...result }, null, 2), { flag: 'wx' });

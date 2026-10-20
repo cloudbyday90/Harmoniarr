@@ -20,8 +20,13 @@ an internal-network provider and an isolated network-disabled media reader.
   decision and bounded Downloader handoff. See docs/NATIVE_CANONICAL_COMMAND_OUTCOME.md.
 - Inject the real transfer snapshot owner as well as the provider service.
   Preserve current-binding checks and await durable beforeSend before POST.
-  Owned HTTP search responses prove the real client and ingestion, not native
-  Soulseek search messages, public-network search or browser command submission.
+  Native search now replaces owned HTTP responses: the actual provider emits
+  global queries and accepts compressed peer responses with original tokens.
+  Preserve zero-token and same-port login replay, refuse changed endpoints and
+  token/query reuse, and distinguish socket write from native API acceptance.
+  Await actual search completion before provider shutdown. See
+  docs/NATIVE_SEARCH_OUTCOME.md. This is isolated owned search, not public-network
+  discovery, directory browsing or browser command submission.
 - Capture actual completed receipt observations before stopping the provider.
   Await task retirement, acknowledge shutdown, then inspect exact read-only
   native files. Export only fixed manifest paths into an exclusive workspace;

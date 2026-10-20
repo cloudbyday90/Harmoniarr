@@ -22,7 +22,8 @@ and [official-source tradeoffs](../../../../docs/NATIVE_DISCOVERY_COMMAND_RESEAR
    manual choice without replacing eligibility. Verify request/search/candidate/
    release/file correlation and refreshed canonical permissions.
 5. Name transport evidence precisely. Owned HTTP responses qualify client and
-   ingestion, not native server/peer search. Native file transport is a separate
+   ingestion, not native server/peer search. The newer [native search method](native-search.md)
+   uses actual queries and compressed peer messages for that boundary. Native file transport is a separate
    boundary; byte completion still precedes inspection and canonical publication.
    Retain runtime/source/hash identities and failed prototypes.
 6. Await real worker completion and owned HTTP/provider/media cleanup. Keep this
