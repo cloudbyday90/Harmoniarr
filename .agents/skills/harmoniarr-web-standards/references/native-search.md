@@ -30,3 +30,16 @@ these boundaries separately rather than waiting an arbitrary duration. Keep
 fast controls and one explicit native scenario, with failed prototypes retained.
 This proves isolated owned search, not public-network discovery, directory browse,
 rendered commands, remote content authenticity or general standards conformance.
+
+For completed-state/publication gaps, read the separate
+[design](../../../../docs/SLSKD_SEARCH_PUBLICATION_DESIGN.md) and
+[research](../../../../docs/SLSKD_SEARCH_PUBLICATION_RESEARCH_2026_10.md).
+Trace the vendor's actual state/count, finalization marker and body writes before
+equating empty with zero. Test completion on the last normal poll, unavailable
+queued start, final empty success, counter regression, failed search and
+cancellation after an awaited read. A one-time publication allowance must never
+reset itself. Preserve original read failures, check current authority during
+waiting and retain the locked persistence guard. Do not retry the search POST.
+Unavailable evidence must fail before candidate/audit publication and successful
+no-match cooldown/exhaustion. Separate deterministic ordering controls from the
+ordinary native case; the latter does not force an internal vendor database race.

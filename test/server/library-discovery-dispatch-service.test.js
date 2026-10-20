@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createImportCandidateService } from '../../src/server/import-candidates/import-candidate-service.js';
 import {
   buildDiscoverySearchQuery,
   createLibraryDiscoveryDispatchService as buildLibraryDiscoveryDispatchService,
@@ -8,6 +9,36 @@ import {
 function createLibraryDiscoveryDispatchService(options = {}) {
   return buildLibraryDiscoveryDispatchService({ loadSettingsFn: async () => ({}), ...options });
 }
+
+test('unpublished provider results record dispatch failure without consuming a successful zero-candidate attempt', async (t) => {
+  const recordDiscoverySearchFailure = t.mock.fn(async () => {});
+  const recordDiscoverySearchSuccess = t.mock.fn(async () => assert.fail('Unpublished results are not successful discovery'));
+  const markDiscoveryRequestExhausted = t.mock.fn(async () => assert.fail('Publication delay cannot exhaust no-match attempts'));
+  const claimed = [{ artistName: 'Artist', releaseTitle: 'Delayed Search Publication Album', metadataReleaseId: 'release', searchAttemptCount: 2 }];
+  const importCandidateService = createImportCandidateService({
+    pool: { connect: async () => assert.fail('Unpublished results cannot open a candidate transaction') },
+    slskdSearchResponsePollAttempts: 1,
+    slskdSearchResponsePollIntervalMs: 0,
+    slskdService: {
+      getSearchResponses: async () => ({ searchId: 'search', responses: [] }),
+      getSearchState: async () => ({ id: 'search', isComplete: true, responseCount: 1, responses: [] }),
+    },
+  });
+  const service = createLibraryDiscoveryDispatchService({
+    importCandidateService,
+    libraryDiscoveryRequestStore: {
+      claimNextReadyAutomaticDiscoveryRequest: async () => claimed.shift() ?? null,
+      recordDiscoverySearchFailure, recordDiscoverySearchSuccess, markDiscoveryRequestExhausted,
+    },
+    slskdService: { startSearch: async () => ({ id: 'search' }) },
+  });
+  const result = await service.dispatchReadyDiscoveryRequests();
+  assert.equal(result.failedCount, 1);
+  assert.equal(result.dispatchedCount, 0);
+  assert.equal(recordDiscoverySearchFailure.mock.calls[0].arguments[0].errorCode, 'slskd_search_responses_not_ready');
+  assert.equal(recordDiscoverySearchSuccess.mock.callCount(), 0);
+  assert.equal(markDiscoveryRequestExhausted.mock.callCount(), 0);
+});
 
 test('positive scoped discovery uses the owning atomic handoff after awaited readiness and bypasses ordinary selection', async () => {
   for (const ready of [true, false]) {

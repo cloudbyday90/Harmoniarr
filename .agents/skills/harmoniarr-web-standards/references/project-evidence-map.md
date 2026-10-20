@@ -1,5 +1,13 @@
 # Project standards-to-evidence map
 
+Search publication is owned by import-candidates/slskd-search-response-service.js.
+Its fast ordering controls distinguish completed state, finalized empty results,
+late bodies, bounded unavailability and cancelled authority. Candidate ingestion
+and discovery dispatch controls prove no premature transaction or successful
+no-match exhaustion. The native audio lane separately covers the ordinary
+provider-to-publication path. See
+[the outcome](../../../../docs/SLSKD_SEARCH_PUBLICATION_OUTCOME.md).
+
 The newer [native search method](native-search.md) replaces controlled HTTP
 responses with actual slskd global queries and compressed peer responses.
 native-search-codec/responder/cli/bridge.js under testing/slskd own bounded wire

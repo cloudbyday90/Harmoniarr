@@ -494,6 +494,49 @@ test('createImportCandidateService waits for asynchronous slskd search responses
   assert.equal(result.candidates[0].files[0].filename, '01 First.flac');
 });
 
+test('completed slskd state waits for response publication before candidate persistence', async (t) => {
+  const { pool } = createPool(t);
+  let stateReads = 0;
+  const response = { username: 'peer', files: [{ filename: 'Artist\\Release\\01 Track.flac', size: 321 }] };
+  const service = createImportCandidateService({
+    pool,
+    loadSettingsFn: async () => ({}),
+    recordAuditEventFn: t.mock.fn(),
+    replaceImportCandidateFilesFn: async (_id, files) => files,
+    upsertImportCandidateFn: async candidate => ({ id: 'published-candidate', ...candidate }),
+    sleepFn: async () => {},
+    slskdSearchResponsePollAttempts: 1,
+    slskdSearchResponsePollIntervalMs: 1,
+    slskdService: {
+      getSearchResponses: async () => ({ searchId: 'publication-gap', responses: [] }),
+      getSearchState: async () => ({ id: 'publication-gap', isComplete: true, responseCount: 1,
+        responses: ++stateReads === 1 ? [] : [response] }),
+    },
+  });
+  const result = await service.ingestSlskdSearchResponses({ searchId: 'publication-gap' });
+  assert.equal(result.candidateCount, 1);
+  assert.equal(result.candidates[0].id, 'published-candidate');
+  assert.equal(pool.connect.mock.callCount(), 1);
+});
+
+test('unpublished slskd responses refuse ingestion before opening a transaction', async (t) => {
+  const { pool } = createPool(t);
+  const service = createImportCandidateService({
+    pool,
+    loadSettingsFn: async () => ({}),
+    recordAuditEventFn: t.mock.fn(),
+    sleepFn: async () => {},
+    slskdSearchResponsePollAttempts: 1,
+    slskdSearchResponsePollIntervalMs: 0,
+    slskdService: {
+      getSearchResponses: async () => ({ searchId: 'unpublished', responses: [] }),
+      getSearchState: async () => ({ id: 'unpublished', isComplete: true, responseCount: 1, responses: [] }),
+    },
+  });
+  await assert.rejects(service.ingestSlskdSearchResponses({ searchId: 'unpublished' }), { code: 'slskd_search_responses_not_ready' });
+  assert.equal(pool.connect.mock.callCount(), 0);
+});
+
 test('createImportCandidateService returns zero-candidate ingestion diagnostics without raw provider details', async (t) => {
   const { pool } = createPool(t);
   const service = createImportCandidateService({

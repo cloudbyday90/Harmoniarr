@@ -1,5 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 20 [search-publication rebuild outcome](LOCAL_DOCKER_SEARCH_PUBLICATION_OUTCOME.md)
+records the current no-cache image, three intended server-file changes,
+preserved data/admin and passing readiness-only check. The separate
+[publication outcome](SLSKD_SEARCH_PUBLICATION_OUTCOME.md) covers bounded waiting,
+truthful empty results, cancellation and the passing ordinary native path.
+Existing provider queue attention remains an operational follow-up.
+
 The October 20 [native search rebuild outcome](LOCAL_DOCKER_NATIVE_SEARCH_OUTCOME.md)
 records the latest no-cache image, identical runtime inventory, preserved data/
 admin and passing readiness-only check. The [native search outcome](NATIVE_SEARCH_OUTCOME.md)

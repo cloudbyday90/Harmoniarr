@@ -8,6 +8,8 @@ description: "Apply and verify web standards for Harmoniarr UI commands, forms, 
 For native query and compressed peer-response qualification, read
 [native search](references/native-search.md). It connects reviewed protocol
 identity, bounded input and provenance to actual provider acceptance.
+That reference also owns completed-state/body publication gaps: bounded waiting,
+truthful empty results, current authority and separate native/ordering evidence.
 
 For canonical search through ingestion and acquisition, use
 [discovery provenance](references/discovery-provenance.md). It distinguishes

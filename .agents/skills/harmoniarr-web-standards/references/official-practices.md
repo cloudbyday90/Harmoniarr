@@ -1,5 +1,12 @@
 # Official practices by boundary
 
+Search finalization uses
+[publication research](../../../../docs/SLSKD_SEARCH_PUBLICATION_RESEARCH_2026_10.md).
+Inspect the released vendor's state/count/final-body order; completion flags are
+not a cross-service publication guarantee. W3C provenance informs source identity
+by inference, OWASP/IETF inform bounded public errors, and Node timer docs limit
+timing claims. Preserve existing domain errors and per-request timeouts.
+
 Native audio publication uses the
 [audio research](../../../../docs/NATIVE_AUDIO_IMPORT_RESEARCH_2026_10.md):
 ffprobe stream/error observations, OWASP content validation by inference,

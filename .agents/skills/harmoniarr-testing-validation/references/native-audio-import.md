@@ -49,3 +49,12 @@ assert queued event and required audit separately, without changing production
 best-effort semantics. Verify snapshot/migration anchors, unknown-type refusal
 and browser visibility/focus/filtering. Explicit queued preparation stays visible
 between automatic milestones and must not imply provider acceptance.
+
+For search publication timing, use fast injected ordering and cancellation
+controls before repeating native audio. Cover completion at the observation
+budget boundary, late bodies, finalized zero, persistent unavailability and
+original read failures. Assert no candidate transaction on unavailable/cancelled
+evidence and no successful no-match cooldown/exhaustion. The existing native
+audio lane verifies actual ordinary provider ingestion/publication; it does not
+force the released provider's internal finalization race. Keep those claims
+separate. See docs/SLSKD_SEARCH_PUBLICATION_DESIGN.md.

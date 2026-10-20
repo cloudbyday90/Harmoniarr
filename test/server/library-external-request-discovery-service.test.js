@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createLibraryExternalRequestDiscoveryService } from '../../src/server/library/library-external-request-discovery-service.js';
+import { createImportCandidateService } from '../../src/server/import-candidates/import-candidate-service.js';
 
 function createFixture(t) {
   const state = {
@@ -59,6 +60,23 @@ test('two targets approving one release receive distinct searches and independen
   assert.notEqual(first.searchId, second.searchId);
   assert.equal(first.metadataReleaseId, second.metadataReleaseId);
   assert.deepEqual(fixture.dependencies.importCandidateService.ingestSlskdSearchResponses.mock.calls.map((call) => call.arguments[0].requestOwnership.sourceRequestedForUserId), ['target-a', 'target-b']);
+});
+
+test('external discovery rechecks cancellation during response polling before another provider read or candidate transaction', async (t) => {
+  const fixture = createFixture(t);
+  const connect = t.mock.fn(async () => assert.fail('Cancelled polling cannot open a candidate transaction'));
+  const getSearchState = t.mock.fn(async () => assert.fail('Cancelled polling cannot continue reading the provider'));
+  const importService = createImportCandidateService({
+    pool: { connect },
+    loadSettingsFn: async () => ({}),
+    sleepFn: async () => { fixture.state.request.requestState = 'cancelled'; },
+    slskdSearchResponsePollIntervalMs: 1,
+    slskdService: { getSearchResponses: async () => ({ searchId: 'search-1', responses: [] }), getSearchState },
+  });
+  fixture.dependencies.importCandidateService.ingestSlskdSearchResponses = importService.ingestSlskdSearchResponses;
+  await assert.rejects(discover(fixture), { code: 'operation_run_cancelled' });
+  assert.equal(connect.mock.callCount(), 0);
+  assert.equal(getSearchState.mock.callCount(), 0);
 });
 
 for (const scenario of ['cancelled', 'retargeted', 'disabled', 'plex_ineligible', 'missing_target']) {

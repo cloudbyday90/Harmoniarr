@@ -4,6 +4,12 @@ Harmoniarr is a self-hosted, Docker-hosted music library manager inspired by Lid
 
 The repository contains the Node.js ESM server, Vue client, PostgreSQL schema, automated validation, and design documents. The platform is under active development toward its first release.
 
+Search ingestion now distinguishes completed provider state from published
+response bodies. See the [design](docs/SLSKD_SEARCH_PUBLICATION_DESIGN.md),
+[official recommendations](docs/SLSKD_SEARCH_PUBLICATION_RESEARCH_2026_10.md) and
+[validation outcome](docs/SLSKD_SEARCH_PUBLICATION_OUTCOME.md) for bounded polling,
+truthful empty results and cancellation checks.
+
 Canonical development/CI validation uses Node **24.22.0** from `.nvmrc` and npm
 **12.0.2**. Select that Node version with your version manager or a verified local
 installation before `npm ci` and `npm run validate:fast`. `npm run check:node-baseline`

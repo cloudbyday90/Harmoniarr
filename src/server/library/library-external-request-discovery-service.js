@@ -80,6 +80,7 @@ export function createLibraryExternalRequestDiscoveryService({
     const result = await importCandidateService.ingestSlskdSearchResponses({
       actorUserId: triggeredByUserId,
       albumTitle: intent.releaseTitle,
+      assertSearchCurrent: assertCurrentTarget,
       beforePersistCandidates: assertCurrentTarget,
       discoveryScope: { metadataReleaseId: intent.metadataReleaseId },
       expectedDurationSeconds: expectations?.expectedDurationSeconds ?? null,
