@@ -19,6 +19,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, toValue, watch } from 'vue';
 import { fetchMissingMusicDecisionDetail as defaultFetchMissingMusicDecisionDetail } from '../lib/missing-music-api.js';
 import { createLatestRequestGate } from '../lib/latest-request-gate.js';
+import { projectSlskdSearchDiagnostics } from '../../shared/slskd-search-diagnostics.js';
 
 function normalizeDecisionId(value) {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
@@ -33,6 +34,7 @@ function normalizeDetail(payload) {
     checkedAt: payload.checkedAt ?? null,
     decision: payload.decision,
     qualityEvidence: payload.qualityEvidence ?? null,
+    searchDiagnostics: projectSlskdSearchDiagnostics(payload.searchDiagnostics),
     libraryAddRecovery: payload.libraryAddRecovery ?? null,
     permissions: {
       canAddToLibrary: payload.permissions?.canAddToLibrary === true,

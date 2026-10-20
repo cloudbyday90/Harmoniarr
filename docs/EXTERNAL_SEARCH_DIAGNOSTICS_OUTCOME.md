@@ -78,7 +78,8 @@ and installed Vue consumer inputs match the retained failing TypeScript 7 candid
 and passing TypeScript 6 control. No PR merge/rebase/closure, dependency update,
 new branch, release, tag or version change was performed.
 
-Next: apply the same bounded, unit-aware diagnostic approach to Missing Music.
-Its current `Filtered` detail adds ignored-response counts to excluded-file
-counts; replace that mixed-unit total with separate cause counts and truthful
-correction guidance while preserving canonical action ownership.
+Shared-search count work is now implemented in the
+[separate outcome](MISSING_SEARCH_COUNTS_OUTCOME.md). Source tracing located the
+old mixed total in advanced Wanted and added bounded canonical inspector facts
+through its separate DTO/composable. Next: role-aware correction destinations for
+these causes in canonical Missing Music, preserving existing action ownership.

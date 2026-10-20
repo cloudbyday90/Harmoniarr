@@ -713,11 +713,11 @@ test('buildDiscoveryDispatchResult explains zero-candidate ingestion diagnostics
 
   assert.equal(result.label, 'No candidates');
   assert.equal(result.tone, 'warning');
-  assert.equal(result.message, 'Soulseek responded, but every file matched a blocked title term.');
-  assert.ok(result.details.some((detail) => detail.label === 'Responses' && detail.value === '2'));
+  assert.equal(result.message, 'Every recorded provider file matched a blocked title term.');
+  assert.ok(result.details.some((detail) => detail.label === 'Provider responses' && detail.value === '2'));
   assert.ok(result.details.some((detail) => detail.label === 'Provider files' && detail.value === '3'));
-  assert.ok(result.details.some((detail) => detail.label === 'Filtered' && detail.value === '3'));
-  assert.ok(result.details.some((detail) => detail.label === 'Reason' && detail.value.includes('blacklisted_files')));
+  assert.ok(result.details.some((detail) => detail.label === 'Files excluded by title' && detail.value === '3'));
+  assert.equal(result.details.some(detail => ['Filtered', 'Reason'].includes(detail.label)), false);
   assert.equal(JSON.stringify(result).includes('apiKey'), false);
 });
 

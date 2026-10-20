@@ -30,3 +30,17 @@ same-UUID retry. Use cheap controls for invalid/unknown/private fields and stale
 or mismatched summaries. In the browser verify actual route navigation, keyboard
 focus visibility, mobile targets and Refresh focus. A structural ARIA check does
 not establish screen-reader announcements or full conformance.
+
+For shared-search count work, read [the design](../../../../docs/MISSING_SEARCH_COUNTS_DESIGN.md)
+and [source tradeoffs](../../../../docs/MISSING_SEARCH_COUNTS_RESEARCH_2026_10.md).
+The old mixed `Filtered` total is in advanced Activity > Wanted; canonical Missing
+Music has its own server DTO, composable normalizer and inspector. Trace all three
+before treating a presentation-helper change as shipped canonical behavior.
+Preserve the new bounded field through the client adapter; test actual rendering.
+Discovery persists ready/cooldown/blocked, not operation-run statuses; use pending
+continuation/failure evidence to test active/refused work in PostgreSQL fixtures.
+Recorded zero responses alone do not establish final publication or grant Search
+again. Keep external recovery's positive-response distinction when sharing numeric
+projection, and hide old canonical causes after a new intent or later failure.
+Keep response and file labels separate and use adjacent term/value assertions in
+description lists. Sharing a presenter does not imply sharing command authority.

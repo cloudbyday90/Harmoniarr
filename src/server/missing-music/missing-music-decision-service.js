@@ -23,6 +23,7 @@ import {
   resolveMissingMusicDecisionScope,
 } from './missing-music-decision-scope-policy.js';
 import { buildMissingMusicMatchChoices } from './missing-music-match-choice-projection.js';
+import { buildMissingMusicSearchDiagnostics } from './missing-music-search-diagnostics-policy.js';
 import { canStartMissingMusicDownload } from './missing-music-download-start-policy.js';
 import { canReviewMissingMusicDownload } from './missing-music-download-review-handoff-policy.js';
 import { canViewMissingMusicDownloader } from './missing-music-downloader-handoff-policy.js';
@@ -334,6 +335,7 @@ export function createMissingMusicDecisionService({
       decision,
       matchChoices,
       qualityEvidence: buildPublicQualityEvidence(projectedRelease.quality),
+      searchDiagnostics: buildMissingMusicSearchDiagnostics(target.release),
       libraryAddRecovery: buildPublicLibraryAddRecovery(target.release.libraryAddRecoveryFacts),
       permissions: {
         canReviewDownloadHandoff: canReviewMissingMusicDownload({ actorUser, targetUser: target.targetUser, release: target.release }),

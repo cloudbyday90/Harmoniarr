@@ -137,6 +137,20 @@ test('useMissingMusicDecisionDetail turns a scoped not-found response into an un
   app.unmount();
 });
 
+test('decision detail retains bounded search counts, clears stale reads and does not infer command permissions', async t => {
+  const payload = createDetail();
+  const counts = { provider: 'slskd', candidateCount: 0, responseCount: 2, responseFileCount: 4, ignoredUserResponseCount: 1 };
+  payload.searchDiagnostics = { ...counts, reasonCodes: ['private'], username: 'private-peer' };
+  payload.permissions.canSearchAgain = false;
+  const { app, decisionDetail } = mountDecisionDetail({ decisionId: 'wanted-amber', fetchMissingMusicDecisionDetail: async () => payload });
+  t.after(() => app.unmount()); await decisionDetail.load();
+  assert.equal(decisionDetail.detail.value.searchDiagnostics.ignoredUserResponseCount, 1);
+  assert.doesNotMatch(JSON.stringify(decisionDetail.detail.value.searchDiagnostics), /private/);
+  assert.equal(decisionDetail.detail.value.permissions.canSearchAgain, false);
+  payload.searchDiagnostics = null; await decisionDetail.load();
+  assert.equal(decisionDetail.detail.value.searchDiagnostics, null);
+});
+
 test('decision detail retains the bounded quality projection and server fallback permission', async (t) => {
   const payload = createDetail();
   payload.qualityEvidence = { code: 'below_minimum', profileCode: 'lossless_archive', formats: ['mp3'], bitrateKbps: 128 };

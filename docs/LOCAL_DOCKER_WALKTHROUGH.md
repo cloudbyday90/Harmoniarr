@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
-The October 20 [search-diagnostics rebuild](LOCAL_DOCKER_EXTERNAL_SEARCH_DIAGNOSTICS_OUTCOME.md)
+The October 20 [shared-search count rebuild](LOCAL_DOCKER_MISSING_SEARCH_COUNTS_OUTCOME.md)
 records the current no-cache image, preserved admin/data and passing readiness.
+The [feature outcome](MISSING_SEARCH_COUNTS_OUTCOME.md) covers canonical/advanced
+unit-aware diagnostics, scoped reads and unchanged search authority.
+
+The October 20 [search-diagnostics rebuild](LOCAL_DOCKER_EXTERNAL_SEARCH_DIAGNOSTICS_OUTCOME.md)
+records the preceding no-cache image, preserved admin/data and passing readiness.
 The [feature outcome](EXTERNAL_SEARCH_DIAGNOSTICS_OUTCOME.md) covers bounded
 filtering explanations, current-job evidence and keyboard correction guidance.
 

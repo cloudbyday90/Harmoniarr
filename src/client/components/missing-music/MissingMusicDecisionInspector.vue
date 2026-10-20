@@ -34,6 +34,7 @@ import { useMissingMusicLibraryAdd } from '../../composables/useMissingMusicLibr
 import { useMissingMusicDownloadReviewHandoff } from '../../composables/useMissingMusicDownloadReviewHandoff.js';
 import { createMissingMusicReleaseMutationGate } from '../../lib/missing-music-release-mutation-gate.js';
 import MissingMusicQualityEvidence from './MissingMusicQualityEvidence.vue';
+import MissingMusicSearchDiagnostics from './MissingMusicSearchDiagnostics.vue';
 import MissingMusicCommandFeedback from './MissingMusicCommandFeedback.vue';
 import MissingMusicLibraryAddRecovery from './MissingMusicLibraryAddRecovery.vue';
 import MissingMusicLibraryAddAction from './MissingMusicLibraryAddAction.vue';
@@ -329,6 +330,8 @@ defineExpose({ busy, refresh: decisionDetail.refresh });
       <p v-if="presentation.isReadOnly" class="missing-music-inspector__account-note">
         {{ presentation.accountNote }}
       </p>
+
+      <MissingMusicSearchDiagnostics :detail="decisionDetail.detail.value" />
 
       <MissingMusicQualityEvidence
         :detail="decisionDetail.detail.value"
