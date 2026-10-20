@@ -22,6 +22,12 @@ in Missing Music; Background Jobs links to the current decision. See the
 [recommendation stack](docs/SEARCH_RECOVERY_RESEARCH_2026_10.md) and
 [tested outcome](docs/SEARCH_RECOVERY_OUTCOME.md).
 
+Approved external-request searches now have target-owned Search again recovery
+with atomic new-run/audit handling, durable replay and stale Retry refusal. See
+the [design](docs/EXTERNAL_SEARCH_RECOVERY_DESIGN.md),
+[official tradeoffs](docs/EXTERNAL_SEARCH_RECOVERY_RESEARCH_2026_10.md) and
+[validation outcome](docs/EXTERNAL_SEARCH_RECOVERY_OUTCOME.md).
+
 Canonical development/CI validation uses Node **24.22.0** from `.nvmrc` and npm
 **12.0.2**. Select that Node version with your version manager or a verified local
 installation before `npm ci` and `npm run validate:fast`. `npm run check:node-baseline`

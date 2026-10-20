@@ -45,12 +45,13 @@ export function createLibraryExternalRequestDiscoveryRunStore({ getPoolFn = getP
     queryable = null,
     triggerSource = 'operator_review',
     triggeredByUserId = null,
+    searchRecoveryOfRunId = null,
   }) {
     return normalizeRun(await operationRunStore.createOperationRun({
       maxAttempts: 1,
       queryable,
       status: 'pending',
-      summary: { intentId, mediaRequestId, triggerSource },
+      summary: { intentId, mediaRequestId, triggerSource, ...(searchRecoveryOfRunId ? { searchRecoveryOfRunId } : {}) },
       triggeredByUserId,
     }));
   }

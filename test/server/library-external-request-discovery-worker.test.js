@@ -29,6 +29,19 @@ function createFixture(t, discoverExternalRequestRelease) {
 
 const args = { intentId: 'intent', mediaRequestId: 'request', runId: 'run', triggeredByUserId: 'admin' };
 
+for (const code of ['slskd_search_continuation_expired', 'slskd_search_continuation_unavailable']) {
+  test(`${code} persists actionable failure without private provider evidence`, async t => {
+    const fixture = createFixture(t, async () => { throw Object.assign(new Error('confidential /mnt/data?api_key=private'), { code }); });
+    await (await fixture.worker.startWorkerRun(args)).completion;
+    await fixture.worker.close();
+    const failed = fixture.dependencies.markRunFailed.mock.calls[0].arguments[0];
+    assert.equal(failed.summary.failureCode, code);
+    assert.match(failed.errorMessage, /Choose Search again/);
+    assert.doesNotMatch(JSON.stringify(failed), /confidential|api_key|\/mnt\/data/);
+    assert.equal(fixture.dependencies.markRunCompleted.mock.callCount(), 0);
+  });
+}
+
 test('external discovery worker completes search as import review without auto-download', async (t) => {
   const fixture = createFixture(t, async () => ({ candidateCount: 2, fileCount: 8, searchId: 'search' }));
   await (await fixture.worker.startWorkerRun(args)).completion;

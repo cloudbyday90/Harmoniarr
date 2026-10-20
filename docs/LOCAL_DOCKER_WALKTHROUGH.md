@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 20 [approved external-search recovery rebuild](LOCAL_DOCKER_EXTERNAL_SEARCH_RECOVERY_OUTCOME.md)
+records the current no-cache image, preserved admin/data and passing readiness.
+The [feature outcome](EXTERNAL_SEARCH_RECOVERY_OUTCOME.md) covers explicit new-run
+consent, account locks, replay, stale Retry refusal and rendered recovery.
+
 The October 20 [saved-search recovery rebuild](LOCAL_DOCKER_SEARCH_RECOVERY_OUTCOME.md)
-records the current no-cache image, rebuilt client, preserved admin/data and
+records the preceding no-cache image, rebuilt client, preserved admin/data and
 passing readiness-only check. The [feature outcome](SEARCH_RECOVERY_OUTCOME.md)
 documents explicit Search again recovery and its database/browser evidence.
 

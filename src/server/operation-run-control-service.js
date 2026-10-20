@@ -145,10 +145,14 @@ export function createOperationRunControlService({
       throw createApiError(409, 'operation_run_not_retryable', 'A retired download request cannot be restarted');
     }
 
-    return operationQueueStore.scheduleRetry({
+    const retried = await operationQueueStore.scheduleRetry({
       maxAttempts: Math.max(existingRun.maxAttempts ?? 1, (existingRun.attemptCount ?? 0) + 1),
       runId,
     });
+    if (!retried && existingRun.operationType === 'library_external_request_discovery') {
+      throw createApiError(409, 'operation_run_not_retryable', 'This search run was replaced. Review the current approved search.');
+    }
+    return retried;
   }
 
   return {

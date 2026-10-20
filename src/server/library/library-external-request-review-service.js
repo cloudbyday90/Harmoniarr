@@ -21,6 +21,7 @@ import { createLibraryExternalRequestDiscoveryRunStore } from './library-externa
 import { createLibraryExternalRequestReviewStore } from './library-external-request-review-store.js';
 import { buildExternalRequestPreparationState, projectExternalRequestReviewItem } from './library-external-request-review-evidence.js';
 import { createLibraryExternalRequestReviewAccessService, normalizeExternalReviewId as uuid } from './library-external-request-review-access-service.js';
+import { createLibraryExternalRequestSearchRecoveryService } from './library-external-request-search-recovery-service.js';
 
 function conflict() {
   return createApiError(409, 'external_request_review_conflict', 'This provider album or release already has a different approval. Review the existing decision.');
@@ -44,6 +45,8 @@ export function createLibraryExternalRequestReviewService({
   assertMaintenanceWriteAllowed = async () => {},
   metadataSearchService = null,
   collectionReviewService = null,
+  searchRecoveryService = createLibraryExternalRequestSearchRecoveryService({ reviewStore, mediaRequestStore,
+    discoveryRunStore, getAppUserById, withTransaction, recordAuditEventFn, assertMaintenanceWriteAllowed }),
 } = {}) {
   const { loadRequest, assertEligibleTarget } = createLibraryExternalRequestReviewAccessService({ mediaRequestStore, getAppUserById });
 
@@ -54,18 +57,18 @@ export function createLibraryExternalRequestReviewService({
 
   async function buildReview({ mediaRequestId, cursor, limit }) {
     const collectionReview = await collectionReviewService?.buildReview({ mediaRequestId, cursor, limit });
-    if (collectionReview) return collectionReview;
+    if (collectionReview) return searchRecoveryService.projectRecovery({ review: collectionReview, request: await loadRequest(mediaRequestId) });
     const request = await loadRequest(mediaRequestId);
     const rows = await providerIngestRequestStore.listProviderIngestRequests({ mediaRequestId });
     const intents = await reviewStore.listIntents({ mediaRequestId });
     const activeRun = await activePreparation(mediaRequestId);
-    return {
+    return searchRecoveryService.projectRecovery({ request, review: {
       items: rows.map(projectExternalRequestReviewItem),
       intents,
       ...(collectionReviewService ? { collection: null,
         canStartCollection: !activeRun && intents.length === 0 && ['playlist', 'artist'].includes(normalizeExternalMediaSource(request.sourceUrl)?.resourceType) } : {}),
       preparation: buildExternalRequestPreparationState({ items: rows, activeRun }),
-    };
+    } });
   }
 
   async function searchReleases({ mediaRequestId, artistName, releaseTitle }) {
@@ -169,5 +172,5 @@ export function createLibraryExternalRequestReviewService({
     });
   }
 
-  return { buildReview, searchReleases, approveRelease, recoverPreparation };
+  return { buildReview, searchReleases, approveRelease, recoverPreparation, searchAgain: searchRecoveryService.searchAgain };
 }

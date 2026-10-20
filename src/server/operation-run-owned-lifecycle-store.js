@@ -53,6 +53,7 @@ export function createOperationRunOwnedLifecycleStore({ getPoolFn = getPool, ope
       UPDATE operation_runs SET ${sets[action]},
       claimed_at=NULL,claimed_by_instance_id=NULL${preserves ? '' : `,
         summary=CASE WHEN summary ? 'musicQueueRecovery' OR summary ? 'downloadPreparationProtocol' OR summary->>'triggerSource'='missing_music_manual'
+          OR (operation_type='library_external_request_discovery' AND summary ? 'searchRecoveryOfRunId')
           THEN COALESCE(summary,'{}'::jsonb)||$2::jsonb ELSE $2::jsonb END`}
       WHERE id=$1::uuid AND ${writableExecutionRunSql('operation_runs')}
         ${action === 'paused' ? "AND status IN ('pending','running')" : ''}

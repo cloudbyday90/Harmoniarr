@@ -7,10 +7,11 @@
 -->
 
 <script setup>
-import { computed, onBeforeUnmount, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useExternalRequestReview } from '../composables/useExternalRequestReview.js';
 import ExternalCollectionReviewControls from './ExternalCollectionReviewControls.vue';
 import ExternalRequestReviewItem from './ExternalRequestReviewItem.vue';
+import ExternalRequestSearchRecovery from './ExternalRequestSearchRecovery.vue';
 
 const props = defineProps({ mediaRequest: { type: Object, required: true } });
 const emit = defineEmits(['updated']);
@@ -21,6 +22,9 @@ const {
   nextPage, previousPage, exclude, startCollection, finalizeCollection,
 } = useExternalRequestReview();
 const targetName = computed(() => props.mediaRequest.requestedForUser?.username ?? 'the request target');
+const pendingRecoveries = ref(new Set());
+const recoveryBusy = computed(() => pendingRecoveries.value.size > 0);
+const busy = computed(() => isLoading.value || isMutating.value || recoveryBusy.value);
 const visibleItems = computed(() => collection.value ? items.value : items.value.filter((item) => item.reviewable
   && !intents.value.some((intent) => intent.providerKey === item.providerKey)));
 
@@ -28,18 +32,30 @@ const canDecide = computed(() => collection.value?.status === 'ready'
   && !collection.value.reviewedAt && collection.value.targetMatches !== false);
 
 watch([() => props.mediaRequest.id, () => props.mediaRequest.requestedForUser?.id], () => {
+  pendingRecoveries.value = new Set();
   reset();
   void refresh();
 }, { immediate: true });
 onBeforeUnmount(reset);
 
 function refresh() {
-  if (isLoading.value || isMutating.value) return false;
+  if (busy.value) return false;
   return load({ mediaRequestId: props.mediaRequest.id });
 }
 
 async function save(action, ...args) {
+  if (recoveryBusy.value) return;
   if (await action(...args)) emit('updated');
+}
+
+function setRecoveryPending(intentId, pending) {
+  const next = new Set(pendingRecoveries.value);
+  if (pending) next.add(intentId); else next.delete(intentId);
+  pendingRecoveries.value = next;
+}
+
+function refreshRecoveredSearch() {
+  return load({ mediaRequestId: props.mediaRequest.id, preserveStatus: true });
 }
 
 function intentStatus(status) {
@@ -62,7 +78,7 @@ function belongsToPreviousTarget(intent) {
         <h2 id="external-review-heading" class="hx-card-title">Review external music</h2>
         <p class="hx-card-subtitle">Choose the matching local catalog edition to search for {{ targetName }}. Import candidates require review before download or import.</p>
       </div>
-      <button type="button" class="hx-btn" :aria-disabled="isLoading || isMutating" @click="refresh">Refresh review</button>
+      <button type="button" class="hx-btn" :aria-disabled="busy" @click="refresh">Refresh review</button>
     </header>
     <div class="hx-card-body hx-external-review-body">
       <div role="status" aria-atomic="true" class="hx-text-muted">{{ statusMessage }}</div>
@@ -71,13 +87,13 @@ function belongsToPreviousTarget(intent) {
       <ExternalCollectionReviewControls
         :collection="collection" :can-start-collection="canStartCollection" :preparation="preparation"
         :pagination="pagination" :page-number="pageNumber" :can-go-previous="canGoPrevious"
-        :busy="isLoading || isMutating" :target-name="targetName"
+        :busy="busy" :target-name="targetName"
         @start="save(startCollection)" @restart="save(startCollection, true)" @recover="save(recover)"
         @finalize="save(finalizeCollection)" @next="nextPage" @previous="previousPage"
       />
       <div v-if="!collection && !canStartCollection && preparation.canRecover" class="hx-external-review-recovery">
         <p class="hx-text-muted">{{ preparation.action === 'execute' ? 'Pending or failed provider items need metadata preparation before they can be reviewed.' : 'This request needs provider planning before music can be reviewed.' }}</p>
-        <button type="button" class="hx-btn" :disabled="isMutating || isLoading" @click="save(recover)">
+        <button type="button" class="hx-btn" :disabled="busy" @click="save(recover)">
           {{ isMutating ? 'Saving…' : preparation.action === 'execute' ? 'Prepare provider metadata' : 'Plan this external request' }}
         </button>
       </div>
@@ -86,7 +102,7 @@ function belongsToPreviousTarget(intent) {
       </p>
       <ExternalRequestReviewItem
         v-for="item in visibleItems" :key="item.collectionItemId || item.id" v-model:draft="drafts[item.id]"
-        :item="item" :target-name="targetName" :busy="isMutating || isLoading"
+        :item="item" :target-name="targetName" :busy="busy"
         :can-exclude="canDecide && Boolean(item.collectionItemId) && item.decision === 'pending'"
         @search="search(item.id)" @approve="save(approve, item.id)" @exclude="save(exclude, item.id)"
       />
@@ -97,6 +113,9 @@ function belongsToPreviousTarget(intent) {
             <span>{{ intent.artistName }} · {{ intent.releaseTitle }}</span>
             <span class="hx-pill">{{ intentStatus(intent.status) }}</span>
             <p v-if="belongsToPreviousTarget(intent)" class="hx-text-muted">Accepted for a previous target. Create a separate request to search for the current target.</p>
+            <ExternalRequestSearchRecovery :media-request-id="mediaRequest.id" :recipient-id="mediaRequest.requestedForUser?.id"
+              :intent="intent" :busy="busy" :refresh-review="refreshRecoveredSearch"
+              @pending="setRecoveryPending(intent.id, $event)" @updated="emit('updated')" />
           </li>
         </ul>
         <p class="hx-text-muted">Accepted searches retain their original target. Search completion does not mean music has been imported.</p>

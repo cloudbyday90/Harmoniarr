@@ -13,6 +13,7 @@ import {
   excludeExternalRequestCollectionItem, finalizeExternalRequestCollection,
   recoverExternalRequestPreparation, searchExternalRequestReleases,
   startExternalRequestCollection,
+  searchExternalRequestAgain,
 } from '../../src/client/lib/external-request-review-api.js';
 
 function setup(t) {
@@ -26,6 +27,17 @@ function setup(t) {
   });
   return calls;
 }
+
+test('Search again binds only expected run and sends durable key plus CSRF', async t => {
+  const calls = setup(t);
+  await searchExternalRequestAgain({ mediaRequestId: 'request/one', intentId: 'intent/one', expectedOperationRunId: 'old-run',
+    idempotencyKey: 'retained-key', requestedForUserId: 'forged' });
+  assert.equal(calls[0].url, '/api/v1/library/media-requests/request%2Fone/external-review/intents/intent%2Fone/search-again');
+  assert.equal(calls[0].options.method, 'POST');
+  assert.equal(calls[0].options.headers.get('Idempotency-Key'), 'retained-key');
+  assert.equal(calls[0].options.headers.get('X-CSRF-Token'), 'test-token');
+  assert.deepEqual(JSON.parse(calls[0].options.body), { expectedOperationRunId: 'old-run' });
+});
 
 test('external review reads encode the request path and carry the abort signal', async (t) => {
   const calls = setup(t);

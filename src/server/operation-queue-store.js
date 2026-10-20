@@ -177,6 +177,8 @@ export function createOperationQueueStore({
             claimed_by_instance_id = NULL
         WHERE id = $1
           AND ${writableExecutionRunSql('operation_runs')}
+          AND NOT (operation_type='library_external_request_discovery'
+            AND COALESCE(summary->>'externalSearchSuperseded','false')='true')
         RETURNING
           id,
           operation_type,

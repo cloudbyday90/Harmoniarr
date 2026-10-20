@@ -9,10 +9,12 @@
 import { createApiError } from '../auth.js';
 import { asyncRoute } from '../http.js';
 import { normalizeExternalRequestReviewError } from '../library/library-external-request-review-error.js';
+import { createControlPlaneIdempotencyService } from '../recovery/control-plane-idempotency-service.js';
 
 export function registerLibraryExternalRequestReviewRoutes(app, {
   externalRequestReviewService, externalRequestCollectionReviewService, requireSession, requireFreshAdminSession,
   requireCsrf, limitMediaRequestAdminMutation, getRequestMetadata,
+  executeIdempotentMutation = createControlPlaneIdempotencyService().executeIdempotentMutation,
 }) {
   async function review(work) {
     try {
@@ -52,6 +54,21 @@ export function registerLibraryExternalRequestReviewRoutes(app, {
       expectedRevision: request.body?.expectedRevision,
       actorUserId: session.appUserId, requestMetadata: getRequestMetadata(request),
     })) });
+  }));
+
+  app.post('/api/v1/library/media-requests/:mediaRequestId/external-review/intents/:intentId/search-again', limitMediaRequestAdminMutation, asyncRoute(async (request, response) => {
+    const session = await requireReviewSession(request, true);
+    requireCsrf(request, session);
+    const key = request.headers['idempotency-key'];
+    if (typeof key !== 'string' || !key.trim()) throw createApiError(400, 'idempotency_key_required', 'Keep the same command key when retrying this search request');
+    const command = { mediaRequestId: request.params.mediaRequestId, intentId: request.params.intentId,
+      expectedOperationRunId: request.body?.expectedOperationRunId };
+    const result = await executeIdempotentMutation({ actorUserId: session.appUserId, idempotencyKey: key,
+      operationScope: 'external-request.search-again', requestPayload: command,
+      executeMutation: async () => ({ statusCode: 202, body: await review(() => externalRequestReviewService.searchAgain({
+        ...command, actorUserId: session.appUserId, requestMetadata: getRequestMetadata(request),
+      })) }) });
+    response.status(result.statusCode ?? 202).json({ ok: true, ...result.body });
   }));
 
   app.post('/api/v1/library/media-requests/:mediaRequestId/external-review/recover', limitMediaRequestAdminMutation, asyncRoute(async (request, response) => {

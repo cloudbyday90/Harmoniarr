@@ -6,8 +6,14 @@
  */
 
 import { getSearchContinuationRecoveryMessage } from '../../shared/search-continuation-recovery.js';
+import { canRecoverExternalSearchRun } from '../../shared/external-request-search-recovery-policy.js';
 
 export function buildOperationSearchRecovery(run) {
+  if (canRecoverExternalSearchRun(run) && typeof run.summary.mediaRequestId === 'string'
+    && /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/iu.test(run.summary.mediaRequestId)) {
+    return { message: 'Review the approved release and choose Search again to request a new search. Job retry continues the saved search.',
+      label: 'Review approved release search', to: { path: `/app/requests/${run.summary.mediaRequestId}` } };
+  }
   if (run?.operationType !== 'library_discovery_dispatch'
     || !Array.isArray(run.summary?.failures)
     || !run.summary.failures.some((failure) => getSearchContinuationRecoveryMessage(failure?.code))) return null;

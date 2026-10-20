@@ -75,6 +75,7 @@ remote-source authenticity, full decoding or general standards conformance.
 Shared release recovery is now implemented in the separate
 [recovery outcome](SEARCH_RECOVERY_OUTCOME.md), including bounded Missing Music
 state, a Background Jobs handoff, explicit Search again intent, replay and browser
-status/focus evidence. Next: the equivalent explicit command for approved
-external-request discovery, whose intent/run authority is separate. No release,
+status/focus evidence. The separate [external recovery outcome](EXTERNAL_SEARCH_RECOVERY_OUTCOME.md)
+now qualifies the approved intent/run command too. Next: explicit fresh searches
+after completed zero-result external discovery. No release,
 tag, new application branch or PR merge is created here.

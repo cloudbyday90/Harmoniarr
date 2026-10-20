@@ -61,10 +61,9 @@ matrix was repeated for this state/UI change. Automated browser checks do not
 prove screen-reader announcements or full WCAG conformance. No release or tag is
 created.
 
-Next: add an explicit new-search command for an approved external-request release.
-Persist bounded expiry/absence on its owning job; lock and recheck the current
-media request, recipient and approved intent; queue a new run and update the
-intent atomically with required audit/replay. Keep old job Retry as read
-continuation. Repeated approval currently reuses the existing run, so it must not
-be presented as a recovery action. Prove terminal-only eligibility, disabled or
-replaced targets, active-run conflicts, concurrency, replay and rendered feedback.
+Approved external-request expiry/absence recovery is now implemented in the
+[separate outcome](EXTERNAL_SEARCH_RECOVERY_OUTCOME.md), including current
+recipient/intent locks, atomic new-run/audit handling, durable replay and a native
+stale Retry refusal. Next: explicit fresh searches after genuine zero-result
+completion, preserving deliberate cooldown/budget policy and the distinction
+between no matches and unavailable evidence.

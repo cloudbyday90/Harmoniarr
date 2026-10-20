@@ -53,3 +53,9 @@ export function recoverExternalRequestPreparation({ mediaRequestId }) {
     body: {},
   });
 }
+
+export function searchExternalRequestAgain({ mediaRequestId, intentId, expectedOperationRunId, idempotencyKey }) {
+  return apiRequest(`${reviewPath(mediaRequestId)}/intents/${encodeURIComponent(intentId)}/search-again`, {
+    method: 'POST', includeCsrf: true, headers: { 'Idempotency-Key': idempotencyKey }, body: { expectedOperationRunId },
+  });
+}

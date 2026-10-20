@@ -12,6 +12,8 @@ That reference also owns completed-state/body publication gaps: bounded waiting,
 truthful empty results, current authority and separate native/ordering evidence.
 It also owns durable search continuation, uncertain POST outcomes and the worker
 claim/cooldown path that must make a saved reservation reachable after restart.
+Use it for shared and approved external-search recovery, expected-run consent,
+retry supersession races and recipient eligibility lock waits.
 
 For canonical search through ingestion and acquisition, use
 [discovery provenance](references/discovery-provenance.md). It distinguishes

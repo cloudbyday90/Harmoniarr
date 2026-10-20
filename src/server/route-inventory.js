@@ -21,6 +21,7 @@ export const serverRouteInventory = Object.freeze([
   { method: 'GET', path: '/api/v1/library/media-requests/:mediaRequestId/external-review/releases', access: 'admin', area: 'library', kind: 'read' },
   { method: 'POST', path: '/api/v1/library/media-requests/:mediaRequestId/external-review/approve', access: 'admin', area: 'library', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/library/media-requests/:mediaRequestId/external-review/recover', access: 'admin', area: 'library', kind: 'mutation' },
+  { method: 'POST', path: '/api/v1/library/media-requests/:mediaRequestId/external-review/intents/:intentId/search-again', access: 'admin', area: 'library', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/library/media-requests/:mediaRequestId/external-review/collection/start', access: 'admin', area: 'library', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/library/media-requests/:mediaRequestId/external-review/collection/items/:collectionItemId/exclude', access: 'admin', area: 'library', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/library/media-requests/:mediaRequestId/external-review/collection/finalize', access: 'admin', area: 'library', kind: 'mutation' },

@@ -77,3 +77,27 @@ and focus after the refreshed result. Screen-reader announcements and complete
 WCAG conformance require separate evidence. The owning native test is
 `test/integration/missing-music-search-again.test.js`; the rendered recovery cases
 are in `test/browser/missing-music-decision-detail-browser-acceptance.test.js`.
+
+Approved external searches use their own
+[design](../../../../docs/EXTERNAL_SEARCH_RECOVERY_DESIGN.md) and
+[research](../../../../docs/EXTERNAL_SEARCH_RECOVERY_RESEARCH_2026_10.md).
+Bind explicit recovery to the approved intent and expected failed run. Recheck
+the current request/recipient under eligibility, request, intent and run locks;
+commit the replacement run, intent pointer, old-run supersession and required
+audit together. Retain the predecessor through worker terminal summaries so
+distinct command keys cannot turn a replay into another run.
+
+A read lock on the old run alone does not fence a previously admitted retry:
+update its supersession marker and condition the actual Retry UPDATE on that
+row. Prove the native lock wait, then refusal after commit, using an independent
+observer outside the saturated fixture pool. Also hold an account-disable write
+and prove eligibility is reread after its lock wait. Do not describe these
+database invariants as browser authorization or provider completion.
+
+Use the existing command cache and retain the exact expected run/key after an
+uncertain HTTP response, even if refreshed review shows the replacement run.
+Separate queued success from optional refresh failure; preserve focus moved
+elsewhere during the command. Keep Refresh focusable while loading with its
+existing guarded aria-disabled behavior. Native disabling can blur its invoker.
+The owning cases are `test/integration/external-request-search-recovery.test.js`
+and `test/browser/external-request-search-recovery.test.js`.

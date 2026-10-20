@@ -19,6 +19,7 @@
 import { createWorkerTaskLifecycle } from '../worker-task-lifecycle.js';
 import { withWorkerTaskCleanup } from '../worker-task-cleanup.js';
 import { drainWorkerLease } from '../worker-lease-cleanup.js';
+import { getExternalSearchRecoveryMessage } from '../../shared/external-request-search-recovery-policy.js';
 import { isOperationRunLeaseLostError } from '../operation-run-lease-error.js';
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
 import {
@@ -111,9 +112,11 @@ export function createLibraryExternalRequestDiscoveryWorker({
           finalLeaseStatus = 'failed';
           if (await markRunFailed({
             expectedLease: acquiredLease,
-            errorMessage: 'External request discovery failed. Review provider health and retry the background job.',
+            errorMessage: getExternalSearchRecoveryMessage(error?.code)
+              ?? 'External request discovery failed. Review provider health and retry the background job.',
             runId,
-            summary: { ...summary, currentStep: 'External request discovery failed' },
+            summary: { ...summary, currentStep: 'External request discovery failed',
+              ...(getExternalSearchRecoveryMessage(error?.code) ? { failureCode: error.code } : {}) },
           }) === false) { finalLeaseStatus = 'failed'; return; }
         }
       }

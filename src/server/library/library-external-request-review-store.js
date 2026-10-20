@@ -7,10 +7,14 @@
  */
 
 import { getPool } from '../database.js';
+import { getExternalSearchRecoveryMessage } from '../../shared/external-request-search-recovery-policy.js';
 
 const intentSelect = `
   SELECT intent.*, release.title AS release_title, artist.name AS artist_name,
-    release.metadata_release_group_id, run.status AS run_status
+    release.metadata_release_group_id, run.status AS run_status,
+    CASE WHEN run.operation_type='library_external_request_discovery'
+      AND run.summary->>'externalSearchSuperseded' IS DISTINCT FROM 'true'
+      THEN run.summary->>'failureCode' END AS search_failure_code
   FROM library_external_request_release_intents intent
   JOIN metadata_releases release ON release.id = intent.metadata_release_id
   JOIN metadata_release_groups release_group ON release_group.id = release.metadata_release_group_id
@@ -30,6 +34,7 @@ function mapIntent(row) {
     createdAt: row.created_at,
     operationRunId: row.operation_run_id,
     status: row.run_status ?? null,
+    ...(getExternalSearchRecoveryMessage(row.search_failure_code) ? { searchFailureCode: row.search_failure_code } : {}),
     artistName: row.artist_name,
     releaseTitle: row.release_title,
     releaseGroupId: row.metadata_release_group_id,
