@@ -56,7 +56,7 @@ services:
       - /tmp:size=32m,mode=1777
 
   slskd:
-    image: slskd/slskd:0.26.0
+    image: slskd/slskd:0.26.1
     restart: unless-stopped
     user: "${PUID:-1000}:${PGID:-1000}"
     read_only: true
