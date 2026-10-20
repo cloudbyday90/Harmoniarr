@@ -6,6 +6,23 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Delivered slice: Isolated native provider receipts (2026-10-20)
+
+- Add a separate opt-in native lane with actual slskd and a narrow owned
+  central/peer fixture. Inspect immutable images, one internal network,
+  non-root/read-only mounts and no published ports before API commands.
+- Prove native 201, exact provider receipt identities, remote queue reads and
+  GET recovery after controlled completed-response loss without another POST.
+  Keep zero transferred bytes distinct from download/import completion.
+- See the [design](NATIVE_SLSKD_FIXTURE_DESIGN.md),
+  [research/tradeoffs](NATIVE_SLSKD_FIXTURE_RESEARCH_2026_10.md) and
+  [outcome](NATIVE_SLSKD_FIXTURE_OUTCOME.md) for executed scope and retained failures.
+- Refresh random [PR 48](OPEN_PR_48_NATIVE_FIXTURE_EVALUATION.md); its unchanged
+  rejected head remains inapplicable to the current language-server toolchain.
+- Next: review and qualify slskd 0.26.1 against this native fixture, preserving
+  exact wire guards and checking its cancellation/retry changes. Qualify the
+  announced Node security patch when it is actually published.
+
 ## Delivered slice: Stable provider wire-version admission (2026-10-20)
 
 - Admit only the observed stable 0.26.0.0 wire string as batch, retaining raw
@@ -16,8 +33,8 @@ Database model source: `docs/DATABASE_MODEL.md`
   [outcome](SLSKD_WIRE_VERSION_OUTCOME.md) for actual evidence and limits.
 - Apply random [PR 48](OPEN_PR_48_WIRE_VERSION_EVALUATION.md) locally; retain the
   TypeScript 7 language-server failure and passing restored TypeScript 6 control.
-- Next: add a wholly isolated native provider/peer fixture for successful batch
-  admission and exact receipt reads before qualifying slskd 0.26.1. Keep its
+- Follow-up delivered: [native provider admission/receipts](NATIVE_SLSKD_FIXTURE_OUTCOME.md)
+  establishes the stable transport before qualifying slskd 0.26.1. Keep its
   canary/future forms blocked. Qualify the announced Node security patch once
   published; no patch version or remediation is invented in advance.
 

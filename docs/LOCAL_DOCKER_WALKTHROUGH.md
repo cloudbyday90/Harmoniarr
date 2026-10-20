@@ -1,5 +1,11 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 20 [native-fixture rebuild outcome](LOCAL_DOCKER_NATIVE_FIXTURE_OUTCOME.md)
+records the latest no-cache image, preserved data/admin and readiness-only pass.
+The separate opt-in native fixture publishes no ports and proves stable-provider
+queue admission with zero media bytes. Walkthrough provider attention remains
+a separate operational follow-up.
+
 The October 20 [wire-version rebuild outcome](LOCAL_DOCKER_WIRE_VERSION_OUTCOME.md)
 records the latest no-cache image, preserved data/admin and passing readiness-only
 check. The pinned provider's stable wire form now passes preparation; native

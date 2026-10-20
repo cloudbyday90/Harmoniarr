@@ -33,6 +33,24 @@ batch transport while retaining its raw durable identity. See the
 candidate's 0.26.1.0 form; that upgrade remains blocked pending separate
 qualification. Startup health alone does not establish download readiness.
 
+The explicit native provider lane runs slskd against an owned protocol fixture,
+with no public account or published ports. Select canonical Node and local images:
+
+```powershell
+$env:HARMONIARR_NATIVE_APP_IMAGE = (docker image inspect --format '{{.Id}}' harmoniarr:walkthrough-local).Trim()
+$env:HARMONIARR_NATIVE_SLSKD_IMAGE = (docker image inspect --format '{{.Id}}' slskd/slskd:0.26.0).Trim()
+npm run validate:native-slskd
+```
+
+The app image must have the current lock and canonical runtime. The lane mounts
+current server/shared/fixture source read-only and verifies native 201 receipts,
+exact reads and GET recovery after controlled response loss. It proves remote
+queue admission with zero media bytes, separately from completed downloads and
+imports. It is opt-in and adds no Docker startup to the fast gate. See the
+[design](docs/NATIVE_SLSKD_FIXTURE_DESIGN.md),
+[official research and tradeoffs](docs/NATIVE_SLSKD_FIXTURE_RESEARCH_2026_10.md) and
+[outcome](docs/NATIVE_SLSKD_FIXTURE_OUTCOME.md).
+
 Service worker activation preserves in-progress forms unless this page requests
 an update. The [reload outcome](docs/PWA_SERVICE_WORKER_RELOAD_OUTCOME.md) records
 the first-install login fix and enabled-worker regression coverage.

@@ -1,5 +1,12 @@
 # Project standards-to-evidence map
 
+Native slskd admission belongs to testing/slskd's bounded wire codec, socket
+factory, protocol policy, Docker runtime and actual-client scenario. The explicit
+test/native lane owns real 201/receipt and GET-recovery proof; routine fast tests
+own malformed frames, scope refusal and cleanup controls. See
+docs/NATIVE_SLSKD_FIXTURE_OUTCOME.md. Queued zero-byte receipts cannot establish
+download completion, library availability or support for a future provider.
+
 Stable provider wire admission belongs to slskd-download-protocol-policy.js.
 The exact 0.26.0.0 entry fixes current preparation while keeping old bindings,
 future/canary refusal and raw version identity. docs/SLSKD_WIRE_VERSION_OUTCOME.md

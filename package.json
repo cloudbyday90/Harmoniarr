@@ -70,6 +70,7 @@
     "test:coverage": "node --test --experimental-test-coverage",
     "test:integration": "node --test --test-concurrency=1 --test-reporter=spec --test-reporter=./testing/reporters/early-failure-reporter.js --test-reporter-destination=stdout --test-reporter-destination=stderr \"test/integration/**/*.test.js\"",
     "test:integration:serial": "npm run test:integration",
+    "validate:native-slskd": "node --test --test-concurrency=1 test/native/slskd-batch.test.js",
     "validate:linux-canonical-media": "node scripts/validate-linux-canonical-media.js",
     "test:integration:shared-postgres": "node scripts/run-shared-postgres-tests.js",
     "test:integration:coordinated": "node scripts/run-integration-tests.js",

@@ -5,6 +5,11 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For real slskd batch/receipt qualification, read
+[native provider qualification](references/native-provider-fixture.md). It owns
+the account-free internal-network fixture, exact native identity, queued-state
+limits and strict process/container/file retirement.
+
 For Docker smoke networking, read [published-port ownership](references/docker-smoke-ports.md).
 It covers complete port replacement, acknowledged service identity, per-phase
 endpoint resolution and refusal before HTTP, with native cleanup evidence.

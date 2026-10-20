@@ -1,5 +1,11 @@
 # AI Workflow And Shared Copilot Skills
 
+The [native provider design](NATIVE_SLSKD_FIXTURE_DESIGN.md) adds a focused
+qualification reference to the testing skill and standards evidence map. Match
+released binary protocols, verify actual native receipt identity and keep queue
+admission separate from media completion. Retire owned sockets and Docker
+resources before deleting generated secrets or temporary state.
+
 The [provider wire-version design](SLSKD_WIRE_VERSION_DESIGN.md) adds a narrow
 qualification method to the maintained testing/standards skills: discover the
 released source and native response, admit only the reviewed exact form, retain

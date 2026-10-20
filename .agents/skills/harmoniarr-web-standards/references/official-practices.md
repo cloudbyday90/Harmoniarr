@@ -1,5 +1,11 @@
 # Official practices by boundary
 
+Native provider guidance uses docs/NATIVE_SLSKD_FIXTURE_RESEARCH_2026_10.md.
+Read the actual linked library tag for binary framing and queue acknowledgements.
+Node owns socket close semantics, Docker/OWASP inform isolation and RFC 9110
+informs uncertain POST handling. W3C provenance guidance is a design inference,
+not native transport certification or completed-download evidence.
+
 October 20 provider guidance uses docs/SLSKD_WIRE_VERSION_RESEARCH_2026_10.md.
 Read the released version/controller implementation and actual authenticated
 wire response. RFC 9110 governs retry semantics; OWASP informs strict response
