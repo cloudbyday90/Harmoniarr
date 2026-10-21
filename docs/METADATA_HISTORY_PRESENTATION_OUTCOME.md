@@ -87,8 +87,7 @@ See the separate [Docker outcome](LOCAL_DOCKER_METADATA_HISTORY_PRESENTATION_OUT
 MCP returned zero open PRs, so no random candidate, rebase, merge or stale closure
 was applicable. Work stays on main without a release, Git tag or version bump.
 
-Next: give detection history its own full-width section outside the summary
-stats grid. Source and inspected captures show long history stretching the
-neighboring summary cards into mostly empty columns and narrowing each history
-entry at desktop widths. Retain page ownership, the stable status container and
-owned completion focus while separating the finite summary from growing history.
+Completed by the [history panel outcome](METADATA_HISTORY_PANEL_OUTCOME.md):
+history now occupies its own full-width named section after the finite summary.
+That outcome records responsive geometry, retained focus/read behavior and the
+next follow-up.

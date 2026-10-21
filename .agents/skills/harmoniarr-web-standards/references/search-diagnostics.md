@@ -166,3 +166,10 @@ machine instant. Invalid or zone-less input gets ordinary fallback text, never
 an invented instant. Test impossible dates, DST repetition, literal provider text
 and long unbroken titles. Freeze source bytes before browser builds and compare
 the tested client with the packaged image before publishing.
+
+For finite summaries beside growing history, use the [panel design](../../../../docs/METADATA_HISTORY_PANEL_DESIGN.md).
+Separate layout ownership and keep source/reading order aligned. Move the focus
+accessor to the component that owns the surviving heading; retain current-page
+and user-interaction authority. Check named sections, narrow reflow, actual grid
+geometry and empty history. Shared odd-child grid rules can change a three-card
+summary after extraction. Viewport checks do not prove browser zoom or full WCAG.

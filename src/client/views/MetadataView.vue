@@ -21,6 +21,7 @@ import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import MetadataArtistSearchPanel from '../components/MetadataArtistSearchPanel.vue';
 import MetadataArtistSummary from '../components/MetadataArtistSummary.vue';
+import MetadataDetectionHistoryPanel from '../components/MetadataDetectionHistoryPanel.vue';
 import MetadataLocalSearchPanel from '../components/MetadataLocalSearchPanel.vue';
 import MetadataLocalReleaseGroupList from '../components/MetadataLocalReleaseGroupList.vue';
 import MetadataLocalReleaseList from '../components/MetadataLocalReleaseList.vue';
@@ -98,8 +99,8 @@ const {
 const refreshMetadata = useMetadataCommandFocus(refreshArtistMetadata, artistActionError);
 const importGroup = useMetadataCommandFocus(importReleaseGroup, releaseGroupActionError);
 const importEdition = useMetadataCommandFocus(importRelease, releaseActionError);
-const artistSummary = ref(null);
-const loadHistory = useMetadataHistoryFocus(loadMoreDetectionEvents, { getCompletionTarget: () => artistSummary.value?.getHistoryHeading() });
+const historyPanel = ref(null);
+const loadHistory = useMetadataHistoryFocus(loadMoreDetectionEvents, { getCompletionTarget: () => historyPanel.value?.getHistoryHeading() });
 
 const {
   cacheBaseline,
@@ -288,17 +289,21 @@ watch(
 
     <template v-else-if="localArtist">
       <MetadataArtistSummary
-        ref="artistSummary"
         :can-refresh-metadata="isAdmin"
+        :is-refreshing-metadata="isRefreshingArtist"
+        :local-artist="localArtist"
+        :queued-refresh-run="queuedRefreshRun"
+        @refresh-metadata="refreshMetadata"
+      />
+
+      <MetadataDetectionHistoryPanel
+        ref="historyPanel"
+        :local-artist="localArtist"
         :detection-events-error-message="detectionEventsErrorMessage"
         :detection-events-page-info="detectionEventsPageInfo"
         :detection-events-status-message="detectionEventsStatusMessage"
         :is-loading-detection-events="isLoadingMoreDetectionEvents"
-        :is-refreshing-metadata="isRefreshingArtist"
-        :local-artist="localArtist"
-        :queued-refresh-run="queuedRefreshRun"
-        @load-more-detection-events="loadHistory"
-        @refresh-metadata="refreshMetadata"
+        @load-more="loadHistory"
       />
 
       <MetadataReleaseGroupBrowser

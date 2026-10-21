@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
-The October 21 [Metadata history presentation rebuild](LOCAL_DOCKER_METADATA_HISTORY_PRESENTATION_OUTCOME.md)
+The October 21 [Metadata history panel rebuild](LOCAL_DOCKER_METADATA_HISTORY_PANEL_OUTCOME.md)
 records the current no-cache image, preserved admin/data and passing readiness.
+The [feature outcome](METADATA_HISTORY_PANEL_OUTCOME.md) verifies sibling layout,
+finite summary geometry, named sections and preserved history/focus consumers.
+
+The October 21 [Metadata history presentation rebuild](LOCAL_DOCKER_METADATA_HISTORY_PRESENTATION_OUTCOME.md)
+records the preceding no-cache image, preserved admin/data and passing readiness.
 The [feature outcome](METADATA_HISTORY_PRESENTATION_OUTCOME.md) verifies labeled
 details, semantic/localized time, safe text and the prior focus/paging consumers.
 
