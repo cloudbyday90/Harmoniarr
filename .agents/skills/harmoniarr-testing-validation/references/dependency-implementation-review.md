@@ -41,6 +41,14 @@ Node/npm at fresh start and restart. A scheduled security announcement is not a
 published patch. The worked example is docs/NODE_24_BASELINE_OUTCOME.md; preserve
 failed candidate and CI-contract evidence before freezing the corrected source.
 
+The October 21 [security patch outcome](../../../../docs/NODE_24_SECURITY_PATCH_OUTCOME.md)
+adds the coordinated 24.22.1 pin and isolated signal-lane guard. Check executable
+checksums, actual image manifests and current runtime components separately from
+repository npm resolutions. A controlled loopback DNS dispatch/refusal comparison
+qualifies that input boundary; normal Brotli responses and existing TLS consumers
+do not prove every disclosed exploit. Preserve non-reproduced comparator results,
+then qualify Windows and packaged Linux without relaxing certificate verification.
+
 1. Discover the current PR and official source URLs through MCP metadata/search.
    Record immutable head/base, actual installed versions and lock integrity.
    Separate vendor/public contracts from private implementation assumptions.

@@ -11,7 +11,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import test from 'node:test';
 
 assert.equal(process.platform, 'linux', 'Run the explicit isolated Linux signal lane');
-assert.equal(process.versions.node, '24.22.0');
+assert.equal(process.versions.node, '24.22.1');
 assert.equal(process.getuid(), 1000);
 
 async function scenario(t, { signal, phase, failure = 'none' }) {
@@ -38,7 +38,7 @@ async function scenario(t, { signal, phase, failure = 'none' }) {
     return messages.find(value => value.type === type);
   }
   try {
-    assert.deepEqual(await message('checkpoint'), { type: 'checkpoint', platform: 'linux', node: '24.22.0' });
+    assert.deepEqual(await message('checkpoint'), { type: 'checkpoint', platform: 'linux', node: '24.22.1' });
     assert.equal(child.kill(signal), true);
     assert.deepEqual(await message('cleanup'), { type: 'cleanup', stopped: true, commands: 0 });
     assert.equal(didClose, false);

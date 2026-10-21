@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 21 [Node security patch rebuild](LOCAL_DOCKER_NODE_SECURITY_PATCH_OUTCOME.md)
+records the current no-cache image, Node 24.22.1, preserved admin/data and passing
+readiness. The [owning outcome](NODE_24_SECURITY_PATCH_OUTCOME.md) records native
+TLS/HTTP, runtime and disposable packaged qualification separately.
+
 The October 21 [migration scaffold rebuild](LOCAL_DOCKER_MIGRATION_SCAFFOLD_OUTCOME.md)
-records the current no-cache image, unchanged runtime bytes, preserved admin/data
+records the preceding no-cache image, unchanged runtime bytes, preserved admin/data
 and passing readiness. The [authoring outcome](MIGRATION_SCAFFOLD_OUTCOME.md)
 qualifies the generator and its actual policy consumers separately.
 

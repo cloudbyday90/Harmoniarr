@@ -21,7 +21,7 @@ export async function runManualSignalLane({ env = process.env, runDocker = creat
   signal?.throwIfAborted();
   await assertLocalRecoveryDocker({ env, runDocker });
   signal?.throwIfAborted();
-  const image = (await readDockerfile()).match(/^ARG NODE_IMAGE=(node:24\.22\.0-alpine[\d.]+@sha256:[a-f0-9]{64})\r?$/mu)?.[1];
+  const image = (await readDockerfile()).match(/^ARG NODE_IMAGE=(node:24\.22\.1-alpine[\d.]+@sha256:[a-f0-9]{64})\r?$/mu)?.[1];
   assert.ok(image, 'Signal lane requires the reviewed pinned Node image');
   const nonce = randomUUID(); const name = `harmoniarr-manual-signals-${nonce}`;
   let attempted = false; let id; let failed = false; let failure;

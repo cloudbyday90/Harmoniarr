@@ -11,27 +11,27 @@ import { checkNodeBaseline, validateNodeBaseline } from '../../scripts/node-base
 
 const digest = 'a'.repeat(64);
 function input() {
-  return { nvmrc: '24.22.0\r\n', nodeVersion: '24.22.0',
-    dockerfile: `ARG NODE_IMAGE=node:24.22.0-alpine3.23@sha256:${digest}\r\nARG RUNTIME_IMAGE=alpine:3.23\r\n`,
-    packageJson: { engines: { node: '>=24.22.0 <25.0.0' }, devEngines: { runtime: { name: 'node', version: '>=24.22.0 <25.0.0' } } } };
+  return { nvmrc: '24.22.1\r\n', nodeVersion: '24.22.1',
+    dockerfile: `ARG NODE_IMAGE=node:24.22.1-alpine3.23@sha256:${digest}\r\nARG RUNTIME_IMAGE=alpine:3.23\r\n`,
+    packageJson: { engines: { node: '>=24.22.1 <25.0.0' }, devEngines: { runtime: { name: 'node', version: '>=24.22.1 <25.0.0' } } } };
 }
 const refusal = { code: 'project_node_baseline_mismatch' };
 
 test('exact host and digest-pinned cross-stage baseline agree independently of CRLF', () => {
-  assert.deepEqual(validateNodeBaseline(input()), { version: '24.22.0',
-    nodeImage: `node:24.22.0-alpine3.23@sha256:${digest}`, runtimeImage: 'alpine:3.23' });
+  assert.deepEqual(validateNodeBaseline(input()), { version: '24.22.1',
+    nodeImage: `node:24.22.1-alpine3.23@sha256:${digest}`, runtimeImage: 'alpine:3.23' });
   const pinned = input(); pinned.dockerfile = pinned.dockerfile.replace('RUNTIME_IMAGE=alpine:3.23', `RUNTIME_IMAGE=alpine:3.23@sha256:${digest}`);
   assert.equal(validateNodeBaseline(pinned).runtimeImage, `alpine:3.23@sha256:${digest}`);
 });
 
 test('stale, newer, other-major and missing active runtimes cannot claim canonical validation', () => {
-  for (const nodeVersion of ['24.18.1', '24.23.0', '26.0.0', undefined]) {
+  for (const nodeVersion of ['24.18.1', '24.22.0', '24.23.0', '26.0.0', undefined]) {
     assert.throws(() => validateNodeBaseline({ ...input(), nodeVersion }), refusal);
   }
 });
 
 test('floating, ranged, prerelease and multiple baseline values refuse admission', () => {
-  for (const nvmrc of ['24', 'lts/*', '>=24.22.0', '24.22.0-rc.1', '24.022.0', '24.22.0\n24.21.0']) {
+  for (const nvmrc of ['24', 'lts/*', '>=24.22.1', '24.22.1-rc.1', '24.022.0', '24.22.1\n24.21.0']) {
     assert.throws(() => validateNodeBaseline({ ...input(), nvmrc }), refusal);
   }
 });
@@ -45,8 +45,8 @@ test('both package floors and runtime owner must agree with the canonical baseli
 });
 
 test('changed Node, changed libc base, unpinned digest and foreign image refuse admission', () => {
-  for (const image of ['node:24.21.0-alpine3.23', 'node:24.22.0-alpine3.24', 'node:24.22.0-alpine3.23',
-    'other:24.22.0-alpine3.23', 'node:24.22.0-alpine3.23@sha256:invalid']) {
+  for (const image of ['node:24.21.0-alpine3.23', 'node:24.22.1-alpine3.24', 'node:24.22.1-alpine3.23',
+    'other:24.22.1-alpine3.23', 'node:24.22.1-alpine3.23@sha256:invalid']) {
     const candidate = input();
     candidate.dockerfile = `ARG NODE_IMAGE=${image}\nARG RUNTIME_IMAGE=alpine:3.23\n`;
     assert.throws(() => validateNodeBaseline(candidate), refusal);
