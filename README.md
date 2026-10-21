@@ -4,6 +4,12 @@ Harmoniarr is a self-hosted, Docker-hosted music library manager inspired by Lid
 
 The repository contains the Node.js ESM server, Vue client, PostgreSQL schema, automated validation, and design documents. The platform is under active development toward its first release.
 
+The manual CLI now has an explicit isolated Linux signal qualification lane.
+See its [design](docs/MANUAL_SESSION_SIGNALS_DESIGN.md),
+[official research and tradeoffs](docs/MANUAL_SESSION_SIGNALS_RESEARCH_2026_10.md)
+and [outcome](docs/MANUAL_SESSION_SIGNALS_OUTCOME.md). Routine fast feedback stays
+separate from native signal, database/browser and deferred operator checks.
+
 The manual accessibility session now observes quit/EOF during startup and drains
 admitted work before cleanup. See its [design](docs/MANUAL_SESSION_CANCELLATION_DESIGN.md),
 [official research and tradeoffs](docs/MANUAL_SESSION_CANCELLATION_RESEARCH_2026_10.md)

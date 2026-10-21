@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
-The October 21 [manual cancellation rebuild](LOCAL_DOCKER_MANUAL_CANCELLATION_OUTCOME.md)
+The October 21 [manual signal rebuild](LOCAL_DOCKER_MANUAL_SIGNALS_OUTCOME.md)
 records the current no-cache image, preserved admin/data and passing readiness.
+The [owning outcome](MANUAL_SESSION_SIGNALS_OUTCOME.md) qualifies Linux input/runner
+signals separately from deferred actual screen-reader/device acceptance.
+
+The October 21 [manual cancellation rebuild](LOCAL_DOCKER_MANUAL_CANCELLATION_OUTCOME.md)
+records the preceding no-cache image, preserved admin/data and passing readiness.
 The [owning outcome](MANUAL_SESSION_CANCELLATION_OUTCOME.md) qualifies early
 quit/EOF, admitted Docker work drainage and actual CLI retirement.
 

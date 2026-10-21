@@ -32,6 +32,9 @@ The [cancellation design](../../../../docs/MANUAL_SESSION_CANCELLATION_DESIGN.md
 records these boundaries and the difference between controlled signal events,
 actual CLI close and OS-delivered signals. Keep desktop fixture preparation
 separate from a global viewport-fit change that needs actual device evidence.
+The explicit Linux [signal lane](../../harmoniarr-testing-validation/references/manual-session-signals.md)
+qualifies real input/runner signals with a controlled session dependency; it does
+not execute speech/device acceptance or full HTTP/PostgreSQL signal shutdown.
 
 Record the evaluated source/version, OS, browser and AT versions, input mode,
 actual zoom/effective viewport, theme and exact steps. For physical safe areas,

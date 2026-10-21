@@ -89,6 +89,7 @@
     "validate:metadata-history-compatibility": "npm run build:client && node --test --test-concurrency=1 \"test/compatibility/metadata-history*.test.js\"",
     "manual:metadata-history": "npm run build:client && node scripts/run-manual-metadata-history.js",
     "validate:metadata-history-manual-fixture": "npm run build:client && node --test --test-concurrency=1 \"test/manual/*.test.js\"",
+    "validate:manual-session-signals": "node scripts/validate-manual-session-signals.js",
     "validate:artist-detail-cache-samples": "npm run build:client && node --test --test-force-exit --test-concurrency=1 test/browser/artist-detail-cache-samples-browser-verification.test.js",
     "validate:artist-detail-cache-lifecycle": "node --test --test-concurrency=1 test/server/artist-detail-cache-sample-lifecycle-evidence.test.js test/integration/artist-detail-cache-sample-lifecycle.test.js",
     "validate:artist-detail-cache-browser-evidence": "npm run build:client && node --test --test-force-exit --test-concurrency=1 test/browser/artist-detail-cache-server-timing-browser-verification.test.js",

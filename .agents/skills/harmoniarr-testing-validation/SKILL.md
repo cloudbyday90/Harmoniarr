@@ -366,6 +366,10 @@ release and actual child close before waiting; retain input/OS-signal coverage
 limits. Controlled Docker gates must drain before exact removal, including
 expected stop plus cleanup Error/null. See docs/MANUAL_SESSION_CANCELLATION_DESIGN.md.
 
+For actual Linux SIGINT/SIGTERM input/runner proof, use the conditional
+[signal reference](references/manual-session-signals.md). It owns the explicit
+isolated lane, child/stdio close and distinction from full database shutdown.
+
 Use `npm run validate:fast` for complete static, server/client/script and build
 feedback during development. It omits PostgreSQL; include the directly affected
 real database tests when SQL, locks, constraints or rollback own the behavior.
