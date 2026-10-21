@@ -62,7 +62,7 @@ suite('role-aware Missing Music search correction review', () => {
       const provider = section.getByRole('link', { name: 'Review provider connection', exact: true });
       await assertLocatorFocused(provider); await assertVisibleFocusOutline(provider);
       await provider.press('Shift+Tab'); await assertLocatorFocused(ignored); await assertVisibleFocusOutline(ignored);
-      await ignored.press('Enter'); await page.waitForURL('**/app/activity/ignored');
+      await ignored.press('Enter'); await page.waitForURL('**/app/activity/ignored?returnTo=missing_music_decision&returnReleaseId=correction-decision');
       await page.getByRole('heading', { name: 'Ignored source users', exact: true }).waitFor();
       await page.goBack(); await section.waitFor();
       await section.getByRole('link', { name: 'Review provider connection', exact: true }).press('Enter');

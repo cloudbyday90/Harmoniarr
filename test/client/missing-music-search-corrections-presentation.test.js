@@ -11,11 +11,12 @@ test('allowed review uses fixed internal destinations and bounded Settings retur
   const input = detail(); input.searchDiagnostics = { ...counts, url: 'https://private.invalid', username: 'private-peer', reasonCodes: ['private-reason'] };
   const steps = build(input);
   assert.deepEqual(steps.map(step => step.link), [
-    { label: 'Review ignored sources', to: { name: 'activity-ignored' } },
+    { label: 'Review ignored sources', to: { name: 'activity-ignored', query: { returnTo: 'missing_music_decision', returnReleaseId: 'decision-one' } } },
     { label: 'Review provider connection', to: { name: 'settings-connections', query: { returnTo: 'missing_music_decision', returnReleaseId: 'decision-one' } } },
   ]);
   assert.doesNotMatch(JSON.stringify(steps), /private|retry|canSearchAgain/);
   input.decision.decisionId = '//untrusted.invalid';
+  assert.deepEqual(build(input)[0].link.to, { name: 'activity-ignored' });
   assert.deepEqual(build(input)[1].link.to, { name: 'settings-connections' });
 });
 

@@ -6,6 +6,7 @@
 
 import { projectSlskdSearchDiagnostics } from '../../shared/slskd-search-diagnostics.js';
 import { SETTINGS_RECOVERY_CONTEXT, buildSettingsRecoveryHandoffLocation } from './settings-recovery-handoff.js';
+import { buildIgnoredSourceReviewLocation } from './ignored-source-review-handoff.js';
 
 export function buildMissingMusicSearchCorrections(detail) {
   const data = projectSlskdSearchDiagnostics(detail?.searchDiagnostics);
@@ -24,7 +25,7 @@ export function buildMissingMusicSearchCorrections(detail) {
       ? 'Review the intentional source exclusions. Changing the ignore list affects future searches for everyone.'
       : 'Ask a household administrator to review the ignored sources. Source exclusions apply to everyone.',
     link: permissions?.canReviewIgnoredSources === true
-      ? { label: 'Review ignored sources', to: { name: 'activity-ignored' } } : null,
+      ? { label: 'Review ignored sources', to: buildIgnoredSourceReviewLocation(detail.decision.decisionId) } : null,
   });
   if (malformed) steps.push({
     key: 'provider',

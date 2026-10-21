@@ -57,3 +57,12 @@ Malformed responses justify investigation, not a connection-failure diagnosis.
 An ignore change affects future searches for everyone; never infer consent from
 a cause count. Browser-check real destination navigation, sequential link focus,
 revocation on Refresh and zero policy/search mutations while opening review.
+
+Ignored-source review now retains the bounded canonical context; see the
+[return design](../../../../docs/IGNORED_REVIEW_RETURN_DESIGN.md). Admit only the
+exact decision context at this boundary, not other Settings contexts or legacy
+aliases supported by the reused parser. Query state is navigation data, never
+recipient authority. Withhold return while the owning policy response is pending;
+do not auto-save drafts or submit a new search. The existing inspector's mount
+read owns fresh status: prove that actual read instead of adding a refresh flag.
+Keep recorded search counts distinct from a subsequent change to the ignore list.

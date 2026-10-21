@@ -22,6 +22,7 @@ import { useSourceUserIgnore } from '../composables/useSourceUserIgnore.js';
 import { useConfirm } from '../composables/useConfirm.js';
 import { fetchSettings, updateSettings } from '../lib/settings-api.js';
 import { getErrorMessage } from '../lib/error-utils.js';
+import IgnoredSourceReviewReturn from '../components/activity/IgnoredSourceReviewReturn.vue';
 import {
   filterIgnoredSourceUsers,
   formatIgnoreActor,
@@ -165,6 +166,8 @@ onMounted(() => {
         </button>
       </div>
     </header>
+
+    <IgnoredSourceReviewReturn :pending="isApplying || isRemoving || isSavingAutoApply" />
 
     <div class="hx-stat-grid" style="margin-bottom: var(--hx-space-4)">
       <div class="hx-stat">

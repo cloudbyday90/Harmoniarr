@@ -77,7 +77,7 @@ lock/installed-consumer comparison matched the retained failing TypeScript 7 Vue
 language-service candidate and passing TypeScript 6 control. No merge, rebase,
 closure, separate branch, version/tag change or release was created.
 
-Next: add a bounded return-to-this-decision link on the ignored-source review
-page, then refresh the originating Missing Music decision. Today that destination
-uses ordinary browser navigation back. Preserve administrator ownership, explicit
-ignore changes and separate search intent; returning must not start a search.
+The subsequent [return outcome](IGNORED_REVIEW_RETURN_OUTCOME.md) completes the
+bounded return-to-this-decision link and verifies the existing inspector's fresh
+detail read. Administrator ownership, explicit ignore changes and separate search
+intent are preserved. That record owns the next follow-up.

@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
-The October 20 [search-correction rebuild](LOCAL_DOCKER_SEARCH_CORRECTIONS_OUTCOME.md)
+The October 20 [ignored-source return rebuild](LOCAL_DOCKER_IGNORED_REVIEW_RETURN_OUTCOME.md)
 records the current no-cache image, preserved admin/data and passing readiness.
+The [feature outcome](IGNORED_REVIEW_RETURN_OUTCOME.md) verifies explicit return
+to the current scoped decision without starting another search.
+
+The October 20 [search-correction rebuild](LOCAL_DOCKER_SEARCH_CORRECTIONS_OUTCOME.md)
+records the preceding no-cache image, preserved admin/data and passing readiness.
 The [feature outcome](MISSING_SEARCH_CORRECTIONS_OUTCOME.md) covers role-aware
 canonical review destinations and unchanged policy/search authority.
 
