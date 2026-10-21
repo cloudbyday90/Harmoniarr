@@ -117,3 +117,11 @@ direct and global links, replacement history, native protected reads and Account
 aliases. If filtering removes the focused tab, restore to a surviving control
 only while that interaction still owns focus; test a user moving elsewhere
 during a held real session response as a separate case.
+
+For Settings page admission, use the complete [route/API matrix](../../../../docs/SETTINGS_AUTHORITY_DESIGN.md).
+Separate admin deployment pages, authenticated personal pages and mixed operator
+metadata browsing. A requester route denylist must not block a valid own-user
+Notifications API. Test saved notification preferences against the authenticated
+owner and an unchanged peer, plus real read admission for every protected page.
+Keep metadata's product route restriction distinct from its authenticated APIs;
+qualify privileged controls separately rather than making all browsing admin-only.

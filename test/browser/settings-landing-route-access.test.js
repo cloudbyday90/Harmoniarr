@@ -79,7 +79,7 @@ suite('role-aware Settings landing and protected Setup admission', () => {
         await page.waitForURL(`${baseUrl}/app/settings/account`);
         await page.getByRole('heading', { name: 'My account', exact: true }).waitFor();
         const nav = page.getByRole('navigation', { name: 'Settings sections', exact: true });
-        assert.deepEqual(await nav.getByRole('link').allTextContents(), ['Media & storage', 'Notifications', 'Library']);
+        assert.deepEqual(await nav.getByRole('link').allTextContents(), ['Notifications']);
         const more = page.getByRole('button', { name: 'Hide more settings', exact: true });
         assert.equal(await more.getAttribute('aria-expanded'), 'true');
         await page.getByRole('navigation', { name: 'More settings sections', exact: true }).getByRole('link', { name: 'Account', exact: true }).waitFor();

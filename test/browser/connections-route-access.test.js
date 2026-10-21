@@ -90,18 +90,18 @@ suite('administrator-only Connections admission with ordinary Account access', (
         await loginThroughUi(page, { baseUrl, username, password });
         await page.goto(target, { waitUntil: 'domcontentloaded' }); await page.waitForURL(`${baseUrl}/app`);
         const nav = await openAccount(page, baseUrl);
-        assert.deepEqual(await nav.getByRole('link').allTextContents(), ['Media & storage', 'Notifications', 'Library']);
+        assert.deepEqual(await nav.getByRole('link').allTextContents(), ['Notifications']);
         await page.getByRole('navigation', { name: 'More settings sections', exact: true }).getByRole('link', { name: 'Account', exact: true }).waitFor();
         if (role === 'operator') {
-          const media = nav.getByRole('link', { name: 'Media & storage', exact: true });
           const notifications = nav.getByRole('link', { name: 'Notifications', exact: true });
-          await media.focus(); await media.press('Tab');
+          const more = nav.getByRole('button', { name: 'Hide more settings', exact: true });
+          await more.focus(); await more.press('Shift+Tab');
           await assertLocatorFocused(notifications); await assertVisibleFocusOutline(notifications);
           await mkdir('.tmp/connections-route-access-2026-10-21', { recursive: true });
           for (const [width, theme] of [[390, 'light'], [800, 'dark'], [1280, 'light']]) {
             await page.setViewportSize({ width, height: 1100 });
             await page.evaluate(value => globalThis.document.documentElement.setAttribute('data-theme', value), theme);
-            await media.focus(); await media.press('Tab');
+            await more.focus(); await more.press('Shift+Tab');
             await assertLocatorFocused(notifications); await assertVisibleFocusOutline(notifications);
             await nav.screenshot({ path: `.tmp/connections-route-access-2026-10-21/operator-nav-${width}-${theme}.png`, animations: 'disabled' });
             if (width === 390) await page.getByRole('navigation', { name: 'More settings sections', exact: true }).screenshot({ path: '.tmp/connections-route-access-2026-10-21/operator-account-390.png', animations: 'disabled' });

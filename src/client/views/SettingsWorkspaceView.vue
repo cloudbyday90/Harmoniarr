@@ -27,6 +27,9 @@ import { sessionStore } from '../state/session.js';
 const navigation = computed(() => buildSettingsNavigation(sessionStore.state.user?.role));
 const primaryTabs = computed(() => navigation.value.primary);
 const secondaryTabs = computed(() => navigation.value.secondary);
+const description = computed(() => sessionStore.state.user?.role === 'admin'
+  ? 'Set up downloads and your library first. Specialized controls remain available when you need them.'
+  : 'Manage your sign-in, account safety and personal notification preferences.');
 
 const route = useRoute();
 const tabbarRef = ref(null);
@@ -67,7 +70,7 @@ onUnmounted(cleanup);
     <header class="hx-page-header">
       <div>
         <h1 class="hx-page-title">Settings</h1>
-        <p class="hx-page-subtitle">Set up downloads and your library first. Specialized controls remain available when you need them.</p>
+        <p class="hx-page-subtitle">{{ description }}</p>
       </div>
     </header>
 

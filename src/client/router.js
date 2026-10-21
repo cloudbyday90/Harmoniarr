@@ -91,14 +91,6 @@ const requesterRestrictedRouteNames = new Set([
   'acquisition',
   'acquisition-downloader',
   'downloader',
-  'settings-connections',
-  'settings-media-storage',
-  'settings-users',
-  'settings-user-detail',
-  'settings-library',
-  'settings-notifications',
-  'settings-recovery',
-  'settings-library-browser',
 ]);
 
 function defaultAuthenticatedRouteName() {

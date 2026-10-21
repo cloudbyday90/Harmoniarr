@@ -4,6 +4,13 @@ Harmoniarr is a self-hosted, Docker-hosted music library manager inspired by Lid
 
 The repository contains the Node.js ESM server, Vue client, PostgreSQL schema, automated validation, and design documents. The platform is under active development toward its first release.
 
+Settings page admission now follows a reviewed route/API authority matrix:
+deployment pages require current admin, while personal preferences and operator
+metadata browsing remain available. See the [design/matrix](docs/SETTINGS_AUTHORITY_DESIGN.md),
+[official recommendations](docs/SETTINGS_AUTHORITY_RESEARCH_2026_10.md),
+[validation outcome](docs/SETTINGS_AUTHORITY_OUTCOME.md) and
+[preserved Docker rebuild](docs/LOCAL_DOCKER_SETTINGS_AUTHORITY_OUTCOME.md).
+
 Settings now opens Setup only after current administrator verification; non-admin
 root visits reach Account. See the [landing design](docs/SETTINGS_LANDING_DESIGN.md),
 [official research and tradeoffs](docs/SETTINGS_LANDING_RESEARCH_2026_10.md),

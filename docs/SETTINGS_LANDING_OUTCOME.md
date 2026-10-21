@@ -79,12 +79,10 @@ metadata confirms [PR #54](https://github.com/cloudbyday90/Harmoniarr/pull/54) i
 closed without merge and its exact pin is already on main from the preceding
 round. No PR patch, rebase or merge was performed in this round.
 
-Next, complete a route/API authority matrix for the remaining Settings
-destinations, beginning with Media & storage. That view mounts `loadSettings`
-plus artwork quota/history readers; its settings read already requires admin.
-Qualify the other readers, mutation/recovery handoffs and role-specific needs
-before extending the area policy. Notifications uses personal subscription and
-category preferences, so a blanket admin restriction would discard distinct
-contracts. Keep Account and ordinary personal preferences usable.
+The recommended remaining Settings matrix is completed in the
+[Settings authority outcome](SETTINGS_AUTHORITY_OUTCOME.md). Current-admin
+admission now covers the six additional deployment pages, while personal
+Notifications/Account and operator metadata browsing retain distinct policies.
+That follow-up also removes the old requester-only Notifications restriction.
 
 All intended changes remain on main; no separate branch is created.
