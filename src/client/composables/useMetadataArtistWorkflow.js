@@ -63,7 +63,7 @@ export function useMetadataArtistWorkflow({
     captureWorkspace: () => artistWorkspaceRequestGate.capture(),
     fetchDetectionEvents: fetchArtistDetectionEvents,
   });
-  const { detectionEventsPageInfo, detectionEventsErrorMessage, isLoadingMoreDetectionEvents, loadMoreDetectionEvents } = detectionHistory;
+  const { detectionEventsPageInfo, detectionEventsErrorMessage, detectionEventsStatusMessage, isLoadingMoreDetectionEvents, loadMoreDetectionEvents } = detectionHistory;
 
   const localSearchWorkflow = createLocalSearchWorkflow();
 
@@ -255,6 +255,7 @@ export function useMetadataArtistWorkflow({
     artistActionError,
     detectionEventsErrorMessage,
     detectionEventsPageInfo,
+    detectionEventsStatusMessage,
     importArtist,
     isImportingArtist,
     isLoadingArtist,

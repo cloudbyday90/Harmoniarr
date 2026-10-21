@@ -18,6 +18,7 @@
 
 <script setup>
 import { RouterLink } from 'vue-router';
+import { ref } from 'vue';
 import {
   describeMonitoringDecision,
   describeWantedState,
@@ -30,6 +31,10 @@ defineProps({
     default: false,
   },
   detectionEventsErrorMessage: {
+    type: String,
+    default: '',
+  },
+  detectionEventsStatusMessage: {
     type: String,
     default: '',
   },
@@ -56,6 +61,8 @@ defineProps({
 });
 
 const emit = defineEmits(['load-more-detection-events', 'refresh-metadata']);
+const historyHeading = ref(null);
+defineExpose({ getHistoryHeading: () => historyHeading.value });
 </script>
 
 <template>
@@ -113,9 +120,12 @@ const emit = defineEmits(['load-more-detection-events', 'refresh-metadata']);
 
     <article class="panel-light">
       <p class="eyebrow">Release detection</p>
-      <h3>Recent discoveries</h3>
-      <p v-if="detectionEventsErrorMessage" class="error-copy metadata-card-copy">{{ detectionEventsErrorMessage }}</p>
-      <ul v-if="(localArtist.detectionEvents ?? []).length" class="metadata-list">
+      <h3 ref="historyHeading" tabindex="-1" class="hx-metadata-history-heading">Recent discoveries</h3>
+      <div role="status" aria-label="Detection history status" aria-live="polite" aria-atomic="true">
+        <p v-if="detectionEventsErrorMessage" class="error-copy metadata-card-copy">Could not load more history. {{ detectionEventsErrorMessage }}</p>
+        <p v-else-if="detectionEventsStatusMessage" class="metadata-card-copy">{{ detectionEventsStatusMessage }}</p>
+      </div>
+      <ul v-if="(localArtist.detectionEvents ?? []).length" class="metadata-list" :aria-busy="isLoadingDetectionEvents">
         <li v-for="event in localArtist.detectionEvents" :key="event.id">
           <div class="metadata-detection-entry-header">
             <strong>{{ event.title }}</strong>
@@ -148,6 +158,11 @@ const emit = defineEmits(['load-more-detection-events', 'refresh-metadata']);
 </template>
 
 <style scoped>
+.hx-metadata-history-heading:focus-visible {
+  outline: 2px solid var(--hx-accent-strong);
+  outline-offset: 2px;
+}
+
 .metadata-detection-actions {
   display: flex;
   justify-content: flex-end;

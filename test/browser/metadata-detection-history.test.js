@@ -81,6 +81,7 @@ suite('Metadata detection history retains artist ownership', () => {
       hold.release(); await execution; await page.waitForLoadState('networkidle'); await assertLocatorFocused(input);
       assert.equal(await page.getByText('Obsolete discovery', { exact: true }).count(), 0);
       assert.equal(await page.getByText('Initial discovery', { exact: true }).count(), 1);
+      assert.equal(await page.getByRole('status', { name: 'Detection history status', exact: true }).textContent(), '');
       readPage = async () => ({ entries: [event('Current discovery')], pageInfo: { hasMore: false, nextCursor: null } });
       await load.press('Enter'); await page.getByText('Current discovery', { exact: true }).waitFor();
       assert.deepEqual(reads.map(row => row.before), ['initial-cursor', 'initial-cursor']);

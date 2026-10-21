@@ -150,3 +150,11 @@ pagination without changing the artist. Reset before navigation begins so the
 old cursor cannot dispatch during a pending detail load. Guard append, cursor,
 error and pending cleanup even when a dependency ignores abort. Native session/
 GET proof with controlled page data does not certify durable event storage.
+
+For history completion, use the [feedback/focus design](../../../../docs/METADATA_HISTORY_FEEDBACK_DESIGN.md).
+Keep a polite atomic status node attached before messages occur and outside busy
+content. After DOM flush, recheck generation and interaction ownership before
+restoring a surviving button or focusing a visible completion heading. A user
+move revokes restoration. Test a long history so preventScroll cannot leave the
+new target off-screen; preserve scroll only for the existing invoker. DOM/ARIA
+assertions do not prove screen-reader announcements.

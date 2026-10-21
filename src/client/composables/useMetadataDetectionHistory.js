@@ -12,6 +12,7 @@ import { createLatestRequestGate } from '../lib/latest-request-gate.js';
 export function useMetadataDetectionHistory({ localArtist, captureWorkspace, fetchDetectionEvents }) {
   const detectionEventsPageInfo = ref({ hasMore: false, nextCursor: null });
   const detectionEventsErrorMessage = ref('');
+  const detectionEventsStatusMessage = ref('');
   const isLoadingMoreDetectionEvents = ref(false);
   const pageGate = createLatestRequestGate();
 
@@ -19,6 +20,7 @@ export function useMetadataDetectionHistory({ localArtist, captureWorkspace, fet
     pageGate.invalidate();
     detectionEventsPageInfo.value = pageInfo ?? { hasMore: false, nextCursor: null };
     detectionEventsErrorMessage.value = '';
+    detectionEventsStatusMessage.value = '';
     isLoadingMoreDetectionEvents.value = false;
   }
 
@@ -31,6 +33,7 @@ export function useMetadataDetectionHistory({ localArtist, captureWorkspace, fet
     const before = detectionEventsPageInfo.value.nextCursor;
     isLoadingMoreDetectionEvents.value = true;
     detectionEventsErrorMessage.value = '';
+    detectionEventsStatusMessage.value = 'Loading more history.';
 
     try {
       const result = await fetchDetectionEvents(artistId, { before, signal: page.signal });
@@ -40,12 +43,21 @@ export function useMetadataDetectionHistory({ localArtist, captureWorkspace, fet
         detectionEvents: [...(localArtist.value.detectionEvents ?? []), ...(result.detectionEvents ?? [])],
       };
       detectionEventsPageInfo.value = result.pageInfo ?? { hasMore: false, nextCursor: null };
+      const count = result.detectionEvents?.length ?? 0;
+      const hasMore = Boolean(detectionEventsPageInfo.value.hasMore);
+      const loaded = count === 0 ? 'No additional history entries were returned.' : `Loaded ${count} more history ${count === 1 ? 'entry' : 'entries'}.`;
+      detectionEventsStatusMessage.value = loaded + (hasMore ? '' : ' All history loaded.');
+      return { kind: 'loaded', hasMore, isCurrent };
     } catch (error) {
-      if (isCurrent() && !isAbortError(error)) detectionEventsErrorMessage.value = getErrorMessage(error, 'Loading more detection history failed');
+      if (!isCurrent()) return;
+      detectionEventsStatusMessage.value = '';
+      if (isAbortError(error)) return { kind: 'cancelled', isCurrent };
+      detectionEventsErrorMessage.value = getErrorMessage(error, 'Loading more detection history failed');
+      return { kind: 'failed', isCurrent };
     } finally {
       if (isCurrent()) isLoadingMoreDetectionEvents.value = false;
     }
   }
 
-  return { detectionEventsPageInfo, detectionEventsErrorMessage, isLoadingMoreDetectionEvents, loadMoreDetectionEvents, reset };
+  return { detectionEventsPageInfo, detectionEventsErrorMessage, detectionEventsStatusMessage, isLoadingMoreDetectionEvents, loadMoreDetectionEvents, reset };
 }

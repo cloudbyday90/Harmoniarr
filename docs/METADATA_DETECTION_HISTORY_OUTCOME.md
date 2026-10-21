@@ -68,10 +68,7 @@ whole-suite speed improvement.
 MCP returned zero open PRs. No random candidate, merge, rebase or stale-PR closure
 was applicable. Work remains on main with no release, Git tag or version bump.
 
-Next, qualify history completion feedback and keyboard focus. The current
-component removes Load more history on the final page; the new browser test
-verifies that removal but does not qualify the resulting focus handoff or an
-assistive-technology announcement. Add meaningful completion/error status and
-owned focus handling without interrupting a user who has moved elsewhere. Keep
-the current page/artist ownership contract and verify announcements separately
-from DOM/ARIA assertions before claiming accessibility conformance.
+Completed by the [history feedback outcome](METADATA_HISTORY_FEEDBACK_OUTCOME.md):
+stable status feedback and interaction-owned focus now cover completion, retry
+and user movement. That outcome records long-history visibility, native evidence,
+remaining assistive-technology qualification and the next presentation follow-up.

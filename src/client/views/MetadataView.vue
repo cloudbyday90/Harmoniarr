@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import MetadataArtistSearchPanel from '../components/MetadataArtistSearchPanel.vue';
 import MetadataArtistSummary from '../components/MetadataArtistSummary.vue';
@@ -31,6 +31,7 @@ import MetadataReleaseGroupBrowser from '../components/MetadataReleaseGroupBrows
 import MetadataSelectedReleaseGroupSummary from '../components/MetadataSelectedReleaseGroupSummary.vue';
 import { useMetadataArtistWorkflow } from '../composables/useMetadataArtistWorkflow.js';
 import { useMetadataCommandFocus } from '../composables/useMetadataCommandFocus.js';
+import { useMetadataHistoryFocus } from '../composables/useMetadataHistoryFocus.js';
 import { useMetadataProviderCacheBaseline } from '../composables/useMetadataProviderCacheBaseline.js';
 import { useMetadataProviderCacheBaselineComparison } from '../composables/useMetadataProviderCacheBaselineComparison.js';
 import {
@@ -51,6 +52,7 @@ const {
   artistActionError,
   detectionEventsErrorMessage,
   detectionEventsPageInfo,
+  detectionEventsStatusMessage,
   importArtist,
   importRelease,
   importReleaseGroup,
@@ -96,6 +98,8 @@ const {
 const refreshMetadata = useMetadataCommandFocus(refreshArtistMetadata, artistActionError);
 const importGroup = useMetadataCommandFocus(importReleaseGroup, releaseGroupActionError);
 const importEdition = useMetadataCommandFocus(importRelease, releaseActionError);
+const artistSummary = ref(null);
+const loadHistory = useMetadataHistoryFocus(loadMoreDetectionEvents, { getCompletionTarget: () => artistSummary.value?.getHistoryHeading() });
 
 const {
   cacheBaseline,
@@ -284,14 +288,16 @@ watch(
 
     <template v-else-if="localArtist">
       <MetadataArtistSummary
+        ref="artistSummary"
         :can-refresh-metadata="isAdmin"
         :detection-events-error-message="detectionEventsErrorMessage"
         :detection-events-page-info="detectionEventsPageInfo"
+        :detection-events-status-message="detectionEventsStatusMessage"
         :is-loading-detection-events="isLoadingMoreDetectionEvents"
         :is-refreshing-metadata="isRefreshingArtist"
         :local-artist="localArtist"
         :queued-refresh-run="queuedRefreshRun"
-        @load-more-detection-events="loadMoreDetectionEvents"
+        @load-more-detection-events="loadHistory"
         @refresh-metadata="refreshMetadata"
       />
 

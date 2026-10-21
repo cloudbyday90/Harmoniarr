@@ -4,6 +4,13 @@ Harmoniarr is a self-hosted, Docker-hosted music library manager inspired by Lid
 
 The repository contains the Node.js ESM server, Vue client, PostgreSQL schema, automated validation, and design documents. The platform is under active development toward its first release.
 
+Metadata history now reports loading/completion/errors in a stable status region
+and retains keyboard focus only while the loading interaction owns it. See the
+[design](docs/METADATA_HISTORY_FEEDBACK_DESIGN.md),
+[official research and tradeoffs](docs/METADATA_HISTORY_FEEDBACK_RESEARCH_2026_10.md),
+[validation outcome](docs/METADATA_HISTORY_FEEDBACK_OUTCOME.md) and
+[preserved Docker rebuild](docs/LOCAL_DOCKER_METADATA_HISTORY_FEEDBACK_OUTCOME.md).
+
 Metadata detection-history pagination now uses a separate owner for pages,
 cursors, errors and pending state across artist changes and catalog replacement.
 See the [design](docs/METADATA_DETECTION_HISTORY_DESIGN.md),
