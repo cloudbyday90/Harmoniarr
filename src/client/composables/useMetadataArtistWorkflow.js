@@ -31,6 +31,7 @@ import {
 } from '../lib/metadata-api.js';
 import { useMetadataLocalSearchWorkflow } from './useMetadataLocalSearchWorkflow.js';
 import { useMetadataReleaseWorkflow } from './useMetadataReleaseWorkflow.js';
+import { useMetadataDetectionHistory } from './useMetadataDetectionHistory.js';
 
 export function useMetadataArtistWorkflow({
   canManageMetadata = () => false,
@@ -49,21 +50,25 @@ export function useMetadataArtistWorkflow({
   const selectedArtist = ref(null);
   const localArtist = ref(null);
   const providerReleaseGroups = ref([]);
-  const detectionEventsPageInfo = ref({ hasMore: false, nextCursor: null });
   const searchError = ref('');
   const artistActionError = ref('');
-  const detectionEventsErrorMessage = ref('');
   const queuedRefreshRun = ref(null);
   const isSearching = ref(false);
   const isImportingArtist = ref(false);
   const isLoadingArtist = ref(false);
-  const isLoadingMoreDetectionEvents = ref(false);
   const isRefreshingArtist = ref(false);
   const artistWorkspaceRequestGate = createLatestRequestGate();
+  const detectionHistory = useMetadataDetectionHistory({
+    localArtist,
+    captureWorkspace: () => artistWorkspaceRequestGate.capture(),
+    fetchDetectionEvents: fetchArtistDetectionEvents,
+  });
+  const { detectionEventsPageInfo, detectionEventsErrorMessage, isLoadingMoreDetectionEvents, loadMoreDetectionEvents } = detectionHistory;
 
   const localSearchWorkflow = createLocalSearchWorkflow();
 
   function beginArtistWorkspace() {
+    detectionHistory.reset();
     isImportingArtist.value = false;
     isRefreshingArtist.value = false;
     isLoadingArtist.value = false;
@@ -87,10 +92,7 @@ export function useMetadataArtistWorkflow({
     }
 
     localArtist.value = localPayload;
-    detectionEventsPageInfo.value = localPayload.detectionEventsPageInfo ?? {
-      hasMore: false,
-      nextCursor: null,
-    };
+    detectionHistory.reset(localPayload.detectionEventsPageInfo);
     providerReleaseGroups.value = browsePayload.browse?.results ?? [];
     return true;
   }
@@ -161,7 +163,6 @@ export function useMetadataArtistWorkflow({
       ? { id: initialMusicBrainzArtistId, name: artist.name }
       : null;
     artistActionError.value = '';
-    detectionEventsErrorMessage.value = '';
     queuedRefreshRun.value = null;
     releaseWorkflow.resetReleaseSelection();
     isLoadingArtist.value = true;
@@ -191,10 +192,7 @@ export function useMetadataArtistWorkflow({
       }
 
       localArtist.value = localPayload;
-      detectionEventsPageInfo.value = localPayload.detectionEventsPageInfo ?? {
-        hasMore: false,
-        nextCursor: null,
-      };
+      detectionHistory.reset(localPayload.detectionEventsPageInfo);
       selectedArtist.value = musicBrainzArtistId
         ? { id: musicBrainzArtistId, name: localPayload.artist?.name ?? artist.name }
         : null;
@@ -215,7 +213,7 @@ export function useMetadataArtistWorkflow({
 
       if (request.isCurrent()) {
         localArtist.value = null;
-        detectionEventsPageInfo.value = { hasMore: false, nextCursor: null };
+        detectionHistory.reset();
         providerReleaseGroups.value = [];
         artistActionError.value = getErrorMessage(error, 'Opening local artist failed');
       }
@@ -223,37 +221,6 @@ export function useMetadataArtistWorkflow({
       if (request.isCurrent()) {
         isLoadingArtist.value = false;
       }
-    }
-  }
-
-  async function loadMoreDetectionEvents() {
-    if (!localArtist.value?.artist?.id || !detectionEventsPageInfo.value?.hasMore || isLoadingMoreDetectionEvents.value) {
-      return;
-    }
-
-    isLoadingMoreDetectionEvents.value = true;
-    detectionEventsErrorMessage.value = '';
-
-    try {
-      const result = await fetchArtistDetectionEvents(localArtist.value.artist.id, {
-        before: detectionEventsPageInfo.value.nextCursor,
-      });
-
-      localArtist.value = {
-        ...localArtist.value,
-        detectionEvents: [
-          ...(localArtist.value.detectionEvents ?? []),
-          ...(result.detectionEvents ?? []),
-        ],
-      };
-      detectionEventsPageInfo.value = result.pageInfo ?? {
-        hasMore: false,
-        nextCursor: null,
-      };
-    } catch (error) {
-      detectionEventsErrorMessage.value = getErrorMessage(error, 'Loading more detection history failed');
-    } finally {
-      isLoadingMoreDetectionEvents.value = false;
     }
   }
 

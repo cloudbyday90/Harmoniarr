@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
-The October 21 [Metadata selection ownership rebuild](LOCAL_DOCKER_METADATA_COMMAND_SELECTION_OUTCOME.md)
+The October 21 [Metadata detection-history rebuild](LOCAL_DOCKER_METADATA_DETECTION_HISTORY_OUTCOME.md)
 records the current no-cache image, preserved admin/data and passing readiness.
+The [feature outcome](METADATA_DETECTION_HISTORY_OUTCOME.md) verifies pagination
+ownership, native session refusal, read abort and ordinary operator paging.
+
+The October 21 [Metadata selection ownership rebuild](LOCAL_DOCKER_METADATA_COMMAND_SELECTION_OUTCOME.md)
+records the preceding no-cache image, preserved admin/data and passing readiness.
 The [feature outcome](METADATA_COMMAND_SELECTION_OUTCOME.md) verifies delayed
 command publication, current feedback and selection-owned pending state.
 

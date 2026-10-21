@@ -143,3 +143,10 @@ follow-up reads, and require both artist and release currency at publication.
 Guard errors and pending cleanup too. Navigation can retire UI ownership while
 the server still accepts the POST; neither read abort nor stale-response refusal
 proves cancellation or authorizes automatic resubmission.
+
+For detection-history pages, use the [pagination ownership design](../../../../docs/METADATA_DETECTION_HISTORY_DESIGN.md).
+Retain both workspace and page generations: replacing a catalog can invalidate
+pagination without changing the artist. Reset before navigation begins so the
+old cursor cannot dispatch during a pending detail load. Guard append, cursor,
+error and pending cleanup even when a dependency ignores abort. Native session/
+GET proof with controlled page data does not certify durable event storage.

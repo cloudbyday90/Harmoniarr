@@ -270,7 +270,9 @@ test('useMetadataArtistWorkflow appends paged detection history for the active a
 
   await workflow.loadMoreDetectionEvents();
 
-  assert.deepEqual(fetchArtistDetectionEvents.mock.calls[0].arguments, ['local-artist-1', { before: 'cursor-1' }]);
+  assert.equal(fetchArtistDetectionEvents.mock.calls[0].arguments[0], 'local-artist-1');
+  assert.equal(fetchArtistDetectionEvents.mock.calls[0].arguments[1].before, 'cursor-1');
+  assert.ok(fetchArtistDetectionEvents.mock.calls[0].arguments[1].signal instanceof AbortSignal);
   assert.deepEqual(workflow.localArtist.value.detectionEvents, [
     {
       id: 'event-1',

@@ -79,10 +79,7 @@ MCP returned zero open PRs. No random candidate, merge, rebase or stale-PR closu
 was applicable. All intended changes stay on main; no release, tag, version bump
 or separate branch is created.
 
-Next, bind detection-history pagination to its artist generation. A separate
-private probe on the final source held artist A's page, opened artist B, and then
-observed A's event and cursor published into B. `loadMoreDetectionEvents` currently
-appends and clears pending state after awaiting without a selection check. This
-reader remains outside the command fix. Reuse the ownership contract, prove
-same-ID reselection and stale failures/pending cleanup, and retain ordinary
-pagination behavior before broadening to other metadata search readers.
+Completed by the [detection-history outcome](METADATA_DETECTION_HISTORY_OUTCOME.md):
+the history reader now owns workspace/page generations and resets before
+navigation or catalog replacement. That outcome records its ordinary paging,
+stale-response and native session/abort proof, plus the next reader to qualify.
