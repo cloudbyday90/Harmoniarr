@@ -17,19 +17,26 @@
 -->
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import AuthEntryShell from '../components/AuthEntryShell.vue';
+import AuthFormFeedback from '../components/AuthFormFeedback.vue';
 import { buildAuthEntrySupportItems } from '../lib/auth-entry-support.js';
-import { usePasswordMatch } from '../composables/usePasswordMatch.js';
+import { createUserCommandFocusTracker } from '../lib/user-command-focus.js';
+import { usePasswordConfirmation } from '../composables/usePasswordConfirmation.js';
 import { useRecoveryStatus } from '../composables/useRecoveryStatus.js';
 
 const router = useRouter();
 const form = reactive({ recoveryCode: '', username: '', password: '', confirmPassword: '' });
 const validationError = ref('');
+const confirmInput = ref(null);
+const completionHeading = ref(null);
+const feedbackPanel = ref(null);
 
 const {
+  attachVisibilityListener,
   blockedByLock,
+  canSubmit,
   completionResult,
   destroy: destroyRecoveryStatus,
   errorMessage,
@@ -44,9 +51,10 @@ const {
   submitRecovery,
 } = useRecoveryStatus({ revalidateOnFocus: true });
 const supportItems = computed(() => buildAuthEntrySupportItems('recovery', { username: form.username }));
-const { markTouched: markConfirmTouched, showMatch: showPasswordMatch, showMismatch: showPasswordMismatch } = usePasswordMatch(
+const { markTouched: markConfirmTouched, showMatch: showPasswordMatch, showMismatch: showPasswordMismatch, validate: validateConfirmation } = usePasswordConfirmation(
   () => form.password,
   () => form.confirmPassword,
+  confirmInput,
 );
 
 const countdownDisplay = computed(() => {
@@ -60,11 +68,13 @@ const countdownDisplay = computed(() => {
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 });
 
-const formDisabled = computed(() => {
-  return isSubmitting.value || !recoveryAvailable.value || expired.value || blockedByLock.value || remainingAttempts.value <= 0;
-});
+const formDisabled = computed(() => !canSubmit.value);
+const pendingMessage = computed(() => isSubmitting.value ? 'Completing recovery…'
+  : isLoading.value ? 'Checking recovery status…'
+    : isCompleted.value ? 'Recovery complete. Use your new credentials to log in.' : '');
 
 onMounted(async () => {
+  attachVisibilityListener();
   await loadStatus();
 });
 
@@ -85,21 +95,21 @@ function validate() {
     return 'Password is required.';
   }
 
-  if (form.password !== form.confirmPassword) {
-    return 'Passwords must match.';
-  }
-
   return '';
 }
 
 async function submit() {
+  if (formDisabled.value) return;
   validationError.value = '';
+  errorMessage.value = '';
   const error = validate();
   if (error) {
     validationError.value = error;
     return;
   }
+  if (!await validateConfirmation()) return;
 
+  const focus = createUserCommandFocusTracker({ document: globalThis.document });
   try {
     await submitRecovery({
       recoveryCode: form.recoveryCode.trim(),
@@ -108,7 +118,15 @@ async function submit() {
       confirmPassword: form.confirmPassword,
     });
   } catch {
-    await loadStatus();
+    // The recovery owner retains the POST error and refreshes status in place.
+  } finally {
+    await nextTick();
+    if (isCompleted.value && focus.ownsFocus()) completionHeading.value?.focus();
+    else if (errorMessage.value) {
+      if (!canSubmit.value && focus.ownsFocus()) feedbackPanel.value?.focus();
+      else focus.restoreAfterFailure();
+    }
+    focus.dispose();
   }
 }
 
@@ -124,6 +142,9 @@ function goToLogin() {
     description="Use this only when an operator armed bootstrap-admin recovery from the command line. Completing recovery revokes existing sessions and restores local admin access."
     :support-items="supportItems"
   >
+    <section ref="feedbackPanel" tabindex="-1" aria-label="Recovery feedback" class="panel-light bootstrap-status-card" :class="{ 'sr-only': !validationError && !errorMessage && !pendingMessage }">
+      <AuthFormFeedback :error-message="validationError || errorMessage" :pending-message="pendingMessage" />
+    </section>
     <article class="panel-light bootstrap-status-card" v-if="isLoading">
       <p class="eyebrow">Checking recovery status</p>
       <p>Loading recovery run information...</p>
@@ -131,7 +152,6 @@ function goToLogin() {
 
     <article class="panel-light bootstrap-status-card" v-else-if="errorMessage && !recoveryAvailable">
       <p class="eyebrow">Recovery status error</p>
-      <p class="error-copy">{{ errorMessage }}</p>
       <p class="muted-copy">
         Ensure a recovery run is armed via <code>harmoniarrctl recovery arm-bootstrap-admin</code> and try again.
       </p>
@@ -149,7 +169,7 @@ function goToLogin() {
     <template v-else-if="isCompleted && completionResult">
       <article class="panel-light bootstrap-status-card">
         <p class="eyebrow">Recovery complete</p>
-        <h2>Admin account recovered successfully</h2>
+        <h2 ref="completionHeading" tabindex="-1">Admin account recovered successfully</h2>
         <p>
           The bootstrap-admin recovery has been completed. All existing sessions have been
           revoked. Use your new credentials to log in.
@@ -234,19 +254,22 @@ function goToLogin() {
             Confirm password
             <input
               id="confirm-new-password"
+              ref="confirmInput"
               v-model="form.confirmPassword"
               name="confirmPassword"
               type="password"
               autocomplete="new-password"
               required
+              :aria-invalid="showPasswordMismatch ? 'true' : undefined"
+              aria-describedby="recovery-password-match"
               :disabled="formDisabled"
               @input="markConfirmTouched"
             />
           </label>
-          <p v-if="showPasswordMismatch" class="auth-pw-hint auth-pw-hint--mismatch">Passwords do not match.</p>
-          <p v-else-if="showPasswordMatch" class="auth-pw-hint auth-pw-hint--match">Passwords match.</p>
-          <p class="error-copy" v-if="validationError">{{ validationError }}</p>
-          <p class="error-copy" v-else-if="errorMessage">{{ errorMessage }}</p>
+          <div id="recovery-password-match" role="status" aria-atomic="true" :class="{ 'sr-only': !showPasswordMismatch && !showPasswordMatch }">
+            <p v-if="showPasswordMismatch" class="auth-pw-hint auth-pw-hint--mismatch">Passwords do not match.</p>
+            <p v-else-if="showPasswordMatch" class="auth-pw-hint auth-pw-hint--match">Passwords match.</p>
+          </div>
           <button type="submit" :disabled="formDisabled">
             {{ isSubmitting ? 'Recovering...' : 'Complete recovery' }}
           </button>

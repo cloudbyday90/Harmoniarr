@@ -1,6 +1,7 @@
 # Authentication form feedback
 
-Use for login/bootstrap/account-claim feedback or submit admission changes.
+Use for login/bootstrap/account-claim and operator-armed recovery feedback or
+submit admission changes.
 Discover/open current W3C, framework and OWASP sources through MCP; distinguish
 normative WCAG criteria from informative techniques and project policy. The
 [research](../../../../docs/AUTH_FORM_FEEDBACK_RESEARCH_2026_10.md) maps this slice.
@@ -28,3 +29,16 @@ including held responses, same-error retry, no duplicate request and successful
 bootstrap/login. Keep controlled Plex failure separate from actual provider
 authorization. Report viewport/theme and manual AT/device coverage honestly;
 role/description assertions do not establish spoken output or full conformance.
+
+For operator-armed admin recovery, keep the recovery-specific POST/refresh owner.
+An invalid code can consume an attempt: refresh availability/budget in place
+without clearing its error or ending pending admission early. Fence old status
+reads against newer reads, submit, completion and destroy; the fence prevents
+state publication, not arbitrary transport completion. Keep feedback mounted
+even when the form disappears. Prove actual server hold/expiry/attempt refusals,
+session revocation, code replay refusal and explicit subsequent login in a fresh
+fixture. Never arm the user's live installation to prepare this proof. Mask codes
+and passwords in screenshots and keep captured secrets out of evidence/logs.
+Do not announce countdown seconds repeatedly or treat a cached client clock as
+server expiry authority. See the recovery [design](../../../../docs/RECOVERY_FORM_FEEDBACK_DESIGN.md)
+and [outcome](../../../../docs/RECOVERY_FORM_FEEDBACK_OUTCOME.md) before adoption.

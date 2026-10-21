@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { computed, readonly, ref, shallowRef } from 'vue';
+import { computed, nextTick, readonly, ref, shallowRef } from 'vue';
 import { fetchRecoveryStatus as defaultFetchRecoveryStatus, completeRecovery as defaultCompleteRecovery } from '../lib/recovery-api.js';
 import { getErrorMessage } from '../lib/error-utils.js';
 
@@ -39,6 +39,8 @@ export function useRecoveryStatus({
   let pollTimer = null;
   let destroyed = false;
   let hasLoaded = false;
+  let readRevision = 0;
+  let visibilityAttached = false;
 
   const recoveryAvailable = computed(() => status.value?.recoveryAvailable === true);
   const blockedByLock = computed(() => status.value?.blockedByLock === true);
@@ -55,6 +57,8 @@ export function useRecoveryStatus({
   });
 
   const expired = computed(() => secondsRemaining.value <= 0 && recoveryAvailable.value);
+  const canSubmit = computed(() => !isLoading.value && !isSubmitting.value && !isCompleted.value
+    && recoveryAvailable.value && !expired.value && !blockedByLock.value && remainingAttempts.value > 0);
 
   function clearPollTimer() {
     if (pollTimer !== null) {
@@ -68,6 +72,7 @@ export function useRecoveryStatus({
     if (!pollIntervalMs || pollIntervalMs <= 0) return;
     if (destroyed) return;
     if (!hasLoaded) return;
+    if (isSubmitting.value || isCompleted.value) return;
 
     pollTimer = setTimeout(async () => {
       if (destroyed) return;
@@ -84,71 +89,73 @@ export function useRecoveryStatus({
 
   function destroy() {
     destroyed = true;
+    readRevision++;
     clearPollTimer();
-    if (revalidateOnFocus && typeof document !== 'undefined') {
+    if (visibilityAttached && typeof document !== 'undefined') {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      visibilityAttached = false;
     }
   }
 
   function attachVisibilityListener() {
-    if (revalidateOnFocus && typeof document !== 'undefined') {
+    if (!destroyed && !visibilityAttached && revalidateOnFocus && typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', handleVisibilityChange);
+      visibilityAttached = true;
     }
   }
 
-  async function loadStatus() {
-    if (destroyed) return;
-    isLoading.value = true;
-    errorMessage.value = '';
+  async function readStatus(initial, { duringSubmission = false } = {}) {
+    if (destroyed || isCompleted.value || (isSubmitting.value && !duringSubmission)) return;
+    const revision = ++readRevision;
+    if (initial) { isLoading.value = true; errorMessage.value = ''; }
+    else isRevalidating.value = true;
+    const current = () => !destroyed && !isCompleted.value && revision === readRevision;
     try {
-      status.value = await fetchRecoveryStatus();
-      hasLoaded = true;
+      const result = await fetchRecoveryStatus();
+      if (current()) { status.value = result; hasLoaded = true; }
     } catch (error) {
-      status.value = null;
-      errorMessage.value = getErrorMessage(error, 'Failed to load recovery status');
+      if (initial && current()) {
+        status.value = null;
+        errorMessage.value = getErrorMessage(error, 'Failed to load recovery status');
+      }
+      // A failed background refresh preserves both prior status and POST error.
     } finally {
-      if (!destroyed) {
-        isLoading.value = false;
+      if (current()) {
+        isLoading.value = false; isRevalidating.value = false;
         schedulePoll();
       }
     }
   }
 
-  async function revalidate() {
-    if (destroyed) return;
-    isRevalidating.value = true;
-    try {
-      status.value = await fetchRecoveryStatus();
-    } catch {
-      // Preserve stale data on revalidation error.
-    } finally {
-      if (!destroyed) {
-        isRevalidating.value = false;
-        schedulePoll();
-      }
-    }
-  }
+  const loadStatus = () => readStatus(true);
+  const revalidate = () => readStatus(false);
 
   async function submitRecovery(form) {
+    if (destroyed || !canSubmit.value) return null;
+    readRevision++; clearPollTimer(); isRevalidating.value = false;
     errorMessage.value = '';
     isSubmitting.value = true;
     try {
+      await nextTick();
+      if (destroyed) return null;
       const result = await completeRecovery(form);
-      completionResult.value = result;
-      isCompleted.value = true;
-      clearPollTimer();
+      if (!destroyed) { completionResult.value = result; isCompleted.value = true; }
       return result;
     } catch (error) {
-      errorMessage.value = getErrorMessage(error, 'Recovery failed');
+      if (!destroyed) {
+        errorMessage.value = getErrorMessage(error, 'Recovery failed');
+        await readStatus(false, { duringSubmission: true });
+      }
       throw error;
     } finally {
-      isSubmitting.value = false;
+      if (!destroyed) { isSubmitting.value = false; schedulePoll(); }
     }
   }
 
   return {
     attachVisibilityListener,
     blockedByLock,
+    canSubmit,
     completionResult,
     destroy,
     errorMessage,

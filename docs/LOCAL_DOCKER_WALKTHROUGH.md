@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
-The October 21 [authentication feedback rebuild](LOCAL_DOCKER_AUTH_FORM_FEEDBACK_OUTCOME.md)
+The October 21 [recovery feedback rebuild](LOCAL_DOCKER_RECOVERY_FORM_FEEDBACK_OUTCOME.md)
 records the current no-cache image, preserved admin/data and passing readiness.
+The [owning outcome](RECOVERY_FORM_FEEDBACK_OUTCOME.md) qualifies armed recovery
+feedback, focus and actual server refusals in a separate disposable fixture.
+
+The October 21 [authentication feedback rebuild](LOCAL_DOCKER_AUTH_FORM_FEEDBACK_OUTCOME.md)
+records the preceding no-cache image, preserved admin/data and passing readiness.
 The [owning outcome](AUTH_FORM_FEEDBACK_OUTCOME.md) qualifies built entry forms,
 native auth outcomes and the limits of browser accessibility evidence.
 

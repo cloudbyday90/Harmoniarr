@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { useRecoveryStatus } from '../../src/client/composables/useRecoveryStatus.js';
 
-function makeStatus({ recoveryAvailable = true, remainingAttempts = 3, expiresAt = null, blockedByLock = false } = {}) {
+function makeStatus({ recoveryAvailable = true, remainingAttempts = 3, expiresAt = new Date(Date.now() + 300_000).toISOString(), blockedByLock = false } = {}) {
   return { recoveryAvailable, remainingAttempts, expiresAt, blockedByLock };
 }
 
