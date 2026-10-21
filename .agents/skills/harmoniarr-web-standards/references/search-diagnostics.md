@@ -156,7 +156,8 @@ Keep a polite atomic status node attached before messages occur and outside busy
 content. After DOM flush, recheck generation and interaction ownership before
 restoring a surviving button or focusing a visible completion heading. A user
 move revokes restoration. Test a long history so preventScroll cannot leave the
-new target off-screen; preserve scroll only for the existing invoker. DOM/ARIA
+new target off-screen. A surviving invoker can also move after append; use the
+visibility workflow below rather than always preserving its scroll. DOM/ARIA
 assertions do not prove screen-reader announcements.
 
 For history detail structure, use the [presentation design](../../../../docs/METADATA_HISTORY_PRESENTATION_DESIGN.md).
@@ -173,3 +174,16 @@ accessor to the component that owns the surviving heading; retain current-page
 and user-interaction authority. Check named sections, narrow reflow, actual grid
 geometry and empty history. Shared odd-child grid rules can change a three-card
 summary after extraction. Viewport checks do not prove browser zoom or full WCAG.
+
+For history invoker visibility, use the [visibility design](../../../../docs/METADATA_HISTORY_VISIBILITY_DESIGN.md).
+Check geometry after the response without using a test scrolling helper to make
+it pass. A control can remain activeElement while moving outside the workspace.
+Restore without centering, then reveal a successful continuing-page invoker with
+native instant nearest alignment only while current result and interaction still
+own it. Recheck after focus handlers, which can synchronously redirect or retire
+ownership. Use scoped target margins for the current fixed navigation and safe
+area; do not infer clearance from viewport bounds alone. Pair a long append with
+an already-visible no-movement control and a held response after user focus moves.
+Keep final heading, retry, cancellation and stale/no-op behavior separately proved.
+Two-pixel cues are a project convention; automated geometry does not establish
+assistive-technology announcements, browser zoom or cross-engine conformance.

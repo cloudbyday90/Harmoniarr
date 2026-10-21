@@ -85,6 +85,9 @@ changes, with deliberate atomic semantics. Keep command feedback outside a busy
 ancestor that would defer it. Do not make background revalidation steal focus.
 If the invoking control disappears, move focus to a meaningful destination only
 while that interaction still owns focus; preserve a user's move elsewhere.
+If appended content moves a surviving invoker, test visibility separately from
+activeElement. Use the [history visibility workflow](references/search-diagnostics.md)
+for owned nearest scrolling, fixed-navigation clearance and no-movement controls.
 Distinguish an accepted/queued intent from a completed provider/download/library
 result, and keep errors bounded.
 

@@ -33,7 +33,7 @@ defineExpose({ getHistoryHeading: () => historyHeading.value });
     </ul>
     <p v-else class="metadata-card-copy">No release detections have been recorded for this artist yet.</p>
     <div v-if="detectionEventsPageInfo?.hasMore" class="hx-metadata-history-actions">
-      <button type="button" class="secondary-button" :disabled="isLoadingDetectionEvents" @click="emit('load-more')">
+      <button type="button" class="secondary-button hx-metadata-history-more" :disabled="isLoadingDetectionEvents" @click="emit('load-more')">
         {{ isLoadingDetectionEvents ? 'Loading more...' : 'Load more history' }}
       </button>
     </div>
@@ -41,7 +41,8 @@ defineExpose({ getHistoryHeading: () => historyHeading.value });
 </template>
 
 <style scoped>
-.hx-metadata-history-heading:focus-visible {
+.hx-metadata-history-heading:focus-visible,
+.hx-metadata-history-more:focus-visible {
   outline: 2px solid var(--hx-accent-strong);
   outline-offset: 2px;
 }
@@ -50,5 +51,16 @@ defineExpose({ getHistoryHeading: () => historyHeading.value });
   display: flex;
   justify-content: flex-end;
   margin-top: var(--hx-space-4);
+}
+
+.hx-metadata-history-more {
+  scroll-margin-block: var(--hx-space-2);
+  scroll-margin-inline: var(--hx-space-2);
+}
+
+@media (max-width: 640px) {
+  .hx-metadata-history-more {
+    scroll-margin-block-end: calc(var(--hx-bottom-nav-height) + env(safe-area-inset-bottom, 0px) + var(--hx-space-2));
+  }
 }
 </style>

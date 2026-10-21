@@ -1,5 +1,13 @@
 # Official practices by boundary
 
+For continuing history focus, use the
+[visibility research](../../../../docs/METADATA_HISTORY_VISIBILITY_RESEARCH_2026_10.md).
+WCAG defines the focus outcome; WHATWG defines focus scrolling; CSSWG defines
+nearest scrolling and target margins. Distinguish informative W3C techniques
+from normative criteria and editor's drafts from tested browser support. Recheck
+interaction authority after synchronous focus handlers; a visible activeElement
+and a no-movement control need native geometry proof, not only DOM assertions.
+
 Durable search uses
 [continuation research](../../../../docs/SLSKD_SEARCH_CONTINUATION_RESEARCH_2026_10.md).
 The released provider's caller UUID enables correlation, not automatic POST

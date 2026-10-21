@@ -85,3 +85,8 @@ is outside the visible workspace with always scrolling after append; the former
 avoids unnecessary movement when the target is already visible. This diagnostic
 does not establish native behavior on older images or every browser. Keep the
 fix and its continuing-page viewport proof as the next focused work item.
+
+Follow-up implemented: the [visibility outcome](METADATA_HISTORY_VISIBILITY_OUTCOME.md)
+records owned native nearest scrolling, mobile navigation clearance and the
+already-visible/user-movement controls. The diagnostic above remains the
+historical finding on this panel candidate.

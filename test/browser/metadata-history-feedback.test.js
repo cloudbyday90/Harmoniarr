@@ -4,7 +4,7 @@ import { after, before, suite, test } from 'node:test';
 import { createBrowserSmokeRuntime } from '../../testing/browser/playwright-smoke-runtime.js';
 import { createMetadataCommandFixture, metadataCommandIds as id } from '../../testing/browser/metadata-command-fixture.js';
 import { bootstrapAdminThroughUi } from '../../testing/browser/operator-browser-helpers.js';
-import { assertLocatorFocused } from '../../testing/browser/keyboard-accessibility-helpers.js';
+import { assertLocatorFocused, assertVisibleFocusOutline } from '../../testing/browser/keyboard-accessibility-helpers.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 import { createFixtureGate, withFixtureLifecycle } from '../../testing/integration/fixture-lifecycle.js';
 
@@ -73,16 +73,41 @@ suite('Metadata history feedback and owned focus', () => {
     }, 'history_final_page_focus');
   });
 
-  test('a non-final page restores its keyboard invoker and reports the appended count', { timeout: config.scenarioTimeoutMs }, async () => {
+  for (const width of [1280, 390]) test(`a continuing page keeps its keyboard invoker visible at ${width}px`, { timeout: config.scenarioTimeoutMs }, async () => {
     await runScenario(async context => {
-      await prepare(context); const { page } = context;
-      readPage = async () => ({ entries: [event('Another discovery')], pageInfo: { hasMore: true, nextCursor: 'next-cursor' } });
+      const { page } = context; await page.setViewportSize({ width, height: 720 });
+      await prepare(context, { longHistory: true });
+      readPage = async () => ({ entries: Array.from({ length: 10 }, (_, index) => event(`Another discovery ${index}`)), pageInfo: { hasMore: true, nextCursor: 'next-cursor' } });
       const load = page.getByRole('button', { name: 'Load more history', exact: true });
-      await load.press('Enter'); await page.getByText('Another discovery', { exact: true }).waitFor();
+      await load.scrollIntoViewIfNeeded(); await load.focus();
+      await load.press('Enter'); await page.getByText('Another discovery 9', { exact: true }).waitFor();
       await assertLocatorFocused(load);
-      assert.equal(await page.getByRole('status', { name: 'Detection history status', exact: true }).textContent(), 'Loaded 1 more history entry.');
+      const bounds = await load.boundingBox();
+      const main = await page.locator('.hx-main').boundingBox();
+      const navigation = await page.locator('.hx-bottom-nav').boundingBox();
+      const bottom = Math.min(main.y + main.height, navigation?.y ?? page.viewportSize().height);
+      assert.ok(bounds.y >= main.y && bounds.y + bounds.height + 2 <= bottom, 'the focused button and outline must be visible above fixed navigation');
+      await assertVisibleFocusOutline(load);
+      await mkdir('.tmp/metadata-history-visibility-2026-10-21', { recursive: true });
+      await page.screenshot({ path: `.tmp/metadata-history-visibility-2026-10-21/continuing-${width}.png`, animations: 'disabled' });
+      assert.equal(await page.getByRole('status', { name: 'Detection history status', exact: true }).textContent(), 'Loaded 10 more history entries.');
       assert.equal(await load.isEnabled(), true); assert.equal(reads.length, 1);
-    }, 'history_continuing_page_focus');
+      assert.deepEqual(fixture.calls, []);
+    }, `history_continuing_page_focus_${width}`);
+  });
+
+  test('an already-visible continuing-page invoker preserves the reading position', { timeout: config.scenarioTimeoutMs }, async () => {
+    await runScenario(async context => {
+      const { page } = context; await page.setViewportSize({ width: 1280, height: 1000 }); await prepare(context);
+      readPage = async () => ({ entries: [], pageInfo: { hasMore: true, nextCursor: 'next-cursor' } });
+      const load = page.getByRole('button', { name: 'Load more history', exact: true }); await load.focus();
+      const scrollBefore = await page.locator('.hx-main').evaluate(node => node.scrollTop);
+      await load.press('Enter');
+      await page.getByText('No additional history entries were returned.', { exact: true }).waitFor();
+      await assertLocatorFocused(load);
+      assert.equal(await page.locator('.hx-main').evaluate(node => node.scrollTop), scrollBefore);
+      assert.deepEqual(fixture.calls, []);
+    }, 'history_visible_continuing_page_position');
   });
 
   test('native service failure restores retry focus and successful retry clears its feedback', { timeout: config.scenarioTimeoutMs }, async () => {
@@ -104,14 +129,15 @@ suite('Metadata history feedback and owned focus', () => {
     }, 'history_failure_retry_focus');
   });
 
-  for (const fail of [false, true]) test(`a held ${fail ? 'failed' : 'final'} page preserves a user's move elsewhere`, { timeout: config.scenarioTimeoutMs }, async t => {
+  for (const outcome of ['final', 'continuing', 'failed']) test(`a held ${outcome} page preserves a user's focus and reading position elsewhere`, { timeout: config.scenarioTimeoutMs }, async t => {
     await runScenario(context => withFixtureLifecycle({ signal: t.signal }, async scope => {
-      await prepare(context); const { page } = context;
+      await prepare(context, { longHistory: true }); const { page } = context;
+      const fail = outcome === 'failed'; const hasMore = outcome === 'continuing';
       const reached = createFixtureGate({ signal: scope.signal }); const hold = createFixtureGate();
       scope.onRelease(() => hold.release()); scope.onRelease(() => reached.release());
       const expectedFailure = new Error('controlled history failure');
       readPage = () => {
-        const execution = (async () => { reached.release(); await hold.promise; if (fail) throw expectedFailure; return { entries: [event('Held discovery')], pageInfo: { hasMore: false, nextCursor: null } }; })();
+        const execution = (async () => { reached.release(); await hold.promise; if (fail) throw expectedFailure; return { entries: Array.from({ length: 10 }, (_, index) => event(`Held discovery ${index}`)), pageInfo: { hasMore, nextCursor: hasMore ? 'next-cursor' : null } }; })();
         scope.track(execution.then(() => { assert.equal(fail, false); }, error => { assert.equal(error, expectedFailure); }));
         return execution;
       };
@@ -120,9 +146,11 @@ suite('Metadata history feedback and owned focus', () => {
       await status.getByText('Loading more history.', { exact: true }).waitFor();
       assert.equal(await status.evaluate(node => node.closest('[aria-busy="true"]') === null), true);
       const input = page.getByLabel('Artist name', { exact: true }); await input.focus();
+      const scrollBefore = await page.locator('.hx-main').evaluate(node => node.scrollTop);
       hold.release();
-      await status.getByText(fail ? /Could not load more history\./ : 'Loaded 1 more history entry. All history loaded.', { exact: !fail }).waitFor();
+      await status.getByText(fail ? /Could not load more history\./ : `Loaded 10 more history entries.${hasMore ? '' : ' All history loaded.'}`, { exact: !fail }).waitFor();
       await assertLocatorFocused(input); assert.equal(reads.length, 1); assert.deepEqual(fixture.calls, []);
-    }), `history_moved_focus_${fail ? 'failure' : 'final'}`);
+      assert.equal(await page.locator('.hx-main').evaluate(node => node.scrollTop), scrollBefore);
+    }), `history_moved_focus_${outcome}`);
   });
 });

@@ -59,7 +59,12 @@ function surface() {
     addEventListener: (_, listener) => listeners.add(listener), removeEventListener: (_, listener) => listeners.delete(listener),
     focus(target) { this.activeElement = target; for (const listener of listeners) listener({ target }); },
   };
-  const target = () => { const element = { isConnected: true, disabled: false, focus: options => { element.lastFocusOptions = options; document.focus(element); } }; return element; };
+  const target = () => {
+    const element = { isConnected: true, disabled: false, reveals: [],
+      focus: options => { element.lastFocusOptions = options; document.focus(element); element.onFocus?.(); },
+      scrollIntoView: options => element.reveals.push(options),
+    }; return element;
+  };
   const button = target(); const heading = target(); document.activeElement = button;
   return { document, button, heading, listeners };
 }
@@ -70,29 +75,59 @@ test('owned final completion focuses the heading; continuing, failed and cancell
     const load = useMetadataHistoryFocus(async () => { ui.document.focus(ui.document.body); return { ...result, isCurrent: () => true }; }, { getDocument: () => ui.document, getCompletionTarget: () => ui.heading });
     await load(); assert.equal(ui.document.activeElement, result.kind === 'loaded' && !result.hasMore ? ui.heading : ui.button);
     assert.equal(ui.document.activeElement.lastFocusOptions.preventScroll, ui.document.activeElement === ui.button);
+    assert.deepEqual(ui.button.reveals, result.kind === 'loaded' && result.hasMore ? [{ behavior: 'instant', block: 'nearest', inline: 'nearest' }] : []);
+    assert.deepEqual(ui.heading.reveals, []);
     assert.equal(ui.listeners.size, 0);
   }
 });
 
 test('a user move elsewhere remains respected even if focus later returns to the body', async () => {
-  for (const leaveOnBody of [false, true]) {
+  for (const leaveOnBody of [false, true]) for (const hasMore of [false, true]) {
     const ui = surface(); const other = {};
-    const load = useMetadataHistoryFocus(async () => { ui.document.focus(other); if (leaveOnBody) ui.document.focus(ui.document.body); return { kind: 'loaded', hasMore: false, isCurrent: () => true }; }, { getDocument: () => ui.document, getCompletionTarget: () => ui.heading });
+    const load = useMetadataHistoryFocus(async () => { ui.document.focus(other); if (leaveOnBody) ui.document.focus(ui.document.body); return { kind: 'loaded', hasMore, isCurrent: () => true }; }, { getDocument: () => ui.document, getCompletionTarget: () => ui.heading });
     await load(); assert.equal(ui.document.activeElement, leaveOnBody ? ui.document.body : other); assert.equal(ui.listeners.size, 0);
+    assert.deepEqual(ui.button.reveals, []);
   }
 });
 
 test('an expired result after command completion never moves focus', async () => {
-  const ui = surface(); let current = true;
-  const load = useMetadataHistoryFocus(async () => { ui.document.focus(ui.document.body); queueMicrotask(() => { current = false; }); return { kind: 'loaded', hasMore: false, isCurrent: () => current }; }, { getDocument: () => ui.document, getCompletionTarget: () => ui.heading });
-  await load(); assert.equal(ui.document.activeElement, ui.document.body); assert.equal(ui.listeners.size, 0);
+  for (const hasMore of [false, true]) {
+    const ui = surface(); let current = true;
+    const load = useMetadataHistoryFocus(async () => { ui.document.focus(ui.document.body); queueMicrotask(() => { current = false; }); return { kind: 'loaded', hasMore, isCurrent: () => current }; }, { getDocument: () => ui.document, getCompletionTarget: () => ui.heading });
+    await load(); assert.equal(ui.document.activeElement, ui.document.body); assert.equal(ui.listeners.size, 0);
+    assert.deepEqual(ui.button.reveals, []);
+  }
+});
+
+test('a continuing page reveals an invoker that retained focus without focusing it again', async () => {
+  const ui = surface();
+  const load = useMetadataHistoryFocus(async () => ({ kind: 'loaded', hasMore: true, isCurrent: () => true }), { getDocument: () => ui.document, getCompletionTarget: () => ui.heading });
+  await load(); assert.equal(ui.document.activeElement, ui.button); assert.equal(ui.button.lastFocusOptions, undefined);
+  assert.equal(ui.button.reveals.length, 1); assert.equal(ui.listeners.size, 0);
+});
+
+test('synchronous focus redirection or result invalidation cannot authorize a later reveal', async () => {
+  for (const redirect of [false, true]) {
+    const ui = surface(); const other = {}; let current = true;
+    ui.button.onFocus = () => { if (redirect) ui.document.focus(other); else current = false; };
+    const load = useMetadataHistoryFocus(async () => { ui.document.focus(ui.document.body); return { kind: 'loaded', hasMore: true, isCurrent: () => current }; }, { getDocument: () => ui.document, getCompletionTarget: () => ui.heading });
+    await load(); assert.deepEqual(ui.button.reveals, []); assert.equal(ui.document.activeElement, redirect ? other : ui.button); assert.equal(ui.listeners.size, 0);
+  }
+});
+
+test('a no-op result cannot restore or reveal its invoker', async () => {
+  const ui = surface();
+  const load = useMetadataHistoryFocus(async () => { ui.document.focus(ui.document.body); }, { getDocument: () => ui.document, getCompletionTarget: () => ui.heading });
+  assert.equal(await load(), undefined); assert.equal(ui.document.activeElement, ui.document.body);
+  assert.deepEqual(ui.button.reveals, []); assert.equal(ui.listeners.size, 0);
 });
 
 test('detached or disabled destinations are not focused', async () => {
-  for (const state of [{ isConnected: false }, { disabled: true }]) {
-    const ui = surface(); Object.assign(ui.heading, state);
-    const load = useMetadataHistoryFocus(async () => { ui.document.focus(ui.document.body); return { kind: 'loaded', hasMore: false, isCurrent: () => true }; }, { getDocument: () => ui.document, getCompletionTarget: () => ui.heading });
+  for (const state of [{ isConnected: false }, { disabled: true }]) for (const hasMore of [false, true]) {
+    const ui = surface(); Object.assign(hasMore ? ui.button : ui.heading, state);
+    const load = useMetadataHistoryFocus(async () => { ui.document.focus(ui.document.body); return { kind: 'loaded', hasMore, isCurrent: () => true }; }, { getDocument: () => ui.document, getCompletionTarget: () => ui.heading });
     await load(); assert.equal(ui.document.activeElement, ui.document.body); assert.equal(ui.listeners.size, 0);
+    assert.deepEqual(ui.button.reveals, []);
   }
 });
 
