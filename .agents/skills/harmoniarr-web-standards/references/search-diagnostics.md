@@ -66,3 +66,11 @@ recipient authority. Withhold return while the owning policy response is pending
 do not auto-save drafts or submit a new search. The existing inspector's mount
 read owns fresh status: prove that actual read instead of adding a refresh flag.
 Keep recorded search counts distinct from a subsequent change to the ignore list.
+
+Ignored-source route admission now shares the reviewed role policy with Activity
+diagnostic navigation; see the [access design](../../../../docs/IGNORED_ROUTE_ACCESS_DESIGN.md).
+Check current session facts before new admin-page entry, not just cached role.
+Retain bootstrap/password/login precedence, bound verification feedback and keep
+unrelated navigation unchanged. Prove refusal before the page's API reads, then
+independent HTTP authorization; hiding a link or guarding a route cannot secure
+the endpoint. Admission checks do not continuously revoke an already mounted view.

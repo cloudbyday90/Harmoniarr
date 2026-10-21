@@ -4,6 +4,13 @@ Harmoniarr is a self-hosted, Docker-hosted music library manager inspired by Lid
 
 The repository contains the Node.js ESM server, Vue client, PostgreSQL schema, automated validation, and design documents. The platform is under active development toward its first release.
 
+Ignored-source review now checks current administrator access before page entry
+and filters its diagnostic navigation link. See the
+[design](docs/IGNORED_ROUTE_ACCESS_DESIGN.md),
+[recommendations and tradeoffs](docs/IGNORED_ROUTE_ACCESS_RESEARCH_2026_10.md),
+[tested outcome](docs/IGNORED_ROUTE_ACCESS_OUTCOME.md) and
+[preserved local rebuild](docs/LOCAL_DOCKER_IGNORED_ROUTE_ACCESS_OUTCOME.md).
+
 Ignored-source review now retains an explicit return to the originating Missing
 Music decision. See the [design](docs/IGNORED_REVIEW_RETURN_DESIGN.md),
 [recommendations and tradeoffs](docs/IGNORED_REVIEW_RETURN_RESEARCH_2026_10.md),

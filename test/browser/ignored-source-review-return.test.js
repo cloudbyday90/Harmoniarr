@@ -107,7 +107,8 @@ suite('bounded ignored-source review return', () => {
       await page.getByText('The requested release is unavailable or you do not have access to it.', { exact: true }).waitFor();
       await getPoolFn().query("UPDATE app_users SET role='operator' WHERE id=$1", [authenticated.payload.user.id]);
       await page.goto(valid, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('heading', { name: 'Ignored source users', exact: true }).waitFor(); assert.equal(await card(page).count(), 0);
+      await page.waitForURL(`${baseUrl}/app`);
+      await page.getByRole('heading', { name: 'Home', exact: true }).waitFor(); assert.equal(await card(page).count(), 0);
       assert.equal((await client.requestJson('/api/v1/activity/ignored-source-users')).response.status, 403);
     }, { scenarioName: 'ignored_review_return_refusal' });
   });

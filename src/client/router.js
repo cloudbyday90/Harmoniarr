@@ -25,6 +25,8 @@ import {
 } from './lib/missing-music-legacy-route-redirect.js';
 import { resolveRouterScroll } from './lib/router-scroll.js';
 import { sessionStore } from './state/session.js';
+import { canEnterActivityRoute, refreshActivityRouteSession, requiresAdministratorActivitySession } from './lib/activity-route-access-policy.js';
+import { useToast } from './composables/useToast.js';
 
 const ActivityBlocklistView = () => import('./views/ActivityBlocklistView.vue');
 const AccountSecurityView = () => import('./views/AccountSecurityView.vue');
@@ -202,6 +204,12 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   if (!sessionStore.state.ready) {
     await sessionStore.refreshSession();
+  } else if (requiresAdministratorActivitySession(to.name)) {
+    const verified = await refreshActivityRouteSession({ routeName: to.name, refreshSession: () => sessionStore.refreshSession() });
+    if (!verified) {
+      useToast().error('Could not verify administrator access. Try again.');
+      return false;
+    }
   }
 
   if (sessionStore.state.bootstrapRequired) {
@@ -229,6 +237,10 @@ router.beforeEach(async (to) => {
   }
 
   if (to.meta.anonymousOnly && sessionStore.state.authenticated) {
+    return { name: defaultAuthenticatedRouteName() };
+  }
+
+  if (!canEnterActivityRoute({ routeName: to.name, actorRole: sessionStore.state.user?.role })) {
     return { name: defaultAuthenticatedRouteName() };
   }
 

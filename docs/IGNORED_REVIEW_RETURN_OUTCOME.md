@@ -75,8 +75,7 @@ installed consumer versions match retained failing TypeScript 7 Vue-language-
 service evidence and a passing TypeScript 6 control. No merge, rebase, closure,
 separate branch, version/tag change or release was created.
 
-Next: add administrator-only route admission for ignored-source review, aligned
-with its existing API policy. The role-withdrawal browser case confirms operators
-can enter that page shell even though its reads are refused. Preserve useful
-operator/requester destinations and independent server authorization; frontend
-navigation guards must not be treated as API access control.
+The subsequent [route-admission outcome](IGNORED_ROUTE_ACCESS_OUTCOME.md)
+completes current-session administrator admission and matching diagnostic-link
+filtering for ignored-source review. It preserves other destinations and
+independent API authorization. That record owns the next follow-up.

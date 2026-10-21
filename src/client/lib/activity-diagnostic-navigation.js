@@ -16,6 +16,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { canEnterActivityRoute } from './activity-route-access-policy.js';
+
 function defineDiagnosticGroup({ description, id, links, title }) {
   return Object.freeze({
     description,
@@ -26,9 +28,8 @@ function defineDiagnosticGroup({ description, id, links, title }) {
 }
 
 /**
- * The Activity diagnostics route map is intentionally static. It exposes only
- * existing, authorized destinations and keeps recovery tasks ahead of raw
- * evidence and source records.
+ * The immutable Activity route inventory keeps recovery tasks ahead of raw
+ * evidence. Its rendered projection also applies reviewed role restrictions.
  */
 export const ACTIVITY_DIAGNOSTIC_GROUPS = Object.freeze([
   defineDiagnosticGroup({
@@ -71,3 +72,10 @@ export const ACTIVITY_DIAGNOSTIC_GROUPS = Object.freeze([
     title: 'Source and history',
   }),
 ]);
+
+export function buildActivityDiagnosticGroups(actorRole) {
+  return ACTIVITY_DIAGNOSTIC_GROUPS.map(group => ({
+    ...group,
+    links: group.links.filter(link => canEnterActivityRoute({ routeName: link.name, actorRole })),
+  })).filter(group => group.links.length > 0);
+}

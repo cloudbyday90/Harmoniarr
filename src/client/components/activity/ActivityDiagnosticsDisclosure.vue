@@ -17,7 +17,11 @@
 -->
 
 <script setup>
-import { ACTIVITY_DIAGNOSTIC_GROUPS } from '../../lib/activity-diagnostic-navigation.js';
+import { computed } from 'vue';
+import { buildActivityDiagnosticGroups } from '../../lib/activity-diagnostic-navigation.js';
+import { sessionStore } from '../../state/session.js';
+
+const groups = computed(() => buildActivityDiagnosticGroups(sessionStore.state.user?.role));
 
 defineProps({
   open: {
@@ -38,7 +42,7 @@ defineProps({
 
       <nav class="activity-diagnostics-groups" aria-label="Advanced Activity diagnostics">
         <section
-          v-for="group in ACTIVITY_DIAGNOSTIC_GROUPS"
+          v-for="group in groups"
           :key="group.id"
           class="activity-diagnostic-group"
           :aria-labelledby="`activity-diagnostic-${group.id}`"

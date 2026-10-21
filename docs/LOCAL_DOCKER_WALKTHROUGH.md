@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
-The October 20 [ignored-source return rebuild](LOCAL_DOCKER_IGNORED_REVIEW_RETURN_OUTCOME.md)
+The October 20 [ignored-source admission rebuild](LOCAL_DOCKER_IGNORED_ROUTE_ACCESS_OUTCOME.md)
 records the current no-cache image, preserved admin/data and passing readiness.
+The [feature outcome](IGNORED_ROUTE_ACCESS_OUTCOME.md) verifies current-session
+administrator page admission, diagnostic navigation and independent API refusal.
+
+The October 20 [ignored-source return rebuild](LOCAL_DOCKER_IGNORED_REVIEW_RETURN_OUTCOME.md)
+records the preceding no-cache image, preserved admin/data and passing readiness.
 The [feature outcome](IGNORED_REVIEW_RETURN_OUTCOME.md) verifies explicit return
 to the current scoped decision without starting another search.
 
