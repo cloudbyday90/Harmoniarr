@@ -53,7 +53,9 @@ For CLI result delivery, use the standards skill's
 Keep committed service success separate from failed output/cleanup and never
 automatically replace material because its one-time handoff was uncertain.
 
-The current migration scaffold omits the repository-required copyright header.
-Add that header, then run cheap copyright/migration/snapshot checks before costly
-native qualification. The lifecycle outcome retains the actual early-gate failure
-and distinguishes pre-header evidence from final checksum qualification.
+The migration scaffold now uses the canonical SQL copyright helper. Follow the
+[authoring outcome](../../../../docs/MIGRATION_SCAFFOLD_OUTCOME.md): validate a
+new scaffold with actual copyright/filename consumers before costly native work.
+Preserve exclusive creation and applied SQL checksums; do not bulk-edit historical
+migrations to repair a generator defect. The lifecycle outcome retains its earlier
+header failure separately from final checksum qualification.

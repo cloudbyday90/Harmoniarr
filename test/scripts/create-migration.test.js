@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { resolve } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const scriptPath = fileURLToPath(new URL('../../scripts/create-migration.js', import.meta.url));
+const copyrightCheckPath = fileURLToPath(new URL('../../scripts/check-copyright.js', import.meta.url));
+const filenameCheckPath = fileURLToPath(new URL('../../scripts/check-migration-filenames.js', import.meta.url));
 
 async function withTempDir(run) {
   const tempDir = await mkdtemp(resolve(tmpdir(), 'harmoniarr-migration-'));
@@ -14,13 +16,15 @@ async function withTempDir(run) {
   try {
     return await run(tempDir);
   } finally {
+    assert.equal(dirname(tempDir), resolve(tmpdir()));
+    assert.equal(basename(tempDir).startsWith('harmoniarr-migration-'), true);
     await rm(tempDir, { force: true, recursive: true });
   }
 }
 
-test('create-migration writes a filename to stdout without a prefix', async () => {
+test('create-migration produces policy-compliant SQL and filename-only stdout in a disposable checkout', async () => {
   await withTempDir(async (tempDir) => {
-    const result = spawnSync(process.execPath, [scriptPath, 'Add library catalog'], {
+    const result = spawnSync(process.execPath, [scriptPath, '../../Add library catalog'], {
       cwd: tempDir,
       encoding: 'utf8',
     });
@@ -31,7 +35,16 @@ test('create-migration writes a filename to stdout without a prefix', async () =
 
     const filename = result.stdout.trim();
     const content = await readFile(resolve(tempDir, 'src/server/migrations', filename), 'utf8');
-    assert.equal(content, '-- forward-only migration\nBEGIN;\n\n-- Use DEFAULT harmoniarr_generate_uuid() for UUID surrogate primary keys.\n\nCOMMIT;\n');
+    assert.equal(content.endsWith('-- forward-only migration\nBEGIN;\n\n-- Use DEFAULT harmoniarr_generate_uuid() for UUID surrogate primary keys.\n\nCOMMIT;\n'), true);
+    assert.deepEqual(await readdir(tempDir), ['src']);
+    assert.deepEqual(await readdir(resolve(tempDir, 'src/server/migrations')), [filename]);
+
+    for (const checkPath of [copyrightCheckPath, filenameCheckPath]) {
+      const check = spawnSync(process.execPath, [checkPath], { cwd: tempDir, encoding: 'utf8' });
+      assert.equal(check.status, 0, check.stderr);
+      assert.equal(check.signal, null);
+      assert.equal(check.stderr, '');
+    }
   });
 });
 

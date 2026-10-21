@@ -8,6 +8,7 @@
 
 import { mkdir, open } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { insertCopyrightHeader } from './copyright-maintenance.js';
 import { joinPositionalArguments } from './script-arguments.js';
 import { runDirectScriptTask } from './script-runtime.js';
 
@@ -53,12 +54,13 @@ async function createMigrationFile() {
   const handle = await open(filePath, 'wx');
 
   try {
-    await handle.writeFile(
+    await handle.writeFile(insertCopyrightHeader(
       '-- forward-only migration\n'
       + 'BEGIN;\n\n'
       + '-- Use DEFAULT harmoniarr_generate_uuid() for UUID surrogate primary keys.\n\n'
       + 'COMMIT;\n',
-    );
+      { filePath },
+    ));
   } finally {
     await handle.close();
   }

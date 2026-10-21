@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 21 [migration scaffold rebuild](LOCAL_DOCKER_MIGRATION_SCAFFOLD_OUTCOME.md)
+records the current no-cache image, unchanged runtime bytes, preserved admin/data
+and passing readiness. The [authoring outcome](MIGRATION_SCAFFOLD_OUTCOME.md)
+qualifies the generator and its actual policy consumers separately.
+
 The October 21 [recovery CLI delivery rebuild](LOCAL_DOCKER_RECOVERY_CLI_DELIVERY_OUTCOME.md)
-records the current no-cache image, preserved admin/data and passing readiness.
+records the preceding no-cache image, preserved admin/data and passing readiness.
 The [owning outcome](RECOVERY_CLI_DELIVERY_OUTCOME.md) qualifies process output,
 cleanup and committed-state behavior in separate disposable fixtures.
 

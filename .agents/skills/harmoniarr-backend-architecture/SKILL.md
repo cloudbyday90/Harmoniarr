@@ -46,6 +46,9 @@ Start by locating the existing boundary for the domain:
 ## Database Changes
 
 - Create migrations with the repo script rather than hand-naming files.
+- New scaffolds include the shared SQL notice. Check generated artifacts with the
+  actual copyright/filename validators before costly database work; see the
+  [scaffold outcome](../../../docs/MIGRATION_SCAFFOLD_OUTCOME.md).
 - Update schema snapshots only through the repo snapshot workflow.
 - Add or update schema anchors for high-value tables, columns, constraints, and indexes that must survive snapshot drift.
 - Keep migrations additive and explicit; avoid destructive data changes unless the user asked for them and a backup/recovery path is clear.
