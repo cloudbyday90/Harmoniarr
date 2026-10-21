@@ -15,13 +15,3 @@ export function requiresAdministratorActivitySession(routeName) {
 export function canEnterActivityRoute({ routeName, actorRole } = {}) {
   return !requiresAdministratorActivitySession(routeName) || actorRole === 'admin';
 }
-
-export async function refreshActivityRouteSession({ routeName, refreshSession } = {}) {
-  if (!requiresAdministratorActivitySession(routeName)) return true;
-  try {
-    await refreshSession();
-    return true;
-  } catch {
-    return false;
-  }
-}

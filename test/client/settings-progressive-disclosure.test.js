@@ -20,6 +20,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { buildSettingsSetupOverview, buildSettingsSetupSteps } from '../../src/client/lib/settings-setup-presentation.js';
+import { buildSettingsNavigation } from '../../src/client/lib/settings-navigation.js';
 
 const DISCLOSURE_PATH = new URL('../../src/client/components/settings/SettingsDisclosure.vue', import.meta.url);
 const WORKSPACE_PATH = new URL('../../src/client/views/SettingsWorkspaceView.vue', import.meta.url);
@@ -209,11 +210,9 @@ test('Settings setup treats healthy folder validation as a core readiness prereq
 test('Settings workspace keeps common setup in primary navigation and reveals specialist routes explicitly', async () => {
   const source = await readFile(WORKSPACE_PATH, 'utf8');
 
-  assert.match(source, /const primaryTabs = \[/);
-  assert.match(source, /\{ name: 'settings', label: 'Setup' \}/);
-  assert.match(source, /\{ name: 'settings-connections', label: 'Connections' \}/);
-  assert.match(source, /const secondaryTabs = \[/);
-  assert.match(source, /\{ name: 'settings-general', label: 'System & security' \}/);
+  const navigation = buildSettingsNavigation('admin');
+  assert.deepEqual(navigation.primary.map(tab => tab.label), ['Setup', 'Connections', 'Media & storage', 'Notifications', 'Library']);
+  assert.deepEqual(navigation.secondary.map(tab => tab.label), ['System & security', 'Users & access', 'Account', 'Backup & restore', 'Metadata browser']);
   assert.match(source, /aria-controls="settings-more-navigation"/);
   assert.match(source, /v-show="isMoreSettingsOpen"/);
 });

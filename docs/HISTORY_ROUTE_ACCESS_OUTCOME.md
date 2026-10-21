@@ -82,12 +82,9 @@ the working TypeScript 6 dependency. Compiler version output alone is insufficie
 
 ## Next item
 
-Qualify Settings > Connections admission and its visible tab against the existing
-admin-only settings API. Its view mounts `loadSettings`, connection status and
-setup progress, while its tab is unconditional and the router currently restricts
-requesters only. The settings GET requires admin; PUT requires fresh admin/CSRF.
-Trace the remaining provider/setup readers before choosing the shared mechanism,
-preserve ordinary Account access and bounded recovery handoffs, and avoid putting
-Settings permissions into an Activity-specific module.
+The recommended Settings Connections follow-up is now completed in the
+[Connections admission outcome](CONNECTIONS_ROUTE_ACCESS_OUTCOME.md). It uses
+area-owned rules with a common session mechanism, preserves Account aliases and
+qualifies the tab, global health link and real protected reads/commands.
 
 Work remains on main. No release, tag, version bump or separate branch is created.

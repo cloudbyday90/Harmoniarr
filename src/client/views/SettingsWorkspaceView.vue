@@ -17,25 +17,15 @@
 -->
 
 <script setup>
-import { onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useTabbarOverflow } from '../composables/useTabbarOverflow.js';
+import { buildSettingsNavigation } from '../lib/settings-navigation.js';
+import { sessionStore } from '../state/session.js';
 
-const primaryTabs = [
-  { name: 'settings', label: 'Setup' },
-  { name: 'settings-connections', label: 'Connections' },
-  { name: 'settings-media-storage', label: 'Media & storage' },
-  { name: 'settings-notifications', label: 'Notifications' },
-  { name: 'settings-library', label: 'Library' },
-];
-
-const secondaryTabs = [
-  { name: 'settings-general', label: 'System & security' },
-  { name: 'settings-users', label: 'Users & access' },
-  { name: 'settings-account', label: 'Account' },
-  { name: 'settings-recovery', label: 'Backup & restore' },
-  { name: 'settings-library-browser', label: 'Metadata browser' },
-];
+const navigation = computed(() => buildSettingsNavigation(sessionStore.state.user?.role));
+const primaryTabs = computed(() => navigation.value.primary);
+const secondaryTabs = computed(() => navigation.value.secondary);
 
 const route = useRoute();
 const tabbarRef = ref(null);
@@ -45,7 +35,7 @@ const { hasOverflowStart, hasOverflowEnd, attach, cleanup } = useTabbarOverflow(
 watch(
   () => route.name,
   (routeName) => {
-    if (secondaryTabs.some((tab) => tab.name === routeName)) {
+    if (secondaryTabs.value.some((tab) => tab.name === routeName)) {
       isMoreSettingsOpen.value = true;
     }
   },
@@ -111,6 +101,11 @@ onUnmounted(cleanup);
 </template>
 
 <style scoped>
+.hx-tab:focus-visible {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: -2px;
+}
+
 .settings-workspace__more-button {
   appearance: none;
   background: transparent;

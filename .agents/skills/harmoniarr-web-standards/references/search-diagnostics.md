@@ -97,3 +97,14 @@ For fixed mobile navigation, inspect actual sequential focus and its geometry
 before diagnosing an obscured-control failure from an unfocused capture. Preserve
 that native focus state in the screenshot; do not move the viewport by script to
 make an otherwise failing focus assertion pass.
+
+Settings Connections uses a separate area policy composed by the common session
+admission service; see the [Connections design](../../../../docs/CONNECTIONS_ROUTE_ACCESS_DESIGN.md).
+Keep navigation and global-health links on the same reviewed decision while
+preserving Account aliases. Distinguish saved Soulseek status (admin) from broad
+provider status (authenticated); similar endpoint names do not imply authority.
+For keyboard cues, distinguish the project's two-pixel outline convention from
+WCAG Focus Visible's actual requirement. Keep a cue inside scrolling navigation
+instead of weakening assertions to match a browser default.
+For action upgrades, controlled source logic and existing Desktop ARM execution
+do not prove the packaged action, fresh-runner registration or hosted caches.

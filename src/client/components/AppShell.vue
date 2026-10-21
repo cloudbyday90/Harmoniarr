@@ -31,6 +31,7 @@ import { formatOperationTimestampShort } from '../lib/operation-run-presentation
 import { formatDependencyProviderLabel, formatDependencyStatusLabel, getDependencyStatusClass } from '../lib/settings-connections-presentation.js';
 import { resolveMenuFocus } from '../lib/menu-keyboard-navigation.js';
 import { useMobileNavigationState } from '../composables/useMobileNavigationState.js';
+import { canEnterSettingsRoute } from '../lib/settings-route-access-policy.js';
 import ToastStack from './ToastStack.vue';
 import ConfirmDialogHost from './ConfirmDialogHost.vue';
 import PwaUpdateBanner from './PwaUpdateBanner.vue';
@@ -92,6 +93,7 @@ watch(resolvedTheme, (t) => {
 });
 
 const isRequester = computed(() => sessionStore.state.user?.role === 'requester');
+const canReviewConnections = computed(() => canEnterSettingsRoute({ routeName: 'settings-connections', actorRole: sessionStore.state.user?.role }));
 const userRole = computed(() => sessionStore.state.user?.role ?? 'operator');
 const userInitial = computed(() => {
   const name = sessionStore.state.user?.username ?? '?';
@@ -384,7 +386,7 @@ onBeforeUnmount(() => {
                 <span v-if="dep.message" class="hx-topbar-health-message">{{ dep.message }}</span>
               </li>
             </ul>
-            <div class="hx-topbar-health-footer">
+            <div v-if="canReviewConnections" class="hx-topbar-health-footer">
               <RouterLink :to="{ name: 'settings-connections' }" class="hx-topbar-health-link" @click="healthPanelOpen = false">
                 View in Settings
               </RouterLink>

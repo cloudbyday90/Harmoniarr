@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
-The October 21 [System history admission rebuild](LOCAL_DOCKER_HISTORY_ROUTE_ACCESS_OUTCOME.md)
+The October 21 [Connections admission rebuild](LOCAL_DOCKER_CONNECTIONS_ROUTE_ACCESS_OUTCOME.md)
 records the current no-cache image, preserved admin/data and passing readiness.
+The [feature outcome](CONNECTIONS_ROUTE_ACCESS_OUTCOME.md) verifies the common
+session guard, area-owned rules, native navigation and ordinary Account access.
+
+The October 21 [System history admission rebuild](LOCAL_DOCKER_HISTORY_ROUTE_ACCESS_OUTCOME.md)
+records the preceding no-cache image, preserved admin/data and passing readiness.
 The [feature outcome](HISTORY_ROUTE_ACCESS_OUTCOME.md) verifies current admin
 admission and omission of the empty non-admin diagnostic group.
 
