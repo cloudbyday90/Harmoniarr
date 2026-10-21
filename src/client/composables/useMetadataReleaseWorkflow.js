@@ -54,8 +54,22 @@ export function useMetadataReleaseWorkflow({
   const isOpeningLocalRelease = ref(false);
   const releaseSelectionRequestGate = createLatestRequestGate();
 
+  function resetPendingSelection() {
+    isImportingReleaseGroup.value = false;
+    isImportingRelease.value = false;
+    isLoadingReleaseGroup.value = false;
+    isOpeningLocalReleaseGroup.value = false;
+    isOpeningLocalRelease.value = false;
+  }
+
+  function beginReleaseSelection() {
+    resetPendingSelection();
+    return releaseSelectionRequestGate.begin();
+  }
+
   function resetReleaseSelection() {
     releaseSelectionRequestGate.invalidate();
+    resetPendingSelection();
     providerReleases.value = [];
     localReleaseGroup.value = null;
     localRelease.value = null;
@@ -63,8 +77,7 @@ export function useMetadataReleaseWorkflow({
     releaseActionError.value = '';
   }
 
-  async function loadReleaseGroupWorkspace(releaseGroup, { preserveRelease = false } = {}) {
-    const request = releaseSelectionRequestGate.begin();
+  async function loadReleaseGroupWorkspace(releaseGroup, { preserveRelease = false, request = beginReleaseSelection() } = {}) {
     releaseGroupActionError.value = '';
     if (!preserveRelease) {
       localRelease.value = null;
@@ -106,26 +119,30 @@ export function useMetadataReleaseWorkflow({
       releaseGroupActionError.value = 'Administrator access is required to import release groups.';
       return;
     }
+    const request = beginReleaseSelection();
+    const releaseGroupId = releaseGroup.id;
+    const artist = selectedArtist.value ? { ...selectedArtist.value } : null;
     releaseGroupActionError.value = '';
     isImportingReleaseGroup.value = true;
 
     try {
-      await importReleaseGroupById(releaseGroup.id);
+      await importReleaseGroupById(releaseGroupId);
+      if (!request.isCurrent()) return;
       await Promise.all([
-        selectedArtist.value
-          ? refreshArtistWorkspace(selectedArtist.value)
+        artist
+          ? refreshArtistWorkspace(artist, { isCurrent: request.isCurrent })
           : Promise.resolve(),
-        loadReleaseGroupWorkspace(releaseGroup),
+        loadReleaseGroupWorkspace({ id: releaseGroupId }, { request }),
       ]);
     } catch (error) {
-      releaseGroupActionError.value = getErrorMessage(error, 'Release group import failed');
+      if (request.isCurrent()) releaseGroupActionError.value = getErrorMessage(error, 'Release group import failed');
     } finally {
-      isImportingReleaseGroup.value = false;
+      if (request.isCurrent()) isImportingReleaseGroup.value = false;
     }
   }
 
   async function openLocalReleaseGroup(releaseGroup) {
-    const request = releaseSelectionRequestGate.begin();
+    const request = beginReleaseSelection();
     releaseGroupActionError.value = '';
     releaseActionError.value = '';
     localRelease.value = null;
@@ -159,31 +176,37 @@ export function useMetadataReleaseWorkflow({
       releaseActionError.value = 'Administrator access is required to import releases.';
       return;
     }
+    const request = beginReleaseSelection();
+    const releaseId = release.id;
+    const artist = selectedArtist.value ? { ...selectedArtist.value } : null;
+    const activeReleaseGroupId = localReleaseGroup.value?.releaseGroup?.source?.musicbrainzReleaseGroupId;
     releaseActionError.value = '';
     isImportingRelease.value = true;
 
     try {
-      await importReleaseById(release.id);
-      localRelease.value = await resolveReleaseLocal(release.id);
+      await importReleaseById(releaseId);
+      if (!request.isCurrent()) return;
+      const releasePayload = await resolveReleaseLocal(releaseId, { signal: request.signal });
+      if (!request.isCurrent()) return;
+      localRelease.value = releasePayload;
 
-      const activeReleaseGroupId = localReleaseGroup.value?.releaseGroup?.source?.musicbrainzReleaseGroupId;
       await Promise.all([
-        selectedArtist.value
-          ? refreshArtistWorkspace(selectedArtist.value)
+        artist
+          ? refreshArtistWorkspace(artist, { isCurrent: request.isCurrent })
           : Promise.resolve(),
         activeReleaseGroupId
-          ? loadReleaseGroupWorkspace({ id: activeReleaseGroupId }, { preserveRelease: true })
+          ? loadReleaseGroupWorkspace({ id: activeReleaseGroupId }, { preserveRelease: true, request })
           : Promise.resolve(),
       ]);
     } catch (error) {
-      releaseActionError.value = getErrorMessage(error, 'Release import failed');
+      if (request.isCurrent()) releaseActionError.value = getErrorMessage(error, 'Release import failed');
     } finally {
-      isImportingRelease.value = false;
+      if (request.isCurrent()) isImportingRelease.value = false;
     }
   }
 
   async function openLocalRelease(release) {
-    const request = releaseSelectionRequestGate.begin();
+    const request = beginReleaseSelection();
     releaseActionError.value = '';
     isOpeningLocalRelease.value = true;
 

@@ -75,10 +75,7 @@ MCP returned zero open PRs; no random candidate was available to implement
 locally. No PR merge, rebase or stale-PR closure was applicable. Work stays on
 main with no branch, release, tag or version bump.
 
-Next, qualify delayed metadata command results against selection ownership.
-Source review shows refresh writes its returned run after awaiting the request,
-and imports read current selection during post-response refresh. Reproduce a
-held response while changing artist/group before designing a selection-bound
-result guard. This is a source-supported follow-up, not a race reproduced by
-this round's tests. Preserve a command already accepted by the server while
-preventing its late UI result from updating another workspace.
+Completed by the [selection ownership outcome](METADATA_COMMAND_SELECTION_OUTCOME.md):
+controlled races reproduce stale results/errors and delayed imports, then verify
+generation-owned publication and cleanup while preserving accepted server work.
+That outcome records the next remaining asynchronous reader to qualify.

@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
-The October 21 [Metadata command authority rebuild](LOCAL_DOCKER_METADATA_COMMAND_AUTHORITY_OUTCOME.md)
+The October 21 [Metadata selection ownership rebuild](LOCAL_DOCKER_METADATA_COMMAND_SELECTION_OUTCOME.md)
 records the current no-cache image, preserved admin/data and passing readiness.
+The [feature outcome](METADATA_COMMAND_SELECTION_OUTCOME.md) verifies delayed
+command publication, current feedback and selection-owned pending state.
+
+The October 21 [Metadata command authority rebuild](LOCAL_DOCKER_METADATA_COMMAND_AUTHORITY_OUTCOME.md)
+records the preceding no-cache image, preserved admin/data and passing readiness.
 The [feature outcome](METADATA_COMMAND_AUTHORITY_OUTCOME.md) verifies privileged
 commands, preserved operator reads and owned focus after native refusal.
 

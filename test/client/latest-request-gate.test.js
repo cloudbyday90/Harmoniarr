@@ -2,6 +2,17 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createLatestRequestGate } from '../../src/client/lib/latest-request-gate.js';
 
+test('capture borrows the current generation and signal without cancelling it or surviving a new generation', () => {
+  const gate = createLatestRequestGate(); const empty = gate.capture();
+  assert.equal(empty.signal, undefined); assert.equal(empty.isCurrent(), true);
+  const read = gate.begin(); const command = gate.capture();
+  assert.equal(empty.isCurrent(), false); assert.equal(read.isCurrent(), true);
+  assert.equal(command.signal, read.signal); assert.equal(command.signal.aborted, false);
+  gate.invalidate(); gate.begin();
+  assert.equal(command.isCurrent(), false); assert.equal(command.signal.aborted, true);
+  assert.equal(gate.capture().isCurrent(), true);
+});
+
 test('begin returns a handle with isCurrent true', () => {
   const gate = createLatestRequestGate();
   const handle = gate.begin();

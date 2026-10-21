@@ -27,21 +27,24 @@ export function createLatestRequestGate() {
     }
   }
 
+  function capture() {
+    const requestId = latestRequestId;
+    return {
+      isCurrent: () => requestId === latestRequestId,
+      signal: activeAbortController?.signal,
+    };
+  }
+
   return {
+    capture,
     begin() {
       abortActiveRequest();
       latestRequestId += 1;
-      const requestId = latestRequestId;
       activeAbortController = typeof AbortController === 'function'
         ? new AbortController()
         : null;
 
-      return {
-        isCurrent() {
-          return requestId === latestRequestId;
-        },
-        signal: activeAbortController?.signal,
-      };
+      return capture();
     },
 
     invalidate() {

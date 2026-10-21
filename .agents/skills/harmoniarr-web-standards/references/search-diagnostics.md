@@ -135,3 +135,11 @@ Native sessions/HTTP guards with controlled catalog/command services prove actor
 CSRF and dispatch ordering, not real provider imports or durable refresh queues.
 For refused commands, verify focus after busy reset and while a native response
 is held; restore the invoker only if the interaction still owns focus.
+
+For delayed Metadata commands, use the [selection ownership design](../../../../docs/METADATA_COMMAND_SELECTION_DESIGN.md).
+Capture a generation and target before dispatch; comparing IDs misses leaving
+and returning to the same resource. Borrow artist ownership during import
+follow-up reads, and require both artist and release currency at publication.
+Guard errors and pending cleanup too. Navigation can retire UI ownership while
+the server still accepts the POST; neither read abort nor stale-response refusal
+proves cancellation or authorizes automatic resubmission.

@@ -63,7 +63,15 @@ export function useMetadataArtistWorkflow({
 
   const localSearchWorkflow = createLocalSearchWorkflow();
 
-  async function refreshArtistWorkspace(artist, request = artistWorkspaceRequestGate.begin()) {
+  function beginArtistWorkspace() {
+    isImportingArtist.value = false;
+    isRefreshingArtist.value = false;
+    isLoadingArtist.value = false;
+    return artistWorkspaceRequestGate.begin();
+  }
+
+  async function refreshArtistWorkspace(artist, request, { isCurrent = () => true } = {}) {
+    if (!request.isCurrent() || !isCurrent()) return false;
     const [localPayload, browsePayload] = await Promise.all([
       resolveArtistLocal(artist.id, { signal: request.signal }),
       browseArtistReleaseGroups({
@@ -74,7 +82,7 @@ export function useMetadataArtistWorkflow({
       }),
     ]);
 
-    if (!request.isCurrent()) {
+    if (!request.isCurrent() || !isCurrent()) {
       return false;
     }
 
@@ -90,7 +98,7 @@ export function useMetadataArtistWorkflow({
   const releaseWorkflow = createReleaseWorkflow({
     canManageMetadata,
     selectedArtist,
-    refreshArtistWorkspace: (artist) => refreshArtistWorkspace(artist),
+    refreshArtistWorkspace: (artist, options) => refreshArtistWorkspace(artist, artistWorkspaceRequestGate.capture(), options),
   });
 
   async function runArtistSearch() {
@@ -116,7 +124,7 @@ export function useMetadataArtistWorkflow({
   }
 
   async function importArtist(artist) {
-    const request = artistWorkspaceRequestGate.begin();
+    const request = beginArtistWorkspace();
     selectedArtist.value = artist;
     artistActionError.value = '';
     queuedRefreshRun.value = null;
@@ -146,7 +154,7 @@ export function useMetadataArtistWorkflow({
   }
 
   async function openLocalArtist(artist) {
-    const request = artistWorkspaceRequestGate.begin();
+    const request = beginArtistWorkspace();
     const initialMusicBrainzArtistId = artist.source?.musicbrainzArtistId ?? null;
 
     selectedArtist.value = initialMusicBrainzArtistId
@@ -254,22 +262,25 @@ export function useMetadataArtistWorkflow({
       artistActionError.value = 'Administrator access is required to refresh metadata.';
       return null;
     }
-    if (!localArtist.value?.artist?.id) {
+    if (!localArtist.value?.artist?.id || isRefreshingArtist.value) {
       return null;
     }
 
+    const request = artistWorkspaceRequestGate.capture();
+    const artistId = localArtist.value.artist.id;
     artistActionError.value = '';
     isRefreshingArtist.value = true;
 
     try {
-      const result = await startMetadataArtistRefreshRequest(localArtist.value.artist.id);
+      const result = await startMetadataArtistRefreshRequest(artistId);
+      if (!request.isCurrent()) return null;
       queuedRefreshRun.value = result.run ?? null;
       return result.run ?? null;
     } catch (error) {
-      artistActionError.value = getErrorMessage(error, 'Starting metadata refresh failed');
+      if (request.isCurrent()) artistActionError.value = getErrorMessage(error, 'Starting metadata refresh failed');
       return null;
     } finally {
-      isRefreshingArtist.value = false;
+      if (request.isCurrent()) isRefreshingArtist.value = false;
     }
   }
 

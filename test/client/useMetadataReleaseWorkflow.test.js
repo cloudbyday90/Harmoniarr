@@ -83,9 +83,11 @@ test('useMetadataReleaseWorkflow imports a release and refreshes the artist and 
   assert.equal(importReleaseById.mock.callCount(), 1);
   assert.deepEqual(importReleaseById.mock.calls[0].arguments, ['mb-release-1']);
   assert.equal(resolveReleaseLocal.mock.callCount(), 1);
-  assert.deepEqual(resolveReleaseLocal.mock.calls[0].arguments, ['mb-release-1']);
+  assert.equal(resolveReleaseLocal.mock.calls[0].arguments[0], 'mb-release-1');
+  assert.ok(resolveReleaseLocal.mock.calls[0].arguments[1].signal instanceof AbortSignal);
   assert.equal(refreshArtistWorkspace.mock.callCount(), 1);
-  assert.deepEqual(refreshArtistWorkspace.mock.calls[0].arguments, [{ id: 'mb-artist-1', name: 'Autechre' }]);
+  assert.deepEqual(refreshArtistWorkspace.mock.calls[0].arguments[0], { id: 'mb-artist-1', name: 'Autechre' });
+  assert.equal(refreshArtistWorkspace.mock.calls[0].arguments[1].isCurrent(), true);
   assert.equal(resolveReleaseGroupLocal.mock.callCount(), 1);
   assert.equal(resolveReleaseGroupLocal.mock.calls[0].arguments[0], 'mb-rg-1');
   assert.ok(resolveReleaseGroupLocal.mock.calls[0].arguments[1].signal instanceof AbortSignal);
