@@ -353,6 +353,13 @@ Metadata history's three-engine/native tab-zoom proof is explicit:
 browser glob. See docs/METADATA_HISTORY_COMPATIBILITY_DESIGN.md for actual zoom
 versus reflow, browser setup/retirement ownership and remaining manual AT checks.
 
+For the operator handoff, `npm run manual:metadata-history` starts the isolated
+desktop session. Qualify its real HTTP/database/UI states explicitly with
+`npm run validate:metadata-history-manual-fixture`; this is outside routine
+browser/fast globs and does not prove speech or physical-device acceptance.
+See docs/METADATA_HISTORY_MANUAL_FIXTURE_DESIGN.md for the fresh database,
+server route restrictions and held-read retirement boundary.
+
 Use `npm run validate:fast` for complete static, server/client/script and build
 feedback during development. It omits PostgreSQL; include the directly affected
 real database tests when SQL, locks, constraints or rollback own the behavior.

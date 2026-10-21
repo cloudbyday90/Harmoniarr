@@ -6,6 +6,26 @@ evidence is recorded separately in the [compatibility outcome](METADATA_HISTORY_
 
 ## Preparation and evidence
 
+For a repeatable desktop session, run `npm run manual:metadata-history` with
+local Docker Engine 28+ available. Open the printed bootstrap URL in a new private window of the
+browser paired with your screen reader. Create a disposable account using test
+credentials, then open the printed artist URL. The real application uses three
+synthetic history pages (10 initial, 10 continuing, one final) in a fresh database.
+The terminal accepts `status`, `hold`, `release`, `fail`, `reset` and `quit`.
+`hold` arms the next page read; activate Load more, observe pending feedback, move
+to Artist name, then use `release`. A facilitator can operate the terminal while
+the evaluator keeps working in the browser. `fail` rejects a held or next read
+once, so the same paging button can retry the unchanged cursor. `reset` requires
+no held read and a browser reload to restore initial content. Quit/EOF/Ctrl+C
+retire the owned session; close the private window afterward.
+
+This fixture serves only an allowlist on host loopback and refuses provider
+search/mutation routes. Terminal controls have no HTTP endpoints. Other app
+pages may report refusal because they are outside this assessment. It cannot
+be reached from a phone; physical-device checks below need their own test
+environment. See the [fixture design](METADATA_HISTORY_MANUAL_FIXTURE_DESIGN.md)
+and [qualification outcome](METADATA_HISTORY_MANUAL_FIXTURE_OUTCOME.md).
+
 Use a test account and a Metadata artist with enough recorded events for at
 least three pages, so continuing and final completions can both be exercised.
 Keep real searches/imports/downloads outside this read-only

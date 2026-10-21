@@ -7,9 +7,9 @@
 import assert from 'node:assert/strict';
 import { createMetadataCommandFixture, metadataCommandIds } from './metadata-command-fixture.js';
 import { bootstrapAdminThroughUi } from './operator-browser-helpers.js';
+import { historyEvent, historyPage } from './metadata-history-data.js';
 
-export const historyEvent = title => ({ id: title, title, primaryType: 'Album', occurredAt: '2026-10-21T00:00:00.000Z', monitoringDecision: 'already_satisfied', resultingWantedStatus: 'none' });
-export const historyPage = (count, hasMore, prefix = 'Appended') => ({ entries: Array.from({ length: count }, (_, index) => historyEvent(`${prefix} discovery ${index}`)), pageInfo: { hasMore, nextCursor: hasMore ? 'next-cursor' : null } });
+export { historyEvent, historyPage };
 
 export function createHistoryCompatibilityFixture() {
   const entries = []; let reads = []; let readPage;

@@ -1,7 +1,13 @@
 # Harmoniarr Local Docker Walkthrough
 
-The October 21 [Metadata compatibility rebuild](LOCAL_DOCKER_METADATA_HISTORY_COMPATIBILITY_OUTCOME.md)
+The October 21 [manual history fixture rebuild](LOCAL_DOCKER_METADATA_HISTORY_MANUAL_OUTCOME.md)
 records the current no-cache image, preserved admin/data and passing readiness.
+The [fixture outcome](METADATA_HISTORY_MANUAL_FIXTURE_OUTCOME.md) qualifies the
+separate disposable desktop session; actual operator accessibility checks are
+deferred. Use `npm run manual:metadata-history` for synthetic pending/retry states.
+
+The October 21 [Metadata compatibility rebuild](LOCAL_DOCKER_METADATA_HISTORY_COMPATIBILITY_OUTCOME.md)
+records the preceding no-cache image, preserved admin/data and passing readiness.
 The [feature outcome](METADATA_HISTORY_COMPATIBILITY_OUTCOME.md) qualifies native
 engines, actual tab zoom and shared mobile focus clearance.
 
