@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
-The October 21 [manual signal rebuild](LOCAL_DOCKER_MANUAL_SIGNALS_OUTCOME.md)
+The October 21 [authentication feedback rebuild](LOCAL_DOCKER_AUTH_FORM_FEEDBACK_OUTCOME.md)
 records the current no-cache image, preserved admin/data and passing readiness.
+The [owning outcome](AUTH_FORM_FEEDBACK_OUTCOME.md) qualifies built entry forms,
+native auth outcomes and the limits of browser accessibility evidence.
+
+The October 21 [manual signal rebuild](LOCAL_DOCKER_MANUAL_SIGNALS_OUTCOME.md)
+records the preceding no-cache image, preserved admin/data and passing readiness.
 The [owning outcome](MANUAL_SESSION_SIGNALS_OUTCOME.md) qualifies Linux input/runner
 signals separately from deferred actual screen-reader/device acceptance.
 

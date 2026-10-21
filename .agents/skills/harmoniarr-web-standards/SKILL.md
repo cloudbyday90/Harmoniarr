@@ -5,6 +5,10 @@ description: "Apply and verify web standards for Harmoniarr UI commands, forms, 
 
 # Harmoniarr Web Standards
 
+For authentication entry forms, use [auth feedback](references/auth-form-feedback.md).
+It covers linked local validation, persistent status/error feedback, submit
+ownership and generic server failures without credential disclosure.
+
 For actual screen-reader/device acceptance after automated focus checks, use
 [manual accessibility](references/manual-accessibility.md). It owns reachable
 pending/error states, fixture containment and honest operator evidence.

@@ -20,55 +20,51 @@
 import { computed, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AuthEntryShell from '../components/AuthEntryShell.vue';
+import AuthFormFeedback from '../components/AuthFormFeedback.vue';
 import { claimAccount } from '../lib/auth-api.js';
 import { buildAuthEntrySupportItems } from '../lib/auth-entry-support.js';
 import { useAutoFocus } from '../composables/useAutoFocus.js';
-import { usePasswordMatch } from '../composables/usePasswordMatch.js';
+import { useAuthSubmission } from '../composables/useAuthSubmission.js';
+import { usePasswordConfirmation } from '../composables/usePasswordConfirmation.js';
 
 const route = useRoute();
 const router = useRouter();
 const firstInput = ref(null);
+const confirmInput = ref(null);
 const form = reactive({
   claimCode: '',
   confirmPassword: '',
   password: '',
   username: typeof route.query.username === 'string' ? route.query.username : '',
 });
-const errorMessage = ref('');
-const isSubmitting = ref(false);
+const { errorMessage, isSubmitting, pendingMessage, run } = useAuthSubmission();
 const supportItems = computed(() => buildAuthEntrySupportItems('claim-account', { username: form.username }));
 useAutoFocus(firstInput);
-const { markTouched: markConfirmTouched, showMatch: showPasswordMatch, showMismatch: showPasswordMismatch } = usePasswordMatch(
+const { markTouched: markConfirmTouched, showMatch: showPasswordMatch, showMismatch: showPasswordMismatch, validate } = usePasswordConfirmation(
   () => form.password,
   () => form.confirmPassword,
+  confirmInput,
 );
 
 async function submit() {
+  if (isSubmitting.value) return;
   errorMessage.value = '';
-  if (form.password !== form.confirmPassword) {
-    errorMessage.value = 'Passwords must match.';
-    return;
-  }
-
-  isSubmitting.value = true;
-  try {
-    const payload = await claimAccount({
-      claimCode: form.claimCode,
-      password: form.password,
-      username: form.username,
-    });
+  if (!await validate()) return;
+  const credentials = {
+    claimCode: form.claimCode,
+    password: form.password,
+    username: form.username,
+  };
+  await run(async () => {
+    const payload = await claimAccount(credentials);
     await router.push({
       name: 'login',
       query: {
         reason: payload.requiresLogin ? 'claim-complete' : undefined,
-        username: payload.username ?? form.username,
+        username: payload.username ?? credentials.username,
       },
     });
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Account claim failed';
-  } finally {
-    isSubmitting.value = false;
-  }
+  }, { pendingText: 'Claiming account…', fallbackMessage: 'Account claim failed' });
 }
 </script>
 
@@ -122,17 +118,22 @@ async function submit() {
           Confirm password
           <input
             id="confirm-new-password"
+            ref="confirmInput"
             v-model="form.confirmPassword"
             name="confirmPassword"
             type="password"
             autocomplete="new-password"
             required
+            :aria-invalid="showPasswordMismatch ? 'true' : undefined"
+            aria-describedby="claim-password-match"
             @input="markConfirmTouched"
           />
         </label>
-        <p v-if="showPasswordMismatch" class="auth-pw-hint auth-pw-hint--mismatch">Passwords do not match.</p>
-        <p v-else-if="showPasswordMatch" class="auth-pw-hint auth-pw-hint--match">Passwords match.</p>
-        <p class="error-copy" v-if="errorMessage">{{ errorMessage }}</p>
+        <div id="claim-password-match" role="status" aria-atomic="true" :class="{ 'sr-only': !showPasswordMismatch && !showPasswordMatch }">
+          <p v-if="showPasswordMismatch" class="auth-pw-hint auth-pw-hint--mismatch">Passwords do not match.</p>
+          <p v-else-if="showPasswordMatch" class="auth-pw-hint auth-pw-hint--match">Passwords match.</p>
+        </div>
+        <AuthFormFeedback :error-message="errorMessage" :pending-message="pendingMessage" />
         <button type="submit" :disabled="isSubmitting">
           {{ isSubmitting ? 'Claiming...' : 'Claim account' }}
         </button>

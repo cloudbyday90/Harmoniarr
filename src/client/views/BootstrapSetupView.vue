@@ -20,6 +20,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import AuthEntryShell from '../components/AuthEntryShell.vue';
+import AuthFormFeedback from '../components/AuthFormFeedback.vue';
 import {
   buildAuthEntrySupportItems,
   getBootstrapHeading,
@@ -27,21 +28,23 @@ import {
 } from '../lib/auth-entry-support.js';
 import { navigateAfterAuthSuccess } from '../lib/auth-navigation.js';
 import { useAutoFocus } from '../composables/useAutoFocus.js';
+import { useAuthSubmission } from '../composables/useAuthSubmission.js';
 import { useBootstrapStatus } from '../composables/useBootstrapStatus.js';
-import { usePasswordMatch } from '../composables/usePasswordMatch.js';
+import { usePasswordConfirmation } from '../composables/usePasswordConfirmation.js';
 import { sessionStore } from '../state/session.js';
 
 const router = useRouter();
 const firstInput = ref(null);
+const confirmInput = ref(null);
 const form = reactive({ claimCode: '', email: '', password: '', confirmPassword: '', username: '' });
-const errorMessage = ref('');
-const isSubmitting = ref(false);
+const { errorMessage, isSubmitting, pendingMessage, run } = useAuthSubmission();
 const { loadStatus, ownerClaimSummary, destroy: destroyBootstrapStatus } = useBootstrapStatus({ revalidateOnFocus: true });
 const supportItems = computed(() => buildAuthEntrySupportItems('bootstrap'));
 useAutoFocus(firstInput);
-const { markTouched: markConfirmTouched, showMatch: showPasswordMatch, showMismatch: showPasswordMismatch } = usePasswordMatch(
+const { markTouched: markConfirmTouched, showMatch: showPasswordMatch, showMismatch: showPasswordMismatch, validate } = usePasswordConfirmation(
   () => form.password,
   () => form.confirmPassword,
+  confirmInput,
 );
 
 onMounted(() => {
@@ -53,29 +56,22 @@ onBeforeUnmount(() => {
 });
 
 async function submit() {
+  if (isSubmitting.value) return;
   errorMessage.value = '';
-  if (form.password !== form.confirmPassword) {
-    errorMessage.value = 'Passwords must match.';
-    return;
-  }
-
-  isSubmitting.value = true;
-  try {
-    await sessionStore.bootstrapAdmin({
-      claimCode: form.claimCode,
-      email: form.email,
-      password: form.password,
-      username: form.username,
-    });
+  if (!await validate()) return;
+  const credentials = {
+    claimCode: form.claimCode,
+    email: form.email,
+    password: form.password,
+    username: form.username,
+  };
+  await run(async () => {
+    await sessionStore.bootstrapAdmin(credentials);
     await navigateAfterAuthSuccess({
       router,
       target: { name: 'onboarding' },
     });
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Bootstrap failed';
-  } finally {
-    isSubmitting.value = false;
-  }
+  }, { pendingText: 'Creating account…', fallbackMessage: 'Bootstrap failed' });
 }
 </script>
 
@@ -146,17 +142,22 @@ async function submit() {
           Confirm password
           <input
             id="confirm-new-password"
+            ref="confirmInput"
             v-model="form.confirmPassword"
             name="confirmPassword"
             type="password"
             autocomplete="new-password"
             required
+            :aria-invalid="showPasswordMismatch ? 'true' : undefined"
+            aria-describedby="bootstrap-password-match"
             @input="markConfirmTouched"
           />
         </label>
-        <p v-if="showPasswordMismatch" class="auth-pw-hint auth-pw-hint--mismatch">Passwords do not match.</p>
-        <p v-else-if="showPasswordMatch" class="auth-pw-hint auth-pw-hint--match">Passwords match.</p>
-        <p class="error-copy" v-if="errorMessage">{{ errorMessage }}</p>
+        <div id="bootstrap-password-match" role="status" aria-atomic="true" :class="{ 'sr-only': !showPasswordMismatch && !showPasswordMatch }">
+          <p v-if="showPasswordMismatch" class="auth-pw-hint auth-pw-hint--mismatch">Passwords do not match.</p>
+          <p v-else-if="showPasswordMatch" class="auth-pw-hint auth-pw-hint--match">Passwords match.</p>
+        </div>
+        <AuthFormFeedback :error-message="errorMessage" :pending-message="pendingMessage" />
         <button type="submit" :disabled="isSubmitting">
           {{ isSubmitting ? 'Creating account...' : 'Create bootstrap admin' }}
         </button>

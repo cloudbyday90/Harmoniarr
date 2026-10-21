@@ -20,11 +20,13 @@
 import { computed, reactive, ref } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import AuthEntryShell from '../components/AuthEntryShell.vue';
+import AuthFormFeedback from '../components/AuthFormFeedback.vue';
 import { startPlexSignIn } from '../lib/auth-api.js';
 import { buildAuthEntrySupportItems } from '../lib/auth-entry-support.js';
 import { navigateAfterAuthSuccess } from '../lib/auth-navigation.js';
 import { buildClaimAccountRoute, buildLoginDescription, buildLoginInfoMessage } from '../lib/login-presentation.js';
 import { useAutoFocus } from '../composables/useAutoFocus.js';
+import { useAuthSubmission } from '../composables/useAuthSubmission.js';
 import { sessionStore } from '../state/session.js';
 
 const route = useRoute();
@@ -34,9 +36,8 @@ const form = reactive({
   username: typeof route.query.username === 'string' ? route.query.username : '',
   password: '',
 });
-const errorMessage = ref('');
-const isStartingPlex = ref(false);
-const isSubmitting = ref(false);
+const { activeAction, errorMessage, isSubmitting, pendingMessage, run } = useAuthSubmission();
+const isStartingPlex = computed(() => activeAction.value === 'plex');
 const infoMessage = computed(() => buildLoginInfoMessage(
   typeof route.query.reason === 'string' ? route.query.reason : undefined,
 ));
@@ -44,26 +45,18 @@ const supportItems = computed(() => buildAuthEntrySupportItems('login', { userna
 useAutoFocus(firstInput);
 
 async function submit() {
-  errorMessage.value = '';
-  isSubmitting.value = true;
-  try {
-    await sessionStore.login(form);
+  const credentials = { ...form };
+  await run(async () => {
+    await sessionStore.login(credentials);
     await navigateAfterAuthSuccess({
       router,
       target: typeof route.query.redirect === 'string' ? route.query.redirect : { name: 'dashboard' },
     });
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Login failed';
-  } finally {
-    isSubmitting.value = false;
-  }
+  }, { name: 'login', pendingText: 'Logging in…', fallbackMessage: 'Login failed' });
 }
 
 async function startPlex() {
-  errorMessage.value = '';
-  isStartingPlex.value = true;
-
-  try {
+  await run(async () => {
     const payload = await startPlexSignIn({
       redirect: typeof route.query.redirect === 'string' ? route.query.redirect : '/app',
     });
@@ -76,11 +69,7 @@ async function startPlex() {
     }
 
     globalThis.location.assign(authorizationUrl);
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Plex sign-in failed';
-  } finally {
-    isStartingPlex.value = false;
-  }
+  }, { name: 'plex', pendingText: 'Opening Plex sign-in…', fallbackMessage: 'Plex sign-in failed' });
 }
 </script>
 
@@ -125,9 +114,9 @@ async function startPlex() {
             required
           />
         </label>
-        <p class="error-copy" v-if="errorMessage">{{ errorMessage }}</p>
+        <AuthFormFeedback :error-message="errorMessage" :pending-message="pendingMessage" />
         <button type="submit" :disabled="isSubmitting">
-          {{ isSubmitting ? 'Logging in...' : 'Log in' }}
+          {{ activeAction === 'login' ? 'Logging in...' : 'Log in' }}
         </button>
       </form>
       <div class="auth-entry-divider" aria-hidden="true">or</div>
