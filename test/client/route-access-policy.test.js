@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { canEnterRoute, refreshRouteSession, requiresAdministratorRouteSession } from '../../src/client/lib/route-access-policy.js';
 
-const reviewedRoutes = ['activity-users', 'activity-blocklist', 'activity-ignored', 'activity-history', 'settings-connections'];
+const reviewedRoutes = ['activity-users', 'activity-blocklist', 'activity-ignored', 'activity-history', 'settings', 'settings-connections'];
 
 test('composed admission requires exact admin across reviewed Activity and Settings routes', () => {
   for (const routeName of reviewedRoutes) {
@@ -16,7 +16,7 @@ test('composed admission requires exact admin across reviewed Activity and Setti
 
 test('Account aliases and other unreviewed destinations retain existing policies without verification reads', async () => {
   let reads = 0;
-  for (const routeName of ['settings-account', 'account-security', 'settings', 'settings-media-storage', 'settings-general', 'dashboard', 'missing', 'activity-feed', undefined]) {
+  for (const routeName of ['settings-account', 'account-security', 'settings-media-storage', 'settings-general', 'dashboard', 'missing', 'activity-feed', undefined]) {
     assert.equal(requiresAdministratorRouteSession(routeName), false);
     for (const actorRole of ['operator', 'requester']) assert.equal(canEnterRoute({ routeName, actorRole }), true);
     assert.equal(await refreshRouteSession({ routeName, refreshSession: () => { reads++; } }), true);

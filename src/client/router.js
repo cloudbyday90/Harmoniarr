@@ -26,6 +26,7 @@ import {
 import { resolveRouterScroll } from './lib/router-scroll.js';
 import { sessionStore } from './state/session.js';
 import { canEnterRoute, refreshRouteSession, requiresAdministratorRouteSession } from './lib/route-access-policy.js';
+import { resolveSettingsRouteRedirect } from './lib/settings-route-access-policy.js';
 import { useToast } from './composables/useToast.js';
 
 const ActivityBlocklistView = () => import('./views/ActivityBlocklistView.vue');
@@ -90,7 +91,6 @@ const requesterRestrictedRouteNames = new Set([
   'acquisition',
   'acquisition-downloader',
   'downloader',
-  'settings',
   'settings-connections',
   'settings-media-storage',
   'settings-users',
@@ -240,7 +240,11 @@ router.beforeEach(async (to) => {
     return { name: defaultAuthenticatedRouteName() };
   }
 
-  if (!canEnterRoute({ routeName: to.name, actorRole: sessionStore.state.user?.role })) {
+  const access = { routeName: to.name, actorRole: sessionStore.state.user?.role };
+  const settingsRedirect = resolveSettingsRouteRedirect(access);
+  if (settingsRedirect) return settingsRedirect;
+
+  if (!canEnterRoute(access)) {
     return { name: defaultAuthenticatedRouteName() };
   }
 

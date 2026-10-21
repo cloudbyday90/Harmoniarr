@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
-The October 21 [Connections admission rebuild](LOCAL_DOCKER_CONNECTIONS_ROUTE_ACCESS_OUTCOME.md)
+The October 21 [Settings landing rebuild](LOCAL_DOCKER_SETTINGS_LANDING_OUTCOME.md)
 records the current no-cache image, preserved admin/data and passing readiness.
+The [feature outcome](SETTINGS_LANDING_OUTCOME.md) verifies protected Setup entry,
+non-admin Account landing and native focus/history behavior.
+
+The October 21 [Connections admission rebuild](LOCAL_DOCKER_CONNECTIONS_ROUTE_ACCESS_OUTCOME.md)
+records the preceding no-cache image, preserved admin/data and passing readiness.
 The [feature outcome](CONNECTIONS_ROUTE_ACCESS_OUTCOME.md) verifies the common
 session guard, area-owned rules, native navigation and ordinary Account access.
 

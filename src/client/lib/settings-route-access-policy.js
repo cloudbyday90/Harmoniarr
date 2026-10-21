@@ -6,9 +6,16 @@
 
 // Other Settings destinations retain their independently enforced policies.
 export function requiresAdministratorSettingsSession(routeName) {
-  return routeName === 'settings-connections';
+  return routeName === 'settings' || routeName === 'settings-connections';
 }
 
 export function canEnterSettingsRoute({ routeName, actorRole } = {}) {
   return !requiresAdministratorSettingsSession(routeName) || actorRole === 'admin';
+}
+
+export function resolveSettingsRouteRedirect({ routeName, actorRole } = {}) {
+  if (routeName === 'settings' && !canEnterSettingsRoute({ routeName, actorRole })) {
+    return { name: 'settings-account', replace: true };
+  }
+  return null;
 }

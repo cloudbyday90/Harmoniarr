@@ -108,3 +108,12 @@ WCAG Focus Visible's actual requirement. Keep a cue inside scrolling navigation
 instead of weakening assertions to match a browser default.
 For action upgrades, controlled source logic and existing Desktop ARM execution
 do not prove the packaged action, fresh-runner registration or hosted caches.
+
+Settings root admission now verifies Setup authority before mounting; see the
+[landing design](../../../../docs/SETTINGS_LANDING_DESIGN.md). Apply bootstrap,
+login and password-change checks before the fixed non-admin Account redirect.
+Do not forward arbitrary Setup query/hash data into that destination. Qualify
+direct and global links, replacement history, native protected reads and Account
+aliases. If filtering removes the focused tab, restore to a surviving control
+only while that interaction still owns focus; test a user moving elsewhere
+during a held real session response as a separate case.

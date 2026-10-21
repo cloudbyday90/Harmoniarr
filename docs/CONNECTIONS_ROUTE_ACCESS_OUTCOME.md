@@ -91,11 +91,9 @@ non-publishing runner check should cover them. No PR merge was performed.
 
 ## Next item
 
-Make the Settings landing route role-aware. Setup currently mounts the same
-admin-only settings/status readers, while the global Settings destination still
-opens Setup. Qualify that root boundary and route non-admin users to Account,
-preserving the reviewed ordinary aliases and avoiding another refused setup page.
-Other Settings destinations require individual contract review; this change does
-not establish that every surviving tab is usable by every role.
+The recommended role-aware Settings landing is completed in the
+[landing outcome](SETTINGS_LANDING_OUTCOME.md). Current administrator verification
+now precedes Setup; other authenticated roles reach Account with ordinary aliases
+preserved. Other Settings destinations still require individual contract review.
 
 Work remains on main. No separate branch, release, tag or version bump is created.

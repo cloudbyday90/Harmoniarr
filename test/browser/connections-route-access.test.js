@@ -90,19 +90,19 @@ suite('administrator-only Connections admission with ordinary Account access', (
         await loginThroughUi(page, { baseUrl, username, password });
         await page.goto(target, { waitUntil: 'domcontentloaded' }); await page.waitForURL(`${baseUrl}/app`);
         const nav = await openAccount(page, baseUrl);
-        assert.deepEqual(await nav.getByRole('link').allTextContents(), ['Setup', 'Media & storage', 'Notifications', 'Library']);
+        assert.deepEqual(await nav.getByRole('link').allTextContents(), ['Media & storage', 'Notifications', 'Library']);
         await page.getByRole('navigation', { name: 'More settings sections', exact: true }).getByRole('link', { name: 'Account', exact: true }).waitFor();
         if (role === 'operator') {
-          const setup = nav.getByRole('link', { name: 'Setup', exact: true });
-          await setup.focus(); await setup.press('Tab');
           const media = nav.getByRole('link', { name: 'Media & storage', exact: true });
-          await assertLocatorFocused(media); await assertVisibleFocusOutline(media);
+          const notifications = nav.getByRole('link', { name: 'Notifications', exact: true });
+          await media.focus(); await media.press('Tab');
+          await assertLocatorFocused(notifications); await assertVisibleFocusOutline(notifications);
           await mkdir('.tmp/connections-route-access-2026-10-21', { recursive: true });
           for (const [width, theme] of [[390, 'light'], [800, 'dark'], [1280, 'light']]) {
             await page.setViewportSize({ width, height: 1100 });
             await page.evaluate(value => globalThis.document.documentElement.setAttribute('data-theme', value), theme);
-            await setup.focus(); await setup.press('Tab');
-            await assertLocatorFocused(media); await assertVisibleFocusOutline(media);
+            await media.focus(); await media.press('Tab');
+            await assertLocatorFocused(notifications); await assertVisibleFocusOutline(notifications);
             await nav.screenshot({ path: `.tmp/connections-route-access-2026-10-21/operator-nav-${width}-${theme}.png`, animations: 'disabled' });
             if (width === 390) await page.getByRole('navigation', { name: 'More settings sections', exact: true }).screenshot({ path: '.tmp/connections-route-access-2026-10-21/operator-account-390.png', animations: 'disabled' });
           }

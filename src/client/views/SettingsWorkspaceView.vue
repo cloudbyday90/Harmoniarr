@@ -17,10 +17,11 @@
 -->
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useTabbarOverflow } from '../composables/useTabbarOverflow.js';
 import { buildSettingsNavigation } from '../lib/settings-navigation.js';
+import { createUserCommandFocusTracker } from '../lib/user-command-focus.js';
 import { sessionStore } from '../state/session.js';
 
 const navigation = computed(() => buildSettingsNavigation(sessionStore.state.user?.role));
@@ -29,8 +30,23 @@ const secondaryTabs = computed(() => navigation.value.secondary);
 
 const route = useRoute();
 const tabbarRef = ref(null);
+const moreButtonRef = ref(null);
 const isMoreSettingsOpen = ref(false);
 const { hasOverflowStart, hasOverflowEnd, attach, cleanup } = useTabbarOverflow();
+
+watch(navigation, async () => {
+  const document = tabbarRef.value?.ownerDocument;
+  const initiator = document?.activeElement;
+  if (initiator?.tagName !== 'A' || !tabbarRef.value?.contains(initiator)) return;
+
+  const focus = createUserCommandFocusTracker({ document });
+  try {
+    await nextTick();
+    if (!initiator.isConnected && focus.ownsFocus()) moreButtonRef.value?.focus();
+  } finally {
+    focus.dispose();
+  }
+});
 
 watch(
   () => route.name,
@@ -69,6 +85,7 @@ onUnmounted(cleanup);
           {{ tab.label }}
         </RouterLink>
         <button
+          ref="moreButtonRef"
           type="button"
           class="hx-tab settings-workspace__more-button"
           aria-controls="settings-more-navigation"
