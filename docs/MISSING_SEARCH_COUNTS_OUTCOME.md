@@ -73,7 +73,8 @@ package/lock/installed Vue consumer checks match the retained failing TypeScript
 candidate and passing TypeScript 6 control. No PR merge, closure or rebase, new
 branch, dependency/version change, tag or release was created.
 
-Next: add role-aware correction destinations for ignored-source and malformed
-response causes inside canonical Missing Music. Preserve requester scope and
-explicit policy ownership; a count must not silently authorize changing an ignore,
-relaxing quality or submitting another provider search.
+The subsequent [correction outcome](MISSING_SEARCH_CORRECTIONS_OUTCOME.md)
+completes role-aware review destinations for ignored-source and malformed-response
+causes in canonical Missing Music. It preserves requester scope and explicit
+policy ownership; counts do not authorize ignore changes, quality relaxation or
+another provider search. That record owns the next follow-up.

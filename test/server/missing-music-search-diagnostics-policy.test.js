@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildMissingMusicSearchDiagnostics as build } from '../../src/server/missing-music/missing-music-search-diagnostics-policy.js';
+import { buildMissingMusicSearchDiagnostics as build, buildMissingMusicSearchCorrectionPermissions as permissions } from '../../src/server/missing-music/missing-music-search-diagnostics-policy.js';
 const diagnostics = { provider: 'slskd', candidateCount: 0, responseCount: 4, responseFileCount: 10,
   ignoredUserResponseCount: 2, blacklistedFileCount: 3, missingUsernameResponseCount: 1, malformedFileCount: 2 };
 const result = { sourceProvider: 'slskd', candidateCount: 0, fileCount: 0, ingestionDiagnostics: diagnostics };
@@ -20,4 +20,22 @@ test('new work, failure, success and unverified history cannot inherit stale dia
     { lastSearchResult: { ...result, sourceProvider: 'unknown' } }, { lastSearchResult: null }]) {
     assert.equal(build(release(evidence)), null);
   }
+});
+
+test('only an administrator on an active recipient receives cause-specific review capabilities', () => {
+  const allowed = { actorUser: { role: 'admin' }, targetUser: { accountStatus: 'active' }, searchDiagnostics: diagnostics };
+  const denied = { canReviewIgnoredSources: false, canReviewProviderConnection: false };
+  assert.deepEqual(permissions(allowed), { canReviewIgnoredSources: true, canReviewProviderConnection: true });
+  for (const role of ['requester', 'operator', 'ADMIN', undefined]) {
+    assert.deepEqual(permissions({ ...allowed, actorUser: { role } }), denied);
+  }
+  for (const accountStatus of ['disabled', 'unknown', undefined]) {
+    assert.deepEqual(permissions({ ...allowed, targetUser: { accountStatus } }), denied);
+  }
+  assert.deepEqual(permissions({ ...allowed, searchDiagnostics: null }), denied);
+  assert.deepEqual(permissions({ ...allowed, searchDiagnostics: { ...diagnostics, ignoredUserResponseCount: '2' } }), denied);
+  const neutral = { ...diagnostics, ignoredUserResponseCount: 0, malformedFileCount: 0, missingUsernameResponseCount: 0 };
+  assert.deepEqual(permissions({ ...allowed, searchDiagnostics: neutral }), denied);
+  assert.deepEqual(permissions({ ...allowed, searchDiagnostics: { ...neutral, ignoredUserResponseCount: 1 } }), { ...denied, canReviewIgnoredSources: true });
+  assert.deepEqual(permissions({ ...allowed, searchDiagnostics: { ...neutral, missingUsernameResponseCount: 1 } }), { ...denied, canReviewProviderConnection: true });
 });

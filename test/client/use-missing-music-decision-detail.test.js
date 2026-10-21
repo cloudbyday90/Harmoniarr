@@ -142,13 +142,19 @@ test('decision detail retains bounded search counts, clears stale reads and does
   const counts = { provider: 'slskd', candidateCount: 0, responseCount: 2, responseFileCount: 4, ignoredUserResponseCount: 1 };
   payload.searchDiagnostics = { ...counts, reasonCodes: ['private'], username: 'private-peer' };
   payload.permissions.canSearchAgain = false;
+  payload.permissions.canReviewIgnoredSources = true;
+  payload.permissions.canReviewProviderConnection = 'true';
   const { app, decisionDetail } = mountDecisionDetail({ decisionId: 'wanted-amber', fetchMissingMusicDecisionDetail: async () => payload });
   t.after(() => app.unmount()); await decisionDetail.load();
   assert.equal(decisionDetail.detail.value.searchDiagnostics.ignoredUserResponseCount, 1);
   assert.doesNotMatch(JSON.stringify(decisionDetail.detail.value.searchDiagnostics), /private/);
   assert.equal(decisionDetail.detail.value.permissions.canSearchAgain, false);
+  assert.equal(decisionDetail.detail.value.permissions.canReviewIgnoredSources, true);
+  assert.equal(decisionDetail.detail.value.permissions.canReviewProviderConnection, false);
+  payload.permissions.canReviewIgnoredSources = false;
   payload.searchDiagnostics = null; await decisionDetail.load();
   assert.equal(decisionDetail.detail.value.searchDiagnostics, null);
+  assert.equal(decisionDetail.detail.value.permissions.canReviewIgnoredSources, false);
 });
 
 test('decision detail retains the bounded quality projection and server fallback permission', async (t) => {

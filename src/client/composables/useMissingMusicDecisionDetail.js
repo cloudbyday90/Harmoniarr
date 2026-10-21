@@ -43,6 +43,8 @@ function normalizeDetail(payload) {
       canRecheckLibraryAdd: payload.permissions?.canRecheckLibraryAdd === true,
       canRepairFolders: payload.permissions?.canRepairFolders === true,
       canReviewDownloadHandoff: payload.permissions?.canReviewDownloadHandoff === true,
+      canReviewIgnoredSources: payload.permissions?.canReviewIgnoredSources === true,
+      canReviewProviderConnection: payload.permissions?.canReviewProviderConnection === true,
       canStartDownload: payload.permissions?.canStartDownload === true,
       canSearchAgain: payload.permissions?.canSearchAgain === true,
       canSelectMatch: payload.permissions?.canSelectMatch === true,

@@ -23,7 +23,7 @@ import {
   resolveMissingMusicDecisionScope,
 } from './missing-music-decision-scope-policy.js';
 import { buildMissingMusicMatchChoices } from './missing-music-match-choice-projection.js';
-import { buildMissingMusicSearchDiagnostics } from './missing-music-search-diagnostics-policy.js';
+import { buildMissingMusicSearchDiagnostics, buildMissingMusicSearchCorrectionPermissions } from './missing-music-search-diagnostics-policy.js';
 import { canStartMissingMusicDownload } from './missing-music-download-start-policy.js';
 import { canReviewMissingMusicDownload } from './missing-music-download-review-handoff-policy.js';
 import { canViewMissingMusicDownloader } from './missing-music-downloader-handoff-policy.js';
@@ -329,15 +329,17 @@ export function createMissingMusicDecisionService({
     const matchChoices = decision.status.nextAction === 'review_matches'
       ? buildMissingMusicMatchChoices(target.release)
       : [];
+    const searchDiagnostics = buildMissingMusicSearchDiagnostics(target.release);
 
     return {
       checkedAt: now().toISOString(),
       decision,
       matchChoices,
       qualityEvidence: buildPublicQualityEvidence(projectedRelease.quality),
-      searchDiagnostics: buildMissingMusicSearchDiagnostics(target.release),
+      searchDiagnostics,
       libraryAddRecovery: buildPublicLibraryAddRecovery(target.release.libraryAddRecoveryFacts),
       permissions: {
+        ...buildMissingMusicSearchCorrectionPermissions({ actorUser, targetUser: target.targetUser, searchDiagnostics }),
         canReviewDownloadHandoff: canReviewMissingMusicDownload({ actorUser, targetUser: target.targetUser, release: target.release }),
         canAddToLibrary: canAddPreparedReleaseToLibrary({ release: target.release, targetUser: target.targetUser }),
         canRecheckLibraryAdd: canRecheckLibraryAdd({ release: target.release, targetUser: target.targetUser }),

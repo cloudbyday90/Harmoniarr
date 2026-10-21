@@ -43,23 +43,44 @@ suite('Missing Music scoped search diagnostic reads', () => {
       const operationCount = (await pool.query('SELECT count(*)::int AS n FROM operation_runs')).rows[0].n;
       const own = await read(owner.client), admin = await read(c.client);
       assert.deepEqual(own.searchDiagnostics, counts); assert.deepEqual(admin.searchDiagnostics, counts);
+      const assertReview = (detail, expected) => {
+        assert.equal(detail.permissions.canReviewIgnoredSources, expected);
+        assert.equal(detail.permissions.canReviewProviderConnection, expected);
+      };
+      assertReview(own, false); assertReview(admin, true);
+      const ignoredBefore = (await c.client.requestJson('/api/v1/activity/ignored-source-users')).payload;
+      const settingsBefore = (await c.client.requestJson('/api/v1/settings')).payload.settings;
+      for (const role of ['requester', 'operator']) {
+        await pool.query('UPDATE app_users SET role=$2 WHERE id=$1', [owner.user.id, role]);
+        const currentClient = createSessionHttpClient(c.baseUrl);
+        await loginWithPassword(currentClient, { username: 'counts-owner', password: 'CountsTestPass123!' });
+        assertReview(await read(currentClient), false);
+        for (const destination of ['/api/v1/activity/ignored-source-users', '/api/v1/settings']) {
+          assert.equal((await currentClient.requestJson(destination)).response.status, 403);
+        }
+        assert.equal((await currentClient.requestJson('/api/v1/activity/ignored-source-users/never-unignore', { method: 'DELETE' })).response.status, 403);
+        assert.equal((await currentClient.requestJson('/api/v1/settings', { method: 'PUT', json: {} })).response.status, 403);
+      }
       assert.doesNotMatch(JSON.stringify(own), /private-/);
       assert.equal(own.permissions.canSearchAgain, false);
       assert.equal((await outsider.client.requestJson(path)).response.status, 404);
       assert.equal((await createSessionHttpClient(c.baseUrl).requestJson(path)).response.status, 401);
       await pool.query("UPDATE library_discovery_requests SET request_status='ready' WHERE id=$1", [discovery.id]);
-      assert.equal((await read(c.client)).searchDiagnostics, null);
+      const ready = await read(c.client); assert.equal(ready.searchDiagnostics, null); assertReview(ready, false);
       await pool.query("UPDATE library_discovery_requests SET request_status='cooldown' WHERE id=$1", [discovery.id]);
       for (const extra of [{ lastDispatchFailure: { code: 'slskd_unavailable' } }, { searchContinuation: { state: 'reserved' } }]) {
         await pool.query('UPDATE library_discovery_requests SET evidence=evidence||$2::jsonb WHERE id=$1', [discovery.id, JSON.stringify(extra)]);
-        assert.equal((await read(c.client)).searchDiagnostics, null);
+        const newer = await read(c.client); assert.equal(newer.searchDiagnostics, null); assertReview(newer, false);
         await pool.query("UPDATE library_discovery_requests SET evidence=evidence-'lastDispatchFailure'-'searchContinuation' WHERE id=$1", [discovery.id]);
       }
       await pool.query('UPDATE app_users SET is_disabled=true WHERE id=$1', [owner.user.id]);
       const disabled = await read(c.client); assert.deepEqual(disabled.searchDiagnostics, counts);
+      assertReview(disabled, false);
       assert.equal(disabled.permissions.isReadOnly, true); assert.equal(disabled.permissions.canSearchAgain, false);
       assert.deepEqual((await pool.query('SELECT search_attempt_count,research_attempt_count,next_search_after FROM library_discovery_requests WHERE id=$1', [discovery.id])).rows[0], openingSchedule);
       assert.equal((await pool.query('SELECT count(*)::int AS n FROM operation_runs')).rows[0].n, operationCount);
+      assert.deepEqual((await c.client.requestJson('/api/v1/activity/ignored-source-users')).payload, ignoredBefore);
+      assert.deepEqual((await c.client.requestJson('/api/v1/settings')).payload.settings, settingsBefore);
     }, { scenarioName: 'missing_music_search_diagnostic_scope' });
   });
 });

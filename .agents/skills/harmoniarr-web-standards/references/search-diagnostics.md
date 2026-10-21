@@ -44,3 +44,16 @@ again. Keep external recovery's positive-response distinction when sharing numer
 projection, and hide old canonical causes after a new intent or later failure.
 Keep response and file labels separate and use adjacent term/value assertions in
 description lists. Sharing a presenter does not imply sharing command authority.
+
+For canonical correction destinations, use the
+[correction design](../../../../docs/MISSING_SEARCH_CORRECTIONS_DESIGN.md).
+Check destination API authority as well as router admission: ignored-source and
+connection pages have administrator-only APIs, even when another role can enter
+their shell. Carry strict server-derived review capabilities through the client
+adapter; require active recipient facts and suppress correction links in disabled
+history. Missing capability is denial, with useful administrator guidance.
+Keep destinations fixed and the existing Settings return context bounded.
+Malformed responses justify investigation, not a connection-failure diagnosis.
+An ignore change affects future searches for everyone; never infer consent from
+a cause count. Browser-check real destination navigation, sequential link focus,
+revocation on Refresh and zero policy/search mutations while opening review.
