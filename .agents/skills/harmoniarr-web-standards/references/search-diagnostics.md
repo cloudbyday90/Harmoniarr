@@ -81,7 +81,19 @@ Trace list, detail, export, bulk and single-write handlers before extending a
 route policy: a read-looking export still needs independent authorization.
 Reuse one owned browser cohort across the reviewed destinations; hold actual
 session responses and prove zero destination reads before admission. After link
-filtering, check the new Tab adjacency between Monitored artists and System
-history rather than retaining assertions for a removed link. A tested full-scan
+filtering, check surviving keyboard boundaries rather than retaining assertions
+for a removed link. A tested full-scan
 OSV workflow update does not qualify its separately pinned PR-comparison sibling
 or GitHub-hosted SARIF upload.
+
+System history now shares this admission policy; see the
+[history design](../../../../docs/HISTORY_ROUTE_ACCESS_DESIGN.md). Trace its actual
+system-feed handler rather than inferring permission from the Activity timeline.
+When the last available link disappears, omit the empty diagnostic group using
+the existing projection. Verify surviving heading/link order and native
+summary-to-first-link navigation in the shell. Controlled history payloads prove
+loading/retry presentation; retain actual session/feed HTTP proof separately.
+For fixed mobile navigation, inspect actual sequential focus and its geometry
+before diagnosing an obscured-control failure from an unfocused capture. Preserve
+that native focus state in the screenshot; do not move the viewport by script to
+make an otherwise failing focus assertion pass.

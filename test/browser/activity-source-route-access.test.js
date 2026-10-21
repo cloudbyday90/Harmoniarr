@@ -14,10 +14,11 @@ const destinations = [
   { path: 'users', label: 'Source users', heading: 'Source Users', api: '/api/v1/activity/source-users' },
   { path: 'blocklist', label: 'Source blocklist', heading: 'Blocklist', api: '/api/v1/activity/blocklist' },
   { path: 'ignored', label: 'Ignored source users', heading: 'Ignored source users', api: '/api/v1/activity/ignored-source-users' },
+  { path: 'history', label: 'System history', heading: 'System history', api: '/api/v1/system/activity-feed' },
 ];
-const sourceApiPaths = [...destinations.map(destination => destination.api), '/api/v1/activity/source-user-ignore-suggestions'];
+const reviewedReadPaths = [...destinations.map(destination => destination.api), '/api/v1/activity/source-user-ignore-suggestions'];
 const protectedRequests = [
-  ...sourceApiPaths.map(path => [path, { method: 'GET' }]),
+  ...reviewedReadPaths.map(path => [path, { method: 'GET' }]),
   ['/api/v1/activity/source-users/never-changed', { method: 'GET' }],
   ['/api/v1/activity/source-users/never-changed/export?format=json', { method: 'GET' }],
   ['/api/v1/activity/source-users/never-changed', { method: 'PATCH', json: { trustState: 'trusted', reason: 'forged role' } }],
@@ -43,12 +44,12 @@ function observe(page) {
   const reads = []; const mutations = []; const errors = [];
   page.on('request', request => {
     const path = new URL(request.url()).pathname;
-    if (sourceApiPaths.some(source => path === source || path.startsWith(`${source}/`))) reads.push(path);
+    if (reviewedReadPaths.some(source => path === source || path.startsWith(`${source}/`))) reads.push(path);
     if (path.startsWith('/api/') && !['GET', 'HEAD', 'OPTIONS'].includes(request.method())) mutations.push(request.method());
   });
   page.on('pageerror', error => errors.push(error.message)); return { reads, mutations, errors };
 }
-suite('administrator-only source-policy navigation', () => {
+suite('administrator-only Activity diagnostic navigation', () => {
   before(async () => { runtime = await createBrowserSmokeRuntime({ config }); }, { timeout: config.suiteSetupTimeoutMs });
   after(async () => { await runtime?.cleanup(); }, { timeout: config.suiteTeardownTimeoutMs });
   for (const destination of destinations) {
@@ -72,7 +73,7 @@ suite('administrator-only source-policy navigation', () => {
         hold.release(); await page.waitForURL(`${baseUrl}/app/activity/${destination.path}`); await loaded;
         await page.getByRole('heading', { name: destination.heading, exact: true }).waitFor();
         assert.ok(observations.reads.length >= 1); assert.deepEqual(observations.mutations, []); assert.deepEqual(observations.errors, []);
-      }), { scenarioName: `source_${destination.path}_admin_current_session` });
+      }), { scenarioName: `activity_${destination.path}_admin_current_session` });
     });
   }
   test('operator/requester/anonymous direct links refuse page admission while ordinary navigation and API denials remain intact', { timeout: config.scenarioTimeoutMs }, async () => {
@@ -104,18 +105,35 @@ suite('administrator-only source-policy navigation', () => {
           for (const destination of destinations) assert.equal(await nav.getByRole('link', { name: destination.label, exact: true }).count(), 0);
           assert.equal(await nav.getByRole('link', { name: 'Request records', exact: true }).count(), 1);
           assert.equal(await nav.getByRole('link', { name: 'Match diagnostics', exact: true }).count(), 1);
-          await mkdir('.tmp/source-route-access-2026-10-21', { recursive: true });
+          assert.deepEqual(await nav.getByRole('heading').allTextContents(), ['Resolve an issue', 'Inspect music', 'Review records']);
+          assert.deepEqual(await nav.getByRole('link').allTextContents(), ['Background jobs', 'Failed library adds', 'Match diagnostics', 'Library-add diagnostics', 'Wanted releases', 'Request records', 'Monitored artists']);
+          await mkdir('.tmp/history-route-access-2026-10-21', { recursive: true });
           for (const [width, theme] of [[390, 'light'], [800, 'dark'], [1280, 'light']]) {
             await page.setViewportSize({ width, height: 1100 });
             await page.evaluate(value => globalThis.document.documentElement.setAttribute('data-theme', value), theme);
+            if (width === 390) {
+              const requests = nav.getByRole('link', { name: 'Request records', exact: true });
+              await requests.focus(); await requests.press('Tab');
+              const monitored = nav.getByRole('link', { name: 'Monitored artists', exact: true });
+              await assertLocatorFocused(monitored); await assertVisibleFocusOutline(monitored);
+              const linkBox = await monitored.boundingBox();
+              const footerBox = await page.getByRole('navigation', { name: 'Mobile navigation', exact: true }).boundingBox();
+              assert.ok(linkBox && footerBox && linkBox.y >= 0 && linkBox.y + linkBox.height <= footerBox.y, 'Mobile keyboard focus must stay above fixed navigation');
+            }
             const capture = width === 390 ? nav.locator('.activity-diagnostic-group').last() : nav;
-            await capture.screenshot({ path: `.tmp/source-route-access-2026-10-21/operator-nav-${width}-${theme}.png`, animations: 'disabled' });
+            await capture.screenshot({ path: `.tmp/history-route-access-2026-10-21/operator-nav-${width}-${theme}.png`, animations: 'disabled' });
           }
           await page.setViewportSize({ width: 1280, height: 1100 });
           const monitored = nav.getByRole('link', { name: 'Monitored artists', exact: true });
-          await monitored.focus(); await monitored.press('Tab');
-          const history = nav.getByRole('link', { name: 'System history', exact: true });
-          await assertLocatorFocused(history); await assertVisibleFocusOutline(history);
+          await monitored.focus(); await monitored.press('Shift+Tab');
+          const requests = nav.getByRole('link', { name: 'Request records', exact: true });
+          await assertLocatorFocused(requests); await assertVisibleFocusOutline(requests);
+          await requests.press('Tab'); await assertLocatorFocused(monitored); await assertVisibleFocusOutline(monitored);
+          const firstLink = nav.getByRole('link', { name: 'Background jobs', exact: true });
+          await firstLink.focus(); await firstLink.press('Shift+Tab');
+          const summary = page.locator('details.activity-diagnostics > summary');
+          await assertLocatorFocused(summary); await summary.press('Tab');
+          await assertLocatorFocused(firstLink); await assertVisibleFocusOutline(firstLink);
         }
         await page.goto(`${baseUrl}/app/missing`, { waitUntil: 'domcontentloaded' });
         await page.getByRole('heading', { name: 'Missing Music', exact: true }).waitFor(); await logoutThroughUi(page);
@@ -123,7 +141,7 @@ suite('administrator-only source-policy navigation', () => {
       assert.deepEqual(observations.reads, []);
       assert.deepEqual((await client.requestJson('/api/v1/activity/ignored-source-users')).payload, beforeList);
       assert.deepEqual(observations.errors, []);
-    }, { scenarioName: 'source_policy_role_refusal' });
+    }, { scenarioName: 'activity_diagnostic_role_refusal' });
   });
   for (const destination of destinations) {
     test(`${destination.label}: cached revocation refuses admission; password-change precedence and failed verification retry stay usable`, { timeout: config.scenarioTimeoutMs }, async () => {
@@ -152,7 +170,7 @@ suite('administrator-only source-policy navigation', () => {
         await browserContext.unroute(pattern); await entryLink.press('Enter'); await page.waitForURL(`${baseUrl}/app/activity/${destination.path}`);
         await page.getByRole('heading', { name: destination.heading, exact: true }).waitFor();
         assert.deepEqual(observations.mutations, []); assert.deepEqual(observations.errors, []);
-      }, { scenarioName: `source_${destination.path}_current_authority` });
+      }, { scenarioName: `activity_${destination.path}_current_authority` });
     });
   }
 });

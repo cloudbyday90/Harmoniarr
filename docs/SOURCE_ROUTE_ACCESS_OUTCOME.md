@@ -81,12 +81,9 @@ runner/checkout compatibility, artifact upload, SARIF publication or PR comparis
 
 ## Follow-up
 
-Next platform fix: qualify System history admission. Its diagnostic link remains
-visible to operators; `useActivityHistory` reads `/api/v1/system/activity-feed`,
-whose handler requires admin, while the router currently restricts requesters
-only. Apply the same handler-to-route review and preserve empty-group filtering
-and keyboard order before extending the policy. This round preserves that
-destination's existing behavior rather than claiming its data is operator-readable.
+The recommended System history follow-up is now completed in the
+[history admission outcome](HISTORY_ROUTE_ACCESS_OUTCOME.md), including current
+session/feed proof, empty-group filtering and surviving keyboard order.
 
 Then qualify Settings > Connections admission and its visible tab against the
 administrator-only settings API. `SettingsConnectionsView` mounts

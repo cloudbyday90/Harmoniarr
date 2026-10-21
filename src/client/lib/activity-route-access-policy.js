@@ -6,7 +6,7 @@
 
 // Only these reviewed Activity boundaries are restricted here. Existing session,
 // requester and other destination policies remain independently enforced.
-const administratorRoutes = new Set(['activity-users', 'activity-blocklist', 'activity-ignored']);
+const administratorRoutes = new Set(['activity-users', 'activity-blocklist', 'activity-ignored', 'activity-history']);
 
 export function requiresAdministratorActivitySession(routeName) {
   return administratorRoutes.has(routeName);

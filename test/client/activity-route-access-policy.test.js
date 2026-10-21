@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { canEnterActivityRoute, refreshActivityRouteSession, requiresAdministratorActivitySession } from '../../src/client/lib/activity-route-access-policy.js';
 
-const administratorRoutes = ['activity-users', 'activity-blocklist', 'activity-ignored'];
+const administratorRoutes = ['activity-users', 'activity-blocklist', 'activity-ignored', 'activity-history'];
 
-test('source-policy admission requires exact administrator role, including unknown-role denial', () => {
+test('reviewed Activity admission requires exact administrator role, including unknown-role denial', () => {
   for (const routeName of administratorRoutes) {
     assert.equal(requiresAdministratorActivitySession(routeName), true);
     assert.equal(canEnterActivityRoute({ routeName, actorRole: 'admin' }), true);
@@ -15,7 +15,7 @@ test('source-policy admission requires exact administrator role, including unkno
 });
 test('unreviewed routes retain existing policies without new session reads', async () => {
   let reads = 0;
-  for (const routeName of ['dashboard', 'missing', 'missing-decision', 'activity-feed', 'activity-history', 'activity-requests', 'activity-diagnostics-matches', 'settings-account', undefined]) {
+  for (const routeName of ['dashboard', 'missing', 'missing-decision', 'activity-feed', 'activity-requests', 'activity-diagnostics-matches', 'settings-account', 'settings-connections', undefined]) {
     assert.equal(requiresAdministratorActivitySession(routeName), false);
     assert.equal(canEnterActivityRoute({ routeName, actorRole: 'operator' }), true);
     assert.equal(await refreshActivityRouteSession({ routeName, refreshSession: () => { reads++; } }), true);

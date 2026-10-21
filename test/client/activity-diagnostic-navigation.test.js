@@ -41,7 +41,9 @@ test('diagnostic projection hides reviewed admin destinations and preserves orde
   const original = names(ACTIVITY_DIAGNOSTIC_GROUPS);
   assert.deepEqual(buildActivityDiagnosticGroups('admin'), ACTIVITY_DIAGNOSTIC_GROUPS);
   for (const actorRole of ['operator', 'requester', undefined, 'ADMIN']) {
-    assert.deepEqual(names(buildActivityDiagnosticGroups(actorRole)), original.filter(name => !['activity-users', 'activity-blocklist', 'activity-ignored'].includes(name)));
+    const groups = buildActivityDiagnosticGroups(actorRole);
+    assert.deepEqual(names(groups), original.filter(name => !['activity-users', 'activity-blocklist', 'activity-ignored', 'activity-history'].includes(name)));
+    assert.deepEqual(groups.map(group => group.id), ['resolve-issue', 'inspect-music', 'review-records']);
   }
   assert.deepEqual(names(ACTIVITY_DIAGNOSTIC_GROUPS), original);
   assert.equal(Object.isFrozen(ACTIVITY_DIAGNOSTIC_GROUPS), true);

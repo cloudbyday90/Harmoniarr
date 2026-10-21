@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
-The October 21 [source-policy admission rebuild](LOCAL_DOCKER_SOURCE_ROUTE_ACCESS_OUTCOME.md)
+The October 21 [System history admission rebuild](LOCAL_DOCKER_HISTORY_ROUTE_ACCESS_OUTCOME.md)
 records the current no-cache image, preserved admin/data and passing readiness.
+The [feature outcome](HISTORY_ROUTE_ACCESS_OUTCOME.md) verifies current admin
+admission and omission of the empty non-admin diagnostic group.
+
+The October 21 [source-policy admission rebuild](LOCAL_DOCKER_SOURCE_ROUTE_ACCESS_OUTCOME.md)
+records the preceding no-cache image, preserved admin/data and passing readiness.
 The [feature outcome](SOURCE_ROUTE_ACCESS_OUTCOME.md) verifies Source users and
 Source blocklist admission alongside ignored-source review.
 
