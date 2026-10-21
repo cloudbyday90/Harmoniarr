@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
-The October 21 [manual history fixture rebuild](LOCAL_DOCKER_METADATA_HISTORY_MANUAL_OUTCOME.md)
+The October 21 [manual cancellation rebuild](LOCAL_DOCKER_MANUAL_CANCELLATION_OUTCOME.md)
 records the current no-cache image, preserved admin/data and passing readiness.
+The [owning outcome](MANUAL_SESSION_CANCELLATION_OUTCOME.md) qualifies early
+quit/EOF, admitted Docker work drainage and actual CLI retirement.
+
+The October 21 [manual history fixture rebuild](LOCAL_DOCKER_METADATA_HISTORY_MANUAL_OUTCOME.md)
+records the preceding no-cache image, preserved admin/data and passing readiness.
 The [fixture outcome](METADATA_HISTORY_MANUAL_FIXTURE_OUTCOME.md) qualifies the
 separate disposable desktop session; actual operator accessibility checks are
 deferred. Use `npm run manual:metadata-history` for synthetic pending/retry states.

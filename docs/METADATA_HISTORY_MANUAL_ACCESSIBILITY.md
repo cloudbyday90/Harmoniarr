@@ -19,6 +19,11 @@ once, so the same paging button can retry the unchanged cursor. `reset` requires
 no held read and a browser reload to restore initial content. Quit/EOF/Ctrl+C
 retire the owned session; close the private window afterward.
 
+Stop input is observed during startup as well as after readiness. Other commands
+received during startup are refused rather than queued. A command already
+submitted to Docker can finish before exact cleanup completes; wait for the CLI
+to exit. See the [cancellation design](MANUAL_SESSION_CANCELLATION_DESIGN.md).
+
 This fixture serves only an allowlist on host loopback and refuses provider
 search/mutation routes. Terminal controls have no HTTP endpoints. Other app
 pages may report refusal because they are outside this assessment. It cannot

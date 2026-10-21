@@ -18,26 +18,34 @@ import { createManualHistoryController } from './metadata-history-controller.js'
 import { createManualHistoryHttpGuard } from './metadata-history-http-guard.js';
 
 /** A real app/session in a fresh database; callers own their browser and evidence. */
-export async function withManualHistorySession(run) {
+export async function withManualHistorySession(run, { signal } = {}) {
   if (typeof run !== 'function') throw new TypeError('Manual history session requires work.');
+  signal?.throwIfAborted();
   const clientDistDir = resolve(import.meta.dirname, '../../dist/client');
   await access(resolve(clientDistDir, 'index.html'));
+  signal?.throwIfAborted();
   const controller = createManualHistoryController();
   const fixture = createMetadataCommandFixture({ history: { ...historyPage(10, true, 'Initial'), pageInfo: { hasMore: true, nextCursor: 'initial-cursor' }, readPage: controller.readPage } });
   const guard = createManualHistoryHttpGuard({ artistId: metadataCommandIds.artist, onboarding: browserOnboardingFixture, overview: browserSystemOverviewFixture });
-  let runtime; let result; let failed = false; let failure;
-  const remember = error => { if (!failed) { failed = true; failure = error; } };
+  let runtime; let result; let failed = false; let failure; let cancelled = false;
+  const remember = error => {
+    if (signal?.aborted && error === signal.reason) { cancelled = true; return; }
+    if (!failed) { failed = true; failure = error; }
+  };
   try {
     runtime = await createIntegrationAppRuntime({ clientDistDir,
       // Never borrow a configured database or reuse a running test container.
-      postgresRuntimeFactory: createManualPostgresRuntime,
+      postgresRuntimeFactory: options => createManualPostgresRuntime({ ...options, signal }),
       createAppFn(options) {
+        signal?.throwIfAborted();
         const application = fixture.createAppFn(options);
         const app = express(); app.use(guard.middleware); app.use(application.app);
         return { ...application, app };
       },
     });
+    signal?.throwIfAborted();
     result = await runtime.runScenario(async context => {
+      signal?.throwIfAborted();
       assert.equal(context.postgresSource, 'testcontainer_postgres');
       guard.bind(context.baseUrl);
       let value;
@@ -54,5 +62,6 @@ export async function withManualHistorySession(run) {
   try { await controller.close(); } catch (error) { remember(error); }
   try { await runtime?.cleanup(); } catch (error) { remember(error); }
   if (failed) throw failure;
+  if (cancelled) throw signal.reason;
   return result;
 }

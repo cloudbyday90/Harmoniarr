@@ -360,6 +360,12 @@ browser/fast globs and does not prove speech or physical-device acceptance.
 See docs/METADATA_HISTORY_MANUAL_FIXTURE_DESIGN.md for the fresh database,
 server route restrictions and held-read retirement boundary.
 
+For manual-session cancellation, keep early quit/EOF child-process checks and
+native Docker acknowledgement/retirement in that explicit lane. Register stdin
+release and actual child close before waiting; retain input/OS-signal coverage
+limits. Controlled Docker gates must drain before exact removal, including
+expected stop plus cleanup Error/null. See docs/MANUAL_SESSION_CANCELLATION_DESIGN.md.
+
 Use `npm run validate:fast` for complete static, server/client/script and build
 feedback during development. It omits PostgreSQL; include the directly affected
 real database tests when SQL, locks, constraints or rollback own the behavior.

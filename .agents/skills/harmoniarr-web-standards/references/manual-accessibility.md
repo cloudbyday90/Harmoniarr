@@ -25,6 +25,14 @@ Reset/reload between samples; retain the same cursor when retrying a failed read
 The explicit `validate:metadata-history-manual-fixture` command qualifies these
 states using native HTTP/PostgreSQL/Chromium; it does not execute manual acceptance.
 
+For session lifetime changes, observe stop input before setup and seal buffered
+command admission. A signal is not completion: drain an admitted Docker command
+before exact owned cleanup, and keep cleanup failures visible after expected stop.
+The [cancellation design](../../../../docs/MANUAL_SESSION_CANCELLATION_DESIGN.md)
+records these boundaries and the difference between controlled signal events,
+actual CLI close and OS-delivered signals. Keep desktop fixture preparation
+separate from a global viewport-fit change that needs actual device evidence.
+
 Record the evaluated source/version, OS, browser and AT versions, input mode,
 actual zoom/effective viewport, theme and exact steps. For physical safe areas,
 record real hardware and an observed nonzero inset; emulated naming or injected

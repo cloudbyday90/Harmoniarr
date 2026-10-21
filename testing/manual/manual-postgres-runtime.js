@@ -14,9 +14,11 @@ import { createPostgresIntegrationRuntime } from '../postgres-integration-runtim
 const label = 'io.harmoniarr.manual-history';
 
 /** A fresh local database with explicit loopback publishing and exact cleanup ownership. */
-export async function createManualPostgresRuntime(options) {
-  const runDocker = createRecoveryDockerCommand();
-  await assertLocalRecoveryDocker({ runDocker });
+export async function createManualPostgresRuntime(options, { env = process.env, runDocker = createRecoveryDockerCommand({ env }) } = {}) {
+  const { signal } = options;
+  signal?.throwIfAborted();
+  await assertLocalRecoveryDocker({ runDocker, env });
+  signal?.throwIfAborted();
   const version = (await runDocker(['version', '--format', '{{.Server.Version}}'])).stdout.trim();
   assert.ok(Number.parseInt(version, 10) >= 28, 'manual fixture requires Docker Engine 28+ for localhost publishing');
   const nonce = randomUUID(); const name = `harmoniarr-manual-history-${nonce}`;
@@ -39,8 +41,10 @@ export async function createManualPostgresRuntime(options) {
     assert.equal((await runDocker(['container', 'ls', '--all', '--filter', `label=${label}=${nonce}`, '--format', '{{.ID}}'])).stdout.trim(), '');
   }
   try {
+    signal?.throwIfAborted();
     return await createPostgresIntegrationRuntime({ ...options, config: { ...options.config, useContainerReuse: false }, env: {},
       createPostgresContainer: config => ({ async start() {
+        signal?.throwIfAborted();
         attempted = true;
         containerId = (await runDocker(['run', '--detach', '--name', name, '--label', `${label}=${nonce}`, '--publish', '127.0.0.1::5432',
           '--env', 'POSTGRES_PASSWORD', '--env', 'POSTGRES_USER=harmoniarr', '--env', 'POSTGRES_DB=harmoniarr',
@@ -48,17 +52,24 @@ export async function createManualPostgresRuntime(options) {
           '--health-cmd', 'pg_isready -U harmoniarr -d harmoniarr', '--health-interval', '1s', '--health-timeout', '3s', '--health-retries', '60',
           config.postgresImage], { environment: { POSTGRES_PASSWORD: password }, timeoutMs: config.startupTimeoutMs })).stdout.trim();
         const container = await inspectOwned();
+        signal?.throwIfAborted();
         const bindings = container.NetworkSettings.Ports['5432/tcp'];
         assert.equal(bindings.length, 1); assert.equal(bindings[0].HostIp, '127.0.0.1');
         port = Number(bindings[0].HostPort); assert.ok(Number.isInteger(port) && port > 0 && port <= 65535);
         assert.equal(container.Mounts.some(mount => mount.Type === 'bind'), false);
         const deadline = Date.now() + config.startupTimeoutMs;
         while (true) {
+          signal?.throwIfAborted();
           const current = await inspectOwned();
+          signal?.throwIfAborted();
           if (current.State.Health?.Status === 'healthy') break;
           assert.equal(current.State.Running, true, 'manual PostgreSQL stopped during startup');
           assert.ok(Date.now() < deadline, 'manual PostgreSQL did not become ready');
-          await delay(250);
+          await delay(250, undefined, { signal }).catch(error => {
+            // Timers wrap an abort in AbortError; callers own the original reason.
+            if (signal?.aborted && error?.name === 'AbortError') throw signal.reason;
+            throw error;
+          });
         }
         return { getId: () => containerId, getHost: () => '127.0.0.1', getDatabase: () => 'harmoniarr',
           getUsername: () => 'harmoniarr', getPassword: () => password, getPort: () => port, stop: removeContainer };
@@ -66,7 +77,11 @@ export async function createManualPostgresRuntime(options) {
     });
   } catch (error) {
     // A failed run/start can still have created the exact named, labeled container.
-    try { await removeContainer(); } catch { /* Retain the original setup Error/null. */ }
+    try { await removeContainer(); } catch (cleanupError) {
+      // Expected stop must not turn an unverified removal into a successful exit.
+      if (signal?.aborted && error === signal.reason) throw cleanupError;
+      // Other setup Error/null keeps its original identity.
+    }
     throw error;
   }
 }
