@@ -36,12 +36,12 @@ test('Activity diagnostic navigation starts with recovery and keeps all destinat
   assert.equal(routeNames.includes('activity-imports'), false);
 });
 
-test('diagnostic projection hides only the reviewed admin destination and preserves order without changing the inventory', () => {
+test('diagnostic projection hides reviewed admin destinations and preserves order without changing the inventory', () => {
   const names = groups => groups.flatMap(group => group.links.map(link => link.name));
   const original = names(ACTIVITY_DIAGNOSTIC_GROUPS);
   assert.deepEqual(buildActivityDiagnosticGroups('admin'), ACTIVITY_DIAGNOSTIC_GROUPS);
   for (const actorRole of ['operator', 'requester', undefined, 'ADMIN']) {
-    assert.deepEqual(names(buildActivityDiagnosticGroups(actorRole)), original.filter(name => name !== 'activity-ignored'));
+    assert.deepEqual(names(buildActivityDiagnosticGroups(actorRole)), original.filter(name => !['activity-users', 'activity-blocklist', 'activity-ignored'].includes(name)));
   }
   assert.deepEqual(names(ACTIVITY_DIAGNOSTIC_GROUPS), original);
   assert.equal(Object.isFrozen(ACTIVITY_DIAGNOSTIC_GROUPS), true);

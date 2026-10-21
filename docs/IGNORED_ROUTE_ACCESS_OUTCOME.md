@@ -81,8 +81,7 @@ and installed consumers matched retained TypeScript 7 Vue-language-service failu
 and TypeScript 6 control evidence. No merge, rebase, closure, separate branch,
 release, tag or version change was created.
 
-Next: review and align Source users and Source blocklist route admission with
-their existing administrator-only API contracts. The current route inventory
-marks their reads/mutations admin-only; this change deliberately leaves those
-routes and other operator destinations unchanged. Qualify each before extending
-the shared policy, retaining independent server authorization.
+The recommended Source users and Source blocklist follow-up is now completed in
+the [source-policy admission outcome](SOURCE_ROUTE_ACCESS_OUTCOME.md). That round
+verifies their actual handlers before extending the shared policy and retains
+independent server authorization.

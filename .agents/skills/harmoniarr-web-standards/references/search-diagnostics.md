@@ -74,3 +74,14 @@ Retain bootstrap/password/login precedence, bound verification feedback and keep
 unrelated navigation unchanged. Prove refusal before the page's API reads, then
 independent HTTP authorization; hiding a link or guarding a route cannot secure
 the endpoint. Admission checks do not continuously revoke an already mounted view.
+
+Source users and Source blocklist now use that same reviewed admission policy;
+see the [source access design](../../../../docs/SOURCE_ROUTE_ACCESS_DESIGN.md).
+Trace list, detail, export, bulk and single-write handlers before extending a
+route policy: a read-looking export still needs independent authorization.
+Reuse one owned browser cohort across the reviewed destinations; hold actual
+session responses and prove zero destination reads before admission. After link
+filtering, check the new Tab adjacency between Monitored artists and System
+history rather than retaining assertions for a removed link. A tested full-scan
+OSV workflow update does not qualify its separately pinned PR-comparison sibling
+or GitHub-hosted SARIF upload.

@@ -4,10 +4,12 @@
  * Licensed under GPL-3.0-or-later. See LICENSE.
  */
 
-// Only this reviewed Activity boundary is restricted here. Existing session,
+// Only these reviewed Activity boundaries are restricted here. Existing session,
 // requester and other destination policies remain independently enforced.
+const administratorRoutes = new Set(['activity-users', 'activity-blocklist', 'activity-ignored']);
+
 export function requiresAdministratorActivitySession(routeName) {
-  return routeName === 'activity-ignored';
+  return administratorRoutes.has(routeName);
 }
 
 export function canEnterActivityRoute({ routeName, actorRole } = {}) {
