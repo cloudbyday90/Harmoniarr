@@ -73,6 +73,7 @@ function createMockStore(overrides = {}) {
 
   return {
     async getActiveArmedRun() { return activeRun; },
+    async lockOperatorLifecycle() {},
     async getRecoveryRunById({ runId }) { return runs.get(runId) ?? null; },
     async insertRecoveryRun(input) {
       const run = {
@@ -80,7 +81,7 @@ function createMockStore(overrides = {}) {
         status: 'armed',
         armedVia: input.armedVia ?? 'harmoniarrctl',
         armedAt: new Date().toISOString(),
-        expiresAt: input.expiresAt?.toISOString?.() ?? input.expiresAt,
+        expiresAt: input.expiresAt?.toISOString?.() ?? input.expiresAt ?? new Date(Date.now() + input.ttlMinutes * 60_000).toISOString(),
         invalidAttemptCount: 0,
         maxAttempts: input.maxAttempts ?? 5,
         completedAt: null,

@@ -72,6 +72,11 @@ test('critical schema anchors include operation run lookup index', () => {
   );
 });
 
+test('critical schema anchors include the single armed recovery index', () => {
+  assert.deepEqual(criticalSchemaAnchors.indexes.find(anchor => anchor.index === 'admin_recovery_runs_one_armed_idx'),
+    { index: 'admin_recovery_runs_one_armed_idx' });
+});
+
 test('critical schema anchors include per-operator wanted state anchors', () => {
   assert.deepEqual(
     criticalSchemaAnchors.tables.find((anchor) => anchor.table === 'library_wanted_releases'),

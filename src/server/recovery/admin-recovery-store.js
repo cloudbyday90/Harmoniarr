@@ -46,8 +46,8 @@ function normalizeRecoveryRun(row) {
 export function createAdminRecoveryStore({
   getPoolFn = getPool,
 } = {}) {
-  async function getActiveArmedRun() {
-    const result = await getPoolFn().query(
+  async function getActiveArmedRun({ queryable = null } = {}) {
+    const result = await (queryable ?? getPoolFn()).query(
       `
         SELECT id, status, recovery_code_hash, armed_via, armed_at, expires_at,
                invalid_attempt_count, max_attempts, completed_at, cancelled_at,
@@ -94,22 +94,26 @@ export function createAdminRecoveryStore({
     recoveryCodeHash,
     armedVia = 'harmoniarrctl',
     expiresAt,
+    ttlMinutes = null,
     maxAttempts = 5,
     reason = null,
+    queryable = null,
   } = {}) {
-    const result = await getPoolFn().query(
+    const result = await (queryable ?? getPoolFn()).query(
       `
         INSERT INTO admin_recovery_runs (
-          status, recovery_code_hash, armed_via, expires_at,
+          status, recovery_code_hash, armed_via, armed_at, expires_at,
           max_attempts, reason
         )
-        VALUES ('armed', $1, $2, $3::timestamptz, $4, $5)
+        VALUES ('armed', $1, $2, clock_timestamp(),
+          CASE WHEN $6::integer IS NULL THEN $3::timestamptz
+            ELSE clock_timestamp() + $6::integer * INTERVAL '1 minute' END, $4, $5)
         RETURNING id, status, recovery_code_hash, armed_via, armed_at, expires_at,
                   invalid_attempt_count, max_attempts, completed_at, cancelled_at,
                   created_admin_user_id, completed_from_ip, completed_user_agent,
                   reason, details_json, created_at
       `,
-      [recoveryCodeHash, armedVia, expiresAt, maxAttempts, reason],
+      [recoveryCodeHash, armedVia, expiresAt ?? null, maxAttempts, reason, ttlMinutes],
     );
 
     return normalizeRecoveryRun(result.rows[0]);
@@ -179,12 +183,12 @@ export function createAdminRecoveryStore({
     return normalizeRecoveryRun(result.rows[0]);
   }
 
-  async function cancelRecoveryRun({ runId, reason = null } = {}) {
-    const result = await getPoolFn().query(
+  async function cancelRecoveryRun({ runId, reason = null, queryable = null } = {}) {
+    const result = await (queryable ?? getPoolFn()).query(
       `
         UPDATE admin_recovery_runs
         SET status = 'cancelled',
-            cancelled_at = NOW(),
+            cancelled_at = clock_timestamp(),
             reason = COALESCE($2, reason)
         WHERE id = $1 AND status = 'armed'
         RETURNING id, status, recovery_code_hash, armed_via, armed_at, expires_at,
@@ -198,14 +202,14 @@ export function createAdminRecoveryStore({
     return normalizeRecoveryRun(result.rows[0]);
   }
 
-  async function expireStaleArmedRuns() {
-    const result = await getPoolFn().query(
+  async function expireStaleArmedRuns({ queryable = null } = {}) {
+    const result = await (queryable ?? getPoolFn()).query(
       `
         UPDATE admin_recovery_runs
         SET status = 'expired',
-            cancelled_at = NOW()
+            cancelled_at = clock_timestamp()
         WHERE status = 'armed'
-          AND expires_at < NOW()
+          AND expires_at <= clock_timestamp()
         RETURNING id, status, recovery_code_hash, armed_via, armed_at, expires_at,
                   invalid_attempt_count, max_attempts, completed_at, cancelled_at,
                   created_admin_user_id, completed_from_ip, completed_user_agent,
@@ -219,6 +223,10 @@ export function createAdminRecoveryStore({
   async function expireRecoveryRun({ runId, queryable }) {
     await queryable.query(`UPDATE admin_recovery_runs SET status = 'expired', cancelled_at = clock_timestamp()
       WHERE id = $1 AND status = 'armed' AND expires_at <= clock_timestamp()`, [runId]);
+  }
+
+  async function lockOperatorLifecycle({ queryable }) {
+    await queryable.query("SELECT pg_advisory_xact_lock(hashtextextended('harmoniarr.admin-recovery-lifecycle', 0))");
   }
 
   async function revokeAllInteractiveSessions({ revokedReason = 'admin_recovery', queryable = null } = {}) {
@@ -246,6 +254,7 @@ export function createAdminRecoveryStore({
     incrementInvalidAttemptCount,
     insertRecoveryRun,
     invalidateRecoveryRun,
+    lockOperatorLifecycle,
     revokeAllInteractiveSessions,
   };
 }

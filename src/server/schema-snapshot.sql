@@ -7955,3 +7955,52 @@ SET migration_key = EXCLUDED.migration_key,
     error_message = NULL,
     application_version = NULL,
     updated_at = NOW();
+
+-- Migration: 20261021_223053_admin_recovery_one_armed_run.sql
+-- Checksum: 76ba13c8ccfc878b4a647bcfdd75421e5171a06e7432c7a75b015ef7e2c7bf15
+-- forward-only migration
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+-- Licensed under GPL-3.0-or-later. See LICENSE.
+BEGIN;
+
+-- Never select/cancel recovery material implicitly during an upgrade.
+DO $$
+BEGIN
+  IF (SELECT count(*) FROM admin_recovery_runs WHERE status = 'armed') > 1 THEN
+    RAISE EXCEPTION USING ERRCODE = '23505',
+      MESSAGE = 'Multiple armed recovery runs require operator review before the one-armed-run migration';
+  END IF;
+END;
+$$;
+
+CREATE UNIQUE INDEX admin_recovery_runs_one_armed_idx
+  ON admin_recovery_runs (status) WHERE status = 'armed';
+
+COMMIT;
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20261021_223053',
+  '20261021_223053_admin_recovery_one_armed_run.sql',
+  'admin_recovery_one_armed_run',
+  '76ba13c8ccfc878b4a647bcfdd75421e5171a06e7432c7a75b015ef7e2c7bf15',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();

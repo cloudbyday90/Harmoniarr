@@ -2,9 +2,14 @@
 
 ## Purpose
 
-This document describes the intended operator runbook for emergency bootstrap-admin recovery in Harmoniarr.
+This document covers operator-armed emergency bootstrap-admin recovery in Harmoniarr.
 
-It is a planning and operations document, not an implementation spec. The lower-level mechanics and API contracts live in `docs/BACKUP_RESTORE_DESIGN.md`, and the posture requirements live in `docs/SECURITY_POLICY.md`.
+The current operator transaction and one-armed-run boundary are documented in the
+[lifecycle design](RECOVERY_LIFECYCLE_DESIGN.md) and
+[qualified outcome](RECOVERY_LIFECYCLE_OUTCOME.md). Recovery completion has its
+own [atomic boundary](RECOVERY_ATOMIC_DESIGN.md). General backup/restore mechanics
+and posture requirements remain in `docs/BACKUP_RESTORE_DESIGN.md` and
+`docs/SECURITY_POLICY.md`.
 
 ## When To Use This Runbook
 
@@ -69,6 +74,14 @@ Operator action:
 - store the recovery code temporarily in a safe place
 - do not paste it into chat, logs, tickets, or shell history notes
 
+To intentionally replace an armed run, use `arm-bootstrap-admin --force` with
+a reason. A maintenance denial or rolled-back write/audit failure preserves the
+old valid run; its code stops working when replacement commits. To disarm, use
+`cancel-bootstrap-admin --force` with a reason. Disarming remains available under
+a maintenance hold. Do not automatically retry after lost output or an uncertain
+command result: check status first, then make an explicit replacement/cancellation
+decision. Status cannot recover the plaintext code.
+
 ### Step 3: Complete Recovery In The Browser
 
 Open the recovery page:
@@ -90,7 +103,7 @@ Expected result:
 - Harmoniarr acquires the `admin_recovery` lock
 - Harmoniarr creates or re-enables exactly one admin path
 - Harmoniarr revokes interactive browser sessions and refresh-token-backed sessions
-- Harmoniarr redirects to the ordinary login screen
+- Harmoniarr shows completion and a **Go to login** action
 
 ### Step 4: Perform Fresh Login
 
@@ -121,7 +134,7 @@ Equivalent pattern:
 ```text
 harmoniarrctl recovery bootstrap-admin-status
 harmoniarrctl recovery arm-bootstrap-admin --reason "operator lockout"
-harmoniarrctl recovery cancel-bootstrap-admin --reason "stale recovery run"
+harmoniarrctl recovery cancel-bootstrap-admin --force --reason "stale recovery run"
 ```
 
 The surrounding wrapper can vary by installer or platform, but it should still route through the same `harmoniarrctl` recovery implementation.
@@ -141,6 +154,25 @@ Use cancellation when:
 - a stale run should be replaced before expiry
 
 ## Expected Failure Cases
+
+### Multiple Armed Runs Block The Upgrade
+
+The one-armed-run migration refuses ambiguous historical data instead of choosing
+which secret to invalidate. Stop recovery mutations, take a consistent backup and
+inspect metadata through the deployment's database administration procedure:
+
+```sql
+SELECT id, armed_at, expires_at, invalid_attempt_count
+FROM admin_recovery_runs
+WHERE status = 'armed'
+ORDER BY armed_at;
+```
+
+Review locally which runs are obsolete. Apply only explicitly reviewed targeted
+corrections using that database procedure, retain terminal history and record the
+decision, then retry the upgrade. Do not delete all recovery history or expose
+code hashes to resolve the refusal. A pre-existing conflicting index name also
+requires schema review rather than silently skipping the guard.
 
 ### Recovery Already Armed
 
@@ -206,12 +238,15 @@ The following events should exist for the recovery lifecycle:
 
 - recovery armed
 - recovery cancelled
-- recovery expired
 - recovery invalidated
 - recovery completed
 - interactive sessions revoked after recovery
 
 These events should be visible to the operator after login for review and later incident analysis.
+
+Expiry updates the recovery run's terminal state; a separate expiry audit event
+is not currently emitted. Operator state changes and their arm/cancel audits,
+and successful completion's account/session/run/audit writes, commit together.
 
 ## What Operators Should Not Do
 

@@ -31,3 +31,24 @@ recovery codes, plaintext passwords or stored credential hashes. Arm only a fres
 disposable fixture. Keep service proofs, route/browser refusal behavior and
 preserved Docker readiness separate; do not infer remote exploitability or full
 accessibility conformance from this qualification.
+
+For arm/force-rearm/cancel, read the operator
+[design](../../../../docs/RECOVERY_LIFECYCLE_DESIGN.md) and
+[outcome](../../../../docs/RECOVERY_LIFECYCLE_OUTCOME.md). A row lock cannot own the
+absence of a run: use maintenance-before-transaction-advisory-before-row ordering.
+Keep replacement, cancellation and audits atomic, check maintenance before
+cancelling valid material, and reread expiry after waits. Derive a new window from
+database wall time after admission, rather than an earlier caller clock.
+
+The partial unique armed-state index is an independent database guard, not a
+substitute for atomic command policy. Refuse migration over ambiguous armed data;
+do not silently choose a code to invalidate. Regenerate the snapshot and prove
+incremental/snapshot anchors plus direct bypass-writer refusal. Qualify empty
+admission waits, rollback after real writes, both completion/cancellation orders
+and CLI consumers. Do not convert lost command-output material into an automatic
+retry. Preserve transaction Error/null through the CLI boundary as well.
+
+The current migration scaffold omits the repository-required copyright header.
+Add that header, then run cheap copyright/migration/snapshot checks before costly
+native qualification. The lifecycle outcome retains the actual early-gate failure
+and distinguishes pre-header evidence from final checksum qualification.

@@ -10,9 +10,9 @@ description: >
 
 Build backend changes through narrow ESM modules. Keep routes thin, services policy-driven, stores persistence-only, and shared utilities pure where practical.
 
-For operator-armed recovery completion, read
+For operator-armed recovery completion and operator lifecycle commands, read
 [atomic recovery](references/admin-recovery-atomic.md). It covers single-use run
-ownership, transaction-bound account/session/audit writes and native rollback proof.
+ownership, atomic arm/rearm/cancel, transaction-bound writes and native rollback proof.
 
 Start by locating the existing boundary for the domain:
 

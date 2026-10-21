@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 21 [recovery lifecycle rebuild](LOCAL_DOCKER_RECOVERY_LIFECYCLE_OUTCOME.md)
+records the current no-cache image, one new migration, preserved admin/data and
+passing readiness. The [owning outcome](RECOVERY_LIFECYCLE_OUTCOME.md) qualifies
+atomic arm/rearm/cancel, uniqueness and native overlap/rollback separately.
+
 The October 21 [atomic recovery rebuild](LOCAL_DOCKER_RECOVERY_ATOMIC_OUTCOME.md)
-records the current no-cache image, preserved admin/data and passing readiness.
+records the preceding no-cache image, preserved admin/data and passing readiness.
 The [owning outcome](RECOVERY_ATOMIC_OUTCOME.md) qualifies single-use completion,
 native overlap and account/session/run/audit rollback in disposable fixtures.
 

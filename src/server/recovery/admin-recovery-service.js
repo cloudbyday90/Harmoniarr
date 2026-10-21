@@ -18,13 +18,13 @@
 
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { recordAuditEvent } from '../audit.js';
-import { createApiError } from '../auth.js';
 import { createDatabaseTransactionRunner } from '../database-transaction-service.js';
 import { getPool } from '../database.js';
 import { hashPassword } from '../security.js';
 import { normalizeUsername, validatePassword } from '../validators/auth-validator.js';
 import { createAdminRecoveryAccountStore } from './admin-recovery-account-store.js';
 import { createAdminRecoveryCompletionService } from './admin-recovery-completion-service.js';
+import { createAdminRecoveryOperatorService } from './admin-recovery-operator-service.js';
 import { createAdminRecoveryStore } from './admin-recovery-store.js';
 import { createMaintenanceLockService } from './maintenance-lock-service.js';
 
@@ -34,7 +34,6 @@ const RECOVERY_CODE_SEGMENT_LENGTH = 4;
 const DEFAULT_TTL_MINUTES = 15;
 const MIN_TTL_MINUTES = 5;
 const MAX_TTL_MINUTES = 30;
-const DEFAULT_MAX_ATTEMPTS = 5;
 
 function generateRecoveryCode() {
   const segments = [];
@@ -88,79 +87,6 @@ export function createAdminRecoveryService({
     return adminRecoveryStore.expireStaleArmedRuns();
   }
 
-  async function armBootstrapAdminRecovery({
-    ttlMinutes = DEFAULT_TTL_MINUTES,
-    reason = null,
-    force = false,
-  } = {}) {
-    await expireStaleRuns();
-
-    const existingActive = await adminRecoveryStore.getActiveArmedRun();
-    if (existingActive) {
-      if (!force) {
-        throw createApiError(409, 'RECOVERY_ALREADY_ARMED', 'Bootstrap-admin recovery is already armed');
-      }
-
-      await adminRecoveryStore.cancelRecoveryRun({
-        reason: 'replaced_by_force_arm',
-        runId: existingActive.id,
-      });
-
-      await recordAuditEventFn({
-        actorType: 'system',
-        eventType: 'bootstrap_admin_recovery_cancelled',
-        summary: 'Previous armed recovery run cancelled by force re-arm',
-        entityType: 'admin_recovery_run',
-        entityId: existingActive.id,
-        details: {
-          replacedByForceArm: true,
-        },
-      });
-    }
-
-    const activeLocks = await maintenanceLockService.listActiveMaintenanceLocks({
-      lockTypes: ['restore', 'upgrade', 'admin_recovery'],
-    });
-
-    if (activeLocks.length > 0) {
-      throw createApiError(409, 'RECOVERY_LOCK_CONFLICT', 'Cannot arm recovery while conflicting maintenance locks are active');
-    }
-
-    const plaintextCode = generateRecoveryCode();
-    const codeHash = hashRecoveryCode(plaintextCode);
-    const clampedTtl = clampTtlMinutes(ttlMinutes);
-    const expiresAt = new Date(Date.now() + clampedTtl * 60 * 1000);
-
-    const run = await adminRecoveryStore.insertRecoveryRun({
-      armedVia: 'harmoniarrctl',
-      expiresAt,
-      maxAttempts: DEFAULT_MAX_ATTEMPTS,
-      reason,
-      recoveryCodeHash: codeHash,
-    });
-
-    await recordAuditEventFn({
-      actorType: 'system',
-      eventType: 'bootstrap_admin_recovery_armed',
-      summary: 'Bootstrap-admin recovery armed',
-      entityType: 'admin_recovery_run',
-      entityId: run.id,
-      details: {
-        armedVia: 'harmoniarrctl',
-        expiresAt: run.expiresAt,
-        reason: reason ?? null,
-      },
-    });
-
-    return {
-      expiresAt: run.expiresAt,
-      recoveryCode: plaintextCode,
-      runId: run.id,
-      replacedExistingRun: existingActive !== null,
-      status: 'armed',
-    };
-  }
-
   async function getBootstrapAdminRecoveryStatus() {
     await expireStaleRuns();
 
@@ -187,44 +113,11 @@ export function createAdminRecoveryService({
     };
   }
 
-  async function cancelBootstrapAdminRecovery({
-    force = false,
-    reason = null,
-  } = {}) {
-    await expireStaleRuns();
-
-    const activeRun = await adminRecoveryStore.getActiveArmedRun();
-    if (!activeRun) {
-      throw createApiError(404, 'RECOVERY_NOT_ARMED', 'No active recovery run exists');
-    }
-
-    if (!force) {
-      throw createApiError(409, 'RECOVERY_FORCE_REQUIRED', 'Use --force to cancel an active recovery run');
-    }
-
-    const cancelled = await adminRecoveryStore.cancelRecoveryRun({
-      reason,
-      runId: activeRun.id,
-    });
-
-    await recordAuditEventFn({
-      actorType: 'system',
-      eventType: 'bootstrap_admin_recovery_cancelled',
-      summary: 'Bootstrap-admin recovery cancelled',
-      entityType: 'admin_recovery_run',
-      entityId: activeRun.id,
-      details: {
-        cancelledAt: cancelled.cancelledAt,
-        reason: reason ?? null,
-      },
-    });
-
-    return {
-      cancelledAt: cancelled.cancelledAt,
-      runId: cancelled.id,
-      status: 'cancelled',
-    };
-  }
+  const { armBootstrapAdminRecovery, cancelBootstrapAdminRecovery } = createAdminRecoveryOperatorService({
+    adminRecoveryStore, maintenanceLockService, withTransactionFn, recordAuditEventFn,
+    generateRecoveryCodeFn: generateRecoveryCode, hashRecoveryCodeFn: hashRecoveryCode,
+    clampTtlMinutesFn: clampTtlMinutes,
+  });
 
   const { completeBootstrapAdminRecovery } = createAdminRecoveryCompletionService({
     adminRecoveryStore, recoveryAccountStore, maintenanceLockService, recordAuditEventFn,
