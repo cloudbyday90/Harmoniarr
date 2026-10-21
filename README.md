@@ -4,6 +4,12 @@ Harmoniarr is a self-hosted, Docker-hosted music library manager inspired by Lid
 
 The repository contains the Node.js ESM server, Vue client, PostgreSQL schema, automated validation, and design documents. The platform is under active development toward its first release.
 
+Recovery now owns a reactive expiry countdown with quiet timer semantics,
+visible-wake refresh and fresh pre-dispatch admission. See its
+[design](docs/RECOVERY_COUNTDOWN_DESIGN.md),
+[official research and tradeoffs](docs/RECOVERY_COUNTDOWN_RESEARCH_2026_10.md)
+and [outcome](docs/RECOVERY_COUNTDOWN_OUTCOME.md) for native evidence and limits.
+
 Operator-armed admin recovery now retains refusal feedback through status refresh
 and owns correction/terminal focus. See its [design](docs/RECOVERY_FORM_FEEDBACK_DESIGN.md),
 [official research and tradeoffs](docs/RECOVERY_FORM_FEEDBACK_RESEARCH_2026_10.md)

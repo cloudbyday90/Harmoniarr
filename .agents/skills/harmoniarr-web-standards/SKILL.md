@@ -9,6 +9,10 @@ For authentication entry forms, use [auth feedback](references/auth-form-feedbac
 It covers linked local validation, persistent status/error feedback, submit
 ownership and generic server failures without credential disclosure.
 
+For countdowns or expiry-dependent admission, use
+[expiry ownership](references/expiry-countdowns.md). It covers reactive clocks,
+delayed timers, visible wake, quiet announcements and fresh pre-dispatch checks.
+
 For actual screen-reader/device acceptance after automated focus checks, use
 [manual accessibility](references/manual-accessibility.md). It owns reachable
 pending/error states, fixture containment and honest operator evidence.

@@ -19,6 +19,7 @@
 import { computed, nextTick, readonly, ref, shallowRef } from 'vue';
 import { fetchRecoveryStatus as defaultFetchRecoveryStatus, completeRecovery as defaultCompleteRecovery } from '../lib/recovery-api.js';
 import { getErrorMessage } from '../lib/error-utils.js';
+import { useExpiryCountdown } from './useExpiryCountdown.js';
 
 const DEFAULT_POLL_INTERVAL_MS = 10_000;
 
@@ -47,14 +48,12 @@ export function useRecoveryStatus({
   const remainingAttempts = computed(() => status.value?.remainingAttempts ?? 0);
   const expiresAt = computed(() => status.value?.expiresAt ?? null);
 
-  const secondsRemaining = computed(() => {
-    if (!expiresAt.value) {
-      return 0;
-    }
-
-    const remaining = Math.floor((new Date(expiresAt.value).getTime() - Date.now()) / 1000);
-    return Math.max(0, remaining);
+  const countdown = useExpiryCountdown({
+    getExpiresAt: () => expiresAt.value,
+    isActive: () => recoveryAvailable.value && !isCompleted.value
+      && (typeof document === 'undefined' || !document.hidden),
   });
+  const { secondsRemaining } = countdown;
 
   const expired = computed(() => secondsRemaining.value <= 0 && recoveryAvailable.value);
   const canSubmit = computed(() => !isLoading.value && !isSubmitting.value && !isCompleted.value
@@ -81,7 +80,9 @@ export function useRecoveryStatus({
   }
 
   function handleVisibilityChange() {
-    if (typeof document === 'undefined' || document.hidden || destroyed || !hasLoaded) return;
+    if (destroyed) return;
+    countdown.refresh();
+    if (typeof document === 'undefined' || document.hidden || !hasLoaded) return;
     void revalidate().then(() => {
       if (!destroyed) schedulePoll();
     });
@@ -91,6 +92,7 @@ export function useRecoveryStatus({
     destroyed = true;
     readRevision++;
     clearPollTimer();
+    countdown.destroy();
     if (visibilityAttached && typeof document !== 'undefined') {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       visibilityAttached = false;
@@ -122,6 +124,7 @@ export function useRecoveryStatus({
     } finally {
       if (current()) {
         isLoading.value = false; isRevalidating.value = false;
+        countdown.refresh();
         schedulePoll();
       }
     }
@@ -131,15 +134,20 @@ export function useRecoveryStatus({
   const revalidate = () => readStatus(false);
 
   async function submitRecovery(form) {
-    if (destroyed || !canSubmit.value) return null;
+    if (destroyed) return null;
+    // Recheck wall time even if the browser has suspended the display timer.
+    countdown.refresh();
+    if (!canSubmit.value) return null;
     readRevision++; clearPollTimer(); isRevalidating.value = false;
     errorMessage.value = '';
     isSubmitting.value = true;
     try {
       await nextTick();
       if (destroyed) return null;
+      countdown.refresh();
+      if (expired.value) return null;
       const result = await completeRecovery(form);
-      if (!destroyed) { completionResult.value = result; isCompleted.value = true; }
+      if (!destroyed) { completionResult.value = result; isCompleted.value = true; countdown.refresh(); }
       return result;
     } catch (error) {
       if (!destroyed) {

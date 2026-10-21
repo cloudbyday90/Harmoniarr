@@ -71,7 +71,8 @@ const countdownDisplay = computed(() => {
 const formDisabled = computed(() => !canSubmit.value);
 const pendingMessage = computed(() => isSubmitting.value ? 'Completing recovery…'
   : isLoading.value ? 'Checking recovery status…'
-    : isCompleted.value ? 'Recovery complete. Use your new credentials to log in.' : '');
+    : isCompleted.value ? 'Recovery complete. Use your new credentials to log in.'
+      : expired.value ? 'This recovery run has expired. Arm a new run from the command line.' : '');
 
 onMounted(async () => {
   attachVisibilityListener();
@@ -189,8 +190,8 @@ function goToLogin() {
         <h2>Active recovery run detected</h2>
         <ul class="status-metrics">
           <li>
-            <span>Time remaining</span>
-            <strong :class="{ 'error-copy': secondsRemaining < 120 }">{{ countdownDisplay }}</strong>
+            <span id="recovery-time-label">Time remaining</span>
+            <strong role="timer" aria-labelledby="recovery-time-label" :class="{ 'error-copy': secondsRemaining < 120 }">{{ countdownDisplay }}</strong>
           </li>
           <li>
             <span>Remaining attempts</span>
