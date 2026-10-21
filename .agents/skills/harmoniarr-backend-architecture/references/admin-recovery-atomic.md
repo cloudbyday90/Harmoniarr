@@ -48,6 +48,11 @@ admission waits, rollback after real writes, both completion/cancellation orders
 and CLI consumers. Do not convert lost command-output material into an automatic
 retry. Preserve transaction Error/null through the CLI boundary as well.
 
+For CLI result delivery, use the standards skill's
+[delivery reference](../../harmoniarr-web-standards/references/cli-result-delivery.md).
+Keep committed service success separate from failed output/cleanup and never
+automatically replace material because its one-time handoff was uncertain.
+
 The current migration scaffold omits the repository-required copyright header.
 Add that header, then run cheap copyright/migration/snapshot checks before costly
 native qualification. The lifecycle outcome retains the actual early-gate failure

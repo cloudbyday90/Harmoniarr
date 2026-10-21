@@ -5,6 +5,10 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For one-time privileged CLI results, use the standards skill's
+[delivery reference](../harmoniarr-web-standards/references/cli-result-delivery.md).
+Qualify actual child stdio close/exit separately from capture-writer assertions.
+
 For native media-to-import qualification, read
 [native audio import](references/native-audio-import.md). It separates successful
 transport from actual content inspection, canonical apply and catalogue publication.

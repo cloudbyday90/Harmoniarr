@@ -16,6 +16,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { writeCliRecord } from './cli-output.js';
+
 export const exitCodes = Object.freeze({
   success: 0,
   internalError: 1,
@@ -34,40 +36,58 @@ const recoveryExitCodeMap = Object.freeze({
 });
 
 export function getRecoveryExitCode(errorCode) {
-  return recoveryExitCodeMap[errorCode] ?? exitCodes.internalError;
+  return Object.hasOwn(recoveryExitCodeMap, errorCode) ? recoveryExitCodeMap[errorCode] : exitCodes.internalError;
 }
 
 export function formatJsonOutput(payload) {
   return JSON.stringify(payload, null, 2);
 }
 
+const recoveryErrorMessages = Object.freeze({
+  RECOVERY_ALREADY_ARMED: 'Bootstrap-admin recovery is already armed.',
+  RECOVERY_NOT_ARMED: 'No active recovery run exists.',
+  RECOVERY_LOCK_CONFLICT: 'Lock conflict: recovery is blocked by restore or upgrade activity.',
+  RECOVERY_DB_UNAVAILABLE: 'The recovery database is unavailable. Check status before retrying a mutation.',
+  RECOVERY_INVALID_ARGUMENT: 'Invalid recovery command options.',
+  RECOVERY_FORCE_REQUIRED: 'Use --force to cancel an active recovery run.',
+});
+
+export const recoveryReviewGuidance = 'Check recovery bootstrap-admin-status before deciding whether to cancel or explicitly re-arm. Status cannot recover the code. Do not automatically retry.';
+
+export function describeRecoveryError(error) {
+  const code = error?.code;
+  if (Object.hasOwn(recoveryErrorMessages, code)) return { code, message: recoveryErrorMessages[code] };
+  return { code: 'RECOVERY_INTERNAL_ERROR', message: `Recovery command outcome could not be confirmed. ${recoveryReviewGuidance}` };
+}
+
 export function formatJsonError({ command, error }) {
   return formatJsonOutput({
     success: false,
     command,
-    error: {
-      code: error.code ?? 'RECOVERY_INTERNAL_ERROR',
-      message: error.message ?? 'Unexpected error',
-    },
+    error: describeRecoveryError(error),
   });
 }
 
-export function writeAndExit({
+export async function writeAndExit({
   exitCode = 0,
   jsonOutput = null,
-  processExit = process.exit,
+  setExitCode = code => { process.exitCode = code; },
   stderr = process.stderr,
   stdout = process.stdout,
   textOutput = null,
   textError = null,
 } = {}) {
-  if (textError) {
-    stderr.write(`${textError}\n`);
-  } else if (jsonOutput !== null) {
-    stdout.write(`${jsonOutput}\n`);
-  } else if (textOutput !== null) {
-    stdout.write(`${textOutput}\n`);
+  try {
+    if (textError) {
+      await writeCliRecord(stderr, `${textError}\n`);
+    } else if (jsonOutput !== null) {
+      await writeCliRecord(stdout, `${jsonOutput}\n`);
+    } else if (textOutput !== null) {
+      await writeCliRecord(stdout, `${textOutput}\n`);
+    }
+    setExitCode(exitCode);
+  } catch (error) {
+    setExitCode(exitCodes.internalError);
+    throw error;
   }
-
-  processExit(exitCode);
 }

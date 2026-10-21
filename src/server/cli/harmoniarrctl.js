@@ -50,7 +50,7 @@ async function main() {
   const args = process.argv.slice(2);
 
   if (args.length === 0 || args[0] === '--help' || args[0] === '-h') {
-    writeAndExit({ textOutput: printUsage(), exitCode: exitCodes.success });
+    await writeAndExit({ textOutput: printUsage(), exitCode: exitCodes.success });
     return;
   }
 
@@ -58,32 +58,39 @@ async function main() {
   const commandName = args[1];
 
   if (!groupName || !commandName) {
-    writeAndExit({
+    await writeAndExit({
       textError: `Error: group and command are required.\n\n${printUsage()}`,
       exitCode: exitCodes.invalidInput,
     });
     return;
   }
 
-  const group = subcommandGroups[groupName];
+  const group = Object.hasOwn(subcommandGroups, groupName) ? subcommandGroups[groupName] : null;
   if (!group) {
-    writeAndExit({
-      textError: `Error: unknown group "${groupName}".\n\n${printUsage()}`,
+    await writeAndExit({
+      textError: `Error: unknown group.\n\n${printUsage()}`,
       exitCode: exitCodes.invalidInput,
     });
     return;
   }
 
-  const command = group[commandName];
+  const command = Object.hasOwn(group, commandName) ? group[commandName] : null;
   if (!command) {
-    writeAndExit({
-      textError: `Error: unknown command "${groupName} ${commandName}".\n\n${printUsage()}`,
+    await writeAndExit({
+      textError: `Error: unknown command.\n\n${printUsage()}`,
       exitCode: exitCodes.invalidInput,
     });
     return;
   }
 
-  await command({ args: args.slice(2) });
+  const outcome = await command({ args: args.slice(2) });
+  process.exitCode = outcome.exitCode;
 }
 
-await main();
+try { await main(); }
+catch {
+  process.exitCode = exitCodes.internalError;
+  try {
+    await writeAndExit({ textError: 'CLI output failed. Recovery state may have changed; check status before retrying.', exitCode: exitCodes.internalError });
+  } catch { /* A closed diagnostic destination cannot receive another report. */ }
+}

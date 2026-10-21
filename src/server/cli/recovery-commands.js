@@ -19,13 +19,9 @@
 import { parseArgs } from 'node:util';
 import { createAdminRecoveryService } from '../recovery/admin-recovery-service.js';
 import { closePool } from '../database.js';
-import {
-  exitCodes,
-  formatJsonError,
-  formatJsonOutput,
-  getRecoveryExitCode,
-  writeAndExit,
-} from './cli-runtime.js';
+import { writeAndExit } from './cli-runtime.js';
+import { runRecoveryCommand } from './recovery-command-runtime.js';
+import { formatArmResult, formatCancelResult, formatStatusResult } from './recovery-command-output.js';
 
 const recoveryCommandOptions = {
   json: { type: 'boolean', default: false },
@@ -34,210 +30,43 @@ const recoveryCommandOptions = {
   'ttl-minutes': { type: 'string' },
 };
 
-function parseRecoveryArgs(args) {
-  return parseArgs({
-    allowPositionals: true,
-    args,
-    options: recoveryCommandOptions,
-    strict: true,
-  });
+function createRecoveryCommand(command, serviceMethod, formatResult) {
+  return async ({
+    args = process.argv.slice(2),
+    recoveryService = createAdminRecoveryService(),
+    writeOutput = writeAndExit,
+    cleanup = closePool,
+  } = {}) => {
+    // Preserve JSON refusal even when strict option parsing fails.
+    const json = args.includes('--json');
+    return runRecoveryCommand({
+      command, json, cleanup, writeOutput,
+      formatResult: result => formatResult(result, json),
+      execute: async () => {
+        let values;
+        try {
+          ({ values } = parseArgs({ args, options: recoveryCommandOptions, strict: true, allowPositionals: false }));
+          if (values['ttl-minutes'] !== undefined && !/^[0-9]+$/u.test(values['ttl-minutes'])) throw new Error('Invalid TTL');
+          if (values['ttl-minutes'] !== undefined && !Number.isSafeInteger(Number(values['ttl-minutes']))) throw new Error('Invalid TTL');
+        } catch {
+          throw Object.assign(new Error('Invalid recovery command options'), { code: 'RECOVERY_INVALID_ARGUMENT' });
+        }
+        return recoveryService[serviceMethod]({
+          force: values.force,
+          reason: values.reason ?? undefined,
+          ttlMinutes: values['ttl-minutes'] === undefined ? undefined : Number(values['ttl-minutes']),
+        });
+      },
+    });
+  };
 }
 
-function cleanup() {
-  return closePool();
-}
-
-async function armCommand({
-  args = process.argv.slice(2),
-  recoveryService = createAdminRecoveryService(),
-  writeOutput = writeAndExit,
-} = {}) {
-  const { values } = parseRecoveryArgs(args);
-  const ttlMinutes = values['ttl-minutes']
-    ? Number.parseInt(values['ttl-minutes'], 10)
-    : undefined;
-
-  try {
-    const result = await recoveryService.armBootstrapAdminRecovery({
-      force: values.force,
-      reason: values.reason ?? undefined,
-      ttlMinutes,
-    });
-
-    await cleanup();
-
-    if (values.json) {
-      writeOutput({
-        jsonOutput: formatJsonOutput({
-          success: true,
-          command: 'arm-bootstrap-admin',
-          status: result.status,
-          recoveryCode: result.recoveryCode,
-          expiresAt: result.expiresAt,
-          recoveryPath: '/recover/bootstrap-admin',
-          replacedExistingRun: result.replacedExistingRun,
-          warnings: [],
-        }),
-        exitCode: exitCodes.success,
-      });
-      return;
-    }
-
-    const lines = [
-      'Bootstrap-admin recovery armed.',
-      `Recovery code: ${result.recoveryCode}`,
-      `Expires at: ${result.expiresAt}`,
-      'Next step: open /recover/bootstrap-admin and complete recovery before expiry.',
-    ];
-
-    if (result.replacedExistingRun) {
-      lines.unshift('Warning: previous armed recovery run was replaced.');
-    }
-
-    writeOutput({
-      textOutput: lines.join('\n'),
-      exitCode: exitCodes.success,
-    });
-  } catch (error) {
-    await cleanup();
-
-    if (values.json) {
-      writeOutput({
-        jsonOutput: formatJsonError({ command: 'arm-bootstrap-admin', error }),
-        exitCode: getRecoveryExitCode(error.code),
-      });
-      return;
-    }
-
-    writeOutput({
-      textError: `Error: ${error.message}`,
-      exitCode: getRecoveryExitCode(error.code),
-    });
-  }
-}
-
-async function statusCommand({
-  args = process.argv.slice(2),
-  recoveryService = createAdminRecoveryService(),
-  writeOutput = writeAndExit,
-} = {}) {
-  const { values } = parseRecoveryArgs(args);
-
-  try {
-    const result = await recoveryService.getBootstrapAdminRecoveryStatus();
-
-    await cleanup();
-
-    if (values.json) {
-      writeOutput({
-        jsonOutput: formatJsonOutput({
-          success: true,
-          command: 'bootstrap-admin-status',
-          ...result,
-          warnings: [],
-        }),
-        exitCode: exitCodes.success,
-      });
-      return;
-    }
-
-    if (!result.recoveryAvailable) {
-      writeOutput({
-        textOutput: 'No active recovery run.',
-        exitCode: exitCodes.success,
-      });
-      return;
-    }
-
-    const lines = [
-      'Bootstrap-admin recovery status:',
-      `  Status: ${result.status}`,
-      `  Expires at: ${result.expiresAt}`,
-      `  Remaining attempts: ${result.remainingAttempts}`,
-      `  Blocked by lock: ${result.blockedByLock ? 'yes' : 'no'}`,
-    ];
-
-    writeOutput({
-      textOutput: lines.join('\n'),
-      exitCode: exitCodes.success,
-    });
-  } catch (error) {
-    await cleanup();
-
-    if (values.json) {
-      writeOutput({
-        jsonOutput: formatJsonError({ command: 'bootstrap-admin-status', error }),
-        exitCode: getRecoveryExitCode(error.code),
-      });
-      return;
-    }
-
-    writeOutput({
-      textError: `Error: ${error.message}`,
-      exitCode: getRecoveryExitCode(error.code),
-    });
-  }
-}
-
-async function cancelCommand({
-  args = process.argv.slice(2),
-  recoveryService = createAdminRecoveryService(),
-  writeOutput = writeAndExit,
-} = {}) {
-  const { values } = parseRecoveryArgs(args);
-
-  try {
-    const result = await recoveryService.cancelBootstrapAdminRecovery({
-      force: values.force,
-      reason: values.reason ?? undefined,
-    });
-
-    await cleanup();
-
-    if (values.json) {
-      writeOutput({
-        jsonOutput: formatJsonOutput({
-          success: true,
-          command: 'cancel-bootstrap-admin',
-          status: result.status,
-          cancelledAt: result.cancelledAt,
-          warnings: [],
-        }),
-        exitCode: exitCodes.success,
-      });
-      return;
-    }
-
-    writeOutput({
-      textOutput: `Bootstrap-admin recovery cancelled at ${result.cancelledAt}.`,
-      exitCode: exitCodes.success,
-    });
-  } catch (error) {
-    await cleanup();
-
-    if (values.json) {
-      writeOutput({
-        jsonOutput: formatJsonError({ command: 'cancel-bootstrap-admin', error }),
-        exitCode: getRecoveryExitCode(error.code),
-      });
-      return;
-    }
-
-    writeOutput({
-      textError: `Error: ${error.message}`,
-      exitCode: getRecoveryExitCode(error.code),
-    });
-  }
-}
+export const armCommand = createRecoveryCommand('arm-bootstrap-admin', 'armBootstrapAdminRecovery', formatArmResult);
+export const statusCommand = createRecoveryCommand('bootstrap-admin-status', 'getBootstrapAdminRecoveryStatus', formatStatusResult);
+export const cancelCommand = createRecoveryCommand('cancel-bootstrap-admin', 'cancelBootstrapAdminRecovery', formatCancelResult);
 
 export const recoveryCommands = Object.freeze({
   'arm-bootstrap-admin': armCommand,
   'bootstrap-admin-status': statusCommand,
   'cancel-bootstrap-admin': cancelCommand,
 });
-
-export {
-  armCommand,
-  cancelCommand,
-  statusCommand,
-};

@@ -1,9 +1,13 @@
 ---
 name: harmoniarr-web-standards
-description: "Apply and verify web standards for Harmoniarr UI commands, forms, focus/status behavior, and HTTP mutations. Use for standards-oriented implementation or review; copy-only changes do not need this workflow."
+description: "Apply and verify standards for Harmoniarr UI commands, forms, focus/status behavior, HTTP mutations and privileged CLI result delivery. Use for standards-oriented implementation or review; copy-only changes do not need this workflow."
 ---
 
 # Harmoniarr Web Standards
+
+For privileged CLI output or one-time recovery material, read
+[CLI result delivery](references/cli-result-delivery.md). It separates commit,
+stream handoff, cleanup and human receipt, with bounded diagnostics and native proof.
 
 For authentication entry forms, use [auth feedback](references/auth-form-feedback.md).
 It covers linked local validation, persistent status/error feedback, submit

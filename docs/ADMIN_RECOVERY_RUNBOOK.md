@@ -155,6 +155,32 @@ Use cancellation when:
 
 ## Expected Failure Cases
 
+### Output Or Cleanup Failed After Arming
+
+The CLI attempts the one-time result before closing its database pool. A cleanup
+failure can therefore follow a complete success JSON/text record, with bounded
+stderr guidance and exit 1. Treat the returned code as sensitive and retain it
+only through your intended private destination. A write callback confirms local
+stream handoff, not that a person read the code or a downstream file was synced.
+
+If output fails, the CLI does not write the code again or automatically re-arm.
+Delivery may be partial. An unexpected service failure can also leave the mutation
+outcome unconfirmed. Inspect current state:
+
+```sh
+docker exec harmoniarr harmoniarrctl recovery bootstrap-admin-status --json
+```
+
+Status cannot recover plaintext. If material was lost or exposed, explicitly
+decide whether to cancel with `--force` or replace with a fresh arm using `--force`.
+Do not automatically retry mutations from the exit status alone. If both output
+destinations are closed, no diagnostic can be delivered. A stalled destination
+can hold the process open; interruption does not undo an already committed run.
+A failed database shutdown can also leave native handles alive. The CLI sets a
+nonzero exit status and does not force termination over unfinished native work.
+See the [delivery design](RECOVERY_CLI_DELIVERY_DESIGN.md) and
+[qualification outcome](RECOVERY_CLI_DELIVERY_OUTCOME.md).
+
 ### Multiple Armed Runs Block The Upgrade
 
 The one-armed-run migration refuses ambiguous historical data instead of choosing
