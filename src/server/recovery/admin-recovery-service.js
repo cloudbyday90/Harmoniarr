@@ -18,10 +18,13 @@
 
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { recordAuditEvent } from '../audit.js';
-import { createApiError, findUserByUsername } from '../auth.js';
+import { createApiError } from '../auth.js';
+import { createDatabaseTransactionRunner } from '../database-transaction-service.js';
 import { getPool } from '../database.js';
 import { hashPassword } from '../security.js';
 import { normalizeUsername, validatePassword } from '../validators/auth-validator.js';
+import { createAdminRecoveryAccountStore } from './admin-recovery-account-store.js';
+import { createAdminRecoveryCompletionService } from './admin-recovery-completion-service.js';
 import { createAdminRecoveryStore } from './admin-recovery-store.js';
 import { createMaintenanceLockService } from './maintenance-lock-service.js';
 
@@ -71,12 +74,13 @@ function clampTtlMinutes(ttlMinutes) {
 }
 
 export function createAdminRecoveryService({
-  adminRecoveryStore = createAdminRecoveryStore(),
-  maintenanceLockService = createMaintenanceLockService(),
-  recordAuditEventFn = recordAuditEvent,
   getPoolFn = getPool,
+  adminRecoveryStore = createAdminRecoveryStore({ getPoolFn }),
+  recoveryAccountStore = createAdminRecoveryAccountStore(),
+  withTransactionFn = createDatabaseTransactionRunner({ getPoolFn }),
+  maintenanceLockService = createMaintenanceLockService({ getPoolFn }),
+  recordAuditEventFn = recordAuditEvent,
   hashPasswordFn = hashPassword,
-  findUserByUsernameFn = findUserByUsername,
   normalizeUsernameFn = normalizeUsername,
   validatePasswordFn = validatePassword,
 } = {}) {
@@ -222,168 +226,11 @@ export function createAdminRecoveryService({
     };
   }
 
-  async function completeBootstrapAdminRecovery({
-    recoveryCode,
-    username,
-    password,
-    confirmPassword,
-    requestMetadata = null,
-  } = {}) {
-    await expireStaleRuns();
-
-    if (typeof recoveryCode !== 'string' || recoveryCode.trim().length < 1) {
-      throw createApiError(400, 'RECOVERY_INVALID_ARGUMENT', 'Recovery code is required');
-    }
-
-    if (typeof username !== 'string' || username.trim().length < 1) {
-      throw createApiError(400, 'RECOVERY_INVALID_ARGUMENT', 'Username is required');
-    }
-
-    const validatedPassword = validatePasswordFn(password);
-    if (validatedPassword !== confirmPassword) {
-      throw createApiError(400, 'RECOVERY_INVALID_ARGUMENT', 'Password and confirmation do not match');
-    }
-
-    const activeRun = await adminRecoveryStore.getActiveArmedRun();
-    if (!activeRun) {
-      throw createApiError(401, 'RECOVERY_NOT_ARMED', 'No active recovery run exists');
-    }
-
-    if (new Date(activeRun.expiresAt).getTime() <= Date.now()) {
-      await adminRecoveryStore.expireStaleArmedRuns();
-      throw createApiError(401, 'RECOVERY_CODE_INVALID_OR_EXPIRED', 'Recovery code is invalid or expired');
-    }
-
-    const blockingLocks = await maintenanceLockService.listActiveMaintenanceLocks({
-      lockTypes: ['restore', 'upgrade'],
-    });
-
-    if (blockingLocks.length > 0) {
-      throw createApiError(409, 'RECOVERY_LOCK_CONFLICT', 'Recovery cannot complete while conflicting maintenance locks are active');
-    }
-
-    if (!verifyRecoveryCode(recoveryCode, activeRun.recoveryCodeHash)) {
-      const updated = await adminRecoveryStore.incrementInvalidAttemptCount({ runId: activeRun.id });
-
-      if (updated && updated.invalidAttemptCount >= updated.maxAttempts) {
-        await adminRecoveryStore.invalidateRecoveryRun({
-          reason: 'max_attempts_reached',
-          runId: activeRun.id,
-        });
-
-        await recordAuditEventFn({
-          actorType: 'anonymous',
-          eventType: 'bootstrap_admin_recovery_invalidated',
-          summary: 'Bootstrap-admin recovery invalidated after too many invalid attempts',
-          entityType: 'admin_recovery_run',
-          entityId: activeRun.id,
-          details: {
-            invalidAttemptCount: updated.invalidAttemptCount,
-          },
-          ipAddress: requestMetadata?.ipAddress ?? null,
-          userAgent: requestMetadata?.userAgent ?? null,
-        });
-
-        throw createApiError(429, 'RECOVERY_ATTEMPT_THRESHOLD_REACHED', 'Too many invalid attempts');
-      }
-
-      throw createApiError(401, 'RECOVERY_CODE_INVALID_OR_EXPIRED', 'Recovery code is invalid or expired');
-    }
-
-    const lock = await maintenanceLockService.acquireMaintenanceLock({
-      lockType: 'admin_recovery',
-      reason: 'bootstrap_admin_recovery',
-    });
-
-    let createdAdminUserId;
-
-    try {
-      const normalizedUsername = normalizeUsernameFn(username);
-      const passwordHash = await hashPasswordFn(validatedPassword);
-
-      const existingUser = await findUserByUsernameFn(normalizedUsername);
-
-      if (existingUser) {
-        await getPoolFn().query(
-          `
-            UPDATE app_users
-            SET password_hash = $2,
-                role = 'admin',
-                is_disabled = FALSE,
-                must_change_password = FALSE,
-                password_changed_at = NOW(),
-                failed_login_count = 0,
-                locked_until = NULL,
-                updated_at = NOW()
-            WHERE id = $1
-          `,
-          [existingUser.id, passwordHash],
-        );
-        createdAdminUserId = existingUser.id;
-      } else {
-        const insertResult = await getPoolFn().query(
-          `
-            INSERT INTO app_users (username, password_hash, role, password_changed_at)
-            VALUES ($1, $2, 'admin', NOW())
-            RETURNING id
-          `,
-          [normalizedUsername, passwordHash],
-        );
-        createdAdminUserId = insertResult.rows[0].id;
-      }
-
-      const revokedSessionCount = await adminRecoveryStore.revokeAllInteractiveSessions({
-        revokedReason: 'admin_recovery',
-      });
-
-      await adminRecoveryStore.completeRecoveryRun({
-        completedFromIp: requestMetadata?.ipAddress ?? null,
-        completedUserAgent: requestMetadata?.userAgent ?? null,
-        createdAdminUserId,
-        runId: activeRun.id,
-      });
-
-      await recordAuditEventFn({
-        actorType: 'system',
-        eventType: 'bootstrap_admin_recovery_completed',
-        summary: 'Bootstrap-admin recovery completed',
-        entityType: 'admin_recovery_run',
-        entityId: activeRun.id,
-        details: {
-          completedAt: new Date().toISOString(),
-          createdAdminUserId,
-        },
-        ipAddress: requestMetadata?.ipAddress ?? null,
-        userAgent: requestMetadata?.userAgent ?? null,
-      });
-
-      await recordAuditEventFn({
-        actorType: 'system',
-        eventType: 'sessions_revoked_after_recovery',
-        summary: 'All interactive sessions revoked after bootstrap-admin recovery',
-        entityType: 'admin_recovery_run',
-        entityId: activeRun.id,
-        details: {
-          revokedSessionCount,
-        },
-        ipAddress: requestMetadata?.ipAddress ?? null,
-        userAgent: requestMetadata?.userAgent ?? null,
-      });
-    } finally {
-      await maintenanceLockService.releaseMaintenanceLock({ lockId: lock.id });
-    }
-
-    return {
-      recoveryChecklist: [
-        'Log in with the recovered admin account',
-        'Review existing admin users',
-        'Rotate or revoke API keys if compromise is suspected',
-      ],
-      requiresLogin: true,
-      runId: activeRun.id,
-      success: true,
-    };
-  }
+  const { completeBootstrapAdminRecovery } = createAdminRecoveryCompletionService({
+    adminRecoveryStore, recoveryAccountStore, maintenanceLockService, recordAuditEventFn,
+    withTransactionFn, hashPasswordFn, normalizeUsernameFn, validatePasswordFn,
+    verifyRecoveryCodeFn: verifyRecoveryCode,
+  });
 
   return {
     armBootstrapAdminRecovery,

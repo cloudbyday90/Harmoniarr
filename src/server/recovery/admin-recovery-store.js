@@ -63,17 +63,22 @@ export function createAdminRecoveryStore({
     return normalizeRecoveryRun(result.rows[0]);
   }
 
-  async function getRecoveryRunById({ runId } = {}) {
+  async function getRecoveryRunById({ runId, queryable = null, lockForTransaction = false } = {}) {
     if (typeof runId !== 'string' || runId.trim().length < 1) {
       return null;
     }
 
-    const result = await getPoolFn().query(
+    if (lockForTransaction) {
+      if (!queryable) throw new Error('A transaction client is required to lock a recovery run');
+      await queryable.query('SELECT id FROM admin_recovery_runs WHERE id = $1 FOR UPDATE', [runId]);
+    }
+    // Separate statement: observe wall time after any row-lock wait.
+    const result = await (queryable ?? getPoolFn()).query(
       `
         SELECT id, status, recovery_code_hash, armed_via, armed_at, expires_at,
                invalid_attempt_count, max_attempts, completed_at, cancelled_at,
                created_admin_user_id, completed_from_ip, completed_user_agent,
-               reason, details_json, created_at
+               reason, details_json, created_at, expires_at <= clock_timestamp() AS is_expired
         FROM admin_recovery_runs
         WHERE id = $1
         LIMIT 1
@@ -81,7 +86,8 @@ export function createAdminRecoveryStore({
       [runId],
     );
 
-    return normalizeRecoveryRun(result.rows[0]);
+    const row = result.rows[0];
+    return row ? { ...normalizeRecoveryRun(row), isExpired: row.is_expired === true } : null;
   }
 
   async function insertRecoveryRun({
@@ -109,8 +115,8 @@ export function createAdminRecoveryStore({
     return normalizeRecoveryRun(result.rows[0]);
   }
 
-  async function incrementInvalidAttemptCount({ runId } = {}) {
-    const result = await getPoolFn().query(
+  async function incrementInvalidAttemptCount({ runId, queryable = null } = {}) {
+    const result = await (queryable ?? getPoolFn()).query(
       `
         UPDATE admin_recovery_runs
         SET invalid_attempt_count = invalid_attempt_count + 1
@@ -126,8 +132,8 @@ export function createAdminRecoveryStore({
     return normalizeRecoveryRun(result.rows[0]);
   }
 
-  async function invalidateRecoveryRun({ runId, reason = null } = {}) {
-    const result = await getPoolFn().query(
+  async function invalidateRecoveryRun({ runId, reason = null, queryable = null } = {}) {
+    const result = await (queryable ?? getPoolFn()).query(
       `
         UPDATE admin_recovery_runs
         SET status = 'invalidated',
@@ -149,16 +155,19 @@ export function createAdminRecoveryStore({
     createdAdminUserId,
     completedFromIp = null,
     completedUserAgent = null,
+    queryable = null,
   } = {}) {
-    const result = await getPoolFn().query(
+    const result = await (queryable ?? getPoolFn()).query(
       `
         UPDATE admin_recovery_runs
         SET status = 'completed',
-            completed_at = NOW(),
+            completed_at = clock_timestamp(),
             created_admin_user_id = $2,
             completed_from_ip = $3,
             completed_user_agent = $4
         WHERE id = $1 AND status = 'armed'
+          AND expires_at > clock_timestamp()
+          AND invalid_attempt_count < max_attempts
         RETURNING id, status, recovery_code_hash, armed_via, armed_at, expires_at,
                   invalid_attempt_count, max_attempts, completed_at, cancelled_at,
                   created_admin_user_id, completed_from_ip, completed_user_agent,
@@ -207,8 +216,13 @@ export function createAdminRecoveryStore({
     return result.rows.map(normalizeRecoveryRun);
   }
 
-  async function revokeAllInteractiveSessions({ revokedReason = 'admin_recovery' } = {}) {
-    const result = await getPoolFn().query(
+  async function expireRecoveryRun({ runId, queryable }) {
+    await queryable.query(`UPDATE admin_recovery_runs SET status = 'expired', cancelled_at = clock_timestamp()
+      WHERE id = $1 AND status = 'armed' AND expires_at <= clock_timestamp()`, [runId]);
+  }
+
+  async function revokeAllInteractiveSessions({ revokedReason = 'admin_recovery', queryable = null } = {}) {
+    const result = await (queryable ?? getPoolFn()).query(
       `
         UPDATE refresh_tokens
         SET is_revoked = TRUE,
@@ -226,6 +240,7 @@ export function createAdminRecoveryStore({
     cancelRecoveryRun,
     completeRecoveryRun,
     expireStaleArmedRuns,
+    expireRecoveryRun,
     getActiveArmedRun,
     getRecoveryRunById,
     incrementInvalidAttemptCount,

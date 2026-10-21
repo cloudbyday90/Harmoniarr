@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
-The October 21 [recovery countdown rebuild](LOCAL_DOCKER_RECOVERY_COUNTDOWN_OUTCOME.md)
+The October 21 [atomic recovery rebuild](LOCAL_DOCKER_RECOVERY_ATOMIC_OUTCOME.md)
 records the current no-cache image, preserved admin/data and passing readiness.
+The [owning outcome](RECOVERY_ATOMIC_OUTCOME.md) qualifies single-use completion,
+native overlap and account/session/run/audit rollback in disposable fixtures.
+
+The October 21 [recovery countdown rebuild](LOCAL_DOCKER_RECOVERY_COUNTDOWN_OUTCOME.md)
+records the preceding no-cache image, preserved admin/data and passing readiness.
 The [owning outcome](RECOVERY_COUNTDOWN_OUTCOME.md) qualifies reactive expiry,
 controlled wake and unchanged native server safeguards in a disposable fixture.
 

@@ -73,6 +73,7 @@ function createMockStore(overrides = {}) {
 
   return {
     async getActiveArmedRun() { return activeRun; },
+    async getRecoveryRunById({ runId }) { return runs.get(runId) ?? null; },
     async insertRecoveryRun(input) {
       const run = {
         id: randomBytes(8).toString('hex'),
@@ -189,7 +190,7 @@ function createTestDeps(overrides = {}) {
     recordAuditEventFn: async (event) => { auditEvents.push(event); },
     getPoolFn: () => poolMock,
     hashPasswordFn: async (pw) => `hashed_${pw}`,
-    findUserByUsernameFn: async () => null,
+    withTransactionFn: work => work(poolMock),
     normalizeUsernameFn: (u) => u.trim().toLowerCase(),
     validatePasswordFn: (p) => p,
   });
@@ -482,50 +483,6 @@ test('completeBootstrapAdminRecovery rejects password mismatch', async () => {
     }),
     { code: 'RECOVERY_INVALID_ARGUMENT' },
   );
-});
-
-test('completeBootstrapAdminRecovery re-enables existing user', async () => {
-  const existingUser = { id: 'existing-user-1', username: 'admin', is_disabled: true };
-  let updateCalled = false;
-
-  createTestDeps({
-    storeOverrides: {},
-  });
-
-  const poolMock = {
-    query: async (sql, params) => {
-      if (sql.includes('INSERT INTO app_users')) {
-        return { rows: [{ id: 'new-user-1' }] };
-      }
-      if (sql.includes('UPDATE app_users')) {
-        updateCalled = true;
-        return { rows: [{ id: params[0] }] };
-      }
-      return { rows: [] };
-    },
-  };
-
-  const existingUserService = createAdminRecoveryService({
-    adminRecoveryStore: createMockStore(),
-    maintenanceLockService: createMockLockService(),
-    recordAuditEventFn: async () => {},
-    getPoolFn: () => poolMock,
-    hashPasswordFn: async (pw) => `hashed_${pw}`,
-    findUserByUsernameFn: async () => existingUser,
-    normalizeUsernameFn: (u) => u.trim().toLowerCase(),
-    validatePasswordFn: (p) => p,
-  });
-
-  const armed = await existingUserService.armBootstrapAdminRecovery();
-  const result = await existingUserService.completeBootstrapAdminRecovery({
-    confirmPassword: 'new-password-123',
-    password: 'new-password-123',
-    recoveryCode: armed.recoveryCode,
-    username: 'admin',
-  });
-
-  assert.equal(result.success, true);
-  assert.ok(updateCalled, 'should update existing user instead of creating new one');
 });
 
 test('completeBootstrapAdminRecovery acquires and releases admin_recovery lock', async () => {

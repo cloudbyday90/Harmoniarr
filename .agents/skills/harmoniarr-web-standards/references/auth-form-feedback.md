@@ -42,3 +42,8 @@ and passwords in screenshots and keep captured secrets out of evidence/logs.
 Do not announce countdown seconds repeatedly or treat a cached client clock as
 server expiry authority. See the recovery [design](../../../../docs/RECOVERY_FORM_FEEDBACK_DESIGN.md)
 and [outcome](../../../../docs/RECOVERY_FORM_FEEDBACK_OUTCOME.md) before adoption.
+
+For server completion changes, use the backend
+[atomic recovery boundary](../../harmoniarr-backend-architecture/references/admin-recovery-atomic.md).
+Accessible completion feedback must follow the committed account/session/run/audit
+outcome; the browser's single pending owner is not a server concurrency guard.
