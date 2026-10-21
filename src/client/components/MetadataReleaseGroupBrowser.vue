@@ -21,6 +21,10 @@ import { computed } from 'vue';
 import { useMetadataTextFilter } from '../composables/useMetadataTextFilter.js';
 
 const props = defineProps({
+  canImportMetadata: {
+    type: Boolean,
+    default: false,
+  },
   errorMessage: {
     type: String,
     default: '',
@@ -95,6 +99,7 @@ function formatSecondaryTypes(secondaryTypes) {
           <div><dt>Status</dt><dd>{{ importedReleaseGroupIds.has(releaseGroup.id) ? 'Imported' : 'Provider only' }}</dd></div>
         </dl>
         <button
+          v-if="importedReleaseGroupIds.has(releaseGroup.id) || canImportMetadata"
           type="button"
           @click="importedReleaseGroupIds.has(releaseGroup.id) ? $emit('open-release-group', releaseGroup) : $emit('import-release-group', releaseGroup)"
           :disabled="isMutatingReleaseGroup || isLoadingReleaseGroup"

@@ -25,6 +25,10 @@ import {
 } from '../lib/metadata-artist-presentation.js';
 
 defineProps({
+  canRefreshMetadata: {
+    type: Boolean,
+    default: false,
+  },
   detectionEventsErrorMessage: {
     type: String,
     default: '',
@@ -67,6 +71,7 @@ const emit = defineEmits(['load-more-detection-events', 'refresh-metadata']);
         Manage monitoring
       </RouterLink>
       <button
+        v-if="canRefreshMetadata"
         type="button"
         class="secondary-button"
         :disabled="isRefreshingMetadata"

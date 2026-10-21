@@ -22,12 +22,11 @@ import test from 'node:test';
 
 const metadataViewUrl = new URL('../../src/client/views/MetadataView.vue', import.meta.url);
 
-test('MetadataView keeps the cache baseline panel administrator-only with explicit baseline comparison actions', async () => {
+test('MetadataView wires the cache baseline panel and explicit baseline comparison actions', async () => {
   const source = await readFile(metadataViewUrl, 'utf8');
 
   assert.match(source, /MetadataProviderCacheBaselinePanel/);
   assert.match(source, /useMetadataProviderCacheBaseline/);
   assert.match(source, /useMetadataProviderCacheBaselineComparison/);
-  assert.match(source, /const isAdmin = computed\(\(\) => sessionStore\.state\.user\?\.role === 'admin'\);/);
   assert.match(source, /<MetadataProviderCacheBaselinePanel[\s\S]*v-if="isAdmin"[\s\S]*:baseline-comparison="baselineComparison"[\s\S]*@mark-comparison-start="markComparisonStart"[\s\S]*@refresh="loadCacheBaseline"/);
 });

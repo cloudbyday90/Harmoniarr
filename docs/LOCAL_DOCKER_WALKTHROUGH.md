@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
-The October 21 [Settings authority rebuild](LOCAL_DOCKER_SETTINGS_AUTHORITY_OUTCOME.md)
+The October 21 [Metadata command authority rebuild](LOCAL_DOCKER_METADATA_COMMAND_AUTHORITY_OUTCOME.md)
 records the current no-cache image, preserved admin/data and passing readiness.
+The [feature outcome](METADATA_COMMAND_AUTHORITY_OUTCOME.md) verifies privileged
+commands, preserved operator reads and owned focus after native refusal.
+
+The October 21 [Settings authority rebuild](LOCAL_DOCKER_SETTINGS_AUTHORITY_OUTCOME.md)
+records the preceding no-cache image, preserved admin/data and passing readiness.
 The [feature outcome](SETTINGS_AUTHORITY_OUTCOME.md) verifies deployment page
 admission, personal preferences, operator metadata browsing and recovery handoff.
 

@@ -21,6 +21,10 @@ import { computed } from 'vue';
 import { useMetadataTextFilter } from '../composables/useMetadataTextFilter.js';
 
 const props = defineProps({
+  canImportMetadata: {
+    type: Boolean,
+    default: false,
+  },
   errorMessage: {
     type: String,
     default: '',
@@ -62,7 +66,7 @@ const { filterQuery, filteredItems: filteredProviderReleases, hasActiveFilter } 
     <div class="section-header">
       <div>
         <p class="eyebrow">Releases</p>
-        <h3>Choose a release to import</h3>
+        <h3>{{ canImportMetadata ? 'Choose a release to import' : 'Provider releases' }}</h3>
       </div>
     </div>
 
@@ -84,7 +88,7 @@ const { filterQuery, filteredItems: filteredProviderReleases, hasActiveFilter } 
           <div><dt>Release date</dt><dd>{{ release.releaseDate || 'Unknown' }}</dd></div>
           <div><dt>Status</dt><dd>{{ importedReleaseIds.has(release.id) ? 'Imported' : 'Provider only' }}</dd></div>
         </dl>
-        <button type="button" @click="$emit('import-release', release)" :disabled="isImportingRelease">
+        <button v-if="canImportMetadata" type="button" @click="$emit('import-release', release)" :disabled="isImportingRelease">
           {{ isImportingRelease ? 'Importing...' : (importedReleaseIds.has(release.id) ? 'Re-import release' : 'Import release') }}
         </button>
       </article>

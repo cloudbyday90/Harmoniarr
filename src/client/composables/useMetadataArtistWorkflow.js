@@ -33,6 +33,7 @@ import { useMetadataLocalSearchWorkflow } from './useMetadataLocalSearchWorkflow
 import { useMetadataReleaseWorkflow } from './useMetadataReleaseWorkflow.js';
 
 export function useMetadataArtistWorkflow({
+  canManageMetadata = () => false,
   browseArtistReleaseGroups = browseMusicBrainzArtistReleaseGroups,
   fetchArtist = fetchMetadataArtist,
   fetchArtistDetectionEvents = defaultFetchMetadataArtistDetectionEvents,
@@ -87,6 +88,7 @@ export function useMetadataArtistWorkflow({
   }
 
   const releaseWorkflow = createReleaseWorkflow({
+    canManageMetadata,
     selectedArtist,
     refreshArtistWorkspace: (artist) => refreshArtistWorkspace(artist),
   });
@@ -248,6 +250,10 @@ export function useMetadataArtistWorkflow({
   }
 
   async function refreshArtistMetadata() {
+    if (canManageMetadata() !== true) {
+      artistActionError.value = 'Administrator access is required to refresh metadata.';
+      return null;
+    }
     if (!localArtist.value?.artist?.id) {
       return null;
     }

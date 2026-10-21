@@ -197,6 +197,7 @@ test('useMetadataArtistWorkflow queues a metadata artist refresh through the sha
     createLocalSearchWorkflow: () => createLocalSearchWorkflowDouble(),
     createReleaseWorkflow: () => releaseWorkflow,
     startMetadataArtistRefreshRequest,
+    canManageMetadata: () => true,
   });
 
   workflow.localArtist.value = {

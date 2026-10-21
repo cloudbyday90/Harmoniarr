@@ -30,6 +30,7 @@ import MetadataReleaseDetail from '../components/MetadataReleaseDetail.vue';
 import MetadataReleaseGroupBrowser from '../components/MetadataReleaseGroupBrowser.vue';
 import MetadataSelectedReleaseGroupSummary from '../components/MetadataSelectedReleaseGroupSummary.vue';
 import { useMetadataArtistWorkflow } from '../composables/useMetadataArtistWorkflow.js';
+import { useMetadataCommandFocus } from '../composables/useMetadataCommandFocus.js';
 import { useMetadataProviderCacheBaseline } from '../composables/useMetadataProviderCacheBaseline.js';
 import { useMetadataProviderCacheBaselineComparison } from '../composables/useMetadataProviderCacheBaselineComparison.js';
 import {
@@ -40,9 +41,11 @@ import {
   resolveMetadataRouteReleaseGroupId,
 } from '../lib/metadata-route-state.js';
 import { sessionStore } from '../state/session.js';
+import { canManageMetadata } from '../lib/metadata-command-access-policy.js';
 
 const route = useRoute();
 const router = useRouter();
+const isAdmin = computed(() => canManageMetadata(sessionStore.state.user?.role));
 
 const {
   artistActionError,
@@ -88,7 +91,11 @@ const {
   searchResults,
   selectedArtist,
   hasSearchedLocal,
-} = useMetadataArtistWorkflow();
+} = useMetadataArtistWorkflow({ canManageMetadata: () => isAdmin.value });
+
+const refreshMetadata = useMetadataCommandFocus(refreshArtistMetadata, artistActionError);
+const importGroup = useMetadataCommandFocus(importReleaseGroup, releaseGroupActionError);
+const importEdition = useMetadataCommandFocus(importRelease, releaseActionError);
 
 const {
   cacheBaseline,
@@ -104,7 +111,6 @@ const {
 } = useMetadataProviderCacheBaselineComparison(cacheBaseline);
 
 const metadataRouteState = computed(() => normalizeMetadataRouteState(route.query));
-const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
 
 async function replaceMetadataRouteState(nextState) {
   const normalizedNextState = normalizeMetadataRouteState({
@@ -218,7 +224,7 @@ watch(
   <section class="page-stack">
     <article class="panel-dark hero-card compact">
       <h2>Artist Metadata</h2>
-      <p>Manage artist metadata sourced from MusicBrainz. Import an artist for the first time, or open one you've already imported to review releases and trigger metadata refreshes.</p>
+      <p>Search MusicBrainz or browse imported artist metadata. Import an artist to review its release groups and saved releases.</p>
       <ul class="metadata-entry-guide">
         <li><strong>First time?</strong> Search MusicBrainz below and import the artist.</li>
         <li><strong>Already imported?</strong> Use local search to reopen their metadata workspace.</li>
@@ -278,6 +284,7 @@ watch(
 
     <template v-else-if="localArtist">
       <MetadataArtistSummary
+        :can-refresh-metadata="isAdmin"
         :detection-events-error-message="detectionEventsErrorMessage"
         :detection-events-page-info="detectionEventsPageInfo"
         :is-loading-detection-events="isLoadingMoreDetectionEvents"
@@ -285,16 +292,17 @@ watch(
         :local-artist="localArtist"
         :queued-refresh-run="queuedRefreshRun"
         @load-more-detection-events="loadMoreDetectionEvents"
-        @refresh-metadata="refreshArtistMetadata"
+        @refresh-metadata="refreshMetadata"
       />
 
       <MetadataReleaseGroupBrowser
+        :can-import-metadata="isAdmin"
         :error-message="releaseGroupActionError"
         :is-loading-release-group="isLoadingReleaseGroup"
         :is-mutating-release-group="isImportingReleaseGroup"
         :local-release-groups="localArtist.releaseGroups"
         :provider-release-groups="providerReleaseGroups"
-        @import-release-group="importReleaseGroup"
+        @import-release-group="importGroup"
         @open-release-group="handleOpenProviderReleaseGroup"
       />
 
@@ -321,12 +329,13 @@ watch(
       </article>
 
       <MetadataProviderReleaseList
+        :can-import-metadata="isAdmin"
         v-if="localReleaseGroup"
         :error-message="releaseActionError"
         :is-importing-release="isImportingRelease"
         :local-releases="localReleaseGroup.releases"
         :provider-releases="providerReleases"
-        @import-release="importRelease"
+        @import-release="importEdition"
       />
 
       <MetadataReleaseDetail v-if="localRelease" :local-release="localRelease" />

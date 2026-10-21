@@ -125,3 +125,13 @@ Notifications API. Test saved notification preferences against the authenticated
 owner and an unchanged peer, plus real read admission for every protected page.
 Keep metadata's product route restriction distinct from its authenticated APIs;
 qualify privileged controls separately rather than making all browsing admin-only.
+
+For Metadata browser commands, use the [command matrix](../../../../docs/METADATA_COMMAND_AUTHORITY_DESIGN.md).
+Keep authenticated artist import distinct from fresh-admin refresh and release
+imports. A mixed row's Open branch must remain a read when its Import branch is
+hidden. Pair default-false component capabilities with default-deny, live workflow
+predicates; omitted callbacks or truthy non-Boolean values cannot grant dispatch.
+Native sessions/HTTP guards with controlled catalog/command services prove actor,
+CSRF and dispatch ordering, not real provider imports or durable refresh queues.
+For refused commands, verify focus after busy reset and while a native response
+is held; restore the invoker only if the interaction still owns focus.

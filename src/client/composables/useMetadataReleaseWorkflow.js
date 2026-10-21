@@ -31,6 +31,7 @@ import {
 } from '../lib/metadata-api.js';
 
 export function useMetadataReleaseWorkflow({
+  canManageMetadata = () => false,
   selectedArtist,
   refreshArtistWorkspace,
   fetchRelease = fetchMetadataRelease,
@@ -101,6 +102,10 @@ export function useMetadataReleaseWorkflow({
   }
 
   async function importReleaseGroup(releaseGroup) {
+    if (canManageMetadata() !== true) {
+      releaseGroupActionError.value = 'Administrator access is required to import release groups.';
+      return;
+    }
     releaseGroupActionError.value = '';
     isImportingReleaseGroup.value = true;
 
@@ -150,6 +155,10 @@ export function useMetadataReleaseWorkflow({
   }
 
   async function importRelease(release) {
+    if (canManageMetadata() !== true) {
+      releaseActionError.value = 'Administrator access is required to import releases.';
+      return;
+    }
     releaseActionError.value = '';
     isImportingRelease.value = true;
 

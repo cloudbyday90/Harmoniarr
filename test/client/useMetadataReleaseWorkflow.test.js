@@ -65,6 +65,7 @@ test('useMetadataReleaseWorkflow imports a release and refreshes the artist and 
     selectedArtist,
     refreshArtistWorkspace,
     importReleaseById,
+    canManageMetadata: () => true,
     resolveReleaseLocal,
     resolveReleaseGroupLocal,
     fetchReleaseGroupReleases,
@@ -131,6 +132,7 @@ test('useMetadataReleaseWorkflow opens a local release through injected read ser
 test('useMetadataReleaseWorkflow surfaces import failures through the shared error state', async () => {
   const workflow = useMetadataReleaseWorkflow({
     selectedArtist: ref({ id: 'mb-artist-1' }),
+    canManageMetadata: () => true,
     refreshArtistWorkspace: async () => {},
     importReleaseById: async () => {
       throw new Error('release import failed upstream');

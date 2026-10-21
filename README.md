@@ -4,6 +4,14 @@ Harmoniarr is a self-hosted, Docker-hosted music library manager inspired by Lid
 
 The repository contains the Node.js ESM server, Vue client, PostgreSQL schema, automated validation, and design documents. The platform is under active development toward its first release.
 
+Metadata refresh and release imports now follow administrator command authority,
+with default-deny workflow checks and owned focus after refusal. Operator reads
+and authenticated artist import remain available. See the
+[command design](docs/METADATA_COMMAND_AUTHORITY_DESIGN.md),
+[official research and tradeoffs](docs/METADATA_COMMAND_AUTHORITY_RESEARCH_2026_10.md),
+[validation outcome](docs/METADATA_COMMAND_AUTHORITY_OUTCOME.md) and
+[preserved Docker rebuild](docs/LOCAL_DOCKER_METADATA_COMMAND_AUTHORITY_OUTCOME.md).
+
 Settings page admission now follows a reviewed route/API authority matrix:
 deployment pages require current admin, while personal preferences and operator
 metadata browsing remain available. See the [design/matrix](docs/SETTINGS_AUTHORITY_DESIGN.md),

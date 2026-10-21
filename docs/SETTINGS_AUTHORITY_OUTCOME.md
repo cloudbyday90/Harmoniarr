@@ -79,10 +79,7 @@ MCP returned zero open PRs, so no random open candidate was available to impleme
 locally. No PR merge or rebase was performed. All intended changes remain on
 main; no branch, release, tag or version bump is created.
 
-Next, qualify Metadata browser's privileged controls while preserving operator
-browsing. `MetadataArtistSummary` exposes artist refresh and the provider release
-components expose import commands; their refresh and release/release-group import
-handlers require fresh admin and CSRF. The parent currently uses `isAdmin` only
-for the cache panel. Trace each command, shared/open-versus-import behavior and
-fresh server refusal before changing visible controls. Keep authenticated artist
-import and ordinary metadata reads distinct from the admin-only commands.
+Completed by the [Metadata command authority outcome](METADATA_COMMAND_AUTHORITY_OUTCOME.md):
+the three privileged commands now use explicit capabilities and guarded dispatch,
+while operator reads and authenticated artist import remain available. Its next
+item is qualification of delayed command results against the selected workspace.
