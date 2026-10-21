@@ -181,9 +181,23 @@ it pass. A control can remain activeElement while moving outside the workspace.
 Restore without centering, then reveal a successful continuing-page invoker with
 native instant nearest alignment only while current result and interaction still
 own it. Recheck after focus handlers, which can synchronously redirect or retire
-ownership. Use scoped target margins for the current fixed navigation and safe
-area; do not infer clearance from viewport bounds alone. Pair a long append with
+ownership. Keep ordinary target margins for the focus cue; the shared mobile
+scroll container now owns fixed-navigation/safe-area clearance. Do not duplicate
+that navigation offset on each control or infer clearance from viewport bounds alone. Pair a long append with
 an already-visible no-movement control and a held response after user focus moves.
 Keep final heading, retry, cancellation and stale/no-op behavior separately proved.
 Two-pixel cues are a project convention; automated geometry does not establish
 assistive-technology announcements, browser zoom or cross-engine conformance.
+
+For native engine and zoom coverage, use the [compatibility design](../../../../docs/METADATA_HISTORY_COMPATIBILITY_DESIGN.md).
+Keep the explicit compatibility lane separate from routine Chromium feedback.
+320 CSS pixels proves a reflow case; CSS zoom, device scale and a DOM Control-plus
+event do not prove browser-shell zoom. Qualify the vendor's actual tab zoom and
+effective CSS viewport separately. Use bundled engines without calling WebKit
+released Safari. Scope extension/profile capabilities to the fresh owned page,
+await browser retirement before deleting the profile, and preserve original
+Error/null through cleanup. Native geometry and ARIA status checks still need
+separate real screen-reader and nonzero-safe-area device assessment.
+Wait for an observable visible focused field before measuring a reading position;
+native focus scrolling can complete on a later WebKit frame. Keep earlier failed
+captures and their unknown timing cause separate from newly instrumented controls.

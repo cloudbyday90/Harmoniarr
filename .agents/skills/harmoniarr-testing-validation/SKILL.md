@@ -348,6 +348,11 @@ atomicity, cancellation checkpoints, deadlines and remaining fixture delay.
 
 Run the smallest focused tests that prove the changed behavior, then broaden based on blast radius. Before commit or push, run the validation level appropriate to the risk.
 
+Metadata history's three-engine/native tab-zoom proof is explicit:
+`npm run validate:metadata-history-compatibility`. It is outside the routine
+browser glob. See docs/METADATA_HISTORY_COMPATIBILITY_DESIGN.md for actual zoom
+versus reflow, browser setup/retirement ownership and remaining manual AT checks.
+
 Use `npm run validate:fast` for complete static, server/client/script and build
 feedback during development. It omits PostgreSQL; include the directly affected
 real database tests when SQL, locks, constraints or rollback own the behavior.

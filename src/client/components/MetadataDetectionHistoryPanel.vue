@@ -58,9 +58,4 @@ defineExpose({ getHistoryHeading: () => historyHeading.value });
   scroll-margin-inline: var(--hx-space-2);
 }
 
-@media (max-width: 640px) {
-  .hx-metadata-history-more {
-    scroll-margin-block-end: calc(var(--hx-bottom-nav-height) + env(safe-area-inset-bottom, 0px) + var(--hx-space-2));
-  }
-}
 </style>

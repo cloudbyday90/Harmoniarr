@@ -61,7 +61,8 @@ For Docker-based testing, use `compose.yaml` or `compose.walkthrough.yaml`.
 - Browser tests run with `--test-concurrency=1` (sequential)
 - The app uses Express 5, Vue 3, and PostgreSQL
 - Auth is cookie-based with CSRF protection (configurable via `HARMONIARR_CSRF_PROTECTION`)
-- Playwright is a devDependency (version 1.59.x)
+- Playwright is a devDependency; read its installed version and provision the matched browser binaries.
+- Routine browser checks use Chromium. The optional `npm run validate:metadata-history-compatibility` lane adds Firefox, WebKit and native tab zoom; see [its design](../../../docs/METADATA_HISTORY_COMPATIBILITY_DESIGN.md) for scope and remaining manual AT checks.
 - Client and server code are ESM-first; keep explicit `.js` import specifiers in test fixtures and support code
 - When testing media-request or import-review flows, prefer existing shared helpers such as `src/client/lib/media-request-api.js`, `src/client/composables/useImportCandidateRunSummary.js`, and `src/client/composables/useOperationHistory.js`
 

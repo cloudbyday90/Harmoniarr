@@ -78,3 +78,9 @@ area. Current automated geometry does not prove screen-reader announcements,
 400% browser zoom, every engine or complete WCAG conformance. Keep that optional
 compatibility lane separate from the routine Chromium selection so ordinary
 feedback remains focused; use failures to choose the next code change.
+
+Follow-up: the [compatibility outcome](METADATA_HISTORY_COMPATIBILITY_OUTCOME.md)
+records the native engine/actual tab-zoom lane and the subsequent shared mobile
+scroll-container clearance. Its shell now owns the navigation offset; the local
+button keeps ordinary focus-cue margins. The result above describes this earlier
+candidate's scoped-margin implementation.

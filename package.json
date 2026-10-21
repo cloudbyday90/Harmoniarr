@@ -86,6 +86,7 @@
     "update:schema-snapshot": "node scripts/update-schema-snapshot.js",
     "validate": "npm run check:node-baseline && npm run check-copyright && npm run migration:check && npm run check:schema-snapshot && npm run check:esm && npm run check:image-tags && npm run check:compose-topology && npm test && npm run build",
     "validate:fast": "npm run check:node-baseline && npm run check-copyright && npm run migration:check && npm run check:schema-snapshot && npm run check:esm && npm run check:image-tags && npm run check:compose-topology && npm run lint && npm run check:test-hygiene && npm run test:server && npm run test:client && npm run test:scripts && npm run build",
+    "validate:metadata-history-compatibility": "npm run build:client && node --test --test-concurrency=1 \"test/compatibility/metadata-history*.test.js\"",
     "validate:artist-detail-cache-samples": "npm run build:client && node --test --test-force-exit --test-concurrency=1 test/browser/artist-detail-cache-samples-browser-verification.test.js",
     "validate:artist-detail-cache-lifecycle": "node --test --test-concurrency=1 test/server/artist-detail-cache-sample-lifecycle-evidence.test.js test/integration/artist-detail-cache-sample-lifecycle.test.js",
     "validate:artist-detail-cache-browser-evidence": "npm run build:client && node --test --test-force-exit --test-concurrency=1 test/browser/artist-detail-cache-server-timing-browser-verification.test.js",

@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 21 [Metadata compatibility rebuild](LOCAL_DOCKER_METADATA_HISTORY_COMPATIBILITY_OUTCOME.md)
+records the current no-cache image, preserved admin/data and passing readiness.
+The [feature outcome](METADATA_HISTORY_COMPATIBILITY_OUTCOME.md) qualifies native
+engines, actual tab zoom and shared mobile focus clearance.
+
 The October 21 [Metadata history visibility rebuild](LOCAL_DOCKER_METADATA_HISTORY_VISIBILITY_OUTCOME.md)
-records the current no-cache image with preserved admin/data and passing readiness.
+records the preceding no-cache image with preserved admin/data and passing readiness.
 The [feature outcome](METADATA_HISTORY_VISIBILITY_OUTCOME.md) verifies current
 keyboard focus stays visible after continuing pages, including mobile navigation.
 

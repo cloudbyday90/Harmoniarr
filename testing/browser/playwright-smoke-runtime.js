@@ -8,7 +8,7 @@
 
 import { access } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { chromium } from 'playwright';
+import { withBrowserSession } from './browser-session.js';
 import { createIntegrationAppRuntime } from '../integration/app-runtime.js';
 import {
   createBrowserRuntimeDiagnostic,
@@ -57,11 +57,11 @@ export function toBrowserRuntimeUnavailableReason(error) {
   }
 
   if (message.includes('Executable doesn\'t exist') || message.includes('browserType.launch')) {
-    return `${message}. Run npx playwright install chromium to provision the browser runtime.`;
+    return `${message}. Run npx playwright install chromium (or firefox/webkit for compatibility) to provision the selected browser runtime.`;
   }
 
   if (message.includes('Host system is missing dependencies')) {
-    return `${message}. Install the required Chromium host dependencies before running browser smoke tests.`;
+    return `${message}. Install the selected browser's host dependencies before running browser smoke tests.`;
   }
 
   return `${message}. Configure external PostgreSQL env vars or start a supported container runtime for integration tests.`;
@@ -71,6 +71,7 @@ export async function createBrowserSmokeRuntime({
   clientDistDir = defaultClientDistDir,
   config,
   createAppFn,
+  browserType,
 } = {}) {
   await ensureBuiltClientDistDir(clientDistDir);
 
@@ -87,13 +88,7 @@ export async function createBrowserSmokeRuntime({
     async runScenario(run, {
       scenarioName = 'browser_smoke',
     } = {}) {
-      return integrationRuntime.runScenario(async (context) => {
-        const browser = await chromium.launch({
-          headless: true,
-        });
-        const browserContext = await browser.newContext({
-          serviceWorkers: 'block',
-        });
+      return integrationRuntime.runScenario(context => withBrowserSession({ browserType }, async ({ browser, browserContext }) => {
         await installBrowserOnboardingFixture(browserContext);
         await installBrowserSystemOverviewFixture(browserContext);
         const page = await browserContext.newPage();
@@ -120,12 +115,8 @@ export async function createBrowserSmokeRuntime({
           }
 
           throw error;
-        } finally {
-          await browserContext.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
-          await browserContext.close().catch(() => {});
-          await browser.close().catch(() => {});
         }
-      }, {
+      }), {
         scenarioName,
       });
     },
