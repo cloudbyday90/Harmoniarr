@@ -158,3 +158,11 @@ restoring a surviving button or focusing a visible completion heading. A user
 move revokes restoration. Test a long history so preventScroll cannot leave the
 new target off-screen; preserve scroll only for the existing invoker. DOM/ARIA
 assertions do not prove screen-reader announcements.
+
+For history detail structure, use the [presentation design](../../../../docs/METADATA_HISTORY_PRESENTATION_DESIGN.md).
+Keep related name/value pairs in semantic markup, with stacked labels in narrow
+cards. Separate localized absolute time and its visible offset from a normalized
+machine instant. Invalid or zone-less input gets ordinary fallback text, never
+an invented instant. Test impossible dates, DST repetition, literal provider text
+and long unbroken titles. Freeze source bytes before browser builds and compare
+the tested client with the packaged image before publishing.

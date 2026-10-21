@@ -22,7 +22,7 @@ export const metadataCommandIds = Object.freeze({
 
 // Real HTTP/session/CSRF routes with controlled catalog and command owners.
 // This fixture deliberately does not persist provider imports or queue work.
-export function createMetadataCommandFixture({ history = null } = {}) {
+export function createMetadataCommandFixture({ history = null, monitoring = { isMonitored: false } } = {}) {
   const id = metadataCommandIds;
   let calls = []; let groupImported = false; let releaseImported = false;
   const artist = { id: id.artist, name: 'Fixture artist', source: { musicbrainzArtistId: id.artistMbid } };
@@ -30,7 +30,7 @@ export function createMetadataCommandFixture({ history = null } = {}) {
   const providerGroup = { id: id.providerGroup, artistId: id.artist, title: 'Provider group', primaryType: 'Album', source: { musicbrainzReleaseGroupId: id.providerGroupMbid } };
   const release = { id: id.release, releaseGroupId: id.group, title: 'Saved edition', source: { musicbrainzReleaseId: id.releaseMbid } };
   const providerRelease = { id: id.providerRelease, releaseGroupId: id.providerGroup, title: 'Provider edition', source: { musicbrainzReleaseId: id.providerReleaseMbid } };
-  const localArtist = () => ({ artist, aliases: [], detectionEvents: history?.entries ?? [], detectionEventsPageInfo: history?.pageInfo ?? { hasMore: false, nextCursor: null }, monitoring: { isMonitored: false }, releaseGroups: groupImported ? [group, providerGroup] : [group], releases: releaseImported ? [release, providerRelease] : [release] });
+  const localArtist = () => ({ artist, aliases: [], detectionEvents: history?.entries ?? [], detectionEventsPageInfo: history?.pageInfo ?? { hasMore: false, nextCursor: null }, monitoring, releaseGroups: groupImported ? [group, providerGroup] : [group], releases: releaseImported ? [release, providerRelease] : [release] });
   const localGroup = selected => ({ artist, releaseGroup: selected, releases: selected.id === id.group ? [release] : releaseImported ? [providerRelease] : [] });
   const localRelease = selected => ({ artist, release: selected, releaseGroup: selected.id === id.release ? group : providerGroup, media: [] });
   function record(command, args) { calls.push({ command, args }); }

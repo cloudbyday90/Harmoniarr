@@ -19,11 +19,8 @@
 <script setup>
 import { RouterLink } from 'vue-router';
 import { ref } from 'vue';
-import {
-  describeMonitoringDecision,
-  describeWantedState,
-  detectionEventLinkTarget,
-} from '../lib/metadata-artist-presentation.js';
+import MetadataDetectionHistoryEntry from './MetadataDetectionHistoryEntry.vue';
+import MetadataTimestamp from './MetadataTimestamp.vue';
 
 defineProps({
   canRefreshMetadata: {
@@ -103,8 +100,8 @@ defineExpose({ getHistoryHeading: () => historyHeading.value });
       <dl>
         <div><dt>Monitored</dt><dd>{{ localArtist.monitoring?.isMonitored ? 'Yes' : 'No' }}</dd></div>
         <div><dt>Release types</dt><dd>{{ (localArtist.monitoring?.monitoredReleaseGroupTypes ?? []).join(', ') }}</dd></div>
-        <div><dt>Last refresh</dt><dd>{{ localArtist.monitoring?.lastRefreshedAt || 'Not yet recorded' }}</dd></div>
-        <div><dt>Next refresh</dt><dd>{{ localArtist.monitoring?.nextRefreshAt || 'Not scheduled' }}</dd></div>
+        <div class="hx-metadata-policy-time"><dt>Last refresh</dt><dd><MetadataTimestamp :value="localArtist.monitoring?.lastRefreshedAt" fallback="Not yet recorded" /></dd></div>
+        <div class="hx-metadata-policy-time"><dt>Next refresh</dt><dd><MetadataTimestamp :value="localArtist.monitoring?.nextRefreshAt" fallback="Not scheduled" /></dd></div>
         <div><dt>Aliases</dt><dd>{{ localArtist.aliases.length }}</dd></div>
       </dl>
     </article>
@@ -126,21 +123,7 @@ defineExpose({ getHistoryHeading: () => historyHeading.value });
         <p v-else-if="detectionEventsStatusMessage" class="metadata-card-copy">{{ detectionEventsStatusMessage }}</p>
       </div>
       <ul v-if="(localArtist.detectionEvents ?? []).length" class="metadata-list" :aria-busy="isLoadingDetectionEvents">
-        <li v-for="event in localArtist.detectionEvents" :key="event.id">
-          <div class="metadata-detection-entry-header">
-            <strong>{{ event.title }}</strong>
-            <RouterLink
-              v-if="detectionEventLinkTarget(localArtist, event)"
-              class="secondary-button"
-              :to="detectionEventLinkTarget(localArtist, event).to"
-            >
-              {{ detectionEventLinkTarget(localArtist, event).label }}
-            </RouterLink>
-          </div>
-          <span>{{ event.primaryType || 'Unknown type' }} · {{ event.occurredAt }}</span>
-          <span>{{ describeMonitoringDecision(event.monitoringDecision) }}</span>
-          <span>Wanted state: {{ describeWantedState(event.resultingWantedStatus) }}</span>
-        </li>
+        <MetadataDetectionHistoryEntry v-for="event in localArtist.detectionEvents" :key="event.id" :event="event" :local-artist="localArtist" />
       </ul>
       <p v-else class="metadata-card-copy">No release detections have been recorded for this artist yet.</p>
       <div v-if="detectionEventsPageInfo?.hasMore" class="metadata-detection-actions">
@@ -158,6 +141,12 @@ defineExpose({ getHistoryHeading: () => historyHeading.value });
 </template>
 
 <style scoped>
+.panel-light .hx-metadata-policy-time {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: var(--hx-space-1);
+}
+
 .hx-metadata-history-heading:focus-visible {
   outline: 2px solid var(--hx-accent-strong);
   outline-offset: 2px;
@@ -167,13 +156,5 @@ defineExpose({ getHistoryHeading: () => historyHeading.value });
   display: flex;
   justify-content: flex-end;
   margin-top: 1rem;
-}
-
-.metadata-detection-entry-header {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  justify-content: space-between;
 }
 </style>

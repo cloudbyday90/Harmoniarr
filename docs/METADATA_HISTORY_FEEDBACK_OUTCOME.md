@@ -83,7 +83,7 @@ the full browser/database/provider matrix or a matched suite speed improvement.
 MCP returned zero open PRs. No random candidate, merge, rebase or stale-PR closure
 was applicable. Work stays on main without a release, Git tag or version bump.
 
-Next: structure detection-history entry details and format timestamps consistently.
-Source and inspected captures show adjacent inline decision/Wanted details running
-together and raw ISO timestamps. Give those details semantic separation and a
-readable time presentation, retaining current pagination and focus ownership.
+Completed by the [history presentation outcome](METADATA_HISTORY_PRESENTATION_OUTCOME.md):
+entry details now have semantic separation and readable absolute timestamps,
+retaining current pagination and focus ownership. That outcome records the next
+follow-up and remaining qualification limits.
