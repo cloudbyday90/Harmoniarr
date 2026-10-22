@@ -17,32 +17,23 @@
  */
 
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import sharp from 'sharp';
 import { createApiError } from '../auth.js';
 import { rgbToOklch, VIBRANCY_THRESHOLD } from './color-utils.js';
 import { createArtworkPolicyService } from './artwork-policy-service.js';
 import { getArtworkAssetBySha256, upsertArtworkAsset } from './artwork-repository.js';
-import { assertArtworkRasterSignature, artworkSharpInputOptions } from './artwork-image-content-policy.js';
+import { assertArtworkBuffer, artworkInputByteLimit } from './artwork-image-content-policy.js';
+import { inspectArtworkBuffer, sanitizeArtworkBuffer, getArtworkBufferStats } from './artwork-image-processing.js';
+import { createArtworkIngestionAdmission } from './artwork-ingestion-admission.js';
+import { readArtworkFile } from './artwork-file-reader.js';
+export { inspectArtworkBuffer, sanitizeArtworkBuffer };
 
 const supportedInputFormats = new Map([
   ['jpeg', { extension: 'jpg', mimeType: 'image/jpeg' }],
   ['png', { extension: 'png', mimeType: 'image/png' }],
   ['webp', { extension: 'webp', mimeType: 'image/webp' }],
 ]);
-
-const outputEncoders = {
-  jpeg(image) {
-    return image.jpeg({ chromaSubsampling: '4:4:4', quality: 90 });
-  },
-  png(image) {
-    return image.png({ compressionLevel: 9 });
-  },
-  webp(image) {
-    return image.webp({ effort: 4, quality: 90 });
-  },
-};
 
 const storageClassDirectories = new Map([
   ['derivative', 'derivatives'],
@@ -52,16 +43,6 @@ const storageClassDirectories = new Map([
 
 function createArtworkValidationError(code, message) {
   return createApiError(400, code, message);
-}
-
-function ensureNonEmptyBuffer(buffer) {
-  if (!Buffer.isBuffer(buffer)) {
-    throw createArtworkValidationError('validation_error', 'artwork buffer must be a Buffer');
-  }
-
-  if (buffer.length === 0) {
-    throw createArtworkValidationError('validation_error', 'artwork buffer must not be empty');
-  }
 }
 
 function computeSha256(buffer) {
@@ -92,25 +73,6 @@ export function buildArtworkRelativePath({ extension, sha256, storageClass }) {
   return path.posix.join(directory, sha256.slice(0, 2), sha256.slice(2, 4), `${sha256}.${extension}`);
 }
 
-export async function inspectArtworkBuffer(buffer, { maxDimensionPixels } = {}) {
-  ensureNonEmptyBuffer(buffer);
-  assertArtworkRasterSignature(buffer);
-  const options = artworkSharpInputOptions(maxDimensionPixels);
-  try { return await sharp(buffer, options).metadata(); }
-  catch { throw createArtworkValidationError('artwork_image_invalid', 'Artwork could not be inspected within the image policy'); }
-}
-
-export async function sanitizeArtworkBuffer({ buffer, format, maxDimensionPixels }) {
-  const encoder = outputEncoders[format];
-  if (!encoder) {
-    throw createArtworkValidationError('artwork_format_unsupported', `Unsupported artwork format: ${format}`);
-  }
-
-  const pipeline = encoder(sharp(buffer, artworkSharpInputOptions(maxDimensionPixels)).rotate()).timeout({ seconds: 3 });
-  try { return await pipeline.toBuffer({ resolveWithObject: true }); }
-  catch { throw createArtworkValidationError('artwork_image_invalid', 'Artwork could not be decoded within the image policy'); }
-}
-
 export async function prepareArtworkAsset({
   buffer,
   fetchedAt = null,
@@ -120,25 +82,27 @@ export async function prepareArtworkAsset({
   storageClass = 'provider_original',
   inspectArtworkBufferFn = inspectArtworkBuffer,
   sanitizeArtworkBufferFn = sanitizeArtworkBuffer,
-  sharpStatsFn = async (buf) => sharp(buf).stats(),
+  sharpStatsFn = getArtworkBufferStats,
 } = {}) {
-  ensureNonEmptyBuffer(buffer);
+  assertArtworkBuffer(buffer);
 
   if (!policy?.limits || !policy?.storage?.root) {
     throw new Error('policy with artwork limits and storage paths is required');
   }
 
   const normalizedStorageClass = normalizeStorageClass(storageClass);
-  const payloadChecksum = computeSha256(buffer);
+  const byteLimit = artworkInputByteLimit(policy.limits);
+  const dimensionLimit = policy.limits.maxOriginalDimensionPixels ?? 8192;
 
-  if (buffer.length > policy.limits.maxOriginalFileSizeBytes) {
+  if (buffer.length > byteLimit) {
     throw createArtworkValidationError(
       'artwork_file_too_large',
-      `Artwork file exceeds the configured size limit of ${policy.limits.maxOriginalFileSizeBytes} bytes`,
+      `Artwork file exceeds the configured size limit of ${byteLimit} bytes`,
     );
   }
 
-  const metadata = await inspectArtworkBufferFn(buffer, { maxDimensionPixels: policy.limits.maxOriginalDimensionPixels });
+  const payloadChecksum = computeSha256(buffer);
+  const metadata = await inspectArtworkBufferFn(buffer, { maxDimensionPixels: dimensionLimit });
   const { width, height } = resolveCanonicalDimensions(metadata);
   const formatDescriptor = supportedInputFormats.get(metadata.format);
 
@@ -157,17 +121,17 @@ export async function prepareArtworkAsset({
     throw createArtworkValidationError('artwork_animation_unsupported', 'Animated or multi-page artwork is not supported');
   }
 
-  if (width > policy.limits.maxOriginalDimensionPixels || height > policy.limits.maxOriginalDimensionPixels) {
+  if (width > dimensionLimit || height > dimensionLimit) {
     throw createArtworkValidationError(
       'artwork_dimensions_too_large',
-      `Artwork dimensions exceed the configured limit of ${policy.limits.maxOriginalDimensionPixels} pixels`,
+      `Artwork dimensions exceed the configured limit of ${dimensionLimit} pixels`,
     );
   }
 
   const { data, info } = await sanitizeArtworkBufferFn({
     buffer,
     format: metadata.format,
-    maxDimensionPixels: policy.limits.maxOriginalDimensionPixels,
+    maxDimensionPixels: dimensionLimit,
   });
   const sha256 = computeSha256(data);
   const relativePath = buildArtworkRelativePath({
@@ -181,7 +145,7 @@ export async function prepareArtworkAsset({
   let dominantLightness = null;
 
   try {
-    const stats = await sharpStatsFn(data);
+    const stats = await sharpStatsFn(data, { maxDimensionPixels: dimensionLimit });
     const { r, g, b } = stats.dominant;
     const { l, c, h } = rgbToOklch(r, g, b);
     if (c >= VIBRANCY_THRESHOLD) {
@@ -231,20 +195,20 @@ export function createArtworkIngestionService({
   artworkPolicyService = createArtworkPolicyService(),
   getArtworkAssetBySha256Fn = getArtworkAssetBySha256,
   inspectArtworkBufferFn = inspectArtworkBuffer,
-  readFileFn = readFile,
+  readFileFn = readArtworkFile,
+  artworkIngestionAdmission = createArtworkIngestionAdmission(),
   sanitizeArtworkBufferFn = sanitizeArtworkBuffer,
   upsertArtworkAssetFn = upsertArtworkAsset,
   writeFileFn = writeFile,
   mkdirFn = mkdir,
 } = {}) {
-  async function ingestArtworkBuffer({
+  async function ingestAdmittedArtwork({
     buffer,
     fetchedAt = null,
     sourceProvider = null,
     sourceUrl = null,
     storageClass = 'provider_original',
-  } = {}) {
-    const policy = await artworkPolicyService.getArtworkRuntimePolicy();
+  }, policy) {
     const prepared = await prepareArtworkAsset({
       buffer,
       fetchedAt,
@@ -282,25 +246,26 @@ export function createArtworkIngestionService({
     };
   }
 
-  async function ingestArtworkFile({
-    filePath,
-    fetchedAt = null,
-    sourceProvider = null,
-    sourceUrl = null,
-    storageClass = 'provider_original',
-  } = {}) {
-    if (typeof filePath !== 'string' || filePath.trim().length === 0) {
-      throw createArtworkValidationError('validation_error', 'filePath must be a non-empty string');
-    }
+  async function ingestArtworkBuffer({ buffer, fetchedAt = null, sourceProvider = null, sourceUrl = null,
+    storageClass = 'provider_original', signal } = {}) {
+    assertArtworkBuffer(buffer);
+    if (buffer.length > 100 * 1024 * 1024) throw createArtworkValidationError('artwork_file_too_large', 'Artwork buffer exceeds the maximum byte limit');
+    return artworkIngestionAdmission.run(async () => {
+      const policy = await artworkPolicyService.getArtworkRuntimePolicy();
+      return ingestAdmittedArtwork({ buffer, fetchedAt, sourceProvider, sourceUrl, storageClass }, policy);
+    }, { signal, weight: buffer.length });
+  }
 
-    const buffer = await readFileFn(filePath);
-    return ingestArtworkBuffer({
-      buffer,
-      fetchedAt,
-      sourceProvider,
-      sourceUrl,
-      storageClass,
-    });
+  async function ingestArtworkFile({ filePath, fetchedAt = null, sourceProvider = null, sourceUrl = null,
+    storageClass = 'provider_original', signal } = {}) {
+    if (typeof filePath !== 'string' || !filePath.trim() || filePath.length > 32_768) {
+      throw createArtworkValidationError('validation_error', 'filePath must be a bounded non-empty string');
+    }
+    return artworkIngestionAdmission.run(async () => {
+      const policy = await artworkPolicyService.getArtworkRuntimePolicy();
+      const buffer = await readFileFn(filePath, { maxBytes: artworkInputByteLimit(policy.limits) });
+      return ingestAdmittedArtwork({ buffer, fetchedAt, sourceProvider, sourceUrl, storageClass }, policy);
+    }, { signal });
   }
 
   return {

@@ -5,6 +5,18 @@
  */
 import { createApiError } from '../auth.js';
 
+export function assertArtworkBuffer(buffer) {
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0) throw createApiError(400, 'validation_error', 'Artwork buffer must not be empty');
+}
+
+export function artworkInputByteLimit(limits) {
+  const value = limits?.maxOriginalFileSizeBytes ?? 20 * 1024 * 1024;
+  if (!Number.isSafeInteger(value) || value < 1 || value > 100 * 1024 * 1024) {
+    throw createApiError(400, 'artwork_policy_invalid', 'Artwork byte policy is invalid');
+  }
+  return value;
+}
+
 export function assertArtworkRasterSignature(buffer) {
   const jpeg = buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
   const png = buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));

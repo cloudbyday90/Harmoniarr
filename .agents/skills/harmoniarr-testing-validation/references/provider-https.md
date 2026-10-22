@@ -1,5 +1,12 @@
 # Provider HTTPS qualification
 
+Direct artwork ingestion also uses the shared image-processing owner. Keep the
+weighted admission/file-reader tests with provider compatibility when it changes.
+`test/native/artwork-file-reader.test.js` is explicit Linux FIFO/growing-handle
+proof, outside the fast server glob. `artwork-ingestion-workload.js` compares real
+decode/files/publication across immutable images; compare exact output projections
+and retire its containers rather than treating sampled RSS as a memory ceiling.
+
 For aggregate artwork admission, use artwork-fetch-admission policy/consumer tests
 and artwork-admission-https.test.js. Hold actual final assignment while overlapping
 batch/single work waits; prove only two downloads/rewrites and queued cancellation

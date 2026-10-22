@@ -34,3 +34,29 @@ proof establishes lifecycle counts, not safe RSS or production throughput. Prese
 resource controls and qualify large-image/multi-process needs separately. See the
 [design](../../../../docs/ARTWORK_ADMISSION_DESIGN.md) and
 [outcome](../../../../docs/ARTWORK_ADMISSION_OUTCOME.md).
+
+## Direct image ingestion
+
+Inventory actual callers before assuming a feature exists. Artwork serving reads
+stored originals; derivative settings/directories alone do not establish a running
+generator. Provider, embedded and sidecar paths share the module's ingestion service.
+Its independent gate covers reading/decoding through asset publication. Fetch can
+hold an outer fetch slot while awaiting this gate; ingestion must not reacquire its
+own gate from the file entrypoint or acquire fetch admission in reverse order.
+
+Bound queued buffer bytes as well as count. Supplied buffers remain caller-owned
+and must stay stable through completion; this accounting does not bound allocations
+made before the call. Queue paths without reading files first. Stat and bounded
+reads belong to one regular-file handle; count the first excess byte after growth
+and await close. Keep read-limit evidence distinct from path authorization or file
+snapshot/immutability claims. Native file errors need fixed private diagnostics.
+
+Use artwork-ingestion-budget/admission and artwork-file-reader server tests, then
+the explicit Linux native FIFO/growth lane. The fixed ingestion workload measures
+six real one-megapixel files/buffers; compare exact hashes/dimensions/publications
+between immutable images. Sampled RSS and one elapsed pair are observations, not
+worst-case capacity, safe defaults or a throughput improvement. Keep measurement
+containers isolated and verify their exact retirement. See the
+[ingestion design](../../../../docs/ARTWORK_INGESTION_BUDGET_DESIGN.md),
+[research](../../../../docs/ARTWORK_INGESTION_BUDGET_RESEARCH.md) and
+[outcome](../../../../docs/ARTWORK_INGESTION_BUDGET_OUTCOME.md).

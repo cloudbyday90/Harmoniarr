@@ -48,6 +48,13 @@ publication. See the [design](docs/ARTWORK_ADMISSION_DESIGN.md),
 [outcome](docs/ARTWORK_ADMISSION_OUTCOME.md) and
 [Docker rebuild](docs/LOCAL_DOCKER_ARTWORK_ADMISSION_OUTCOME.md).
 
+Provider, embedded and sidecar ingestion now share a decode/publication budget,
+with bounded queued buffer bytes and same-handle file reads. See the
+[design](docs/ARTWORK_INGESTION_BUDGET_DESIGN.md),
+[research and tradeoffs](docs/ARTWORK_INGESTION_BUDGET_RESEARCH.md),
+[outcome](docs/ARTWORK_INGESTION_BUDGET_OUTCOME.md) and
+[Docker rebuild](docs/LOCAL_DOCKER_ARTWORK_INGESTION_OUTCOME.md).
+
 MusicBrainz now uses operation-specific decoded JSON limits, preserves large
 release payloads and paging, and retires ignored HTTP bodies before retrying.
 See the [design and tradeoffs](docs/MUSICBRAINZ_RESPONSE_DESIGN.md),
