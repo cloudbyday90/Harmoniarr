@@ -15,7 +15,7 @@ for (const [scenario, count] of [['normal', 5], ['bounds', 7], ['adverse', 4]]) 
     const closes = []; const timers = new Set(); const closed = [];
     const track = (req, path) => { closes.push(new Promise(resolve => { req.socket.once('close', () => { closed.push(path); resolve(); }); })); };
     try {
-      await withProviderHttpsFixture({ signal: t.signal, consumerUrl: new URL('../../testing/server/artwork-image-https-consumer.js', import.meta.url),
+      await withProviderHttpsFixture({ signal: t.signal, transport: 'direct', consumerUrl: new URL('../../testing/server/artwork-image-https-consumer.js', import.meta.url),
         handler(req, res) {
           assert.equal(req.socket.servername, req.headers.host); assert.equal(req.method, 'GET');
           assert.equal(req.headers['accept-encoding'], 'identity');
@@ -49,6 +49,7 @@ for (const [scenario, count] of [['normal', 5], ['bounds', 7], ['adverse', 4]]) 
         const result = await runClient(scenario); assert.equal(result.imageBoundaryPassed, true);
         assert.equal(result.node, process.versions.node); assert.equal(result.tlsVerificationDisabled, false);
         assert.equal(records.requests.length, count);
+        assert.equal(records.proxyConnections, 0);
         assert.equal(records.tunnels.some(authority => authority.includes('redirect-sink')), false);
         if (scenario === 'normal') assert.equal(records.tlsErrors.length, 0);
         else assert.ok(records.tlsErrors.every(code => code === 'ECONNRESET'));

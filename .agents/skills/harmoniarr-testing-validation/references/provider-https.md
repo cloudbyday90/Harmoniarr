@@ -117,3 +117,23 @@ abort is distinct from failed identity verification. Preserve failed native runs
 and identify production fixes separately from corrected fixture expectations.
 See [design](../../../../docs/ARTWORK_IMAGE_DOWNLOAD_DESIGN.md) and
 [outcome](../../../../docs/ARTWORK_IMAGE_DOWNLOAD_OUTCOME.md).
+
+## Artwork connection-time egress
+
+Use `artwork-egress.test.js` for complete A/AAAA validation, immutable pinning,
+proxy refusal, cancelled/late DNS and fresh redirect/retry resolution. Keep the
+Push public-policy/resolver/transport checks when changing their extracted owner.
+`artwork-egress-https.test.js` observes native fallback, TLS identity refusal,
+proxy non-contact and rebinding refusal with a healthy-after-close gate.
+
+The direct fixture inspects production lookup, Host/SNI, agent and verification
+options before a test-only loopback reroute. Its public DNS answers are controlled;
+do not claim public Internet or native IPv6 reachability. Read Node's completed
+`autoSelectFamilyAttemptedAddresses` for fallback evidence: the first attempt may
+precede the request's socket event listener. A missing event alone is not a lost
+connection attempt. Keep earlier failing event-capture evidence.
+
+Artwork fails closed when a proxy is configured, including NO_PROXY wildcard.
+Do not silently bypass that condition for live checks or infer safe proxy support
+from a CONNECT fixture. See [egress design](../../../../docs/ARTWORK_EGRESS_DESIGN.md)
+and [outcome](../../../../docs/ARTWORK_EGRESS_OUTCOME.md).

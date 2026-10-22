@@ -13,9 +13,12 @@ import { createArtworkImageDownloadService } from '../../src/server/artwork/artw
 import { createArtworkFetchService } from '../../src/server/artwork/artwork-fetch-service.js';
 import { createArtworkIngestionService } from '../../src/server/artwork/artwork-ingestion-service.js';
 import { createCoverArtArchiveClient } from '../../src/server/integrations/cover-art-archive/cover-art-archive-client.js';
+import { createArtworkEgressFixture } from './artwork-egress-fixture.js';
 
 const host = 'https://assets.fanart.tv/';
-const get = createArtworkImageDownloadService({ requestTimeoutMs: 1200 }).downloadImage;
+const egress = createArtworkEgressFixture();
+const downloads = createArtworkImageDownloadService({ requestTimeoutMs: 1200, fetchImpl: egress.fetchImpl });
+const get = downloads.downloadImage;
 const options = { sourceProvider: 'fanartTv', limits: { maxOriginalFileSizeBytes: 256 } };
 async function refused(path, diagnosticCode) {
   await assert.rejects(get(new URL(path, host), options), error => {
@@ -35,10 +38,11 @@ async function normal() {
     getArtworkAssetBySha256Fn: async () => null, upsertArtworkAssetFn: async asset => { assets.push(asset); return { ...asset, id: `asset-${assets.length}` }; } });
   try {
     for (const sourceProvider of ['fanartTv', 'theAudioDb', 'coverArtArchive']) {
-      const clients = sourceProvider === 'coverArtArchive' ? { coverArtArchiveClient: createCoverArtArchiveClient({ maxRetries: 0 }) }
+      const clients = sourceProvider === 'coverArtArchive' ? { coverArtArchiveClient: createCoverArtArchiveClient({ maxRetries: 0, fetchImpl: egress.fetchImpl }) }
         : sourceProvider === 'fanartTv' ? { fanartTvClient: { fetchArtistImages: async () => [{ imageType: 'artistthumb', url: `${host}normal.png` }] } }
           : { theAudioDbClient: { fetchArtistImages: async () => [{ imageType: 'artistthumb', url: 'https://www.theaudiodb.com/images/normal.png' }] } };
       const service = createArtworkFetchService({ ...clients, artworkPolicyService, artworkIngestionService,
+        downloadImageFn: downloads.downloadImageBuffer,
         listArtworkAssignmentsFn: async () => [], artworkAssignmentService: { assignPreferredArtwork: async input => { assignments.push(input); } } });
       const ownerType = sourceProvider === 'coverArtArchive' ? 'musicbrainz_release_group' : 'musicbrainz_artist';
       const artworkRole = sourceProvider === 'coverArtArchive' ? 'cover_front' : 'artist_thumbnail';

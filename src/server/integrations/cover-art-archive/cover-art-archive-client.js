@@ -30,7 +30,7 @@ export function createCoverArtArchiveClient({
   minIntervalMs = process.env.COVERARTARCHIVE_MIN_INTERVAL_MS,
   requestTimeoutMs = process.env.COVERARTARCHIVE_REQUEST_TIMEOUT_MS,
   maxRetries = process.env.COVERARTARCHIVE_MAX_RETRIES,
-  fetchImpl = fetch,
+  fetchImpl,
   sleepImpl = delay => new Promise(resolve => { setTimeout(resolve, delay); }),
 } = {}) {
   let normalizedBaseUrl;

@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
-The October 22 [artwork image rebuild](LOCAL_DOCKER_ARTWORK_IMAGE_OUTCOME.md)
+The October 22 [artwork egress rebuild](LOCAL_DOCKER_ARTWORK_EGRESS_OUTCOME.md)
 records the current no-cache image, preserved admin/data and passing readiness.
+The [owning outcome](ARTWORK_EGRESS_OUTCOME.md) records connection-time public
+destination enforcement, direct-only routing and separate native qualification.
+
+The October 22 [artwork image rebuild](LOCAL_DOCKER_ARTWORK_IMAGE_OUTCOME.md)
+records the preceding no-cache image, preserved admin/data and passing readiness.
 The [owning outcome](ARTWORK_IMAGE_DOWNLOAD_OUTCOME.md) records provider origins,
 bounded image transport and real Sharp publication separately from live acceptance.
 

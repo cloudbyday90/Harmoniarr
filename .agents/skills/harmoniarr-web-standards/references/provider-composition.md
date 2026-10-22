@@ -42,3 +42,13 @@ An origin allowlist does not establish connect-time DNS pinning or untrusted-pro
 protection. Record deployment routing assumptions explicitly. See the
 [image design](../../../../docs/ARTWORK_IMAGE_DOWNLOAD_DESIGN.md) and
 [research](../../../../docs/ARTWORK_IMAGE_DOWNLOAD_RESEARCH.md).
+
+For connection-time egress, validate the entire A/AAAA result and connect only
+through a copied immutable snapshot; include every automatic fallback. Repeat
+resolution for redirects and retries, and prevent cancelled/late DNS from opening
+a socket. Preserve original Host/SNI/default certificate checks. A configured proxy
+requires qualified routing or explicit refusal, never silent bypass. Reuse the
+shared public-address/DNS modules while retaining consumer-specific diagnostics.
+See [egress design](../../../../docs/ARTWORK_EGRESS_DESIGN.md) and its separate
+[research](../../../../docs/ARTWORK_EGRESS_RESEARCH.md). This does not qualify other
+clients, system routing, certificate-root administration or aggregate image load.

@@ -7,12 +7,15 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 /** A new process owns all proxy/trust configuration; never inherit operator secrets. */
-export async function runProviderHttpsChild({ proxyUrl, caFile, scenario, signal,
+export async function runProviderHttpsChild({ proxyUrl, tlsPort, caFile, scenario, signal,
   consumerUrl = new URL('./provider-https-consumer.js', import.meta.url) }) {
   signal?.throwIfAborted();
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) =>
     /^(PATH|SYSTEMROOT|WINDIR|TEMP|TMP|LANG|TZ)$/iu.test(key)));
-  Object.assign(env, { NODE_USE_ENV_PROXY: '1', HTTPS_PROXY: proxyUrl, HTTP_PROXY: proxyUrl, NO_PROXY: '' });
+  if (tlsPort !== undefined) {
+    if (!Number.isInteger(tlsPort) || tlsPort < 1 || tlsPort > 65535) throw new Error('Invalid owned TLS fixture port');
+    Object.assign(env, { HARMONIARR_TEST_HTTPS_PORT: String(tlsPort), HARMONIARR_TEST_PROXY_URL: proxyUrl });
+  } else Object.assign(env, { NODE_USE_ENV_PROXY: '1', HTTPS_PROXY: proxyUrl, HTTP_PROXY: proxyUrl, NO_PROXY: '' });
   if (caFile) env.NODE_EXTRA_CA_CERTS = caFile;
   const child = spawn(process.execPath, [fileURLToPath(consumerUrl), scenario], {
     env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],

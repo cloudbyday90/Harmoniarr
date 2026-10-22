@@ -35,6 +35,12 @@ the [design](docs/ARTWORK_IMAGE_DOWNLOAD_DESIGN.md),
 [validation outcome](docs/ARTWORK_IMAGE_DOWNLOAD_OUTCOME.md) and
 [Docker rebuild](docs/LOCAL_DOCKER_ARTWORK_IMAGE_OUTCOME.md).
 
+Artwork egress now checks both DNS families and pins HTTPS fallback to a validated
+address snapshot. Environment-proxy artwork requests fail closed. See the
+[design](docs/ARTWORK_EGRESS_DESIGN.md), [research and tradeoffs](docs/ARTWORK_EGRESS_RESEARCH.md),
+[validation outcome](docs/ARTWORK_EGRESS_OUTCOME.md) and
+[Docker rebuild](docs/LOCAL_DOCKER_ARTWORK_EGRESS_OUTCOME.md).
+
 MusicBrainz now uses operation-specific decoded JSON limits, preserves large
 release payloads and paging, and retires ignored HTTP bodies before retrying.
 See the [design and tradeoffs](docs/MUSICBRAINZ_RESPONSE_DESIGN.md),

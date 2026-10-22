@@ -5,6 +5,7 @@
  */
 import { awaitProviderRequest } from '../integrations/provider-request-cancellation.js';
 import { assertArtworkRasterSignature } from './artwork-image-content-policy.js';
+import { createArtworkImageTransport } from './artwork-image-transport.js';
 import { admitArtworkImageUrl, artworkImageByteLimit, artworkImageError, artworkImageRetryAfter, isArtworkImageError } from './artwork-image-download-policy.js';
 
 const redirects = new Set([301, 302, 303, 307, 308]);
@@ -12,7 +13,7 @@ const redirects = new Set([301, 302, 303, 307, 308]);
 // a handler. Observe cleanup rejection immediately while preserving its result.
 function observed(promise) { void promise?.catch(() => {}); return promise; }
 
-export function createArtworkImageDownloadService({ fetchImpl = fetch, requestTimeoutMs = 15000 } = {}) {
+export function createArtworkImageDownloadService({ fetchImpl = createArtworkImageTransport().fetchImage, requestTimeoutMs = 15000 } = {}) {
   if (!Number.isSafeInteger(requestTimeoutMs) || requestTimeoutMs < 1 || requestTimeoutMs > 2_147_483_647) {
     throw artworkImageError('policy_invalid');
   }
@@ -31,7 +32,10 @@ export function createArtworkImageDownloadService({ fetchImpl = fetch, requestTi
             credentials: 'omit', referrerPolicy: 'no-referrer',
             headers: { Accept: 'image/jpeg, image/png, image/webp', 'Accept-Encoding': 'identity', ...(userAgent ? { 'User-Agent': userAgent } : {}) },
           }), { signal });
-        } catch { throw artworkImageError(signal.aborted ? 'timeout' : 'transport_failed', { retryable: true }); }
+        } catch (error) {
+          if (isArtworkImageError(error)) throw error;
+          throw artworkImageError(signal.aborted ? 'timeout' : 'transport_failed', { retryable: true });
+        }
         if (response.redirected || (response.url && response.url !== url.href)) throw artworkImageError('url_refused');
         if (redirects.has(response.status)) {
           if (sourceProvider !== 'coverArtArchive' || hop >= 3) throw artworkImageError('redirect_refused');
