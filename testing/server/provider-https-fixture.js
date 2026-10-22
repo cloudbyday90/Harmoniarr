@@ -16,7 +16,7 @@ import { runProviderHttpsChild } from './provider-https-child-runner.js';
 
 const authorities = new Set(['api.spotify.com:443', 'accounts.spotify.com:443', 'www.googleapis.com:443',
   'oauth2.googleapis.com:443', 'api.music.apple.com:443', 'ws.audioscrobbler.com:443', 'musicbrainz.org:443',
-  '127.0.0.1:443', 'redirect-sink.example.invalid:443']);
+  'webservice.fanart.tv:443', '127.0.0.1:443', 'redirect-sink.example.invalid:443']);
 
 /** Public certificates only. The proxy never resolves or connects to the requested authority. */
 export async function withProviderHttpsFixture({ profile = 'matched', handler, signal, consumerUrl }, run) {

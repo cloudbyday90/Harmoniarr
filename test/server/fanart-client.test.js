@@ -3,7 +3,7 @@ import test from 'node:test';
 import { createFanartTvClient, selectArtistImages, selectAlbumImages } from '../../src/server/integrations/fanart-tv/fanart-client.js';
 
 test('fetchArtistImages returns empty array for 404/null response', async () => {
-  const fetchImpl = async () => ({ ok: false, status: 404, headers: new Map() });
+  const fetchImpl = async () => new Response(null, { status: 404 });
   const client = createFanartTvClient({
     fetchImpl,
     requestTimeoutMs: 5000,
@@ -30,12 +30,7 @@ test('fetchArtistImages returns parsed artist images', async () => {
     ],
   };
 
-  const fetchImpl = async () => ({
-    ok: true,
-    status: 200,
-    headers: new Map(),
-    json: async () => responseBody,
-  });
+  const fetchImpl = async () => new Response(JSON.stringify(responseBody));
 
   const client = createFanartTvClient({
     fetchImpl,
@@ -58,12 +53,7 @@ test('fetchAlbumImages returns parsed album images', async () => {
     ],
   };
 
-  const fetchImpl = async () => ({
-    ok: true,
-    status: 200,
-    headers: new Map(),
-    json: async () => responseBody,
-  });
+  const fetchImpl = async () => new Response(JSON.stringify(responseBody));
 
   const client = createFanartTvClient({
     fetchImpl,
@@ -78,7 +68,7 @@ test('fetchAlbumImages returns parsed album images', async () => {
 
 test('fetchArtistImages throws for empty mbid', async () => {
   const client = createFanartTvClient({
-    fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({}) }),
+    fetchImpl: async () => new Response('{}'),
     requestTimeoutMs: 5000,
   });
 
@@ -92,7 +82,7 @@ test('fetchArtistImages sends api-key and client-key headers', async () => {
   let sentHeaders = null;
   const fetchImpl = async (_url, options) => {
     sentHeaders = options.headers;
-    return { ok: true, status: 200, headers: new Map(), json: async () => ({}) };
+    return new Response('{}');
   };
 
   const client = createFanartTvClient({
@@ -111,8 +101,8 @@ test('fetchArtistImages retries on 503', async () => {
   let callCount = 0;
   const fetchImpl = async () => {
     callCount += 1;
-    if (callCount === 1) return { ok: false, status: 503, headers: new Map() };
-    return { ok: true, status: 200, headers: new Map(), json: async () => ({}) };
+    if (callCount === 1) return new Response(null, { status: 503 });
+    return new Response('{}');
   };
 
   const client = createFanartTvClient({

@@ -61,7 +61,31 @@ distinguish correcting a mock's call count or read-start gate from a runtime fix
 See [MusicBrainz design](../../../../docs/MUSICBRAINZ_RESPONSE_DESIGN.md) and
 [outcome](../../../../docs/MUSICBRAINZ_RESPONSE_OUTCOME.md).
 
-This fixture covers the shared JSON clients, Last.fm and MusicBrainz. It does not cover other metadata/slskd/Plex/push clients,
+## Fanart.tv response ownership
+
+Use `fanart-response.test.js` for exact decoded limits, awaited HTTP-body cleanup,
+credential-resolver privacy and the actual artwork consumer. Use
+`fanart-https.test.js` for default-origin Host/SNI, header-only synthetic keys,
+redirect-target refusal, decompression and deadline-driven socket retirement.
+Preserve 404-empty results and selection priority. A successful flat album fixture
+is compatibility evidence, not proof of current v3.2 nested album selection.
+Match provider schema/version and requested target before claiming live payload
+support. Trace default application credential wiring separately: injected keys
+prove the client transport, not delivery of saved keys through startup composition.
+See [design](../../../../docs/FANART_RESPONSE_DESIGN.md) and
+[outcome](../../../../docs/FANART_RESPONSE_OUTCOME.md).
+
+Validate retry/timeout configuration before admission. Very long Retry-After
+values must not overflow Node's timer and become early retries; qualify approved
+deferred failure separately from ordinary date/seconds and backoff behavior.
+JSON refusal must occur before image download/ingestion. This does not qualify
+the subsequent image downloader's URL, redirect, byte or image-format policy.
+For no-cache OS drift, keep the original artifact refusal and qualify the exact
+new package separately. Node's bundled component version can remain unchanged
+after a security backport; it is not the same binary as the OS shared library.
+See the [Docker outcome](../../../../docs/LOCAL_DOCKER_FANART_RESPONSE_OUTCOME.md).
+
+This fixture covers the shared JSON clients, Last.fm, MusicBrainz and Fanart.tv. It does not cover other metadata/slskd/Plex/push clients,
 live public DNS, remote providers, proxy authentication, all TLS variants or full
 application SSRF resistance. See the [design](../../../../docs/PROVIDER_HTTPS_DESIGN.md)
 and [outcome](../../../../docs/PROVIDER_HTTPS_OUTCOME.md).

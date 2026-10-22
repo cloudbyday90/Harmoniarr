@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
-The October 21 [MusicBrainz response rebuild](LOCAL_DOCKER_MUSICBRAINZ_RESPONSE_OUTCOME.md)
+The October 22 [Fanart.tv response rebuild](LOCAL_DOCKER_FANART_RESPONSE_OUTCOME.md)
 records the current no-cache image, preserved admin/data and passing readiness.
+The [owning outcome](FANART_RESPONSE_OUTCOME.md) records bounded metadata,
+credential privacy and native HTTPS qualification separately.
+
+The October 21 [MusicBrainz response rebuild](LOCAL_DOCKER_MUSICBRAINZ_RESPONSE_OUTCOME.md)
+records the preceding no-cache image, preserved admin/data and passing readiness.
 The [owning outcome](MUSICBRAINZ_RESPONSE_OUTCOME.md) records operation-specific
 limits, complete release compatibility and native HTTPS qualification separately.
 

@@ -14,6 +14,13 @@ qualification, including sanitized malformed-URL refusal. See the
 [design](docs/PROVIDER_HTTPS_DESIGN.md), [official research](docs/PROVIDER_HTTPS_RESEARCH_2026_10.md)
 and [outcome](docs/PROVIDER_HTTPS_OUTCOME.md).
 
+Fanart.tv metadata now uses bounded decoded JSON, retires ignored HTTP bodies and
+keeps credential-bearing failures private. See the
+[design and tradeoffs](docs/FANART_RESPONSE_DESIGN.md),
+[official research](docs/FANART_RESPONSE_RESEARCH_2026_10.md),
+[validation outcome](docs/FANART_RESPONSE_OUTCOME.md) and
+[local Docker rebuild](docs/LOCAL_DOCKER_FANART_RESPONSE_OUTCOME.md).
+
 MusicBrainz now uses operation-specific decoded JSON limits, preserves large
 release payloads and paging, and retires ignored HTTP bodies before retrying.
 See the [design and tradeoffs](docs/MUSICBRAINZ_RESPONSE_DESIGN.md),
