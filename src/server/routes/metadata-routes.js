@@ -46,6 +46,8 @@ function normalizeMetadataError(error) {
       return createApiError(503, error.code, 'MusicBrainz is temporarily unavailable');
     case 'musicbrainz_request_failed':
       return createApiError(502, error.code, error.message);
+    case 'musicbrainz_invalid_response':
+      return createApiError(502, error.code, 'MusicBrainz returned an invalid response');
     default:
       return error;
   }

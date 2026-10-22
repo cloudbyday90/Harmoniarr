@@ -23,10 +23,10 @@ import {
 } from '../../outbound-url-policy.js';
 import {
   awaitProviderRequest,
-  createProviderRequestSignal,
   throwIfProviderRequestAborted,
   waitForProviderRequestDelay,
 } from '../provider-request-cancellation.js';
+import { createMusicBrainzRequestService } from './musicbrainz-request-service.js';
 import { resolveMusicBrainzRequestPolicy } from './musicbrainz-request-policy.js';
 
 // Last-resort contact used in the User-Agent when no HARMONIARR_CONTACT_URL or
@@ -66,7 +66,7 @@ function normalizeBaseUrl(value, { allowedHosts, allowedHostSuffixes }) {
   } catch {
     throw createMusicBrainzError(
       'musicbrainz_misconfigured',
-      `Invalid MusicBrainz base URL: ${candidate}`,
+      'Invalid MusicBrainz base URL',
     );
   }
 }
@@ -79,61 +79,6 @@ function resolveUserAgent({ applicationName, applicationVersion, contactEmail, c
   const contact = contactUrl ?? contactEmail ?? DEFAULT_CONTACT_URL;
 
   return `${applicationName}/${applicationVersion} (${contact})`;
-}
-
-function computeBackoffDelay(attemptNumber, minIntervalMs) {
-  const boundedAttempt = Math.min(attemptNumber, 4);
-  const baseDelay = minIntervalMs * (2 ** boundedAttempt);
-  const jitter = Math.floor(Math.random() * 250);
-  return baseDelay + jitter;
-}
-
-function getHeader(response, headerName) {
-  if (!response.headers?.get) {
-    return null;
-  }
-
-  return response.headers.get(headerName);
-}
-
-function parseRetryAfterMs(value, nowMs = Date.now()) {
-  if (value == null || value === '') {
-    return null;
-  }
-
-  const seconds = Number(value);
-  if (Number.isFinite(seconds) && seconds >= 0) {
-    return Math.ceil(seconds * 1000);
-  }
-
-  const dateMs = Date.parse(value);
-  if (Number.isFinite(dateMs)) {
-    return Math.max(0, dateMs - nowMs);
-  }
-
-  return null;
-}
-
-function buildFailureDetails({
-  cause,
-  maxRetries,
-  retryable,
-  retryAfterMs = null,
-  status = null,
-  throttled = false,
-  url,
-  attempts,
-}) {
-  return {
-    attempts,
-    cause,
-    maxRetries,
-    retryable,
-    retryAfterMs,
-    status,
-    throttled,
-    url,
-  };
 }
 
 export function createMusicBrainzClient({
@@ -164,8 +109,8 @@ export function createMusicBrainzClient({
       minIntervalMs,
       requestTimeoutMs,
     });
-  } catch (error) {
-    throw createMusicBrainzError('musicbrainz_misconfigured', error.message);
+  } catch {
+    throw createMusicBrainzError('musicbrainz_misconfigured', 'Invalid MusicBrainz request policy');
   }
   const {
     maxRetries: effectiveMaxRetries,
@@ -177,6 +122,11 @@ export function createMusicBrainzClient({
     applicationVersion,
     contactEmail,
     contactUrl,
+  });
+
+  const requestService = createMusicBrainzRequestService({
+    fetchImpl, sleepImpl, requestTimeoutMs: effectiveRequestTimeoutMs,
+    maxRetries: effectiveMaxRetries, minIntervalMs: effectiveMinIntervalMs, userAgent,
   });
 
   let queuedRequest = Promise.resolve();
@@ -215,102 +165,7 @@ export function createMusicBrainzClient({
         url.searchParams.set(key, String(value));
       }
 
-      for (let attempt = 0; attempt <= effectiveMaxRetries; attempt += 1) {
-        throwIfProviderRequestAborted(signal);
-
-        let response;
-        try {
-          response = await fetchImpl(url, {
-            method: 'GET',
-            headers: {
-              Accept: 'application/json',
-              'User-Agent': userAgent,
-            },
-            redirect: 'error',
-            signal: createProviderRequestSignal({
-              signal,
-              timeoutMs: effectiveRequestTimeoutMs,
-            }),
-          });
-        } catch (error) {
-          throwIfProviderRequestAborted(signal);
-
-          if (attempt < effectiveMaxRetries) {
-            await waitForProviderRequestDelay(
-              computeBackoffDelay(attempt + 1, effectiveMinIntervalMs),
-              { signal, sleepImpl },
-            );
-            continue;
-          }
-
-          throw createMusicBrainzError(
-            'musicbrainz_unavailable',
-            `MusicBrainz ${operation} request failed before receiving a response`,
-            buildFailureDetails({
-              attempts: attempt + 1,
-              cause: error,
-              maxRetries: effectiveMaxRetries,
-              retryable: true,
-              url: url.toString(),
-            }),
-          );
-        }
-
-        if (response.ok) {
-          return response.json();
-        }
-
-        if (response.status === 404) {
-          throw createMusicBrainzError(
-            'musicbrainz_not_found',
-            `MusicBrainz ${operation} not found`,
-            buildFailureDetails({
-              attempts: attempt + 1,
-              maxRetries: effectiveMaxRetries,
-              retryable: false,
-              status: response.status,
-              url: url.toString(),
-            }),
-          );
-        }
-
-        const retryable = response.status === 429 || response.status === 503 || response.status >= 500;
-        const retryAfterMs = parseRetryAfterMs(getHeader(response, 'retry-after'));
-        const throttled = response.status === 429 || response.status === 503;
-        if (retryable && attempt < effectiveMaxRetries) {
-          const backoffDelayMs = computeBackoffDelay(attempt + 1, effectiveMinIntervalMs);
-          await waitForProviderRequestDelay(
-            retryAfterMs == null ? backoffDelayMs : Math.max(backoffDelayMs, retryAfterMs),
-            { signal, sleepImpl },
-          );
-          continue;
-        }
-
-        throw createMusicBrainzError(
-          retryable ? 'musicbrainz_unavailable' : 'musicbrainz_request_failed',
-          `MusicBrainz ${operation} request failed with status ${response.status}`,
-          buildFailureDetails({
-            attempts: attempt + 1,
-            maxRetries: effectiveMaxRetries,
-            retryable,
-            retryAfterMs,
-            status: response.status,
-            throttled,
-            url: url.toString(),
-          }),
-        );
-      }
-
-      throw createMusicBrainzError(
-        'musicbrainz_unavailable',
-        `MusicBrainz ${operation} request exhausted retries`,
-        buildFailureDetails({
-          attempts: effectiveMaxRetries + 1,
-          maxRetries: effectiveMaxRetries,
-          retryable: true,
-          url: url.toString(),
-        }),
-      );
+      return requestService.requestJson(url, { operation, signal });
     }, { signal });
   }
 

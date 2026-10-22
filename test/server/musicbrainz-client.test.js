@@ -155,7 +155,7 @@ test('MusicBrainz client exposes throttling details when retries are exhausted',
       assert.equal(error.details.retryAfterMs, 2000);
       assert.equal(error.details.status, 429);
       assert.equal(error.details.throttled, true);
-      assert.equal(error.details.url, 'https://musicbrainz.test/ws/2/release?fmt=json&query=release%3A%22Amber%22&limit=1&offset=0');
+      assert.equal(Object.hasOwn(error.details, 'url'), false);
       return true;
     },
   );
@@ -177,7 +177,7 @@ test('MusicBrainz client classifies non-retryable upstream failures as request f
       assert.equal(error.details.retryable, false);
       assert.equal(error.details.status, 400);
       assert.equal(error.details.throttled, false);
-      assert.equal(error.details.url, 'https://musicbrainz.test/ws/2/artist/bad-artist-id?fmt=json&inc=aliases');
+      assert.equal(Object.hasOwn(error.details, 'url'), false);
       return true;
     },
   );
@@ -193,7 +193,7 @@ test('MusicBrainz client rejects insecure or private override base URLs', async 
       fetchImpl: async () => createJsonResponse({}),
     }),
     (error) => error?.code === 'musicbrainz_misconfigured'
-      && error?.message === 'Invalid MusicBrainz base URL: http://127.0.0.1:8080/ws/2',
+      && error?.message === 'Invalid MusicBrainz base URL',
   );
 });
 

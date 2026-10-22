@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
-The October 21 [Last.fm response rebuild](LOCAL_DOCKER_LASTFM_RESPONSE_OUTCOME.md)
+The October 21 [MusicBrainz response rebuild](LOCAL_DOCKER_MUSICBRAINZ_RESPONSE_OUTCOME.md)
 records the current no-cache image, preserved admin/data and passing readiness.
+The [owning outcome](MUSICBRAINZ_RESPONSE_OUTCOME.md) records operation-specific
+limits, complete release compatibility and native HTTPS qualification separately.
+
+The October 21 [Last.fm response rebuild](LOCAL_DOCKER_LASTFM_RESPONSE_OUTCOME.md)
+records the preceding no-cache image, preserved admin/data and passing readiness.
 The [owning outcome](LASTFM_RESPONSE_OUTCOME.md) records bounded JSON, private
 diagnostics, ignored-body cancellation and native HTTPS qualification separately.
 

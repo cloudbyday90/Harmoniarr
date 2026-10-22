@@ -87,6 +87,14 @@ export function classifyMusicBrainzDependencyError(error) {
         message: error.message,
         details: copySafeDetails(error.details),
       });
+    case 'musicbrainz_invalid_response':
+      return createDependencyStatus({
+        provider,
+        status: 'degraded',
+        code: error.code,
+        message: 'MusicBrainz returned an invalid response',
+        details: copySafeDetails(error.details),
+      });
     case 'musicbrainz_not_found':
       return createDependencyStatus({
         provider,

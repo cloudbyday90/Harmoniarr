@@ -39,9 +39,29 @@ Use exact-ceiling and gated cancellation controls plus native compressed/body
 deadline proof. Stubbed sleep in native retry checks establishes ordering/counts,
 not real rate cadence. Qualify the related-artists consumer as well. See the
 [Last.fm outcome](../../../../docs/LASTFM_RESPONSE_OUTCOME.md) before extending
-the cap to MusicBrainz's larger, operation-dependent payloads.
+the cap to another provider's operation-dependent payloads.
 
-This fixture covers the shared JSON clients and Last.fm; other metadata/slskd/Plex/push clients,
+## MusicBrainz operation budgets
+
+Use `test/server/musicbrainz-response.test.js` for exact per-operation decoded-byte
+limits and the structured 3,000-track fixture, and `musicbrainz-https.test.js` for
+native default-origin compression, deadlines and ignored-body socket retirement.
+Preserve includes, count/offset metadata, short pages, one client queue, meaningful
+User-Agent, minimum admission interval and 429/503 Retry-After health fields.
+Do not apply another provider's cap blindly or enlarge its wrapper to accommodate
+MusicBrainz. The shared streaming core permits 8 MB; the existing shared-provider
+wrapper still refuses anything above 2 MB. Byte caps bound input, not total heap.
+
+Body-invalid success is a terminal typed failure; prove the real catalogue/cache
+path records degraded health rather than caching an empty success, and that the
+HTTP route maps it to safe 502 feedback. Separate parser tests, consumer mapping
+and actual native transport evidence. Synthetic records prove tested shapes and
+sizes, not every live catalogue maximum. Keep failed candidate controls and
+distinguish correcting a mock's call count or read-start gate from a runtime fix.
+See [MusicBrainz design](../../../../docs/MUSICBRAINZ_RESPONSE_DESIGN.md) and
+[outcome](../../../../docs/MUSICBRAINZ_RESPONSE_OUTCOME.md).
+
+This fixture covers the shared JSON clients, Last.fm and MusicBrainz. It does not cover other metadata/slskd/Plex/push clients,
 live public DNS, remote providers, proxy authentication, all TLS variants or full
 application SSRF resistance. See the [design](../../../../docs/PROVIDER_HTTPS_DESIGN.md)
 and [outcome](../../../../docs/PROVIDER_HTTPS_OUTCOME.md).

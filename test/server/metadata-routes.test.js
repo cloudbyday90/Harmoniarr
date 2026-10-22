@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { registerMetadataRoutes } from '../../src/server/routes/metadata-routes.js';
+import { createMusicBrainzClient } from '../../src/server/integrations/musicbrainz/musicbrainz-client.js';
 import { createJsonTestApp, withServer } from '../../testing/server/http-test-helpers.js';
 
 function createMetadataRouteTestApp(overrides = {}) {
@@ -1287,6 +1288,18 @@ test('metadata routes normalize shared musicbrainz request failures to 502 respo
     });
   });
 });
+test('metadata routes expose a safe 502 for an actual malformed MusicBrainz response', async () => {
+  const client = createMusicBrainzClient({ maxRetries: 1, sleepImpl: async () => {},
+    fetchImpl: async () => new Response('{"private":"PUBLIC-TEST-ONLY-private') });
+  const app = createMetadataRouteTestApp({ searchMusicBrainzArtists: input => client.searchArtists(input) });
+  await withServer(app, async baseUrl => {
+    const response = await fetch(`${baseUrl}/api/v1/metadata/musicbrainz/artists/search?q=fixture`);
+    assert.equal(response.status, 502);
+    assert.deepEqual(await response.json(), { ok: false,
+      error: { code: 'musicbrainz_invalid_response', message: 'MusicBrainz returned an invalid response' } });
+  });
+});
+
 test('metadata import route preserves auth-guard failures from the injected session guard', async () => {
   const app = createMetadataRouteTestApp({
     requireFreshSession: async () => {
