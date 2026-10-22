@@ -8,6 +8,9 @@ description: "Apply and verify standards for Harmoniarr UI commands, forms, focu
 For native image processes, deadlines or containment claims, read
 [native image workers](references/native-image-workers.md). It owns bounded
 protocol delivery, actual process/stdio retirement and parent publication fencing.
+For built-in decoder memory controls, also read
+[worker memory](references/worker-memory.md). It distinguishes allocation limits
+from RSS, runtime reservations, admission estimates and actual native refusal.
 
 For privileged CLI output or one-time recovery material, read
 [CLI result delivery](references/cli-result-delivery.md). It separates commit,

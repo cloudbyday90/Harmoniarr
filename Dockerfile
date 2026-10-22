@@ -52,7 +52,8 @@ RUN apk add --no-cache \
       postgresql18 \
       postgresql18-client \
     postgresql18-contrib \
-      tzdata
+      tzdata \
+      util-linux-misc
 
 COPY --from=node-base /usr/local/bin/node /usr/local/bin/node
 COPY --from=node-base /usr/local/lib/node_modules /usr/local/lib/node_modules

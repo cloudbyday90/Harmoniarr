@@ -113,6 +113,7 @@ docker run --rm --network none --read-only --cap-drop ALL `
   --mount "type=bind,source=$($PWD.Path)/src/server,target=/app/src/server,readonly" `
   --mount "type=bind,source=$($PWD.Path)/src/shared,target=/app/src/shared,readonly" `
   --mount "type=bind,source=$($PWD.Path)/testing/server/artwork-worker-fixture.js,target=/app/testing/server/artwork-worker-fixture.js,readonly" `
+  --mount "type=bind,source=$($PWD.Path)/testing/server/artwork-worker-inputs.js,target=/app/testing/server/artwork-worker-inputs.js,readonly" `
   --mount "type=bind,source=$($PWD.Path)/test/native/artwork-worker.test.js,target=/app/test/native/artwork-worker.test.js,readonly" `
   --entrypoint node harmoniarr:walkthrough-local `
   --test --test-concurrency=1 test/native/artwork-worker.test.js
@@ -131,8 +132,8 @@ user and application cgroup, so native code compromise or aggregate OOM is not
 independently contained. The actual packaged executable is PIE (ELF ET_DYN), but
 broader exploit-hardening behavior was not certified.
 
-**Next: design and qualify a separately constrained image-worker deployment.** Give
-it independent memory, PID, filesystem and network boundaries without an app Docker
-socket. Prove parent survival under forced worker OOM, two concurrent maximum-policy
-images, bounded result delivery and the same close/publication fence. Retain process
-workers until measured startup costs justify the ownership complexity of a pool.
+The operator replaced the proposed separately constrained image-worker deployment
+with [built-in memory management](ARTWORK_MEMORY_DESIGN.md). Its
+[outcome](ARTWORK_MEMORY_OUTCOME.md) records actual allocation refusal, concurrent
+maximum images and the limits of DATA enforcement within the existing app.
+Retain process workers until measured startup costs justify a pool's ownership cost.

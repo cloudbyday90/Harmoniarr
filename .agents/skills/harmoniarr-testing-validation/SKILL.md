@@ -5,6 +5,12 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For decoder memory controls, use the standards skill's
+[worker memory](../harmoniarr-web-standards/references/worker-memory.md) reference.
+Keep actual external allocation refusal and concurrent maximum images in explicit
+Linux lanes, separate from cheap policy/framing tests. Verify kernel limits/OOM
+counters and drain every child before cleanup; DATA is not RSS or a RAM reservation.
+
 For actual provider HTTPS, use [provider HTTPS qualification](references/provider-https.md).
 It owns child-scoped trust/proxy configuration, preserved DNS identity, native
 redirect/body refusal and deadline-driven socket retirement without live accounts.

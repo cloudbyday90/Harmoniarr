@@ -7,12 +7,14 @@ import sharp from 'sharp';
 import { finished } from 'node:stream/promises';
 import { transformArtworkBuffer } from './artwork-image-transform.js';
 import { artworkInputByteLimit, artworkSharpInputOptions } from './artwork-image-content-policy.js';
-import { artworkWorkerRefusal } from './artwork-worker-protocol.js';
+import { artworkWorkerRefusal, isArtworkWorkerError } from './artwork-worker-protocol.js';
+import { assertArtworkWorkerMemoryLimit } from './artwork-worker-memory.js';
 
 // No application environment, source path, URL, repository or publication authority.
 sharp.cache(false);
 sharp.concurrency(1);
 try {
+  await assertArtworkWorkerMemoryLimit();
   const maxBytes = Number(process.argv[2]); const maxDimensionPixels = Number(process.argv[3]);
   artworkInputByteLimit({ maxOriginalFileSizeBytes: maxBytes });
   artworkSharpInputOptions(maxDimensionPixels);
@@ -29,6 +31,7 @@ try {
 } catch (error) {
   const code = artworkWorkerRefusal(error?.code) ? error.code : 'artwork_image_invalid';
   process.exitCode = 1;
-  process.stdout.end(`${JSON.stringify({ error: code })}\n`);
+  const refusal = isArtworkWorkerError(error) ? { failure: error.code === 'artwork_worker_memory' ? 'memory' : 'failed' } : { error: code };
+  process.stdout.end(`${JSON.stringify(refusal)}\n`);
   await finished(process.stdout).catch(() => {});
 }

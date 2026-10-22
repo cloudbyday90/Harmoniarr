@@ -6,6 +6,8 @@ import { createArtworkWorkerService } from '../../src/server/artwork/artwork-wor
 import { createArtworkIngestionService, prepareArtworkAsset } from '../../src/server/artwork/artwork-ingestion-service.js';
 import { createArtworkIngestionAdmission } from '../../src/server/artwork/artwork-ingestion-admission.js';
 import { createArtworkFetchService } from '../../src/server/artwork/artwork-fetch-service.js';
+import { artworkWorkerLaunch } from '../../src/server/artwork/artwork-worker-memory.js';
+import { fileURLToPath } from 'node:url';
 
 const input = { buffer: Buffer.from('input'), maxBytes: 20, maxDimensionPixels: 8 };
 const output = () => Buffer.from(`${JSON.stringify({ size: 3, width: 8, height: 8, format: 'png', dominant: null })}\nabc`);
@@ -20,8 +22,8 @@ function fixture(options = {}) {
 test('worker spawn uses an explicit ESM module, bounded scalar arguments and a minimal environment', async () => {
   const f = fixture(); const pending = f.service.processArtworkBuffer(input);
   const { spawnArgs, spawnOptions } = f.getSpawn();
-  assert.equal(spawnArgs[0], process.execPath); assert.match(spawnArgs[1][0], /artwork-image-worker\.js$/u);
-  assert.deepEqual(spawnArgs[1].slice(1), ['20', '8']);
+  const expected = artworkWorkerLaunch(fileURLToPath(new URL('../../src/server/artwork/artwork-image-worker.js', import.meta.url)), ['20', '8']);
+  assert.equal(spawnArgs[0], expected.command); assert.deepEqual(spawnArgs[1], expected.args);
   assert.equal(spawnOptions.shell, false); assert.equal(spawnOptions.windowsHide, true);
   assert.deepEqual(spawnOptions.stdio, ['pipe', 'pipe', 'ignore']);
   assert.deepEqual(Object.keys(spawnOptions.env).sort(), [...(process.env.SystemRoot ? ['SystemRoot'] : []), 'UV_THREADPOOL_SIZE', 'VIPS_CONCURRENCY', 'NODE_ENV'].sort());
@@ -84,7 +86,7 @@ test('worker refuses invalid inputs before spawning and checks the monotonic dea
   for (const timeoutMs of [0, -1, 1.5, 60_001]) assert.throws(() => createArtworkWorkerService({ timeoutMs }), TypeError);
 });
 
-test('owned worker availability failure escapes a real fetch batch without provider-absence backoff', async () => {
+for (const reason of ['failed', 'memory']) test(`owned worker ${reason} failure escapes a real fetch batch without provider-absence backoff`, async () => {
   const f = fixture(); let backoffs = 0;
   const ingestion = { ingestArtworkBuffer: () => f.service.processArtworkBuffer(input) };
   const fetch = createArtworkFetchService({ artworkIngestionService: ingestion,
@@ -94,6 +96,8 @@ test('owned worker availability failure escapes a real fetch batch without provi
     artworkFetchBackoffService: { shouldBackoff: async () => ({ active: false }), recordFailure: async () => { backoffs++; }, clearFailure: async () => {} },
   });
   const pending = fetch.resolveArtworkBatch([{ ownerType: 'musicbrainz_artist', ownerId: 'artist', artworkRole: 'artist_thumbnail' }]);
-  const rejected = assert.rejects(pending, { code: 'artwork_worker_failed', status: 503 });
-  await new Promise(resolve => { setImmediate(resolve); }); f.child.emit('close', null, 'SIGKILL'); await rejected; assert.equal(backoffs, 0);
+  const rejected = assert.rejects(pending, { code: `artwork_worker_${reason}`, status: 503 });
+  await new Promise(resolve => { setImmediate(resolve); });
+  f.child.stdout.write(Buffer.from(`${JSON.stringify({ failure: reason })}\n`));
+  f.child.emit('close', 1, null); await rejected; assert.equal(backoffs, 0);
 });

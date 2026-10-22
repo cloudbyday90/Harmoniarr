@@ -6,6 +6,7 @@
 import sharp from 'sharp';
 import { createApiError } from '../api-error.js';
 import { assertArtworkBuffer, assertArtworkRasterSignature, artworkSharpInputOptions } from './artwork-image-content-policy.js';
+import { artworkWorkerError } from './artwork-worker-protocol.js';
 
 const encoders = {
   jpeg: image => image.jpeg({ chromaSubsampling: '4:4:4', quality: 90 }),
@@ -25,7 +26,9 @@ export async function sanitizeArtworkBuffer({ buffer, format, maxDimensionPixels
   if (!Object.hasOwn(encoders, format)) throw createApiError(400, 'artwork_format_unsupported', 'Artwork format is unsupported');
   const pipeline = encoder(sharp(buffer, artworkSharpInputOptions(maxDimensionPixels)).rotate()).timeout({ seconds: 3 });
   try { return await pipeline.toBuffer({ resolveWithObject: true }); }
-  catch { throw createApiError(400, 'artwork_image_invalid', 'Artwork could not be decoded within the image policy'); }
+  // Native rewrite errors have no stable structured distinction between corrupt
+  // data, allocation failure and timeout. Do not turn capacity loss into absence.
+  catch { throw artworkWorkerError(); }
 }
 
 export async function getArtworkBufferStats(buffer, { maxDimensionPixels } = {}) {

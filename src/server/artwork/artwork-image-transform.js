@@ -7,6 +7,7 @@ import { createApiError } from '../api-error.js';
 import { assertArtworkBuffer, artworkInputByteLimit, artworkSharpInputOptions } from './artwork-image-content-policy.js';
 import { inspectArtworkBuffer, sanitizeArtworkBuffer, getArtworkBufferStats } from './artwork-image-processing.js';
 import { ARTWORK_WORKER_OUTPUT_LIMIT } from './artwork-worker-protocol.js';
+import { assertArtworkMemoryAdmission } from './artwork-worker-memory.js';
 
 /** Native implementation: production calls this only in the disposable child. */
 export async function transformArtworkBuffer({ buffer, maxBytes, maxDimensionPixels }, {
@@ -32,6 +33,7 @@ export async function transformArtworkBuffer({ buffer, maxBytes, maxDimensionPix
   if (width > maxDimensionPixels || height > maxDimensionPixels) {
     throw createApiError(400, 'artwork_dimensions_too_large', 'Artwork exceeds the dimension limit');
   }
+  assertArtworkMemoryAdmission({ metadata, width, height, inputBytes: buffer.length });
   const { data, info } = await sanitizeArtworkBufferFn({ buffer, format: metadata.format, maxDimensionPixels });
   if (data.length > ARTWORK_WORKER_OUTPUT_LIMIT) {
     throw createApiError(400, 'artwork_output_too_large', 'Rewritten artwork exceeds the output byte limit');

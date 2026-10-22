@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import sharp from 'sharp';
-import { crc32 } from 'node:zlib';
+import { maximumByteArtworkPng } from '../../testing/server/artwork-worker-inputs.js';
 import { createArtworkWorkerService } from '../../src/server/artwork/artwork-worker-service.js';
 import { createArtworkIngestionService, prepareArtworkAsset } from '../../src/server/artwork/artwork-ingestion-service.js';
 import { createArtworkIngestionAdmission } from '../../src/server/artwork/artwork-ingestion-admission.js';
@@ -44,7 +44,9 @@ function maximumJpeg() {
 function observedWorker({ mode, timeoutMs = 15_000, controller } = {}) {
   const observations = []; const outputSeen = Promise.withResolvers();
   const worker = createArtworkWorkerService({ timeoutMs, spawnFn: (file, args, options) => {
-    const child = spawn(file, mode ? [fixturePath, ...args.slice(1), mode] : args, options);
+    const workerIndex = args.findIndex(value => value.endsWith('/artwork-image-worker.js'));
+    assert.ok(workerIndex >= 0);
+    const child = spawn(file, mode ? [...args.slice(0, workerIndex), fixturePath, ...args.slice(workerIndex + 1), mode] : args, options);
     const record = { pid: child.pid, output: 0, closed: false }; observations.push(record);
     child.stdout.on('data', chunk => { record.output += chunk.length; outputSeen.resolve(); controller?.abort(); });
     child.once('close', (code, signal) => { Object.assign(record, { closed: true, code, signal }); });
@@ -62,20 +64,7 @@ function assertRetired(worker) {
 
 test('maximum byte input uses actual child rewrite and parent-owned publication with exact output', async t => {
   const root = await mkdtemp(join(tmpdir(), 'harmoniarr-worker-max-bytes-')); t.after(() => rm(root, { recursive: true, force: true }));
-  const png = await sharp({ create: { width: 16, height: 16, channels: 3, background: 'red' } }).png().toBuffer();
-  // Valid unknown ancillary PNG chunks pad to the exact configured maximum.
-  // Their CRCs are real; padding is not claimed as pixel-complexity stress.
-  const input = Buffer.alloc(maxBytes); png.copy(input, 0, 0, png.length - 12);
-  let offset = png.length - 12;
-  const count = Math.ceil((maxBytes - png.length) / (1024 * 1024 + 12));
-  let remaining = maxBytes - png.length - count * 12;
-  for (let index = 0; index < count; index++) {
-    const length = Math.min(1024 * 1024, remaining); remaining -= length;
-    input.writeUInt32BE(length, offset); input.write('haRm', offset + 4, 'ascii');
-    input.writeUInt32BE(crc32(input.subarray(offset + 4, offset + 8 + length)), offset + 8 + length);
-    offset += length + 12;
-  }
-  assert.equal(offset, maxBytes - 12); png.copy(input, offset, png.length - 12);
+  const { input, png } = await maximumByteArtworkPng(maxBytes);
   const worker = observedWorker(); let writes = 0;
   const service = createArtworkIngestionService({ artworkPolicyService: { getArtworkRuntimePolicy: async () => ({ limits, storage: { root } }) },
     prepareArtworkAssetFn: options => prepareArtworkAsset({ ...options, transformArtworkBufferFn: worker.processArtworkBuffer }),

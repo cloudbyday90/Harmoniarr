@@ -39,7 +39,10 @@ export function createArtworkWorkerCollector(maxDimensionPixels) {
         if (end === -1) return;
         try { header = JSON.parse(headerBytes.toString('utf8')); } catch { throw artworkWorkerError(); }
         if (!header || typeof header !== 'object' || Array.isArray(header)) throw artworkWorkerError();
-        if (header.error) {
+        if (header.failure) {
+          if (!['memory', 'failed'].includes(header.failure) || Object.keys(header).length !== 1) throw artworkWorkerError();
+          header.size = 0;
+        } else if (header.error) {
           if (!artworkWorkerRefusal(header.error) || Object.keys(header).length !== 1) throw artworkWorkerError();
           header.size = 0;
         } else {
@@ -59,8 +62,9 @@ export function createArtworkWorkerCollector(maxDimensionPixels) {
     },
     result(exitCode) {
       if (!header || size !== header.size) throw artworkWorkerError();
+      if (header.failure && exitCode === 1) throw artworkWorkerError(header.failure);
       if (header.error && exitCode === 1) throw artworkWorkerRefusal(header.error);
-      if (exitCode !== 0 || header.error) throw artworkWorkerError();
+      if (exitCode !== 0 || header.error || header.failure) throw artworkWorkerError();
       return { data: Buffer.concat(chunks, size), format: header.format, width: header.width, height: header.height,
         dominant: header.dominant === null ? null : { r: header.dominant.r, g: header.dominant.g, b: header.dominant.b } };
     },

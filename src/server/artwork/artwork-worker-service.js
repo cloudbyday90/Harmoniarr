@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { performance } from 'node:perf_hooks';
 import { assertArtworkBuffer, artworkInputByteLimit, artworkSharpInputOptions } from './artwork-image-content-policy.js';
 import { artworkWorkerError, artworkWorkerRefusal, createArtworkWorkerCollector } from './artwork-worker-protocol.js';
+import { artworkWorkerLaunch } from './artwork-worker-memory.js';
 
 const workerPath = fileURLToPath(new URL('./artwork-image-worker.js', import.meta.url));
 
@@ -24,7 +25,8 @@ export function createArtworkWorkerService({ spawnFn = spawn, timeoutMs = 15_000
     const collector = createArtworkWorkerCollector(maxDimensionPixels);
     let child;
     try {
-      child = spawnFn(process.execPath, [workerPath, String(maxBytes), String(maxDimensionPixels)], {
+      const launch = artworkWorkerLaunch(workerPath, [String(maxBytes), String(maxDimensionPixels)]);
+      child = spawnFn(launch.command, launch.args, {
         shell: false, windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'],
         env: { ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
           UV_THREADPOOL_SIZE: '1', VIPS_CONCURRENCY: '1', NODE_ENV: 'production' },

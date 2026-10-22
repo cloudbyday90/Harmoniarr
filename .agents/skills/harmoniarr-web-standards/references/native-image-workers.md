@@ -48,8 +48,10 @@ not a reproduced decoder defect; padded bytes are not high-entropy pixel stress.
 Keep expensive cases in the explicit constrained Linux lane. Compare exact hashes,
 dimensions, approved metadata and publication counts. Report container-wide memory
 and per-process samples with their scope. A shared cgroup can kill the server;
-do not claim independent worker OOM containment. Review PIE/ASLR and dedicated
-worker deployment separately before claiming hostile native-code isolation.
+do not claim independent worker OOM containment. Review PIE/ASLR and actual OS
+capabilities before claiming hostile native-code isolation. If the operator asks
+for memory management in the existing app, use [worker memory](worker-memory.md);
+do not turn that request into a separate deployed service.
 
 See [design](../../../../docs/ARTWORK_WORKER_DESIGN.md),
 [official research and tradeoffs](../../../../docs/ARTWORK_WORKER_RESEARCH.md)

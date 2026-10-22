@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 22 [built-in artwork memory rebuild](LOCAL_DOCKER_ARTWORK_MEMORY_OUTCOME.md)
+records the current no-cache image, maintained Linux limiter, preserved admin/data
+and passing readiness. The [owning outcome](ARTWORK_MEMORY_OUTCOME.md) separates
+actual allocation refusal and memory qualification from shared-container OOM claims.
+
 The October 22 [artwork-worker rebuild](LOCAL_DOCKER_ARTWORK_WORKER_OUTCOME.md)
-records the current no-cache image, preserved admin/data and passing readiness.
+records the preceding no-cache image, preserved admin/data and passing readiness.
 The [owning outcome](ARTWORK_WORKER_OUTCOME.md) records process/stdio retirement,
 bounded results and separate maximum-policy Linux qualification.
 
