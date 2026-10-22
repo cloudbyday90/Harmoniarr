@@ -91,7 +91,29 @@ new package separately. Node's bundled component version can remain unchanged
 after a security backport; it is not the same binary as the OS shared library.
 See the [Docker outcome](../../../../docs/LOCAL_DOCKER_FANART_RESPONSE_OUTCOME.md).
 
-This fixture covers the shared JSON clients, Last.fm, MusicBrainz and Fanart.tv. It does not cover other metadata/slskd/Plex/push clients,
+This JSON cohort covers the shared clients, Last.fm, MusicBrainz and Fanart.tv.
+It does not qualify other metadata/slskd/Plex/push APIs,
 live public DNS, remote providers, proxy authentication, all TLS variants or full
 application SSRF resistance. See the [design](../../../../docs/PROVIDER_HTTPS_DESIGN.md)
 and [outcome](../../../../docs/PROVIDER_HTTPS_OUTCOME.md).
+
+## Artwork image transport and publication
+
+Use `artwork-image-download.test.js` for per-provider origins, exact byte ceilings,
+manual CAA redirect admission and cleanup ordering. Use `artwork-image-https.test.js`
+for actual default-origin sockets, healthy-after-refusal gates and real Sharp
+inspection/rewrite into a temporary directory. Its assignments/database are
+controlled sinks, not PostgreSQL proof. The fixture adds only the reviewed image
+authorities; child-scoped public trust and the default verifier remain intact.
+
+Identity HTTP images have one streamed byte budget; compressed HTTP responses are
+refused. Do not describe this as compressed-image decompression qualification.
+Raster signature admission happens before Sharp; input-pixel ceilings and rewrite
+remain separate from file-byte limits and aggregate process memory limits.
+Observe every cleanup promise even when the deadline signal has already fired;
+otherwise an aborted reader cancellation can reject without a handler. Failed
+redirect cleanup must not admit another hop. Expected ECONNRESET from deliberate
+abort is distinct from failed identity verification. Preserve failed native runs
+and identify production fixes separately from corrected fixture expectations.
+See [design](../../../../docs/ARTWORK_IMAGE_DOWNLOAD_DESIGN.md) and
+[outcome](../../../../docs/ARTWORK_IMAGE_DOWNLOAD_OUTCOME.md).

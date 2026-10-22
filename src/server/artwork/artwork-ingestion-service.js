@@ -24,6 +24,7 @@ import { createApiError } from '../auth.js';
 import { rgbToOklch, VIBRANCY_THRESHOLD } from './color-utils.js';
 import { createArtworkPolicyService } from './artwork-policy-service.js';
 import { getArtworkAssetBySha256, upsertArtworkAsset } from './artwork-repository.js';
+import { assertArtworkRasterSignature, artworkSharpInputOptions } from './artwork-image-content-policy.js';
 
 const supportedInputFormats = new Map([
   ['jpeg', { extension: 'jpg', mimeType: 'image/jpeg' }],
@@ -91,19 +92,23 @@ export function buildArtworkRelativePath({ extension, sha256, storageClass }) {
   return path.posix.join(directory, sha256.slice(0, 2), sha256.slice(2, 4), `${sha256}.${extension}`);
 }
 
-export async function inspectArtworkBuffer(buffer) {
+export async function inspectArtworkBuffer(buffer, { maxDimensionPixels } = {}) {
   ensureNonEmptyBuffer(buffer);
-  return sharp(buffer).metadata();
+  assertArtworkRasterSignature(buffer);
+  const options = artworkSharpInputOptions(maxDimensionPixels);
+  try { return await sharp(buffer, options).metadata(); }
+  catch { throw createArtworkValidationError('artwork_image_invalid', 'Artwork could not be inspected within the image policy'); }
 }
 
-export async function sanitizeArtworkBuffer({ buffer, format }) {
+export async function sanitizeArtworkBuffer({ buffer, format, maxDimensionPixels }) {
   const encoder = outputEncoders[format];
   if (!encoder) {
     throw createArtworkValidationError('artwork_format_unsupported', `Unsupported artwork format: ${format}`);
   }
 
-  const pipeline = encoder(sharp(buffer).rotate()).timeout({ seconds: 3 });
-  return pipeline.toBuffer({ resolveWithObject: true });
+  const pipeline = encoder(sharp(buffer, artworkSharpInputOptions(maxDimensionPixels)).rotate()).timeout({ seconds: 3 });
+  try { return await pipeline.toBuffer({ resolveWithObject: true }); }
+  catch { throw createArtworkValidationError('artwork_image_invalid', 'Artwork could not be decoded within the image policy'); }
 }
 
 export async function prepareArtworkAsset({
@@ -133,7 +138,7 @@ export async function prepareArtworkAsset({
     );
   }
 
-  const metadata = await inspectArtworkBufferFn(buffer);
+  const metadata = await inspectArtworkBufferFn(buffer, { maxDimensionPixels: policy.limits.maxOriginalDimensionPixels });
   const { width, height } = resolveCanonicalDimensions(metadata);
   const formatDescriptor = supportedInputFormats.get(metadata.format);
 
@@ -162,6 +167,7 @@ export async function prepareArtworkAsset({
   const { data, info } = await sanitizeArtworkBufferFn({
     buffer,
     format: metadata.format,
+    maxDimensionPixels: policy.limits.maxOriginalDimensionPixels,
   });
   const sha256 = computeSha256(data);
   const relativePath = buildArtworkRelativePath({

@@ -31,3 +31,14 @@ refused nested envelope. See [design](../../../../docs/FANART_WIRING_DESIGN.md),
 [outcome](../../../../docs/FANART_WIRING_OUTCOME.md). This workflow supports
 implementation within the user's scope; it authorizes no live provider traffic,
 credential disclosure, release or unrelated account changes.
+
+For image delivery, trace every provider path: CAA may download inside its client
+while other clients return URLs. One protected helper does not establish default
+composition for all paths. Revalidate every manual redirect before dispatch,
+retire its body first, and avoid forwarding API keys. Keep identity transfer-byte,
+image pixel and aggregate process budgets distinct. A signature narrows decoder
+admission; actual decode/rewrite must still precede filesystem/database publication.
+An origin allowlist does not establish connect-time DNS pinning or untrusted-proxy
+protection. Record deployment routing assumptions explicitly. See the
+[image design](../../../../docs/ARTWORK_IMAGE_DOWNLOAD_DESIGN.md) and
+[research](../../../../docs/ARTWORK_IMAGE_DOWNLOAD_RESEARCH.md).

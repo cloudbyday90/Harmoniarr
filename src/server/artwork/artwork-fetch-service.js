@@ -20,6 +20,7 @@ import { createArtworkIngestionService } from './artwork-ingestion-service.js';
 import { createArtworkAssignmentService } from './artwork-assignment-service.js';
 import { createArtworkPolicyService } from './artwork-policy-service.js';
 import { listArtworkAssignments } from './artwork-repository.js';
+import { createArtworkImageDownloadService } from './artwork-image-download-service.js';
 
 const fanartRoleMap = {
   artistthumb: 'artist_thumbnail',
@@ -77,11 +78,7 @@ export function createArtworkFetchService({
   fanartTvClient = null,
   theAudioDbClient = null,
   listArtworkAssignmentsFn = listArtworkAssignments,
-  downloadImageFn = async (url) => {
-    const response = await fetch(url);
-    if (!response.ok) return null;
-    return Buffer.from(await response.arrayBuffer());
-  },
+  downloadImageFn = createArtworkImageDownloadService().downloadImageBuffer,
 } = {}) {
   const resolvedArtworkFetchBackoffService = artworkFetchBackoffService ?? {
     clearFailure: async () => {},
@@ -89,12 +86,12 @@ export function createArtworkFetchService({
     shouldBackoff: async () => ({ active: false, retryAfterAt: null }),
   };
 
-  async function resolveFromCaa({ mbid, mbidType, ownerId, ownerType, artworkRole, refresh = false }) {
+  async function resolveFromCaa({ mbid, mbidType, ownerId, ownerType, artworkRole, limits, refresh = false }) {
     if (artworkQuotaService && await artworkQuotaService.isQuotaExceeded('coverArtArchive')) {
       return null;
     }
 
-    const result = await coverArtArchiveClient.fetchFrontImage({ mbid, mbidType });
+    const result = await coverArtArchiveClient.fetchFrontImage({ mbid, mbidType, limits });
     if (!result) return null;
 
     if (artworkQuotaService) {
@@ -130,7 +127,7 @@ export function createArtworkFetchService({
     return buildResult(asset, 'coverArtArchive');
   }
 
-  async function resolveFromFanartTv({ ownerId, ownerType, artworkRole, refresh = false }) {
+  async function resolveFromFanartTv({ ownerId, ownerType, artworkRole, limits, refresh = false }) {
     if (!fanartTvClient) return null;
 
     if (artworkQuotaService && await artworkQuotaService.isQuotaExceeded('fanartTv')) {
@@ -164,7 +161,7 @@ export function createArtworkFetchService({
     const match = images.find((img) => typeList.includes(img.imageType));
     if (!match) return null;
 
-    const buffer = await downloadImageFn(match.url);
+    const buffer = await downloadImageFn(match.url, { sourceProvider: 'fanartTv', limits });
     if (!buffer) return null;
     const resolvedRole = isReleaseGroup ? 'cover_front' : (fanartRoleMap[match.imageType] ?? artworkRole);
 
@@ -201,7 +198,7 @@ export function createArtworkFetchService({
     return buildResult(asset, 'fanartTv');
   }
 
-  async function resolveFromTheAudioDb({ ownerId, ownerType, artworkRole, refresh = false }) {
+  async function resolveFromTheAudioDb({ ownerId, ownerType, artworkRole, limits, refresh = false }) {
     if (!theAudioDbClient) return null;
     if (ownerType !== 'musicbrainz_artist') return null;
 
@@ -230,7 +227,7 @@ export function createArtworkFetchService({
         artworkRole === 'artist_logo' && ['artistlogo', 'artistclearart'].includes(img.imageType));
     if (!match) return null;
 
-    const buffer = await downloadImageFn(match.url);
+    const buffer = await downloadImageFn(match.url, { sourceProvider: 'theAudioDb', limits });
     if (!buffer) return null;
     const resolvedRole = theAudioDbRoleMap[match.imageType] ?? artworkRole;
 
@@ -310,6 +307,7 @@ export function createArtworkFetchService({
           attemptedFetch = true;
           const caaResult = await resolveFromCaa({
             artworkRole,
+            limits: policy.limits,
             mbid: ownerId,
             mbidType: isReleaseGroup ? 'release-group' : 'release',
             ownerId,
@@ -328,7 +326,7 @@ export function createArtworkFetchService({
           anyQuotaExceeded = true;
         } else {
           attemptedFetch = true;
-          const fanarResult = await resolveFromFanartTv({ artworkRole, ownerId, ownerType, refresh });
+          const fanarResult = await resolveFromFanartTv({ artworkRole, ownerId, ownerType, limits: policy.limits, refresh });
           if (fanarResult) {
             await resolvedArtworkFetchBackoffService.clearFailure({ artworkRole, ownerId, ownerType });
             return fanarResult;
@@ -343,7 +341,7 @@ export function createArtworkFetchService({
           anyQuotaExceeded = true;
         } else {
           attemptedFetch = true;
-          const theaudiodbResult = await resolveFromTheAudioDb({ artworkRole, ownerId, ownerType, refresh });
+          const theaudiodbResult = await resolveFromTheAudioDb({ artworkRole, ownerId, ownerType, limits: policy.limits, refresh });
           if (theaudiodbResult) {
             await resolvedArtworkFetchBackoffService.clearFailure({ artworkRole, ownerId, ownerType });
             return theaudiodbResult;
@@ -356,7 +354,7 @@ export function createArtworkFetchService({
           anyQuotaExceeded = true;
         } else {
           attemptedFetch = true;
-          const fanarResult = await resolveFromFanartTv({ artworkRole, ownerId, ownerType, refresh });
+          const fanarResult = await resolveFromFanartTv({ artworkRole, ownerId, ownerType, limits: policy.limits, refresh });
           if (fanarResult) {
             await resolvedArtworkFetchBackoffService.clearFailure({ artworkRole, ownerId, ownerType });
             return fanarResult;

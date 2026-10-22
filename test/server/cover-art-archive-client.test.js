@@ -2,15 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createCoverArtArchiveClient } from '../../src/server/integrations/cover-art-archive/cover-art-archive-client.js';
 
-function createFakeResponse({ status = 200, headers = {}, body = null, url = 'https://coverartarchive.org/release/test-mbid/front' }) {
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    headers: new Map(Object.entries(headers)),
-    url,
-    arrayBuffer: async () => body ?? new ArrayBuffer(0),
-    json: async () => body,
-  };
+function createFakeResponse({ status = 200, headers = {}, body = null }) {
+  return new Response(body, { status, headers });
 }
 
 test('createCoverArtArchiveClient falls back to a default contact when none is configured', () => {
@@ -34,12 +27,10 @@ test('fetchFrontImage returns null for 404 response', async () => {
 
 test('fetchFrontImage returns image buffer on success', async () => {
   const imageBuffer = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0]);
-  const fetchImpl = async () => createFakeResponse({
-    status: 200,
-    headers: { 'content-type': 'image/jpeg' },
-    body: imageBuffer.buffer,
-    url: 'https://archive.org/download/test/image.jpg',
-  });
+  let calls = 0;
+  const fetchImpl = async () => ++calls === 1
+    ? new Response(null, { status: 307, headers: { location: 'https://archive.org/download/test/image.jpg' } })
+    : createFakeResponse({ status: 200, headers: { 'content-type': 'image/jpeg' }, body: imageBuffer });
 
   const client = createCoverArtArchiveClient({
     contactEmail: 'test@example.com',
@@ -87,7 +78,7 @@ test('fetchFrontImage throws coverartarchive_unavailable on network error after 
 
 test('fetchFrontImage retries on 503 and succeeds on second attempt', async () => {
   let callCount = 0;
-  const imageBuffer = Buffer.from([0xFF, 0xD8]);
+  const imageBuffer = Buffer.from([0xFF, 0xD8, 0xFF]);
   const fetchImpl = async () => {
     callCount += 1;
     if (callCount === 1) {
@@ -96,7 +87,7 @@ test('fetchFrontImage retries on 503 and succeeds on second attempt', async () =
     return createFakeResponse({
       status: 200,
       headers: { 'content-type': 'image/jpeg' },
-      body: imageBuffer.buffer,
+      body: imageBuffer,
     });
   };
 

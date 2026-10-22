@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
-The October 22 [Fanart.tv wiring rebuild](LOCAL_DOCKER_FANART_WIRING_OUTCOME.md)
+The October 22 [artwork image rebuild](LOCAL_DOCKER_ARTWORK_IMAGE_OUTCOME.md)
 records the current no-cache image, preserved admin/data and passing readiness.
+The [owning outcome](ARTWORK_IMAGE_DOWNLOAD_OUTCOME.md) records provider origins,
+bounded image transport and real Sharp publication separately from live acceptance.
+
+The October 22 [Fanart.tv wiring rebuild](LOCAL_DOCKER_FANART_WIRING_OUTCOME.md)
+records the preceding no-cache image, preserved admin/data and passing readiness.
 The [owning outcome](FANART_WIRING_OUTCOME.md) records saved-key composition and
 target-bound nested album selection separately from image-download qualification.
 

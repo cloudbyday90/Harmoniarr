@@ -28,6 +28,13 @@ responses bind artwork to the requested release group. See the
 [validation outcome](docs/FANART_WIRING_OUTCOME.md) and
 [Docker rebuild](docs/LOCAL_DOCKER_FANART_WIRING_OUTCOME.md).
 
+Provider artwork images now use per-provider URL admission, bounded manual CAA
+redirects, streamed image limits and raster/pixel checks before publication. See
+the [design](docs/ARTWORK_IMAGE_DOWNLOAD_DESIGN.md),
+[research and tradeoffs](docs/ARTWORK_IMAGE_DOWNLOAD_RESEARCH.md),
+[validation outcome](docs/ARTWORK_IMAGE_DOWNLOAD_OUTCOME.md) and
+[Docker rebuild](docs/LOCAL_DOCKER_ARTWORK_IMAGE_OUTCOME.md).
+
 MusicBrainz now uses operation-specific decoded JSON limits, preserves large
 release payloads and paging, and retires ignored HTTP bodies before retrying.
 See the [design and tradeoffs](docs/MUSICBRAINZ_RESPONSE_DESIGN.md),
