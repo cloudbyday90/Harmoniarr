@@ -54,6 +54,7 @@ import { createPlexDirectoryImportService } from './integrations/plex/plex-direc
 import { createPlexLinkedAccountManagementService } from './integrations/plex/plex-linked-account-management-service.js';
 import { createPlexLinkedAccountReconciliationService } from './integrations/plex/plex-linked-account-reconciliation-service.js';
 import { createProviderClientResolverService } from './integrations/providers/provider-client-resolver-service.js';
+import { createProviderCredentialsService } from './integrations/providers/provider-credentials-service.js';
 import { createRequestRateLimiterService } from './request-rate-limiter.js';
 import { createControlPlaneRedactionService } from './control-plane-redaction-service.js';
 import { createRestoreScopeRuntimeSnapshotStore } from './recovery/restore-scope-runtime-snapshot-store.js';
@@ -194,6 +195,7 @@ export function createApp({
   createMetadataModule: buildMetadataModule = createMetadataModule,
   createOperationsModule: buildOperationsModule = createOperationsModule,
   createProviderModule: buildProviderModule = createProviderModule,
+  createProviderCredentialsService: buildProviderCredentialsService = createProviderCredentialsService,
   createSettingsService: buildSettingsService = createSettingsService,
   createSlskdConfigService: buildSlskdConfigService = createSlskdConfigService,
   createSlskdModule: buildSlskdModule = createSlskdModule,
@@ -246,9 +248,11 @@ export function createApp({
   const deploymentSecurityService = buildDeploymentSecurityService({ loadSettingsFn: loadSettings });
   const slskdConfigService = buildSlskdConfigService();
   const providerModule = buildProviderModule();
+  const providerCredentialsService = buildProviderCredentialsService();
   let libraryModule = null;
   const settingsService = buildSettingsService({
     deploymentSecurityService,
+    providerCredentialsService,
     onAutomaticDownloadFoldersReady: async (payload) => {
       if (!libraryModule?.libraryDiscoveryFolderSetupRecoveryService) {
         return {
@@ -297,6 +301,7 @@ export function createApp({
   const artworkModule = buildArtworkModule({
     maintenanceLockOperationPauseService,
     maintenanceLockService,
+    providerCredentialsService,
     settingsService,
   });
   const authModule = buildAuthModule({

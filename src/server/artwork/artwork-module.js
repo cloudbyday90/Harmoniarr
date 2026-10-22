@@ -34,6 +34,7 @@ import { createArtworkServeService } from './artwork-serve-service.js';
 import { createArtworkSummaryService } from './artwork-summary-service.js';
 import { createCoverArtArchiveClient } from '../integrations/cover-art-archive/cover-art-archive-client.js';
 import { createFanartTvClient } from '../integrations/fanart-tv/fanart-client.js';
+import { createProviderCredentialsService } from '../integrations/providers/provider-credentials-service.js';
 import { createTheAudioDbClient } from '../integrations/theaudiodb/theaudiodb-client.js';
 import { createOperationRunInterruptionGate } from '../operation-run-cancellation.js';
 import { createMaintenanceLockService } from '../recovery/maintenance-lock-service.js';
@@ -42,6 +43,8 @@ import * as artworkRepository from './artwork-repository.js';
 
 export function createArtworkModule({
   settingsService,
+  providerCredentialsService = createProviderCredentialsService(),
+  createFanartTvClient: buildFanartTvClient = createFanartTvClient,
   maintenanceLockService = createMaintenanceLockService(),
   maintenanceLockOperationPauseService = null,
   maintenanceLockWriteGuardService = createMaintenanceLockWriteGuardService({
@@ -114,7 +117,14 @@ export function createArtworkModule({
   const resolvedCoverArtArchiveClient = coverArtArchiveClient
     ?? (() => { try { return createCoverArtArchiveClient(); } catch { return null; } })();
   const resolvedFanartTvClient = fanartTvClient
-    ?? (() => { try { return createFanartTvClient(); } catch { return null; } })();
+    ?? (() => {
+      try {
+        return buildFanartTvClient({
+          resolveApiKey: () => providerCredentialsService.resolveFanartTvApiKey(),
+          resolveClientKey: () => providerCredentialsService.resolveFanartTvClientKey(),
+        });
+      } catch { return null; }
+    })();
   const resolvedTheAudioDbClient = theAudioDbClient
     ?? (() => { try { return createTheAudioDbClient(); } catch { return null; } })();
   const resolvedArtworkQuotaService = artworkQuotaService

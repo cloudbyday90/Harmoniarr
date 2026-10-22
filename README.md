@@ -21,6 +21,13 @@ keeps credential-bearing failures private. See the
 [validation outcome](docs/FANART_RESPONSE_OUTCOME.md) and
 [local Docker rebuild](docs/LOCAL_DOCKER_FANART_RESPONSE_OUTCOME.md).
 
+Saved Fanart.tv keys now reach the default artwork client, and nested album
+responses bind artwork to the requested release group. See the
+[composition design](docs/FANART_WIRING_DESIGN.md),
+[research and recommendation stack](docs/FANART_WIRING_RESEARCH.md),
+[validation outcome](docs/FANART_WIRING_OUTCOME.md) and
+[Docker rebuild](docs/LOCAL_DOCKER_FANART_WIRING_OUTCOME.md).
+
 MusicBrainz now uses operation-specific decoded JSON limits, preserves large
 release payloads and paging, and retires ignored HTTP bodies before retrying.
 See the [design and tradeoffs](docs/MUSICBRAINZ_RESPONSE_DESIGN.md),

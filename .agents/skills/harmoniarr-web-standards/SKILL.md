@@ -44,6 +44,10 @@ For provider media publication, use
 provenance, IETF mutation ownership, OWASP content validation and vendor probing
 to separate observable checks without implying general standards conformance.
 
+For provider credential wiring or nested artwork metadata, read
+[provider composition](references/provider-composition.md). It distinguishes
+saved-secret delivery, native transport and target-owned publication.
+
 
 Turn applicable official practices into observable behavior in the requested
 journey. Select relevant standards; do not expand ordinary work into a blanket

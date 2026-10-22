@@ -135,6 +135,8 @@ suite('createApp', () => {
   const createMetadataModule = t.mock.fn(() => metadataModule);
   const createOperationsModule = t.mock.fn(() => operationsModule);
   const createProviderModule = t.mock.fn(() => providerModule);
+  const providerCredentialsService = {};
+  const createProviderCredentialsService = t.mock.fn(() => providerCredentialsService);
   const createSettingsService = t.mock.fn(() => settingsService);
   const createSlskdConfigService = t.mock.fn(() => slskdConfigService);
   const createSlskdModule = t.mock.fn(() => slskdModule);
@@ -186,6 +188,7 @@ suite('createApp', () => {
     createMetadataModule,
     createOperationsModule,
     createProviderModule,
+    createProviderCredentialsService,
     createSettingsService,
     createSlskdConfigService,
     createSlskdModule,
@@ -231,6 +234,9 @@ suite('createApp', () => {
   const systemModuleArgs = createSystemModule.mock.calls[0].arguments[0];
 
   assert.equal(artworkModuleArgs.settingsService, settingsService);
+  assert.equal(createProviderCredentialsService.mock.callCount(), 1);
+  assert.equal(artworkModuleArgs.providerCredentialsService, providerCredentialsService);
+  assert.equal(createSettingsService.mock.calls[0].arguments[0].providerCredentialsService, providerCredentialsService);
   assert.equal(typeof artworkModuleArgs.maintenanceLockService.listActiveMaintenanceLocks, 'function');
   assert.equal(authModuleArgs.settingsService, settingsService);
   assert.equal(createSettingsService.mock.calls[0].arguments[0].deploymentSecurityService, deploymentSecurityService);

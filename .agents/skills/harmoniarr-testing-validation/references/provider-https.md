@@ -72,6 +72,12 @@ is compatibility evidence, not proof of current v3.2 nested album selection.
 Match provider schema/version and requested target before claiming live payload
 support. Trace default application credential wiring separately: injected keys
 prove the client transport, not delivery of saved keys through startup composition.
+Use `fanart-wiring.test.js` and `fanart-wiring-https.test.js` for real credential
+owner/module/client composition with controlled persistence. Assert stored-key
+rotation/clear, exact nested album identity and no effects after refusal. The
+native child uses the same real artwork consumer with controlled image and
+assignment sinks; this does not prove PostgreSQL encryption or real image decode.
+See the [wiring outcome](../../../../docs/FANART_WIRING_OUTCOME.md).
 See [design](../../../../docs/FANART_RESPONSE_DESIGN.md) and
 [outcome](../../../../docs/FANART_RESPONSE_OUTCOME.md).
 

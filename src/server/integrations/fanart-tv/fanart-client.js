@@ -23,6 +23,9 @@ import {
 } from '../../outbound-url-policy.js';
 import { createFanartTvRequestService } from './fanart-request-service.js';
 import { resolveFanartTvRequestPolicy } from './fanart-request-policy.js';
+import { selectAlbumImages, selectArtistImages } from './fanart-image-selection.js';
+
+export { selectAlbumImages, selectArtistImages };
 
 function createFanartTvError(code, message, details = {}) {
   const error = new Error(message);
@@ -53,37 +56,6 @@ function normalizeBaseUrl(value, { allowedHosts, allowedHostSuffixes }) {
   } catch {
     throw createFanartTvError('fanarttv_misconfigured', 'Invalid Fanart.tv base URL');
   }
-}
-
-const artistImageTypes = ['artistthumb', 'artistbackground', 'hdmusiclogo', 'musiclogo'];
-const albumImageTypes = ['albumcover'];
-
-function selectBestImage(images, imageType) {
-  const list = images?.[imageType];
-  if (!Array.isArray(list) || list.length === 0) return null;
-  const sorted = [...list].sort((a, b) => (Number(b.likes) || 0) - (Number(a.likes) || 0));
-  const preferred = sorted.find((img) => img.lang === '' || img.lang == null) ?? sorted[0];
-  return preferred ?? null;
-}
-
-export function selectArtistImages(response) {
-  if (!response || typeof response !== 'object') return [];
-  const results = [];
-  for (const imageType of artistImageTypes) {
-    const image = selectBestImage(response, imageType);
-    if (image) results.push({ imageType, url: image.url, id: image.id, likes: Number(image.likes) || 0 });
-  }
-  return results;
-}
-
-export function selectAlbumImages(response) {
-  if (!response || typeof response !== 'object') return [];
-  const results = [];
-  for (const imageType of albumImageTypes) {
-    const image = selectBestImage(response, imageType);
-    if (image) results.push({ imageType, url: image.url, id: image.id, likes: Number(image.likes) || 0 });
-  }
-  return results;
 }
 
 export function createFanartTvClient({
@@ -144,7 +116,7 @@ export function createFanartTvClient({
 
     const response = await requestJson(`music/albums/${mbid}`);
     if (!response) return [];
-    return selectAlbumImages(response);
+    return selectAlbumImages(response, mbid);
   }
 
   return { fetchAlbumImages, fetchArtistImages };
