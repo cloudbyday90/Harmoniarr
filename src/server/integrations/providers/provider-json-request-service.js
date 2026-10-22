@@ -17,7 +17,9 @@ const origins = {
 
 export function createProviderJsonRequestService({ provider, fetchFn = globalThis.fetch, requestTimeoutMs = 15000, requestPolicy = {} }) {
   async function requestJson({ url, method = 'GET', headers, body, oauth = false }) {
-    const destination = new URL(url);
+    let destination;
+    try { destination = new URL(url); }
+    catch { throw createProviderRequestError(provider, 'request_rejected'); }
     if (!origins[provider]?.has(destination.origin) || destination.username || destination.password || destination.hash) throw createProviderRequestError(provider, 'request_rejected');
     const timeoutMs = Number.isSafeInteger(requestTimeoutMs) ? Math.max(1, Math.min(requestTimeoutMs, 60000)) : 15000;
     const controller = new AbortController();

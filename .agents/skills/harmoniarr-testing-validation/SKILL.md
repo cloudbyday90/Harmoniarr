@@ -5,6 +5,10 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For actual provider HTTPS, use [provider HTTPS qualification](references/provider-https.md).
+It owns child-scoped trust/proxy configuration, preserved DNS identity, native
+redirect/body refusal and deadline-driven socket retirement without live accounts.
+
 For one-time privileged CLI results, use the standards skill's
 [delivery reference](../harmoniarr-web-standards/references/cli-result-delivery.md).
 Qualify actual child stdio close/exit separately from capture-writer assertions.

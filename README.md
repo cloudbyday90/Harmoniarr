@@ -9,6 +9,11 @@ security update. See the [design](docs/NODE_24_SECURITY_PATCH_DESIGN.md),
 [official research](docs/NODE_24_SECURITY_PATCH_RESEARCH_2026_10.md)
 and [qualification outcome](docs/NODE_24_SECURITY_PATCH_OUTCOME.md).
 
+Provider HTTPS now has account-free native TLS, redirect, compression and deadline
+qualification, including sanitized malformed-URL refusal. See the
+[design](docs/PROVIDER_HTTPS_DESIGN.md), [official research](docs/PROVIDER_HTTPS_RESEARCH_2026_10.md)
+and [outcome](docs/PROVIDER_HTTPS_OUTCOME.md).
+
 New migration scaffolds now include the canonical SQL copyright/license notice
 and pass the actual authoring policy checks. See the
 [design](docs/MIGRATION_SCAFFOLD_DESIGN.md),

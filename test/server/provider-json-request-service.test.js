@@ -8,6 +8,21 @@ const secret = 'PRIVATE-SENTINEL-token';
 const url = `https://www.googleapis.com/youtube/v3/playlistItems?key=${secret}`;
 const serializeError = (error) => JSON.stringify({ ...error, message: error.message });
 
+test('malformed request URLs use bounded diagnostics without exposing the parser input', async (t) => {
+  const fetchFn = t.mock.fn();
+  const service = createProviderJsonRequestService({ provider: 'spotify', fetchFn });
+  await assert.rejects(service.requestJson({ url: `invalid-${secret}` }), error => {
+    assert.equal(error.diagnosticCode, 'request_rejected');
+    assert.equal(error.code, 'spotify_request_failed');
+    assert.equal(serializeError(error).includes(secret), false);
+    assert.equal(Object.hasOwn(error, 'input'), false);
+    assert.equal(Object.hasOwn(error, 'cause'), false);
+    assert.deepEqual(error.details, { status: null, reasonCode: null, retryAfterSeconds: null });
+    return true;
+  });
+  assert.equal(fetchFn.mock.callCount(), 0);
+});
+
 for (const scenario of [
   { status: 401, reason: 'invalid_token', category: 'credentials_rejected' },
   { status: 403, reason: 'quotaExceeded', category: 'quota_exceeded' },

@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 21 [provider HTTPS rebuild](LOCAL_DOCKER_PROVIDER_HTTPS_OUTCOME.md)
+records the current no-cache image, preserved admin/data and passing readiness.
+The [owning outcome](PROVIDER_HTTPS_OUTCOME.md) records native certificate,
+redirect, response-bound and deadline qualification separately.
+
 The October 21 [Node security patch rebuild](LOCAL_DOCKER_NODE_SECURITY_PATCH_OUTCOME.md)
-records the current no-cache image, Node 24.22.1, preserved admin/data and passing
+records the preceding no-cache image, Node 24.22.1, preserved admin/data and passing
 readiness. The [owning outcome](NODE_24_SECURITY_PATCH_OUTCOME.md) records native
 TLS/HTTP, runtime and disposable packaged qualification separately.
 
