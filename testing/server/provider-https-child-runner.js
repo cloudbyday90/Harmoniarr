@@ -7,13 +7,14 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 /** A new process owns all proxy/trust configuration; never inherit operator secrets. */
-export async function runProviderHttpsChild({ proxyUrl, caFile, scenario, signal }) {
+export async function runProviderHttpsChild({ proxyUrl, caFile, scenario, signal,
+  consumerUrl = new URL('./provider-https-consumer.js', import.meta.url) }) {
   signal?.throwIfAborted();
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) =>
     /^(PATH|SYSTEMROOT|WINDIR|TEMP|TMP|LANG|TZ)$/iu.test(key)));
   Object.assign(env, { NODE_USE_ENV_PROXY: '1', HTTPS_PROXY: proxyUrl, HTTP_PROXY: proxyUrl, NO_PROXY: '' });
   if (caFile) env.NODE_EXTRA_CA_CERTS = caFile;
-  const child = spawn(process.execPath, [fileURLToPath(new URL('./provider-https-consumer.js', import.meta.url)), scenario], {
+  const child = spawn(process.execPath, [fileURLToPath(consumerUrl), scenario], {
     env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
   });
   let failure;

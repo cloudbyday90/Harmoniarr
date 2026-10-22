@@ -6,7 +6,8 @@ fixture listeners, or use these keys for real data. The CA signing key is not
 committed. Certificates expire in October 2036; regenerate the two leaf profiles
 and CA together before expiry.
 
-`matched` contains the five fixed provider DNS names and IPv4 127.0.0.1.
+`matched` contains the five fixed collection-provider DNS names, Last.fm's
+ws.audioscrobbler.com hostname and IPv4 127.0.0.1.
 `mismatched` contains only wrong.example.invalid and IPv4 127.0.0.2. Both share
 the fixture CA so identity refusal is independent of chain refusal.
 

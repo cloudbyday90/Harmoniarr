@@ -40,9 +40,7 @@ test('createLastFmClient getSimilarArtists returns empty when no mbid or artistN
 
 test('createLastFmClient getSimilarArtists parses similar artists response', async () => {
   const responses = [
-    {
-      ok: true,
-      json: async () => ({
+    Response.json({
         similarartists: {
           artist: [
             { name: 'Artist A', mbid: 'mb-a', match: '0.95' },
@@ -50,7 +48,6 @@ test('createLastFmClient getSimilarArtists parses similar artists response', asy
           ],
         },
       }),
-    },
   ];
 
   const client = createLastFmClient({
@@ -70,9 +67,7 @@ test('createLastFmClient getSimilarArtists parses similar artists response', asy
 
 test('createLastFmClient getSimilarArtists handles missing mbid gracefully', async () => {
   const responses = [
-    {
-      ok: true,
-      json: async () => ({
+    Response.json({
         similarartists: {
           artist: [
             { name: 'No MBID Artist', match: '0.5' },
@@ -80,7 +75,6 @@ test('createLastFmClient getSimilarArtists handles missing mbid gracefully', asy
           ],
         },
       }),
-    },
   ];
 
   const client = createLastFmClient({
@@ -98,10 +92,7 @@ test('createLastFmClient getSimilarArtists handles missing mbid gracefully', asy
 
 test('createLastFmClient getSimilarArtists returns empty on missing similarartists key', async () => {
   const responses = [
-    {
-      ok: true,
-      json: async () => ({ error: 6, message: 'Artist not found' }),
-    },
+    Response.json({ error: 6, message: 'Artist not found' }),
   ];
 
   const client = createLastFmClient({
@@ -116,9 +107,7 @@ test('createLastFmClient getSimilarArtists returns empty on missing similarartis
 
 test('createLastFmClient getSimilarArtists clamps score to 0-1 range', async () => {
   const responses = [
-    {
-      ok: true,
-      json: async () => ({
+    Response.json({
         similarartists: {
           artist: [
             { name: 'High', mbid: 'mb-high', match: '2.5' },
@@ -127,7 +116,6 @@ test('createLastFmClient getSimilarArtists clamps score to 0-1 range', async () 
           ],
         },
       }),
-    },
   ];
 
   const client = createLastFmClient({
@@ -144,16 +132,13 @@ test('createLastFmClient getSimilarArtists clamps score to 0-1 range', async () 
 
 test('createLastFmClient getSimilarArtists accepts artistName as fallback', async () => {
   const responses = [
-    {
-      ok: true,
-      json: async () => ({
+    Response.json({
         similarartists: {
           artist: [
             { name: 'Similar', mbid: 'mb-s', match: '0.6' },
           ],
         },
       }),
-    },
   ];
 
   const client = createLastFmClient({

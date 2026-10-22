@@ -23,10 +23,10 @@ import {
 } from '../../outbound-url-policy.js';
 import {
   awaitProviderRequest,
-  createProviderRequestSignal,
   throwIfProviderRequestAborted,
   waitForProviderRequestDelay,
 } from '../provider-request-cancellation.js';
+import { createLastFmRequestService } from './lastfm-request-service.js';
 
 const NOOP_CLIENT = Object.freeze({
   getSimilarArtists: async () => [],
@@ -54,7 +54,7 @@ function parsePositiveInteger(value, fallback) {
   if (!Number.isInteger(parsed) || parsed <= 0) {
     throw createLastFmError(
       'lastfm_misconfigured',
-      `Expected a positive integer but received ${value}`,
+      'Expected a positive integer for Last.fm configuration',
     );
   }
 
@@ -70,18 +70,11 @@ function parseNonNegativeInteger(value, fallback) {
   if (!Number.isInteger(parsed) || parsed < 0) {
     throw createLastFmError(
       'lastfm_misconfigured',
-      `Expected a non-negative integer but received ${value}`,
+      'Expected a non-negative integer for Last.fm configuration',
     );
   }
 
   return parsed;
-}
-
-function computeBackoffDelay(attemptNumber, minIntervalMs) {
-  const boundedAttempt = Math.min(attemptNumber, 4);
-  const baseDelay = minIntervalMs * (2 ** boundedAttempt);
-  const jitter = Math.floor(Math.random() * 250);
-  return baseDelay + jitter;
 }
 
 function normalizeBaseUrl(value, { allowedHosts, allowedHostSuffixes }) {
@@ -103,7 +96,7 @@ function normalizeBaseUrl(value, { allowedHosts, allowedHostSuffixes }) {
   } catch {
     throw createLastFmError(
       'lastfm_misconfigured',
-      `Invalid Last.fm base URL: ${candidate}`,
+      'Invalid Last.fm base URL',
     );
   }
 }
@@ -134,6 +127,8 @@ export function createLastFmClient({
   const effectiveMinIntervalMs = Math.max(parsePositiveInteger(minIntervalMs, 1000), 1000);
   const effectiveRequestTimeoutMs = parsePositiveInteger(requestTimeoutMs, 10000);
   const effectiveMaxRetries = parseNonNegativeInteger(maxRetries, 2);
+  const requests = createLastFmRequestService({ fetchImpl, sleepImpl, requestTimeoutMs: effectiveRequestTimeoutMs,
+    maxRetries: effectiveMaxRetries, minIntervalMs: effectiveMinIntervalMs });
 
   let queuedRequest = Promise.resolve();
   let nextRequestAt = 0;
@@ -157,7 +152,7 @@ export function createLastFmClient({
     return awaitProviderRequest(result, { signal });
   }
 
-  async function requestJson(queryParams, { operation, signal = null }) {
+  async function requestJson(queryParams, { signal = null }) {
     return enqueue(async () => {
       throwIfProviderRequestAborted(signal);
 
@@ -172,63 +167,7 @@ export function createLastFmClient({
         url.searchParams.set(key, String(value));
       }
 
-      for (let attempt = 0; attempt <= effectiveMaxRetries; attempt += 1) {
-        throwIfProviderRequestAborted(signal);
-
-        let response;
-        try {
-          response = await fetchImpl(url, {
-            method: 'GET',
-            headers: { Accept: 'application/json' },
-            redirect: 'error',
-            signal: createProviderRequestSignal({
-              signal,
-              timeoutMs: effectiveRequestTimeoutMs,
-            }),
-          });
-        } catch (error) {
-          throwIfProviderRequestAborted(signal);
-
-          if (attempt < effectiveMaxRetries) {
-            await waitForProviderRequestDelay(
-              computeBackoffDelay(attempt + 1, effectiveMinIntervalMs),
-              { signal, sleepImpl },
-            );
-            continue;
-          }
-
-          throw createLastFmError(
-            'lastfm_unavailable',
-            `Last.fm ${operation} request failed before receiving a response`,
-            { attempts: attempt + 1, cause: error, maxRetries: effectiveMaxRetries, retryable: true, url: url.toString() },
-          );
-        }
-
-        if (response.ok) {
-          return response.json();
-        }
-
-        const retryable = response.status === 429 || response.status === 503 || response.status >= 500;
-        if (retryable && attempt < effectiveMaxRetries) {
-          await waitForProviderRequestDelay(
-            computeBackoffDelay(attempt + 1, effectiveMinIntervalMs),
-            { signal, sleepImpl },
-          );
-          continue;
-        }
-
-        throw createLastFmError(
-          retryable ? 'lastfm_unavailable' : 'lastfm_request_failed',
-          `Last.fm ${operation} request failed with status ${response.status}`,
-          { attempts: attempt + 1, maxRetries: effectiveMaxRetries, retryable, status: response.status, url: url.toString() },
-        );
-      }
-
-      throw createLastFmError(
-        'lastfm_unavailable',
-        `Last.fm ${operation} request exhausted retries`,
-        { attempts: effectiveMaxRetries + 1, maxRetries: effectiveMaxRetries, retryable: true, url: url.toString() },
-      );
+      return requests.requestJson(url, { signal });
     }, { signal });
   }
 
@@ -249,7 +188,7 @@ export function createLastFmClient({
 
     let payload;
     try {
-      payload = await requestJson(query, { operation: 'similar artists', signal });
+      payload = await requestJson(query, { signal });
     } catch (error) {
       if (error.code === 'lastfm_request_failed') {
         return [];

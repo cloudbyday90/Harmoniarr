@@ -15,10 +15,10 @@ import certificates from '../fixtures/provider-https/public-test-certificates.js
 import { runProviderHttpsChild } from './provider-https-child-runner.js';
 
 const authorities = new Set(['api.spotify.com:443', 'accounts.spotify.com:443', 'www.googleapis.com:443',
-  'oauth2.googleapis.com:443', 'api.music.apple.com:443', '127.0.0.1:443', 'redirect-sink.example.invalid:443']);
+  'oauth2.googleapis.com:443', 'api.music.apple.com:443', 'ws.audioscrobbler.com:443', '127.0.0.1:443', 'redirect-sink.example.invalid:443']);
 
 /** Public certificates only. The proxy never resolves or connects to the requested authority. */
-export async function withProviderHttpsFixture({ profile = 'matched', handler, signal }, run) {
+export async function withProviderHttpsFixture({ profile = 'matched', handler, signal, consumerUrl }, run) {
   if (!['matched', 'mismatched'].includes(profile)) throw new TypeError('Invalid HTTPS fixture profile');
   signal?.throwIfAborted();
   const root = await mkdtemp(join(tmpdir(), 'harmoniarr-provider-https-'));
@@ -74,7 +74,7 @@ export async function withProviderHttpsFixture({ profile = 'matched', handler, s
     return run({ records, runClient: (scenario, { trust = true } = {}) => {
       if (!admissionOpen) return Promise.reject(new Error('Provider HTTPS fixture is retired'));
       const task = runProviderHttpsChild({ proxyUrl: `http://127.0.0.1:${proxyPort}`,
-        caFile: trust ? caFile : null, scenario, signal: childSignal });
+        caFile: trust ? caFile : null, scenario, signal: childSignal, consumerUrl });
       children.add(task);
       void task.then(() => children.delete(task), () => children.delete(task));
       return task;

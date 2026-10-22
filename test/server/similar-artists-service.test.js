@@ -9,6 +9,7 @@ import {
   mergeSimilarArtists,
 } from '../../src/server/metadata/similar-artists-service.js';
 import { createRelatedArtistsResponseBudgetService } from '../../src/server/metadata/related-artists-response-budget-service.js';
+import { createLastFmClient } from '../../src/server/integrations/lastfm/lastfm-client.js';
 
 // ---------------------------------------------------------------------------
 // extractMbRelatedArtists
@@ -771,6 +772,23 @@ test('createSimilarArtistsService continues when Last.fm fails', async () => {
 
   assert.equal(result.similar.length, 1);
   assert.equal(result.similar[0].source, 'listenbrainz');
+});
+
+test('related artists keeps other sources when the actual Last.fm client refuses invalid JSON', async () => {
+  const secret = 'PUBLIC-TEST-ONLY-lastfm-private-sentinel';
+  let calls = 0;
+  const service = createSimilarArtistsService({
+    listenBrainzClient: createTestListenBrainzClient(async () => [{ mbid: 'fixture-lb', name: 'Fixture Artist', score: 0.9 }]),
+    musicBrainzClient: createTestMusicBrainzClient(async () => ({ relations: [] })),
+    lastFmClient: createLastFmClient({ apiKey: secret, maxRetries: 0, fetchImpl: async () => {
+      calls++; return new Response(`{"private":"${secret}`);
+    } }),
+  });
+  const result = await service.getSimilarArtists({ artistMbid: 'fixture-seed' });
+  assert.equal(calls, 1);
+  assert.equal(result.similar[0].id, 'fixture-lb');
+  assert.equal(result.similar[0].source, 'listenbrainz');
+  assert.equal(JSON.stringify(result).includes(secret), false);
 });
 
 test('createSimilarArtistsService returns Last.fm results when other sources are empty', async () => {

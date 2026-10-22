@@ -26,7 +26,22 @@ diagnostics. A malformed URL must use the same approved error projection as an
 unapproved origin. Retain original candidate failures; distinguish corrected test
 expectations from production defects. Follow normal focused-to-fast validation.
 
-This fixture covers the shared JSON clients, not metadata/slskd/Plex/push clients,
+## Last.fm response adoption
+
+For Last.fm, run `test/server/lastfm-https.test.js` with its own child consumer.
+The same fixture now includes the default ws.audioscrobbler.com identity. Keep
+one client-owned queue and its existing transport/HTTP retry policy. Adopt the
+shared decoded-byte reader; successful malformed/oversized bodies are terminal
+failures, not empty successes or additional retries. Cancel ignored HTTP bodies
+before backoff, preserving the known HTTP result through cleanup errors. Caller
+abort identity belongs to its internal owner; provider-originated text does not.
+Use exact-ceiling and gated cancellation controls plus native compressed/body
+deadline proof. Stubbed sleep in native retry checks establishes ordering/counts,
+not real rate cadence. Qualify the related-artists consumer as well. See the
+[Last.fm outcome](../../../../docs/LASTFM_RESPONSE_OUTCOME.md) before extending
+the cap to MusicBrainz's larger, operation-dependent payloads.
+
+This fixture covers the shared JSON clients and Last.fm; other metadata/slskd/Plex/push clients,
 live public DNS, remote providers, proxy authentication, all TLS variants or full
 application SSRF resistance. See the [design](../../../../docs/PROVIDER_HTTPS_DESIGN.md)
 and [outcome](../../../../docs/PROVIDER_HTTPS_OUTCOME.md).
