@@ -21,6 +21,9 @@ import { createArtworkAssignmentService } from './artwork-assignment-service.js'
 import { createArtworkPolicyService } from './artwork-policy-service.js';
 import { listArtworkAssignments } from './artwork-repository.js';
 import { createArtworkImageDownloadService } from './artwork-image-download-service.js';
+import { createArtworkFetchAdmission } from './artwork-fetch-admission.js';
+import { resolveArtworkFetchBatch } from './artwork-fetch-batch.js';
+import { normalizeArtworkFetchRequest } from './artwork-fetch-request.js';
 
 const fanartRoleMap = {
   artistthumb: 'artist_thumbnail',
@@ -79,6 +82,7 @@ export function createArtworkFetchService({
   theAudioDbClient = null,
   listArtworkAssignmentsFn = listArtworkAssignments,
   downloadImageFn = createArtworkImageDownloadService().downloadImageBuffer,
+  artworkFetchAdmission = createArtworkFetchAdmission(),
 } = {}) {
   const resolvedArtworkFetchBackoffService = artworkFetchBackoffService ?? {
     clearFailure: async () => {},
@@ -264,7 +268,7 @@ export function createArtworkFetchService({
     return buildResult(asset, 'theAudioDb');
   }
 
-  async function resolveArtwork({ ownerType, ownerId, artworkRole = 'cover_front', refresh = false }) {
+  async function resolveAdmittedArtwork({ ownerType, ownerId, artworkRole = 'cover_front', refresh = false }) {
     const policy = await artworkPolicyService.getArtworkRuntimePolicy();
     if (!policy.fetch.enabled) return { ...emptyResult };
 
@@ -380,22 +384,13 @@ export function createArtworkFetchService({
     return anyQuotaExceeded ? { ...quotaExceededResult } : { ...emptyResult };
   }
 
-  async function resolveArtworkBatch(requests) {
-    const results = {};
-    await Promise.all(requests.map(async (request) => {
-      const key = `${request.ownerType}:${request.ownerId}:${request.artworkRole ?? 'cover_front'}`;
-      try {
-        results[key] = await resolveArtwork({
-          artworkRole: request.artworkRole ?? 'cover_front',
-          ownerId: request.ownerId,
-          ownerType: request.ownerType,
-          refresh: request.refresh ?? false,
-        });
-      } catch {
-        results[key] = { ...emptyResult };
-      }
-    }));
-    return results;
+  async function resolveArtwork(input) {
+    const metadata = normalizeArtworkFetchRequest(input);
+    return artworkFetchAdmission.run(() => resolveAdmittedArtwork(metadata), { signal: input.signal });
+  }
+
+  function resolveArtworkBatch(requests, { signal } = {}) {
+    return resolveArtworkFetchBatch(requests, { resolveArtwork, emptyResult, signal });
   }
 
   return { resolveArtwork, resolveArtworkBatch };

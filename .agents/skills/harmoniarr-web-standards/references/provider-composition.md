@@ -1,5 +1,9 @@
 # Provider composition and target ownership
 
+For aggregate provider/image limits, read [resource admission](resource-admission.md).
+It owns shared-instance scope, bounded queue metadata, cancellation versus actual
+completion and temporary capacity refusal without provider-absence backoff.
+
 Use when a provider client works in isolation but application configuration or
 nested metadata may not reach the correct artwork owner.
 

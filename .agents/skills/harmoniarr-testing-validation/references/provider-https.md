@@ -1,5 +1,13 @@
 # Provider HTTPS qualification
 
+For aggregate artwork admission, use artwork-fetch-admission policy/consumer tests
+and artwork-admission-https.test.js. Hold actual final assignment while overlapping
+batch/single work waits; prove only two downloads/rewrites and queued cancellation
+before dispatch. The native journey covers seven images through three providers,
+real Sharp/files and controlled publication sinks. It establishes lifecycle counts,
+not a hard memory ceiling or live-provider throughput. See
+[resource admission](../../harmoniarr-web-standards/references/resource-admission.md).
+
 Use for the shared Spotify/YouTube/Apple Music request service or its native
 transport contracts. Existing policy tests inject Response objects; they do not
 establish TLS identity, redirect refusal, decompression or socket retirement.

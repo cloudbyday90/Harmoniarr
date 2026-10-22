@@ -41,6 +41,13 @@ address snapshot. Environment-proxy artwork requests fail closed. See the
 [validation outcome](docs/ARTWORK_EGRESS_OUTCOME.md) and
 [Docker rebuild](docs/LOCAL_DOCKER_ARTWORK_EGRESS_OUTCOME.md).
 
+Artwork fetches now share two active slots across batch, single and background
+calls, with bounded waiting and lazy batch admission. Slots last through final
+publication. See the [design](docs/ARTWORK_ADMISSION_DESIGN.md),
+[research and tradeoffs](docs/ARTWORK_ADMISSION_RESEARCH.md),
+[outcome](docs/ARTWORK_ADMISSION_OUTCOME.md) and
+[Docker rebuild](docs/LOCAL_DOCKER_ARTWORK_ADMISSION_OUTCOME.md).
+
 MusicBrainz now uses operation-specific decoded JSON limits, preserves large
 release payloads and paging, and retires ignored HTTP bodies before retrying.
 See the [design and tradeoffs](docs/MUSICBRAINZ_RESPONSE_DESIGN.md),

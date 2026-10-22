@@ -3,6 +3,8 @@ import test from 'node:test';
 import { createApiError } from '../../src/server/auth.js';
 import { registerArtworkRoutes } from '../../src/server/routes/artwork-routes.js';
 import { createJsonTestApp, withServer } from '../../testing/server/http-test-helpers.js';
+import { createArtworkFetchService } from '../../src/server/artwork/artwork-fetch-service.js';
+import { createArtworkFetchAdmission } from '../../src/server/artwork/artwork-fetch-admission.js';
 
 function createArtworkRouteTestApp(overrides = {}) {
   return createJsonTestApp((app) => {
@@ -86,6 +88,33 @@ function createArtworkRouteTestApp(overrides = {}) {
     });
   });
 }
+
+test('actual artwork service capacity refusal reaches single and batch HTTP callers as 503', async () => {
+  const entered = Promise.withResolvers(); const held = Promise.withResolvers(); let publications = 0;
+  const service = createArtworkFetchService({ artworkFetchAdmission: createArtworkFetchAdmission({ concurrency: 1, maxQueued: 0 }),
+    artworkPolicyService: { getArtworkRuntimePolicy: async () => ({ fetch: { enabled: true } }) },
+    listArtworkAssignmentsFn: async () => [],
+    fanartTvClient: { fetchArtistImages: async () => [{ imageType: 'artistthumb', url: 'https://assets.fanart.tv/image.png' }] },
+    downloadImageFn: async () => { entered.resolve(); await held.promise; return Buffer.from('image'); },
+    artworkIngestionService: { ingestArtworkBuffer: async () => ({ asset: { id: 'owned-asset' } }) },
+    artworkAssignmentService: { assignPreferredArtwork: async () => { publications++; } },
+  });
+  const app = createArtworkRouteTestApp({ resolveArtwork: service.resolveArtwork, resolveArtworkBatch: service.resolveArtworkBatch });
+  await withServer(app, async baseUrl => {
+    const path = '/api/v1/artwork/resolve?owner_type=musicbrainz_artist&owner_id=held&artwork_role=artist_thumbnail';
+    const active = fetch(`${baseUrl}${path}`);
+    try {
+      await Promise.race([entered.promise, active.then(() => assert.fail('returned before hold'))]);
+      const single = await fetch(`${baseUrl}${path}`);
+      assert.equal(single.status, 503); assert.equal((await single.json()).error.code, 'artwork_fetch_capacity');
+      const batch = await fetch(`${baseUrl}/api/v1/artwork/resolve-batch`, { method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ requests: [{ ownerType: 'musicbrainz_artist', ownerId: 'overloaded', artworkRole: 'artist_thumbnail' }] }) });
+      assert.equal(batch.status, 503); assert.equal((await batch.json()).error.code, 'artwork_fetch_capacity');
+      assert.equal(publications, 0);
+    } finally { held.resolve(); const response = await active; assert.equal(response.status, 200); await response.arrayBuffer(); }
+    assert.equal(publications, 1);
+  });
+});
 
 test('artwork cleanup run detail route requires admin session and returns a single cleanup run', async (t) => {
   const requireAdminSession = t.mock.fn(async () => ({ appUserId: 'user-3', user: { role: 'admin' } }));
