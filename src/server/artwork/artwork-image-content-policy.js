@@ -3,7 +3,7 @@
  * Copyright (C) 2026 Harmoniarr Contributors
  * Licensed under GPL-3.0-or-later. See LICENSE.
  */
-import { createApiError } from '../auth.js';
+import { createApiError } from '../api-error.js';
 
 export function assertArtworkBuffer(buffer) {
   if (!Buffer.isBuffer(buffer) || buffer.length === 0) throw createApiError(400, 'validation_error', 'Artwork buffer must not be empty');

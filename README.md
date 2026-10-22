@@ -55,6 +55,12 @@ with bounded queued buffer bytes and same-handle file reads. See the
 [outcome](docs/ARTWORK_INGESTION_BUDGET_OUTCOME.md) and
 [Docker rebuild](docs/LOCAL_DOCKER_ARTWORK_INGESTION_OUTCOME.md).
 
+Artwork decoding now uses disposable ESM child processes with bounded output,
+external termination and successful-close publication fencing. See the
+[design](docs/ARTWORK_WORKER_DESIGN.md), [research and tradeoffs](docs/ARTWORK_WORKER_RESEARCH.md),
+[qualification and explicit test lane](docs/ARTWORK_WORKER_OUTCOME.md) and
+[Docker rebuild](docs/LOCAL_DOCKER_ARTWORK_WORKER_OUTCOME.md).
+
 MusicBrainz now uses operation-specific decoded JSON limits, preserves large
 release payloads and paging, and retires ignored HTTP bodies before retrying.
 See the [design and tradeoffs](docs/MUSICBRAINZ_RESPONSE_DESIGN.md),

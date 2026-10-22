@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import sharp from 'sharp';
-import { createArtworkIngestionService, inspectArtworkBuffer } from '../../src/server/artwork/artwork-ingestion-service.js';
+import { createArtworkIngestionService, prepareArtworkAsset } from '../../src/server/artwork/artwork-ingestion-service.js';
 import { createArtworkIngestionAdmission } from '../../src/server/artwork/artwork-ingestion-admission.js';
 import { readArtworkFile } from '../../src/server/artwork/artwork-file-reader.js';
 import { createArtworkFetchService } from '../../src/server/artwork/artwork-fetch-service.js';
@@ -27,7 +27,7 @@ test('one default ingestion budget covers buffers, files, embedded, sidecar and 
     limits: { maxOriginalDimensionPixels: 64, maxOriginalFileSizeBytes: 1024 * 1024 }, storage: { root } }) };
   const ingestion = createArtworkIngestionService({ artworkPolicyService,
     readFileFn: (...args) => { reads++; return readArtworkFile(...args); },
-    inspectArtworkBufferFn: (...args) => { inspections++; return inspectArtworkBuffer(...args); },
+    prepareArtworkAssetFn: (...args) => { inspections++; return prepareArtworkAsset(...args); },
     getArtworkAssetBySha256Fn: async () => null,
     upsertArtworkAssetFn: async asset => { upserts++; const id = `asset-${upserts}`;
       if (upserts === 2) entered.resolve(); if (upserts <= 2) await held.promise; return { ...asset, id }; },
@@ -60,7 +60,7 @@ test('file ingestion acquires once, waits before reading, cancels queued reads a
   let limit = 1024; let reads = 0; let writes = 0;
   const service = createArtworkIngestionService({ artworkIngestionAdmission: gate,
     artworkPolicyService: { getArtworkRuntimePolicy: async () => ({ limits: { maxOriginalFileSizeBytes: limit, maxOriginalDimensionPixels: 8 }, storage: { root: '/owned' } }) },
-    inspectArtworkBufferFn: async (...args) => { entered.resolve(); await held.promise; return inspectArtworkBuffer(...args); },
+    prepareArtworkAssetFn: async (...args) => { entered.resolve(); await held.promise; return prepareArtworkAsset(...args); },
     readFileFn: async () => { reads++; return buffer; }, mkdirFn: async () => {}, writeFileFn: async () => { writes++; },
     getArtworkAssetBySha256Fn: async () => null, upsertArtworkAssetFn: async asset => ({ ...asset, id: 'asset' }),
   });

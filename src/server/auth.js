@@ -47,12 +47,8 @@ const refreshCookieName = 'harmoniarr_refresh';
 const csrfCookieName = 'harmoniarr_csrf';
 const refreshTokenMaxAgeSeconds = 60 * 60 * 24 * 14;
 
-export function createApiError(status, code, message) {
-  const error = new Error(message);
-  error.status = status;
-  error.code = code;
-  return error;
-}
+import { createApiError } from './api-error.js';
+export { createApiError };
 
 export function getRequestMetadata(request) {
   const forwarded = request.headers['x-forwarded-for'];

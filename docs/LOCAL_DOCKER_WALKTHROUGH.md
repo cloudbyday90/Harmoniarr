@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
-The October 22 [shared ingestion rebuild](LOCAL_DOCKER_ARTWORK_INGESTION_OUTCOME.md)
+The October 22 [artwork-worker rebuild](LOCAL_DOCKER_ARTWORK_WORKER_OUTCOME.md)
 records the current no-cache image, preserved admin/data and passing readiness.
+The [owning outcome](ARTWORK_WORKER_OUTCOME.md) records process/stdio retirement,
+bounded results and separate maximum-policy Linux qualification.
+
+The October 22 [shared ingestion rebuild](LOCAL_DOCKER_ARTWORK_INGESTION_OUTCOME.md)
+records the preceding no-cache image, preserved admin/data and passing readiness.
 The [owning outcome](ARTWORK_INGESTION_BUDGET_OUTCOME.md) records shared ingestion
 admission, bounded file reads and immutable-image workload comparison separately.
 

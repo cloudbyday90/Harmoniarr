@@ -1,5 +1,16 @@
 # Provider HTTPS qualification
 
+For child-process image isolation, run artwork-worker-protocol/service server tests
+with the existing ingestion and provider cohort. The explicit Linux
+`test/native/artwork-worker.test.js` qualifies maximum bytes/pixels and real process
+retirement; keep it outside the routine fast glob. Use the constrained profile in
+[the worker outcome](../../../../docs/ARTWORK_WORKER_OUTCOME.md), then verify the
+actual packaged ESM default and source/image identities. Parent-loader blocking
+proves default work reaches another process. A native-active marker establishes
+work before cancellation, not a reproduced libvips hang. Inspect kill, exit, stream
+close and publication as separate events. See the standards
+[worker workflow](../../harmoniarr-web-standards/references/native-image-workers.md).
+
 Direct artwork ingestion also uses the shared image-processing owner. Keep the
 weighted admission/file-reader tests with provider compatibility when it changes.
 `test/native/artwork-file-reader.test.js` is explicit Linux FIFO/growing-handle

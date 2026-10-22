@@ -9,9 +9,10 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
+import { prepareArtworkAsset } from '../../src/server/artwork/artwork-ingestion-service.js';
 
 /** Fixed native work; sampled RSS is an observation, never a memory ceiling. */
-export async function measureArtworkIngestionWorkload({ createArtworkIngestionService, inspectArtworkBuffer }) {
+export async function measureArtworkIngestionWorkload({ createArtworkIngestionService }) {
   const root = await mkdtemp(join(tmpdir(), 'harmoniarr-artwork-workload-'));
   const tasks = []; let timer; let failed = false; let failure; let result;
   let active = 0; let peakActive = 0; let inspections = 0; let writes = 0; let peakRss = process.memoryUsage().rss;
@@ -25,7 +26,7 @@ export async function measureArtworkIngestionWorkload({ createArtworkIngestionSe
       limits: { maxOriginalFileSizeBytes: 20 * 1024 * 1024, maxOriginalDimensionPixels: dimension }, storage: { root },
     }) };
     const service = createArtworkIngestionService({ artworkPolicyService,
-      inspectArtworkBufferFn: async (...args) => { active++; peakActive = Math.max(peakActive, active); inspections++; return inspectArtworkBuffer(...args); },
+      prepareArtworkAssetFn: async (...args) => { active++; peakActive = Math.max(peakActive, active); inspections++; return prepareArtworkAsset(...args); },
       getArtworkAssetBySha256Fn: async () => null,
       upsertArtworkAssetFn: async asset => {
         writes++; active--; projection.push({ sha256: asset.sha256, payloadChecksum: asset.payloadChecksum, fileSizeBytes: asset.fileSizeBytes,

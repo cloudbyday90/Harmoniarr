@@ -1,9 +1,13 @@
 ---
 name: harmoniarr-web-standards
-description: "Apply and verify standards for Harmoniarr UI commands, forms, focus/status behavior, HTTP mutations and privileged CLI result delivery. Use for standards-oriented implementation or review; copy-only changes do not need this workflow."
+description: "Apply and verify standards for Harmoniarr UI commands, forms, focus/status behavior, HTTP mutations, privileged CLI result delivery, resource admission and native image workers. Use for standards-oriented implementation or review; copy-only changes do not need this workflow."
 ---
 
 # Harmoniarr Web Standards
+
+For native image processes, deadlines or containment claims, read
+[native image workers](references/native-image-workers.md). It owns bounded
+protocol delivery, actual process/stdio retirement and parent publication fencing.
 
 For privileged CLI output or one-time recovery material, read
 [CLI result delivery](references/cli-result-delivery.md). It separates commit,

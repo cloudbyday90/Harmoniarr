@@ -4,6 +4,7 @@
  * Licensed under GPL-3.0-or-later. See LICENSE.
  */
 import { ARTWORK_FETCH_BATCH_LIMIT, ARTWORK_FETCH_CONCURRENCY, isArtworkAdmissionError } from './artwork-fetch-admission.js';
+import { isArtworkWorkerError } from './artwork-worker-protocol.js';
 import { normalizeArtworkFetchRequest } from './artwork-fetch-request.js';
 
 /** Lazy bounded producers; admission errors escape only after every worker drains. */
@@ -20,7 +21,7 @@ export async function resolveArtworkFetchBatch(requests, { resolveArtwork, empty
       const key = `${input.ownerType}:${input.ownerId}:${input.artworkRole}`;
       try { results[key] = await resolveArtwork({ ...input, signal }); }
       catch (error) {
-        if (isArtworkAdmissionError(error)) failure ??= error;
+        if (isArtworkAdmissionError(error) || isArtworkWorkerError(error)) failure ??= error;
         else results[key] = { ...emptyResult };
       }
     }

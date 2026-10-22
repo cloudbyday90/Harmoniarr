@@ -4,7 +4,7 @@
  * Licensed under GPL-3.0-or-later. See LICENSE.
  */
 import sharp from 'sharp';
-import { createApiError } from '../auth.js';
+import { createApiError } from '../api-error.js';
 import { assertArtworkBuffer, assertArtworkRasterSignature, artworkSharpInputOptions } from './artwork-image-content-policy.js';
 
 const encoders = {

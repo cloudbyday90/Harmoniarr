@@ -107,3 +107,6 @@ fencing before treating worker memory limits as containment. Current one-megapix
 measurements do not qualify worst-case input or hard RSS. Preserve deployment
 resource controls; design derivative generation explicitly if that feature is
 implemented later rather than assuming its scaffolding already performs work.
+
+The subsequent [worker outcome](ARTWORK_WORKER_OUTCOME.md) records implementation
+and qualification of that next item, including the separate remaining OS boundary.
