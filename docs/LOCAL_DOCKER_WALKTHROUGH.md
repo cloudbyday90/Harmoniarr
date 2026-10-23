@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
-The October 23 [spectral interruption rebuild](LOCAL_DOCKER_SPECTRAL_INTERRUPTION_OUTCOME.md)
+The October 23 [spectral admission rebuild](LOCAL_DOCKER_SPECTRAL_ADMISSION_OUTCOME.md)
 records the current no-cache image, preserved admin/data and readiness. The
+[owning outcome](SPECTRAL_ADMISSION_OUTCOME.md) records concurrent backlog/dedup
+reproduction, transactional admission and packaged PostgreSQL qualification.
+
+The October 23 [spectral interruption rebuild](LOCAL_DOCKER_SPECTRAL_INTERRUPTION_OUTCOME.md)
+records the preceding no-cache image, preserved admin/data and readiness. The
 [owning outcome](SPECTRAL_INTERRUPTION_OUTCOME.md) records captured spectral claims,
 transactional cache/job publication and actual native interruption/close.
 

@@ -5,6 +5,11 @@ or peer reputation after spectral classification. Read the
 [design](../../../../docs/SPECTRAL_INTERRUPTION_DESIGN.md) and
 [research](../../../../docs/SPECTRAL_INTERRUPTION_RESEARCH.md).
 
+Producer capacity and library-file deduplication use the separate
+[queue admission](queue-admission.md) workflow. Both spectral INSERT paths must
+participate before their fresh capacity check. Claim/retry/recovery preserve
+open count; a future terminal-to-open transition would need that admission too.
+
 Trace apply quality preparation → proof → hasher/analyzer separately from the
 sidecar queue. Reuse the operation-run interruption scope for the apply path and
 pass the heartbeat signal to its returned advisory sidecar drain. Public proof

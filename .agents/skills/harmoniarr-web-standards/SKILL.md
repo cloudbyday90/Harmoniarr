@@ -5,6 +5,10 @@ description: "Apply and verify standards for Harmoniarr UI commands, forms, focu
 
 # Harmoniarr Web Standards
 
+For durable backlog limits or enqueue deduplication, read
+[queue admission](references/queue-admission.md). It covers participating writers,
+post-lock snapshots, bounded waiting and actual concurrent database proof.
+
 For spectral proof, claim generations and transactional cache/job publication,
 read [spectral ownership](references/spectral-ownership.md).
 

@@ -5,6 +5,16 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For queue capacity/deduplication, use the standards
+[admission reference](../harmoniarr-web-standards/references/queue-admission.md).
+Test both real producer directions and a duplicate identity with spare capacity;
+change session isolation defaults, observe actual lock waits independently and
+preserve rollback/Error/null plus per-file partial commits. Keep worker progress
+separate from producer serialization and timeout bounds separate from wall time.
+Spectral's ten contention cases share one registrar between isolated integration
+databases and `validate:native-spectral-admission`; the latter requires the
+explicit disposable deployment profile before touching packaged PostgreSQL.
+
 For spectral changes, use the standards [ownership reference](../harmoniarr-web-standards/references/spectral-ownership.md).
 Run proof/hash/quality/apply tests and real PostgreSQL spectral-interruption cases
 before `validate:native-spectral-interruption`. Separate actual metadata/close

@@ -17,6 +17,7 @@
  */
 
 import { createSourceUserSpectralClaimStore, captureSpectralJobClaim } from './source-user-spectral-claim-store.js';
+import { createSourceUserSpectralAdmissionStore } from './source-user-spectral-admission-store.js';
 import { getPool } from '../database.js';
 import { buildSourceUserUsernameKey } from './source-user-trust-service.js';
 
@@ -111,11 +112,12 @@ export function createSourceUserSpectralJobStore({
   maxBacklog = DEFAULT_MAX_BACKLOG,
 } = {}) {
   const backlogCap = normalizePositiveInteger(maxBacklog) ?? DEFAULT_MAX_BACKLOG;
+  const { withSpectralJobAdmission } = createSourceUserSpectralAdmissionStore({ getPoolFn });
 
   /**
    * Atomically enqueues a job unless the pending+active backlog is already at
-   * the cap. The cap check and insert share one statement snapshot;
-   * this does not serialize concurrent enqueue transactions.
+   * the cap. Both producers share transaction admission before the fresh
+   * capacity/dedup statement, held until the inserted row commits.
    *
    * @returns {Promise<{ enqueued: boolean, job: object | null, reason: string | null }>}
    */
@@ -142,7 +144,7 @@ export function createSourceUserSpectralJobStore({
       throw new Error('enqueueSpectralJob requires a non-blank username');
     }
 
-    const result = await getPoolFn().query(
+    const result = await withSpectralJobAdmission((queryable) => queryable.query(
       `INSERT INTO source_user_spectral_jobs (
          username_key, username, import_candidate_id, file_path,
          declared_codec, declared_extension, sample_rate, bit_rate, state
@@ -164,7 +166,7 @@ export function createSourceUserSpectralJobStore({
         normalizeNonNegativeBigInt(bitRate),
         backlogCap,
       ],
-    );
+    ));
 
     if (result.rows.length === 0) {
       return { enqueued: false, job: null, reason: 'backlog_full' };
@@ -244,7 +246,8 @@ export function createSourceUserSpectralJobStore({
    * Enqueues a batch of retroactive library re-grade jobs under the reserved
    * sentinel identity. Each insert is guarded by both the global backlog cap and
    * a per-library-file dedupe (no second open job for a file already queued),
-   * so repeated scans are idempotent and cannot overrun the queue.
+   * under the shared admission transaction. Repeated/concurrent cooperating scans
+   * cannot add a second open job for that file or exceed their configured cap.
    *
    * @param {object} input
    * @param {Array<{ libraryFileId: string, filePath: string, declaredCodec?: string|null, declaredExtension?: string|null, sampleRate?: number|null, bitRate?: number|null }>} input.files
@@ -266,7 +269,7 @@ export function createSourceUserSpectralJobStore({
         continue;
       }
 
-      const result = await getPoolFn().query(
+      const result = await withSpectralJobAdmission((queryable) => queryable.query(
         `INSERT INTO source_user_spectral_jobs (
            username_key, username, file_path, declared_codec, declared_extension,
            sample_rate, bit_rate, origin, library_file_id, state
@@ -292,7 +295,7 @@ export function createSourceUserSpectralJobStore({
           libraryFileId,
           backlogCap,
         ],
-      );
+      ));
 
       if (result.rows.length > 0) {
         summary.enqueued += 1;

@@ -120,11 +120,11 @@ fully drained or exactly-once. A durable outbox needs a separate design. Sampled
 fingerprint and classification policies are unchanged; these controls do not
 establish general content authenticity or protection against file replacement.
 
-**Next:** reproduce concurrent spectral backlog/dedup admission and serialize its
-owning check/insert. The existing COUNT/INSERT shares one snapshot but does not
-serialize separate enqueue transactions. This is a source-level finding to qualify,
-not a reproduced race in these interruption tests. Prioritize this resource boundary
-before the advisory reputation outbox.
+**Follow-up completed:** the [admission outcome](SPECTRAL_ADMISSION_OUTCOME.md)
+subsequently reproduced concurrent backlog/dedup races and added shared producer
+transactions. These interruption tests did not themselves reproduce that race.
+The admission outcome owns that separate proof and the next reputation-delivery
+recommendation.
 
 GitHub MCP found no open PRs at selection and again before publication. No
 applicable random/stale PR could be implemented, rebased or closed; no PR was

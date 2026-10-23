@@ -22,13 +22,20 @@ import { createSourceUserSpectralJobStore } from '../../src/server/activity/sour
 
 function createFakePool(queryImpl) {
   const calls = [];
+  const query = async (text, params) => {
+    calls.push({ params, text });
+    return queryImpl ? queryImpl(text, params) : { rows: [], rowCount: 0 };
+  };
   return {
     calls,
     getPoolFn: () => ({
-      query: async (text, params) => {
-        calls.push({ params, text });
-        return queryImpl ? queryImpl(text, params) : { rows: [], rowCount: 0 };
-      },
+      query,
+      connect: async () => ({
+        // These tests own row mapping; transaction ordering has dedicated coverage.
+        query: (text, params) => /^(BEGIN|COMMIT|ROLLBACK|SET |SELECT pg_advisory)/u.test(text)
+          ? Promise.resolve({ rows: [] }) : query(text, params),
+        release() {},
+      }),
     }),
   };
 }
