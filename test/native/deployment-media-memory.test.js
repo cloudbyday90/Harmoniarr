@@ -10,13 +10,21 @@ import { withDeploymentMediaWorkers } from '../../testing/server/deployment-medi
 const { gib, profile } = await requireDeploymentMemoryProfile();
 test('shared-container media memory: real catalogue scan, FFprobe and encoding overlap artwork and SQL', { timeout: 90_000 }, async t => {
   t.after(closePool); const pool = getPool(); const before = await profile.snapshot();
-  const measurement = await withDeploymentMediaFixture(async fixture => {
+  const artworkCloses = []; let measurement;
+  try { measurement = await withDeploymentMediaFixture(async fixture => {
     const observer = createDeploymentMediaObserver({ signal: t.signal });
     return runDeploymentMemoryWorkload({ pool, dimension: 8192, callerBytes: 256 * 1024 ** 2,
       onArtworkSpawn: () => observer.observeArtworkSpawn(),
+      onArtworkClose: event => artworkCloses.push(event),
       withConcurrentWork: (context, work) => withDeploymentMediaWorkers({ ...context, fixture, observer }, work),
     });
-  });
+  }); } catch (error) {
+    try {
+      const kernel = await profile.snapshot();
+      t.diagnostic(JSON.stringify({ failureEvidence: 'media-scan', artworkCloses, memoryPeakBytes: kernel.memoryPeakBytes, oomKills: kernel.oomKills }));
+    } catch { /* Retain the original workload failure through optional diagnostics. */ }
+    throw error;
+  }
   const afterFixture = await profile.snapshot(); assert.equal(afterFixture.oomKills, before.oomKills);
   assert.ok(afterFixture.memoryPeakBytes < gib * 1024 ** 3);
   const { baseline, settled } = measurement.checkpoints;

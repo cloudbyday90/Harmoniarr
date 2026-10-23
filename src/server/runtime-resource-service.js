@@ -19,6 +19,7 @@
 import { availableParallelism } from 'node:os';
 import process from 'node:process';
 import sharp from 'sharp';
+import { MEDIA_COMMAND_ADMISSION_POLICY } from './media/media-command-admission.js';
 
 const defaultMonitorIntervalMs = 60_000;
 const defaultHeartbeatStaleMultiplier = 3;
@@ -193,6 +194,7 @@ export function createRuntimeResourceService({
   function getRuntimeConfiguration() {
     return {
       mediaCommands: {
+        admission: { ...MEDIA_COMMAND_ADMISSION_POLICY },
         defaultKillGraceMs: mediaCommandKillGraceMs,
         defaultMaxBufferBytes: mediaCommandMaxBufferBytes,
         defaultTimeoutMs: mediaCommandTimeoutMs,

@@ -130,6 +130,10 @@ suite('createApp', () => {
     })),
   };
   const createMediaToolingStatusService = t.mock.fn(() => mediaToolingStatusService);
+  const commandService = { runCommand: t.mock.fn(async ({ label }) => ({ durationMs: 1,
+    stdout: label === 'spectral cutoff analysis' ? 'lavfi.aspectralstats.1.rolloff=18000' : JSON.stringify({ streams: [{ codec_type: 'audio', codec_name: 'flac' }], format: {} }),
+  })) };
+  const createMediaCommandService = t.mock.fn(() => commandService);
   const createLibraryModule = t.mock.fn(() => libraryModule);
   const createMissingMusicModule = t.mock.fn(() => missingMusicModule);
   const createMetadataModule = t.mock.fn(() => metadataModule);
@@ -185,6 +189,7 @@ suite('createApp', () => {
     createLibraryModule,
     createMissingMusicModule,
     createMediaToolingStatusService,
+    createMediaCommandService,
     createMetadataModule,
     createOperationsModule,
     createProviderModule,
@@ -334,6 +339,14 @@ suite('createApp', () => {
   const dependencyHealth = await systemModuleArgs.dependencyHealthService.getDependencyHealth();
   assert.equal(dependencyHealth.length, 3);
   assert.equal(mediaToolingStatusService.getStatus.mock.callCount(), 1);
+  assert.equal(createMediaCommandService.mock.callCount(), 1);
+  assert.equal(createMediaToolingStatusService.mock.calls[0].arguments[0].mediaCommandService, commandService);
+  await importCandidateModuleArgs.mediaInspectionService.inspectSourceFile({ sourcePath: '/fixture/source.flac' });
+  await importCandidateModuleArgs.mediaTranscodeExecutionService.executeCandidate({ sourcePath: '/fixture/source.flac',
+    transcodePlan: { recommendedAction: 'transcode_candidate', target: { audioCodec: 'opus' } } });
+  await importCandidateModuleArgs.analyzeSpectralCutoffFn({ filePath: '/fixture/source.flac' });
+  assert.deepEqual(commandService.runCommand.mock.calls.map(row => row.arguments[0].label),
+    ['media inspection', 'media transcode preflight', 'spectral cutoff analysis']);
   assert.equal(metadataModule.musicBrainzSearchService.checkProviderHealth.mock.callCount(), 1);
   assert.equal(slskdModule.slskdService.getConnectionStatus.mock.callCount(), 1);
   const mediaToolingHealth = dependencyHealth.find((dependency) => dependency.provider === 'media_tooling');

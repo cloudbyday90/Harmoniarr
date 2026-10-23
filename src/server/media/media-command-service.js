@@ -17,285 +17,48 @@
  */
 
 import { spawn } from 'node:child_process';
+import { createMediaCommandAdmission } from './media-command-admission.js';
+import { executeMediaCommand } from './media-command-process.js';
 
-const defaultSpawn = spawn;
-
-function normalizeAllowedBinaries(value) {
-  if (!Array.isArray(value)) {
-    return new Set();
+function snapshotArgs(args) {
+  if (!Array.isArray(args) || args.length > 256) throw new TypeError('Invalid media command arguments');
+  const snapshot = []; let bytes = 0;
+  for (const arg of args) {
+    if (typeof arg !== 'string' || arg.includes('\0')) throw new TypeError('Invalid media command arguments');
+    bytes += Buffer.byteLength(arg);
+    if (bytes > 64 * 1024) throw new TypeError('Media command arguments exceed their byte limit');
+    snapshot.push(arg);
   }
-
-  return new Set(value
-    .filter((binary) => typeof binary === 'string' && binary.trim().length > 0)
-    .map((binary) => binary.trim().toLowerCase()));
-}
-
-function appendChunk(chunks, currentSize, chunk, maxBuffer) {
-  const remaining = maxBuffer - currentSize;
-  if (remaining <= 0) {
-    return currentSize;
-  }
-
-  const slice = chunk.length > remaining ? chunk.subarray(0, remaining) : chunk;
-  chunks.push(slice);
-  return currentSize + slice.length;
-}
-
-function createCommandError(message, details = {}) {
-  const error = new Error(message);
-  Object.assign(error, details);
-  return error;
+  return Object.freeze(snapshot);
 }
 
 export function createMediaCommandService({
   allowedBinaries = [],
+  admission = createMediaCommandAdmission(),
   defaultKillGraceMs = 5000,
   defaultMaxBuffer = 1024 * 1024,
   defaultTimeoutMs = 5000,
   onCommandExit = () => {},
   onCommandStart = () => {},
   onCommandWarning = () => {},
-  spawnFn = defaultSpawn,
+  spawnFn = spawn,
 } = {}) {
-  const allowedBinarySet = normalizeAllowedBinaries(allowedBinaries);
-
-  async function runCommand({
-    args = [],
-    binary,
-    killGraceMs = defaultKillGraceMs,
-    killSignal = 'SIGTERM',
-    label = null,
-    maxBuffer = defaultMaxBuffer,
-    signal = null,
-    timeoutMs = defaultTimeoutMs,
-  }) {
-    if (typeof binary !== 'string' || binary.trim().length === 0) {
-      throw new Error('runCommand requires binary');
-    }
-
+  const allowedBinarySet = new Set(allowedBinaries.filter(binary => typeof binary === 'string' && binary.trim()).map(binary => binary.trim().toLowerCase()));
+  async function runCommand({ args = [], binary, killGraceMs = defaultKillGraceMs, killSignal = 'SIGTERM', label = null,
+    maxBuffer = defaultMaxBuffer, signal = null, timeoutMs = defaultTimeoutMs }) {
+    if (typeof binary !== 'string' || !binary.trim() || binary.length > 4096 || binary.includes('\0')) throw new TypeError('runCommand requires binary');
     const normalizedBinary = binary.trim();
     if (allowedBinarySet.size > 0 && !allowedBinarySet.has(normalizedBinary.toLowerCase())) {
-      const error = new Error(`Binary is not allowlisted for media command execution: ${normalizedBinary}`);
-      error.code = 'media_command_binary_not_allowed';
-      throw error;
+      throw Object.assign(new Error('Binary is not allowlisted for media command execution'), { code: 'media_command_binary_not_allowed' });
     }
-
-    return new Promise((resolve, reject) => {
-      const startedAt = Date.now();
-      const child = spawnFn(normalizedBinary, args, {
-        shell: false,
-        stdio: ['ignore', 'pipe', 'pipe'],
-        windowsHide: true,
-      });
-      const stdoutChunks = [];
-      const stderrChunks = [];
-      let stdoutSize = 0;
-      let stderrSize = 0;
-      let settled = false;
-      let terminationReason = null;
-      let killTimer = null;
-      let timeoutHandle = null;
-      let abortListener = null;
-
-      function clearTimers() {
-        clearTimeout(timeoutHandle);
-        clearTimeout(killTimer);
-      }
-
-      function cleanup() {
-        clearTimers();
-        if (signal && abortListener) {
-          signal.removeEventListener('abort', abortListener);
-        }
-      }
-
-      function finalizeError(error) {
-        if (settled) {
-          return;
-        }
-
-        settled = true;
-        cleanup();
-        reject(error);
-      }
-
-      function finalizeSuccess(result) {
-        if (settled) {
-          return;
-        }
-
-        settled = true;
-        cleanup();
-        resolve(result);
-      }
-
-      function buildOutputDetails() {
-        return {
-          durationMs: Date.now() - startedAt,
-          pid: child.pid ?? null,
-          stderr: Buffer.concat(stderrChunks).toString('utf8'),
-          stdout: Buffer.concat(stdoutChunks).toString('utf8'),
-        };
-      }
-
-      function requestTermination(reason, message) {
-        if (terminationReason) {
-          return;
-        }
-
-        terminationReason = reason;
-        onCommandWarning({
-          args,
-          binary: normalizedBinary,
-          label,
-          message,
-          pid: child.pid ?? null,
-          reason,
-        });
-
-        child.kill(killSignal);
-        killTimer = setTimeout(() => {
-          if (child.exitCode === null && child.signalCode === null) {
-            onCommandWarning({
-              args,
-              binary: normalizedBinary,
-              label,
-              message: `${message} Escalating to SIGKILL after ${killGraceMs}ms.`,
-              pid: child.pid ?? null,
-              reason: `${reason}_force_kill`,
-            });
-            child.kill('SIGKILL');
-          }
-        }, killGraceMs);
-      }
-
-      onCommandStart({
-        args,
-        binary: normalizedBinary,
-        label,
-        pid: child.pid ?? null,
-      });
-
-      child.on('error', (error) => {
-        finalizeError(error);
-      });
-
-      child.stdout?.on('data', (chunk) => {
-        stdoutSize = appendChunk(stdoutChunks, stdoutSize, chunk, maxBuffer);
-        if (stdoutSize >= maxBuffer || stderrSize >= maxBuffer) {
-          requestTermination(
-            'max_buffer_exceeded',
-            `Media command exceeded the configured output buffer limit of ${maxBuffer} bytes.`,
-          );
-        }
-      });
-
-      child.stderr?.on('data', (chunk) => {
-        stderrSize = appendChunk(stderrChunks, stderrSize, chunk, maxBuffer);
-        if (stdoutSize >= maxBuffer || stderrSize >= maxBuffer) {
-          requestTermination(
-            'max_buffer_exceeded',
-            `Media command exceeded the configured output buffer limit of ${maxBuffer} bytes.`,
-          );
-        }
-      });
-
-      child.on('close', (code, signalCode) => {
-        const output = buildOutputDetails();
-        onCommandExit({
-          args,
-          binary: normalizedBinary,
-          durationMs: output.durationMs,
-          exitCode: code,
-          label,
-          pid: child.pid ?? null,
-          signalCode,
-          terminationReason,
-        });
-
-        if (terminationReason === 'timeout') {
-          finalizeError(createCommandError(
-            `Media command timed out after ${timeoutMs}ms`,
-            {
-              ...output,
-              code: 'ETIMEDOUT',
-              exitCode: code,
-              signalCode,
-              timedOut: true,
-            },
-          ));
-          return;
-        }
-
-        if (terminationReason === 'aborted') {
-          finalizeError(createCommandError(
-            'Media command was aborted',
-            {
-              ...output,
-              code: 'ABORT_ERR',
-              exitCode: code,
-              signalCode,
-            },
-          ));
-          return;
-        }
-
-        if (terminationReason === 'max_buffer_exceeded') {
-          finalizeError(createCommandError(
-            `Media command output exceeded maxBuffer (${maxBuffer} bytes)`,
-            {
-              ...output,
-              code: 'MEDIA_COMMAND_MAX_BUFFER_EXCEEDED',
-              exitCode: code,
-              signalCode,
-            },
-          ));
-          return;
-        }
-
-        if (code !== 0) {
-          finalizeError(createCommandError(
-            `Media command exited with code ${code ?? 'null'}`,
-            {
-              ...output,
-              code: 'MEDIA_COMMAND_EXIT_NON_ZERO',
-              exitCode: code,
-              signalCode,
-            },
-          ));
-          return;
-        }
-
-        finalizeSuccess({
-          ...output,
-          exitCode: code,
-          signalCode,
-        });
-      });
-
-      if (timeoutMs > 0) {
-        timeoutHandle = setTimeout(() => {
-          requestTermination(
-            'timeout',
-            `Media command exceeded timeout after ${timeoutMs}ms.`,
-          );
-        }, timeoutMs);
-      }
-
-      if (signal) {
-        if (signal.aborted) {
-          requestTermination('aborted', 'Media command aborted before completion.');
-        } else {
-          abortListener = () => {
-            requestTermination('aborted', 'Media command aborted before completion.');
-          };
-          signal.addEventListener('abort', abortListener, { once: true });
-        }
-      }
-    });
+    if (!Number.isInteger(maxBuffer) || maxBuffer < 1 || maxBuffer > 64 * 1024 * 1024
+      || !Number.isInteger(timeoutMs) || timeoutMs < 0 || timeoutMs > 30 * 60 * 1000
+      || !Number.isInteger(killGraceMs) || killGraceMs < 1 || killGraceMs > 60_000
+      || !['SIGTERM', 'SIGKILL'].includes(killSignal)
+      || (label !== null && (typeof label !== 'string' || label.length > 4096))) throw new TypeError('Invalid media command bounds');
+    const command = { binary: normalizedBinary, args: snapshotArgs(args), killGraceMs, killSignal, label, maxBuffer, signal, timeoutMs };
+    return admission.run(() => executeMediaCommand(command, { spawnFn, onCommandExit, onCommandStart, onCommandWarning }),
+      { signal: signal ?? undefined });
   }
-
-  return {
-    runCommand,
-  };
+  return { runCommand, getAdmissionState: admission.getState };
 }

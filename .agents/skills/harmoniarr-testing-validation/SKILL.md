@@ -5,6 +5,11 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For shared FFmpeg/FFprobe limits, use the standards skill's
+[native command reference](../harmoniarr-web-standards/references/media-command-admission.md).
+Run focused caller/worker tests before the explicit Linux
+`validate:native-media-command-admission` and shared-container memory lanes.
+
 For decoder memory controls, use the standards skill's
 [worker memory](../harmoniarr-web-standards/references/worker-memory.md) reference.
 Keep actual external allocation refusal and concurrent maximum images in explicit

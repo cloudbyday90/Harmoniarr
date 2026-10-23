@@ -109,10 +109,9 @@ run/lease owners and actual spawn/completion/close before publishing numeric
 evidence. Keep thread count, process count and physical memory distinct. Do not
 expose a memory slider or lower limits from this selected catalogue.
 
-**Next:** audit canonical FFmpeg/FFprobe callers and add one shared, bounded media-
-command admission owner inside the existing app. `app.js` supplies a canonical
-`createMediaCommandService`; its implementation bounds each command's time/output
-but has no active/queued command admission ceiling. Reuse the existing FIFO,
-retain capacity through actual child/stdio close, and qualify cancellation,
-fairness and affected callers before choosing defaults. This is a hardening
-recommendation, not a reproduced attack or a whole-app memory ceiling.
+The [shared media admission follow-up](MEDIA_COMMAND_ADMISSION_OUTCOME.md) now
+implements the app-owned FIFO and actual-close retirement across canonical
+callers. It also records a supporting artwork phase deadline correction and new
+constrained qualification. **Next:** propagate durable-worker cancellation through
+readiness and media commands, retaining actual close and lease release. Admission
+remains a count bound, not a whole-app memory ceiling or deployment minimum.

@@ -99,6 +99,7 @@ suite('runtime-resource-service', () => {
 
     assert.deepEqual(service.getRuntimeConfiguration(), {
       mediaCommands: {
+        admission: { concurrency: 2, maxQueued: 16, queueTimeoutMs: 15_000 },
         defaultKillGraceMs: 7000,
         defaultMaxBufferBytes: 2097152,
         defaultTimeoutMs: 45000,

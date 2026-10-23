@@ -191,6 +191,7 @@ export function createApp({
   createMissingMusicModule: buildMissingMusicModule = createMissingMusicModule,
   createPushModule: buildPushModule = createPushModule,
   createFulfillmentModule: buildFulfillmentModule = createFulfillmentModule,
+  createMediaCommandService: buildMediaCommandService = createMediaCommandService,
   createMediaToolingStatusService: buildMediaToolingStatusService = createMediaToolingStatusService,
   createMetadataModule: buildMetadataModule = createMetadataModule,
   createOperationsModule: buildOperationsModule = createOperationsModule,
@@ -229,7 +230,7 @@ export function createApp({
   const runtimeResourceService = createRuntimeResourceService();
   const ffmpegBinary = resolveBinaryName(process.env.HARMONIARR_FFMPEG_BIN, 'ffmpeg');
   const ffprobeBinary = resolveBinaryName(process.env.HARMONIARR_FFPROBE_BIN, 'ffprobe');
-  const mediaCommandService = createMediaCommandService({
+  const mediaCommandService = buildMediaCommandService({
     allowedBinaries: [ffmpegBinary, ffprobeBinary],
     ...runtimeResourceService.getMediaCommandDefaults(),
   });

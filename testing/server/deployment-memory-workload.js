@@ -25,8 +25,8 @@ import { maximumByteArtworkPng } from './artwork-worker-inputs.js';
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 export async function runDeploymentMemoryWorkload({ pool, dimension, callerBytes, maximumBytes = false,
-  withConcurrentWork = (_context, work) => work(), onArtworkSpawn = () => {} }) {
-  if (typeof withConcurrentWork !== 'function' || typeof onArtworkSpawn !== 'function') throw new TypeError('Invalid concurrent qualification owner');
+  withConcurrentWork = (_context, work) => work(), onArtworkSpawn = () => {}, onArtworkClose = () => {} }) {
+  if ([withConcurrentWork, onArtworkSpawn, onArtworkClose].some(callback => typeof callback !== 'function')) throw new TypeError('Invalid concurrent qualification owner');
   const image = maximumBytes ? (await maximumByteArtworkPng(100 * 1024 ** 2)).input
     : await sharp({ create: { width: dimension, height: dimension, channels: 3, background: 'red' } }).jpeg().toBuffer();
   const jobs = maximumBytes ? 1 : 2;
@@ -36,9 +36,13 @@ export async function runDeploymentMemoryWorkload({ pool, dimension, callerBytes
     const published = Promise.withResolvers(); const release = Promise.withResolvers(); const downloaded = Promise.withResolvers();
     const worker = createArtworkWorkerService({ spawnFn: (...args) => {
       const child = spawn(...args); const record = { pid: child.pid, closed: false }; children.push(record);
+      let outputBytes = 0; child.stdout.on('data', chunk => { outputBytes += chunk.length; });
       activeChildren++; peakChildren = Math.max(peakChildren, activeChildren);
       child.once('spawn', onArtworkSpawn);
-      child.once('close', () => { record.closed = true; activeChildren--; }); return child;
+      child.once('close', (code, signal) => {
+        record.closed = true; activeChildren--;
+        try { onArtworkClose({ code, signal, outputBytes }); } catch { /* optional qualification diagnostic */ }
+      }); return child;
     } });
     let policy;
     const application = createApp({ clientDistDir: '/app/client-dist', packageJsonPath: '/app/package.json', createArtworkModule: options => {

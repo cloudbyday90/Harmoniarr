@@ -29,9 +29,13 @@ export async function withDeploymentMediaWorkers({ application, pool, fixture, o
     reconcileWantedReleases: library.libraryWantedReleaseService.reconcileWantedReleases,
     reconcileDiscoveryRequests: library.libraryDiscoveryRequestService.reconcileDiscoveryRequests,
   }); owners.push(scan);
-  const inspection = createMediaInspectionService({ mediaCommandService: createMediaCommandService({
-    allowedBinaries: ['ffprobe'], spawnFn: (...args) => observer.spawnMedia('probe', ...args),
-  }) });
+  const mediaCommandService = createMediaCommandService({ allowedBinaries: ['ffprobe', 'ffmpeg'], spawnFn: (...args) => {
+    if (args[0] === 'ffmpeg') {
+      assert.deepEqual(args[1].slice(-3), ['-f', 'null', '-']); assert.equal(args[1][args[1].indexOf('-c:a') + 1], 'libopus');
+    }
+    return observer.spawnMedia(args[0] === 'ffmpeg' ? 'encode' : 'probe', ...args);
+  } });
+  const inspection = createMediaInspectionService({ mediaCommandService });
   const selected = fixture.sources.map(path => ({ id: randomUUID(), path, executionStatus: { code: 'ready' } }));
   const probeWorker = createImportCandidateMediaInspectionWorker({ ...inspectionStore,
     buildSelectedImportCandidateSummary: async () => ({ selectedCandidates: selected }),
@@ -41,10 +45,7 @@ export async function withDeploymentMediaWorkers({ application, pool, fixture, o
     },
   }); owners.push(probeWorker);
   const transcode = createMediaTranscodeExecutionService({ ffmpegThreads: application.runtimeResourceService.getRuntimeConfiguration().mediaCommands.ffmpegThreads,
-    mediaCommandService: createMediaCommandService({ allowedBinaries: ['ffmpeg'], spawnFn: (...args) => {
-      assert.deepEqual(args[1].slice(-3), ['-f', 'null', '-']); assert.equal(args[1][args[1].indexOf('-c:a') + 1], 'libopus');
-      return observer.spawnMedia('encode', ...args);
-    } }),
+    mediaCommandService,
   });
   const encodeWorker = createImportCandidateTranscodeWorker({ ...transcodeStore,
     buildSelectedImportCandidateSummary: async () => ({ selectedCandidates: [{ id: 'fixture-transcode', executionStatus: { code: 'ready' } }] }),
@@ -75,6 +76,7 @@ export async function withDeploymentMediaWorkers({ application, pool, fixture, o
       [`library_scan:${scanId}`, `import_candidate_media_inspection:${probeId}`, `import_candidate_transcode_orchestration:${encodeId}`],
     ])).rows[0];
     assert.deepEqual(leases, { count: 3, released: 3, active: 0 });
+    assert.deepEqual(mediaCommandService.getAdmissionState(), { active: 0, queued: 0 });
     return { ...result, media: { ...observer.getState(), cataloguedFiles: rows.files, taggedFiles: rows.tags, inspectedFiles: 4,
       passedPreflights: 1, mode: 'preflight_only', completedRuns: 3, releasedLeases: leases.released, activeLeases: leases.active,
       ffmpegThreads: application.runtimeResourceService.getRuntimeConfiguration().mediaCommands.ffmpegThreads } };

@@ -24,7 +24,9 @@ export async function inspectArtworkBuffer(buffer, { maxDimensionPixels } = {}) 
 export async function sanitizeArtworkBuffer({ buffer, format, maxDimensionPixels }) {
   const encoder = encoders[format];
   if (!Object.hasOwn(encoders, format)) throw createApiError(400, 'artwork_format_unsupported', 'Artwork format is unsupported');
-  const pipeline = encoder(sharp(buffer, artworkSharpInputOptions(maxDimensionPixels)).rotate()).timeout({ seconds: 3 });
+  // Maximum-size images share CPU with media commands. Leave room for metadata
+  // and best-effort stats inside the worker's unchanged 15-second outer deadline.
+  const pipeline = encoder(sharp(buffer, artworkSharpInputOptions(maxDimensionPixels)).rotate()).timeout({ seconds: 10 });
   try { return await pipeline.toBuffer({ resolveWithObject: true }); }
   // Native rewrite errors have no stable structured distinction between corrupt
   // data, allocation failure and timeout. Do not turn capacity loss into absence.

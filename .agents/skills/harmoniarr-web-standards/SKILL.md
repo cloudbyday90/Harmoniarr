@@ -1,9 +1,13 @@
 ---
 name: harmoniarr-web-standards
-description: "Apply and verify standards for Harmoniarr UI commands, forms, focus/status behavior, HTTP mutations, privileged CLI result delivery, resource admission and native image workers. Use for standards-oriented implementation or review; copy-only changes do not need this workflow."
+description: "Apply and verify standards for Harmoniarr UI commands, forms, focus/status behavior, HTTP mutations, privileged CLI result delivery, resource admission and native media/image workers. Use for standards-oriented implementation or review; copy-only changes do not need this workflow."
 ---
 
 # Harmoniarr Web Standards
+
+For FFmpeg/FFprobe admission, cancellation or execution lifetime, read
+[shared native commands](references/media-command-admission.md). It owns canonical
+caller composition, bounded waiting and capacity retained through actual close.
 
 For native image processes, deadlines or containment claims, read
 [native image workers](references/native-image-workers.md). It owns bounded
