@@ -9,6 +9,10 @@ For shared FFmpeg/FFprobe limits, use the standards skill's
 [native command reference](../harmoniarr-web-standards/references/media-command-admission.md).
 Run focused caller/worker tests before the explicit Linux
 `validate:native-media-command-admission` and shared-container memory lanes.
+`validate:native-media-worker-cancellation` adds held-close durable cancellation
+and actual FFmpeg interruption. Keep its codec polling control separate from the
+one-second production interval, and pair it with the six readiness/queued/active
+PostgreSQL cases plus existing worker-lifetime tests.
 
 For decoder memory controls, use the standards skill's
 [worker memory](../harmoniarr-web-standards/references/worker-memory.md) reference.

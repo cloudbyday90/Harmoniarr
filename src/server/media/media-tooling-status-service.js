@@ -17,6 +17,7 @@
  */
 
 import { createMediaCommandService } from './media-command-service.js';
+import { throwIfMediaCancelled } from './media-cancellation.js';
 
 function resolveBinaryName(envValue, fallback) {
   if (typeof envValue !== 'string') {
@@ -27,13 +28,14 @@ function resolveBinaryName(envValue, fallback) {
   return trimmed.length > 0 ? trimmed : fallback;
 }
 
-async function checkBinary({ binary, mediaCommandService }) {
+async function checkBinary({ binary, mediaCommandService, signal }) {
   try {
     await mediaCommandService.runCommand({
       args: ['-version'],
       binary,
       label: `media tooling check (${binary})`,
       timeoutMs: 5000,
+      ...(signal ? { signal } : {}),
     });
     return {
       available: true,
@@ -55,12 +57,14 @@ export function createMediaToolingStatusService({
     allowedBinaries: [ffmpegBinary, ffprobeBinary],
   }),
 } = {}) {
-  async function getStatus() {
+  async function getStatus({ signal } = {}) {
+    throwIfMediaCancelled(signal);
     const [ffmpegResult, ffprobeResult] = await Promise.all([
-      checkBinary({ binary: ffmpegBinary, mediaCommandService }),
-      checkBinary({ binary: ffprobeBinary, mediaCommandService }),
+      checkBinary({ binary: ffmpegBinary, mediaCommandService, signal }),
+      checkBinary({ binary: ffprobeBinary, mediaCommandService, signal }),
     ]);
 
+    throwIfMediaCancelled(signal);
     const ffmpegAvailable = ffmpegResult.available;
     const ffprobeAvailable = ffprobeResult.available;
 

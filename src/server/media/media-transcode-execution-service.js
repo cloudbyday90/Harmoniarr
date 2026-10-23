@@ -17,6 +17,7 @@
  */
 
 import { createMediaCommandService } from './media-command-service.js';
+import { throwIfMediaCancelled } from './media-cancellation.js';
 
 const encoderByCodec = Object.freeze({
   aac: 'aac',
@@ -46,7 +47,8 @@ export function createMediaTranscodeExecutionService({
   }),
   timeoutMs = 30_000,
 } = {}) {
-  async function executeCandidate({ sourcePath, transcodePlan } = {}) {
+  async function executeCandidate({ sourcePath, transcodePlan, signal } = {}) {
+    throwIfMediaCancelled(signal);
     if (typeof sourcePath !== 'string' || sourcePath.trim().length === 0) {
       throw new Error('executeCandidate requires sourcePath');
     }
@@ -59,7 +61,8 @@ export function createMediaTranscodeExecutionService({
       };
     }
 
-    const toolingStatus = await getMediaToolingStatus();
+    const toolingStatus = await (signal ? getMediaToolingStatus({ signal }) : getMediaToolingStatus());
+    throwIfMediaCancelled(signal);
     if (toolingStatus?.details?.ffmpegAvailable !== true) {
       return {
         mode: 'preflight_only',
@@ -91,7 +94,9 @@ export function createMediaTranscodeExecutionService({
         label: 'media transcode preflight',
         maxBuffer: 2 * 1024 * 1024,
         timeoutMs,
+        ...(signal ? { signal } : {}),
       });
+      throwIfMediaCancelled(signal);
 
       return {
         mode: 'preflight_only',
@@ -99,6 +104,7 @@ export function createMediaTranscodeExecutionService({
         warnings: [],
       };
     } catch {
+      throwIfMediaCancelled(signal);
       return {
         mode: 'preflight_only',
         status: 'preflight_failed',

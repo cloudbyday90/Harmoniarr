@@ -75,6 +75,7 @@
     "validate:native-deployment-memory": "node --test --test-concurrency=1 test/native/deployment-memory.test.js",
     "validate:native-deployment-media-memory": "node --test --test-concurrency=1 test/native/deployment-memory.test.js test/native/deployment-media-memory.test.js",
     "validate:native-media-command-admission": "node --test --test-concurrency=1 test/native/media-command-admission.test.js",
+    "validate:native-media-worker-cancellation": "node --test --test-concurrency=1 test/native/media-worker-cancellation.test.js",
     "validate:native-slskd-files": "node --test --test-concurrency=1 test/native/slskd-files.test.js",
     "validate:native-slskd-audio": "node --test --test-concurrency=1 test/native/slskd-audio-import.test.js",
     "validate:native-slskd-partial": "node --test --test-concurrency=1 test/native/slskd-partial.test.js",

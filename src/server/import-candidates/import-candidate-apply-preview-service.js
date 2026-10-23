@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { settleMediaTasks, throwIfMediaCancelled } from '../media/media-cancellation.js';
 import { stat } from 'node:fs/promises';
 import { createMediaLosslessRetentionPolicyService } from '../media/media-lossless-retention-policy-service.js';
 import { IMPORT_CANDIDATE_ADD_BLOCKER_CODES } from './import-candidate-add-blocker.js';
@@ -178,7 +179,8 @@ export function createImportCandidateApplyPreviewService({
   const recoveryService = trackDeliveryRecoveryService ?? createOperatorTrackDeliveryRecoveryService({
     ...(mediaInspectionService ? { mediaInspectionService } : {}) });
 
-  async function previewImportCandidateApply({ importCandidateId, targetUser = null }) {
+  async function previewImportCandidateApply({ importCandidateId, targetUser = null, signal }) {
+    throwIfMediaCancelled(signal);
     const preview = await previewImportCandidate({ importCandidateId, targetUser });
     const filePreviews = Array.isArray(preview?.naming?.filePreviews) ? preview.naming.filePreviews : [];
     const decisions = mapDecisionsByFileId(await listImportCandidateFileDecisions({ importCandidateId }));
@@ -186,15 +188,17 @@ export function createImportCandidateApplyPreviewService({
     const hasMediaInspection = typeof mediaInspectionService?.inspectSourceFile === 'function';
     const hasMediaTranscodePlanning = typeof mediaTranscodePlanningService?.planInspection === 'function';
 
-    const files = await Promise.all(filePreviews.map(async (filePreview) => {
+    const files = await settleMediaTasks(filePreviews.map(async (filePreview) => {
+      throwIfMediaCancelled(signal);
       const [libraryTarget, sourceFile, stagingTarget] = await Promise.all([
         inspectPath(filePreview.libraryPath, statFn),
         inspectPath(filePreview.sourcePath, statFn),
         inspectPath(filePreview.stagingPath, statFn),
       ]);
+      throwIfMediaCancelled(signal);
       const decision = decisions.get(filePreview.fileId) ?? null;
       const inspection = hasMediaInspection && sourceFile.exists
-        ? await mediaInspectionService.inspectSourceFile({ sourcePath: filePreview.sourcePath })
+        ? await mediaInspectionService.inspectSourceFile({ sourcePath: filePreview.sourcePath, ...(signal ? { signal } : {}) })
         : {
           metadata: null,
           warnings: [],
@@ -241,13 +245,15 @@ export function createImportCandidateApplyPreviewService({
       };
     }));
 
+    throwIfMediaCancelled(signal);
     if (files.some(file => file.delivery)) {
-      const delivered = await recoveryService.resolveDelivered({ importCandidateId, files });
+      const delivered = await recoveryService.resolveDelivered({ importCandidateId, files, ...(signal ? { signal } : {}) });
       for (const file of files) if (delivered.has(file.fileId) && file.sourceFile.exists) {
         file.status = { code: 'ready', message: 'This private delivery is verified and will be retained while remaining tracks are applied.' };
       }
     }
 
+    throwIfMediaCancelled(signal);
     const counts = files.reduce((summary, file) => {
       summary.totalFiles += 1;
       summary.inspectionWarningCount += file.inspection.warnings.length;

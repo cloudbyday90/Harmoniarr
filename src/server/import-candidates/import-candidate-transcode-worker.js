@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { withOperationRunInterruption } from '../worker-interruption-scope.js';
 import { createWorkerTaskLifecycle } from '../worker-task-lifecycle.js';
 import { withWorkerTaskCleanup } from '../worker-task-cleanup.js';
 import { drainWorkerLease } from '../worker-lease-cleanup.js';
@@ -47,6 +48,7 @@ export function createImportCandidateTranscodeWorker({
     warnings: [],
   }),
   isCancellationRequested,
+  withOperationRunInterruptionFn = withOperationRunInterruption,
   markRunPaused,
   markRunCancelled,
   markRunCompleted,
@@ -101,9 +103,9 @@ export function createImportCandidateTranscodeWorker({
             continue;
           }
 
-          const applyPreview = await previewImportCandidateApply({
-            importCandidateId: candidate.id,
-          });
+          const applyPreview = await withOperationRunInterruptionFn({ isCancellationRequested, runId }, signal => previewImportCandidateApply({
+            importCandidateId: candidate.id, ...(signal ? { signal } : {}),
+          }));
           counters.reviewedCandidateCount += 1;
 
           for (const file of applyPreview.files ?? []) {
@@ -114,10 +116,10 @@ export function createImportCandidateTranscodeWorker({
             }
 
             counters.transcodeCandidateFileCount += 1;
-            const transcodeExecution = await executeTranscodeCandidate({
+            const transcodeExecution = await withOperationRunInterruptionFn({ isCancellationRequested, runId }, signal => executeTranscodeCandidate({
               sourcePath: file?.sourceFile?.path,
-              transcodePlan: file?.transcodePlan,
-            });
+              transcodePlan: file?.transcodePlan, ...(signal ? { signal } : {}),
+            }));
             counters.warningCount += summarizeWarnings(transcodeExecution);
 
             if (transcodeExecution?.status === 'preflight_passed') {

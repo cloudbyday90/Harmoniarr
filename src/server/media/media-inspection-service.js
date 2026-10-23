@@ -17,6 +17,7 @@
  */
 
 import { createMediaCommandService } from './media-command-service.js';
+import { throwIfMediaCancelled } from './media-cancellation.js';
 
 
 function parseDurationSeconds(value) {
@@ -120,16 +121,20 @@ export function createMediaInspectionService({
   }),
   timeoutMs = 15_000,
 } = {}) {
-  async function getReadiness() {
-    return normalizeReadiness(await getMediaToolingStatus());
+  async function getReadiness({ signal } = {}) {
+    throwIfMediaCancelled(signal);
+    const status = await (signal ? getMediaToolingStatus({ signal }) : getMediaToolingStatus());
+    throwIfMediaCancelled(signal);
+    return normalizeReadiness(status);
   }
 
-  async function inspectSourceFile({ sourcePath }) {
+  async function inspectSourceFile({ sourcePath, signal }) {
+    throwIfMediaCancelled(signal);
     if (typeof sourcePath !== 'string' || sourcePath.trim().length === 0) {
       throw new Error('inspectSourceFile requires sourcePath');
     }
 
-    const readiness = await getReadiness();
+    const readiness = await getReadiness({ signal });
     if (!readiness.ready) {
       return {
         metadata: null,
@@ -152,7 +157,9 @@ export function createMediaInspectionService({
         label: 'media inspection',
         maxBuffer: 1024 * 1024,
         timeoutMs,
+        ...(signal ? { signal } : {}),
       });
+      throwIfMediaCancelled(signal);
       const parsed = JSON.parse(stdout);
       const streams = Array.isArray(parsed?.streams) ? parsed.streams : [];
       const audioStreams = streams.filter((stream) => stream?.codec_type === 'audio');
@@ -193,6 +200,7 @@ export function createMediaInspectionService({
         warnings,
       };
     } catch {
+      throwIfMediaCancelled(signal);
       return {
         metadata: null,
         warnings: [{

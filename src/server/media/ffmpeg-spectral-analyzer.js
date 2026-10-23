@@ -31,6 +31,7 @@
 // injection.
 
 import { createMediaCommandService } from './media-command-service.js';
+import { throwIfMediaCancelled } from './media-cancellation.js';
 import { estimateCutoffFromRolloffSamples } from './media-spectral-analysis.js';
 
 // ffmpeg's ametadata print emits keys like:
@@ -77,7 +78,8 @@ export function createFfmpegSpectralAnalyzer({
    *   durationMs: number | null
    * }>}
    */
-  async function analyzeSpectralCutoff({ filePath } = {}) {
+  async function analyzeSpectralCutoff({ filePath, signal } = {}) {
+    throwIfMediaCancelled(signal);
     if (typeof filePath !== 'string' || filePath.trim().length === 0) {
       throw new Error('analyzeSpectralCutoff requires filePath');
     }
@@ -109,7 +111,9 @@ export function createFfmpegSpectralAnalyzer({
       label: 'spectral cutoff analysis',
       maxBuffer,
       timeoutMs,
-    });
+      ...(signal ? { signal } : {}),
+    }).catch(error => { throwIfMediaCancelled(signal); throw error; });
+    throwIfMediaCancelled(signal);
 
     const rolloffSamples = parseRolloffSamples(stdout);
     return {

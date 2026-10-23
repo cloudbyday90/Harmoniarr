@@ -34,6 +34,23 @@ const verifiedOperation = () => captureTrackDeliveryOperation({ ...preview.files
   status: 'applied', verifiedTrack: tracks[0], trackFileEvidence: evidence });
 const expectedLease = { leaseKey: 'import_candidate_apply:run', ownerInstanceId: 'worker', acquisitionId: '11111111-1111-4111-8111-111111111111' };
 
+test('delivery re-verification forwards cancellation and refuses result handoff without a new fingerprint', async () => {
+  const controller = new AbortController(); const entered = Promise.withResolvers(); const gate = Promise.withResolvers(); let fingerprints = 0;
+  const candidate = { status: 'import_pending', normalizedPayload: { operatorTrackDeliveryProgress: {
+    version: 1, participants, plans: captureTrackDeliveryPlans(preview.files), files: [verifiedOperation()] } } };
+  const recovery = createOperatorTrackDeliveryRecoveryService({ store: { readCandidate: async () => candidate },
+    verifier: { assertCandidateCurrent: async () => selection }, fingerprintTrackFile: async () => { fingerprints++; return evidence; },
+    mediaInspectionService: { inspectSourceFile: async ({ signal }) => {
+      assert.equal(signal, controller.signal); entered.resolve(); await gate.promise;
+      return { metadata: { audioStreamCount: 1, videoStreamCount: 0, durationSeconds: 2,
+        tags: { title: tracks[0].title, track: '1', disc: '1', musicbrainz_trackid: tracks[0].recordingMbid, musicbrainz_albumid: 'edition' } } };
+    } },
+  });
+  const task = recovery.resolveDelivered({ importCandidateId: 'candidate', files: preview.files, signal: controller.signal });
+  const refused = assert.rejects(task, reason => reason === null); await entered.promise; controller.abort(null); gate.resolve(); await refused;
+  assert.equal(fingerprints, 1);
+});
+
 function progressHarness({ event = async () => {} } = {}) {
   const candidate = { id: 'candidate', status: 'import_pending', normalizedPayload: {} };
   const authority = { run: { operation_type: 'import_candidate_apply', status: 'running', summary: { importCandidateIds: ['candidate'] } },

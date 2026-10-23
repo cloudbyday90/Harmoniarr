@@ -102,12 +102,12 @@ delay, temporary unavailable results under saturation and potentially more rewri
 CPU inside the existing child deadline. Count limits do not isolate codec memory,
 threads, descendants or unrelated PostgreSQL/Sharp work.
 
-**Next:** propagate durable-worker cancellation through readiness checks and media
-commands, proving queued cancellation avoids spawn and active cancellation retains
-actual close plus lease release. Current canonical consumers do not uniformly
-forward a signal; the command boundary alone does not prove whole-worker abort.
-Broader operational measurements remain necessary before tuning defaults or
-publishing deployment sizing guidance.
+The [durable cancellation follow-up](MEDIA_WORKER_CANCELLATION_OUTCOME.md) now
+propagates inspection/preflight interruption through readiness, queued and active
+commands, with actual close and lease-release proof. **Next:** connect lease-loss
+detection to that interruption path while retaining current-write authority and
+close-before-release. Other job owners and broader operational measurements remain
+outside these selected claims and are still needed before deployment sizing.
 
 GitHub MCP found no open PRs at selection and before publication, so no applicable
 random/stale PR was implemented, rebased or closed. No PR was merged. Changes stay

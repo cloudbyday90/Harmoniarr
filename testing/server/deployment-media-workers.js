@@ -39,9 +39,9 @@ export async function withDeploymentMediaWorkers({ application, pool, fixture, o
   const selected = fixture.sources.map(path => ({ id: randomUUID(), path, executionStatus: { code: 'ready' } }));
   const probeWorker = createImportCandidateMediaInspectionWorker({ ...inspectionStore,
     buildSelectedImportCandidateSummary: async () => ({ selectedCandidates: selected }),
-    previewImportCandidateApply: async ({ importCandidateId }) => {
+    previewImportCandidateApply: async ({ importCandidateId, signal }) => {
       await observer.waitForEncoder(); const source = selected.find(row => row.id === importCandidateId);
-      return { files: [{ sourceFile: { path: source.path }, inspection: await inspection.inspectSourceFile({ sourcePath: source.path }) }] };
+      return { files: [{ sourceFile: { path: source.path }, inspection: await inspection.inspectSourceFile({ sourcePath: source.path, signal }) }] };
     },
   }); owners.push(probeWorker);
   const transcode = createMediaTranscodeExecutionService({ ffmpegThreads: application.runtimeResourceService.getRuntimeConfiguration().mediaCommands.ffmpegThreads,

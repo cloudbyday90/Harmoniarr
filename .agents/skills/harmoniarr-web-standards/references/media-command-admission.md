@@ -32,3 +32,23 @@ container sizing in `validate:native-deployment-media-memory`, using one shared
 service for encoder/probe workers. Those lifecycle and selected-memory lanes
 do not prove signals propagate from every durable worker or establish a general
 deployment minimum. See the [outcome](../../../../docs/MEDIA_COMMAND_ADMISSION_OUTCOME.md).
+
+## Durable cancellation propagation
+
+For inspection/preflight cancellation, follow the
+[cancellation design](../../../../docs/MEDIA_WORKER_CANCELLATION_DESIGN.md). Keep
+durable operator/pause checks authoritative, with one serialized poll per owned
+step and a fresh handoff check. Stop/drain the observer before terminal status;
+do not reinterpret worker close as an operator cancellation request.
+
+Propagate the same signal through readiness, preview file inspection, delivered-
+track verification and native execution. Recheck abort outside generic warning
+fallbacks. Null is a valid reason; use `throwIfAborted`, not a truthy reason test.
+Drain all preview siblings and both tooling checks before returning an error.
+Promise rejection alone does not establish native or lease retirement.
+
+Use the default one-second policy with durable-store controls, plus actual Linux
+held-SIGTERM close and real encoder cancellation in
+`validate:native-media-worker-cancellation`. Its 25 ms codec control is a test
+setting, not a production latency claim. SQL/filesystem reads still drain normally;
+spectral accepts a signal but its separate job owner has no new durable polling.

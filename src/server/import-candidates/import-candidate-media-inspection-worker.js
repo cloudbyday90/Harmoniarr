@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { withOperationRunInterruption } from '../worker-interruption-scope.js';
 import { createWorkerTaskLifecycle } from '../worker-task-lifecycle.js';
 import { withWorkerTaskCleanup } from '../worker-task-cleanup.js';
 import { createWorkerAdvisoryTasks } from '../worker-advisory-tasks.js';
@@ -54,6 +55,7 @@ export function createImportCandidateMediaInspectionWorker({
   }),
   createOperationRunLeaseHeartbeatFn = createOperationRunLeaseHeartbeat,
   isCancellationRequested,
+  withOperationRunInterruptionFn = withOperationRunInterruption,
   markRunPaused,
   markRunCancelled,
   markRunCompleted,
@@ -110,9 +112,9 @@ export function createImportCandidateMediaInspectionWorker({
             continue;
           }
 
-          const applyPreview = await previewImportCandidateApply({
-            importCandidateId: candidate.id,
-          });
+          const applyPreview = await withOperationRunInterruptionFn({ isCancellationRequested, runId }, signal => previewImportCandidateApply({
+            importCandidateId: candidate.id, ...(signal ? { signal } : {}),
+          }));
           const inspectionSummary = summarizeInspection(applyPreview.files ?? []);
           const candidateDiagnostics = buildMediaInspectionDiagnostics({
             applyPreview,

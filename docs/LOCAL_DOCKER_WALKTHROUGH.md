@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
-The October 23 [shared media admission rebuild](LOCAL_DOCKER_MEDIA_COMMAND_ADMISSION_OUTCOME.md)
+The October 23 [media worker cancellation rebuild](LOCAL_DOCKER_MEDIA_WORKER_CANCELLATION_OUTCOME.md)
 records the current no-cache image, preserved admin/data and readiness. The
+[owning outcome](MEDIA_WORKER_CANCELLATION_OUTCOME.md) records durable interruption
+through readiness, queued/active native work and captured lease release.
+
+The October 23 [shared media admission rebuild](LOCAL_DOCKER_MEDIA_COMMAND_ADMISSION_OUTCOME.md)
+records the preceding no-cache image, preserved admin/data and readiness. The
 [owning outcome](MEDIA_COMMAND_ADMISSION_OUTCOME.md) records shared command limits,
 actual retirement and the supporting bounded artwork phase deadline correction.
 
