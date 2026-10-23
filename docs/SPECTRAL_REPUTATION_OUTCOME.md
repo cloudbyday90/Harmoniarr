@@ -105,12 +105,13 @@ JSON rewrite. Direct SQL, older/nonparticipating writers and intentional restore
 remain outside an automatic preservation guarantee. Historical completed jobs
 are not backfilled because their old events lack a reliable correlation key.
 
-Next: inventory stable operation identities for non-spectral outcome producers,
-then promote those paths from best-effort ledger recording to strict atomic
-evidence. Their retained behavior is demonstrated by the savepoint test; changing
-it safely needs replay identities for each producer. Separately, normalized
-per-peer snapshot persistence could remove the full-rewrite bottleneck, but should
-preserve operator overrides, restore behavior and the new ownership proof.
+Follow-up completed: the [candidate publication outcome](CANDIDATE_REPUTATION_OUTCOME.md)
+records the five non-spectral producers, guarded event identities and atomic
+producer/ledger/snapshot publication. The savepoint test described above is
+historical baseline evidence; the current regression test now requires rollback.
+Next: repair the controlled-provider fixture authority gap recorded in that outcome;
+then measure whole-snapshot cost before designing per-source persistence, preserving
+operator overrides, restores and transaction ownership.
 
 GitHub MCP returned no open PRs at selection and recheck. No random/stale PR was
 available to implement, rebase or close; no PR was merged. Work remains on main,

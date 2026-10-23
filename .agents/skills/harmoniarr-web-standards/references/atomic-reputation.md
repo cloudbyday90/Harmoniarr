@@ -27,13 +27,13 @@ The whole-snapshot rewrite remains a scaling cost, and nonparticipating writers
 remain outside this cooperating application contract.
 
 Strict spectral ledger/snapshot failures must roll back cache and completion too.
-Legacy non-spectral evidence retains its old best-effort ledger policy: use a
-savepoint so a swallowed SQL error does not leave the enclosing snapshot transaction
-aborted. Do not silently extend that policy to strict evidence, or claim that
-non-spectral ledger durability was solved by the spectral change.
+Non-spectral producers now use [candidate publication](candidate-reputation.md):
+the guarded candidate event UUID, producer transaction and returned advisory.
+Ledger refusal rolls back their producer state and counters. The original spectral
+round left this work outstanding; its historical outcome records that baseline.
 
 Run notification/auto-ignore callbacks after successful commit. Await their returned
-work in spectral processing; legacy detached hooks remain distinct. An abort after
+work in spectral and candidate processing. An abort after
 commit cannot undo the penalty, and advisory failure is not durable-write failure.
 Do not claim exactly-once notifications or ownership of hidden descendants.
 

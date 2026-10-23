@@ -62,5 +62,5 @@ distinct boundaries.
 
 Private build, inventory, readiness, frozen artifact, native and retirement records
 remain under `.tmp/spectral-reputation-2026-10-23/`. No release or tag is created.
-Next: establish stable producer identities for non-spectral evidence before
-promoting its legacy best-effort ledger policy to atomic publication.
+The subsequent [candidate publication rebuild](LOCAL_DOCKER_CANDIDATE_REPUTATION_OUTCOME.md)
+records completion of the non-spectral follow-up and the current local image.

@@ -233,12 +233,11 @@ export function registerSpectralReputationTests({ config, createRuntime }) {
       });
     }
 
-    scenario('legacy ledger SQL refusal recovers its savepoint while preserving snapshot evidence', async c => {
+    scenario('standalone ledger SQL refusal rolls back snapshot evidence', async c => {
       await c.pool.query("CREATE OR REPLACE FUNCTION fixture_refuse() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'fixture refusal'; END $$");
       await c.pool.query('CREATE TRIGGER fixture_refusal BEFORE INSERT ON source_user_outcome_events FOR EACH ROW EXECUTE FUNCTION fixture_refuse()');
-      await c.evidence().recordSourceUserOutcomeEvidence({ username: input.username, outcome: 'failure' });
-      assert.deepEqual(await c.counts(), { events: 0, cache: 0, snapshots: 1 });
-      assert.equal((await c.snapshots.listTrustSnapshot())[0].failureCount, 1);
+      await assert.rejects(c.evidence().recordSourceUserOutcomeEvidence({ username: input.username, outcome: 'failure' }), /fixture refusal/u);
+      assert.deepEqual(await c.counts(), { events: 0, cache: 0, snapshots: 0 });
     });
   });
 }

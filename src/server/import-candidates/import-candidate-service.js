@@ -16,6 +16,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createDatabaseTransactionRunner } from '../database-transaction-service.js';
+import { createImportCandidateOutcomePublisher, settleCandidateOutcomeAdvisory } from './import-candidate-outcome-publication-service.js';
 import { createHash } from 'node:crypto';
 import { createApiError } from '../auth.js';
 import { recordAuditEvent } from '../audit.js';
@@ -484,7 +486,7 @@ export function createImportCandidateService({
   trackAcquisitionStore = createOperatorTrackAcquisitionStore({ getPoolFn: () => pool }),
   trackFulfillmentService = createOperatorTrackFulfillmentService({ verifier: trackScopeVerifier, store: trackAcquisitionStore }),
   recordAuditEventFn = recordAuditEvent,
-  recordSourceUserOutcomeEvidenceFn = async () => null,
+  recordSourceUserOutcomeEvidenceFn,
   replaceImportCandidateFilesFn = replaceImportCandidateFiles,
   scoreDownloadResultFn = scoreDownloadResult,
   loadSettingsFn = loadSettings,
@@ -497,20 +499,12 @@ export function createImportCandidateService({
   upsertImportCandidateFn = upsertImportCandidate,
   lockExistingIngestionParentsFn = lockExistingImportCandidateIngestionParents,
 } = {}) {
-  async function withTransaction(work) {
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      const result = await work(client);
-      await client.query('COMMIT');
-      return result;
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
-  }
+  const runTransaction = createDatabaseTransactionRunner({ getPoolFn: () => pool });
+  const withTransaction = work => runTransaction(async client => {
+    await client.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
+    return work(client);
+  });
+  const publishOutcome = createImportCandidateOutcomePublisher({ recordOutcome: recordSourceUserOutcomeEvidenceFn });
 
   const { waitForSearchResponses } = createSlskdSearchResponseService({
     slskdService,
@@ -635,7 +629,9 @@ export function createImportCandidateService({
     queryable = null,
     applyResult = null,
     applyContext = null,
+    sourceOutcome = null,
   }) {
+    let publication;
     const normalizedImportCandidateId = normalizeRequiredString(importCandidateId, {
       fieldName: 'importCandidateId',
       maxLength: 100,
@@ -696,6 +692,8 @@ export function createImportCandidateService({
         reason: normalizedReason,
       }, client);
 
+      if (sourceOutcome) publication = await publishOutcome({ candidate: transitionedCandidate, event, queryable: client, ...sourceOutcome });
+
       if (toStatus === 'applied') await trackFulfillmentService.assertPublicationCurrent?.({
         candidate: currentCandidate, applyResult, queryable: client, applyContext });
 
@@ -705,6 +703,8 @@ export function createImportCandidateService({
       };
     };
     const transitionResult = queryable ? await transitionWork(queryable) : await withTransaction(transitionWork);
+
+    await settleCandidateOutcomeAdvisory(publication);
 
     const auditEvent = {
       actorUserId,
@@ -844,22 +844,7 @@ export function createImportCandidateService({
       requestMetadata,
       summary: 'Import candidate applied into the library',
       toStatus: 'applied',
-    }).then(async (transitionResult) => {
-      try {
-        await recordSourceUserOutcomeEvidenceFn({
-          actorUserId,
-          eventType: 'import_candidate_applied',
-          occurredAt: transitionResult?.candidate?.updatedAt ?? null,
-          outcome: 'success',
-          qualityLabel,
-          qualityWeight,
-          reason,
-          username: transitionResult?.candidate?.username,
-        });
-      } catch {
-        // Trust evidence must not block the core status transition.
-      }
-      return transitionResult;
+      sourceOutcome: { outcome: 'success', qualityLabel, qualityWeight },
     });
   }
 
@@ -878,20 +863,7 @@ export function createImportCandidateService({
       requestMetadata,
       summary: 'Import candidate download failed',
       toStatus: 'failed',
-    }).then(async (transitionResult) => {
-      try {
-        await recordSourceUserOutcomeEvidenceFn({
-          actorUserId,
-          eventType: 'import_candidate_download_failed',
-          occurredAt: transitionResult?.candidate?.updatedAt ?? null,
-          outcome: 'failure',
-          reason,
-          username: transitionResult?.candidate?.username,
-        });
-      } catch {
-        // Trust evidence must not block the core status transition.
-      }
-      return transitionResult;
+      sourceOutcome: { outcome: 'failure' },
     });
   }
 
@@ -912,22 +884,7 @@ export function createImportCandidateService({
       requestMetadata,
       summary: 'Import candidate failed quality verification',
       toStatus: 'failed',
-    }).then(async (transitionResult) => {
-      try {
-        await recordSourceUserOutcomeEvidenceFn({
-          actorUserId,
-          eventType: 'import_candidate_quality_failed',
-          occurredAt: transitionResult?.candidate?.updatedAt ?? null,
-          outcome: 'failure',
-          qualityLabel,
-          qualityWeight,
-          reason,
-          username: transitionResult?.candidate?.username,
-        });
-      } catch {
-        // Trust evidence must not block the core status transition.
-      }
-      return transitionResult;
+      sourceOutcome: { outcome: 'failure', qualityLabel, qualityWeight },
     });
   }
 
@@ -965,24 +922,7 @@ export function createImportCandidateService({
         ? 'Completed download source was unavailable before library add'
         : 'Import candidate requires a safe library-add decision',
       toStatus: 'failed',
-    }).then(async (transitionResult) => {
-      if (!recordSourceFailure) {
-        return transitionResult;
-      }
-
-      try {
-        await recordSourceUserOutcomeEvidenceFn({
-          actorUserId,
-          eventType: 'import_candidate_import_blocked',
-          occurredAt: transitionResult?.candidate?.updatedAt ?? null,
-          outcome: 'failure',
-          reason,
-          username: transitionResult?.candidate?.username,
-        });
-      } catch {
-        // Trust evidence must not block the core status transition.
-      }
-      return transitionResult;
+      sourceOutcome: recordSourceFailure ? { outcome: 'failure' } : null,
     });
   }
 

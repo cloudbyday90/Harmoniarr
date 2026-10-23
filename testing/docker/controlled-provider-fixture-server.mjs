@@ -237,7 +237,14 @@ const server = createServer(async (request, response) => {
     }
     if (request.method === 'POST' && pathname === '/api/v0/searches') {
       const body = await readJson(request);
-      const id = randomUUID();
+      const id = body?.id ?? randomUUID();
+      if (typeof id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(id)) {
+        return writeJson(response, 400, { error: 'invalid_search_id' });
+      }
+      const prior = searches.get(id);
+      if (prior) return prior.searchText === body?.searchText
+        ? writeJson(response, 200, buildSearchState(prior))
+        : writeJson(response, 409, { error: 'search_identity_conflict' });
       const search = { fixture: findControlledProviderFixtureBySearchText(body?.searchText), id, pollCount: 0, searchText: body?.searchText ?? '', startedAt: new Date().toISOString() };
       searches.set(id, search);
       return writeJson(response, 200, buildSearchState(search));

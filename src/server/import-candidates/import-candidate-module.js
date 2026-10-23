@@ -117,7 +117,7 @@ export function createImportCandidateModule({
   onDownloadCompletedFn = null,
   onReleaseAddedFn = null,
   recordActivityEventFn = null,
-  recordSourceUserOutcomeEvidenceFn = async () => null,
+  recordSourceUserOutcomeEvidenceFn,
   recordSpectralOutcomeEvidenceFn = null,
   scheduleLibraryScan = null,
   queueDeferredLibraryScan = null,

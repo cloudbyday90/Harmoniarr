@@ -77,6 +77,7 @@
     "validate:native-media-command-admission": "node --test --test-concurrency=1 test/native/media-command-admission.test.js",
     "validate:native-spectral-interruption": "node --test --test-concurrency=1 test/native/spectral-interruption.test.js",
     "validate:native-spectral-admission": "node --test --test-concurrency=1 test/native/spectral-admission.test.js",
+    "validate:native-candidate-reputation": "node --test --test-concurrency=1 test/native/candidate-reputation.test.js",
     "validate:native-spectral-reputation": "node --test --test-concurrency=1 test/native/spectral-reputation.test.js",
     "validate:native-media-worker-lease-interruption": "node --test --test-concurrency=1 test/native/media-worker-lease-interruption.test.js",
     "validate:native-media-worker-cancellation": "node --test --test-concurrency=1 test/native/media-worker-cancellation.test.js",

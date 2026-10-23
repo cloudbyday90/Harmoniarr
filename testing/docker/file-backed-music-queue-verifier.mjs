@@ -24,6 +24,7 @@ import { dirname } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { createActivityModule } from '/app/server-dist/activity/activity-module.js';
+import { createTrustSnapshotStore } from '/app/server-dist/recovery/trust-snapshot-store.js';
 import { closePool, getPool } from '/app/server-dist/database.js';
 import { createImportCandidateModule } from '/app/server-dist/import-candidates/import-candidate-module.js';
 import {
@@ -559,7 +560,7 @@ async function previewCandidate(importCandidateModule, importCandidateId) {
 
 async function runVerification() {
   const pool = getPool();
-  const activityModule = createActivityModule();
+  const activityModule = createActivityModule(createTrustSnapshotStore());
   await restoreStagedFfprobe();
   const mediaToolingStatusService = createMediaToolingStatusService({
     ffprobeBinary: stagedFfprobePath,
@@ -572,7 +573,7 @@ async function runVerification() {
     getMediaToolingStatus: mediaToolingStatusService.getStatus,
     mediaInspectionService,
     recordActivityEventFn: activityModule.activityEventService.recordActivityEvent,
-    recordSourceUserOutcomeEvidenceFn: async () => null,
+    recordSourceUserOutcomeEvidenceFn: activityModule.sourceUserTrustEvidenceService.recordSourceUserOutcomeEvidence,
     scheduleLibraryScan: async () => null,
     slskdService: createProviderStub(),
   });
@@ -600,6 +601,11 @@ async function runVerification() {
     importCandidateId: authenticCandidate.id,
   });
   assert.equal(authenticFinalCandidate.status, 'applied', 'verified FLAC must be added to the library');
+  const authenticEvidence = await pool.query(`SELECT outcomes.id, outcomes.outcome FROM source_user_outcome_events outcomes
+    JOIN import_candidate_events events ON events.id=outcomes.id
+    WHERE events.import_candidate_id=$1 AND events.event_type='import_candidate_applied'`, [authenticCandidate.id]);
+  assert.equal(authenticEvidence.rows.length, 1, 'real library add must publish one event-correlated outcome');
+  assert.equal(authenticEvidence.rows[0].outcome, 'success');
   assert.equal(authenticResult.run.appliedCount, 1, 'verified FLAC apply run must report one added file');
   await assertFileExists(authenticResult.libraryPath);
   await waitForActivity(pool, { entityId: authenticSeed.release.wantedReleaseId, eventType: 'download_completed' });

@@ -239,7 +239,7 @@ test('recordSourceUserOutcomeEvidence appends an immutable ledger event', async 
   assert.equal(args.actorUserId, 'admin-1');
 });
 
-test('recordSourceUserOutcomeEvidence still persists when the ledger append fails', async (t) => {
+test('recordSourceUserOutcomeEvidence refuses snapshot publication when the ledger append fails', async (t) => {
   const replaceTrustSnapshot = t.mock.fn(async () => {});
   const service = createSourceUserTrustEvidenceService({
     appendOutcomeEventFn: async () => { throw new Error('ledger offline'); },
@@ -247,14 +247,12 @@ test('recordSourceUserOutcomeEvidence still persists when the ledger append fail
     replaceTrustSnapshot,
   });
 
-  const row = await service.recordSourceUserOutcomeEvidence({
+  await assert.rejects(service.recordSourceUserOutcomeEvidence({
     eventType: 'import_candidate_applied',
     outcome: 'success',
     username: 'new-peer',
-  });
-
-  assert.equal(row.successCount, 1);
-  assert.equal(replaceTrustSnapshot.mock.callCount(), 1);
+  }), /ledger offline/u);
+  assert.equal(replaceTrustSnapshot.mock.callCount(), 0);
 });
 
 test('listSourceUserReputationIndex enriches rows with recency-weighted reputation and auto-ignore suggestions', async () => {

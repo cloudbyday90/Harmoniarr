@@ -9,6 +9,7 @@
  */
 
 import assert from 'node:assert/strict';
+import process from 'node:process';
 import { randomUUID } from 'node:crypto';
 import { readFile, readdir, rm, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -21,6 +22,7 @@ import {
 import { assertSharedRecoveryDownloaderMusicQueueLinkage } from './controlled-provider-music-queue-linkage-verifier.mjs';
 import { createAcquisitionModule } from '/app/server-dist/acquisition/acquisition-module.js';
 import { createActivityModule } from '/app/server-dist/activity/activity-module.js';
+import { createTrustSnapshotStore } from '/app/server-dist/recovery/trust-snapshot-store.js';
 import { closePool, getPool } from '/app/server-dist/database.js';
 import { createDownloaderModule } from '/app/server-dist/downloader/downloader-module.js';
 import { createImportCandidateModule } from '/app/server-dist/import-candidates/import-candidate-module.js';
@@ -28,6 +30,7 @@ import { createLibraryModule } from '/app/server-dist/library/library-module.js'
 import { createSlskdService } from '/app/server-dist/slskd/slskd-service.js';
 import { persistSettings } from '/app/server-dist/settings.js';
 
+const { fetch } = globalThis;
 const downloadsRoot = '/data/downloads';
 const musicRoot = '/data/music';
 const stagingRoot = '/data/staging';
@@ -440,7 +443,7 @@ function assertSharedActivityFanoutIsRedacted({ activities, sharedSeed, wantedRe
 async function runVerification() {
   assert.ok(providerApiKey, 'controlled provider API key is required');
   const pool = getPool();
-  const activityModule = createActivityModule();
+  const activityModule = createActivityModule(createTrustSnapshotStore());
   const slskdService = createSlskdService({
     getClientConfig: async () => ({
       apiKey: providerApiKey,
@@ -453,7 +456,7 @@ async function runVerification() {
   const importCandidateModule = createImportCandidateModule({
     getMediaToolingStatus: async () => ({ details: { ffmpegAvailable: true, ffprobeAvailable: true }, status: 'healthy' }),
     recordActivityEventFn: activityModule.activityEventService.recordActivityEvent,
-    recordSourceUserOutcomeEvidenceFn: async () => null,
+    recordSourceUserOutcomeEvidenceFn: activityModule.sourceUserTrustEvidenceService.recordSourceUserOutcomeEvidence,
     scheduleLibraryScan: async () => null,
     scheduleDownloadRecoveryRediscovery: async (payload) => {
       if (!libraryModule?.libraryDiscoveryRediscoveryService?.scheduleDownloadRecoveryRediscovery) {
@@ -908,7 +911,7 @@ async function runVerification() {
       wantedReleaseId,
     };
   }));
-  await Promise.all(sharedDiscoverySeed.wantedReleases.map(async ({ appUserId, wantedReleaseId }, index) => {
+  await Promise.all(sharedDiscoverySeed.wantedReleases.map(async ({ appUserId }, index) => {
     const other = sharedDiscoverySeed.wantedReleases[(index + 1) % sharedDiscoverySeed.wantedReleases.length];
     await assert.rejects(
       () => acquisitionModule.acquisitionPipelineService.getMusicQueueRelease({

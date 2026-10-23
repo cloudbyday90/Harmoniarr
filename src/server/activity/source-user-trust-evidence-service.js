@@ -170,23 +170,28 @@ export function createSourceUserTrustEvidenceService({
 
   async function recordSourceUserOutcomeEvidence({ actorUserId = null, eventType = null,
     occurredAt = new Date().toISOString(), outcome, qualityLabel = null, qualityWeight = 1,
-    reason = null, username } = {}) {
+    reason = null, username, id = null, queryable = null } = {}) {
+    if (queryable) {
+      if (!id || typeof appendOutcomeEventFn !== 'function') throw new TypeError('Durable candidate evidence is required');
+      assertDatabasePublicationScope(queryable, { kind: 'import_candidate_event', ownerId: id });
+    }
     const normalizedUsername = normalizeOptionalString(username);
     if (!normalizedUsername || (outcome !== 'success' && outcome !== 'failure')) return null;
     const event = { actorUserId, eventType: normalizeOptionalString(eventType),
-      occurredAt: typeof occurredAt === 'string' && occurredAt.trim() ? occurredAt : new Date().toISOString(),
-      outcome, qualityLabel, qualityWeight, reason: normalizeOptionalString(reason), username: normalizedUsername };
-    const projection = await mutate(async (rows, queryable) => {
-      const result = applySourceUserOutcomeEvidence(rows, event);
+      occurredAt: occurredAt instanceof Date ? occurredAt.toISOString()
+        : typeof occurredAt === 'string' && occurredAt.trim() ? occurredAt : new Date().toISOString(),
+      outcome, qualityLabel, qualityWeight, reason: normalizeOptionalString(reason), username: normalizedUsername,
+      ...(id ? { id } : {}) };
+    const projection = await mutate(async (rows, owned) => {
       if (typeof appendOutcomeEventFn === 'function') {
-        if (queryable) await queryable.query('SAVEPOINT trust_outcome_ledger');
-        try { await appendOutcomeEventFn({ ...event, ...(queryable ? { queryable } : {}) }); }
-        catch { if (queryable) await queryable.query('ROLLBACK TO SAVEPOINT trust_outcome_ledger'); }
-        if (queryable) await queryable.query('RELEASE SAVEPOINT trust_outcome_ledger');
+        const inserted = await appendOutcomeEventFn({ ...event, ...(owned ? { queryable: owned } : {}) });
+        if (!inserted) throw new Error('Source outcome event was not recorded');
       }
-      return result;
-    });
-    void notifyOutcome({ ...projection, actorUserId }).catch(() => {});
+      return applySourceUserOutcomeEvidence(rows, event);
+    }, { queryable, publicationKind: 'import_candidate_event' });
+    const afterCommit = () => notifyOutcome({ ...projection, actorUserId });
+    if (queryable) return { recorded: true, afterCommit };
+    await afterCommit();
     return projection.nextRow;
   }
 
@@ -209,8 +214,7 @@ export function createSourceUserTrustEvidenceService({
   async function notifyOutcome({ nextRow, previousReviewState, actorUserId }) {
     const normalizedUsername = nextRow.username;
     const usernameKey = buildSourceUserUsernameKey(normalizedUsername);
-    // Returned advisory work is awaited by spectral publication after commit;
-    // legacy callers retain their explicitly detached advisory policy.
+    // Producer-owned publication returns advisory work for execution after commit.
     const tasks = [];
     if (typeof onAutoIgnoreEvaluationFn === 'function' && typeof listRecentOutcomeEventsFn === 'function') {
       tasks.push((async () => {

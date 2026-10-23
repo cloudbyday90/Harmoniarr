@@ -35,7 +35,7 @@ export function createTrustSnapshotStore({ getPoolFn = getPool } = {}) {
       return work(queryable);
     });
   }
-  async function mutateTrustSnapshot(update, { queryable = null, signal } = {}) {
+  async function mutateTrustSnapshot(update, { queryable = null, signal, publicationKind = 'spectral_job' } = {}) {
     throwIfMediaCancelled(signal);
     const run = async client => {
       throwIfMediaCancelled(signal);
@@ -47,7 +47,8 @@ export function createTrustSnapshotStore({ getPoolFn = getPool } = {}) {
       return result;
     };
     if (queryable) {
-      assertDatabasePublicationScope(queryable, { kind: 'spectral_job' });
+      if (!['spectral_job', 'import_candidate_event'].includes(publicationKind)) throw new TypeError('Unknown trust publication kind');
+      assertDatabasePublicationScope(queryable, { kind: publicationKind });
       await admit(queryable);
       return run(queryable);
     }

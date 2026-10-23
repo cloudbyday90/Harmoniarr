@@ -367,7 +367,7 @@ test('createImportCandidateService ingests slskd responses in one transaction an
   assert.deepEqual(slskdService.getSearchResponses.mock.calls[0].arguments, [{ searchId: 'search-1' }]);
   assert.equal(pool.connect.mock.callCount(), 1);
   assert.equal(client.query.mock.calls[0].arguments[0], 'BEGIN');
-  assert.match(client.query.mock.calls[1].arguments[0], /ORDER BY candidate.id FOR UPDATE OF candidate/u);
+  assert.match(client.query.mock.calls[2].arguments[0], /ORDER BY candidate.id FOR UPDATE OF candidate/u);
   assert.equal(client.query.mock.calls.at(-1).arguments[0], 'COMMIT');
   assert.equal(client.release.mock.callCount(), 1);
   assert.equal(upsertImportCandidateFn.mock.callCount(), 1);
@@ -432,7 +432,7 @@ test('candidate persistence guard rejects stale requests after provider work and
     },
     searchId: 'search',
   }), { code: 'operation_run_cancelled' });
-  assert.deepEqual(client.query.mock.calls.map((call) => call.arguments[0]), ['BEGIN', 'ROLLBACK']);
+  assert.deepEqual(client.query.mock.calls.map((call) => call.arguments[0]), ['BEGIN', 'SET TRANSACTION ISOLATION LEVEL READ COMMITTED', 'ROLLBACK']);
   assert.equal(upsertImportCandidateFn.mock.callCount(), 0);
   assert.equal(recordAuditEventFn.mock.callCount(), 0);
   assert.equal(client.release.mock.callCount(), 1);
@@ -781,7 +781,7 @@ test('createImportCandidateService holds candidates with guarded status transiti
     },
   });
 
-  assert.deepEqual(client.query.mock.calls.map((call) => call.arguments[0]), ['BEGIN', 'COMMIT']);
+  assert.deepEqual(client.query.mock.calls.map((call) => call.arguments[0]), ['BEGIN', 'SET TRANSACTION ISOLATION LEVEL READ COMMITTED', 'COMMIT']);
   assert.deepEqual(getImportCandidateByIdFn.mock.calls[0].arguments, ['candidate-1', client]);
   assert.deepEqual(transitionImportCandidateStatusFn.mock.calls[0].arguments, [{
     fromStatuses: ['pending'],
@@ -828,6 +828,7 @@ test('createImportCandidateService selects candidates with the expected status g
   const getImportCandidateByIdFn = t.mock.fn(async () => createStoredCandidate({ status: 'held' }));
   const transitionImportCandidateStatusFn = t.mock.fn(async ({ toStatus }) => createStoredCandidate({ status: toStatus }));
   const insertImportCandidateEventFn = t.mock.fn(async ({ eventType, previousStatus, newStatus, reason }) => ({
+    id: 'event-1', occurredAt: '2026-04-30T14:00:00.000Z',
     eventType,
     previousStatus,
     newStatus,
@@ -916,7 +917,7 @@ test('createImportCandidateService rolls back a selection when its Music Queue s
     client,
   }]);
   assert.equal(transitionImportCandidateStatusFn.mock.callCount(), 0);
-  assert.deepEqual(client.query.mock.calls.map((call) => call.arguments[0]), ['BEGIN', 'ROLLBACK']);
+  assert.deepEqual(client.query.mock.calls.map((call) => call.arguments[0]), ['BEGIN', 'SET TRANSACTION ISOLATION LEVEL READ COMMITTED', 'ROLLBACK']);
 });
 
 test('createImportCandidateService rejects and reopens selected candidates with the expected status guards', async (t) => {
@@ -924,6 +925,7 @@ test('createImportCandidateService rejects and reopens selected candidates with 
   const getImportCandidateByIdFn = t.mock.fn(async () => createStoredCandidate({ status: 'selected' }));
   const transitionImportCandidateStatusFn = t.mock.fn(async ({ toStatus }) => createStoredCandidate({ status: toStatus }));
   const insertImportCandidateEventFn = t.mock.fn(async ({ eventType, previousStatus, newStatus, reason }) => ({
+    id: 'event-1', occurredAt: '2026-04-30T14:00:00.000Z',
     eventType,
     previousStatus,
     newStatus,
@@ -968,12 +970,13 @@ test('createImportCandidateService marks download and import-blocker transitions
   const getImportCandidateByIdFn = t.mock.fn(async () => createStoredCandidate({ status: 'selected' }));
   const transitionImportCandidateStatusFn = t.mock.fn(async ({ toStatus }) => createStoredCandidate({ status: toStatus }));
   const insertImportCandidateEventFn = t.mock.fn(async ({ eventType, previousStatus, newStatus, reason }) => ({
+    id: 'event-1', occurredAt: '2026-04-30T14:00:00.000Z',
     eventType,
     previousStatus,
     newStatus,
     reason,
   }));
-  const recordSourceUserOutcomeEvidenceFn = t.mock.fn(async () => null);
+  const recordSourceUserOutcomeEvidenceFn = t.mock.fn(async () => ({ recorded: true }));
   const service = createImportCandidateService({
     getImportCandidateByIdFn,
     insertImportCandidateEventFn,
@@ -1055,7 +1058,12 @@ test('createImportCandidateService marks download and import-blocker transitions
   assert.equal(insertImportCandidateEventFn.mock.calls[5].arguments[0].eventType, 'import_candidate_download_failed');
   assert.equal(insertImportCandidateEventFn.mock.calls[6].arguments[0].eventType, 'import_candidate_import_blocked');
   assert.equal(insertImportCandidateEventFn.mock.calls[7].arguments[0].eventType, 'import_candidate_import_blocked');
-  assert.deepEqual(recordSourceUserOutcomeEvidenceFn.mock.calls.map((call) => call.arguments[0]), [
+  assert.deepEqual(recordSourceUserOutcomeEvidenceFn.mock.calls.map((call) => {
+    const { id, queryable, ...event } = call.arguments[0];
+    assert.equal(id, 'event-1');
+    assert.equal(typeof queryable.query, 'function');
+    return event;
+  }), [
     {
       actorUserId: null,
       eventType: 'import_candidate_applied',
@@ -1081,6 +1089,7 @@ test('createImportCandidateService marks download and import-blocker transitions
       eventType: 'import_candidate_download_failed',
       occurredAt: '2026-04-30T14:00:00.000Z',
       outcome: 'failure',
+      qualityLabel: null, qualityWeight: 1,
       reason: 'Remote transfer failed',
       username: 'source-user',
     },
@@ -1089,17 +1098,19 @@ test('createImportCandidateService marks download and import-blocker transitions
       eventType: 'import_candidate_import_blocked',
       occurredAt: '2026-04-30T14:00:00.000Z',
       outcome: 'failure',
+      qualityLabel: null, qualityWeight: 1,
       reason: 'Completed source disappeared before add',
       username: 'source-user',
     },
   ]);
 });
 
-test('createImportCandidateService preserves status transitions when trust evidence recording fails', async (t) => {
-  const { pool } = createPool(t);
+test('createImportCandidateService rolls back status transitions when trust evidence recording fails', async (t) => {
+  const { client, pool } = createPool(t);
   const service = createImportCandidateService({
     getImportCandidateByIdFn: t.mock.fn(async () => createStoredCandidate({ status: 'selected' })),
     insertImportCandidateEventFn: t.mock.fn(async ({ eventType, previousStatus, newStatus, reason }) => ({
+      id: 'event-1', occurredAt: '2026-04-30T14:00:00.000Z',
       eventType,
       previousStatus,
       newStatus,
@@ -1116,12 +1127,11 @@ test('createImportCandidateService preserves status transitions when trust evide
     transitionImportCandidateStatusFn: t.mock.fn(async ({ toStatus }) => createStoredCandidate({ status: toStatus })),
   });
 
-  const result = await service.markImportCandidateDownloadFailed({
+  await assert.rejects(service.markImportCandidateDownloadFailed({
     importCandidateId: 'candidate-1',
     reason: 'Remote transfer failed',
-  });
-
-  assert.equal(result.candidate.status, 'failed');
+  }), /trust snapshot unavailable/u);
+  assert.equal(client.query.mock.calls.at(-1).arguments[0], 'ROLLBACK');
 });
 
 test('createImportCandidateService rejects stale review transitions with a conflict', async (t) => {
@@ -1146,7 +1156,7 @@ test('createImportCandidateService rejects stale review transitions with a confl
       return true;
     },
   );
-  assert.deepEqual(client.query.mock.calls.map((call) => call.arguments[0]), ['BEGIN', 'ROLLBACK']);
+  assert.deepEqual(client.query.mock.calls.map((call) => call.arguments[0]), ['BEGIN', 'SET TRANSACTION ISOLATION LEVEL READ COMMITTED', 'ROLLBACK']);
 });
 
 test('createImportCandidateService returns not found for missing review transition targets', async (t) => {
@@ -1200,7 +1210,7 @@ test('createImportCandidateService rolls back candidate ingestion failures', asy
   );
 
   assert.equal(client.query.mock.calls[0].arguments[0], 'BEGIN');
-  assert.match(client.query.mock.calls[1].arguments[0], /ORDER BY candidate.id FOR UPDATE OF candidate/u);
+  assert.match(client.query.mock.calls[2].arguments[0], /ORDER BY candidate.id FOR UPDATE OF candidate/u);
   assert.equal(client.query.mock.calls.at(-1).arguments[0], 'ROLLBACK');
   assert.equal(client.release.mock.callCount(), 1);
 });

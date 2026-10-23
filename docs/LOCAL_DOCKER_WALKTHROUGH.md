@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
-The October 23 [spectral reputation rebuild](LOCAL_DOCKER_SPECTRAL_REPUTATION_OUTCOME.md)
+The October 23 [candidate reputation rebuild](LOCAL_DOCKER_CANDIDATE_REPUTATION_OUTCOME.md)
 records the current no-cache image, preserved admin/data and readiness. The
+[owning outcome](CANDIDATE_REPUTATION_OUTCOME.md) records atomic publication across
+all five non-spectral outcome producers and their replay boundaries.
+
+The October 23 [spectral reputation rebuild](LOCAL_DOCKER_SPECTRAL_REPUTATION_OUTCOME.md)
+records the preceding no-cache image, preserved admin/data and readiness. The
 [owning outcome](SPECTRAL_REPUTATION_OUTCOME.md) records actual consumer exit,
 atomic reputation publication and coordinated trust snapshot mutation.
 
@@ -408,7 +413,7 @@ to be read.
 
 ## Optional: Last.fm API Key
 
-To enable similar-artist recommendations in Discover, set the `LASTFM_API_KEY` environment variable before starting the stack. The key is free and unlimited — get one at https://www.last.fm/api/account/create.
+To enable similar-artist recommendations in Discover, set the `LASTFM_API_KEY` environment variable before starting the stack. The key is free and unlimited â€” get one at https://www.last.fm/api/account/create.
 
 ```powershell
 $env:LASTFM_API_KEY = "your-key-here"

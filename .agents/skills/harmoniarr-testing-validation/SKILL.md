@@ -5,6 +5,12 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For candidate evidence, use the standards [publication reference](../harmoniarr-web-standards/references/candidate-reputation.md).
+Run the shared twenty-case candidate PostgreSQL registrar and existing recovery
+transaction/spectral cross-writer cohorts; use `validate:native-candidate-reputation`
+for the same cases on packaged PostgreSQL. Keep actual child exit, close and server
+lock retirement separate, and retain failed candidate records.
+
 For spectral reputation, use the standards
 [atomic reputation reference](../harmoniarr-web-standards/references/atomic-reputation.md).
 The shared fifteen-case PostgreSQL/native registrar includes actual consumer exit,

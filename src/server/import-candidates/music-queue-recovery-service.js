@@ -5,6 +5,7 @@
  * See LICENSE file for details.
  */
 
+import { createImportCandidateOutcomePublisher, settleCandidateOutcomeAdvisory } from './import-candidate-outcome-publication-service.js';
 import { isDeepStrictEqual } from 'node:util';
 import { createDatabaseTransactionRunner } from '../database-transaction-service.js';
 import { lockAppUserEligibility } from '../app-user-eligibility-lock-store.js';
@@ -27,12 +28,13 @@ export function createMusicQueueRecoveryService({ store = createMusicQueueRecove
   createExecutionRun, createDiscoveryRun = createLibraryDiscoveryRunStore().createOperationRun,
   withTransaction = createDatabaseTransactionRunner(), lockAccounts = lockAppUserEligibility,
   recordAuditEventFn = recordAuditEvent, qualityPolicyService = createAcquisitionQualityPolicyService(),
-  recordSourceOutcome = async () => {}, getNow = () => new Date(), maxAttempts = 3, retryDelayMs = 600_000,
+  recordSourceOutcome, getNow = () => new Date(), maxAttempts = 3, retryDelayMs = 600_000,
   rediscoveryDelayMs = 7_200_000, maxResearchAttempts = 2 } = {}) {
   for (const [name, fn] of Object.entries({ assertMaintenanceWriteAllowed, createExecutionRun, createDiscoveryRun, withTransaction,
     lockAccounts, recordAuditEventFn, getCandidate: store.getCandidate, getOrigin: store.getOrigin })) {
     if (typeof fn !== 'function') throw new TypeError(`createMusicQueueRecoveryService requires ${name}`);
   }
+  const publishOutcome = createImportCandidateOutcomePublisher({ recordOutcome: recordSourceOutcome });
   async function ownsRecoveryCandidate({ candidate, operationRunId = null }) {
     return hasOwnedRecoveryOrigin(candidate, await store.getOrigin(operationRunId, candidate.id));
   }
@@ -52,8 +54,9 @@ export function createMusicQueueRecoveryService({ store = createMusicQueueRecove
     const sourceReservation = await store.readExecutionReservation(original.id);
     const candidates = metadataReleaseId && (kind !== 'import' || canRecover) ? await store.listCandidateIds({ failedCandidateId,
       metadataReleaseId, sourceSearchId: original.sourceSearchId, maxAttempts }) : [];
-    let terminalOutcomeEvidence;
+    let publication;
     const result = await withTransaction(async (queryable) => {
+      await queryable.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
       await assertMaintenanceWriteAllowed({ queryable });
       if (participants.length) {
         await lockAccounts({ userIds: [...new Set(participants.map((participant) => participant.appUserId))], queryable });
@@ -92,9 +95,6 @@ export function createMusicQueueRecoveryService({ store = createMusicQueueRecove
       await audit({ eventType: terminal.event.eventType, entityId: failed.id,
         details: { originRunId: operationRunId, terminalOutcome: terminalByKind[kind], ...(addBlockerCode ? { addBlockerCode } : {}),
           ...(recoveryReasonCode ? { recoveryReasonCode } : {}) }, summary: 'Music Queue observed a stopped acquisition attempt' }, queryable);
-      if (kind !== 'import' || canRecover) terminalOutcomeEvidence = { eventType: terminal.event.eventType,
-        occurredAt: terminal.candidate.updatedAt, username: failed.username, outcome: 'failure', reason: failureReason,
-        ...(kind === 'quality' ? { qualityWeight: 0 } : {}) };
       let decision = { ...base, terminalObservationRecorded: true,
         ...(addBlockerCode ? { addBlockerCode } : {}), ...(recoveryReasonCode ? { recoveryReasonCode } : {}),
         ...(kind === 'import' && !canRecover && !recoveryReasonCode ? { requiresOperator: true } : {}),
@@ -150,12 +150,14 @@ export function createMusicQueueRecoveryService({ store = createMusicQueueRecove
         }
         decision.failedAttemptCount = attempted.downloadAttemptCount;
       }
+      if ((kind !== 'import' || canRecover) && !(kind === 'rejected' && decision.retrySameCandidate)) {
+        publication = await publishOutcome({ candidate: terminal.candidate, event: terminal.event, queryable,
+          outcome: 'failure', ...(kind === 'quality' ? { qualityWeight: 0 } : {}) });
+      }
       await store.saveEpisode({ candidate: terminal.candidate, originRunId: operationRunId, result: decision, observation }, queryable);
       return decision;
     });
-    if (terminalOutcomeEvidence && !result.episodeReplayed && !(kind === 'rejected' && result.retrySameCandidate)) {
-      try { await recordSourceOutcome(terminalOutcomeEvidence); } catch { /* Supplemental source evidence cannot undo committed intent. */ }
-    }
+    await settleCandidateOutcomeAdvisory(publication);
     return result;
   }
   return { ownsRecoveryCandidate, isCurrentExecutionObservation, isAdoptedDownloadEpisode, handleMusicQueueRecovery, store };
