@@ -52,3 +52,23 @@ held-SIGTERM close and real encoder cancellation in
 `validate:native-media-worker-cancellation`. Its 25 ms codec control is a test
 setting, not a production latency claim. SQL/filesystem reads still drain normally;
 spectral accepts a signal but its separate job owner has no new durable polling.
+
+## Lease observation and media interruption
+
+Use the [lease interruption design](../../../../docs/MEDIA_LEASE_INTERRUPTION_DESIGN.md)
+when media outlives ownership. Forward the existing heartbeat's signal into each
+step scope; do not add a parallel lease watcher or infer current authority from
+an unexpired local timestamp. Null renewal confirms loss; a thrown renewal reason
+is uncertainty and must retain its original Error/null, separate from loss.
+
+Retain the first observed failure, pre-abort refusal, one-shot removable listener,
+pending-read drainage and actual native close. Confirmed loss skips terminal run
+writes. Cleanup stops/drains the heartbeat then releases only the captured
+acquisition; expiry permits own release, replacement refuses it. Preserve database
+fencing even after notification. Shutdown remains a graceful drain.
+
+Qualify both media owners through real PostgreSQL replacement during readiness,
+queued admission and active execution; include expired-own release and unchanged
+replacement/run rows. The explicit native lease lane uses an actual renewal tick
+after replacement to interrupt Linux held-SIGTERM and real encoding. It does not
+establish a 60-second detection bound or replace other workers' ownership proof.

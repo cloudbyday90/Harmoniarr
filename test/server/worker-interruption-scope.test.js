@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { getEventListeners } from 'node:events';
 import { withOperationRunInterruption } from '../../src/server/worker-interruption-scope.js';
 
 const flush = () => new Promise(resolve => { setImmediate(resolve); });
@@ -51,4 +52,35 @@ test('a final durable check refuses late cancellation and missing checkers alloc
   await assert.rejects(withOperationRunInterruption({ runId: 'owned', isCancellationRequested: async () => true }, async () => 'unpublished'), { code: 'operation_run_cancelled' });
   assert.equal(await withOperationRunInterruption({ runId: 'fixture', setTimeoutFn: () => assert.fail('No checker, no poll') },
     async signal => { assert.equal(signal, undefined); return 'done'; }), 'done');
+});
+
+for (const reason of [new Error('lease lost'), null]) {
+  test(`pre-aborted lease signal refuses dispatch with original ${reason === null ? 'null' : 'Error'}`, async () => {
+    const controller = new AbortController(); controller.abort(reason);
+    await assert.rejects(withOperationRunInterruption({ signal: controller.signal, setTimeoutFn: () => assert.fail('No timer') },
+      () => assert.fail('No dispatch')), error => error === reason);
+    assert.equal(getEventListeners(controller.signal, 'abort').length, 0);
+  });
+}
+
+test('signal-only interruption drains callback, preserves first failure and removes its listener', async () => {
+  const controller = new AbortController(); const work = Promise.withResolvers(); const original = new Error('lost'); let supplied; let settled = false;
+  const task = withOperationRunInterruption({ signal: controller.signal, setTimeoutFn: () => assert.fail('No durable checker, no timer') },
+    signal => { supplied = signal; return work.promise; });
+  const refused = assert.rejects(task, error => error === original); void task.then(() => { settled = true; }, () => { settled = true; });
+  controller.abort(original); await flush(); assert.equal(supplied.reason, original); assert.equal(settled, false);
+  work.reject(null); await refused; assert.equal(getEventListeners(controller.signal, 'abort').length, 0);
+  const normal = new AbortController();
+  assert.equal(await withOperationRunInterruption({ signal: normal.signal }, async () => 'done'), 'done');
+  assert.equal(getEventListeners(normal.signal, 'abort').length, 0);
+});
+
+test('lease interruption drains an admitted durable read and does not start a handoff read', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] }); const controller = new AbortController(); const read = Promise.withResolvers(); const work = Promise.withResolvers();
+  let checks = 0; let settled = false;
+  const task = withOperationRunInterruption({ signal: controller.signal, isCancellationRequested: async () => { checks++; return read.promise; } }, () => work.promise);
+  const refused = assert.rejects(task, error => error === null); void task.then(() => { settled = true; }, () => { settled = true; });
+  t.mock.timers.tick(1000); controller.abort(null); work.resolve(); await flush(); assert.equal(settled, false);
+  read.reject(new Error('later read')); await refused; t.mock.timers.tick(5000); assert.equal(checks, 1);
+  assert.equal(getEventListeners(controller.signal, 'abort').length, 0);
 });

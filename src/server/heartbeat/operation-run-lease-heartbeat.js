@@ -17,6 +17,7 @@
  */
 
 import { createIntervalHeartbeatRunner } from './interval-heartbeat-runner.js';
+import { createOperationRunLeaseLostError } from '../operation-run-lease-error.js';
 import { normalizeExpectedJobLease } from '../job-lease-policy.js';
 import { createWorkerTaskLifecycle } from '../worker-task-lifecycle.js';
 
@@ -32,16 +33,19 @@ export function createOperationRunLeaseHeartbeat({
   status = 'active',
 } = {}) {
   const capturedLease = normalizeExpectedJobLease(expectedLease);
+  const interruption = new AbortController();
+  const lost = () => { interruption.abort(createOperationRunLeaseLostError()); return { reason: 'lease_lost', skipped: true }; };
   let sequence = 0;
   let stopping;
   const tasks = createWorkerTaskLifecycle({
     execute: async () => {
       try {
-        if (!capturedLease) return { reason: 'lease_lost', skipped: true };
+        if (!capturedLease) return lost();
         const renewed = await renewLease({ runId, status, expectedLease: capturedLease });
-        if (renewed === null) return { reason: 'lease_lost', skipped: true };
+        if (renewed === null) return lost();
         return { skipped: false };
       } catch (error) {
+        interruption.abort(error);
         await onError(error);
         return { reason: 'error', skipped: true };
       }
@@ -72,6 +76,7 @@ export function createOperationRunLeaseHeartbeat({
 
   return {
     ...runner,
+    signal: interruption.signal,
     start() {
       if (stopping) {
         throw Object.assign(new Error('Lease heartbeat admission is closed'), { code: 'heartbeat_closing' });

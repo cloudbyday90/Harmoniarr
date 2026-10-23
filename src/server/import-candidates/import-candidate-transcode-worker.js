@@ -74,6 +74,7 @@ export function createImportCandidateTranscodeWorker({
         }
 
         await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
+        leaseHeartbeat?.signal?.throwIfAborted();
         if (await markRunStarted({ expectedLease: acquiredLease,
           runId,
           summary: {
@@ -97,26 +98,28 @@ export function createImportCandidateTranscodeWorker({
 
         for (const candidate of selectedSummary.selectedCandidates ?? []) {
           await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
+          leaseHeartbeat?.signal?.throwIfAborted();
 
           if (candidate?.executionStatus?.code === 'blocked') {
             counters.blockedCandidateCount += 1;
             continue;
           }
 
-          const applyPreview = await withOperationRunInterruptionFn({ isCancellationRequested, runId }, signal => previewImportCandidateApply({
+          const applyPreview = await withOperationRunInterruptionFn({ isCancellationRequested, runId, signal: leaseHeartbeat?.signal }, signal => previewImportCandidateApply({
             importCandidateId: candidate.id, ...(signal ? { signal } : {}),
           }));
           counters.reviewedCandidateCount += 1;
 
           for (const file of applyPreview.files ?? []) {
             await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
+            leaseHeartbeat?.signal?.throwIfAborted();
 
             if (!isTranscodeCandidate(file)) {
               continue;
             }
 
             counters.transcodeCandidateFileCount += 1;
-            const transcodeExecution = await withOperationRunInterruptionFn({ isCancellationRequested, runId }, signal => executeTranscodeCandidate({
+            const transcodeExecution = await withOperationRunInterruptionFn({ isCancellationRequested, runId, signal: leaseHeartbeat?.signal }, signal => executeTranscodeCandidate({
               sourcePath: file?.sourceFile?.path,
               transcodePlan: file?.transcodePlan, ...(signal ? { signal } : {}),
             }));
@@ -134,6 +137,7 @@ export function createImportCandidateTranscodeWorker({
           }
         }
 
+        leaseHeartbeat?.signal?.throwIfAborted();
         if (await markRunCompleted({ expectedLease: acquiredLease,
           runId,
           summary: {
@@ -150,7 +154,7 @@ export function createImportCandidateTranscodeWorker({
           },
         }) === false) return;
       } catch (error) {
-        if (isOperationRunLeaseLostError(error)) return;
+        if (isOperationRunLeaseLostError(error)) { finalLeaseStatus = 'failed'; return; }
         if (!acquiredLease) {
           if (error?.code === 'operation_run_lease_unavailable') return;
           throw error;

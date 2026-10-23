@@ -5,6 +5,10 @@
  * See LICENSE for details.
  */
 
+export function createOperationRunLeaseLostError() {
+  return Object.assign(new Error('Operation run lease ownership was lost'), { code: 'operation_run_lease_lost' });
+}
+
 export function isOperationRunLeaseLostError(error) {
   return error?.code === 'operation_run_lease_lost';
 }

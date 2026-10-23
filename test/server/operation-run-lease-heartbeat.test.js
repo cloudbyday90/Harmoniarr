@@ -43,9 +43,13 @@ test('heartbeat captures its original token and reports ownership loss without b
   lease.acquisitionId = createTestJobLease('import_candidate_execution_planning', 'run').acquisitionId;
   assert.deepEqual(await heartbeat.tick(), { skipped: true, reason: 'lease_lost' });
   assert.equal(renewLease.mock.callCount(), 1);
+  assert.equal(heartbeat.signal.aborted, true);
+  assert.equal(heartbeat.signal.reason.code, 'operation_run_lease_lost');
+  const first = heartbeat.signal.reason; await heartbeat.tick(); assert.equal(heartbeat.signal.reason, first);
   const missing = createOperationRunLeaseHeartbeat({ runId: 'run', renewLease });
   assert.deepEqual(await missing.tick(), { skipped: true, reason: 'lease_lost' });
-  assert.equal(renewLease.mock.callCount(), 1);
+  assert.equal(renewLease.mock.callCount(), 2);
+  assert.equal(missing.signal.reason.code, 'operation_run_lease_lost');
 });
 
 test('terminal heartbeat close drains admitted renewal and refuses timer restart', async () => {
@@ -65,6 +69,7 @@ test('terminal heartbeat close drains admitted renewal and refuses timer restart
     assert.throws(() => heartbeat.start(), { code: 'heartbeat_closing' });
     assert.equal(renewals, 1);
   } finally { gate.resolve(); await closing; }
+  assert.equal(heartbeat.signal.aborted, false);
 });
 
 test('heartbeat callback rejection is observed and retained for terminal close', async () => {
@@ -77,3 +82,17 @@ test('heartbeat callback rejection is observed and retained for terminal close',
   assert.deepEqual(await heartbeat.tick(), { skipped: true, reason: 'error' });
   await assert.rejects(heartbeat.stopAndDrain(), error => error === failure);
 });
+
+for (const reason of [new Error('renewal unavailable'), null]) {
+  test(`heartbeat signals original ${reason === null ? 'null' : 'Error'} before held error reporting and drains it`, async () => {
+    const entered = Promise.withResolvers(); const release = Promise.withResolvers();
+    const heartbeat = createOperationRunLeaseHeartbeat({ expectedLease: createTestJobLease('import_candidate_apply', 'failed'), runId: 'failed',
+      renewLease: async () => { throw reason; }, onError: async error => { assert.equal(error, reason); entered.resolve(); await release.promise; },
+    });
+    const ticking = heartbeat.tick(); await entered.promise;
+    assert.equal(heartbeat.signal.aborted, true); assert.equal(heartbeat.signal.reason, reason);
+    let closed = false; const closing = heartbeat.stopAndDrain().then(() => { closed = true; });
+    await new Promise(resolve => { setImmediate(resolve); }); assert.equal(closed, false);
+    release.resolve(); assert.deepEqual(await ticking, { reason: 'error', skipped: true }); await closing;
+  });
+}

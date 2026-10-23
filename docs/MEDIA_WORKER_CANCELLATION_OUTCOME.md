@@ -104,11 +104,12 @@ The benefit is stopping obsolete media work without orphaning resources. Costs
 are additional bounded checks and cancellation delay; count limits still do not
 isolate codec memory, threads, descendants or unrelated database/artwork work.
 
-**Next:** connect lease-loss detection to this media interruption path, preserving
-current-write authority and close-before-release. The existing heartbeat reports
-lease loss and guards writes; stopping obsolete native work after that signal
-needs its own native/persistence proof. This is a follow-up hardening recommendation,
-not a reproduced authorization vulnerability.
+The [lease interruption follow-up](MEDIA_LEASE_INTERRUPTION_OUTCOME.md) now
+connects observed renewal refusal/failure to media interruption, preserving
+replacement acquisition authority and close-before-release. **Next:** carry
+interruption through spectral proof and sidecar owners, with separate claim,
+cache/publication and native drainage evidence. This remains a bounded follow-up,
+not a claim that every background owner is covered.
 
 GitHub MCP found no open PRs at selection and again before publication. No
 applicable random/stale PR could be implemented, rebased or closed. No PR was

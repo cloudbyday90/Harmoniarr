@@ -86,6 +86,7 @@ export function createImportCandidateMediaInspectionWorker({
         }
 
         await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
+        leaseHeartbeat?.signal?.throwIfAborted();
         if (await markRunStarted({ expectedLease: acquiredLease,
           runId,
           summary: {
@@ -106,13 +107,14 @@ export function createImportCandidateMediaInspectionWorker({
 
         for (const candidate of selectedSummary.selectedCandidates ?? []) {
           await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
+          leaseHeartbeat?.signal?.throwIfAborted();
 
           if (candidate?.executionStatus?.code === 'blocked') {
             counters.blockedCandidateCount += 1;
             continue;
           }
 
-          const applyPreview = await withOperationRunInterruptionFn({ isCancellationRequested, runId }, signal => previewImportCandidateApply({
+          const applyPreview = await withOperationRunInterruptionFn({ isCancellationRequested, runId, signal: leaseHeartbeat?.signal }, signal => previewImportCandidateApply({
             importCandidateId: candidate.id, ...(signal ? { signal } : {}),
           }));
           const inspectionSummary = summarizeInspection(applyPreview.files ?? []);
@@ -138,6 +140,7 @@ export function createImportCandidateMediaInspectionWorker({
           );
         }
 
+        leaseHeartbeat?.signal?.throwIfAborted();
         if (await markRunCompleted({ expectedLease: acquiredLease,
           runId,
           summary: {
@@ -152,7 +155,7 @@ export function createImportCandidateMediaInspectionWorker({
           },
         }) === false) return;
       } catch (error) {
-        if (isOperationRunLeaseLostError(error)) return;
+        if (isOperationRunLeaseLostError(error)) { finalLeaseStatus = 'failed'; return; }
         if (!acquiredLease) {
           if (error?.code === 'operation_run_lease_unavailable') return;
           throw error;

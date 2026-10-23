@@ -103,7 +103,7 @@ test('lease-coded failure after acquisition retains the owning domain outcome an
     }, markRunFailed: async input => { failed = input; return true; }, releaseLease: async input => { released = input; } }));
     await (await worker.startWorkerRun({ runId: 'inspection' })).completion; await worker.close();
     assert.deepEqual(released.expectedLease, lease());
-    if (code === 'operation_run_lease_lost') { assert.equal(failed, undefined); assert.equal(released.status, 'completed'); }
+    if (code === 'operation_run_lease_lost') { assert.equal(failed, undefined); assert.equal(released.status, 'failed'); }
     else { assert.equal(failed.errorMessage, 'inspection dependency lease outcome'); assert.equal(released.status, 'failed'); }
   }
 });

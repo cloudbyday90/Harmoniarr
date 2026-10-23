@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
-The October 23 [media worker cancellation rebuild](LOCAL_DOCKER_MEDIA_WORKER_CANCELLATION_OUTCOME.md)
+The October 23 [media lease interruption rebuild](LOCAL_DOCKER_MEDIA_LEASE_INTERRUPTION_OUTCOME.md)
 records the current no-cache image, preserved admin/data and readiness. The
+[owning outcome](MEDIA_LEASE_INTERRUPTION_OUTCOME.md) records observed renewal
+loss/failure, actual native drainage and replacement-acquisition protection.
+
+The October 23 [media worker cancellation rebuild](LOCAL_DOCKER_MEDIA_WORKER_CANCELLATION_OUTCOME.md)
+records the preceding no-cache image, preserved admin/data and readiness. The
 [owning outcome](MEDIA_WORKER_CANCELLATION_OUTCOME.md) records durable interruption
 through readiness, queued/active native work and captured lease release.
 

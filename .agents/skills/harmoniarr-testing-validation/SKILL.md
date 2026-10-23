@@ -13,6 +13,11 @@ Run focused caller/worker tests before the explicit Linux
 and actual FFmpeg interruption. Keep its codec polling control separate from the
 one-second production interval, and pair it with the six readiness/queued/active
 PostgreSQL cases plus existing worker-lifetime tests.
+`validate:native-media-worker-lease-interruption` adds replacement-acquisition
+refusal with held native close and real FFmpeg interruption. Use its explicit
+renewal tick only as a qualification control; the production heartbeat remains
+60 seconds. Pair it with readiness/queued/active replacement and own-expiry
+PostgreSQL cases; prove stale terminal writes and releases cannot alter a new owner.
 
 For decoder memory controls, use the standards skill's
 [worker memory](../harmoniarr-web-standards/references/worker-memory.md) reference.
