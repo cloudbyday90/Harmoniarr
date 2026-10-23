@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createSourceUserTrustMutation } from './source-user-trust-mutation-service.js';
 import { createApiError } from '../auth.js';
 import { MAX_TRUST_HISTORY_ENTRIES } from './trust-history-constants.js';
 
@@ -167,8 +168,10 @@ function sortBlockedSourceUsers(a, b) {
 export function createSourceUserBlocklistService({
   listTrustSnapshot = async () => [],
   replaceTrustSnapshot = async () => {},
+  mutateTrustSnapshot = null,
   onBlockEventFn = async () => {},
 } = {}) {
+  const mutate = createSourceUserTrustMutation({ mutateTrustSnapshot, listTrustSnapshot, replaceTrustSnapshot });
   async function listBlockedSourceUsers({ query } = {}) {
     const normalizedQuery = normalizeQuery(query);
     const rows = normalizeSnapshotRows(await listTrustSnapshot());
@@ -191,101 +194,103 @@ export function createSourceUserBlocklistService({
     const normalizedReason = normalizeReason(reason);
     const normalizedNotes = normalizeOperatorNotes(operatorNotes);
     const usernameKey = getUsernameKey(normalizedUsername);
-    const rows = normalizeSnapshotRows(await listTrustSnapshot());
-    const existingIndex = rows.findIndex((row) => getUsernameKey(row.username) === usernameKey);
-    const existing = existingIndex >= 0 ? rows[existingIndex] : null;
-    const wasBlocked = isBlockedSourceUser(existing);
-    const nowIso = new Date().toISOString();
-    const blockHistoryEntry = wasBlocked ? null : {
-      actorUserId,
-      eventType: 'source_user_blocked',
-      id: `${nowIso}:blocklist_event:blocked:${rows.length + 1}`,
-      kind: 'blocklist_event',
-      occurredAt: nowIso,
-      reason: normalizedReason,
-    };
-    const nextRow = {
-      ...(existing ?? {}),
-      blockedAt: wasBlocked ? (existing.blockedAt ?? nowIso) : nowIso,
-      blockedByUserId: wasBlocked ? (existing.blockedByUserId ?? actorUserId ?? null) : (actorUserId ?? null),
-      blockReason: normalizedReason,
-      isBlocked: true,
-      operatorNotes: normalizedNotes,
-      trustHistory: blockHistoryEntry
-        ? normalizeTrustHistory([blockHistoryEntry, ...(Array.isArray(existing?.trustHistory) ? existing.trustHistory : [])])
-        : (existing?.trustHistory ?? []),
-      trustState: 'blocked',
-      updatedAt: nowIso,
-      username: normalizedUsername,
-    };
+    const { nextRow: savedRow, wasBlocked: previouslyBlocked } = await mutate(rows => {
+      const existingIndex = rows.findIndex((row) => getUsernameKey(row.username) === usernameKey);
+      const existing = existingIndex >= 0 ? rows[existingIndex] : null;
+      const wasBlocked = isBlockedSourceUser(existing);
+      const nowIso = new Date().toISOString();
+      const blockHistoryEntry = wasBlocked ? null : {
+        actorUserId,
+        eventType: 'source_user_blocked',
+        id: `${nowIso}:blocklist_event:blocked:${rows.length + 1}`,
+        kind: 'blocklist_event',
+        occurredAt: nowIso,
+        reason: normalizedReason,
+      };
+      const nextRow = {
+        ...(existing ?? {}),
+        blockedAt: wasBlocked ? (existing.blockedAt ?? nowIso) : nowIso,
+        blockedByUserId: wasBlocked ? (existing.blockedByUserId ?? actorUserId ?? null) : (actorUserId ?? null),
+        blockReason: normalizedReason,
+        isBlocked: true,
+        operatorNotes: normalizedNotes,
+        trustHistory: blockHistoryEntry
+          ? normalizeTrustHistory([blockHistoryEntry, ...(Array.isArray(existing?.trustHistory) ? existing.trustHistory : [])])
+          : (existing?.trustHistory ?? []),
+        trustState: 'blocked',
+        updatedAt: nowIso,
+        username: normalizedUsername,
+      };
 
-    if (existingIndex >= 0) {
-      rows.splice(existingIndex, 1, nextRow);
-    } else {
-      rows.push(nextRow);
-    }
+      if (existingIndex >= 0) {
+        rows.splice(existingIndex, 1, nextRow);
+      } else {
+        rows.push(nextRow);
+      }
 
-    await replaceTrustSnapshot({ sourceUsers: rows });
+      return { nextRow, wasBlocked };
+    });
 
-    if (!wasBlocked) {
+    if (!previouslyBlocked) {
       void onBlockEventFn({
         actorUserId,
         eventType: 'blocked',
         reason: normalizedReason,
-        username: nextRow.username,
+        username: savedRow.username,
       }).catch(() => {});
     }
 
     return {
-      sourceUser: mapBlockedSourceUser(nextRow),
+      sourceUser: mapBlockedSourceUser(savedRow),
     };
   }
 
   async function unblockSourceUser({ actorUserId = null, username } = {}) {
     const normalizedUsername = normalizeUsername(username);
     const usernameKey = getUsernameKey(normalizedUsername);
-    const rows = normalizeSnapshotRows(await listTrustSnapshot());
-    const existingIndex = rows.findIndex((row) => getUsernameKey(row.username) === usernameKey);
+    const { nextRow: savedRow } = await mutate(rows => {
+      const existingIndex = rows.findIndex((row) => getUsernameKey(row.username) === usernameKey);
 
-    if (existingIndex < 0 || !isBlockedSourceUser(rows[existingIndex])) {
-      throw createApiError(404, 'source_user_block_not_found', 'Blocked source user was not found');
-    }
+      if (existingIndex < 0 || !isBlockedSourceUser(rows[existingIndex])) {
+        throw createApiError(404, 'source_user_block_not_found', 'Blocked source user was not found');
+      }
 
-    const existing = rows[existingIndex];
-    const nowIso = new Date().toISOString();
-    const unblockHistoryEntry = {
-      actorUserId,
-      eventType: 'source_user_unblocked',
-      id: `${nowIso}:blocklist_event:unblocked:${rows.length + 1}`,
-      kind: 'blocklist_event',
-      occurredAt: nowIso,
-    };
-    const nextRow = {
-      ...existing,
-      blockedAt: null,
-      blockedByUserId: null,
-      blockReason: null,
-      isBlocked: false,
-      trustHistory: normalizeTrustHistory([unblockHistoryEntry, ...(Array.isArray(existing.trustHistory) ? existing.trustHistory : [])]),
-      trustState: existing.trustState === 'blocked' ? 'neutral' : existing.trustState,
-      unblockedAt: nowIso,
-      unblockedByUserId: actorUserId ?? null,
-      updatedAt: nowIso,
-      username: existing.username ?? normalizedUsername,
-    };
+      const existing = rows[existingIndex];
+      const nowIso = new Date().toISOString();
+      const unblockHistoryEntry = {
+        actorUserId,
+        eventType: 'source_user_unblocked',
+        id: `${nowIso}:blocklist_event:unblocked:${rows.length + 1}`,
+        kind: 'blocklist_event',
+        occurredAt: nowIso,
+      };
+      const nextRow = {
+        ...existing,
+        blockedAt: null,
+        blockedByUserId: null,
+        blockReason: null,
+        isBlocked: false,
+        trustHistory: normalizeTrustHistory([unblockHistoryEntry, ...(Array.isArray(existing.trustHistory) ? existing.trustHistory : [])]),
+        trustState: existing.trustState === 'blocked' ? 'neutral' : existing.trustState,
+        unblockedAt: nowIso,
+        unblockedByUserId: actorUserId ?? null,
+        updatedAt: nowIso,
+        username: existing.username ?? normalizedUsername,
+      };
 
-    rows.splice(existingIndex, 1, nextRow);
-    await replaceTrustSnapshot({ sourceUsers: rows });
+      rows.splice(existingIndex, 1, nextRow);
+      return { nextRow };
+    });
 
     void onBlockEventFn({
       actorUserId,
       eventType: 'unblocked',
-      username: nextRow.username,
+      username: savedRow.username,
     }).catch(() => {});
 
     return {
       sourceUser: {
-        username: nextRow.username,
+        username: savedRow.username,
       },
     };
   }

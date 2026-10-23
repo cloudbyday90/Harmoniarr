@@ -95,6 +95,8 @@ export function createSourceUserOutcomeLedgerStore({ getPoolFn = getPool } = {})
     qualityWeight = DEFAULT_QUALITY_WEIGHT,
     reason = null,
     username,
+    id = null,
+    queryable = null,
   } = {}) {
     const normalizedUsername = normalizeOptionalString(username);
     const usernameKey = buildSourceUserUsernameKey(normalizedUsername);
@@ -105,7 +107,7 @@ export function createSourceUserOutcomeLedgerStore({ getPoolFn = getPool } = {})
     const nowIso = new Date().toISOString();
     const occurredAtIso = normalizeTimestamp(occurredAt, nowIso);
 
-    const result = await getPoolFn().query(
+    const result = await (queryable ?? getPoolFn()).query(
       `
         INSERT INTO source_user_outcome_events (
           username_key,
@@ -116,9 +118,10 @@ export function createSourceUserOutcomeLedgerStore({ getPoolFn = getPool } = {})
           event_type,
           reason,
           actor_user_id,
-          occurred_at
+          occurred_at,
+          id
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, COALESCE($10::uuid, harmoniarr_generate_uuid()))
         RETURNING
           id,
           username_key,
@@ -142,6 +145,7 @@ export function createSourceUserOutcomeLedgerStore({ getPoolFn = getPool } = {})
         normalizeOptionalString(reason),
         actorUserId === null || actorUserId === undefined ? null : String(actorUserId),
         occurredAtIso,
+        id,
       ],
     );
 

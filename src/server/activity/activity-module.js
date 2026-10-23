@@ -55,6 +55,7 @@ export function createActivityModule({
   activityEventService = createActivityEventService({ activityEventStore }),
   listTrustSnapshot = async () => [],
   replaceTrustSnapshot = async () => {},
+  mutateTrustSnapshot = null,
   onTrustOverrideFn = async () => {},
   onBlockEventFn = async () => {},
   onTrustThresholdCrossedFn = async () => {},
@@ -68,6 +69,7 @@ export function createActivityModule({
   sourceUserBlocklistService = createSourceUserBlocklistService({
     listTrustSnapshot,
     replaceTrustSnapshot,
+    mutateTrustSnapshot,
     onBlockEventFn,
   }),
   sourceUserTrustService = createSourceUserTrustService({
@@ -89,10 +91,12 @@ export function createActivityModule({
     onAutoIgnoreEvaluationFn: sourceUserIgnoreService.evaluateAutoIgnoreForUser,
     onTrustThresholdCrossedFn,
     replaceTrustSnapshot,
+    mutateTrustSnapshot,
   }),
   sourceUserTrustOverrideService = createSourceUserTrustOverrideService({
     listTrustSnapshot,
     replaceTrustSnapshot,
+    mutateTrustSnapshot,
     onTrustOverrideFn,
   }),
   sourceUserBulkOperationService = createSourceUserBulkOperationService({
@@ -110,7 +114,7 @@ export function createActivityModule({
     analyzeSpectralCutoffFn: typeof analyzeSpectralCutoffFn === 'function'
       ? analyzeSpectralCutoffFn
       : DEFAULT_SPECTRAL_ANALYZER,
-    recordSourceUserOutcomeEvidenceFn: sourceUserTrustEvidenceService.recordSourceUserOutcomeEvidence,
+    recordSpectralOutcomeEvidenceFn: sourceUserTrustEvidenceService.recordSpectralOutcomeEvidence,
     spectralCacheStore,
     hashFileFn: fileContentHasher.hashFile,
     loadSpectralThresholdsFn,

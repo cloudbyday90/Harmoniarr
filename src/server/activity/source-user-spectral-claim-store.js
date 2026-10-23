@@ -6,6 +6,7 @@
 import { getPool } from '../database.js';
 import { createDatabaseTransactionRunner } from '../database-transaction-service.js';
 import { throwIfMediaCancelled } from '../media/media-cancellation.js';
+import { withDatabasePublicationScope } from '../database-publication-scope.js';
 
 export function captureSpectralJobClaim({ id, attempts } = {}) {
   if (typeof id !== 'string' || !id.trim() || !Number.isSafeInteger(attempts) || attempts < 1) {
@@ -30,10 +31,11 @@ export function createSourceUserSpectralClaimStore({ getPoolFn = getPool,
   async function withSpectralJobClaim({ expectedClaim, signal }, work) {
     const claim = captureSpectralJobClaim(expectedClaim); throwIfMediaCancelled(signal);
     return withTransaction(async queryable => {
+      await queryable.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
       const result = await queryable.query("SELECT id FROM source_user_spectral_jobs WHERE id=$1 AND attempts=$2 AND state='active' FOR UPDATE", [claim.id, claim.attempts]);
       throwIfMediaCancelled(signal);
       if (result.rows.length !== 1) throw createSpectralClaimLostError();
-      const value = await work(queryable);
+      const value = await withDatabasePublicationScope({ queryable, kind: 'spectral_job', ownerId: claim.id }, work);
       throwIfMediaCancelled(signal);
       return value;
     });

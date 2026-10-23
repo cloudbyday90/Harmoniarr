@@ -29,10 +29,10 @@ function createStoreStub(claimJobs = []) {
       isSpectralJobClaimCurrent: async () => true,
       withSpectralJobClaim: async (_input, work) => work(null),
       releaseSpectralJobClaim: async () => true,
-      completeSpectralJob: async (input) => { calls.complete.push(input); return input; },
+      completeSpectralJob: async (input) => { calls.complete.push(input); return { recorded: true }; },
       countPendingSpectralJobs: async () => 0,
       enqueueSpectralJob: async () => ({ enqueued: true, job: { id: 'job' }, reason: null }),
-      failSpectralJob: async (input) => { calls.fail.push(input); return input; },
+      failSpectralJob: async (input) => { calls.fail.push(input); return { recorded: true }; },
       pruneSpectralJobs: async () => 0,
       requeueStaleActiveJobs: async () => 0,
     },
@@ -54,6 +54,7 @@ test('a cache hit reuses the measurement and skips the analyzer', async () => {
     spectralJobStore: stub.store,
     analyzeSpectralCutoffFn: async () => { analyzerCalls += 1; return { cutoffHz: 20000, frameCount: 5 }; },
     hashFileFn: async () => 'cafe',
+    recordSpectralOutcomeEvidenceFn: async () => ({ recorded: true }),
     spectralCacheStore: {
       getCachedMeasurement: async () => ({ cutoffHz: 18000, frameCount: 99 }),
       putCachedMeasurement: async () => null,
@@ -85,7 +86,7 @@ test('a cache miss runs the analyzer and writes back to the cache', async () => 
     hashFileFn: async () => 'beef',
     spectralCacheStore: {
       getCachedMeasurement: async () => null,
-      putCachedMeasurement: async (input) => { puts.push(input); return input; },
+      putCachedMeasurement: async (input) => { puts.push(input); return { recorded: true }; },
     },
   });
 
@@ -112,7 +113,7 @@ test('retroactive jobs never write peer reputation even when penalized', async (
     spectralJobStore: stub.store,
     // A cutoff this low on a lossless claim is a confirmed transcode (penalize=true).
     analyzeSpectralCutoffFn: async () => ({ cutoffHz: 15500, frameCount: 120 }),
-    recordSourceUserOutcomeEvidenceFn: async (input) => { evidenceCalls.push(input); return input; },
+    recordSpectralOutcomeEvidenceFn: async (input) => { evidenceCalls.push(input); return { recorded: true }; },
   });
 
   const summary = await service.processPendingSpectralJobs({ limit: 4 });

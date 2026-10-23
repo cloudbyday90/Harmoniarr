@@ -17,6 +17,7 @@
  */
 
 import { getPool } from '../database.js';
+import { createTrustSnapshotStore } from './trust-snapshot-store.js';
 
 function normalizeSnapshotRows(rows) {
   if (!Array.isArray(rows)) {
@@ -31,50 +32,6 @@ function normalizeSnapshotRows(rows) {
 export function createRestoreScopeRuntimeSnapshotStore({
   getPoolFn = getPool,
 } = {}) {
-  async function listTrustSnapshot() {
-    const result = await getPoolFn().query(
-      `
-        SELECT payload
-        FROM recovery_trust_snapshots
-        ORDER BY snapshot_order ASC
-      `,
-    );
-
-    return normalizeSnapshotRows(result.rows.map((row) => row.payload));
-  }
-
-  async function replaceTrustSnapshot({ sourceUsers = [] } = {}) {
-    const normalizedRows = normalizeSnapshotRows(sourceUsers);
-    const pool = getPoolFn();
-    const client = await pool.connect();
-
-    try {
-      await client.query('BEGIN');
-      await client.query('DELETE FROM recovery_trust_snapshots');
-
-      for (const [index, payload] of normalizedRows.entries()) {
-        await client.query(
-          `
-            INSERT INTO recovery_trust_snapshots (
-              snapshot_order,
-              payload,
-              updated_at
-            )
-            VALUES ($1, $2::jsonb, NOW())
-          `,
-          [index, JSON.stringify(payload)],
-        );
-      }
-
-      await client.query('COMMIT');
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
-  }
-
   async function listOverridesSnapshot() {
     const result = await getPoolFn().query(
       `
@@ -121,8 +78,7 @@ export function createRestoreScopeRuntimeSnapshotStore({
 
   return {
     listOverridesSnapshot,
-    listTrustSnapshot,
+    ...createTrustSnapshotStore({ getPoolFn }),
     replaceOverridesSnapshot,
-    replaceTrustSnapshot,
   };
 }

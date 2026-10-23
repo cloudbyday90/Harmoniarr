@@ -42,7 +42,7 @@ function createQueryable() {
         return { rows: [] };
       }
 
-      if (/BEGIN|COMMIT|ROLLBACK/i.test(sql)) {
+      if (/BEGIN|COMMIT|ROLLBACK|SET |SELECT pg_advisory/i.test(sql)) {
         return { rows: [] };
       }
 

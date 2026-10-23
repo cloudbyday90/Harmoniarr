@@ -14,6 +14,9 @@ import { applyPendingMigrations } from '../../src/server/migrations.js';
 import { createSourceUserSpectralJobStore } from '../../src/server/activity/source-user-spectral-job-store.js';
 import { createSourceUserSpectralCacheStore } from '../../src/server/activity/source-user-spectral-cache-store.js';
 import { createSourceUserSpectralSidecarService } from '../../src/server/activity/source-user-spectral-sidecar-service.js';
+import { createRestoreScopeRuntimeSnapshotStore } from '../../src/server/recovery/restore-scope-runtime-snapshot-store.js';
+import { createSourceUserOutcomeLedgerStore } from '../../src/server/activity/source-user-outcome-ledger-store.js';
+import { createSourceUserTrustEvidenceService } from '../../src/server/activity/source-user-trust-evidence-service.js';
 import { createMediaSpectralProofService } from '../../src/server/media/media-spectral-proof-service.js';
 import { createMediaCommandService } from '../../src/server/media/media-command-service.js';
 import { createFfmpegSpectralAnalyzer } from '../../src/server/media/ffmpeg-spectral-analyzer.js';
@@ -26,9 +29,11 @@ async function fixture(work) {
     const { job } = await store.enqueueSpectralJob({ username: 'fixture-peer', filePath: '/fixture/source.flac', declaredCodec: 'flac', sampleRate: 44100 });
     const read = async () => (await pool.query('SELECT * FROM source_user_spectral_jobs WHERE id=$1', [job.id])).rows[0];
     const countCache = async () => Number((await pool.query('SELECT COUNT(*) AS count FROM source_user_spectral_cache')).rows[0].count);
+    const evidence = createSourceUserTrustEvidenceService({ ...createRestoreScopeRuntimeSnapshotStore({ getPoolFn }),
+      appendOutcomeEventFn: createSourceUserOutcomeLedgerStore({ getPoolFn }).appendOutcomeEvent });
     const service = overrides => createSourceUserSpectralSidecarService({ spectralJobStore: store, spectralCacheStore: cache,
-      hashFileFn: async () => 'fixture-hash', analyzeSpectralCutoffFn: async () => ({ cutoffHz: 15500, frameCount: 120 }), ...overrides });
-    await work({ pool, getPoolFn, databaseConfig, store, cache, job, read, countCache, service });
+      recordSpectralOutcomeEvidenceFn: evidence.recordSpectralOutcomeEvidence, hashFileFn: async () => 'fixture-hash', analyzeSpectralCutoffFn: async () => ({ cutoffHz: 15500, frameCount: 120 }), ...overrides });
+    await work({ pool, getPoolFn, databaseConfig, store, cache, job, read, countCache, service, evidence });
   });
 }
 async function expire(c) {
@@ -39,10 +44,13 @@ suite('spectral interruption and claim publication in real PostgreSQL', () => {
   before(async () => { runtime = await createPostgresIntegrationRuntime({ config, env: {} }); }, { timeout: config.suiteSetupTimeoutMs });
   after(async () => { await runtime?.cleanup(); }, { timeout: config.suiteTeardownTimeoutMs });
 
-  test('owned cache and job commit before returned reputation evidence', { timeout: config.scenarioTimeoutMs }, async () => fixture(async c => {
+  test('owned cache and job commit before returned reputation advisories', { timeout: config.scenarioTimeoutMs }, async () => fixture(async c => {
     let evidence = 0;
-    const result = await c.service({ recordSourceUserOutcomeEvidenceFn: async () => {
-      assert.equal((await c.read()).state, 'done'); assert.equal(await c.countCache(), 1); evidence++;
+    const result = await c.service({ recordSpectralOutcomeEvidenceFn: async input => {
+      const recorded = await c.evidence.recordSpectralOutcomeEvidence(input);
+      return { ...recorded, afterCommit: async () => {
+        assert.equal((await c.read()).state, 'done'); assert.equal(await c.countCache(), 1); evidence++;
+      } };
     } }).processPendingSpectralJobs();
     assert.equal(result.transcodedConfirmed, 1); assert.equal(evidence, 1); assert.equal((await c.read()).attempts, 1);
   }));
@@ -65,7 +73,7 @@ suite('spectral interruption and claim publication in real PostgreSQL', () => {
       child.once('message', () => ready.resolve()); child.once('close', () => { retired = true; closed.resolve(); }); return child;
     } });
     const analyzer = createFfmpegSpectralAnalyzer({ ffmpegBin: process.execPath, mediaCommandService: commands });
-    const task = c.service({ analyzeSpectralCutoffFn: analyzer.analyzeSpectralCutoff, recordSourceUserOutcomeEvidenceFn: async () => { evidence++; } }).processPendingSpectralJobs();
+    const task = c.service({ analyzeSpectralCutoffFn: analyzer.analyzeSpectralCutoff, recordSpectralOutcomeEvidenceFn: async () => { evidence++; } }).processPendingSpectralJobs();
     try {
       await waitForFixtureReady({ ready: ready.promise, operation: task, signal: t.signal }); await expire(c);
       assert.equal(await c.store.requeueStaleActiveJobs({ olderThanMs: 1 }), 1); const [replacement] = await c.store.claimNextSpectralJobs();
@@ -79,7 +87,7 @@ suite('spectral interruption and claim publication in real PostgreSQL', () => {
     const entered = Promise.withResolvers(); const gate = Promise.withResolvers(); const controller = new AbortController(); let evidence = 0;
     const service = c.service({ spectralCacheStore: { ...c.cache, putCachedMeasurement: async input => {
       const result = await c.cache.putCachedMeasurement(input); entered.resolve(); await gate.promise; return result;
-    } }, recordSourceUserOutcomeEvidenceFn: async () => { evidence++; } });
+    } }, recordSpectralOutcomeEvidenceFn: async () => { evidence++; } });
     const task = service.processPendingSpectralJobs({ signal: controller.signal }); const refused = assert.rejects(task, error => error === null);
     await entered.promise; assert.equal(await c.countCache(), 0); controller.abort(null); gate.resolve(); await refused;
     assert.equal(await c.countCache(), 0); assert.equal((await c.read()).state, 'pending'); assert.equal(evidence, 0);

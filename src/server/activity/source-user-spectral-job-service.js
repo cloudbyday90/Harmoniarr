@@ -9,7 +9,7 @@ import { createSpectralClaimLostError } from './source-user-spectral-claim-store
 
 /** Prepare outside the transaction; publish a measurement and job result under its claim lock. */
 export function createSourceUserSpectralJobService({ spectralJobStore, spectralCacheStore, hashFileFn,
-  analyzeSpectralCutoffFn, classifySpectralCutoffFn, recordSourceUserOutcomeEvidenceFn, onWarning }) {
+  analyzeSpectralCutoffFn, classifySpectralCutoffFn, recordSpectralOutcomeEvidenceFn, onWarning }) {
   async function prepareJob({ job, signal, thresholds }) {
     throwIfMediaCancelled(signal);
     let contentHash = job.contentHash ?? null;
@@ -37,6 +37,7 @@ export function createSourceUserSpectralJobService({ spectralJobStore, spectralC
   async function publishJob({ job, expectedClaim, signal, prepared }) {
     throwIfMediaCancelled(signal);
     const { contentHash, measurement, classification, servedFromCache } = prepared;
+    let afterCommit = null;
     const published = await spectralJobStore.withSpectralJobClaim({ expectedClaim, signal }, async queryable => {
       if (!servedFromCache && contentHash && typeof spectralCacheStore?.putCachedMeasurement === 'function') {
         await spectralCacheStore.putCachedMeasurement({ contentHash, cutoffHz: measurement?.cutoffHz ?? null,
@@ -48,16 +49,20 @@ export function createSourceUserSpectralJobService({ spectralJobStore, spectralC
         contentHash, analysis: { confidence: classification.confidence, frameCount: measurement?.frameCount ?? 0,
           nyquistHz: classification.nyquistHz, reason: classification.reason, servedFromCache } });
       if (!result) throw createSpectralClaimLostError();
+      if (classification.penalize === true && job.origin !== 'retroactive') {
+        if (typeof recordSpectralOutcomeEvidenceFn !== 'function') throw new TypeError('Transactional spectral evidence recording is required');
+        const evidence = await recordSpectralOutcomeEvidenceFn({ job, queryable, signal,
+          qualityWeight: classification.qualityWeight, reason: classification.reason });
+        if (evidence?.recorded !== true) throw new Error('Spectral reputation was not recorded');
+        afterCommit = evidence.afterCommit;
+      }
       return result;
     });
     if (!published) throw createSpectralClaimLostError();
     throwIfMediaCancelled(signal);
-    if (classification.penalize === true && job.origin !== 'retroactive') {
-      try {
-        await recordSourceUserOutcomeEvidenceFn({ eventType: 'spectral_analysis', outcome: 'failure',
-          qualityLabel: 'spectral_transcode_confirmed', qualityWeight: classification.qualityWeight,
-          reason: classification.reason, username: job.username });
-      } catch (error) { throwIfMediaCancelled(signal); onWarning('Failed to merge confirmed transcode into reputation ledger', error); }
+    if (typeof afterCommit === 'function') {
+      try { await afterCommit(); }
+      catch (error) { throwIfMediaCancelled(signal); onWarning('Failed to deliver spectral reputation advisories', error); }
       throwIfMediaCancelled(signal);
     }
     return { classification, servedFromCache };

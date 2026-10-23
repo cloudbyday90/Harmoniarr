@@ -28,7 +28,7 @@ test('spectral claim loss owns Linux SIGTERM through held close and preserves th
   const analyzer = createFfmpegSpectralAnalyzer({ ffmpegBin: process.execPath, mediaCommandService: command });
   const service = createSourceUserSpectralSidecarService({ spectralJobStore: store, spectralCacheStore: cache,
     hashFileFn: async () => 'held-native-hash', analyzeSpectralCutoffFn: analyzer.analyzeSpectralCutoff,
-    recordSourceUserOutcomeEvidenceFn: async () => { evidence++; } });
+    recordSpectralOutcomeEvidenceFn: async () => { evidence++; } });
   const task = service.processPendingSpectralJobs();
   try {
     await waitForFixtureReady({ ready: ready.promise, operation: task, signal: t.signal });

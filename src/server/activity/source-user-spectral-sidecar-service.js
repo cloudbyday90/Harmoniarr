@@ -54,7 +54,7 @@ function normalizePositiveInteger(value) {
  * @param {object} deps
  * @param {object} deps.spectralJobStore - Created by createSourceUserSpectralJobStore.
  * @param {(input: { filePath: string }) => Promise<{ cutoffHz: number | null, frameCount: number }>} deps.analyzeSpectralCutoffFn
- * @param {Function} [deps.recordSourceUserOutcomeEvidenceFn] - Merge sink for confirmed transcodes.
+ * @param {Function} [deps.recordSpectralOutcomeEvidenceFn] - Merge sink for confirmed transcodes.
  * @param {Function} [deps.classifySpectralCutoffFn]
  * @param {() => Promise<object>} [deps.loadSpectralThresholdsFn] - Best-effort loader
  *   for the persisted operator-tuned cutoff thresholds. Resolved once per batch
@@ -65,7 +65,7 @@ function normalizePositiveInteger(value) {
 export function createSourceUserSpectralSidecarService({
   spectralJobStore,
   analyzeSpectralCutoffFn,
-  recordSourceUserOutcomeEvidenceFn = async () => null,
+  recordSpectralOutcomeEvidenceFn = null,
   classifySpectralCutoffFn = classifySpectralCutoff,
   spectralCacheStore = null,
   hashFileFn = null,
@@ -143,7 +143,7 @@ export function createSourceUserSpectralSidecarService({
   }
 
   const jobService = createSourceUserSpectralJobService({ spectralJobStore, spectralCacheStore, hashFileFn,
-    analyzeSpectralCutoffFn, classifySpectralCutoffFn, recordSourceUserOutcomeEvidenceFn, onWarning });
+    analyzeSpectralCutoffFn, classifySpectralCutoffFn, recordSpectralOutcomeEvidenceFn, onWarning });
 
   async function processPendingSpectralJobs({ limit = DEFAULT_PROCESS_LIMIT, signal } = {}) {
     throwIfMediaCancelled(signal);

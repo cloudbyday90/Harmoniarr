@@ -118,6 +118,7 @@ export function createImportCandidateModule({
   onReleaseAddedFn = null,
   recordActivityEventFn = null,
   recordSourceUserOutcomeEvidenceFn = async () => null,
+  recordSpectralOutcomeEvidenceFn = null,
   scheduleLibraryScan = null,
   queueDeferredLibraryScan = null,
   scheduleDownloadRecoveryRediscovery = null,
@@ -142,7 +143,7 @@ export function createImportCandidateModule({
   sourceUserSpectralSidecarService = createSourceUserSpectralSidecarService({
     spectralJobStore: createSourceUserSpectralJobStore(),
     analyzeSpectralCutoffFn,
-    recordSourceUserOutcomeEvidenceFn,
+    recordSpectralOutcomeEvidenceFn,
     hashFileFn: fileContentHasher.hashFile,
     spectralCacheStore,
   }),

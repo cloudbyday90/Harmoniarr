@@ -16,15 +16,6 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-function normalizeOptionalString(value) {
-  if (typeof value !== 'string') {
-    return null;
-  }
-
-  const normalized = value.replace(/\s+/g, ' ').trim();
-  return normalized || null;
-}
-
 import {
   buildSourceUserUsernameKey,
   mapSourceUserTrustRow,
@@ -35,7 +26,19 @@ import {
   buildRecencyWeightedReputation,
   evaluateAutoIgnoreSuggestion,
 } from './source-user-reputation-model.js';
-import { HISTORY_RETENTION_MS, MAX_TRUST_HISTORY_ENTRIES } from './trust-history-constants.js';
+import { applySourceUserOutcomeEvidence } from './source-user-outcome-evidence-policy.js';
+import { createSourceUserTrustMutation } from './source-user-trust-mutation-service.js';
+import { assertDatabasePublicationScope } from '../database-publication-scope.js';
+import { throwIfMediaCancelled } from '../media/media-cancellation.js';
+
+function normalizeOptionalString(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalized = value.replace(/\s+/g, ' ').trim();
+  return normalized || null;
+}
 
 const ALERTABLE_REVIEW_STATES = new Set(['watch', 'excluded']);
 
@@ -53,44 +56,6 @@ function mapReputationRow(row) {
   };
 }
 
-function compactExpiredEntries(rows) {
-  const cutoff = Date.now() - HISTORY_RETENTION_MS;
-  return rows.filter((row) => {
-    if (row.kind === 'manual_override' || row.kind === 'blocklist_event') {
-      return true;
-    }
-
-    const timestamp = typeof row.occurredAt === 'string' ? Date.parse(row.occurredAt) : 0;
-    return timestamp >= cutoff;
-  });
-}
-
-function normalizeTrustHistory(rows) {
-  if (!Array.isArray(rows)) {
-    return [];
-  }
-
-  return compactExpiredEntries(
-    rows
-      .filter((row) => row && typeof row === 'object')
-      .map((row) => ({ ...row })),
-  )
-    .sort((a, b) => {
-      const timeA = typeof a.occurredAt === 'string' ? Date.parse(a.occurredAt) : 0;
-      const timeB = typeof b.occurredAt === 'string' ? Date.parse(b.occurredAt) : 0;
-      return timeB - timeA;
-    })
-    .slice(0, MAX_TRUST_HISTORY_ENTRIES);
-}
-
-function appendTrustHistory(row, entry) {
-  return normalizeTrustHistory([entry, ...(Array.isArray(row?.trustHistory) ? row.trustHistory : [])]);
-}
-
-function resolveReviewState(row) {
-  return mapSourceUserTrustRow(row).review?.state ?? null;
-}
-
 function shouldAlertOnReviewTransition(previousState, nextState) {
   return ALERTABLE_REVIEW_STATES.has(nextState)
     && previousState !== nextState;
@@ -103,7 +68,10 @@ export function createSourceUserTrustEvidenceService({
   onAutoIgnoreEvaluationFn = null,
   onTrustThresholdCrossedFn = null,
   replaceTrustSnapshot = async () => {},
+  mutateTrustSnapshot = null,
 } = {}) {
+  const mutate = createSourceUserTrustMutation({ mutateTrustSnapshot, listTrustSnapshot, replaceTrustSnapshot });
+
   async function loadRecencyEnrichment(usernameKeys) {
     if (typeof listRecentOutcomeEventsFn !== 'function' || usernameKeys.length === 0) {
       return new Map();
@@ -200,133 +168,68 @@ export function createSourceUserTrustEvidenceService({
     return { suggestions, total: suggestions.length };
   }
 
-  async function recordSourceUserOutcomeEvidence({
-    actorUserId = null,
-    eventType = null,
-    occurredAt = new Date().toISOString(),
-    outcome,
-    qualityLabel = null,
-    qualityWeight = 1,
-    reason = null,
-    username,
-  } = {}) {
+  async function recordSourceUserOutcomeEvidence({ actorUserId = null, eventType = null,
+    occurredAt = new Date().toISOString(), outcome, qualityLabel = null, qualityWeight = 1,
+    reason = null, username } = {}) {
     const normalizedUsername = normalizeOptionalString(username);
-    if (!normalizedUsername || (outcome !== 'success' && outcome !== 'failure')) {
-      return null;
-    }
-
-    const usernameKey = buildSourceUserUsernameKey(normalizedUsername);
-    const rows = normalizeSourceUserTrustSnapshotRows(await listTrustSnapshot());
-    const existingIndex = rows.findIndex((row) => buildSourceUserUsernameKey(row?.username) === usernameKey);
-    const existing = existingIndex >= 0 ? rows[existingIndex] : null;
-    const previousReviewState = existing ? resolveReviewState(existing) : null;
-    const updatedAt = typeof occurredAt === 'string' && occurredAt.trim() ? occurredAt : new Date().toISOString();
-    const normalizedReason = normalizeOptionalString(reason);
-    const normalizedEventType = normalizeOptionalString(eventType);
-    const historyEntry = {
-      actorUserId,
-      eventType: normalizedEventType,
-      id: `${updatedAt}:${normalizedEventType ?? outcome}:${outcome}:${toNonNegativeInteger(existing?.successCount) + toNonNegativeInteger(existing?.failureCount) + 1}`,
-      kind: 'delivery_evidence',
-      occurredAt: updatedAt,
-      outcome,
-      reason: normalizedReason,
-    };
-    const nextRow = {
-      ...(existing ?? {}),
-      failureCount: toNonNegativeInteger(existing?.failureCount) + (outcome === 'failure' ? 1 : 0),
-      isBlocked: existing?.isBlocked === true,
-      lastEvidenceAt: updatedAt,
-      lastEvidenceEventType: normalizedEventType,
-      lastEvidenceOutcome: outcome,
-      lastEvidenceReason: normalizedReason,
-      successCount: toNonNegativeInteger(existing?.successCount) + (outcome === 'success' ? 1 : 0),
-      trustHistory: appendTrustHistory(existing, historyEntry),
-      trustState: resolveSourceUserTrustState(existing),
-      updatedAt,
-      username: existing?.username ?? normalizedUsername,
-      ...(outcome === 'success'
-        ? {
-          lastSuccessfulAt: updatedAt,
-          lastSuccessfulEventType: normalizedEventType,
-          lastSuccessfulReason: normalizedReason,
-        }
-        : {
-          lastFailureAt: updatedAt,
-          lastFailureEventType: normalizedEventType,
-          lastFailureReason: normalizedReason,
-        }),
-    };
-
-    if (existingIndex >= 0) {
-      rows.splice(existingIndex, 1, nextRow);
-    } else {
-      rows.push(nextRow);
-    }
-
-    // Append-only ledger write: a pure INSERT that is inherently free of the
-    // read-modify-write lost-update race in the snapshot rewrite below. This is
-    // the durable, concurrency-safe evidence source for recency-weighted
-    // reputation. Best-effort so a ledger hiccup never blocks the outcome path.
-    if (typeof appendOutcomeEventFn === 'function') {
-      try {
-        await appendOutcomeEventFn({
-          actorUserId,
-          eventType: normalizedEventType,
-          occurredAt: updatedAt,
-          outcome,
-          qualityLabel,
-          qualityWeight,
-          reason: normalizedReason,
-          username: normalizedUsername,
-        });
-      } catch {
-        // Intentionally swallowed: ledger durability is best-effort relative to
-        // the operator-facing trust snapshot.
+    if (!normalizedUsername || (outcome !== 'success' && outcome !== 'failure')) return null;
+    const event = { actorUserId, eventType: normalizeOptionalString(eventType),
+      occurredAt: typeof occurredAt === 'string' && occurredAt.trim() ? occurredAt : new Date().toISOString(),
+      outcome, qualityLabel, qualityWeight, reason: normalizeOptionalString(reason), username: normalizedUsername };
+    const projection = await mutate(async (rows, queryable) => {
+      const result = applySourceUserOutcomeEvidence(rows, event);
+      if (typeof appendOutcomeEventFn === 'function') {
+        if (queryable) await queryable.query('SAVEPOINT trust_outcome_ledger');
+        try { await appendOutcomeEventFn({ ...event, ...(queryable ? { queryable } : {}) }); }
+        catch { if (queryable) await queryable.query('ROLLBACK TO SAVEPOINT trust_outcome_ledger'); }
+        if (queryable) await queryable.query('RELEASE SAVEPOINT trust_outcome_ledger');
       }
-    }
+      return result;
+    });
+    void notifyOutcome({ ...projection, actorUserId }).catch(() => {});
+    return projection.nextRow;
+  }
 
-    await replaceTrustSnapshot({ sourceUsers: rows });
+  async function recordSpectralOutcomeEvidence({ job, queryable, signal, qualityWeight, reason }) {
+    assertDatabasePublicationScope(queryable, { kind: 'spectral_job', ownerId: job?.id });
+    if (job?.origin !== 'apply' || !normalizeOptionalString(job?.username)
+      || typeof appendOutcomeEventFn !== 'function') throw new TypeError('Durable apply-path spectral evidence is required');
+    throwIfMediaCancelled(signal);
+    const event = { id: job.id, eventType: 'spectral_analysis', occurredAt: new Date().toISOString(), outcome: 'failure',
+      qualityLabel: 'spectral_transcode_confirmed', qualityWeight, reason, username: job.username, actorUserId: null };
+    const projection = await mutate(async (rows, owned) => {
+      const inserted = await appendOutcomeEventFn({ ...event, queryable: owned });
+      if (!inserted) throw new Error('Spectral outcome event was not recorded');
+      throwIfMediaCancelled(signal);
+      return applySourceUserOutcomeEvidence(rows, event);
+    }, { queryable, signal });
+    return { recorded: true, afterCommit: () => notifyOutcome({ ...projection, actorUserId: null }) };
+  }
 
-    // Closed-loop hook: after the durable ledger write, recompute this single
-    // peer's recency-weighted reputation and hand the explainable suggestion to
-    // the opt-in auto-ignore policy. Fire-and-forget so it never blocks or
-    // breaks the outcome path; gated entirely by the injected handler.
+  async function notifyOutcome({ nextRow, previousReviewState, actorUserId }) {
+    const normalizedUsername = nextRow.username;
+    const usernameKey = buildSourceUserUsernameKey(normalizedUsername);
+    // Returned advisory work is awaited by spectral publication after commit;
+    // legacy callers retain their explicitly detached advisory policy.
+    const tasks = [];
     if (typeof onAutoIgnoreEvaluationFn === 'function' && typeof listRecentOutcomeEventsFn === 'function') {
-      void (async () => {
-        try {
-          const events = await listRecentOutcomeEventsFn({ usernameKeys: [usernameKey] });
-          const recencyWeighted = buildRecencyWeightedReputation({ events: Array.isArray(events) ? events : [] });
-          const suggestion = evaluateAutoIgnoreSuggestion({ reputation: recencyWeighted });
-          if (!suggestion.suggested) {
-            return;
-          }
-          await onAutoIgnoreEvaluationFn({
-            actorUserId,
-            reputation: recencyWeighted,
-            suggestion,
-            username: normalizedUsername,
-          });
-        } catch {
-          // Advisory convenience: a failure here must not affect outcome recording.
-        }
-      })();
+      tasks.push((async () => {
+        const events = await listRecentOutcomeEventsFn({ usernameKeys: [usernameKey] });
+        const recencyWeighted = buildRecencyWeightedReputation({ events: Array.isArray(events) ? events : [] });
+        const suggestion = evaluateAutoIgnoreSuggestion({ reputation: recencyWeighted });
+        if (suggestion.suggested) await onAutoIgnoreEvaluationFn({ actorUserId, reputation: recencyWeighted, suggestion, username: normalizedUsername });
+      })());
     }
-
     const nextView = mapSourceUserTrustRow(nextRow);
     if (typeof onTrustThresholdCrossedFn === 'function' && shouldAlertOnReviewTransition(previousReviewState, nextView.review?.state)) {
-      void onTrustThresholdCrossedFn({
-        failureCount: nextView.reputation.failureCount,
-        previousReviewState,
-        reason: nextView.review?.reason ?? null,
-        reviewState: nextView.review?.state ?? null,
-        successCount: nextView.reputation.successCount,
-        successRatePercent: nextView.reputation.successRatePercent,
-        trustState: nextView.trustState,
-        username: nextView.username,
-      }).catch(() => {});
+      tasks.push(Promise.resolve().then(() => onTrustThresholdCrossedFn({
+        failureCount: nextView.reputation.failureCount, previousReviewState,
+        reason: nextView.review?.reason ?? null, reviewState: nextView.review?.state ?? null,
+        successCount: nextView.reputation.successCount, successRatePercent: nextView.reputation.successRatePercent,
+        trustState: nextView.trustState, username: nextView.username,
+      })));
     }
-
+    await Promise.allSettled(tasks);
     return nextRow;
   }
 
@@ -334,5 +237,6 @@ export function createSourceUserTrustEvidenceService({
     listSourceUserAutoIgnoreSuggestions,
     listSourceUserReputationIndex,
     recordSourceUserOutcomeEvidence,
+    recordSpectralOutcomeEvidence,
   };
 }

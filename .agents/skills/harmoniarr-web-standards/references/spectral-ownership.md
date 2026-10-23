@@ -34,10 +34,12 @@ same queryable through both writes and check abort before commit. Retain all
 captured batch releases after interruption, without touching replacement claims.
 An admitted commit cannot be reversed by later abort notification.
 
-Only successful owned completion may invoke returned advisory reputation work.
-Its callback is separate from cache/job commit; do not claim atomic or exactly-once
-reputation, or ownership of its hidden advisory hooks. Retroactive jobs must not
-penalize peers. Cache write failure now refuses the combined publication.
+Current spectral reputation uses [atomic publication](atomic-reputation.md): the
+ledger and trust snapshot commit with cache/job completion. This replaces the
+earlier post-commit durable callback described in the interruption baseline.
+Only successful commit may invoke returned advisory hooks; do not claim durable
+or exactly-once notification delivery or hidden descendant ownership. Retroactive
+jobs must not penalize peers. Any required durable-write failure refuses publication.
 
 Prove real PostgreSQL requeue/reclaim, stale-write refusal, cancellation rollback,
 recovery lock wait, cache-hit refusal and returned callback ordering. Use

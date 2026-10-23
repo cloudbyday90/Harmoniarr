@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
-The October 23 [spectral admission rebuild](LOCAL_DOCKER_SPECTRAL_ADMISSION_OUTCOME.md)
+The October 23 [spectral reputation rebuild](LOCAL_DOCKER_SPECTRAL_REPUTATION_OUTCOME.md)
 records the current no-cache image, preserved admin/data and readiness. The
+[owning outcome](SPECTRAL_REPUTATION_OUTCOME.md) records actual consumer exit,
+atomic reputation publication and coordinated trust snapshot mutation.
+
+The October 23 [spectral admission rebuild](LOCAL_DOCKER_SPECTRAL_ADMISSION_OUTCOME.md)
+records the preceding no-cache image, preserved admin/data and readiness. The
 [owning outcome](SPECTRAL_ADMISSION_OUTCOME.md) records concurrent backlog/dedup
 reproduction, transactional admission and packaged PostgreSQL qualification.
 

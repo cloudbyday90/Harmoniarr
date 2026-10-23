@@ -83,13 +83,12 @@ It preserves old duplicates/over-cap rows, and differing instance caps do not
 define one consistent maximum. Five seconds bounds each lock acquisition, not
 pool checkout, total statement/transaction time or a whole retroactive request.
 
-Next: design durable, idempotent delivery of confirmed spectral reputation
-evidence. `publishJob` currently commits cache/job completion before invoking the
-advisory reputation callback, whose failure is logged. A crash or callback failure
-can leave completed analysis without that evidence. Reproduce this gap before
-choosing an outbox; preserve event identity and retroactive exclusion, and prove
-replay without duplicate penalties. This is a source-level follow-up, not a crash
-reproduction or an exactly-once guarantee established by this round.
+The next reputation-delivery item was subsequently reproduced and implemented in
+the [atomic reputation outcome](SPECTRAL_REPUTATION_OUTCOME.md). That separate
+round owns the actual process-exit reproduction, ledger/snapshot transaction,
+stable event identity and replay evidence. These admission tests did not establish
+reputation durability. The newer outcome owns the next non-spectral evidence
+recommendation and the distinction between durable penalties and advisory hooks.
 
 GitHub MCP returned no open PRs at selection and again before publication. There
 was no applicable random/stale PR to implement, rebase or close; no PR was merged.

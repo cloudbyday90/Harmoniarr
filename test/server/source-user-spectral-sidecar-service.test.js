@@ -29,13 +29,13 @@ function createStoreStub({ enqueueResult, claimJobs = [] } = {}) {
       isSpectralJobClaimCurrent: async () => true,
       withSpectralJobClaim: async (_input, work) => work(null),
       releaseSpectralJobClaim: async () => true,
-      completeSpectralJob: async (input) => { calls.complete.push(input); return input; },
+      completeSpectralJob: async (input) => { calls.complete.push(input); return { recorded: true }; },
       countPendingSpectralJobs: async () => 0,
       enqueueSpectralJob: async (input) => {
         calls.enqueue.push(input);
         return enqueueResult ?? { enqueued: true, job: { id: 'job' }, reason: null };
       },
-      failSpectralJob: async (input) => { calls.fail.push(input); return input; },
+      failSpectralJob: async (input) => { calls.fail.push(input); return { recorded: true }; },
       pruneSpectralJobs: async () => 0,
       requeueStaleActiveJobs: async () => 0,
     },
@@ -80,16 +80,16 @@ test('processPendingSpectralJobs merges a confirmed transcode into the reputatio
   const service = createSourceUserSpectralSidecarService({
     spectralJobStore: stub.store,
     analyzeSpectralCutoffFn: async () => ({ cutoffHz: 15500, frameCount: 120 }),
-    recordSourceUserOutcomeEvidenceFn: async (input) => { evidenceCalls.push(input); return input; },
+    recordSpectralOutcomeEvidenceFn: async (input) => { evidenceCalls.push(input); return { recorded: true }; },
   });
 
   const summary = await service.processPendingSpectralJobs({ limit: 4 });
 
   assert.equal(summary.transcodedConfirmed, 1);
   assert.equal(evidenceCalls.length, 1);
-  assert.equal(evidenceCalls[0].outcome, 'failure');
-  assert.equal(evidenceCalls[0].qualityLabel, 'spectral_transcode_confirmed');
-  assert.equal(evidenceCalls[0].username, 'FLAC-Peer');
+  assert.equal(evidenceCalls[0].job.id, 'job-1');
+  assert.ok(Object.hasOwn(evidenceCalls[0], 'queryable'));
+  assert.equal(evidenceCalls[0].job.username, 'FLAC-Peer');
   assert.ok(evidenceCalls[0].qualityWeight <= 0.05 + 1e-9);
   assert.equal(stub.calls.complete.length, 1);
   assert.equal(stub.calls.complete[0].verdict, 'transcoded');
@@ -103,7 +103,7 @@ test('processPendingSpectralJobs does not penalize an authentic file', async () 
   const service = createSourceUserSpectralSidecarService({
     spectralJobStore: stub.store,
     analyzeSpectralCutoffFn: async () => ({ cutoffHz: 21000, frameCount: 90 }),
-    recordSourceUserOutcomeEvidenceFn: async (input) => { evidenceCalls.push(input); return input; },
+    recordSpectralOutcomeEvidenceFn: async (input) => { evidenceCalls.push(input); return { recorded: true }; },
   });
 
   const summary = await service.processPendingSpectralJobs({ limit: 4 });

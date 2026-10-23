@@ -344,6 +344,7 @@ export function createApp({
   const activityModule = buildActivityModule({
     listTrustSnapshot: restoreScopeRuntimeSnapshotStore.listTrustSnapshot,
     replaceTrustSnapshot: restoreScopeRuntimeSnapshotStore.replaceTrustSnapshot,
+    mutateTrustSnapshot: restoreScopeRuntimeSnapshotStore.mutateTrustSnapshot,
     analyzeSpectralCutoffFn: spectralAnalyzer.analyzeSpectralCutoff,
     ...createFidelityThresholdLoaders({ loadSettingsFn: loadSettings }),
     onTrustOverrideFn: ({ _actorUserId, _reason, trustState, username }) => broadcastAdminNotification({
@@ -449,6 +450,7 @@ export function createApp({
     maintenanceLockOperationPauseService,
     recordActivityEventFn: activityModule.activityEventService.recordActivityEvent,
     recordSourceUserOutcomeEvidenceFn: activityModule.sourceUserTrustEvidenceService.recordSourceUserOutcomeEvidence,
+    recordSpectralOutcomeEvidenceFn: activityModule.sourceUserTrustEvidenceService.recordSpectralOutcomeEvidence,
     sourceUserSpectralSidecarService: activityModule.sourceUserSpectralSidecarService,
     scheduleLibraryScan: async ({
       releaseHints = [],

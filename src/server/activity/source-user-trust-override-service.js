@@ -16,11 +16,11 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createSourceUserTrustMutation } from './source-user-trust-mutation-service.js';
 import { createApiError } from '../auth.js';
 import {
   buildSourceUserUsernameKey,
   mapSourceUserTrustRow,
-  normalizeSourceUserTrustSnapshotRows,
   resolveSourceUserTrustState,
 } from './source-user-trust-service.js';
 import { MAX_TRUST_HISTORY_ENTRIES } from './trust-history-constants.js';
@@ -99,63 +99,66 @@ function normalizeTrustHistory(entries) {
 export function createSourceUserTrustOverrideService({
   listTrustSnapshot = async () => [],
   replaceTrustSnapshot = async () => {},
+  mutateTrustSnapshot = null,
   onTrustOverrideFn = async () => {},
 } = {}) {
+  const mutate = createSourceUserTrustMutation({ mutateTrustSnapshot, listTrustSnapshot, replaceTrustSnapshot });
   async function updateSourceUserTrust({ actorUserId = null, operatorNotes = null, reason, trustState, username } = {}) {
     const normalizedUsername = normalizeRequiredText(username, 'username', 128);
     const normalizedReason = normalizeRequiredText(reason, 'reason', MAX_REASON_LENGTH);
     const normalizedNotes = normalizeOptionalText(operatorNotes, 'operatorNotes', MAX_NOTES_LENGTH);
     const normalizedTrustState = normalizeTrustState(trustState);
     const usernameKey = buildSourceUserUsernameKey(normalizedUsername);
-    const rows = normalizeSourceUserTrustSnapshotRows(await listTrustSnapshot());
-    const existingIndex = rows.findIndex((row) => buildSourceUserUsernameKey(row?.username) === usernameKey);
-    const existing = existingIndex >= 0 ? rows[existingIndex] : null;
+    const { nextRow: savedRow } = await mutate(rows => {
+      const existingIndex = rows.findIndex((row) => buildSourceUserUsernameKey(row?.username) === usernameKey);
+      const existing = existingIndex >= 0 ? rows[existingIndex] : null;
 
-    if (resolveSourceUserTrustState(existing) === 'blocked') {
-      throw createApiError(409, 'source_user_trust_blocked_use_blocklist', 'Blocked source users must be managed from the blocklist workflow first');
-    }
+      if (resolveSourceUserTrustState(existing) === 'blocked') {
+        throw createApiError(409, 'source_user_trust_blocked_use_blocklist', 'Blocked source users must be managed from the blocklist workflow first');
+      }
 
-    const updatedAt = new Date().toISOString();
-    const historyEntry = {
-      actorUserId,
-      eventType: 'source_user_trust_overridden',
-      id: `${updatedAt}:manual_override:${normalizedTrustState}:${rows.length + 1}`,
-      kind: 'manual_override',
-      occurredAt: updatedAt,
-      operatorNotes: normalizedNotes,
-      reason: normalizedReason,
-      trustState: normalizedTrustState,
-    };
-    const nextRow = {
-      ...(existing ?? {}),
-      isBlocked: false,
-      lastManualDecisionAt: updatedAt,
-      lastManualDecisionByUserId: actorUserId,
-      lastManualDecisionReason: normalizedReason,
-      operatorNotes: normalizedNotes,
-      trustHistory: normalizeTrustHistory([historyEntry, ...(Array.isArray(existing?.trustHistory) ? existing.trustHistory : [])]),
-      trustState: normalizedTrustState,
-      updatedAt,
-      username: existing?.username ?? normalizedUsername,
-    };
+      const updatedAt = new Date().toISOString();
+      const historyEntry = {
+        actorUserId,
+        eventType: 'source_user_trust_overridden',
+        id: `${updatedAt}:manual_override:${normalizedTrustState}:${rows.length + 1}`,
+        kind: 'manual_override',
+        occurredAt: updatedAt,
+        operatorNotes: normalizedNotes,
+        reason: normalizedReason,
+        trustState: normalizedTrustState,
+      };
+      const nextRow = {
+        ...(existing ?? {}),
+        isBlocked: false,
+        lastManualDecisionAt: updatedAt,
+        lastManualDecisionByUserId: actorUserId,
+        lastManualDecisionReason: normalizedReason,
+        operatorNotes: normalizedNotes,
+        trustHistory: normalizeTrustHistory([historyEntry, ...(Array.isArray(existing?.trustHistory) ? existing.trustHistory : [])]),
+        trustState: normalizedTrustState,
+        updatedAt,
+        username: existing?.username ?? normalizedUsername,
+      };
 
-    if (existingIndex >= 0) {
-      rows.splice(existingIndex, 1, nextRow);
-    } else {
-      rows.push(nextRow);
-    }
+      if (existingIndex >= 0) {
+        rows.splice(existingIndex, 1, nextRow);
+      } else {
+        rows.push(nextRow);
+      }
 
-    await replaceTrustSnapshot({ sourceUsers: rows });
+      return { nextRow };
+    });
 
     void onTrustOverrideFn({
       actorUserId,
       reason: normalizedReason,
       trustState: normalizedTrustState,
-      username: nextRow.username,
+      username: savedRow.username,
     }).catch(() => {});
 
     return {
-      sourceUser: mapSourceUserTrustRow(nextRow),
+      sourceUser: mapSourceUserTrustRow(savedRow),
     };
   }
 

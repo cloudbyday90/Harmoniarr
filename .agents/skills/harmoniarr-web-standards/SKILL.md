@@ -5,6 +5,10 @@ description: "Apply and verify standards for Harmoniarr UI commands, forms, focu
 
 # Harmoniarr Web Standards
 
+For durable spectral reputation or trust snapshot mutation, read
+[atomic reputation](references/atomic-reputation.md). It covers same-database
+publication, stable event identity, shared snapshot ownership and advisory limits.
+
 For durable backlog limits or enqueue deduplication, read
 [queue admission](references/queue-admission.md). It covers participating writers,
 post-lock snapshots, bounded waiting and actual concurrent database proof.

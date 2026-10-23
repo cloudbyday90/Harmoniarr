@@ -66,7 +66,7 @@ test('refused publication cannot cache or penalize, and successful publication p
     completeSpectralJob: async () => { calls.push('complete'); return job; }, releaseSpectralJobClaim: async () => { calls.push('release'); },
   }, spectralCacheStore: { putCachedMeasurement: async () => { calls.push('cache'); } },
   analyzeSpectralCutoffFn: async () => ({ cutoffHz: 15500, frameCount: 120 }),
-  recordSourceUserOutcomeEvidenceFn: async () => { calls.push('evidence'); entered.resolve(); await gate.promise; },
+  recordSpectralOutcomeEvidenceFn: async () => ({ recorded: true, afterCommit: async () => { calls.push('evidence'); entered.resolve(); await gate.promise; } }),
   });
   assert.equal((await service.processPendingSpectralJobs()).interrupted, 1); assert.deepEqual(calls, ['release']);
   refused = false; calls.length = 0; const task = service.processPendingSpectralJobs(); await entered.promise;

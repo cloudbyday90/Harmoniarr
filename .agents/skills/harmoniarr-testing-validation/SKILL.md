@@ -5,6 +5,13 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For spectral reputation, use the standards
+[atomic reputation reference](../harmoniarr-web-standards/references/atomic-reputation.md).
+The shared fifteen-case PostgreSQL/native registrar includes actual consumer exit,
+ledger/snapshot rollback and both admission orders for every canonical snapshot
+writer. Pair `validate:native-spectral-reputation` with app-composition and existing
+spectral interruption/admission checks; returned advisories follow durable commit.
+
 For queue capacity/deduplication, use the standards
 [admission reference](../harmoniarr-web-standards/references/queue-admission.md).
 Test both real producer directions and a duplicate identity with spare capacity;
