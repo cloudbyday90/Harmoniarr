@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 22 [deployment memory rebuild](LOCAL_DOCKER_DEPLOYMENT_MEMORY_OUTCOME.md)
+records the current no-cache image, preserved admin/data and readiness. The
+[owning outcome](DEPLOYMENT_MEMORY_OUTCOME.md) records native shared-container
+PostgreSQL/provider/artwork measurements and the limits of deployment sizing.
+
 The October 22 [aggregate artwork rebuild](LOCAL_DOCKER_ARTWORK_AGGREGATE_OUTCOME.md)
-records the current no-cache image, built-in memory admission, preserved admin/data
+records the preceding no-cache image, built-in memory admission, preserved admin/data
 and readiness. The [owning outcome](ARTWORK_AGGREGATE_OUTCOME.md) records logical
 reservation lifetime, bounded metadata/grants and native maximum-pixel serialization.
 

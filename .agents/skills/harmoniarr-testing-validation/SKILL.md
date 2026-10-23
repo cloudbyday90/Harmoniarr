@@ -14,6 +14,10 @@ For weighted admission and metadata/grant changes, read
 [aggregate reservations](../harmoniarr-web-standards/references/aggregate-reservations.md).
 Include both ingestion and fetch callers of the shared FIFO, with native-active
 cancellation after grant and held publication after actual child retirement.
+`validate:native-deployment-memory` qualifies shared-container app composition,
+retained caller buffers, actual provider-image TLS and held native PostgreSQL work.
+Use fresh 2/3 GiB profiles from docs/DEPLOYMENT_MEMORY_DESIGN.md; do not substitute
+Node RSS for whole-container usage or claim unexecuted cgroup/media-worker coverage.
 `validate:native-artwork-corpus` owns seven fixed entropy/sample-depth cases in a
 one-CPU/1 GiB Linux profile; the allocation/concurrent-byte lane keeps its separate
 two-CPU/3 GiB profile. Their shared test-only cgroup helper requires actual v1/v2

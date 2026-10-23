@@ -109,8 +109,9 @@ and reduce; grant exact bytes/EOF; bound native work/results; wait for actual cl
 publish; release. The [research document](ARTWORK_AGGREGATE_RESEARCH.md) records the
 alternatives and their pros/cons.
 
-**Next item:** qualify deployment-budget sizing alongside parent/provider intake,
-caller-owned buffers and PostgreSQL. Measure representative concurrent workloads
-and headroom before exposing operator configuration. Keep that work inside the
-existing application; do not infer whole-app protection from the logical artwork
-counter or reduce the child limit from moderate-image peaks.
+The [deployment memory follow-up](DEPLOYMENT_MEMORY_OUTCOME.md) now qualifies
+selected parent/provider/PostgreSQL workloads in fresh 2/3 GiB containers.
+**Next item:** add actual concurrent scanning and media inspection/transcoding to
+that envelope before exposing operator configuration. Keep the existing app;
+do not infer whole-app protection from the logical artwork counter or reduce the
+child limit from moderate-image peaks.

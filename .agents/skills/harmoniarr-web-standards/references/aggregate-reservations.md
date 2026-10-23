@@ -51,6 +51,16 @@ Run the existing corpus and both lifecycle/resource lanes on the rebuilt image.
 State that the logical budget does not isolate compromised native code or reserve
 kernel/cgroup memory.
 
+For deployment sizing, use the explicit lane in the
+[deployment design](../../../../docs/DEPLOYMENT_MEMORY_DESIGN.md). Require disposable
+app/database storage, observed SQL/native overlap and separate container/process/
+logical counters. Detect actual cgroup version: v1 usage is approximate and its
+failcnt is not a v2 OOM-event counter. Historical peaks include startup and earlier
+cases; do not subtract them to invent phase usage or sum shared/overlapping counters.
+Drain held SQL clients concurrently so whichever acquires the xact lock first can
+roll back; submission order alone does not prove acquisition order. Record absent
+periodic/media work before extrapolating a deployment minimum or adding settings.
+
 See [design](../../../../docs/ARTWORK_AGGREGATE_DESIGN.md),
 [research/tradeoffs](../../../../docs/ARTWORK_AGGREGATE_RESEARCH.md) and
 [outcome](../../../../docs/ARTWORK_AGGREGATE_OUTCOME.md).
