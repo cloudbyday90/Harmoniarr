@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 22 [aggregate artwork rebuild](LOCAL_DOCKER_ARTWORK_AGGREGATE_OUTCOME.md)
+records the current no-cache image, built-in memory admission, preserved admin/data
+and readiness. The [owning outcome](ARTWORK_AGGREGATE_OUTCOME.md) records logical
+reservation lifetime, bounded metadata/grants and native maximum-pixel serialization.
+
 The October 22 [artwork corpus rebuild](LOCAL_DOCKER_ARTWORK_CORPUS_OUTCOME.md)
-records the current no-cache image, unchanged packaged runtime, preserved admin/data
+records the preceding no-cache image, unchanged packaged runtime, preserved admin/data
 and readiness. The [owning outcome](ARTWORK_CORPUS_OUTCOME.md) records seven native
 sample-depth/entropy cases and the next aggregate admission recommendation.
 

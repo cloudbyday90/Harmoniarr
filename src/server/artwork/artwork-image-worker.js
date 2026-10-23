@@ -9,6 +9,7 @@ import { transformArtworkBuffer } from './artwork-image-transform.js';
 import { artworkInputByteLimit, artworkSharpInputOptions } from './artwork-image-content-policy.js';
 import { artworkWorkerRefusal, isArtworkWorkerError } from './artwork-worker-protocol.js';
 import { assertArtworkWorkerMemoryLimit } from './artwork-worker-memory.js';
+import { createArtworkWorkerSession } from './artwork-worker-session.js';
 
 // No application environment, source path, URL, repository or publication authority.
 sharp.cache(false);
@@ -18,13 +19,8 @@ try {
   const maxBytes = Number(process.argv[2]); const maxDimensionPixels = Number(process.argv[3]);
   artworkInputByteLimit({ maxOriginalFileSizeBytes: maxBytes });
   artworkSharpInputOptions(maxDimensionPixels);
-  let size = 0; const chunks = [];
-  for await (const chunk of process.stdin) {
-    size += chunk.length;
-    if (size > maxBytes) throw artworkWorkerRefusal('artwork_file_too_large');
-    chunks.push(chunk);
-  }
-  const { data, ...projection } = await transformArtworkBuffer({ buffer: Buffer.concat(chunks, size), maxBytes, maxDimensionPixels });
+  const session = createArtworkWorkerSession({ inputBytes: Number(process.argv[4]), maxBytes });
+  const { data, ...projection } = await transformArtworkBuffer({ buffer: await session.readInput(), maxBytes, maxDimensionPixels, onMetadata: session.requestGrant });
   process.stdout.write(`${JSON.stringify({ ...projection, size: data.length })}\n`);
   process.stdout.end(data);
   await finished(process.stdout);
@@ -34,4 +30,4 @@ try {
   const refusal = isArtworkWorkerError(error) ? { failure: error.code === 'artwork_worker_memory' ? 'memory' : 'failed' } : { error: code };
   process.stdout.end(`${JSON.stringify(refusal)}\n`);
   await finished(process.stdout).catch(() => {});
-}
+} finally { process.stdin.destroy(); }

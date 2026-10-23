@@ -95,12 +95,12 @@ without slowing every routine test invocation. Costs are an extra opt-in native
 lane and synthetic coverage that cannot represent every real image.
 
 Keep the qualified 1 GiB DATA ceiling: these moderate-image RSS values do not
-replace the preceding maximum-JPEG allocation evidence. **Next: implement staged
-aggregate reservations in the existing admission owner**, starting with a bounded
-metadata/grant protocol and parent-retained-buffer accounting. Hold reservations
-through actual close/publication, retain fixed resource failures, and prove
-cancellation/timeout/late-result behavior before changing concurrency. Free-memory
-sampling may support that policy but cannot be its reservation authority.
+replace the preceding maximum-JPEG allocation evidence. The subsequent
+[aggregate reservation outcome](ARTWORK_AGGREGATE_OUTCOME.md) implements the next
+step in the existing admission owner with a bounded metadata/grant protocol and
+parent-buffer accounting. Its [design](ARTWORK_AGGREGATE_DESIGN.md) uses initial
+allowances followed only by reductions to avoid upgrade deadlocks. Free-memory
+sampling cannot replace reservation authority.
 
 ## Repeat the corpus
 

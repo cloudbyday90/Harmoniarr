@@ -7,25 +7,26 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { performance } from 'node:perf_hooks';
 import { assertArtworkBuffer, artworkInputByteLimit, artworkSharpInputOptions } from './artwork-image-content-policy.js';
-import { artworkWorkerError, artworkWorkerRefusal, createArtworkWorkerCollector } from './artwork-worker-protocol.js';
+import { artworkWorkerError, artworkWorkerRefusal, isArtworkWorkerError } from './artwork-worker-protocol.js';
 import { artworkWorkerLaunch } from './artwork-worker-memory.js';
+import { createArtworkSessionCollector, ARTWORK_WORKER_GRANT } from './artwork-worker-session-protocol.js';
 
 const workerPath = fileURLToPath(new URL('./artwork-image-worker.js', import.meta.url));
 
 export function createArtworkWorkerService({ spawnFn = spawn, timeoutMs = 15_000, now = () => performance.now() } = {}) {
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 60_000) throw new TypeError('Invalid artwork worker deadline');
-  async function processArtworkBuffer({ buffer, maxBytes, maxDimensionPixels, signal }) {
+  async function processArtworkBuffer({ buffer, maxBytes, maxDimensionPixels, signal, onMetadata }) {
     assertArtworkBuffer(buffer);
     maxBytes = artworkInputByteLimit({ maxOriginalFileSizeBytes: maxBytes });
     maxDimensionPixels ??= 8192;
     artworkSharpInputOptions(maxDimensionPixels);
+    if (onMetadata !== undefined && typeof onMetadata !== 'function') throw new TypeError('Invalid artwork metadata owner');
     if (buffer.length > maxBytes) throw artworkWorkerRefusal('artwork_file_too_large');
     if (signal?.aborted) throw artworkWorkerError('cancelled');
     const started = now();
-    const collector = createArtworkWorkerCollector(maxDimensionPixels);
     let child;
     try {
-      const launch = artworkWorkerLaunch(workerPath, [String(maxBytes), String(maxDimensionPixels)]);
+      const launch = artworkWorkerLaunch(workerPath, [String(maxBytes), String(maxDimensionPixels), String(buffer.length)]);
       child = spawnFn(launch.command, launch.args, {
         shell: false, windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'],
         env: { ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
@@ -34,6 +35,16 @@ export function createArtworkWorkerService({ spawnFn = spawn, timeoutMs = 15_000
     } catch { throw artworkWorkerError(); }
     return new Promise((resolve, reject) => {
       let failure; let closed = false;
+      const collector = createArtworkSessionCollector(maxDimensionPixels, metadata => {
+        const ownerResult = onMetadata?.(metadata);
+        if (ownerResult !== undefined) {
+          if (ownerResult instanceof Promise) void ownerResult.catch(() => {});
+          throw artworkWorkerError();
+        }
+        if (failure || signal?.aborted) throw artworkWorkerError('cancelled');
+        if (now() - started >= timeoutMs) throw artworkWorkerError('timeout');
+        child.stdin.end(ARTWORK_WORKER_GRANT);
+      });
       function refuse(error) {
         if (closed || failure) return;
         failure = error;
@@ -49,7 +60,7 @@ export function createArtworkWorkerService({ spawnFn = spawn, timeoutMs = 15_000
       child.stdout.on('data', chunk => {
         if (failure) return;
         if (now() - started >= timeoutMs) { refuse(artworkWorkerError('timeout')); return; }
-        try { collector.push(chunk); } catch { refuse(artworkWorkerError()); }
+        try { collector.push(chunk); } catch (error) { refuse(isArtworkWorkerError(error) ? error : artworkWorkerError()); }
       });
       child.once('close', (code, exitSignal) => {
         closed = true;
@@ -63,7 +74,7 @@ export function createArtworkWorkerService({ spawnFn = spawn, timeoutMs = 15_000
       });
       signal?.addEventListener('abort', abort, { once: true });
       if (signal?.aborted) abort();
-      if (!failure) child.stdin.end(buffer);
+      if (!failure) child.stdin.write(buffer);
     });
   }
   return { processArtworkBuffer };

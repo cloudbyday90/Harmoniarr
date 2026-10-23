@@ -29,9 +29,12 @@ export async function assertArtworkWorkerMemoryLimit({ platform = process.platfo
 }
 
 /** Conservative admission estimate; the kernel limit remains the allocation guard. */
-export function assertArtworkMemoryAdmission({ metadata, width, height, inputBytes }) {
+export function artworkDecodedMemoryBytes(metadata, width = metadata.width, height = metadata.height) {
   const channels = Number.isInteger(metadata.channels) && metadata.channels >= 1 && metadata.channels <= 4 ? metadata.channels : 4;
   const bytes = sampleBytes.get(metadata.depth) ?? 8;
-  const estimate = 64 * 1024 * 1024 + 2 * inputBytes + 4 * width * height * Math.max(3, channels) * bytes;
+  return 4 * width * height * Math.max(3, channels) * bytes;
+}
+export function assertArtworkMemoryAdmission({ metadata, width, height, inputBytes }) {
+  const estimate = 64 * 1024 * 1024 + 2 * inputBytes + artworkDecodedMemoryBytes(metadata, width, height);
   if (!Number.isSafeInteger(estimate) || estimate > ARTWORK_WORKER_DATA_LIMIT) throw artworkWorkerError('memory');
 }

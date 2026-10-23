@@ -10,6 +10,10 @@ For decoder memory controls, use the standards skill's
 Keep actual external allocation refusal and concurrent maximum images in explicit
 Linux lanes, separate from cheap policy/framing tests. Verify kernel limits/OOM
 counters and drain every child before cleanup; DATA is not RSS or a RAM reservation.
+For weighted admission and metadata/grant changes, read
+[aggregate reservations](../harmoniarr-web-standards/references/aggregate-reservations.md).
+Include both ingestion and fetch callers of the shared FIFO, with native-active
+cancellation after grant and held publication after actual child retirement.
 `validate:native-artwork-corpus` owns seven fixed entropy/sample-depth cases in a
 one-CPU/1 GiB Linux profile; the allocation/concurrent-byte lane keeps its separate
 two-CPU/3 GiB profile. Their shared test-only cgroup helper requires actual v1/v2

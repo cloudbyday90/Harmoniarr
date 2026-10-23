@@ -63,7 +63,8 @@ test('two concurrent maximum-byte jobs retain exact hashes within their individu
   const root = await mkdtemp(join(tmpdir(), 'harmoniarr-memory-pair-')); t.after(() => rm(root, { recursive: true, force: true }));
   const { input } = await maximumByteArtworkPng(limits.maxOriginalFileSizeBytes);
   let publications = 0;
-  const service = createArtworkIngestionService({ artworkPolicyService: { getArtworkRuntimePolicy: async () => ({ limits, storage: { root } }) },
+  const service = createArtworkIngestionService({ artworkIngestionAdmission: createArtworkIngestionAdmission({ memoryBudgetBytes: 3 * 1024 ** 3 }),
+    artworkPolicyService: { getArtworkRuntimePolicy: async () => ({ limits, storage: { root } }) },
     prepareArtworkAssetFn: options => prepareArtworkAsset({ ...options, transformArtworkBufferFn: worker.processArtworkBuffer }),
     getArtworkAssetBySha256Fn: async () => null, upsertArtworkAssetFn: async asset => { publications++; return { ...asset, id: 'paired' }; },
   });
@@ -100,4 +101,30 @@ test('default worker refuses combined maximum bytes and pixels as capacity befor
   retired({ records }); assert.equal(records.length, 1); assert.equal(records[0].frame, '{"failure":"memory"}\n');
   assert.equal(publications, 0); assert.deepEqual(await readdir(root), []); assert.equal(await oomKills(), beforeOom);
   t.diagnostic(JSON.stringify({ inputBytes: input.length, pixels: 8192 ** 2, publications, refusal: 'artwork_worker_memory', oomKillsUnchanged: true }));
+});
+
+test('default aggregate reservation serializes maximum-pixel children through held publication', async t => {
+  const beforeOom = await oomKills(); const worker = observedWorker('observe'); const gate = createArtworkIngestionAdmission();
+  const root = await mkdtemp(join(tmpdir(), 'harmoniarr-memory-aggregate-')); t.after(() => rm(root, { recursive: true, force: true }));
+  const input = await sharp({ create: { width: 8192, height: 8192, channels: 3, background: 'red' } }).jpeg().toBuffer();
+  const entered = Promise.withResolvers(); const held = Promise.withResolvers(); let publications = 0;
+  const service = createArtworkIngestionService({ artworkIngestionAdmission: gate,
+    artworkPolicyService: { getArtworkRuntimePolicy: async () => ({ limits, storage: { root } }) },
+    prepareArtworkAssetFn: options => prepareArtworkAsset({ ...options, transformArtworkBufferFn: worker.processArtworkBuffer }),
+    getArtworkAssetBySha256Fn: async () => null, upsertArtworkAssetFn: async asset => {
+      publications++; if (publications === 1) { entered.resolve(); await held.promise; } return { ...asset, id: 'aggregate' };
+    },
+  });
+  const tasks = [service.ingestArtworkBuffer({ buffer: input }), service.ingestArtworkBuffer({ buffer: input })];
+  try {
+    await Promise.race([entered.promise, Promise.all(tasks).then(() => assert.fail('Publication hold was bypassed'))]);
+    assert.equal(worker.records.length, 1); assert.equal(worker.records[0].closed, true);
+    assert.equal(gate.getState().queued, 1); assert.equal(gate.getState().active, 1);
+    assert.ok(gate.getMemoryState().reservedBytes > 1024 ** 3); assert.ok(gate.getMemoryState().reservedBytes <= gate.getMemoryState().budgetBytes);
+  } finally { held.resolve(); await Promise.allSettled(tasks); }
+  for (const result of await Promise.all(tasks)) assert.equal(hash(await readFile(result.absolutePath)), '6cd962b9433503f386017ab370eaf43b2524abc7cd1e6abf501b540d79630576');
+  assert.equal(publications, 2); assert.equal(worker.peakActive(), 1); assert.equal(await oomKills(), beforeOom); retired(worker);
+  assert.equal(gate.getMemoryState().reservedBytes, 0);
+  t.diagnostic(JSON.stringify({ defaultBudgetBytes: gate.getMemoryState().budgetBytes, maximumConcurrentChildren: worker.peakActive(),
+    publications, childRetirementBeforePublicationRelease: true, finalReservedBytes: 0, oomKillsUnchanged: true }));
 });

@@ -13,21 +13,27 @@ const input = { buffer: Buffer.from('input'), maxBytes: 20, maxDimensionPixels: 
 const output = () => Buffer.from(`${JSON.stringify({ size: 3, width: 8, height: 8, format: 'png', dominant: null })}\nabc`);
 function fixture(options = {}) {
   const child = new EventEmitter(); child.stdin = new PassThrough(); child.stdout = new PassThrough();
+  const inputChunks = []; child.stdin.on('data', chunk => inputChunks.push(chunk));
   const killed = Promise.withResolvers(); const kills = []; let spawnOptions; let spawnArgs;
+  const granted = Promise.withResolvers(); child.stdin.once('finish', granted.resolve);
   child.kill = signal => { kills.push(signal); killed.resolve(); if (options.killThrows) throw new Error('private'); return true; };
   const service = createArtworkWorkerService({ ...options, spawnFn: (...args) => { spawnArgs = args; spawnOptions = args[2]; return child; } });
-  return { child, service, killed: killed.promise, kills, getSpawn: () => ({ spawnOptions, spawnArgs }) };
+  return { child, service, killed: killed.promise, kills, getInput: () => Buffer.concat(inputChunks), getSpawn: () => ({ spawnOptions, spawnArgs }), async reply() {
+    child.stdout.write(`${JSON.stringify({ stage: 'metadata', format: 'png', width: 8, height: 8, channels: 3, depth: 'uchar' })}\n`);
+    await granted.promise; child.stdout.write(output());
+  } };
 }
 
 test('worker spawn uses an explicit ESM module, bounded scalar arguments and a minimal environment', async () => {
   const f = fixture(); const pending = f.service.processArtworkBuffer(input);
   const { spawnArgs, spawnOptions } = f.getSpawn();
-  const expected = artworkWorkerLaunch(fileURLToPath(new URL('../../src/server/artwork/artwork-image-worker.js', import.meta.url)), ['20', '8']);
+  const expected = artworkWorkerLaunch(fileURLToPath(new URL('../../src/server/artwork/artwork-image-worker.js', import.meta.url)), ['20', '8', '5']);
   assert.equal(spawnArgs[0], expected.command); assert.deepEqual(spawnArgs[1], expected.args);
   assert.equal(spawnOptions.shell, false); assert.equal(spawnOptions.windowsHide, true);
   assert.deepEqual(spawnOptions.stdio, ['pipe', 'pipe', 'ignore']);
   assert.deepEqual(Object.keys(spawnOptions.env).sort(), [...(process.env.SystemRoot ? ['SystemRoot'] : []), 'UV_THREADPOOL_SIZE', 'VIPS_CONCURRENCY', 'NODE_ENV'].sort());
-  f.child.stdout.write(output()); f.child.emit('exit', 0, null);
+  await f.reply(); f.child.emit('exit', 0, null);
+  assert.equal(f.getInput().toString(), 'inputgrant\n');
   let settled = false; void pending.then(() => { settled = true; }); await Promise.resolve(); assert.equal(settled, false);
   f.child.emit('close', 0, null); assert.equal((await pending).data.toString(), 'abc');
 });
@@ -58,8 +64,10 @@ test('active cancellation fences publication and holds the shared ingestion slot
   const queuedRejection = assert.rejects(queued, { code: 'artwork_ingestion_cancelled' });
   controller.abort(); await f.killed; f.child.stdout.write(output()); f.child.emit('exit', 0, null);
   assert.equal(gate.getState().active, 1); assert.equal(gate.getState().queued, 1); assert.equal(publications, 0);
+  assert.ok(gate.getMemoryState().reservedBytes > 0);
   queuedController.abort(); await queuedRejection; f.child.emit('close', 0, null); await rejection;
   assert.deepEqual(gate.getState(), { active: 0, queued: 0, queuedBytes: 0 }); assert.equal(publications, 0);
+  assert.equal(gate.getMemoryState().reservedBytes, 0);
 });
 
 test('worker failures drain on stream/spawn errors and project fixed diagnostics', async () => {
@@ -81,7 +89,7 @@ test('worker refuses invalid inputs before spawning and checks the monotonic dea
     { ...input, signal: AbortSignal.abort() }]) await assert.rejects(service.processArtworkBuffer(options));
   assert.equal(spawns, 0);
   let time = 0; const f = fixture({ timeoutMs: 1000, now: () => time });
-  const pending = f.service.processArtworkBuffer(input); f.child.stdout.write(output()); time = 1000;
+  const pending = f.service.processArtworkBuffer(input); await f.reply(); time = 1000;
   f.child.emit('close', 0, null); await assert.rejects(pending, { code: 'artwork_worker_timeout' });
   for (const timeoutMs of [0, -1, 1.5, 60_001]) assert.throws(() => createArtworkWorkerService({ timeoutMs }), TypeError);
 });
@@ -100,4 +108,21 @@ for (const reason of ['failed', 'memory']) test(`owned worker ${reason} failure 
   await new Promise(resolve => { setImmediate(resolve); });
   f.child.stdout.write(Buffer.from(`${JSON.stringify({ failure: reason })}\n`));
   f.child.emit('close', 1, null); await rejected; assert.equal(backoffs, 0);
+});
+
+test('metadata ownership failure withholds grant and retains worker retirement before rejection', async () => {
+  for (const owner of [() => { throw new Error('private owner'); }, () => Promise.reject(new Error('private async owner'))]) {
+    const f = fixture(); const pending = f.service.processArtworkBuffer({ ...input, onMetadata: owner });
+    const rejected = assert.rejects(pending, error => error.code === 'artwork_worker_failed' && !error.cause && !error.message.includes('private'));
+    f.child.stdout.write(`${JSON.stringify({ stage: 'metadata', format: 'png', width: 8, height: 8, channels: 3, depth: 'uchar' })}\n`);
+    await f.killed; assert.equal(f.child.stdin.writableEnded, false); f.child.emit('close', null, 'SIGKILL'); await rejected;
+  }
+});
+
+test('a deadline reached during metadata ownership refuses before grant', async () => {
+  let time = 0; const f = fixture({ timeoutMs: 1000, now: () => time });
+  const pending = f.service.processArtworkBuffer({ ...input, onMetadata: () => { time = 1000; } });
+  const rejected = assert.rejects(pending, { code: 'artwork_worker_timeout', status: 503 });
+  f.child.stdout.write(`${JSON.stringify({ stage: 'metadata', format: 'png', width: 8, height: 8, channels: 3, depth: 'uchar' })}\n`);
+  await f.killed; assert.equal(f.getInput().toString(), 'input'); f.child.emit('close', null, 'SIGKILL'); await rejected;
 });

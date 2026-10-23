@@ -48,7 +48,12 @@ function observedWorker({ mode, timeoutMs = 15_000, controller } = {}) {
     assert.ok(workerIndex >= 0);
     const child = spawn(file, mode ? [...args.slice(0, workerIndex), fixturePath, ...args.slice(workerIndex + 1), mode] : args, options);
     const record = { pid: child.pid, output: 0, closed: false }; observations.push(record);
-    child.stdout.on('data', chunk => { record.output += chunk.length; outputSeen.resolve(); controller?.abort(); });
+    let metadataDone = false;
+    child.stdout.on('data', chunk => {
+      if (!metadataDone) { const end = chunk.indexOf(10); if (end === -1) return; metadataDone = true; chunk = chunk.subarray(end + 1); }
+      record.output += chunk.length;
+      if (chunk.length) { outputSeen.resolve(); controller?.abort(); }
+    });
     child.once('close', (code, signal) => { Object.assign(record, { closed: true, code, signal }); });
     return child;
   } });

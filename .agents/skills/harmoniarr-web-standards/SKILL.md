@@ -11,6 +11,9 @@ protocol delivery, actual process/stdio retirement and parent publication fencin
 For built-in decoder memory controls, also read
 [worker memory](references/worker-memory.md). It distinguishes allocation limits
 from RSS, runtime reservations, admission estimates and actual native refusal.
+For weighted FIFO ownership or the decoder metadata/grant handshake, read
+[aggregate reservations](references/aggregate-reservations.md). It covers
+decrease-only accounting, deadlock avoidance and publication lifetime.
 
 For privileged CLI output or one-time recovery material, read
 [CLI result delivery](references/cli-result-delivery.md). It separates commit,

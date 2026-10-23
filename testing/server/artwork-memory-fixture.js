@@ -9,19 +9,19 @@ import { finished } from 'node:stream/promises';
 import sharp from 'sharp';
 import { ARTWORK_WORKER_DATA_LIMIT, assertArtworkWorkerMemoryLimit } from '../../src/server/artwork/artwork-worker-memory.js';
 import { transformArtworkBuffer } from '../../src/server/artwork/artwork-image-transform.js';
+import { createArtworkWorkerSession } from '../../src/server/artwork/artwork-worker-session.js';
 
 await assertArtworkWorkerMemoryLimit();
 sharp.cache(false); sharp.concurrency(1);
 const report = value => process.stderr.write(`${JSON.stringify(value)}\n`);
 const limits = await readFile('/proc/self/limits', 'utf8');
 assert.match(limits, new RegExp(`^Max data size\\s+${ARTWORK_WORKER_DATA_LIMIT}\\s+${ARTWORK_WORKER_DATA_LIMIT}\\s+bytes`, 'mu'));
-let size = 0; const chunks = [];
-for await (const chunk of process.stdin) { size += chunk.length; assert.ok(size <= Number(process.argv[2])); chunks.push(chunk); }
-const { data, ...projection } = await transformArtworkBuffer({ buffer: Buffer.concat(chunks, size), maxBytes: Number(process.argv[2]), maxDimensionPixels: Number(process.argv[3]) });
+const session = createArtworkWorkerSession({ inputBytes: Number(process.argv[4]), maxBytes: Number(process.argv[2]) });
+const { data, ...projection } = await transformArtworkBuffer({ buffer: await session.readInput(), maxBytes: Number(process.argv[2]), maxDimensionPixels: Number(process.argv[3]), onMetadata: session.requestGrant });
 report({ kind: 'processed', dataLimitBytes: ARTWORK_WORKER_DATA_LIMIT, maxRssKiB: process.resourceUsage().maxRSS });
 process.stdout.write(`${JSON.stringify({ ...projection, size: data.length })}\n`);
 process.stdout.end(data); await finished(process.stdout);
-if (process.argv[4] === 'allocate') {
+if (process.argv[5] === 'allocate') {
   // Real external Buffer allocations, retained and touched. This is an allocation
   // control after valid output, not a reproduced image-decoder vulnerability.
   const retained = []; let allocated = 0; let refused = false;

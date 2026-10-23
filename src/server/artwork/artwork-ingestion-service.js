@@ -80,6 +80,7 @@ export async function prepareArtworkAsset({
   sharpStatsFn = getArtworkBufferStats,
   transformArtworkBufferFn = options => transformArtworkBuffer(options, { inspectArtworkBufferFn, sanitizeArtworkBufferFn, sharpStatsFn }),
   signal,
+  onMetadata,
 } = {}) {
   assertArtworkBuffer(buffer);
 
@@ -100,7 +101,7 @@ export async function prepareArtworkAsset({
 
   const payloadChecksum = computeSha256(buffer);
   const { data, format, width, height, dominant } = await transformArtworkBufferFn({
-    buffer, maxBytes: byteLimit, maxDimensionPixels: dimensionLimit, signal,
+    buffer, maxBytes: byteLimit, maxDimensionPixels: dimensionLimit, signal, onMetadata,
   });
   const formatDescriptor = supportedInputFormats.get(format);
   const sha256 = computeSha256(data);
@@ -175,12 +176,14 @@ export function createArtworkIngestionService({
     sourceUrl = null,
     storageClass = 'provider_original',
     signal,
+    onMetadata,
   }, policy) {
     const prepared = await prepareArtworkAssetFn({
       buffer,
       fetchedAt,
       policy,
       signal,
+      onMetadata,
       sourceProvider,
       sourceUrl,
       storageClass,
@@ -216,10 +219,11 @@ export function createArtworkIngestionService({
     storageClass = 'provider_original', signal } = {}) {
     assertArtworkBuffer(buffer);
     if (buffer.length > 100 * 1024 * 1024) throw createArtworkValidationError('artwork_file_too_large', 'Artwork buffer exceeds the maximum byte limit');
-    return artworkIngestionAdmission.run(async () => {
+    return artworkIngestionAdmission.run(async reservation => {
       const policy = await artworkPolicyService.getArtworkRuntimePolicy();
-      return ingestAdmittedArtwork({ buffer, fetchedAt, sourceProvider, sourceUrl, storageClass, signal }, policy);
-    }, { signal, weight: buffer.length });
+      return ingestAdmittedArtwork({ buffer, fetchedAt, sourceProvider, sourceUrl, storageClass, signal,
+        onMetadata: metadata => reservation?.onMetadata(metadata, buffer.length) }, policy);
+    }, { signal, weight: buffer.length, inputBytes: buffer.length });
   }
 
   async function ingestArtworkFile({ filePath, fetchedAt = null, sourceProvider = null, sourceUrl = null,
@@ -227,10 +231,11 @@ export function createArtworkIngestionService({
     if (typeof filePath !== 'string' || !filePath.trim() || filePath.length > 32_768) {
       throw createArtworkValidationError('validation_error', 'filePath must be a bounded non-empty string');
     }
-    return artworkIngestionAdmission.run(async () => {
+    return artworkIngestionAdmission.run(async reservation => {
       const policy = await artworkPolicyService.getArtworkRuntimePolicy();
       const buffer = await readFileFn(filePath, { maxBytes: artworkInputByteLimit(policy.limits) });
-      return ingestAdmittedArtwork({ buffer, fetchedAt, sourceProvider, sourceUrl, storageClass, signal }, policy);
+      return ingestAdmittedArtwork({ buffer, fetchedAt, sourceProvider, sourceUrl, storageClass, signal,
+        onMetadata: metadata => reservation?.onMetadata(metadata, buffer.length) }, policy);
     }, { signal });
   }
 
