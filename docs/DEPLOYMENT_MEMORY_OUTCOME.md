@@ -112,8 +112,8 @@ headroom; the passing 2 GiB subset does not justify declaring 2 GiB sufficient f
 all deployments or lowering the child limit. Do not add automatic tuning or an
 operator memory slider from this dataset.
 
-**Next:** qualify concurrent library scanning and actual media inspection/
-transcoding against this same shared-container envelope, with real worker
-ownership and a representative catalogue. Those unmeasured owners, query
-concurrency and storage behavior must inform a deployment sizing recommendation
-before changing built-in limits or exposing memory configuration.
+The [concurrent media follow-up](DEPLOYMENT_MEDIA_MEMORY_OUTCOME.md) now qualifies
+a bounded four-format catalogue, real scan/inspection/encode workers and guarded
+publication. **Next:** add shared bounded admission for canonical FFmpeg/FFprobe
+commands through actual close. Broader catalogue, concurrency and storage evidence
+is still needed before declaring a deployment minimum or exposing memory settings.

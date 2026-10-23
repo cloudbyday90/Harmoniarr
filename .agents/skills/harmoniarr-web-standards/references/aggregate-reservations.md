@@ -61,6 +61,18 @@ Drain held SQL clients concurrently so whichever acquires the xact lock first ca
 roll back; submission order alone does not prove acquisition order. Record absent
 periodic/media work before extrapolating a deployment minimum or adding settings.
 
+The [media qualification design](../../../../docs/DEPLOYMENT_MEDIA_MEMORY_DESIGN.md)
+adds real scan/FFprobe/FFmpeg workers with controlled candidate planning. The
+transcode path currently encodes to the null muxer; it does not write a converted
+file. Require actual spawn/close and distinguish lifecycle overlap from simultaneous
+maximum CPU/memory. Verify parsed catalogue tags and unchanged original hashes.
+For lease retirement, `released_at` is authoritative: a released lease can retain
+a future `expires_at`. Require captured released rows and final status, not expiry
+alone. Keep thread counts distinct from CPU quota, and counts distinct from RSS.
+Hold publication on a path shared by new and existing assets: an insert-only
+callback can be bypassed by idempotent lookup. Keep repeated-asset cases together
+so retained buffers/reservations, rather than row novelty, own the gate.
+
 See [design](../../../../docs/ARTWORK_AGGREGATE_DESIGN.md),
 [research/tradeoffs](../../../../docs/ARTWORK_AGGREGATE_RESEARCH.md) and
 [outcome](../../../../docs/ARTWORK_AGGREGATE_OUTCOME.md).

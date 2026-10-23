@@ -18,6 +18,10 @@ cancellation after grant and held publication after actual child retirement.
 retained caller buffers, actual provider-image TLS and held native PostgreSQL work.
 Use fresh 2/3 GiB profiles from docs/DEPLOYMENT_MEMORY_DESIGN.md; do not substitute
 Node RSS for whole-container usage or claim unexecuted cgroup/media-worker coverage.
+`validate:native-deployment-media-memory` adds bounded real scan/tag persistence,
+FFprobe and FFmpeg null-output encoding. Preserve the preceding three cases and
+require actual overlap/close, released lease rows and unchanged original bytes.
+See docs/DEPLOYMENT_MEDIA_MEMORY_DESIGN.md for controlled planning and scope limits.
 `validate:native-artwork-corpus` owns seven fixed entropy/sample-depth cases in a
 one-CPU/1 GiB Linux profile; the allocation/concurrent-byte lane keeps its separate
 two-CPU/3 GiB profile. Their shared test-only cgroup helper requires actual v1/v2

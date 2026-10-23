@@ -16,7 +16,7 @@ import { createArtworkImageDownloadService } from '../../src/server/artwork/artw
 import { createArtworkIngestionService, prepareArtworkAsset } from '../../src/server/artwork/artwork-ingestion-service.js';
 import { createArtworkIngestionAdmission } from '../../src/server/artwork/artwork-ingestion-admission.js';
 import { createArtworkWorkerService } from '../../src/server/artwork/artwork-worker-service.js';
-import { upsertArtworkAsset } from '../../src/server/artwork/artwork-repository.js';
+import { getArtworkAssetBySha256 } from '../../src/server/artwork/artwork-repository.js';
 import { withWorkerTaskCleanup } from '../../src/server/worker-task-cleanup.js';
 import { measureDeploymentMemory } from './deployment-memory-observer.js';
 import { withDeploymentDatabaseWork } from './deployment-memory-database.js';
@@ -24,7 +24,9 @@ import { withDeploymentImageProvider } from './deployment-memory-provider.js';
 import { maximumByteArtworkPng } from './artwork-worker-inputs.js';
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
-export async function runDeploymentMemoryWorkload({ pool, dimension, callerBytes, maximumBytes = false }) {
+export async function runDeploymentMemoryWorkload({ pool, dimension, callerBytes, maximumBytes = false,
+  withConcurrentWork = (_context, work) => work(), onArtworkSpawn = () => {} }) {
+  if (typeof withConcurrentWork !== 'function' || typeof onArtworkSpawn !== 'function') throw new TypeError('Invalid concurrent qualification owner');
   const image = maximumBytes ? (await maximumByteArtworkPng(100 * 1024 ** 2)).input
     : await sharp({ create: { width: dimension, height: dimension, channels: 3, background: 'red' } }).jpeg().toBuffer();
   const jobs = maximumBytes ? 1 : 2;
@@ -35,6 +37,7 @@ export async function runDeploymentMemoryWorkload({ pool, dimension, callerBytes
     const worker = createArtworkWorkerService({ spawnFn: (...args) => {
       const child = spawn(...args); const record = { pid: child.pid, closed: false }; children.push(record);
       activeChildren++; peakChildren = Math.max(peakChildren, activeChildren);
+      child.once('spawn', onArtworkSpawn);
       child.once('close', () => { record.closed = true; activeChildren--; }); return child;
     } });
     let policy;
@@ -49,10 +52,10 @@ export async function runDeploymentMemoryWorkload({ pool, dimension, callerBytes
       } };
       const ingestion = createArtworkIngestionService({ artworkPolicyService, artworkIngestionAdmission: gate,
         prepareArtworkAssetFn: input => prepareArtworkAsset({ ...input, transformArtworkBufferFn: worker.processArtworkBuffer }),
-        upsertArtworkAssetFn: async asset => {
-          const saved = await upsertArtworkAsset(asset);
+        getArtworkAssetBySha256Fn: async sha256 => {
+          const existing = await getArtworkAssetBySha256(sha256);
           if (!heldPublication) { heldPublication = true; published.resolve(); await release.promise; }
-          return saved;
+          return existing;
         },
       });
       const transport = createArtworkImageDownloadService({ fetchImpl: provider.fetchImpl });
@@ -68,7 +71,7 @@ export async function runDeploymentMemoryWorkload({ pool, dimension, callerBytes
     return withWorkerTaskCleanup(async () => {
       return await measureDeploymentMemory(async checkpoint => {
         const retained = Buffer.alloc(callerBytes, 0x5a);
-        return withDeploymentDatabaseWork(pool, async database => {
+        return withDeploymentDatabaseWork(pool, database => withConcurrentWork({ application, pool }, async () => {
           await checkpoint('admitted');
           const owners = Array.from({ length: jobs }, () => randomUUID()); let publicationReservedBytes;
           for (const ownerId of owners) tasks.push(application.artworkModule.artworkFetchService.resolveArtwork({
@@ -103,7 +106,7 @@ export async function runDeploymentMemoryWorkload({ pool, dimension, callerBytes
             sortWorkMemBytes: 8 * 1024 ** 2, sortedRowsPerStatement: 100_000, sortParallelWorkers: 0,
             images: results.length, assignments: jobs, outputSha256: hashes[0], peakChildren, ...provider.getState(),
             publicationReservedBytes, logicalBudgetBytes: gate.getMemoryState().budgetBytes, finalReservedBytes: 0 };
-        });
+        }));
       });
     }, async () => {
       release.resolve(); await Promise.allSettled(tasks);

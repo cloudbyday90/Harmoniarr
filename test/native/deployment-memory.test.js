@@ -2,25 +2,10 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { closePool, getPool } from '../../src/server/database.js';
-import { artworkWorkerCgroup } from '../../testing/server/artwork-worker-cgroup.js';
+import { requireDeploymentMemoryProfile } from '../../testing/server/deployment-memory-profile.js';
 import { runDeploymentMemoryWorkload } from '../../testing/server/deployment-memory-workload.js';
 
-// Refuse live databases and undeclared profiles before acquiring a pool.
-assert.equal(process.env.PGHOST, '127.0.0.1');
-assert.equal(process.env.PGDATABASE, 'harmoniarr_memory_qualification');
-assert.equal(process.env.PGDATA, '/app/data/postgres/18/data');
-assert.ok(!process.env.HARMONIARR_APPDATA || process.env.HARMONIARR_APPDATA === '/app/data');
-const dataMount = (await readFile('/proc/self/mountinfo', 'utf8')).split('\n').find(line => line.split(' ')[4] === '/app/data');
-assert.equal(dataMount?.split(' - ')[1]?.split(' ')[0], 'tmpfs', 'Require disposable app/database storage without a host data mount');
-const gib = Number(process.env.HARMONIARR_MEMORY_PROFILE_GIB ?? 3);
-assert.ok([2, 3].includes(gib));
-const profile = await artworkWorkerCgroup({ memoryBytes: gib * 1024 ** 3, cpus: 2, pids: 256 });
-
-// Public test-only material, shared with the existing app fixture. Never use
-// account credentials or a live notification endpoint in this offline lane.
-process.env.VAPID_CONTACT = 'mailto:memory-qualification@example.invalid';
-process.env.VAPID_PUBLIC_KEY = 'BN9CEVhAa-agHfE816dgSQUoOhYCng4hD86REpzvPg3wzlT8fr9LmvK60sb70uhX-vk0UFixyFak3dhk6SPyKRA';
-process.env.VAPID_PRIVATE_KEY = 'tt5cAktvbcZtFB5tTbQr7eOaNWFH_-OvsAWx-yE9E00';
+const { gib, profile } = await requireDeploymentMemoryProfile();
 
 for (const [name, dimension, callerBytes] of [['ordinary', 1024, 64 * 1024 ** 2], ['maximum-pixels', 8192, 256 * 1024 ** 2], ['maximum-bytes', 16, 256 * 1024 ** 2]]) {
   test(`shared-container memory: ${name} artwork, retained parent buffers and PostgreSQL`, async t => {

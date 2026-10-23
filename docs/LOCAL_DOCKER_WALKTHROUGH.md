@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
-The October 22 [deployment memory rebuild](LOCAL_DOCKER_DEPLOYMENT_MEMORY_OUTCOME.md)
+The October 23 [concurrent media memory rebuild](LOCAL_DOCKER_DEPLOYMENT_MEDIA_MEMORY_OUTCOME.md)
 records the current no-cache image, preserved admin/data and readiness. The
+[owning outcome](DEPLOYMENT_MEDIA_MEMORY_OUTCOME.md) records real scan/native
+preflight overlap, released leases and scoped shared-container memory evidence.
+
+The October 22 [deployment memory rebuild](LOCAL_DOCKER_DEPLOYMENT_MEMORY_OUTCOME.md)
+records the preceding no-cache image, preserved admin/data and readiness. The
 [owning outcome](DEPLOYMENT_MEMORY_OUTCOME.md) records native shared-container
 PostgreSQL/provider/artwork measurements and the limits of deployment sizing.
 
