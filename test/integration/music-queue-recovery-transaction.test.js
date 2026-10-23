@@ -110,6 +110,63 @@ suite('Scoped Music Queue recovery transactions with isolated PostgreSQL', () =>
     });
   });
 
+  test('shared recovery at its search cap persists a terminal discovery stop and replays without another decision', { timeout: config.scenarioTimeoutMs }, async t => {
+    await scenario(t, async context => {
+      const f = await fixture(context, { shared: true });
+      await context.pool.query("UPDATE library_discovery_requests SET request_status='cooldown',blocked_reason='automatic_cooldown',next_search_after=NOW()+INTERVAL '1 day',research_attempt_count=2 WHERE id=$1", [f.discoveryId]);
+      const result = await recover(context, f);
+      assert.equal(result.recovered, false); assert.equal(result.reason, 'rediscovery_exhausted');
+      assert.equal(result.rediscovery.exhausted, true); assert.equal(result.rediscovery.scheduled, false);
+      const stopped = (await context.pool.query('SELECT * FROM library_discovery_requests WHERE id=$1', [f.discoveryId])).rows[0];
+      assert.equal(stopped.request_status, 'blocked'); assert.equal(stopped.blocked_reason, 'download_recovery_exhausted');
+      assert.equal(stopped.next_search_after, null); assert.equal(stopped.research_attempt_count, 2);
+      assert.equal(stopped.evidence.downloadRecoveryExhausted.researchAttemptCount, 2);
+      assert.equal(stopped.evidence.downloadRecoveryExhausted.sourceSearchId, f.searchId);
+      assert.equal(JSON.stringify(stopped.evidence.downloadRecoveryExhausted).includes(f.owner.id), false);
+      assert.equal((await childRuns(context.pool)).length, 0);
+      assert.equal((await recover(context, f)).episodeReplayed, true);
+      assert.deepEqual((await context.pool.query('SELECT * FROM library_discovery_requests WHERE id=$1', [f.discoveryId])).rows[0], stopped);
+      assert.equal(await episodeCount(context.pool, f.candidate.id), 1);
+      assert.equal((await context.store.getCandidate(f.candidate.id)).downloadAttemptCount, 1);
+    });
+  });
+
+  test('exhaustion update and later episode rejection roll back candidate, search stop and outcome publication together', { timeout: config.scenarioTimeoutMs }, async t => {
+    await scenario(t, async context => {
+      const f = await fixture(context, { shared: true });
+      await context.pool.query('UPDATE library_discovery_requests SET research_attempt_count=2 WHERE id=$1', [f.discoveryId]);
+      const original = (await context.pool.query('SELECT * FROM library_discovery_requests WHERE id=$1', [f.discoveryId])).rows[0];
+      for (const [table, operation, condition] of [['library_discovery_requests', 'UPDATE', "NEW.blocked_reason='download_recovery_exhausted'"],
+        ['import_candidate_events', 'INSERT', "NEW.event_type='import_candidate_recovery_decided'"]]) {
+        await context.pool.query(`CREATE FUNCTION reject_exhaustion_write() RETURNS trigger LANGUAGE plpgsql AS $$
+          BEGIN IF ${condition} THEN RAISE EXCEPTION 'Controlled exhaustion rejection'; END IF; RETURN NEW; END $$;
+          CREATE TRIGGER reject_exhaustion_write BEFORE ${operation} ON ${table} FOR EACH ROW EXECUTE FUNCTION reject_exhaustion_write()`);
+        try {
+          await assert.rejects(recover(context, f), /Controlled exhaustion rejection/u);
+          assert.deepEqual((await context.pool.query('SELECT * FROM library_discovery_requests WHERE id=$1', [f.discoveryId])).rows[0], original);
+          assert.deepEqual(await context.store.getCandidate(f.candidate.id), f.candidate);
+          assert.equal(await episodeCount(context.pool, f.candidate.id), 0);
+          assert.equal((await childRuns(context.pool)).length, 0);
+          assert.equal((await context.pool.query('SELECT COUNT(*)::int AS count FROM import_candidate_events')).rows[0].count, 0);
+        } finally {
+          await context.pool.query(`DROP TRIGGER reject_exhaustion_write ON ${table}; DROP FUNCTION reject_exhaustion_write()`);
+        }
+      }
+    });
+  });
+
+  test('an already scheduled search at the cap retains its saved future reservation', { timeout: config.scenarioTimeoutMs }, async t => {
+    await scenario(t, async context => {
+      const f = await fixture(context);
+      await context.pool.query("UPDATE library_discovery_requests SET request_status='ready',research_attempt_count=2,next_search_after=NOW()+INTERVAL '2 hours' WHERE id=$1", [f.discoveryId]);
+      const savedDiscovery = await context.store.getDiscovery(f.metadata.metadataReleaseId);
+      const result = await recover(context, f);
+      assert.equal(result.recovered, false); assert.equal(result.rediscovery, undefined);
+      assert.deepEqual(await context.store.getDiscovery(f.metadata.metadataReleaseId), savedDiscovery);
+      assert.equal((await childRuns(context.pool)).length, 0);
+    });
+  });
+
   test('required audit, child queue and episode-event rejection roll back the whole eligible decision', { timeout: config.scenarioTimeoutMs }, async (t) => {
     await scenario(t, async (context) => {
       const f = await fixture(context); const next = await replacement(context, f);
@@ -138,6 +195,7 @@ suite('Scoped Music Queue recovery transactions with isolated PostgreSQL', () =>
     for (const drift of ['disabled', 'unlinked', 'late', 'dispatch']) {
       await scenario(t, async (context) => {
         const f = await fixture(context); await replacement(context, f);
+        await context.pool.query('UPDATE library_discovery_requests SET research_attempt_count=2 WHERE id=$1', [f.discoveryId]);
         if (drift === 'disabled') await context.pool.query('UPDATE app_users SET is_disabled=true WHERE id=$1', [f.owner.id]);
         if (drift === 'unlinked') await context.pool.query('DELETE FROM library_discovery_request_wanted_release_links WHERE wanted_release_id=$1', [f.wantedId]);
         if (drift === 'late') {
@@ -148,6 +206,7 @@ suite('Scoped Music Queue recovery transactions with isolated PostgreSQL', () =>
           '{lastDispatchAttemptedAt}',to_jsonb(NOW()+INTERVAL '1 second')) WHERE id=$1`, [f.discoveryId]);
         const stopped = await recover(context, f);
         assert.equal(stopped.reason, 'recovery_scope_not_current', drift);
+        assert.equal((await context.pool.query('SELECT evidence FROM library_discovery_requests WHERE id=$1', [f.discoveryId])).rows[0].evidence.downloadRecoveryExhausted, undefined, drift);
         assert.equal(stopped.terminalObservationRecorded, true);
         assert.equal((await context.store.getCandidate(f.candidate.id)).status, 'failed');
         assert.equal((await context.store.getCandidate(f.candidate.id)).downloadAttemptCount, 0);

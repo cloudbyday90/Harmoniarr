@@ -18,10 +18,13 @@ import {
 
 function createCompleteEvidence() {
   return {
+    authorityRefusals: ['missing_owner', 'disabled_owner', 'monitoring_revoked'].map(change => ({ change,
+      admittedBeforeChange: true, appliedCount: 0, providerTransferDelta: 0, libraryFilesUnchanged: true })),
     catalogCandidates: 20,
     catalogFixtures: 17,
     pipeline: { finalStatus: 'applied' },
     qualityExhaustion: {
+      preflightSkippedReason: 'no_safe_import_pending_candidate',
       activityBlockerCode: 'media_verification',
       activityEntityId: 'wanted-quality-exhaustion',
       followUpRunId: null,
@@ -36,6 +39,7 @@ function createCompleteEvidence() {
       wantedReleaseId: 'wanted-quality-exhaustion',
     },
     qualityRecovery: {
+      preflightSkippedReason: 'no_safe_import_pending_candidate',
       fallbackApplyRunId: 'quality-fallback-run',
       fallbackFinalStatus: 'applied',
       primaryAudioCodec: 'flac',
@@ -111,7 +115,8 @@ function createCompleteEvidence() {
     sourceDisappearanceRecovery: {
       fallbackApplyRunId: 'source-disappearance-run',
       primaryFinalStatus: 'failed',
-      terminalOutcome: 'source_disappeared',
+      terminalOutcome: 'import_blocked',
+      addBlockerCode: 'source_path_unavailable',
     },
   };
 }
@@ -121,6 +126,7 @@ test('controlled-provider pipeline evidence accepts the complete aggregate contr
 
   assert.deepEqual(getControlledProviderPipelineEvidenceReport(evidence), {
     checks: {
+      current_authority: true,
       catalog_candidate_count: true,
       catalog_fixture_count: true,
       primary_pipeline: true,
@@ -154,4 +160,26 @@ test('controlled-provider pipeline evidence names missing checks without seriali
       return true;
     },
   );
+});
+
+
+test('a generic import stop without the specific source blocker cannot qualify source disappearance', () => {
+  const evidence = createCompleteEvidence();
+  delete evidence.sourceDisappearanceRecovery.addBlockerCode;
+  assert.equal(getControlledProviderPipelineEvidenceReport(evidence).checks.source_disappearance_recovery, false);
+});
+
+test('current authority qualification requires each distinct refusal and both side-effect checks', () => {
+  for (const mutate of [rows => rows.pop(), rows => { rows[2] = rows[0]; }, rows => { rows[0].appliedCount = 1; },
+    rows => { rows[0].providerTransferDelta = 1; }, rows => { rows[0].libraryFilesUnchanged = false; }]) {
+    const evidence = createCompleteEvidence(); mutate(evidence.authorityRefusals);
+    assert.equal(getControlledProviderPipelineEvidenceReport(evidence).checks.current_authority, false);
+  }
+});
+
+test('worker quality evidence alone does not qualify the earlier preflight refusal', () => {
+  const evidence = createCompleteEvidence(); delete evidence.qualityRecovery.preflightSkippedReason;
+  delete evidence.qualityExhaustion.preflightSkippedReason;
+  const report = getControlledProviderPipelineEvidenceReport(evidence);
+  assert.equal(report.checks.quality_recovery, false); assert.equal(report.checks.quality_exhaustion, false);
 });

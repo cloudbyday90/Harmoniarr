@@ -5,6 +5,11 @@ description: "Apply and verify standards for Harmoniarr UI commands, forms, focu
 
 # Harmoniarr Web Standards
 
+For controlled acquisition fixtures and saved worker inputs, read
+[fixture authority](references/fixture-authority.md). It separates application-
+derived recipients, current authorization, preflight/worker quality proof and
+acknowledged cleanup from historical provenance.
+
 For candidate outcome identity, terminal recovery evidence or producer replay, read
 [candidate publication](references/candidate-reputation.md). It covers all five
 non-spectral producers, transaction ownership, retention and external-effect limits.

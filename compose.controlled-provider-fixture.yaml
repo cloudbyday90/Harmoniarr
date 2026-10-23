@@ -9,6 +9,11 @@ services:
       - "./testing/docker/controlled-provider-fixture-catalog.mjs:/validation/controlled-provider-fixture-catalog.mjs:ro"
       - "./testing/docker/controlled-provider-music-queue-linkage-verifier.mjs:/validation/controlled-provider-music-queue-linkage-verifier.mjs:ro"
       - "./testing/docker/controlled-provider-pipeline-verifier.mjs:/validation/controlled-provider-pipeline-verifier.mjs:ro"
+      - "./testing/docker/controlled-provider-worker-driver.mjs:/validation/controlled-provider-worker-driver.mjs:ro"
+      - "./testing/docker/controlled-provider-authority-fixtures.mjs:/validation/controlled-provider-authority-fixtures.mjs:ro"
+      - "./testing/docker/controlled-provider-metadata-fixture.mjs:/validation/controlled-provider-metadata-fixture.mjs:ro"
+      - "./testing/docker/controlled-provider-quality-drift-fixture.mjs:/validation/controlled-provider-quality-drift-fixture.mjs:ro"
+      - "./testing/docker/controlled-provider-authority-verifier.mjs:/validation/controlled-provider-authority-verifier.mjs:ro"
 
   controlled-provider:
     image: node:26.12.0-alpine

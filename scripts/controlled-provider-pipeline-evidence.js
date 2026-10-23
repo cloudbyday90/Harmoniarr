@@ -27,11 +27,13 @@ function verifyRecovery(result) {
 
 function verifySourceDisappearanceRecovery(result) {
   return hasAppliedFallback(result)
-    && result?.terminalOutcome === 'source_disappeared';
+    && result?.terminalOutcome === 'import_blocked'
+    && result?.addBlockerCode === 'source_path_unavailable';
 }
 
 function verifyQualityRecovery(result) {
   return hasAppliedFallback(result)
+    && result?.preflightSkippedReason === 'no_safe_import_pending_candidate'
     && result?.primaryAudioCodec === 'flac'
     && result?.primaryFilename?.endsWith('.flac')
     && result?.fallbackFinalStatus === 'applied';
@@ -39,6 +41,7 @@ function verifyQualityRecovery(result) {
 
 function verifyQualityExhaustion(result) {
   return result?.primaryFinalStatus === 'failed'
+    && result?.preflightSkippedReason === 'no_safe_import_pending_candidate'
     && result?.primaryAudioCodec === 'flac'
     && result?.primaryFilename?.endsWith('.flac')
     && result?.qualityRecoveryExhaustedCount === 1
@@ -122,7 +125,12 @@ function verifySharedManualRestart(result) {
  * the verifier payload into command output.
  */
 export function getControlledProviderPipelineEvidenceReport(result) {
+  const authority = result?.authorityRefusals;
   const checks = {
+    current_authority: Array.isArray(authority) && authority.length === 3
+      && ['missing_owner', 'disabled_owner', 'monitoring_revoked'].every(change => authority.filter(row => row?.change === change
+        && row.admittedBeforeChange === true && row.appliedCount === 0 && row.providerTransferDelta === 0
+        && row.libraryFilesUnchanged === true).length === 1),
     catalog_candidate_count: hasExpectedCount(result?.catalogCandidates, 20),
     catalog_fixture_count: hasExpectedCount(result?.catalogFixtures, 17),
     primary_pipeline: result?.pipeline?.finalStatus === 'applied',

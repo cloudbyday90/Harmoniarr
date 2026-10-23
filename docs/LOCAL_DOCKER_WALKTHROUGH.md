@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 23 [controlled authority rebuild](LOCAL_DOCKER_CONTROLLED_AUTHORITY_OUTCOME.md)
+records the current no-cache image and preserved administrator/data/mounts. Its
+[implementation outcome](CONTROLLED_PROVIDER_AUTHORITY_OUTCOME.md) restores the
+full controlled-provider pipeline and transactional scoped recovery exhaustion.
+
 The October 23 [candidate reputation rebuild](LOCAL_DOCKER_CANDIDATE_REPUTATION_OUTCOME.md)
-records the current no-cache image, preserved admin/data and readiness. The
+records the preceding no-cache image, preserved admin/data and readiness. The
 [owning outcome](CANDIDATE_REPUTATION_OUTCOME.md) records atomic publication across
 all five non-spectral outcome producers and their replay boundaries.
 

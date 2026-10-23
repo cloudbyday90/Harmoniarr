@@ -62,11 +62,12 @@ Adopt existing PostgreSQL transactions, event UUIDs, guarded publication scopes 
 
 SQL rollback does not reverse completed filesystem copies or remote transfers. Existing receipt and recovery guards still own reconciliation. This is not exactly-once notification delivery, a distributed transaction, an automatic historical backfill, or a new memory-sizing/security-conformance result. Producer guards own replay after ledger pruning; coherent restore is required and a missing ledger row does not authorize replaying a completed producer.
 
-Next: bring the controlled-provider fixture's discovery/recipient setup into the
-current acquisition-authority model, starting with the first ownerless discovery
-seed. Prove authorized progress and revoked/missing-owner refusal on the same
-fixture before restoring the full pipeline acceptance claim. Then measure snapshot
-rewrite cost and contention to decide per-source persistence while preserving
-manual trust/block decisions, retention and coherent restores.
+Completed follow-up: the October 23 [controlled authority outcome](CONTROLLED_PROVIDER_AUTHORITY_OUTCOME.md)
+records canonical fixture derivation, current-owner refusal and restored full
+controlled-provider qualification, plus the bounded scoped recovery correction.
+It supersedes the fixture qualification gap above while preserving this round's
+failed evidence. Next: persist/project initial quality-preflight review, then
+measure snapshot rewrite cost/contention before choosing per-source persistence
+with manual decisions, retention and coherent restores preserved.
 
 GitHub MCP found no open PRs to choose or clean up. No PR was merged, branch created, version bumped, release or tag created. Private artifacts remain under `.tmp/candidate-reputation-2026-10-23/`.

@@ -147,6 +147,11 @@ export function createMusicQueueRecoveryService({ store = createMusicQueueRecove
             entityType: 'operation_run', details: { runId: run.id, triggerSource: MUSIC_QUEUE_RECOVERY_DISCOVERY_SOURCE,
               metadataReleaseId, originRunId: operationRunId }, summary: 'Music Queue queued one guarded delayed search' }, queryable);
           decision = { ...decision, reason: 'rediscovery_scheduled', rediscovery: { scheduled: true, discoveryRunId: run.id, nextSearchAfter } };
+        } else if (kind !== 'quality' && discovery.researchAttemptCount >= maxResearchAttempts
+          && !(discovery.requestStatus === 'ready' && Date.parse(discovery.nextSearchAfter) > getNow().getTime())) {
+          const rediscovery = await store.persistRecoveryExhaustion({ discoveryId: discovery.id, sourceSearchId: discoverySearchId,
+            failedCandidateId: failed.id, maxResearchAttempts, observedAt: getNow().toISOString() }, queryable);
+          decision = { ...decision, reason: 'rediscovery_exhausted', rediscovery };
         }
         decision.failedAttemptCount = attempted.downloadAttemptCount;
       }

@@ -61,6 +61,9 @@ whole-app quiescence, notification exactly-once or live provider acceptance clai
 Private inventory/build/readiness/native/retirement records remain under
 `.tmp/candidate-reputation-2026-10-23/`. No release or tag was created.
 
-Next: correct controlled-provider fixture discovery/recipient authority setup
-and prove authorized and refused cases; then measure snapshot contention before
-choosing per-source persistence with explicit overrides and coherent restores.
+Completed follow-up: the [controlled authority rebuild](LOCAL_DOCKER_CONTROLLED_AUTHORITY_OUTCOME.md)
+records the newer no-cache image; its [implementation outcome](CONTROLLED_PROVIDER_AUTHORITY_OUTCOME.md)
+restores full controlled-provider qualification with permitted/refused authority.
+Next: persist/project initial quality-preflight review, then measure snapshot
+contention before choosing per-source persistence with explicit overrides and
+coherent restores.

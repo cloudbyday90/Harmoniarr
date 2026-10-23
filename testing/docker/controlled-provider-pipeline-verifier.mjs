@@ -21,6 +21,10 @@ import {
 } from './controlled-provider-fixture-catalog.mjs';
 import { assertSharedRecoveryDownloaderMusicQueueLinkage } from './controlled-provider-music-queue-linkage-verifier.mjs';
 import { createAcquisitionModule } from '/app/server-dist/acquisition/acquisition-module.js';
+import { createControlledProviderAuthorityFixtures } from './controlled-provider-authority-fixtures.mjs';
+import { executeControlledDownload, executeControlledApply, executeControlledDiscovery } from './controlled-provider-worker-driver.mjs';
+import { queueControlledQualityDrift } from './controlled-provider-quality-drift-fixture.mjs';
+import { verifyControlledProviderAuthority } from './controlled-provider-authority-verifier.mjs';
 import { createActivityModule } from '/app/server-dist/activity/activity-module.js';
 import { createTrustSnapshotStore } from '/app/server-dist/recovery/trust-snapshot-store.js';
 import { closePool, getPool } from '/app/server-dist/database.js';
@@ -92,233 +96,11 @@ function buildDownloadedFixturePath(fixture, { variant = 'primary' } = {}) {
   );
 }
 
-async function seedAppUser(pool) {
-  const user = await pool.query(
-    `INSERT INTO app_users (username, password_hash, role, must_change_password)
-     VALUES ($1, $2, 'admin', FALSE) RETURNING id`,
-    [`controlled-provider-${randomUUID()}`, `controlled-provider-${randomUUID()}`],
-  );
-  return user.rows[0].id;
-}
-
-async function seedDiscoveryRequest(pool, fixture, { appUserId = null } = {}) {
-  const artist = await pool.query(
-    `INSERT INTO metadata_artists (source_provider, source_artist_id, musicbrainz_artist_id, name, sort_name)
-     VALUES ('controlled_fixture', $1, $2, $3, $3) RETURNING id`,
-    [`artist-${fixture.id}`, randomUUID(), fixture.artistName],
-  );
-  const releaseGroup = await pool.query(
-    `INSERT INTO metadata_release_groups (
-      metadata_artist_id, source_provider, source_release_group_id, musicbrainz_release_group_id,
-      title, primary_type, first_release_date
-    ) VALUES ($1, 'controlled_fixture', $2, $3, $4, 'Album', '2026-01-01') RETURNING id`,
-    [artist.rows[0].id, `group-${fixture.id}`, randomUUID(), fixture.releaseTitle],
-  );
-  const release = await pool.query(
-    `INSERT INTO metadata_releases (
-      metadata_release_group_id, source_provider, source_release_id, musicbrainz_release_id,
-      title, status, release_date, track_count, medium_count, is_canonical
-    ) VALUES ($1, 'controlled_fixture', $2, $3, $4, 'Official', '2026-01-01', 1, 1, TRUE) RETURNING id`,
-    [releaseGroup.rows[0].id, `release-${fixture.id}`, randomUUID(), fixture.releaseTitle],
-  );
-  const medium = await pool.query(
-    `INSERT INTO metadata_media (metadata_release_id, position, format, track_count)
-     VALUES ($1, 1, 'Digital Media', 1) RETURNING id`,
-    [release.rows[0].id],
-  );
-  const recording = await pool.query(
-    `INSERT INTO metadata_recordings (
-      source_provider, source_recording_id, musicbrainz_recording_id, title, length_ms, artist_credit
-    ) VALUES ('controlled_fixture', $1, $2, $3, 3000, $4) RETURNING id`,
-    [`recording-${fixture.id}`, randomUUID(), fixture.trackTitle, fixture.artistName],
-  );
-  await pool.query(
-    `INSERT INTO metadata_tracks (
-      metadata_medium_id, metadata_recording_id, position, number_text, title, length_ms, artist_credit
-    ) VALUES ($1, $2, 1, '1', $3, 3000, $4)`,
-    [medium.rows[0].id, recording.rows[0].id, fixture.trackTitle, fixture.artistName],
-  );
-  const wantedRelease = appUserId
-    ? await pool.query(
-      `INSERT INTO library_wanted_releases (
-        app_user_id, metadata_artist_id, metadata_release_group_id, metadata_release_id,
-        wanted_status, expected_track_count, matched_track_count, missing_track_count,
-        release_date, release_status, evidence
-      ) VALUES ($1, $2, $3, $4, 'missing', 1, 0, 1, '2026-01-01', 'Official', $5::jsonb)
-      RETURNING id`,
-      [
-        appUserId,
-        artist.rows[0].id,
-        releaseGroup.rows[0].id,
-        release.rows[0].id,
-        JSON.stringify({ qualityProfile: 'lossless_archive', source: 'controlled_provider_e2e' }),
-      ],
-    )
-    : null;
-  const discoveryRequest = await pool.query(
-    `INSERT INTO library_discovery_requests (
-      metadata_artist_id, metadata_release_group_id, metadata_release_id, wanted_status, search_mode, request_status, evidence
-    ) VALUES ($1, $2, $3, 'missing', 'automatic', 'ready', $4::jsonb)
-    RETURNING id`,
-    [artist.rows[0].id, releaseGroup.rows[0].id, release.rows[0].id, JSON.stringify({ qualityProfile: 'lossless_archive' })],
-  );
-  if (wantedRelease?.rows[0]?.id) {
-    await pool.query(
-      `INSERT INTO library_discovery_request_wanted_release_links (
-        discovery_request_id, wanted_release_id, evidence
-      ) VALUES ($1, $2, '{}'::jsonb)`,
-      [discoveryRequest.rows[0].id, wantedRelease.rows[0].id],
-    );
-  }
-
-  return {
-    appUserId,
-    discoveryRequestId: discoveryRequest.rows[0].id,
-    metadataArtistId: artist.rows[0].id,
-    metadataReleaseGroupId: releaseGroup.rows[0].id,
-    metadataReleaseId: release.rows[0].id,
-    wantedReleaseId: wantedRelease?.rows[0]?.id ?? null,
-  };
-}
-
-async function seedSharedOperatorDiscoveryRequest(pool, fixture) {
-  const discoverySeed = await seedDiscoveryRequest(pool, fixture);
-  const operatorIds = await Promise.all([seedAppUser(pool), seedAppUser(pool)]);
-  const privatePolicyMarkers = operatorIds.map((_, index) => `operator-${index + 1}-private-policy-${randomUUID()}`);
-  const wantedReleases = [];
-
-  for (const [index, appUserId] of operatorIds.entries()) {
-    const wantedRelease = await pool.query(
-      `INSERT INTO library_wanted_releases (
-        app_user_id, metadata_artist_id, metadata_release_group_id, metadata_release_id,
-        wanted_status, expected_track_count, matched_track_count, missing_track_count,
-        release_date, release_status, evidence
-      ) VALUES ($1, $2, $3, $4, 'missing', 1, 0, 1, '2026-01-01', 'Official', $5::jsonb)
-      RETURNING id`,
-      [
-        appUserId,
-        discoverySeed.metadataArtistId,
-        discoverySeed.metadataReleaseGroupId,
-        discoverySeed.metadataReleaseId,
-        JSON.stringify({
-          privatePolicyMarker: privatePolicyMarkers[index],
-          qualityProfile: index === 0 ? 'lossless_archive' : 'high_quality',
-          source: 'controlled_provider_shared_operator_e2e',
-        }),
-      ],
-    );
-    const wantedReleaseId = wantedRelease.rows[0].id;
-    wantedReleases.push({ appUserId, wantedReleaseId });
-    await pool.query(
-      `INSERT INTO library_discovery_request_wanted_release_links (
-        discovery_request_id, wanted_release_id, evidence
-      ) VALUES ($1, $2, $3::jsonb)`,
-      [
-        discoverySeed.discoveryRequestId,
-        wantedReleaseId,
-        JSON.stringify({
-          musicQueueQualityOverride: {
-            privatePolicyMarker: privatePolicyMarkers[index],
-          },
-        }),
-      ],
-    );
-  }
-
-  return {
-    ...discoverySeed,
-    privatePolicyMarkers,
-    wantedReleases,
-  };
-}
-
-async function seedPersistedSharedOperatorDiscoveryRequest({
-  libraryModule,
-  pool,
-  fixture,
-}) {
-  const discoverySeed = await seedDiscoveryRequest(pool, fixture);
-  const operatorIds = await Promise.all([seedAppUser(pool), seedAppUser(pool)]);
-  const privatePolicyMarkers = operatorIds.map((_, index) => `operator-${index + 1}-private-policy-${randomUUID()}`);
-
-  await Promise.all(operatorIds.map(async (appUserId, index) => {
-    await pool.query(
-      `
-        INSERT INTO operator_artist_monitoring (
-          app_user_id,
-          metadata_artist_id,
-          is_monitored,
-          monitored_release_group_types,
-          release_scope,
-          wanted_automation_mode,
-          acquisition_profile_key,
-          search_on_add_mode,
-          selection_source_mode
-        ) VALUES ($1, $2, TRUE, ARRAY['album']::text[], 'current_and_future', 'current_and_future_matching', $3, 'missing_now', 'policy_plus_overrides')
-      `,
-      [
-        appUserId,
-        discoverySeed.metadataArtistId,
-        index === 0 ? 'lossless_archive' : 'balanced_library',
-      ],
-    );
-  }));
-
-  await libraryModule.libraryWantedReleaseService.reconcileWantedReleases();
-  await libraryModule.libraryDiscoveryRequestService.reconcileDiscoveryRequests();
-
-  const wantedReleaseRows = await pool.query(
-    `
-      SELECT app_user_id AS "appUserId", id AS "wantedReleaseId"
-      FROM library_wanted_releases
-      WHERE metadata_release_id = $1
-        AND app_user_id = ANY($2::uuid[])
-    `,
-    [discoverySeed.metadataReleaseId, operatorIds],
-  );
-  assert.equal(wantedReleaseRows.rowCount, operatorIds.length, 'the persisted shared fixture must materialize every monitored operator release');
-  const wantedReleaseIdByOperatorId = new Map(wantedReleaseRows.rows.map((row) => [row.appUserId, row.wantedReleaseId]));
-  const wantedReleases = operatorIds.map((appUserId, index) => ({
-    appUserId,
-    wantedReleaseId: wantedReleaseIdByOperatorId.get(appUserId),
-    privatePolicyMarker: privatePolicyMarkers[index],
-  }));
-
-  for (const { privatePolicyMarker, wantedReleaseId } of wantedReleases) {
-    assert.ok(wantedReleaseId, 'every persisted shared operator must receive a wanted release identity');
-    await pool.query(
-      `
-        UPDATE library_discovery_request_wanted_release_links AS release_link
-        SET evidence = COALESCE(release_link.evidence, '{}'::jsonb) || jsonb_build_object(
-          'musicQueueQualityOverride',
-          jsonb_build_object('privatePolicyMarker', $3::text)
-        )
-        FROM library_discovery_requests AS discovery_request
-        WHERE release_link.discovery_request_id = discovery_request.id
-          AND discovery_request.metadata_release_id = $1
-          AND release_link.wanted_release_id = $2
-      `,
-      [discoverySeed.metadataReleaseId, wantedReleaseId, privatePolicyMarker],
-    );
-  }
-
-  return {
-    ...discoverySeed,
-    privatePolicyMarkers,
-    wantedReleases,
-  };
-}
-
 async function executeDownloadAndReconcile({
   importCandidateModule,
   runId,
-  triggerSource,
 }) {
-  await importCandidateModule.importCandidateExecutionWorker.startWorkerRun({
-    requestedCandidateCount: 1,
-    runId,
-    triggerSource,
-  });
+  await executeControlledDownload(importCandidateModule, runId);
   await waitForRun(importCandidateModule.importCandidateExecutionRunStore, runId);
   const executionRunDetail = await importCandidateModule.importCandidateExecutionSummaryService
     .buildImportCandidateExecutionRunDetail({ runId });
@@ -329,15 +111,8 @@ async function executeDownloadAndReconcile({
 async function completeSafeAutoAdd({
   importCandidateModule,
   runId,
-  triggerSource,
 }) {
-  await importCandidateModule.importCandidateApplyWorker.startWorkerRun({
-    applySafetyMode: 'safe_auto',
-    executableCandidateCount: 1,
-    requestedCandidateCount: 1,
-    runId,
-    triggerSource,
-  });
+  await executeControlledApply(importCandidateModule, runId);
   return waitForRun(importCandidateModule.importCandidateApplyRunStore, runId);
 }
 
@@ -402,7 +177,8 @@ function assertSharedCandidateIsRedacted({ candidate, sharedSeed, wantedReleaseI
   assert.deepEqual(
     candidate.normalizedPayload?.musicQueue,
     {
-      profileCode: 'lossless_archive',
+      profileCode: sharedSeed.profileCode,
+      minimumBitrateKbps: 320,
       wantedReleaseId: wantedReleaseIds[0],
       wantedReleaseIds,
     },
@@ -474,6 +250,9 @@ async function runVerification() {
     recordActivityEventFn: activityModule.activityEventService.recordActivityEvent,
     slskdService,
   });
+  const authorityFixtures = createControlledProviderAuthorityFixtures({ pool,
+    reconcileWantedReleases: libraryModule.libraryWantedReleaseService.reconcileWantedReleases,
+    reconcileDiscoveryRequests: libraryModule.libraryDiscoveryRequestService.reconcileDiscoveryRequests });
   const acquisitionModule = createAcquisitionModule({
     buildLibraryWantedReleases: libraryModule.routeDependencies.buildLibraryWantedReleases,
     recordActivityEventFn: activityModule.activityEventService.recordActivityEvent,
@@ -508,7 +287,7 @@ async function runVerification() {
       && fixture.id !== sharedRecoveryFixture?.id
   ));
 
-  await seedDiscoveryRequest(pool, pipelineFixture);
+  await authorityFixtures.createSingleDiscovery(pipelineFixture);
   const dispatch = await libraryModule.libraryDiscoveryDispatchService.dispatchReadyDiscoveryRequests();
   assert.equal(dispatch.candidateCount, 1, `discovery must ingest one controlled candidate: ${JSON.stringify(dispatch)}`);
   const downloadRunId = dispatch.dispatchedSearches[0]?.autoDownloadStart?.runId;
@@ -517,7 +296,6 @@ async function runVerification() {
   const reconciliation = await executeDownloadAndReconcile({
     importCandidateModule,
     runId: downloadRunId,
-    triggerSource: 'controlled_provider_e2e',
   });
   assert.equal(
     reconciliation.summary.transitioned,
@@ -529,7 +307,6 @@ async function runVerification() {
   const applyRun = await completeSafeAutoAdd({
     importCandidateModule,
     runId: applyRunId,
-    triggerSource: 'controlled_provider_e2e',
   });
   assert.equal(applyRun.appliedCount, 1, 'verified generated FLAC must be added to the isolated music root');
   const pipelineCandidateId = dispatch.dispatchedSearches[0]?.autoSelection?.selectedCandidateId;
@@ -539,7 +316,7 @@ async function runVerification() {
   await stat(appliedPreview.files[0]?.libraryTarget?.path);
 
   assert.ok(recoveryFixture, 'the controlled catalog must include a recovery fixture');
-  await seedDiscoveryRequest(pool, recoveryFixture);
+  await authorityFixtures.createSingleDiscovery(recoveryFixture);
   const recoveryDispatch = await libraryModule.libraryDiscoveryDispatchService.dispatchReadyDiscoveryRequests();
   assert.equal(recoveryDispatch.candidateCount, 2, 'recovery fixture must ingest a primary and fallback candidate');
   const failedDownloadRunId = recoveryDispatch.dispatchedSearches[0]?.autoDownloadStart?.runId;
@@ -552,7 +329,6 @@ async function runVerification() {
   const failedReconciliation = await executeDownloadAndReconcile({
     importCandidateModule,
     runId: failedDownloadRunId,
-    triggerSource: 'controlled_provider_failure_recovery',
   });
   assert.equal(failedReconciliation.summary.recovered, 1, 'terminal provider failure must promote the next candidate');
   const fallbackDownloadRunId = failedReconciliation.recoveries[0]?.recoveryRunId;
@@ -562,14 +338,12 @@ async function runVerification() {
   const fallbackReconciliation = await executeDownloadAndReconcile({
     importCandidateModule,
     runId: fallbackDownloadRunId,
-    triggerSource: 'controlled_provider_failure_recovery',
   });
   const fallbackApplyRunId = fallbackReconciliation.autoApplyRuns[0]?.runId;
   assert.ok(fallbackApplyRunId, 'recovered transfer must continue into safe automatic add');
   const fallbackApplyRun = await completeSafeAutoAdd({
     importCandidateModule,
     runId: fallbackApplyRunId,
-    triggerSource: 'controlled_provider_failure_recovery',
   });
   assert.equal(fallbackApplyRun.appliedCount, 1, 'recovery fallback must be added to the isolated library');
   const finalPrimaryCandidate = await importCandidateModule.importCandidateService.getImportCandidate({
@@ -583,7 +357,7 @@ async function runVerification() {
 
   assert.ok(sourceDisappearanceFixture, 'the controlled catalog must include a completed-source disappearance fixture');
   const libraryFilesBeforeSourceDisappearance = await listFiles(musicRoot);
-  await seedDiscoveryRequest(pool, sourceDisappearanceFixture);
+  await authorityFixtures.createSingleDiscovery(sourceDisappearanceFixture);
   const sourceDisappearanceDispatch = await libraryModule.libraryDiscoveryDispatchService.dispatchReadyDiscoveryRequests();
   assert.equal(sourceDisappearanceDispatch.candidateCount, 2, 'completed-source disappearance fixture must ingest a primary and fallback candidate');
   const sourceDisappearanceDownloadRunId = sourceDisappearanceDispatch.dispatchedSearches[0]?.autoDownloadStart?.runId;
@@ -597,11 +371,7 @@ async function runVerification() {
     `controlled-${sourceDisappearanceFixture.id}`,
     'the higher-scored completed-source primary candidate must be attempted first',
   );
-  await importCandidateModule.importCandidateExecutionWorker.startWorkerRun({
-    requestedCandidateCount: 1,
-    runId: sourceDisappearanceDownloadRunId,
-    triggerSource: 'controlled_provider_completed_source_disappeared',
-  });
+  await executeControlledDownload(importCandidateModule, sourceDisappearanceDownloadRunId);
   await waitForRun(importCandidateModule.importCandidateExecutionRunStore, sourceDisappearanceDownloadRunId);
   const disappearedSourcePath = buildDownloadedFixturePath(sourceDisappearanceFixture);
   await stat(disappearedSourcePath);
@@ -622,7 +392,8 @@ async function runVerification() {
   const sourceDisappearanceRecovery = sourceDisappearanceReconciliation.recoveries[0];
   const sourceDisappearanceFallbackDownloadRunId = sourceDisappearanceRecovery?.recoveryRunId;
   const sourceDisappearanceFallbackCandidateId = sourceDisappearanceRecovery?.nextCandidateId;
-  assert.equal(sourceDisappearanceRecovery?.terminalOutcome, 'source_disappeared', 'the durable recovery outcome must not collapse into a generic failure');
+  assert.equal(sourceDisappearanceRecovery?.terminalOutcome, 'import_blocked');
+  assert.equal(sourceDisappearanceRecovery?.addBlockerCode, 'source_path_unavailable', 'the scoped import stop must retain its specific source blocker');
   assert.ok(sourceDisappearanceFallbackDownloadRunId, 'the missing source recovery must schedule a follow-up download run');
   assert.notEqual(sourceDisappearanceFallbackCandidateId, sourceDisappearancePrimaryCandidateId, 'the missing source recovery must promote a different candidate');
   const sourceDisappearancePrimaryFinalCandidate = await importCandidateModule.importCandidateService.getImportCandidate({
@@ -635,11 +406,7 @@ async function runVerification() {
     'the disappeared source must not write a file to the library before fallback',
   );
 
-  await importCandidateModule.importCandidateExecutionWorker.startWorkerRun({
-    requestedCandidateCount: 1,
-    runId: sourceDisappearanceFallbackDownloadRunId,
-    triggerSource: 'controlled_provider_completed_source_disappeared',
-  });
+  await executeControlledDownload(importCandidateModule, sourceDisappearanceFallbackDownloadRunId);
   await waitForRun(importCandidateModule.importCandidateExecutionRunStore, sourceDisappearanceFallbackDownloadRunId);
   const sourceDisappearanceFallbackExecutionSummary = await importCandidateModule.importCandidateExecutionSummaryService
     .buildImportCandidateExecutionSummary();
@@ -647,9 +414,7 @@ async function runVerification() {
     .reconcileImportCandidateExecutionSummary({ executionSummary: sourceDisappearanceFallbackExecutionSummary });
   const sourceDisappearanceFallbackApplyRunId = sourceDisappearanceFallbackReconciliation.autoApplyRuns[0]?.runId;
   assert.ok(sourceDisappearanceFallbackApplyRunId, 'the recovered completed source fallback must continue into safe automatic add');
-  await importCandidateModule.importCandidateApplyWorker.startWorkerRun({
-    applySafetyMode: 'safe_auto', executableCandidateCount: 1, requestedCandidateCount: 1, runId: sourceDisappearanceFallbackApplyRunId, triggerSource: 'controlled_provider_completed_source_disappeared',
-  });
+  await executeControlledApply(importCandidateModule, sourceDisappearanceFallbackApplyRunId);
   const sourceDisappearanceFallbackApplyRun = await waitForRun(
     importCandidateModule.importCandidateApplyRunStore,
     sourceDisappearanceFallbackApplyRunId,
@@ -671,7 +436,7 @@ async function runVerification() {
 
   assert.ok(qualityRecoveryFixture, 'the controlled catalog must include a strict-quality recovery fixture');
   const libraryFilesBeforeQualityRecovery = await listFiles(musicRoot);
-  await seedDiscoveryRequest(pool, qualityRecoveryFixture);
+  await authorityFixtures.createSingleDiscovery(qualityRecoveryFixture);
   const qualityRecoveryDispatch = await libraryModule.libraryDiscoveryDispatchService.dispatchReadyDiscoveryRequests();
   assert.equal(qualityRecoveryDispatch.candidateCount, 2, 'strict-quality recovery must ingest a primary and fallback match');
   const qualityRecoveryDownloadRunId = qualityRecoveryDispatch.dispatchedSearches[0]?.autoDownloadStart?.runId;
@@ -685,17 +450,17 @@ async function runVerification() {
     `controlled-${qualityRecoveryFixture.id}`,
     'the higher-scored spectrally limited FLAC primary must be attempted before the fallback',
   );
-  const qualityRecoveryReconciliation = await executeDownloadAndReconcile({
+  const qualityRecoveryPreflight = await executeDownloadAndReconcile({
     importCandidateModule,
     runId: qualityRecoveryDownloadRunId,
-    triggerSource: 'controlled_provider_quality_recovery',
   });
+  const qualityRecoveryReconciliation = await queueControlledQualityDrift({ candidateId: qualityRecoveryPrimaryCandidateId,
+    module: importCandidateModule, reconciliation: qualityRecoveryPreflight, verifiedSourcePath: appliedPreview.files[0].libraryTarget.path });
   const qualityRecoveryApplyRunId = qualityRecoveryReconciliation.autoApplyRuns[0]?.runId;
   assert.ok(qualityRecoveryApplyRunId, 'the spectrally limited FLAC primary must reach the actual safe-add quality gate');
   const qualityRecoveryApplyRun = await completeSafeAutoAdd({
     importCandidateModule,
     runId: qualityRecoveryApplyRunId,
-    triggerSource: 'controlled_provider_quality_recovery',
   });
   assert.equal(qualityRecoveryApplyRun.appliedCount, 0, 'a spectrally limited FLAC primary must not be added to the library');
   assert.equal(qualityRecoveryApplyRun.qualityBlockedCount, 1, 'the quality gate must record the blocked primary');
@@ -743,14 +508,12 @@ async function runVerification() {
   const qualityRecoveryFallbackReconciliation = await executeDownloadAndReconcile({
     importCandidateModule,
     runId: qualityRecoveryFallbackDownloadRun.id,
-    triggerSource: 'controlled_provider_quality_recovery',
   });
   const qualityRecoveryFallbackApplyRunId = qualityRecoveryFallbackReconciliation.autoApplyRuns[0]?.runId;
   assert.ok(qualityRecoveryFallbackApplyRunId, 'the quality-eligible fallback must continue into safe automatic add');
   const qualityRecoveryFallbackApplyRun = await completeSafeAutoAdd({
     importCandidateModule,
     runId: qualityRecoveryFallbackApplyRunId,
-    triggerSource: 'controlled_provider_quality_recovery',
   });
   assert.equal(qualityRecoveryFallbackApplyRun.appliedCount, 1, 'the genuine FLAC fallback must be added to the isolated library');
   const qualityRecoveryFallbackFinalCandidate = await importCandidateModule.importCandidateService.getImportCandidate({
@@ -765,8 +528,8 @@ async function runVerification() {
 
   assert.ok(qualityExhaustionFixture, 'the controlled catalog must include a strict-quality exhaustion fixture');
   const libraryFilesBeforeQualityExhaustion = await listFiles(musicRoot);
-  const qualityExhaustionAppUserId = await seedAppUser(pool);
-  const qualityExhaustionSeed = await seedDiscoveryRequest(pool, qualityExhaustionFixture, {
+  const qualityExhaustionAppUserId = await authorityFixtures.createOperator();
+  const qualityExhaustionSeed = await authorityFixtures.createSingleDiscovery(qualityExhaustionFixture, {
     appUserId: qualityExhaustionAppUserId,
   });
   assert.ok(qualityExhaustionSeed.wantedReleaseId, 'strict-quality exhaustion must have a persisted wanted release');
@@ -775,17 +538,17 @@ async function runVerification() {
   const qualityExhaustionDownloadRunId = qualityExhaustionDispatch.dispatchedSearches[0]?.autoDownloadStart?.runId;
   const qualityExhaustionPrimaryCandidateId = qualityExhaustionDispatch.dispatchedSearches[0]?.autoSelection?.selectedCandidateId;
   assert.ok(qualityExhaustionDownloadRunId, 'the strict-quality exhaustion primary must automatically enter download handoff');
-  const qualityExhaustionReconciliation = await executeDownloadAndReconcile({
+  const qualityExhaustionPreflight = await executeDownloadAndReconcile({
     importCandidateModule,
     runId: qualityExhaustionDownloadRunId,
-    triggerSource: 'controlled_provider_quality_exhaustion',
   });
+  const qualityExhaustionReconciliation = await queueControlledQualityDrift({ candidateId: qualityExhaustionPrimaryCandidateId,
+    module: importCandidateModule, reconciliation: qualityExhaustionPreflight, verifiedSourcePath: appliedPreview.files[0].libraryTarget.path });
   const qualityExhaustionApplyRunId = qualityExhaustionReconciliation.autoApplyRuns[0]?.runId;
   assert.ok(qualityExhaustionApplyRunId, 'the strict-quality exhaustion primary must reach the actual safe-add quality gate');
   const qualityExhaustionApplyRun = await completeSafeAutoAdd({
     importCandidateModule,
     runId: qualityExhaustionApplyRunId,
-    triggerSource: 'controlled_provider_quality_exhaustion',
   });
   assert.equal(qualityExhaustionApplyRun.appliedCount, 0, 'strict-quality exhaustion must not add the spectrally limited FLAC');
   assert.equal(qualityExhaustionApplyRun.qualityBlockedCount, 1, 'strict-quality exhaustion must record the quality block');
@@ -851,7 +614,10 @@ async function runVerification() {
   assert.equal(Object.hasOwn(qualityExhaustionActivity.extraPayload ?? {}, 'username'), false, 'Activity must not expose the provider username');
 
   assert.ok(sharedDiscoveryFixture, 'the controlled catalog must include a shared-discovery fixture');
-  const sharedDiscoverySeed = await seedSharedOperatorDiscoveryRequest(pool, sharedDiscoveryFixture);
+  const authorityRefusals = await verifyControlledProviderAuthority({ pool, fixture: sharedDiscoveryFixture, authorityFixtures,
+    libraryModule, importCandidateModule, executeDownloadAndReconcile, getProviderEvidence: getControlledProviderFixtureEvidence,
+    listLibraryFiles: () => listFiles(musicRoot) });
+  const sharedDiscoverySeed = await authorityFixtures.createSharedDiscovery(sharedDiscoveryFixture);
   const sharedDiscoveryEvidenceBefore = await getControlledProviderFixtureEvidence(sharedDiscoveryFixture.id);
   const sharedDiscoveryDispatch = await libraryModule.libraryDiscoveryDispatchService.dispatchReadyDiscoveryRequests();
   assert.equal(
@@ -878,7 +644,6 @@ async function runVerification() {
   const sharedDiscoveryReconciliation = await executeDownloadAndReconcile({
     importCandidateModule,
     runId: sharedDiscoveryDownloadRunId,
-    triggerSource: 'controlled_provider_shared_discovery',
   });
   const sharedDiscoveryApplyRunId = sharedDiscoveryReconciliation.autoApplyRuns[0]?.runId;
   assert.ok(sharedDiscoveryApplyRunId, 'a completed shared transfer must start one safe automatic add run');
@@ -934,7 +699,7 @@ async function runVerification() {
   });
 
   assert.ok(sharedRecoveryFixture, 'the controlled catalog must include a shared recovery fixture');
-  const sharedRecoverySeed = await seedSharedOperatorDiscoveryRequest(pool, sharedRecoveryFixture);
+  const sharedRecoverySeed = await authorityFixtures.createSharedDiscovery(sharedRecoveryFixture);
   const sharedRecoveryWantedReleaseIds = sharedRecoverySeed.wantedReleases.map(({ wantedReleaseId }) => wantedReleaseId);
   const sharedRecoveryEvidenceBefore = await getControlledProviderFixtureEvidence(sharedRecoveryFixture.id);
   const sharedRecoveryDispatch = await libraryModule.libraryDiscoveryDispatchService.dispatchReadyDiscoveryRequests();
@@ -966,7 +731,6 @@ async function runVerification() {
   const sharedRecoveryReconciliation = await executeDownloadAndReconcile({
     importCandidateModule,
     runId: sharedRecoveryPrimaryRunId,
-    triggerSource: 'controlled_provider_shared_recovery',
   });
   assert.equal(sharedRecoveryReconciliation.summary.recovered, 1, 'one shared primary failure must promote one fallback');
   assert.equal(sharedRecoveryReconciliation.recoveries.length, 1, 'one shared provider failure must create one recovery chain');
@@ -1006,11 +770,7 @@ async function runVerification() {
     wantedReleaseIds: sharedRecoveryWantedReleaseIds,
   });
 
-  await importCandidateModule.importCandidateExecutionWorker.startWorkerRun({
-    requestedCandidateCount: 1,
-    runId: sharedRecoveryFallbackRunId,
-    triggerSource: 'controlled_provider_shared_recovery',
-  });
+  await executeControlledDownload(importCandidateModule, sharedRecoveryFallbackRunId);
   await waitForRun(importCandidateModule.importCandidateExecutionRunStore, sharedRecoveryFallbackRunId);
   const sharedRecoveryEvidenceAfter = await getControlledProviderFixtureEvidence(sharedRecoveryFixture.id);
   assert.equal(
@@ -1069,11 +829,7 @@ async function runVerification() {
   }));
 
   assert.ok(sharedBoundedStopFixture, 'the controlled catalog must include a shared bounded-stop fixture');
-  const sharedBoundedStopSeed = await seedPersistedSharedOperatorDiscoveryRequest({
-    fixture: sharedBoundedStopFixture,
-    libraryModule,
-    pool,
-  });
+  const sharedBoundedStopSeed = await authorityFixtures.createSharedDiscovery(sharedBoundedStopFixture, { strict: false });
   const sharedBoundedStopWantedReleaseIds = sharedBoundedStopSeed.wantedReleases.map(({ wantedReleaseId }) => wantedReleaseId);
   const sharedBoundedStopEvidenceBefore = await getControlledProviderFixtureEvidence(sharedBoundedStopFixture.id);
   const sharedBoundedStopDispatch = await libraryModule.libraryDiscoveryDispatchService.dispatchReadyDiscoveryRequests();
@@ -1123,7 +879,6 @@ async function runVerification() {
   const sharedBoundedStopReconciliation = await executeDownloadAndReconcile({
     importCandidateModule,
     runId: sharedBoundedStopPrimaryRunId,
-    triggerSource: 'controlled_provider_shared_bounded_stop',
   });
   assert.equal(sharedBoundedStopReconciliation.summary.recovered, 0, 'an exhausted shared retry budget must not create a fallback download');
   assert.equal(sharedBoundedStopReconciliation.summary.rediscovered, 0, 'an exhausted shared retry budget must not create another rediscovery run');
@@ -1312,14 +1067,7 @@ async function runVerification() {
   });
 
   const sharedManualRestartEvidenceBefore = await getControlledProviderFixtureEvidence(sharedBoundedStopFixture.id);
-  await libraryModule.libraryDiscoveryWorker.startWorkerRun({
-    requestMetadata: { ipAddress: '127.0.0.1' },
-    runId: sharedManualRestartRunId,
-    triggerSource: 'music_queue_try_again',
-    triggeredByUserId: sharedBoundedStopSeed.wantedReleases.find((entry) => (
-      entry.wantedReleaseId === sharedManualRestartInitiatorWantedReleaseId
-    ))?.appUserId ?? null,
-  });
+  await executeControlledDiscovery(libraryModule, sharedManualRestartRunId);
   const sharedManualRestartRun = await waitForRun(libraryModule.libraryDiscoveryRunStore, sharedManualRestartRunId);
   assert.equal(sharedManualRestartRun.candidateCount, 1, 'the accepted shared restart must dispatch one new global provider search');
   const sharedManualRestartFinalStateResult = await pool.query(
@@ -1361,7 +1109,6 @@ async function runVerification() {
   await executeDownloadAndReconcile({
     importCandidateModule,
     runId: sharedManualRestartDownloadRunId,
-    triggerSource: 'controlled_provider_shared_manual_restart',
   });
   const sharedManualRestartEvidenceAfterTransfer = await getControlledProviderFixtureEvidence(sharedBoundedStopFixture.id);
   assert.equal(
@@ -1437,6 +1184,7 @@ async function runVerification() {
 
   return {
     catalogFixtures: controlledProviderFixtureCatalog.length,
+    authorityRefusals,
     catalogCandidates: catalogCandidateCount,
     noResponseFixtures: noResponseCount,
     pipeline: { applyRunId, downloadRunId, finalStatus: 'applied' },
@@ -1454,8 +1202,10 @@ async function runVerification() {
       primaryCandidateId: sourceDisappearancePrimaryCandidateId,
       primaryFinalStatus: sourceDisappearancePrimaryFinalCandidate.status,
       terminalOutcome: sourceDisappearanceRecovery.terminalOutcome,
+      addBlockerCode: sourceDisappearanceRecovery.addBlockerCode,
     },
     qualityRecovery: {
+      preflightSkippedReason: qualityRecoveryPreflight.autoApplyRuns[0].skippedReason,
       fallbackApplyRunId: qualityRecoveryFallbackApplyRunId,
       fallbackFinalStatus: qualityRecoveryFallbackFinalCandidate.status,
       primaryAudioCodec: qualityRecoveryPrimaryPreview.files[0]?.inspection?.metadata?.primaryAudioCodec ?? null,
@@ -1464,6 +1214,7 @@ async function runVerification() {
       primaryFinalStatus: qualityRecoveryPrimaryFinalCandidate.status,
     },
     qualityExhaustion: {
+      preflightSkippedReason: qualityExhaustionPreflight.autoApplyRuns[0].skippedReason,
       followUpRunId: qualityExhaustionFollowUpRun?.id ?? null,
       libraryFileCountAfter: libraryFilesAfterQualityExhaustion.length,
       libraryFileCountBefore: libraryFilesBeforeQualityExhaustion.length,

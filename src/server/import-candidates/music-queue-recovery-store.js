@@ -9,6 +9,7 @@ import { getPool } from '../database.js';
 import { effectiveExecutionOriginSql } from './import-execution-origin-sql.js';
 import { getImportCandidateById, listImportCandidateFiles, insertImportCandidateEvent } from './import-candidate-repository.js';
 import { createImportCandidateReleaseRecheckStore } from './import-candidate-release-recheck-store.js';
+import { persistMusicQueueRecoveryExhaustion } from './music-queue-recovery-exhaustion-store.js';
 import { MUSIC_QUEUE_RECOVERY_EXECUTION_SOURCE, MUSIC_QUEUE_RECOVERY_DISCOVERY_SOURCE } from './music-queue-recovery-policy.js';
 
 export function createMusicQueueRecoveryStore({ getPoolFn = getPool } = {}) {
@@ -163,6 +164,6 @@ export function createMusicQueueRecoveryStore({ getPoolFn = getPool } = {}) {
   }
   return { ...scopeStore, getCandidate, getOrigin, isAdoptedDownloadEpisode, getDiscovery, listCandidateIds, lockParents, getEpisode, saveEpisode,
     recordTerminal, incrementAttempt, selectCandidate, findActiveSelection, readExecutionReservation, readDiscoveryReservation,
-    supersedeDiscoveryReservations, isCurrentExecutionOrigin, scheduleRediscovery, holdRecoverySelection,
+    supersedeDiscoveryReservations, isCurrentExecutionOrigin, scheduleRediscovery, persistRecoveryExhaustion: persistMusicQueueRecoveryExhaustion, holdRecoverySelection,
     retireExecutionReservation, recordExecutionNotDispatched, retireDiscoveryReservation, transitionExecutionPhase, lockRecoveryCreation };
 }

@@ -5,6 +5,15 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For controlled-provider fixture repairs, use the standards
+[fixture authority reference](../harmoniarr-web-standards/references/fixture-authority.md).
+Run the driver/evidence unit checks and explicit fixture .mjs lint first, then
+`validate:docker-controlled-provider-pipeline` against an immutable packaged image.
+Keep initial media refusal separate from changed-source worker proof, and current
+apply authority separate from the existing pre-provider recovery PostgreSQL lane.
+Retain unchanged runtime qualification only after exact source/package comparison;
+fixture-only changes do not justify unrelated native allocation reruns.
+
 For candidate evidence, use the standards [publication reference](../harmoniarr-web-standards/references/candidate-reputation.md).
 Run the shared twenty-case candidate PostgreSQL registrar and existing recovery
 transaction/spectral cross-writer cohorts; use `validate:native-candidate-reputation`
