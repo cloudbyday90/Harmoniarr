@@ -50,6 +50,17 @@ Scenario checks: heap-only cap → insufficient for native buffers; low startup 
 their combination; valid output then allocation failure → no publication; shared
 container → keep aggregate OOM limitation explicit. Do not require a second service.
 
+For sample-depth/entropy changes, use the explicit
+`validate:native-artwork-corpus` lane and its
+[design](../../../../docs/ARTWORK_CORPUS_DESIGN.md). Confirm native `depth` and
+`bitsPerSample`; generating a nominal 16-bit image from eight-bit samples is not
+full-depth evidence. PNG samples are network-order; qualify real CRCs and bound
+fixture compression. Stream the large refusal input rather than allocating its
+entire decoded image. Compare canonical eight-bit pixels without claiming original
+16-bit precision, and verify real input EXIF before asserting its removal.
+Keep moderate-image RSS samples separate from maximum-image sizing and aggregate
+reservation authority. An available-memory snapshot is not a reservation.
+
 See [design](../../../../docs/ARTWORK_MEMORY_DESIGN.md),
 [research/tradeoffs](../../../../docs/ARTWORK_MEMORY_RESEARCH.md) and
 [outcome](../../../../docs/ARTWORK_MEMORY_OUTCOME.md).

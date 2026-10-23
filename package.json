@@ -71,6 +71,7 @@
     "test:integration": "node --test --test-concurrency=1 --test-reporter=spec --test-reporter=./testing/reporters/early-failure-reporter.js --test-reporter-destination=stdout --test-reporter-destination=stderr \"test/integration/**/*.test.js\"",
     "test:integration:serial": "npm run test:integration",
     "validate:native-slskd": "node --test --test-concurrency=1 test/native/slskd-batch.test.js",
+    "validate:native-artwork-corpus": "node --test --test-concurrency=1 test/native/artwork-worker-corpus.test.js",
     "validate:native-slskd-files": "node --test --test-concurrency=1 test/native/slskd-files.test.js",
     "validate:native-slskd-audio": "node --test --test-concurrency=1 test/native/slskd-audio-import.test.js",
     "validate:native-slskd-partial": "node --test --test-concurrency=1 test/native/slskd-partial.test.js",

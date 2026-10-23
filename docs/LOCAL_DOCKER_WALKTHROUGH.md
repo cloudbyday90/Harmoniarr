@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 22 [artwork corpus rebuild](LOCAL_DOCKER_ARTWORK_CORPUS_OUTCOME.md)
+records the current no-cache image, unchanged packaged runtime, preserved admin/data
+and readiness. The [owning outcome](ARTWORK_CORPUS_OUTCOME.md) records seven native
+sample-depth/entropy cases and the next aggregate admission recommendation.
+
 The October 22 [built-in artwork memory rebuild](LOCAL_DOCKER_ARTWORK_MEMORY_OUTCOME.md)
-records the current no-cache image, maintained Linux limiter, preserved admin/data
+records the preceding no-cache image, maintained Linux limiter, preserved admin/data
 and passing readiness. The [owning outcome](ARTWORK_MEMORY_OUTCOME.md) separates
 actual allocation refusal and memory qualification from shared-container OOM claims.
 

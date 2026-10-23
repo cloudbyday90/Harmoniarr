@@ -11,24 +11,10 @@ import { createArtworkWorkerService } from '../../src/server/artwork/artwork-wor
 import { createArtworkIngestionService, prepareArtworkAsset } from '../../src/server/artwork/artwork-ingestion-service.js';
 import { createArtworkIngestionAdmission } from '../../src/server/artwork/artwork-ingestion-admission.js';
 import { maximumByteArtworkPng } from '../../testing/server/artwork-worker-inputs.js';
+import { artworkWorkerCgroup } from '../../testing/server/artwork-worker-cgroup.js';
 
-assert.equal(process.platform, 'linux', 'Use the explicit constrained Linux memory lane');
-const kernel = async path => (await readFile(`/sys/fs/cgroup/${path}`, 'utf8')).trim();
-let version = 2; let memoryLimit;
-try { memoryLimit = await kernel('memory.max'); }
-catch (error) { if (error.code !== 'ENOENT') throw error; version = 1; memoryLimit = await kernel('memory/memory.limit_in_bytes'); }
-assert.equal(memoryLimit, String(3 * 1024 ** 3), 'Three GiB covers the test parent and two one-GiB DATA budgets');
-if (version === 2) {
-  assert.equal(await kernel('memory.swap.max'), '0'); assert.equal(await kernel('pids.max'), '96');
-  const [quota, period] = (await kernel('cpu.max')).split(' ').map(Number); assert.equal(quota / period, 2);
-} else {
-  assert.equal(await kernel('memory/memory.memsw.limit_in_bytes'), memoryLimit); assert.equal(await kernel('pids/pids.max'), '96');
-  assert.equal(Number(await kernel('cpu/cpu.cfs_quota_us')) / Number(await kernel('cpu/cpu.cfs_period_us')), 2);
-}
-const oomKills = async () => {
-  const text = await kernel(version === 2 ? 'memory.events' : 'memory/memory.oom_control');
-  const match = /^oom_kill\s+(\d+)$/mu.exec(text); assert.ok(match, 'Require kernel OOM kill counter'); return Number(match[1]);
-};
+const profile = await artworkWorkerCgroup({ memoryBytes: 3 * 1024 ** 3, cpus: 2 });
+const oomKills = async () => (await profile.snapshot()).oomKills;
 const fixturePath = fileURLToPath(new URL('../../testing/server/artwork-memory-fixture.js', import.meta.url));
 const limits = { maxOriginalFileSizeBytes: 100 * 1024 * 1024, maxOriginalDimensionPixels: 8192 };
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -91,7 +77,7 @@ test('two concurrent maximum-byte jobs retain exact hashes within their individu
   }
   assert.equal(publications, 2); assert.equal(worker.peakActive(), 2); assert.equal(await oomKills(), beforeOom); retired(worker);
   t.diagnostic(JSON.stringify({ publications, concurrentChildren: worker.peakActive(), children: worker.records.flatMap(reports),
-    containerMemoryPeakBytes: Number(await kernel(version === 2 ? 'memory.peak' : 'memory/memory.max_usage_in_bytes')),
+    containerMemoryPeakBytes: (await profile.snapshot()).memoryPeakBytes,
     scope: 'whole qualification container, including fixture generation and earlier allocation control', oomKillsUnchanged: true }));
 });
 

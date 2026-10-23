@@ -10,6 +10,11 @@ For decoder memory controls, use the standards skill's
 Keep actual external allocation refusal and concurrent maximum images in explicit
 Linux lanes, separate from cheap policy/framing tests. Verify kernel limits/OOM
 counters and drain every child before cleanup; DATA is not RSS or a RAM reservation.
+`validate:native-artwork-corpus` owns seven fixed entropy/sample-depth cases in a
+one-CPU/1 GiB Linux profile; the allocation/concurrent-byte lane keeps its separate
+two-CPU/3 GiB profile. Their shared test-only cgroup helper requires actual v1/v2
+controls and OOM counters. Do not repeat unrelated client/SQL suites for a corpus-
+only change when exact packaged runtime/source comparisons establish unchanged code.
 
 For actual provider HTTPS, use [provider HTTPS qualification](references/provider-https.md).
 It owns child-scoped trust/proxy configuration, preserved DNS identity, native

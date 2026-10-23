@@ -111,10 +111,11 @@ dependencies and no additional deployed service. Costs include experimental
 child-only JIT-less behavior, conservative capacity refusals and remaining shared
 container/host memory competition. It is not a total RSS or hostile-code sandbox.
 
-**Next: qualify diverse high-entropy and 16-bit images, then size aggregate memory
-admission inside the existing app.** Keep load-sensitive concurrent maximum-pixel
-throughput separate from the memory correctness gate, with unchanged deadlines
-and recorded resource/host conditions.
+The subsequent [corpus outcome](ARTWORK_CORPUS_OUTCOME.md) qualifies diverse
+high-entropy and 16-bit inputs. Its [design](ARTWORK_CORPUS_DESIGN.md) assesses the
+next aggregate admission step inside the existing app. Keep load-sensitive
+concurrent maximum-pixel throughput separate from the memory correctness gate,
+with unchanged deadlines and recorded resource/host conditions.
 
 ## Run the explicit memory lane
 
