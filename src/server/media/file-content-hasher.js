@@ -26,6 +26,8 @@
 // block; and every read is bounded by the planner's window length.
 
 import { open } from 'node:fs/promises';
+import { throwIfMediaCancelled } from './media-cancellation.js';
+import { withWorkerTaskCleanup } from '../worker-task-cleanup.js';
 
 import {
   DEFAULT_SAMPLE_SIZE,
@@ -64,16 +66,19 @@ export function createFileContentHasher({
    * @param {number} [input.sizeBytes] - Known size (e.g. from the catalog row); avoids a stat.
    * @returns {Promise<string>} hex digest
    */
-  async function hashFile({ filePath, sizeBytes = null } = {}) {
+  async function hashFile({ filePath, sizeBytes = null, signal } = {}) {
+    throwIfMediaCancelled(signal);
     if (typeof filePath !== 'string' || filePath.trim().length === 0) {
       throw new Error('hashFile requires filePath');
     }
 
     const handle = await openFileFn(filePath, 'r');
-    try {
+    const fingerprint = await withWorkerTaskCleanup(async () => {
+      throwIfMediaCancelled(signal);
       let size = normalizeNonNegativeInteger(sizeBytes);
       if (size === null) {
         const stats = await handle.stat();
+        throwIfMediaCancelled(signal);
         size = normalizeNonNegativeInteger(stats.size) ?? 0;
       }
 
@@ -81,6 +86,7 @@ export function createFileContentHasher({
       const chunks = [];
 
       for (const window of plan.windows) {
+        throwIfMediaCancelled(signal);
         const length = normalizeNonNegativeInteger(window.length) ?? 0;
         if (length <= 0) {
           continue;
@@ -88,13 +94,14 @@ export function createFileContentHasher({
         const position = Math.max(0, normalizeNonNegativeInteger(window.position) ?? 0);
         const buffer = Buffer.alloc(length);
         const { bytesRead } = await handle.read(buffer, 0, length, position);
+        throwIfMediaCancelled(signal);
         chunks.push(bytesRead === length ? buffer : buffer.subarray(0, bytesRead));
       }
 
       return buildContentFingerprint({ sizeBytes: size, chunks });
-    } finally {
-      await handle.close();
-    }
+    }, () => handle.close());
+    throwIfMediaCancelled(signal);
+    return fingerprint;
   }
 
   return { hashFile };

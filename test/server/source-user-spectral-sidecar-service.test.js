@@ -25,7 +25,10 @@ function createStoreStub({ enqueueResult, claimJobs = [] } = {}) {
   return {
     calls,
     store: {
-      claimNextSpectralJobs: async () => claimJobs,
+      claimNextSpectralJobs: async () => claimJobs.map(job => ({ ...job, attempts: 1 })),
+      isSpectralJobClaimCurrent: async () => true,
+      withSpectralJobClaim: async (_input, work) => work(null),
+      releaseSpectralJobClaim: async () => true,
       completeSpectralJob: async (input) => { calls.complete.push(input); return input; },
       countPendingSpectralJobs: async () => 0,
       enqueueSpectralJob: async (input) => {
@@ -123,5 +126,5 @@ test('processPendingSpectralJobs fails a job when analysis throws and never thro
 
   assert.equal(summary.failed, 1);
   assert.equal(stub.calls.fail.length, 1);
-  assert.equal(stub.calls.fail[0].error, 'ffmpeg unavailable');
+  assert.equal(stub.calls.fail[0].error, 'Spectral processing failed');
 });

@@ -51,7 +51,8 @@ Use the default one-second policy with durable-store controls, plus actual Linux
 held-SIGTERM close and real encoder cancellation in
 `validate:native-media-worker-cancellation`. Its 25 ms codec control is a test
 setting, not a production latency claim. SQL/filesystem reads still drain normally;
-spectral accepts a signal but its separate job owner has no new durable polling.
+the [spectral ownership follow-up](spectral-ownership.md) adds separate claim
+observation and locked cache/job publication for that queue.
 
 ## Lease observation and media interruption
 

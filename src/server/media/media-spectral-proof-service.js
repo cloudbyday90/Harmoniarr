@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { throwIfMediaCancelled } from './media-cancellation.js';
 import {
   classifySpectralCutoff,
   isDeclaredLossless,
@@ -58,7 +59,7 @@ export function createMediaSpectralProofService({
   spectralCacheStore = null,
   strictAcceptsInconclusive = false,
 } = {}) {
-  async function loadThresholds() {
+  async function loadThresholds(signal) {
     if (typeof loadSpectralThresholdsFn !== 'function') {
       return undefined;
     }
@@ -67,12 +68,13 @@ export function createMediaSpectralProofService({
       const thresholds = await loadSpectralThresholdsFn();
       return thresholds && typeof thresholds === 'object' ? thresholds : undefined;
     } catch (error) {
+      throwIfMediaCancelled(signal);
       onWarning('Failed to load spectral thresholds for pre-add proof', error);
       return undefined;
     }
   }
 
-  async function readCachedMeasurement({ contentHash }) {
+  async function readCachedMeasurement({ contentHash, signal }) {
     if (!contentHash || !spectralCacheStore || typeof spectralCacheStore.getCachedMeasurement !== 'function') {
       return null;
     }
@@ -80,12 +82,13 @@ export function createMediaSpectralProofService({
     try {
       return await spectralCacheStore.getCachedMeasurement({ contentHash });
     } catch (error) {
+      throwIfMediaCancelled(signal);
       onWarning('Failed to read cached spectral measurement for pre-add proof', error);
       return null;
     }
   }
 
-  async function writeCachedMeasurement({ contentHash, measurement }) {
+  async function writeCachedMeasurement({ contentHash, measurement, signal }) {
     if (!contentHash || !spectralCacheStore || typeof spectralCacheStore.putCachedMeasurement !== 'function') {
       return null;
     }
@@ -93,11 +96,13 @@ export function createMediaSpectralProofService({
     try {
       return await spectralCacheStore.putCachedMeasurement({
         contentHash,
+        ...(signal ? { signal } : {}),
         cutoffHz: measurement?.cutoffHz ?? null,
         durationMs: measurement?.durationMs ?? null,
         frameCount: measurement?.frameCount ?? 0,
       });
     } catch (error) {
+      throwIfMediaCancelled(signal);
       onWarning('Failed to write cached spectral measurement for pre-add proof', error);
       return null;
     }
@@ -154,7 +159,9 @@ export function createMediaSpectralProofService({
     filePath = null,
     sampleRate = null,
     sizeBytes = null,
+    signal,
   } = {}) {
+    throwIfMediaCancelled(signal);
     if (!isDeclaredLossless({ codec: declaredCodec, extension: declaredExtension })) {
       return buildResult({
         accepted: true,
@@ -183,8 +190,9 @@ export function createMediaSpectralProofService({
 
     let contentHash;
     try {
-      contentHash = await hashFileFn({ filePath: normalizedPath, sizeBytes });
+      contentHash = await hashFileFn({ filePath: normalizedPath, sizeBytes, ...(signal ? { signal } : {}) });
     } catch (error) {
+      throwIfMediaCancelled(signal);
       onWarning('Failed to fingerprint file for pre-add spectral proof', error);
       return buildResult({
         accepted: false,
@@ -193,6 +201,7 @@ export function createMediaSpectralProofService({
       });
     }
 
+    throwIfMediaCancelled(signal);
     const normalizedHash = normalizeToken(contentHash);
     if (!normalizedHash) {
       return buildResult({
@@ -202,8 +211,10 @@ export function createMediaSpectralProofService({
       });
     }
 
-    const thresholds = await loadThresholds();
-    const cached = await readCachedMeasurement({ contentHash: normalizedHash });
+    const thresholds = await loadThresholds(signal);
+    throwIfMediaCancelled(signal);
+    const cached = await readCachedMeasurement({ contentHash: normalizedHash, signal });
+    throwIfMediaCancelled(signal);
     if (cached) {
       const classification = classifyMeasurement({
         declaredCodec,
@@ -230,8 +241,9 @@ export function createMediaSpectralProofService({
 
     let measurement;
     try {
-      measurement = await analyzeSpectralCutoffFn({ filePath: normalizedPath });
+      measurement = await analyzeSpectralCutoffFn({ filePath: normalizedPath, ...(signal ? { signal } : {}) });
     } catch (error) {
+      throwIfMediaCancelled(signal);
       onWarning('Failed to analyze file for pre-add spectral proof', error);
       return buildResult({
         accepted: false,
@@ -241,7 +253,9 @@ export function createMediaSpectralProofService({
       });
     }
 
-    await writeCachedMeasurement({ contentHash: normalizedHash, measurement });
+    throwIfMediaCancelled(signal);
+    await writeCachedMeasurement({ contentHash: normalizedHash, measurement, signal });
+    throwIfMediaCancelled(signal);
     const classification = classifyMeasurement({
       declaredCodec,
       declaredExtension,

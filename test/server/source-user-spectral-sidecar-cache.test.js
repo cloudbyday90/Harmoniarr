@@ -25,7 +25,10 @@ function createStoreStub(claimJobs = []) {
   return {
     calls,
     store: {
-      claimNextSpectralJobs: async () => claimJobs,
+      claimNextSpectralJobs: async () => claimJobs.map(job => ({ ...job, attempts: 1 })),
+      isSpectralJobClaimCurrent: async () => true,
+      withSpectralJobClaim: async (_input, work) => work(null),
+      releaseSpectralJobClaim: async () => true,
       completeSpectralJob: async (input) => { calls.complete.push(input); return input; },
       countPendingSpectralJobs: async () => 0,
       enqueueSpectralJob: async () => ({ enqueued: true, job: { id: 'job' }, reason: null }),

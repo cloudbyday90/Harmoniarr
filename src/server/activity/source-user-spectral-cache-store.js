@@ -24,6 +24,8 @@
 //
 // All SQL is fully parameterized.
 
+import { throwIfMediaCancelled } from '../media/media-cancellation.js';
+import { createDatabaseTransactionRunner } from '../database-transaction-service.js';
 import { getPool } from '../database.js';
 
 function normalizeContentHash(value) {
@@ -96,13 +98,16 @@ export function createSourceUserSpectralCacheStore({ getPoolFn = getPool } = {})
     cutoffHz = null,
     frameCount = 0,
     durationMs = null,
+    queryable = null, signal,
   } = {}) {
+    throwIfMediaCancelled(signal);
+    if (signal && !queryable) return createDatabaseTransactionRunner({ getPoolFn })(client => putCachedMeasurement({ contentHash, cutoffHz, frameCount, durationMs, queryable: client, signal }));
     const normalized = normalizeContentHash(contentHash);
     if (!normalized) {
       return null;
     }
 
-    const result = await getPoolFn().query(
+    const result = await (queryable ?? getPoolFn()).query(
       `INSERT INTO source_user_spectral_cache (content_hash, cutoff_hz, frame_count, duration_ms)
        VALUES ($1, $2, $3, $4)
        ON CONFLICT (content_hash) DO UPDATE
@@ -119,6 +124,7 @@ export function createSourceUserSpectralCacheStore({ getPoolFn = getPool } = {})
       ],
     );
 
+    throwIfMediaCancelled(signal);
     return result.rows.length === 0 ? null : mapCacheRow(result.rows[0]);
   }
 

@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createSourceUserSpectralClaimStore, captureSpectralJobClaim } from './source-user-spectral-claim-store.js';
 import { getPool } from '../database.js';
 import { buildSourceUserUsernameKey } from './source-user-trust-service.js';
 
@@ -101,8 +102,8 @@ function mapSpectralJobRow(row) {
  * The queue is the back-pressure boundary between the synchronous apply path
  * and the expensive FFT analysis: `enqueueSpectralJob` refuses new work once the
  * pending+active backlog reaches `maxBacklog`, and `claimNextSpectralJobs` uses
- * `FOR UPDATE SKIP LOCKED` so concurrent drains never double-process a file
- * (the same durable-claim pattern proven by pg-boss). All SQL is fully
+ * `FOR UPDATE SKIP LOCKED` for disjoint pending claims. Captured claim generations separately fence
+ * publication after stale recovery. All SQL is fully
  * parameterized.
  */
 export function createSourceUserSpectralJobStore({
@@ -113,8 +114,8 @@ export function createSourceUserSpectralJobStore({
 
   /**
    * Atomically enqueues a job unless the pending+active backlog is already at
-   * the cap. The cap check and the insert are a single statement so concurrent
-   * enqueues cannot race past the limit.
+   * the cap. The cap check and insert share one statement snapshot;
+   * this does not serialize concurrent enqueue transactions.
    *
    * @returns {Promise<{ enqueued: boolean, job: object | null, reason: string | null }>}
    */
@@ -205,12 +206,15 @@ export function createSourceUserSpectralJobStore({
     estimatedSourceBitrate = null,
     analysis = null,
     contentHash = null,
+    expectedClaim, queryable = null,
   }) {
+    const claim = captureSpectralJobClaim(expectedClaim);
+    if (claim.id !== id) throw new TypeError('Spectral claim target mismatch');
     if (typeof id !== 'string' || id.trim().length === 0) {
       throw new Error('completeSpectralJob requires id');
     }
 
-    const result = await getPoolFn().query(
+    const result = await (queryable ?? getPoolFn()).query(
       `UPDATE source_user_spectral_jobs
        SET state = 'done',
            verdict = $2,
@@ -220,7 +224,7 @@ export function createSourceUserSpectralJobStore({
            content_hash = COALESCE($6, content_hash),
            last_error = NULL,
            updated_at = NOW()
-       WHERE id = $1
+       WHERE id = $1 AND state = 'active' AND attempts = $7
        RETURNING *`,
       [
         id,
@@ -229,6 +233,7 @@ export function createSourceUserSpectralJobStore({
         normalizePositiveInteger(estimatedSourceBitrate),
         analysis === null || analysis === undefined ? null : JSON.stringify(analysis),
         normalizeOptionalString(contentHash),
+        claim.attempts,
       ],
     );
 
@@ -352,7 +357,9 @@ export function createSourceUserSpectralJobStore({
    * Records a failed attempt. If the job still has attempts remaining it returns
    * to `pending` for a later retry; otherwise it is parked in `failed`.
    */
-  async function failSpectralJob({ id, error = null, maxAttempts = DEFAULT_MAX_ATTEMPTS }) {
+  async function failSpectralJob({ id, expectedClaim, error = null, maxAttempts = DEFAULT_MAX_ATTEMPTS }) {
+    const claim = captureSpectralJobClaim(expectedClaim);
+    if (claim.id !== id) throw new TypeError('Spectral claim target mismatch');
     if (typeof id !== 'string' || id.trim().length === 0) {
       throw new Error('failSpectralJob requires id');
     }
@@ -364,9 +371,9 @@ export function createSourceUserSpectralJobStore({
            claimed_at = NULL,
            last_error = $2,
            updated_at = NOW()
-       WHERE id = $1
+       WHERE id = $1 AND state = 'active' AND attempts = $4
        RETURNING *`,
-      [id, normalizeOptionalString(error), attemptCap],
+      [id, normalizeOptionalString(error), attemptCap, claim.attempts],
     );
 
     return result.rows.length === 0 ? null : mapSpectralJobRow(result.rows[0]);
@@ -417,6 +424,7 @@ export function createSourceUserSpectralJobStore({
   }
 
   return {
+    ...createSourceUserSpectralClaimStore({ getPoolFn }),
     claimNextSpectralJobs,
     completeSpectralJob,
     countPendingSpectralJobs,

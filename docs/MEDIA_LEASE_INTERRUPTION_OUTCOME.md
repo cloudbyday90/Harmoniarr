@@ -112,11 +112,12 @@ obsolete work without weakening ownership. Costs are renewal-dependent detection
 and conservative interruption on transient renewal errors. Signals do not reserve
 memory or replace process/deadline/output/queue/container controls.
 
-**Next:** propagate interruption through spectral proof and sidecar ownership.
-Both callers currently invoke the signal-capable analyzer without a signal; their
-hashing, job claims, cache writes and final publication need separate ownership
-and native close proof. This round covers inspection/preflight only and does not
-establish cancellation of every background job or a new authorization vulnerability.
+The [spectral follow-up](SPECTRAL_INTERRUPTION_OUTCOME.md) now forwards interruption
+through apply quality proof, hashing and sidecar preparation, with captured claim
+generations and locked cache/job publication. **Next:** qualify and serialize
+spectral backlog/dedup admission under concurrent enqueue transactions. The current
+snapshot COUNT/INSERT is not serialization. Reputation outbox delivery remains a
+separate candidate and is not claimed exactly-once here.
 
 GitHub MCP found no open PRs at selection and again before publication. No
 applicable random/stale PR could be implemented, rebased or closed; no PR was

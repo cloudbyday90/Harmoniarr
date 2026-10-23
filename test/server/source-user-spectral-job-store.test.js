@@ -101,7 +101,7 @@ test('completeSpectralJob persists the verdict and serializes the analysis blob'
   const store = createSourceUserSpectralJobStore({ getPoolFn: pool.getPoolFn });
 
   const job = await store.completeSpectralJob({
-    id: 'job-1',
+    id: 'job-1', expectedClaim: { id: 'job-1', attempts: 1 },
     verdict: 'transcoded',
     cutoffHz: 15800,
     estimatedSourceBitrate: 128,
@@ -119,7 +119,7 @@ test('failSpectralJob requeues to pending until the attempt cap is reached', asy
   const pool = createFakePool(() => ({ rows: [{ id: 'job-1', username: 'peer', username_key: 'peer', file_path: '/a.flac', state: 'pending', attempts: 1 }] }));
   const store = createSourceUserSpectralJobStore({ getPoolFn: pool.getPoolFn });
 
-  await store.failSpectralJob({ id: 'job-1', error: 'ffmpeg blew up', maxAttempts: 3 });
+  await store.failSpectralJob({ id: 'job-1', expectedClaim: { id: 'job-1', attempts: 1 }, error: 'ffmpeg blew up', maxAttempts: 3 });
 
   assert.match(pool.calls[0].text, /CASE WHEN attempts >= \$3 THEN 'failed' ELSE 'pending' END/);
   assert.equal(pool.calls[0].params[1], 'ffmpeg blew up');

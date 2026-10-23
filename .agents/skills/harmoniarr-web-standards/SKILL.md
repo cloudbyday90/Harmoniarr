@@ -5,6 +5,9 @@ description: "Apply and verify standards for Harmoniarr UI commands, forms, focu
 
 # Harmoniarr Web Standards
 
+For spectral proof, claim generations and transactional cache/job publication,
+read [spectral ownership](references/spectral-ownership.md).
+
 For FFmpeg/FFprobe admission, cancellation or execution lifetime, read
 [shared native commands](references/media-command-admission.md). It owns canonical
 caller composition, bounded waiting and capacity retained through actual close.

@@ -1221,3 +1221,27 @@ test('import apply worker holds an ambiguous filesystem checkpoint without invok
   assert.equal(completedSummary.awaitingConfirmationCount, 1);
   assert.equal(completedSummary.appliedCount, 0);
 });
+
+
+for (const lost of [false, true]) test(`apply ${lost ? 'lease loss' : 'cancellation'} reaches spectral quality preparation and drains before release`, async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] }); const entered = Promise.withResolvers(); const finish = Promise.withResolvers();
+  const candidate = createReadyImportCandidate(); let cancel = false; let signal; let released = false; let cancelled = false;
+  const worker = createImportCandidateApplyWorker({ acquireLease: async ({ runId }) => createTestJobLease('import_candidate_apply', runId),
+    isCancellationRequested: async () => { if (cancel && lost) throw Object.assign(new Error('lost'), { code: 'operation_run_lease_lost' }); return cancel; }, markRunStarted: async () => true,
+    buildImportPendingCandidateSummary: async () => ({ importPendingCandidates: [candidate] }),
+    resolveCurrentSafeAutoAddCandidate: async () => candidate,
+    previewImportCandidateApply: async () => createVerifiedApplyPreview(),
+    safeAutoAddQualityGateService: { evaluateSafeAutoAddQuality: async input => {
+      signal = input.signal; entered.resolve(); await finish.promise; signal.throwIfAborted(); return { eligible: true };
+    } },
+    applyImportCandidatePreview: async () => assert.fail('Cancelled proof cannot authorize apply'),
+    markRunCompleted: async () => assert.fail('Cancelled preparation cannot complete'), markRunFailed: async () => assert.fail('Cancellation is not failure'),
+    markRunCancelled: async () => { cancelled = true; },
+    replaceImportApplyRunItems: async () => [], updateImportApplyRunItem: async () => assert.fail('Cancelled proof is not a candidate failure'),
+    releaseLease: async ({ status }) => { assert.equal(status, lost ? 'failed' : 'cancelled'); released = true; },
+  });
+  const { completion } = await worker.startWorkerRun({ runId: 'spectral-cancel', applySafetyMode: 'safe_auto', triggerSource: 'music_queue_download_completed' });
+  await entered.promise; cancel = true; t.mock.timers.tick(1000); await new Promise(resolve => { setImmediate(resolve); });
+  assert.equal(signal.aborted, true); assert.equal(cancelled, false); assert.equal(released, false);
+  finish.resolve(); await completion; await worker.close(); assert.equal(cancelled, !lost); assert.equal(released, true);
+});

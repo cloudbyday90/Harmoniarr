@@ -30,8 +30,13 @@
 // lossless-claimed file is confirmed to be a low-bitrate transcode it records a
 // `spectral_transcode_confirmed` failure outcome (with the classifier's low
 // delivered-quality weight) against the originating source user. Every job
-// reaches a terminal/retry state; the consumer never throws.
+// reaches a terminal/retry state; interruption drains and releases captured claims.
 
+import { captureSpectralJobClaim, createSpectralClaimLostError } from './source-user-spectral-claim-store.js';
+import { createSourceUserSpectralJobService } from './source-user-spectral-job-service.js';
+import { withOperationRunInterruption } from '../worker-interruption-scope.js';
+import { withWorkerTaskCleanup } from '../worker-task-cleanup.js';
+import { settleMediaTasks, throwIfMediaCancelled } from '../media/media-cancellation.js';
 import {
   classifySpectralCutoff,
   isDeclaredLossless,
@@ -66,6 +71,7 @@ export function createSourceUserSpectralSidecarService({
   hashFileFn = null,
   loadSpectralThresholdsFn = null,
   maxAttempts = 3,
+  withInterruption = withOperationRunInterruption,
   onWarning = () => {},
 } = {}) {
   if (!spectralJobStore || typeof spectralJobStore.enqueueSpectralJob !== 'function') {
@@ -136,173 +142,53 @@ export function createSourceUserSpectralSidecarService({
     return summary;
   }
 
-  async function mergeConfirmedTranscode({ job, classification }) {
-    try {
-      await recordSourceUserOutcomeEvidenceFn({
-        eventType: 'spectral_analysis',
-        outcome: 'failure',
-        qualityLabel: 'spectral_transcode_confirmed',
-        qualityWeight: classification.qualityWeight,
-        reason: classification.reason,
-        username: job.username,
-      });
-    } catch (error) {
-      onWarning('Failed to merge confirmed transcode into reputation ledger', error);
-    }
-  }
+  const jobService = createSourceUserSpectralJobService({ spectralJobStore, spectralCacheStore, hashFileFn,
+    analyzeSpectralCutoffFn, classifySpectralCutoffFn, recordSourceUserOutcomeEvidenceFn, onWarning });
 
-  /**
-   * Bounded consumer. Claims and processes up to `limit` pending jobs.
-   *
-   * @returns {Promise<{
-   *   claimed: number, analyzed: number, transcodedConfirmed: number,
-   *   suspicious: number, authentic: number, inconclusive: number, failed: number
-   * }>}
-   */
-  async function processPendingSpectralJobs({ limit = DEFAULT_PROCESS_LIMIT } = {}) {
-    const summary = {
-      claimed: 0,
-      analyzed: 0,
-      cacheHits: 0,
-      transcodedConfirmed: 0,
-      suspicious: 0,
-      authentic: 0,
-      inconclusive: 0,
-      failed: 0,
-    };
-
+  async function processPendingSpectralJobs({ limit = DEFAULT_PROCESS_LIMIT, signal } = {}) {
+    throwIfMediaCancelled(signal);
+    const summary = { claimed: 0, analyzed: 0, cacheHits: 0, transcodedConfirmed: 0,
+      suspicious: 0, authentic: 0, inconclusive: 0, failed: 0, interrupted: 0 };
     let jobs;
-    try {
-      jobs = await spectralJobStore.claimNextSpectralJobs({ limit });
-    } catch (error) {
-      onWarning('Failed to claim spectral analysis jobs', error);
+    try { jobs = await spectralJobStore.claimNextSpectralJobs({ limit }); }
+    catch (error) { throwIfMediaCancelled(signal); onWarning('Failed to claim spectral analysis jobs', error); return summary; }
+    const claims = jobs.map(job => ({ job, expectedClaim: captureSpectralJobClaim(job) }));
+    summary.claimed = claims.length;
+    return withWorkerTaskCleanup(async () => {
+      throwIfMediaCancelled(signal);
+      let thresholds;
+      if (typeof loadSpectralThresholdsFn === 'function') {
+        try { const loaded = await loadSpectralThresholdsFn(); thresholds = loaded && typeof loaded === 'object' ? loaded : undefined; }
+        catch (error) { throwIfMediaCancelled(signal); onWarning('Failed to load spectral thresholds; using defaults', error); }
+        throwIfMediaCancelled(signal);
+      }
+      for (const { job, expectedClaim } of claims) {
+        throwIfMediaCancelled(signal);
+        const check = async () => {
+          if (!await spectralJobStore.isSpectralJobClaimCurrent({ expectedClaim })) throw createSpectralClaimLostError();
+          return false;
+        };
+        try {
+          await check(); throwIfMediaCancelled(signal);
+          const prepared = await withInterruption({ signal, runId: job.id, isCancellationRequested: check },
+            ownedSignal => jobService.prepareJob({ job, signal: ownedSignal, thresholds }));
+          const result = await jobService.publishJob({ job, expectedClaim, signal, prepared });
+          summary.analyzed++; if (result.servedFromCache) summary.cacheHits++;
+          const verdict = result.classification.verdict;
+          if (verdict === 'transcoded') summary.transcodedConfirmed++;
+          else if (verdict === 'suspicious') summary.suspicious++;
+          else if (verdict === 'authentic') summary.authentic++;
+          else summary.inconclusive++;
+        } catch (error) {
+          throwIfMediaCancelled(signal);
+          if (error?.code === 'spectral_job_claim_lost') { summary.interrupted++; continue; }
+          summary.failed++; onWarning('Spectral job processing failed', error);
+          try { await spectralJobStore.failSpectralJob({ id: job.id, expectedClaim, error: 'Spectral processing failed', maxAttempts: attemptCap }); }
+          catch (failure) { onWarning('Failed to record spectral analysis failure', failure); }
+        }
+      }
       return summary;
-    }
-
-    summary.claimed = jobs.length;
-
-    // Resolve the operator-tuned thresholds once for the whole batch so every
-    // job is graded under a single consistent policy. Best-effort: a loader
-    // failure falls through to the classifier's built-in defaults.
-    let spectralThresholds;
-    if (typeof loadSpectralThresholdsFn === 'function') {
-      try {
-        const loaded = await loadSpectralThresholdsFn();
-        if (loaded && typeof loaded === 'object') {
-          spectralThresholds = loaded;
-        }
-      } catch (error) {
-        onWarning('Failed to load spectral thresholds; using defaults', error);
-      }
-    }
-
-    for (const job of jobs) {
-      // Derive the content fingerprint first so an identical file already
-      // measured (by any peer or library copy) reuses the cached measurement and
-      // skips the expensive ffmpeg decode. Fingerprinting is best-effort: an IO
-      // error simply falls through to a normal decode.
-      let contentHash = job.contentHash ?? null;
-      if (!contentHash && typeof hashFileFn === 'function') {
-        try {
-          contentHash = await hashFileFn({ filePath: job.filePath });
-        } catch (error) {
-          contentHash = null;
-          onWarning('Failed to fingerprint file for spectral cache', error);
-        }
-      }
-
-      let measurement = null;
-      let servedFromCache = false;
-      if (contentHash && spectralCacheStore && typeof spectralCacheStore.getCachedMeasurement === 'function') {
-        try {
-          const cached = await spectralCacheStore.getCachedMeasurement({ contentHash });
-          if (cached) {
-            measurement = { cutoffHz: cached.cutoffHz, frameCount: cached.frameCount };
-            servedFromCache = true;
-            summary.cacheHits += 1;
-          }
-        } catch (error) {
-          onWarning('Failed to read spectral cache', error);
-        }
-      }
-
-      if (!servedFromCache) {
-        try {
-          measurement = await analyzeSpectralCutoffFn({ filePath: job.filePath });
-        } catch (error) {
-          summary.failed += 1;
-          try {
-            await spectralJobStore.failSpectralJob({
-              id: job.id,
-              error: error?.message ?? 'spectral analysis failed',
-              maxAttempts: attemptCap,
-            });
-          } catch (failError) {
-            onWarning('Failed to record spectral analysis failure', failError);
-          }
-          continue;
-        }
-
-        if (contentHash && spectralCacheStore && typeof spectralCacheStore.putCachedMeasurement === 'function') {
-          try {
-            await spectralCacheStore.putCachedMeasurement({
-              contentHash,
-              cutoffHz: measurement?.cutoffHz ?? null,
-              frameCount: measurement?.frameCount ?? 0,
-              durationMs: measurement?.durationMs ?? null,
-            });
-          } catch (error) {
-            onWarning('Failed to write spectral cache', error);
-          }
-        }
-      }
-
-      const classification = classifySpectralCutoffFn({
-        cutoffHz: measurement?.cutoffHz ?? null,
-        sampleRate: job.sampleRate,
-        declaredLossless: isDeclaredLossless({ codec: job.declaredCodec, extension: job.declaredExtension }),
-        thresholds: spectralThresholds,
-      });
-
-      summary.analyzed += 1;
-      if (classification.verdict === 'transcoded') {
-        summary.transcodedConfirmed += 1;
-      } else if (classification.verdict === 'suspicious') {
-        summary.suspicious += 1;
-      } else if (classification.verdict === 'authentic') {
-        summary.authentic += 1;
-      } else {
-        summary.inconclusive += 1;
-      }
-
-      // Only apply-path jobs are tied to a real source user; retroactive library
-      // re-grades use a sentinel identity and must never write reputation.
-      // Jobs without an explicit origin predate the column and are apply-path.
-      if (classification.penalize === true && job.origin !== 'retroactive') {
-        await mergeConfirmedTranscode({ job, classification });
-      }
-
-      try {
-        await spectralJobStore.completeSpectralJob({
-          id: job.id,
-          verdict: classification.verdict,
-          cutoffHz: classification.cutoffHz,
-          estimatedSourceBitrate: classification.estimatedSourceBitrate,
-          contentHash,
-          analysis: {
-            confidence: classification.confidence,
-            frameCount: measurement?.frameCount ?? 0,
-            nyquistHz: classification.nyquistHz,
-            reason: classification.reason,
-            servedFromCache,
-          },
-        });
-      } catch (error) {
-        onWarning('Failed to finalize spectral analysis job', error);
-      }
-    }
-
-    return summary;
+    }, () => settleMediaTasks(claims.map(({ expectedClaim }) => spectralJobStore.releaseSpectralJobClaim({ expectedClaim }))));
   }
 
   return {

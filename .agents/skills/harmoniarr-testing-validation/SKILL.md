@@ -5,6 +5,11 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For spectral changes, use the standards [ownership reference](../harmoniarr-web-standards/references/spectral-ownership.md).
+Run proof/hash/quality/apply tests and real PostgreSQL spectral-interruption cases
+before `validate:native-spectral-interruption`. Separate actual metadata/close
+from cache/job transaction and returned reputation evidence.
+
 For shared FFmpeg/FFprobe limits, use the standards skill's
 [native command reference](../harmoniarr-web-standards/references/media-command-admission.md).
 Run focused caller/worker tests before the explicit Linux

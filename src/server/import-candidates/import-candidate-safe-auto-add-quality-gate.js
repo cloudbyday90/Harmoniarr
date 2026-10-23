@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { throwIfMediaCancelled } from '../media/media-cancellation.js';
 import {
   QUALITY_PROFILE_CODES,
   createAcquisitionQualityPolicyService,
@@ -146,7 +147,7 @@ function buildBlocker({ code, file, message }) {
 }
 
 async function evaluateStrictLosslessFile({
-  file,
+  file, signal,
   preAddSpectralProofService,
   qualityPolicyService,
   qualityOverride,
@@ -196,7 +197,7 @@ async function evaluateStrictLosslessFile({
   }
 
   const deliveryQuality = assessFileDeliveryQuality({ filename: file?.filename, metadata });
-  const blockingSignal = deliveryQuality.signals.find((signal) => BLOCKING_DELIVERY_SIGNALS.has(signal));
+  const blockingSignal = deliveryQuality.signals.find((deliverySignal) => BLOCKING_DELIVERY_SIGNALS.has(deliverySignal));
   if (blockingSignal) {
     return buildBlocker({
       code: `safe_auto_quality_${blockingSignal}`,
@@ -229,6 +230,7 @@ async function evaluateStrictLosslessFile({
     filePath: file?.sourceFile?.path ?? file?.sourcePath ?? null,
     sampleRate: metadata.sampleRate ?? null,
     sizeBytes: file?.sourceFile?.sizeBytes ?? null,
+    ...(signal ? { signal } : {}),
   });
   if (!spectralProof.accepted) {
     return buildBlocker({
@@ -248,7 +250,9 @@ export function createImportCandidateSafeAutoAddQualityGateService({
   async function evaluateSafeAutoAddQuality({
     applyPreview,
     summaryCandidate = {},
+    signal,
   } = {}) {
+    throwIfMediaCancelled(signal);
     const { profileCode, qualityOverride, minimumBitrateKbps } = resolveMusicQueueContext(summaryCandidate);
     const profile = qualityPolicyService.resolveQualityProfile(profileCode);
     const effectiveMinimumBitrateKbps = Math.max(minimumBitrateKbps ?? 0, profile.minimumBitrateKbps ?? 0) || null;
@@ -283,7 +287,7 @@ export function createImportCandidateSafeAutoAddQualityGateService({
     const blockers = [];
     for (const file of files) {
       const blocker = await evaluateStrictLosslessFile({
-        file,
+        file, signal,
         preAddSpectralProofService,
         profileCode: profile.code,
         qualityOverride,
@@ -291,6 +295,7 @@ export function createImportCandidateSafeAutoAddQualityGateService({
         requiresLosslessProof: profile.requiresVerification,
         qualityPolicyService,
       });
+      throwIfMediaCancelled(signal);
       if (blocker) {
         blockers.push(blocker);
       }

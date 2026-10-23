@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { withOperationRunInterruption } from '../worker-interruption-scope.js';
 import { isOperationRunLeaseLostError } from '../operation-run-lease-error.js';
 import { buildMusicQueueAddBlockedActivityEvent } from '../activity/music-queue-add-blocked-activity-event-service.js';
 import { recordActivityEventSafely } from '../activity/music-queue-lifecycle-activity-event-service.js';
@@ -449,6 +450,7 @@ export function createImportCandidateApplyWorker({
             continue;
           }
 
+          let qualityPreparationFailed = false;
           try {
             const currentQualityCandidate = applySafetyMode === 'safe_auto'
               ? await resolveCurrentSafeAutoAddCandidate({ summaryCandidate, triggerSource, runId }) : summaryCandidate;
@@ -504,10 +506,10 @@ export function createImportCandidateApplyWorker({
               applyPreview = await previewImportCandidateApply({ importCandidateId: summaryCandidate.id });
             }
             if (applySafetyMode === 'safe_auto') {
-              const qualityGate = await safeAutoAddQualityGateService.evaluateSafeAutoAddQuality({
+              const qualityGate = await withOperationRunInterruption({ isCancellationRequested, runId, signal: leaseHeartbeat?.signal }, signal => safeAutoAddQualityGateService.evaluateSafeAutoAddQuality({
                 applyPreview,
-                summaryCandidate: currentQualityCandidate,
-              });
+                summaryCandidate: currentQualityCandidate, ...(signal ? { signal } : {}),
+              })).catch(error => { qualityPreparationFailed = true; throw error; });
               if (!qualityGate.eligible) {
                 const recoveryReasonCode = deriveImportCandidateAddRecoveryReasonCode({
                   addBlockerCode: IMPORT_CANDIDATE_ADD_BLOCKER_CODES.MEDIA_VERIFICATION,
@@ -727,6 +729,8 @@ export function createImportCandidateApplyWorker({
               }
             }
           } catch (error) {
+            if (qualityPreparationFailed || isOperationRunCancellationError(error) || isOperationRunPauseError(error) || isOperationRunLeaseLostError(error)
+              || (leaseHeartbeat?.signal?.aborted && error === leaseHeartbeat.signal.reason)) throw error;
             counts.applyFailed += 1;
             await updateImportApplyRunItem({
               applySnapshot: {
@@ -787,13 +791,13 @@ export function createImportCandidateApplyWorker({
         // work belongs to completion; advisory errors do not fail the domain run.
         if (typeof processPendingSpectralJobsFn === 'function') {
           try {
-            await processPendingSpectralJobsFn({ limit: spectralDrainLimit });
+            await processPendingSpectralJobsFn({ limit: spectralDrainLimit, ...(leaseHeartbeat?.signal ? { signal: leaseHeartbeat.signal } : {}) });
           } catch {
             // Spectral analysis is advisory; a drain failure must not fail the run.
           }
         }
       } catch (error) {
-        if (isOperationRunLeaseLostError(error)) return;
+        if (isOperationRunLeaseLostError(error)) { finalLeaseStatus = 'failed'; return; }
         if (!acquiredLease) throw error;
         if (isOperationRunPauseError(error)) {
           finalLeaseStatus = 'paused';
