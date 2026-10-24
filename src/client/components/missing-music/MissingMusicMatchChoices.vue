@@ -17,10 +17,10 @@ watch(() => presentation.value.isAlternative, value => { if (!value) expanded.va
 </script>
 
 <template>
-  <div v-if="presentation.choices.length" class="missing-music-match-choices">
+  <div v-if="presentation.choices.length || detail?.matchChoicePage" class="missing-music-match-choices">
     <button v-if="presentation.isAlternative" type="button" class="hx-btn" data-variant="secondary"
       :aria-expanded="expanded" aria-controls="missing-music-match-choices" :disabled="busy"
-      @click="expanded = !expanded">Choose another match</button>
+      @click="expanded = !expanded">{{ presentation.disclosureLabel }}</button>
       <section
         id="missing-music-match-choices"
         v-show="!presentation.isAlternative || expanded"
@@ -34,6 +34,7 @@ watch(() => presentation.value.isAlternative, value => { if (!value) expanded.va
             <template v-if="presentation.canSelect">Selecting a match does not start a download.</template>
           </p>
         </div>
+        <p v-if="presentation.pageMessage">{{ presentation.pageMessage }}</p>
 
         <ul class="missing-music-inspector__match-list" aria-label="Available matches" :aria-busy="busy">
           <li v-for="match in presentation.choices" :key="match.id">
@@ -62,14 +63,14 @@ watch(() => presentation.value.isAlternative, value => { if (!value) expanded.va
         </ul>
         <nav v-if="detail?.matchChoicePage" class="missing-music-match-pages" aria-label="Available match pages">
           <button type="button" class="hx-btn" data-variant="secondary"
-            :aria-disabled="busy || !detail.matchChoicePage.previousCursor"
-            @click="!busy && detail.matchChoicePage.previousCursor && emit('page', null)">First page</button>
+            :aria-disabled="busy || !detail.matchChoicePage.canReturnToFirst"
+            @click="!busy && detail.matchChoicePage.canReturnToFirst && emit('page', null)">First page</button>
           <button type="button" class="hx-btn" data-variant="secondary"
             :aria-disabled="busy || !detail.matchChoicePage.previousCursor"
-            @click="!busy && detail.matchChoicePage.previousCursor && emit('page', detail.matchChoicePage.previousCursor)">Previous matches</button>
+            @click="!busy && detail.matchChoicePage.previousCursor && emit('page', detail.matchChoicePage.previousCursor)">{{ presentation.previousPageLabel }}</button>
           <button type="button" class="hx-btn" data-variant="secondary"
             :aria-disabled="busy || !detail.matchChoicePage.nextCursor"
-            @click="!busy && detail.matchChoicePage.nextCursor && emit('page', detail.matchChoicePage.nextCursor)">Next matches</button>
+            @click="!busy && detail.matchChoicePage.nextCursor && emit('page', detail.matchChoicePage.nextCursor)">{{ presentation.nextPageLabel }}</button>
         </nav>
       </section>
   </div>

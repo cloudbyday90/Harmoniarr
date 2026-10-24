@@ -337,18 +337,19 @@ export function createMissingMusicDecisionService({
     );
     const libraryAddReview = buildPublicLibraryAddReview(target.release.libraryAddRecoveryFacts);
     const measuredReview = ['lossy_audio', 'suspicious_lossless'].includes(libraryAddReview?.reasonCode);
+    const canReviewMatches = measuredReview && !isMusicQueueRediscoveryInProgress(target.release.discoveryRequest);
     let matchChoices = decision.status.nextAction === 'review_matches'
       ? buildMissingMusicMatchChoices(target.release)
       : [];
     let canRestartQualityReview = false;
     let matchChoicePage = null;
-    if (matchCursor != null && (!measuredReview || target.targetUser.accountStatus === 'disabled')) throw qualityReviewCursorChanged();
-    if (measuredReview && target.targetUser.accountStatus !== 'disabled') {
+    if (matchCursor != null && (!canReviewMatches || target.targetUser.accountStatus === 'disabled')) throw qualityReviewCursorChanged();
+    if (canReviewMatches && target.targetUser.accountStatus !== 'disabled') {
       const alternatives = await getQualityReviewAlternatives({ appUserId: target.targetUser.id, wantedReleaseId: target.decisionId,
         actorUserId: actorUser.id, actorRole: actorUser.role, matchCursor });
       matchChoices = buildMissingMusicQualityReviewChoices(alternatives.candidates);
       matchChoicePage = alternatives.matchChoicePage ?? null;
-      canRestartQualityReview = !isMusicQueueRediscoveryInProgress(target.release.discoveryRequest) && alternatives.canSearchAgain === true;
+      canRestartQualityReview = alternatives.canSearchAgain === true;
     }
     const searchDiagnostics = buildMissingMusicSearchDiagnostics(target.release);
 
@@ -382,7 +383,7 @@ export function createMissingMusicDecisionService({
           nextAction: decision.status.nextAction,
         }),
         canSelectMatch: target.targetUser.accountStatus !== 'disabled' && matchChoices.length > 0,
-        canChooseAnotherMatch: measuredReview && matchChoices.length > 0,
+        canChooseAnotherMatch: measuredReview && (matchChoices.length > 0 || matchChoicePage != null),
         isReadOnly: target.targetUser.accountStatus === 'disabled',
       },
       scope: target.scope,

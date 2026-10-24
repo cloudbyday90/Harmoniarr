@@ -6,6 +6,17 @@
  */
 import { seedImportCandidateFixture } from './import-candidate-fixtures.js';
 
+/** Narrow read/guard facts in one insert; selected alternatives still use real file fixtures. */
+export async function seedQualityReviewScanRows(fixture, { weakCount = 200 } = {}) {
+  await fixture.pool.query(`INSERT INTO import_candidates
+    (id,source_provider,source_search_id,source_response_key,status,normalized_payload,file_count,total_size_bytes,
+      username,folder_path,raw_payload,discovered_at)
+    SELECT ('00000000-0000-4000-8000-' || lpad(n::text,12,'0'))::uuid,
+      source_provider,source_search_id,'scan-weak-' || n,'pending',
+      normalized_payload || '{"extensions":["mp3"]}'::jsonb,1,50000000,username,folder_path,'{}'::jsonb,NOW()
+    FROM import_candidates CROSS JOIN generate_series(1,$2::int) AS series(n) WHERE id=$1`, [fixture.candidateId, weakCount]);
+}
+
 /** Existing controlled search candidates; no provider discovery or measured-audio claim. */
 export async function seedQualityReviewAlternative(fixture, { extension = 'flac', context = null, sourceSearchId = fixture.searchId } = {}) {
   const failed = await fixture.module.importCandidateService.getImportCandidate({ importCandidateId: fixture.candidateId });

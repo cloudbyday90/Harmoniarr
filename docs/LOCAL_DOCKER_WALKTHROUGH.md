@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 24 [bounded-scan rebuild](LOCAL_DOCKER_MATCH_SCAN_BUDGET_OUTCOME.md)
+records the latest no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](ELIGIBLE_MATCH_SCAN_BUDGET_OUTCOME.md) connects bounded
+detail reads to explicit continuation and independent current command authority.
+
 The October 24 [eligible-page rebuild](LOCAL_DOCKER_MATCH_PAGINATION_OUTCOME.md)
 records the latest no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](ELIGIBLE_MATCH_PAGINATION_OUTCOME.md) connects scoped

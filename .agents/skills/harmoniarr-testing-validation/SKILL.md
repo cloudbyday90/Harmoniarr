@@ -5,6 +5,13 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For bounded detail scans, read the standards
+[scan reference](../harmoniarr-web-standards/references/match-scan-budget.md).
+Run scanner/scope/cursor/presentation/gate tests, then combine scan-budget and
+existing pagination/shortlist/selection/restart SQL and browser cohorts. Prove
+200-fact/four-query bounds separately from complete command-guard traversal,
+exact EOF and stale empty-walk refusal. Bulk fixture facts avoid per-row setup.
+
 For eligible-match pagination, read the standards
 [page reference](../harmoniarr-web-standards/references/match-pagination.md).
 Run cursor/scope/client-gate checks, eligible-match-pagination SQL/browser cases

@@ -50,6 +50,13 @@ export function formatMissingMusicMatchSize(value) {
   return `${amount >= 10 || unitIndex === 0 ? amount.toFixed(0) : amount.toFixed(1)} ${units[unitIndex - 1]}`;
 }
 
+export function buildMissingMusicMatchPageMessage(detail) {
+  if (detail?.matchChoicePage?.scanIncomplete === true) return 'More matches need checking. Continue to see whether any fit this release.';
+  if (detail?.matchChoicePage && !detail?.matchChoices?.length) return detail.permissions?.canSearchAgain === true
+    ? 'No eligible matches were found. You can search again.' : 'No eligible matches were found in this group.';
+  return '';
+}
+
 export function buildMissingMusicMatchChoicePresentation(detail) {
   const choices = Array.isArray(detail?.matchChoices) ? detail.matchChoices : [];
   const isReadOnly = detail?.permissions?.isReadOnly === true;
@@ -58,6 +65,12 @@ export function buildMissingMusicMatchChoicePresentation(detail) {
     : 'this release';
 
   return {
+    pageMessage: buildMissingMusicMatchPageMessage(detail),
+    disclosureLabel: choices.length ? 'Choose another match' : 'Check available matches',
+    previousPageLabel: detail?.matchChoicePage?.scanIncomplete && detail.matchChoicePage.scanDirection === 'previous'
+      ? 'Continue checking previous matches' : 'Previous matches',
+    nextPageLabel: detail?.matchChoicePage?.scanIncomplete && detail.matchChoicePage.scanDirection === 'next'
+      ? 'Continue checking matches' : 'Next matches',
     isAlternative: detail?.permissions?.canChooseAnotherMatch === true && !isReadOnly,
     canSelect: detail?.permissions?.canSelectMatch === true && !isReadOnly,
     choices: choices
@@ -72,9 +85,10 @@ export function buildMissingMusicMatchChoicePresentation(detail) {
         id: choice.id,
         label: `Match ${index + 1}`,
       })),
-    heading: isReadOnly ? 'Recorded match choices' : 'Choose a match',
+    heading: isReadOnly ? 'Recorded match choices' : !choices.length && detail?.matchChoicePage ? 'Available matches' : 'Choose a match',
     instructions: isReadOnly
       ? 'This disabled account is read-only. These recorded choices cannot be changed.'
+      : !choices.length && detail?.matchChoicePage ? 'Check the available matches for this release. Continue when more matches need checking.'
       : 'Choose the match that best fits this release. Selecting it records the next download step.',
   };
 }

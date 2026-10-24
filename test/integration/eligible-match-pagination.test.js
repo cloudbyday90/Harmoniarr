@@ -66,7 +66,9 @@ suite('Current quality-review pages through PostgreSQL and HTTP', () => {
       assert.equal((await read(context.client, f.wantedId, cursor)).response.status, 409);
       await f.pool.query('UPDATE app_users SET is_disabled=FALSE WHERE id=$1', [f.sibling.id]);
       await f.pool.query("UPDATE import_candidates SET status='rejected' WHERE source_search_id=$1 AND status IN ('pending','held') AND id>$2", [f.searchId, first.matchChoices.at(-1).id]);
-      assert.equal((await read(context.client, f.wantedId, cursor)).response.status, 409);
+      const emptyPage = await read(context.client, f.wantedId, cursor);
+      assert.equal(emptyPage.response.status, 200); assert.deepEqual(emptyPage.payload.matchChoices, []);
+      assert.equal(emptyPage.payload.permissions.canSearchAgain, false); assert.equal(emptyPage.payload.matchChoicePage.nextCursor, null);
       const current = (await read(context.client, f.wantedId)).payload;
       assert.equal(current.matchChoices.length, 12); assert.equal(current.matchChoicePage.nextCursor, null);
       assert.equal(current.permissions.canSearchAgain, false);

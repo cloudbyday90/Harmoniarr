@@ -15,9 +15,10 @@ import { hasCurrentSafeAddParticipants } from './import-candidate-release-safe-a
 import { buildRecheckQualityContext, getRecheckWantedReleaseIds } from './import-candidate-release-recheck-quality-policy.js';
 import { canRetainRecoveryQualityContext } from './import-candidate-recovery-quality-policy.js';
 import { OPERATOR_TRACK_SCOPE_BLOCKER } from '../metadata/operator-track-scope-policy.js';
-import { createImportCandidateQualityReviewCandidateStore, QUALITY_REVIEW_CANDIDATE_PAGE_SIZE } from './import-candidate-quality-review-candidate-store.js';
-import { createQualityReviewCursorPolicy, qualityReviewCursorContext, qualityReviewCursorChanged,
-  QUALITY_REVIEW_MATCH_PAGE_SIZE } from './import-candidate-quality-review-cursor-policy.js';
+import { createImportCandidateQualityReviewCandidateStore } from './import-candidate-quality-review-candidate-store.js';
+import { createQualityReviewCursorPolicy } from './import-candidate-quality-review-cursor-policy.js';
+import { createQualityReviewScanService } from './import-candidate-quality-review-scan-service.js';
+import { createQualityReviewPageService } from './import-candidate-quality-review-page-service.js';
 
 /** Replacement selection preserves the failed acquisition and its shared quality floor. */
 export function createImportCandidateQualityReviewScopeService({ recheckStore, getImportCandidate,
@@ -65,42 +66,11 @@ export function createImportCandidateQualityReviewScopeService({ recheckStore, g
       && evaluateQualityEvidence({ candidate, ...scope.requiredContext }).autoDownloadEligible);
   }
 
-  async function collectEligibleAlternatives(scope, { queryable = null, limit, anchor = null, direction = 'next' }) {
-    let afterId = anchor;
-    const eligible = [];
-    for (;;) {
-      const page = await candidateStore.listCandidatePage({ sourceSearchId: scope.failedCandidate.sourceSearchId, afterId, direction, queryable });
-      for (const candidate of page) {
-        if (isEligible(candidate, scope)) eligible.push(candidate);
-        if (eligible.length === limit) return eligible;
-      }
-      if (page.length < QUALITY_REVIEW_CANDIDATE_PAGE_SIZE) return eligible;
-      afterId = page.at(-1).id;
-    }
-  }
-  async function getQualityReviewAlternatives(input) {
-    const scope = await readScope(input);
-    if (!scope) {
-      if (input.matchCursor != null) throw qualityReviewCursorChanged();
-      return { candidates: [], canSearchAgain: false };
-    }
-    const context = qualityReviewCursorContext(input, scope);
-    const { anchor, direction } = cursorPolicy.decode(input.matchCursor, context);
-    const found = await collectEligibleAlternatives(scope, { limit: QUALITY_REVIEW_MATCH_PAGE_SIZE + 1, anchor, direction });
-    if (!found.length && anchor) throw qualityReviewCursorChanged();
-    const hasMore = found.length > QUALITY_REVIEW_MATCH_PAGE_SIZE;
-    const candidates = found.slice(0, QUALITY_REVIEW_MATCH_PAGE_SIZE);
-    if (direction === 'previous') candidates.reverse();
-    const encode = (row, nextDirection) => cursorPolicy.encode({ anchor: row.id, direction: nextDirection, context });
-    return { candidates, canSearchAgain: !anchor && candidates.length === 0,
-      ...(candidates.length ? { matchChoicePage: {
-        previousCursor: (direction === 'previous' ? hasMore : Boolean(anchor)) ? encode(candidates[0], 'previous') : null,
-        nextCursor: (direction === 'previous' ? Boolean(anchor) : hasMore) ? encode(candidates.at(-1), 'next') : null,
-      } } : {}),
-    };
-  }
+  const scanCandidates = createQualityReviewScanService({ candidateStore, isEligible });
+  const getQualityReviewAlternatives = createQualityReviewPageService({ readScope, scanCandidates, cursorPolicy });
   async function hasEligibleAlternative(scope, { queryable = null } = {}) {
-    return (await collectEligibleAlternatives(scope, { queryable, limit: 1 })).length > 0;
+    // Write authority requires fresh complete exhaustion, independently of read windows.
+    return (await scanCandidates(scope, { queryable, limit: 1, maxRows: Infinity })).candidates.length > 0;
   }
 
   async function withCurrentScope({ actorUserId, appUserId, wantedReleaseId, importCandidateId = null }, execute) {

@@ -20,6 +20,7 @@ import { computed, onBeforeUnmount, onMounted, ref, toValue, watch } from 'vue';
 import { fetchMissingMusicDecisionDetail as defaultFetchMissingMusicDecisionDetail } from '../lib/missing-music-api.js';
 import { createLatestRequestGate } from '../lib/latest-request-gate.js';
 import { projectSlskdSearchDiagnostics } from '../../shared/slskd-search-diagnostics.js';
+import { buildMissingMusicMatchPageMessage } from '../lib/missing-music-match-selection-presentation.js';
 
 function normalizeDecisionId(value) {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
@@ -57,6 +58,9 @@ function normalizeDetail(payload) {
     matchChoicePage: payload.matchChoicePage ? {
       nextCursor: typeof payload.matchChoicePage.nextCursor === 'string' ? payload.matchChoicePage.nextCursor : null,
       previousCursor: typeof payload.matchChoicePage.previousCursor === 'string' ? payload.matchChoicePage.previousCursor : null,
+      scanIncomplete: payload.matchChoicePage.scanIncomplete === true,
+      scanDirection: payload.matchChoicePage.scanDirection === 'previous' ? 'previous' : 'next',
+      canReturnToFirst: payload.matchChoicePage.canReturnToFirst === true,
     } : null,
     scope: payload.scope ?? 'mine',
   };
@@ -225,7 +229,7 @@ export function useMissingMusicDecisionDetail({
     isNavigatingMatches.value = false;
     if (result && matchPageStatus.value === 'Loading matches…') {
       const count = result.matchChoices.length;
-      matchPageStatus.value = `Showing ${count} ${count === 1 ? 'match' : 'matches'}.`;
+      matchPageStatus.value = buildMissingMusicMatchPageMessage(result) || `Showing ${count} ${count === 1 ? 'match' : 'matches'}.`;
     }
     else if (!result && matchPageStatus.value === 'Loading matches…') matchPageStatus.value = 'Matches could not be loaded. Try again.';
     return result;

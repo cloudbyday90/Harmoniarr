@@ -5,6 +5,10 @@ description: "Apply and verify standards for Harmoniarr UI commands, forms, focu
 
 # Harmoniarr Web Standards
 
+For sparse match reads, read [scan budgets](references/match-scan-budget.md).
+It covers bounded fact/evaluation work, incomplete windows, explicit continuation
+and independent current restart authority.
+
 For additional eligible choices, read [scoped pages](references/match-pagination.md).
 It covers authenticated continuation, bidirectional keysets, bounded client state
 and shared refresh/focus lifecycles.

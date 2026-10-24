@@ -2,6 +2,8 @@
 
 Use for browsing measured-quality alternatives beyond twelve. Read the active
 repository's docs/ELIGIBLE_MATCH_PAGINATION_DESIGN.md, research and outcome.
+For bounded incomplete/empty windows and current-view exhaustion inference, also
+follow [scan budgets](match-scan-budget.md).
 
 1. Keep read authorization and transactional selection independent. Recompute
    current recipient/quality/track scope on each page; a signed cursor is not consent.

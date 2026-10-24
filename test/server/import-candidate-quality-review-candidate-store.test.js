@@ -30,3 +30,13 @@ test('reverse keysets use the same bounded projection with a parameterized exclu
   assert.match(query.sql, /id<\$2::uuid\) ORDER BY id DESC LIMIT \$3/u);
   assert.deepEqual(query.params, ['search', 'anchor', 50]); assert.doesNotMatch(query.sql, /FOR UPDATE|OFFSET/u);
 });
+
+test('empty EOF navigation can include its boundary without changing the bounded query parameters', async () => {
+  const calls = []; const store = createImportCandidateQualityReviewCandidateStore({ getPoolFn: () => ({ query: async (sql, params) => {
+    calls.push({ sql, params }); return { rows: [] };
+  } }) });
+  for (const direction of ['previous', 'next']) await store.listCandidatePage({ sourceSearchId: 'search', afterId: 'boundary', direction, inclusive: true });
+  assert.match(calls[0].sql, /id<=\$2::uuid\) ORDER BY id DESC LIMIT \$3/u);
+  assert.match(calls[1].sql, /id>=\$2::uuid\) ORDER BY id LIMIT \$3/u);
+  assert.deepEqual(calls.map(c => c.params), [['search', 'boundary', 50], ['search', 'boundary', 50]]);
+});

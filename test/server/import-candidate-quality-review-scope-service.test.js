@@ -29,7 +29,9 @@ function fixture({ weak = 51, eligible = 15, disabled = false, alternative = nul
     },
     candidateStore: { listCandidatePage: async input => {
       pages.push(input);
-      const rows = candidates.filter(row => !input.afterId || (input.direction === 'previous' ? row.id < input.afterId : row.id > input.afterId));
+      const rows = candidates.filter(row => !input.afterId || (input.direction === 'previous'
+        ? input.inclusive ? row.id <= input.afterId : row.id < input.afterId
+        : input.inclusive ? row.id >= input.afterId : row.id > input.afterId));
       return (input.direction === 'previous' ? rows.reverse() : rows).slice(0, 50);
     } },
     getImportCandidate: async ({ importCandidateId }) => {
@@ -78,6 +80,36 @@ test('guarded existence checks use the same batches, preserve the owning queryab
   const scope = await f.service.readScope({ appUserId: ownerId, wantedReleaseId: wantedId });
   assert.equal(await f.service.hasEligibleAlternative(scope, { queryable }), true);
   assert.equal(f.pages.length, 1); assert.equal(f.pages[0].queryable, queryable); assert.deepEqual(f.reads, [failedId]);
+});
+
+test('empty bounded windows continue explicitly and cannot authorize restart before a hidden eligible choice', async () => {
+  const f = fixture({ weak: 401, eligible: 1 }); const input = { appUserId: ownerId, wantedReleaseId: wantedId };
+  const first = await f.service.getQualityReviewAlternatives(input);
+  assert.equal(f.pages.length, 4); assert.deepEqual(first.candidates, []); assert.equal(first.canSearchAgain, false);
+  assert.equal(first.matchChoicePage.scanIncomplete, true); assert.ok(first.matchChoicePage.nextCursor);
+  const second = await f.service.getQualityReviewAlternatives({ ...input, matchCursor: first.matchChoicePage.nextCursor });
+  assert.equal(f.pages.length, 8); assert.deepEqual(second.candidates, []); assert.equal(second.canSearchAgain, false);
+  const third = await f.service.getQualityReviewAlternatives({ ...input, matchCursor: second.matchChoicePage.nextCursor });
+  assert.deepEqual(third.candidates.map(c => c.id), [id(402)]); assert.equal(third.matchChoicePage.scanIncomplete, false);
+  assert.equal(third.canSearchAgain, false); assert.equal(f.pages.length, 9);
+  const scope = await f.service.readScope(input);
+  assert.equal(await f.service.hasEligibleAlternative(scope), true, 'The command guard must find choices beyond the read budget');
+});
+
+test('exact-boundary empty walks require later EOF and an empty terminal page can return to its boundary match', async () => {
+  const input = { appUserId: ownerId, wantedReleaseId: wantedId };
+  const empty = fixture({ weak: 200, eligible: 0 }); const first = await empty.service.getQualityReviewAlternatives(input);
+  assert.equal(first.canSearchAgain, false); assert.equal(first.matchChoicePage.scanIncomplete, true);
+  const end = await empty.service.getQualityReviewAlternatives({ ...input, matchCursor: first.matchChoicePage.nextCursor });
+  assert.equal(end.canSearchAgain, true); assert.equal(end.matchChoicePage.scanIncomplete, false); assert.equal(end.matchChoicePage.nextCursor, null);
+  const reverse = await empty.service.getQualityReviewAlternatives({ ...input, matchCursor: end.matchChoicePage.previousCursor });
+  assert.equal(reverse.canSearchAgain, false); assert.equal(reverse.matchChoicePage.scanDirection, 'previous');
+  const choice = fixture({ weak: 199, eligible: 1 }); const offered = await choice.service.getQualityReviewAlternatives(input);
+  assert.deepEqual(offered.candidates.map(c => c.id), [id(200)]); assert.equal(offered.matchChoicePage.scanIncomplete, true);
+  const tail = await choice.service.getQualityReviewAlternatives({ ...input, matchCursor: offered.matchChoicePage.nextCursor });
+  assert.equal(tail.canSearchAgain, false); assert.deepEqual(tail.candidates, []);
+  const back = await choice.service.getQualityReviewAlternatives({ ...input, matchCursor: tail.matchChoicePage.previousCursor });
+  assert.deepEqual(back.candidates.map(c => c.id), [id(200)]);
 });
 
 test('foreign candidate scope is refused before taking candidate locks or opening a write transaction', async () => {

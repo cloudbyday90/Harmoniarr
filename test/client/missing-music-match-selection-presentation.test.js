@@ -20,8 +20,21 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   buildMissingMusicMatchChoicePresentation,
+  buildMissingMusicMatchPageMessage,
   formatMissingMusicMatchSize,
 } from '../../src/client/lib/missing-music-match-selection-presentation.js';
+
+test('an empty partial window explains continuation without presenting a selectable choice or exhaustion', () => {
+  const detail = { matchChoices: [], matchChoicePage: { scanIncomplete: true }, permissions: { canChooseAnotherMatch: true } };
+  const presentation = buildMissingMusicMatchChoicePresentation(detail);
+  assert.equal(presentation.isAlternative, true); assert.equal(presentation.canSelect, false);
+  assert.equal(presentation.disclosureLabel, 'Check available matches'); assert.equal(presentation.heading, 'Available matches');
+  assert.match(presentation.pageMessage, /More matches need checking/u);
+  detail.matchChoicePage.scanIncomplete = false;
+  assert.equal(buildMissingMusicMatchPageMessage(detail), 'No eligible matches were found in this group.');
+  detail.permissions.canSearchAgain = true;
+  assert.equal(buildMissingMusicMatchPageMessage(detail), 'No eligible matches were found. You can search again.');
+});
 
 test('Missing Music match presentation names each choice and excludes provider-private facts', () => {
   const presentation = buildMissingMusicMatchChoicePresentation({

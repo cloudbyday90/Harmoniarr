@@ -24,21 +24,22 @@ export function qualityReviewCursorContext(input, scope) {
 /** A continuation is authenticated navigation state, never selection authority. */
 export function createQualityReviewCursorPolicy({ key = randomBytes(32), now = Date.now, ttlMs = 15 * 60_000 } = {}) {
   const sign = payload => createHmac('sha256', key).update(payload).digest();
-  function encode({ anchor, direction, context }) {
-    const payload = Buffer.from(JSON.stringify({ v: 1, anchor, direction, context, expires: now() + ttlMs })).toString('base64url');
+  function encode({ anchor, direction, context, emptyFromStart = false, inclusive = false }) {
+    const payload = Buffer.from(JSON.stringify({ v: 2, anchor, direction, context, emptyFromStart, inclusive, expires: now() + ttlMs })).toString('base64url');
     return `${payload}.${sign(payload).toString('base64url')}`;
   }
   function decode(cursor, context) {
-    if (cursor == null) return { anchor: null, direction: 'next' };
+    if (cursor == null) return { anchor: null, direction: 'next', emptyFromStart: true, inclusive: false };
     try {
       if (typeof cursor !== 'string' || cursor.length > 1024 || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/u.test(cursor)) throw new Error();
       const [payload, signature] = cursor.split('.');
       const actual = Buffer.from(signature, 'base64url'); const expected = sign(payload);
       if (actual.toString('base64url') !== signature || actual.length !== expected.length || !timingSafeEqual(actual, expected)) throw new Error();
       const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
-      if (data.v !== 1 || !UUID.test(data.anchor) || !['next', 'previous'].includes(data.direction)
+      if (data.v !== 2 || !UUID.test(data.anchor) || !['next', 'previous'].includes(data.direction)
+        || typeof data.emptyFromStart !== 'boolean' || typeof data.inclusive !== 'boolean' || (data.emptyFromStart && data.direction !== 'next')
         || data.context !== context || !Number.isSafeInteger(data.expires) || data.expires <= now()) throw new Error();
-      return { anchor: data.anchor, direction: data.direction };
+      return { anchor: data.anchor, direction: data.direction, emptyFromStart: data.emptyFromStart, inclusive: data.inclusive };
     } catch { throw qualityReviewCursorChanged(); }
   }
   return { encode, decode };

@@ -103,6 +103,21 @@ function createLibraryAddRecoveryService({ releaseChanges = {}, factsChanges = {
   }) };
 }
 
+test('queued quality-review searches retire old match windows without scanning them again', async () => {
+  const { release } = createLibraryAddRecoveryService({ factsChanges: { recoveryReasonCode: 'lossy_audio' } });
+  release.discoveryRequest = { searchMode: 'automatic', requestStatus: 'ready', blockedReason: null,
+    evidence: { musicQueueRediscovery: { reasonCode: 'quality_review_search_again' } } };
+  const getQualityReviewAlternatives = test.mock.fn(() => assert.fail('Queued searches cannot scan the old match set'));
+  const { service } = createService({ listWantedReleasesWithMetadata: async () => [release], getQualityReviewAlternatives });
+  const actorUser = { id: 'user-1', role: 'requester' };
+  const detail = await service.getMissingMusicDecisionDetail({ actorUser, decisionId: release.id });
+  assert.equal(detail.matchChoicePage, null); assert.deepEqual(detail.matchChoices, []);
+  assert.equal(detail.permissions.canChooseAnotherMatch, false); assert.equal(detail.permissions.canSearchAgain, false);
+  await assert.rejects(service.getMissingMusicDecisionDetail({ actorUser, decisionId: release.id, matchCursor: 'old-page' }),
+    error => error.code === 'missing_music_match_page_changed');
+  assert.equal(getQualityReviewAlternatives.mock.callCount(), 0);
+});
+
 test('library-add recovery permissions, next step and action worklist agree for current bounded audio and source interruptions', async () => {
   for (const reasonCode of ['source_path_unavailable', 'audio_check_failed']) {
     const { release, service } = createLibraryAddRecoveryService({

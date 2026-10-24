@@ -85,6 +85,18 @@ test('match navigation replaces bounded results, retains the accepted page for p
   assert.deepEqual(cursors, [null, 'page-two', 'page-two', 'failed-page', 'page-two', null]);
 });
 
+test('empty partial pages survive normalization and announce incomplete checking instead of exhaustion', async t => {
+  const { app, decisionDetail } = mountDecisionDetail({ decisionId: 'wanted-amber', fetchMissingMusicDecisionDetail: async () => ({
+    ...createDetail(), matchChoices: [], matchChoicePage: { nextCursor: 'continuation', previousCursor: null,
+      scanIncomplete: true, scanDirection: 'previous', canReturnToFirst: true }, permissions: { canChooseAnotherMatch: true, canSearchAgain: false },
+  }) }); t.after(() => app.unmount());
+  await decisionDetail.loadMatchPage('page'); const detail = decisionDetail.detail.value;
+  assert.equal(detail.matchChoicePage.scanIncomplete, true); assert.equal(detail.matchChoicePage.scanDirection, 'previous');
+  assert.equal(detail.matchChoicePage.canReturnToFirst, true); assert.equal(detail.permissions.canChooseAnotherMatch, true);
+  assert.equal(detail.permissions.canSearchAgain, false);
+  assert.equal(decisionDetail.matchPageStatus.value, 'More matches need checking. Continue to see whether any fit this release.');
+});
+
 test('superseded match navigation cannot replace results or announce failure during a newer read', async t => {
   const requests = [];
   const { app, decisionDetail } = mountDecisionDetail({ decisionId: 'wanted-amber', fetchMissingMusicDecisionDetail: (_id, options) => {

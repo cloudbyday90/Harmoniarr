@@ -1,5 +1,9 @@
 # Eligible quality-review match pagination
 
+The subsequent [bounded-scan design](ELIGIBLE_MATCH_SCAN_BUDGET_DESIGN.md) extends
+this contract with incomplete empty windows and explicit EOF navigation. It keeps
+the independent fresh write guards described here.
+
 Designed October 24, 2026. Builds on the [eligible shortlist](ELIGIBLE_MATCH_SHORTLIST_DESIGN.md).
 The [research](ELIGIBLE_MATCH_PAGINATION_RESEARCH.md) records the alternatives.
 

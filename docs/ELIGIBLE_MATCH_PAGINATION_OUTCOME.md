@@ -79,9 +79,8 @@ transactional selection. The benefit is broader comparison with bounded retained
 facts and DOM; the tradeoff is current-view pagination and cursor reset on policy
 change, expiry or server restart. No frozen candidate snapshot is retained.
 
-Next: **bound candidate scan work per request with an explicit incomplete-page
-continuation contract**. Retained memory is bounded now, but sparse searches can
-still scan the entire current search. Measure scanned rows/page reads first, then
-add a built-in scan budget and continuation that distinguishes incomplete from
-exhausted. Keep Search again unavailable until complete exhaustion is established;
-do not introduce a silent cutoff or another application/service.
+The following [scan-budget slice](ELIGIBLE_MATCH_SCAN_BUDGET_OUTCOME.md) now bounds
+detail-read candidate facts with explicit incomplete windows and preserves the
+complete fresh command guard. Its outcome owns the current next recommendation.
+It also replaces this slice's empty-continuation reset with explicit current-view
+EOF navigation; this document retains the original implementation evidence.
