@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 24 [candidate-query rebuild](LOCAL_DOCKER_CANDIDATE_QUERY_PLANS_OUTCOME.md)
+records the latest no-cache image, preserved administrator/data/mounts and one
+additive index migration. The [feature outcome](CANDIDATE_QUERY_PLANS_OUTCOME.md)
+connects measured access paths to unchanged paging and fresh command authority.
+
 The October 24 [bounded-scan rebuild](LOCAL_DOCKER_MATCH_SCAN_BUDGET_OUTCOME.md)
 records the latest no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](ELIGIBLE_MATCH_SCAN_BUDGET_OUTCOME.md) connects bounded

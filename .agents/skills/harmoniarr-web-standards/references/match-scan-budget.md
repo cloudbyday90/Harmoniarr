@@ -2,6 +2,8 @@
 
 Use for sparse quality-review match reads. Read the active repository's
 docs/ELIGIBLE_MATCH_SCAN_BUDGET_DESIGN.md, research and outcome.
+For physical query access beyond the logical budget, follow
+[candidate query plans](candidate-query-plans.md).
 
 1. Bound facts fetched as well as evaluated, separately from response size. The
    detail reader uses at most four fifty-row queries; stop early on lookahead.

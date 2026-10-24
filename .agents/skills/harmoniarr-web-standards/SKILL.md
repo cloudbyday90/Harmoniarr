@@ -5,6 +5,10 @@ description: "Apply and verify standards for Harmoniarr UI commands, forms, focu
 
 # Harmoniarr Web Standards
 
+For candidate SQL/index work, read [query plans](references/candidate-query-plans.md).
+It connects scoped parameterized access paths, actual plan/buffer evidence,
+additive schema adoption and unchanged command/UI authority.
+
 For sparse match reads, read [scan budgets](references/match-scan-budget.md).
 It covers bounded fact/evaluation work, incomplete windows, explicit continuation
 and independent current restart authority.

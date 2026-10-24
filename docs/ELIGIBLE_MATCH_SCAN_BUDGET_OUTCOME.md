@@ -88,9 +88,7 @@ detail preparation, bytes, RSS or mutation work. The fresh restart check can sti
 traverse the complete current search; it is deliberately separate from read
 continuation and cannot silently inherit the read cutoff.
 
-Next: **qualify the candidate query access path with PostgreSQL EXPLAIN on large
-mixed search histories**, including first, forward, reverse and inclusive EOF
-boundaries. Measure rows scanned/rejected and buffer work, then evaluate a scoped
-search/status/UUID index and anchor predicate changes. Command-side budgeting
-requires a separate revision/certificate design involving every candidate writer;
-do not replace the fresh guard with historical cursor authority.
+The subsequent [query-plan slice](CANDIDATE_QUERY_PLANS_OUTCOME.md) now measures
+mixed histories and adds the scoped partial index/direct anchor shapes. Its
+outcome owns the next recommendation. Command-side budgeting still needs separate
+writer coordination and cannot trust historical cursor authority.

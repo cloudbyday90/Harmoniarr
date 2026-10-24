@@ -5,6 +5,13 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For candidate keyset access paths, read the standards
+[plan reference](../harmoniarr-web-standards/references/candidate-query-plans.md).
+Run store/plan-summary/anchor checks, the shared 224-profile PostgreSQL matrix and
+affected scan/pagination/selection/restart cohorts. Qualify fresh and populated
+schema adoption plus the guarded packaged native plan entry; do not count forced
+generic stress results as the application's current unnamed-query default.
+
 For bounded detail scans, read the standards
 [scan reference](../harmoniarr-web-standards/references/match-scan-budget.md).
 Run scanner/scope/cursor/presentation/gate tests, then combine scan-budget and

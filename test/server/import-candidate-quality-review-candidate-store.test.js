@@ -6,7 +6,14 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createImportCandidateQualityReviewCandidateStore } from '../../src/server/import-candidates/import-candidate-quality-review-candidate-store.js';
+import { buildQualityReviewCandidatePageQuery, createImportCandidateQualityReviewCandidateStore } from '../../src/server/import-candidates/import-candidate-quality-review-candidate-store.js';
+
+test('first pages omit the nullable anchor while retaining literal status scope and bound source/limit', () => {
+  const query = buildQualityReviewCandidatePageQuery({ sourceSearchId: "search' OR true" });
+  assert.deepEqual(query.values, ["search' OR true", 50]);
+  assert.match(query.text, /source_search_id=\$1 AND status IN \('pending','held'\)/u);
+  assert.match(query.text, /ORDER BY id LIMIT \$2$/u); assert.doesNotMatch(query.text, /IS NULL|\bOR\b|FOR UPDATE|search'/u);
+});
 
 test('batch facts use a parameterized stable keyset, exclude detail owners and join the supplied transaction', async () => {
   let query;
@@ -27,7 +34,7 @@ test('reverse keysets use the same bounded projection with a parameterized exclu
     query = { sql, params }; return { rows: [] };
   } }) });
   await store.listCandidatePage({ sourceSearchId: 'search', afterId: 'anchor', direction: 'previous' });
-  assert.match(query.sql, /id<\$2::uuid\) ORDER BY id DESC LIMIT \$3/u);
+  assert.match(query.sql, /id<\$2::uuid ORDER BY id DESC LIMIT \$3/u);
   assert.deepEqual(query.params, ['search', 'anchor', 50]); assert.doesNotMatch(query.sql, /FOR UPDATE|OFFSET/u);
 });
 
@@ -36,7 +43,7 @@ test('empty EOF navigation can include its boundary without changing the bounded
     calls.push({ sql, params }); return { rows: [] };
   } }) });
   for (const direction of ['previous', 'next']) await store.listCandidatePage({ sourceSearchId: 'search', afterId: 'boundary', direction, inclusive: true });
-  assert.match(calls[0].sql, /id<=\$2::uuid\) ORDER BY id DESC LIMIT \$3/u);
-  assert.match(calls[1].sql, /id>=\$2::uuid\) ORDER BY id LIMIT \$3/u);
+  assert.match(calls[0].sql, /id<=\$2::uuid ORDER BY id DESC LIMIT \$3/u);
+  assert.match(calls[1].sql, /id>=\$2::uuid ORDER BY id LIMIT \$3/u);
   assert.deepEqual(calls.map(c => c.params), [['search', 'boundary', 50], ['search', 'boundary', 50]]);
 });
