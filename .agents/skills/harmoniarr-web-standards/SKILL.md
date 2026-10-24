@@ -5,6 +5,11 @@ description: "Apply and verify standards for Harmoniarr UI commands, forms, focu
 
 # Harmoniarr Web Standards
 
+For replacement choices after measured quality refusal, read
+[recipient-owned alternatives](references/quality-review-match-selection.md).
+It joins W3C disclosure behavior, OWASP action authorization, shared quality policy,
+transactional evidence and actual contention/browser proof.
+
 For initial media refusals before queueing, read
 [durable preflight review](references/preflight-quality-review.md). It connects
 current guarded publication, bounded guidance, client normalization and actual

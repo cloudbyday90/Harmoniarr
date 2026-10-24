@@ -54,6 +54,10 @@ export function mapReleaseRecheckFacts(row) {
 }
 
 export function createImportCandidateReleaseRecheckStore({ getPoolFn = getPool } = {}) {
+  async function readSelectionActor({ appUserId, queryable }) {
+    const row = (await queryable.query('SELECT id, role, is_disabled FROM app_users WHERE id=$1::uuid', [appUserId])).rows[0];
+    return row ? { id: row.id, role: row.role, isDisabled: row.is_disabled } : null;
+  }
   async function readOwnedRelease({ appUserId, wantedReleaseId, queryable = null }) {
     const result = await (queryable ?? getPoolFn()).query(`SELECT lwr.id, lwr.app_user_id, lwr.metadata_release_id,
       lwr.wanted_status, lwr.missing_track_count, lwr.evidence, owner.is_disabled,
@@ -117,5 +121,5 @@ export function createImportCandidateReleaseRecheckStore({ getPoolFn = getPool }
         AND jsonb_typeof(summary->'importCandidateIds')='array' AND summary->'importCandidateIds' ? $2::text`, [runId, importCandidateId]);
     return result.rows[0]?.authority ?? null;
   }
-  return { readOwnedRelease, readParticipantPolicies, lockParticipantReleases, lockCandidate, saveQualityContext, readAutomaticLibraryAddAuthority };
+  return { readOwnedRelease, readSelectionActor, readParticipantPolicies, lockParticipantReleases, lockCandidate, saveQualityContext, readAutomaticLibraryAddAuthority };
 }

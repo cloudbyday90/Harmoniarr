@@ -755,6 +755,7 @@ export function createImportCandidateService({
     importCandidateId,
     reason = null,
     requestMetadata = null,
+    queryable = null,
   }) {
     return transitionCandidateReviewStatus({
       actorUserId,
@@ -764,6 +765,7 @@ export function createImportCandidateService({
       importCandidateId,
       reason,
       requestMetadata,
+      queryable,
       summary: 'Import candidate selected for download planning',
       toStatus: 'selected',
     });

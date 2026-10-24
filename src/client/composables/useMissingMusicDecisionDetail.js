@@ -49,6 +49,7 @@ function normalizeDetail(payload) {
       canStartDownload: payload.permissions?.canStartDownload === true,
       canSearchAgain: payload.permissions?.canSearchAgain === true,
       canSelectMatch: payload.permissions?.canSelectMatch === true,
+      canChooseAnotherMatch: payload.permissions?.canChooseAnotherMatch === true,
       canViewDownloader: payload.permissions?.canViewDownloader === true,
       isReadOnly: payload.permissions?.isReadOnly === true,
     },

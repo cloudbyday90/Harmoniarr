@@ -5,6 +5,14 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For Choose another match after quality review, use the standards
+[alternative selection reference](../harmoniarr-web-standards/references/quality-review-match-selection.md).
+Run focused decision/presentation checks, quality-review-match-selection SQL/HTTP
+and browser cases, and existing selection/review regression lanes. Observe an
+actual PostgreSQL lock wait through an independent connection; the application
+pool remains bounded. Keep synthetic search/gate fixtures separate from actual
+provider/media qualification and preserve explicit download authority.
+
 For initial quality-review persistence, use the standards
 [preflight review reference](../harmoniarr-web-standards/references/preflight-quality-review.md).
 Run focused service/projection/normalization tests, preflight-quality-review

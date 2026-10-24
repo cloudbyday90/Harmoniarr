@@ -30,4 +30,7 @@ The SQL/browser gates are deliberately controlled; packaged media proves actual 
 
 GitHub MCP returned zero open PRs at initial selection and recheck, so no applicable PR could be implemented or cleaned up. Work remains on main with no release, Git tag or version change.
 
-Next: add a recipient-owned Choose another match handoff for measured quality refusals in Missing Music. The new durable explanation is visible, but suspicious-lossless review still directs users to Advanced diagnostics; direct match choices are currently exposed only for review_matches. Preserve failed-candidate exclusion, current shared requirements and explicit target consent when completing that action.
+Follow-up implemented: [recipient-owned alternative selection](QUALITY_REVIEW_MATCH_OUTCOME.md)
+adds Choose another match inside Missing Music with current shared quality and
+ownership checks. It preserves failed candidates and explicit download authority.
+See that outcome for the next recommended item.

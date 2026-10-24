@@ -15,6 +15,16 @@ function detail(reasonCode = 'source_path_unavailable', permissions = {}) {
     libraryAddRecovery: { reasonCode, queued: false, runId: null }, permissions: { canRecheckLibraryAdd: true, canRepairFolders: true, ...permissions } };
 }
 
+test('measured review offers the inline chooser only with current permission and active history', () => {
+  const input = { ...detail(), libraryAddRecovery: null,
+    libraryAddReview: { reasonCode: 'suspicious_lossless', title: 'Lossless audio needs review', detail: 'Measured refusal.', nextStep: 'Review recorded diagnostics.' },
+    permissions: { canChooseAnotherMatch: true } };
+  assert.match(buildMissingMusicLibraryAddRecoveryPresentation(input).reviewNextStep, /^Choose another match below/u);
+  for (const permissions of [{ canChooseAnotherMatch: false }, { canChooseAnotherMatch: 'true' }, { canChooseAnotherMatch: true, isReadOnly: true }]) {
+    assert.equal(buildMissingMusicLibraryAddRecoveryPresentation({ ...input, permissions }).reviewNextStep, 'Review recorded diagnostics.');
+  }
+});
+
 test('folder recovery uses the same decision in the bounded Settings return without a recipient or candidate input', () => {
   const presentation = buildMissingMusicLibraryAddRecoveryPresentation(detail());
   assert.equal(presentation.canRecheck, true);

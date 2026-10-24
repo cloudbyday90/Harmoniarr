@@ -67,9 +67,11 @@ test('Missing Music links to a routable detail inspector with a labelled current
   assert.match(inspectorSource, /<h2 ref="headingElement" class="hx-card-title missing-music-inspector__heading" tabindex="-1">/);
   assert.match(inspectorSource, /\.missing-music-inspector__heading:focus/);
   assert.match(inspectorSource, /<h3 id="missing-music-inspector-current-status" ref="statusHeadingElement" tabindex="-1">Current status<\/h3>/);
-  assert.match(inspectorSource, /aria-labelledby="missing-music-inspector-match-choices"/);
-  assert.match(inspectorSource, /Use this match/);
-  assert.match(inspectorSource, /Selecting a match does not start a download/);
+  assert.match(inspectorSource, /<MissingMusicMatchChoices\b/);
+  const matchChoicesSource = await readFile(new URL('../../src/client/components/missing-music/MissingMusicMatchChoices.vue', import.meta.url), 'utf8');
+  assert.match(matchChoicesSource, /aria-labelledby="missing-music-inspector-match-choices"/);
+  assert.match(matchChoicesSource, /Use this match/);
+  assert.match(matchChoicesSource, /Selecting a match does not start a download/);
   assert.match(inspectorSource, /Back to release decisions/);
   assert.match(missingViewSource, /<MissingMusicDecisionInspector v-if="selectedDecisionId"/);
   assert.match(missingViewSource, /ref="pageHeadingElement" class="hx-page-title missing-music-page-title" tabindex="-1"/);

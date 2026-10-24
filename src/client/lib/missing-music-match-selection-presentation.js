@@ -58,6 +58,7 @@ export function buildMissingMusicMatchChoicePresentation(detail) {
     : 'this release';
 
   return {
+    isAlternative: detail?.permissions?.canChooseAnotherMatch === true && !isReadOnly,
     canSelect: detail?.permissions?.canSelectMatch === true && !isReadOnly,
     choices: choices
       .filter((choice) => typeof choice?.id === 'string' && choice.id.trim())

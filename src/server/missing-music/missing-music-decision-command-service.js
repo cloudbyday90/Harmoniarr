@@ -22,6 +22,7 @@ import {
 } from '../activity/music-queue-milestone-activity-event-service.js';
 import { recordActivityEventSafely } from '../activity/music-queue-lifecycle-activity-event-service.js';
 import { findSelectableMissingMusicMatch } from './missing-music-match-choice-projection.js';
+import { isMeasuredQualityReview } from '../acquisition/acquisition-library-add-recheck-policy.js';
 
 const MAX_MATCH_ID_LENGTH = 200;
 
@@ -57,6 +58,7 @@ export function createMissingMusicDecisionCommandService({
   recordActivityEventFn = null,
   resolveMissingMusicDecisionTarget,
   selectImportCandidate,
+  selectQualityReviewMatch = null,
 } = {}) {
   validateDependencies({ resolveMissingMusicDecisionTarget, selectImportCandidate });
 
@@ -78,7 +80,12 @@ export function createMissingMusicDecisionCommandService({
       throw createApiError(404, 'missing_music_match_not_found', 'Missing Music match was not found for this release');
     }
 
-    const selection = await selectImportCandidate({
+    const qualityReview = isMeasuredQualityReview(target.release.libraryAddRecoveryFacts);
+    if (qualityReview && typeof selectQualityReviewMatch !== 'function') {
+      throw createApiError(503, 'missing_music_selection_unavailable', 'Match selection is temporarily unavailable');
+    }
+    const selection = await (qualityReview ? selectQualityReviewMatch : selectImportCandidate)({
+      ...(qualityReview ? { appUserId: target.targetUser.id, wantedReleaseId: target.decisionId } : {}),
       actorUserId: actorUser.id,
       eventDetails: {
         missingMusic: {

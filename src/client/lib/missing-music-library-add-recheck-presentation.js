@@ -39,7 +39,10 @@ export function buildMissingMusicLibraryAddRecoveryPresentation(detail) {
     repairFoldersLocation: canRepairFolders && context ? buildSettingsRecoveryHandoffLocation({ recoveryContext: context, routeName: 'settings-media-storage' }) : null,
     showPanel: Boolean(reasonCode) || queued || Boolean(review),
     title: queued ? 'Library-add checks queued' : review ? review.title : reasonCode === 'source_path_unavailable' ? 'Completed files are not reachable' : 'Audio check could not finish',
-    reviewNextStep: !queued && review ? review.nextStep : null,
+    reviewNextStep: !queued && review
+      ? !isReadOnly && detail?.permissions?.canChooseAnotherMatch === true
+        ? 'Choose another match below. Harmoniarr will check its audio before adding it to your library.' : review.nextStep
+      : null,
     explanation: queued
       ? 'Harmoniarr will add the completed files only after the current audio and library checks pass.'
       : review ? review.detail : reasonCode === 'source_path_unavailable'

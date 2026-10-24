@@ -613,6 +613,8 @@ export function createApp({
     startLibraryDiscoveryRun: libraryModule.routeDependencies.startLibraryDiscoveryRun,
   });
   const missingMusicModule = buildMissingMusicModule({
+    listQualityReviewMatchIds: importCandidateModule.importCandidateQualityReviewSelectionService?.listQualityReviewMatchIds,
+    selectQualityReviewMatch: importCandidateModule.importCandidateQualityReviewSelectionService?.selectQualityReviewMatch,
     startReleaseManualSafeAdd: importCandidateModule.importCandidateReleaseManualSafeAddService?.startReleaseManualSafeAdd,
     recheckReleaseSafeAdd: importCandidateModule.importCandidateReleaseSafeAddRecheckService?.recheckReleaseSafeAdd,
     requestInitialMusicSearch: libraryModule.libraryInitialSearchService.requestInitialMusicSearch,

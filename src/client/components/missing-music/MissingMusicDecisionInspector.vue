@@ -20,7 +20,6 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { buildMissingMusicDecisionDetailPresentation } from '../../lib/missing-music-decision-detail-presentation.js';
-import { buildMissingMusicMatchChoicePresentation } from '../../lib/missing-music-match-selection-presentation.js';
 import { trapModalTabFocus } from '../../lib/modal-focus-trap.js';
 import { createUserCommandFocusTracker } from '../../lib/user-command-focus.js';
 import { useMissingMusicDecisionDetail } from '../../composables/useMissingMusicDecisionDetail.js';
@@ -38,6 +37,7 @@ import MissingMusicSearchDiagnostics from './MissingMusicSearchDiagnostics.vue';
 import MissingMusicCommandFeedback from './MissingMusicCommandFeedback.vue';
 import MissingMusicLibraryAddRecovery from './MissingMusicLibraryAddRecovery.vue';
 import MissingMusicLibraryAddAction from './MissingMusicLibraryAddAction.vue';
+import MissingMusicMatchChoices from './MissingMusicMatchChoices.vue';
 
 const props = defineProps({
   decisionId: {
@@ -72,7 +72,6 @@ const decisionDetail = useMissingMusicDecisionDetail({
   decisionId: currentDecisionId,
 });
 const presentation = computed(() => buildMissingMusicDecisionDetailPresentation(decisionDetail.detail.value));
-const matchChoicePresentation = computed(() => buildMissingMusicMatchChoicePresentation(decisionDetail.detail.value));
 const busy = computed(() => mutationBusy.value || decisionDetail.isLoading.value || decisionDetail.isRevalidating.value);
 let disposed = false;
 const commandFocusTrackers = new Set();
@@ -352,45 +351,10 @@ defineExpose({ busy, refresh: decisionDetail.refresh });
         @recheck-library-add="recheckLibraryAdd"
       />
 
-      <section
-        v-if="matchChoicePresentation.choices.length"
-        class="missing-music-inspector__section"
-        aria-labelledby="missing-music-inspector-match-choices"
-      >
-        <div>
-          <h3 id="missing-music-inspector-match-choices">{{ matchChoicePresentation.heading }}</h3>
-          <p id="missing-music-inspector-match-choice-help">
-            {{ matchChoicePresentation.instructions }}
-            <template v-if="matchChoicePresentation.canSelect">Selecting a match does not start a download.</template>
-          </p>
-        </div>
-
-        <ul class="missing-music-inspector__match-list" aria-label="Available matches">
-          <li v-for="match in matchChoicePresentation.choices" :key="match.id">
-            <article class="missing-music-inspector__match">
-              <h4>{{ match.label }}</h4>
-              <dl>
-                <div v-for="fact in match.facts" :key="fact.label">
-                  <dt>{{ fact.label }}</dt>
-                  <dd>{{ fact.value }}</dd>
-                </div>
-              </dl>
-              <button
-                v-if="matchChoicePresentation.canSelect"
-                type="button"
-                class="hx-btn"
-                data-variant="primary"
-                :aria-label="match.accessibleActionLabel"
-                :aria-describedby="'missing-music-inspector-match-choice-help'"
-                :disabled="mutationBusy"
-                @click="selectMatch(match.id)"
-              >
-                {{ matchSelection.activeMatchId.value === match.id ? 'Selecting…' : 'Use this match' }}
-              </button>
-            </article>
-          </li>
-        </ul>
-      </section>
+      <MissingMusicMatchChoices
+        :detail="decisionDetail.detail.value" :busy="mutationBusy"
+        :active-match-id="matchSelection.activeMatchId.value" @select="selectMatch"
+      />
     </div>
   </article>
 
@@ -545,51 +509,6 @@ defineExpose({ busy, refresh: decisionDetail.refresh });
   background: var(--hx-danger-soft);
 }
 
-.missing-music-inspector__match-list {
-  display: grid;
-  gap: var(--hx-space-3);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.missing-music-inspector__match {
-  display: grid;
-  gap: var(--hx-space-3);
-  padding: var(--hx-space-3);
-  border: 1px solid var(--hx-border);
-  border-radius: var(--hx-radius-md);
-  background: var(--hx-bg-surface-muted);
-}
-
-.missing-music-inspector__match h4,
-.missing-music-inspector__match dl {
-  margin: 0;
-}
-
-.missing-music-inspector__match dl {
-  display: grid;
-  gap: var(--hx-space-2);
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.missing-music-inspector__match dl div {
-  display: grid;
-  gap: var(--hx-space-1);
-}
-
-.missing-music-inspector__match dt {
-  color: var(--hx-text-muted);
-  font-size: var(--hx-text-xs);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.missing-music-inspector__match dd {
-  margin: 0;
-}
-
 .missing-music-download-dialog {
   width: min(100% - (2 * var(--hx-space-4)), 34rem);
   padding: 0;
@@ -624,12 +543,6 @@ defineExpose({ busy, refresh: decisionDetail.refresh });
 }
 
 @media (max-width: 640px) {
-  .missing-music-inspector__facts {
-    grid-template-columns: 1fr;
-  }
-
-  .missing-music-inspector__match dl {
-    grid-template-columns: 1fr;
-  }
+  .missing-music-inspector__facts { grid-template-columns: 1fr; }
 }
 </style>

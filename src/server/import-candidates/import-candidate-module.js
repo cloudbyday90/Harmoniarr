@@ -30,6 +30,7 @@ import { createImportCandidateApplyRunStore } from './import-candidate-apply-run
 import { createImportCandidateApplyService } from './import-candidate-apply-service.js';
 import { createImportCandidateApplyQueueService } from './import-candidate-apply-queue-service.js';
 import { createImportCandidateReleaseRecheckStore } from './import-candidate-release-recheck-store.js';
+import { createImportCandidateQualityReviewSelectionService } from './import-candidate-quality-review-selection-service.js';
 import { createImportCandidateReleaseRecheckGuardService } from './import-candidate-release-recheck-guard-service.js';
 import { createImportCandidateApplySummaryService } from './import-candidate-apply-summary-service.js';
 import { createImportCandidateApplyWorker } from './import-candidate-apply-worker.js';
@@ -417,6 +418,14 @@ export function createImportCandidateModule({
       markImportCandidateImportBlocked: importCandidateService.markImportCandidateImportBlocked }).recordPreparedLibraryAddReview,
     queuePreparedImportCandidateApply: importCandidateApplyQueueService.queuePreparedImportCandidateApply,
   }),
+  importCandidateQualityReviewSelectionService = createImportCandidateQualityReviewSelectionService({
+    recheckStore: importCandidateReleaseRecheckStore,
+    getImportCandidate: importCandidateService.getImportCandidate,
+    selectImportCandidate: importCandidateService.selectImportCandidate,
+    assertMaintenanceWriteAllowed: ({ queryable }) => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+      operationLabel: 'quality-review match selection', queryable,
+    }),
+  }),
   importCandidateReleaseSafeAddRecheck = importCandidateReleaseSafeAddRecheckService
     ?? createImportCandidateReleaseSafeAddRecheckService({
       recheckStore: importCandidateReleaseRecheckStore,
@@ -562,6 +571,7 @@ export function createImportCandidateModule({
     importCandidateReleaseSafeAddRecheckService: importCandidateReleaseSafeAddRecheck,
     importCandidateReleaseRecheckGuardService,
     importCandidateReleaseRecheckStore,
+    importCandidateQualityReviewSelectionService,
     importCandidateApplyQueueService,
     importCandidateApplyPreviewService,
     importCandidatePreviewService,

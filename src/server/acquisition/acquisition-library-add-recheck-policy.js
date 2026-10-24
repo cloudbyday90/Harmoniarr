@@ -8,6 +8,11 @@
 import { hasQueuedGuardedLibraryAdd } from './acquisition-library-add-policy.js';
 import { buildMusicQueueAddRecoveryPresentation, normalizeMusicQueueAddRecoveryReasonCode } from '../../shared/music-queue-add-recovery-presentation.js';
 
+export function isMeasuredQualityReview(facts) {
+  return facts?.addBlockerCode === 'media_verification'
+    && ['lossy_audio', 'suspicious_lossless'].includes(facts.recoveryReasonCode);
+}
+
 /** Current owned facts select static copy; diagnostic strings never become public guidance. */
 export function buildPublicLibraryAddReview(facts) {
   if (facts?.candidateStatus !== 'failed' || facts.addBlockerCode !== 'media_verification'

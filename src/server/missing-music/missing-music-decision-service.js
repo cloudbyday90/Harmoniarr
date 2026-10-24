@@ -176,6 +176,7 @@ function validateDependencies({
 }
 
 export function createMissingMusicDecisionService({
+  listQualityReviewMatchIds = async () => [],
   listAppUsers,
   listWantedReleaseIdentityPage,
   listWantedReleasesWithMetadata,
@@ -326,9 +327,17 @@ export function createMissingMusicDecisionService({
       () => projectedRelease,
       now(),
     );
-    const matchChoices = decision.status.nextAction === 'review_matches'
+    const libraryAddReview = buildPublicLibraryAddReview(target.release.libraryAddRecoveryFacts);
+    const measuredReview = ['lossy_audio', 'suspicious_lossless'].includes(libraryAddReview?.reasonCode);
+    let matchChoices = decision.status.nextAction === 'review_matches'
       ? buildMissingMusicMatchChoices(target.release)
       : [];
+    if (measuredReview && target.targetUser.accountStatus !== 'disabled') {
+      const choices = buildMissingMusicMatchChoices(target.release);
+      const eligibleIds = await listQualityReviewMatchIds({ appUserId: target.targetUser.id, wantedReleaseId: target.decisionId,
+        matchIds: choices.map(choice => choice.id) });
+      matchChoices = choices.filter(choice => eligibleIds.includes(choice.id));
+    }
     const searchDiagnostics = buildMissingMusicSearchDiagnostics(target.release);
 
     return {
@@ -338,7 +347,7 @@ export function createMissingMusicDecisionService({
       qualityEvidence: buildPublicQualityEvidence(projectedRelease.quality),
       searchDiagnostics,
       libraryAddRecovery: buildPublicLibraryAddRecovery(target.release.libraryAddRecoveryFacts),
-      libraryAddReview: buildPublicLibraryAddReview(target.release.libraryAddRecoveryFacts),
+      libraryAddReview,
       permissions: {
         ...buildMissingMusicSearchCorrectionPermissions({ actorUser, targetUser: target.targetUser, searchDiagnostics }),
         canReviewDownloadHandoff: canReviewMissingMusicDownload({ actorUser, targetUser: target.targetUser, release: target.release }),
@@ -359,6 +368,7 @@ export function createMissingMusicDecisionService({
           nextAction: decision.status.nextAction,
         }),
         canSelectMatch: target.targetUser.accountStatus !== 'disabled' && matchChoices.length > 0,
+        canChooseAnotherMatch: measuredReview && matchChoices.length > 0,
         isReadOnly: target.targetUser.accountStatus === 'disabled',
       },
       scope: target.scope,
