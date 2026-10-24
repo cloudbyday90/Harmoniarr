@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 24 [bounded-restart rebuild](LOCAL_DOCKER_BOUNDED_RESTART_QUALIFICATION_OUTCOME.md)
+records the latest no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](BOUNDED_RESTART_QUALIFICATION_OUTCOME.md) connects bounded
+owned progress, current revision fencing and truthful checking/queued feedback.
+
 The October 24 [candidate-revision rebuild](LOCAL_DOCKER_CANDIDATE_SEARCH_REVISIONS_OUTCOME.md)
 records the latest no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](CANDIDATE_SEARCH_REVISIONS_OUTCOME.md) connects durable

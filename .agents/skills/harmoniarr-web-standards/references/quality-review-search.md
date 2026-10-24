@@ -8,6 +8,8 @@ active repository's docs/QUALITY_REVIEW_SEARCH_DESIGN.md, research and outcome.
    existing queue, idempotency, feedback and focus owners.
 2. Establish exhaustion across the whole current search in bounded keyset pages.
    An empty twelve-choice public shortlist is not proof that no alternative exists.
+   Follow [bounded qualification](bounded-restart-qualification.md) for current
+   durable steps and atomic current revision fencing instead of full traversal.
 3. Share the current quality-review scope with replacement selection. Lock current
    maintenance/accounts/wanted/discovery/creation/candidate owners; read after lock
    waits and recheck actor role, participant identity, missing state and track scope.

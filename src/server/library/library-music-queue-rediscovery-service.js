@@ -13,6 +13,7 @@ import { projectMusicQueueRelease } from '../acquisition/acquisition-pipeline-se
 import { canRequestMusicQueueRediscovery, isMusicQueueRediscoveryInProgress } from '../acquisition/acquisition-rediscovery-policy.js';
 import { buildQualityReviewSearchRequirement, QUALITY_REVIEW_SEARCH_REASON } from './library-quality-review-search-policy.js';
 import { createLibraryMusicQueueRediscoveryStore } from './library-music-queue-rediscovery-store.js';
+import { createQualityReviewSearchService } from '../import-candidates/quality-review-search-service.js';
 
 export function createLibraryMusicQueueRediscoveryService({
   assertMaintenanceWriteAllowed,
@@ -24,6 +25,7 @@ export function createLibraryMusicQueueRediscoveryService({
   rediscoveryStore = createLibraryMusicQueueRediscoveryStore(),
   requestMusicQueueRediscovery,
   qualityReviewScopeService = null,
+  onQualityReviewSearchQueued = async () => {},
   withTransaction = createDatabaseTransactionRunner(),
 } = {}) {
   for (const [name, dependency] of Object.entries({ assertMaintenanceWriteAllowed, getAppUserById,
@@ -56,17 +58,17 @@ export function createLibraryMusicQueueRediscoveryService({
     }
     return result;
   }
+  const qualityReviewSearch = qualityReviewScopeService ? createQualityReviewSearchService({ scopeService: qualityReviewScopeService,
+    onSearchQueued: onQualityReviewSearchQueued,
+    commitIntent: ({ scope, ...input }) => commitIntent({ ...input, qualityReviewRequirement: buildQualityReviewSearchRequirement(scope) }),
+    recordCheckRequested: ({ actorUserId, appUserId, wantedReleaseId, queryable }) => recordAuditEventFn({
+      actorType: 'user', actorUserId, eventType: 'missing_music_match_check_requested', entityType: 'library_wanted_release',
+      entityId: wantedReleaseId, summary: 'Available match check requested', details: { requestedForUserId: appUserId } }, queryable),
+  }) : null;
   async function requestGuardedMusicQueueRediscovery({ appUserId, metadataReleaseId, requestMetadata = null, ...intent }) {
     if (intent.reasonCode === QUALITY_REVIEW_SEARCH_REASON) {
       if (!qualityReviewScopeService) throw createApiError(503, 'music_queue_retry_unavailable', 'Quality-review search is unavailable');
-      return qualityReviewScopeService.withCurrentScope({ appUserId, actorUserId: intent.requestedByUserId,
-        wantedReleaseId: intent.wantedReleaseId }, async ({ scope, queryable }) => {
-        if (scope.release.metadataReleaseId !== metadataReleaseId || await qualityReviewScopeService.hasEligibleAlternative(scope, { queryable })) {
-          throw createApiError(409, 'music_queue_retry_not_available', 'Review the available matches before searching again');
-        }
-        return commitIntent({ appUserId, metadataReleaseId, requestMetadata, intent, queryable,
-          qualityReviewRequirement: buildQualityReviewSearchRequirement(scope) });
-      });
+      return qualityReviewSearch.request({ appUserId, metadataReleaseId, requestMetadata, intent });
     }
     return withTransaction(async (queryable) => {
       // Maintenance must precede account and domain locks throughout the app.
@@ -92,5 +94,5 @@ export function createLibraryMusicQueueRediscoveryService({
     });
   }
 
-  return { requestGuardedMusicQueueRediscovery };
+  return { requestGuardedMusicQueueRediscovery, qualityReviewSearch };
 }

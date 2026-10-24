@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { createOperationRunStore } from '../../src/server/operation-run-store.js';
+import { createOperationRunOwnedLifecycleStore } from '../../src/server/operation-run-owned-lifecycle-store.js';
 
 const bridgeNow = new Date('2026-10-09T21:00:00.000Z');
 function ownedPool(t, { runId, operationType = 'library_scan', attemptCount = 1, maxAttempts = 3,
@@ -48,6 +49,16 @@ test('transaction cancellation checks do not borrow another pool connection', as
   const store = createOperationRunStore({ getPoolFn: () => assert.fail('Cancellation guard must remain on its transaction'), operationType: 'library_external_request_discovery' });
   assert.equal(await store.isCancellationRequested({ runId: 'run', queryable }), true);
   assert.deepEqual(queryable.query.mock.calls[0].arguments[1], ['run', 'library_external_request_discovery']);
+});
+
+test('borrowed owned lifecycle validates the acquisition without opening, committing or releasing its caller transaction', async t => {
+  const h = ownedPool(t, { runId: 'borrowed' });
+  const store = createOperationRunOwnedLifecycleStore({ getPoolFn: () => h.pool, operationType: 'library_scan' });
+  assert.equal(await store.withOwnedRun({ runId: 'borrowed', expectedLease: h.expectedLease, queryable: h.client }, ({ queryable }) => {
+    assert.equal(queryable, h.client); return 'owned';
+  }), 'owned');
+  assert.equal(h.pool.connect.mock.callCount(), 0); assert.equal(h.client.release.mock.callCount(), 0);
+  assert.ok(!h.query.mock.calls.some(call => ['BEGIN', 'COMMIT', 'ROLLBACK'].includes(call.arguments[0])));
 });
 
 test('operation run creation stays in the supplied transaction without borrowing a pool connection', async (t) => {

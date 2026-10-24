@@ -70,3 +70,8 @@ revision inversion abort confirms that a command cannot simply lock a revision
 first and reuse an empty cursor. Qualify lock order or serializable predicate
 protection, current policy/actor/track authority, rollback/replay, expiry and
 starvation before replacing the complete guard. Keep this built into the platform.
+
+The [bounded qualification outcome](BOUNDED_RESTART_QUALIFICATION_OUTCOME.md) now
+implements that protocol using existing owned operation runs and a final NOWAIT
+revision fence. It supersedes the complete restart traversal and owns the next
+failed-candidate fact/lock reduction recommendation.

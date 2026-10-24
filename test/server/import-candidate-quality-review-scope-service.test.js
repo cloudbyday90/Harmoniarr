@@ -19,6 +19,7 @@ function fixture({ weak = 51, eligible = 15, disabled = false, alternative = nul
   const reads = []; const pages = []; const locks = []; let scopeReads = 0; let transactions = 0;
   const service = createImportCandidateQualityReviewScopeService({
     revisionStore: { readRevision: async () => 'current-revision' },
+    searchRunStore: { findActive: async () => null },
     recheckStore: {
       readOwnedRelease: async () => { scopeReads++; return { metadataReleaseId: id(902), targetUser: { isDisabled: disabled },
         libraryAddRecoveryFacts: { candidateId: failedId, candidateStatus: 'failed', addBlockerCode: 'media_verification',
@@ -79,8 +80,8 @@ test('forward and reverse pages retain twelve eligible facts without repeating a
 test('guarded existence checks use the same batches, preserve the owning queryable and stop at the first eligible result', async () => {
   const f = fixture({ weak: 0, eligible: 90 }); const queryable = { query: () => {} };
   const scope = await f.service.readScope({ appUserId: ownerId, wantedReleaseId: wantedId });
-  assert.equal(await f.service.hasEligibleAlternative(scope, { queryable }), true);
-  assert.equal(f.pages.length, 1); assert.equal(f.pages[0].queryable, queryable); assert.deepEqual(f.reads, [failedId]);
+  assert.equal((await f.service.scanAlternativeWindow(scope, { queryable })).candidates.length, 1);
+  assert.equal(f.pages.length, 1); assert.equal(f.pages[0].queryable, queryable); assert.equal(f.pages[0].lockRows, false); assert.deepEqual(f.reads, [failedId]);
 });
 
 test('empty bounded windows continue explicitly and cannot authorize restart before a hidden eligible choice', async () => {
@@ -94,7 +95,8 @@ test('empty bounded windows continue explicitly and cannot authorize restart bef
   assert.deepEqual(third.candidates.map(c => c.id), [id(402)]); assert.equal(third.matchChoicePage.scanIncomplete, false);
   assert.equal(third.canSearchAgain, false); assert.equal(f.pages.length, 9);
   const scope = await f.service.readScope(input);
-  assert.equal(await f.service.hasEligibleAlternative(scope), true, 'The command guard must find choices beyond the read budget');
+  const partial = await f.service.scanAlternativeWindow(scope);
+  assert.equal(partial.candidates.length, 0); assert.equal(partial.exhausted, false, 'Command windows also stop at the fact budget');
 });
 
 test('exact-boundary empty walks require later EOF and an empty terminal page can return to its boundary match', async () => {

@@ -421,6 +421,10 @@ export function createLibraryModule({
   }) : null,
   libraryMusicQueueRediscoveryService = getAppUserById ? createLibraryMusicQueueRediscoveryService({
     qualityReviewScopeService,
+    onQualityReviewSearchQueued: async input => {
+      try { await libraryDiscoveryRunService.startLibraryDiscoveryRun(input); }
+      catch (error) { if (error?.code !== 'library_discovery_in_progress') throw error; }
+    },
     assertMaintenanceWriteAllowed: ({ queryable }) => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
       operationLabel: 'another Missing Music search', queryable,
     }),
@@ -585,6 +589,7 @@ export function createLibraryModule({
     libraryMediaRequestPipelineStore,
     libraryMediaRequestStore,
     libraryMusicQueueRediscoveryService,
+    libraryQualityReviewSearchWorker: libraryMusicQueueRediscoveryService?.qualityReviewSearch?.worker,
     libraryInitialSearchService,
     libraryFallbackQualityService,
     libraryOrganizeApplyRunStore,

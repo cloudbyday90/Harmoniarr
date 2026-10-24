@@ -350,6 +350,11 @@ export function createMissingMusicDecisionService({
       matchChoices = buildMissingMusicQualityReviewChoices(alternatives.candidates);
       matchChoicePage = alternatives.matchChoicePage ?? null;
       canRestartQualityReview = alternatives.canSearchAgain === true;
+      if (alternatives.checkingMatches === true) {
+        decision.status = { code: 'checking_matches', label: 'Checking available matches', nextAction: null, tone: 'info',
+          message: 'Harmoniarr is checking the remaining matches before starting another search.' };
+        decision.state = 'searching';
+      }
     }
     const searchDiagnostics = buildMissingMusicSearchDiagnostics(target.release);
 

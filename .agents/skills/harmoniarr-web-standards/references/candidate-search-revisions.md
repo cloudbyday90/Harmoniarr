@@ -19,11 +19,11 @@ docs/CANDIDATE_SEARCH_REVISIONS_DESIGN.md, research and outcome in the active re
    prelocked candidates and revision rows can form a cycle. Statement-local key
    sorting is not a transaction-wide lock order. Preserve abort/rollback evidence;
    never silently replay provider effects to hide a database failure.
-5. Keep full fresh command guards until a separately qualified protocol covers
-   source mutations, current actor/participant/policy/track facts, expiry, replay,
-   audit atomicity and starvation. A revision or historical empty cursor is not
-   an exhaustion certificate. Reusing existing operation runs is the preferred
-   built-in direction for bounded durable progress, not implemented authority.
+5. Follow [bounded restart qualification](bounded-restart-qualification.md) for
+   current command authority. It covers current actors/participants/policy/track
+   facts, expiry, replay, atomic audit and starvation using existing operation
+   runs and a final nonwaiting fence. A revision or historical empty cursor alone
+   is not an exhaustion certificate.
 6. Retain the existing explicit refresh/status/focus lifecycle; prove a real stale
    cursor refresh in the browser. Automated keyboard results do not complete
    deferred screen-reader or physical-device acceptance.

@@ -141,6 +141,7 @@ export const criticalSchemaAnchors = Object.freeze({
     { table: 'operator_artist_reconciliation_snapshot', constraint: 'operator_artist_reconciliation_snapshot_payload_object_check' },
   ]),
   indexes: Object.freeze([
+    { index: 'operation_runs_active_quality_review_search_idx' },
     { index: 'import_candidates_quality_review_page_idx' },
     { index: 'admin_recovery_runs_one_armed_idx' },
     { index: 'slskd_search_intents_discovery_unique' },

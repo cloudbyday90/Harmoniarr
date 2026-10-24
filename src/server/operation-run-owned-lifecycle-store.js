@@ -15,11 +15,11 @@ import { writableExecutionRunSql } from './import-candidates/import-execution-or
 /** Every leased lifecycle mutation observes the parent and its exact acquisition under ordered locks. */
 export function createOperationRunOwnedLifecycleStore({ getPoolFn = getPool, operationType, leaseJobType = operationType,
   withTransaction = createDatabaseTransactionRunner({ getPoolFn }) } = {}) {
-  async function withOwnedRun({ runId, expectedLease }, work) {
+  async function withOwnedRun({ runId, expectedLease, queryable: existingQueryable = null }, work) {
     const leaseKey = `${leaseJobType}:${runId}`;
     const expected = normalizeExpectedJobLease(expectedLease, { leaseKey });
     if (!expected) return false;
-    return withTransaction(async (queryable) => {
+    const execute = async (queryable) => {
       const parent = await queryable.query(`SELECT * FROM operation_runs WHERE id=$1::uuid AND operation_type=$2
         AND ${writableExecutionRunSql('operation_runs')} FOR UPDATE`, [runId, operationType]);
       const run = parent.rows[0];
@@ -31,7 +31,8 @@ export function createOperationRunOwnedLifecycleStore({ getPoolFn = getPool, ope
       const now = observedAt instanceof Date ? observedAt.getTime() : Date.parse(observedAt);
       if (!isCurrentJobLeaseAcquisition(lease, expected, { leaseKey, now })) return false;
       return work({ run, lease, expectedLease: expected, queryable });
-    });
+    };
+    return existingQueryable ? execute(existingQueryable) : withTransaction(execute);
   }
   async function writeLifecycle({ runId, action, summary, expectedLease, errorMessage = null, nextAttemptAt = null, queryable }) {
     const expected = normalizeExpectedJobLease(expectedLease, { leaseKey: `${leaseJobType}:${runId}` });
@@ -54,6 +55,7 @@ export function createOperationRunOwnedLifecycleStore({ getPoolFn = getPool, ope
       claimed_at=NULL,claimed_by_instance_id=NULL${preserves ? '' : `,
         summary=CASE WHEN summary ? 'musicQueueRecovery' OR summary ? 'downloadPreparationProtocol' OR summary->>'triggerSource'='missing_music_manual'
           OR (operation_type='library_external_request_discovery' AND summary ? 'searchRecoveryOfRunId')
+          OR operation_type='quality_review_search'
           THEN COALESCE(summary,'{}'::jsonb)||$2::jsonb ELSE $2::jsonb END`}
       WHERE id=$1::uuid AND ${writableExecutionRunSql('operation_runs')}
         ${action === 'paused' ? "AND status IN ('pending','running')" : ''}

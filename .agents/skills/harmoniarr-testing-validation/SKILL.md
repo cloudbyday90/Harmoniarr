@@ -5,12 +5,20 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For bounded measured-review restart, read the standards
+[qualification reference](../harmoniarr-web-standards/references/bounded-restart-qualification.md).
+Run progress/service/worker/borrowed-ownership checks, bounded-quality-review-search
+HTTP/queue cases, shared real fence contention and guarded native fence entry.
+Combine affected selection/search/pagination/plan, operation recovery and lease
+SQL cohorts once. Cover checking/reload/queued browser behavior and retain
+unrelated native memory proof only after exact source/runtime comparison.
+
 For durable candidate search revisions, read the standards
 [revision reference](../harmoniarr-web-standards/references/candidate-search-revisions.md).
 Pair store/page unit checks with fresh/populated schema and actual writer-wait,
 inversion/rollback SQL proof. Reuse the registrar on guarded packaged PostgreSQL,
-and exercise stale-cursor refresh through the real browser. Retain full restart
-authorization and distinguish revision evidence from memory/performance claims.
+and exercise stale-cursor refresh through the real browser. Follow the qualification
+reference for current restart authority; separate revision evidence from RSS claims.
 
 For candidate keyset access paths, read the standards
 [plan reference](../harmoniarr-web-standards/references/candidate-query-plans.md).
@@ -23,8 +31,8 @@ For bounded detail scans, read the standards
 [scan reference](../harmoniarr-web-standards/references/match-scan-budget.md).
 Run scanner/scope/cursor/presentation/gate tests, then combine scan-budget and
 existing pagination/shortlist/selection/restart SQL and browser cohorts. Prove
-200-fact/four-query bounds separately from complete command-guard traversal,
-exact EOF and stale empty-walk refusal. Bulk fixture facts avoid per-row setup.
+200-fact/four-query bounds, current bounded command steps, exact EOF and stale
+empty-walk refusal. Bulk fixture facts avoid per-row setup.
 
 For eligible-match pagination, read the standards
 [page reference](../harmoniarr-web-standards/references/match-pagination.md).

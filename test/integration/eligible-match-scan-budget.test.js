@@ -9,6 +9,7 @@ import { before, after, suite, test } from 'node:test';
 import { createPreflightReviewFixture } from '../../testing/integration/preflight-review-fixture.js';
 import { seedQualityReviewAlternative, seedQualityReviewScanRows } from '../../testing/integration/quality-review-match-fixture.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
+import { advanceBoundedSearch } from '../../testing/integration/bounded-quality-review-search-fixture.js';
 
 const fixture = createPreflightReviewFixture(); const config = resolveIntegrationTestRuntimeConfig(); let runtime;
 const path = id => `/api/v1/missing-music/decisions/${id}`;
@@ -27,7 +28,9 @@ suite('Bounded detail scans with independent current restart authority', () => {
       assert.deepEqual(first.matchChoices, []); assert.equal(first.matchChoicePage.scanIncomplete, true);
       assert.equal(first.permissions.canChooseAnotherMatch, true); assert.equal(first.permissions.canSelectMatch, false);
       assert.equal(first.permissions.canSearchAgain, false); assert.ok(first.matchChoicePage.nextCursor);
-      assert.equal((await restart(context.client, f.wantedId)).response.status, 409); assert.equal(await audits(f.pool), 0);
+      const checking = await restart(context.client, f.wantedId);
+      assert.equal(checking.payload.action.checkingMatches, true); assert.equal(await audits(f.pool), 0);
+      await advanceBoundedSearch(f); assert.equal(await audits(f.pool), 0);
       const second = (await read(context.client, f.wantedId, first.matchChoicePage.nextCursor)).payload;
       assert.deepEqual(second.matchChoices.map(c => c.id), [eligible.id]); assert.equal(second.matchChoicePage.scanIncomplete, false);
       assert.equal(second.permissions.canSearchAgain, false); assert.equal(second.matchChoicePage.nextCursor, null);
@@ -49,7 +52,8 @@ suite('Bounded detail scans with independent current restart authority', () => {
       assert.deepEqual(end.matchChoices, []); assert.equal(end.matchChoicePage.scanIncomplete, false);
       assert.equal(end.permissions.canSearchAgain, true); assert.equal(end.matchChoicePage.nextCursor, null);
       const response = await restart(context.client, f.wantedId);
-      assert.equal(response.response.status, 200, JSON.stringify(response.payload)); assert.equal(response.payload.action.searchPreparationStarted, true);
+      assert.equal(response.response.status, 200, JSON.stringify(response.payload)); assert.equal(response.payload.action.checkingMatches, true);
+      assert.equal(await audits(f.pool), 0); await advanceBoundedSearch(f);
       assert.equal(await audits(f.pool), 1);
       const queued = (await read(context.client, f.wantedId)).payload;
       assert.equal(queued.decision.status.code, 'queued_for_search'); assert.equal(queued.matchChoicePage, null);

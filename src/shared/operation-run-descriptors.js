@@ -105,6 +105,11 @@ export const operationRunRegistry = Object.freeze({
     supportsManualRetry: true,
     title: 'Library scan',
   }),
+  qualityReviewSearch: Object.freeze({
+    leaseJobType: 'quality_review_search', operationType: 'quality_review_search',
+    startedEventType: 'quality_review_search_started', supportsCancellation: true,
+    supportsManualRetry: false, title: 'Check available matches',
+  }),
   metadataArtistRefresh: Object.freeze({
     leaseJobType: 'metadata_artist_refresh',
     operationType: 'metadata_artist_refresh',

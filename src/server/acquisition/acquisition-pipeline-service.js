@@ -384,7 +384,7 @@ export function createAcquisitionPipelineService({
     }
 
     const requestedAt = getNow().toISOString();
-    const restart = normalizeMusicQueueRediscoveryResult(await requestMusicQueueRediscovery({
+    const restartResult = await requestMusicQueueRediscovery({
       appUserId: scopedAppUserId,
       metadataReleaseId,
       reasonCode: qualityReview ? 'quality_review_search_again' : projectedRelease.status?.code === 'quality_choice_needed'
@@ -394,7 +394,11 @@ export function createAcquisitionPipelineService({
       requestedByUserId: actorUserId,
       requestMetadata,
       wantedReleaseId: scopedWantedReleaseId,
-    }));
+    });
+    if (restartResult?.checkingMatches === true) {
+      return { action: { code: 'search_again', checkingMatches: true, wantedReleaseId: scopedWantedReleaseId } };
+    }
+    const restart = normalizeMusicQueueRediscoveryResult(restartResult);
     if (!restart) {
       throw createApiError(409, 'music_queue_retry_not_available', 'This release could not be queued for another search');
     }

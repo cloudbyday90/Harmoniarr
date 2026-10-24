@@ -30,6 +30,7 @@ export const defaultOperationQueueDispatchOperationTypes = Object.freeze([
   operationRunRegistry.libraryExternalRequestDiscovery.operationType,
   operationRunRegistry.libraryOrganizeApply.operationType,
   operationRunRegistry.libraryScan.operationType,
+  operationRunRegistry.qualityReviewSearch.operationType,
   operationRunRegistry.metadataArtistRefresh.operationType,
   operationRunRegistry.operatorArtistReconciliation.operationType,
   operationRunRegistry.operatorNotificationFanout.operationType,
@@ -47,6 +48,9 @@ export function createOperationQueueHandlers({
   systemModule = null,
 } = {}) {
   const handlers = {};
+  if (libraryModule?.libraryQualityReviewSearchWorker?.startWorkerRun) {
+    handlers[operationRunRegistry.qualityReviewSearch.operationType] = ({ run }) => libraryModule.libraryQualityReviewSearchWorker.startWorkerRun({ runId: run.id });
+  }
 
   if (artworkModule?.artworkCleanupWorker?.startWorkerRun) {
     handlers[operationRunRegistry.artworkCleanup.operationType] = async ({ run }) => artworkModule.artworkCleanupWorker.startWorkerRun({

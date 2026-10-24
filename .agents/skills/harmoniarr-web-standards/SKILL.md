@@ -5,6 +5,10 @@ description: "Apply and verify standards for Harmoniarr UI commands, forms, focu
 
 # Harmoniarr Web Standards
 
+For current bounded Search again commands, read
+[restart qualification](references/bounded-restart-qualification.md). It covers
+owned progress, nonwaiting revision fencing and atomic current authorization.
+
 For durable candidate invalidation and future bounded restart protocols, read
 [search revisions](references/candidate-search-revisions.md). It covers all-writer
 publication, cursor freshness, actual lock inversion and the command boundary.

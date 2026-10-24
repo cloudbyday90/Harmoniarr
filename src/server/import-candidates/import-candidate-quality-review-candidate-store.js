@@ -25,8 +25,8 @@ export function buildQualityReviewCandidatePageQuery({ sourceSearchId, afterId =
 
 /** Only policy inputs and bounded-choice facts; no file, peer or provider detail. */
 export function createImportCandidateQualityReviewCandidateStore({ getPoolFn = getPool } = {}) {
-  async function listCandidatePage({ sourceSearchId, afterId = null, direction = 'next', inclusive = false, queryable = null }) {
-    const { text, values } = buildQualityReviewCandidatePageQuery({ sourceSearchId, afterId, direction, inclusive, lockRows: queryable != null });
+  async function listCandidatePage({ sourceSearchId, afterId = null, direction = 'next', inclusive = false, queryable = null, lockRows = queryable != null }) {
+    const { text, values } = buildQualityReviewCandidatePageQuery({ sourceSearchId, afterId, direction, inclusive, lockRows });
     const result = await (queryable ?? getPoolFn()).query(text, values);
     return result.rows.map(row => ({ id: row.id, status: row.status, sourceSearchId: row.source_search_id,
       fileCount: row.file_count, totalSizeBytes: row.total_size_bytes == null ? null : Number(row.total_size_bytes),

@@ -35,12 +35,13 @@ test('an exact budget boundary needs an explicit later EOF and reverse scans mak
   assert.equal((await f.scan({ anchor: reverse.afterId, direction: 'previous' })).exhausted, true);
 });
 
-test('eligible lookahead stops evaluations early and guarded checks explicitly retain complete traversal', async () => {
+test('eligible lookahead stops early and even an unbounded caller option cannot exceed the scanner limit', async () => {
   const dense = fixture({ eligible: () => true }); const page = await dense.scan();
   assert.equal(page.fetchedCount, 50); assert.equal(page.checkedCount, 13); assert.equal(page.candidates.length, 13);
   const sparse = fixture({ eligible: n => n === 301 }); const queryable = {};
   const guarded = await sparse.scan({ limit: 1, maxRows: Infinity, queryable });
-  assert.equal(guarded.candidates[0].id, '00301'); assert.equal(guarded.checkedCount, 301); assert.equal(guarded.pageReads, 7);
+  assert.equal(guarded.candidates.length, 0); assert.equal(guarded.checkedCount, 200); assert.equal(guarded.pageReads, 4);
+  assert.equal((await sparse.scan({ limit: 1, anchor: guarded.afterId, queryable })).candidates[0].id, '00301');
   assert.ok(sparse.calls.every(input => input.queryable === queryable));
-  const empty = fixture({ rows: 500 }); assert.equal((await empty.scan({ limit: 1, maxRows: Infinity })).exhausted, true);
+  const empty = fixture({ rows: 500 }); assert.equal((await empty.scan({ limit: 1, maxRows: Infinity })).exhausted, false);
 });

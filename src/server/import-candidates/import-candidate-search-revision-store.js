@@ -12,5 +12,11 @@ export function createImportCandidateSearchRevisionStore({ getPoolFn = getPool }
       'SELECT revision FROM import_candidate_search_revisions WHERE source_search_id=$1', [sourceSearchId]);
     return result.rows[0]?.revision ?? null;
   }
-  return { readRevision };
+  async function lockRevisionNowait({ sourceSearchId, queryable }) {
+    if (!queryable) throw new TypeError('Revision fencing requires an owning transaction');
+    await queryable.query("SET LOCAL lock_timeout='250ms'");
+    const result = await queryable.query('SELECT revision FROM import_candidate_search_revisions WHERE source_search_id=$1 FOR UPDATE NOWAIT', [sourceSearchId]);
+    return result.rows[0]?.revision ?? null;
+  }
+  return { readRevision, lockRevisionNowait };
 }

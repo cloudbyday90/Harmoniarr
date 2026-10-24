@@ -41,6 +41,12 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
+test('bounded checking feedback does not claim a provider search is queued', async t => {
+  const { app, search } = mountCommands({ searchMissingMusicDecisionAgain: async () => ({ action: { checkingMatches: true } }) });
+  t.after(() => app.unmount()); await search.searchAgain({ decisionId: 'wanted-checking' });
+  assert.equal(search.statusMessage.value, 'Checking available matches before starting another search.');
+});
+
 test('Search again submits one scoped command and reports preparation using saved automation', async (t) => {
   const calls = [];
   const pending = deferred();

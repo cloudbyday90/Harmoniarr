@@ -20,12 +20,14 @@ import { createQualityReviewCursorPolicy } from './import-candidate-quality-revi
 import { createQualityReviewScanService } from './import-candidate-quality-review-scan-service.js';
 import { createQualityReviewPageService } from './import-candidate-quality-review-page-service.js';
 import { createImportCandidateSearchRevisionStore } from './import-candidate-search-revision-store.js';
+import { createQualityReviewSearchRunStore } from './quality-review-search-run-store.js';
 
 /** Replacement selection preserves the failed acquisition and its shared quality floor. */
 export function createImportCandidateQualityReviewScopeService({ recheckStore, getImportCandidate,
   candidateStore = createImportCandidateQualityReviewCandidateStore(),
   cursorPolicy = createQualityReviewCursorPolicy(),
   revisionStore = createImportCandidateSearchRevisionStore(),
+  searchRunStore = createQualityReviewSearchRunStore(),
   assertMaintenanceWriteAllowed, withTransaction = createDatabaseTransactionRunner(),
   lockAppUserEligibilityFn = lockAppUserEligibility, lockRunCreation = lockImportCandidateApplyCreation,
 } = {}) {
@@ -70,11 +72,8 @@ export function createImportCandidateQualityReviewScopeService({ recheckStore, g
   }
 
   const scanCandidates = createQualityReviewScanService({ candidateStore, isEligible });
-  const getQualityReviewAlternatives = createQualityReviewPageService({ readScope, scanCandidates, cursorPolicy, revisionStore });
-  async function hasEligibleAlternative(scope, { queryable = null } = {}) {
-    // Write authority requires fresh complete exhaustion, independently of read windows.
-    return (await scanCandidates(scope, { queryable, limit: 1, maxRows: Infinity })).candidates.length > 0;
-  }
+  const getQualityReviewAlternatives = createQualityReviewPageService({ readScope, scanCandidates, cursorPolicy, revisionStore, searchRunStore });
+  const scanAlternativeWindow = (scope, { queryable, anchor = null } = {}) => scanCandidates(scope, { queryable, anchor, limit: 1, lockRows: false });
 
   async function withCurrentScope({ actorUserId, appUserId, wantedReleaseId, importCandidateId = null }, execute) {
     const input = { appUserId, wantedReleaseId };
@@ -83,6 +82,7 @@ export function createImportCandidateQualityReviewScopeService({ recheckStore, g
     if (!prepared) throw unavailable();
     if (importCandidateId && !isEligible(await readCandidate(importCandidateId), prepared)) throw unavailable();
     return withTransaction(async queryable => {
+      await queryable.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
       await assertMaintenanceWriteAllowed({ queryable });
       await lockAppUserEligibilityFn({ userIds: [actorUserId, ...prepared.participants.map(p => p.appUserId)], queryable });
       await recheckStore.lockParticipantReleases({ wantedReleaseIds: prepared.wantedReleaseIds, queryable });
@@ -98,5 +98,5 @@ export function createImportCandidateQualityReviewScopeService({ recheckStore, g
       return execute({ scope, queryable });
     });
   }
-  return { readCandidate, readScope, isEligible, getQualityReviewAlternatives, hasEligibleAlternative, withCurrentScope };
+  return { readCandidate, readScope, isEligible, getQualityReviewAlternatives, scanAlternativeWindow, withCurrentScope };
 }

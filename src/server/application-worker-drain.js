@@ -12,6 +12,7 @@ export function drainApplicationWorkerOwners({ importCandidateModule, libraryMod
   return drainWorkerOwners([
     metadataModule?.metadataArtistRefreshWorker,
     metadataModule?.operatorArtistReconciliationWorker,
+    libraryModule?.libraryQualityReviewSearchWorker,
     libraryModule?.libraryExternalIntakeWorker,
     libraryModule?.libraryProviderIngestExecutionWorker,
     libraryModule?.libraryExternalRequestDiscoveryWorker,

@@ -15,10 +15,10 @@ import { createLibraryAddFixtureUser, seedOwnedLibraryAddFixture } from './libra
 
 /** SQL/HTTP qualification injects the gate; packaged verifiers own actual audio measurement. */
 export function createPreflightReviewFixture() {
-  let module;
+  let module; let libraryModule;
   const controls = { code: 'safe_auto_spectral_transcoded', beforeGateReturns: null, eligible: false };
   async function createRuntime({ clientDistDir = null } = {}) {
-    return createIntegrationAppRuntime({ config: resolveIntegrationTestRuntimeConfig(), createAppFn: options => createApp({ ...options,
+    return createIntegrationAppRuntime({ config: resolveIntegrationTestRuntimeConfig(), createAppFn: options => { const application = createApp({ ...options,
       ...(clientDistDir ? { clientDistDir } : {}),
       createImportCandidateModule: dependencies => {
         module = createImportCandidateModule({ ...dependencies,
@@ -33,7 +33,7 @@ export function createPreflightReviewFixture() {
         });
         return module;
       },
-    }) });
+    }); libraryModule = application.libraryModule; return application; } });
   }
   async function setup({ client, getPoolFn, workspaceDir }, { shared = false } = {}) {
     controls.code = 'safe_auto_spectral_transcoded'; controls.beforeGateReturns = null; controls.eligible = false;
@@ -56,7 +56,7 @@ export function createPreflightReviewFixture() {
       sibling = { ...sibling, wantedId: wanted.id };
     }
     const start = () => module.importCandidateAutoApplyRunService.startSafeApplyRunAfterDownloadCompleted({ importCandidateId: fixture.candidateId });
-    return { ...fixture, pool, owner, admin, sibling, start, module };
+    return { ...fixture, pool, owner, admin, sibling, start, module, libraryModule };
   }
   return { controls, createRuntime, setup };
 }

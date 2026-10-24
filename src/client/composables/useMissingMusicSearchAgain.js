@@ -16,7 +16,9 @@ export function useMissingMusicSearchAgain(options = {}) {
     fallbackErrorMessage: 'The search could not be queued. Refresh this release and try again.',
     pendingMessage: 'Queueing a new search…',
     scope: 'missing-music.decisions.search-again',
-    successMessage: (payload) => payload?.action?.dispatchAlreadyActive
+    successMessage: (payload) => payload?.action?.checkingMatches
+      ? 'Checking available matches before starting another search.'
+      : payload?.action?.dispatchAlreadyActive
       ? 'Search work is already running. This release is queued for evaluation.'
       : payload?.action?.restartAlreadyQueued
         ? 'A new search is already queued for this release.'

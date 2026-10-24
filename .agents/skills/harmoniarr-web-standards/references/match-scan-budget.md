@@ -15,11 +15,10 @@ For physical query access beyond the logical budget, follow
 4. Bind and authenticate continuation state, including empty-from-start history.
    Treat it as a current-view browsing inference. Never use a browser cursor or
    completed historical walk as restart/selection authority.
-5. Retain the fresh complete transactional restart guard until every candidate
-   writer participates in a separately qualified revision/certificate design.
-   State this mutation cost separately from the detail-read budget.
-   [Search revisions](candidate-search-revisions.md) now invalidate changed read
-   continuations; they do not replace that command guard.
+5. Apply the current [bounded restart protocol](bounded-restart-qualification.md).
+   [Search revisions](candidate-search-revisions.md) invalidate changed read
+   continuations; independent owned qualification and a current fence authorize
+   the command. Detail-read budgets and command-step budgets are separate.
 6. Use native stable controls and persistent polite status. Normalize partial
    empty pages strictly, retain the disclosure, preserve focus and accepted page
    on errors, and avoid automatic continuation loops. First page begins a fresh
