@@ -39,6 +39,7 @@ test('the context binds actor, target, failed search, participants and current e
   const scope = { failedCandidate: { id: 'failed', sourceSearchId: 'search' }, wantedReleaseIds: ['wanted'],
     requiredContext: { profileCode: 'lossless_archive' }, participants: [{ wantedReleaseId: 'wanted', appUserId: 'owner', isDisabled: false }] };
   const original = qualityReviewCursorContext(input, scope);
+  assert.notEqual(qualityReviewCursorContext(input, scope, 'new-revision'), original);
   for (const field of Object.keys(input)) assert.notEqual(qualityReviewCursorContext({ ...input, [field]: 'changed' }, scope), original);
   for (const mutate of [s => { s.failedCandidate.id = 'new'; }, s => { s.failedCandidate.sourceSearchId = 'new'; },
     s => { s.requiredContext.profileCode = 'any_available'; }, s => { s.participants[0].isDisabled = true; },

@@ -12,10 +12,10 @@ export const QUALITY_REVIEW_MATCH_PAGE_SIZE = 12;
 export const qualityReviewCursorChanged = () => createApiError(409, 'missing_music_match_page_changed',
   'Available matches have changed. Refresh this release to return to the first page.');
 
-export function qualityReviewCursorContext(input, scope) {
+export function qualityReviewCursorContext(input, scope, revision) {
   return createHash('sha256').update(JSON.stringify({ actor: input.actorUserId ?? input.appUserId,
     role: input.actorRole ?? null, target: input.appUserId, wanted: input.wantedReleaseId,
-    failed: scope.failedCandidate.id, search: scope.failedCandidate.sourceSearchId,
+    failed: scope.failedCandidate.id, search: scope.failedCandidate.sourceSearchId, revision,
     recipients: scope.wantedReleaseIds, policy: scope.requiredContext,
     participants: [...scope.participants].sort((a, b) => a.wantedReleaseId.localeCompare(b.wantedReleaseId)),
   })).digest('hex');

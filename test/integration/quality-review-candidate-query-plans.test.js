@@ -22,12 +22,13 @@ suite('Quality-review candidate access plans and additive schema adoption', () =
   test('a populated prior schema upgrades and preserves ordered choices across custom/generic read/lock plans', { timeout: config.scenarioTimeoutMs }, async () => {
     await runtime.runIsolatedDatabase(async ({ getPoolFn }) => {
       const pool = getPoolFn(); const manifest = await loadMigrationManifest();
-      assert.match(manifest.at(-1).filename, /quality_review_candidate_keyset_index\.sql$/u);
-      await pool.query(renderSchemaSnapshot({ migrations: manifest.slice(0, -1) }));
+      const indexPosition = manifest.findIndex(migration => /quality_review_candidate_keyset_index\.sql$/u.test(migration.filename));
+      assert.ok(indexPosition >= 0);
+      await pool.query(renderSchemaSnapshot({ migrations: manifest.slice(0, indexPosition) }));
       const result = await qualifyCandidateQueryPlans({ pool, evidencePath: process.env.HARMONIARR_CANDIDATE_PLAN_EVIDENCE_PATH,
         installIndex: async () => {
-          const applied = await applyPendingMigrations({ getPoolFn }); assert.equal(applied.length, 1);
-          assert.equal(applied[0], manifest.at(-1).filename);
+          const applied = await applyPendingMigrations({ getPoolFn });
+          assert.deepEqual(applied, manifest.slice(indexPosition).map(migration => migration.filename));
         } });
       assert.equal(result.profiles, 224); assert.ok(result.indexBytes > 0);
       const info = (await pool.query(`SELECT indisvalid,indisready,indnkeyatts,indnatts,pg_get_indexdef(indexrelid) AS definition

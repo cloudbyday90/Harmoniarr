@@ -5,6 +5,13 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For durable candidate search revisions, read the standards
+[revision reference](../harmoniarr-web-standards/references/candidate-search-revisions.md).
+Pair store/page unit checks with fresh/populated schema and actual writer-wait,
+inversion/rollback SQL proof. Reuse the registrar on guarded packaged PostgreSQL,
+and exercise stale-cursor refresh through the real browser. Retain full restart
+authorization and distinguish revision evidence from memory/performance claims.
+
 For candidate keyset access paths, read the standards
 [plan reference](../harmoniarr-web-standards/references/candidate-query-plans.md).
 Run store/plan-summary/anchor checks, the shared 224-profile PostgreSQL matrix and

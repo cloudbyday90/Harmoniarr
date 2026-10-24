@@ -15,8 +15,8 @@ after(closePool);
 test('packaged PostgreSQL qualifies the shared candidate plan matrix on disposable tmpfs data', { timeout: 180_000 }, async () => {
   const pool = getPool();
   assert.equal((await pool.query('SELECT count(*)::int AS count FROM import_candidates')).rows[0].count, 0);
-  const migration = (await loadMigrationManifest()).at(-1);
-  assert.match(migration.filename, /quality_review_candidate_keyset_index\.sql$/u);
+  const migration = (await loadMigrationManifest()).find(item => /quality_review_candidate_keyset_index\.sql$/u.test(item.filename));
+  assert.ok(migration);
   await pool.query(`DROP INDEX ${candidatePlanIndex}`);
   const result = await qualifyCandidateQueryPlans({ pool, installIndex: () => pool.query(migration.sql),
     evidencePath: process.env.HARMONIARR_CANDIDATE_PLAN_EVIDENCE_PATH });

@@ -64,8 +64,9 @@ suite('Bounded detail scans with independent current restart authority', () => {
       const first = (await read(context.client, f.wantedId)).payload;
       await f.pool.query(`UPDATE import_candidates SET normalized_payload=jsonb_set(normalized_payload,'{extensions}','["flac"]')
         WHERE id='00000000-0000-4000-8000-000000000001'`);
-      const end = (await read(context.client, f.wantedId, first.matchChoicePage.nextCursor)).payload;
-      assert.equal(end.permissions.canSearchAgain, true, 'A current-view continuation is a browsing inference, not a write proof');
+      const end = await read(context.client, f.wantedId, first.matchChoicePage.nextCursor);
+      assert.equal(end.response.status, 409, 'A committed change behind the cursor invalidates the empty walk');
+      assert.equal(end.payload.error.code, 'missing_music_match_page_changed');
       assert.equal((await restart(context.client, f.wantedId)).response.status, 409); assert.equal(await audits(f.pool), 0);
       const current = (await read(context.client, f.wantedId)).payload;
       assert.equal(current.matchChoices[0].id, '00000000-0000-4000-8000-000000000001');

@@ -18,6 +18,7 @@ function fixture({ weak = 51, eligible = 15, disabled = false, alternative = nul
     normalizedPayload: { musicQueue: context, extensions: [index < weak ? 'mp3' : 'flac'] } }));
   const reads = []; const pages = []; const locks = []; let scopeReads = 0; let transactions = 0;
   const service = createImportCandidateQualityReviewScopeService({
+    revisionStore: { readRevision: async () => 'current-revision' },
     recheckStore: {
       readOwnedRelease: async () => { scopeReads++; return { metadataReleaseId: id(902), targetUser: { isDisabled: disabled },
         libraryAddRecoveryFacts: { candidateId: failedId, candidateStatus: 'failed', addBlockerCode: 'media_verification',

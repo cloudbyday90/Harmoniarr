@@ -16,6 +16,33 @@ const fixture = createPreflightReviewFixture(); const config = resolveIntegratio
 suite('Explicit continuation from an empty quality-review window', () => {
   before(async () => { runtime = await fixture.createRuntime({ clientDistDir: resolve('dist/client') }); }, { timeout: config.suiteSetupTimeoutMs });
   after(async () => { await runtime?.cleanup(); }, { timeout: config.suiteTeardownTimeoutMs });
+  test('a committed choice behind a cursor refreshes once to the first page and announces current results', { timeout: config.scenarioTimeoutMs }, async () => {
+    await runtime.runScenario(async context => {
+      const f = await fixture.setup(context); await f.start(); await seedQualityReviewScanRows(f);
+      await withBrowserSession({}, async ({ browserContext }) => {
+        await browserContext.addCookies(context.client.getCookieHeader().split(';').filter(Boolean).map(cookie => {
+          const [name, ...value] = cookie.trim().split('='); return { name, value: value.join('='), url: context.baseUrl };
+        }));
+        const page = await browserContext.newPage(); page.setDefaultTimeout(config.browserActionTimeoutMs);
+        await page.goto(`${context.baseUrl}/app/missing/${f.wantedId}`);
+        await page.getByRole('button', { name: 'Check available matches', exact: true }).click();
+        const continuation = page.getByRole('button', { name: 'Continue checking matches', exact: true });
+        await continuation.waitFor();
+        await f.pool.query(`UPDATE import_candidates SET normalized_payload=jsonb_set(normalized_payload,'{extensions}','["flac"]')
+          WHERE id='00000000-0000-4000-8000-000000000001'`);
+        const responses = []; page.on('response', response => {
+          if (response.url().includes(`/api/v1/missing-music/decisions/${f.wantedId}`)) responses.push(response.status());
+        });
+        await continuation.focus(); await page.keyboard.press('Enter');
+        const status = page.getByText('Matches changed. Showing the first page.', { exact: true }); await status.waitFor();
+        assert.deepEqual(responses, [409, 200]);
+        assert.equal(await page.getByRole('button', { name: /^Use this match for/u }).count(), 1);
+        assert.equal(await page.getByRole('button', { name: 'Search again', exact: true }).count(), 0);
+        assert.equal(await status.evaluate(el => Boolean(el.closest('[role="status"]'))), true);
+        assert.equal((await f.pool.query("SELECT count(*)::int AS count FROM audit_events WHERE event_type='missing_music_search_again_requested'")).rows[0].count, 0);
+      });
+    });
+  });
   test('keyboard continuation retains focus, reveals a later match and preserves explicit selection and refresh', { timeout: config.scenarioTimeoutMs }, async () => {
     await runtime.runScenario(async context => {
       const f = await fixture.setup(context); await f.start(); await seedQualityReviewScanRows(f);

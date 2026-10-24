@@ -19,17 +19,20 @@ import { createImportCandidateQualityReviewCandidateStore } from './import-candi
 import { createQualityReviewCursorPolicy } from './import-candidate-quality-review-cursor-policy.js';
 import { createQualityReviewScanService } from './import-candidate-quality-review-scan-service.js';
 import { createQualityReviewPageService } from './import-candidate-quality-review-page-service.js';
+import { createImportCandidateSearchRevisionStore } from './import-candidate-search-revision-store.js';
 
 /** Replacement selection preserves the failed acquisition and its shared quality floor. */
 export function createImportCandidateQualityReviewScopeService({ recheckStore, getImportCandidate,
   candidateStore = createImportCandidateQualityReviewCandidateStore(),
   cursorPolicy = createQualityReviewCursorPolicy(),
+  revisionStore = createImportCandidateSearchRevisionStore(),
   assertMaintenanceWriteAllowed, withTransaction = createDatabaseTransactionRunner(),
   lockAppUserEligibilityFn = lockAppUserEligibility, lockRunCreation = lockImportCandidateApplyCreation,
 } = {}) {
   for (const [name, value] of Object.entries({ getImportCandidate, assertMaintenanceWriteAllowed,
     withTransaction, lockAppUserEligibilityFn, lockRunCreation, readOwnedRelease: recheckStore?.readOwnedRelease,
     readParticipantPolicies: recheckStore?.readParticipantPolicies, readSelectionActor: recheckStore?.readSelectionActor,
+    readRevision: revisionStore?.readRevision,
     lockCandidate: recheckStore?.lockCandidate, listCandidatePage: candidateStore?.listCandidatePage,
     lockParticipantReleases: recheckStore?.lockParticipantReleases })) {
     if (typeof value !== 'function') throw new TypeError(`Quality-review selection requires ${name}`);
@@ -67,7 +70,7 @@ export function createImportCandidateQualityReviewScopeService({ recheckStore, g
   }
 
   const scanCandidates = createQualityReviewScanService({ candidateStore, isEligible });
-  const getQualityReviewAlternatives = createQualityReviewPageService({ readScope, scanCandidates, cursorPolicy });
+  const getQualityReviewAlternatives = createQualityReviewPageService({ readScope, scanCandidates, cursorPolicy, revisionStore });
   async function hasEligibleAlternative(scope, { queryable = null } = {}) {
     // Write authority requires fresh complete exhaustion, independently of read windows.
     return (await scanCandidates(scope, { queryable, limit: 1, maxRows: Infinity })).candidates.length > 0;

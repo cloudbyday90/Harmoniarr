@@ -108,3 +108,7 @@ can still traverse an entire active search and hold its canonical locks. Qualify
 revision/lock ordering, in-flight insert/status/policy changes, rollback and fresh
 command authority before using any cached completion certificate. Keep it built
 into the platform; a historical browser cursor cannot grant restart authority.
+
+The [revision increment](CANDIDATE_SEARCH_REVISIONS_OUTCOME.md) now establishes
+atomic writer invalidation and revision-bound browsing. It records actual lock
+inversion evidence and owns the next concurrency-protocol qualification step.

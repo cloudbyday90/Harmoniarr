@@ -18,6 +18,8 @@ For physical query access beyond the logical budget, follow
 5. Retain the fresh complete transactional restart guard until every candidate
    writer participates in a separately qualified revision/certificate design.
    State this mutation cost separately from the detail-read budget.
+   [Search revisions](candidate-search-revisions.md) now invalidate changed read
+   continuations; they do not replace that command guard.
 6. Use native stable controls and persistent polite status. Normalize partial
    empty pages strictly, retain the disclosure, preserve focus and accepted page
    on errors, and avoid automatic continuation loops. First page begins a fresh

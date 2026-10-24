@@ -22,10 +22,13 @@ const publicSchema = 'public';
 
 export const criticalSchemaAnchors = Object.freeze({
   triggers: Object.freeze([
+    ...['insert', 'update', 'delete', 'truncate'].map(event => ({ table: 'import_candidates', trigger: `import_candidates_search_revision_${event}` })),
     { table: 'app_users', trigger: 'app_users_root_authority_admission' },
     { table: 'app_settings', trigger: 'app_settings_root_authority_admission' },
   ]),
   columns: Object.freeze([
+    { table: 'import_candidate_search_revisions', column: 'revision' },
+    { table: 'import_candidate_search_revisions', column: 'source_search_id' },
     { table: 'library_external_request_release_intents', column: 'last_empty_search_run_id' },
     { table: 'library_external_request_release_intents', column: 'last_empty_search_at' },
     { table: 'library_external_request_release_intents', column: 'empty_search_recovery_count' },
@@ -89,6 +92,7 @@ export const criticalSchemaAnchors = Object.freeze({
     { table: 'library_files', column: 'tag_extracted_modified_at' },
   ]),
   constraints: Object.freeze([
+    { table: 'import_candidate_search_revisions', constraint: 'import_candidate_search_revisions_pkey' },
     { table: 'library_external_request_release_intents', constraint: 'external_empty_search_observation' },
     { table: 'library_external_request_release_intents', constraint: 'external_empty_search_budget' },
     { table: 'slskd_search_intents', constraint: 'slskd_search_intents_owner_check' },
@@ -173,6 +177,7 @@ export const criticalSchemaAnchors = Object.freeze({
     { index: 'operator_artist_reconciliation_snapshot_latest_idx' },
   ]),
   tables: Object.freeze([
+    { table: 'import_candidate_search_revisions' },
     { table: 'activity_events' },
     { table: 'operator_track_receipt_invalidations' },
     { table: 'operator_track_receipts' },

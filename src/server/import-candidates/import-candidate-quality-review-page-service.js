@@ -6,16 +6,20 @@
  */
 import { qualityReviewCursorContext, qualityReviewCursorChanged, QUALITY_REVIEW_MATCH_PAGE_SIZE } from './import-candidate-quality-review-cursor-policy.js';
 
-export function createQualityReviewPageService({ readScope, scanCandidates, cursorPolicy }) {
+export function createQualityReviewPageService({ readScope, scanCandidates, cursorPolicy, revisionStore }) {
   return async function getQualityReviewAlternatives(input) {
     const scope = await readScope(input);
     if (!scope) {
       if (input.matchCursor != null) throw qualityReviewCursorChanged();
       return { candidates: [], canSearchAgain: false };
     }
-    const context = qualityReviewCursorContext(input, scope);
+    const revisionInput = { sourceSearchId: scope.failedCandidate.sourceSearchId };
+    const revision = await revisionStore.readRevision(revisionInput);
+    if (!revision) throw qualityReviewCursorChanged();
+    const context = qualityReviewCursorContext(input, scope, revision);
     const { anchor, direction, emptyFromStart, inclusive } = cursorPolicy.decode(input.matchCursor, context);
     const scan = await scanCandidates(scope, { limit: QUALITY_REVIEW_MATCH_PAGE_SIZE + 1, anchor, direction, inclusive });
+    if (await revisionStore.readRevision(revisionInput) !== revision) throw qualityReviewCursorChanged();
     const hasMore = scan.candidates.length > QUALITY_REVIEW_MATCH_PAGE_SIZE;
     const scanIncomplete = !hasMore && !scan.exhausted;
     const candidates = scan.candidates.slice(0, QUALITY_REVIEW_MATCH_PAGE_SIZE);
