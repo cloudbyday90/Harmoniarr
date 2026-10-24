@@ -114,6 +114,7 @@ export function createLibraryModule({
   importCandidateAutoDownloadRunService = null,
   importCandidateAutoSelectionService = null,
   importCandidateService = null,
+  qualityReviewScopeService = null,
   onOrganizeReleaseAddedFn = null,
   onDiscoveryRequestExhaustedFn = null,
   onDownloadRecoveryExhaustedFn = null,
@@ -419,6 +420,7 @@ export function createLibraryModule({
     getAppUserById, listWantedReleasesWithMetadata: libraryWantedReleaseStore.listWantedReleasesWithMetadata,
   }) : null,
   libraryMusicQueueRediscoveryService = getAppUserById ? createLibraryMusicQueueRediscoveryService({
+    qualityReviewScopeService,
     assertMaintenanceWriteAllowed: ({ queryable }) => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
       operationLabel: 'another Missing Music search', queryable,
     }),

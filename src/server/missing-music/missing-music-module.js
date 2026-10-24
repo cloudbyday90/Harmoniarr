@@ -43,6 +43,7 @@ export function createMissingMusicModule({
   startLibraryDiscoveryRun,
   selectImportCandidate,
   listQualityReviewMatchIds,
+  canSearchAgainAfterQualityReview,
   selectQualityReviewMatch,
   startImportCandidateExecutionRun,
 } = {}) {
@@ -52,6 +53,7 @@ export function createMissingMusicModule({
   });
   const missingMusicDecisionService = createMissingMusicDecisionService({
     listQualityReviewMatchIds,
+    canSearchAgainAfterQualityReview,
     listAppUsers,
     listWantedReleaseIdentityPage,
     listWantedReleasesWithMetadata,

@@ -499,6 +499,7 @@ export function createApp({
     slskdService: slskdModule.slskdService,
   });
   libraryModule = buildLibraryModule({
+    qualityReviewScopeService: importCandidateModule.importCandidateQualityReviewScopeService,
     artworkAssignmentService: artworkModule.artworkAssignmentService,
     artworkIngestionService: artworkModule.artworkIngestionService,
     getAppUserById: appUserModule.appUserService.getAppUserById,
@@ -613,6 +614,7 @@ export function createApp({
     startLibraryDiscoveryRun: libraryModule.routeDependencies.startLibraryDiscoveryRun,
   });
   const missingMusicModule = buildMissingMusicModule({
+    canSearchAgainAfterQualityReview: importCandidateModule.importCandidateQualityReviewScopeService?.canSearchAgainAfterQualityReview,
     listQualityReviewMatchIds: importCandidateModule.importCandidateQualityReviewSelectionService?.listQualityReviewMatchIds,
     selectQualityReviewMatch: importCandidateModule.importCandidateQualityReviewSelectionService?.selectQualityReviewMatch,
     startReleaseManualSafeAdd: importCandidateModule.importCandidateReleaseManualSafeAddService?.startReleaseManualSafeAdd,

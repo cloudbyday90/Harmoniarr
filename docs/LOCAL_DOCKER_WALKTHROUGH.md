@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 24 [quality-review search rebuild](LOCAL_DOCKER_QUALITY_REVIEW_SEARCH_OUTCOME.md)
+records the current no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](QUALITY_REVIEW_SEARCH_OUTCOME.md) connects exhausted
+quality-review choices to guarded shared discovery and a durable quality floor.
+
 The October 23 [quality-review alternative rebuild](LOCAL_DOCKER_QUALITY_REVIEW_MATCH_OUTCOME.md)
 records the current no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](QUALITY_REVIEW_MATCH_OUTCOME.md) connects recipient-owned

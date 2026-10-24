@@ -11,6 +11,7 @@ import { lockAppUserEligibility } from '../app-user-eligibility-lock-store.js';
 import { createDatabaseTransactionRunner } from '../database-transaction-service.js';
 import { projectMusicQueueRelease } from '../acquisition/acquisition-pipeline-service.js';
 import { canRequestMusicQueueRediscovery, isMusicQueueRediscoveryInProgress } from '../acquisition/acquisition-rediscovery-policy.js';
+import { buildQualityReviewSearchRequirement, QUALITY_REVIEW_SEARCH_REASON } from './library-quality-review-search-policy.js';
 import { createLibraryMusicQueueRediscoveryStore } from './library-music-queue-rediscovery-store.js';
 
 export function createLibraryMusicQueueRediscoveryService({
@@ -22,6 +23,7 @@ export function createLibraryMusicQueueRediscoveryService({
   recordAuditEventFn = recordAuditEvent,
   rediscoveryStore = createLibraryMusicQueueRediscoveryStore(),
   requestMusicQueueRediscovery,
+  qualityReviewScopeService = null,
   withTransaction = createDatabaseTransactionRunner(),
 } = {}) {
   for (const [name, dependency] of Object.entries({ assertMaintenanceWriteAllowed, getAppUserById,
@@ -31,7 +33,41 @@ export function createLibraryMusicQueueRediscoveryService({
     recordCoalescedTargetIntent: rediscoveryStore?.recordCoalescedTargetIntent })) {
     if (typeof dependency !== 'function') throw new TypeError(`createLibraryMusicQueueRediscoveryService requires ${name}`);
   }
+  async function commitIntent({ appUserId, metadataReleaseId, requestMetadata, intent, queryable, qualityReviewRequirement = null }) {
+    const result = await requestMusicQueueRediscovery({ metadataReleaseId, ...intent, ...(qualityReviewRequirement ? { qualityReviewRequirement } : {}), queryable });
+    if (!result) throw createApiError(409, 'music_queue_retry_not_available', 'This release could not be queued for another search');
+    const recordedTargetIntent = result.restartDisposition === 'already_queued'
+      ? await rediscoveryStore.recordCoalescedTargetIntent({
+        ...intent, queryable, requestedAt: result.discoveryRequest.evidence.musicQueueRediscovery.requestedAt,
+      })
+      : true;
+    if (recordedTargetIntent) {
+      await recordAuditEventFn({
+        actorType: intent.requestedByUserId ? 'user' : 'system',
+        actorUserId: intent.requestedByUserId,
+        eventType: 'missing_music_search_again_requested',
+        entityType: 'library_wanted_release',
+        entityId: intent.wantedReleaseId,
+        summary: 'Another search requested for a wanted release',
+        details: { metadataReleaseId, requestedForUserId: appUserId, restartAlreadyQueued: result.restartDisposition === 'already_queued' },
+        ipAddress: requestMetadata?.ipAddress ?? null,
+        userAgent: requestMetadata?.userAgent ?? null,
+      }, queryable);
+    }
+    return result;
+  }
   async function requestGuardedMusicQueueRediscovery({ appUserId, metadataReleaseId, requestMetadata = null, ...intent }) {
+    if (intent.reasonCode === QUALITY_REVIEW_SEARCH_REASON) {
+      if (!qualityReviewScopeService) throw createApiError(503, 'music_queue_retry_unavailable', 'Quality-review search is unavailable');
+      return qualityReviewScopeService.withCurrentScope({ appUserId, actorUserId: intent.requestedByUserId,
+        wantedReleaseId: intent.wantedReleaseId }, async ({ scope, queryable }) => {
+        if (scope.release.metadataReleaseId !== metadataReleaseId || await qualityReviewScopeService.hasEligibleAlternative(scope, { queryable })) {
+          throw createApiError(409, 'music_queue_retry_not_available', 'Review the available matches before searching again');
+        }
+        return commitIntent({ appUserId, metadataReleaseId, requestMetadata, intent, queryable,
+          qualityReviewRequirement: buildQualityReviewSearchRequirement(scope) });
+      });
+    }
     return withTransaction(async (queryable) => {
       // Maintenance must precede account and domain locks throughout the app.
       await assertMaintenanceWriteAllowed({ queryable });
@@ -52,27 +88,7 @@ export function createLibraryMusicQueueRediscoveryService({
         throw createApiError(409, 'music_queue_retry_not_available', 'This release is not stopped in a state that can be searched again');
       }
 
-      const result = await requestMusicQueueRediscovery({ metadataReleaseId, ...intent, queryable });
-      if (!result) throw createApiError(409, 'music_queue_retry_not_available', 'This release could not be queued for another search');
-      const recordedTargetIntent = result.restartDisposition === 'already_queued'
-        ? await rediscoveryStore.recordCoalescedTargetIntent({
-          ...intent, queryable, requestedAt: result.discoveryRequest.evidence.musicQueueRediscovery.requestedAt,
-        })
-        : true;
-      if (recordedTargetIntent) {
-        await recordAuditEventFn({
-          actorType: intent.requestedByUserId ? 'user' : 'system',
-          actorUserId: intent.requestedByUserId,
-          eventType: 'missing_music_search_again_requested',
-          entityType: 'library_wanted_release',
-          entityId: intent.wantedReleaseId,
-          summary: 'Another search requested for a wanted release',
-          details: { metadataReleaseId, requestedForUserId: appUserId, restartAlreadyQueued: result.restartDisposition === 'already_queued' },
-          ipAddress: requestMetadata?.ipAddress ?? null,
-          userAgent: requestMetadata?.userAgent ?? null,
-        }, queryable);
-      }
-      return result;
+      return commitIntent({ appUserId, metadataReleaseId, requestMetadata, intent, queryable });
     });
   }
 

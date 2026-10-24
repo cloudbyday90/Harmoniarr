@@ -18,6 +18,19 @@ test('ordinary reconciliation preserves a scoped refusal even after its deadline
 });
 import { createLibraryDiscoveryRequestService } from '../../src/server/library/library-discovery-request-service.js';
 
+test('ordinary reconciliation retains a quality-review refusal until an explicit new intent', async () => {
+  let requests;
+  const marker = { reasonCode: 'quality_review_search_again', qualityReviewRequirement: { profileCode: 'lossless_archive' } };
+  const service = createLibraryDiscoveryRequestService({ getNow: () => new Date('2026-10-24T12:00:00Z'),
+    getPoolFn: () => ({ query: async () => ({ rows: [{ metadata_artist_id: 'artist', metadata_release_group_id: 'group',
+      metadata_release_id: 'release', wanted_status: 'missing', search_mode: 'automatic', blocked_reason: 'quality_review_search_not_current',
+      search_attempt_count: 0, prior_evidence: { musicQueueRediscovery: marker } }] }) }),
+    libraryDiscoveryRequestStore: { replaceLibraryDiscoveryRequests: async input => { requests = input.discoveryRequests; } } });
+  await service.reconcileDiscoveryRequests();
+  assert.equal(requests[0].requestStatus, 'blocked'); assert.equal(requests[0].blockedReason, 'quality_review_search_not_current');
+  assert.equal(requests[0].nextSearchAfter, null); assert.deepEqual(requests[0].evidence.musicQueueRediscovery, marker);
+});
+
 test('guarded search continuation survives reconciliation without extending the normal six-hour cooldown', async () => {
   let requests;
   const marker = '2026-10-20T12:00:00Z';

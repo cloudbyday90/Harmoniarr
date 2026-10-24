@@ -86,6 +86,8 @@ function mapDiscoveryDispatchRow(row) {
     searchAttemptCount: Number.parseInt(String(row.search_attempt_count ?? 0), 10) || 0,
     searchMode: row.search_mode ?? null,
     operatorLinks: normalizeOperatorLinks(row.operator_links),
+    ...(row.evidence?.musicQueueRediscovery?.reasonCode === 'quality_review_search_again' || row.evidence?.musicQueueRediscovery?.qualityReviewRequirement != null
+      ? { qualityReviewParticipantsCurrent: row.quality_review_participants_current === true } : {}),
     wantedReleaseIds: normalizeLinkedWantedReleaseIds(row.wanted_release_ids),
     wantedReleaseId: row.wanted_release_id ?? null,
     wantedStatus: row.wanted_status ?? null,
@@ -201,7 +203,8 @@ export function createLibraryDiscoveryRequestStore({
             metadata_release_groups.title AS release_group_title,
             metadata_releases.title AS release_title,
             operator_wanted_releases.wanted_release_ids,
-            operator_wanted_releases.operator_links
+            operator_wanted_releases.operator_links,
+            operator_wanted_releases.quality_review_participants_current
           FROM library_discovery_requests
           JOIN metadata_artists
             ON metadata_artists.id = library_discovery_requests.metadata_artist_id
@@ -213,6 +216,8 @@ export function createLibraryDiscoveryRequestStore({
             SELECT
               ARRAY_AGG(library_wanted_releases.id ORDER BY library_wanted_releases.app_user_id ASC, library_wanted_releases.id ASC)
                 AS wanted_release_ids,
+              BOOL_AND(NOT app_users.is_disabled AND library_wanted_releases.missing_track_count > 0
+                AND COALESCE(library_wanted_releases.evidence->>'visibilityState','') <> 'ignored') AS quality_review_participants_current,
               JSONB_AGG(
                 JSONB_BUILD_OBJECT(
                   'appUserId', library_wanted_releases.app_user_id,
@@ -298,6 +303,7 @@ export function createLibraryDiscoveryRequestStore({
           candidate.release_title,
           candidate.wanted_release_ids,
           candidate.operator_links,
+          candidate.quality_review_participants_current,
           candidate.wanted_release_ids[1] AS wanted_release_id
         FROM claimed
         JOIN candidate
@@ -448,6 +454,12 @@ export function createLibraryDiscoveryRequestStore({
     await getPoolFn().query(`UPDATE library_discovery_requests SET request_status='blocked',
       blocked_reason='operator_track_scope_verification_required',next_search_after=NULL,updated_at=NOW()
       WHERE metadata_release_id=$1::uuid`, [metadataReleaseId]);
+  }
+  async function markDiscoveryRequestQualityReviewBlocked({ claimedRequest }) {
+    await getPoolFn().query(`UPDATE library_discovery_requests SET request_status='blocked',
+      blocked_reason='quality_review_search_not_current',next_search_after=NULL,updated_at=NOW()
+      WHERE id=$1 AND evidence->>'lastDispatchAttemptedAt'=$2 AND request_status IN ('cooldown','ready')`,
+    [claimedRequest.discoveryRequestId, claimedRequest.evidence?.lastDispatchAttemptedAt]);
   }
 
   async function recordDiscoverySearchSuccess({
@@ -776,9 +788,10 @@ export function createLibraryDiscoveryRequestStore({
     requestedByUserId = null,
     wantedReleaseId = null,
     queryable = null,
+    qualityReviewRequirement = null,
   }) {
     if (!queryable) return withTransaction((client) => requestMusicQueueRediscovery({ metadataReleaseId, reasonCode,
-      requestedAt, requestedByUserId, wantedReleaseId, queryable: client }));
+      requestedAt, requestedByUserId, wantedReleaseId, qualityReviewRequirement, queryable: client }));
     const pool = queryable ?? getPoolFn();
     const result = await pool.query(
       `
@@ -810,7 +823,8 @@ export function createLibraryDiscoveryRequestStore({
                 'priorSearchAttemptCount', search_attempt_count,
                 'reasonCode', $3::text,
                 'requestedAt', $2::timestamptz
-              )
+              ) || CASE WHEN COALESCE($6::jsonb,evidence #> '{musicQueueRediscovery,qualityReviewRequirement}') IS NULL THEN '{}'::jsonb
+                ELSE jsonb_build_object('qualityReviewRequirement',COALESCE($6::jsonb,evidence #> '{musicQueueRediscovery,qualityReviewRequirement}')) END
             ),
             updated_at = NOW()
           WHERE metadata_release_id = $1
@@ -865,7 +879,7 @@ export function createLibraryDiscoveryRequestStore({
         JOIN metadata_releases
           ON metadata_releases.id = reset.metadata_release_id
       `,
-      [metadataReleaseId, requestedAt, reasonCode, requestedByUserId, wantedReleaseId],
+      [metadataReleaseId, requestedAt, reasonCode, requestedByUserId, wantedReleaseId, qualityReviewRequirement ? JSON.stringify(qualityReviewRequirement) : null],
     );
 
     const discoveryRequest = mapDiscoveryRequestStateRow(result.rows[0]);
@@ -1161,6 +1175,7 @@ export function createLibraryDiscoveryRequestStore({
     markDiscoveryRequestExhausted,
     recordDiscoverySearchFailure,
     markDiscoveryRequestTrackScopeBlocked,
+    markDiscoveryRequestQualityReviewBlocked,
     recordDiscoverySearchSuccess,
     releaseFolderSetupBlockedAutomaticDiscoveryRequests,
     requestMusicQueueRediscovery,

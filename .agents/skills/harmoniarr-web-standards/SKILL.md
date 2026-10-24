@@ -5,6 +5,11 @@ description: "Apply and verify standards for Harmoniarr UI commands, forms, focu
 
 # Harmoniarr Web Standards
 
+For Search again after exhausted measured-quality choices, read
+[quality-review search](references/quality-review-search.md). It covers full-search
+exhaustion, durable quality floors without copied consent, current claim authority,
+atomic intent and accessible queued feedback.
+
 For replacement choices after measured quality refusal, read
 [recipient-owned alternatives](references/quality-review-match-selection.md).
 It joins W3C disclosure behavior, OWASP action authorization, shared quality policy,

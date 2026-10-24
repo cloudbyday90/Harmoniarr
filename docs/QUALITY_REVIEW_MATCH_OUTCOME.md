@@ -70,7 +70,7 @@ canonical transaction and existing explicit download flow. It completes the
 recipient journey without duplicating acquisition authority. The tradeoff is a
 short guarded write and conservative refusal of stale or insufficient evidence.
 
-Next: provide recipient-owned **Search again when no eligible alternatives remain**
-after measured quality review. Reuse the current discovery-intent command with
-current shared scope, original quality floor and explicit consent checks; keep the
-rejected acquisition intact and do not infer fallback permission from exhaustion.
+Follow-up implemented: [Search again after measured review](QUALITY_REVIEW_SEARCH_OUTCOME.md)
+adds a guarded restart when the entire current search has no eligible alternative.
+It preserves shared identity and the original quality floor across later retries.
+See that outcome for the next recommendation.

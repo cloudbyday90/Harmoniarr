@@ -30,6 +30,8 @@ import { canViewMissingMusicDownloader } from './missing-music-downloader-handof
 import { canSearchMissingMusicAgain } from './missing-music-search-again-policy.js';
 import { canFindInitialMusicMatches } from '../acquisition/acquisition-initial-search-policy.js';
 import { canRecheckLibraryAdd, buildPublicLibraryAddRecovery, buildPublicLibraryAddReview, hasQueuedLibraryAddRecheck, getLibraryAddRecheckReason } from '../acquisition/acquisition-library-add-recheck-policy.js';
+import { isMusicQueueRediscoveryInProgress } from '../acquisition/acquisition-rediscovery-policy.js';
+import { hasQueuedQualityReviewSearch } from '../library/library-quality-review-search-policy.js';
 import { canAddPreparedReleaseToLibrary, hasQueuedGuardedLibraryAdd } from '../acquisition/acquisition-library-add-policy.js';
 import { canAllowMissingMusicFallbackQuality } from './missing-music-fallback-quality-policy.js';
 import { buildPublicQualityEvidence } from '../acquisition/acquisition-quality-evidence-policy.js';
@@ -114,6 +116,10 @@ function projectDecision(release, requestedFor, projectMusicQueueReleaseFn, now 
       message: 'Harmoniarr has queued a safe library add and will check the files again before changing the library.',
       nextAction: null, tone: 'info' };
   }
+  if (hasQueuedQualityReviewSearch(release)) {
+    status = { code: 'queued_for_search', label: 'Search queued', nextAction: null, tone: 'info',
+      message: 'Another search is queued with the current quality requirements. Acquisition will follow the saved automation policy.' };
+  }
 
   return {
     decisionId: projectedRelease.id,
@@ -177,6 +183,7 @@ function validateDependencies({
 
 export function createMissingMusicDecisionService({
   listQualityReviewMatchIds = async () => [],
+  canSearchAgainAfterQualityReview = async () => false,
   listAppUsers,
   listWantedReleaseIdentityPage,
   listWantedReleasesWithMetadata,
@@ -339,6 +346,8 @@ export function createMissingMusicDecisionService({
       matchChoices = choices.filter(choice => eligibleIds.includes(choice.id));
     }
     const searchDiagnostics = buildMissingMusicSearchDiagnostics(target.release);
+    const canRestartQualityReview = measuredReview && !isMusicQueueRediscoveryInProgress(target.release.discoveryRequest)
+      && await canSearchAgainAfterQualityReview({ appUserId: target.targetUser.id, wantedReleaseId: target.decisionId });
 
     return {
       checkedAt: now().toISOString(),
@@ -357,7 +366,7 @@ export function createMissingMusicDecisionService({
           && getLibraryAddRecheckReason(target.release.libraryAddRecoveryFacts) === 'source_path_unavailable',
         canFindMatches: canFindInitialMusicMatches({ release: target.release, targetUser: target.targetUser, now: now(), projectedRelease }),
         canAllowFallbackQuality: canAllowMissingMusicFallbackQuality({ projectedRelease, targetUser: target.targetUser }),
-        canSearchAgain: canSearchMissingMusicAgain({ statusCode: decision.status.code, targetUser: target.targetUser }),
+        canSearchAgain: canRestartQualityReview || canSearchMissingMusicAgain({ statusCode: decision.status.code, targetUser: target.targetUser }),
         canStartDownload: canStartMissingMusicDownload({
           actorUser,
           nextAction: decision.status.nextAction,

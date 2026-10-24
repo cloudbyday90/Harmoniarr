@@ -8,6 +8,7 @@
 import { isScopedQualityFallbackOverride, normalizeSavedQualityPreferences, resolveAcquisitionQualityProfileCode } from '../acquisition/acquisition-quality-evidence-policy.js';
 import { createOperatorTrackScopeVerificationService } from '../metadata/operator-track-scope-verification-service.js';
 import { getOperatorTrackRequirements, refuseOperatorTrackFiles } from '../metadata/operator-track-file-policy.js';
+import { applyQualityReviewSearchRequirement, QUALITY_REVIEW_SEARCH_REASON } from './library-quality-review-search-policy.js';
 
 const PROFILE_PRIORITY = { any_available: 0, high_quality: 1, lossless_archive: 2 };
 
@@ -39,7 +40,7 @@ export function createLibraryDiscoveryQualityContextService({ getUserPreferences
     try { return await getUserPreferencesFn({ userId }); } catch { return null; }
   }
 
-  async function resolveSharedDiscoveryQualityContext(claimedRequest, { queryable = null } = {}) {
+  async function resolveCurrentSharedDiscoveryQualityContext(claimedRequest, { queryable = null } = {}) {
     const links = normalizeLinks(claimedRequest?.operatorLinks);
     const sharedExplicitProfile = claimedRequest?.evidence?.qualityProfile ?? claimedRequest?.evidence?.acquisitionProfile ?? null;
     const operatorTrackScopes = links.filter(link => Object.hasOwn(link, 'operatorTrackScope'))
@@ -105,6 +106,15 @@ export function createLibraryDiscoveryQualityContextService({ getUserPreferences
       ...(wantedReleaseIds.length > 1 ? { wantedReleaseIds } : {}), sharedOperatorDiscovery: true,
       formatPreferences: buildSharedFormatPreferences(profileCode, fallbackOverrideActive, minimumBitrateKbps),
       preferredFormat: profileCode === 'lossless_archive' && !fallbackOverrideActive ? 'flac' : 'any' };
+  }
+  async function resolveSharedDiscoveryQualityContext(claimedRequest, options) {
+    const current = await resolveCurrentSharedDiscoveryQualityContext(claimedRequest, options);
+    const context = applyQualityReviewSearchRequirement(current, claimedRequest);
+    const intent = claimedRequest?.evidence?.musicQueueRediscovery;
+    if (intent?.reasonCode !== QUALITY_REVIEW_SEARCH_REASON && intent?.qualityReviewRequirement == null) return context;
+    return { ...context, formatPreferences: { ...buildSharedFormatPreferences(context.profileCode, Boolean(context.qualityOverride), context.minimumBitrateKbps ?? 256),
+      ...(context.minimumBitrateKbps ? { minimumBitrateKbps: context.minimumBitrateKbps } : {}) },
+      preferredFormat: context.profileCode === 'lossless_archive' && !context.qualityOverride ? 'flac' : 'any' };
   }
   return { resolveSharedDiscoveryQualityContext };
 }

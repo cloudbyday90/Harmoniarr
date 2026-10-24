@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { QUALITY_REVIEW_SEARCH_BLOCKER } from './library-quality-review-search-policy.js';
 import { createLibraryDiscoveryRequestStore } from './library-discovery-request-store.js';
 import {
   buildDiscoverySearchQuery,
@@ -452,6 +453,11 @@ export function createLibraryDiscoveryDispatchService({
       try {
         sharedQualityContext = recoveryPrepared ? recoveryPrepared.context : await resolveSharedDiscoveryQualityContext(claimedRequest);
       } catch (error) {
+        if (error?.code === QUALITY_REVIEW_SEARCH_BLOCKER) {
+          await libraryDiscoveryRequestStore.markDiscoveryRequestQualityReviewBlocked({ claimedRequest });
+          failures.push({ code: error.code, message: error.message, metadataReleaseId: claimedRequest.metadataReleaseId });
+          continue;
+        }
         if (error?.code !== 'operator_track_scope_verification_required') throw error;
         await libraryDiscoveryRequestStore.markDiscoveryRequestTrackScopeBlocked({ metadataReleaseId: claimedRequest.metadataReleaseId });
         failures.push({ code: error.code, message: error.message, metadataReleaseId: claimedRequest.metadataReleaseId });

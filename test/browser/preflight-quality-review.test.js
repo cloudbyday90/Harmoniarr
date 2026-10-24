@@ -28,7 +28,8 @@ suite('Durable initial quality review in rendered Missing Music', () => {
       await withBrowserSession({}, async ({ browserContext }) => {
         const page = await openDecision({ browserContext, ...context, wantedId: f.wantedId });
         await page.getByRole('heading', { name: 'Lossless audio needs review', exact: true }).waitFor();
-        await page.getByText('Review the audio check before choosing another match. Advanced diagnostics has the recorded verification result.', { exact: true }).waitFor();
+        await page.getByText('No eligible matches remain from this search. Search again using the current quality requirements.', { exact: true }).waitFor();
+        await page.getByRole('button', { name: 'Search again', exact: true }).waitFor();
         assert.equal(await page.getByRole('button', { name: 'Check the files again', exact: true }).count(), 0);
         assert.equal(await page.getByRole('button', { name: 'Add to library', exact: true }).count(), 0);
         assert.doesNotMatch(await page.locator('body').innerText(), /private\/provider|raw tool output|file\.flac/u);

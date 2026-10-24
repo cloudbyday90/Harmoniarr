@@ -20,6 +20,7 @@ import { createApiError } from '../auth.js';
 import { getSearchContinuationRecoveryMessage } from '../../shared/search-continuation-recovery.js';
 import { createRuntimeReporter } from '../runtime-reporter.js';
 import { canRequestMusicQueueRediscovery, isMusicQueueRediscoveryInProgress } from './acquisition-rediscovery-policy.js';
+import { isMeasuredQualityReview } from './acquisition-library-add-recheck-policy.js';
 import { canAllowAcquisitionFallbackQuality, evaluateReleaseQualityEvidence, isAwaitingRediscoveryQualityEvidence, isScopedQualityFallbackOverride } from './acquisition-quality-evidence-policy.js';
 import { buildMusicQueueOperatorSelectionEvidence } from './acquisition-operator-selection-evidence.js';
 import {
@@ -371,7 +372,8 @@ export function createAcquisitionPipelineService({
     }
 
     const projectedRelease = projectMusicQueueRelease(release, { qualityPolicyService, statusService });
-    if (!canRequestMusicQueueRediscovery(projectedRelease.status?.code)
+    const qualityReview = isMeasuredQualityReview(release.libraryAddRecoveryFacts);
+    if (!qualityReview && !canRequestMusicQueueRediscovery(projectedRelease.status?.code)
       && !isMusicQueueRediscoveryInProgress(release.discoveryRequest)) {
       throw createApiError(409, 'music_queue_retry_not_available', 'This release is not stopped in a state that can be searched again');
     }
@@ -385,7 +387,7 @@ export function createAcquisitionPipelineService({
     const restart = normalizeMusicQueueRediscoveryResult(await requestMusicQueueRediscovery({
       appUserId: scopedAppUserId,
       metadataReleaseId,
-      reasonCode: projectedRelease.status?.code === 'quality_choice_needed'
+      reasonCode: qualityReview ? 'quality_review_search_again' : projectedRelease.status?.code === 'quality_choice_needed'
         ? 'quality_choice_search_again'
         : 'music_queue_try_again',
       requestedAt,

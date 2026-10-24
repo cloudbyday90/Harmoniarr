@@ -41,7 +41,9 @@ export function buildMissingMusicLibraryAddRecoveryPresentation(detail) {
     title: queued ? 'Library-add checks queued' : review ? review.title : reasonCode === 'source_path_unavailable' ? 'Completed files are not reachable' : 'Audio check could not finish',
     reviewNextStep: !queued && review
       ? !isReadOnly && detail?.permissions?.canChooseAnotherMatch === true
-        ? 'Choose another match below. Harmoniarr will check its audio before adding it to your library.' : review.nextStep
+        ? 'Choose another match below. Harmoniarr will check its audio before adding it to your library.'
+        : !isReadOnly && detail?.permissions?.canSearchAgain === true
+          ? 'No eligible matches remain from this search. Search again using the current quality requirements.' : review.nextStep
       : null,
     explanation: queued
       ? 'Harmoniarr will add the completed files only after the current audio and library checks pass.'

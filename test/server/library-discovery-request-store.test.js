@@ -321,6 +321,7 @@ test('requestMusicQueueRediscovery resets one release into ready automatic searc
       'quality_choice_search_again',
       'user-1',
       'wanted-1',
+      null,
     ]);
     return {
       rows: [{
@@ -368,13 +369,14 @@ test('requestMusicQueueRediscovery resets one release into ready automatic searc
 
 test('requestMusicQueueRediscovery reports an already queued restart without rewriting shared state', async (t) => {
   const query = t.mock.fn(async (_sql, params) => {
-    if (params.length === 5) {
+    if (_sql.includes('WITH reset')) {
       assert.deepEqual(params, [
         'release-1',
         '2026-06-29T12:00:00.000Z',
         'music_queue_try_again',
         'user-1',
         'wanted-1',
+        null,
       ]);
       return { rows: [] };
     }

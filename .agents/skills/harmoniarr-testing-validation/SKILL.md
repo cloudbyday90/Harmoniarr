@@ -5,6 +5,13 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For Search again after measured refusal, read the standards
+[quality-review search reference](../harmoniarr-web-standards/references/quality-review-search.md).
+Pair focused policy/store checks with quality-review-search-again SQL/browser
+cases and existing search/selection regressions. Prove actual claim-to-query/ingest
+quality arguments, full keyset exhaustion, rollback and both actor/recipient lock
+waits. Keep controlled provider calls separate from native media qualification.
+
 For Choose another match after quality review, use the standards
 [alternative selection reference](../harmoniarr-web-standards/references/quality-review-match-selection.md).
 Run focused decision/presentation checks, quality-review-match-selection SQL/HTTP

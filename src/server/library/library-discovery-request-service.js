@@ -174,7 +174,8 @@ function mapDiscoveryRow(row, { automaticCooldownMs, now }) {
     };
   }
 
-  if (searchMode === 'automatic' && getSearchContinuationRecoveryMessage(row.blocked_reason)) {
+  if (searchMode === 'automatic' && (getSearchContinuationRecoveryMessage(row.blocked_reason)
+    || row.blocked_reason === 'quality_review_search_not_current')) {
     return {
       blockedReason: row.blocked_reason, evidence: priorEvidence,
       lastSearchAt: toIsoStringOrNull(row.last_search_at), manualRequestedAt: toIsoStringOrNull(row.manual_requested_at),

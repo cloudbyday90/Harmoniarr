@@ -31,6 +31,7 @@ import { createImportCandidateApplyService } from './import-candidate-apply-serv
 import { createImportCandidateApplyQueueService } from './import-candidate-apply-queue-service.js';
 import { createImportCandidateReleaseRecheckStore } from './import-candidate-release-recheck-store.js';
 import { createImportCandidateQualityReviewSelectionService } from './import-candidate-quality-review-selection-service.js';
+import { createImportCandidateQualityReviewScopeService } from './import-candidate-quality-review-scope-service.js';
 import { createImportCandidateReleaseRecheckGuardService } from './import-candidate-release-recheck-guard-service.js';
 import { createImportCandidateApplySummaryService } from './import-candidate-apply-summary-service.js';
 import { createImportCandidateApplyWorker } from './import-candidate-apply-worker.js';
@@ -418,13 +419,15 @@ export function createImportCandidateModule({
       markImportCandidateImportBlocked: importCandidateService.markImportCandidateImportBlocked }).recordPreparedLibraryAddReview,
     queuePreparedImportCandidateApply: importCandidateApplyQueueService.queuePreparedImportCandidateApply,
   }),
-  importCandidateQualityReviewSelectionService = createImportCandidateQualityReviewSelectionService({
+  importCandidateQualityReviewScopeService = createImportCandidateQualityReviewScopeService({
     recheckStore: importCandidateReleaseRecheckStore,
     getImportCandidate: importCandidateService.getImportCandidate,
-    selectImportCandidate: importCandidateService.selectImportCandidate,
     assertMaintenanceWriteAllowed: ({ queryable }) => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
-      operationLabel: 'quality-review match selection', queryable,
+      operationLabel: 'quality-review action', queryable,
     }),
+  }),
+  importCandidateQualityReviewSelectionService = createImportCandidateQualityReviewSelectionService({
+    scopeService: importCandidateQualityReviewScopeService, selectImportCandidate: importCandidateService.selectImportCandidate,
   }),
   importCandidateReleaseSafeAddRecheck = importCandidateReleaseSafeAddRecheckService
     ?? createImportCandidateReleaseSafeAddRecheckService({
@@ -572,6 +575,7 @@ export function createImportCandidateModule({
     importCandidateReleaseRecheckGuardService,
     importCandidateReleaseRecheckStore,
     importCandidateQualityReviewSelectionService,
+    importCandidateQualityReviewScopeService,
     importCandidateApplyQueueService,
     importCandidateApplyPreviewService,
     importCandidatePreviewService,
