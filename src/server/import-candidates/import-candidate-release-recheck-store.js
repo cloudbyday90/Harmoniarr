@@ -54,12 +54,6 @@ export function mapReleaseRecheckFacts(row) {
 }
 
 export function createImportCandidateReleaseRecheckStore({ getPoolFn = getPool } = {}) {
-  async function listQualityReviewCandidateIds({ sourceSearchId, afterId = null, queryable = null }) {
-    const result = await (queryable ?? getPoolFn()).query(`SELECT id FROM import_candidates
-      WHERE source_search_id=$1 AND status IN ('pending','held') AND ($2::uuid IS NULL OR id>$2::uuid)
-      ORDER BY id LIMIT 50 ${queryable ? 'FOR UPDATE' : ''}`, [sourceSearchId, afterId]);
-    return result.rows.map(row => row.id);
-  }
   async function readSelectionActor({ appUserId, queryable }) {
     const row = (await queryable.query('SELECT id, role, is_disabled FROM app_users WHERE id=$1::uuid', [appUserId])).rows[0];
     return row ? { id: row.id, role: row.role, isDisabled: row.is_disabled } : null;
@@ -127,5 +121,5 @@ export function createImportCandidateReleaseRecheckStore({ getPoolFn = getPool }
         AND jsonb_typeof(summary->'importCandidateIds')='array' AND summary->'importCandidateIds' ? $2::text`, [runId, importCandidateId]);
     return result.rows[0]?.authority ?? null;
   }
-  return { readOwnedRelease, readSelectionActor, listQualityReviewCandidateIds, readParticipantPolicies, lockParticipantReleases, lockCandidate, saveQualityContext, readAutomaticLibraryAddAuthority };
+  return { readOwnedRelease, readSelectionActor, readParticipantPolicies, lockParticipantReleases, lockCandidate, saveQualityContext, readAutomaticLibraryAddAuthority };
 }

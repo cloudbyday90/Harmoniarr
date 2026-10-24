@@ -80,7 +80,7 @@ suite('Recipient-owned Search again after measured quality review', () => {
       const eligible = await seedQualityReviewAlternative(f);
       await f.pool.query(`UPDATE import_candidates SET normalized_payload=normalized_payload || '{"compositeScore":0}' WHERE id=$1`, [eligible.id]);
       const detail = (await context.client.requestJson(detailPath(f.wantedId))).payload;
-      assert.deepEqual(detail.matchChoices, []); assert.equal(detail.permissions.canSearchAgain, false);
+      assert.deepEqual(detail.matchChoices.map(choice => choice.id), [eligible.id]); assert.equal(detail.permissions.canSearchAgain, false);
       assert.equal((await post(context.client, f.wantedId)).response.status, 409); assert.equal(await audits(f.pool), 0);
       await f.pool.query("UPDATE import_candidates SET status='rejected' WHERE id=$1", [eligible.id]);
       assert.equal((await context.client.requestJson(detailPath(f.wantedId))).payload.permissions.canSearchAgain, true);

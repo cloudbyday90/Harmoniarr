@@ -15,16 +15,18 @@ import { hasCurrentSafeAddParticipants } from './import-candidate-release-safe-a
 import { buildRecheckQualityContext, getRecheckWantedReleaseIds } from './import-candidate-release-recheck-quality-policy.js';
 import { canRetainRecoveryQualityContext } from './import-candidate-recovery-quality-policy.js';
 import { OPERATOR_TRACK_SCOPE_BLOCKER } from '../metadata/operator-track-scope-policy.js';
+import { createImportCandidateQualityReviewCandidateStore, QUALITY_REVIEW_CANDIDATE_PAGE_SIZE } from './import-candidate-quality-review-candidate-store.js';
 
 /** Replacement selection preserves the failed acquisition and its shared quality floor. */
 export function createImportCandidateQualityReviewScopeService({ recheckStore, getImportCandidate,
+  candidateStore = createImportCandidateQualityReviewCandidateStore(),
   assertMaintenanceWriteAllowed, withTransaction = createDatabaseTransactionRunner(),
   lockAppUserEligibilityFn = lockAppUserEligibility, lockRunCreation = lockImportCandidateApplyCreation,
 } = {}) {
   for (const [name, value] of Object.entries({ getImportCandidate, assertMaintenanceWriteAllowed,
     withTransaction, lockAppUserEligibilityFn, lockRunCreation, readOwnedRelease: recheckStore?.readOwnedRelease,
     readParticipantPolicies: recheckStore?.readParticipantPolicies, readSelectionActor: recheckStore?.readSelectionActor,
-    lockCandidate: recheckStore?.lockCandidate, listQualityReviewCandidateIds: recheckStore?.listQualityReviewCandidateIds,
+    lockCandidate: recheckStore?.lockCandidate, listCandidatePage: candidateStore?.listCandidatePage,
     lockParticipantReleases: recheckStore?.lockParticipantReleases })) {
     if (typeof value !== 'function') throw new TypeError(`Quality-review selection requires ${name}`);
   }
@@ -60,28 +62,27 @@ export function createImportCandidateQualityReviewScopeService({ recheckStore, g
       && evaluateQualityEvidence({ candidate, ...scope.requiredContext }).autoDownloadEligible);
   }
 
-  async function listQualityReviewMatchIds({ appUserId, wantedReleaseId, matchIds = [] }) {
-    const scope = await readScope({ appUserId, wantedReleaseId });
-    if (!scope) return [];
-    const eligible = [];
-    for (const matchId of [...new Set(matchIds)].slice(0, 12)) {
-      if (isEligible(await readCandidate(matchId), scope)) eligible.push(matchId);
-    }
-    return eligible;
-  }
-
-  async function hasEligibleAlternative(scope, { queryable = null } = {}) {
+  async function collectEligibleAlternatives(scope, { queryable = null, limit }) {
     let afterId = null;
+    const eligible = [];
     for (;;) {
-      const ids = await recheckStore.listQualityReviewCandidateIds({ sourceSearchId: scope.failedCandidate.sourceSearchId, afterId, queryable });
-      for (const id of ids) if (isEligible(await readCandidate(id, queryable), scope)) return true;
-      if (ids.length < 50) return false;
-      afterId = ids.at(-1);
+      const page = await candidateStore.listCandidatePage({ sourceSearchId: scope.failedCandidate.sourceSearchId, afterId, queryable });
+      for (const candidate of page) {
+        if (isEligible(candidate, scope)) eligible.push(candidate);
+        if (eligible.length === limit) return eligible;
+      }
+      if (page.length < QUALITY_REVIEW_CANDIDATE_PAGE_SIZE) return eligible;
+      afterId = page.at(-1).id;
     }
   }
-  async function canSearchAgainAfterQualityReview(input) {
+  async function getQualityReviewAlternatives(input) {
     const scope = await readScope(input);
-    return Boolean(scope && !await hasEligibleAlternative(scope));
+    if (!scope) return { candidates: [], canSearchAgain: false };
+    const candidates = await collectEligibleAlternatives(scope, { limit: 12 });
+    return { candidates, canSearchAgain: candidates.length === 0 };
+  }
+  async function hasEligibleAlternative(scope, { queryable = null } = {}) {
+    return (await collectEligibleAlternatives(scope, { queryable, limit: 1 })).length > 0;
   }
 
   async function withCurrentScope({ actorUserId, appUserId, wantedReleaseId, importCandidateId = null }, execute) {
@@ -89,6 +90,7 @@ export function createImportCandidateQualityReviewScopeService({ recheckStore, g
     const prepared = await readScope(input);
     const unavailable = () => createApiError(409, 'missing_music_match_changed', 'Available matches have changed. Refresh this release before continuing.');
     if (!prepared) throw unavailable();
+    if (importCandidateId && !isEligible(await readCandidate(importCandidateId), prepared)) throw unavailable();
     return withTransaction(async queryable => {
       await assertMaintenanceWriteAllowed({ queryable });
       await lockAppUserEligibilityFn({ userIds: [actorUserId, ...prepared.participants.map(p => p.appUserId)], queryable });
@@ -105,6 +107,5 @@ export function createImportCandidateQualityReviewScopeService({ recheckStore, g
       return execute({ scope, queryable });
     });
   }
-  return { readCandidate, readScope, isEligible, listQualityReviewMatchIds, hasEligibleAlternative,
-    canSearchAgainAfterQualityReview, withCurrentScope };
+  return { readCandidate, readScope, isEligible, getQualityReviewAlternatives, hasEligibleAlternative, withCurrentScope };
 }

@@ -22,7 +22,7 @@ import {
   normalizeMissingMusicAccountStatus,
   resolveMissingMusicDecisionScope,
 } from './missing-music-decision-scope-policy.js';
-import { buildMissingMusicMatchChoices } from './missing-music-match-choice-projection.js';
+import { buildMissingMusicMatchChoices, buildMissingMusicQualityReviewChoices } from './missing-music-match-choice-projection.js';
 import { buildMissingMusicSearchDiagnostics, buildMissingMusicSearchCorrectionPermissions } from './missing-music-search-diagnostics-policy.js';
 import { canStartMissingMusicDownload } from './missing-music-download-start-policy.js';
 import { canReviewMissingMusicDownload } from './missing-music-download-review-handoff-policy.js';
@@ -182,8 +182,7 @@ function validateDependencies({
 }
 
 export function createMissingMusicDecisionService({
-  listQualityReviewMatchIds = async () => [],
-  canSearchAgainAfterQualityReview = async () => false,
+  getQualityReviewAlternatives = async () => ({ candidates: [], canSearchAgain: false }),
   listAppUsers,
   listWantedReleaseIdentityPage,
   listWantedReleasesWithMetadata,
@@ -339,15 +338,14 @@ export function createMissingMusicDecisionService({
     let matchChoices = decision.status.nextAction === 'review_matches'
       ? buildMissingMusicMatchChoices(target.release)
       : [];
+    let canRestartQualityReview = false;
     if (measuredReview && target.targetUser.accountStatus !== 'disabled') {
-      const choices = buildMissingMusicMatchChoices(target.release);
-      const eligibleIds = await listQualityReviewMatchIds({ appUserId: target.targetUser.id, wantedReleaseId: target.decisionId,
-        matchIds: choices.map(choice => choice.id) });
-      matchChoices = choices.filter(choice => eligibleIds.includes(choice.id));
+      const alternatives = await getQualityReviewAlternatives({ appUserId: target.targetUser.id, wantedReleaseId: target.decisionId });
+      matchChoices = buildMissingMusicQualityReviewChoices(alternatives.candidates);
+      canRestartQualityReview = !isMusicQueueRediscoveryInProgress(target.release.discoveryRequest) && alternatives.canSearchAgain === true;
     }
     const searchDiagnostics = buildMissingMusicSearchDiagnostics(target.release);
-    const canRestartQualityReview = measuredReview && !isMusicQueueRediscoveryInProgress(target.release.discoveryRequest)
-      && await canSearchAgainAfterQualityReview({ appUserId: target.targetUser.id, wantedReleaseId: target.decisionId });
+
 
     return {
       checkedAt: now().toISOString(),

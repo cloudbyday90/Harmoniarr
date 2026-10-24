@@ -42,8 +42,7 @@ export function createMissingMusicModule({
   startReleaseManualSafeAdd = async () => { throw createApiError(503, 'missing_music_library_add_unavailable', 'Library add is unavailable'); },
   startLibraryDiscoveryRun,
   selectImportCandidate,
-  listQualityReviewMatchIds,
-  canSearchAgainAfterQualityReview,
+  getQualityReviewAlternatives,
   selectQualityReviewMatch,
   startImportCandidateExecutionRun,
 } = {}) {
@@ -52,8 +51,7 @@ export function createMissingMusicModule({
     listWantedReleasesWithMetadata,
   });
   const missingMusicDecisionService = createMissingMusicDecisionService({
-    listQualityReviewMatchIds,
-    canSearchAgainAfterQualityReview,
+    getQualityReviewAlternatives,
     listAppUsers,
     listWantedReleaseIdentityPage,
     listWantedReleasesWithMetadata,

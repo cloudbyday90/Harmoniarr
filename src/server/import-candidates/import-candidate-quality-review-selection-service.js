@@ -14,6 +14,9 @@ export function createImportCandidateQualityReviewSelectionService({ selectImpor
   const scope = scopeService ?? createImportCandidateQualityReviewScopeService(scopeDependencies);
   async function selectQualityReviewMatch({ actorUserId, appUserId, wantedReleaseId, importCandidateId,
     eventDetails = null, requestMetadata = null }) {
+    if (typeof importCandidateId !== 'string' || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/iu.test(importCandidateId)) {
+      throw createApiError(400, 'validation_error', 'matchId must be a valid candidate identifier');
+    }
     return scope.withCurrentScope({ actorUserId, appUserId, wantedReleaseId, importCandidateId }, async ({ scope: current, queryable }) => {
       if (!scope.isEligible(await scope.readCandidate(importCandidateId, queryable), current)) {
         throw createApiError(409, 'missing_music_match_changed', 'Available matches have changed. Refresh this release before choosing another match.');
@@ -22,5 +25,5 @@ export function createImportCandidateQualityReviewSelectionService({ selectImpor
         reason: 'Selected another match after measured quality review' });
     });
   }
-  return { listQualityReviewMatchIds: scope.listQualityReviewMatchIds, selectQualityReviewMatch };
+  return { selectQualityReviewMatch };
 }

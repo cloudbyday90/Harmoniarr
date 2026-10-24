@@ -5,6 +5,12 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For eligible alternatives beyond a raw shortlist, use the standards
+[eligible shortlist reference](../harmoniarr-web-standards/references/eligible-shortlist.md).
+Run batch/scope and decision checks, eligible-match-shortlist SQL/browser cases and
+the existing quality-review selection/restart cohorts. Prove no per-alternative
+detail/file reads and batch/full-candidate policy parity before the stable gate.
+
 For Search again after measured refusal, read the standards
 [quality-review search reference](../harmoniarr-web-standards/references/quality-review-search.md).
 Pair focused policy/store checks with quality-review-search-again SQL/browser

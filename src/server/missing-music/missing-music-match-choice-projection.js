@@ -65,11 +65,11 @@ export function findSelectableMissingMusicMatch(release, matchId) {
  * provider identifiers, transfer state, paths, queue data, and scoring
  * internals are intentionally excluded from this browser-facing shape.
  */
-export function buildMissingMusicMatchChoices(release) {
+function buildMatchChoices(matches) {
   const choices = [];
   const seenIds = new Set();
 
-  for (const match of listReleaseMatches(release)) {
+  for (const match of matches) {
     if (!SELECTABLE_MATCH_STATUSES.has(match?.status)) continue;
 
     const id = normalizeIdentifier(match?.matchId);
@@ -86,4 +86,13 @@ export function buildMissingMusicMatchChoices(release) {
   }
 
   return choices;
+}
+
+export function buildMissingMusicMatchChoices(release) {
+  return buildMatchChoices(listReleaseMatches(release));
+}
+
+export function buildMissingMusicQualityReviewChoices(candidates) {
+  return buildMatchChoices(candidates.map(candidate => ({ matchId: candidate.id, status: candidate.status,
+    fileCount: candidate.fileCount, totalSizeBytes: candidate.totalSizeBytes, formats: candidate.normalizedPayload?.extensions })));
 }

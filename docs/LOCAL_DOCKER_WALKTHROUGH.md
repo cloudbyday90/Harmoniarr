@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 24 [eligible-shortlist rebuild](LOCAL_DOCKER_ELIGIBLE_SHORTLIST_OUTCOME.md)
+records the current no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](ELIGIBLE_MATCH_SHORTLIST_OUTCOME.md) connects filtered
+eligible choices to guarded selection beyond the old raw shortlist.
+
 The October 24 [quality-review search rebuild](LOCAL_DOCKER_QUALITY_REVIEW_SEARCH_OUTCOME.md)
 records the current no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](QUALITY_REVIEW_SEARCH_OUTCOME.md) connects exhausted

@@ -17,3 +17,14 @@ export async function seedQualityReviewAlternative(fixture, { extension = 'flac'
       bitRateKbps: extension === 'mp3' ? 128 : 900, sampleRateHz: 44_100, lengthSeconds: 2, isLocked: false }],
   });
 }
+
+/** Higher raw scores deliberately put the eligible choice beyond the old shortlist. */
+export async function seedHiddenQualityReviewChoice(fixture, { weakCount = 51 } = {}) {
+  const weakIds = [];
+  for (let index = 0; index < weakCount; index++) weakIds.push((await seedQualityReviewAlternative(fixture, { extension: 'mp3' })).id);
+  await fixture.pool.query(`UPDATE import_candidates SET normalized_payload=normalized_payload || '{"compositeScore":100}'
+    WHERE id=ANY($1::uuid[])`, [weakIds]);
+  const eligible = await seedQualityReviewAlternative(fixture);
+  await fixture.pool.query(`UPDATE import_candidates SET normalized_payload=normalized_payload || '{"compositeScore":0}' WHERE id=$1`, [eligible.id]);
+  return { weakIds, eligible };
+}

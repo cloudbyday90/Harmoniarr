@@ -5,6 +5,10 @@ description: "Apply and verify standards for Harmoniarr UI commands, forms, focu
 
 # Harmoniarr Web Standards
 
+For hidden eligible alternatives, read [eligible shortlist](references/eligible-shortlist.md).
+It covers filter-before-limit projection, batched policy facts and selection
+authority independent of the raw shortlist.
+
 For Search again after exhausted measured-quality choices, read
 [quality-review search](references/quality-review-search.md). It covers full-search
 exhaustion, durable quality floors without copied consent, current claim authority,

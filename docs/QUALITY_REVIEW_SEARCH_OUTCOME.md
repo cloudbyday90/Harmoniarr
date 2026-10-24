@@ -76,8 +76,7 @@ the existing acquisition authority with a small targeted extension. The cost is
 additional database reads for conservative full-search exhaustion and refusal when
 queued ownership no longer matches.
 
-Next: **filter or paginate eligible match choices before the public shortlist
-limit**. The new regression demonstrates that an eligible candidate can exist
-beyond the public shortlist. Search again correctly refuses in that case, but the
-recipient still needs a bounded way to reach that alternative. Reuse the shared
-eligibility policy and batch candidate facts while preserving private evidence.
+Follow-up implemented: [eligible alternatives before the shortlist limit](ELIGIBLE_MATCH_SHORTLIST_OUTCOME.md)
+filters the shared policy before the twelve-choice cap and allows those choices
+through guarded selection. Batched candidate facts also replace per-alternative
+detail/file reads. See that outcome for the remaining browsing recommendation.

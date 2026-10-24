@@ -75,12 +75,11 @@ export function createMissingMusicDecisionCommandService({
       throw createApiError(409, 'missing_music_decision_read_only', 'This Missing Music history is read-only');
     }
 
-    const match = findSelectableMissingMusicMatch(target.release, normalizedMatchId);
-    if (!match) {
+    const qualityReview = isMeasuredQualityReview(target.release.libraryAddRecoveryFacts);
+    if (!qualityReview && !findSelectableMissingMusicMatch(target.release, normalizedMatchId)) {
       throw createApiError(404, 'missing_music_match_not_found', 'Missing Music match was not found for this release');
     }
 
-    const qualityReview = isMeasuredQualityReview(target.release.libraryAddRecoveryFacts);
     if (qualityReview && typeof selectQualityReviewMatch !== 'function') {
       throw createApiError(503, 'missing_music_selection_unavailable', 'Match selection is temporarily unavailable');
     }
