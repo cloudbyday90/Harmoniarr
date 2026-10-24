@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 24 [read-scope rebuild](LOCAL_DOCKER_QUALITY_REVIEW_READ_SCOPE_OUTCOME.md)
+records the latest no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](QUALITY_REVIEW_READ_SCOPE_OUTCOME.md) connects minimal
+read-only review scope, exact cursor parity and unchanged command authority.
+
 The October 24 [minimal-facts rebuild](LOCAL_DOCKER_QUALIFICATION_CANDIDATE_FACTS_OUTCOME.md)
 records the latest no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](QUALIFICATION_CANDIDATE_FACTS_OUTCOME.md) connects narrow

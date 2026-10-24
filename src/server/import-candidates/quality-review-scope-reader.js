@@ -8,7 +8,7 @@ import { hasCurrentSafeAddParticipants } from './import-candidate-release-safe-a
 import { buildRecheckQualityContext, getRecheckWantedReleaseIds } from './import-candidate-release-recheck-quality-policy.js';
 import { OPERATOR_TRACK_SCOPE_BLOCKER } from '../metadata/operator-track-scope-policy.js';
 
-/** Full selection and narrow qualification share one current-policy calculation. */
+/** Full selection and narrow browsing/qualification share current policy. */
 export function createQualityReviewScopeReader({ recheckStore, readFailedCandidate, readOwnedReview = recheckStore.readOwnedRelease }) {
   return async function readScope({ appUserId, wantedReleaseId, queryable = null }) {
     const release = await readOwnedReview({ appUserId, wantedReleaseId, queryable });

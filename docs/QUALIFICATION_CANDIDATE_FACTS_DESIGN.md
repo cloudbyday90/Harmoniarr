@@ -3,6 +3,10 @@
 October 24, 2026. Narrow the remaining failed-candidate detail and child-lock
 cost in the bounded restart protocol, without changing its authority.
 
+The subsequent [read-scope design](QUALITY_REVIEW_READ_SCOPE_DESIGN.md) extends
+these facts to read-only chooser/detail reads. The original table below records
+the qualification increment; selected commands retain their full scope and locks.
+
 ## Contract and architecture
 
 Qualification needs the failed candidate's id, status, source search and saved

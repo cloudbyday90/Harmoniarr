@@ -10,20 +10,24 @@ import { createImportCandidateQualityReviewScopeService } from '../../src/server
 
 const id = index => `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`;
 const wantedId = id(900); const ownerId = id(901); const failedId = id(999);
-function fixture({ weak = 51, eligible = 15, disabled = false, alternative = null } = {}) {
+function fixture({ weak = 51, eligible = 15, disabled = false, alternative = null, checking = false } = {}) {
   const context = { profileCode: 'lossless_archive', wantedReleaseId: wantedId };
   const failed = { id: failedId, status: 'failed', sourceSearchId: 'current-search', normalizedPayload: { musicQueue: context } };
   const candidates = Array.from({ length: weak + eligible }, (_, index) => ({ id: id(index + 1), status: 'pending',
     sourceSearchId: 'current-search', fileCount: 1, totalSizeBytes: 5000,
     normalizedPayload: { musicQueue: context, extensions: [index < weak ? 'mp3' : 'flac'] } }));
-  const reads = []; const pages = []; const locks = []; let scopeReads = 0; let transactions = 0;
+  const reads = []; const factReads = []; const pages = []; const locks = []; let scopeReads = 0; let transactions = 0;
+  const readOwnedReview = async () => { scopeReads++; return { metadataReleaseId: id(902), targetUser: { isDisabled: disabled },
+    libraryAddRecoveryFacts: { candidateId: failedId, candidateStatus: 'failed', addBlockerCode: 'media_verification',
+      recoveryReasonCode: 'suspicious_lossless', hasConflictingCandidate: false, activeRunId: null } }; };
   const service = createImportCandidateQualityReviewScopeService({
     revisionStore: { readRevision: async () => 'current-revision' },
-    searchRunStore: { findActive: async () => null },
+    searchRunStore: { findActive: async () => checking ? { id: id(903) } : null },
+    failedCandidateStore: { readOwnedReview, readFacts: async ({ importCandidateId }) => {
+      factReads.push(importCandidateId); assert.equal(importCandidateId, failedId); return failed;
+    }, lockFailedCandidate: async () => assert.fail('Read-only pages cannot acquire parent locks') },
     recheckStore: {
-      readOwnedRelease: async () => { scopeReads++; return { metadataReleaseId: id(902), targetUser: { isDisabled: disabled },
-        libraryAddRecoveryFacts: { candidateId: failedId, candidateStatus: 'failed', addBlockerCode: 'media_verification',
-          recoveryReasonCode: 'suspicious_lossless', hasConflictingCandidate: false, activeRunId: null } }; },
+      readOwnedRelease: readOwnedReview,
       readParticipantPolicies: async () => [{ wantedReleaseId: wantedId, appUserId: ownerId, metadataReleaseId: id(902),
         discoveryLinkExists: true, wantedStatus: 'missing', missingTrackCount: 1, isDisabled: false,
         qualityPreferences: { minimumQuality: 'lossless', preferredFormat: 'flac' } }],
@@ -44,20 +48,21 @@ function fixture({ weak = 51, eligible = 15, disabled = false, alternative = nul
     assertMaintenanceWriteAllowed: async () => {},
     withTransaction: async () => { transactions++; assert.fail('An ineligible foreign candidate cannot open a write transaction'); },
   });
-  return { service, reads, pages, locks, transactions: () => transactions, scopeReads: () => scopeReads };
+  return { service, reads, factReads, pages, locks, transactions: () => transactions, scopeReads: () => scopeReads };
 }
 
 test('one scope and two batch reads expose twelve eligible choices beyond fifty ineligible rows without per-candidate detail', async () => {
   const f = fixture(); const result = await f.service.getQualityReviewAlternatives({ appUserId: ownerId, wantedReleaseId: wantedId });
   assert.deepEqual(result.candidates.map(row => row.id), Array.from({ length: 12 }, (_, index) => id(index + 52)));
-  assert.equal(result.canSearchAgain, false); assert.equal(f.scopeReads(), 1); assert.deepEqual(f.reads, [failedId]);
+  assert.equal(result.canSearchAgain, false); assert.equal(f.scopeReads(), 1); assert.deepEqual(f.factReads, [failedId]);
+  assert.deepEqual(f.reads, []); assert.deepEqual(f.locks, []); assert.equal(f.transactions(), 0);
   assert.equal(f.pages.length, 2); assert.equal(f.pages[0].afterId, null); assert.equal(f.pages[1].afterId, id(50));
 });
 
 test('empty eligible results require complete batch traversal and an invalid scope cannot imply exhaustion', async () => {
   const f = fixture({ weak: 100, eligible: 0 });
   assert.deepEqual(await f.service.getQualityReviewAlternatives({ appUserId: ownerId, wantedReleaseId: wantedId }), { candidates: [], canSearchAgain: true });
-  assert.equal(f.pages.length, 3); assert.deepEqual(f.reads, [failedId]);
+  assert.equal(f.pages.length, 3); assert.deepEqual(f.factReads, [failedId]); assert.deepEqual(f.reads, []);
   const disabled = fixture({ disabled: true });
   assert.deepEqual(await disabled.service.getQualityReviewAlternatives({ appUserId: ownerId, wantedReleaseId: wantedId }), { candidates: [], canSearchAgain: false });
   assert.equal(disabled.pages.length, 0);
@@ -74,7 +79,7 @@ test('forward and reverse pages retain twelve eligible facts without repeating a
   assert.deepEqual(back.candidates, second.candidates);
   const start = await f.service.getQualityReviewAlternatives({ ...input, matchCursor: back.matchChoicePage.previousCursor });
   assert.deepEqual(start.candidates, first.candidates); assert.equal(start.matchChoicePage.previousCursor, null);
-  assert.equal(third.canSearchAgain, false); assert.deepEqual(f.reads, Array(5).fill(failedId));
+  assert.equal(third.canSearchAgain, false); assert.deepEqual(f.factReads, Array(5).fill(failedId)); assert.deepEqual(f.reads, []);
 });
 
 test('guarded existence checks use the same batches, preserve the owning queryable and stop at the first eligible result', async () => {
@@ -122,4 +127,14 @@ test('foreign candidate scope is refused before taking candidate locks or openin
   await assert.rejects(f.service.withCurrentScope({ appUserId: ownerId, actorUserId: ownerId, wantedReleaseId: wantedId,
     importCandidateId: alternative.id }, async () => assert.fail('Foreign scope cannot reach mutation')), error => error.code === 'missing_music_match_changed');
   assert.deepEqual(f.reads, [failedId, alternative.id]); assert.equal(f.transactions(), 0); assert.deepEqual(f.locks, []);
+});
+
+test('checking and unavailable read scopes suppress choices and refuse continuation without loading full detail or locking', async () => {
+  for (const options of [{ checking: true }, { disabled: true }]) {
+    const f = fixture(options); const input = { appUserId: ownerId, wantedReleaseId: wantedId };
+    assert.deepEqual(await f.service.getQualityReviewAlternatives(input), { candidates: [], canSearchAgain: false,
+      ...(options.checking ? { checkingMatches: true } : {}) });
+    await assert.rejects(f.service.getQualityReviewAlternatives({ ...input, matchCursor: 'earlier-page' }), { code: 'missing_music_match_page_changed' });
+    assert.deepEqual(f.reads, []); assert.deepEqual(f.pages, []); assert.deepEqual(f.locks, []); assert.equal(f.transactions(), 0);
+  }
 });

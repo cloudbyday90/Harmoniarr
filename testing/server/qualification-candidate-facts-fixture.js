@@ -14,6 +14,7 @@ import { buildRecheckQualityContext, getRecheckWantedReleaseIds } from '../../sr
 import { canRetainRecoveryQualityContext } from '../../src/server/import-candidates/import-candidate-recovery-quality-policy.js';
 import { buildQualityReviewSearchRequirement } from '../../src/server/library/library-quality-review-search-policy.js';
 import { qualityReviewSearchContext } from '../../src/server/import-candidates/quality-review-search-policy.js';
+import { qualityReviewCursorContext } from '../../src/server/import-candidates/import-candidate-quality-review-cursor-policy.js';
 import { createOperatorTrackCatalogStore } from '../../src/server/metadata/operator-track-catalog-store.js';
 import { seedMetadataReleaseFixture } from '../integration/metadata-fixtures.js';
 
@@ -32,6 +33,7 @@ async function outcome(candidate, participants, queryable) {
     const wantedReleaseIds = getRecheckWantedReleaseIds(candidate);
     const scope = { failedCandidate: candidate, participants, wantedReleaseIds, requiredContext };
     return { requiredContext, requirement: buildQualityReviewSearchRequirement(scope),
+      cursorContext: qualityReviewCursorContext({ actorUserId: id(6), actorRole: 'admin', appUserId: id(4), wantedReleaseId: participants[0]?.wantedReleaseId }, scope, id(7)),
       progressContext: qualityReviewSearchContext({ actorUserId: id(6), appUserId: id(4), wantedReleaseId: participants[0]?.wantedReleaseId }, scope, id(7)),
       retains: canRetainRecoveryQualityContext({ candidate: { normalizedPayload: { musicQueue: requiredContext } }, failedCandidate: candidate, requiredContext }) };
   } catch (error) { return { error: error.code ?? error.name }; }

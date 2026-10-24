@@ -48,7 +48,8 @@ export function createImportCandidateQualityReviewScopeService({ recheckStore, g
   }
 
   const readScope = createQualityReviewScopeReader({ recheckStore, readFailedCandidate: readCandidate });
-  const readQualificationScope = createQualityReviewScopeReader({ recheckStore,
+  // Browsing and qualification share minimal facts; selected commands retain full detail.
+  const readFactScope = createQualityReviewScopeReader({ recheckStore,
     readOwnedReview: failedCandidateStore.readOwnedReview,
     readFailedCandidate: (importCandidateId, queryable) => failedCandidateStore.readFacts({ importCandidateId, queryable }) });
 
@@ -61,14 +62,14 @@ export function createImportCandidateQualityReviewScopeService({ recheckStore, g
   }
 
   const scanCandidates = createQualityReviewScanService({ candidateStore, isEligible });
-  const getQualityReviewAlternatives = createQualityReviewPageService({ readScope, scanCandidates, cursorPolicy, revisionStore, searchRunStore });
+  const getQualityReviewAlternatives = createQualityReviewPageService({ readScope: readFactScope, scanCandidates, cursorPolicy, revisionStore, searchRunStore });
   const scanAlternativeWindow = (scope, { queryable, anchor = null } = {}) => scanCandidates(scope, { queryable, anchor, limit: 1, lockRows: false });
 
   const guardDependencies = { recheckStore, assertMaintenanceWriteAllowed, withTransaction, lockAppUserEligibilityFn, lockRunCreation };
   const withCurrentScope = createQualityReviewScopeGuard({ ...guardDependencies, readScope,
     lockFailedCandidate: recheckStore.lockCandidate, readSelectedCandidate: readCandidate, isEligible });
-  const withCurrentQualificationScope = createQualityReviewScopeGuard({ ...guardDependencies, readScope: readQualificationScope,
+  const withCurrentQualificationScope = createQualityReviewScopeGuard({ ...guardDependencies, readScope: readFactScope,
     lockFailedCandidate: failedCandidateStore.lockFailedCandidate });
-  return { readCandidate, readScope, readQualificationScope, isEligible, getQualityReviewAlternatives,
+  return { readCandidate, readScope, readQualificationScope: readFactScope, isEligible, getQualityReviewAlternatives,
     scanAlternativeWindow, withCurrentScope, withCurrentQualificationScope };
 }

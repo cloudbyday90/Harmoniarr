@@ -5,6 +5,10 @@ description: "Apply and verify standards for Harmoniarr UI commands, forms, focu
 
 # Harmoniarr Web Standards
 
+For minimal read-only quality-review pages, read
+[review scope](references/quality-review-read-scope.md). It covers current access,
+page/cursor parity, observed GET queries and independently authorized commands.
+
 For minimal failed-candidate qualification inputs, read
 [candidate facts](references/qualification-candidate-facts.md). It covers field
 presence, policy parity, shared guard factories and the proven parent/child lock boundary.

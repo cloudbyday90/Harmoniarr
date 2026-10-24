@@ -35,6 +35,7 @@ research and outcome, plus [bounded qualification](bounded-restart-qualification
    projection and parity evidence in the same change.
 
 Record serialized fixture bytes and cardinality without claiming latency, RSS or
-whole-platform improvement. Read-only chooser/detail and selection still use
-their existing full scope. Extending the projection to those boundaries needs
-separate access, policy and presentation qualification.
+whole-platform improvement. Read-only chooser/detail now reuses the minimal scope
+with the separate [read-scope proof](quality-review-read-scope.md). Selection retains
+full scope and its child locks; extending that mutation boundary requires separate
+qualification.

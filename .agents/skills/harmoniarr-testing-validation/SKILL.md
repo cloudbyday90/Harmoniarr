@@ -5,6 +5,14 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For minimal read-only review scope, read the standards
+[read-scope reference](../harmoniarr-web-standards/references/quality-review-read-scope.md).
+Pair no-full-getter page checks with actual full/minimal SQL page/cursor parity and
+observed large-candidate GET queries. Run access/stale/legacy/refusal HTTP cases and
+the changed shared cursor-digest fixture on guarded packaged PostgreSQL. Combine
+affected paging/scan/selection/restart cohorts once, then browser and media checks;
+avoid unrelated native reruns after exact source/test/runtime comparison.
+
 For minimal restart-qualification facts, read the standards
 [fact reference](../harmoniarr-web-standards/references/qualification-candidate-facts.md).
 Run fact-store/reader/guard/service checks, shared full/minimal policy and lock

@@ -66,9 +66,8 @@ an explicit policy-field contract, variable required context arrays and possible
 JSONB decompression. These fixture bytes do not establish latency, RSS, physical
 I/O or a new concurrent deployment memory envelope.
 
-Next: **remove full failed-candidate detail/file loading from the read-only
-quality-review detail/chooser scope**. Reuse the proven fact boundary only after
-proving public review/status, current access, page/cursor freshness and eligible
-choice parity. Keep selected-candidate command locks separately qualified. This
-addresses the remaining full allocation during each chooser/detail read; mixed
-workload memory measurement and orphan-revision retirement remain later work.
+The [read-only scope increment](QUALITY_REVIEW_READ_SCOPE_OUTCOME.md) now reuses the
+minimal fact boundary for chooser/detail reads, with current access, public status
+and full/minimal page/cursor parity proof. Selection's full detail and child locks
+remain separately authoritative. That outcome owns the next mixed-workload resource
+qualification recommendation; orphan-revision retirement remains later work.
