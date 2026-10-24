@@ -66,9 +66,7 @@ allocations; costs are the explicit field contract and remaining outer projectio
 required-array and JSONB decompression work. No whole-request RSS, I/O or latency
 improvement is asserted from fixture bytes.
 
-Next: **qualify bounded mixed review and media workloads in the packaged single
-application container**. Exercise overlapping detail pagination/restart and actual
-scan/media work using existing admission/lease owners. Capture cgroup usage/peak,
-OOM counters, process memory and request latency separately, prove actual overlap
-and retirement, and keep original bytes intact. Use those measurements to choose
-the next memory control before further speculative query or deployment changes.
+The [mixed workload outcome](DEPLOYMENT_REVIEW_MEMORY_OUTCOME.md) now qualifies
+review navigation/restart alongside actual scan/media, artwork and PostgreSQL work
+in fresh constrained containers. It records separate memory/latency observations,
+actual overlap, source preservation and retirement, and owns the next recommendation.

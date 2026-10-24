@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 24 [mixed review/media rebuild](LOCAL_DOCKER_DEPLOYMENT_REVIEW_MEMORY_OUTCOME.md)
+records the latest no-cache image and preserved administrator/data/mounts. The
+[resource outcome](DEPLOYMENT_REVIEW_MEMORY_OUTCOME.md) records fresh 2/3 GiB profiles,
+actual HTTP/native overlap and separate memory/latency observations.
+
 The October 24 [read-scope rebuild](LOCAL_DOCKER_QUALITY_REVIEW_READ_SCOPE_OUTCOME.md)
 records the latest no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](QUALITY_REVIEW_READ_SCOPE_OUTCOME.md) connects minimal

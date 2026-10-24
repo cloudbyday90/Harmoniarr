@@ -5,6 +5,15 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For mixed review/media memory, read the standards
+[workload reference](../harmoniarr-web-standards/references/deployment-review-memory.md).
+Run observer/concurrent-drain tests plus existing memory/media observer checks.
+Execute only the new guarded native entry in fresh 2/3 GiB containers; keep actual
+request durations, child overlap, source preservation and exact lease release.
+Do not add native allocation work to the fast gate or rerun unchanged whole SQL/
+browser/native matrices when exact source/test/packaged-runtime proof supports
+retention. No profile alone establishes a minimum or automatic admission tuning.
+
 For minimal read-only review scope, read the standards
 [read-scope reference](../harmoniarr-web-standards/references/quality-review-read-scope.md).
 Pair no-full-getter page checks with actual full/minimal SQL page/cursor parity and

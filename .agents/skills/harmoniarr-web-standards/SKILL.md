@@ -5,6 +5,10 @@ description: "Apply and verify standards for Harmoniarr UI commands, forms, focu
 
 # Harmoniarr Web Standards
 
+For concurrent review/media resource measurements, read
+[mixed workload](references/deployment-review-memory.md). It covers actual HTTP/
+native overlap, metric meanings, bounded evidence and owned drainage.
+
 For minimal read-only quality-review pages, read
 [review scope](references/quality-review-read-scope.md). It covers current access,
 page/cursor parity, observed GET queries and independently authorized commands.
