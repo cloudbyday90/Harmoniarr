@@ -5,6 +5,14 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For mixed artwork corpus qualification, read the standards
+[corpus reference](../harmoniarr-web-standards/references/deployment-review-corpus.md).
+Pair selector/pixel/metadata verification with existing observer/drain checks. Run
+seven cases in separate fresh 2/3 GiB containers, plus affected default memory and
+baseline mixed regressions. Expected decoder refusal still requires no publication,
+actual child/lease retirement and successful review/media work. Keep this matrix
+opt-in; retain unchanged SQL/browser/provider proof only after exact comparison.
+
 For mixed review/media memory, read the standards
 [workload reference](../harmoniarr-web-standards/references/deployment-review-memory.md).
 Run observer/concurrent-drain tests plus existing memory/media observer checks.

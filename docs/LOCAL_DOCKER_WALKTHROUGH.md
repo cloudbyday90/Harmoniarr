@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 24 [mixed artwork-corpus rebuild](LOCAL_DOCKER_DEPLOYMENT_REVIEW_CORPUS_OUTCOME.md)
+records the latest no-cache image and preserved administrator/data/mounts. The
+[corpus outcome](DEPLOYMENT_REVIEW_CORPUS_OUTCOME.md) records fresh entropy/sample-depth
+profiles, owned refusal and actual review/media completion.
+
 The October 24 [mixed review/media rebuild](LOCAL_DOCKER_DEPLOYMENT_REVIEW_MEMORY_OUTCOME.md)
 records the latest no-cache image and preserved administrator/data/mounts. The
 [resource outcome](DEPLOYMENT_REVIEW_MEMORY_OUTCOME.md) records fresh 2/3 GiB profiles,

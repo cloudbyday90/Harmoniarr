@@ -5,6 +5,10 @@ description: "Apply and verify standards for Harmoniarr UI commands, forms, focu
 
 # Harmoniarr Web Standards
 
+For entropy/sample-depth artwork in mixed resource checks, read
+[mixed corpus](references/deployment-review-corpus.md). It covers fresh case/profile
+identity, canonical pixels, expected refusal and unchanged downstream authority.
+
 For concurrent review/media resource measurements, read
 [mixed workload](references/deployment-review-memory.md). It covers actual HTTP/
 native overlap, metric meanings, bounded evidence and owned drainage.

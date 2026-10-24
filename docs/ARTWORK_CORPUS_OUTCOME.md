@@ -4,6 +4,11 @@ Completed October 22, 2026 on `main`. See the separate
 [design](ARTWORK_CORPUS_DESIGN.md), [official research and tradeoffs](ARTWORK_CORPUS_RESEARCH.md)
 and [local rebuild outcome](LOCAL_DOCKER_ARTWORK_CORPUS_OUTCOME.md).
 
+The subsequent [mixed corpus outcome](DEPLOYMENT_REVIEW_CORPUS_OUTCOME.md) exercises
+these same inputs alongside review/media/SQL work in fresh constrained containers.
+Its whole-container observations have a different scope from the isolated results
+below.
+
 ## Delivered
 
 Added a repeatable seven-case native artwork corpus, bounded streaming PNG fixture

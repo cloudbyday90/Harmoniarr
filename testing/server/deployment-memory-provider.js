@@ -12,11 +12,12 @@ import { withWorkerTaskCleanup } from '../../src/server/worker-task-cleanup.js';
 import certificates from '../fixtures/provider-https/public-test-certificates.json' with { type: 'json' };
 
 /** Fixed metadata, real image HTTPS; only the final destination is fixture-owned. */
-export async function withDeploymentImageProvider(image, work) {
+export async function withDeploymentImageProvider(image, work, { contentType = image[0] === 0xff ? 'image/jpeg' : 'image/png' } = {}) {
+  assert.ok(['image/jpeg', 'image/png', 'image/webp'].includes(contentType));
   const sockets = new Map(); let requests = 0; let connections = 0;
   const server = createServer(certificates.matched, (req, res) => {
     requests++; req.resume();
-    res.writeHead(200, { 'Content-Type': image[0] === 0xff ? 'image/jpeg' : 'image/png', 'Content-Length': image.length, Connection: 'close' }); res.end(image);
+    res.writeHead(200, { 'Content-Type': contentType, 'Content-Length': image.length, Connection: 'close' }); res.end(image);
   });
   server.on('connection', socket => {
     connections++; sockets.set(socket, new Promise(resolve => { socket.once('close', resolve); }));

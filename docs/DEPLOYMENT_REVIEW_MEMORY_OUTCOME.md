@@ -87,7 +87,7 @@ demonstrating a need for a new memory control. It does not establish a productio
 minimum: one review owner, short catalogue, low-entropy artwork and stopped unrelated
 periodic workers limit extrapolation.
 
-Next: **qualify the existing fixed high-entropy/sample-depth artwork corpus within
-this same mixed workload**. Use fresh bounded profiles and the existing native
-decoder/admission owners before changing reservation headroom or recommending a
-deployment minimum. Household concurrency remains a separate unmeasured dimension.
+The [mixed corpus outcome](DEPLOYMENT_REVIEW_CORPUS_OUTCOME.md) now extends this
+workload to the fixed entropy/sample-depth corpus with separate publication and
+capacity-refusal obligations. It owns current results and the next recommendation.
+Household concurrency remains a separate unmeasured dimension.
