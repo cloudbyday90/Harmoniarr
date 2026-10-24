@@ -1,6 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { canRecheckLibraryAdd, buildPublicLibraryAddRecovery } from '../../src/server/acquisition/acquisition-library-add-recheck-policy.js';
+import { canRecheckLibraryAdd, buildPublicLibraryAddRecovery, buildPublicLibraryAddReview } from '../../src/server/acquisition/acquisition-library-add-recheck-policy.js';
+
+test('current failed audio review exposes static allow-listed guidance without private evidence or new permissions', () => {
+  const facts = { candidateStatus: 'failed', addBlockerCode: 'media_verification', recoveryReasonCode: 'suspicious_lossless', hasConflictingCandidate: false,
+    sourcePath: '/private/download', message: 'private tool output', appUserId: 'private-owner' };
+  const review = buildPublicLibraryAddReview(facts);
+  assert.equal(review.title, 'Lossless audio needs review'); assert.equal(review.reasonCode, 'suspicious_lossless');
+  assert.deepEqual(Object.keys(review).sort(), ['detail', 'nextStep', 'reasonCode', 'title']);
+  assert.doesNotMatch(JSON.stringify(review), /private|qualityOverride|canRecheck/u);
+  for (const patch of [{ candidateStatus: 'import_pending' }, { hasConflictingCandidate: true }, { recoveryReasonCode: 'raw-tool-error' }, { addBlockerCode: 'source_path_unavailable' }]) {
+    assert.equal(buildPublicLibraryAddReview({ ...facts, ...patch }), null);
+  }
+});
 
 const release = { wantedStatus: 'missing', missingTrackCount: 1, discoveryLinkExists: true,
   libraryAddRecoveryFacts: { candidateId: 'private-candidate', candidateStatus: 'failed', hasConflictingCandidate: false,

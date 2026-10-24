@@ -34,6 +34,7 @@ function verifySourceDisappearanceRecovery(result) {
 function verifyQualityRecovery(result) {
   return hasAppliedFallback(result)
     && result?.preflightSkippedReason === 'no_safe_import_pending_candidate'
+    && result?.preflightReviewRecorded === true
     && result?.primaryAudioCodec === 'flac'
     && result?.primaryFilename?.endsWith('.flac')
     && result?.fallbackFinalStatus === 'applied';
@@ -42,6 +43,7 @@ function verifyQualityRecovery(result) {
 function verifyQualityExhaustion(result) {
   return result?.primaryFinalStatus === 'failed'
     && result?.preflightSkippedReason === 'no_safe_import_pending_candidate'
+    && result?.preflightReviewRecorded === true
     && result?.primaryAudioCodec === 'flac'
     && result?.primaryFilename?.endsWith('.flac')
     && result?.qualityRecoveryExhaustedCount === 1

@@ -48,6 +48,7 @@ function mapImportBlockerEvent(row) {
     addBlockerCode: row.add_blocker_code,
     importCandidateId: row.import_candidate_id,
     recoveryReasonCode: row.recovery_reason_code,
+    updatedAt: row.occurred_at,
   };
 }
 
@@ -140,7 +141,8 @@ export function createImportCandidateReleaseAddDiagnosticRepository({
         SELECT
           events.details ->> 'addBlockerCode' AS add_blocker_code,
           events.import_candidate_id,
-          events.details ->> 'recoveryReasonCode' AS recovery_reason_code
+          events.details ->> 'recoveryReasonCode' AS recovery_reason_code,
+          events.occurred_at
         FROM import_candidate_events events
         JOIN import_candidates candidates
           ON candidates.id = events.import_candidate_id

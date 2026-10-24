@@ -26,6 +26,7 @@ const presentation = computed(() => buildMissingMusicLibraryAddRecoveryPresentat
   <section v-if="presentation.showPanel" class="hx-missing-add-recovery" aria-labelledby="missing-music-add-recovery-heading">
     <h3 id="missing-music-add-recovery-heading">{{ presentation.title }}</h3>
     <p>{{ presentation.explanation }}</p>
+    <p v-if="presentation.reviewNextStep">{{ presentation.reviewNextStep }}</p>
     <RouterLink v-if="presentation.repairFoldersLocation" class="hx-btn" :to="presentation.repairFoldersLocation">Set up folders</RouterLink>
     <div v-if="presentation.canRecheck" class="hx-missing-add-recovery__action">
       <p id="missing-music-add-recheck-help">{{ presentation.actionExplanation }}</p>

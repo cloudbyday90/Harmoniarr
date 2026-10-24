@@ -5,6 +5,20 @@ import { createImportCandidateReleaseAddDiagnosticsService } from '../../src/ser
 const wantedReleaseId = '8f28e363-3187-48c1-bd48-0b1b613f6c9d';
 const uuidv7WantedReleaseId = '0198cf45-a08f-7d82-a815-4d05b3ab6dca';
 
+test('a newer preflight event is a bounded diagnostic outcome even without an apply item', async () => {
+  for (const oldOutcomes of [[], [{ importCandidateId: 'old', itemStatus: 'applied', updatedAt: '2026-10-22T00:00:00Z' }]]) {
+    const service = createImportCandidateReleaseAddDiagnosticsService({ releaseAddDiagnosticRepository: {
+      getScopedWantedRelease: async () => ({ id: wantedReleaseId }), listLatestReleaseAddOutcomes: async () => oldOutcomes,
+      findLatestReleaseImportBlockerEvent: async () => ({ addBlockerCode: 'media_verification', recoveryReasonCode: 'suspicious_lossless',
+        importCandidateId: 'current', updatedAt: '2026-10-23T00:00:00Z', rawOutput: 'private diagnostic content' }),
+    } });
+    const result = await service.buildReleaseAddDiagnostics({ actorUserId: 'owner', wantedReleaseId, limit: 1 });
+    assert.equal(result.latestOutcome.diagnosticCandidateId, 'current'); assert.equal(result.outcomes.length, 1);
+    assert.equal(result.latestOutcome.presentation.label, 'Lossless audio needs review');
+    assert.doesNotMatch(JSON.stringify(result), /private|rawOutput/u);
+  }
+});
+
 test('release add diagnostics returns the newest release-scoped safe outcome without raw diagnostic data', async (t) => {
   const releaseAddDiagnosticRepository = {
     getScopedWantedRelease: t.mock.fn(async () => ({

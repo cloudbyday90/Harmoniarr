@@ -31,7 +31,8 @@ alone is not owned completion. Preserve Error/null refusal.
 ## Separate preflight, worker and external effects
 
 Strict preflight can refuse media before an apply run exists. Prove that refusal
-independently. To test the worker's fresh quality check, admit valid task-owned
+and its durable review independently. Use a distinct current acquisition for the
+worker case; do not reopen the measured initial rejection. Admit valid task-owned
 bytes through the real guard, then restore the rejected bytes before starting the
 worker. Do not fabricate a queued run or relax the current quality requirement.
 Limit deliberate source changes to disposable files and restore them in finally.

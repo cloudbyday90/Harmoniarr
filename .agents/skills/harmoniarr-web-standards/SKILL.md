@@ -5,6 +5,11 @@ description: "Apply and verify standards for Harmoniarr UI commands, forms, focu
 
 # Harmoniarr Web Standards
 
+For initial media refusals before queueing, read
+[durable preflight review](references/preflight-quality-review.md). It connects
+current guarded publication, bounded guidance, client normalization and actual
+rendered review/recheck without granting quality fallback consent.
+
 For controlled acquisition fixtures and saved worker inputs, read
 [fixture authority](references/fixture-authority.md). It separates application-
 derived recipients, current authorization, preflight/worker quality proof and

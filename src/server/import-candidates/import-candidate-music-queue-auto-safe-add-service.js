@@ -11,13 +11,15 @@ import { createImportCandidateReleaseSafeAddPreparationService, hasCurrentSafeAd
 import { getRecheckMusicQueueContext, getRecheckWantedReleaseIds } from './import-candidate-release-recheck-quality-policy.js';
 import { hasCompatibleMusicQueuePhysicalOwnership } from './import-candidate-music-queue-auto-safe-add-policy.js';
 import { evaluateImportBlockerRecovery } from './import-candidate-terminal-recovery-policy.js';
+import { buildMusicQueueAddBlockedActivityEvent } from '../activity/music-queue-add-blocked-activity-event-service.js';
+import { recordActivityEventSafely } from '../activity/music-queue-lifecycle-activity-event-service.js';
 
 /** System authority is the acquired release scope, independent of any explicit-add marker. */
 export function createImportCandidateMusicQueueAutoSafeAddService({ recheckStore, getImportCandidate, listFileDecisions,
   previewImportCandidateApply, safeAutoAddQualityGateService, commitPreparedAutomaticLibraryAdd,
-  handleImportCandidateImportBlocker } = {}) {
+  commitPreparedLibraryAddReview, recordActivityEventFn = null, handleImportCandidateImportBlocker } = {}) {
   for (const [name, dependency] of Object.entries({ getImportCandidate, readOwnedRelease: recheckStore?.readOwnedRelease,
-    commitPreparedAutomaticLibraryAdd, handleImportCandidateImportBlocker })) {
+    commitPreparedAutomaticLibraryAdd, commitPreparedLibraryAddReview, handleImportCandidateImportBlocker })) {
     if (typeof dependency !== 'function') throw new TypeError(`createImportCandidateMusicQueueAutoSafeAddService requires ${name}`);
   }
   const preparation = createImportCandidateReleaseSafeAddPreparationService({ recheckStore, listFileDecisions,
@@ -56,7 +58,14 @@ export function createImportCandidateMusicQueueAutoSafeAddService({ recheckStore
         ?? (policy.canRecover ? 'completed_source_unavailable' : 'import_blocker_requires_operator') };
     }
     if (!await preparation.verifyPreparedFiles({ prepared: scope.prepared, wantedReleaseId: scope.wantedReleaseId,
-      marker: 'automaticLibraryAddForWantedReleaseId', applyPreview })) return { outcome: 'still_needs_review' };
+      marker: 'automaticLibraryAddForWantedReleaseId', applyPreview })) {
+      if (scope.prepared.qualityGate?.eligible !== false) return { outcome: 'still_needs_review' };
+      const review = await commitPreparedLibraryAddReview({ ...scope, actorUserId: null, requestMetadata });
+      if (review.outcome !== 'review_recorded') return review;
+      recordActivityEventSafely(recordActivityEventFn, buildMusicQueueAddBlockedActivityEvent({ blockerCode: 'media_verification',
+        recoveryReasonCode: review.recoveryReasonCode, runId: operationRunId, summaryCandidate: candidate }));
+      return { outcome: 'still_needs_review' };
+    }
     return commit();
   }
   return { startAutomaticMusicQueueLibraryAdd };

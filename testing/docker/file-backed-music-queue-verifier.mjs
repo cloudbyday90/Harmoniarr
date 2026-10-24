@@ -432,7 +432,7 @@ async function executeSafeAutoAdd({ candidate, importCandidateModule, beforeWork
   };
 }
 
-async function executeQualityChangedAfterQueue({ candidate, importCandidateModule, verifiedLibraryPath, pool }) {
+async function executeQualityChangedAfterQueue({ candidate, importCandidateModule, verifiedLibraryPath, pool, appUserId }) {
   const preview = await previewCandidate(importCandidateModule, candidate.id);
   const sourcePath = preview.files[0]?.sourceFile?.path;
   assert.equal(sourcePath, `${downloadsRoot}/docker-file-backed-transcoded/disguised.flac`, 'media changes stay in the acknowledged disposable source');
@@ -444,27 +444,34 @@ async function executeQualityChangedAfterQueue({ candidate, importCandidateModul
   assert.equal(refusal.autoApplyRuns[0]?.runId ?? null, null, 'preflight refusal must allocate no apply run');
   assert.equal(refusal.autoApplyRuns[0]?.skippedReason, 'no_safe_import_pending_candidate', 'quality refusal must remain in review');
   assert.equal((await importCandidateModule.importCandidateService.getImportCandidate({ importCandidateId: candidate.id })).status,
-    'import_pending', 'preflight quality review must retain the completed candidate');
+    'failed', 'preflight quality review must persist the completed candidate stop');
   assert.equal(await countApplyRunItemsForCandidate(pool, candidate.id), 0, 'preflight refusal must create no apply item');
   await assert.rejects(stat(preview.files[0].libraryTarget.path), { code: 'ENOENT' });
   assert.deepEqual(await readFile(sourcePath), disguisedBytes, 'preflight refusal must retain the actual downloaded bytes');
 
-  // The actual owner admits real valid media. Only then change this task-owned source to exercise the worker's fresh check.
-  await copyFile(verifiedLibraryPath, sourcePath);
-  const result = await executeSafeAutoAdd({ candidate, importCandidateModule, completedExecutionRunId: refusal.currentRunId,
+  const review = (await pool.query(`SELECT details FROM import_candidate_events WHERE import_candidate_id=$1
+    AND event_type='import_candidate_import_blocked'`, [candidate.id])).rows;
+  assert.equal(review.length, 1); assert.equal(review[0].details.recoveryReasonCode, 'suspicious_lossless');
+  // Distinct current acquisition: never reopen a measured rejection merely to exercise the worker.
+  const workerFixture = buildCandidateFixture({ filename: 'worker.flac', folderName: 'docker-file-backed-quality-worker', label: 'quality-worker' });
+  const workerSourcePath = `${downloadsRoot}/docker-file-backed-quality-worker/worker.flac`;
+  await mkdir(dirname(workerSourcePath), { recursive: true }); await copyFile(verifiedLibraryPath, workerSourcePath);
+  const workerSeed = await seedCandidate(pool, { ...workerFixture, label: 'quality-worker' }, { appUserId });
+  const result = await executeSafeAutoAdd({ candidate: workerSeed.candidate, importCandidateModule,
     beforeWorkerStart: async (queued) => {
-      assert.equal(queued.sourcePath, sourcePath, 'queued startup must use the same captured disposable source');
-      await writeFile(sourcePath, disguisedBytes);
+      assert.equal(queued.sourcePath, workerSourcePath, 'queued startup must use the distinct captured disposable source');
+      await writeFile(workerSourcePath, disguisedBytes);
     } });
-  assert.deepEqual(await readFile(sourcePath), disguisedBytes, 'the worker quality stop must retain the changed source bytes');
+  assert.deepEqual(await readFile(workerSourcePath), disguisedBytes, 'the worker quality stop must retain the changed source bytes');
   const appliedItems = await pool.query(`SELECT apply_snapshot FROM import_apply_run_items
-    WHERE operation_run_id=$1 AND import_candidate_id=$2`, [result.run.id, candidate.id]);
+    WHERE operation_run_id=$1 AND import_candidate_id=$2`, [result.run.id, workerSeed.candidate.id]);
   assert.equal(appliedItems.rows.length, 1, 'the guarded quality stop must retain its single actual apply item');
   const quality = appliedItems.rows[0].apply_snapshot?.apply?.qualityGate;
   assert.equal(quality?.eligible, false, 'the real module worker must persist its rejected quality decision');
   assert.ok(quality.blockers.some((blocker) => ['safe_auto_spectral_suspicious', 'safe_auto_spectral_transcoded'].includes(blocker.code)),
     'the review decision must be measured transcode evidence rather than unavailable tooling');
-  return { ...result, preflightSkippedReason: refusal.autoApplyRuns[0].skippedReason };
+  return { ...result, workerCandidateId: workerSeed.candidate.id, workerWantedReleaseId: workerSeed.release.wantedReleaseId, preflightReviewRecorded: true,
+    preflightSkippedReason: refusal.autoApplyRuns[0].skippedReason };
 }
 
 async function assertFileExists(pathValue) {
@@ -625,9 +632,10 @@ async function runVerification() {
     importCandidateModule,
     verifiedLibraryPath: authenticResult.libraryPath,
     pool,
+    appUserId,
   });
   const disguisedFinalCandidate = await importCandidateModule.importCandidateService.getImportCandidate({
-    importCandidateId: disguisedCandidate.id,
+    importCandidateId: disguisedResult.workerCandidateId,
   });
   assert.equal(disguisedResult.run.appliedCount, 0, 'transcoded FLAC must not be added to the library');
   assert.equal(disguisedResult.run.blockedCount, 1, 'transcoded FLAC must be quality blocked');
@@ -865,8 +873,12 @@ async function runVerification() {
   assert.equal(
     await countApplyRunItemsForCandidate(pool, disguisedCandidate.id),
     strictQualityRunItemCount,
-    'strict quality recheck must not create a second automatic apply item',
+    'initial strict quality review must not create an automatic apply item',
   );
+  assert.equal((await importCandidateModule.importCandidateReleaseSafeAddRecheckService.recheckReleaseSafeAdd({
+    appUserId, wantedReleaseId: disguisedResult.workerWantedReleaseId })).outcome, 'not_available',
+  'the distinct worker quality stop must also remain review-only');
+  assert.equal(await countApplyRunItemsForCandidate(pool, disguisedResult.workerCandidateId), 1);
   const collisionRecheck = await importCandidateModule.importCandidateReleaseSafeAddRecheckService
     .recheckReleaseSafeAdd({
       appUserId,
@@ -886,7 +898,9 @@ async function runVerification() {
       runId: authenticResult.run.id,
     },
     transcoded: {
-      candidateId: disguisedCandidate.id,
+      preflightReviewRecorded: disguisedResult.preflightReviewRecorded,
+      preflightCandidateId: disguisedCandidate.id,
+      candidateId: disguisedResult.workerCandidateId,
       finalStatus: disguisedFinalCandidate.status,
       runId: disguisedResult.run.id,
       preflightSkippedReason: disguisedResult.preflightSkippedReason,

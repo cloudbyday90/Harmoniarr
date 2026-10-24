@@ -25,6 +25,7 @@ export function buildMissingMusicLibraryAddRecheckFeedback(action) {
 
 export function buildMissingMusicLibraryAddRecoveryPresentation(detail) {
   const recovery = detail?.libraryAddRecovery;
+  const review = ['lossy_audio', 'suspicious_lossless'].includes(detail?.libraryAddReview?.reasonCode) ? detail.libraryAddReview : null;
   const reasonCode = RECOVERY_REASONS.has(recovery?.reasonCode) ? recovery.reasonCode : null;
   const queued = recovery?.queued === true;
   const isReadOnly = detail?.permissions?.isReadOnly === true || detail?.decision?.requestedFor?.accountStatus === 'disabled';
@@ -36,11 +37,12 @@ export function buildMissingMusicLibraryAddRecoveryPresentation(detail) {
   return {
     canRecheck,
     repairFoldersLocation: canRepairFolders && context ? buildSettingsRecoveryHandoffLocation({ recoveryContext: context, routeName: 'settings-media-storage' }) : null,
-    showPanel: Boolean(reasonCode) || queued,
-    title: queued ? 'Library-add checks queued' : reasonCode === 'source_path_unavailable' ? 'Completed files are not reachable' : 'Audio check could not finish',
+    showPanel: Boolean(reasonCode) || queued || Boolean(review),
+    title: queued ? 'Library-add checks queued' : review ? review.title : reasonCode === 'source_path_unavailable' ? 'Completed files are not reachable' : 'Audio check could not finish',
+    reviewNextStep: !queued && review ? review.nextStep : null,
     explanation: queued
       ? 'Harmoniarr will add the completed files only after the current audio and library checks pass.'
-      : reasonCode === 'source_path_unavailable'
+      : review ? review.detail : reasonCode === 'source_path_unavailable'
         ? 'Harmoniarr cannot reach the completed download from its configured folders. A household administrator may need to repair the folder setup. After saving healthy folders, return to this release and check the files again.'
         : 'Harmoniarr could not finish checking the downloaded audio. A household administrator may need to repair the media tools before you try again.',
     actionExplanation: `Check the same completed download for ${username}. This can queue a library add only after the audio and file plan pass the safety checks.`,

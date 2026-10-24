@@ -31,4 +31,8 @@ These cases prove controlled HTTP/application composition and post-download appl
 
 GitHub MCP returned zero open PRs at initial selection and pre-publication recheck, so none was applicable for local implementation or stale-PR cleanup. Work stays on main, with no release, Git tag or version change.
 
-Next: make initial preflight quality refusal a durable release-owned review outcome and expose it through Missing Music. Current code returns still_needs_review before an apply run exists; qualify the public projection and recovery action without weakening quality or inventing fallback consent. Afterward, measure trust snapshot rewrite cost/contention before choosing per-source persistence.
+Completed follow-up: the [initial quality-review outcome](PREFLIGHT_QUALITY_REVIEW_OUTCOME.md)
+records atomic preflight refusal, bounded Missing Music guidance and the existing
+repair command, with independent initial/worker media qualification. Next: add a
+recipient-owned alternative-match handoff from measured quality review; afterward,
+measure trust snapshot rewrite cost/contention before choosing per-source persistence.

@@ -29,7 +29,7 @@ import { canReviewMissingMusicDownload } from './missing-music-download-review-h
 import { canViewMissingMusicDownloader } from './missing-music-downloader-handoff-policy.js';
 import { canSearchMissingMusicAgain } from './missing-music-search-again-policy.js';
 import { canFindInitialMusicMatches } from '../acquisition/acquisition-initial-search-policy.js';
-import { canRecheckLibraryAdd, buildPublicLibraryAddRecovery, hasQueuedLibraryAddRecheck, getLibraryAddRecheckReason } from '../acquisition/acquisition-library-add-recheck-policy.js';
+import { canRecheckLibraryAdd, buildPublicLibraryAddRecovery, buildPublicLibraryAddReview, hasQueuedLibraryAddRecheck, getLibraryAddRecheckReason } from '../acquisition/acquisition-library-add-recheck-policy.js';
 import { canAddPreparedReleaseToLibrary, hasQueuedGuardedLibraryAdd } from '../acquisition/acquisition-library-add-policy.js';
 import { canAllowMissingMusicFallbackQuality } from './missing-music-fallback-quality-policy.js';
 import { buildPublicQualityEvidence } from '../acquisition/acquisition-quality-evidence-policy.js';
@@ -338,6 +338,7 @@ export function createMissingMusicDecisionService({
       qualityEvidence: buildPublicQualityEvidence(projectedRelease.quality),
       searchDiagnostics,
       libraryAddRecovery: buildPublicLibraryAddRecovery(target.release.libraryAddRecoveryFacts),
+      libraryAddReview: buildPublicLibraryAddReview(target.release.libraryAddRecoveryFacts),
       permissions: {
         ...buildMissingMusicSearchCorrectionPermissions({ actorUser, targetUser: target.targetUser, searchDiagnostics }),
         canReviewDownloadHandoff: canReviewMissingMusicDownload({ actorUser, targetUser: target.targetUser, release: target.release }),

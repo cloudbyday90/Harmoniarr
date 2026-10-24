@@ -17,6 +17,7 @@ import { buildAutomaticLibraryAddAuthority } from './import-candidate-music-queu
 
 export function createImportCandidateReleaseRecheckGuardService({ assertMaintenanceWriteAllowed, recheckStore, getImportCandidate,
   listFileDecisions, resumeImportCandidateForSafeAdd, queuePreparedImportCandidateApply,
+  recordPreparedLibraryAddReview = null,
   withTransaction = createDatabaseTransactionRunner(), lockAppUserEligibilityFn = lockAppUserEligibility,
   lockRunCreation = lockImportCandidateApplyCreation,
 } = {}) {
@@ -29,7 +30,7 @@ export function createImportCandidateReleaseRecheckGuardService({ assertMaintena
   }
   async function commitPreparedSafeAdd({ prepared, appUserId, wantedReleaseId, actorUserId, requestMetadata }, mode) {
     const isPreparedAdd = mode !== 'recheck';
-    const automatic = mode === 'automatic';
+    const automatic = mode === 'automatic' || mode === 'review';
     return withTransaction(async (queryable) => {
       await assertMaintenanceWriteAllowed({ queryable });
       const wantedReleaseIds = getRecheckWantedReleaseIds(prepared.candidate);
@@ -58,6 +59,10 @@ export function createImportCandidateReleaseRecheckGuardService({ assertMaintena
       if (!prepared.qualityContext) return { outcome: 'not_available' };
       const automaticLibraryAddAuthority = automatic ? buildAutomaticLibraryAddAuthority(candidate) : null;
       if (automatic && !automaticLibraryAddAuthority) return { outcome: 'not_available' };
+      if (mode === 'review') {
+        if (typeof recordPreparedLibraryAddReview !== 'function') throw new TypeError('Prepared quality review owner is required');
+        return recordPreparedLibraryAddReview({ prepared, requestMetadata, queryable });
+      }
       const marker = automatic ? 'automaticLibraryAddForWantedReleaseId'
         : isPreparedAdd ? 'libraryAddRequestedForWantedReleaseId' : 'recheckRequestedForWantedReleaseId';
       await recheckStore.saveQualityContext({ importCandidateId: candidate.id, musicQueueContext: { ...prepared.qualityContext, [marker]: wantedReleaseId },
@@ -77,5 +82,6 @@ export function createImportCandidateReleaseRecheckGuardService({ assertMaintena
   }
   return { commitPreparedReleaseRecheck: (input) => commitPreparedSafeAdd(input, 'recheck'),
     commitPreparedReleaseLibraryAdd: (input) => commitPreparedSafeAdd(input, 'manual'),
+    commitPreparedLibraryAddReview: (input) => commitPreparedSafeAdd(input, 'review'),
     commitPreparedAutomaticLibraryAdd: (input) => commitPreparedSafeAdd(input, 'automatic') };
 }

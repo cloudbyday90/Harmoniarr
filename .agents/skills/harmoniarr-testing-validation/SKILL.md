@@ -5,6 +5,13 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For initial quality-review persistence, use the standards
+[preflight review reference](../harmoniarr-web-standards/references/preflight-quality-review.md).
+Run focused service/projection/normalization tests, preflight-quality-review
+PostgreSQL/HTTP and browser cases, then both packaged controlled-provider and
+file-backed verifiers. Injected quality decisions do not establish measured audio;
+changed-source worker proof must use a distinct acquisition after initial refusal.
+
 For controlled-provider fixture repairs, use the standards
 [fixture authority reference](../harmoniarr-web-standards/references/fixture-authority.md).
 Run the driver/evidence unit checks and explicit fixture .mjs lint first, then

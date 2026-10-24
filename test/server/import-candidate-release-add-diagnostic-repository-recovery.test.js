@@ -8,6 +8,7 @@ test('release add diagnostic repository exposes only bounded blocker categories 
       rows: [{
         add_blocker_code: 'media_verification',
         import_candidate_id: 'candidate-1',
+        occurred_at: '2026-10-23T12:00:00Z',
         recovery_reason_code: 'audio_check_failed',
       }],
     })),
@@ -26,5 +27,6 @@ test('release add diagnostic repository exposes only bounded blocker categories 
     addBlockerCode: 'media_verification',
     importCandidateId: 'candidate-1',
     recoveryReasonCode: 'audio_check_failed',
+    updatedAt: '2026-10-23T12:00:00Z',
   });
 });

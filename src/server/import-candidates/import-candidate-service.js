@@ -896,6 +896,7 @@ export function createImportCandidateService({
     recoveryReasonCode = null,
     reason = null,
     requestMetadata = null,
+    queryable = null,
   }) {
     const normalizedAddBlockerCode = normalizeImportCandidateAddBlockerCode(addBlockerCode);
     const normalizedRecoveryReasonCode = deriveImportCandidateAddRecoveryReasonCode({
@@ -922,6 +923,7 @@ export function createImportCandidateService({
         ? 'Completed download source was unavailable before library add'
         : 'Import candidate requires a safe library-add decision',
       toStatus: 'failed',
+      queryable,
       sourceOutcome: recordSourceFailure ? { outcome: 'failure' } : null,
     });
   }

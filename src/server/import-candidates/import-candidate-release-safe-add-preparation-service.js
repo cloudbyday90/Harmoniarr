@@ -41,6 +41,7 @@ export function createImportCandidateReleaseSafeAddPreparationService({ recheckS
     const { candidate } = prepared;
     const qualityGate = await safeAutoAddQualityGateService.evaluateSafeAutoAddQuality({ applyPreview,
       summaryCandidate: { ...candidate, normalizedPayload: { ...candidate.normalizedPayload, musicQueue: prepared.qualityContext } } });
+    prepared.qualityGate = qualityGate;
     return qualityGate?.eligible === true;
   }
   return { readPreparedScope, verifyPreparedFiles };

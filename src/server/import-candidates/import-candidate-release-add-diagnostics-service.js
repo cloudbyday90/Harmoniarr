@@ -193,6 +193,16 @@ export function createImportCandidateReleaseAddDiagnosticsService({
       wantedReleaseId: normalizedWantedReleaseId,
     })).map(projectReleaseAddOutcome);
 
+    if (typeof releaseAddDiagnosticRepository.findLatestReleaseImportBlockerEvent === 'function') {
+      const event = await releaseAddDiagnosticRepository.findLatestReleaseImportBlockerEvent({ wantedReleaseId: normalizedWantedReleaseId });
+      if (event && (!outcomes.length || Date.parse(event.updatedAt) > Date.parse(outcomes[0].updatedAt))) {
+        const recovery = buildImportBlockerEventRecoveryCandidate(event);
+        if (recovery) outcomes.unshift({ diagnosticCandidateId: recovery.importCandidateId, updatedAt: event.updatedAt,
+          presentation: buildOutcomePresentation({ blockerCode: recovery.addBlockerCode, recoveryReasonCode: recovery.recoveryReasonCode }) });
+        outcomes.splice(normalizeLimit(limit));
+      }
+    }
+
     const latestOutcome = outcomes[0] ?? null;
     return {
       checkedAt: new Date().toISOString(),

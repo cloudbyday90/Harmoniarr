@@ -30,6 +30,16 @@ test('interrupted audio verification offers only the permitted recheck and never
   assert.match(presentation.explanation, /repair the media tools/u);
 });
 
+test('measured preflight review shows its server guidance without inventing a recheck or consent action', () => {
+  const input = { ...detail(null, { canRecheckLibraryAdd: false }), libraryAddReview: { reasonCode: 'suspicious_lossless',
+    title: 'Lossless audio needs review', detail: 'The completed file was not added.', nextStep: 'Review the audio check.' } };
+  const presentation = buildMissingMusicLibraryAddRecoveryPresentation(input);
+  assert.equal(presentation.showPanel, true); assert.equal(presentation.title, input.libraryAddReview.title);
+  assert.equal(presentation.explanation, input.libraryAddReview.detail); assert.equal(presentation.reviewNextStep, input.libraryAddReview.nextStep);
+  assert.equal(presentation.canRecheck, false); assert.equal(presentation.repairFoldersLocation, null);
+  assert.equal(buildMissingMusicLibraryAddRecoveryPresentation({ ...input, libraryAddRecovery: { queued: true } }).reviewNextStep, null);
+});
+
 test('unsafe categories, missing permission, disabled history, and already queued work cannot expose another recheck', () => {
   for (const code of ['library_collision', 'lossy_audio', 'suspicious_lossless', 'unsafe_add_plan', 'add_failed', 'media_verification', 'unknown', null]) {
     const input = detail(code);

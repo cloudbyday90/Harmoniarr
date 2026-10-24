@@ -22,16 +22,17 @@ function fixture(overrides = {}) {
   const release = { metadataReleaseId: 'metadata-1', targetUser: { id: 'owner-1' }, wantedStatus: 'missing', missingTrackCount: 1,
     discoveryLinkExists: true, libraryAddFacts: { candidateId: candidate.id, candidateStatus: 'import_pending', fileCount: 1,
       hasConflictingCandidate: false } };
-  const commits = []; const recoveries = []; const gates = []; let previews = 0;
+  const commits = []; const recoveries = []; const gates = []; const reviews = []; let previews = 0;
   const service = createImportCandidateMusicQueueAutoSafeAddService({ getImportCandidate: async () => structuredClone(candidate),
     recheckStore: { readOwnedRelease: async () => structuredClone(release), readParticipantPolicies: async () => structuredClone(participants) },
     listFileDecisions: async () => [], previewImportCandidateApply: async () => { previews += 1;
       return { summary: { status: 'ready' }, counts: { readyCount: 1 }, files: [{ status: { code: 'ready' } }] }; },
     safeAutoAddQualityGateService: { evaluateSafeAutoAddQuality: async (input) => { gates.push(input); return { eligible: true }; } },
     commitPreparedAutomaticLibraryAdd: async (input) => { commits.push(input); return { outcome: 'queued', runId: 'run-1' }; },
+    commitPreparedLibraryAddReview: async input => { reviews.push(input); return { outcome: 'review_recorded', recoveryReasonCode: 'suspicious_lossless' }; },
     handleImportCandidateImportBlocker: async (input) => { recoveries.push(input); return { recovered: true }; }, ...overrides });
   const start = () => service.startAutomaticMusicQueueLibraryAdd({ candidate: structuredClone(candidate), operationRunId: 'execution-origin-1' });
-  return { start, service, candidate, participants, release, commits, recoveries, gates, previews: () => previews };
+  return { start, service, candidate, participants, release, commits, recoveries, gates, reviews, previews: () => previews };
 }
 
 test('automatic authority preserves acquired primary and physical owner while rebuilding all current shared requirements', async () => {
@@ -127,6 +128,22 @@ test('blocker preview drift forwards the pre-await observation rather than treat
   assert.equal(f.recoveries[0].observation.sourceSearchId, 'current-search');
   assert.equal(f.recoveries[0].operationRunId, 'execution-origin-1');
   assert.equal(f.commits.length, 0);
+});
+
+test('a measured initial refusal reaches the guarded review owner without starting apply or automatic recovery', async () => {
+  const f = fixture({ safeAutoAddQualityGateService: { evaluateSafeAutoAddQuality: async () => ({ eligible: false,
+    blockers: [{ code: 'safe_auto_spectral_transcoded' }] }) } });
+  assert.deepEqual(await f.start(), { outcome: 'still_needs_review' });
+  assert.equal(f.reviews.length, 1); assert.equal(f.commits.length, 0); assert.equal(f.recoveries.length, 0);
+  assert.equal(f.reviews[0].prepared.qualityGate.eligible, false); assert.equal(f.reviews[0].actorUserId, null);
+});
+
+test('stale or active review publication returns its owning refusal without reporting a committed stop', async () => {
+  for (const outcome of ['not_available', 'deferred', 'already_queued']) {
+    const f = fixture({ safeAutoAddQualityGateService: { evaluateSafeAutoAddQuality: async () => ({ eligible: false,
+      blockers: [{ code: 'safe_auto_spectral_transcoded' }] }) }, commitPreparedLibraryAddReview: async () => ({ outcome }) });
+    assert.deepEqual(await f.start(), { outcome }); assert.equal(f.commits.length, 0);
+  }
 });
 
 test('legacy compatibility policy does not infer revoked or malformed fallback consent', () => {

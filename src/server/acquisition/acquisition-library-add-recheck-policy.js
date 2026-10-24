@@ -6,6 +6,17 @@
  */
 
 import { hasQueuedGuardedLibraryAdd } from './acquisition-library-add-policy.js';
+import { buildMusicQueueAddRecoveryPresentation, normalizeMusicQueueAddRecoveryReasonCode } from '../../shared/music-queue-add-recovery-presentation.js';
+
+/** Current owned facts select static copy; diagnostic strings never become public guidance. */
+export function buildPublicLibraryAddReview(facts) {
+  if (facts?.candidateStatus !== 'failed' || facts.addBlockerCode !== 'media_verification'
+    || facts.hasConflictingCandidate !== false) return null;
+  const reasonCode = normalizeMusicQueueAddRecoveryReasonCode(facts.recoveryReasonCode);
+  if (!['audio_check_failed', 'lossy_audio', 'suspicious_lossless'].includes(reasonCode)) return null;
+  const { title, detail, nextStep } = buildMusicQueueAddRecoveryPresentation({ blockerCode: 'media_verification', recoveryReasonCode: reasonCode });
+  return { reasonCode, title, detail, nextStep };
+}
 
 export function getLibraryAddRecheckReason(facts) {
   if (facts?.addBlockerCode === 'source_path_unavailable') return 'source_path_unavailable';

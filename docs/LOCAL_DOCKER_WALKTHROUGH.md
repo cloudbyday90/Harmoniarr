@@ -1,7 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
-The October 23 [controlled authority rebuild](LOCAL_DOCKER_CONTROLLED_AUTHORITY_OUTCOME.md)
+The October 23 [initial quality-review rebuild](LOCAL_DOCKER_PREFLIGHT_QUALITY_OUTCOME.md)
 records the current no-cache image and preserved administrator/data/mounts. Its
+[implementation outcome](PREFLIGHT_QUALITY_REVIEW_OUTCOME.md) connects durable
+preflight refusal to scoped Missing Music guidance and the existing repair action.
+
+The October 23 [controlled authority rebuild](LOCAL_DOCKER_CONTROLLED_AUTHORITY_OUTCOME.md)
+records the preceding no-cache image and preserved administrator/data/mounts. Its
 [implementation outcome](CONTROLLED_PROVIDER_AUTHORITY_OUTCOME.md) restores the
 full controlled-provider pipeline and transactional scoped recovery exhaustion.
 

@@ -68,6 +68,16 @@ function createDetail(decisionId = 'wanted-amber') {
   };
 }
 
+test('durable audio-review guidance survives detail normalization and a fresh read', async () => {
+  const payload = { ...createDetail(), libraryAddReview: { reasonCode: 'suspicious_lossless', title: 'Lossless audio needs review',
+    detail: 'The completed file was not added.', nextStep: 'Review the audio check.' } };
+  const { app, decisionDetail } = mountDecisionDetail({ decisionId: ref('wanted-amber'), fetchMissingMusicDecisionDetail: async () => payload });
+  try {
+    await decisionDetail.refresh(); assert.deepEqual(decisionDetail.detail.value.libraryAddReview, payload.libraryAddReview);
+    await decisionDetail.refresh(); assert.deepEqual(decisionDetail.detail.value.libraryAddReview, payload.libraryAddReview);
+  } finally { app.unmount(); }
+});
+
 test('decision detail retains only the strict server prepared-add permission', async (t) => {
   const payload = createDetail();
   payload.permissions.canAddToLibrary = 'true';

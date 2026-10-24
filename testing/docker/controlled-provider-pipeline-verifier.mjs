@@ -99,9 +99,11 @@ function buildDownloadedFixturePath(fixture, { variant = 'primary' } = {}) {
 async function executeDownloadAndReconcile({
   importCandidateModule,
   runId,
+  beforeReconcile = null,
 }) {
   await executeControlledDownload(importCandidateModule, runId);
   await waitForRun(importCandidateModule.importCandidateExecutionRunStore, runId);
+  await beforeReconcile?.();
   const executionRunDetail = await importCandidateModule.importCandidateExecutionSummaryService
     .buildImportCandidateExecutionRunDetail({ runId });
   return importCandidateModule.importCandidateExecutionReconciliationService
@@ -440,9 +442,9 @@ async function runVerification() {
   const qualityRecoveryDispatch = await libraryModule.libraryDiscoveryDispatchService.dispatchReadyDiscoveryRequests();
   assert.equal(qualityRecoveryDispatch.candidateCount, 2, 'strict-quality recovery must ingest a primary and fallback match');
   const qualityRecoveryDownloadRunId = qualityRecoveryDispatch.dispatchedSearches[0]?.autoDownloadStart?.runId;
-  const qualityRecoveryPrimaryCandidateId = qualityRecoveryDispatch.dispatchedSearches[0]?.autoSelection?.selectedCandidateId;
+  let qualityRecoveryPrimaryCandidateId = qualityRecoveryDispatch.dispatchedSearches[0]?.autoSelection?.selectedCandidateId;
   assert.ok(qualityRecoveryDownloadRunId, 'the strict-quality primary must automatically enter download handoff');
-  const qualityRecoveryPrimaryCandidate = await importCandidateModule.importCandidateService.getImportCandidate({
+  let qualityRecoveryPrimaryCandidate = await importCandidateModule.importCandidateService.getImportCandidate({
     importCandidateId: qualityRecoveryPrimaryCandidateId,
   });
   assert.equal(
@@ -455,7 +457,10 @@ async function runVerification() {
     runId: qualityRecoveryDownloadRunId,
   });
   const qualityRecoveryReconciliation = await queueControlledQualityDrift({ candidateId: qualityRecoveryPrimaryCandidateId,
-    module: importCandidateModule, reconciliation: qualityRecoveryPreflight, verifiedSourcePath: appliedPreview.files[0].libraryTarget.path });
+    module: importCandidateModule, reconciliation: qualityRecoveryPreflight, verifiedSourcePath: appliedPreview.files[0].libraryTarget.path,
+    fixture: qualityRecoveryFixture, authorityFixtures, libraryModule, pool, executeDownloadAndReconcile });
+  qualityRecoveryPrimaryCandidateId = qualityRecoveryReconciliation.candidateId;
+  qualityRecoveryPrimaryCandidate = await importCandidateModule.importCandidateService.getImportCandidate({ importCandidateId: qualityRecoveryPrimaryCandidateId });
   const qualityRecoveryApplyRunId = qualityRecoveryReconciliation.autoApplyRuns[0]?.runId;
   assert.ok(qualityRecoveryApplyRunId, 'the spectrally limited FLAC primary must reach the actual safe-add quality gate');
   const qualityRecoveryApplyRun = await completeSafeAutoAdd({
@@ -528,22 +533,26 @@ async function runVerification() {
 
   assert.ok(qualityExhaustionFixture, 'the controlled catalog must include a strict-quality exhaustion fixture');
   const libraryFilesBeforeQualityExhaustion = await listFiles(musicRoot);
-  const qualityExhaustionAppUserId = await authorityFixtures.createOperator();
-  const qualityExhaustionSeed = await authorityFixtures.createSingleDiscovery(qualityExhaustionFixture, {
+  let qualityExhaustionAppUserId = await authorityFixtures.createOperator();
+  let qualityExhaustionSeed = await authorityFixtures.createSingleDiscovery(qualityExhaustionFixture, {
     appUserId: qualityExhaustionAppUserId,
   });
   assert.ok(qualityExhaustionSeed.wantedReleaseId, 'strict-quality exhaustion must have a persisted wanted release');
   const qualityExhaustionDispatch = await libraryModule.libraryDiscoveryDispatchService.dispatchReadyDiscoveryRequests();
   assert.equal(qualityExhaustionDispatch.candidateCount, 1, 'strict-quality exhaustion must ingest only the spectrally limited primary');
   const qualityExhaustionDownloadRunId = qualityExhaustionDispatch.dispatchedSearches[0]?.autoDownloadStart?.runId;
-  const qualityExhaustionPrimaryCandidateId = qualityExhaustionDispatch.dispatchedSearches[0]?.autoSelection?.selectedCandidateId;
+  let qualityExhaustionPrimaryCandidateId = qualityExhaustionDispatch.dispatchedSearches[0]?.autoSelection?.selectedCandidateId;
   assert.ok(qualityExhaustionDownloadRunId, 'the strict-quality exhaustion primary must automatically enter download handoff');
   const qualityExhaustionPreflight = await executeDownloadAndReconcile({
     importCandidateModule,
     runId: qualityExhaustionDownloadRunId,
   });
   const qualityExhaustionReconciliation = await queueControlledQualityDrift({ candidateId: qualityExhaustionPrimaryCandidateId,
-    module: importCandidateModule, reconciliation: qualityExhaustionPreflight, verifiedSourcePath: appliedPreview.files[0].libraryTarget.path });
+    module: importCandidateModule, reconciliation: qualityExhaustionPreflight, verifiedSourcePath: appliedPreview.files[0].libraryTarget.path,
+    fixture: qualityExhaustionFixture, authorityFixtures, libraryModule, pool, executeDownloadAndReconcile });
+  qualityExhaustionPrimaryCandidateId = qualityExhaustionReconciliation.candidateId;
+  qualityExhaustionAppUserId = qualityExhaustionReconciliation.owner.appUserId;
+  qualityExhaustionSeed = qualityExhaustionReconciliation.owner;
   const qualityExhaustionApplyRunId = qualityExhaustionReconciliation.autoApplyRuns[0]?.runId;
   assert.ok(qualityExhaustionApplyRunId, 'the strict-quality exhaustion primary must reach the actual safe-add quality gate');
   const qualityExhaustionApplyRun = await completeSafeAutoAdd({
@@ -1205,6 +1214,7 @@ async function runVerification() {
       addBlockerCode: sourceDisappearanceRecovery.addBlockerCode,
     },
     qualityRecovery: {
+      preflightReviewRecorded: qualityRecoveryReconciliation.preflightReviewRecorded,
       preflightSkippedReason: qualityRecoveryPreflight.autoApplyRuns[0].skippedReason,
       fallbackApplyRunId: qualityRecoveryFallbackApplyRunId,
       fallbackFinalStatus: qualityRecoveryFallbackFinalCandidate.status,
@@ -1214,6 +1224,7 @@ async function runVerification() {
       primaryFinalStatus: qualityRecoveryPrimaryFinalCandidate.status,
     },
     qualityExhaustion: {
+      preflightReviewRecorded: qualityExhaustionReconciliation.preflightReviewRecorded,
       preflightSkippedReason: qualityExhaustionPreflight.autoApplyRuns[0].skippedReason,
       followUpRunId: qualityExhaustionFollowUpRun?.id ?? null,
       libraryFileCountAfter: libraryFilesAfterQualityExhaustion.length,

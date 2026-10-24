@@ -22,4 +22,7 @@ The separate packaged file-backed Music Queue verifier passed on the same image.
 
 Private rebuild/inventory/readiness/retirement evidence is under .tmp/controlled-authority-2026-10-23/rebuild-second/; the failed attempt and packaged qualification are retained in the parent evidence directory. This is a local rebuild and controlled qualification, not public-network provider acceptance or a release.
 
-Next: persist and project initial preflight quality refusals through Missing Music while retaining current ownership, quality and consent checks.
+Completed follow-up: the [initial quality-review rebuild](LOCAL_DOCKER_PREFLIGHT_QUALITY_OUTCOME.md)
+records the next no-cache image; its [implementation outcome](PREFLIGHT_QUALITY_REVIEW_OUTCOME.md)
+connects persisted refusal to Missing Music. Next: a recipient-owned alternative-match
+handoff from measured quality review, retaining current shared requirements and consent.

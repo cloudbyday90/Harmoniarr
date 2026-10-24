@@ -24,6 +24,7 @@ function createCompleteEvidence() {
     catalogFixtures: 17,
     pipeline: { finalStatus: 'applied' },
     qualityExhaustion: {
+      preflightReviewRecorded: true,
       preflightSkippedReason: 'no_safe_import_pending_candidate',
       activityBlockerCode: 'media_verification',
       activityEntityId: 'wanted-quality-exhaustion',
@@ -39,6 +40,7 @@ function createCompleteEvidence() {
       wantedReleaseId: 'wanted-quality-exhaustion',
     },
     qualityRecovery: {
+      preflightReviewRecorded: true,
       preflightSkippedReason: 'no_safe_import_pending_candidate',
       fallbackApplyRunId: 'quality-fallback-run',
       fallbackFinalStatus: 'applied',

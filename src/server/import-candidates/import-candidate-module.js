@@ -62,6 +62,7 @@ import { createImportCandidateExecutionWorker } from './import-candidate-executi
 import { createImportExecutionTransferLinkStore } from './import-execution-transfer-link-store.js';
 import { createImportCandidateAutoApplyRunService } from './import-candidate-auto-apply-run-service.js';
 import { createImportCandidateMusicQueueAutoSafeAddService } from './import-candidate-music-queue-auto-safe-add-service.js';
+import { createImportCandidatePreflightReviewService } from './import-candidate-preflight-review-service.js';
 import { createImportCandidateAutoDownloadRunService } from './import-candidate-auto-download-run-service.js';
 import { createImportCandidateAutoSelectionService } from './import-candidate-auto-selection-service.js';
 import { createImportCandidateSafeAutoAddQualityGateService } from './import-candidate-safe-auto-add-quality-gate.js';
@@ -412,6 +413,8 @@ export function createImportCandidateModule({
     getImportCandidate: importCandidateService.getImportCandidate,
     listFileDecisions: listImportCandidateFileDecisions,
     resumeImportCandidateForSafeAdd: importCandidateService.resumeImportCandidateForSafeAdd,
+    recordPreparedLibraryAddReview: createImportCandidatePreflightReviewService({
+      markImportCandidateImportBlocked: importCandidateService.markImportCandidateImportBlocked }).recordPreparedLibraryAddReview,
     queuePreparedImportCandidateApply: importCandidateApplyQueueService.queuePreparedImportCandidateApply,
   }),
   importCandidateReleaseSafeAddRecheck = importCandidateReleaseSafeAddRecheckService
@@ -440,6 +443,8 @@ export function createImportCandidateModule({
     previewImportCandidateApply: importCandidateApplyPreviewService.previewImportCandidateApply,
     safeAutoAddQualityGateService: importCandidateSafeAutoAddQualityGateService,
     commitPreparedAutomaticLibraryAdd: importCandidateReleaseRecheckGuardService.commitPreparedAutomaticLibraryAdd,
+    commitPreparedLibraryAddReview: importCandidateReleaseRecheckGuardService.commitPreparedLibraryAddReview,
+    recordActivityEventFn,
     handleImportCandidateImportBlocker: importCandidateRecoveryService.handleImportCandidateImportBlocker,
   }),
   importCandidateAutoApplyRunService = createImportCandidateAutoApplyRunService({
