@@ -17,6 +17,7 @@
  */
 
 import { createApiError } from '../auth.js';
+import { qualityReviewCursorChanged } from '../import-candidates/import-candidate-quality-review-cursor-policy.js';
 import { projectMusicQueueRelease } from '../acquisition/acquisition-pipeline-service.js';
 import {
   normalizeMissingMusicAccountStatus,
@@ -324,6 +325,7 @@ export function createMissingMusicDecisionService({
   async function getMissingMusicDecisionDetail({
     actorUser,
     decisionId,
+    matchCursor = null,
   } = {}) {
     const target = await resolveDecisionTarget({ actorUser, decisionId });
     const projectedRelease = projectMusicQueueReleaseFn(target.release);
@@ -339,9 +341,13 @@ export function createMissingMusicDecisionService({
       ? buildMissingMusicMatchChoices(target.release)
       : [];
     let canRestartQualityReview = false;
+    let matchChoicePage = null;
+    if (matchCursor != null && (!measuredReview || target.targetUser.accountStatus === 'disabled')) throw qualityReviewCursorChanged();
     if (measuredReview && target.targetUser.accountStatus !== 'disabled') {
-      const alternatives = await getQualityReviewAlternatives({ appUserId: target.targetUser.id, wantedReleaseId: target.decisionId });
+      const alternatives = await getQualityReviewAlternatives({ appUserId: target.targetUser.id, wantedReleaseId: target.decisionId,
+        actorUserId: actorUser.id, actorRole: actorUser.role, matchCursor });
       matchChoices = buildMissingMusicQualityReviewChoices(alternatives.candidates);
+      matchChoicePage = alternatives.matchChoicePage ?? null;
       canRestartQualityReview = !isMusicQueueRediscoveryInProgress(target.release.discoveryRequest) && alternatives.canSearchAgain === true;
     }
     const searchDiagnostics = buildMissingMusicSearchDiagnostics(target.release);
@@ -351,6 +357,7 @@ export function createMissingMusicDecisionService({
       checkedAt: now().toISOString(),
       decision,
       matchChoices,
+      matchChoicePage,
       qualityEvidence: buildPublicQualityEvidence(projectedRelease.quality),
       searchDiagnostics,
       libraryAddRecovery: buildPublicLibraryAddRecovery(target.release.libraryAddRecoveryFacts),

@@ -9,7 +9,7 @@ import { computed, ref, watch } from 'vue';
 import { buildMissingMusicMatchChoicePresentation } from '../../lib/missing-music-match-selection-presentation.js';
 
 const props = defineProps({ detail: { type: Object, default: null }, busy: Boolean, activeMatchId: { type: String, default: '' } });
-const emit = defineEmits(['select']);
+const emit = defineEmits(['select', 'page']);
 const presentation = computed(() => buildMissingMusicMatchChoicePresentation(props.detail));
 const expanded = ref(false);
 watch(() => props.detail?.decision?.decisionId, () => { expanded.value = false; });
@@ -35,7 +35,7 @@ watch(() => presentation.value.isAlternative, value => { if (!value) expanded.va
           </p>
         </div>
 
-        <ul class="missing-music-inspector__match-list" aria-label="Available matches">
+        <ul class="missing-music-inspector__match-list" aria-label="Available matches" :aria-busy="busy">
           <li v-for="match in presentation.choices" :key="match.id">
             <article class="missing-music-inspector__match">
               <h4>{{ match.label }}</h4>
@@ -60,12 +60,25 @@ watch(() => presentation.value.isAlternative, value => { if (!value) expanded.va
             </article>
           </li>
         </ul>
+        <nav v-if="detail?.matchChoicePage" class="missing-music-match-pages" aria-label="Available match pages">
+          <button type="button" class="hx-btn" data-variant="secondary"
+            :aria-disabled="busy || !detail.matchChoicePage.previousCursor"
+            @click="!busy && detail.matchChoicePage.previousCursor && emit('page', null)">First page</button>
+          <button type="button" class="hx-btn" data-variant="secondary"
+            :aria-disabled="busy || !detail.matchChoicePage.previousCursor"
+            @click="!busy && detail.matchChoicePage.previousCursor && emit('page', detail.matchChoicePage.previousCursor)">Previous matches</button>
+          <button type="button" class="hx-btn" data-variant="secondary"
+            :aria-disabled="busy || !detail.matchChoicePage.nextCursor"
+            @click="!busy && detail.matchChoicePage.nextCursor && emit('page', detail.matchChoicePage.nextCursor)">Next matches</button>
+        </nav>
       </section>
   </div>
 </template>
 
 <style scoped>
 .missing-music-match-choices { display: grid; justify-items: start; gap: var(--hx-space-3); }
+.missing-music-match-pages { display: flex; flex-wrap: wrap; gap: var(--hx-space-2); }
+.missing-music-match-pages [aria-disabled="true"] { opacity: 0.5; cursor: default; }
 .missing-music-inspector__section {
   display: grid; gap: var(--hx-space-2); width: 100%; padding: var(--hx-space-4);
   border: 1px solid var(--hx-border); border-radius: var(--hx-radius-md);

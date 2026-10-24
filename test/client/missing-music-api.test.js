@@ -123,6 +123,14 @@ test('fetchMissingMusicDecisionDetail encodes only the decision identifier', asy
   assert.equal(fetchMock.mock.calls[0].arguments[1].method, 'GET');
 });
 
+test('match-page reads encode the scoped cursor while keeping cancellation outside the URL', async t => {
+  const mock = installFetchMock(t); const signal = new AbortController().signal;
+  await fetchMissingMusicDecisionDetail('wanted', { matchCursor: 'opaque+cursor/', signal });
+  const [url, options] = mock.mock.calls[0].arguments;
+  assert.equal(url, '/api/v1/missing-music/decisions/wanted?matchCursor=opaque%2Bcursor%2F');
+  assert.equal(options.signal, signal); assert.equal(options.method, 'GET');
+});
+
 test('fetchMissingMusicDecisionDetail requires a non-empty decision identifier', () => {
   assert.throws(
     () => fetchMissingMusicDecisionDetail('  '),

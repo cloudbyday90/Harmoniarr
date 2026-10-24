@@ -376,7 +376,7 @@ test('Missing Music decisions route preserves authentication errors', async () =
   });
 });
 
-test('Missing Music detail route forwards only the route identifier and authenticated actor', async (t) => {
+test('Missing Music detail route forwards the route identifier, cursor and authenticated actor', async (t) => {
   const getMissingMusicDecisionDetail = t.mock.fn(async () => ({
     checkedAt: '2026-08-26T16:30:00.000Z',
     decision: { decisionId: 'wanted-amber' },
@@ -392,7 +392,7 @@ test('Missing Music detail route forwards only the route identifier and authenti
   });
 
   await withServer(app, async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/api/v1/missing-music/decisions/wanted-amber`);
+    const response = await fetch(`${baseUrl}/api/v1/missing-music/decisions/wanted-amber?matchCursor=opaque`);
     const payload = await response.json();
 
     assert.equal(response.status, 200);
@@ -404,6 +404,7 @@ test('Missing Music detail route forwards only the route identifier and authenti
         username: 'admin',
       },
       decisionId: 'wanted-amber',
+      matchCursor: 'opaque',
     });
     assert.equal(payload.ok, true);
     assert.equal(payload.decision.decisionId, 'wanted-amber');

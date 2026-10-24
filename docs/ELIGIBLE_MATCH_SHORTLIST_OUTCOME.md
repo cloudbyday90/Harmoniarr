@@ -71,7 +71,6 @@ detail/file queries. Sparse eligible searches can still require full traversal;
 the shortlist remains twelve choices and uses stable UUID order rather than raw
 score order.
 
-Next: **browse additional eligible choices beyond twelve** if broader comparison
-is needed. Use scoped keyset cursors with current-search/policy invalidation,
-bounded page reads and preserved focus/refresh behavior. Keep eligibility and
-selection authority shared; do not restore a raw-score shortlist membership gate.
+The next slice now [implements browsing beyond twelve](ELIGIBLE_MATCH_PAGINATION_OUTCOME.md)
+with scoped keysets and shared refresh/focus ownership. Its outcome owns the
+current recommendation; this document retains the original filter-before-cap evidence.

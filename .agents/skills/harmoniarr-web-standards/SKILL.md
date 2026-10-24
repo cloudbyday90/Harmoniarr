@@ -5,6 +5,10 @@ description: "Apply and verify standards for Harmoniarr UI commands, forms, focu
 
 # Harmoniarr Web Standards
 
+For additional eligible choices, read [scoped pages](references/match-pagination.md).
+It covers authenticated continuation, bidirectional keysets, bounded client state
+and shared refresh/focus lifecycles.
+
 For hidden eligible alternatives, read [eligible shortlist](references/eligible-shortlist.md).
 It covers filter-before-limit projection, batched policy facts and selection
 authority independent of the raw shortlist.

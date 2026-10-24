@@ -20,3 +20,13 @@ test('batch facts use a parameterized stable keyset, exclude detail owners and j
   assert.deepEqual(rows, [{ id: 'candidate', status: 'held', sourceSearchId: 'search', fileCount: 2,
     totalSizeBytes: 1234, normalizedPayload: { extensions: ['flac'] } }]);
 });
+
+test('reverse keysets use the same bounded projection with a parameterized exclusive anchor', async () => {
+  let query;
+  const store = createImportCandidateQualityReviewCandidateStore({ getPoolFn: () => ({ query: async (sql, params) => {
+    query = { sql, params }; return { rows: [] };
+  } }) });
+  await store.listCandidatePage({ sourceSearchId: 'search', afterId: 'anchor', direction: 'previous' });
+  assert.match(query.sql, /id<\$2::uuid\) ORDER BY id DESC LIMIT \$3/u);
+  assert.deepEqual(query.params, ['search', 'anchor', 50]); assert.doesNotMatch(query.sql, /FOR UPDATE|OFFSET/u);
+});

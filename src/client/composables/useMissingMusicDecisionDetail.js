@@ -54,6 +54,10 @@ function normalizeDetail(payload) {
       isReadOnly: payload.permissions?.isReadOnly === true,
     },
     matchChoices: Array.isArray(payload.matchChoices) ? payload.matchChoices : [],
+    matchChoicePage: payload.matchChoicePage ? {
+      nextCursor: typeof payload.matchChoicePage.nextCursor === 'string' ? payload.matchChoicePage.nextCursor : null,
+      previousCursor: typeof payload.matchChoicePage.previousCursor === 'string' ? payload.matchChoicePage.previousCursor : null,
+    } : null,
     scope: payload.scope ?? 'mine',
   };
 }
@@ -80,6 +84,8 @@ export function useMissingMusicDecisionDetail({
   const isLoading = ref(false);
   const isRevalidating = ref(false);
   const isNotFound = ref(false);
+  const matchPageStatus = ref('');
+  const isNavigatingMatches = ref(false);
   const resolvedDecisionId = computed(() => normalizeDecisionId(toValue(decisionId)));
   let disposed = false;
   const gate = createLatestRequestGate();
@@ -87,6 +93,9 @@ export function useMissingMusicDecisionDetail({
   let pollTimer = null;
   let paused = false;
   let isInitialLoad = true;
+  let acceptedMatchCursor = null;
+  let pendingMatchCursor = null;
+  let readGeneration = 0;
 
   function clearPoll() {
     clearTimeout(pollTimer);
@@ -104,6 +113,9 @@ export function useMissingMusicDecisionDetail({
   }
 
   function invalidateRead() {
+    readGeneration++;
+    isNavigatingMatches.value = false;
+    if (matchPageStatus.value === 'Loading matches…') matchPageStatus.value = '';
     gate.invalidate();
     pendingRead = null;
     clearPoll();
@@ -120,6 +132,7 @@ export function useMissingMusicDecisionDetail({
 
     if (invalidatePending) {
       invalidateRead();
+      acceptedMatchCursor = null;
     }
 
     detail.value = normalizedDetail;
@@ -130,12 +143,13 @@ export function useMissingMusicDecisionDetail({
     return normalizedDetail;
   }
 
-  function load() {
+  function load({ matchCursor = acceptedMatchCursor } = {}) {
     if (disposed || paused || !resolvedDecisionId.value) return Promise.resolve(null);
     if (pendingRead) return pendingRead;
 
     clearPoll();
     const request = gate.begin();
+    pendingMatchCursor = matchCursor;
     const currentDecisionId = resolvedDecisionId.value;
     const hasDetail = detail.value?.decision.decisionId === currentDecisionId;
     errorMessage.value = '';
@@ -148,13 +162,28 @@ export function useMissingMusicDecisionDetail({
       // Keep synchronous fetcher failures on the same asynchronous lifecycle.
       await Promise.resolve();
       try {
-        const payload = await fetchMissingMusicDecisionDetail(currentDecisionId, { signal: request.signal });
+        const fetchDetail = cursor => fetchMissingMusicDecisionDetail(currentDecisionId, {
+          signal: request.signal, ...(cursor != null ? { matchCursor: cursor } : {}),
+        });
+        let payload;
+        let currentCursor = matchCursor;
+        let resetPage = false;
+        try { payload = await fetchDetail(currentCursor); }
+        catch (error) {
+          if (currentCursor == null || error?.code !== 'missing_music_match_page_changed' || !request.isCurrent()) throw error;
+          currentCursor = null;
+          resetPage = true;
+          payload = await fetchDetail(null);
+        }
         if (disposed || !request.isCurrent()) return null;
 
         if (!payload?.decision || payload.decision.decisionId !== currentDecisionId) {
           throw new Error('Missing Music release details failed to load');
         }
-        return applyDetail(payload, { invalidatePending: false });
+        const applied = applyDetail(payload, { invalidatePending: false });
+        acceptedMatchCursor = currentCursor;
+        if (resetPage) matchPageStatus.value = 'Matches changed. Showing the first page.';
+        return applied;
       } catch (error) {
         if (disposed || !request.isCurrent()) return null;
         if (isMissingMusicDecisionNotFoundError(error)) {
@@ -176,6 +205,30 @@ export function useMissingMusicDecisionDetail({
     })();
     pendingRead = read;
     return read;
+  }
+
+  function refresh() {
+    if (pendingRead && pendingMatchCursor == null) return pendingRead;
+    invalidateRead();
+    matchPageStatus.value = '';
+    return load({ matchCursor: null });
+  }
+
+  async function loadMatchPage(cursor) {
+    if (paused || disposed || (cursor !== null && typeof cursor !== 'string')) return null;
+    invalidateRead();
+    matchPageStatus.value = 'Loading matches…';
+    isNavigatingMatches.value = true;
+    const generation = readGeneration;
+    const result = await load({ matchCursor: cursor });
+    if (generation !== readGeneration) return result;
+    isNavigatingMatches.value = false;
+    if (result && matchPageStatus.value === 'Loading matches…') {
+      const count = result.matchChoices.length;
+      matchPageStatus.value = `Showing ${count} ${count === 1 ? 'match' : 'matches'}.`;
+    }
+    else if (!result && matchPageStatus.value === 'Loading matches…') matchPageStatus.value = 'Matches could not be loaded. Try again.';
+    return result;
   }
 
   function setPaused(value) {
@@ -200,6 +253,8 @@ export function useMissingMusicDecisionDetail({
   watch(resolvedDecisionId, () => {
     invalidateRead();
     detail.value = null;
+    acceptedMatchCursor = null;
+    matchPageStatus.value = '';
     detailDecisionId.value = resolvedDecisionId.value;
     errorMessage.value = '';
     isNotFound.value = false;
@@ -229,8 +284,11 @@ export function useMissingMusicDecisionDetail({
     isLoading,
     isRevalidating,
     isNotFound,
+    matchPageStatus,
+    isNavigatingMatches,
     load,
-    refresh: load,
+    loadMatchPage,
+    refresh,
     setPaused,
   };
 }

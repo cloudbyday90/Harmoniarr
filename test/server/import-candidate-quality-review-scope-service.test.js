@@ -28,7 +28,9 @@ function fixture({ weak = 51, eligible = 15, disabled = false, alternative = nul
       readSelectionActor: async () => ({ id: ownerId }), lockCandidate: async input => { locks.push(input); }, lockParticipantReleases: async () => {},
     },
     candidateStore: { listCandidatePage: async input => {
-      pages.push(input); return candidates.filter(row => !input.afterId || row.id > input.afterId).slice(0, 50);
+      pages.push(input);
+      const rows = candidates.filter(row => !input.afterId || (input.direction === 'previous' ? row.id < input.afterId : row.id > input.afterId));
+      return (input.direction === 'previous' ? rows.reverse() : rows).slice(0, 50);
     } },
     getImportCandidate: async ({ importCandidateId }) => {
       reads.push(importCandidateId);
@@ -55,6 +57,20 @@ test('empty eligible results require complete batch traversal and an invalid sco
   const disabled = fixture({ disabled: true });
   assert.deepEqual(await disabled.service.getQualityReviewAlternatives({ appUserId: ownerId, wantedReleaseId: wantedId }), { candidates: [], canSearchAgain: false });
   assert.equal(disabled.pages.length, 0);
+});
+
+test('forward and reverse pages retain twelve eligible facts without repeating a fixed candidate set', async () => {
+  const f = fixture({ weak: 100, eligible: 25 }); const input = { appUserId: ownerId, wantedReleaseId: wantedId };
+  const first = await f.service.getQualityReviewAlternatives(input);
+  const second = await f.service.getQualityReviewAlternatives({ ...input, matchCursor: first.matchChoicePage.nextCursor });
+  const third = await f.service.getQualityReviewAlternatives({ ...input, matchCursor: second.matchChoicePage.nextCursor });
+  assert.equal(first.matchChoicePage.previousCursor, null); assert.equal(third.matchChoicePage.nextCursor, null);
+  assert.deepEqual([...first.candidates, ...second.candidates, ...third.candidates].map(c => c.id), Array.from({ length: 25 }, (_, n) => id(101 + n)));
+  const back = await f.service.getQualityReviewAlternatives({ ...input, matchCursor: third.matchChoicePage.previousCursor });
+  assert.deepEqual(back.candidates, second.candidates);
+  const start = await f.service.getQualityReviewAlternatives({ ...input, matchCursor: back.matchChoicePage.previousCursor });
+  assert.deepEqual(start.candidates, first.candidates); assert.equal(start.matchChoicePage.previousCursor, null);
+  assert.equal(third.canSearchAgain, false); assert.deepEqual(f.reads, Array(5).fill(failedId));
 });
 
 test('guarded existence checks use the same batches, preserve the owning queryable and stop at the first eligible result', async () => {

@@ -105,6 +105,7 @@ export function registerMissingMusicRoutes(app, {
     const payload = await getMissingMusicDecisionDetail({
       actorUser: buildActorUser(session),
       decisionId: request.params.decisionId,
+      matchCursor: request.query.matchCursor ?? null,
     });
 
     response.json({

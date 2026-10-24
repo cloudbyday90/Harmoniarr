@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 24 [eligible-page rebuild](LOCAL_DOCKER_MATCH_PAGINATION_OUTCOME.md)
+records the latest no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](ELIGIBLE_MATCH_PAGINATION_OUTCOME.md) connects scoped
+match pages to current policy and the existing guarded selection command.
+
 The October 24 [eligible-shortlist rebuild](LOCAL_DOCKER_ELIGIBLE_SHORTLIST_OUTCOME.md)
 records the current no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](ELIGIBLE_MATCH_SHORTLIST_OUTCOME.md) connects filtered

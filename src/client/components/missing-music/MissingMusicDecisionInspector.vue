@@ -351,9 +351,10 @@ defineExpose({ busy, refresh: decisionDetail.refresh });
         @recheck-library-add="recheckLibraryAdd"
       />
 
+      <p role="status" aria-atomic="true">{{ decisionDetail.matchPageStatus.value }}</p>
       <MissingMusicMatchChoices
-        :detail="decisionDetail.detail.value" :busy="mutationBusy"
-        :active-match-id="matchSelection.activeMatchId.value" @select="selectMatch"
+        :detail="decisionDetail.detail.value" :busy="mutationBusy || decisionDetail.isNavigatingMatches.value"
+        :active-match-id="matchSelection.activeMatchId.value" @select="selectMatch" @page="decisionDetail.loadMatchPage"
       />
     </div>
   </article>

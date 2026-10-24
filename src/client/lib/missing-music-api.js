@@ -46,13 +46,13 @@ export function fetchMissingMusicDecisions({
  })}`, { signal });
 }
 
-export function fetchMissingMusicDecisionDetail(decisionId, { signal } = {}) {
+export function fetchMissingMusicDecisionDetail(decisionId, { signal, matchCursor = null } = {}) {
   const normalizedDecisionId = typeof decisionId === 'string' ? decisionId.trim() : '';
   if (!normalizedDecisionId) {
     throw new TypeError('fetchMissingMusicDecisionDetail requires a decisionId');
   }
 
-  return apiRequest(`/api/v1/missing-music/decisions/${encodeURIComponent(normalizedDecisionId)}`, { signal });
+  return apiRequest(`/api/v1/missing-music/decisions/${encodeURIComponent(normalizedDecisionId)}${buildQueryString({ matchCursor })}`, { signal });
 }
 
 export function fetchMissingMusicDownloaderHandoff(decisionId) {

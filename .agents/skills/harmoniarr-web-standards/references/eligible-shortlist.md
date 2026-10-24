@@ -25,7 +25,7 @@ research and outcome.
    cap/order, replay, stale authority and no transfer. Use query-count assertions for
    page reads and absence of per-alternative detail work, not whole-app timing claims.
 
-This slice filters before the cap. Public pagination and score-based cursor
-ordering are separate choices requiring their own refresh/focus/ownership design.
+This slice filters before the cap. For public pagination, follow
+[scoped pages](match-pagination.md); score-based ordering is a separate choice.
 Use official MCP-discovered sources and keep browser semantics separate from
 manual screen-reader/device acceptance.

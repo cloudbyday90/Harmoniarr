@@ -5,6 +5,12 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For eligible-match pagination, read the standards
+[page reference](../harmoniarr-web-standards/references/match-pagination.md).
+Run cursor/scope/client-gate checks, eligible-match-pagination SQL/browser cases
+and existing selection/restart/shortlist regressions. Assert bounded DOM, terminal
+navigation focus and explicit refresh separately from manual screen-reader proof.
+
 For eligible alternatives beyond a raw shortlist, use the standards
 [eligible shortlist reference](../harmoniarr-web-standards/references/eligible-shortlist.md).
 Run batch/scope and decision checks, eligible-match-shortlist SQL/browser cases and

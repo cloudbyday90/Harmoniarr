@@ -16,10 +16,13 @@ import { buildRecheckQualityContext, getRecheckWantedReleaseIds } from './import
 import { canRetainRecoveryQualityContext } from './import-candidate-recovery-quality-policy.js';
 import { OPERATOR_TRACK_SCOPE_BLOCKER } from '../metadata/operator-track-scope-policy.js';
 import { createImportCandidateQualityReviewCandidateStore, QUALITY_REVIEW_CANDIDATE_PAGE_SIZE } from './import-candidate-quality-review-candidate-store.js';
+import { createQualityReviewCursorPolicy, qualityReviewCursorContext, qualityReviewCursorChanged,
+  QUALITY_REVIEW_MATCH_PAGE_SIZE } from './import-candidate-quality-review-cursor-policy.js';
 
 /** Replacement selection preserves the failed acquisition and its shared quality floor. */
 export function createImportCandidateQualityReviewScopeService({ recheckStore, getImportCandidate,
   candidateStore = createImportCandidateQualityReviewCandidateStore(),
+  cursorPolicy = createQualityReviewCursorPolicy(),
   assertMaintenanceWriteAllowed, withTransaction = createDatabaseTransactionRunner(),
   lockAppUserEligibilityFn = lockAppUserEligibility, lockRunCreation = lockImportCandidateApplyCreation,
 } = {}) {
@@ -62,11 +65,11 @@ export function createImportCandidateQualityReviewScopeService({ recheckStore, g
       && evaluateQualityEvidence({ candidate, ...scope.requiredContext }).autoDownloadEligible);
   }
 
-  async function collectEligibleAlternatives(scope, { queryable = null, limit }) {
-    let afterId = null;
+  async function collectEligibleAlternatives(scope, { queryable = null, limit, anchor = null, direction = 'next' }) {
+    let afterId = anchor;
     const eligible = [];
     for (;;) {
-      const page = await candidateStore.listCandidatePage({ sourceSearchId: scope.failedCandidate.sourceSearchId, afterId, queryable });
+      const page = await candidateStore.listCandidatePage({ sourceSearchId: scope.failedCandidate.sourceSearchId, afterId, direction, queryable });
       for (const candidate of page) {
         if (isEligible(candidate, scope)) eligible.push(candidate);
         if (eligible.length === limit) return eligible;
@@ -77,9 +80,24 @@ export function createImportCandidateQualityReviewScopeService({ recheckStore, g
   }
   async function getQualityReviewAlternatives(input) {
     const scope = await readScope(input);
-    if (!scope) return { candidates: [], canSearchAgain: false };
-    const candidates = await collectEligibleAlternatives(scope, { limit: 12 });
-    return { candidates, canSearchAgain: candidates.length === 0 };
+    if (!scope) {
+      if (input.matchCursor != null) throw qualityReviewCursorChanged();
+      return { candidates: [], canSearchAgain: false };
+    }
+    const context = qualityReviewCursorContext(input, scope);
+    const { anchor, direction } = cursorPolicy.decode(input.matchCursor, context);
+    const found = await collectEligibleAlternatives(scope, { limit: QUALITY_REVIEW_MATCH_PAGE_SIZE + 1, anchor, direction });
+    if (!found.length && anchor) throw qualityReviewCursorChanged();
+    const hasMore = found.length > QUALITY_REVIEW_MATCH_PAGE_SIZE;
+    const candidates = found.slice(0, QUALITY_REVIEW_MATCH_PAGE_SIZE);
+    if (direction === 'previous') candidates.reverse();
+    const encode = (row, nextDirection) => cursorPolicy.encode({ anchor: row.id, direction: nextDirection, context });
+    return { candidates, canSearchAgain: !anchor && candidates.length === 0,
+      ...(candidates.length ? { matchChoicePage: {
+        previousCursor: (direction === 'previous' ? hasMore : Boolean(anchor)) ? encode(candidates[0], 'previous') : null,
+        nextCursor: (direction === 'previous' ? Boolean(anchor) : hasMore) ? encode(candidates.at(-1), 'next') : null,
+      } } : {}),
+    };
   }
   async function hasEligibleAlternative(scope, { queryable = null } = {}) {
     return (await collectEligibleAlternatives(scope, { queryable, limit: 1 })).length > 0;

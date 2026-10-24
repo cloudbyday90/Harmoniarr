@@ -25,3 +25,7 @@ transactional selection/event/audit and separate download command.
 
 GitHub MCP found zero open PRs at initial selection. Recheck before completion;
 do not invent a PR implementation or merge an unrelated change.
+
+The subsequent [pagination research](ELIGIBLE_MATCH_PAGINATION_RESEARCH.md) adopts
+bounded browsing through the existing detail endpoint and request gate, avoiding
+the separate endpoint/state owner considered above.

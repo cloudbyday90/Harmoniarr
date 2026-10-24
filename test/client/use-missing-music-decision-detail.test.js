@@ -68,6 +68,57 @@ function createDetail(decisionId = 'wanted-amber') {
   };
 }
 
+test('match navigation replaces bounded results, retains the accepted page for polling and refreshes from the first page', async t => {
+  const cursors = []; let fail = false;
+  const { app, decisionDetail } = mountDecisionDetail({ decisionId: 'wanted-amber', fetchMissingMusicDecisionDetail: async (_id, options) => {
+    cursors.push(options.matchCursor ?? null);
+    if (fail) throw new Error('Private provider payload');
+    return { ...createDetail(), matchChoices: [{ id: options.matchCursor ?? 'first' }], matchChoicePage: { nextCursor: 'next', previousCursor: null } };
+  } }); t.after(() => app.unmount());
+  await decisionDetail.load(); await decisionDetail.loadMatchPage('page-two');
+  assert.deepEqual(decisionDetail.detail.value.matchChoices, [{ id: 'page-two' }]);
+  assert.equal(decisionDetail.matchPageStatus.value, 'Showing 1 match.');
+  await decisionDetail.load(); fail = true; await decisionDetail.loadMatchPage('failed-page'); fail = false;
+  assert.equal(decisionDetail.matchPageStatus.value, 'Matches could not be loaded. Try again.');
+  await decisionDetail.load(); assert.equal(decisionDetail.detail.value.matchChoices[0].id, 'page-two');
+  await decisionDetail.refresh(); assert.equal(decisionDetail.detail.value.matchChoices[0].id, 'first');
+  assert.deepEqual(cursors, [null, 'page-two', 'page-two', 'failed-page', 'page-two', null]);
+});
+
+test('superseded match navigation cannot replace results or announce failure during a newer read', async t => {
+  const requests = [];
+  const { app, decisionDetail } = mountDecisionDetail({ decisionId: 'wanted-amber', fetchMissingMusicDecisionDetail: (_id, options) => {
+    const pending = deferred(); requests.push({ ...pending, ...options }); return pending.promise;
+  } }); t.after(() => app.unmount());
+  const old = decisionDetail.loadMatchPage('old'); await Promise.resolve();
+  assert.equal(decisionDetail.isNavigatingMatches.value, true);
+  const current = decisionDetail.loadMatchPage('current'); await Promise.resolve();
+  assert.equal(requests[0].signal.aborted, true); requests[0].reject(new Error('old private failure')); await old;
+  assert.equal(decisionDetail.matchPageStatus.value, 'Loading matches…');
+  requests[1].resolve({ ...createDetail(), matchChoices: [{ id: 'current' }] }); await current;
+  assert.equal(decisionDetail.detail.value.matchChoices[0].id, 'current');
+  assert.equal(decisionDetail.matchPageStatus.value, 'Showing 1 match.');
+  assert.equal(decisionDetail.isNavigatingMatches.value, false);
+  const background = decisionDetail.load(); await Promise.resolve();
+  assert.equal(decisionDetail.isRevalidating.value, true);
+  assert.equal(decisionDetail.isNavigatingMatches.value, false);
+  requests[2].resolve({ ...createDetail(), matchChoices: [{ id: 'current' }] }); await background;
+});
+
+test('a refused continuation retries the current first page once and permission loss clears the old choices', async t => {
+  const cursors = []; let denied = false;
+  const { app, decisionDetail } = mountDecisionDetail({ decisionId: 'wanted-amber', fetchMissingMusicDecisionDetail: async (_id, options) => {
+    cursors.push(options.matchCursor ?? null);
+    if (denied) throw Object.assign(new Error('private'), { status: 403 });
+    if (options.matchCursor) throw Object.assign(new Error('private policy'), { code: 'missing_music_match_page_changed', status: 409 });
+    return { ...createDetail(), matchChoices: [] };
+  } }); t.after(() => app.unmount());
+  await decisionDetail.loadMatchPage('expired'); assert.deepEqual(cursors, ['expired', null]);
+  assert.equal(decisionDetail.matchPageStatus.value, 'Matches changed. Showing the first page.');
+  denied = true; await decisionDetail.loadMatchPage('foreign');
+  assert.equal(decisionDetail.detail.value, null); assert.equal(cursors.length, 3);
+});
+
 test('durable audio-review guidance survives detail normalization and a fresh read', async () => {
   const payload = { ...createDetail(), libraryAddReview: { reasonCode: 'suspicious_lossless', title: 'Lossless audio needs review',
     detail: 'The completed file was not added.', nextStep: 'Review the audio check.' } };
