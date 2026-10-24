@@ -5,6 +5,14 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For minimal restart-qualification facts, read the standards
+[fact reference](../harmoniarr-web-standards/references/qualification-candidate-facts.md).
+Run fact-store/reader/guard/service checks, shared full/minimal policy and lock
+fixture, HTTP parent-wait/held-child/track-union cases, and the guarded native fact
+entry. Combine existing bounded restart/selection/fence/cursor/plan SQL cohorts
+once; verify current browser and controlled-media behavior. Serialized fixture
+bytes establish result-width reduction, not latency or memory guarantees.
+
 For bounded measured-review restart, read the standards
 [qualification reference](../harmoniarr-web-standards/references/bounded-restart-qualification.md).
 Run progress/service/worker/borrowed-ownership checks, bounded-quality-review-search

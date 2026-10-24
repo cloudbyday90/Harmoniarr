@@ -29,7 +29,7 @@ export function createQualityReviewSearchService({ scopeService, commitIntent, r
     return advanceQualityReviewSearchProgress({ progress, context, revision, now, scan, failedCandidateId: scope.failedCandidate.id });
   }
   const withCurrentSearchScope = async (input, work) => {
-    try { return await scopeService.withCurrentScope(input, work); }
+    try { return await scopeService.withCurrentQualificationScope(input, work); }
     catch (error) { if (error?.code === '55P03') throw qualityReviewSearchBusy(); throw error; }
   };
   async function request({ appUserId, metadataReleaseId, requestMetadata, intent }) {

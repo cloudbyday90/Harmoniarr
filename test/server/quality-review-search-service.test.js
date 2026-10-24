@@ -34,7 +34,7 @@ function fixture({ exhausted = false, found = false } = {}) {
     withOwnedRun: async (input, execute) => { assert.equal(input.queryable, queryable); return execute({ run: { status: 'running', summary: saved, triggered_by_user_id: id(6) } }); },
     writeLifecycle: async input => { calls.push(input.action); saved = { ...saved, ...input.summary }; return true; } };
   const service = createQualityReviewSearchService({
-    scopeService: { withCurrentScope: async (_input, execute) => execute({ scope, queryable }),
+    scopeService: { withCurrentQualificationScope: async (_input, execute) => execute({ scope, queryable }),
       scanAlternativeWindow: async (_scope, input) => { calls.push(['scan', input.anchor]); return { candidates: alternative ? [{}] : [], exhausted: scanExhausted, afterId: id(3) }; } },
     revisionStore: { readRevision: async () => revision, lockRevisionNowait: async () => { calls.push('fence'); return revision; } },
     runStore, commitIntent: async () => { calls.push('intent'); return { queued: true }; },

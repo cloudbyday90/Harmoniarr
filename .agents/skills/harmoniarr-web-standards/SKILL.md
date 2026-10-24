@@ -5,6 +5,10 @@ description: "Apply and verify standards for Harmoniarr UI commands, forms, focu
 
 # Harmoniarr Web Standards
 
+For minimal failed-candidate qualification inputs, read
+[candidate facts](references/qualification-candidate-facts.md). It covers field
+presence, policy parity, shared guard factories and the proven parent/child lock boundary.
+
 For current bounded Search again commands, read
 [restart qualification](references/bounded-restart-qualification.md). It covers
 owned progress, nonwaiting revision fencing and atomic current authorization.

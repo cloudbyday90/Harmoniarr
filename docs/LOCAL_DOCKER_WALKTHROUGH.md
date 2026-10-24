@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 24 [minimal-facts rebuild](LOCAL_DOCKER_QUALIFICATION_CANDIDATE_FACTS_OUTCOME.md)
+records the latest no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](QUALIFICATION_CANDIDATE_FACTS_OUTCOME.md) connects narrow
+qualification inputs, parent-only locking and full/minimal policy parity.
+
 The October 24 [bounded-restart rebuild](LOCAL_DOCKER_BOUNDED_RESTART_QUALIFICATION_OUTCOME.md)
 records the latest no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](BOUNDED_RESTART_QUALIFICATION_OUTCOME.md) connects bounded

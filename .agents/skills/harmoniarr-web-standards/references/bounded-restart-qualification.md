@@ -37,7 +37,8 @@ research and outcome. This supersedes the original full-traversal command guard.
    regressions. Logical scan bounds do not prove overall latency, bytes or RSS.
 
 Current costs: existing canonical lock waits and full failed-candidate file/detail
-loads, same-search revision contention, historical revision rows and possible
-expiry under churn. No revision/qualification token replaces downstream claim,
+loads in read-only/selection paths, same-search revision contention, historical
+revision rows and possible expiry under churn. Qualification now uses
+[minimal facts and parent locks](qualification-candidate-facts.md). No revision/qualification token replaces downstream claim,
 quality, transfer or library-add authority. Retention work must preserve these
 boundaries rather than introducing a new job system.

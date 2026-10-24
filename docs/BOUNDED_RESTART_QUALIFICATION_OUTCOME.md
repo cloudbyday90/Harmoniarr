@@ -86,9 +86,9 @@ candidate work and durable resumption. Costs are added job lifecycle/state handl
 revision contention, possible expiry under churn or oversized searches, and the
 remaining canonical lock/detail costs. This is no wall-time, byte or RSS guarantee.
 
-Next: **replace full failed-candidate detail/file loading and locking during
-qualification with the smallest authoritative facts and lock set**. Prove parity
-for original quality floor, recipients, track scope, failed acquisition and current
-authority before narrowing it. Separately plan bounded orphan-revision retirement
-and mixed-workload deployment measurements; historical revisions remain retained,
-and these SQL/budget checks do not qualify a new concurrent memory envelope.
+The next increment is complete: [minimal qualification facts](QUALIFICATION_CANDIDATE_FACTS_OUTCOME.md)
+replaces full failed-candidate detail/file loading and child locking during restart
+qualification, with actual policy and lock parity evidence. Its outcome owns the
+current follow-up. Separately plan bounded orphan-revision retirement and mixed
+deployment measurements; historical revisions remain retained, and these SQL/budget
+checks do not qualify a new concurrent memory envelope.
