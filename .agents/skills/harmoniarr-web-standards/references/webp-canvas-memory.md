@@ -1,5 +1,9 @@
 # WebP canvas memory
 
+For current 7120-square admission also read [encoder boundary](webp-encoder-boundary.md).
+The same pinned bytes now refuse before grant after token-growth accounting.
+The admitted characterization below describes the preceding policy/evidence.
+
 For the fixed 7120-square noisy WebP qualification, read active-repo
 docs/WEBP_ADMITTED_BOUNDARY_DESIGN.md, research and outcome. Keep dimensions,
 quality and metadata chosen before outcomes; pin exact bytes before consuming.

@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 25 [encoder boundary rebuild](LOCAL_DOCKER_WEBP_ENCODER_BOUNDARY_OUTCOME.md)
+records the latest no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](WEBP_ENCODER_BOUNDARY_OUTCOME.md) connects native
+token-growth evidence to deliberate pre-grant refusal under unchanged limits.
+
 The October 25 [admitted WebP rebuild](LOCAL_DOCKER_WEBP_ADMITTED_BOUNDARY_OUTCOME.md)
 records the latest no-cache image and preserved administrator/data/mounts. The
 [qualification outcome](WEBP_ADMITTED_BOUNDARY_OUTCOME.md) records the fixed

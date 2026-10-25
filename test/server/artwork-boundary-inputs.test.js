@@ -30,6 +30,7 @@ test('fixed boundary inputs declare format-aware admission and unknown descripto
   }
   for (const id of [null, undefined, '', 'foreign']) assert.throws(() => selectBoundaryArtworkCase(id), TypeError);
   assert.equal(selectBoundaryArtworkCase('rgb8-webp-admitted-noise').id, 'rgb8-webp-canvas-refusal');
+  assert.equal(selectBoundaryArtworkCase('rgb8-webp-admitted-7120-noise').id, 'rgb8-webp-7120-token-refusal');
   await assert.rejects(loadBoundaryArtworkInput({ ...boundaryArtworkCases[0] }), TypeError);
 });
 

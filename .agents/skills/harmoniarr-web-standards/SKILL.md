@@ -5,6 +5,10 @@ description: "Apply and verify standards for Harmoniarr UI commands, forms, focu
 
 # Harmoniarr Web Standards
 
+For structured WebP allocation diagnosis or encoder token-growth accounting, read
+[encoder boundary](references/webp-encoder-boundary.md). It covers binary/source
+identity, actual error/limit evidence, growth-reserve limits and pre-grant refusal.
+
 For WebP native failures or format-aware decoder accounting, read
 [WebP canvas memory](references/webp-canvas-memory.md). It separates minimal
 decode from full rewrite, pinned source evidence from inference, and early

@@ -7,11 +7,12 @@ import sharp from 'sharp';
 import { createApiError } from '../api-error.js';
 import { assertArtworkBuffer, assertArtworkRasterSignature, artworkSharpInputOptions } from './artwork-image-content-policy.js';
 import { artworkWorkerError } from './artwork-worker-protocol.js';
+import { ARTWORK_WEBP_EFFORT, ARTWORK_WEBP_QUALITY } from './artwork-webp-policy.js';
 
 const encoders = {
   jpeg: image => image.jpeg({ chromaSubsampling: '4:4:4', quality: 90 }),
   png: image => image.png({ compressionLevel: 9 }),
-  webp: image => image.webp({ effort: 4, quality: 90 }),
+  webp: image => image.webp({ effort: ARTWORK_WEBP_EFFORT, quality: ARTWORK_WEBP_QUALITY }),
 };
 
 export async function inspectArtworkBuffer(buffer, { maxDimensionPixels } = {}) {

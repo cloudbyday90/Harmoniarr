@@ -1,5 +1,9 @@
 # Noisy WebP admitted-boundary outcome
 
+The subsequent [encoder boundary outcome](WEBP_ENCODER_BOUNDARY_OUTCOME.md)
+identifies token-growth allocation failure and records current pre-grant refusal
+for these same pinned bytes. The failed publication results below are historical.
+
 October 25, 2026. **The fixed candidate passes numeric admission but fails
 successful-processing qualification.** Its workers refuse safely; this does not
 establish a working noisy WebP envelope. See separate [design](WEBP_ADMITTED_BOUNDARY_DESIGN.md),

@@ -5,6 +5,7 @@ import { createArtworkWorkerCollector, isArtworkWorkerError } from '../../src/se
 import { transformArtworkBuffer } from '../../src/server/artwork/artwork-image-transform.js';
 import { sanitizeArtworkBuffer } from '../../src/server/artwork/artwork-image-processing.js';
 import { decodedArtworkMemoryReservation } from '../../src/server/artwork/artwork-memory-reservation.js';
+import { ARTWORK_WEBP_EFFORT, ARTWORK_WEBP_QUALITY, webpEncoderGrowthMemoryBytes } from '../../src/server/artwork/artwork-webp-policy.js';
 
 test('Linux child allocation limits are lowered before Node exec without a shell or inherited flags', () => {
   assert.deepEqual(artworkWorkerLaunch('/worker.js', ['20', '8'], { platform: 'linux', execPath: '/node' }), {
@@ -81,10 +82,33 @@ test('WebP canvas accounts for four bytes per pixel independently of visible alp
   for (const format of ['jpeg', 'png']) assert.equal(artworkDecoderCanvasBytes({ format, width: 8192, height: 8192, channels: 3 }), 0);
   const metadata = { width: 8192, height: 8192, channels: 3, depth: 'uchar' }; const inputBytes = 14127228;
   assert.equal(artworkWorkerMemoryEstimate({ ...metadata, format: 'jpeg' }, inputBytes), 1072636152);
-  assert.equal(artworkWorkerMemoryEstimate({ ...metadata, format: 'webp' }, inputBytes), 1341071608);
+  assert.equal(artworkWorkerMemoryEstimate({ ...metadata, format: 'webp' }, inputBytes), 1352671488);
   const medium = { ...metadata, width: 4096, height: 4096 };
   assert.equal(decodedArtworkMemoryReservation({ ...medium, format: 'webp' }, 5)
-    - decodedArtworkMemoryReservation({ ...medium, format: 'jpeg' }, 5), 64 * 1024 ** 2);
+    - decodedArtworkMemoryReservation({ ...medium, format: 'jpeg' }, 5), 64 * 1024 ** 2 + webpEncoderGrowthMemoryBytes(4096, 4096));
+});
+
+test('WebP encoder growth reserves a native token page and allocator slack without changing encoder settings', () => {
+  assert.equal(ARTWORK_WEBP_QUALITY, 90); assert.equal(ARTWORK_WEBP_EFFORT, 4);
+  assert.equal(webpEncoderGrowthMemoryBytes(1, 1), 8192 * 2 + 8 + 65536);
+  assert.equal(webpEncoderGrowthMemoryBytes(16, 16), webpEncoderGrowthMemoryBytes(1, 1));
+  assert.equal(webpEncoderGrowthMemoryBytes(7120, 7120), 8713108 + 65536);
+  assert.ok(webpEncoderGrowthMemoryBytes(7121, 7120) > webpEncoderGrowthMemoryBytes(7120, 7120));
+  const metadata = { format: 'webp', width: 7120, height: 7120, channels: 3, depth: 'uchar' };
+  const boundary = (ARTWORK_WORKER_DATA_LIMIT - artworkWorkerMemoryEstimate(metadata, 0)) / 2;
+  assert.equal(boundary, 7388726);
+  assert.doesNotThrow(() => assertArtworkMemoryAdmission({ metadata, inputBytes: boundary }));
+  assert.throws(() => assertArtworkMemoryAdmission({ metadata, inputBytes: boundary + 1 }), { code: 'artwork_worker_memory' });
+});
+
+test('the pinned 7120-square WebP refuses before grant, rewrite and stats with encoder growth accounted', async () => {
+  const metadata = { format: 'webp', width: 7120, height: 7120, channels: 3, depth: 'uchar' };
+  const buffer = Buffer.alloc(10675042); assert.equal(artworkWorkerMemoryEstimate(metadata, buffer.length), 1080314456);
+  await assert.rejects(transformArtworkBuffer({ buffer, maxBytes: 100 * 1024 ** 2, maxDimensionPixels: 8192,
+    onMetadata: () => assert.fail('Refuse before parent grant') }, {
+    inspectArtworkBufferFn: async () => metadata, sanitizeArtworkBufferFn: async () => assert.fail('No rewrite'),
+    sharpStatsFn: async () => assert.fail('No stats'),
+  }), { code: 'artwork_worker_memory', status: 503 });
 });
 
 test('large RGB WebP refuses before grant/rewrite/stats while a medium WebP remains admitted', async () => {

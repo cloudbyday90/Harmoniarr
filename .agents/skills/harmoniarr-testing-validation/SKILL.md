@@ -5,6 +5,13 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For WebP encoder growth changes, read the standards
+[encoder reference](../harmoniarr-web-standards/references/webp-encoder-boundary.md).
+Run page/budget/grant-order and existing worker/observer checks, then one fast
+gate and affected guarded native profiles. Reuse pinned artifacts. Keep debugger
+evidence separate from normal measurements and retain unrelated proof only after
+exact source/package review.
+
 For fixed noisy WebP admitted-boundary qualification, read the standards
 [canvas reference](../harmoniarr-web-standards/references/webp-canvas-memory.md).
 Reproduce pins outside measured work; qualify the new admitted case and existing
