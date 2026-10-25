@@ -101,10 +101,8 @@ The benefit is actual failure containment without another service; the cost is
 explicit native qualification and currently unsupported maximum noisy inputs.
 The full option comparison and recommendation stack are in the research document.
 
-Next: **diagnose the maximum JPEG SIGABRT boundary under the existing 1 GiB DATA
-and 128 MiB V8 old-space limits**. Use bounded private phase evidence to distinguish
-input collection, metadata, rewrite and statistics before deciding whether to
-refuse earlier or reduce codec working memory. Keep WebP's controlled failure as
-a separate case. Do not raise limits, claim graceful refusal or recommend a
-deployment minimum from these measurements alone. Any production fix should keep
-ordinary accepted-image behavior and use this lane as its regression proof.
+The diagnosis and shared-budget repair are now recorded in the
+[rewrite headroom outcome](ARTWORK_REWRITE_HEADROOM_OUTCOME.md). The historical
+measurements above remain containment evidence. The repaired fixed maximum entry
+requires deliberate memory refusal before the metadata/grant handshake and normal
+child close; the new outcome records its follow-up and resource-policy limits.

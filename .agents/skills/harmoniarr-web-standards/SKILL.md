@@ -5,6 +5,10 @@ description: "Apply and verify standards for Harmoniarr UI commands, forms, focu
 
 # Harmoniarr Web Standards
 
+For rewrite abort diagnosis or child/parent memory accounting, read
+[rewrite headroom](references/artwork-rewrite-headroom.md). It separates observed
+allocation failure from inferred cause and requires deliberate pre-grant refusal.
+
 For maximum-resolution noisy JPEG/WebP qualification, read
 [maximum artwork](references/deployment-maximum-artwork.md). It distinguishes
 admission refusal, controlled processing failure and native abort containment,

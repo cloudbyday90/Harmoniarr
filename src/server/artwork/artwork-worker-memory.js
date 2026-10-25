@@ -4,7 +4,7 @@
  * Licensed under GPL-3.0-or-later. See LICENSE.
  */
 import { readFile } from 'node:fs/promises';
-import { artworkWorkerError } from './artwork-worker-protocol.js';
+import { artworkWorkerError, ARTWORK_WORKER_OUTPUT_LIMIT } from './artwork-worker-protocol.js';
 
 export const ARTWORK_WORKER_DATA_LIMIT = 1024 * 1024 * 1024;
 const sampleBytes = new Map([['uchar', 1], ['char', 1], ['ushort', 2], ['short', 2], ['uint', 4], ['int', 4], ['float', 4], ['double', 8]]);
@@ -34,7 +34,13 @@ export function artworkDecodedMemoryBytes(metadata, width = metadata.width, heig
   const bytes = sampleBytes.get(metadata.depth) ?? 8;
   return 4 * width * height * Math.max(3, channels) * bytes;
 }
+/** Shared child estimate, including runtime and retained native rewrite output.
+ * This is conservative admission accounting, not an allocator or RSS guarantee.
+ */
+export function artworkWorkerMemoryEstimate(metadata, inputBytes, width = metadata.width, height = metadata.height) {
+  return 128 * 1024 ** 2 + 2 * inputBytes + ARTWORK_WORKER_OUTPUT_LIMIT + artworkDecodedMemoryBytes(metadata, width, height);
+}
 export function assertArtworkMemoryAdmission({ metadata, width, height, inputBytes }) {
-  const estimate = 64 * 1024 * 1024 + 2 * inputBytes + artworkDecodedMemoryBytes(metadata, width, height);
+  const estimate = artworkWorkerMemoryEstimate(metadata, inputBytes, width, height);
   if (!Number.isSafeInteger(estimate) || estimate > ARTWORK_WORKER_DATA_LIMIT) throw artworkWorkerError('memory');
 }

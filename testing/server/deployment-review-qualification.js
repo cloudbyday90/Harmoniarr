@@ -12,6 +12,7 @@ import { withDeploymentMediaWorkers } from './deployment-media-workers.js';
 import { createDeploymentReviewObserver, runDeploymentReviewConcurrently } from './deployment-review-observer.js';
 import { withDeploymentReviewWorkload } from './deployment-review-workload.js';
 import { readDeploymentMemory } from './deployment-memory-observer.js';
+import { maximumArtworkCases } from './artwork-maximum-inputs.js';
 
 /** Guarded entries own the pool/profile; every case shares the same actual workload. */
 export async function qualifyDeploymentReviewMemory({ pool, profile, gib, signal, artworkCaseId = null }) {
@@ -24,10 +25,14 @@ export async function qualifyDeploymentReviewMemory({ pool, profile, gib, signal
   const { pid: _pid, ...databaseSettings } = backend; const before = await profile.snapshot(); const beforeFixture = await readDeploymentMemory();
   const measurement = await withDeploymentMediaFixture(async fixture => {
     const observation = createDeploymentReviewObserver({ mediaObserver: createDeploymentMediaObserver({ signal }) });
+    const holdScanUntilArtwork = maximumArtworkCases.some(spec => spec.id === artworkCaseId);
     return runDeploymentMemoryWorkload({ pool, dimension: 8192, callerBytes: 256 * 1024 ** 2, artworkCaseId, signal,
-      onArtworkSpawn: () => observation.observer.observeArtworkSpawn(),
+      onArtworkSpawn: () => {
+        observation.observer.observeArtworkSpawn();
+        if (holdScanUntilArtwork) observation.observer.releaseScan();
+      },
       withConcurrentWork: (context, work) => withDeploymentReviewWorkload({ ...context, observation, signal }, review =>
-        withDeploymentMediaWorkers({ ...context, fixture, observer: observation.observer }, () => runDeploymentReviewConcurrently(work, review))),
+        withDeploymentMediaWorkers({ ...context, fixture, observer: observation.observer, holdScanUntilArtwork }, () => runDeploymentReviewConcurrently(work, review))),
     });
   });
   const after = await profile.snapshot(); const afterFixture = await readDeploymentMemory();

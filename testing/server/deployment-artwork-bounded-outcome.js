@@ -64,5 +64,5 @@ export async function settleBoundedDeploymentArtwork({ pool, image, artworkCase,
     artworkCase: { ...artworkCase.evidence, ...termination,
       outcome: termination.containedNativeFailures ? 'contained-native-failure' : images === owners.length ? 'published' : images === 0 ? 'refused' : 'mixed',
       refusalCount: refusals.length, refusals, publicationLookups: getPublicationLookups(), closedWorkers: children.length,
-      workerResults: children.map(({ code, signal }) => ({ code, signal })) } };
+      workerResults: children.map(({ code, signal, outputBytes }) => ({ code, signal, outputBytes })) } };
 }

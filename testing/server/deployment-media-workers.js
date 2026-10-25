@@ -14,7 +14,7 @@ import { createMediaInspectionService } from '../../src/server/media/media-inspe
 import { createMediaTranscodeExecutionService } from '../../src/server/media/media-transcode-execution-service.js';
 import { withWorkerTaskCleanup } from '../../src/server/worker-task-cleanup.js';
 
-export async function withDeploymentMediaWorkers({ application, pool, fixture, observer }, work) {
+export async function withDeploymentMediaWorkers({ application, pool, fixture, observer, holdScanUntilArtwork = false }, work) {
   const library = application.libraryModule; const imports = application.importCandidateModule;
   const scanStore = library.libraryScanRunStore; const inspectionStore = imports.importCandidateMediaInspectionRunStore;
   const transcodeStore = imports.importCandidateTranscodeRunStore; const queue = createOperationQueueStore();
@@ -64,7 +64,10 @@ export async function withDeploymentMediaWorkers({ application, pool, fixture, o
     await Promise.race([observer.waitForScan(), completions[0].then(() => assert.fail('Scan missed its owned tag stage'))]);
     const encodeId = await start(encodeWorker, transcodeStore, 'import_candidate_transcode_orchestration', { requestedCandidateCount: 1, transcodeCandidateFileCount: 1 });
     const probeId = await start(probeWorker, inspectionStore, 'import_candidate_media_inspection', { requestedCandidateCount: selected.length });
-    await observer.waitForOverlap(); observer.releaseScan();
+    await observer.waitForOverlap();
+    // Large fixture downloads can outlast the short scan. Their owner releases
+    // this tag gate at the actual artwork spawn; cleanup always releases it.
+    if (!holdScanUntilArtwork) observer.releaseScan();
     const result = await work(); await Promise.all(completions);
     const scanRun = await scanStore.getRunById(scanId); const probeRun = await inspectionStore.getRunById(probeId); const encodeRun = await transcodeStore.getRunById(encodeId);
     for (const run of [scanRun, probeRun, encodeRun]) assert.equal(run.status, 'completed');

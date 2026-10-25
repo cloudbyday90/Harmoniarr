@@ -41,7 +41,7 @@ export async function runDeploymentMemoryWorkload({ pool, dimension, callerBytes
       activeChildren++; peakChildren = Math.max(peakChildren, activeChildren);
       child.once('spawn', onArtworkSpawn);
       child.once('close', (code, exitSignal) => {
-        Object.assign(record, { closed: true, code, signal: exitSignal }); activeChildren--;
+        Object.assign(record, { closed: true, code, signal: exitSignal, outputBytes }); activeChildren--;
         try { onArtworkClose({ code, signal: exitSignal, outputBytes }); } catch { /* optional qualification diagnostic */ }
       }); return child;
     } });

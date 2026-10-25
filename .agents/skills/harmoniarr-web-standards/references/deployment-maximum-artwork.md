@@ -4,6 +4,10 @@ Use for fixed maximum-resolution JPEG/WebP resource qualification. Read active-r
 docs/DEPLOYMENT_MAXIMUM_ARTWORK_DESIGN.md, research/outcome and
 [mixed workload ownership](deployment-review-memory.md).
 
+The current fixed maximum entry requires deliberate pre-grant memory refusal;
+read [rewrite headroom](artwork-rewrite-headroom.md). Historical native-abort
+containment remains diagnostic evidence and cannot pass that repaired regression.
+
 - Use the fixed maximum selectors before pool acquisition. TIFF is a supported
   generation source; lazy sixteen-row strips avoid a full raw JavaScript image.
   Check actual decode/pixel parity with a tiny multi-strip file before native work.

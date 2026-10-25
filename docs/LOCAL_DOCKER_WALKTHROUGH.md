@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 24 [rewrite headroom rebuild](LOCAL_DOCKER_ARTWORK_REWRITE_HEADROOM_OUTCOME.md)
+records the latest no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](ARTWORK_REWRITE_HEADROOM_OUTCOME.md) links the observed
+native rewrite allocation failure to shared child/parent memory admission.
+
 The October 24 [maximum artwork rebuild](LOCAL_DOCKER_DEPLOYMENT_MAXIMUM_ARTWORK_OUTCOME.md)
 records the latest no-cache image and preserved administrator/data/mounts. The
 [maximum artwork outcome](DEPLOYMENT_MAXIMUM_ARTWORK_OUTCOME.md) distinguishes

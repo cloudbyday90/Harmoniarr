@@ -13,7 +13,15 @@ import { qualifyDeploymentReviewMemory } from '../../testing/server/deployment-r
 const { gib, profile } = await requireDeploymentMemoryProfile();
 const spec = maximumArtworkCases.find(item => item.id === process.env.HARMONIARR_REVIEW_ARTWORK_CASE);
 assert.ok(spec, 'Select an owned maximum artwork case before pool acquisition');
-test(`maximum mixed artwork: ${spec.id}`, { timeout: 180_000 }, async t => {
+test(`maximum mixed artwork refuses combined memory cost: ${spec.id}`, { timeout: 180_000 }, async t => {
   t.after(closePool);
-  t.diagnostic(JSON.stringify(await qualifyDeploymentReviewMemory({ pool: getPool(), profile, gib, signal: t.signal, artworkCaseId: spec.id })));
+  const result = await qualifyDeploymentReviewMemory({ pool: getPool(), profile, gib, signal: t.signal, artworkCaseId: spec.id });
+  const artwork = result.result.artworkCase;
+  assert.equal(result.result.images, 0); assert.equal(artwork.containedNativeFailures, 0); assert.equal(artwork.timeoutTerminations, 0);
+  assert.ok(artwork.refusals.some(row => row.code === 'artwork_worker_memory'));
+  assert.ok(artwork.refusals.every(row => ['artwork_worker_memory', 'artwork_ingestion_capacity'].includes(row.code)));
+  assert.ok(artwork.workerResults.every(row => row.code === 1 && row.signal === null));
+  assert.ok(artwork.workerResults.every(row => row.outputBytes === Buffer.byteLength('{"failure":"memory"}\n')),
+    'The real worker must refuse before its metadata/grant handshake or any output body');
+  t.diagnostic(JSON.stringify(result));
 });

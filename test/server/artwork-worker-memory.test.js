@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { ARTWORK_WORKER_DATA_LIMIT, artworkWorkerLaunch, assertArtworkWorkerMemoryLimit } from '../../src/server/artwork/artwork-worker-memory.js';
+import { ARTWORK_WORKER_DATA_LIMIT, artworkWorkerLaunch, assertArtworkWorkerMemoryLimit, assertArtworkMemoryAdmission, artworkWorkerMemoryEstimate } from '../../src/server/artwork/artwork-worker-memory.js';
 import { createArtworkWorkerCollector, isArtworkWorkerError } from '../../src/server/artwork/artwork-worker-protocol.js';
 import { transformArtworkBuffer } from '../../src/server/artwork/artwork-image-transform.js';
 import { sanitizeArtworkBuffer } from '../../src/server/artwork/artwork-image-processing.js';
@@ -52,6 +52,27 @@ test('memory admission accounts for input retention together with decoded pixels
     inspectArtworkBufferFn: async () => ({ format: 'jpeg', width: 8192, height: 8192, channels: 3, depth: 'uchar' }),
     sanitizeArtworkBufferFn: async () => assert.fail('refuse combined budget before rewrite'),
   }), { code: 'artwork_worker_memory', status: 503 });
+});
+
+test('combined maximum RGB admission includes runtime and rewrite output with an exact byte boundary', () => {
+  const metadata = { width: 8192, height: 8192, channels: 3, depth: 'uchar' };
+  const inputBytes = 14 * 1024 ** 2;
+  assert.equal(artworkWorkerMemoryEstimate(metadata, inputBytes), ARTWORK_WORKER_DATA_LIMIT);
+  assert.doesNotThrow(() => assertArtworkMemoryAdmission({ metadata, inputBytes }));
+  for (const bytes of [inputBytes + 1, 55_298_216, 54_289_930]) {
+    assert.throws(() => assertArtworkMemoryAdmission({ metadata, inputBytes: bytes }),
+      error => isArtworkWorkerError(error) && error.code === 'artwork_worker_memory' && error.status === 503);
+  }
+});
+
+test('combined memory refusal precedes the parent grant, rewrite and statistics', async () => {
+  const seen = [];
+  await assert.rejects(transformArtworkBuffer({ buffer: Buffer.alloc(14 * 1024 ** 2 + 1), maxBytes: 100 * 1024 ** 2,
+    maxDimensionPixels: 8192, onMetadata: () => seen.push('grant') }, {
+    inspectArtworkBufferFn: async () => { seen.push('inspect'); return { format: 'jpeg', width: 8192, height: 8192, channels: 3, depth: 'uchar' }; },
+    sanitizeArtworkBufferFn: async () => { seen.push('rewrite'); }, sharpStatsFn: async () => { seen.push('stats'); },
+  }), error => isArtworkWorkerError(error) && error.code === 'artwork_worker_memory');
+  assert.deepEqual(seen, ['inspect']);
 });
 
 test('memory failure framing permits only the fixed capacity result with failed exit and no body', () => {

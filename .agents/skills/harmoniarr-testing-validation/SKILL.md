@@ -5,6 +5,12 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For native rewrite headroom changes, read the standards
+[accounting reference](../harmoniarr-web-standards/references/artwork-rewrite-headroom.md).
+Run budget/grant-order, ingestion, framing and observer checks, then one fast gate.
+Use the strict maximum regression plus affected worker lifecycle/allocation/corpus
+and mixed profiles; a contained abort cannot pass the repaired maximum entry.
+
 For maximum-resolution noisy JPEG/WebP inputs, read the standards
 [maximum artwork reference](../harmoniarr-web-standards/references/deployment-maximum-artwork.md).
 Pair lazy-source/real TIFF parity, cleanup/cache restoration and owned outcome
