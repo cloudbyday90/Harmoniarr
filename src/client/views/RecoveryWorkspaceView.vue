@@ -12,6 +12,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import SettingsDisclosure from '../components/settings/SettingsDisclosure.vue';
 import ArtworkAdmissionDiagnostics from '../components/ArtworkAdmissionDiagnostics.vue';
+import RecoveryDiagnosticEvents from '../components/RecoveryDiagnosticEvents.vue';
 import { buildBackupExportDownloadUrl } from '../lib/recovery-api.js';
 import {
   buildRecoveryRouteQuery,
@@ -88,8 +89,6 @@ const {
   errorMessage: diagnosticsErrorMessage,
   isLoading: isLoadingDiagnostics,
   loadDiagnostics,
-  recentFailedRuns,
-  recentPrivilegedActions,
   recentQueueRuns,
   queueDiagnostics,
   recoveryDiagnostics,
@@ -414,9 +413,7 @@ watch(hasActiveLocks, (nextHasActiveLocks) => {
           <div v-if="queueDiagnostics" class="cfg-group"><p class="cfg-group-title">Queue overview</p><dl class="review-meta-grid"><div><dt>Pending</dt><dd>{{ queueDiagnostics.queueState?.pending ?? 'Unavailable' }}</dd></div><div><dt>Running</dt><dd>{{ queueDiagnostics.queueState?.running ?? 'Unavailable' }}</dd></div><div><dt>Failed</dt><dd>{{ queueDiagnostics.queueState?.failed ?? 'Unavailable' }}</dd></div><div><dt>Tracked</dt><dd>{{ queueDiagnostics.queueState?.totalTracked ?? 'Unavailable' }}</dd></div></dl></div>
           <ArtworkAdmissionDiagnostics :runtime="queueDiagnostics?.runtime" />
           <div v-if="recentQueueRuns.length" class="cfg-group"><p class="cfg-group-title">Recent queue runs</p><div class="cfg-mapping-list recovery-workspace__list"><div v-for="run in recentQueueRuns.slice(0, 5)" :key="run.operationType + (run.startedAt ?? run.createdAt)" class="cfg-mapping-card recovery-workspace__check"><div><strong>{{ run.operationType }}</strong><p class="hx-text-muted">{{ formatDiagnosticTimestamp(run.startedAt) }}</p></div><span class="hx-pill" :data-tone="run.status === 'completed' ? 'success' : run.status === 'failed' ? 'danger' : null">{{ run.status }}</span></div></div></div>
-          <div v-if="recentFailedRuns.length" class="cfg-group"><p class="cfg-group-title">Recent failures</p><div class="cfg-mapping-list recovery-workspace__list"><div v-for="failed in recentFailedRuns.slice(0, 5)" :key="failed.operationType + (failed.recentFailureAt ?? '')" class="cfg-mapping-card"><strong>{{ failed.operationType }}</strong><p class="hx-text-muted">Last failure {{ formatDiagnosticTimestamp(failed.recentFailureAt) }}</p><p v-if="failed.recentFailureMessage" class="hx-text-muted">{{ failed.recentFailureMessage }}</p><p class="hx-text-muted">{{ failed.recentFailureCount ?? 0 }} failure{{ failed.recentFailureCount === 1 ? '' : 's' }}</p></div></div></div>
-          <div v-if="recentPrivilegedActions.length" class="cfg-group"><p class="cfg-group-title">Recent privileged actions</p><div class="cfg-mapping-list recovery-workspace__list"><div v-for="action in recentPrivilegedActions.slice(0, 5)" :key="action.eventName + (action.occurredAt ?? '')" class="cfg-mapping-card"><strong>{{ action.eventName }}</strong><p class="hx-text-muted">{{ formatDiagnosticTimestamp(action.occurredAt) }}<span v-if="action.actorUserId"> - by {{ action.actorUserId }}</span></p></div></div></div>
-          <div v-if="!recentQueueRuns.length && !recentFailedRuns.length && !recentPrivilegedActions.length" class="hx-empty"><p class="hx-empty-copy">No recent recovery activity to display.</p></div>
+          <RecoveryDiagnosticEvents :diagnostics="recoveryDiagnostics" />
         </template>
         <div v-else class="hx-empty"><p class="hx-empty-copy">No diagnostics data available. Refresh to load current state.</p></div>
       </SettingsDisclosure>

@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 25 [Recovery diagnostic event rebuild](LOCAL_DOCKER_RECOVERY_DIAGNOSTIC_EVENTS_OUTCOME.md)
+records the latest no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](RECOVERY_DIAGNOSTIC_EVENTS_OUTCOME.md) records current
+service-field presentation, redaction, stable row identity and rendered regressions.
+
 The October 25 [artwork admission diagnostics rebuild](LOCAL_DOCKER_ARTWORK_ADMISSION_DIAGNOSTICS_OUTCOME.md)
 records the latest no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](ARTWORK_ADMISSION_DIAGNOSTICS_OUTCOME.md) connects live

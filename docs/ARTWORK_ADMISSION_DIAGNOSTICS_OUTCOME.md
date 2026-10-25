@@ -103,6 +103,11 @@ All project changes are committed/pushed on main without a release or branch.
 
 ## Next recommendation
 
+Continued in the [Recovery diagnostic event outcome](RECOVERY_DIAGNOSTIC_EVENTS_OUTCOME.md),
+with separate [design](RECOVERY_DIAGNOSTIC_EVENTS_DESIGN.md) and
+[research](RECOVERY_DIAGNOSTIC_EVENTS_RESEARCH.md). The recommendation below
+records the display-contract gap identified at the end of this implementation.
+
 Correct the remaining Recovery diagnostics field mappings for recent failures and
 privileged actions. The service returns errorMessage/finishedAt/eventType, while
 the view still expects recentFailureMessage/recentFailureAt/eventName in those
