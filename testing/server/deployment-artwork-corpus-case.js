@@ -8,17 +8,20 @@ import { createHash } from 'node:crypto';
 import sharp from 'sharp';
 import { artworkCorpusCases, createArtworkCorpusInput } from './artwork-corpus-inputs.js';
 import { maximumArtworkCases, createMaximumArtworkInput } from './artwork-maximum-inputs.js';
+import { boundaryArtworkCases } from './artwork-boundary-cases.js';
+import { loadBoundaryArtworkInput } from './artwork-boundary-inputs.js';
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 export function selectDeploymentArtworkCase(id) {
-  const spec = [...artworkCorpusCases, ...maximumArtworkCases].find(item => item.id === id);
+  const spec = [...artworkCorpusCases, ...maximumArtworkCases, ...boundaryArtworkCases].find(item => item.id === id);
   if (!spec) throw new TypeError('Select an owned deployment artwork case');
   return spec;
 }
 /** Reuse the fixed corpus; large refusal cases never decode pixels in the parent. */
 export async function prepareDeploymentArtworkCase(id, { signal } = {}) {
   const spec = selectDeploymentArtworkCase(id);
-  const generated = spec.boundedOutcome ? await createMaximumArtworkInput(spec, { signal }) : { image: await createArtworkCorpusInput(spec) };
+  const generated = spec.prepared ? await loadBoundaryArtworkInput(spec, { signal })
+    : spec.boundedOutcome ? await createMaximumArtworkInput(spec, { signal }) : { image: await createArtworkCorpusInput(spec) };
   const { image } = generated;
   const metadata = await sharp(image, { limitInputPixels: 8192 ** 2 }).metadata();
   assert.equal(metadata.width, spec.width); assert.equal(metadata.height, spec.height); assert.equal(metadata.channels, spec.channels);
@@ -29,7 +32,8 @@ export async function prepareDeploymentArtworkCase(id, { signal } = {}) {
   let canonicalPixels;
   return { spec, image, contentType: `image/${spec.format}`,
     evidence: { id: spec.id, width: spec.width, height: spec.height, inputBits: spec.bits, channels: spec.channels,
-      inputBytes: image.length, expectedRefusal: Boolean(spec.refuse), ...(generated.generation ? { generation: generated.generation, boundedOutcome: true } : {}) },
+      inputBytes: image.length, expectedRefusal: Boolean(spec.refuse), ...(generated.generation ? { generation: generated.generation, boundedOutcome: true } : {}),
+      ...(generated.artifact ? { artifact: generated.artifact, boundedOutcome: true } : {}) },
     async verifyOutput(output) {
       assert.ok(!spec.refuse, 'Capacity refusal cannot publish output');
       const rewritten = await sharp(output).metadata();

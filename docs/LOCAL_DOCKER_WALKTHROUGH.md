@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 24 [admitted artwork rebuild](LOCAL_DOCKER_ARTWORK_ADMITTED_BOUNDARY_OUTCOME.md)
+records the latest no-cache image and preserved administrator/data/mounts. The
+[qualification outcome](ARTWORK_ADMITTED_BOUNDARY_OUTCOME.md) separates prepared
+input identity, successful JPEG publication and controlled WebP refusal.
+
 The October 24 [rewrite headroom rebuild](LOCAL_DOCKER_ARTWORK_REWRITE_HEADROOM_OUTCOME.md)
 records the latest no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](ARTWORK_REWRITE_HEADROOM_OUTCOME.md) links the observed

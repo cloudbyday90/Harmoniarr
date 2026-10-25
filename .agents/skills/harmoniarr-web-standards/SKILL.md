@@ -5,6 +5,10 @@ description: "Apply and verify standards for Harmoniarr UI commands, forms, focu
 
 # Harmoniarr Web Standards
 
+For prepared images inside memory admission, read
+[admitted artwork](references/artwork-admitted-boundary.md). It covers pinned
+read-only artifacts, separate preparation costs and honest success/refusal evidence.
+
 For rewrite abort diagnosis or child/parent memory accounting, read
 [rewrite headroom](references/artwork-rewrite-headroom.md). It separates observed
 allocation failure from inferred cause and requires deliberate pre-grant refusal.

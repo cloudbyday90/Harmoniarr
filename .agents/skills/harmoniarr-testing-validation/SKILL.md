@@ -5,6 +5,12 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For prepared admitted-image qualification, read the standards
+[artifact reference](../harmoniarr-web-standards/references/artwork-admitted-boundary.md).
+Run pinning/read-bound/handle-lifetime checks with selector/observer regressions;
+prepare once and run fresh 2/3 GiB consumers. Keep codecs opt-in and producer peaks
+separate. Retain unchanged runtime proof only after exact source/package review.
+
 For native rewrite headroom changes, read the standards
 [accounting reference](../harmoniarr-web-standards/references/artwork-rewrite-headroom.md).
 Run budget/grant-order, ingestion, framing and observer checks, then one fast gate.

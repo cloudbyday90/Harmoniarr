@@ -109,8 +109,8 @@ combination is refused before unsafe rewrite allocation, with no separate servic
 Cost: some large combinations that occasionally succeeded are now conservatively
 refused. See the research document for the full option comparison and stack.
 
-Next: **qualify high-entropy inputs just inside the combined admission boundary**,
-including maximum-resolution JPEG/WebP encoded below the geometry-specific 14 MiB
-example. Prove actual success or controlled refusal, output identity, close and
-kernel counters before promising an accepted envelope or considering file-backed
-rewrite. The unit arithmetic boundary alone does not establish allocator behavior.
+That qualification is now recorded in the
+[admitted boundary outcome](ARTWORK_ADMITTED_BOUNDARY_OUTCOME.md), including exact
+prepared input identity and different JPEG/WebP outcomes. Use its next item before
+promising an accepted envelope or changing native output delivery. The arithmetic
+boundary alone does not establish allocator behavior.
