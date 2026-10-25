@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 25 [WebP canvas rebuild](LOCAL_DOCKER_WEBP_CANVAS_MEMORY_OUTCOME.md)
+records the latest no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](WEBP_CANVAS_MEMORY_OUTCOME.md) records deliberate
+pre-grant WebP refusal, JPEG publication and a successful medium-WebP control.
+
 The October 24 [admitted artwork rebuild](LOCAL_DOCKER_ARTWORK_ADMITTED_BOUNDARY_OUTCOME.md)
 records the latest no-cache image and preserved administrator/data/mounts. The
 [qualification outcome](ARTWORK_ADMITTED_BOUNDARY_OUTCOME.md) separates prepared

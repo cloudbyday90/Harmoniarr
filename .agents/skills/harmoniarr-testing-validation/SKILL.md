@@ -5,6 +5,13 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For format-aware WebP memory changes, read the standards
+[canvas reference](../harmoniarr-web-standards/references/webp-canvas-memory.md).
+Pair child/parent accounting and pre-grant checks with pinned fresh 2/3 GiB mixed
+profiles, JPEG publication, a medium-WebP success control and affected native
+lifecycle/allocation/corpus regressions. Preserve one stable fast gate; retain
+unrelated evidence only after exact source and packaged-runtime comparison.
+
 For prepared admitted-image qualification, read the standards
 [artifact reference](../harmoniarr-web-standards/references/artwork-admitted-boundary.md).
 Run pinning/read-bound/handle-lifetime checks with selector/observer regressions;

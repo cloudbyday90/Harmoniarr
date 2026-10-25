@@ -15,14 +15,20 @@ import { readPinnedArtworkFile } from '../../testing/server/artwork-pinned-file.
 import { prepareBoundaryArtworkInputs } from '../../testing/server/artwork-boundary-preparation.js';
 import { assertArtworkMemoryAdmission, artworkWorkerMemoryEstimate, ARTWORK_WORKER_DATA_LIMIT } from '../../src/server/artwork/artwork-worker-memory.js';
 
-test('fixed admitted inputs are inside the shared budget and unknown descriptors cannot load arbitrary files', async () => {
+test('fixed boundary inputs declare format-aware admission and unknown descriptors cannot load arbitrary files', async () => {
   for (const spec of boundaryArtworkCases) {
     const metadata = { ...spec, depth: 'uchar' };
-    assert.equal(selectBoundaryArtworkCase(spec.id), spec); assertArtworkMemoryAdmission({ metadata, inputBytes: spec.inputBytes });
+    assert.equal(selectBoundaryArtworkCase(spec.id), spec);
     const headroom = ARTWORK_WORKER_DATA_LIMIT - artworkWorkerMemoryEstimate(metadata, spec.inputBytes);
-    assert.ok(headroom > 0 && headroom < 2 * 1024 ** 2); assert.ok(Object.isFrozen(spec));
+    if (spec.expectedAdmission === 'admitted') {
+      assertArtworkMemoryAdmission({ metadata, inputBytes: spec.inputBytes }); assert.ok(headroom > 0 && headroom < 2 * 1024 ** 2);
+    } else {
+      assert.throws(() => assertArtworkMemoryAdmission({ metadata, inputBytes: spec.inputBytes }), { code: 'artwork_worker_memory' }); assert.ok(headroom < 0);
+    }
+    assert.ok(Object.isFrozen(spec));
   }
   for (const id of [null, undefined, '', 'foreign']) assert.throws(() => selectBoundaryArtworkCase(id), TypeError);
+  assert.equal(selectBoundaryArtworkCase('rgb8-webp-admitted-noise').id, 'rgb8-webp-canvas-refusal');
   await assert.rejects(loadBoundaryArtworkInput({ ...boundaryArtworkCases[0] }), TypeError);
 });
 

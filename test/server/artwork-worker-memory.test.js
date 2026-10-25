@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { ARTWORK_WORKER_DATA_LIMIT, artworkWorkerLaunch, assertArtworkWorkerMemoryLimit, assertArtworkMemoryAdmission, artworkWorkerMemoryEstimate } from '../../src/server/artwork/artwork-worker-memory.js';
+import { ARTWORK_WORKER_DATA_LIMIT, artworkWorkerLaunch, assertArtworkWorkerMemoryLimit, assertArtworkMemoryAdmission, artworkWorkerMemoryEstimate, artworkDecoderCanvasBytes } from '../../src/server/artwork/artwork-worker-memory.js';
 import { createArtworkWorkerCollector, isArtworkWorkerError } from '../../src/server/artwork/artwork-worker-protocol.js';
 import { transformArtworkBuffer } from '../../src/server/artwork/artwork-image-transform.js';
 import { sanitizeArtworkBuffer } from '../../src/server/artwork/artwork-image-processing.js';
+import { decodedArtworkMemoryReservation } from '../../src/server/artwork/artwork-memory-reservation.js';
 
 test('Linux child allocation limits are lowered before Node exec without a shell or inherited flags', () => {
   assert.deepEqual(artworkWorkerLaunch('/worker.js', ['20', '8'], { platform: 'linux', execPath: '/node' }), {
@@ -73,6 +74,27 @@ test('combined memory refusal precedes the parent grant, rewrite and statistics'
     sanitizeArtworkBufferFn: async () => { seen.push('rewrite'); }, sharpStatsFn: async () => { seen.push('stats'); },
   }), error => isArtworkWorkerError(error) && error.code === 'artwork_worker_memory');
   assert.deepEqual(seen, ['inspect']);
+});
+
+test('WebP canvas accounts for four bytes per pixel independently of visible alpha', () => {
+  for (const channels of [3, 4]) assert.equal(artworkDecoderCanvasBytes({ format: 'webp', width: 512, height: 512, channels }), 1024 ** 2);
+  for (const format of ['jpeg', 'png']) assert.equal(artworkDecoderCanvasBytes({ format, width: 8192, height: 8192, channels: 3 }), 0);
+  const metadata = { width: 8192, height: 8192, channels: 3, depth: 'uchar' }; const inputBytes = 14127228;
+  assert.equal(artworkWorkerMemoryEstimate({ ...metadata, format: 'jpeg' }, inputBytes), 1072636152);
+  assert.equal(artworkWorkerMemoryEstimate({ ...metadata, format: 'webp' }, inputBytes), 1341071608);
+  const medium = { ...metadata, width: 4096, height: 4096 };
+  assert.equal(decodedArtworkMemoryReservation({ ...medium, format: 'webp' }, 5)
+    - decodedArtworkMemoryReservation({ ...medium, format: 'jpeg' }, 5), 64 * 1024 ** 2);
+});
+
+test('large RGB WebP refuses before grant/rewrite/stats while a medium WebP remains admitted', async () => {
+  const seen = [];
+  const dependencies = width => ({ inspectArtworkBufferFn: async () => ({ format: 'webp', width, height: width, channels: 3, depth: 'uchar' }),
+    sanitizeArtworkBufferFn: async () => { seen.push('rewrite'); return { data: Buffer.from('output'), info: { width, height: width } }; },
+    sharpStatsFn: async () => { seen.push('stats'); return { dominant: null }; } });
+  const input = { buffer: Buffer.from('input'), maxBytes: 100 * 1024 ** 2, maxDimensionPixels: 8192, onMetadata: () => { seen.push('grant'); } };
+  await assert.rejects(transformArtworkBuffer(input, dependencies(8192)), { code: 'artwork_worker_memory', status: 503 }); assert.deepEqual(seen, []);
+  assert.equal((await transformArtworkBuffer(input, dependencies(4096))).width, 4096); assert.deepEqual(seen, ['grant', 'rewrite', 'stats']);
 });
 
 test('memory failure framing permits only the fixed capacity result with failed exit and no body', () => {

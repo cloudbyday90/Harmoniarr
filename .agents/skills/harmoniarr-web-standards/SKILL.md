@@ -5,6 +5,11 @@ description: "Apply and verify standards for Harmoniarr UI commands, forms, focu
 
 # Harmoniarr Web Standards
 
+For WebP native failures or format-aware decoder accounting, read
+[WebP canvas memory](references/webp-canvas-memory.md). It separates minimal
+decode from full rewrite, pinned source evidence from inference, and early
+capacity refusal from successful processing.
+
 For prepared images inside memory admission, read
 [admitted artwork](references/artwork-admitted-boundary.md). It covers pinned
 read-only artifacts, separate preparation costs and honest success/refusal evidence.

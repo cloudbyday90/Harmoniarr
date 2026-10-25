@@ -116,6 +116,9 @@ Human screen-reader/device acceptance remains deferred. No release or new branch
 
 ## Recommendation and next item
 
+The October 25 [WebP canvas outcome](WEBP_CANVAS_MEMORY_OUTCOME.md) completes
+the investigation below and records the current format-aware admission policy.
+
 Keep shared admission, native isolation and current DATA/deadline controls. Use
 fixed pinned fixtures prepared once, fresh read-only consumers and focused tests.
 Benefits are exact input identity and less repeated qualification setup; costs are

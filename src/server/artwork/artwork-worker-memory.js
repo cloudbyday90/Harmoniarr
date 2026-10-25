@@ -34,11 +34,16 @@ export function artworkDecodedMemoryBytes(metadata, width = metadata.width, heig
   const bytes = sampleBytes.get(metadata.depth) ?? 8;
   return 4 * width * height * Math.max(3, channels) * bytes;
 }
+/** libvips WebP decoding uses an RGBA canvas even for an RGB result. */
+export function artworkDecoderCanvasBytes(metadata, width = metadata.width, height = metadata.height) {
+  return metadata.format === 'webp' ? 4 * width * height : 0;
+}
 /** Shared child estimate, including runtime and retained native rewrite output.
  * This is conservative admission accounting, not an allocator or RSS guarantee.
  */
 export function artworkWorkerMemoryEstimate(metadata, inputBytes, width = metadata.width, height = metadata.height) {
-  return 128 * 1024 ** 2 + 2 * inputBytes + ARTWORK_WORKER_OUTPUT_LIMIT + artworkDecodedMemoryBytes(metadata, width, height);
+  return 128 * 1024 ** 2 + 2 * inputBytes + ARTWORK_WORKER_OUTPUT_LIMIT
+    + artworkDecodedMemoryBytes(metadata, width, height) + artworkDecoderCanvasBytes(metadata, width, height);
 }
 export function assertArtworkMemoryAdmission({ metadata, width, height, inputBytes }) {
   const estimate = artworkWorkerMemoryEstimate(metadata, inputBytes, width, height);

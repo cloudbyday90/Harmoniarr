@@ -1,5 +1,10 @@
 # Prepared admitted artwork qualification
 
+For current WebP admission expectations also read
+[canvas memory](webp-canvas-memory.md). The prepared bytes remain pinned; the
+canonical boundary descriptor now expects early refusal for the large WebP and
+successful JPEG publication. The former admitted command/selector remain aliases.
+
 Use for selected noisy-source images inside shared memory admission. Read
 active-repo docs/ARTWORK_ADMITTED_BOUNDARY_DESIGN.md, research/outcome and
 [rewrite accounting](artwork-rewrite-headroom.md).
