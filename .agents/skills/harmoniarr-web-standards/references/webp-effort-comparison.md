@@ -3,6 +3,13 @@
 Use for encoder effort/quality experiments. Read active-repo
 docs/WEBP_EFFORT_COMPARISON_DESIGN.md, research and outcome.
 
+For a representative artwork screen, also read active-repo
+docs/WEBP_ARTWORK_CORPUS_DESIGN.md, research and outcome. Pin original provenance
+and lossless prepared inputs before comparing. Keep a fixed content-class scope,
+counterbalanced three-repeat schedule and predeclared engineering thresholds.
+Separate numerical screening, agent inspection and human visual acceptance; none
+of these alone grants a production switch. Preserve failed criteria and cases.
+
 - Reuse pinned bytes; predeclare scope, crop geometry, settings and equal limits.
   Never adjust caps or input to obtain a successful reference. Keep production
   admission active; a test-only encoder probe cannot qualify app publication.

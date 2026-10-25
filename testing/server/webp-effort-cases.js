@@ -4,6 +4,7 @@
  * Licensed under GPL-3.0-or-later. See LICENSE.
  */
 import { selectBoundaryArtworkCase } from './artwork-boundary-cases.js';
+import { webpArtworkCases } from './webp-artwork-corpus.js';
 
 export const webpEffortInput = selectBoundaryArtworkCase('rgb8-webp-7120-token-refusal');
 export const webpEffortCases = Object.freeze(['full', 'center-1024'].flatMap(scope => [2, 4].map(effort => Object.freeze({
@@ -13,7 +14,7 @@ export const webpEffortCases = Object.freeze(['full', 'center-1024'].flatMap(sco
 }))));
 
 export function selectWebpEffortCase(effort, scope) {
-  const spec = webpEffortCases.find(row => row.effort === effort && row.scope === scope);
-  if (!spec) throw new TypeError('Select fixed WebP effort 2/4 and full/center-1024 scope');
+  const spec = [...webpEffortCases, ...webpArtworkCases].find(row => row.effort === effort && row.scope === scope);
+  if (!spec) throw new TypeError('Select fixed WebP effort 2/4 and a registered comparison scope');
   return spec;
 }

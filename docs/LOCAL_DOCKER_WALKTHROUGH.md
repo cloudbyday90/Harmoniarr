@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 25 [WebP artwork corpus rebuild](LOCAL_DOCKER_WEBP_ARTWORK_CORPUS_OUTCOME.md)
+records the latest no-cache image and preserved administrator/data/mounts. The
+[corpus outcome](WEBP_ARTWORK_CORPUS_OUTCOME.md) records repeated content-class
+comparisons, separate pixel metrics and visual-review limitations.
+
 The October 25 [WebP effort comparison rebuild](LOCAL_DOCKER_WEBP_EFFORT_COMPARISON_OUTCOME.md)
 records the latest no-cache image and preserved administrator/data/mounts. The
 [comparison outcome](WEBP_EFFORT_COMPARISON_OUTCOME.md) separates encoder method

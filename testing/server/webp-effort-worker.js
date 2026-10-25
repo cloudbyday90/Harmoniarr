@@ -19,13 +19,14 @@ let started = null; let encodeMs = null; let outcome = 'failed'; let outputBytes
 try {
   assert.equal(process.platform, 'linux'); await assertArtworkWorkerMemoryLimit();
   const spec = selectWebpEffortCase(Number(process.argv[5]), process.argv[6]);
+  const input = spec.input ?? webpEffortInput;
   const maxBytes = Number(process.argv[2]); const maxDimensionPixels = Number(process.argv[3]);
   assert.equal(maxBytes, ARTWORK_WORKER_OUTPUT_LIMIT); assert.equal(maxDimensionPixels, 8192);
   const session = createArtworkWorkerSession({ inputBytes: Number(process.argv[4]), maxBytes });
-  const buffer = await session.readInput(); assert.equal(buffer.length, webpEffortInput.inputBytes);
-  assert.equal(createHash('sha256').update(buffer).digest('hex'), webpEffortInput.sha256);
+  const buffer = await session.readInput(); assert.equal(buffer.length, input.inputBytes);
+  assert.equal(createHash('sha256').update(buffer).digest('hex'), input.sha256);
   const options = artworkSharpInputOptions(maxDimensionPixels); const metadata = await sharp(buffer, options).metadata();
-  assert.equal(metadata.width, 7120); assert.equal(metadata.height, 7120); assert.equal(metadata.channels, 3); assert.ok(metadata.exif?.length);
+  assert.equal(metadata.width, input.width); assert.equal(metadata.height, input.height); assert.equal(metadata.channels, 3); assert.ok(metadata.exif?.length);
   await session.requestGrant({ format: 'webp', width: spec.width, height: spec.height, channels: 3, depth: 'uchar' });
   let image = sharp(buffer, options).rotate(); if (spec.crop) image = image.extract(spec.crop);
   started = performance.now();

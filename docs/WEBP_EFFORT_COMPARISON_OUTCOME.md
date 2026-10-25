@@ -150,3 +150,6 @@ use here; its cost is larger output and slightly higher crop error. Retaining th
 current policy preserves established compression behavior and conservative refusal,
 at the cost of continuing to reject this known oversized-memory candidate. The
 representative corpus is the recommended next item; no release or branch is created.
+
+The subsequent [artwork corpus outcome](WEBP_ARTWORK_CORPUS_OUTCOME.md) implements
+that content-class screen with pinned public-source and deterministic inputs.
