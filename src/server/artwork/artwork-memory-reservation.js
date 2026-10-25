@@ -20,6 +20,7 @@ export function initialArtworkMemoryReservation(inputBytes) {
 export function decodedArtworkMemoryReservation(metadata, inputBytes) {
   assertInputBytes(inputBytes);
   const child = artworkWorkerMemoryEstimate(metadata, inputBytes);
+  if (metadata.webpSelection === true) return initialArtworkMemoryReservation(inputBytes);
   const estimate = inputBytes + 2 * ARTWORK_WORKER_OUTPUT_LIMIT + child;
   if (!Number.isSafeInteger(estimate) || estimate < 1) throw new TypeError('Invalid artwork metadata reservation');
   return Math.min(initialArtworkMemoryReservation(inputBytes), estimate);

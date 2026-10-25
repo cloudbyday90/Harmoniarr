@@ -177,3 +177,7 @@ The benefit is exact graphic pixels with much smaller output in the qualified
 samples. The costs are additional mode/resource ownership and content-dependent
 CPU/size behavior. A built-in bounded selection service, backed by measured
 admission and publication tests, is the recommended next implementation step.
+
+The subsequent [bounded selection outcome](WEBP_OUTPUT_SELECTION_OUTCOME.md)
+implements that step with conservative full-envelope reservation and actual
+PostgreSQL/file publication qualification.

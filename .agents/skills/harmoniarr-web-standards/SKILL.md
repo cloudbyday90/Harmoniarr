@@ -5,6 +5,10 @@ description: "Apply and verify standards for Harmoniarr UI commands, forms, focu
 
 # Harmoniarr Web Standards
 
+For production WebP mode selection, read
+[bounded output selection](references/webp-output-selection.md). It covers narrow
+eligibility, full reservation, shared deadline, exact grants and publication fences.
+
 For encoder effort/quality experiments, read
 [WebP effort comparison](references/webp-effort-comparison.md). It covers fixed
 inputs, independent full/crop evidence, equal limits, owned artifacts and the

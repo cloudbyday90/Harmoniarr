@@ -8,6 +8,7 @@ import { createApiError } from '../api-error.js';
 import { assertArtworkBuffer, assertArtworkRasterSignature, artworkSharpInputOptions } from './artwork-image-content-policy.js';
 import { artworkWorkerError } from './artwork-worker-protocol.js';
 import { ARTWORK_WEBP_EFFORT, ARTWORK_WEBP_QUALITY } from './artwork-webp-policy.js';
+import { rewriteArtworkWebpSelection } from './artwork-webp-rewrite-service.js';
 
 const encoders = {
   jpeg: image => image.jpeg({ chromaSubsampling: '4:4:4', quality: 90 }),
@@ -22,7 +23,8 @@ export async function inspectArtworkBuffer(buffer, { maxDimensionPixels } = {}) 
   catch { throw createApiError(400, 'artwork_image_invalid', 'Artwork could not be inspected within the image policy'); }
 }
 
-export async function sanitizeArtworkBuffer({ buffer, format, maxDimensionPixels }) {
+export async function sanitizeArtworkBuffer({ buffer, format, maxDimensionPixels, webpSelection = false }) {
+  if (format === 'webp' && webpSelection === true) return rewriteArtworkWebpSelection({ buffer, maxDimensionPixels });
   const encoder = encoders[format];
   if (!Object.hasOwn(encoders, format)) throw createApiError(400, 'artwork_format_unsupported', 'Artwork format is unsupported');
   // Maximum-size images share CPU with media commands. Leave room for metadata

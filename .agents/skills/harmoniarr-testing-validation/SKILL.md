@@ -5,6 +5,12 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For production WebP output selection, read the standards
+[selection reference](../harmoniarr-web-standards/references/webp-output-selection.md).
+Pair focused policy/service/admission/protocol checks with actual guarded database/
+file publication, native cancellation and affected worker/mixed regressions. Keep
+one stable fast gate and explicit exact-source/runtime retention of unrelated proof.
+
 For WebP effort/quality experiments, read the standards
 [comparison reference](../harmoniarr-web-standards/references/webp-effort-comparison.md).
 Keep fixed full/crop cases and separate pixel metrics opt-in; pair cheap metric/

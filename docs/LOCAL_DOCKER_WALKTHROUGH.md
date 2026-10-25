@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 25 [bounded WebP selection rebuild](LOCAL_DOCKER_WEBP_OUTPUT_SELECTION_OUTCOME.md)
+records the latest no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](WEBP_OUTPUT_SELECTION_OUTCOME.md) connects size-based
+sanitized selection to full reservation, actual publication and cancellation.
+
 The October 25 [lossless WebP rewrite rebuild](LOCAL_DOCKER_WEBP_LOSSLESS_REWRITE_OUTCOME.md)
 records the latest no-cache image and preserved administrator/data/mounts. The
 [qualification outcome](WEBP_LOSSLESS_REWRITE_OUTCOME.md) separates exact RGB8

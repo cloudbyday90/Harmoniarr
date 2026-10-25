@@ -81,6 +81,7 @@
     "validate:native-deployment-review-artwork-characterization": "node --test --test-concurrency=1 test/native/deployment-review-artwork-characterization.test.js",
     "validate:native-artwork-webp-canvas": "node --test --test-concurrency=1 test/native/artwork-webp-canvas.test.js",
     "validate:native-webp-effort-comparison": "node --test --test-concurrency=1 test/native/artwork-webp-effort.test.js",
+    "validate:native-webp-output-selection": "node --test --test-concurrency=1 test/native/artwork-webp-selection.test.js",
     "validate:native-webp-corpus-preparation": "node --test --test-concurrency=1 test/native/artwork-webp-corpus-preparation.test.js",
     "validate:native-deployment-review-maximum-artwork": "node --test --test-concurrency=1 test/native/deployment-review-maximum-artwork.test.js",
     "validate:native-media-command-admission": "node --test --test-concurrency=1 test/native/media-command-admission.test.js",

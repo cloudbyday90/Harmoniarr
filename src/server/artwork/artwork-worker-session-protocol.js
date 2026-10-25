@@ -4,13 +4,15 @@
  * Licensed under GPL-3.0-or-later. See LICENSE.
  */
 import { artworkWorkerError, ARTWORK_WORKER_HEADER_LIMIT, createArtworkWorkerCollector } from './artwork-worker-protocol.js';
+import { canReserveArtworkWebpSelection } from './artwork-webp-selection-policy.js';
 
 const depths = ['uchar', 'char', 'ushort', 'short', 'uint', 'int', 'float', 'double', 'unknown'];
 export const ARTWORK_WORKER_GRANT = 'grant\n';
 export function artworkWorkerMetadata(metadata) {
+  if (metadata.webpSelection !== undefined && metadata.webpSelection !== true) throw artworkWorkerError();
   return { stage: 'metadata', format: metadata.format, width: metadata.width, height: metadata.height,
     channels: Number.isInteger(metadata.channels) && metadata.channels >= 1 && metadata.channels <= 4 ? metadata.channels : 4,
-    depth: depths.includes(metadata.depth) ? metadata.depth : 'unknown' };
+    depth: depths.includes(metadata.depth) ? metadata.depth : 'unknown', ...(metadata.webpSelection === true ? { webpSelection: true } : {}) };
 }
 
 export function createArtworkSessionCollector(maxDimensionPixels, onMetadata) {
@@ -27,7 +29,8 @@ export function createArtworkSessionCollector(maxDimensionPixels, onMetadata) {
       phase = 'result'; result.push(Buffer.concat([prefix, chunk.subarray(end)])); return;
     }
     if (!header || typeof header !== 'object' || Array.isArray(header) || header.stage !== 'metadata'
-      || Object.keys(header).sort().join(',') !== 'channels,depth,format,height,stage,width'
+      || !['channels,depth,format,height,stage,width', 'channels,depth,format,height,stage,webpSelection,width'].includes(Object.keys(header).sort().join(','))
+      || (Object.hasOwn(header, 'webpSelection') && (header.webpSelection !== true || !canReserveArtworkWebpSelection(header, 1)))
       || !['jpeg', 'png', 'webp'].includes(header.format) || !depths.includes(header.depth)
       || !Number.isInteger(header.channels) || header.channels < 1 || header.channels > 4
       || !['width', 'height'].every(key => Number.isInteger(header[key]) && header[key] > 0 && header[key] <= maxDimensionPixels)

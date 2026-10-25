@@ -6,6 +6,7 @@
 import { readFile } from 'node:fs/promises';
 import { artworkWorkerError, ARTWORK_WORKER_OUTPUT_LIMIT } from './artwork-worker-protocol.js';
 import { webpEncoderGrowthMemoryBytes } from './artwork-webp-policy.js';
+import { canReserveArtworkWebpSelection } from './artwork-webp-selection-policy.js';
 
 export const ARTWORK_WORKER_DATA_LIMIT = 1024 * 1024 * 1024;
 const sampleBytes = new Map([['uchar', 1], ['char', 1], ['ushort', 2], ['short', 2], ['uint', 4], ['int', 4], ['float', 4], ['double', 8]]);
@@ -43,6 +44,12 @@ export function artworkDecoderCanvasBytes(metadata, width = metadata.width, heig
  * This is conservative admission accounting, not an allocator or RSS guarantee.
  */
 export function artworkWorkerMemoryEstimate(metadata, inputBytes, width = metadata.width, height = metadata.height) {
+  if (metadata.webpSelection !== undefined) {
+    if (metadata.webpSelection !== true || !canReserveArtworkWebpSelection({ ...metadata, width, height }, inputBytes)) throw artworkWorkerError('memory');
+    // Both retained outputs and the native working set stay inside this DATA
+    // envelope. Do not infer a tighter bound from isolated encoder measurements.
+    return ARTWORK_WORKER_DATA_LIMIT;
+  }
   return 128 * 1024 ** 2 + 2 * inputBytes + ARTWORK_WORKER_OUTPUT_LIMIT
     + artworkDecodedMemoryBytes(metadata, width, height) + artworkDecoderCanvasBytes(metadata, width, height)
     + (metadata.format === 'webp' ? webpEncoderGrowthMemoryBytes(width, height) : 0);

@@ -10,6 +10,7 @@ import { assertArtworkBuffer, artworkInputByteLimit, artworkSharpInputOptions } 
 import { artworkWorkerError, artworkWorkerRefusal, isArtworkWorkerError } from './artwork-worker-protocol.js';
 import { artworkWorkerLaunch } from './artwork-worker-memory.js';
 import { createArtworkSessionCollector, ARTWORK_WORKER_GRANT } from './artwork-worker-session-protocol.js';
+import { canReserveArtworkWebpSelection } from './artwork-webp-selection-policy.js';
 
 const workerPath = fileURLToPath(new URL('./artwork-image-worker.js', import.meta.url));
 
@@ -36,6 +37,7 @@ export function createArtworkWorkerService({ spawnFn = spawn, timeoutMs = 15_000
     return new Promise((resolve, reject) => {
       let failure; let closed = false;
       const collector = createArtworkSessionCollector(maxDimensionPixels, metadata => {
+        if (metadata.webpSelection === true && !canReserveArtworkWebpSelection(metadata, buffer.length)) throw artworkWorkerError();
         const ownerResult = onMetadata?.(metadata);
         if (ownerResult !== undefined) {
           if (ownerResult instanceof Promise) void ownerResult.catch(() => {});

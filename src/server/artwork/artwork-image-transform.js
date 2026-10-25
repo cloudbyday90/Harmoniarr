@@ -8,6 +8,7 @@ import { assertArtworkBuffer, artworkInputByteLimit, artworkSharpInputOptions } 
 import { inspectArtworkBuffer, sanitizeArtworkBuffer, getArtworkBufferStats } from './artwork-image-processing.js';
 import { ARTWORK_WORKER_OUTPUT_LIMIT } from './artwork-worker-protocol.js';
 import { assertArtworkMemoryAdmission } from './artwork-worker-memory.js';
+import { shouldSelectArtworkWebpOutput } from './artwork-webp-selection-policy.js';
 
 /** Native implementation: production calls this only in the disposable child. */
 export async function transformArtworkBuffer({ buffer, maxBytes, maxDimensionPixels, onMetadata }, {
@@ -33,9 +34,10 @@ export async function transformArtworkBuffer({ buffer, maxBytes, maxDimensionPix
   if (width > maxDimensionPixels || height > maxDimensionPixels) {
     throw createApiError(400, 'artwork_dimensions_too_large', 'Artwork exceeds the dimension limit');
   }
-  assertArtworkMemoryAdmission({ metadata, width, height, inputBytes: buffer.length });
-  await onMetadata?.({ format: metadata.format, width, height, channels: metadata.channels, depth: metadata.depth });
-  const { data, info } = await sanitizeArtworkBufferFn({ buffer, format: metadata.format, maxDimensionPixels });
+  const selection = shouldSelectArtworkWebpOutput(buffer, metadata) ? { webpSelection: true } : {};
+  assertArtworkMemoryAdmission({ metadata: { ...metadata, ...selection }, width, height, inputBytes: buffer.length });
+  await onMetadata?.({ format: metadata.format, width, height, channels: metadata.channels, depth: metadata.depth, ...selection });
+  const { data, info } = await sanitizeArtworkBufferFn({ buffer, format: metadata.format, maxDimensionPixels, ...selection });
   if (data.length > ARTWORK_WORKER_OUTPUT_LIMIT) {
     throw createApiError(400, 'artwork_output_too_large', 'Rewritten artwork exceeds the output byte limit');
   }
