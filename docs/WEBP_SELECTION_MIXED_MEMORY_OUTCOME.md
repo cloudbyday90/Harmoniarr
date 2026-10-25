@@ -110,6 +110,11 @@ All project changes stay on main and are committed/pushed without a release.
 
 ## Next recommendation
 
+Continued in the [admission diagnostics outcome](ARTWORK_ADMISSION_DIAGNOSTICS_OUTCOME.md),
+with separate [design](ARTWORK_ADMISSION_DIAGNOSTICS_DESIGN.md) and
+[research](ARTWORK_ADMISSION_DIAGNOSTICS_RESEARCH.md). The recommendation below
+records the next step identified by this qualification.
+
 Add a bounded read-only artwork-admission projection to the existing administrator
 runtime diagnostics. The gate already owns active/queued/input-byte and logical
 reservation/budget counters, while runtime monitoring currently reports process

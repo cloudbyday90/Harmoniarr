@@ -51,6 +51,7 @@ function normalizeLockTypeFilter(lockTypes) {
 export function createRecoveryDiagnosticsService({
   controlPlaneRedactionService = createControlPlaneRedactionService(),
   getPoolFn = getPool,
+  getRuntimeDiagnostics = () => null,
   listActiveMaintenanceLocks = async () => [],
   listRecentAuditEvents = async () => [],
   listRecentOperationRuns = async () => [],
@@ -103,6 +104,7 @@ export function createRecoveryDiagnosticsService({
         ...statusCounts,
         totalTracked: statusCounts.pending + statusCounts.running + statusCounts.failed,
       },
+      runtime: getRuntimeDiagnostics(),
       recentRuns,
     };
   }

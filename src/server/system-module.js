@@ -55,6 +55,7 @@ export function createSystemModule({
   activityFeedService = null,
   appleMusicStatusService = null,
   appPort,
+  artworkIngestionService = null,
   artworkPolicyService = null,
   artworkSummaryService = null,
   auditReadService = null,
@@ -185,6 +186,7 @@ export function createSystemModule({
   systemService = createSystemService({
     activityFeedService: systemActivityFeedService,
     appleMusicStatusService,
+    artworkIngestionService,
     artworkPolicyService,
     artworkSummaryService,
     importCandidateExecutionHeartbeatConfig,
@@ -219,6 +221,7 @@ export function createSystemModule({
     });
   const resolvedSystemRecoveryDiagnosticsService = recoveryDiagnosticsService
     ?? createRecoveryDiagnosticsService({
+      getRuntimeDiagnostics: systemService.getRuntimeDiagnostics,
       listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks,
       listRecentAuditEvents: resolvedAuditReadService.listRecentAuditEvents,
       listRecentOperationRuns: operationHistoryService?.listRecentOperationRuns,

@@ -17,6 +17,7 @@
  */
 
 import { createControlPlaneRedactionService } from './control-plane-redaction-service.js';
+import { projectArtworkAdmissionObservation } from '../shared/artwork-admission-diagnostics.js';
 
 function normalizeLimit(limit, { defaultLimit = 10, maxLimit = 25 } = {}) {
   const parsed = Number.parseInt(limit, 10);
@@ -117,6 +118,7 @@ function summarizeOverview(overview, controlPlaneRedactionService) {
     pathValidation: overview.pathValidation ?? null,
     runtime: overview.runtime
       ? {
+        artworkAdmission: projectArtworkAdmissionObservation(overview.runtime.artworkAdmission),
         configuration: overview.runtime.configuration
           ? {
             mediaCommands: overview.runtime.configuration.mediaCommands ?? null,

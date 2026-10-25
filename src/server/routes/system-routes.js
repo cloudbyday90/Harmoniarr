@@ -120,6 +120,7 @@ export function registerSystemRoutes(app, {
 
   app.get('/api/v1/system/overview', asyncRoute(async (request, response) => {
     await requireAdminSession(request);
+    response.setHeader('Cache-Control', 'no-store');
     response.json(await getOverview({ includeDependencies: true }));
   }));
 
@@ -352,6 +353,7 @@ export function registerSystemRoutes(app, {
 
   app.get('/api/v1/system/diagnostics/queue-state', asyncRoute(async (request, response) => {
     await requireAdminSession(request);
+    response.setHeader('Cache-Control', 'no-store');
 
     response.json({
       ok: true,
@@ -380,6 +382,7 @@ export function registerSystemRoutes(app, {
 
   app.get('/api/v1/system/diagnostics/export', limitDiagnosticsExport, asyncRoute(async (request, response) => {
     await requireAdminSession(request);
+    response.setHeader('Cache-Control', 'no-store');
 
     const lockTypes = typeof request.query.lockTypes === 'string'
       ? request.query.lockTypes.split(',')

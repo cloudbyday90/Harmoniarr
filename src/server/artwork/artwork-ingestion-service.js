@@ -240,6 +240,7 @@ export function createArtworkIngestionService({
   }
 
   return {
+    getAdmissionSnapshot: () => artworkIngestionAdmission.getSnapshot?.() ?? null,
     ingestArtworkFile,
     ingestArtworkBuffer,
   };

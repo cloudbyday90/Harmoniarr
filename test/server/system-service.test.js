@@ -503,6 +503,7 @@ test('createSystemService includes runtime monitoring details in the overview pa
   const overview = await systemService.getOverview({ includeDependencies: false });
 
   assert.deepEqual(overview.runtime, {
+    artworkAdmission: null,
     configuration: runtimeResourceService.getRuntimeConfiguration(),
     latestSample: {
       capturedAt: '2026-05-03T12:00:00.000Z',

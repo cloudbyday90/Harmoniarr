@@ -4,6 +4,7 @@
  * Licensed under GPL-3.0-or-later. See LICENSE.
  */
 import { createWorkAdmission } from '../work-admission.js';
+import { projectArtworkAdmissionSnapshot } from '../../shared/artwork-admission-diagnostics.js';
 import { ARTWORK_ACTIVE_MEMORY_BUDGET, initialArtworkMemoryReservation, decodedArtworkMemoryReservation } from './artwork-memory-reservation.js';
 
 export function createArtworkIngestionAdmission({ concurrency = 2, maxQueued = 4,
@@ -19,6 +20,12 @@ export function createArtworkIngestionAdmission({ concurrency = 2, maxQueued = 4
       reservation.shrinkTo(decodedArtworkMemoryReservation(metadata, actualInputBytes));
     },
   }), { ...options, activeWeight: initialArtworkMemoryReservation(inputBytes) }),
+  getSnapshot: () => {
+    const state = admission.getState();
+    return projectArtworkAdmissionSnapshot({ active: state.active, queued: state.queued, queuedInputBytes: state.queuedWeight,
+      reservedBytes: state.activeWeight, budgetBytes: memoryBudgetBytes, concurrencyLimit: concurrency,
+      queueLimit: maxQueued, queuedInputLimitBytes: maxQueuedBytes, queueTimeoutMs });
+  },
   getMemoryState: () => ({ reservedBytes: admission.getState().activeWeight, budgetBytes: memoryBudgetBytes }), getState: () => {
     const { active, queued, queuedWeight } = admission.getState(); return { active, queued, queuedBytes: queuedWeight };
   } };

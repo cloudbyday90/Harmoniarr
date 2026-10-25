@@ -71,6 +71,9 @@ test('diagnostics export service builds a compact redacted diagnostics bundle an
         },
       },
       runtime: {
+        artworkAdmission: { active: 0, queued: 0, queuedInputBytes: 0, reservedBytes: 0, budgetBytes: 2147483648,
+          concurrencyLimit: 2, queueLimit: 4, queuedInputLimitBytes: 33554432, queueTimeoutMs: 15000,
+          capturedAt: '2026-05-03T13:00:00.000Z', privatePath: '/private/artwork', sourceUrl: 'https://private.invalid' },
         configuration: {
           mediaCommands: {
             ffmpegThreads: 4,
@@ -162,6 +165,10 @@ test('diagnostics export service builds a compact redacted diagnostics bundle an
   assert.equal(exportPayload.diagnostics.overview.dependencies[0].message, 'MusicBrainz retrying for [REDACTED_EMAIL]');
   assert.equal(exportPayload.diagnostics.overview.heartbeats[0].message, 'Metadata refresh is paused for [REDACTED_EMAIL] at [REDACTED_PATH]');
   assert.equal(exportPayload.diagnostics.overview.runtime.message, 'Runtime warning for [REDACTED_PATH] and [REDACTED_EMAIL]');
+  assert.equal(exportPayload.diagnostics.overview.runtime.artworkAdmission.budgetBytes, 2147483648);
+  assert.equal(Object.keys(exportPayload.diagnostics.overview.runtime.artworkAdmission).length, 10);
+  assert.equal(exportPayload.diagnostics.overview.runtime.artworkAdmission.privatePath, undefined);
+  assert.equal(exportPayload.diagnostics.overview.runtime.artworkAdmission.sourceUrl, undefined);
   assert.equal(exportPayload.diagnostics.overview.runtime.warnings[0].message, 'Process RSS exceeded threshold at [REDACTED_PATH]');
   assert.equal(exportPayload.diagnostics.activityFeed.entries[0].message, 'Import failed while reading [REDACTED_PATH] for [REDACTED_EMAIL]');
   assert.equal(exportPayload.diagnostics.operatorNotifications.notifications[0].message, 'Run failed for [REDACTED_EMAIL] at [REDACTED_PATH]');

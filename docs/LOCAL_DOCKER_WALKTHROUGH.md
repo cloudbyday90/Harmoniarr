@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 25 [artwork admission diagnostics rebuild](LOCAL_DOCKER_ARTWORK_ADMISSION_DIAGNOSTICS_OUTCOME.md)
+records the latest no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](ARTWORK_ADMISSION_DIAGNOSTICS_OUTCOME.md) connects live
+logical counters, cached process memory and administrator-only delivery/rendering.
+
 The October 25 [selected WebP mixed-workload rebuild](LOCAL_DOCKER_WEBP_SELECTION_MIXED_MEMORY_OUTCOME.md)
 records the latest no-cache image and preserved administrator/data/mounts. The
 [qualification outcome](WEBP_SELECTION_MIXED_MEMORY_OUTCOME.md) records actual

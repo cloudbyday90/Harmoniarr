@@ -317,6 +317,7 @@ suite('createApp', () => {
   assert.equal(libraryModuleArgs.settingsService, settingsService);
   assert.equal(libraryModuleArgs.slskdService, slskdModule.slskdService);
   assert.equal(systemModuleArgs.artworkPolicyService, artworkModule.artworkPolicyService);
+  assert.equal(systemModuleArgs.artworkIngestionService, artworkModule.artworkIngestionService);
   assert.equal(typeof systemModuleArgs.dependencyHealthService.getDependencyHealth, 'function');
   assert.equal(systemModuleArgs.libraryScanSummaryService, libraryModule.libraryScanSummaryService);
   assert.equal(systemModuleArgs.libraryWantedReleaseStore, libraryModule.libraryWantedReleaseStore);
@@ -421,6 +422,7 @@ suite('createApp', () => {
   assert.deepEqual(systemModuleArgs, {
     appPort: 4510,
     appleMusicStatusService: providerModule.appleMusicStatusService,
+    artworkIngestionService: artworkModule.artworkIngestionService,
     artworkPolicyService: artworkModule.artworkPolicyService,
     artworkSummaryService: artworkModule.artworkSummaryService,
     controlPlaneIdempotencyService: systemModuleArgs.controlPlaneIdempotencyService,

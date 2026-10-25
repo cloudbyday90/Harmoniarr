@@ -680,6 +680,7 @@ export function createApp({
   const systemModule = buildSystemModule({
     appleMusicStatusService: providerModule.appleMusicStatusService,
     appPort,
+    artworkIngestionService: artworkModule.artworkIngestionService,
     artworkPolicyService: artworkModule.artworkPolicyService,
     artworkSummaryService: artworkModule.artworkSummaryService,
     controlPlaneIdempotencyService,

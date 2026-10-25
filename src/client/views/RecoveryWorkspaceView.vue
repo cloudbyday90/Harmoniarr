@@ -11,6 +11,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import SettingsDisclosure from '../components/settings/SettingsDisclosure.vue';
+import ArtworkAdmissionDiagnostics from '../components/ArtworkAdmissionDiagnostics.vue';
 import { buildBackupExportDownloadUrl } from '../lib/recovery-api.js';
 import {
   buildRecoveryRouteQuery,
@@ -405,11 +406,13 @@ watch(hasActiveLocks, (nextHasActiveLocks) => {
         show-label="Open diagnostics"
         hide-label="Hide diagnostics"
       >
-        <div class="hx-card-actions"><button type="button" class="hx-btn" @click="loadDiagnostics" :disabled="isLoadingDiagnostics">{{ isLoadingDiagnostics ? 'Refreshing...' : 'Refresh diagnostics' }}</button></div>
-        <p v-if="diagnosticsErrorMessage" class="recovery-workspace__error">{{ diagnosticsErrorMessage }}</p>
+        <div class="hx-card-actions"><button type="button" class="hx-btn recovery-workspace__diagnostics-refresh" @click="!isLoadingDiagnostics && loadDiagnostics()" :aria-disabled="isLoadingDiagnostics ? 'true' : undefined">{{ isLoadingDiagnostics ? 'Refreshing...' : 'Refresh diagnostics' }}</button></div>
+        <p role="status" aria-live="polite" aria-atomic="true">{{ isLoadingDiagnostics ? 'Loading diagnostics…' : diagnosticsErrorMessage ? '' : queueDiagnostics || recoveryDiagnostics ? 'Diagnostics updated.' : '' }}</p>
+        <p v-if="diagnosticsErrorMessage" role="alert" class="recovery-workspace__error">{{ diagnosticsErrorMessage }}</p>
         <div v-else-if="isLoadingDiagnostics" class="hx-empty"><p class="hx-empty-copy">Loading diagnostics...</p></div>
         <template v-else-if="queueDiagnostics || recoveryDiagnostics">
-          <div v-if="queueDiagnostics" class="cfg-group"><p class="cfg-group-title">Queue overview</p><dl class="review-meta-grid"><div><dt>Pending</dt><dd>{{ queueDiagnostics.pendingCount ?? 0 }}</dd></div><div><dt>Running</dt><dd>{{ queueDiagnostics.runningCount ?? 0 }}</dd></div><div><dt>Failed</dt><dd>{{ queueDiagnostics.failedCount ?? 0 }}</dd></div><div><dt>Completed</dt><dd>{{ queueDiagnostics.completedCount ?? 0 }}</dd></div></dl></div>
+          <div v-if="queueDiagnostics" class="cfg-group"><p class="cfg-group-title">Queue overview</p><dl class="review-meta-grid"><div><dt>Pending</dt><dd>{{ queueDiagnostics.queueState?.pending ?? 'Unavailable' }}</dd></div><div><dt>Running</dt><dd>{{ queueDiagnostics.queueState?.running ?? 'Unavailable' }}</dd></div><div><dt>Failed</dt><dd>{{ queueDiagnostics.queueState?.failed ?? 'Unavailable' }}</dd></div><div><dt>Tracked</dt><dd>{{ queueDiagnostics.queueState?.totalTracked ?? 'Unavailable' }}</dd></div></dl></div>
+          <ArtworkAdmissionDiagnostics :runtime="queueDiagnostics?.runtime" />
           <div v-if="recentQueueRuns.length" class="cfg-group"><p class="cfg-group-title">Recent queue runs</p><div class="cfg-mapping-list recovery-workspace__list"><div v-for="run in recentQueueRuns.slice(0, 5)" :key="run.operationType + (run.startedAt ?? run.createdAt)" class="cfg-mapping-card recovery-workspace__check"><div><strong>{{ run.operationType }}</strong><p class="hx-text-muted">{{ formatDiagnosticTimestamp(run.startedAt) }}</p></div><span class="hx-pill" :data-tone="run.status === 'completed' ? 'success' : run.status === 'failed' ? 'danger' : null">{{ run.status }}</span></div></div></div>
           <div v-if="recentFailedRuns.length" class="cfg-group"><p class="cfg-group-title">Recent failures</p><div class="cfg-mapping-list recovery-workspace__list"><div v-for="failed in recentFailedRuns.slice(0, 5)" :key="failed.operationType + (failed.recentFailureAt ?? '')" class="cfg-mapping-card"><strong>{{ failed.operationType }}</strong><p class="hx-text-muted">Last failure {{ formatDiagnosticTimestamp(failed.recentFailureAt) }}</p><p v-if="failed.recentFailureMessage" class="hx-text-muted">{{ failed.recentFailureMessage }}</p><p class="hx-text-muted">{{ failed.recentFailureCount ?? 0 }} failure{{ failed.recentFailureCount === 1 ? '' : 's' }}</p></div></div></div>
           <div v-if="recentPrivilegedActions.length" class="cfg-group"><p class="cfg-group-title">Recent privileged actions</p><div class="cfg-mapping-list recovery-workspace__list"><div v-for="action in recentPrivilegedActions.slice(0, 5)" :key="action.eventName + (action.occurredAt ?? '')" class="cfg-mapping-card"><strong>{{ action.eventName }}</strong><p class="hx-text-muted">{{ formatDiagnosticTimestamp(action.occurredAt) }}<span v-if="action.actorUserId"> - by {{ action.actorUserId }}</span></p></div></div></div>
@@ -432,6 +435,7 @@ watch(hasActiveLocks, (nextHasActiveLocks) => {
 .recovery-workspace__tasks-header { max-width: 760px; }
 .recovery-workspace__tasks-header .hx-text-muted { margin: var(--hx-space-1) 0 0; }
 .recovery-workspace__error { color: var(--hx-danger); font-size: var(--hx-text-sm); margin: var(--hx-space-3) 0 0; }
+.recovery-workspace__diagnostics-refresh[aria-disabled='true'] { cursor: progress; opacity: 0.6; }
 .recovery-workspace__list { margin-top: var(--hx-space-3); }
 .recovery-workspace__list-row, .recovery-workspace__selected-backup, .recovery-workspace__check { align-items: flex-start; display: flex; gap: var(--hx-space-3); justify-content: space-between; }
 .recovery-workspace__list-actions { align-items: flex-end; display: flex; flex-direction: column; flex: none; gap: var(--hx-space-2); }

@@ -950,7 +950,24 @@ test('queue diagnostics route requires admin session and returns queue state pay
     assert.deepEqual(getQueueDiagnostics.mock.calls[0].arguments, [{ runLimit: 12 }]);
     assert.equal(payload.ok, true);
     assert.equal(payload.queueState.totalTracked, 4);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
   });
+});
+
+test('runtime diagnostic delivery refuses anonymous and non-admin callers before reading observations', async (t) => {
+  for (const status of [401, 403]) {
+    let reads = 0;
+    const app = createSystemRouteTestApp({ requireAdminSession: async () => { throw Object.assign(new Error('Access refused'), { status, code: 'access_refused' }); },
+      getOverview: async () => { reads++; }, getQueueDiagnostics: async () => { reads++; }, getDiagnosticsExportDownload: async () => { reads++; },
+    });
+    await withServer(app, async baseUrl => {
+      for (const path of ['/api/v1/system/overview', '/api/v1/system/diagnostics/queue-state', '/api/v1/system/diagnostics/export']) {
+        const response = await fetch(baseUrl + path); assert.equal(response.status, status);
+        assert.doesNotMatch(await response.text(), /reservedBytes|artworkAdmission/u);
+      }
+    });
+    assert.equal(reads, 0);
+  }
 });
 
 test('recovery diagnostics route requires admin session and forwards limit and lock filters', async (t) => {

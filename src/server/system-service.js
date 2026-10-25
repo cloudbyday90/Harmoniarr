@@ -24,6 +24,7 @@ import { getMigrationStatus } from './migrations.js';
 import { createPathValidationSummary } from './paths/path-validation-summary.js';
 import { createSettingsService } from './settings-service.js';
 import { resolveLibraryDiscoveryHeartbeatConfig } from './library/library-discovery-heartbeat-config.js';
+import { buildSystemRuntimeDiagnostics } from './system-runtime-diagnostics.js';
 
 function buildArtworkMaintenanceOverview(summary) {
   if (!summary) {
@@ -57,10 +58,11 @@ function buildRawHeartbeatOverview(config, heartbeatState) {
 }
 
 function buildRuntimeOverview({
+  artworkAdmission = null,
   runtimeResourceMonitor = null,
   runtimeResourceService = null,
 } = {}) {
-  if (!runtimeResourceMonitor && !runtimeResourceService) {
+  if (!runtimeResourceMonitor && !runtimeResourceService && !artworkAdmission) {
     return null;
   }
 
@@ -69,6 +71,7 @@ function buildRuntimeOverview({
     : null;
 
   return {
+    artworkAdmission,
     configuration: runtimeResourceService?.getRuntimeConfiguration
       ? runtimeResourceService.getRuntimeConfiguration()
       : null,
@@ -82,6 +85,7 @@ function buildRuntimeOverview({
 export function createSystemService({
   activityFeedService = null,
   appleMusicStatusService = null,
+  artworkIngestionService = null,
   artworkPolicyService = null,
   artworkSummaryService = null,
   libraryDiscoveryHeartbeatConfig = resolveLibraryDiscoveryHeartbeatConfig(),
@@ -106,6 +110,8 @@ export function createSystemService({
   settingsService = createSettingsService(),
 }) {
   let packageMetadata;
+
+  const getRuntimeDiagnostics = () => buildSystemRuntimeDiagnostics({ artworkIngestionService, runtimeResourceMonitor });
 
   async function getPackageMetadata() {
     if (!packageMetadata) {
@@ -285,6 +291,7 @@ export function createSystemService({
         youtube: youtubeStatus,
       },
       runtime: buildRuntimeOverview({
+        artworkAdmission: getRuntimeDiagnostics().artworkAdmission,
         runtimeResourceMonitor,
         runtimeResourceService,
       }),
@@ -322,5 +329,6 @@ export function createSystemService({
     getActivityFeed,
     getOperatorNotifications,
     getOverview,
+    getRuntimeDiagnostics,
   };
 }
