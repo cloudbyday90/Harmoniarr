@@ -11,14 +11,16 @@ import { createArtworkWorkerSession } from '../../src/server/artwork/artwork-wor
 import { assertArtworkWorkerMemoryLimit } from '../../src/server/artwork/artwork-worker-memory.js';
 import { artworkSharpInputOptions } from '../../src/server/artwork/artwork-image-content-policy.js';
 import { ARTWORK_WORKER_OUTPUT_LIMIT } from '../../src/server/artwork/artwork-worker-protocol.js';
-import { selectWebpEffortCase, webpEffortInput } from './webp-effort-cases.js';
+import { webpEffortInput } from './webp-effort-cases.js';
+import { selectWebpRewriteCase } from './webp-lossless-cases.js';
+import { inspectLosslessWebpContainer } from './webp-lossless-container.js';
 
 // Test-only encoder comparison. No application admission/publication authority.
 sharp.cache(false); sharp.concurrency(1);
 let started = null; let encodeMs = null; let outcome = 'failed'; let outputBytes = 0;
 try {
   assert.equal(process.platform, 'linux'); await assertArtworkWorkerMemoryLimit();
-  const spec = selectWebpEffortCase(Number(process.argv[5]), process.argv[6]);
+  const spec = selectWebpRewriteCase(Number(process.argv[5]), process.argv[6], process.argv[7] ?? 'lossy');
   const input = spec.input ?? webpEffortInput;
   const maxBytes = Number(process.argv[2]); const maxDimensionPixels = Number(process.argv[3]);
   assert.equal(maxBytes, ARTWORK_WORKER_OUTPUT_LIMIT); assert.equal(maxDimensionPixels, 8192);
@@ -27,10 +29,14 @@ try {
   assert.equal(createHash('sha256').update(buffer).digest('hex'), input.sha256);
   const options = artworkSharpInputOptions(maxDimensionPixels); const metadata = await sharp(buffer, options).metadata();
   assert.equal(metadata.width, input.width); assert.equal(metadata.height, input.height); assert.equal(metadata.channels, 3); assert.ok(metadata.exif?.length);
+  if (spec.lossless) {
+    const facts = inspectLosslessWebpContainer(buffer);
+    assert.equal(facts.width, metadata.width); assert.equal(facts.height, metadata.height); assert.equal(metadata.hasAlpha, false);
+  }
   await session.requestGrant({ format: 'webp', width: spec.width, height: spec.height, channels: 3, depth: 'uchar' });
   let image = sharp(buffer, options).rotate(); if (spec.crop) image = image.extract(spec.crop);
   started = performance.now();
-  const { data, info } = await image.webp({ quality: spec.quality, effort: spec.effort }).timeout({ seconds: 10 }).toBuffer({ resolveWithObject: true });
+  const { data, info } = await image.webp({ quality: spec.quality, effort: spec.effort, ...(spec.lossless ? { lossless: true } : {}) }).timeout({ seconds: 10 }).toBuffer({ resolveWithObject: true });
   encodeMs = performance.now() - started; assert.ok(data.length > 0 && data.length <= ARTWORK_WORKER_OUTPUT_LIMIT);
   assert.equal(info.width, spec.width); assert.equal(info.height, spec.height);
   outcome = 'success'; outputBytes = data.length;

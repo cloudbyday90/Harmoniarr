@@ -167,3 +167,6 @@ large candidate. Its content-dependent size/error costs prevent this global
 switch. Retaining effort 4 preserves current behavior and conservative refusal;
 the lossless-graphics experiment targets a measured inefficiency without changing
 that security boundary prematurely.
+
+The subsequent [lossless rewrite outcome](WEBP_LOSSLESS_REWRITE_OUTCOME.md)
+qualifies that next supported-mode experiment on the unchanged pinned inputs.

@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 25 [lossless WebP rewrite rebuild](LOCAL_DOCKER_WEBP_LOSSLESS_REWRITE_OUTCOME.md)
+records the latest no-cache image and preserved administrator/data/mounts. The
+[qualification outcome](WEBP_LOSSLESS_REWRITE_OUTCOME.md) separates exact RGB8
+sanitization evidence from graphic/photographic size and resource tradeoffs.
+
 The October 25 [WebP artwork corpus rebuild](LOCAL_DOCKER_WEBP_ARTWORK_CORPUS_OUTCOME.md)
 records the latest no-cache image and preserved administrator/data/mounts. The
 [corpus outcome](WEBP_ARTWORK_CORPUS_OUTCOME.md) records repeated content-class

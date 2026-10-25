@@ -10,6 +10,14 @@ counterbalanced three-repeat schedule and predeclared engineering thresholds.
 Separate numerical screening, agent inspection and human visual acceptance; none
 of these alone grants a production switch. Preserve failed criteria and cases.
 
+For lossless rewrite qualification, read active-repo
+docs/WEBP_LOSSLESS_REWRITE_DESIGN.md, research and outcome. Compare explicit modes
+on unchanged pinned inputs, with default lossy compatibility controls. Container
+facts are bounded structural evidence, not pixel decoding or production authority.
+Require native rewriting, metadata removal and exact decoded RGB8 equality;
+report photographic size/latency costs beside graphic wins. Do not reuse lossy
+admission estimates for a newly selected mode without separate resource design.
+
 - Reuse pinned bytes; predeclare scope, crop geometry, settings and equal limits.
   Never adjust caps or input to obtain a successful reference. Keep production
   admission active; a test-only encoder probe cannot qualify app publication.

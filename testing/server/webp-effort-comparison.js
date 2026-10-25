@@ -8,16 +8,16 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createArtworkWorkerService } from '../../src/server/artwork/artwork-worker-service.js';
 import { ARTWORK_WORKER_OUTPUT_LIMIT, isArtworkWorkerError } from '../../src/server/artwork/artwork-worker-protocol.js';
-import { selectWebpEffortCase } from './webp-effort-cases.js';
+import { selectWebpRewriteCase } from './webp-lossless-cases.js';
 
 const fixture = fileURLToPath(new URL('./webp-effort-worker.js', import.meta.url));
 /** Reuse production framing/deadline/close ownership; replace only the test child. */
-export async function compareWebpEffort({ buffer, effort, scope, signal }, { spawnFn = spawn } = {}) {
-  const spec = selectWebpEffortCase(effort, scope); const controller = new AbortController();
+export async function compareWebpEffort({ buffer, effort, scope, mode = 'lossy', signal }, { spawnFn = spawn } = {}) {
+  const spec = selectWebpRewriteCase(effort, scope, mode); const controller = new AbortController();
   const records = []; const diagnostics = []; let diagnosticBytes = 0; let overflow = false;
   const worker = createArtworkWorkerService({ spawnFn: (file, args, options) => {
     const index = args.findIndex(value => value.endsWith('artwork-image-worker.js')); assert.ok(index >= 0);
-    const child = spawnFn(file, [...args.slice(0, index), fixture, ...args.slice(index + 1), String(effort), scope],
+    const child = spawnFn(file, [...args.slice(0, index), fixture, ...args.slice(index + 1), String(effort), scope, mode],
       { ...options, stdio: ['pipe', 'pipe', 'pipe'] });
     const record = { pid: child.pid, closed: false }; records.push(record);
     child.stderr.on('data', chunk => {
@@ -45,7 +45,7 @@ export async function compareWebpEffort({ buffer, effort, scope, signal }, { spa
     assert.ok(Number.isFinite(report.encodeMs) && report.encodeMs >= 0); assert.ok(Number.isSafeInteger(report.maxRssKiB) && report.maxRssKiB > 0);
     assert.equal(report.outputBytes, result?.data.length ?? 0);
   } else assert.equal(child.signal, 'SIGKILL');
-  return { spec, data: result?.data ?? null, observation: { id: spec.id, effort, quality: spec.quality, scope,
+  return { spec, data: result?.data ?? null, observation: { id: spec.id, effort, quality: spec.quality, scope, mode,
     outcome: deadline ? 'deadline' : failure ? 'encoder-failed' : 'encoded', failure: failure ?? null,
     wholeWorkerMs, encodeMs: report?.encodeMs ?? null, childMaxRssKiB: report?.maxRssKiB ?? null,
     outputBytes: result?.data.length ?? 0, worker: child, diagnosticBytes, retirementVerified: true,
