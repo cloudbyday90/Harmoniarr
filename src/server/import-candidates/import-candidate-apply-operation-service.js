@@ -19,6 +19,7 @@
 import { copyFile, link, mkdir, rm, stat } from 'node:fs/promises';
 import { isDeepStrictEqual } from 'node:util';
 import { posix as path } from 'node:path';
+import { buildFilesystemFailure, isFilesystemFailure } from '../filesystem-failure-policy.js';
 import { createMediaFilesystemService } from '../media/media-filesystem-service.js';
 import { createOperatorTrackScopeVerificationService } from '../metadata/operator-track-scope-verification-service.js';
 import { getPool } from '../database.js';
@@ -711,7 +712,16 @@ export function createImportCandidateApplyOperationService({
         fileOperations.push(operation);
       } catch (error) {
         summary.failedFileCount += 1;
-        operation.errorMessage = error instanceof Error ? error.message : String(error);
+        if (isFilesystemFailure(error)) {
+          operation.filesystemFailure = buildFilesystemFailure(error, {
+            operation: currentStep?.stepType === 'stage' ? 'import_file_stage'
+              : currentStep?.stepType === 'finalize' ? 'import_file_finalize' : 'import_file_check',
+            sourcePath: currentStep?.sourcePath ?? file.sourceFile?.path,
+            destinationPath: currentStep?.destinationPath,
+          });
+        }
+        operation.errorMessage = operation.filesystemFailure?.message
+          ?? (error instanceof Error ? error.message : String(error));
         operation.status = 'failed';
         if (currentStep?.sourcePath && currentStep?.destinationPath) {
           await persistOperation({

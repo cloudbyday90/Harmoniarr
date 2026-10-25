@@ -17,6 +17,7 @@
  */
 
 import { readFile } from 'node:fs/promises';
+import { buildFilesystemFailure } from '../filesystem-failure-policy.js';
 import { createApiError } from '../auth.js';
 import { recordAuditEvent } from '../audit.js';
 import { createOperationRunStore } from '../operation-run-store.js';
@@ -144,6 +145,7 @@ export function createBackupRestoreApplyService({
     let responseBody = null;
     let thrownError = null;
     let restoreCompleted = false;
+    let filesystemFailure = null;
 
     try {
       await markStarted({
@@ -181,7 +183,13 @@ export function createBackupRestoreApplyService({
         throw createApiError(500, 'backup_artifact_storage_unavailable', 'Backup artifact storage path is unavailable');
       }
 
-      const serializedPayload = await readBackupPayloadFn(artifact.storagePath);
+      let serializedPayload;
+      try {
+        serializedPayload = await readBackupPayloadFn(artifact.storagePath);
+      } catch (error) {
+        filesystemFailure = buildFilesystemFailure(error, { operation: 'backup_payload_read', sourcePath: artifact.storagePath });
+        throw Object.assign(new Error(filesystemFailure.message), { code: filesystemFailure.code });
+      }
       const envelope = backupEncryptionService.inspectBackupEnvelope(serializedPayload);
 
       if (envelope.encrypted && !backupEncryptionService.isEncryptionAvailable()) {
@@ -256,6 +264,7 @@ export function createBackupRestoreApplyService({
           backupArtifactId,
           currentStep: 'Restore apply failed',
           errorCode: normalizeErrorCode(error),
+          ...(filesystemFailure ? { filesystemFailure } : {}),
         },
       });
 
@@ -265,6 +274,7 @@ export function createBackupRestoreApplyService({
         details: {
           backupArtifactId,
           errorCode: normalizeErrorCode(error),
+          ...(filesystemFailure ? { filesystemFailure } : {}),
           errorMessage: error instanceof Error ? error.message : 'Backup restore apply failed',
           lockId: lock?.id ?? null,
           runId: run.id,

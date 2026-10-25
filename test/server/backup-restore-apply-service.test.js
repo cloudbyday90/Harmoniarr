@@ -415,3 +415,31 @@ test('startBackupRestoreApply rejects artifacts when no supported scope payload 
 
   assert.equal(markRunFailed.mock.callCount(), 1);
 });
+
+
+test('restore payload read persists safe structured failure and releases its lock without reflecting native error text', async (t) => {
+  for (const code of ['EACCES', '/unsafe-code']) {
+    const original = Object.assign(new Error('private-native-message /retired/音乐 Room/backup.json token=secret'), { code });
+    const markRunFailed = t.mock.fn(async () => {}); const audit = t.mock.fn(async () => {}); const release = t.mock.fn(async () => {});
+    const service = createBackupRestoreApplyService({
+      acquireMaintenanceLock: async () => ({ id: 'lock-1' }), createOperationRun: async () => ({ id: 'run-1' }),
+      getBackupArtifactById: async () => ({ id: 'backup-1', storagePath: '/retired/音乐 Room/backup.json' }),
+      getBackupRestorePreview: async () => ({ canApplyRestore: true }), getOperationRunById: async () => ({}),
+      markRunCompleted: async () => {}, markRunStarted: async () => {}, markRunFailed,
+      readBackupPayloadFn: async () => { throw original; }, recordAuditEventFn: audit, releaseMaintenanceLock: release,
+    });
+    await assert.rejects(service.startBackupRestoreApply({ backupArtifactId: 'backup-1' }), error => {
+      assert.notEqual(error, original); assert.equal(error.cause, undefined);
+      assert.equal(error.code, code === 'EACCES' ? code : 'filesystem_operation_failed');
+      assert.doesNotMatch(error.message, /private-native-message|retired|secret|unsafe-code/u); return true;
+    });
+    assert.equal(release.mock.callCount(), 1); assert.equal(markRunFailed.mock.callCount(), 1);
+    const persisted = markRunFailed.mock.calls[0].arguments[0];
+    assert.equal(persisted.errorMessage, persisted.summary.filesystemFailure.message);
+    assert.equal(persisted.summary.filesystemFailure.sourcePath, '/retired/音乐 Room/backup.json');
+    const failedEvent = audit.mock.calls.map(call => call.arguments[0]).find(event => event.eventType === 'backup_restore_failed');
+    assert.deepEqual(failedEvent.details.filesystemFailure, persisted.summary.filesystemFailure);
+    assert.equal(failedEvent.details.errorMessage, persisted.errorMessage);
+    assert.equal(original.message, 'private-native-message /retired/音乐 Room/backup.json token=secret');
+  }
+});

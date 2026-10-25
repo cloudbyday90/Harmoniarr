@@ -1,5 +1,8 @@
 # Configured-path redaction outcome
 
+The first producer follow-up is implemented in the separate
+[structured filesystem failure outcome](STRUCTURED_FILESYSTEM_FAILURE_OUTCOME.md).
+
 October 25, 2026. Implements the follow-up from
 [Recovery diagnostic events](RECOVERY_DIAGNOSTIC_EVENTS_OUTCOME.md). See separate
 [design and tradeoffs](CONFIGURED_PATH_REDACTION_DESIGN.md),

@@ -4,6 +4,7 @@
  * Licensed under GPL-3.0-or-later. See LICENSE.
  */
 import assert from 'node:assert/strict';
+import { buildFilesystemFailure } from '../../src/server/filesystem-failure-policy.js';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 import { createRecoveryDiagnosticsService } from '../../src/server/recovery/recovery-diagnostics-service.js';
@@ -22,7 +23,8 @@ test('Recovery diagnostic events render current redacted service fields with sta
   await runtime.runScenario(async ({ baseUrl, page, browserContext }) => {
     await bootstrapAdminThroughUi(page, { baseUrl }); let mode = 'populated'; const errors = []; const warnings = [];
     page.on('pageerror', error => errors.push(error.message)); page.on('console', message => { if (message.type() === 'warning') warnings.push(message.text()); });
-    const service = createRecoveryDiagnosticsService({ loadSettingsFn: async () => ({ paths: { music: "/private/音乐 Room" } }), listRecentOperationRuns: async () => mode === 'populated' ? [failure(1), failure(2)] : mode === 'replacement' ? [failure(2)] : [],
+    const structured = buildFilesystemFailure({ code: 'ENOENT' }, { operation: 'backup_payload_read', sourcePath: '/retired-private/音乐/backup.json' });
+    const service = createRecoveryDiagnosticsService({ loadSettingsFn: async () => ({ paths: { music: mode === 'structured' ? '/replacement' : "/private/音乐 Room" } }), listRecentOperationRuns: async () => mode === 'structured' ? [{ id: 'structured-run', operationType: 'backup_restore_apply', status: 'failed', finishedAt: time, errorMessage: structured.message, summary: { filesystemFailure: structured } }] : mode === 'populated' ? [failure(1), failure(2)] : mode === 'replacement' ? [failure(2)] : [],
       listRecentAuditEvents: async () => ['populated', 'replacement'].includes(mode) ? [
         { id: 'audit-1', eventType: 'maintenance_lock_entered', occurredAt: time, summary: 'private-summary-marker' },
         { id: 'audit-2', eventType: 'maintenance_lock_released', occurredAt: time, details: { token: 'private-audit-token' } },
@@ -53,10 +55,13 @@ test('Recovery diagnostic events render current redacted service fields with sta
     mode = 'error'; await refresh.click(); await page.locator('#settings-recovery-diagnostics').getByRole('alert').waitFor(); assert.equal(await failures.count(), 0);
     mode = 'populated'; await refresh.click(); await failures.getByText('Backup restore apply', { exact: true }).first().waitFor();
     assert.equal(await refresh.evaluate(node => node === globalThis.document.activeElement), true);
+    mode = 'structured'; await refresh.click(); await failures.getByText(/The backup payload could not be read/u).waitFor();
+    assert.match(await failures.textContent(), /ENOENT|Check that the required file/u);
+    assert.doesNotMatch(await failures.textContent(), /retired-private|音乐|backup.json/u);
     await page.setViewportSize({ width: 390, height: 844 });
     if (process.env.HARMONIARR_RECOVERY_EVENT_SCREENSHOT_DIR) await failures.screenshot({ animations: 'disabled', path: join(process.env.HARMONIARR_RECOVERY_EVENT_SCREENSHOT_DIR, 'recovery-events-mobile.png') });
     assert.equal(await failures.evaluate(node => { const box = node.getBoundingClientRect(); return node.scrollWidth <= node.clientWidth && box.left >= 0 && box.right <= globalThis.innerWidth; }), true);
     assert.equal(warnings.some(message => /duplicate.*key/iu.test(message)), false); assert.deepEqual(errors, []);
-    t.diagnostic(JSON.stringify({ serviceDerivedPayload: true, sameTypeTimeDistinctRows: 2, escapedHtml: true, redactionPreserved: true, refreshFocusRetained: true, viewport: 390 }));
+    t.diagnostic(JSON.stringify({ serviceDerivedPayload: true, sameTypeTimeDistinctRows: 2, escapedHtml: true, redactionPreserved: true, structuredFailureAfterRootChange: true, refreshFocusRetained: true, viewport: 390 }));
   }, { scenarioName: 'recovery_diagnostic_events' });
 });

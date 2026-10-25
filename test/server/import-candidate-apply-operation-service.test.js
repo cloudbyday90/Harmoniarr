@@ -709,3 +709,26 @@ test('applyImportCandidatePreview records transcode preflight outcomes for trans
   assert.equal(result.summary.transcodePreflightUnavailableCount, 0);
   assert.equal(result.fileOperations[0].transcodeExecution.status, 'preflight_passed');
 });
+
+
+test('import file failures retain native codes and owned paths without copying native messages into rows or results', async (t) => {
+  for (const stage of ['stage', 'finalize']) {
+    const deps = createSimulatedFilesystemDeps(t); const originalLink = deps.linkFn;
+    const raw = Object.assign(new Error('private-native-message /retired/音乐 Room/song token=secret'), { code: 'EIO' });
+    const fail = async (source, destination) => { if ((stage === 'stage' && destination.startsWith('/staging/'))
+      || (stage === 'finalize' && destination.startsWith('/library/'))) throw raw; return originalLink(source, destination); };
+    const record = t.mock.fn(async () => {});
+    const result = await createImportCandidateApplyOperationService({ ...deps, linkFn: fail,
+      copyFileFn: async (source, destination) => { if (stage === 'stage') throw raw; return deps.copyFileFn(source, destination); },
+      recordImportOperationFn: record }).applyImportCandidatePreview({ applyPreview: createReadyApplyPreview(),
+      operationRunId: 'run-1', importCandidateId: 'candidate-1' });
+    const operation = result.fileOperations[0]; assert.equal(operation.status, 'failed');
+    assert.equal(operation.filesystemFailure.code, 'EIO'); assert.equal(operation.filesystemFailure.operation, 'import_file_' + stage);
+    assert.equal(operation.errorMessage, operation.filesystemFailure.message);
+    const row = record.mock.calls.map(call => call.arguments[0]).find(entry => entry.status === 'failed');
+    assert.equal(row.errorMessage, operation.errorMessage); assert.equal(row.sourcePath, operation.filesystemFailure.sourcePath);
+    assert.equal(row.destinationPath, operation.filesystemFailure.destinationPath);
+    assert.doesNotMatch(operation.errorMessage, /private-native-message|retired|secret/u);
+    assert.equal(raw.message, 'private-native-message /retired/音乐 Room/song token=secret');
+  }
+});

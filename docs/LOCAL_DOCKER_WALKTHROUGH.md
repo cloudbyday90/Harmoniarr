@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 25 [structured filesystem failure rebuild](LOCAL_DOCKER_STRUCTURED_FILESYSTEM_FAILURE_OUTCOME.md)
+records the latest no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](STRUCTURED_FILESYSTEM_FAILURE_OUTCOME.md) records safe
+producer explanations, path-owned context and historical diagnostics after settings changes.
+
 The October 25 [configured-path redaction rebuild](LOCAL_DOCKER_CONFIGURED_PATH_REDACTION_OUTCOME.md)
 records the latest no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](CONFIGURED_PATH_REDACTION_OUTCOME.md) records current
