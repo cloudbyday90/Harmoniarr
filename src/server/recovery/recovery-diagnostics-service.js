@@ -17,6 +17,7 @@
  */
 
 import { getPool } from '../database.js';
+import { loadSettings } from '../settings.js';
 import { createControlPlaneRedactionService } from '../control-plane-redaction-service.js';
 import { defaultOperationQueueDispatchOperationTypes } from '../operation-queue-handlers.js';
 
@@ -49,7 +50,8 @@ function normalizeLockTypeFilter(lockTypes) {
 }
 
 export function createRecoveryDiagnosticsService({
-  controlPlaneRedactionService = createControlPlaneRedactionService(),
+  controlPlaneRedactionService: injectedRedactionService = null,
+  loadSettingsFn = loadSettings,
   getPoolFn = getPool,
   getRuntimeDiagnostics = () => null,
   listActiveMaintenanceLocks = async () => [],
@@ -62,6 +64,8 @@ export function createRecoveryDiagnosticsService({
   }),
 } = {}) {
   async function getQueueDiagnostics({ runLimit } = {}) {
+    const controlPlaneRedactionService = injectedRedactionService
+      ?? createControlPlaneRedactionService({ settings: await loadSettingsFn() });
     const normalizedRunLimit = normalizeLimit(runLimit, { defaultLimit: 20, maxLimit: 50 });
     const [summaryResult, recentRuns, dispatchReadiness] = await Promise.all([
       getPoolFn().query(
@@ -96,7 +100,7 @@ export function createRecoveryDiagnosticsService({
         allowed: dispatchReadiness?.allowed !== false,
         nextRetryAt: dispatchReadiness?.nextRetryAt ?? null,
         pauseCode: dispatchReadiness?.pauseCode ?? null,
-        pauseMessage: dispatchReadiness?.pauseMessage ?? null,
+        pauseMessage: controlPlaneRedactionService.redactLogMessage(dispatchReadiness?.pauseMessage ?? null),
         pauseProvider: dispatchReadiness?.pauseProvider ?? null,
         pausedOperationTypes: dispatchReadiness?.pausedOperationTypes ?? defaultOperationQueueDispatchOperationTypes,
       },
@@ -104,12 +108,14 @@ export function createRecoveryDiagnosticsService({
         ...statusCounts,
         totalTracked: statusCounts.pending + statusCounts.running + statusCounts.failed,
       },
-      runtime: getRuntimeDiagnostics(),
-      recentRuns,
+      runtime: controlPlaneRedactionService.redactValue(getRuntimeDiagnostics()),
+      recentRuns: controlPlaneRedactionService.redactValue(recentRuns),
     };
   }
 
   async function getRecoveryDiagnostics({ auditLimit, lockTypes, runLimit } = {}) {
+    const controlPlaneRedactionService = injectedRedactionService
+      ?? createControlPlaneRedactionService({ settings: await loadSettingsFn() });
     const normalizedAuditLimit = normalizeLimit(auditLimit, { defaultLimit: 15, maxLimit: 25 });
     const normalizedRunLimit = normalizeLimit(runLimit, { defaultLimit: 20, maxLimit: 50 });
     const normalizedLockTypes = normalizeLockTypeFilter(lockTypes);
@@ -143,7 +149,7 @@ export function createRecoveryDiagnosticsService({
         eventType: event.eventType,
         id: event.id,
         occurredAt: event.occurredAt ?? null,
-        summary: event.summary ?? null,
+        summary: controlPlaneRedactionService.redactLogMessage(event.summary ?? null),
       }));
 
     return {

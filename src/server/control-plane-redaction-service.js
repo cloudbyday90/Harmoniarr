@@ -16,6 +16,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { collectConfiguredPathRoots, createConfiguredPathRedactor } from './configured-path-redaction.js';
+
 const redactedValue = '[REDACTED]';
 const redactedEmail = '[REDACTED_EMAIL]';
 const redactedPath = '[REDACTED_PATH]';
@@ -98,18 +100,22 @@ function normalizeKey(key) {
   return key.toLowerCase().replaceAll(/[^a-z0-9]/g, '');
 }
 
-function sanitizePlainString(value) {
-  return String(value)
-    .replaceAll('\r', ' ')
-    .replaceAll('\n', ' ')
-    .replaceAll(sensitiveParameterPattern, (_match, prefix, key) => `${prefix}${key}=${redactedValue}`)
-    .replaceAll(bearerPattern, redactedBearer)
-    .replaceAll(emailPattern, redactedEmail)
-    .replaceAll(windowsPathPattern, redactedPath)
-    .replaceAll(unixPathPattern, redactedPath);
-}
+export function createControlPlaneRedactionService({
+  settings = null,
+  appDataPath = process.env.HARMONIARR_APPDATA,
+} = {}) {
+  const redactConfiguredPaths = createConfiguredPathRedactor(collectConfiguredPathRoots(settings, appDataPath));
+  function sanitizePlainString(value) {
+    return redactConfiguredPaths(String(value))
+      .replaceAll('\r', ' ')
+      .replaceAll('\n', ' ')
+      .replaceAll(sensitiveParameterPattern, (_match, prefix, key) => `${prefix}${key}=${redactedValue}`)
+      .replaceAll(bearerPattern, redactedBearer)
+      .replaceAll(emailPattern, redactedEmail)
+      .replaceAll(windowsPathPattern, redactedPath)
+      .replaceAll(unixPathPattern, redactedPath);
+  }
 
-export function createControlPlaneRedactionService() {
   function redactValue(value, { key = null } = {}) {
     const normalizedKey = normalizeKey(key);
 

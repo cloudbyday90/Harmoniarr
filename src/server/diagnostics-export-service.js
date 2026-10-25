@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { loadSettings } from './settings.js';
 import { createControlPlaneRedactionService } from './control-plane-redaction-service.js';
 import { projectArtworkAdmissionObservation } from '../shared/artwork-admission-diagnostics.js';
 
@@ -166,7 +167,8 @@ function summarizeQueueDiagnostics(queueDiagnostics, controlPlaneRedactionServic
 }
 
 export function createDiagnosticsExportService({
-  controlPlaneRedactionService = createControlPlaneRedactionService(),
+  controlPlaneRedactionService: injectedRedactionService = null,
+  loadSettingsFn = loadSettings,
   getOperatorNotifications = async () => ({
     checkedAt: new Date().toISOString(),
     counts: {
@@ -188,6 +190,8 @@ export function createDiagnosticsExportService({
     notificationLimit,
     runLimit,
   } = {}) {
+    const controlPlaneRedactionService = injectedRedactionService
+      ?? createControlPlaneRedactionService({ settings: await loadSettingsFn() });
     const normalizedActivityLimit = normalizeLimit(activityLimit, { defaultLimit: 20, maxLimit: 50 });
     const normalizedAuditLimit = normalizeLimit(auditLimit, { defaultLimit: 15, maxLimit: 25 });
     const normalizedNotificationLimit = normalizeLimit(notificationLimit, { defaultLimit: 20, maxLimit: 25 });
@@ -213,7 +217,7 @@ export function createDiagnosticsExportService({
       }),
     ]);
 
-    return {
+    return controlPlaneRedactionService.redactValue({
       checkedAt: exportedAt.toISOString(),
       diagnostics: {
         activityFeed: {
@@ -258,7 +262,7 @@ export function createDiagnosticsExportService({
         notificationLimit: normalizedNotificationLimit,
         runLimit: normalizedRunLimit,
       },
-    };
+    });
   }
 
   async function getDiagnosticsExportDownload(options = {}) {

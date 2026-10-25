@@ -10,7 +10,7 @@ import { createRecoveryDiagnosticsService } from '../../src/server/recovery/reco
 const time = '2026-10-25T16:00:00.000Z';
 
 test('real recovery service fields retain redacted failures, event times and distinct IDs despite identical type/time values', async () => {
-  const service = createRecoveryDiagnosticsService({ listRecentOperationRuns: async () => [1, 2].map(id => ({ id: `run-${id}`, operationType: 'backup_restore_apply', status: 'failed', finishedAt: time, errorMessage: `Failure ${id} at /app/data/restore.json for ops@example.invalid` })),
+  const service = createRecoveryDiagnosticsService({ loadSettingsFn: async () => ({}), listRecentOperationRuns: async () => [1, 2].map(id => ({ id: `run-${id}`, operationType: 'backup_restore_apply', status: 'failed', finishedAt: time, errorMessage: `Failure ${id} at /app/data/restore.json for ops@example.invalid` })),
     listRecentAuditEvents: async () => [{ id: 'audit-1', eventType: 'maintenance_lock_entered', occurredAt: time, summary: 'private-summary' }],
   });
   const result = buildRecoveryDiagnosticEvents(await service.getRecoveryDiagnostics());

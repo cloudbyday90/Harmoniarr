@@ -16,13 +16,13 @@ before(async () => { runtime = await createBrowserSmokeRuntime({ config }); }, {
 after(async () => { await runtime?.cleanup(); }, { timeout: config.suiteTeardownTimeoutMs });
 const time = '2026-10-25T16:00:00.000Z';
 const failure = id => ({ id: `run-${id}`, operationType: 'backup_restore_apply', status: 'failed', finishedAt: time,
-  errorMessage: `Failure ${id} at /app/data/restore.json for ops@example.invalid token=private-token <img src=x onerror="globalThis.recoveryDiagnosticExecuted=true">` });
+  errorMessage: `Failure ${id} at "/private/音乐 Room/Album Name/restore.json" for ops@example.invalid token=private-token <img src=x onerror="globalThis.recoveryDiagnosticExecuted=true">` });
 
 test('Recovery diagnostic events render current redacted service fields with stable rows and truthful refresh states', { timeout: config.scenarioTimeoutMs }, async t => {
   await runtime.runScenario(async ({ baseUrl, page, browserContext }) => {
     await bootstrapAdminThroughUi(page, { baseUrl }); let mode = 'populated'; const errors = []; const warnings = [];
     page.on('pageerror', error => errors.push(error.message)); page.on('console', message => { if (message.type() === 'warning') warnings.push(message.text()); });
-    const service = createRecoveryDiagnosticsService({ listRecentOperationRuns: async () => mode === 'populated' ? [failure(1), failure(2)] : mode === 'replacement' ? [failure(2)] : [],
+    const service = createRecoveryDiagnosticsService({ loadSettingsFn: async () => ({ paths: { music: "/private/音乐 Room" } }), listRecentOperationRuns: async () => mode === 'populated' ? [failure(1), failure(2)] : mode === 'replacement' ? [failure(2)] : [],
       listRecentAuditEvents: async () => ['populated', 'replacement'].includes(mode) ? [
         { id: 'audit-1', eventType: 'maintenance_lock_entered', occurredAt: time, summary: 'private-summary-marker' },
         { id: 'audit-2', eventType: 'maintenance_lock_released', occurredAt: time, details: { token: 'private-audit-token' } },
@@ -41,7 +41,7 @@ test('Recovery diagnostic events render current redacted service fields with sta
     assert.equal(await failures.getByRole('listitem').count(), 2); assert.equal(await failures.locator('time').count(), 2);
     assert.deepEqual(await actions.locator('strong').allTextContents(), ['Maintenance lock entered', 'Maintenance lock released']);
     const text = await failures.textContent(); assert.match(text, /\[REDACTED_PATH\]/u); assert.match(text, /\[REDACTED_EMAIL\]/u); assert.match(text, /<img/u);
-    assert.doesNotMatch(text, /\/app\/data\/restore|ops@example|private-token|0 failures/u); assert.equal(await failures.locator('img').count(), 0);
+    assert.doesNotMatch(text, /音乐 Room|Album Name|ops@example|private-token|0 failures/u); assert.equal(await failures.locator('img').count(), 0);
     assert.equal(await page.evaluate(() => globalThis.recoveryDiagnosticExecuted), undefined);
     assert.doesNotMatch(await actions.textContent(), /private-summary-marker|private-audit-token|unrecognized_type/u);
     const refresh = page.getByRole('button', { name: 'Refresh diagnostics', exact: true });

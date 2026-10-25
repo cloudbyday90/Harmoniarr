@@ -3,7 +3,7 @@ import test from 'node:test';
 import { createDiagnosticsExportService } from '../../src/server/diagnostics-export-service.js';
 
 test('diagnostics export service builds a compact redacted diagnostics bundle and attachment payload', async () => {
-  const service = createDiagnosticsExportService({
+  const service = createDiagnosticsExportService({ loadSettingsFn: async () => ({}),
     getOperatorNotifications: async ({ limit }) => ({
       checkedAt: '2026-05-03T13:03:00.000Z',
       counts: {
@@ -190,4 +190,22 @@ test('diagnostics export service builds a compact redacted diagnostics bundle an
   assert.equal(download.contentType, 'application/json; charset=utf-8');
   assert.match(download.filename, /^harmoniarr_diagnostics_2026-05-03T13-06-00-000Z\.json$/);
   assert.match(download.content.toString('utf8'), /"exportType": "system_diagnostics"/);
+});
+
+
+test('export and attachment apply current configured roots even to passthrough nested fields', async () => {
+  let reads = 0; let music = '/private/音乐';
+  const service = createDiagnosticsExportService({
+    loadSettingsFn: async () => { reads++; return { paths: { music } }; },
+    getOverview: async () => ({ pathValidation: { summary: { message: 'cannot read "/private/音乐/Album Name/song"' } } }),
+    getOperatorNotifications: async () => ({ notifications: [{ title: 'inspect /private/音乐/a', message: 'retry /private/音乐/a' }] }),
+    getRecoveryDiagnostics: async () => ({ recentFailedRuns: [{ id: 'run-1', errorMessage: 'read /private/音乐/a' }] }),
+  });
+  const first = await service.buildDiagnosticsExport(); assert.equal(reads, 1);
+  assert.doesNotMatch(JSON.stringify(first), /音乐|Album Name/u);
+  assert.equal(first.diagnostics.recovery.recentFailedRuns[0].id, 'run-1');
+  const attachment = await service.getDiagnosticsExportDownload(); assert.equal(reads, 2);
+  assert.doesNotMatch(attachment.content.toString('utf8'), /音乐|Album Name/u);
+  music = '/different/root';
+  assert.match(JSON.stringify(await service.buildDiagnosticsExport()), /音乐/u); assert.equal(reads, 3);
 });

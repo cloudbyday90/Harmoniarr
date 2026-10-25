@@ -38,7 +38,7 @@ test('getQueueDiagnostics returns status totals with recent runs', async (t) => 
     pauseProvider: 'maintenance',
     pausedOperationTypes: ['library_scan'],
   }));
-  const service = createRecoveryDiagnosticsService({
+  const service = createRecoveryDiagnosticsService({ loadSettingsFn: async () => ({}),
     getPoolFn: () => ({ query }),
     listRecentOperationRuns,
     nowFn: () => new Date('2026-05-02T13:00:00.000Z'),
@@ -110,7 +110,7 @@ test('getRecoveryDiagnostics returns maintenance locks, failed runs, and privile
       details: {},
     },
   ]));
-  const service = createRecoveryDiagnosticsService({
+  const service = createRecoveryDiagnosticsService({ loadSettingsFn: async () => ({}),
     listActiveMaintenanceLocks,
     listRecentAuditEvents,
     listRecentOperationRuns,
@@ -143,4 +143,34 @@ test('getRecoveryDiagnostics returns maintenance locks, failed runs, and privile
   assert.equal(listActiveMaintenanceLocks.mock.callCount(), 1);
   assert.equal(listRecentOperationRuns.mock.callCount(), 1);
   assert.equal(listRecentAuditEvents.mock.callCount(), 1);
+});
+
+
+test('diagnostics use one fresh settings snapshot per read and redact all run, audit and queue messages', async () => {
+  let reads = 0; let music = '/private/音乐';
+  const run = { id: 'run-1', status: 'failed', errorMessage: 'failed at "/private/音乐/Artist Name/song"', summary: { note: 'read /private/音乐/a' } };
+  const service = createRecoveryDiagnosticsService({
+    loadSettingsFn: async () => { reads++; return { paths: { music } }; },
+    getPoolFn: () => ({ query: async () => ({ rows: [] }) }),
+    listRecentOperationRuns: async () => Array.from({ length: 30 }, (_, id) => ({ ...run, id })),
+    listRecentAuditEvents: async () => [{ id: 'audit-1', eventType: 'maintenance_lock_entered', summary: 'read /private/音乐/a', details: { note: 'read /private/音乐/a' } }],
+    listActiveMaintenanceLocks: async () => [{ id: 'lock-1', reason: 'read /private/音乐/a' }],
+    resolveQueueDispatchReadiness: async () => ({ pauseMessage: 'read /private/音乐/a' }),
+    getRuntimeDiagnostics: () => ({ warning: 'read /private/音乐/a' }),
+  });
+  const first = await service.getRecoveryDiagnostics();
+  assert.equal(reads, 1); assert.doesNotMatch(JSON.stringify(first), /音乐|Artist Name/u);
+  assert.equal(first.recentFailedRuns[0].errorMessage, 'failed at "[REDACTED_PATH]"');
+  const queue = await service.getQueueDiagnostics();
+  assert.equal(reads, 2); assert.doesNotMatch(JSON.stringify(queue), /音乐/u); assert.equal(queue.recentRuns.length, 30);
+  music = '/different/root';
+  const next = await service.getRecoveryDiagnostics();
+  assert.equal(reads, 3); assert.match(next.recentFailedRuns[0].errorMessage, /音乐/u);
+  assert.match(run.errorMessage, /音乐/u); // Stored input remains untouched.
+});
+
+test('diagnostics refuse to fall back to incomplete redaction after a settings failure', async () => {
+  const service = createRecoveryDiagnosticsService({ loadSettingsFn: async () => { throw new Error('settings unavailable'); } });
+  await assert.rejects(service.getRecoveryDiagnostics(), /settings unavailable/u);
+  await assert.rejects(service.getQueueDiagnostics(), /settings unavailable/u);
 });

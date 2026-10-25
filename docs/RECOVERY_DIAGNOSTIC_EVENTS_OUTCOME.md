@@ -1,5 +1,8 @@
 # Recovery diagnostic events outcome
 
+The configured-root follow-up is implemented in the separate
+[configured-path redaction outcome](CONFIGURED_PATH_REDACTION_OUTCOME.md).
+
 October 25, 2026. Completes the next step in the
 [admission diagnostics outcome](ARTWORK_ADMISSION_DIAGNOSTICS_OUTCOME.md). See
 [design](RECOVERY_DIAGNOSTIC_EVENTS_DESIGN.md),

@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 25 [configured-path redaction rebuild](LOCAL_DOCKER_CONFIGURED_PATH_REDACTION_OUTCOME.md)
+records the latest no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](CONFIGURED_PATH_REDACTION_OUTCOME.md) records current
+settings snapshots, server-side path minimization and composed HTTP/browser proof.
+
 The October 25 [Recovery diagnostic event rebuild](LOCAL_DOCKER_RECOVERY_DIAGNOSTIC_EVENTS_OUTCOME.md)
 records the latest no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](RECOVERY_DIAGNOSTIC_EVENTS_OUTCOME.md) records current
