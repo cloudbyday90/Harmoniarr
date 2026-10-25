@@ -23,26 +23,26 @@ import { maximumByteArtworkPng } from './artwork-worker-inputs.js';
 import { prepareDeploymentArtworkCase } from './deployment-artwork-corpus-case.js';
 import { settleDeploymentArtwork } from './deployment-artwork-publication.js';
 
-export async function runDeploymentMemoryWorkload({ pool, dimension, callerBytes, maximumBytes = false, artworkCaseId = null,
+export async function runDeploymentMemoryWorkload({ pool, dimension, callerBytes, maximumBytes = false, artworkCaseId = null, signal,
   withConcurrentWork = (_context, work) => work(), onArtworkSpawn = () => {}, onArtworkClose = () => {} }) {
   if ([withConcurrentWork, onArtworkSpawn, onArtworkClose].some(callback => typeof callback !== 'function')) throw new TypeError('Invalid concurrent qualification owner');
   if (artworkCaseId != null && maximumBytes) throw new TypeError('Use one owned artwork input mode');
-  const artworkCase = artworkCaseId == null ? null : await prepareDeploymentArtworkCase(artworkCaseId);
+  const artworkCase = artworkCaseId == null ? null : await prepareDeploymentArtworkCase(artworkCaseId, { signal });
   const image = artworkCase?.image ?? (maximumBytes ? (await maximumByteArtworkPng(100 * 1024 ** 2)).input
     : await sharp({ create: { width: dimension, height: dimension, channels: 3, background: 'red' } }).jpeg().toBuffer());
   const jobs = maximumBytes ? 1 : 2;
   return withDeploymentImageProvider(image, async provider => {
     const gate = createArtworkIngestionAdmission(); const children = []; const tasks = [];
-    let activeChildren = 0; let peakChildren = 0; let downloads = 0; let heldPublication = false;
+    let activeChildren = 0; let peakChildren = 0; let downloads = 0; let heldPublication = false; let publicationLookups = 0;
     const published = Promise.withResolvers(); const release = Promise.withResolvers(); const downloaded = Promise.withResolvers();
     const worker = createArtworkWorkerService({ spawnFn: (...args) => {
       const child = spawn(...args); const record = { pid: child.pid, closed: false, code: null, signal: null }; children.push(record);
       let outputBytes = 0; child.stdout.on('data', chunk => { outputBytes += chunk.length; });
       activeChildren++; peakChildren = Math.max(peakChildren, activeChildren);
       child.once('spawn', onArtworkSpawn);
-      child.once('close', (code, signal) => {
-        Object.assign(record, { closed: true, code, signal }); activeChildren--;
-        try { onArtworkClose({ code, signal, outputBytes }); } catch { /* optional qualification diagnostic */ }
+      child.once('close', (code, exitSignal) => {
+        Object.assign(record, { closed: true, code, signal: exitSignal }); activeChildren--;
+        try { onArtworkClose({ code, signal: exitSignal, outputBytes }); } catch { /* optional qualification diagnostic */ }
       }); return child;
     } });
     let policy;
@@ -59,6 +59,7 @@ export async function runDeploymentMemoryWorkload({ pool, dimension, callerBytes
         prepareArtworkAssetFn: input => prepareArtworkAsset({ ...input, transformArtworkBufferFn: worker.processArtworkBuffer }),
         getArtworkAssetBySha256Fn: async sha256 => {
           assert.ok(!artworkCase?.spec.refuse, 'Refused artwork cannot reach publication lookup');
+          publicationLookups++;
           const existing = await getArtworkAssetBySha256(sha256);
           if (!heldPublication) { heldPublication = true; published.resolve(); await release.promise; }
           return existing;
@@ -84,7 +85,8 @@ export async function runDeploymentMemoryWorkload({ pool, dimension, callerBytes
             ownerId, ownerType: 'musicbrainz_artist', artworkRole: 'artist_thumbnail',
           }));
           const publication = await settleDeploymentArtwork({ pool, image, artworkCase, dimension, maximumBytes, owners, tasks,
-            published, downloaded, release, gate, children, getPolicy: () => policy, getDownloads: () => downloads, checkpoint });
+            published, downloaded, release, gate, children, getPolicy: () => policy, getDownloads: () => downloads,
+            getPublicationLookups: () => publicationLookups, checkpoint });
           assert.equal(retained[0], 0x5a); assert.equal(retained.at(-1), 0x5a);
           assert.equal(gate.getMemoryState().reservedBytes, 0); assert.deepEqual(gate.getState(), { active: 0, queued: 0, queuedBytes: 0 });
           return { dimension: artworkCase?.spec.width ?? dimension, callerBytes: retained.length, imageBytes: image.length, activeDatabaseStatements: database.activeStatements,

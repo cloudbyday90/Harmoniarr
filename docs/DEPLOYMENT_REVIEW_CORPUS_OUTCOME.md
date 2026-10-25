@@ -84,7 +84,8 @@ review facts/scans and owned decoder refusal. Benefits are real composition and
 separate success/refusal proof. Costs are explicit opt-in containers and a deliberately
 selected corpus. No new resource policy is justified by these passing cases alone.
 
-Next: **qualify fixed maximum-accepted-resolution high-entropy JPEG/WebP inputs
-under the current byte/pixel limits**. Use bounded/streamed generation and fresh
-mixed profiles before adjusting reservation headroom or recommending a deployment
-minimum. Multi-owner concurrency remains a separate unmeasured dimension.
+The maximum-resolution JPEG/WebP follow-up is now recorded in the
+[maximum artwork outcome](DEPLOYMENT_MAXIMUM_ARTWORK_OUTCOME.md), including its
+native-failure containment finding. Use that outcome's next item before adjusting
+reservation headroom or recommending a deployment minimum. Multi-owner concurrency
+remains a separate unmeasured dimension.

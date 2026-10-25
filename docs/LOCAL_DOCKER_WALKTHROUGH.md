@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 24 [maximum artwork rebuild](LOCAL_DOCKER_DEPLOYMENT_MAXIMUM_ARTWORK_OUTCOME.md)
+records the latest no-cache image and preserved administrator/data/mounts. The
+[maximum artwork outcome](DEPLOYMENT_MAXIMUM_ARTWORK_OUTCOME.md) distinguishes
+controlled refusal from native abort containment under actual mixed work.
+
 The October 24 [mixed artwork-corpus rebuild](LOCAL_DOCKER_DEPLOYMENT_REVIEW_CORPUS_OUTCOME.md)
 records the latest no-cache image and preserved administrator/data/mounts. The
 [corpus outcome](DEPLOYMENT_REVIEW_CORPUS_OUTCOME.md) records fresh entropy/sample-depth

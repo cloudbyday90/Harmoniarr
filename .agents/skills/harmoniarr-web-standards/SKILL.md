@@ -5,6 +5,11 @@ description: "Apply and verify standards for Harmoniarr UI commands, forms, focu
 
 # Harmoniarr Web Standards
 
+For maximum-resolution noisy JPEG/WebP qualification, read
+[maximum artwork](references/deployment-maximum-artwork.md). It distinguishes
+admission refusal, controlled processing failure and native abort containment,
+including generation memory and unchanged production resource bounds.
+
 For entropy/sample-depth artwork in mixed resource checks, read
 [mixed corpus](references/deployment-review-corpus.md). It covers fresh case/profile
 identity, canonical pixels, expected refusal and unchanged downstream authority.

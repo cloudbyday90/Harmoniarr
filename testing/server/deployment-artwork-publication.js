@@ -8,11 +8,14 @@ import { createHash } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import sharp from 'sharp';
+import { settleBoundedDeploymentArtwork } from './deployment-artwork-bounded-outcome.js';
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 
 /** Publication and expected capacity refusal retain different proof obligations. */
 export async function settleDeploymentArtwork({ pool, image, artworkCase, dimension, maximumBytes, owners, tasks,
-  published, downloaded, release, gate, children, getPolicy, getDownloads, checkpoint }) {
+  published, downloaded, release, gate, children, getPolicy, getDownloads, getPublicationLookups, checkpoint }) {
+  if (artworkCase?.spec.boundedOutcome) return settleBoundedDeploymentArtwork({ pool, image, artworkCase, owners, tasks,
+    published, release, gate, children, getPolicy, getDownloads, getPublicationLookups, checkpoint });
   const refusal = artworkCase?.spec.refuse === true; const jobs = owners.length;
   let publicationReservedBytes = 0; const hashes = []; let images = 0;
   if (refusal) {

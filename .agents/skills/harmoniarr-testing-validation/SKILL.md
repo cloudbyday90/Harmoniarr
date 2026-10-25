@@ -5,6 +5,13 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For maximum-resolution noisy JPEG/WebP inputs, read the standards
+[maximum artwork reference](../harmoniarr-web-standards/references/deployment-maximum-artwork.md).
+Pair lazy-source/real TIFF parity, cleanup/cache restoration and owned outcome
+classification with corpus/observer/drain checks. Run the opt-in maximum entry
+in fresh 2/3 GiB profiles. Treat a contained native abort as containment evidence,
+not graceful refusal or successful image processing; preserve failed candidates.
+
 For mixed artwork corpus qualification, read the standards
 [corpus reference](../harmoniarr-web-standards/references/deployment-review-corpus.md).
 Pair selector/pixel/metadata verification with existing observer/drain checks. Run
