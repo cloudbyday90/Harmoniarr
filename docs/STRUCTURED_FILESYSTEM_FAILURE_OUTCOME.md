@@ -1,5 +1,8 @@
 # Structured filesystem failure outcome
 
+The journal follow-up is implemented in the separate
+[backup journal failure outcome](BACKUP_JOURNAL_FAILURE_OUTCOME.md).
+
 October 25, 2026. Completes the first producer step from
 [configured-path redaction](CONFIGURED_PATH_REDACTION_OUTCOME.md). See separate
 [design and tradeoffs](STRUCTURED_FILESYSTEM_FAILURE_DESIGN.md),

@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 25 [backup journal failure rebuild](LOCAL_DOCKER_BACKUP_JOURNAL_FAILURE_OUTCOME.md)
+records the latest no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](BACKUP_JOURNAL_FAILURE_OUTCOME.md) records bounded journal
+errors, preserved recovery phase and real publish/delete recovery evidence.
+
 The October 25 [structured filesystem failure rebuild](LOCAL_DOCKER_STRUCTURED_FILESYSTEM_FAILURE_OUTCOME.md)
 records the latest no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](STRUCTURED_FILESYSTEM_FAILURE_OUTCOME.md) records safe

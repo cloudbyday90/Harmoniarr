@@ -5,6 +5,8 @@
  */
 
 const operationMessages = new Map([
+  ['backup_artifact_publish', 'Backup publication could not be completed'],
+  ['backup_artifact_delete', 'Backup deletion could not be completed'],
   ['backup_payload_read', 'The backup payload could not be read'],
   ['import_file_stage', 'Library add could not prepare a file'],
   ['import_file_finalize', 'Library add could not finalize a file'],

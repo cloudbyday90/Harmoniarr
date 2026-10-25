@@ -142,7 +142,19 @@ export function createBackupArtifactFileOperationStore({
     return normalizeOperation(result.rows[0]);
   }
 
+  async function recordFileOperationFailure({ fileOperationId, lastErrorCode, lastErrorMessage }) {
+    const result = await getPoolFn().query(
+      `UPDATE backup_artifact_file_operations
+       SET last_error_code = $2, last_error_message = $3, updated_at = NOW()
+       WHERE id = $1
+       RETURNING ${operationColumns}`,
+      [fileOperationId, lastErrorCode, lastErrorMessage],
+    );
+    return normalizeOperation(result.rows[0]);
+  }
+
   return {
+    recordFileOperationFailure,
     createFileOperation,
     listIncompleteFileOperations,
     updateFileOperation,

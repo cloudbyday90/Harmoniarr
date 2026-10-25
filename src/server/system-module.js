@@ -120,6 +120,7 @@ export function createSystemModule({
   systemBackupArtifactFileOperationService = backupArtifactFileOperationService ?? createBackupArtifactFileOperationService({
     createBackupArtifact: backupArtifactRepository.createBackupArtifact,
     createFileOperation: backupArtifactFileOperationStore.createFileOperation,
+    recordFileOperationFailure: backupArtifactFileOperationStore.recordFileOperationFailure,
     deleteBackupArtifactById: backupArtifactRepository.deleteBackupArtifactById,
     getBackupArtifactByFilename: backupArtifactRepository.getBackupArtifactByFilename,
     getBackupArtifactById: backupArtifactRepository.getBackupArtifactById,

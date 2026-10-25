@@ -63,6 +63,7 @@ const pathKeys = new Set([
   'stagingpath',
   'storagepath',
   'targetpath',
+  'temporarypath',
 ]);
 
 const windowsPathPattern = /\b[A-Za-z]:\\(?:[^\\\r\n\t ]+\\?)+/g;

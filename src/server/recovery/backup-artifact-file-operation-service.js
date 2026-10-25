@@ -18,6 +18,7 @@
 
 import { createHash, randomUUID } from 'node:crypto';
 import { createApiError } from '../auth.js';
+import { buildBackupArtifactJournalFailure } from './backup-artifact-failure-policy.js';
 import {
   createBackupArtifactFileService,
   createTemporaryBackupArtifactPath,
@@ -41,17 +42,8 @@ function createVerificationRequiredError(code) {
   return createApiError(
     409,
     'backup_artifact_filesystem_confirmation_required',
-    `Backup artifact filesystem state could not be verified (${code}). No file was changed.`,
+    `Backup artifact filesystem state could not be verified (${code}). Inspect the file state before trying again.`,
   );
-}
-
-function getErrorDetails(error) {
-  return {
-    code: typeof error?.code === 'string' && error.code.length > 0
-      ? error.code
-      : 'backup_artifact_file_operation_failed',
-    message: error instanceof Error ? error.message : 'Backup artifact file operation failed',
-  };
 }
 
 function toOperationArtifact(operation, storagePath) {
@@ -80,6 +72,7 @@ export function createBackupArtifactFileOperationService({
   getBackupArtifactById = async () => null,
   listIncompleteFileOperations = async () => [],
   randomUuidFn = randomUUID,
+  recordFileOperationFailure = async () => { throw new Error('recordFileOperationFailure dependency is required'); },
   sha256Fn = sha256,
   updateFileOperation = async () => {
     throw new Error('updateFileOperation dependency is required');
@@ -219,8 +212,8 @@ export function createBackupArtifactFileOperationService({
       : null;
     const resolvedArtifact = deletedArtifact ?? operation.artifactSnapshot;
 
+    // Deletion clears the journal link through ON DELETE SET NULL.
     await updateFileOperation({
-      backupArtifactId,
       fileOperationId: operation.id,
       status: 'completed',
     });
@@ -261,15 +254,14 @@ export function createBackupArtifactFileOperationService({
         fileOperationId: operation.id,
         status: 'temporary_ready',
       });
-      return publishPreparedOperation(operation);
+      return await publishPreparedOperation(operation);
     } catch (error) {
       if (error?.code !== 'backup_artifact_filesystem_confirmation_required') {
-        const details = getErrorDetails(error);
-        await updateFileOperation({
+        const details = buildBackupArtifactJournalFailure(error, operation);
+        await recordFileOperationFailure({
           fileOperationId: operation.id,
           lastErrorCode: details.code,
           lastErrorMessage: details.message,
-          status: operation.status,
         });
       }
 
@@ -298,12 +290,11 @@ export function createBackupArtifactFileOperationService({
       return await deletePreparedOperation(operation);
     } catch (error) {
       if (error?.code !== 'backup_artifact_filesystem_confirmation_required') {
-        const details = getErrorDetails(error);
-        await updateFileOperation({
+        const details = buildBackupArtifactJournalFailure(error, operation);
+        await recordFileOperationFailure({
           fileOperationId: operation.id,
           lastErrorCode: details.code,
           lastErrorMessage: details.message,
-          status: operation.status,
         });
       }
 
@@ -334,12 +325,11 @@ export function createBackupArtifactFileOperationService({
         return { status: 'awaiting_confirmation' };
       }
 
-      const details = getErrorDetails(error);
-      await updateFileOperation({
+      const details = buildBackupArtifactJournalFailure(error, operation);
+      await recordFileOperationFailure({
         fileOperationId: operation.id,
         lastErrorCode: details.code,
         lastErrorMessage: details.message,
-        status: operation.status,
       });
       return { status: 'deferred' };
     }

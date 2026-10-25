@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createBackupArtifactFixture as createArtifactDraft } from '../../testing/server/backup-artifact-fixture.js';
 import { createHash } from 'node:crypto';
 import { access, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -10,46 +11,6 @@ import { createBackupArtifactFileVerificationService } from '../../src/server/re
 
 function sha256(value) {
   return createHash('sha256').update(value).digest('hex');
-}
-
-function createArtifactDraft({ storagePath }) {
-  const manifest = {
-    application: {
-      name: 'harmoniarr',
-      version: '0.1.0-beta',
-    },
-    backup: {
-      encrypted: false,
-      scope: ['settings'],
-      type: 'logical',
-    },
-    exportedAt: '2026-08-25T12:00:00.000Z',
-    formatVersion: '1',
-    schema: {
-      migrationLevel: 'applied:99',
-    },
-  };
-  const content = JSON.stringify({
-    ...manifest,
-    data: {
-      settings: {},
-    },
-  }, null, 2);
-
-  return {
-    artifact: {
-      ...manifest,
-      backupType: manifest.backup.type,
-      encrypted: false,
-      fileSizeBytes: Buffer.byteLength(content),
-      filename: 'harmoniarr_backup_2026-08-25T12-00-00-000Z_operation-1.json',
-      manifest,
-      payloadSha256: sha256(content),
-      scope: manifest.backup.scope,
-      storagePath,
-    },
-    content,
-  };
 }
 
 function createLifecycleHarness({ fileService = createBackupArtifactFileService() } = {}) {
@@ -97,6 +58,7 @@ function createLifecycleHarness({ fileService = createBackupArtifactFileService(
     getBackupArtifactByFilename,
     getBackupArtifactById,
     listIncompleteFileOperations: async () => operations.filter((operation) => !['completed', 'abandoned'].includes(operation.status)),
+    recordFileOperationFailure: updateFileOperation,
     randomUuidFn: () => 'temporary-1',
     updateFileOperation,
   });
@@ -213,4 +175,56 @@ test('recoverIncompleteFileOperations completes interrupted deletion only after 
   assert.equal(harness.operations[0].status, 'completed');
   assert.equal(harness.artifacts.length, 0);
   await assert.rejects(() => access(storagePath), { code: 'ENOENT' });
+});
+
+
+test('async publication promotion failure is recorded safely without regressing the temporary-ready phase', async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), 'harmoniarr-backup-journal-publish-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const draft = createArtifactDraft({ storagePath: join(directory, 'backup.json') });
+  const raw = Object.assign(new Error('private-native-message /retired/音乐 Room token=secret'), { code: 'EIO' });
+  const files = createBackupArtifactFileService();
+  const harness = createLifecycleHarness({ fileService: { ...files, promoteTemporaryFile: async () => { throw raw; } } });
+  await assert.rejects(harness.service.publishBackupArtifact(draft), error => error === raw);
+  const [operation] = harness.operations;
+  assert.equal(operation.status, 'temporary_ready'); assert.equal(operation.lastErrorCode, 'EIO');
+  assert.doesNotMatch(operation.lastErrorMessage, /private-native-message|retired|secret/u);
+  assert.equal(await readFile(operation.temporaryPath, 'utf8'), draft.content); assert.equal(harness.artifacts.length, 0);
+});
+
+test('delete failure retains inventory and records safe text without changing the thrown error', async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), 'harmoniarr-backup-journal-delete-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const draft = createArtifactDraft({ storagePath: join(directory, 'backup.json') });
+  const files = createBackupArtifactFileService(); let fail = true;
+  const raw = Object.assign(new Error('private-native-message token=secret'), { code: 'EACCES' });
+  const harness = createLifecycleHarness({ fileService: { ...files, removeFileIfPresent: async input => {
+    if (fail) throw raw; return files.removeFileIfPresent(input);
+  } } });
+  const artifact = await harness.service.publishBackupArtifact(draft);
+  await assert.rejects(harness.service.deleteBackupArtifact({ artifact }), error => error === raw);
+  const operation = harness.operations.find(entry => entry.operationType === 'delete');
+  assert.equal(operation.status, 'prepared'); assert.equal(operation.lastErrorCode, 'EACCES');
+  assert.doesNotMatch(operation.lastErrorMessage, /private-native-message|secret/u);
+  assert.equal(harness.artifacts.length, 1); assert.equal(await readFile(artifact.storagePath, 'utf8'), draft.content);
+  fail = false; assert.equal((await harness.service.recoverIncompleteFileOperations()).completedCount, 1);
+  assert.equal(harness.artifacts.length, 0);
+});
+
+test('restart recovery records a fixed unknown failure and remains deferred without losing verified temporary bytes', async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), 'harmoniarr-backup-journal-recover-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const draft = createArtifactDraft({ storagePath: join(directory, 'backup.json') }); const files = createBackupArtifactFileService();
+  const harness = createLifecycleHarness({ fileService: { ...files, promoteTemporaryFile: async () => {
+    throw Object.assign(new Error('private-native-message token=secret'), { code: '/unsafe-code' });
+  } } });
+  const operation = await harness.createFileOperation({ artifactSnapshot: draft.artifact, storagePath: draft.artifact.storagePath,
+    filename: draft.artifact.filename, operationType: 'publish', expectedFileSha256: sha256(draft.content),
+    expectedFileSizeBytes: Buffer.byteLength(draft.content), temporaryPath: join(directory, '.interrupted.partial') });
+  await files.writePrivateTemporaryFile({ content: draft.content, temporaryPath: operation.temporaryPath });
+  const result = await harness.service.recoverIncompleteFileOperations();
+  assert.equal(result.deferredCount, 1); assert.equal(operation.status, 'prepared');
+  assert.equal(operation.lastErrorCode, 'backup_artifact_file_operation_failed');
+  assert.doesNotMatch(operation.lastErrorMessage, /private-native-message|secret|unsafe-code/u);
+  assert.equal(await readFile(operation.temporaryPath, 'utf8'), draft.content);
 });
