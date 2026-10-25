@@ -16,7 +16,8 @@ import { maximumArtworkCases } from './artwork-maximum-inputs.js';
 import { boundaryArtworkCases } from './artwork-boundary-cases.js';
 
 /** Guarded entries own the pool/profile; every case shares the same actual workload. */
-export async function qualifyDeploymentReviewMemory({ pool, profile, gib, signal, artworkCaseId = null }) {
+export async function qualifyDeploymentReviewMemory({ pool, profile, gib, signal, artworkCaseId = null, artworkFixtureFactory = null }) {
+  if (artworkFixtureFactory !== null && typeof artworkFixtureFactory !== 'function') throw new TypeError('Invalid mixed artwork fixture factory');
   const backend = (await pool.query(`SELECT pg_backend_pid() AS pid,current_setting('server_version_num')::int AS version,
     pg_size_bytes(current_setting('shared_buffers'))::text AS sharedBuffersBytes,
     pg_size_bytes(current_setting('work_mem'))::text AS workMemBytes,current_setting('hash_mem_multiplier')::float AS hashMultiplier,
@@ -26,11 +27,12 @@ export async function qualifyDeploymentReviewMemory({ pool, profile, gib, signal
   const { pid: _pid, ...databaseSettings } = backend; const before = await profile.snapshot(); const beforeFixture = await readDeploymentMemory();
   const measurement = await withDeploymentMediaFixture(async fixture => {
     const observation = createDeploymentReviewObserver({ mediaObserver: createDeploymentMediaObserver({ signal }) });
-    const holdScanUntilArtwork = [...maximumArtworkCases, ...boundaryArtworkCases].some(spec => spec.id === artworkCaseId);
-    return runDeploymentMemoryWorkload({ pool, dimension: 8192, callerBytes: 256 * 1024 ** 2, artworkCaseId, signal,
+    const artworkFixture = artworkFixtureFactory?.({ mediaObserver: observation.observer, signal });
+    const holdScanUntilArtwork = Boolean(artworkFixture) || [...maximumArtworkCases, ...boundaryArtworkCases].some(spec => spec.id === artworkCaseId);
+    return runDeploymentMemoryWorkload({ pool, dimension: 8192, callerBytes: 256 * 1024 ** 2, artworkCaseId, artworkFixture, signal,
       onArtworkSpawn: () => {
         observation.observer.observeArtworkSpawn();
-        if (holdScanUntilArtwork) observation.observer.releaseScan();
+        if (holdScanUntilArtwork && !artworkFixture) observation.observer.releaseScan();
       },
       withConcurrentWork: (context, work) => withDeploymentReviewWorkload({ ...context, observation, signal }, review =>
         withDeploymentMediaWorkers({ ...context, fixture, observer: observation.observer, holdScanUntilArtwork }, () => runDeploymentReviewConcurrently(work, review))),
@@ -42,7 +44,7 @@ export async function qualifyDeploymentReviewMemory({ pool, profile, gib, signal
   const { baseline, settled } = measurement.checkpoints;
   assert.equal(settled.kernel.events.max, baseline.kernel.events.max); assert.equal(settled.kernel.events.oom, baseline.kernel.events.oom);
   assert.equal(measurement.result.finalReservedBytes, 0); assert.equal(measurement.result.review.detailNativeOverlap, true);
-  return { scenario: artworkCaseId == null ? 'review-media' : 'review-artwork-corpus', memoryGiB: gib, node: process.versions.node,
+  return { scenario: artworkFixtureFactory ? 'review-webp-selection' : artworkCaseId == null ? 'review-media' : 'review-artwork-corpus', memoryGiB: gib, node: process.versions.node,
     database: { ...databaseSettings, appPoolMax: pool.options.max }, ...measurement, afterFixtureKernelPeakBytes: after.memoryPeakBytes, oomKillsUnchanged: true,
     fixtureKernelEvents: { before: beforeFixture.events, after: afterFixture.events },
     scope: 'selected controlled single-app workload; lifetime peak includes setup; native overlap is lifecycle evidence; transcode writes only null output; durations are observations, not an SLO' };

@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 25 [selected WebP mixed-workload rebuild](LOCAL_DOCKER_WEBP_SELECTION_MIXED_MEMORY_OUTCOME.md)
+records the latest no-cache image and preserved administrator/data/mounts. The
+[qualification outcome](WEBP_SELECTION_MIXED_MEMORY_OUTCOME.md) records actual
+review/media overlap, publication and native-active cancellation under full reservation.
+
 The October 25 [bounded WebP selection rebuild](LOCAL_DOCKER_WEBP_OUTPUT_SELECTION_OUTCOME.md)
 records the latest no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](WEBP_OUTPUT_SELECTION_OUTCOME.md) connects size-based

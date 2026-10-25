@@ -28,6 +28,7 @@ export function createDeploymentMediaObserver({ spawnFn = spawn, signal = AbortS
     waitForScan: () => scanReady.promise,
     waitForEncoder: () => encoderReady.promise,
     waitForOverlap: () => overlap.promise,
+    getActiveState: () => ({ scan: scanActive, encoder: active('encode').length > 0 }),
     observeArtworkSpawn() { artworkStarts++; if (scanActive && active('encode').length > 0) artworkOverlap = true; },
     spawnMedia(kind, binary, args, options) {
       if (!open || failed || !['encode', 'probe'].includes(kind) || records.length >= 64) throw new TypeError('Invalid native qualification launch');

@@ -110,6 +110,11 @@ main with all project changes committed/pushed; no release or branch is created.
 
 ## Next recommendation
 
+Continued in the [mixed-workload qualification](WEBP_SELECTION_MIXED_MEMORY_OUTCOME.md),
+with separate [design](WEBP_SELECTION_MIXED_MEMORY_DESIGN.md) and
+[research](WEBP_SELECTION_MIXED_MEMORY_RESEARCH.md). The following recommendation
+records the evidence gap at the end of this implementation.
+
 Qualify this selected mode while heavy review/media native work overlaps, using
 the existing pinned inputs in fresh 2/3 GiB profiles. Keep the full reservation
 and verify actual overlap, publication/queued work, cancellation, kernel events

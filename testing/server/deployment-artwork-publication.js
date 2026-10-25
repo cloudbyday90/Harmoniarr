@@ -36,6 +36,7 @@ export async function settleDeploymentArtwork({ pool, image, artworkCase, dimens
       assert.ok(gate.getMemoryState().reservedBytes > 0); assert.ok(children.some(child => child.closed));
       publicationReservedBytes = gate.getMemoryState().reservedBytes;
       if (!artworkCase && dimension === 8192) { assert.equal(children.length, 1); assert.equal(gate.getState().queued, 1); }
+      await artworkCase?.verifyPublication?.({ gate, children });
       await checkpoint('publication');
     } finally { release.resolve(); }
     const results = await completed; images = results.length;

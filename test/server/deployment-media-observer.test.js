@@ -19,11 +19,15 @@ function fixture() {
 
 test('native overlap requires actual spawn events and retained scan/encoder lifetimes', async () => {
   const { observer, children, launch, launches } = fixture();
+  assert.deepEqual(observer.getActiveState(), { scan: false, encoder: false });
   const scan = observer.enterScan(); await observer.waitForScan();
   launch('encode'); launch('probe'); assert.equal(observer.getState().scanProbeEncodeOverlap, false);
+  assert.deepEqual(observer.getActiveState(), { scan: true, encoder: false });
   children[0].emit('spawn'); await observer.waitForEncoder(); children[1].emit('spawn'); await observer.waitForOverlap();
+  assert.deepEqual(observer.getActiveState(), { scan: true, encoder: true });
   observer.observeArtworkSpawn(); observer.releaseScan(); await scan; observer.finishScan();
   children.forEach(child => { child.emit('close', 0, null); }); await observer.close();
+  assert.deepEqual(observer.getActiveState(), { scan: false, encoder: false });
   assert.deepEqual(observer.getState(), { scanProbeEncodeOverlap: true, scanEncoderArtworkOverlap: true, artworkStarts: 1,
     maximumConcurrentNativeCommands: 2, encoderCommands: 1, probeCommands: 1, normalCloses: 2 });
   assert.deepEqual(launches[0], ['ffmpeg', ['owned', 'args'], { shell: false }]);
