@@ -5,6 +5,11 @@ description: "Apply and verify standards for Harmoniarr UI commands, forms, focu
 
 # Harmoniarr Web Standards
 
+For encoder effort/quality experiments, read
+[WebP effort comparison](references/webp-effort-comparison.md). It covers fixed
+inputs, independent full/crop evidence, equal limits, owned artifacts and the
+limits of pixel metrics when deciding a production policy.
+
 For structured WebP allocation diagnosis or encoder token-growth accounting, read
 [encoder boundary](references/webp-encoder-boundary.md). It covers binary/source
 identity, actual error/limit evidence, growth-reserve limits and pre-grant refusal.

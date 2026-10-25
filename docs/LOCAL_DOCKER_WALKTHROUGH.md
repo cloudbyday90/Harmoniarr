@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 25 [WebP effort comparison rebuild](LOCAL_DOCKER_WEBP_EFFORT_COMPARISON_OUTCOME.md)
+records the latest no-cache image and preserved administrator/data/mounts. The
+[comparison outcome](WEBP_EFFORT_COMPARISON_OUTCOME.md) separates encoder method
+measurements, quality limitations and the decision to retain production policy.
+
 The October 25 [encoder boundary rebuild](LOCAL_DOCKER_WEBP_ENCODER_BOUNDARY_OUTCOME.md)
 records the latest no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](WEBP_ENCODER_BOUNDARY_OUTCOME.md) connects native

@@ -122,3 +122,6 @@ encoder's method 2 avoids this token-buffer path; compare effort 2 at quality 90
 as a controlled alternative before changing production effort 4. Explicit
 low-memory wrapper support is another capability decision. Do not keep
 searching fixture dimensions or raising DATA to manufacture an accepted boundary.
+
+The subsequent [effort comparison](WEBP_EFFORT_COMPARISON_OUTCOME.md) evaluates
+that next item on the fixed input and independent predeclared center crop.

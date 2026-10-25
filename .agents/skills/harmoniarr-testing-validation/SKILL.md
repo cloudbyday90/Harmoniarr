@@ -5,6 +5,13 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For WebP effort/quality experiments, read the standards
+[comparison reference](../harmoniarr-web-standards/references/webp-effort-comparison.md).
+Keep fixed full/crop cases and separate pixel metrics opt-in; pair cheap metric/
+selector checks with existing worker framing/lifecycle regressions, one fast gate,
+fresh equal-resource encoder cases and affected production success/refusal controls.
+Retain unrelated proof only after exact source/test/packaged-runtime review.
+
 For WebP encoder growth changes, read the standards
 [encoder reference](../harmoniarr-web-standards/references/webp-encoder-boundary.md).
 Run page/budget/grant-order and existing worker/observer checks, then one fast
