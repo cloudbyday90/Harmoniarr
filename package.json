@@ -78,6 +78,7 @@
     "validate:native-deployment-review-artwork-corpus": "node --test --test-concurrency=1 test/native/deployment-review-artwork-corpus.test.js",
     "validate:native-deployment-review-admitted-artwork": "node --test --test-concurrency=1 test/native/deployment-review-boundary-artwork.test.js",
     "validate:native-deployment-review-artwork-boundary": "node --test --test-concurrency=1 test/native/deployment-review-boundary-artwork.test.js",
+    "validate:native-deployment-review-artwork-characterization": "node --test --test-concurrency=1 test/native/deployment-review-artwork-characterization.test.js",
     "validate:native-artwork-webp-canvas": "node --test --test-concurrency=1 test/native/artwork-webp-canvas.test.js",
     "validate:native-deployment-review-maximum-artwork": "node --test --test-concurrency=1 test/native/deployment-review-maximum-artwork.test.js",
     "validate:native-media-command-admission": "node --test --test-concurrency=1 test/native/media-command-admission.test.js",

@@ -21,7 +21,8 @@ test('fixed boundary inputs declare format-aware admission and unknown descripto
     assert.equal(selectBoundaryArtworkCase(spec.id), spec);
     const headroom = ARTWORK_WORKER_DATA_LIMIT - artworkWorkerMemoryEstimate(metadata, spec.inputBytes);
     if (spec.expectedAdmission === 'admitted') {
-      assertArtworkMemoryAdmission({ metadata, inputBytes: spec.inputBytes }); assert.ok(headroom > 0 && headroom < 2 * 1024 ** 2);
+      assertArtworkMemoryAdmission({ metadata, inputBytes: spec.inputBytes }); assert.ok(headroom > 0 && headroom < spec.maxAdmissionHeadroomBytes);
+      assert.ok(spec.maxAdmissionHeadroomBytes <= 4 * 1024 ** 2);
     } else {
       assert.throws(() => assertArtworkMemoryAdmission({ metadata, inputBytes: spec.inputBytes }), { code: 'artwork_worker_memory' }); assert.ok(headroom < 0);
     }
@@ -58,6 +59,8 @@ test('preparation refuses existing output directories without altering their con
   const parent = resolve(tmpdir()); const root = await mkdtemp(join(parent, 'harmoniarr-prepare-test-'));
   t.after(async () => { assert.equal(dirname(root), parent); assert.ok(basename(root).startsWith('harmoniarr-prepare-test-')); await rm(root, { recursive: true, force: true }); });
   const path = join(root, 'keep'); await writeFile(path, 'original');
+  for (const caseId of ['', null, 'foreign']) await assert.rejects(prepareBoundaryArtworkInputs({ root, caseId }), TypeError);
+  for (const spec of boundaryArtworkCases) await assert.rejects(prepareBoundaryArtworkInputs({ root, caseId: spec.id }), { code: 'EEXIST' });
   await assert.rejects(prepareBoundaryArtworkInputs({ root }), { code: 'EEXIST' });
   assert.equal(await readFile(path, 'utf8'), 'original');
   await assert.rejects(prepareBoundaryArtworkInputs({ root, signal: AbortSignal.abort(null) }), error => error === null);

@@ -1,5 +1,18 @@
 # WebP canvas memory
 
+For the fixed 7120-square noisy WebP qualification, read active-repo
+docs/WEBP_ADMITTED_BOUNDARY_DESIGN.md, research and outcome. Keep dimensions,
+quality and metadata chosen before outcomes; pin exact bytes before consuming.
+Use each descriptor's positive headroom band, without changing production limits.
+The maintained preparer accepts an optional fixed `caseId`; default preparation
+groups by geometry and must preserve earlier pins. Never hide a failed admitted
+candidate by searching geometry/quality or relaxing publication assertions.
+`validate:native-deployment-review-artwork-characterization` records bounded
+outcomes separately, with explicit `processingQualified`. Its passing containment
+check cannot replace a failed strict publication result. Keep both outcomes and
+failed candidates visible; generic encoder/write errors do not identify an
+allocation cause. File targets can still use an internal WebP memory writer.
+
 Use for WebP rewrite failures or format-aware artwork memory admission. Read
 active-repo docs/WEBP_CANVAS_MEMORY_DESIGN.md, research and outcome, plus
 [prepared boundary inputs](artwork-admitted-boundary.md).
@@ -23,7 +36,7 @@ active-repo docs/WEBP_CANVAS_MEMORY_DESIGN.md, research and outcome, plus
   `validate:native-deployment-review-artwork-boundary`; the former admitted
   command and WebP selector are compatibility aliases. Fixed descriptors declare
   expected admission. Keep the same input bytes/SHA across fresh 2/3 GiB mixed
-  profiles. JPEG must publish; the selected large WebP must return only the
+  profiles. Admitted JPEG/WebP must publish; the selected 8192-square WebP must return only the
   memory frame with normal exit 1, no signal and no output/publication. Abort
   containment cannot pass this entry.
 - Qualify a real medium WebP rewrite with metadata removal, exact grant metadata

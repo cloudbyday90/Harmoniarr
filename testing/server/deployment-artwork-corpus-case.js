@@ -27,7 +27,7 @@ export async function prepareDeploymentArtworkCase(id, { signal } = {}) {
   assert.equal(metadata.width, spec.width); assert.equal(metadata.height, spec.height); assert.equal(metadata.channels, spec.channels);
   assert.equal(metadata.depth, spec.bits === 16 ? 'ushort' : 'uchar');
   if (spec.format === 'png') assert.equal(metadata.bitsPerSample, spec.bits);
-  if (spec.format === 'jpeg') assert.ok(metadata.exif?.length);
+  if (spec.format === 'jpeg' || spec.exifArtist) assert.ok(metadata.exif?.length);
   if (spec.noise && spec.format === 'png') assert.ok(image.length > spec.width * spec.height * spec.channels * spec.bits / 8);
   let canonicalPixels;
   return { spec, image, contentType: `image/${spec.format}`,

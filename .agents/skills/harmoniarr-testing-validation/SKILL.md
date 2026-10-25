@@ -5,6 +5,13 @@ description: Use this skill when choosing, running, or explaining Harmoniarr val
 
 # Harmoniarr Testing Validation
 
+For fixed noisy WebP admitted-boundary qualification, read the standards
+[canvas reference](../harmoniarr-web-standards/references/webp-canvas-memory.md).
+Reproduce pins outside measured work; qualify the new admitted case and existing
+success/refusal selectors in fresh 2/3 GiB profiles. Fixture-only changes need
+selector/read/cleanup/observer regressions and exact retained-runtime review,
+without repeating unchanged worker allocation or SQL/browser/provider matrices.
+
 For format-aware WebP memory changes, read the standards
 [canvas reference](../harmoniarr-web-standards/references/webp-canvas-memory.md).
 Pair child/parent accounting and pre-grant checks with pinned fresh 2/3 GiB mixed

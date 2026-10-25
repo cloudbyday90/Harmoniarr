@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 25 [admitted WebP rebuild](LOCAL_DOCKER_WEBP_ADMITTED_BOUNDARY_OUTCOME.md)
+records the latest no-cache image and preserved administrator/data/mounts. The
+[qualification outcome](WEBP_ADMITTED_BOUNDARY_OUTCOME.md) records the fixed
+noisy WebP near format-aware admission and its actual processing result.
+
 The October 25 [WebP canvas rebuild](LOCAL_DOCKER_WEBP_CANVAS_MEMORY_OUTCOME.md)
 records the latest no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](WEBP_CANVAS_MEMORY_OUTCOME.md) records deliberate

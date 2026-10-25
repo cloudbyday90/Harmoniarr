@@ -103,6 +103,9 @@ new branch is created.
 
 ## Recommendation and next item
 
+The [admitted WebP outcome](WEBP_ADMITTED_BOUNDARY_OUTCOME.md) records the next
+fixed noisy-source qualification under this accounting policy.
+
 Use source-backed decoder accounting, owned refusal, unchanged native limits,
 success controls and focused opt-in qualification. Benefits are earlier refusal,
 consistent reservations and less failed native work; the cost is conservative
