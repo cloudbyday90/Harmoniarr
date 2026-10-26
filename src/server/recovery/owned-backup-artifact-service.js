@@ -8,15 +8,17 @@ import { createBackupArtifactFileOperationStore } from './backup-artifact-file-o
 import { createBackupArtifactFileOperationService } from './backup-artifact-file-operation-service.js';
 import { createBackupArtifactFileService } from './backup-artifact-file-service.js';
 import { createBackupArtifactOwnershipStore } from './backup-artifact-ownership-store.js';
+import { backupArtifactDrainGate } from './backup-artifact-drain-gate.js';
 
 export function createOwnedBackupArtifactService({
   backupArtifactRepository = createBackupArtifactRepository(),
   backupArtifactFileOperationStore = createBackupArtifactFileOperationStore(),
   ownershipStore = createBackupArtifactOwnershipStore(),
   createFileService = createBackupArtifactFileService,
+  drainGate = backupArtifactDrainGate,
 } = {}) {
   function run(method, input, onBusy) {
-    return ownershipStore.withOwnership(async ({ queryable, assertOwnership }) => {
+    return drainGate.run(() => ownershipStore.withOwnership(async ({ queryable, assertOwnership }) => {
       const bind = fn => async value => {
         await assertOwnership();
         return fn(value, queryable);
@@ -36,7 +38,7 @@ export function createOwnedBackupArtifactService({
         },
       });
       return service[method](input);
-    }, { onBusy });
+    }, { onBusy }), { onBusy });
   }
   return {
     publishBackupArtifact: input => run('publishBackupArtifact', input),

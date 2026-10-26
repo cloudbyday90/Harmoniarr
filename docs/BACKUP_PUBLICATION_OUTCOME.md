@@ -84,6 +84,9 @@ UI, screen-reader or physical-device acceptance claim.
 
 ## Next recommended item
 
+Completed for the current process by the [I/O drainage outcome](BACKUP_IO_DRAIN_OUTCOME.md),
+which owns the current follow-up and qualification limits. Original recommendation:
+
 Qualify connection loss **during already-admitted filesystem work**, especially
 deletion, before choosing a stronger ownership/drain protocol. The current native
 test terminates the owner before link admission. PostgreSQL releases a lost

@@ -104,9 +104,10 @@ test('exclusive publication and shared production ownership preserve foreign byt
         assert.ok(Date.now() < deadline, 'terminated owner must retire within the qualification bound');
         await new Promise(resolve => { setTimeout(resolve, 10); });
       }
-      assert.equal((await recovery.recoverIncompleteFileOperations()).completedCount,1);
+      assert.equal((await recovery.recoverIncompleteFileOperations()).ownershipBusy,true);
     } finally { lostFinish.resolve(); }
     const lostResult=await lostTask; assert.equal(lostResult.error.code,'backup_artifact_owner_lost'); assert.equal(oldLinks,0);
+    assert.equal((await recovery.recoverIncompleteFileOperations()).completedCount,1);
     assert.equal(await count('lost-owner'),1); assert.equal((await row('lost-owner')).status,'completed');
     assert.equal(await readFile(lost.artifact.storagePath,'utf8'),lost.content);
     assert.equal((await getPool().query("SELECT count(*)::int AS count FROM pg_locks WHERE locktype='advisory' AND database=(SELECT oid FROM pg_database WHERE datname=current_database())")).rows[0].count,0);

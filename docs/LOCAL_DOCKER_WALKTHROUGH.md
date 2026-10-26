@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 25 [backup I/O drainage rebuild](LOCAL_DOCKER_BACKUP_IO_DRAIN_OUTCOME.md)
+records the current no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](BACKUP_IO_DRAIN_OUTCOME.md) records local ownership
+through admitted file work and recovery after actual database-session loss.
+
 The October 25 [exclusive backup publication rebuild](LOCAL_DOCKER_BACKUP_PUBLICATION_OUTCOME.md)
 records the current no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](BACKUP_PUBLICATION_OUTCOME.md) records exclusive links,

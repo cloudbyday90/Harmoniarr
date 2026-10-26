@@ -5,6 +5,7 @@
  */
 import { getPool } from '../database.js';
 import { createApiError } from '../api-error.js';
+import { createBackupArtifactBusyError } from './backup-artifact-drain-gate.js';
 
 const lockKey = 'harmoniarr.backup-artifact-filesystem';
 const ownerLost = () => createApiError(503, 'backup_artifact_owner_lost', 'Backup operation ownership was lost. Inspect the journal before trying again.');
@@ -45,7 +46,7 @@ export function createBackupArtifactOwnershipStore({ getPoolFn = getPool } = {})
         throw error;
       }
       if (!acquired) {
-        if (!onBusy) throw createApiError(409, 'backup_artifact_operation_busy', 'Another backup file operation is active. Try again after it finishes.');
+        if (!onBusy) throw createBackupArtifactBusyError();
         result = await onBusy();
       } else {
         await assertOwnership();
