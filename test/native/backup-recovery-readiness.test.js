@@ -21,6 +21,7 @@ await requireDeploymentMemoryProfile();
 test('recovery requires owned same-file sync and close before adopting temporary or final backup bytes', { timeout: 60_000 }, async t => {
   t.after(closePool);
   const directory = await mkdtemp('/tmp/backup-readiness-');
+  process.env.HARMONIARR_BACKUPS = directory;
   const app = createApp({ clientDistDir: '/app/client-dist', packageJsonPath: '/app/package.json' });
   const recovery = app.systemModule.backupArtifactFileOperationService;
   const store = createBackupArtifactFileOperationStore();

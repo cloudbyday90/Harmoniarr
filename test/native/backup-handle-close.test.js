@@ -18,6 +18,7 @@ await requireDeploymentMemoryProfile();
 test('private backup handle cleanup preserves work failure, owns delayed close and leaves verified recovery in control', { timeout: 60_000 }, async t => {
   t.after(closePool);
   const directory = await mkdtemp('/tmp/backup-handle-close-');
+  process.env.HARMONIARR_BACKUPS = directory;
   const app = createApp({ clientDistDir: '/app/client-dist', packageJsonPath: '/app/package.json' });
   const recovery = app.systemModule.backupArtifactFileOperationService;
   const tasks = [], releases = [], cases = [];

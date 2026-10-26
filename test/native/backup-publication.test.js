@@ -22,6 +22,7 @@ await requireDeploymentMemoryProfile();
 test('exclusive publication and shared production ownership preserve foreign bytes and recover interrupted dual names', { timeout: 60_000 }, async t => {
   t.after(closePool);
   const directory = await mkdtemp('/tmp/backup-publication-');
+  process.env.HARMONIARR_BACKUPS = directory;
   const application = createApp({ clientDistDir: '/app/client-dist', packageJsonPath: '/app/package.json' });
   const recovery = application.systemModule.backupArtifactFileOperationService;
   const store = createBackupArtifactFileOperationStore();

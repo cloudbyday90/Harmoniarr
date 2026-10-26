@@ -23,6 +23,7 @@ await requireDeploymentMemoryProfile();
 test('backup journal records safe failures without phase regression and fresh composed recovery verifies actual file/catalog state', { timeout: 60_000 }, async t => {
   t.after(closePool);
   const directory = await mkdtemp('/tmp/backup-journal-');
+  process.env.HARMONIARR_BACKUPS = directory;
   const files = createBackupArtifactFileService(), repository = createBackupArtifactRepository(), store = createBackupArtifactFileOperationStore();
   const producer = overrides => createBackupArtifactFileOperationService({ ...repository, ...store, ...overrides });
   const storeErrors = [];

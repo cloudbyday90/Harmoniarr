@@ -86,7 +86,7 @@ test('temporary write/sync failure keeps exact precedence through every close ou
     for (const primary of [original, null, undefined]) {
       for (const closeFailure of [false, new Error('secondary close failure'), null]) {
         const calls = [];
-        const service = createBackupArtifactFileService({ mkdirFn: async () => {}, openFn: async (_path, flags, mode) => {
+        const service = createBackupArtifactFileService({ openFn: async (_path, flags, mode) => {
           assert.equal(flags, 'wx'); assert.equal(mode, 0o600);
           return {
             writeFile: async () => { calls.push('write'); if (stage === 'write') throw primary; },
@@ -104,14 +104,14 @@ test('temporary write/sync failure keeps exact precedence through every close ou
 test('close-only failure remains visible and an unsuccessful open has no handle to close', async () => {
   for (const closeFailure of [new Error('close-only failure'), null, undefined]) {
     let closed = 0;
-    const service = createBackupArtifactFileService({ mkdirFn: async () => {}, openFn: async () => ({
+    const service = createBackupArtifactFileService({ openFn: async () => ({
       writeFile: async () => {}, sync: async () => {}, close: async () => { closed++; throw closeFailure; },
     }) });
     await assert.rejects(service.writePrivateTemporaryFile({ content: 'fixture', temporaryPath: '/unused/fixture.partial' }), error => error === closeFailure);
     assert.equal(closed, 1);
   }
   const openFailure = new Error('open failed');
-  const service = createBackupArtifactFileService({ mkdirFn: async () => {}, openFn: async () => { throw openFailure; } });
+  const service = createBackupArtifactFileService({ openFn: async () => { throw openFailure; } });
   await assert.rejects(service.writePrivateTemporaryFile({ content: 'fixture', temporaryPath: '/unused/fixture.partial' }), error => error === openFailure);
 });
 
@@ -119,7 +119,7 @@ test('temporary writer retains its failure until delayed close settles', async (
   const ready = Promise.withResolvers(), finish = Promise.withResolvers();
   const primary = Object.freeze(new Error('work failed'));
   let settled = false;
-  const service = createBackupArtifactFileService({ mkdirFn: async () => {}, openFn: async () => ({
+  const service = createBackupArtifactFileService({ openFn: async () => ({
     writeFile: async () => { throw primary; }, sync: async () => { assert.fail('sync after failed write'); },
     close: async () => { ready.resolve(); await finish.promise; throw new Error('close failed later'); },
   }) });
@@ -128,4 +128,13 @@ test('temporary writer retains its failure until delayed close settles', async (
   try { await ready.promise; assert.equal(settled, false); }
   finally { finish.resolve(); await task; }
   assert.equal((await task).error, primary);
+});
+
+test('byte writing never recreates a missing parent after directory preparation', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'harmoniarr-backup-parent-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const parent = join(directory, 'missing');
+  await assert.rejects(createBackupArtifactFileService().writePrivateTemporaryFile({ content: 'bytes', temporaryPath: join(parent, 'owned.partial') }), { code: 'ENOENT' });
+  await assert.rejects(readFile(join(parent, 'owned.partial')), { code: 'ENOENT' });
+  await assert.rejects(lstat(parent), { code: 'ENOENT' });
 });

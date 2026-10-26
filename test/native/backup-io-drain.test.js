@@ -30,6 +30,7 @@ async function retireBackend(pid) {
 test('local production ownership drains admitted link and unlink work after backend loss before recovery or replacement', { timeout: 60_000 }, async t => {
   t.after(closePool);
   const directory = await mkdtemp('/tmp/backup-io-drain-');
+  process.env.HARMONIARR_BACKUPS = directory;
   const application = createApp({ clientDistDir: '/app/client-dist', packageJsonPath: '/app/package.json' });
   const recovery = application.systemModule.backupArtifactFileOperationService;
   const pendingTasks = [];

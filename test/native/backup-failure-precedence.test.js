@@ -20,6 +20,7 @@ await requireDeploymentMemoryProfile();
 test('backup failures retain primary identity through rejected journal UPDATE and lost ownership, then recover verified files', { timeout: 60_000 }, async t => {
   t.after(closePool);
   const directory = await mkdtemp('/tmp/backup-failure-precedence-');
+  process.env.HARMONIARR_BACKUPS = directory;
   const application = createApp({ clientDistDir: '/app/client-dist', packageJsonPath: '/app/package.json' });
   const recovery = application.systemModule.backupArtifactFileOperationService;
   const tasks = [];

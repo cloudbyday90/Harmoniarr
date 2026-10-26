@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { link, lstat, mkdir, open, unlink } from 'node:fs/promises';
+import { link, lstat, open, unlink } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { withWorkerTaskCleanup } from '../worker-task-cleanup.js';
 
@@ -39,7 +39,6 @@ export function createTemporaryBackupArtifactPath({ storagePath, token }) {
  * The caller persists intent and verifies content before and after promotion.
  */
 export function createBackupArtifactFileService({
-  mkdirFn = mkdir,
   openFn = open,
   linkFn = link,
   lstatFn = lstat,
@@ -47,9 +46,6 @@ export function createBackupArtifactFileService({
   unlinkFn = unlink,
 } = {}) {
   async function writePrivateTemporaryFile({ content, temporaryPath }) {
-    await assertOwnership();
-    await mkdirFn(dirname(temporaryPath), { recursive: true });
-
     await assertOwnership();
     const handle = await openFn(temporaryPath, 'wx', privateFileMode);
     await withWorkerTaskCleanup(async () => {

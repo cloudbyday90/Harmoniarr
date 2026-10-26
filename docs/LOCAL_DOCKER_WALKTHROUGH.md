@@ -1,5 +1,15 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 26 [backup directory creation rebuild](LOCAL_DOCKER_BACKUP_DIRECTORY_CREATION_OUTCOME.md)
+records the current no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](BACKUP_DIRECTORY_CREATION_OUTCOME.md) records bounded
+private creation and repeated ancestor checkpoints before opening backup bytes.
+
+Backup publication requires the configured `HARMONIARR_BACKUPS` directory's parent
+to exist as a trusted deployment anchor. The default `/app/data/backups` uses
+the provisioned `/app/data` mount. New directories use mode `0700`; existing
+permissions are retained. Recovery defers missing trees rather than recreating them.
+
 The October 26 [backup directory synchronization rebuild](LOCAL_DOCKER_BACKUP_DIRECTORY_SYNC_OUTCOME.md)
 records the current no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](BACKUP_DIRECTORY_SYNC_OUTCOME.md) records ordered directory

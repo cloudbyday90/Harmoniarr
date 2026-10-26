@@ -21,6 +21,7 @@ await requireDeploymentMemoryProfile();
 test('directory checkpoints retain publication/deletion intent through failures and drain before replacement recovery', { timeout: 60_000 }, async t => {
   t.after(closePool);
   const directory = await mkdtemp('/tmp/backup-directory-sync-');
+  process.env.HARMONIARR_BACKUPS = directory;
   const app = createApp({ clientDistDir:'/app/client-dist',packageJsonPath:'/app/package.json' });
   const recovery = app.systemModule.backupArtifactFileOperationService;
   const store = createBackupArtifactFileOperationStore();

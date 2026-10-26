@@ -98,7 +98,8 @@ Frozen code/test source: 3,549 files,
 Private evidence/audit is under `.tmp/backup-directory-sync-2026-10-26/`.
 Changed bytes, documentation links and owned-resource retirement are audited.
 
-Next recommended item: qualify durable first-use backup-directory creation. The
+Completed by the [directory creation outcome](BACKUP_DIRECTORY_CREATION_OUTCOME.md).
+The recommended item was to qualify durable first-use backup-directory creation. The
 writer still uses recursive mkdir; syncing entries inside the resulting directory
 does not persist newly created ancestor links. Define bounded traversal within
 the configured private root, sync affected ancestor entries, and preserve intent

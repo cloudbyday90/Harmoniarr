@@ -101,6 +101,7 @@ test('publish, delete and recovery rethrow the original Error/null after seconda
       const row = { ...operation, artifactSnapshot: draft.artifact, operationType: 'delete', status: 'prepared' };
       const service = createBackupArtifactFileOperationService({
         backupArtifactFileService: { writePrivateTemporaryFile: fail, removeFileIfPresent: fail },
+        backupArtifactDirectoryCreationService: { prepareArtifactDirectories: async () => {} },
         backupArtifactFileVerificationService: { verifyBackupArtifactFile: async () => ({ status: 'verified' }) },
         createFileOperation: async () => row,
         listIncompleteFileOperations: async () => [row, { ...row, id: 'second-operation' }],

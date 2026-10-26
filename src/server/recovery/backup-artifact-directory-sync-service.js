@@ -16,9 +16,8 @@ function identityFailure() {
 
 /** Requests a namespace checkpoint; unsupported or failed sync never becomes success. */
 export function createBackupArtifactDirectorySyncService({ assertOwnership = async () => {}, openFn = open, lstatFn = lstat } = {}) {
-  async function syncParentDirectory({ storagePath } = {}) {
-    if (typeof storagePath !== 'string' || storagePath.trim().length === 0) throw new TypeError('storagePath is required');
-    const directory = dirname(storagePath);
+  async function syncDirectory({ directory } = {}) {
+    if (typeof directory !== 'string' || directory.trim().length === 0) throw new TypeError('directory is required');
     await assertOwnership();
     const initial = await lstatFn(directory, { bigint: true });
     if (!initial.isDirectory()) throw identityFailure();
@@ -32,5 +31,9 @@ export function createBackupArtifactDirectorySyncService({ assertOwnership = asy
     await assertOwnership();
     if (!sameDirectory(initial, await lstatFn(directory, { bigint: true }))) throw identityFailure();
   }
-  return { syncParentDirectory };
+  async function syncParentDirectory({ storagePath } = {}) {
+    if (typeof storagePath !== 'string' || !storagePath.trim()) throw new TypeError('storagePath is required');
+    return syncDirectory({ directory: dirname(storagePath) });
+  }
+  return { syncDirectory, syncParentDirectory };
 }

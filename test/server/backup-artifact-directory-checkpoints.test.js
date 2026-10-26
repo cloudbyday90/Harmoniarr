@@ -24,6 +24,7 @@ function fixture({ sync = async () => {}, final = false, temporary = false } = {
       removeFileIfPresent:async () => { events.push('unlink'); final=false; return {removed:true}; },
     },
     backupArtifactDirectorySyncService:{ syncParentDirectory:async ({storagePath}) => { events.push(storagePath === operation.storagePath ? 'sync-final' : 'sync-temporary'); await sync(storagePath); } },
+    backupArtifactDirectoryCreationService:{ prepareArtifactDirectories:async () => {} },
     createFileOperation:async input => { Object.assign(operation,input); return operation; },
     listIncompleteFileOperations:async () => [operation],
     updateFileOperation:async ({fileOperationId:_id,...patch}) => { if(patch.status)events.push(patch.status); Object.assign(operation,patch); },

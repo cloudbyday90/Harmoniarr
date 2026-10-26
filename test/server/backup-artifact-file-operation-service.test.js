@@ -14,6 +14,7 @@ function sha256(value) {
 }
 
 function createLifecycleHarness({ fileService = createBackupArtifactFileService(), readinessService,
+  directoryCreationService = { prepareArtifactDirectories: async () => {} },
   directorySyncService = { syncParentDirectory: async () => {} } } = {}) {
   const artifacts = [];
   const operations = [];
@@ -56,6 +57,7 @@ function createLifecycleHarness({ fileService = createBackupArtifactFileService(
     backupArtifactFileReadinessService: readinessService,
     // Windows unit fixtures control this platform boundary; native Linux tests use real directory sync.
     backupArtifactDirectorySyncService: directorySyncService,
+    backupArtifactDirectoryCreationService: directoryCreationService,
     createBackupArtifact,
     createFileOperation,
     deleteBackupArtifactById,

@@ -26,6 +26,7 @@ import {
 import { createBackupArtifactFileVerificationService } from './backup-artifact-file-verification-service.js';
 import { createBackupArtifactFileReadinessService } from './backup-artifact-file-readiness-service.js';
 import { createBackupArtifactDirectorySyncService } from './backup-artifact-directory-sync-service.js';
+import { createBackupArtifactDirectoryCreationService } from './backup-artifact-directory-creation-service.js';
 
 function sha256(value) {
   return createHash('sha256').update(value).digest('hex');
@@ -65,6 +66,7 @@ export function createBackupArtifactFileOperationService({
   backupArtifactFileVerificationService = createBackupArtifactFileVerificationService(),
   backupArtifactFileReadinessService = createBackupArtifactFileReadinessService(),
   backupArtifactDirectorySyncService = createBackupArtifactDirectorySyncService(),
+  backupArtifactDirectoryCreationService = createBackupArtifactDirectoryCreationService(),
   createBackupArtifact = async () => {
     throw new Error('createBackupArtifact dependency is required');
   },
@@ -161,6 +163,11 @@ export function createBackupArtifactFileOperationService({
   }
 
   async function publishPreparedOperation(operation, recovering = false) {
+    if (recovering) {
+      await backupArtifactDirectoryCreationService.prepareArtifactDirectories({
+        storagePaths: [operation.storagePath, operation.temporaryPath].filter(Boolean),
+      });
+    }
     const finalVerification = await verifyOperationArtifact(operation, operation.storagePath, recovering);
     if (finalVerification.status === 'verified') return finalizeVerifiedPublication(operation);
 
@@ -268,6 +275,7 @@ export function createBackupArtifactFileOperationService({
     });
 
     try {
+      await backupArtifactDirectoryCreationService.prepareArtifactDirectories({ storagePaths: [artifact.storagePath], createMissing: true });
       await backupArtifactFileService.writePrivateTemporaryFile({ content, temporaryPath });
       const temporaryVerification = await verifyOperationArtifact(operation, temporaryPath);
       if (temporaryVerification.status !== 'verified') {
