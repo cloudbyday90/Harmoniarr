@@ -9,6 +9,14 @@ import { buildBackupRecoveryStatus } from '../../src/client/lib/backup-recovery-
 import { buildOperationSummaryEntries, getOperationRunOperatorSummary } from '../../src/client/lib/operation-run-presentation.js';
 import { buildOperationRunLinkTarget } from '../../src/client/lib/operation-run-link-targets.js';
 
+test('interrupted scan totals are distinguished from the current unfinished journal', () => {
+  for (const unfinishedCount of [0, 4]) {
+    const result = buildBackupRecoveryStatus({ state: 'completed', unfinishedCount, confirmationCount: 1, progressMayBeIncomplete: true });
+    assert.match(result.message, /Recorded job totals may omit work completed before an interruption/u);
+    assert.match(result.message, /Unfinished counts reflect the last status check/u);
+  }
+});
+
 test('finished backup scan distinguishes unresolved operations from a clear journal', () => {
   const held = buildBackupRecoveryStatus({ state: 'completed', unfinishedCount: 4, confirmationCount: 1 });
   assert.equal(held.state, 'attention');

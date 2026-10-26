@@ -87,7 +87,11 @@ The provider check establishes readiness only. Manual screen-reader and physical
 device checks remain deferred; these tests do not establish hardware power-loss
 durability or a minimum container memory requirement.
 
-Next recommended item: qualify interruption of the recovery job itself while a
+This follow-up is implemented and qualified in
+[recovery job interruption](BACKUP_RECOVERY_INTERRUPTION_OUTCOME.md), including
+explicit status language for batch observations that can be lost during a crash.
+
+Original next recommended item: qualify interruption of the recovery job itself while a
 batch owns file I/O and at the durable continuation boundary. Prove restart,
 lease-loss/cancellation and shutdown drainage with actual process replacement,
 including unfinished counts that remain accurate when a batch is replayed. Reuse

@@ -8,6 +8,7 @@ import { createBackupRecoveryStartupService } from './backup-recovery-startup-se
 import { createBackupRecoveryWorker } from './backup-recovery-worker.js';
 import { createMaintenanceLockOperationPauseService } from './maintenance-lock-operation-pause-service.js';
 import { backupRecoveryCountKeys } from './backup-recovery-policy.js';
+import { hasIncompleteBackupRecoveryProgress } from './backup-recovery-progress-policy.js';
 
 export function createBackupRecoveryModule({ backupArtifactFileOperationService, listActiveMaintenanceLocks, runStore = createBackupRecoveryRunStore(), onError } = {}) {
   const startupService = createBackupRecoveryStartupService({ queueStartupRecovery: runStore.queueStartupRecovery, onError });
@@ -15,7 +16,8 @@ export function createBackupRecoveryModule({ backupArtifactFileOperationService,
   async function getStatus() {
     const [run, counts] = await Promise.all([runStore.getLatestRun(), runStore.getJournalCounts()]);
     const progress = Object.fromEntries([...backupRecoveryCountKeys, 'processedCount'].map(key => [key, Number.isSafeInteger(run?.summary?.[key]) ? run.summary[key] : 0]));
-    return { ...counts, ...progress, admissionState: startupService.getState(), state: run?.status ?? 'not_started', runId: run?.id ?? null, finishedAt: run?.finishedAt ?? null };
+    return { ...counts, ...progress, progressMayBeIncomplete: hasIncompleteBackupRecoveryProgress(run?.summary),
+      admissionState: startupService.getState(), state: run?.status ?? 'not_started', runId: run?.id ?? null, finishedAt: run?.finishedAt ?? null };
   }
   return { startupService, worker, getStatus, runStore };
 }

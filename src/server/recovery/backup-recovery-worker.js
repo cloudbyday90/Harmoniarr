@@ -15,6 +15,7 @@ import {
   isOperationRunCancellationError,
 } from '../operation-run-cancellation.js';
 import { backupRecoveryCountKeys } from './backup-recovery-policy.js';
+import { hasIncompleteBackupRecoveryProgress } from './backup-recovery-progress-policy.js';
 
 export function createBackupRecoveryWorker({
   runStore,
@@ -31,6 +32,8 @@ export function createBackupRecoveryWorker({
     execute: async ({ run }) => {
       let lease, heartbeat, status = 'failed';
       const summary = { ...run.summary };
+      if (hasIncompleteBackupRecoveryProgress(summary)) summary.progressMayBeIncomplete = true;
+      let pageStarted = false;
       await withWorkerTaskCleanup(async () => {
         try {
           lease = await runStore.acquireLease({ runId: run.id });
@@ -43,6 +46,7 @@ export function createBackupRecoveryWorker({
           };
           await authority();
           if (await runStore.markRunStarted({ runId: run.id, expectedLease: lease, summary: { currentStep: 'Checking interrupted backups' } }) === false) return;
+          pageStarted = true;
           const result = await recoveryService.recoverIncompleteFileOperationPage({
             through: summary.backupRecoveryThrough,
             after: summary.backupRecoveryAfter ?? null,
@@ -65,6 +69,7 @@ export function createBackupRecoveryWorker({
           }
         } catch (error) {
           if (!lease || isOperationRunLeaseLostError(error)) return;
+          if (pageStarted) summary.progressMayBeIncomplete = true;
           if (isOperationRunPauseError(error)) {
             status = 'paused';
             summary.currentStep = 'Backup recovery paused for maintenance';

@@ -27,7 +27,7 @@ test('Recovery announces bounded startup progress and held outcomes without movi
       await route.fulfill({
         status: 200, contentType: 'application/json', body: JSON.stringify({
           ok: true, backupArtifacts: [],
-          backupRecovery: { state, admissionState: 'queued', runId: '00000000-0000-4000-8000-000000000001', unfinishedCount: 4, confirmationCount: 1 }
+          backupRecovery: { state, admissionState: 'queued', runId: '00000000-0000-4000-8000-000000000001', unfinishedCount: 4, confirmationCount: 1, progressMayBeIncomplete: state === 'completed' }
         })
       });
     });
@@ -43,6 +43,7 @@ test('Recovery announces bounded startup progress and held outcomes without movi
       const refresh = page.getByRole('button', { name: 'Refresh status', exact: true });
       state = 'completed'; await refresh.click();
       await status.filter({ hasText: 'Some operations remain unresolved' }).waitFor();
+      assert.match(await status.textContent(), /Recorded job totals may omit work/u);
       assert.equal(await refresh.evaluate(node => node === globalThis.document.activeElement), true);
       assert.match(await panel.getByRole('link', { name: 'View backup recovery job' }).getAttribute('href'), /00000000-0000-4000-8000-000000000001/u);
       await page.setViewportSize({ width: 390, height: 844 });

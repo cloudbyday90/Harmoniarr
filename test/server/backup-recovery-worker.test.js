@@ -8,7 +8,7 @@ import test from 'node:test';
 import { createBackupRecoveryWorker } from '../../src/server/recovery/backup-recovery-worker.js';
 import { createBackupRecoveryStartupService } from '../../src/server/recovery/backup-recovery-startup-service.js';
 const lease = { leaseKey: 'backup_artifact_recovery:run', ownerInstanceId: 'instance', acquisitionId: '00000000-0000-4000-8000-000000000001', releasedAt: null, expiresAt: '2099-01-01T00:00:00.000Z' };
-function fixture({ page = async () => ({ processedCount: 1, completedCount: 1, hasMore: false }), interruption = false, renewal = null } = {}) {
+function fixture({ page = async () => ({ processedCount: 1, completedCount: 1, hasMore: false }), interruption = false, renewal = null, summary = {} } = {}) {
   const calls = []; let current = lease;
   const store = {
 acquireLease: async () => lease, getLease: async () => current, isCancellationRequested: async () => interruption,
@@ -19,7 +19,7 @@ acquireLease: async () => lease, getLease: async () => current, isCancellationRe
 runStore: store, recoveryService: { recoverIncompleteFileOperationPage: page },
     createHeartbeat: () => ({ start() { }, signal: new AbortController().signal, stopAndDrain: async () => { if (renewal) await renewal; calls.push(['drained']); } })
   });
-  return { worker, calls, lose: () => { current = null; }, start: () => worker.startWorkerRun({ run: { id: 'run', summary: { backupRecoveryThrough: '2026-10-26' } } }).completion };
+  return { worker, calls, lose: () => { current = null; }, start: () => worker.startWorkerRun({ run: { id: 'run', summary: { backupRecoveryThrough: '2026-10-26', ...summary } } }).completion };
 }
 test('worker returns actual completion through admitted recovery, heartbeat drain and release', async () => {
   const gate = Promise.withResolvers(), drain = Promise.withResolvers(), entered = Promise.withResolvers();
@@ -38,8 +38,16 @@ test('cancellation and lost acquisition refuse admitted page work', async () => 
   });
 test('worker records fixed safe failure without raw filesystem/provider content', async () => {
   const f = fixture({ page: async () => { throw new Error('private /data/music secret'); } }); await f.start();
-  const saved = f.calls.find(([name]) => name === 'Failed')[1]; assert.doesNotMatch(saved.errorMessage, /private|secret|music/u); await f.worker.close();
+  const saved = f.calls.find(([name]) => name === 'Failed')[1]; assert.doesNotMatch(saved.errorMessage, /private|secret|music/u); assert.equal(saved.summary.progressMayBeIncomplete, true); await f.worker.close();
   });
+
+test('stranded-run replay caveat survives a successful completion', async () => {
+  const f = fixture({ summary: { recoveryDetectedAt: '2026-10-26T12:00:00Z', completedCount: 25 } });
+  await f.start();
+  const saved = f.calls.find(([name]) => name === 'Completed')[1].summary;
+  assert.equal(saved.progressMayBeIncomplete, true); assert.equal(saved.completedCount, 26);
+  await f.worker.close();
+});
 test('startup admission is one owned task with bounded retries and visible failure', async () => {
   let attempts = 0; const service = createBackupRecoveryStartupService({ queueStartupRecovery: async () => { attempts++; throw new Error('private'); }, delayFn: async () => { } });
   service.start(); service.start(); await new Promise(resolve => { setImmediate(resolve); }); assert.equal(attempts, 3); assert.equal(service.getState(), 'failed'); await service.stopAndDrain();

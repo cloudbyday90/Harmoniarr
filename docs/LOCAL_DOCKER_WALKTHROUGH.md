@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 26 [recovery job interruption rebuild](LOCAL_DOCKER_BACKUP_RECOVERY_INTERRUPTION_OUTCOME.md)
+records the current no-cache image and preserved administrator/data/mounts. The
+[qualification outcome](BACKUP_RECOVERY_INTERRUPTION_OUTCOME.md) records recovery
+worker crash, cancellation, lease-loss, maintenance and drainage behavior.
+
 The October 26 [bounded startup backup recovery rebuild](LOCAL_DOCKER_BACKUP_STARTUP_RECOVERY_OUTCOME.md)
 records the current no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](BACKUP_STARTUP_RECOVERY_OUTCOME.md) records durable
