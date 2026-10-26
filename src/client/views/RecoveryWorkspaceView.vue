@@ -14,6 +14,7 @@ import SettingsDisclosure from '../components/settings/SettingsDisclosure.vue';
 import ArtworkAdmissionDiagnostics from '../components/ArtworkAdmissionDiagnostics.vue';
 import RecoveryDiagnosticEvents from '../components/RecoveryDiagnosticEvents.vue';
 import BackupRecoveryStatus from '../components/BackupRecoveryStatus.vue';
+import ReadinessDiagnostics from '../components/ReadinessDiagnostics.vue';
 import { buildBackupExportDownloadUrl } from '../lib/recovery-api.js';
 import {
   buildRecoveryRouteQuery,
@@ -415,6 +416,7 @@ watch(hasActiveLocks, (nextHasActiveLocks) => {
         <template v-else-if="queueDiagnostics || recoveryDiagnostics">
           <div v-if="queueDiagnostics" class="cfg-group"><p class="cfg-group-title">Queue overview</p><dl class="review-meta-grid"><div><dt>Pending</dt><dd>{{ queueDiagnostics.queueState?.pending ?? 'Unavailable' }}</dd></div><div><dt>Running</dt><dd>{{ queueDiagnostics.queueState?.running ?? 'Unavailable' }}</dd></div><div><dt>Failed</dt><dd>{{ queueDiagnostics.queueState?.failed ?? 'Unavailable' }}</dd></div><div><dt>Tracked</dt><dd>{{ queueDiagnostics.queueState?.totalTracked ?? 'Unavailable' }}</dd></div></dl></div>
           <ArtworkAdmissionDiagnostics :runtime="queueDiagnostics?.runtime" />
+          <ReadinessDiagnostics :snapshot="recoveryDiagnostics?.readiness" />
           <div v-if="recentQueueRuns.length" class="cfg-group"><p class="cfg-group-title">Recent queue runs</p><div class="cfg-mapping-list recovery-workspace__list"><div v-for="run in recentQueueRuns.slice(0, 5)" :key="run.operationType + (run.startedAt ?? run.createdAt)" class="cfg-mapping-card recovery-workspace__check"><div><strong>{{ run.operationType }}</strong><p class="hx-text-muted">{{ formatDiagnosticTimestamp(run.startedAt) }}</p></div><span class="hx-pill" :data-tone="run.status === 'completed' ? 'success' : run.status === 'failed' ? 'danger' : null">{{ run.status }}</span></div></div></div>
           <RecoveryDiagnosticEvents :diagnostics="recoveryDiagnostics" />
         </template>

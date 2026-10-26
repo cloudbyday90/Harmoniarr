@@ -1071,15 +1071,15 @@ test('system health route returns the shared overview summary without dependency
     const payload = await response.json();
 
     assert.equal(response.status, 200);
-    assert.deepEqual(getOverview.mock.calls[0].arguments, [{ includeArtworkMaintenance: false, includeDependencies: false }]);
+    const options = getOverview.mock.calls[0].arguments[0];
+    assert.equal(options.includeArtworkMaintenance, false); assert.equal(options.includeDependencies, false); assert.equal(typeof options.onReadinessStage, 'function');
+    assert.equal(response.headers.get('cache-control'), 'no-store');
     assert.deepEqual(payload, {
       ok: true,
-      service: 'harmoniarr-service',
+      service: 'harmoniarr',
       startedAt: '2026-04-28T18:00:00.000Z',
       appPort: 4488,
-      database: 'embedded-postgres',
       pendingMigrations: 2,
-      postgresDataDir: '/app/data/postgres/18/data',
     });
   });
 });

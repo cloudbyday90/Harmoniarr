@@ -126,6 +126,7 @@ test('createSystemModule exposes shared route dependencies from injected service
   assert.equal(systemModule.systemService, systemService);
   assert.deepEqual(systemModule.routeDependencies, {
     appPort: 4312,
+    checkHealth: systemModule.healthReadinessService.check,
     buildLibraryScanSummary,
     buildOnboardingSummary,
     getActivityFeed,

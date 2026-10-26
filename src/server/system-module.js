@@ -51,9 +51,11 @@ import { resolveLibraryDiscoveryHeartbeatConfig } from './library/library-discov
 import { createRuntimeResourceMonitor } from './runtime-resource-monitor.js';
 import { createRuntimeResourceService } from './runtime-resource-service.js';
 import { createSystemService } from './system-service.js';
+import { createHealthReadinessService } from './readiness/health-readiness-service.js';
 
 export function createSystemModule({
   activityFeedService = null,
+  healthReadinessService = null,
   appleMusicStatusService = null,
   appPort,
   artworkIngestionService = null,
@@ -210,6 +212,7 @@ export function createSystemModule({
     settingsService,
   }),
 } = {}) {
+  const resolvedHealthReadinessService = healthReadinessService ?? createHealthReadinessService({ getOverview: systemService.getOverview, appPort });
   const resolvedMaintenanceLockControlService = maintenanceLockControlService
     ?? createMaintenanceLockControlService({
       acquireMaintenanceLockFn: maintenanceLockService.acquireMaintenanceLock,
@@ -223,6 +226,7 @@ export function createSystemModule({
     });
   const resolvedSystemRecoveryDiagnosticsService = recoveryDiagnosticsService
     ?? createRecoveryDiagnosticsService({
+      getReadinessDiagnostics: resolvedHealthReadinessService.diagnostics.getSnapshot,
       getRuntimeDiagnostics: systemService.getRuntimeDiagnostics,
       listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks,
       listRecentAuditEvents: resolvedAuditReadService.listRecentAuditEvents,
@@ -302,8 +306,10 @@ export function createSystemModule({
     runtimeResourceService,
     settingsService,
     systemService,
+    healthReadinessService: resolvedHealthReadinessService,
     routeDependencies: {
       appPort,
+      checkHealth: resolvedHealthReadinessService.check,
       getActivityFeed: systemService.getActivityFeed,
       getOperatorNotifications: systemService.getOperatorNotifications,
       createBackupExport: systemBackupExportService.createBackupExport,

@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 26 [readiness diagnostics rebuild](LOCAL_DOCKER_READINESS_DIAGNOSTICS_OUTCOME.md)
+records the current no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](READINESS_DIAGNOSTICS_OUTCOME.md) records bounded safe
+diagnostics, real failure attribution and read-only migration observation.
+
 The October 26 [recovery job interruption rebuild](LOCAL_DOCKER_BACKUP_RECOVERY_INTERRUPTION_OUTCOME.md)
 records the current no-cache image and preserved administrator/data/mounts. The
 [qualification outcome](BACKUP_RECOVERY_INTERRUPTION_OUTCOME.md) records recovery

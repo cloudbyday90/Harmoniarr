@@ -20,7 +20,7 @@ import { readFile } from 'node:fs/promises';
 import { buildHeartbeatOverviewList, resolveHeartbeatOverviewState } from './heartbeat/heartbeat-overview.js';
 import { getPool } from './database.js';
 import { createDependencyHealthService } from './dependency-health-service.js';
-import { getMigrationStatus } from './migrations.js';
+import { readMigrationStatus } from './schema-migration-status-service.js';
 import { createPathValidationSummary } from './paths/path-validation-summary.js';
 import { createSettingsService } from './settings-service.js';
 import { resolveLibraryDiscoveryHeartbeatConfig } from './library/library-discovery-heartbeat-config.js';
@@ -104,7 +104,7 @@ export function createSystemService({
   runtimeResourceService = null,
   youtubeOAuthService = null,
   dependencyHealthService = createDependencyHealthService(),
-  getMigrationStatusFn = getMigrationStatus,
+  getMigrationStatusFn = readMigrationStatus,
   getPoolFn = getPool,
   readPackageMetadataFn = async (path) => JSON.parse(await readFile(path, 'utf8')),
   settingsService = createSettingsService(),
@@ -229,22 +229,32 @@ export function createSystemService({
   }
 
   async function getOverview(options = {}) {
+    const observe = stage => { try { options.onReadinessStage?.(stage); } catch { /* Diagnostics cannot change overview work. */ } };
+    const observeWork = (stage, work) => { observe(stage); return work(); };
     const includeDependencies = options.includeDependencies ?? true;
     const includeArtworkMaintenance = options.includeArtworkMaintenance ?? includeDependencies;
+    observe('package_metadata');
     const packageJson = await getPackageMetadata();
+    observe('settings');
     const settingsPayload = await settingsService.buildSettingsPayload();
     const configuredPaths = settingsPayload.settings?.paths ?? {};
+    observe('migration_status');
     const pool = getPoolFn();
     const migrationStatus = await getMigrationStatusFn();
+    observe('database_query');
     const dbCheck = await pool.query('SELECT current_database() AS name');
+    if (includeDependencies) observe('dependencies');
     const dependencies = includeDependencies
       ? await dependencyHealthService.getDependencyHealth()
       : [];
+    observe('heartbeats');
     const heartbeats = buildSystemHeartbeats();
+    observe('active_jobs');
     const activeJobCount = operationHistoryService?.countActiveOperationRuns
       ? await operationHistoryService.countActiveOperationRuns()
       : 0;
 
+    if (includeDependencies) observe('provider_status');
     const [spotifyStatus, youtubeStatus, appleMusicStatus] = includeDependencies
       ? await Promise.all([
           spotifyOAuthService?.buildStatus(pool) ?? null,
@@ -253,12 +263,13 @@ export function createSystemService({
         ])
       : [null, null, null];
 
-    return {
+    observe('overview_projection');
+    const overview = {
       artwork: artworkPolicyService?.buildArtworkOverviewFromSettingsPayload
         ? artworkPolicyService.buildArtworkOverviewFromSettingsPayload(settingsPayload)
         : null,
       artworkMaintenance: includeArtworkMaintenance && artworkSummaryService?.buildArtworkSummary
-        ? buildArtworkMaintenanceOverview(await artworkSummaryService.buildArtworkSummary())
+        ? await observeWork('artwork_summary', async () => buildArtworkMaintenanceOverview(await artworkSummaryService.buildArtworkSummary()))
         : null,
       service: {
         name: 'harmoniarr',
@@ -276,7 +287,7 @@ export function createSystemService({
         metadataRefreshHeartbeatState,
       ),
       heartbeats,
-      activityFeed: await getActivityFeed({ limit: options.activityFeedLimit }),
+      activityFeed: await observeWork('activity_feed', () => getActivityFeed({ limit: options.activityFeedLimit })),
       database: {
         name: dbCheck.rows[0]?.name ?? process.env.PGDATABASE ?? 'harmoniarr',
         appliedMigrations: migrationStatus.applied,
@@ -290,11 +301,11 @@ export function createSystemService({
         spotify: spotifyStatus,
         youtube: youtubeStatus,
       },
-      runtime: buildRuntimeOverview({
+      runtime: observeWork('runtime_projection', () => buildRuntimeOverview({
         artworkAdmission: getRuntimeDiagnostics().artworkAdmission,
         runtimeResourceMonitor,
         runtimeResourceService,
-      }),
+      })),
       paths: [
         {
           label: 'App data',
@@ -323,6 +334,8 @@ export function createSystemService({
         },
       ],
     };
+    observe('complete');
+    return overview;
   }
   return {
     acknowledgeAllOperatorNotifications,

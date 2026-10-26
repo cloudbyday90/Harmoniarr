@@ -54,6 +54,7 @@ export function createRecoveryDiagnosticsService({
   loadSettingsFn = loadSettings,
   getPoolFn = getPool,
   getRuntimeDiagnostics = () => null,
+  getReadinessDiagnostics = () => null,
   listActiveMaintenanceLocks = async () => [],
   listRecentAuditEvents = async () => [],
   listRecentOperationRuns = async () => [],
@@ -152,8 +153,10 @@ export function createRecoveryDiagnosticsService({
         summary: controlPlaneRedactionService.redactLogMessage(event.summary ?? null),
       }));
 
+    const readiness = getReadinessDiagnostics();
     return {
       checkedAt: nowFn().toISOString(),
+      ...(readiness ? { readiness } : {}),
       maintenance: {
         activeLocks: maintenanceLocks.map((lock) => controlPlaneRedactionService.redactMaintenanceLock(lock)),
         hasActiveLocks: maintenanceLocks.length > 0,

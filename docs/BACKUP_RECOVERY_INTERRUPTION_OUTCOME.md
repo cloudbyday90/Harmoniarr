@@ -81,7 +81,11 @@ journal counts and explicit replay status. This reuses the qualified authority
 and deployment, while accepting that saved batch totals are observations. An exact
 outcome ledger remains a separate product/schema decision.
 
-Next recommended item: investigate and improve bounded, sanitized diagnostics for
+The next item is implemented in the [readiness diagnostics outcome](READINESS_DIAGNOSTICS_OUTCOME.md).
+Its qualification captured a new migration-status failure and led to read-only
+migration observation. The original uncaptured exception remains unknown.
+
+Original recommendation: investigate and improve bounded, sanitized diagnostics for
 readiness failures. The preceding qualification observed an unexplained HTTP 500
 from `/healthz`; its cause remains unknown. Capture a safe failure reason and
 attribution before changing readiness policy or blaming host load. Preserve fatal

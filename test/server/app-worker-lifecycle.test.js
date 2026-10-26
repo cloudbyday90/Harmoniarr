@@ -82,6 +82,18 @@ test('application drain captures all twelve receivers and attempts every known o
   await assert.rejects(pending, error => error === null); assert.deepEqual(calls, ['metadata', 'reconciliation', 'intake', 'provider', 'requestDiscovery', 'discovery', 'execution', 'inspection', 'transcode', 'apply', 'organize', 'scan']);
 });
 
+for (const primary of [new Error('backup close'), null]) {
+  test(`readiness owner drains after backup ${primary === null ? 'null' : 'Error'} and retains its captured receiver`, async () => {
+    const gate = Promise.withResolvers(), entered = Promise.withResolvers(), calls = [];
+    const readiness = { close() { assert.equal(this, readiness); calls.push('readiness'); entered.resolve(); return gate.promise; } };
+    const application = { systemModule: { backupRecoveryWorker: { close() { calls.push('backup'); throw primary; } }, healthReadinessService: readiness },
+      metadataModule: { metadataArtistRefreshWorker: { close() { calls.push('metadata'); } } } };
+    const pending = drainApplicationWorkerOwners(application); void pending.catch(() => {}); await entered.promise;
+    application.systemModule = null; assert.deepEqual(calls, ['backup', 'readiness']); gate.resolve();
+    await assert.rejects(pending, error => error === primary); assert.deepEqual(calls, ['backup', 'readiness', 'metadata']);
+  });
+}
+
 for (const primary of [new Error('inspection cleanup'), null]) {
   test(`inspection ${primary === null ? 'null' : 'Error'} remains primary while apply and scan drain`, async () => {
     const calls = [];

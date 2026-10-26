@@ -21,6 +21,7 @@ import { asyncRoute, sanitizePageLimit } from '../http.js';
 import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
 import { readdir } from 'node:fs/promises';
 import { resolve, dirname, sep } from 'node:path';
+import { createHealthReadinessService } from '../readiness/health-readiness-service.js';
 
 const defaultRequestAuthDependencies = createRequestAuthDependencies();
 
@@ -52,6 +53,7 @@ export function registerSystemRoutes(app, {
   buildOnboardingSummary,
   executeIdempotentMutation = async ({ executeMutation }) => executeMutation(),
   getOverview,
+  checkHealth = createHealthReadinessService({ getOverview, appPort }).check,
   startOperatorNotificationFanoutRun,
   buildSettingsPayload,
   updateSettings,
@@ -83,16 +85,9 @@ export function registerSystemRoutes(app, {
   }
 
   app.get('/healthz', asyncRoute(async (_request, response) => {
-    const overview = await getOverview({ includeArtworkMaintenance: false, includeDependencies: false });
-    response.json({
-      ok: true,
-      service: overview.service.name,
-      startedAt: overview.service.startedAt,
-      appPort,
-      database: overview.database.name,
-      pendingMigrations: overview.database.pendingMigrations,
-      postgresDataDir: process.env.PGDATA ?? '/app/data/postgres/18/data',
-    });
+    response.setHeader('Cache-Control', 'no-store');
+    const result = await checkHealth();
+    response.status(result.statusCode).json(result.body);
   }));
 
   app.get('/api/v1/settings', asyncRoute(async (request, response) => {
@@ -366,6 +361,7 @@ export function registerSystemRoutes(app, {
 
   app.get('/api/v1/system/diagnostics/recovery-state', asyncRoute(async (request, response) => {
     await requireAdminSession(request);
+    response.setHeader('Cache-Control', 'no-store');
 
     const lockTypes = typeof request.query.lockTypes === 'string'
       ? request.query.lockTypes.split(',')
