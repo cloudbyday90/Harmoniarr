@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { assertNoPendingMigrations } from './migrations.js';
+import { assertNoPendingMigrations } from './schema-migration-status-service.js';
 import { runMigrationCli } from './migration-cli-runtime.js';
 
 await runMigrationCli({

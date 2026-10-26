@@ -18,7 +18,8 @@
 
 import { getPool } from './database.js';
 import { loadMigrationManifest } from './migration-manifest.js';
-import { ensureSchemaTable } from './schema-migration-store.js';
+import { getDatabaseMigrationRows } from './schema-migration-store.js';
+import { withWorkerTaskCleanup } from './worker-task-cleanup.js';
 
 const appliedStatus = 'applied';
 
@@ -136,21 +137,12 @@ export async function inspectDatabaseMigrationState({
   const pool = getPoolFn();
   const client = await pool.connect();
 
-  try {
-    await ensureSchemaTable(client);
-    const result = await client.query(`
-      SELECT filename, checksum, status, migration_key, error_message
-      FROM schema_migrations
-      ORDER BY filename ASC
-    `);
-
+  return withWorkerTaskCleanup(async () => {
     return buildDatabaseMigrationStateReport({
-      databaseRows: result.rows,
+      databaseRows: await getDatabaseMigrationRows(client),
       repoMigrations,
     });
-  } finally {
-    client.release();
-  }
+  }, () => client.release());
 }
 
 export async function assertDatabaseMigrationStateCurrent(options = {}) {

@@ -18,27 +18,9 @@
 
 import { getPool } from './database.js';
 import { listMigrationFiles, readMigrationFile } from './migration-manifest.js';
-import { ensureSchemaTable, getAppliedMigrationChecksums, getAppliedMigrationFilenames } from './schema-migration-store.js';
-
-export async function getMigrationStatus({ getPoolFn = getPool } = {}) {
-  const pool = getPoolFn();
-  const client = await pool.connect();
-
-  try {
-    await ensureSchemaTable(client);
-    const files = await listMigrationFiles();
-    const applied = await getAppliedMigrationFilenames(client);
-    const pending = files.filter((file) => !applied.has(file.filename)).map((file) => file.filename);
-
-    return {
-      available: files.length,
-      applied: applied.size,
-      pending,
-    };
-  } finally {
-    client.release();
-  }
-}
+import { ensureSchemaTable, getAppliedMigrationFilenames } from './schema-migration-store.js';
+export { getMigrationStatus, assertNoPendingMigrations } from './schema-migration-status-service.js';
+export { verifyAppliedMigrationChecksums, assertNoMigrationChecksumDrift } from './migration-checksum-service.js';
 
 export async function applyPendingMigrations({ getPoolFn = getPool } = {}) {
   const pool = getPoolFn();
@@ -154,57 +136,4 @@ export async function applyPendingMigrations({ getPoolFn = getPool } = {}) {
   } finally {
     client.release();
   }
-}
-
-export async function assertNoPendingMigrations(options = {}) {
-  const status = await getMigrationStatus(options);
-  if (status.pending.length > 0) {
-    throw new Error(`Pending migrations detected: ${status.pending.join(', ')}`);
-  }
-
-  return status;
-}
-
-export async function verifyAppliedMigrationChecksums({ getPoolFn = getPool } = {}) {
-  const pool = getPoolFn();
-  const client = await pool.connect();
-
-  try {
-    await ensureSchemaTable(client);
-    const applied = await getAppliedMigrationChecksums(client);
-
-    const violations = [];
-    for (const { filename, storedChecksum } of applied) {
-      let currentChecksum;
-      try {
-        const migrationFile = await readMigrationFile(filename);
-        currentChecksum = migrationFile.checksum;
-      } catch {
-        violations.push({ currentChecksum: null, filename, status: 'file_missing', storedChecksum });
-        continue;
-      }
-
-      if (currentChecksum !== storedChecksum) {
-        violations.push({ currentChecksum, filename, status: 'checksum_mismatch', storedChecksum });
-      }
-    }
-
-    return {
-      checkedCount: applied.length,
-      clean: violations.length === 0,
-      violations,
-    };
-  } finally {
-    client.release();
-  }
-}
-
-export async function assertNoMigrationChecksumDrift({ getPoolFn = getPool } = {}) {
-  const result = await verifyAppliedMigrationChecksums({ getPoolFn });
-  if (!result.clean) {
-    const descriptions = result.violations.map(({ filename, status }) => `${filename} (${status})`).join(', ');
-    throw new Error(`Migration checksum drift detected: ${descriptions}`);
-  }
-
-  return result;
 }

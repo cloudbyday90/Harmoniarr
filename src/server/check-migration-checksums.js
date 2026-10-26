@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { assertNoMigrationChecksumDrift } from './migrations.js';
+import { assertNoMigrationChecksumDrift } from './migration-checksum-service.js';
 import { runMigrationCli } from './migration-cli-runtime.js';
 
 await runMigrationCli({

@@ -59,3 +59,12 @@ export async function getAppliedMigrationChecksums(client) {
   );
   return result.rows.map((row) => ({ filename: row.filename, storedChecksum: row.checksum }));
 }
+
+export async function getDatabaseMigrationRows(client) {
+  const result = await client.query(`
+    SELECT filename, checksum, status, migration_key, error_message
+    FROM schema_migrations
+    ORDER BY filename ASC
+  `);
+  return result.rows;
+}

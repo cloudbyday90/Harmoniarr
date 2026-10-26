@@ -6,14 +6,4 @@
  * See LICENSE file for details.
  */
 
-import { runMigrationCli } from '../src/server/migration-cli-runtime.js';
-import {
-  formatDatabaseMigrationStateDiagnostics,
-  inspectDatabaseMigrationState,
-} from '../src/server/schema-migration-state-service.js';
-
-await runMigrationCli({
-  prefix: 'harmoniarr-diagnose-migrations',
-  renderSuccessMessage: formatDatabaseMigrationStateDiagnostics,
-  run: inspectDatabaseMigrationState,
-});
+import '../src/server/diagnose-migrations.js';

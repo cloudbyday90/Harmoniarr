@@ -90,3 +90,7 @@ side effects. The remaining legacy status/checksum/state helpers still call
 ensureSchemaTable; separate diagnostic observation from explicit preparation while
 preserving bootstrap behavior and fatal startup checks. Qualify missing-schema and
 concurrent diagnostic execution before changing those contracts.
+
+Implemented in the [migration CLI readers outcome](MIGRATION_CLI_READERS_OUTCOME.md).
+That follow-up separates diagnostic SELECTs from explicit preparation and records
+restricted-role, missing-ledger and concurrent-command qualification.

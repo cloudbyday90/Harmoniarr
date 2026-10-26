@@ -13,6 +13,7 @@ import { createApp } from '/app/server-dist/app.js';
 import { drainApplicationWorkerOwners } from '/app/server-dist/application-worker-drain.js';
 import { closePool, getPool } from '/app/server-dist/database.js';
 import { getMigrationStatus } from '/app/server-dist/migrations.js';
+import { ensureSchemaTable } from '/app/server-dist/schema-migration-store.js';
 import { readMigrationStatus } from '/app/server-dist/schema-migration-status-service.js';
 import { createBackupEncryptionService } from '/app/server-dist/recovery/backup-encryption-service.js';
 import { startServerRuntime } from '/app/server-dist/startup-runtime.js';
@@ -52,7 +53,8 @@ test('prepared migration observation supports concurrent HTTP reads and explicit
     assert.equal((await client.requestJson('/api/v1/bootstrap/admin', { method: 'POST', json: { username: 'observation-admin', password: 'ObservationFixture123!' } })).response.status, 201);
     const initialLogLevel = (await client.requestJson('/api/v1/settings')).payload.settings.system.logLevel;
     guard = await createMigrationObservationGuard(pool); const catalogBefore = await guard.getCatalogIdentity(); assert.ok(catalogBefore);
-    await assert.rejects(getMigrationStatus(), error => error.code === '25006');
+    await assert.rejects(ensureSchemaTable(pool), error => error.code === '25006');
+    assert.deepEqual(await getMigrationStatus(), { available: 115, applied: 115, pending: [] });
     const reader = await pool.connect();
     try {
       await reader.query('BEGIN READ ONLY');

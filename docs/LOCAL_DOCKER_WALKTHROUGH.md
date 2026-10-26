@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 26 [migration CLI readers rebuild](LOCAL_DOCKER_MIGRATION_CLI_READERS_OUTCOME.md)
+records the current no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](MIGRATION_CLI_READERS_OUTCOME.md) records read-only status,
+checksum and full-state diagnostics with explicit preparation ownership.
+
 The October 26 [onboarding migration state rebuild](LOCAL_DOCKER_ONBOARDING_MIGRATION_STATE_OUTCOME.md)
 records the current no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](ONBOARDING_MIGRATION_STATE_OUTCOME.md) records explicit
