@@ -8,6 +8,7 @@ import { createBackupArtifactFileOperationStore } from './backup-artifact-file-o
 import { createBackupArtifactFileOperationService } from './backup-artifact-file-operation-service.js';
 import { createBackupArtifactFileService } from './backup-artifact-file-service.js';
 import { createBackupArtifactFileReadinessService } from './backup-artifact-file-readiness-service.js';
+import { createBackupArtifactDirectorySyncService } from './backup-artifact-directory-sync-service.js';
 import { createBackupArtifactOwnershipStore } from './backup-artifact-ownership-store.js';
 import { backupArtifactDrainGate } from './backup-artifact-drain-gate.js';
 
@@ -17,6 +18,7 @@ export function createOwnedBackupArtifactService({
   ownershipStore = createBackupArtifactOwnershipStore(),
   createFileService = createBackupArtifactFileService,
   createReadinessService = createBackupArtifactFileReadinessService,
+  createDirectorySyncService = createBackupArtifactDirectorySyncService,
   drainGate = backupArtifactDrainGate,
   onJournalFailure,
 } = {}) {
@@ -30,6 +32,7 @@ export function createOwnedBackupArtifactService({
         onJournalFailure,
         backupArtifactFileService: createFileService({ assertOwnership }),
         backupArtifactFileReadinessService: createReadinessService({ assertOwnership }),
+        backupArtifactDirectorySyncService: createDirectorySyncService({ assertOwnership }),
         createBackupArtifact: bind(backupArtifactRepository.createBackupArtifact),
         getBackupArtifactByFilename: bind(backupArtifactRepository.getBackupArtifactByFilename),
         getBackupArtifactById: bind(backupArtifactRepository.getBackupArtifactById),

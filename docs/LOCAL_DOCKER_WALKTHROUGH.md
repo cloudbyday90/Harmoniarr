@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 26 [backup directory synchronization rebuild](LOCAL_DOCKER_BACKUP_DIRECTORY_SYNC_OUTCOME.md)
+records the current no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](BACKUP_DIRECTORY_SYNC_OUTCOME.md) records ordered directory
+checkpoints before publication/deletion completion and retained intent on failure.
+
 The October 26 [backup recovery readiness rebuild](LOCAL_DOCKER_BACKUP_RECOVERY_READINESS_OUTCOME.md)
 records the current no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](BACKUP_RECOVERY_READINESS_OUTCOME.md) records fresh

@@ -93,7 +93,8 @@ Frozen code/test source: 3,545 files,
 Private evidence/audit is under `.tmp/backup-recovery-readiness-2026-10-26/`.
 All changed bytes and documentation links are audited before commit.
 
-Next recommended item: define and qualify directory-sync handling after backup
+Completed by the [directory synchronization outcome](BACKUP_DIRECTORY_SYNC_OUTCOME.md).
+The recommended item was to define and qualify directory-sync handling after backup
 link/unlink operations before reporting completed publication. The new step
 establishes file readiness; it does not persist the containing directory entry.
 First determine supported behavior on the actual deployment storage and how an

@@ -25,6 +25,7 @@ import {
 } from './backup-artifact-file-service.js';
 import { createBackupArtifactFileVerificationService } from './backup-artifact-file-verification-service.js';
 import { createBackupArtifactFileReadinessService } from './backup-artifact-file-readiness-service.js';
+import { createBackupArtifactDirectorySyncService } from './backup-artifact-directory-sync-service.js';
 
 function sha256(value) {
   return createHash('sha256').update(value).digest('hex');
@@ -63,6 +64,7 @@ export function createBackupArtifactFileOperationService({
   backupArtifactFileService = createBackupArtifactFileService(),
   backupArtifactFileVerificationService = createBackupArtifactFileVerificationService(),
   backupArtifactFileReadinessService = createBackupArtifactFileReadinessService(),
+  backupArtifactDirectorySyncService = createBackupArtifactDirectorySyncService(),
   createBackupArtifact = async () => {
     throw new Error('createBackupArtifact dependency is required');
   },
@@ -148,16 +150,19 @@ export function createBackupArtifactFileOperationService({
     }
   }
 
+  async function finalizeVerifiedPublication(operation) {
+    await backupArtifactDirectorySyncService.syncParentDirectory({ storagePath: operation.storagePath });
+    await cleanupPublicationTemporaryFile(operation);
+    if (operation.temporaryPath) {
+      await backupArtifactDirectorySyncService.syncParentDirectory({ storagePath: operation.temporaryPath });
+    }
+    await updateFileOperation({ fileOperationId: operation.id, status: 'finalized' });
+    return completePublication(operation);
+  }
+
   async function publishPreparedOperation(operation, recovering = false) {
     const finalVerification = await verifyOperationArtifact(operation, operation.storagePath, recovering);
-    if (finalVerification.status === 'verified') {
-      await cleanupPublicationTemporaryFile(operation);
-      await updateFileOperation({
-        fileOperationId: operation.id,
-        status: 'finalized',
-      });
-      return completePublication(operation);
-    }
+    if (finalVerification.status === 'verified') return finalizeVerifiedPublication(operation);
 
     if (finalVerification.status === 'unverified') {
       await holdForConfirmation(operation, finalVerification);
@@ -205,12 +210,7 @@ export function createBackupArtifactFileOperationService({
       throw createVerificationRequiredError(promotedVerification.code);
     }
 
-    await cleanupPublicationTemporaryFile(operation);
-    await updateFileOperation({
-      fileOperationId: operation.id,
-      status: 'finalized',
-    });
-    return completePublication(operation);
+    return finalizeVerifiedPublication(operation);
   }
 
   async function deletePreparedOperation(operation) {
@@ -225,6 +225,7 @@ export function createBackupArtifactFileOperationService({
       fileDeleted = (await backupArtifactFileService.removeFileIfPresent({ storagePath: operation.storagePath })).removed;
     }
 
+    await backupArtifactDirectorySyncService.syncParentDirectory({ storagePath: operation.storagePath });
     await updateFileOperation({
       fileOperationId: operation.id,
       status: 'finalized',
