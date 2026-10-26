@@ -86,6 +86,9 @@ outcomes; no UI or manual screen-reader/device acceptance claim is added.
 
 ## Next recommended item
 
+Completed by the [failure precedence outcome](BACKUP_FAILURE_PRECEDENCE_OUTCOME.md),
+which owns the current follow-up and qualification limits. Original recommendation:
+
 Preserve the primary file-operation failure when failure journaling is itself
 refused. A separate controlled core-service probe found that an original `EIO`
 or thrown null is replaced by `backup_artifact_owner_lost` when the awaited

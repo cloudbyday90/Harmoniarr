@@ -18,7 +18,7 @@
 
 import { createHash, randomUUID } from 'node:crypto';
 import { createApiError } from '../auth.js';
-import { buildBackupArtifactJournalFailure } from './backup-artifact-failure-policy.js';
+import { createBackupArtifactFailureRecorder } from './backup-artifact-failure-recorder.js';
 import {
   createBackupArtifactFileService,
   createTemporaryBackupArtifactPath,
@@ -73,11 +73,13 @@ export function createBackupArtifactFileOperationService({
   listIncompleteFileOperations = async () => [],
   randomUuidFn = randomUUID,
   recordFileOperationFailure = async () => { throw new Error('recordFileOperationFailure dependency is required'); },
+  onJournalFailure,
   sha256Fn = sha256,
   updateFileOperation = async () => {
     throw new Error('updateFileOperation dependency is required');
   },
 } = {}) {
+  const { recordFailure } = createBackupArtifactFailureRecorder({ recordFileOperationFailure, onJournalFailure });
   async function verifyOperationArtifact(operation, storagePath) {
     return backupArtifactFileVerificationService.verifyBackupArtifactFile({
       artifact: toOperationArtifact(operation, storagePath),
@@ -275,12 +277,7 @@ export function createBackupArtifactFileOperationService({
       return await publishPreparedOperation(operation);
     } catch (error) {
       if (error?.code !== 'backup_artifact_filesystem_confirmation_required') {
-        const details = buildBackupArtifactJournalFailure(error, operation);
-        await recordFileOperationFailure({
-          fileOperationId: operation.id,
-          lastErrorCode: details.code,
-          lastErrorMessage: details.message,
-        });
+        await recordFailure(error, operation);
       }
 
       throw error;
@@ -308,12 +305,7 @@ export function createBackupArtifactFileOperationService({
       return await deletePreparedOperation(operation);
     } catch (error) {
       if (error?.code !== 'backup_artifact_filesystem_confirmation_required') {
-        const details = buildBackupArtifactJournalFailure(error, operation);
-        await recordFileOperationFailure({
-          fileOperationId: operation.id,
-          lastErrorCode: details.code,
-          lastErrorMessage: details.message,
-        });
+        await recordFailure(error, operation);
       }
 
       throw error;
@@ -343,12 +335,7 @@ export function createBackupArtifactFileOperationService({
         return { status: 'awaiting_confirmation' };
       }
 
-      const details = buildBackupArtifactJournalFailure(error, operation);
-      await recordFileOperationFailure({
-        fileOperationId: operation.id,
-        lastErrorCode: details.code,
-        lastErrorMessage: details.message,
-      });
+      if (!await recordFailure(error, operation)) throw error;
       return { status: 'deferred' };
     }
   }

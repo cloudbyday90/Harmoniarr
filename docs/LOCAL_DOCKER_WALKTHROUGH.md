@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 26 [backup failure precedence rebuild](LOCAL_DOCKER_BACKUP_FAILURE_PRECEDENCE_OUTCOME.md)
+records the current no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](BACKUP_FAILURE_PRECEDENCE_OUTCOME.md) records primary
+failure preservation, PR #56 compatibility and the compressed-parser security fix.
+
 The October 25 [backup I/O drainage rebuild](LOCAL_DOCKER_BACKUP_IO_DRAIN_OUTCOME.md)
 records the current no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](BACKUP_IO_DRAIN_OUTCOME.md) records local ownership

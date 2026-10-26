@@ -16,6 +16,7 @@ export function createOwnedBackupArtifactService({
   ownershipStore = createBackupArtifactOwnershipStore(),
   createFileService = createBackupArtifactFileService,
   drainGate = backupArtifactDrainGate,
+  onJournalFailure,
 } = {}) {
   function run(method, input, onBusy) {
     return drainGate.run(() => ownershipStore.withOwnership(async ({ queryable, assertOwnership }) => {
@@ -24,6 +25,7 @@ export function createOwnedBackupArtifactService({
         return fn(value, queryable);
       };
       const service = createBackupArtifactFileOperationService({
+        onJournalFailure,
         backupArtifactFileService: createFileService({ assertOwnership }),
         createBackupArtifact: bind(backupArtifactRepository.createBackupArtifact),
         getBackupArtifactByFilename: bind(backupArtifactRepository.getBackupArtifactByFilename),
