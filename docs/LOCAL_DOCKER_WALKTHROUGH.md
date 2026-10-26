@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 26 [bounded startup backup recovery rebuild](LOCAL_DOCKER_BACKUP_STARTUP_RECOVERY_OUTCOME.md)
+records the current no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](BACKUP_STARTUP_RECOVERY_OUTCOME.md) records durable
+startup batches, administrator status and automatic recovery after replacement.
+
 The October 26 [backup container replacement rebuild](LOCAL_DOCKER_BACKUP_CONTAINER_CRASH_OUTCOME.md)
 records the current no-cache image and preserved administrator/data/mounts. The
 [qualification outcome](BACKUP_CONTAINER_CRASH_OUTCOME.md) records 18 abrupt

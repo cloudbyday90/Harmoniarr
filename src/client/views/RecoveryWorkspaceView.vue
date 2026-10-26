@@ -13,6 +13,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router';
 import SettingsDisclosure from '../components/settings/SettingsDisclosure.vue';
 import ArtworkAdmissionDiagnostics from '../components/ArtworkAdmissionDiagnostics.vue';
 import RecoveryDiagnosticEvents from '../components/RecoveryDiagnosticEvents.vue';
+import BackupRecoveryStatus from '../components/BackupRecoveryStatus.vue';
 import { buildBackupExportDownloadUrl } from '../lib/recovery-api.js';
 import {
   buildRecoveryRouteQuery,
@@ -53,6 +54,7 @@ const isDiagnosticsOpen = ref(false);
 const {
   actionErrorMessage: backupActionErrorMessage,
   backupArtifacts,
+  backupRecovery,
   createBackup,
   deleteSelectedBackup,
   errorMessage: backupErrorMessage,
@@ -219,7 +221,7 @@ watch(hasActiveLocks, (nextHasActiveLocks) => {
           </div>
         </div>
         <div class="hx-card-actions">
-          <button type="button" class="hx-btn" @click="refreshRecoveryStatus" :disabled="isLoadingBackups || isLoadingLocks">
+          <button type="button" class="hx-btn" @click="!isLoadingBackups && !isLoadingLocks && refreshRecoveryStatus()" :aria-disabled="isLoadingBackups || isLoadingLocks ? 'true' : undefined">
             {{ isLoadingBackups || isLoadingLocks ? 'Refreshing...' : 'Refresh status' }}
           </button>
           <button type="button" class="hx-btn" data-variant="primary" aria-controls="recovery-backup-create-status settings-recovery-backup-history" @click="handleCreateBackup" :disabled="isCreating">
@@ -227,6 +229,7 @@ watch(hasActiveLocks, (nextHasActiveLocks) => {
           </button>
         </div>
         <p id="recovery-backup-create-status" class="recovery-workspace__create-status" role="status" aria-atomic="true" :data-state="backupCreateStatus.state">{{ backupCreateStatus.message }}</p>
+        <BackupRecoveryStatus :status="backupRecovery" :loading="isLoadingBackups" />
         <p v-if="backupActionErrorMessage" class="recovery-workspace__error" role="alert">{{ backupActionErrorMessage }}</p>
         <p v-else-if="backupErrorMessage" class="recovery-workspace__error" role="alert">{{ backupErrorMessage }}</p>
       </div>

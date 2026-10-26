@@ -70,7 +70,8 @@ export async function runBackupContainerCrashQualification({image,evidenceDir,on
       const logs=await logsFor(current);await writeFile(resolve(root,plan.checkpoint+'-startup.log'),logs,{flag:'wx'});
       const result={checkpoint:plan.checkpoint,outcome:plan.mode,previous,current,clusterId:verified.clusterId,snapshotSha256:verified.snapshotSha256,
         killedExit137:true,noOom:true,oldContainerRemoved:true,sameVolume:true,productionEntrypoint:true,httpAndSchemaReady:true,
-        walRedoObserved:true,persistedSnapshotVerified:true,repeatedRecovery:true,currentBytesAndCatalogVerified:true};
+        walRedoObserved:true,preCrashRecordVerified:true,automaticStartupRecovery:verified.automaticStartupRecovery===true,
+        repeatedRecovery:true,currentBytesAndCatalogVerified:true};
       cases.push(result);await save(plan.checkpoint+'-result.json',result);onProgress({completed:cases.length,total:backupSqlCrashPlan.length,checkpoint:plan.checkpoint});
     }
     const result={image,cases,fullServerStartup:true,backgroundServicesEnabled:true,productionRuntimeUnmodified:true,powerLossNotTested:true};

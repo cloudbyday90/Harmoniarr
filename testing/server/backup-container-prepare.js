@@ -15,11 +15,13 @@ import {createBackupPgAckRelay} from './backup-pg-ack-relay.js';
 import {backupSqlGateNamespace,backupSqlFixtureApplication,installBackupSqlCrashGate} from './backup-sql-crash-gate.js';
 import {getBackupSqlCrashCase} from './backup-sql-crash-plan.js';
 import {backupContainerRoot,backupContainerBackups,backupContainerLog,backupContainerBytes,backupContainerSnapshot,writeBackupContainerRecord} from './backup-container-record.js';
+import {waitForBackupStartupRecovery} from './backup-startup-recovery-wait.js';
 
 const startProcess=createBackupCrashProcessRunner({getCase:getBackupSqlCrashCase,childModuleUrl:new URL('./backup-pg-crash-child.js',import.meta.url),allowDispatch:true});
 export async function prepareBackupContainer(plan,manifest,send){
   const pool=getPool();let holder,relay,child,app;
   await withWorkerTaskCleanup(async()=>{
+    await waitForBackupStartupRecovery(pool);
     await mkdir(backupContainerBackups,{recursive:true,mode:0o700});await mkdir(join(backupContainerRoot,'logs'),{recursive:true,mode:0o700});
     if(!(await pool.query("SELECT to_regclass('fixture_backup_container_sentinels') AS name")).rows[0].name){
       await installBackupSqlCrashGate(pool);

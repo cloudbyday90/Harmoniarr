@@ -17,6 +17,7 @@
  */
 
 export const operationRunRegistry = Object.freeze({
+  backupArtifactRecovery:Object.freeze({leaseJobType:'backup_artifact_recovery',operationType:'backup_artifact_recovery',startedEventType:'backup_artifact_recovery_started',supportsCancellation:true,supportsManualRetry:false,title:'Backup recovery'}),
   artworkCleanup: Object.freeze({
     leaseJobType: 'artwork_cleanup',
     operationType: 'artwork_cleanup',

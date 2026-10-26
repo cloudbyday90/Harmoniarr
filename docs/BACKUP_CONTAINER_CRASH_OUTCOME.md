@@ -118,7 +118,11 @@ Frozen code/test source: 3,582 files,
 Private source/preliminary/final evidence and audit:
 `.tmp/backup-container-crash-2026-10-26/`.
 
-Next recommended item: integrate bounded backup recovery into the existing
+This follow-up is implemented in [bounded startup backup recovery](BACKUP_STARTUP_RECOVERY_OUTCOME.md).
+The snapshot behavior described below belongs to this document's baseline image;
+the new replacement qualification checks automatic recovery before manual probes.
+
+Original next recommended item: integrate bounded backup recovery into the existing
 application startup/background-job flow, with administrator-visible completion,
 deferral and confirmation status. This qualification establishes that HTTP-ready
 startup does not itself reconcile the backup journal: the original snapshot

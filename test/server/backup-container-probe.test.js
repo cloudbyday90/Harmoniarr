@@ -25,6 +25,13 @@ test('container protocol binds exact finite checkpoint, container and saved reco
   }
   assert.throws(()=>parseBackupContainerMessage(line({...message,extra:'x'.repeat(4096)}),{phase:'prepare',checkpoint,containerId:id}));
 });
+
+test('replacement verification requires affirmative automatic startup recovery',()=>{
+  const verified={...message,event:'verified',automaticStartupRecovery:true,repeatedRecovery:true,currentBytesAndCatalogVerified:true};
+  const context={phase:'verify',checkpoint,containerId:id};
+  assert.deepEqual(parseBackupContainerMessage(line(verified).trim(),context),verified);
+  for(const automaticStartupRecovery of [false,undefined])assert.throws(()=>parseBackupContainerMessage(line({...verified,automaticStartupRecovery}).trim(),context));
+});
 test('container probe handles split readiness and requires observed killed exec close',async()=>{
   const f=fixture(),text=line(message);f.child.stdout.emit('data',Buffer.from(text.slice(0,20)));f.child.stdout.emit('data',Buffer.from(text.slice(20)));
   assert.deepEqual(await f.probe.waitReady(),message);let finished=false;

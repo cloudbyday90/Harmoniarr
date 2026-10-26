@@ -220,6 +220,7 @@ export function registerSystemRoutes(app, {
 
   app.get('/api/v1/recovery/backups', asyncRoute(async (request, response) => {
     await requireAdminSession(request);
+    response.set('Cache-Control','no-store');
 
     response.json({
       ok: true,

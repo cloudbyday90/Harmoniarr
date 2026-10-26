@@ -19,6 +19,7 @@
 import { operationRunRegistry } from '../shared/operation-run-descriptors.js';
 
 export const defaultOperationQueueDispatchOperationTypes = Object.freeze([
+  operationRunRegistry.backupArtifactRecovery.operationType,
   operationRunRegistry.artworkCleanup.operationType,
   operationRunRegistry.importCandidateExecutionPlanning.operationType,
   operationRunRegistry.importCandidateApply.operationType,
@@ -48,6 +49,7 @@ export function createOperationQueueHandlers({
   systemModule = null,
 } = {}) {
   const handlers = {};
+  if(systemModule?.backupRecoveryWorker?.startWorkerRun)handlers[operationRunRegistry.backupArtifactRecovery.operationType]=({run})=>systemModule.backupRecoveryWorker.startWorkerRun({run});
   if (libraryModule?.libraryQualityReviewSearchWorker?.startWorkerRun) {
     handlers[operationRunRegistry.qualityReviewSearch.operationType] = ({ run }) => libraryModule.libraryQualityReviewSearchWorker.startWorkerRun({ runId: run.id });
   }

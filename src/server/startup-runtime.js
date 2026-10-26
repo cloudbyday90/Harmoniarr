@@ -224,6 +224,7 @@ export async function startServerRuntime({
     startupServiceSupervisor.registerService(pushModule.pushNotificationHistoryCleanupHeartbeat);
   }
   startupServiceSupervisor.registerService(systemModule.idempotencyRecordCleanupHeartbeat);
+  if(systemModule?.backupRecoveryStartupService)startupServiceSupervisor.registerService(systemModule.backupRecoveryStartupService);
   if (systemModule?.runtimeResourceMonitor) {
     startupServiceSupervisor.registerService(systemModule.runtimeResourceMonitor);
   }
@@ -238,7 +239,7 @@ export async function startServerRuntime({
       await startupServiceSupervisor.shutdown({
         onShutdown: async () => {
           await closeServer(server);
-          await drainApplicationWorkerOwners({ importCandidateModule, libraryModule, metadataModule });
+          await drainApplicationWorkerOwners({ importCandidateModule, libraryModule, metadataModule,systemModule });
           await closeDatabasePool();
         },
       });

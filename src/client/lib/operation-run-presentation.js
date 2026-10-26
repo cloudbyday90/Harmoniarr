@@ -71,6 +71,9 @@ export function getOperationRunAttentionLabel(run) {
 
 export function getOperationRunOperatorSummary(run) {
   const operationTitle = getOperationTitle(run);
+  if(run?.operationType==='backup_artifact_recovery'&&run.status==='completed')return run.summary?.deferredCount||run.summary?.awaitingConfirmationCount
+    ?'Backup recovery scan finished. Some operations need review in Recovery.'
+    :'Backup recovery scan finished. Its recorded results are available below.';
 
   switch (run?.status) {
     case 'failed':
@@ -93,6 +96,7 @@ export function getOperationRunOperatorSummary(run) {
 }
 
 export function getOperationRunNextStep(run) {
+  if(run?.operationType==='backup_artifact_recovery')return 'Open Recovery to check unfinished operations. Refresh its status before taking further action.';
   switch (run?.status) {
     case 'failed':
       return canRequestOperationRunRetry(run)
@@ -329,6 +333,7 @@ export function formatLeaseStateTone(state) {
  */
 export function buildOperationSummaryEntries(summary) {
   return Object.entries(summary ?? {})
+    .filter(([key])=>!['backupRecoveryThrough','backupRecoveryAfter'].includes(key))
     .filter(([, value]) => value !== null && value !== undefined)
     .map(([key, value]) => ({ key, value }))
     .slice(0, 12);

@@ -32,6 +32,7 @@ import { createOperatorNotificationAcknowledgementService } from './operator-not
 import { createOperatorNotificationFanoutWorker } from './operator-notification-fanout-worker.js';
 import { createBackupArtifactRepository } from './recovery/backup-artifact-repository.js';
 import { createOwnedBackupArtifactService } from './recovery/owned-backup-artifact-service.js';
+import { createBackupRecoveryModule } from './recovery/backup-recovery-module.js';
 import { createBackupArtifactFileOperationStore } from './recovery/backup-artifact-file-operation-store.js';
 import { createBackupExportService } from './recovery/backup-export-service.js';
 import { createBackupRestoreApplyService } from './recovery/backup-restore-apply-service.js';
@@ -69,6 +70,7 @@ export function createSystemModule({
   musicBrainzSearchService,
   backupArtifactRepository = createBackupArtifactRepository(),
   backupArtifactFileOperationService = null,
+  backupRecoveryModule = null,
   backupArtifactFileOperationStore = createBackupArtifactFileOperationStore(),
   backupExportService = null,
   backupRestoreApplyService = null,
@@ -121,7 +123,12 @@ export function createSystemModule({
     backupArtifactRepository,
     backupArtifactFileOperationStore,
   }),
+  systemBackupRecoveryModule = backupRecoveryModule ?? createBackupRecoveryModule({
+    backupArtifactFileOperationService:systemBackupArtifactFileOperationService,
+    listActiveMaintenanceLocks:maintenanceLockService.listActiveMaintenanceLocks,
+  }),
   systemBackupExportService = backupExportService ?? createBackupExportService({
+    getBackupRecoveryStatus:systemBackupRecoveryModule.getStatus,
     backupArtifactFileOperationService: systemBackupArtifactFileOperationService,
     getBackupArtifactById: backupArtifactRepository.getBackupArtifactById,
     listBackupArtifacts: backupArtifactRepository.listBackupArtifacts,
@@ -267,6 +274,9 @@ export function createSystemModule({
     });
 
   return {
+    backupRecoveryStartupService:systemBackupRecoveryModule.startupService,
+    backupRecoveryWorker:systemBackupRecoveryModule.worker,
+    backupRecoveryStatusService:systemBackupRecoveryModule,
     activityFeedService: systemActivityFeedService,
     operatorNotificationService: systemOperatorNotificationService,
     backupArtifactRepository,

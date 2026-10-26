@@ -12,6 +12,7 @@ import { createBackupArtifactDirectorySyncService } from './backup-artifact-dire
 import { createBackupArtifactDirectoryCreationService } from './backup-artifact-directory-creation-service.js';
 import { createBackupArtifactOwnershipStore } from './backup-artifact-ownership-store.js';
 import { backupArtifactDrainGate } from './backup-artifact-drain-gate.js';
+import { backupRecoveryFileByteLimit,emptyBackupRecoveryCounts } from './backup-recovery-policy.js';
 
 export function createOwnedBackupArtifactService({
   backupArtifactRepository = createBackupArtifactRepository(),
@@ -26,22 +27,25 @@ export function createOwnedBackupArtifactService({
 } = {}) {
   function run(method, input, onBusy) {
     return drainGate.run(() => ownershipStore.withOwnership(async ({ queryable, assertOwnership }) => {
+      const assertAuthority=async()=>{await assertOwnership();if(method==='recoverIncompleteFileOperationPage')await input?.assertRecoveryAuthority?.();};
       const bind = fn => async value => {
-        await assertOwnership();
+        await assertAuthority();
         return fn(value, queryable);
       };
       const service = createBackupArtifactFileOperationService({
         onJournalFailure,
-        backupArtifactFileService: createFileService({ assertOwnership }),
-        backupArtifactFileReadinessService: createReadinessService({ assertOwnership }),
-        backupArtifactDirectorySyncService: createDirectorySyncService({ assertOwnership }),
-        backupArtifactDirectoryCreationService: createDirectoryCreationService({ assertOwnership }),
+        backupArtifactFileService: createFileService({ assertOwnership:assertAuthority }),
+        backupArtifactFileReadinessService: createReadinessService({ assertOwnership:assertAuthority }),
+        backupArtifactDirectorySyncService: createDirectorySyncService({ assertOwnership:assertAuthority }),
+        backupArtifactDirectoryCreationService: createDirectoryCreationService({ assertOwnership:assertAuthority }),
+        maxRecoveryFileSizeBytes:method==='recoverIncompleteFileOperationPage'?backupRecoveryFileByteLimit:null,
         createBackupArtifact: bind(backupArtifactRepository.createBackupArtifact),
         getBackupArtifactByFilename: bind(backupArtifactRepository.getBackupArtifactByFilename),
         getBackupArtifactById: bind(backupArtifactRepository.getBackupArtifactById),
         deleteBackupArtifactById: bind(backupArtifactRepository.deleteBackupArtifactById),
         createFileOperation: bind(backupArtifactFileOperationStore.createFileOperation),
         updateFileOperation: bind(backupArtifactFileOperationStore.updateFileOperation),
+        listIncompleteFileOperationPage:bind(backupArtifactFileOperationStore.listIncompleteFileOperationPage),
         recordFileOperationFailure: bind(backupArtifactFileOperationStore.recordFileOperationFailure),
         listIncompleteFileOperations: async () => {
           await assertOwnership();
@@ -54,6 +58,7 @@ export function createOwnedBackupArtifactService({
   return {
     publishBackupArtifact: input => run('publishBackupArtifact', input),
     deleteBackupArtifact: input => run('deleteBackupArtifact', input),
+    recoverIncompleteFileOperationPage:input=>run('recoverIncompleteFileOperationPage',input,()=>({...emptyBackupRecoveryCounts(),processedCount:0,cursor:input?.after??null,hasMore:true,ownershipBusy:true})),
     recoverIncompleteFileOperations: () => run('recoverIncompleteFileOperations', undefined, () => ({
       abandonedCount: 0,
       awaitingConfirmationCount: 0,

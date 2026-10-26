@@ -132,6 +132,7 @@ export function createBackupExportService({
   backupManifestService = createBackupManifestService(),
   backupEncryptionService = createBackupEncryptionService(),
   backupArtifactFileOperationService = null,
+  getBackupRecoveryStatus = async () => null,
   randomUuidFn = randomUUID,
 } = {}) {
   if (!packageJsonPath) {
@@ -254,6 +255,7 @@ export function createBackupExportService({
 
     return {
       backupArtifacts: artifacts.map(sanitizeArtifact),
+      backupRecovery:await getBackupRecoveryStatus(),
       checkedAt: new Date().toISOString(),
     };
   }

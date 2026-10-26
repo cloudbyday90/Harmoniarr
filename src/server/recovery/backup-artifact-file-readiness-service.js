@@ -7,6 +7,7 @@ import { constants } from 'node:fs';
 import { lstat, open } from 'node:fs/promises';
 import { withWorkerTaskCleanup } from '../worker-task-cleanup.js';
 import { createBackupArtifactFileVerificationService } from './backup-artifact-file-verification-service.js';
+import { readBackupRecoveryHandle } from './backup-recovery-file-reader.js';
 
 const existingFileFlags = constants.O_RDWR | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0);
 const unverified = code => ({ status: 'unverified', code });
@@ -39,9 +40,10 @@ export function createBackupArtifactFileReadinessService({
     const result = await withWorkerTaskCleanup(async () => {
       const opened = await handle.stat({ bigint: true });
       if (!sameFile(initial, opened)) return changed();
+      const boundedContent = input.maxFileSizeBytes == null ? null : await readBackupRecoveryHandle(handle,input.maxFileSizeBytes);
       const verifier = createVerificationService({
         statFn: async () => opened,
-        readFileFn: () => handle.readFile(),
+        readFileFn: () => boundedContent ?? handle.readFile(),
       });
       const verification = await verifier.verifyBackupArtifactFile({ ...input, storagePath });
       if (verification.status !== 'verified') return verification;

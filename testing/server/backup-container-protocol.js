@@ -13,8 +13,8 @@ export function parseBackupContainerMessage(line,{phase,checkpoint,containerId})
   assert.equal(value.checkpoint,checkpoint);assert.equal(value.containerId,containerId);
   assert.match(value.clusterId,/^[0-9]{1,20}$/u);assert.match(value.snapshotSha256,/^[a-f0-9]{64}$/u);
   const expected=phase==='prepare'?'prepared':'verified';assert.ok(['prepare','verify'].includes(phase));assert.equal(value.event,expected);
-  const keys=['event','checkpoint','containerId','clusterId','snapshotSha256',...(phase==='verify'?['repeatedRecovery','currentBytesAndCatalogVerified']:[])];
+  const keys=['event','checkpoint','containerId','clusterId','snapshotSha256',...(phase==='verify'?['automaticStartupRecovery','repeatedRecovery','currentBytesAndCatalogVerified']:[])];
   assert.deepEqual(Object.keys(value).sort(),keys.sort());
-  if(phase==='verify'){assert.equal(value.repeatedRecovery,true);assert.equal(value.currentBytesAndCatalogVerified,true);}
+  if(phase==='verify'){assert.equal(value.automaticStartupRecovery,true);assert.equal(value.repeatedRecovery,true);assert.equal(value.currentBytesAndCatalogVerified,true);}
   return value;
 }

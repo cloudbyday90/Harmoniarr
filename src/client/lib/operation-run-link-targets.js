@@ -30,6 +30,7 @@ import {
 import { buildOperationRunDetailLocation } from './operations-route-state.js';
 
 const operationRunLinkDefinitionsByType = new Map([
+  [operationRunRegistry.backupArtifactRecovery.operationType,{buildLocation:buildOperationRunDetailLocation,openLabel:'View backup recovery'}],
   [operationRunRegistry.artworkCleanup.operationType, {
     buildLocation: buildOperationRunDetailLocation,
     openLabel: 'View artwork cleanup',

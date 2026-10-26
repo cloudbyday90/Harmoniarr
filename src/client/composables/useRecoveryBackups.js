@@ -55,6 +55,7 @@ export function useRecoveryBackups({
   const selectionRequestGate = createLatestRequestGate();
 
   const backupArtifacts = computed(() => backupsPayload.value?.backupArtifacts ?? []);
+  const backupRecovery = computed(() => backupsPayload.value?.backupRecovery ?? null);
 
   function clearSelection() {
     selectionRequestGate.invalidate();
@@ -206,6 +207,7 @@ export function useRecoveryBackups({
     actionErrorMessage,
     applyRestore,
     backupArtifacts,
+    backupRecovery,
     backupsPayload,
     createBackup,
     deleteSelectedBackup,

@@ -17,6 +17,7 @@
  */
 
 import { getPool } from '../database.js';
+import { backupRecoveryBatchSize, validateBackupRecoveryWindow } from './backup-recovery-policy.js';
 
 function toIso(value) {
   return value?.toISOString?.() ?? value ?? null;
@@ -107,6 +108,16 @@ export function createBackupArtifactFileOperationStore({
     return result.rows.map(normalizeOperation);
   }
 
+  async function listIncompleteFileOperationPage({through,after=null},queryable=getPoolFn()) {
+    validateBackupRecoveryWindow({through,after});
+    const result=await queryable.query(`SELECT ${operationColumns},created_at::text AS recovery_cursor_created_at
+      FROM backup_artifact_file_operations WHERE status IN ('prepared','temporary_ready','finalized','awaiting_confirmation')
+      AND created_at <= $1::timestamptz
+      AND ($2::timestamptz IS NULL OR (created_at,id)>($2::timestamptz,$3::uuid))
+      ORDER BY created_at ASC,id ASC LIMIT $4`,[through,after?.createdAt??null,after?.id??null,backupRecoveryBatchSize+1]);
+    return result.rows.map(row=>({operation:normalizeOperation(row),cursor:{createdAt:row.recovery_cursor_created_at,id:row.id}}));
+  }
+
   async function updateFileOperation({
     backupArtifactId = undefined,
     fileOperationId,
@@ -157,6 +168,7 @@ export function createBackupArtifactFileOperationStore({
     recordFileOperationFailure,
     createFileOperation,
     listIncompleteFileOperations,
+    listIncompleteFileOperationPage,
     updateFileOperation,
   };
 }

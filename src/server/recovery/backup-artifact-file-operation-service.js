@@ -27,6 +27,7 @@ import { createBackupArtifactFileVerificationService } from './backup-artifact-f
 import { createBackupArtifactFileReadinessService } from './backup-artifact-file-readiness-service.js';
 import { createBackupArtifactDirectorySyncService } from './backup-artifact-directory-sync-service.js';
 import { createBackupArtifactDirectoryCreationService } from './backup-artifact-directory-creation-service.js';
+import { backupRecoveryAdmissionMs,backupRecoveryBatchSize,emptyBackupRecoveryCounts } from './backup-recovery-policy.js';
 
 function sha256(value) {
   return createHash('sha256').update(value).digest('hex');
@@ -77,6 +78,9 @@ export function createBackupArtifactFileOperationService({
   getBackupArtifactByFilename = async () => null,
   getBackupArtifactById = async () => null,
   listIncompleteFileOperations = async () => [],
+  listIncompleteFileOperationPage = async () => [],
+  maxRecoveryFileSizeBytes = null,
+  nowFn = () => performance.now(),
   randomUuidFn = randomUUID,
   recordFileOperationFailure = async () => { throw new Error('recordFileOperationFailure dependency is required'); },
   onJournalFailure,
@@ -94,6 +98,7 @@ export function createBackupArtifactFileOperationService({
       expectedFileSha256: operation.expectedFileSha256,
       expectedFileSizeBytes: operation.expectedFileSizeBytes,
       storagePath,
+      ...(recovering && maxRecoveryFileSizeBytes!==null ? {maxFileSizeBytes:maxRecoveryFileSizeBytes} : {}),
     });
   }
 
@@ -211,7 +216,7 @@ export function createBackupArtifactFileOperationService({
       throw createVerificationRequiredError('artifact_destination_exists');
     }
 
-    const promotedVerification = await verifyOperationArtifact(operation, operation.storagePath);
+    const promotedVerification = await verifyOperationArtifact(operation, operation.storagePath,recovering&&maxRecoveryFileSizeBytes!==null);
     if (promotedVerification.status !== 'verified') {
       await holdForConfirmation(operation, promotedVerification);
       throw createVerificationRequiredError(promotedVerification.code);
@@ -220,8 +225,8 @@ export function createBackupArtifactFileOperationService({
     return finalizeVerifiedPublication(operation);
   }
 
-  async function deletePreparedOperation(operation) {
-    const verification = await verifyOperationArtifact(operation, operation.storagePath);
+  async function deletePreparedOperation(operation, recovering=false) {
+    const verification = await verifyOperationArtifact(operation, operation.storagePath,recovering&&maxRecoveryFileSizeBytes!==null);
     if (verification.status === 'unverified') {
       await holdForConfirmation(operation, verification);
       throw createVerificationRequiredError(verification.code);
@@ -330,6 +335,8 @@ export function createBackupArtifactFileOperationService({
       return { status: 'awaiting_confirmation' };
     }
 
+    if(maxRecoveryFileSizeBytes!==null&&(!Number.isSafeInteger(operation.expectedFileSizeBytes)||operation.expectedFileSizeBytes<0||operation.expectedFileSizeBytes>maxRecoveryFileSizeBytes))return {status:'deferred'};
+
     try {
       if (operation.operationType === 'publish') {
         const artifact = await publishPreparedOperation(operation, true);
@@ -337,13 +344,15 @@ export function createBackupArtifactFileOperationService({
       }
 
       if (operation.operationType === 'delete') {
-        const result = await deletePreparedOperation(operation);
+        const result = await deletePreparedOperation(operation,true);
         return { artifactId: result.backupArtifact?.id ?? null, status: 'completed' };
       }
 
       await holdForConfirmation(operation, { code: 'operation_type_unrecognized' });
       return { status: 'awaiting_confirmation' };
     } catch (error) {
+      if(['operation_run_paused','operation_run_cancelled','operation_run_lease_lost'].includes(error?.code))throw error;
+      if(error?.code==='backup_recovery_file_limit')return {status:'deferred'};
       if (error?.code === 'backup_artifact_filesystem_confirmation_required') {
         return { status: 'awaiting_confirmation' };
       }
@@ -369,9 +378,22 @@ export function createBackupArtifactFileOperationService({
     };
   }
 
+  async function recoverIncompleteFileOperationPage({through,after=null}={}) {
+    const rows=await listIncompleteFileOperationPage({through,after}),counts=emptyBackupRecoveryCounts(),started=nowFn();
+    let processedCount=0,cursor=after;
+    const countKey={completed:'completedCount',deferred:'deferredCount',awaiting_confirmation:'awaitingConfirmationCount',abandoned:'abandonedCount'};
+    for(const row of rows.slice(0,backupRecoveryBatchSize)) {
+      if(processedCount>0&&nowFn()-started>=backupRecoveryAdmissionMs)break;
+      const result=await recoverFileOperation(row.operation);counts[countKey[result.status]]++;
+      processedCount++;cursor=row.cursor;
+    }
+    return {...counts,processedCount,cursor,hasMore:rows.length>processedCount};
+  }
+
   return {
     deleteBackupArtifact,
     publishBackupArtifact,
     recoverIncompleteFileOperations,
+    recoverIncompleteFileOperationPage,
   };
 }

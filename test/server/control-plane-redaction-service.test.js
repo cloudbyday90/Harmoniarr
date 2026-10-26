@@ -2,6 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createControlPlaneRedactionService } from '../../src/server/control-plane-redaction-service.js';
 
+test('backup continuation facts remain private in delivered operation summaries', () => {
+  const service = createControlPlaneRedactionService();
+  assert.deepEqual(service.redactOperationSummary({ processedCount: 25, backupRecoveryThrough: 'private', backupRecoveryAfter: { id: 'private', createdAt: 'private' } }), { processedCount: 25 });
+});
+
 test('control plane redaction service redacts sensitive keys recursively', () => {
   const service = createControlPlaneRedactionService();
 
