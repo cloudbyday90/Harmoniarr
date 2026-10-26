@@ -76,7 +76,8 @@ Frozen code/dependency/test source: 3,542 files,
 Private baseline, failed fixture expectation, corrected/final runs, runtime
 comparison and audit are under `.tmp/backup-handle-close-2026-10-26/`.
 
-Next recommended item: define and qualify a fresh sync/close readiness step before
+Completed by the [recovery readiness outcome](BACKUP_RECOVERY_READINESS_OUTCOME.md).
+The recommended item was to define and qualify a fresh sync/close readiness step before
 recovery adopts complete prepared bytes. Current recovery verifies content and
 can publish a complete temporary file after a failed writer without a new sync.
 The controlled cases demonstrate adoption, not durability after a real fsync

@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 26 [backup recovery readiness rebuild](LOCAL_DOCKER_BACKUP_RECOVERY_READINESS_OUTCOME.md)
+records the current no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](BACKUP_RECOVERY_READINESS_OUTCOME.md) records fresh
+same-handle verification, sync/close and identity checks before recovery adoption.
+
 The October 26 [backup handle cleanup rebuild](LOCAL_DOCKER_BACKUP_HANDLE_CLOSE_OUTCOME.md)
 records the current no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](BACKUP_HANDLE_CLOSE_OUTCOME.md) records awaited cleanup,

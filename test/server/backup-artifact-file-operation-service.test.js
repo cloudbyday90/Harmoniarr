@@ -13,7 +13,7 @@ function sha256(value) {
   return createHash('sha256').update(value).digest('hex');
 }
 
-function createLifecycleHarness({ fileService = createBackupArtifactFileService() } = {}) {
+function createLifecycleHarness({ fileService = createBackupArtifactFileService(), readinessService } = {}) {
   const artifacts = [];
   const operations = [];
   let nextArtifactId = 1;
@@ -52,6 +52,7 @@ function createLifecycleHarness({ fileService = createBackupArtifactFileService(
   const service = createBackupArtifactFileOperationService({
     backupArtifactFileService: fileService,
     backupArtifactFileVerificationService: createBackupArtifactFileVerificationService(),
+    backupArtifactFileReadinessService: readinessService,
     createBackupArtifact,
     createFileOperation,
     deleteBackupArtifactById,
@@ -227,4 +228,27 @@ test('restart recovery records a fixed unknown failure and remains deferred with
   assert.equal(operation.lastErrorCode, 'backup_artifact_file_operation_failed');
   assert.doesNotMatch(operation.lastErrorMessage, /private-native-message|secret|unsafe-code/u);
   assert.equal(await readFile(operation.temporaryPath, 'utf8'), draft.content);
+});
+
+test('recovery cannot advance temporary or final publication while readiness fails', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'harmoniarr-backup-readiness-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  for (const finalExists of [false, true]) for (const failure of [new Error('readiness failed'), null]) {
+    let attempts = 0;
+    const draft = createArtifactDraft({ storagePath: join(directory, `${finalExists}-${attempts}-${failure === null}.json`) });
+    const harness = createLifecycleHarness({ readinessService: { prepareBackupArtifactFile: async ({ storagePath }) => {
+      attempts++;
+      if (!finalExists && storagePath === draft.artifact.storagePath) return { status: 'missing' };
+      throw failure;
+    } } });
+    const operation = await harness.createFileOperation({ artifactSnapshot: draft.artifact, storagePath: draft.artifact.storagePath,
+      filename: draft.artifact.filename, operationType: 'publish', expectedFileSha256: sha256(draft.content),
+      expectedFileSizeBytes: Buffer.byteLength(draft.content), temporaryPath: draft.artifact.storagePath+'.partial' });
+    const path = finalExists ? operation.storagePath : operation.temporaryPath;
+    await createBackupArtifactFileService().writePrivateTemporaryFile({ content: draft.content, temporaryPath: path });
+    const result = await harness.service.recoverIncompleteFileOperations();
+    assert.equal(result.deferredCount, 1); assert.equal(result.completedCount, 0);
+    assert.equal(operation.status, 'prepared'); assert.equal(harness.artifacts.length, 0);
+    assert.equal(await readFile(path, 'utf8'), draft.content); assert.equal(attempts, finalExists ? 1 : 2);
+  }
 });

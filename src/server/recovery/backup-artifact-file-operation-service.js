@@ -24,6 +24,7 @@ import {
   createTemporaryBackupArtifactPath,
 } from './backup-artifact-file-service.js';
 import { createBackupArtifactFileVerificationService } from './backup-artifact-file-verification-service.js';
+import { createBackupArtifactFileReadinessService } from './backup-artifact-file-readiness-service.js';
 
 function sha256(value) {
   return createHash('sha256').update(value).digest('hex');
@@ -61,6 +62,7 @@ function toOperationArtifact(operation, storagePath) {
 export function createBackupArtifactFileOperationService({
   backupArtifactFileService = createBackupArtifactFileService(),
   backupArtifactFileVerificationService = createBackupArtifactFileVerificationService(),
+  backupArtifactFileReadinessService = createBackupArtifactFileReadinessService(),
   createBackupArtifact = async () => {
     throw new Error('createBackupArtifact dependency is required');
   },
@@ -80,8 +82,10 @@ export function createBackupArtifactFileOperationService({
   },
 } = {}) {
   const { recordFailure } = createBackupArtifactFailureRecorder({ recordFileOperationFailure, onJournalFailure });
-  async function verifyOperationArtifact(operation, storagePath) {
-    return backupArtifactFileVerificationService.verifyBackupArtifactFile({
+  async function verifyOperationArtifact(operation, storagePath, recovering = false) {
+    const verify = recovering ? backupArtifactFileReadinessService.prepareBackupArtifactFile
+      : backupArtifactFileVerificationService.verifyBackupArtifactFile;
+    return verify({
       artifact: toOperationArtifact(operation, storagePath),
       expectedFileSha256: operation.expectedFileSha256,
       expectedFileSizeBytes: operation.expectedFileSizeBytes,
@@ -144,8 +148,8 @@ export function createBackupArtifactFileOperationService({
     }
   }
 
-  async function publishPreparedOperation(operation) {
-    const finalVerification = await verifyOperationArtifact(operation, operation.storagePath);
+  async function publishPreparedOperation(operation, recovering = false) {
+    const finalVerification = await verifyOperationArtifact(operation, operation.storagePath, recovering);
     if (finalVerification.status === 'verified') {
       await cleanupPublicationTemporaryFile(operation);
       await updateFileOperation({
@@ -171,7 +175,7 @@ export function createBackupArtifactFileOperationService({
       return null;
     }
 
-    const temporaryVerification = await verifyOperationArtifact(operation, temporaryPath);
+    const temporaryVerification = await verifyOperationArtifact(operation, temporaryPath, recovering);
     if (temporaryVerification.status === 'missing') {
       await updateFileOperation({
         fileOperationId: operation.id,
@@ -319,7 +323,7 @@ export function createBackupArtifactFileOperationService({
 
     try {
       if (operation.operationType === 'publish') {
-        const artifact = await publishPreparedOperation(operation);
+        const artifact = await publishPreparedOperation(operation, true);
         return artifact ? { artifactId: artifact.id, status: 'completed' } : { status: 'abandoned' };
       }
 
