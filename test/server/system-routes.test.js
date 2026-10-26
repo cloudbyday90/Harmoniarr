@@ -703,6 +703,7 @@ test('backup restore preview route requires admin session and returns preview pa
     const payload = await response.json();
 
     assert.equal(response.status, 200);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
     assert.equal(requireAdminSession.mock.callCount(), 1);
     assert.deepEqual(getBackupRestorePreview.mock.calls[0].arguments, [{
       backupArtifactId: 'backup-1',
@@ -1716,6 +1717,7 @@ test('system onboarding route requires a session and returns the shared onboardi
     const payload = await response.json();
 
     assert.equal(response.status, 200);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
     assert.equal(requireAdminSession.mock.callCount(), 1);
     assert.equal(buildOnboardingSummary.mock.callCount(), 1);
     assert.deepEqual(payload, {

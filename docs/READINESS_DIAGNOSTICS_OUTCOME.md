@@ -104,7 +104,10 @@ backpressure-aware logs → existing administrator Recovery diagnostics. It keep
 deployment and ownership simple while accepting volatile history and suppressed
 log records. A new daemon or diagnostics table adds no value for this scope.
 
-Next recommended item: audit remaining HTTP observation callers of the legacy
+The next item is implemented in the [migration observation outcome](MIGRATION_OBSERVATION_OUTCOME.md),
+including onboarding, backup export and restore preview.
+
+Original recommendation: audit remaining HTTP observation callers of the legacy
 migration-preparation helper, beginning with onboarding summary. Move prepared-state
 reads to the new reader and keep explicit preparation in startup/CLI paths. Qualify
 real concurrent reads and read-only transactions before considering a separate

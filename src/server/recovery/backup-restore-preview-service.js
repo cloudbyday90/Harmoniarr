@@ -20,7 +20,7 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createApiError } from '../auth.js';
 import { createControlPlaneRedactionService } from '../control-plane-redaction-service.js';
-import { getMigrationStatus } from '../migrations.js';
+import { readMigrationStatus } from '../schema-migration-status-service.js';
 import { createBackupEncryptionService } from './backup-encryption-service.js';
 
 function toIsoDate(value) {
@@ -134,7 +134,7 @@ function buildMigrationCompatibilityChecks({ backupMigrationLevel, currentMigrat
 export function createBackupRestorePreviewService({
   controlPlaneRedactionService = createControlPlaneRedactionService(),
   getBackupArtifactById = async () => null,
-  getMigrationStatusFn = getMigrationStatus,
+  getMigrationStatusFn = readMigrationStatus,
   listRestoreApplyBlockingLocks = async () => [],
   nowFn = () => new Date(),
   readBackupPayloadFn = (storagePath) => readFile(storagePath, 'utf8'),

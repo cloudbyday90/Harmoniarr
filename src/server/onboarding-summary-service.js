@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { getMigrationStatus } from './migrations.js';
+import { readMigrationStatus } from './schema-migration-status-service.js';
 import {
   classifyMusicBrainzDependencyError,
   classifySlskdDependencyError,
@@ -231,7 +231,7 @@ function createFallbackSlskdStatus(error) {
 
 export function createOnboardingSummaryService({
   backgroundJobHealthService = createBackgroundJobHealthService(),
-  getMigrationStatusFn = getMigrationStatus,
+  getMigrationStatusFn = readMigrationStatus,
   libraryScanSummaryService = createLibraryScanSummaryService(),
   musicBrainzSearchService = createMusicBrainzSearchService(),
   settingsService = createSettingsService(),

@@ -21,7 +21,7 @@ import { readFile } from 'node:fs/promises';
 import { basename, isAbsolute, join, relative, resolve } from 'node:path';
 import { createApiError } from '../auth.js';
 import { recordAuditEvent } from '../audit.js';
-import { getMigrationStatus } from '../migrations.js';
+import { readMigrationStatus } from '../schema-migration-status-service.js';
 import { loadSettings } from '../settings.js';
 import { createBackupManifestService } from './backup-manifest-service.js';
 import { createBackupEncryptionService } from './backup-encryption-service.js';
@@ -117,7 +117,7 @@ function buildScopeSettings({
 export function createBackupExportService({
   backupsDirectory = process.env.HARMONIARR_BACKUPS ?? '/app/data/backups',
   getBackupArtifactById = async () => null,
-  getMigrationStatusFn = getMigrationStatus,
+  getMigrationStatusFn = readMigrationStatus,
   listBackupArtifacts = async () => [],
   listOverridesSnapshotForBackup = async () => [],
   listOperatorArtistMonitoringForBackup = async () => [],

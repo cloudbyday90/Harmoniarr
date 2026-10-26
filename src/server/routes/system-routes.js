@@ -255,6 +255,7 @@ export function registerSystemRoutes(app, {
 
   app.get('/api/v1/recovery/backups/:backupArtifactId/restore-preview', asyncRoute(async (request, response) => {
     await requireAdminSession(request);
+    response.setHeader('Cache-Control', 'no-store');
 
     response.json({
       ok: true,
@@ -418,6 +419,7 @@ export function registerSystemRoutes(app, {
 
   app.get('/api/v1/system/onboarding', asyncRoute(async (request, response) => {
     await requireAdminSession(request);
+    response.setHeader('Cache-Control', 'no-store');
     response.json(await buildOnboardingSummary());
   }));
 

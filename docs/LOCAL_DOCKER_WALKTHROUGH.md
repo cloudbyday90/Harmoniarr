@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 26 [migration observation rebuild](LOCAL_DOCKER_MIGRATION_OBSERVATION_OUTCOME.md)
+records the current no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](MIGRATION_OBSERVATION_OUTCOME.md) records schema-write-free
+migration observation for onboarding and backup services.
+
 The October 26 [readiness diagnostics rebuild](LOCAL_DOCKER_READINESS_DIAGNOSTICS_OUTCOME.md)
 records the current no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](READINESS_DIAGNOSTICS_OUTCOME.md) records bounded safe
