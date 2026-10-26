@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 26 [backup handle cleanup rebuild](LOCAL_DOCKER_BACKUP_HANDLE_CLOSE_OUTCOME.md)
+records the current no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](BACKUP_HANDLE_CLOSE_OUTCOME.md) records awaited cleanup,
+original failure preservation and the locally applied PR #55 metadata update.
+
 The October 26 [backup failure precedence rebuild](LOCAL_DOCKER_BACKUP_FAILURE_PRECEDENCE_OUTCOME.md)
 records the current no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](BACKUP_FAILURE_PRECEDENCE_OUTCOME.md) records primary

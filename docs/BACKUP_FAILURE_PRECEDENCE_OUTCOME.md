@@ -82,6 +82,8 @@ branch change; work stays on `main`.
 
 ## Next recommended item
 
+Completed by the [backup handle cleanup outcome](BACKUP_HANDLE_CLOSE_OUTCOME.md).
+
 Preserve the primary temporary-file write/sync failure when closing its file handle
 also fails. A separate controlled file-handle probe reproduces Error/null masking
 at both write and sync: the current unconditional `finally` close throws over the

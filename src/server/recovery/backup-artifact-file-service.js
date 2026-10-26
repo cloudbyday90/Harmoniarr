@@ -18,6 +18,7 @@
 
 import { link, lstat, mkdir, open, unlink } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
+import { withWorkerTaskCleanup } from '../worker-task-cleanup.js';
 
 const privateFileMode = 0o600;
 
@@ -51,12 +52,10 @@ export function createBackupArtifactFileService({
 
     await assertOwnership();
     const handle = await openFn(temporaryPath, 'wx', privateFileMode);
-    try {
+    await withWorkerTaskCleanup(async () => {
       await handle.writeFile(content);
       await handle.sync();
-    } finally {
-      await handle.close();
-    }
+    }, () => handle.close());
   }
 
   async function promoteTemporaryFile({ storagePath, temporaryPath }) {
