@@ -11,10 +11,12 @@ const repoMigrations = [
   {
     checksum: 'checksum-1',
     filename: '20260427_000001_bootstrap_core_tables.sql',
+    migrationKey: '20260427_000001',
   },
   {
     checksum: 'checksum-2',
     filename: '20260428_000001_artwork_asset_foundation.sql',
+    migrationKey: '20260428_000001',
   },
 ];
 
@@ -47,11 +49,13 @@ test('buildDatabaseMigrationStateReport treats matching applied rows as current'
       {
         checksum: 'checksum-1',
         filename: '20260427_000001_bootstrap_core_tables.sql',
+        migration_key: '20260427_000001',
         status: 'applied',
       },
       {
         checksum: 'checksum-2',
         filename: '20260428_000001_artwork_asset_foundation.sql',
+        migration_key: '20260428_000001',
         status: 'applied',
       },
     ],
@@ -72,17 +76,20 @@ test('buildDatabaseMigrationStateReport reports pending, unknown, drift, and fai
       {
         checksum: 'different',
         filename: '20260427_000001_bootstrap_core_tables.sql',
+        migration_key: '20260427_000001',
         status: 'applied',
       },
       {
         checksum: 'unknown-checksum',
         filename: '20260101_000001_removed.sql',
+        migration_key: '20260101_000001',
         status: 'applied',
       },
       {
         checksum: 'checksum-2',
         error_message: 'boom',
         filename: '20260428_000001_artwork_asset_foundation.sql',
+        migration_key: '20260428_000001',
         status: 'failed',
       },
     ],
@@ -112,11 +119,13 @@ test('inspectDatabaseMigrationState reads rows from schema_migrations and releas
     {
       checksum: 'checksum-1',
       filename: '20260427_000001_bootstrap_core_tables.sql',
+      migration_key: '20260427_000001',
       status: 'applied',
     },
     {
       checksum: 'checksum-2',
       filename: '20260428_000001_artwork_asset_foundation.sql',
+      migration_key: '20260428_000001',
       status: 'applied',
     },
   ]);
@@ -135,6 +144,7 @@ test('assertDatabaseMigrationStateCurrent rejects stale database state with reme
     {
       checksum: 'checksum-1',
       filename: '20260427_000001_bootstrap_core_tables.sql',
+      migration_key: '20260427_000001',
       status: 'applied',
     },
   ]);
@@ -146,4 +156,16 @@ test('assertDatabaseMigrationStateCurrent rejects stale database state with reme
     }),
     /Database migration state is not current\.[\s\S]*Run npm run migrate/,
   );
+});
+
+test('migration key mismatch is inconsistent even when filename, checksum and applied status match', () => {
+  for (const migrationKey of ['20990101_000001', null]) {
+    const report = buildDatabaseMigrationStateReport({ repoMigrations: [repoMigrations[0]], databaseRows: [{
+      filename: repoMigrations[0].filename, checksum: repoMigrations[0].checksum, status: 'applied', migration_key: migrationKey,
+    }] });
+    assert.equal(report.current, false);
+    assert.deepEqual(report.migrationKeyDrift, [{ filename: repoMigrations[0].filename,
+      currentMigrationKey: repoMigrations[0].migrationKey, storedMigrationKey: migrationKey }]);
+    assert.match(formatDatabaseMigrationStateDiagnostics(report), /1 migration key drift/u);
+  }
 });

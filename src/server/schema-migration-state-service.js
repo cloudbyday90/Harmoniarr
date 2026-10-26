@@ -74,6 +74,12 @@ export function buildDatabaseMigrationStateReport({
     })
     .filter(Boolean);
 
+  const migrationKeyDrift = appliedRows.flatMap((row) => {
+    const migration = repoMigrationIndex.get(row.filename);
+    if (!migration || row.migrationKey === migration.migrationKey) return [];
+    return [{ filename: row.filename, currentMigrationKey: migration.migrationKey, storedMigrationKey: row.migrationKey }];
+  });
+
   return {
     appliedCount: appliedRows.length,
     appliedRows,
@@ -81,7 +87,9 @@ export function buildDatabaseMigrationStateReport({
     current: pending.length === 0
       && unknownApplied.length === 0
       && checksumDrift.length === 0
+      && migrationKeyDrift.length === 0
       && nonAppliedRows.length === 0,
+    migrationKeyDrift,
     nonAppliedRows,
     pending,
     repoCount: repoMigrations.length,
@@ -96,6 +104,7 @@ export function formatDatabaseMigrationStateSummary(report) {
     `${report.pending.length} pending`,
     `${report.unknownApplied.length} unknown applied`,
     `${report.checksumDrift.length} checksum drift`,
+    `${report.migrationKeyDrift.length} migration key drift`,
     `${report.nonAppliedRows.length} non-applied row(s)`,
   ].join(', ');
 }
@@ -124,6 +133,10 @@ export function formatDatabaseMigrationStateDiagnostics(report) {
     lines.push(`Non-applied migration rows: ${report.nonAppliedRows
       .map((row) => `${row.filename} (${row.status}${row.errorMessage ? `: ${row.errorMessage}` : ''})`)
       .join(', ')}`);
+  }
+
+  if (report.migrationKeyDrift.length > 0) {
+    lines.push(`Migration key drift: ${report.migrationKeyDrift.map((row) => row.filename).join(', ')}`);
   }
 
   return lines.join('\n');

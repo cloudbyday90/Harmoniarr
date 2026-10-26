@@ -90,3 +90,7 @@ including checksum drift and unknown applied rows. Current startup checks pendin
 filenames and service/path readiness; it does not enforce the full-state report.
 Define bootstrap/recovery remediation and availability policy before adding that
 gate. The read-only full-state service is now available for that work.
+
+Implemented in the [startup migration lineage outcome](STARTUP_MIGRATION_LINEAGE_OUTCOME.md).
+That follow-up records checksum/key/status/unknown-row admission, bounded startup
+diagnostics and the explicit preparation/recovery availability boundary.

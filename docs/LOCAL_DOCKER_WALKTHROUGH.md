@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 26 [startup migration lineage rebuild](LOCAL_DOCKER_STARTUP_MIGRATION_LINEAGE_OUTCOME.md)
+records the current no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](STARTUP_MIGRATION_LINEAGE_OUTCOME.md) records complete
+prepared-ledger admission before application composition and recovery workers.
+
 The October 26 [migration CLI readers rebuild](LOCAL_DOCKER_MIGRATION_CLI_READERS_OUTCOME.md)
 records the current no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](MIGRATION_CLI_READERS_OUTCOME.md) records read-only status,

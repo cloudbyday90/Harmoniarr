@@ -46,9 +46,9 @@ test('caller mutation during migration application cannot change the lineage sup
   assert.equal(result.migrationCount, 1);
 });
 
-test('a wrong migration key is refused even when the existing migration report calls the ledger current', async () => {
+test('a wrong migration key is refused even when an injected report forges the current flag', async () => {
   const source = inputs(); const rows = databaseRows(source.manifest); rows[0].migration_key = '20261010_999999';
-  const current = report(source.manifest, rows); assert.equal(current.current, true);
+  const current = { ...report(source.manifest, rows), current: true };
   await assert.rejects(prepareMigrationTemplateDatabase({ inputs: source, getPoolFn: () => ({}),
     applyPendingMigrationsFn: async () => [], assertDatabaseMigrationStateCurrentFn: async () => current,
   }), { code: 'migration_template_preparation_incomplete' });

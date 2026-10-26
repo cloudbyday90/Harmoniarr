@@ -26,7 +26,7 @@ import { resolveLibraryDiscoveryHeartbeatConfig } from './library/library-discov
 import { createLedgerRetentionHeartbeat } from './ledger-retention-heartbeat.js';
 import { createLedgerRetentionService } from './ledger-retention-service.js';
 import { createMetadataRefreshHeartbeat } from './metadata/metadata-refresh-heartbeat.js';
-import { assertNoPendingMigrations } from './migrations.js';
+import { assertStartupMigrationStateCurrent } from './startup-migration-validation-service.js';
 import { createOperationQueueDispatcher } from './operation-queue-dispatcher.js';
 import { createOperationQueueHandlers } from './operation-queue-handlers.js';
 import { createOperationQueueStore } from './operation-queue-store.js';
@@ -52,7 +52,7 @@ function closeServer(server) {
 }
 
 export async function startServerRuntime({
-  assertNoPendingMigrations: verifyNoPendingMigrations = assertNoPendingMigrations,
+  assertStartupMigrationStateCurrent: verifyMigrationState = assertStartupMigrationStateCurrent,
   closePool: closeDatabasePool = closePool,
   createApp: buildApp = createApp,
   createImportCandidateExecutionHeartbeat: buildImportCandidateExecutionHeartbeat = createImportCandidateExecutionHeartbeat,
@@ -90,7 +90,7 @@ export async function startServerRuntime({
     runtimeReporter.writeInfo(`loaded schema snapshot from ${schemaBootstrap.schemaSnapshotPath}`);
   }
 
-  await verifyNoPendingMigrations();
+  await verifyMigrationState({ getPoolFn: resolvePool });
   await buildStartupValidationService({
     getPoolFn: resolvePool,
   }).assertStartupReady();

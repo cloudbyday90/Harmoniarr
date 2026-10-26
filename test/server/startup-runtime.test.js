@@ -167,7 +167,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
         callOrder.push('startupValidation');
       },
     }),
-    assertNoPendingMigrations: async () => {
+    assertStartupMigrationStateCurrent: async () => {
       callOrder.push('migrations');
     },
     closePool: async () => {
@@ -610,7 +610,7 @@ test('startServerRuntime leaves background services idle for isolated verificati
   });
 
   const runtime = await startServerRuntime({
-    assertNoPendingMigrations: async () => {},
+    assertStartupMigrationStateCurrent: async () => {},
     bootstrapDatabaseSchemaFromSnapshot: async () => ({
       bootstrapped: false,
       schemaSnapshotPath: 'schema.sql',
@@ -733,7 +733,7 @@ test('startServerRuntime reports shutdown errors through stderr and sets exitCod
     createStartupValidationService: () => ({
       async assertStartupReady() {},
     }),
-    assertNoPendingMigrations: async () => {},
+    assertStartupMigrationStateCurrent: async () => {},
     closePool: async () => {},
     createApp: () => ({
       app: {
@@ -918,7 +918,7 @@ test('startServerRuntime fails before app composition when startup validation re
           throw new Error('Startup validation failed: Staging root: Configured path is not reachable from Harmoniarr. (ENOENT)');
         },
       }),
-      assertNoPendingMigrations: async () => {},
+      assertStartupMigrationStateCurrent: async () => {},
       closePool: async () => {},
     }),
     /Startup validation failed: Staging root: Configured path is not reachable from Harmoniarr\. \(ENOENT\)/,
