@@ -16,22 +16,16 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { getPool } from './database.js';
 import { ensureSchemaTable } from './schema-migration-store.js';
 import { assertMigrationPreparationSafe } from './migration-preparation-service.js';
 import { prepareMigrationTransactionSql } from './migration-sql-transaction-policy.js';
 import { assertIdleMigrationClient, executeMigrationTransaction } from './migration-transaction-service.js';
-import { withWorkerTaskCleanup } from './worker-task-cleanup.js';
+import { withDatabasePreparation } from './database-preparation-owner-service.js';
 export { getMigrationStatus, assertNoPendingMigrations } from './schema-migration-status-service.js';
 export { verifyAppliedMigrationChecksums, assertNoMigrationChecksumDrift } from './migration-checksum-service.js';
 
-export async function applyPendingMigrations({ getPoolFn = getPool, retryFailedMigrations = false, loadMigrationManifestFn } = {}) {
-  const client = await getPoolFn().connect();
-  let unusable = false;
-  const markClientUnusable = () => { unusable = true; };
-  client.on?.('error', markClientUnusable);
-  client.on?.('end', markClientUnusable);
-  return withWorkerTaskCleanup(async () => {
+export async function applyPendingMigrations({ getPoolFn, preparation, retryFailedMigrations = false, loadMigrationManifestFn } = {}) {
+  return withDatabasePreparation({ getPoolFn, preparation }, async ({ client, markClientUnusable }) => {
     assertIdleMigrationClient(client, markClientUnusable);
     const plan = await assertMigrationPreparationSafe({ queryable: client, retryFailedMigrations, loadMigrationManifestFn });
     const pendingNames = new Set(plan.pending);
@@ -42,9 +36,5 @@ export async function applyPendingMigrations({ getPoolFn = getPool, retryFailedM
       await executeMigrationTransaction({ client, migration, sql, markClientUnusable });
     }
     return pending.map(migration => migration.filename);
-  }, () => {
-    client.off?.('error', markClientUnusable);
-    client.off?.('end', markClientUnusable);
-    return unusable ? client.release(true) : client.release();
   });
 }

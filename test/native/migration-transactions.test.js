@@ -8,6 +8,7 @@ import test from 'node:test';
 import pg from 'pg';
 import { getPool, closePool, buildConnectionConfig } from '/app/server-dist/database.js';
 import { applyPendingMigrations } from '/app/server-dist/migrations.js';
+import { databasePreparationLockKey } from '/app/server-dist/database-preparation-lock-store.js';
 import { checksumSql, loadMigrationManifest } from '/app/server-dist/migration-manifest.js';
 import { withWorkerTaskCleanup } from '/app/server-dist/worker-task-cleanup.js';
 import { requireDeploymentMemoryProfile } from '../../testing/server/deployment-memory-profile.js';
@@ -27,6 +28,9 @@ test('migration DDL and applied receipts share visibility, rollback and real los
     const deadline = Date.now() + 10_000;
     while (!await probe()) { t.signal.throwIfAborted(); assert.ok(Date.now() < deadline, label); await new Promise(done => { setTimeout(done, 10); }); }
   }
+  const ownerGone = async () => (await pool.query(`SELECT count(*)::integer AS count FROM pg_locks WHERE locktype='advisory'
+    AND database=(SELECT oid FROM pg_database WHERE datname=current_database())
+    AND classid=$1::oid AND objid=$2::oid AND objsubid=2`, databasePreparationLockKey)).rows[0].count === 0;
   await withWorkerTaskCleanup(async () => {
     await pool.query(`CREATE FUNCTION fixture_migration_receipt_gate() RETURNS trigger LANGUAGE plpgsql AS $gate$
       BEGIN IF NEW.filename='20990101_000001_fixture_atomic.sql' AND NEW.status='applied' THEN
@@ -56,6 +60,7 @@ test('migration DDL and applied receipts share visibility, rollback and real los
         if (mode === 'commit') { assert.deepEqual(result.value, [filename]); assert.deepEqual((await state()).rows, [{ status: 'applied' }]); }
         else {
           assert.equal(result.failed, true); assert.deepEqual(await state(), { table: null, rows: [] });
+          await until(ownerGone, 'terminated preparation owner must retire before reviewed replay');
           assert.deepEqual(await applyPendingMigrations({ loadMigrationManifestFn: manifest(migration(sql)) }), [filename]);
         }
         assert.equal((await pool.query('SELECT value FROM ' + table)).rows[0].value, 7);
@@ -88,6 +93,7 @@ test('migration DDL and applied receipts share visibility, rollback and real los
           assert.deepEqual(await state(), { table: null, rows: [] });
         }
       }, async () => { await writer.end(); await proxy.close(); });
+      await until(ownerGone, 'disconnected preparation owner must retire before reviewed replay');
       const replay = await applyPendingMigrations({ loadMigrationManifestFn: manifest(migration(sql)) });
       assert.equal(replay.length, mode === 'after-commit' ? 0 : 1);
       assert.deepEqual((await state()).rows, [{ status: 'applied' }]);

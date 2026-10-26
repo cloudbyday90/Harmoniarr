@@ -18,9 +18,8 @@
 
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { getPool } from './database.js';
 import { assertMigrationPreparationSafe } from './migration-preparation-service.js';
-import { withWorkerTaskCleanup } from './worker-task-cleanup.js';
+import { withDatabasePreparation } from './database-preparation-owner-service.js';
 
 export const defaultSchemaSnapshotPath = resolve(import.meta.dirname, 'schema-snapshot.sql');
 
@@ -36,15 +35,13 @@ export async function getPublicTableCount(client) {
 }
 
 export async function bootstrapDatabaseSchemaFromSnapshot({
-  getPoolFn = getPool,
+  getPoolFn,
+  preparation,
   readFileFn = readFile,
   assertMigrationPreparationSafeFn = assertMigrationPreparationSafe,
   schemaSnapshotPath = defaultSchemaSnapshotPath,
 } = {}) {
-  const pool = getPoolFn();
-  const client = await pool.connect();
-
-  return withWorkerTaskCleanup(async () => {
+  return withDatabasePreparation({ getPoolFn, preparation }, async ({ client }) => {
     const tableCount = await getPublicTableCount(client);
     if (tableCount > 0) {
       return {
@@ -70,5 +67,5 @@ export async function bootstrapDatabaseSchemaFromSnapshot({
       schemaSnapshotPath,
       tableCount,
     };
-  }, () => client.release());
+  });
 }

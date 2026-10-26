@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { withPreparationLockFixture } from '../../testing/server/preparation-lock-fixture.js';
 import {
   bootstrapDatabaseSchemaFromSnapshot,
   getPublicTableCount,
@@ -33,7 +34,7 @@ test('bootstrapDatabaseSchemaFromSnapshot applies the schema snapshot only when 
     },
     getPoolFn: () => ({
       async connect() {
-        return {
+        return withPreparationLockFixture({
           async query(sql) {
             queryCalls.push(sql);
             if (queryCalls.length === 1) {
@@ -47,7 +48,7 @@ test('bootstrapDatabaseSchemaFromSnapshot applies the schema snapshot only when 
           release() {
             released = true;
           },
-        };
+        });
       },
     }),
     readFileFn: async (path, encoding) => {
@@ -73,7 +74,7 @@ test('snapshot bootstrap refuses hidden existing relations before reading or exe
   for (const original of [new Error('refused'), null]) {
     let reads = 0, queries = 0, releases = 0;
     await assert.rejects(bootstrapDatabaseSchemaFromSnapshot({
-      getPoolFn: () => ({ connect: async () => ({
+      getPoolFn: () => ({ connect: async () => withPreparationLockFixture({
         query: async () => { queries++; return { rows: [{ table_count: 0 }] }; },
         release: () => { releases++; throw new Error('release failed'); },
       }) }),
@@ -90,7 +91,7 @@ test('bootstrapDatabaseSchemaFromSnapshot leaves non-empty schemas alone', async
   const result = await bootstrapDatabaseSchemaFromSnapshot({
     getPoolFn: () => ({
       async connect() {
-        return {
+        return withPreparationLockFixture({
           async query(sql) {
             queryCalls.push(sql);
             return {
@@ -98,7 +99,7 @@ test('bootstrapDatabaseSchemaFromSnapshot leaves non-empty schemas alone', async
             };
           },
           release() {},
-        };
+        });
       },
     }),
     readFileFn: async () => {

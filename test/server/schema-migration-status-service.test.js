@@ -5,7 +5,7 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readMigrationStatus } from '../../src/server/schema-migration-status-service.js';
+import { getMigrationStatus, readMigrationStatus } from '../../src/server/schema-migration-status-service.js';
 
 test('migration status observes applied filenames with one SELECT and no schema preparation', async () => {
   const queries = [];
@@ -33,4 +33,15 @@ test('migration manifest failures propagate before database observation', async 
     queryable: { query: async () => { calls++; } },
   }), error => error === original);
   assert.equal(calls, 0);
+});
+
+test('composed preparation status reads its supplied connection without another checkout or release', async () => {
+  let queries = 0;
+  const status = await getMigrationStatus({
+    getPoolFn: () => { throw new Error('must not check out another connection'); },
+    queryable: { query: async sql => {
+      assert.match(sql, /^SELECT filename /u); queries++; return { rows: [] };
+    } },
+  });
+  assert.equal(status.applied, 0); assert.equal(status.available, 115); assert.equal(queries, 1);
 });

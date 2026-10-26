@@ -162,6 +162,7 @@ Migration defensibility:
 - Failed migrations must remain visible in diagnostic history. Default preparation refuses them; reviewed, unchanged failed SQL requires explicit `npm run migrate -- --retry-failed`. See the [preparation design](MIGRATION_PREPARATION_DESIGN.md) and [outcome](MIGRATION_PREPARATION_OUTCOME.md).
 - Never auto-repair a failed migration by dropping user data.
 - A lost COMMIT acknowledgement is an unknown outcome: discard the connection, stop writers and inspect through an independent maintenance connection before retrying. Do not overwrite history with a failed receipt or automatically replay.
+- Cooperating preparers acquire one nonwaiting database-local session advisory lock before bootstrap/history reads or writes, retaining the same client through final verification. Busy preparers refuse before work; uncertain acquisition/unlock discards the connection. Diagnostics remain read-only outside that write lock. Quiesce old binaries, external SQL and application workers that do not participate. See the [serialization design](PREPARATION_SERIALIZATION_DESIGN.md) and [outcome](PREPARATION_SERIALIZATION_OUTCOME.md).
 
 ### Database Self-Healing
 

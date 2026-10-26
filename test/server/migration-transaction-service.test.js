@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { executeMigrationTransaction } from '../../src/server/migration-transaction-service.js';
 import { applyPendingMigrations } from '../../src/server/migrations.js';
+import { withPreparationLockFixture } from '../../testing/server/preparation-lock-fixture.js';
 
 const migration = { filename: '20260101_000001_fixture.sql', migrationKey: '20260101_000001', checksum: 'fixture', sql: 'SELECT 1' };
 function fixture(options = {}) {
@@ -23,6 +24,7 @@ function fixture(options = {}) {
     if (sql === 'COMMIT' || sql === 'ROLLBACK') status = 'I';
     return { command: sql === 'COMMIT' ? commitCommand : sql === 'ROLLBACK' ? 'ROLLBACK' : null, rowCount, rows: [] };
   } };
+  withPreparationLockFixture(client);
   return { calls, client, discarded: () => discarded, run: () => executeMigrationTransaction({
     client, migration, sql: migration.sql, markClientUnusable: () => { discarded = true; },
   }) };
@@ -73,7 +75,7 @@ test('unsupported SQL refuses the whole pending plan before preparation DDL', as
   const calls = [];
   await assert.rejects(applyPendingMigrations({ loadMigrationManifestFn: async () => [migration,
     { ...migration, filename: '20260101_000002_fixture.sql', migrationKey: '20260101_000002', sql: 'COMMIT;' }],
-    getPoolFn: () => ({ connect: async () => ({ getTransactionStatus: () => 'I', query: async sql => { calls.push(sql); return { rows: [{ ledger_present: false, relation_count: 0 }] }; }, release() { calls.push('release'); } }) }),
+    getPoolFn: () => ({ connect: async () => withPreparationLockFixture({ getTransactionStatus: () => 'I', query: async sql => { calls.push(sql); return { rows: [{ ledger_present: false, relation_count: 0 }] }; }, release() { calls.push('release'); } }) }),
   }), { code: 'migration_sql_transaction_invalid' });
   assert.equal(calls.length, 2); assert.equal(calls[1], 'release');
 });

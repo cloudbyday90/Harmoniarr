@@ -6,13 +6,18 @@ test('prepareDatabase bootstraps empty databases before applying and verifying m
   const events = [];
 
   const result = await prepareDatabase({
+    withDatabasePreparationFn: async ({ getPoolFn }, work) => {
+      assert.equal(getPoolFn, 'pool-factory');
+      return work({ client: 'captured-client' });
+    },
     applyPendingMigrationsFn: async ({ getPoolFn }) => {
       assert.equal(getPoolFn, 'pool-factory');
       events.push('apply');
       return ['20260501_010101_example.sql'];
     },
-    assertNoPendingMigrationsFn: async ({ getPoolFn }) => {
+    assertNoPendingMigrationsFn: async ({ getPoolFn, queryable }) => {
       assert.equal(getPoolFn, 'pool-factory');
+      assert.equal(queryable, 'captured-client');
       events.push('verify');
       return {
         applied: 19,
@@ -48,6 +53,7 @@ test('prepareDatabase still applies migrations and verifies lineage when snapsho
   const events = [];
 
   const result = await prepareDatabase({
+    withDatabasePreparationFn: async (options, work) => work({ client: 'captured-client' }),
     applyPendingMigrationsFn: async () => {
       events.push('apply');
       return [];

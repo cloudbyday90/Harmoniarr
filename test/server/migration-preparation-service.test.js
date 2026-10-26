@@ -8,6 +8,7 @@ import test from 'node:test';
 import { assertMigrationPreparationSafe } from '../../src/server/migration-preparation-service.js';
 import { applyPendingMigrations } from '../../src/server/migrations.js';
 import { parseMigrationCliOptions } from '../../src/server/migration-cli-options.js';
+import { withPreparationLockFixture } from '../../testing/server/preparation-lock-fixture.js';
 
 const manifest = [{ filename: '20260101_000001_first.sql', migrationKey: '20260101_000001', checksum: 'first', sql: 'SELECT 1' },
   { filename: '20260102_000001_second.sql', migrationKey: '20260102_000001', checksum: 'second', sql: 'SELECT 2' }];
@@ -29,6 +30,7 @@ function fixture({ rows = [row()], schema = { ledger_present: true, relation_cou
     },
     release() { assert.equal(this, client); calls.push('release'); if (releaseFailure) throw releaseFailure; },
   };
+  withPreparationLockFixture(client);
   return { calls, client, options: { queryable: client, loadMigrationManifestFn: async () => manifest } };
 }
 
@@ -108,7 +110,9 @@ test('migration retry CLI requires an explicit boolean flag and rejects ambiguou
 test('caller mutation during observation cannot replace captured pending SQL or identity', async () => {
   const source = structuredClone(manifest); const f = fixture(); const query = f.client.query;
   f.client.query = async function (sql) {
-    source[1].sql = 'unexpected mutation'; source[1].checksum = 'changed';
+    if (sql.includes('pg_catalog.pg_class')) {
+      source[1].sql = 'unexpected mutation'; source[1].checksum = 'changed';
+    }
     return query.call(this, sql);
   };
   await applyPendingMigrations({ getPoolFn: () => ({ connect: async () => f.client }), loadMigrationManifestFn: async () => source });

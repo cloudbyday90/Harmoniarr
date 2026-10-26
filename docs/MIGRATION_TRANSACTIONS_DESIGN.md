@@ -76,9 +76,11 @@ explicit reviewed failed-row retry contract. Never delete history to force repla
 The failed receipt is best effort after a confirmed rollback; connection loss
 can leave no failure row. Durable logs and independent inspection still matter.
 Local synchronous_commit cannot override disabled fsync or faulty storage.
-Quiesce writers: concurrent preparers/external SQL remain uncoordinated. The next
-item is a shared preparation lock spanning bootstrap, history validation and
-writes, with native concurrent-writer qualification.
+The subsequent [preparation serialization design](PREPARATION_SERIALIZATION_DESIGN.md)
+coordinates cooperating preparers across bootstrap, history validation, writes
+and final observation. Quiesce nonparticipating application workers, old binaries
+and external SQL. The outer owner does not make the whole snapshot/batch atomic;
+snapshot interruption and ledger visibility are the next investigation.
 
 ## Validation ownership
 

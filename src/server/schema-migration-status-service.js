@@ -20,7 +20,8 @@ export async function readMigrationStatus({ queryable = getPool(), listMigration
 }
 
 /** Compatibility API for callers that provide a pool factory. Preparation is explicit. */
-export async function getMigrationStatus({ getPoolFn = getPool } = {}) {
+export async function getMigrationStatus({ getPoolFn = getPool, queryable } = {}) {
+  if (queryable !== undefined) return readMigrationStatus({ queryable });
   const client = await getPoolFn().connect();
   return withWorkerTaskCleanup(() => readMigrationStatus({ queryable: client }), () => client.release());
 }

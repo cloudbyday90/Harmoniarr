@@ -84,6 +84,8 @@ Recommendation: retain immutable history → full pending SQL preflight → sing
 transaction owner → checked receipt → acknowledged COMMIT. The benefit is atomic
 DDL/history; the cost is a narrow SQL policy and explicit independent inspection
 after acknowledgement loss. Per-migration atomicity does not serialize writers
-or make arbitrary SQL/external effects safe. Next: coordinate cooperating
-preparers across bootstrap, history admission and writes using one owned lock
-lifetime and real concurrent-writer tests.
+or make arbitrary SQL/external effects safe. The subsequent
+[preparation serialization outcome](PREPARATION_SERIALIZATION_OUTCOME.md)
+coordinates cooperating preparers across bootstrap, history admission, writes
+and final verification. Next investigate atomic snapshot bootstrap and actual
+interruption/ledger visibility, preserving snapshot provenance.

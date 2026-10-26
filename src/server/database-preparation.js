@@ -18,20 +18,20 @@
 
 import { applyPendingMigrations, assertNoPendingMigrations } from './migrations.js';
 import { bootstrapDatabaseSchemaFromSnapshot } from './schema-bootstrap.js';
+import { withDatabasePreparation } from './database-preparation-owner-service.js';
 
 export async function prepareDatabase({
   applyPendingMigrationsFn = applyPendingMigrations,
   assertNoPendingMigrationsFn = assertNoPendingMigrations,
   bootstrapDatabaseSchemaFromSnapshotFn = bootstrapDatabaseSchemaFromSnapshot,
   getPoolFn,
+  withDatabasePreparationFn = withDatabasePreparation,
 } = {}) {
-  const bootstrap = await bootstrapDatabaseSchemaFromSnapshotFn({ getPoolFn });
-  const appliedMigrations = await applyPendingMigrationsFn({ getPoolFn });
-  const status = await assertNoPendingMigrationsFn({ getPoolFn });
+  return withDatabasePreparationFn({ getPoolFn }, async preparation => {
+    const bootstrap = await bootstrapDatabaseSchemaFromSnapshotFn({ getPoolFn, preparation });
+    const appliedMigrations = await applyPendingMigrationsFn({ getPoolFn, preparation });
+    const status = await assertNoPendingMigrationsFn({ getPoolFn, queryable: preparation.client });
 
-  return {
-    appliedMigrations,
-    bootstrap,
-    status,
-  };
+    return { appliedMigrations, bootstrap, status };
+  });
 }

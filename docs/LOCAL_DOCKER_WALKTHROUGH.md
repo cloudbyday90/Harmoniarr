@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 26 [preparation serialization rebuild](LOCAL_DOCKER_PREPARATION_SERIALIZATION_OUTCOME.md)
+records the current no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](PREPARATION_SERIALIZATION_OUTCOME.md) records one owned
+preparation session across bootstrap, migrations and final verification.
+
 The October 26 [migration transaction rebuild](LOCAL_DOCKER_MIGRATION_TRANSACTIONS_OUTCOME.md)
 records the current no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](MIGRATION_TRANSACTIONS_OUTCOME.md) records atomic
