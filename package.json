@@ -145,7 +145,8 @@
     "update-copyright": "node scripts/update-copyright.js",
     "add-copyright-headers": "node scripts/add-copyright-headers.js",
     "check:schema-anchor-contract": "node scripts/check-schema-anchor-contract.js",
-    "update:schema-anchor-contract": "node scripts/update-schema-anchor-contract.js"
+    "update:schema-anchor-contract": "node scripts/update-schema-anchor-contract.js",
+    "diagnose:schema": "node scripts/diagnose-schema.js"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

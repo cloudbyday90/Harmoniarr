@@ -14,6 +14,12 @@ inside the same transaction. Historical SQL is unchanged. See the
 Next: add a bounded read-only critical-anchor diagnostic for existing nonempty
 databases, preserving observation/maintenance boundaries and offering no repair.
 
+That diagnostic is now implemented as `npm run diagnose:schema`; see its separate
+[design](SCHEMA_DRIFT_DESIGN.md) and [outcome](SCHEMA_DRIFT_OUTCOME.md). Next expose
+the bounded summary in existing administrator diagnostics with explicit refresh,
+no-store and accessible current/attention/unavailable feedback; retain repair and
+startup admission as separate decisions.
+
 October 12 scan addition: `20261012_225951_scan_owned_receipt_invalidation.sql`
 adds UUID revision identity, generated path lookup and revision-bound negative
 observations. Replay preserves existing identities; snapshot/anchors include the

@@ -96,3 +96,7 @@ repair, and prove restricted-role/no-write behavior before broadening startup
 admission. See [research and alternatives](SNAPSHOT_ANCHORS_RESEARCH.md),
 [design](SNAPSHOT_ANCHORS_DESIGN.md) and
 [Docker outcome](LOCAL_DOCKER_SNAPSHOT_ANCHORS_OUTCOME.md).
+
+The next diagnostic item is implemented separately in the
+[read-only schema drift design](SCHEMA_DRIFT_DESIGN.md) and
+[outcome](SCHEMA_DRIFT_OUTCOME.md); this earlier qualification remains historical.

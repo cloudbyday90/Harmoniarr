@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 26 [schema drift diagnostic rebuild](LOCAL_DOCKER_SCHEMA_DRIFT_OUTCOME.md)
+records the current no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](SCHEMA_DRIFT_OUTCOME.md) records restricted-role read-only
+observation, preparation fencing and names-only structural drift reporting.
+
 The October 26 [snapshot anchor rebuild](LOCAL_DOCKER_SNAPSHOT_ANCHORS_OUTCOME.md)
 records the current no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](SNAPSHOT_ANCHORS_OUTCOME.md) records 164 pre-commit

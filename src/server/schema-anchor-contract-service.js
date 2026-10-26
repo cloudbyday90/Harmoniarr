@@ -4,7 +4,7 @@
  * Licensed under GPL-3.0-or-later. See LICENSE.
  */
 import { readFile } from 'node:fs/promises';
-import { assertSchemaAnchorContract, canonicalAnchorJson, schemaAnchorProvenance, schemaAnchorSpecifications } from './schema-anchor-contract-policy.js';
+import { assertSchemaAnchorContract, compareSchemaAnchorCatalog, schemaAnchorProvenance } from './schema-anchor-contract-policy.js';
 import { inspectSchemaAnchorCatalog } from './schema-anchor-catalog-service.js';
 
 export const defaultSchemaAnchorContractPath = new URL('./schema-anchor-contract.json', import.meta.url);
@@ -20,12 +20,8 @@ export async function loadSchemaAnchorContract({ snapshotSql, repoMigrations, re
 
 export async function assertSnapshotSchemaAnchors({ client, contract }) {
   const actual = await inspectSchemaAnchorCatalog(client);
-  const mismatches = [];
-  for (const [group, entries] of Object.entries(schemaAnchorSpecifications)) {
-    for (const { key } of entries) {
-      if (canonicalAnchorJson(actual[group]?.[key]) !== canonicalAnchorJson(contract.anchors[group][key])) mismatches.push(key);
-    }
-  }
+  const report = compareSchemaAnchorCatalog({ actual, contract });
+  const mismatches = [...report.missing, ...report.altered];
   if (mismatches.length) {
     throw Object.assign(new Error(`Schema snapshot failed critical anchor verification before commit (${mismatches.length} mismatches).`),
       { code: 'snapshot_schema_anchors_invalid', anchors: mismatches });

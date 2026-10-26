@@ -24,6 +24,17 @@ export function canonicalAnchorJson(value) {
 export function renderSchemaAnchorContract(contract) {
   return JSON.stringify(JSON.parse(canonicalAnchorJson(contract)), null, 2) + '\n';
 }
+
+/** Approved identities only: reconstructed SQL and function bodies never leave this comparison. */
+export function compareSchemaAnchorCatalog({ actual, contract }) {
+  const missing = [], altered = [];
+  for (const [group, entries] of Object.entries(schemaAnchorSpecifications)) for (const { key } of entries) {
+    if (actual[group]?.[key] == null) missing.push(key);
+    else if (canonicalAnchorJson(actual[group][key]) !== canonicalAnchorJson(contract.anchors[group][key])) altered.push(key);
+  }
+  return { state: missing.length || altered.length ? 'drift' : 'current',
+    checkedCount: Object.values(schemaAnchorSpecifications).reduce((count, entries) => count + entries.length, 0), missing, altered };
+}
 const digest = value => createHash('sha256').update(value).digest('hex');
 export function schemaAnchorProvenance({ snapshotSql, repoMigrations }) {
   return { format: 1, postgresMajor: 18, snapshotSha256: digest(snapshotSql),
