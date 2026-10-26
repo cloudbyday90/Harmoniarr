@@ -2,6 +2,27 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createOnboardingSummaryService } from '../../src/server/onboarding-summary-service.js';
 
+test('unavailable migration observation counts as an issue without becoming a pending migration or a ready summary', async () => {
+  const dependencies = {
+    backgroundJobHealthService: { getWorkerHealth: async () => ({ status: 'healthy' }) },
+    libraryScanSummaryService: { buildLibraryScanSummary: async () => ({ readiness: { status: 'ready' }, summary: { message: 'Ready.' } }) },
+    musicBrainzSearchService: { checkProviderHealth: async () => ({ status: 'healthy' }) },
+    settingsService: { buildSettingsPayload: async () => ({ settings: { paths: {} }, pathValidation: { summary: { status: 'healthy' } } }) },
+    slskdService: { getConnectionStatus: async () => ({ status: 'healthy', details: { isConnected: true } }), validateAuthentication: async () => ({ isValid: true }) },
+  };
+  const current = await createOnboardingSummaryService({ ...dependencies, getMigrationStatusFn: async () => ({ applied: 115, pending: [] }) }).buildOnboardingSummary();
+  assert.equal(current.summary.status, 'complete'); assert.equal(current.summary.issueCount, 0);
+  for (const failure of [new Error('private database path /secret'), null]) {
+    const result = await createOnboardingSummaryService({ ...dependencies, getMigrationStatusFn: async () => { throw failure; } }).buildOnboardingSummary();
+    assert.equal(result.steps.find(step => step.id === 'database').status, 'unavailable');
+    assert.equal(result.summary.status, 'attention'); assert.equal(result.summary.issueCount, current.summary.issueCount + 1);
+    assert.equal(result.summary.message, '1 setup item needs attention before scans or imports.');
+    assert.equal(result.summary.completeStepCount, current.summary.completeStepCount - 1);
+    assert.equal(result.summary.totalStepCount, current.summary.totalStepCount);
+    assert.doesNotMatch(JSON.stringify(result), /private|secret|migration_status_unavailable|1 migration/u);
+  }
+});
+
 test('createOnboardingSummaryService turns shared health checks into actionable checklist steps', async () => {
   const service = createOnboardingSummaryService({
     backgroundJobHealthService: {

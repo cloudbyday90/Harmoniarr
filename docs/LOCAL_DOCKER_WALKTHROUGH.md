@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 26 [onboarding migration state rebuild](LOCAL_DOCKER_ONBOARDING_MIGRATION_STATE_OUTCOME.md)
+records the current no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](ONBOARDING_MIGRATION_STATE_OUTCOME.md) records explicit
+unavailable migration status and accessible setup-refresh behavior.
+
 The October 26 [migration observation rebuild](LOCAL_DOCKER_MIGRATION_OBSERVATION_OUTCOME.md)
 records the current no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](MIGRATION_OBSERVATION_OUTCOME.md) records schema-write-free

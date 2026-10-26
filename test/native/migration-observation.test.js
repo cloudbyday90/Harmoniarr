@@ -93,7 +93,11 @@ test('prepared migration observation supports concurrent HTTP reads and explicit
     await pool.query("UPDATE app_users SET role='admin' WHERE username='observation-admin'");
     await guard.setEnabled(false); await pool.query('ALTER TABLE schema_migrations RENAME TO fixture_observation_missing_migrations'); renamed = true; await guard.setEnabled(true);
     await assert.rejects(readMigrationStatus(), error => error.code === '42P01');
-    const unavailable = await onboarding(); assertRead(unavailable); assert.equal(databaseStep(unavailable).status, 'attention');
+    const unavailable = await onboarding(); assertRead(unavailable); assert.equal(databaseStep(unavailable).status, 'unavailable');
+    assert.equal(databaseStep(unavailable).message, 'Database migration status is unavailable. Refresh to try again.');
+    assert.equal(unavailable.payload.summary.status, 'attention');
+    assert.equal(unavailable.payload.summary.issueCount, current.payload.summary.issueCount + 1);
+    assert.doesNotMatch(JSON.stringify(databaseStep(unavailable)), /42P01|fixture_|SELECT|migration_status_unavailable|1 migration/u);
     assert.equal((await preview(firstId)).response.status, 500);
     assert.equal((await createBackup('observation-missing-schema')).response.status, 500); assert.equal(await artifactCount(), 3);
     await guard.setEnabled(false); await pool.query('ALTER TABLE fixture_observation_missing_migrations RENAME TO schema_migrations'); renamed = false; await guard.setEnabled(true);
@@ -104,7 +108,7 @@ test('prepared migration observation supports concurrent HTTP reads and explicit
     t.diagnostic(JSON.stringify({ schemaWriteGuardVerified: true, readOnlyTransaction: true, concurrentReads: 20, overlappingBackup: true,
       encryptedFilesAndManifestsVerified: 3, idempotentReplay: true, pendingMigrationRefusal: true, missingSchemaNotRepaired: true,
       administratorOnly: true, csrfRequired: true, noStore: true, catalogIdentityUnchanged: true, auditAndJournalVerified: true,
-      restoreAppliedWithoutSchemaWrites: true }));
+      restoreAppliedWithoutSchemaWrites: true, unavailableMigrationDistinct: true }));
   }, async () => {
     if (guard) await guard.setEnabled(false);
     if (renamed) await pool.query('ALTER TABLE fixture_observation_missing_migrations RENAME TO schema_migrations');

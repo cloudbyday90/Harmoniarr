@@ -17,7 +17,6 @@
  */
 
 import { computed, readonly, ref } from 'vue';
-import { getErrorMessage } from '../lib/error-utils.js';
 import { fetchOnboardingSummary as defaultFetchOnboardingSummary } from '../lib/system-api.js';
 
 function hasOutstandingIssues(summaryValue) {
@@ -36,6 +35,7 @@ export function useOnboardingSummary({
   let pollTimer = null;
   let destroyed = false;
   let hasLoaded = false;
+  let activeLoad = null;
 
   const nextAction = computed(() => onboardingSummary.value?.nextAction ?? null);
   const steps = computed(() => onboardingSummary.value?.steps ?? []);
@@ -62,9 +62,7 @@ export function useOnboardingSummary({
 
   function handleVisibilityChange() {
     if (typeof document === 'undefined' || document.hidden || destroyed || !hasLoaded) return;
-    void loadOnboardingSummary().then(() => {
-      if (!destroyed) schedulePoll();
-    });
+    void loadOnboardingSummary();
   }
 
   function destroy() {
@@ -81,8 +79,10 @@ export function useOnboardingSummary({
     }
   }
 
-  async function loadOnboardingSummary() {
-    if (destroyed) return;
+  function loadOnboardingSummary() {
+    if (destroyed) return Promise.resolve();
+    if (activeLoad) return activeLoad;
+    clearPollTimer();
     errorMessage.value = '';
 
     const isRevalidation = hasLoaded;
@@ -92,21 +92,27 @@ export function useOnboardingSummary({
       isLoading.value = true;
     }
 
-    try {
-      onboardingSummary.value = await fetchOnboardingSummary();
-      hasLoaded = true;
-    } catch (error) {
-      if (!isRevalidation) {
-        onboardingSummary.value = null;
+    activeLoad = Promise.resolve().then(async () => {
+      try {
+        if (destroyed) return;
+        const result = await fetchOnboardingSummary();
+        if (destroyed) return;
+        onboardingSummary.value = result;
+        hasLoaded = true;
+      } catch {
+        if (destroyed) return;
+        if (!isRevalidation) onboardingSummary.value = null;
+        errorMessage.value = 'Setup status could not be loaded. Refresh to try again.';
+      } finally {
+        activeLoad = null;
+        if (!destroyed) {
+          isLoading.value = false;
+          isRevalidating.value = false;
+          schedulePoll();
+        }
       }
-      errorMessage.value = getErrorMessage(error, 'Onboarding summary failed');
-    } finally {
-      if (!destroyed) {
-        isLoading.value = false;
-        isRevalidating.value = false;
-        schedulePoll();
-      }
-    }
+    });
+    return activeLoad;
   }
 
   return {

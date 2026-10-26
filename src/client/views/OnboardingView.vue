@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { onMounted } from 'vue';
+import { onBeforeUnmount, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import OnboardingSummaryPanel from '../components/OnboardingSummaryPanel.vue';
 import { useOnboardingSummary } from '../composables/useOnboardingSummary.js';
@@ -26,7 +26,9 @@ const router = useRouter();
 
 const {
   errorMessage,
+  destroy,
   isLoading,
+  isRevalidating,
   loadOnboardingSummary,
   nextAction,
   steps,
@@ -36,6 +38,7 @@ const {
 onMounted(() => {
   void loadOnboardingSummary();
 });
+onBeforeUnmount(destroy);
 
 function dismiss() {
   void router.push({ name: 'dashboard' });
@@ -47,6 +50,7 @@ function dismiss() {
     <OnboardingSummaryPanel
       :error-message="errorMessage"
       :is-loading="isLoading"
+      :is-revalidating="isRevalidating"
       :is-setup-mode="true"
       :next-action="nextAction"
       :steps="steps"

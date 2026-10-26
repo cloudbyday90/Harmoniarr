@@ -19,11 +19,31 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  buildOnboardingRefreshMessage,
   formatMetaLabel,
   formatMetaValue,
   getStepStatusClass,
   getStepStatusLabel,
 } from '../../src/client/lib/onboarding-presentation.js';
+
+describe('onboarding refresh feedback', () => {
+  it('describes first load and refresh before any terminal result', () => {
+    assert.equal(buildOnboardingRefreshMessage({ isLoading: true }), 'Checking setup readiness…');
+    assert.equal(buildOnboardingRefreshMessage({ isRevalidating: true, summary: {} }), 'Refreshing setup status…');
+  });
+  it('distinguishes an unavailable database check from a successful complete check', () => {
+    assert.equal(buildOnboardingRefreshMessage({ summary: {}, steps: [{ id: 'database', status: 'unavailable' }] }), 'Setup status updated. Database migration status is unavailable.');
+    assert.equal(buildOnboardingRefreshMessage({ summary: {}, steps: [{ id: 'database', status: 'complete' }] }), 'Setup status updated.');
+  });
+  it('reports retained data or initial failure without echoing private transport text', () => {
+    for (const summary of [null, {}]) {
+      const result = buildOnboardingRefreshMessage({ summary, errorMessage: 'private SELECT /secret' });
+      assert.doesNotMatch(result, /private|SELECT|secret/u);
+      assert.equal(result.includes('last successful checklist'), Boolean(summary));
+    }
+    assert.equal(buildOnboardingRefreshMessage({}), '');
+  });
+});
 
 // ── formatMetaLabel ───────────────────────────────────────────────────────────
 
@@ -131,6 +151,10 @@ describe('formatMetaValue', () => {
 // ── getStepStatusLabel ────────────────────────────────────────────────────────
 
 describe('getStepStatusLabel', () => {
+  it('distinguishes an unavailable check from a pending issue', () => {
+    assert.equal(getStepStatusLabel('unavailable'), 'Unavailable');
+    assert.equal(getStepStatusLabel('attention'), 'Needs attention');
+  });
   it('returns "Complete" for "complete"', () => {
     assert.equal(getStepStatusLabel('complete'), 'Complete');
   });

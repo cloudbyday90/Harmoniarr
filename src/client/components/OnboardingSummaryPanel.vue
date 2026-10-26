@@ -18,19 +18,25 @@
 
 <script setup>
 import { RouterLink } from 'vue-router';
+import { computed, useId } from 'vue';
 import {
+  buildOnboardingRefreshMessage,
   formatMetaLabel,
   formatMetaValue,
   getStepStatusClass,
   getStepStatusLabel,
 } from '../lib/onboarding-presentation.js';
 
-defineProps({
+const props = defineProps({
   errorMessage: {
     type: String,
     default: '',
   },
   isLoading: {
+    type: Boolean,
+    default: false,
+  },
+  isRevalidating: {
     type: Boolean,
     default: false,
   },
@@ -53,6 +59,9 @@ defineProps({
 });
 
 const emit = defineEmits(['dismiss', 'refresh']);
+const resultsId = `onboarding-results-${useId()}`;
+const isBusy = computed(() => props.isLoading || props.isRevalidating);
+const refreshMessage = computed(() => buildOnboardingRefreshMessage(props));
 </script>
 
 <template>
@@ -63,64 +72,71 @@ const emit = defineEmits(['dismiss', 'refresh']);
         <p class="hx-card-subtitle" v-if="summary">{{ summary.message }}</p>
       </div>
       <div class="onboarding-panel-actions">
-        <button type="button" class="review-reset-button" @click="emit('refresh')">Refresh</button>
+        <button type="button" class="review-reset-button" :aria-controls="resultsId" :aria-disabled="isBusy ? 'true' : undefined" @click="!isBusy && emit('refresh')">Refresh</button>
         <button v-if="isSetupMode" type="button" class="review-reset-button" @click="emit('dismiss')">Hide setup mode</button>
       </div>
     </header>
 
-    <article class="error-panel panel-light" v-if="errorMessage">
-      <h3>Onboarding summary unavailable</h3>
-      <p>{{ errorMessage }}</p>
-    </article>
+    <p class="onboarding-refresh-status" role="status" aria-live="polite" aria-atomic="true">{{ refreshMessage }}</p>
+    <div :id="resultsId" class="onboarding-panel-results" :aria-busy="isBusy ? 'true' : 'false'">
+      <article class="error-panel panel-light" v-if="errorMessage">
+        <h3>{{ summary ? 'Setup refresh unavailable' : 'Setup status unavailable' }}</h3>
+        <p>{{ refreshMessage }}</p>
+      </article>
 
-    <p v-else-if="isLoading">Checking setup readiness across paths, providers, and runtime prerequisites.</p>
-
-    <template v-else-if="summary">
-      <div class="pill-row onboarding-pill-row">
-        <div class="pill">
-          <span>Ready steps</span>
-          <strong>{{ summary.completeStepCount }} / {{ summary.totalStepCount }}</strong>
-        </div>
-        <div class="pill">
-          <span>Open issues</span>
-          <strong>{{ summary.issueCount }}</strong>
-        </div>
-      </div>
-
-      <div class="onboarding-step-stack">
-        <article class="onboarding-step-card" v-for="step in steps" :key="step.id">
-          <div class="review-detail-header">
-            <div>
-              <p>{{ step.title }}</p>
-              <strong>{{ step.message }}</strong>
-            </div>
-            <span class="review-status-pill" :class="getStepStatusClass(step.status)">
-              {{ getStepStatusLabel(step.status) }}
-            </span>
+      <template v-if="summary">
+        <div class="pill-row onboarding-pill-row">
+          <div class="pill">
+            <span>Ready steps</span>
+            <strong>{{ summary.completeStepCount }} / {{ summary.totalStepCount }}</strong>
           </div>
-          <dl class="review-meta-grid onboarding-meta-grid" v-if="step.meta">
-            <div v-for="[key, value] in Object.entries(step.meta)" :key="key">
-              <dt>{{ formatMetaLabel(key) }}</dt>
-              <dd>{{ formatMetaValue(value) }}</dd>
-            </div>
-          </dl>
-          <RouterLink
-            v-if="step.action"
-            :to="step.action.to"
-            class="onboarding-action-link"
-          >
-            {{ step.action.label }}
-          </RouterLink>
-        </article>
-      </div>
+          <div class="pill">
+            <span>Open issues</span>
+            <strong>{{ summary.issueCount }}</strong>
+          </div>
+        </div>
 
-      <RouterLink
-        v-if="nextAction"
-        :to="nextAction.to"
-        class="onboarding-primary-link"
-      >
-        {{ nextAction.label }}
-      </RouterLink>
-    </template>
+        <div class="onboarding-step-stack">
+          <article class="onboarding-step-card" v-for="step in steps" :key="step.id">
+            <div class="review-detail-header">
+              <div>
+                <p>{{ step.title }}</p>
+                <strong>{{ step.message }}</strong>
+              </div>
+              <span class="review-status-pill" :class="getStepStatusClass(step.status)">
+                {{ getStepStatusLabel(step.status) }}
+              </span>
+            </div>
+            <dl class="review-meta-grid onboarding-meta-grid" v-if="step.meta">
+              <div v-for="[key, value] in Object.entries(step.meta)" :key="key">
+                <dt>{{ formatMetaLabel(key) }}</dt>
+                <dd>{{ formatMetaValue(value) }}</dd>
+              </div>
+            </dl>
+            <RouterLink
+              v-if="step.action"
+              :to="step.action.to"
+              class="onboarding-action-link"
+            >
+              {{ step.action.label }}
+            </RouterLink>
+          </article>
+        </div>
+
+        <RouterLink
+          v-if="nextAction"
+          :to="nextAction.to"
+          class="onboarding-primary-link"
+        >
+          {{ nextAction.label }}
+        </RouterLink>
+      </template>
+    </div>
   </article>
 </template>
+
+<style scoped>
+.onboarding-refresh-status { margin: 0; color: var(--hx-text-muted); font-size: var(--hx-text-sm); }
+.onboarding-panel-results { display: grid; gap: var(--hx-space-4); min-width: 0; }
+.review-reset-button[aria-disabled='true'] { cursor: progress; opacity: 0.65; }
+</style>

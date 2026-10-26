@@ -85,6 +85,7 @@ export function getStepStatusLabel(status) {
   switch (status) {
     case 'complete': return 'Complete';
     case 'info': return 'Info';
+    case 'unavailable': return 'Unavailable';
     default: return 'Needs attention';
   }
 }
@@ -101,4 +102,16 @@ export function getStepStatusClass(status) {
     case 'info': return 'review-status-pending';
     default: return 'review-status-held';
   }
+}
+
+/** Bounded feedback for the panel's one stable, polite status region. */
+export function buildOnboardingRefreshMessage({ isLoading, isRevalidating, errorMessage, summary, steps = [] }) {
+  if (isLoading) return 'Checking setup readiness…';
+  if (isRevalidating) return 'Refreshing setup status…';
+  if (errorMessage) return summary
+    ? 'Setup status could not be refreshed. The last successful checklist is still shown. Refresh to try again.'
+    : 'Setup status is unavailable. Refresh to try again.';
+  if (!summary) return '';
+  return steps.some(step => step.id === 'database' && step.status === 'unavailable')
+    ? 'Setup status updated. Database migration status is unavailable.' : 'Setup status updated.';
 }

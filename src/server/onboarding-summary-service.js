@@ -17,6 +17,7 @@
  */
 
 import { readMigrationStatus } from './schema-migration-status-service.js';
+import { buildOnboardingMigrationStep } from './onboarding-migration-step.js';
 import {
   classifyMusicBrainzDependencyError,
   classifySlskdDependencyError,
@@ -113,17 +114,6 @@ function createMetadataProviderStep(metadataStatus) {
   });
 }
 
-function createDatabaseStep(migrationStatus) {
-  return createStep({
-    id: 'database',
-    title: 'Apply database migrations',
-    status: migrationStatus.pending.length === 0 ? 'complete' : 'attention',
-    message: migrationStatus.pending.length === 0
-      ? 'Database migrations are current.'
-      : `${migrationStatus.pending.length} migration${migrationStatus.pending.length === 1 ? '' : 's'} still need attention.`,
-  });
-}
-
 function createWorkerStep(workerHealth) {
   return createStep({
     id: 'background-workers',
@@ -194,7 +184,7 @@ function createLibraryScanStep(scanSummary) {
 
 function buildSummary(steps) {
   const checklistSteps = steps.filter((step) => step.status !== 'info');
-  const issueSteps = checklistSteps.filter((step) => step.status === 'attention');
+  const issueSteps = checklistSteps.filter((step) => step.status === 'attention' || step.status === 'unavailable');
   const completeStepCount = checklistSteps.filter((step) => step.status === 'complete').length;
 
   return {
@@ -203,7 +193,7 @@ function buildSummary(steps) {
     totalStepCount: checklistSteps.length,
     issueCount: issueSteps.length,
     message: issueSteps.length > 0
-      ? `${issueSteps.length} setup item${issueSteps.length === 1 ? '' : 's'} need attention before scans or imports.`
+      ? `${issueSteps.length} setup item${issueSteps.length === 1 ? '' : 's'} ${issueSteps.length === 1 ? 'needs' : 'need'} attention before scans or imports.`
       : 'Core onboarding checks are ready for library scan and import work.',
   };
 }
@@ -281,9 +271,6 @@ export function createOnboardingSummaryService({
     const metadataStatus = metadataResult.status === 'fulfilled'
       ? metadataResult.value
       : createFallbackMetadataStatus(metadataResult.reason);
-    const migrationStatus = migrationResult.status === 'fulfilled'
-      ? migrationResult.value
-      : { applied: 0, pending: ['migration_status_unavailable'] };
     const libraryScanSummary = scanResult.status === 'fulfilled'
       ? scanResult.value
       : {
@@ -317,7 +304,7 @@ export function createOnboardingSummaryService({
       createSlskdConnectionStep(connectionStatus),
       createSlskdAuthenticationStep(authenticationStatus),
       createMetadataProviderStep(metadataStatus),
-      createDatabaseStep(migrationStatus),
+      buildOnboardingMigrationStep(migrationResult),
       createLibraryScanStep(libraryScanSummary),
       createWorkerStep(workerHealth),
     ];

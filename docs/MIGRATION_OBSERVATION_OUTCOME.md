@@ -77,7 +77,10 @@ It removes repeated catalog writes while retaining strict failure and durability
 boundaries. A dedicated role/pool or serialized preparing helper adds contracts
 that this change does not need.
 
-Next recommended item: distinguish unavailable migration status from pending
+The next item is implemented in the [onboarding migration state outcome](ONBOARDING_MIGRATION_STATE_OUTCOME.md),
+with explicit unavailable status and bounded refresh feedback.
+
+Original recommendation: distinguish unavailable migration status from pending
 migrations in onboarding. Its current fallback represents a failed lookup as one
 pending item; the new missing-schema control confirms attention behavior but does
 not improve that wording. Add an explicit unavailable state and accessible status
