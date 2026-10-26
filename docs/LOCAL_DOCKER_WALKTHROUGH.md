@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 26 [backup process-crash qualification rebuild](LOCAL_DOCKER_BACKUP_PROCESS_CRASH_OUTCOME.md)
+records the current no-cache image and preserved administrator/data/mounts. The
+[qualification outcome](BACKUP_PROCESS_CRASH_OUTCOME.md) records 19 abrupt
+application-service checkpoints and fresh default recovery on identical runtime code.
+
 The October 26 [backup directory creation rebuild](LOCAL_DOCKER_BACKUP_DIRECTORY_CREATION_OUTCOME.md)
 records the current no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](BACKUP_DIRECTORY_CREATION_OUTCOME.md) records bounded

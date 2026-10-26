@@ -106,7 +106,8 @@ Frozen code/test source: 3,552 files,
 Private evidence/audit is under `.tmp/backup-directory-creation-2026-10-26/`.
 Changed bytes, documentation links and resource retirement are audited.
 
-Next recommended item: qualify actual application-process termination at the
+Completed by the [process-crash qualification outcome](BACKUP_PROCESS_CRASH_OUTCOME.md).
+The recommended item was to qualify actual application-process termination at the
 directory, byte-write, link/unlink and SQL checkpoints. Observe process exit and
 fresh default recovery in isolated storage, separating missing/unwritten intent,
 verified saved bytes and catalog completion. The current tests terminate a
