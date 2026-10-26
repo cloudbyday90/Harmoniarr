@@ -120,3 +120,7 @@ schema/startup readiness, WAL recovery and fresh backup recovery, while preservi
 committed/uncommitted target distinctions. The current container stays alive during
 database restarts. Neither lane qualifies host failure, arbitrary filesystem
 interruption, disk corruption or hardware power loss.
+
+The container termination/replacement follow-up is completed in the separate
+[container replacement outcome](BACKUP_CONTAINER_CRASH_OUTCOME.md). Hardware and
+host failure remain distinct from these process/container qualifications.

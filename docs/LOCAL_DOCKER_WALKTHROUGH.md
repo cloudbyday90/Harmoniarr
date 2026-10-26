@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 26 [backup container replacement rebuild](LOCAL_DOCKER_BACKUP_CONTAINER_CRASH_OUTCOME.md)
+records the current no-cache image and preserved administrator/data/mounts. The
+[qualification outcome](BACKUP_CONTAINER_CRASH_OUTCOME.md) records 18 abrupt
+container replacements with production HTTP startup and fresh backup recovery.
+
 The October 26 [backup PostgreSQL crash/restart rebuild](LOCAL_DOCKER_BACKUP_POSTGRES_CRASH_OUTCOME.md)
 records the current no-cache image and preserved administrator/data/mounts. The
 [qualification outcome](BACKUP_POSTGRES_CRASH_OUTCOME.md) records 18 real database
