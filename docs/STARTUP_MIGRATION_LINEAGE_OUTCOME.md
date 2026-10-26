@@ -112,3 +112,7 @@ legitimate absent pending migrations, reject existing checksum/key/unknown-row
 inconsistencies, and define failed-row retry ownership separately. Qualify the real
 Docker entrypoint against bad history and valid pending upgrades before promoting
 that stricter preparation policy.
+
+Implemented in the [migration preparation outcome](MIGRATION_PREPARATION_OUTCOME.md).
+That follow-up validates existing history before preparation DDL, retains absent
+pending upgrades and requires explicit consent for compatible failed-row retries.

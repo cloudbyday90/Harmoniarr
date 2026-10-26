@@ -26,6 +26,11 @@ test('bootstrapDatabaseSchemaFromSnapshot applies the schema snapshot only when 
   let released = false;
 
   const result = await bootstrapDatabaseSchemaFromSnapshot({
+    assertMigrationPreparationSafeFn: async ({ queryable }) => {
+      assert.equal(typeof queryable.query, 'function');
+      assert.equal(queryCalls.length, 1);
+      return { fresh: true };
+    },
     getPoolFn: () => ({
       async connect() {
         return {
@@ -62,6 +67,21 @@ test('bootstrapDatabaseSchemaFromSnapshot applies the schema snapshot only when 
   assert.equal(queryCalls.length, 2);
   assert.match(queryCalls[1], /CREATE TABLE demo/);
   assert.equal(released, true);
+});
+
+test('snapshot bootstrap refuses hidden existing relations before reading or executing snapshot SQL and preserves primary failure', async () => {
+  for (const original of [new Error('refused'), null]) {
+    let reads = 0, queries = 0, releases = 0;
+    await assert.rejects(bootstrapDatabaseSchemaFromSnapshot({
+      getPoolFn: () => ({ connect: async () => ({
+        query: async () => { queries++; return { rows: [{ table_count: 0 }] }; },
+        release: () => { releases++; throw new Error('release failed'); },
+      }) }),
+      assertMigrationPreparationSafeFn: async () => { throw original; },
+      readFileFn: async () => { reads++; return 'unsafe'; },
+    }), error => error === original);
+    assert.equal(reads, 0); assert.equal(queries, 1); assert.equal(releases, 1);
+  }
 });
 
 test('bootstrapDatabaseSchemaFromSnapshot leaves non-empty schemas alone', async () => {

@@ -68,3 +68,17 @@ export async function getDatabaseMigrationRows(client) {
   `);
   return result.rows;
 }
+
+export async function getMigrationPreparationSchemaState(client) {
+  const result = await client.query(`
+    SELECT EXISTS (
+      SELECT 1 FROM pg_catalog.pg_class c
+      JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relname='schema_migrations' AND c.relkind='r'
+    ) AS ledger_present,
+    (SELECT count(*)::integer FROM pg_catalog.pg_class c
+      JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relkind IN ('r','p','f','v','m','S')) AS relation_count
+  `);
+  return result.rows[0];
+}

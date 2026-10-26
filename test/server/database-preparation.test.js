@@ -6,11 +6,13 @@ test('prepareDatabase bootstraps empty databases before applying and verifying m
   const events = [];
 
   const result = await prepareDatabase({
-    applyPendingMigrationsFn: async () => {
+    applyPendingMigrationsFn: async ({ getPoolFn }) => {
+      assert.equal(getPoolFn, 'pool-factory');
       events.push('apply');
       return ['20260501_010101_example.sql'];
     },
-    assertNoPendingMigrationsFn: async () => {
+    assertNoPendingMigrationsFn: async ({ getPoolFn }) => {
+      assert.equal(getPoolFn, 'pool-factory');
       events.push('verify');
       return {
         applied: 19,

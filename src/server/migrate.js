@@ -18,11 +18,12 @@
 
 import { applyPendingMigrations } from './migrations.js';
 import { runMigrationCli } from './migration-cli-runtime.js';
+import { parseMigrationCliOptions } from './migration-cli-options.js';
 
 await runMigrationCli({
   prefix: 'harmoniarr-migrate',
   renderSuccessMessage: (applied) => {
     return `applied ${applied.length} migration(s)`;
   },
-  run: applyPendingMigrations,
+  run: () => applyPendingMigrations(parseMigrationCliOptions()),
 });

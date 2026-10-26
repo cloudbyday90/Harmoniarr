@@ -12,7 +12,8 @@ import { createMigrationObservationGuard } from './migration-observation-fixture
 export const migrationObserverRole = 'fixture_migration_cli_reader';
 const entries = Object.freeze({ status: '/app/server-dist/check-migrations.js', checksum: '/app/server-dist/check-migration-checksums.js',
   diagnose: '/app/server-dist/diagnose-migrations.js', sourceDiagnose: '/app/scripts/diagnose-migrations.js',
-  migrate: '/app/server-dist/migrate.js', startup: '/app/server-dist/index.js' });
+  migrate: '/app/server-dist/migrate.js', retryMigrate: '/app/server-dist/migrate.js',
+  prepare: '/app/server-dist/prepare-database.js', startup: '/app/server-dist/index.js' });
 const execute = promisify(execFile);
 
 /** Own only fixture roles/guard in a database already admitted by the native profile. */
@@ -27,7 +28,7 @@ export async function createMigrationCliFixture(pool) {
     const env = { ...process.env, HARMONIARR_TEST_DISABLE_BACKGROUND_SERVICES: 'true',
       PGUSER: owner ? process.env.PGUSER : migrationObserverRole };
     try {
-      const result = await execute(process.execPath, [entries[command]], { env, timeout: 20_000, maxBuffer: 64 * 1024, windowsHide: true });
+      const result = await execute(process.execPath, [entries[command], ...(command === 'retryMigrate' ? ['--retry-failed'] : [])], { env, timeout: 20_000, maxBuffer: 64 * 1024, windowsHide: true });
       return { code: 0, ...result };
     } catch (error) {
       assert.equal(error.killed, false, 'diagnostic must finish rather than expire'); assert.equal(error.signal, null);

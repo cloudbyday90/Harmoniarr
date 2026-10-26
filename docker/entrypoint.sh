@@ -148,8 +148,12 @@ if ! "$PSQL_BIN" -h 127.0.0.1 -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTG
   "$CREATEDB_BIN" -h 127.0.0.1 -p "$POSTGRES_PORT" -U "$POSTGRES_USER" "$POSTGRES_DB"
 fi
 
-log "preparing database state"
-node /app/server-dist/prepare-database.js
+if [ "$#" -eq 3 ] && [ "$1" = "node" ] && [ "$2" = "/app/server-dist/migrate.js" ] && [ "$3" = "--retry-failed" ]; then
+  log "explicit failed-migration retry owns guarded preparation"
+else
+  log "preparing database state"
+  node /app/server-dist/prepare-database.js
+fi
 
 log "starting application command: $*"
 "$@" &

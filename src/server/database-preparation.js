@@ -26,8 +26,8 @@ export async function prepareDatabase({
   getPoolFn,
 } = {}) {
   const bootstrap = await bootstrapDatabaseSchemaFromSnapshotFn({ getPoolFn });
-  const appliedMigrations = await applyPendingMigrationsFn();
-  const status = await assertNoPendingMigrationsFn();
+  const appliedMigrations = await applyPendingMigrationsFn({ getPoolFn });
+  const status = await assertNoPendingMigrationsFn({ getPoolFn });
 
   return {
     appliedMigrations,

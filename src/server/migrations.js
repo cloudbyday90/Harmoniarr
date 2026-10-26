@@ -17,25 +17,24 @@
  */
 
 import { getPool } from './database.js';
-import { listMigrationFiles, readMigrationFile } from './migration-manifest.js';
-import { ensureSchemaTable, getAppliedMigrationFilenames } from './schema-migration-store.js';
+import { ensureSchemaTable } from './schema-migration-store.js';
+import { assertMigrationPreparationSafe } from './migration-preparation-service.js';
+import { withWorkerTaskCleanup } from './worker-task-cleanup.js';
 export { getMigrationStatus, assertNoPendingMigrations } from './schema-migration-status-service.js';
 export { verifyAppliedMigrationChecksums, assertNoMigrationChecksumDrift } from './migration-checksum-service.js';
 
-export async function applyPendingMigrations({ getPoolFn = getPool } = {}) {
+export async function applyPendingMigrations({ getPoolFn = getPool, retryFailedMigrations = false, loadMigrationManifestFn } = {}) {
   const pool = getPoolFn();
   const client = await pool.connect();
 
-  try {
+  return withWorkerTaskCleanup(async () => {
+    const plan = await assertMigrationPreparationSafe({ queryable: client, retryFailedMigrations, loadMigrationManifestFn });
     await ensureSchemaTable(client);
-
-    const files = await listMigrationFiles();
-    const applied = await getAppliedMigrationFilenames(client);
-    const pending = files.filter((file) => !applied.has(file.filename));
+    const pendingNames = new Set(plan.pending);
+    const pending = plan.repoMigrations.filter(file => pendingNames.has(file.filename));
 
     for (const migration of pending) {
-      const migrationFile = await readMigrationFile(migration);
-      const { checksum, sql } = migrationFile;
+      const { checksum, sql } = migration;
       const startedAt = new Date();
 
       try {
@@ -133,7 +132,5 @@ export async function applyPendingMigrations({ getPoolFn = getPool } = {}) {
     }
 
     return pending.map((migration) => migration.filename);
-  } finally {
-    client.release();
-  }
+  }, () => client.release());
 }

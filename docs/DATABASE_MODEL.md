@@ -159,7 +159,7 @@ Migration defensibility:
 - Run each migration in a transaction unless it contains an operation that cannot run inside one.
 - Migrations should be idempotent where practical.
 - Fresh installs may load a schema snapshot, then run normal migration verification.
-- Failed migrations must be visible in logs and the UI.
+- Failed migrations must remain visible in diagnostic history. Default preparation refuses them; reviewed, unchanged failed SQL requires explicit `npm run migrate -- --retry-failed`. See the [preparation design](MIGRATION_PREPARATION_DESIGN.md) and [outcome](MIGRATION_PREPARATION_OUTCOME.md).
 - Never auto-repair a failed migration by dropping user data.
 
 ### Database Self-Healing
@@ -172,7 +172,7 @@ Allowed automatic recovery:
 - Recreate missing runtime directories such as `/run/postgresql`.
 - Reapply expected ownership and permissions to app-owned data and runtime directories when the container starts as root for setup.
 - Start Postgres, wait for readiness, and retry readiness checks with bounded backoff.
-- Resume pending migrations after a previous startup failed before completion.
+- Resume absent pending migrations after a previous startup failed before completion. Existing failed/running records require the preparation policy above; startup does not silently replay them.
 - Requeue jobs left in transient states when the app crashed, using advisory locks so only one process performs recovery.
 - Mark stale downloads, imports, or worker jobs as needing reconciliation rather than deleting them.
 - Run retention cleanup for append-only logs based on configured policy.

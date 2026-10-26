@@ -19,6 +19,8 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { getPool } from './database.js';
+import { assertMigrationPreparationSafe } from './migration-preparation-service.js';
+import { withWorkerTaskCleanup } from './worker-task-cleanup.js';
 
 export const defaultSchemaSnapshotPath = resolve(import.meta.dirname, 'schema-snapshot.sql');
 
@@ -36,12 +38,13 @@ export async function getPublicTableCount(client) {
 export async function bootstrapDatabaseSchemaFromSnapshot({
   getPoolFn = getPool,
   readFileFn = readFile,
+  assertMigrationPreparationSafeFn = assertMigrationPreparationSafe,
   schemaSnapshotPath = defaultSchemaSnapshotPath,
 } = {}) {
   const pool = getPoolFn();
   const client = await pool.connect();
 
-  try {
+  return withWorkerTaskCleanup(async () => {
     const tableCount = await getPublicTableCount(client);
     if (tableCount > 0) {
       return {
@@ -52,6 +55,8 @@ export async function bootstrapDatabaseSchemaFromSnapshot({
       };
     }
 
+    const plan = await assertMigrationPreparationSafeFn({ queryable: client });
+    if (!plan.fresh) throw new Error('Snapshot bootstrap requires an empty public schema');
     const snapshotSql = await readFileFn(schemaSnapshotPath, 'utf8');
     if (!snapshotSql.trim()) {
       throw new Error(`Schema snapshot is empty at ${schemaSnapshotPath}`);
@@ -65,7 +70,5 @@ export async function bootstrapDatabaseSchemaFromSnapshot({
       schemaSnapshotPath,
       tableCount,
     };
-  } finally {
-    client.release();
-  }
+  }, () => client.release());
 }

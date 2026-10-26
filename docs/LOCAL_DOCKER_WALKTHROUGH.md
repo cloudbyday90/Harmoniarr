@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 26 [migration preparation rebuild](LOCAL_DOCKER_MIGRATION_PREPARATION_OUTCOME.md)
+records the current no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](MIGRATION_PREPARATION_OUTCOME.md) records pre-DDL history
+validation, ordinary pending upgrades and reviewed failed-migration retry.
+
 The October 26 [startup migration lineage rebuild](LOCAL_DOCKER_STARTUP_MIGRATION_LINEAGE_OUTCOME.md)
 records the current no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](STARTUP_MIGRATION_LINEAGE_OUTCOME.md) records complete
