@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 26 [backup PostgreSQL crash/restart rebuild](LOCAL_DOCKER_BACKUP_POSTGRES_CRASH_OUTCOME.md)
+records the current no-cache image and preserved administrator/data/mounts. The
+[qualification outcome](BACKUP_POSTGRES_CRASH_OUTCOME.md) records 18 real database
+crash/restart cases on an owned persistent volume and fresh default backup recovery.
+
 The October 26 [backup SQL interruption rebuild](LOCAL_DOCKER_BACKUP_SQL_CRASH_OUTCOME.md)
 records the current no-cache image and preserved administrator/data/mounts. The
 [qualification outcome](BACKUP_SQL_CRASH_OUTCOME.md) records 18 actual SQL wait or

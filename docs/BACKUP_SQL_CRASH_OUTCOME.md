@@ -108,3 +108,7 @@ database shutdown/startup, WAL recovery, old-session retirement and fresh defaul
 backup recovery with explicit committed/rolled-back outcomes. The current tests
 keep PostgreSQL running. They do not qualify database/container crashes, a full
 HTTP-server rollout, arbitrary in-flight filesystem calls or hardware power loss.
+
+The database-process crash/restart follow-up is completed in the separate
+[PostgreSQL crash outcome](BACKUP_POSTGRES_CRASH_OUTCOME.md). Container replacement
+and hardware power loss remain distinct failure domains.
