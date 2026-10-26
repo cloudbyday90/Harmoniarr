@@ -98,11 +98,10 @@ deletion from a newly absent file. Quiesce writers because independent migration
 commands/external SQL are not serialized by this change. Failed-row consent does
 not prove rollback or idempotency, and it does not clean leftover objects.
 
-Next: resolve migration transaction ownership. The writer wraps BEGIN/COMMIT while
-the repository SQL also contains transaction controls. Qualify actual DDL/ledger
-commit visibility, rollback and lost acknowledgements, then establish one owner
-without rewriting historical migration files/checksums. Coordinate preparers after
-that lifetime is clear.
+The subsequent [transaction ownership outcome](MIGRATION_TRANSACTIONS_OUTCOME.md)
+resolves the writer/SQL framing overlap without rewriting historical checksums
+and qualifies DDL/ledger commit visibility, rollback and real lost acknowledgements.
+Next: coordinate cooperating preparers across bootstrap, admission and writes.
 
 GitHub MCP found no open PRs in cloudbyday90/Harmoniarr, making random local PR
 application and stale-PR cleanup/rebase inapplicable. This work stays on main;

@@ -156,11 +156,12 @@ Schema defensibility:
 Migration defensibility:
 
 - Use timestamped migrations only.
-- Run each migration in a transaction unless it contains an operation that cannot run inside one.
+- The executor owns one transaction per migration, including its body DDL and checked applied receipt. Historical wrappers are compiled out in memory without changing raw SQL/checksums; unsupported controls refuse the whole pending plan before preparation writes. Nontransactional operations require a separate reviewed design. See the [transaction design](MIGRATION_TRANSACTIONS_DESIGN.md) and [outcome](MIGRATION_TRANSACTIONS_OUTCOME.md).
 - Migrations should be idempotent where practical.
 - Fresh installs may load a schema snapshot, then run normal migration verification.
 - Failed migrations must remain visible in diagnostic history. Default preparation refuses them; reviewed, unchanged failed SQL requires explicit `npm run migrate -- --retry-failed`. See the [preparation design](MIGRATION_PREPARATION_DESIGN.md) and [outcome](MIGRATION_PREPARATION_OUTCOME.md).
 - Never auto-repair a failed migration by dropping user data.
+- A lost COMMIT acknowledgement is an unknown outcome: discard the connection, stop writers and inspect through an independent maintenance connection before retrying. Do not overwrite history with a failed receipt or automatically replay.
 
 ### Database Self-Healing
 

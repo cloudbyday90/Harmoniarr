@@ -15,13 +15,17 @@ const row = (migration = manifest[0], overrides = {}) => ({ filename: migration.
   checksum: migration.checksum, status: 'applied', ...overrides });
 function fixture({ rows = [row()], schema = { ledger_present: true, relation_count: 2 }, queryFailure, releaseFailure, failQuery = false } = {}) {
   const calls = [];
+  let transactionStatus = 'I';
   const client = {
+    getTransactionStatus: () => transactionStatus,
     async query(sql) {
       assert.equal(this, client); calls.push(sql);
       if (failQuery) throw queryFailure;
       if (sql.includes('pg_catalog.pg_class')) return { rows: [schema] };
       if (sql.includes('SELECT filename, checksum, status')) return { rows };
-      return { rows: [] };
+      if (sql === 'BEGIN') transactionStatus = 'T';
+      if (sql === 'COMMIT' || sql === 'ROLLBACK') transactionStatus = 'I';
+      return { rows: [], rowCount: 1, command: sql === 'COMMIT' ? 'COMMIT' : sql === 'ROLLBACK' ? 'ROLLBACK' : undefined };
     },
     release() { assert.equal(this, client); calls.push('release'); if (releaseFailure) throw releaseFailure; },
   };

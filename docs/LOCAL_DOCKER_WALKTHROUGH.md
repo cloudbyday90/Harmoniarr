@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 26 [migration transaction rebuild](LOCAL_DOCKER_MIGRATION_TRANSACTIONS_OUTCOME.md)
+records the current no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](MIGRATION_TRANSACTIONS_OUTCOME.md) records atomic
+migration DDL/receipts, rollback and real lost-COMMIT acknowledgement behavior.
+
 The October 26 [migration preparation rebuild](LOCAL_DOCKER_MIGRATION_PREPARATION_OUTCOME.md)
 records the current no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](MIGRATION_PREPARATION_OUTCOME.md) records pre-DDL history
