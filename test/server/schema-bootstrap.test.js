@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { withPreparationLockFixture } from '../../testing/server/preparation-lock-fixture.js';
+import { renderSchemaSnapshot } from '../../src/server/schema-snapshot-renderer.js';
 import {
   bootstrapDatabaseSchemaFromSnapshot,
   getPublicTableCount,
@@ -25,16 +26,20 @@ test('getPublicTableCount reads the number of public base tables', async () => {
 test('bootstrapDatabaseSchemaFromSnapshot applies the schema snapshot only when the public schema is empty', async () => {
   const queryCalls = [];
   let released = false;
+  let transactionStatus = 'I';
+  const migration = { filename: '20990101_000001_fixture.sql', migrationKey: '20990101_000001',
+    description: 'fixture', checksum: 'fixture-checksum', sql: 'BEGIN; CREATE TABLE demo (id integer); COMMIT;' };
 
   const result = await bootstrapDatabaseSchemaFromSnapshot({
     assertMigrationPreparationSafeFn: async ({ queryable }) => {
       assert.equal(typeof queryable.query, 'function');
       assert.equal(queryCalls.length, 1);
-      return { fresh: true };
+      return { fresh: true, repoMigrations: [migration] };
     },
     getPoolFn: () => ({
       async connect() {
         return withPreparationLockFixture({
+          getTransactionStatus: () => transactionStatus,
           async query(sql) {
             queryCalls.push(sql);
             if (queryCalls.length === 1) {
@@ -43,6 +48,10 @@ test('bootstrapDatabaseSchemaFromSnapshot applies the schema snapshot only when 
               };
             }
 
+            if (sql === 'BEGIN') transactionStatus = 'T';
+            if (sql === 'COMMIT') { transactionStatus = 'I'; return { command: 'COMMIT' }; }
+            if (sql.includes('SELECT filename, checksum, status')) return { rows: [{ filename: migration.filename,
+              migration_key: migration.migrationKey, checksum: migration.checksum, status: 'applied' }] };
             return { rows: [] };
           },
           release() {
@@ -54,7 +63,7 @@ test('bootstrapDatabaseSchemaFromSnapshot applies the schema snapshot only when 
     readFileFn: async (path, encoding) => {
       assert.equal(path, 'schema.sql');
       assert.equal(encoding, 'utf8');
-      return 'CREATE TABLE demo (id integer);';
+      return renderSchemaSnapshot({ migrations: [migration] });
     },
     schemaSnapshotPath: 'schema.sql',
   });
@@ -65,8 +74,11 @@ test('bootstrapDatabaseSchemaFromSnapshot applies the schema snapshot only when 
     schemaSnapshotPath: 'schema.sql',
     tableCount: 0,
   });
-  assert.equal(queryCalls.length, 2);
-  assert.match(queryCalls[1], /CREATE TABLE demo/);
+  assert.equal(queryCalls.length, 7);
+  assert.equal(queryCalls[1], 'BEGIN');
+  assert.match(queryCalls[4], /CREATE TABLE demo/);
+  assert.match(queryCalls[5], /SELECT filename, checksum, status/u);
+  assert.equal(queryCalls[6], 'COMMIT');
   assert.equal(released, true);
 });
 

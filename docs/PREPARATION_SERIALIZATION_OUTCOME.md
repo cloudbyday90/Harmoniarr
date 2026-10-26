@@ -87,5 +87,6 @@ nonwaiting session admission → guarded preparation/transactions → same-clien
 verification → acknowledged unlock/release. This prevents cooperating stale-plan
 races across processes and commits, at the cost of explicit busy retry and a
 physical-session requirement. It does not coordinate nonparticipants or make a
-whole snapshot/batch atomic. Next: investigate atomic snapshot bootstrap and
-real interruption/ledger visibility while preserving snapshot provenance.
+whole snapshot/batch atomic. The subsequent [atomic snapshot outcome](ATOMIC_SNAPSHOT_OUTCOME.md)
+adds one fresh-bootstrap transaction while preserving raw provenance and proving
+real interruption/ledger visibility. Next strengthen pre-commit critical anchors.

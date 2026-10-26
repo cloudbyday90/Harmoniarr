@@ -20,6 +20,8 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { assertMigrationPreparationSafe } from './migration-preparation-service.js';
 import { withDatabasePreparation } from './database-preparation-owner-service.js';
+import { prepareSchemaSnapshotSql } from './schema-snapshot-plan-service.js';
+import { executeSchemaSnapshotTransaction } from './schema-snapshot-transaction-service.js';
 
 export const defaultSchemaSnapshotPath = resolve(import.meta.dirname, 'schema-snapshot.sql');
 
@@ -41,7 +43,7 @@ export async function bootstrapDatabaseSchemaFromSnapshot({
   assertMigrationPreparationSafeFn = assertMigrationPreparationSafe,
   schemaSnapshotPath = defaultSchemaSnapshotPath,
 } = {}) {
-  return withDatabasePreparation({ getPoolFn, preparation }, async ({ client }) => {
+  return withDatabasePreparation({ getPoolFn, preparation }, async ({ client, markClientUnusable }) => {
     const tableCount = await getPublicTableCount(client);
     if (tableCount > 0) {
       return {
@@ -59,7 +61,8 @@ export async function bootstrapDatabaseSchemaFromSnapshot({
       throw new Error(`Schema snapshot is empty at ${schemaSnapshotPath}`);
     }
 
-    await client.query(snapshotSql);
+    const sql = prepareSchemaSnapshotSql({ snapshotSql, repoMigrations: plan.repoMigrations });
+    await executeSchemaSnapshotTransaction({ client, markClientUnusable, sql, repoMigrations: plan.repoMigrations });
 
     return {
       bootstrapped: true,

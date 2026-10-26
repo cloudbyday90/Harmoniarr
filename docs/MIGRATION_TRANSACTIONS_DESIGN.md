@@ -12,7 +12,9 @@ transaction. No historical SQL, checksum, table or schema snapshot changes.
 `migrations.js` owns connection checkout, history validation, full pending-plan
 compilation, preparation DDL and release. `migration-sql-lexer.js` identifies
 top-level command spans. `migration-sql-transaction-policy.js` enforces supported
-framing. `migration-transaction-service.js` owns the protocol state machine.
+framing. `migration-transaction-service.js` owns receipt/failure policy and delegates
+protocol state to `owned-sql-transaction-service.js`, also used by the
+[atomic snapshot design](ATOMIC_SNAPSHOT_DESIGN.md).
 `migration-ledger-store.js` owns parameterized running/applied/failed receipts.
 All modules are ESM inside the existing application.
 

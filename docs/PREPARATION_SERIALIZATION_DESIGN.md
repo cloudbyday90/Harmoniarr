@@ -73,8 +73,9 @@ COMMIT policies remain in force.
 This outer lock serializes preparation; it does not make the whole bootstrap or
 migration batch one transaction. Historical SQL and schema snapshot bytes remain
 unchanged. The snapshot contains 42 top-level BEGIN/COMMIT pairs and 115 ledger
-inserts. Next investigate atomic snapshot bootstrap and interruption
-outcomes, preserving snapshot provenance and reviewed upgrade behavior.
+inserts. The subsequent [atomic snapshot design](ATOMIC_SNAPSHOT_DESIGN.md)
+compiles that artifact in memory and commits fresh bootstrap atomically while
+preserving provenance. Normal pending batches still commit per migration.
 
 ## Validation plan
 
