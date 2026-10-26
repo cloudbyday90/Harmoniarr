@@ -110,3 +110,7 @@ original-session retirement and explicit committed/rolled-back outcomes before
 fresh recovery. This matrix pauses after returned store calls; it does not qualify
 lost SQL responses, PostgreSQL/container crashes, an HTTP-server rollout,
 arbitrary in-flight filesystem operations or hardware power loss.
+
+The SQL-wait/response-loss follow-up is completed by the separate
+[SQL interruption outcome](BACKUP_SQL_CRASH_OUTCOME.md). Database/container crash
+and storage power-loss qualifications remain outside both matrices.

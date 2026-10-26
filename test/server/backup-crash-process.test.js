@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import test from 'node:test';
 import { backupCrashPlan } from '../../testing/server/backup-crash-plan.js';
-import { startBackupCrashProcess } from '../../testing/server/backup-crash-process.js';
+import { createBackupCrashProcessRunner,startBackupCrashProcess } from '../../testing/server/backup-crash-process.js';
 
 const checkpoint='intent-recorded';
 const counts={completedCount:0,deferredCount:0,awaitingConfirmationCount:0,abandonedCount:0};
@@ -79,4 +79,19 @@ test('spawn error without a child identity still requires close before cleanup c
   await assert.rejects(f.runner.waitReady(),{code:'fixture_spawn_failed'});let settled=false;
   const cleanup=f.runner.dispose().finally(()=>{settled=true;});await Promise.resolve();
   assert.equal(settled,false);assert.deepEqual(f.kills,[]);f.child.emit('close',-2,null);await cleanup;
+});
+
+test('SQL dispatch requires an acknowledged owned child and can be sent only once',async()=>{
+  const child=new EventEmitter();child.pid=125;child.stdout=new EventEmitter();child.stderr=new EventEmitter();child.kill=()=>true;
+  const messages=[];let options;
+  child.send=(message,callback)=>{messages.push(message);callback();};
+  const start=createBackupCrashProcessRunner({allowDispatch:true});
+  for(const pgPort of [0,65536,'5432',1.5])assert.throws(()=>start({mode:'crash',checkpoint,root:'/fixture',pgPort}));
+  assert.throws(()=>startBackupCrashProcess({mode:'crash',checkpoint,root:'/fixture',pgPort:5433}));
+  const runner=start({mode:'crash',checkpoint,root:'/fixture',pgPort:5433,spawnFn:(_command,_args,value)=>{options=value;return child;}});
+  await assert.rejects(runner.dispatch(),{code:'fixture_dispatch_not_acknowledged'});assert.deepEqual(messages,[]);
+  child.emit('message',{event:'checkpoint',checkpoint,processPid:125,backendPid:456});await runner.waitReady();await runner.dispatch();
+  assert.equal(options.env.PGPORT,'5433');assert.deepEqual(messages,[{event:'dispatch'}]);
+  await assert.rejects(runner.dispatch(),{code:'fixture_dispatch_not_acknowledged'});
+  const cleanup=runner.dispose();child.emit('close',null,'SIGKILL');await cleanup;
 });

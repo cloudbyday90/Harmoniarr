@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 26 [backup SQL interruption rebuild](LOCAL_DOCKER_BACKUP_SQL_CRASH_OUTCOME.md)
+records the current no-cache image and preserved administrator/data/mounts. The
+[qualification outcome](BACKUP_SQL_CRASH_OUTCOME.md) records 18 actual SQL wait or
+withheld-response cases and the rerun of 19 preceding process-crash checkpoints.
+
 The October 26 [backup process-crash qualification rebuild](LOCAL_DOCKER_BACKUP_PROCESS_CRASH_OUTCOME.md)
 records the current no-cache image and preserved administrator/data/mounts. The
 [qualification outcome](BACKUP_PROCESS_CRASH_OUTCOME.md) records 19 abrupt

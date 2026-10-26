@@ -15,15 +15,18 @@ function validCounts(value) {
 }
 
 /** Own one child only. A kill request never substitutes for observed process/stdio close. */
-export function startBackupCrashProcess({mode,checkpoint,root,signal,spawnFn=spawn}={}) {
-  signal?.throwIfAborted();getBackupCrashCase(checkpoint);
+export function createBackupCrashProcessRunner({getCase=getBackupCrashCase,childModuleUrl=new URL('./backup-crash-child.js',import.meta.url),allowDispatch=false}={}) {
+return function start({mode,checkpoint,root,signal,pgPort,spawnFn=spawn}={}) {
+  signal?.throwIfAborted();getCase(checkpoint);
   if (!['crash','recover'].includes(mode)||typeof root!=='string'||!root.trim()||root.includes('\0')) throw new TypeError('Invalid backup crash process input');
+  if(pgPort!==undefined&&(!allowDispatch||!Number.isInteger(pgPort)||pgPort<1||pgPort>65535))throw new TypeError('Invalid fixture PostgreSQL port');
   const env=Object.fromEntries(Object.entries(process.env).filter(([key])=>/^(?:PATH|SYSTEMROOT|WINDIR|TEMP|TMP|LANG|TZ|PGHOST|PGPORT|PGUSER|PGPASSWORD|PGDATABASE|PGDATA|POSTGRES_USER|POSTGRES_PASSWORD|HARMONIARR_APPDATA|HARMONIARR_MEMORY_PROFILE_GIB|HARMONIARR_ENCRYPTION_KEY)$/u.test(key)));
   env.HARMONIARR_BACKUPS=root;
-  const child=spawnFn(process.execPath,[fileURLToPath(new URL('./backup-crash-child.js',import.meta.url)),mode,checkpoint,root],
+  if(pgPort!==undefined)env.PGPORT=String(pgPort);
+  const child=spawnFn(process.execPath,[fileURLToPath(childModuleUrl),mode,checkpoint,root],
     {env,stdio:['ignore','pipe','pipe','ipc'],windowsHide:true,shell:false});
   const ready=Promise.withResolvers(),closed=Promise.withResolvers(),fault=Promise.withResolvers();
-  let result,closeResult,failed=false,primaryFailure,bytes=0,seen=false;
+  let result,closeResult,failed=false,primaryFailure,bytes=0,seen=false,dispatched=false;
   const fail=code=>{if(!failed){failed=true;primaryFailure=failure(code);fault.resolve({error:primaryFailure});}};
   child.on('error',()=>fail('fixture_spawn_failed'));
   child.once('close',(code,exitSignal)=>{closeResult={code,signal:exitSignal};closed.resolve(closeResult);});
@@ -67,5 +70,12 @@ export function startBackupCrashProcess({mode,checkpoint,root,signal,spawnFn=spa
   async function dispose(){
     try{await killAndClose();}finally{signal?.removeEventListener('abort',abort);}
   }
-  return {pid:child.pid,waitReady,crash,complete,dispose,isClosed:()=>Boolean(closeResult),outputBytes:()=>bytes};
+  async function dispatch(){
+    if(!allowDispatch||mode!=='crash'||!seen||failed||dispatched||closeResult)throw failure('fixture_dispatch_not_acknowledged');
+    dispatched=true;
+    await bounded(new Promise((resolve,reject)=>{child.send({event:'dispatch'},error=>error?reject(failure('fixture_dispatch_failed')):resolve());}),5000);
+  }
+  return {pid:child.pid,waitReady,crash,complete,dispose,...(allowDispatch?{dispatch}:{}),isClosed:()=>Boolean(closeResult),outputBytes:()=>bytes};
+};
 }
+export const startBackupCrashProcess=createBackupCrashProcessRunner();
