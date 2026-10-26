@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { mkdir, open, rename, unlink } from 'node:fs/promises';
+import { link, lstat, mkdir, open, unlink } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 
 const privateFileMode = 0o600;
@@ -40,12 +40,16 @@ export function createTemporaryBackupArtifactPath({ storagePath, token }) {
 export function createBackupArtifactFileService({
   mkdirFn = mkdir,
   openFn = open,
-  renameFn = rename,
+  linkFn = link,
+  lstatFn = lstat,
+  assertOwnership = async () => {},
   unlinkFn = unlink,
 } = {}) {
   async function writePrivateTemporaryFile({ content, temporaryPath }) {
+    await assertOwnership();
     await mkdirFn(dirname(temporaryPath), { recursive: true });
 
+    await assertOwnership();
     const handle = await openFn(temporaryPath, 'wx', privateFileMode);
     try {
       await handle.writeFile(content);
@@ -60,11 +64,13 @@ export function createBackupArtifactFileService({
       throw new Error('Temporary and final backup artifact paths must differ');
     }
 
-    await renameFn(temporaryPath, storagePath);
+    await assertOwnership();
+    await linkFn(temporaryPath, storagePath);
   }
 
   async function removeFileIfPresent({ storagePath }) {
     try {
+      await assertOwnership();
       await unlinkFn(storagePath);
       return { removed: true };
     } catch (error) {
@@ -76,7 +82,26 @@ export function createBackupArtifactFileService({
     }
   }
 
+  async function removeLinkedTemporaryFile({ storagePath, temporaryPath }) {
+    if (!temporaryPath) return { removed: false };
+    let temporary;
+    try {
+      temporary = await lstatFn(temporaryPath, { bigint: true });
+    } catch (error) {
+      if (error?.code === 'ENOENT') return { removed: false };
+      throw error;
+    }
+    const final = await lstatFn(storagePath, { bigint: true });
+    if (!temporary.isFile() || !final.isFile() || temporary.dev !== final.dev || temporary.ino !== final.ino) {
+      throw Object.assign(new Error('Backup temporary file identity requires inspection'), { code: 'backup_artifact_temporary_identity_mismatch' });
+    }
+    await assertOwnership();
+    await unlinkFn(temporaryPath);
+    return { removed: true };
+  }
+
   return {
+    removeLinkedTemporaryFile,
     promoteTemporaryFile,
     removeFileIfPresent,
     writePrivateTemporaryFile,

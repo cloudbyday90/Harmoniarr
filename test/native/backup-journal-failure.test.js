@@ -28,8 +28,8 @@ test('backup journal records safe failures without phase regression and fresh co
   const storeErrors = [];
   const application = createApp({ clientDistDir: '/app/client-dist', packageJsonPath: '/app/package.json',
     createSystemModule: options => createSystemModule({ ...options, backupArtifactFileOperationStore: {
-      ...store, updateFileOperation: async input => {
-        try { return await store.updateFileOperation(input); }
+      ...store, updateFileOperation: async (input, queryable) => {
+        try { return await store.updateFileOperation(input, queryable); }
         catch (error) { storeErrors.push({ code: error.code, phase: input.status }); throw error; }
       },
     } }),
@@ -109,7 +109,7 @@ test('backup journal records safe failures without phase regression and fresh co
       assert.doesNotMatch(error.message, /No file was changed/u); assert.match(error.message, /Inspect the file state/u); return true;
     });
     operation = await row('promoted-mismatch', 'publish'); assert.equal(operation.status, 'awaiting_confirmation');
-    await assert.rejects(access(operation.temporary_path), { code: 'ENOENT' });
+    assert.equal(await readFile(operation.temporary_path, 'utf8'), 'changed-after-promotion');
     assert.equal((await recover()).awaitingConfirmationCount, 2); assert.equal(await artifactCount('promoted-mismatch'), 0);
     assert.equal(await readFile(promotedMismatch.artifact.storagePath, 'utf8'), 'changed-after-promotion');
 

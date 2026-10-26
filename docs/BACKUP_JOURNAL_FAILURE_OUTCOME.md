@@ -69,6 +69,9 @@ There was no PR to apply, merge, rebase or close. Work remains on `main`.
 
 ## Next recommended item
 
+Completed by the [exclusive publication outcome](BACKUP_PUBLICATION_OUTCOME.md),
+which owns the current follow-up and qualification limits. Original recommendation:
+
 Qualify exclusive backup promotion and concurrent recovery ownership. The file
 service currently verifies destination state before a separate rename, whose
 documented behavior can replace an existing target. Those calls alone do not

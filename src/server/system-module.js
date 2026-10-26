@@ -31,7 +31,7 @@ import { createOperatorNotificationFanoutHeartbeat } from './operator-notificati
 import { createOperatorNotificationAcknowledgementService } from './operator-notification-acknowledgement-service.js';
 import { createOperatorNotificationFanoutWorker } from './operator-notification-fanout-worker.js';
 import { createBackupArtifactRepository } from './recovery/backup-artifact-repository.js';
-import { createBackupArtifactFileOperationService } from './recovery/backup-artifact-file-operation-service.js';
+import { createOwnedBackupArtifactService } from './recovery/owned-backup-artifact-service.js';
 import { createBackupArtifactFileOperationStore } from './recovery/backup-artifact-file-operation-store.js';
 import { createBackupExportService } from './recovery/backup-export-service.js';
 import { createBackupRestoreApplyService } from './recovery/backup-restore-apply-service.js';
@@ -117,15 +117,9 @@ export function createSystemModule({
     operationHistoryService,
   }),
   systemOperatorNotificationService = operatorNotificationService ?? createOperatorNotificationService(),
-  systemBackupArtifactFileOperationService = backupArtifactFileOperationService ?? createBackupArtifactFileOperationService({
-    createBackupArtifact: backupArtifactRepository.createBackupArtifact,
-    createFileOperation: backupArtifactFileOperationStore.createFileOperation,
-    recordFileOperationFailure: backupArtifactFileOperationStore.recordFileOperationFailure,
-    deleteBackupArtifactById: backupArtifactRepository.deleteBackupArtifactById,
-    getBackupArtifactByFilename: backupArtifactRepository.getBackupArtifactByFilename,
-    getBackupArtifactById: backupArtifactRepository.getBackupArtifactById,
-    listIncompleteFileOperations: backupArtifactFileOperationStore.listIncompleteFileOperations,
-    updateFileOperation: backupArtifactFileOperationStore.updateFileOperation,
+  systemBackupArtifactFileOperationService = backupArtifactFileOperationService ?? createOwnedBackupArtifactService({
+    backupArtifactRepository,
+    backupArtifactFileOperationStore,
   }),
   systemBackupExportService = backupExportService ?? createBackupExportService({
     backupArtifactFileOperationService: systemBackupArtifactFileOperationService,

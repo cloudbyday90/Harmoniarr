@@ -129,9 +129,23 @@ export function createBackupArtifactFileOperationService({
     return artifact;
   }
 
+  async function cleanupPublicationTemporaryFile(operation) {
+    try {
+      await backupArtifactFileService.removeLinkedTemporaryFile({
+        storagePath: operation.storagePath,
+        temporaryPath: operation.temporaryPath,
+      });
+    } catch (error) {
+      if (error?.code !== 'backup_artifact_temporary_identity_mismatch') throw error;
+      await holdForConfirmation(operation, { code: error.code });
+      throw createVerificationRequiredError(error.code);
+    }
+  }
+
   async function publishPreparedOperation(operation) {
     const finalVerification = await verifyOperationArtifact(operation, operation.storagePath);
     if (finalVerification.status === 'verified') {
+      await cleanupPublicationTemporaryFile(operation);
       await updateFileOperation({
         fileOperationId: operation.id,
         status: 'finalized',
@@ -171,10 +185,13 @@ export function createBackupArtifactFileOperationService({
       throw createVerificationRequiredError(temporaryVerification.code);
     }
 
-    await backupArtifactFileService.promoteTemporaryFile({
-      storagePath: operation.storagePath,
-      temporaryPath,
-    });
+    try {
+      await backupArtifactFileService.promoteTemporaryFile({ storagePath: operation.storagePath, temporaryPath });
+    } catch (error) {
+      if (error?.code !== 'EEXIST') throw error;
+      await holdForConfirmation(operation, { code: 'artifact_destination_exists' });
+      throw createVerificationRequiredError('artifact_destination_exists');
+    }
 
     const promotedVerification = await verifyOperationArtifact(operation, operation.storagePath);
     if (promotedVerification.status !== 'verified') {
@@ -182,6 +199,7 @@ export function createBackupArtifactFileOperationService({
       throw createVerificationRequiredError(promotedVerification.code);
     }
 
+    await cleanupPublicationTemporaryFile(operation);
     await updateFileOperation({
       fileOperationId: operation.id,
       status: 'finalized',

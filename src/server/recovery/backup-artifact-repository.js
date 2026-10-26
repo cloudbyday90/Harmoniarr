@@ -70,8 +70,8 @@ export function createBackupArtifactRepository({
     payloadSha256,
     scope,
     storagePath,
-  }) {
-    const pool = getPoolFn();
+  }, queryable = getPoolFn()) {
+    const pool = queryable;
     const result = await pool.query(
       `
         INSERT INTO backup_artifacts (
@@ -112,8 +112,8 @@ export function createBackupArtifactRepository({
     return normalizeArtifact(result.rows[0]);
   }
 
-  async function listBackupArtifacts({ limit = 25 } = {}) {
-    const pool = getPoolFn();
+  async function listBackupArtifacts({ limit = 25 } = {}, queryable = getPoolFn()) {
+    const pool = queryable;
     const result = await pool.query(
       `
         SELECT id, filename, backup_type, encrypted, encryption_key_fingerprint, format_version, app_version, migration_level, scope_json, payload_sha256, file_size_bytes, created_by_user_id, storage_path, manifest_json, created_at
@@ -127,8 +127,8 @@ export function createBackupArtifactRepository({
     return result.rows.map(normalizeArtifact);
   }
 
-  async function getBackupArtifactById({ backupArtifactId }) {
-    const pool = getPoolFn();
+  async function getBackupArtifactById({ backupArtifactId }, queryable = getPoolFn()) {
+    const pool = queryable;
     const result = await pool.query(
       `
         SELECT id, filename, backup_type, encrypted, encryption_key_fingerprint, format_version, app_version, migration_level, scope_json, payload_sha256, file_size_bytes, created_by_user_id, storage_path, manifest_json, created_at
@@ -142,8 +142,8 @@ export function createBackupArtifactRepository({
     return normalizeArtifact(result.rows[0]);
   }
 
-  async function getBackupArtifactByFilename({ filename }) {
-    const pool = getPoolFn();
+  async function getBackupArtifactByFilename({ filename }, queryable = getPoolFn()) {
+    const pool = queryable;
     const result = await pool.query(
       `
         SELECT id, filename, backup_type, encrypted, encryption_key_fingerprint, format_version, app_version, migration_level, scope_json, payload_sha256, file_size_bytes, created_by_user_id, storage_path, manifest_json, created_at
@@ -157,8 +157,8 @@ export function createBackupArtifactRepository({
     return normalizeArtifact(result.rows[0]);
   }
 
-  async function deleteBackupArtifactById({ backupArtifactId }) {
-    const pool = getPoolFn();
+  async function deleteBackupArtifactById({ backupArtifactId }, queryable = getPoolFn()) {
+    const pool = queryable;
     const result = await pool.query(
       `
         DELETE FROM backup_artifacts

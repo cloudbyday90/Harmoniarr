@@ -67,8 +67,8 @@ export function createBackupArtifactFileOperationStore({
     operationType,
     storagePath,
     temporaryPath = null,
-  }) {
-    const result = await getPoolFn().query(
+  }, queryable = getPoolFn()) {
+    const result = await queryable.query(
       `
         INSERT INTO backup_artifact_file_operations (
           operation_type, backup_artifact_id, filename, storage_path,
@@ -94,8 +94,8 @@ export function createBackupArtifactFileOperationStore({
     return normalizeOperation(result.rows[0]);
   }
 
-  async function listIncompleteFileOperations() {
-    const result = await getPoolFn().query(
+  async function listIncompleteFileOperations(queryable = getPoolFn()) {
+    const result = await queryable.query(
       `
         SELECT ${operationColumns}
         FROM backup_artifact_file_operations
@@ -113,10 +113,10 @@ export function createBackupArtifactFileOperationStore({
     lastErrorCode = null,
     lastErrorMessage = null,
     status,
-  }) {
+  }, queryable = getPoolFn()) {
     const shouldUpdateArtifactId = backupArtifactId !== undefined;
     const isTerminal = status === 'completed' || status === 'abandoned';
-    const result = await getPoolFn().query(
+    const result = await queryable.query(
       `
         UPDATE backup_artifact_file_operations
         SET status = $2,
@@ -142,8 +142,8 @@ export function createBackupArtifactFileOperationStore({
     return normalizeOperation(result.rows[0]);
   }
 
-  async function recordFileOperationFailure({ fileOperationId, lastErrorCode, lastErrorMessage }) {
-    const result = await getPoolFn().query(
+  async function recordFileOperationFailure({ fileOperationId, lastErrorCode, lastErrorMessage }, queryable = getPoolFn()) {
+    const result = await queryable.query(
       `UPDATE backup_artifact_file_operations
        SET last_error_code = $2, last_error_message = $3, updated_at = NOW()
        WHERE id = $1

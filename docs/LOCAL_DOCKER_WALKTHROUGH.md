@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 25 [exclusive backup publication rebuild](LOCAL_DOCKER_BACKUP_PUBLICATION_OUTCOME.md)
+records the current no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](BACKUP_PUBLICATION_OUTCOME.md) records exclusive links,
+shared recovery ownership and a probe on the actual backup storage bind.
+
 The October 25 [backup journal failure rebuild](LOCAL_DOCKER_BACKUP_JOURNAL_FAILURE_OUTCOME.md)
 records the latest no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](BACKUP_JOURNAL_FAILURE_OUTCOME.md) records bounded journal
