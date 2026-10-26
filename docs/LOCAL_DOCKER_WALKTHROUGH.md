@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 26 [snapshot anchor rebuild](LOCAL_DOCKER_SNAPSHOT_ANCHORS_OUTCOME.md)
+records the current no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](SNAPSHOT_ANCHORS_OUTCOME.md) records 164 pre-commit
+critical facts and native missing/altered-anchor rollback and reviewed retry.
+
 The October 26 [atomic snapshot rebuild](LOCAL_DOCKER_ATOMIC_SNAPSHOT_OUTCOME.md)
 records the current no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](ATOMIC_SNAPSHOT_OUTCOME.md) records snapshot provenance,

@@ -6,8 +6,10 @@
 import { executeOwnedSqlTransaction } from './owned-sql-transaction-service.js';
 import { getDatabaseMigrationRows } from './schema-migration-store.js';
 import { buildDatabaseMigrationStateReport } from './schema-migration-state-service.js';
+import { assertSnapshotSchemaAnchors } from './schema-anchor-contract-service.js';
 
-export async function executeSchemaSnapshotTransaction({ client, markClientUnusable, sql, repoMigrations }) {
+export async function executeSchemaSnapshotTransaction({ client, markClientUnusable, sql, repoMigrations, contract,
+  assertSnapshotSchemaAnchorsFn = assertSnapshotSchemaAnchors }) {
   return executeOwnedSqlTransaction({ client, markClientUnusable,
     unknownCommitErrorFn: cause => Object.assign(new Error('Schema snapshot commit outcome is unknown. Stop writers and inspect with npm run diagnose:migrations using an independent maintenance connection before retrying.', { cause }),
       { code: 'snapshot_commit_outcome_unknown' }),
@@ -19,6 +21,7 @@ export async function executeSchemaSnapshotTransaction({ client, markClientUnusa
       if (!report.current || databaseRows.length !== repoMigrations.length) {
         throw Object.assign(new Error('Schema snapshot migration lineage verification failed before commit.'), { code: 'snapshot_migration_state_invalid' });
       }
+      await assertSnapshotSchemaAnchorsFn({ client, contract });
     },
   });
 }

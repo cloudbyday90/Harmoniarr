@@ -31,6 +31,8 @@ test('bootstrapDatabaseSchemaFromSnapshot applies the schema snapshot only when 
     description: 'fixture', checksum: 'fixture-checksum', sql: 'BEGIN; CREATE TABLE demo (id integer); COMMIT;' };
 
   const result = await bootstrapDatabaseSchemaFromSnapshot({
+    loadSchemaAnchorContractFn: async () => ({ fixture: true }),
+    assertSnapshotSchemaAnchorsFn: async ({ contract }) => { assert.equal(contract.fixture, true); },
     assertMigrationPreparationSafeFn: async ({ queryable }) => {
       assert.equal(typeof queryable.query, 'function');
       assert.equal(queryCalls.length, 1);
@@ -127,4 +129,28 @@ test('bootstrapDatabaseSchemaFromSnapshot leaves non-empty schemas alone', async
     tableCount: 4,
   });
   assert.equal(queryCalls.length, 1);
+});
+
+test('snapshot anchor contract is admitted before BEGIN and non-empty schemas never load it', async () => {
+  for (const original of [new Error('stale contract'), null]) {
+    const calls = [];
+    const migration = { filename: '20990101_000001_fixture.sql', migrationKey: '20990101_000001',
+      description: 'fixture', checksum: 'fixture-checksum', sql: 'CREATE TABLE demo (id integer);' };
+    await assert.rejects(bootstrapDatabaseSchemaFromSnapshot({
+      getPoolFn: () => ({ connect: async () => withPreparationLockFixture({
+        query: async sql => { calls.push(sql); return { rows: [{ table_count: 0 }] }; }, release() {},
+      }) }),
+      assertMigrationPreparationSafeFn: async () => ({ fresh: true, repoMigrations: [migration] }),
+      readFileFn: async () => renderSchemaSnapshot({ migrations: [migration] }),
+      loadSchemaAnchorContractFn: async () => { throw original; },
+    }), error => error === original);
+    assert.equal(calls.length, 1); assert.equal(calls.includes('BEGIN'), false);
+  }
+  const result = await bootstrapDatabaseSchemaFromSnapshot({
+    getPoolFn: () => ({ connect: async () => withPreparationLockFixture({
+      query: async () => ({ rows: [{ table_count: 1 }] }), release() {},
+    }) }),
+    loadSchemaAnchorContractFn: async () => { assert.fail('non-empty schema loaded anchor contract'); },
+  });
+  assert.equal(result.reason, 'schema_not_empty');
 });

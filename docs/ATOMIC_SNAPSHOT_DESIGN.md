@@ -64,9 +64,10 @@ effects, not arbitrary external SQL effects, consumed random values or hardware
 power loss. Larger future snapshots need renewed resource/lock-space qualification.
 Normal pending migration batches still commit per migration.
 
-Receipt identity does not establish every live DDL property. Schema-anchor
-comparison currently belongs to separate development validation. Next add
-pre-commit critical-anchor checks with missing/altered-anchor rollback proof.
+Receipt identity does not establish every live DDL property. The subsequent
+[schema anchor contract](SNAPSHOT_ANCHORS_DESIGN.md) adds 164 independent critical
+fact comparisons before COMMIT, with missing/altered-anchor rollback proof.
+Unanchored schema properties remain outside that contract.
 
 ## Evidence ownership
 

@@ -15,12 +15,15 @@ import { loadMigrationManifest, checksumSql } from '/app/server-dist/migration-m
 import { databasePreparationLockKey } from '/app/server-dist/database-preparation-lock-store.js';
 import { buildDatabaseMigrationStateReport } from '/app/server-dist/schema-migration-state-service.js';
 import { withWorkerTaskCleanup } from '/app/server-dist/worker-task-cleanup.js';
+import { loadSchemaAnchorContract } from '/app/server-dist/schema-anchor-contract-service.js';
+import { schemaAnchorProvenance } from '/app/server-dist/schema-anchor-contract-policy.js';
 import { createMigrationCommitProxy } from '../../testing/server/migration-commit-proxy.js';
 import { requireDeploymentMemoryProfile } from '../../testing/server/deployment-memory-profile.js';
 
 await requireDeploymentMemoryProfile();
 test('snapshot DDL and all lineage receipts commit together or roll back across real interruption and COMMIT loss', { timeout: 120_000 }, async t => {
   const admin = getPool(), baseline = await loadMigrationManifest(), results = []; let databasesRetired = 0;
+  const expectedAnchors = await loadSchemaAnchorContract({ snapshotSql: renderSchemaSnapshot({ migrations: baseline }), repoMigrations: baseline });
   async function until(probe, label) {
     const deadline = Date.now() + 10_000;
     while (!await probe()) { t.signal.throwIfAborted(); assert.ok(Date.now() < deadline, label); await new Promise(resolve => { setTimeout(resolve, 10); }); }
@@ -47,6 +50,7 @@ test('snapshot DDL and all lineage receipts commit together or roll back across 
     const bootstrap = (extra = [], overrides = {}) => {
       const manifest = [...baseline, ...extra];
       return bootstrapDatabaseSchemaFromSnapshot({ getPoolFn: () => writer,
+        loadSchemaAnchorContractFn: async input => ({ anchors: expectedAnchors.anchors, provenance: schemaAnchorProvenance(input) }),
         assertMigrationPreparationSafeFn: options => assertMigrationPreparationSafe({ ...options, loadMigrationManifestFn: async () => manifest }),
         readFileFn: async () => renderSchemaSnapshot({ migrations: manifest }), ...overrides });
     };
@@ -97,6 +101,31 @@ test('snapshot DDL and all lineage receipts commit together or roll back across 
       assert.deepEqual(await f.state(), before); assert.equal(await f.ownerGone(), true);
       assert.equal((await f.bootstrap()).bootstrapped, true); await f.receipts();
       results.push({ mode, entireSnapshotRolledBack: true, noOutsideFailedReceipt: true, reviewedRetryReceipts: 115 });
+    });
+    const corruptions = {
+      'missing-table': 'DROP TABLE public.import_candidate_search_revisions CASCADE;',
+      'missing-column': 'ALTER TABLE public.operation_runs DROP COLUMN summary;',
+      'nullable-column': 'ALTER TABLE public.operation_runs ALTER COLUMN status DROP NOT NULL;',
+      'weakened-constraint': 'ALTER TABLE public.library_external_request_release_intents DROP CONSTRAINT external_empty_search_budget; ALTER TABLE public.library_external_request_release_intents ADD CONSTRAINT external_empty_search_budget CHECK (true);',
+      'unvalidated-constraint': 'ALTER TABLE public.library_external_request_release_intents DROP CONSTRAINT external_empty_search_budget; ALTER TABLE public.library_external_request_release_intents ADD CONSTRAINT external_empty_search_budget CHECK (true) NOT VALID;',
+      'unenforced-constraint': 'ALTER TABLE public.library_external_request_release_intents DROP CONSTRAINT external_empty_search_budget; ALTER TABLE public.library_external_request_release_intents ADD CONSTRAINT external_empty_search_budget CHECK (true) NOT ENFORCED;',
+      'missing-index': 'DROP INDEX public.operation_runs_pending_dispatch_idx;',
+      'replaced-index': 'DROP INDEX public.operation_runs_pending_dispatch_idx; CREATE INDEX operation_runs_pending_dispatch_idx ON public.operation_runs(status);',
+      'disabled-trigger': 'ALTER TABLE public.app_users DISABLE TRIGGER app_users_root_authority_admission;',
+      'replaced-trigger-function': `DO $fixture$ DECLARE target text; BEGIN
+        SELECT p.oid::regprocedure::text INTO target FROM pg_trigger t JOIN pg_proc p ON p.oid=t.tgfoid
+        WHERE t.tgrelid='public.app_users'::regclass AND t.tgname='app_users_root_authority_admission';
+        EXECUTE 'CREATE OR REPLACE FUNCTION ' || target || ' RETURNS trigger LANGUAGE plpgsql AS ''BEGIN RETURN NEW; END''';
+        END $fixture$;`,
+    };
+    for (const [mode, sql] of Object.entries(corruptions)) await database(async f => {
+      const before = await f.state();
+      await assert.rejects(f.bootstrap([extra(sql)]), error => {
+        assert.equal(error.code, 'snapshot_schema_anchors_invalid'); assert.ok(error.anchors.length > 0); return true;
+      });
+      assert.deepEqual(await f.state(), before); assert.equal(await f.ownerGone(), true);
+      assert.equal((await f.bootstrap()).bootstrapped, true); await f.receipts();
+      results.push({ mode, entireSnapshotRolledBack: true, matchingLineageInsufficient: true, reviewedRetryReceipts: 115 });
     });
     await database(async f => {
       const before = await f.state();

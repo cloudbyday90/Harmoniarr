@@ -72,6 +72,14 @@ test('critical schema anchors include operation run lookup index', () => {
   );
 });
 
+test('critical schema anchor names use PostgreSQL stored identifiers, including truncated historical indexes', () => {
+  for (const entries of Object.values(criticalSchemaAnchors)) for (const entry of entries) {
+    for (const name of Object.values(entry)) assert.ok(Buffer.byteLength(name, 'utf8') <= 63, name);
+  }
+  assert.ok(criticalSchemaAnchors.indexes.some(anchor => anchor.index === 'operation_runs_operator_artist_reconciliation_pending_unique_id'));
+  assert.ok(criticalSchemaAnchors.indexes.some(anchor => anchor.index === 'operation_runs_operator_artist_reconciliation_running_unique_id'));
+});
+
 test('critical schema anchors include the single armed recovery index', () => {
   assert.deepEqual(criticalSchemaAnchors.indexes.find(anchor => anchor.index === 'admin_recovery_runs_one_armed_idx'),
     { index: 'admin_recovery_runs_one_armed_idx' });

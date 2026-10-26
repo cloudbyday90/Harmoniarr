@@ -7,6 +7,13 @@ Security source: `docs/SECURITY_POLICY.md`
 
 ## Current Status (2026-04-27)
 
+October 26, 2026 preparation hardening: fresh snapshot publication now requires
+complete migration lineage and 164 independently generated critical schema facts
+inside the same transaction. Historical SQL is unchanged. See the
+[anchor design](SNAPSHOT_ANCHORS_DESIGN.md) and [outcome](SNAPSHOT_ANCHORS_OUTCOME.md).
+Next: add a bounded read-only critical-anchor diagnostic for existing nonempty
+databases, preserving observation/maintenance boundaries and offering no repair.
+
 October 12 scan addition: `20261012_225951_scan_owned_receipt_invalidation.sql`
 adds UUID revision identity, generated path lookup and revision-bound negative
 observations. Replay preserves existing identities; snapshot/anchors include the

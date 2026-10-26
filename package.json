@@ -106,8 +106,8 @@
     "test:scripts": "node --test \"test/scripts/**/*.test.js\" \"test/compose-image-tag-policy.test.js\"",
     "test:server": "node --test \"test/server/**/*.test.js\"",
     "update:schema-snapshot": "node scripts/update-schema-snapshot.js",
-    "validate": "npm run check:node-baseline && npm run check-copyright && npm run migration:check && npm run check:schema-snapshot && npm run check:esm && npm run check:image-tags && npm run check:compose-topology && npm test && npm run build",
-    "validate:fast": "npm run check:node-baseline && npm run check-copyright && npm run migration:check && npm run check:schema-snapshot && npm run check:esm && npm run check:image-tags && npm run check:compose-topology && npm run lint && npm run check:test-hygiene && npm run test:server && npm run test:client && npm run test:scripts && npm run build",
+    "validate": "npm run check:node-baseline && npm run check-copyright && npm run migration:check && npm run check:schema-snapshot && npm run check:schema-anchor-contract && npm run check:esm && npm run check:image-tags && npm run check:compose-topology && npm test && npm run build",
+    "validate:fast": "npm run check:node-baseline && npm run check-copyright && npm run migration:check && npm run check:schema-snapshot && npm run check:schema-anchor-contract && npm run check:esm && npm run check:image-tags && npm run check:compose-topology && npm run lint && npm run check:test-hygiene && npm run test:server && npm run test:client && npm run test:scripts && npm run build",
     "validate:metadata-history-compatibility": "npm run build:client && node --test --test-concurrency=1 \"test/compatibility/metadata-history*.test.js\"",
     "manual:metadata-history": "npm run build:client && node scripts/run-manual-metadata-history.js",
     "validate:metadata-history-manual-fixture": "npm run build:client && node --test --test-concurrency=1 \"test/manual/*.test.js\"",
@@ -143,7 +143,9 @@
     "write:issue-4-evidence-map": "node scripts/render-issue-4-release-evidence-map.js",
     "validate:database": "npm run wait:database && npm run build:server && npm run prepare:database && npm run validate:schema-bootstrap",
     "update-copyright": "node scripts/update-copyright.js",
-    "add-copyright-headers": "node scripts/add-copyright-headers.js"
+    "add-copyright-headers": "node scripts/add-copyright-headers.js",
+    "check:schema-anchor-contract": "node scripts/check-schema-anchor-contract.js",
+    "update:schema-anchor-contract": "node scripts/update-schema-anchor-contract.js"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

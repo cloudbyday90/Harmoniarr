@@ -23,13 +23,17 @@ function fixture(options = {}) {
     return { command: sql === 'COMMIT' ? (options.commitCommand ?? 'COMMIT') : sql === 'ROLLBACK' ? 'ROLLBACK' : '', rows: options.rows ?? [row] };
   } };
   return { calls, discarded: () => discarded, run: () => executeSchemaSnapshotTransaction({ client, sql: 'SNAPSHOT_BODY',
+    assertSnapshotSchemaAnchorsFn: async ({ client: owned }) => {
+      assert.equal(owned, client); assert.equal(status, 'T'); calls.push('ANCHORS');
+      if (options.failAt === 'anchors') throw options.original;
+    },
     repoMigrations: [migration], markClientUnusable: () => { discarded = true; } }) };
 }
 
 test('snapshot body and complete key/checksum/status observation precede its single acknowledged commit', async () => {
   const f = fixture(); await f.run();
   assert.deepEqual(f.calls.slice(0, 4), ['BEGIN', 'SET LOCAL standard_conforming_strings = on', 'SET LOCAL synchronous_commit = on', 'SNAPSHOT_BODY']);
-  assert.match(f.calls[4], /SELECT filename, checksum, status/u); assert.equal(f.calls[5], 'COMMIT');
+  assert.match(f.calls[4], /SELECT filename, checksum, status/u); assert.equal(f.calls[5], 'ANCHORS'); assert.equal(f.calls[6], 'COMMIT');
   assert.equal(f.discarded(), false);
 });
 
@@ -43,7 +47,7 @@ test('missing, duplicate, unknown, wrong-key/checksum or non-applied receipts ro
 });
 
 test('snapshot body/verification Error and null survive rollback Error/null without outside journal writes', async () => {
-  for (const failAt of ['body', 'verify']) for (const original of [new Error('primary'), null]) {
+  for (const failAt of ['body', 'verify', 'anchors']) for (const original of [new Error('primary'), null]) {
     for (const secondary of [{}, { rollbackFailure: new Error('rollback') }, { rollbackFailure: null }]) {
       const f = fixture({ failAt, original, ...secondary });
       await assert.rejects(f.run(), error => error === original);

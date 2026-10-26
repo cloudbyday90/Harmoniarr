@@ -88,4 +88,5 @@ one transaction → full receipt verification → acknowledged commit. Benefit:
 atomic DDL/history. Cost: extra compilation, strict artifact matching and a larger
 transaction. It does not establish every live DDL property or authenticate an
 untrusted image. Next add pre-commit critical schema-anchor checks and native
-missing/altered-anchor rollback proof.
+missing/altered-anchor rollback proof. That follow-up is now recorded separately
+in the [schema anchor outcome](SNAPSHOT_ANCHORS_OUTCOME.md).

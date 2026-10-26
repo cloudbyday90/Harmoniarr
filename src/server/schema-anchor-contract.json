@@ -1,0 +1,1318 @@
+{
+  "anchors": {
+    "columns": {
+      "column.activity_events.event_type": {
+        "collation": "pg_catalog.default",
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "text"
+      },
+      "column.import_candidate_search_revisions.revision": {
+        "collation": null,
+        "default": "public.harmoniarr_generate_uuid()",
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "uuid"
+      },
+      "column.import_candidate_search_revisions.source_search_id": {
+        "collation": "pg_catalog.default",
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "text"
+      },
+      "column.job_leases.acquisition_id": {
+        "collation": null,
+        "default": "gen_random_uuid()",
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "uuid"
+      },
+      "column.library_external_request_collection_items.decision": {
+        "collation": "pg_catalog.default",
+        "default": "'pending'::text",
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "text"
+      },
+      "column.library_external_request_collections.requested_for_user_id": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "uuid"
+      },
+      "column.library_external_request_collections.revision": {
+        "collation": null,
+        "default": "1",
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "bigint"
+      },
+      "column.library_external_request_release_intents.empty_search_recovery_count": {
+        "collation": null,
+        "default": "0",
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "integer"
+      },
+      "column.library_external_request_release_intents.last_empty_search_at": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": false,
+        "type": "timestamp with time zone"
+      },
+      "column.library_external_request_release_intents.last_empty_search_run_id": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": false,
+        "type": "uuid"
+      },
+      "column.library_external_request_release_intents.operation_run_id": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": false,
+        "type": "uuid"
+      },
+      "column.library_external_request_release_intents.provider_evidence": {
+        "collation": null,
+        "default": "'{}'::jsonb",
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "jsonb"
+      },
+      "column.library_external_request_release_intents.requested_for_user_id": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "uuid"
+      },
+      "column.library_files.tag_extracted_modified_at": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": false,
+        "type": "timestamp with time zone"
+      },
+      "column.library_files.tag_extracted_size_bytes": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": false,
+        "type": "bigint"
+      },
+      "column.library_wanted_releases.app_user_id": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "uuid"
+      },
+      "column.media_requests.linked_request_id": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": false,
+        "type": "uuid"
+      },
+      "column.media_requests.matched_metadata_release_id": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": false,
+        "type": "uuid"
+      },
+      "column.media_requests.request_state": {
+        "collation": "pg_catalog.default",
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "text"
+      },
+      "column.media_requests.requested_by_user_id": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "uuid"
+      },
+      "column.media_requests.requested_for_user_id": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "uuid"
+      },
+      "column.metadata_artist_refresh_state.last_refreshed_at": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": false,
+        "type": "timestamp with time zone"
+      },
+      "column.metadata_artist_refresh_state.metadata_artist_id": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "uuid"
+      },
+      "column.metadata_artist_refresh_state.next_refresh_at": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": false,
+        "type": "timestamp with time zone"
+      },
+      "column.metadata_provider_response_cache.cache_key": {
+        "collation": "pg_catalog.default",
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "text"
+      },
+      "column.metadata_provider_response_cache.cache_namespace": {
+        "collation": "pg_catalog.default",
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "text"
+      },
+      "column.metadata_provider_response_cache.fetched_at": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "timestamp with time zone"
+      },
+      "column.notification_queue.claim_token": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": false,
+        "type": "uuid"
+      },
+      "column.notification_queue.expires_at": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "timestamp with time zone"
+      },
+      "column.notification_queue.terminal_at": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": false,
+        "type": "timestamp with time zone"
+      },
+      "column.operation_runs.operation_type": {
+        "collation": "pg_catalog.default",
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "text"
+      },
+      "column.operation_runs.status": {
+        "collation": "pg_catalog.default",
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "text"
+      },
+      "column.operation_runs.summary": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": false,
+        "type": "jsonb"
+      },
+      "column.operator_artist_monitoring.app_user_id": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "uuid"
+      },
+      "column.operator_artist_monitoring.metadata_artist_id": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "uuid"
+      },
+      "column.operator_artist_monitoring.release_scope": {
+        "collation": "pg_catalog.default",
+        "default": "'future_only'::text",
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "text"
+      },
+      "column.operator_artist_monitoring.wanted_automation_mode": {
+        "collation": "pg_catalog.default",
+        "default": "'future_matching'::text",
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "text"
+      },
+      "column.operator_artist_reconciliation_snapshot.snapshot_payload": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "jsonb"
+      },
+      "column.operator_artist_reconciliation_snapshot.snapshot_revision": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "bigint"
+      },
+      "column.operator_library_release_visibility.app_user_id": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "uuid"
+      },
+      "column.operator_library_release_visibility.metadata_release_id": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "uuid"
+      },
+      "column.operator_library_release_visibility.visibility_state": {
+        "collation": "pg_catalog.default",
+        "default": "'visible'::text",
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "text"
+      },
+      "column.operator_release_group_selection.selection_origin": {
+        "collation": "pg_catalog.default",
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": false,
+        "type": "text"
+      },
+      "column.operator_release_group_selection.selection_state": {
+        "collation": "pg_catalog.default",
+        "default": "'selected'::text",
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "text"
+      },
+      "column.operator_track_override.is_desired": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "boolean"
+      },
+      "column.operator_track_override.remap_status": {
+        "collation": "pg_catalog.default",
+        "default": "'resolved'::text",
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "text"
+      },
+      "column.operator_track_override.track_mbid": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": false,
+        "type": "uuid"
+      },
+      "column.operator_track_receipt_invalidations.disposition": {
+        "collation": "pg_catalog.default",
+        "default": "'missing'::text",
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "text"
+      },
+      "column.operator_track_receipt_invalidations.scan_acquisition_id": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "uuid"
+      },
+      "column.operator_track_receipts.app_user_id": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "uuid"
+      },
+      "column.operator_track_receipts.library_path": {
+        "collation": "pg_catalog.default",
+        "default": "(receipt #>> '{files,0,libraryPath}'::text[])",
+        "generated": "s",
+        "identity": "",
+        "notNull": false,
+        "type": "text"
+      },
+      "column.operator_track_receipts.metadata_release_id": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "uuid"
+      },
+      "column.operator_track_receipts.receipt": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "jsonb"
+      },
+      "column.operator_track_receipts.receipt_revision_id": {
+        "collation": null,
+        "default": "public.harmoniarr_generate_uuid()",
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "uuid"
+      },
+      "column.provider_ingest_requests.ingest_key": {
+        "collation": "pg_catalog.default",
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": false,
+        "type": "text"
+      },
+      "column.provider_ingest_requests.next_page_cursor": {
+        "collation": "pg_catalog.default",
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": false,
+        "type": "text"
+      },
+      "column.schema_migrations.checksum": {
+        "collation": "pg_catalog.default",
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "text"
+      },
+      "column.schema_migrations.filename": {
+        "collation": "pg_catalog.default",
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "text"
+      },
+      "column.schema_migrations.status": {
+        "collation": "pg_catalog.default",
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "text"
+      },
+      "column.slskd_search_intents.accepted_at": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": false,
+        "type": "timestamp with time zone"
+      },
+      "column.slskd_search_intents.expires_at": {
+        "collation": null,
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "timestamp with time zone"
+      },
+      "column.slskd_search_intents.provider_fingerprint": {
+        "collation": "pg_catalog.default",
+        "default": null,
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "text"
+      },
+      "column.user_push_subscriptions.registration_token": {
+        "collation": null,
+        "default": "public.harmoniarr_generate_uuid()",
+        "generated": "",
+        "identity": "",
+        "notNull": true,
+        "type": "uuid"
+      }
+    },
+    "constraints": {
+      "constraint.activity_events.activity_events_event_type_check": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK ((event_type = ANY (ARRAY['request_created'::text, 'request_cancelled'::text, 'request_reassigned'::text, 'download_completed'::text, 'release_added'::text, 'request_fulfilled'::text, 'artist_monitored'::text, 'artist_policy_saved'::text, 'quality_fallback_allowed'::text, 'music_queue_quality_blocked'::text, 'music_queue_search_queued'::text, 'music_queue_search_started'::text, 'music_queue_download_retrying'::text, 'music_queue_match_retrying'::text, 'music_queue_no_matches_left'::text, 'music_queue_download_failed'::text, 'music_queue_import_blocked'::text, 'music_queue_match_selected'::text, 'music_queue_download_queued'::text, 'music_queue_download_started'::text, 'music_queue_audio_checked'::text, 'music_queue_audio_warning'::text, 'music_queue_audio_check_failed'::text])))",
+        "enforced": true,
+        "noInherit": false,
+        "type": "c",
+        "validated": true
+      },
+      "constraint.import_candidate_search_revisions.import_candidate_search_revisions_pkey": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "PRIMARY KEY (source_search_id)",
+        "enforced": true,
+        "noInherit": true,
+        "type": "p",
+        "validated": true
+      },
+      "constraint.library_external_request_collection_items.external_collection_item_decision_consistent": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK ((((decision = 'pending'::text) AND (release_intent_id IS NULL) AND (exclusion_reason IS NULL) AND (decided_at IS NULL)) OR ((decision = 'included'::text) AND (item_kind = 'release'::text) AND (release_intent_id IS NOT NULL) AND (exclusion_reason IS NULL) AND (decided_at IS NOT NULL)) OR ((decision = 'excluded'::text) AND (release_intent_id IS NULL) AND (exclusion_reason IS NOT NULL) AND ((length(btrim(exclusion_reason)) >= 1) AND (length(btrim(exclusion_reason)) <= 500)) AND (decided_at IS NOT NULL))))",
+        "enforced": true,
+        "noInherit": false,
+        "type": "c",
+        "validated": true
+      },
+      "constraint.library_external_request_collection_items.external_collection_item_identity_unique": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "UNIQUE (media_request_id, item_key)",
+        "enforced": true,
+        "noInherit": true,
+        "type": "u",
+        "validated": true
+      },
+      "constraint.library_external_request_collections.external_collection_reviewed_state": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (((status = 'reviewed'::text) = (reviewed_at IS NOT NULL)))",
+        "enforced": true,
+        "noInherit": false,
+        "type": "c",
+        "validated": true
+      },
+      "constraint.library_external_request_release_intents.external_empty_search_budget": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK ((((empty_search_recovery_count >= 0) AND (empty_search_recovery_count <= 2)) AND ((empty_search_recovery_count = 0) OR (last_empty_search_at IS NOT NULL))))",
+        "enforced": true,
+        "noInherit": false,
+        "type": "c",
+        "validated": true
+      },
+      "constraint.library_external_request_release_intents.external_empty_search_observation": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (((last_empty_search_run_id IS NULL) = (last_empty_search_at IS NULL)))",
+        "enforced": true,
+        "noInherit": false,
+        "type": "c",
+        "validated": true
+      },
+      "constraint.library_external_request_release_intents.external_request_release_intents_provider_unique": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "UNIQUE (media_request_id, provider_key)",
+        "enforced": true,
+        "noInherit": true,
+        "type": "u",
+        "validated": true
+      },
+      "constraint.library_external_request_release_intents.external_request_release_intents_release_unique": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "UNIQUE (media_request_id, metadata_release_id)",
+        "enforced": true,
+        "noInherit": true,
+        "type": "u",
+        "validated": true
+      },
+      "constraint.library_wanted_releases.library_wanted_releases_user_release_unique": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "UNIQUE (app_user_id, metadata_release_id)",
+        "enforced": true,
+        "noInherit": true,
+        "type": "u",
+        "validated": true
+      },
+      "constraint.media_requests.media_requests_requested_for_user_id_fkey": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "FOREIGN KEY (requested_for_user_id) REFERENCES public.app_users(id) ON DELETE CASCADE",
+        "enforced": true,
+        "noInherit": true,
+        "type": "f",
+        "validated": true
+      },
+      "constraint.media_requests.media_requests_state_check": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK ((request_state = ANY (ARRAY['already_exists'::text, 'cancelled'::text, 'failed'::text, 'needs_fetch'::text, 'needs_review'::text])))",
+        "enforced": true,
+        "noInherit": false,
+        "type": "c",
+        "validated": true
+      },
+      "constraint.metadata_artist_refresh_state.metadata_artist_refresh_state_metadata_artist_id_fkey": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "FOREIGN KEY (metadata_artist_id) REFERENCES public.metadata_artists(id) ON DELETE CASCADE",
+        "enforced": true,
+        "noInherit": true,
+        "type": "f",
+        "validated": true
+      },
+      "constraint.metadata_artist_refresh_state.metadata_artist_refresh_state_pkey": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "PRIMARY KEY (metadata_artist_id)",
+        "enforced": true,
+        "noInherit": true,
+        "type": "p",
+        "validated": true
+      },
+      "constraint.metadata_provider_response_cache.metadata_provider_response_cache_namespace_key_unique": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "UNIQUE (cache_namespace, cache_key)",
+        "enforced": true,
+        "noInherit": true,
+        "type": "u",
+        "validated": true
+      },
+      "constraint.notification_queue.notification_queue_claim_pending_check": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (((claim_token IS NULL) OR (status = 'pending'::text)))",
+        "enforced": true,
+        "noInherit": false,
+        "type": "c",
+        "validated": true
+      },
+      "constraint.notification_queue.notification_queue_terminal_state_check": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK ((((status = 'pending'::text) AND (terminal_at IS NULL)) OR ((status = ANY (ARRAY['sent'::text, 'failed'::text, 'expired'::text])) AND (terminal_at IS NOT NULL) AND isfinite(terminal_at))))",
+        "enforced": true,
+        "noInherit": false,
+        "type": "c",
+        "validated": true
+      },
+      "constraint.operation_runs.operation_runs_pkey": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "PRIMARY KEY (id)",
+        "enforced": true,
+        "noInherit": true,
+        "type": "p",
+        "validated": true
+      },
+      "constraint.operator_artist_monitoring.operator_artist_monitoring_release_scope_check": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK ((release_scope = ANY (ARRAY['track_only'::text, 'future_only'::text, 'current_and_future'::text])))",
+        "enforced": true,
+        "noInherit": false,
+        "type": "c",
+        "validated": true
+      },
+      "constraint.operator_artist_monitoring.operator_artist_monitoring_user_artist_unique": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "UNIQUE (app_user_id, metadata_artist_id)",
+        "enforced": true,
+        "noInherit": true,
+        "type": "u",
+        "validated": true
+      },
+      "constraint.operator_artist_monitoring.operator_artist_monitoring_wanted_automation_mode_check": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK ((wanted_automation_mode = ANY (ARRAY['manual_only'::text, 'future_matching'::text, 'current_and_future_matching'::text])))",
+        "enforced": true,
+        "noInherit": false,
+        "type": "c",
+        "validated": true
+      },
+      "constraint.operator_artist_reconciliation_snapshot.operator_artist_reconciliation_snapshot_payload_object_check": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK ((jsonb_typeof(snapshot_payload) = 'object'::text))",
+        "enforced": true,
+        "noInherit": false,
+        "type": "c",
+        "validated": true
+      },
+      "constraint.operator_artist_reconciliation_snapshot.operator_artist_reconciliation_snapshot_revision_unique": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "UNIQUE (app_user_id, metadata_artist_id, snapshot_revision)",
+        "enforced": true,
+        "noInherit": true,
+        "type": "u",
+        "validated": true
+      },
+      "constraint.operator_library_release_visibility.operator_library_release_visibility_state_check": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK ((visibility_state = ANY (ARRAY['visible'::text, 'removed'::text])))",
+        "enforced": true,
+        "noInherit": false,
+        "type": "c",
+        "validated": true
+      },
+      "constraint.operator_library_release_visibility.operator_library_release_visibility_user_release_unique": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "UNIQUE (app_user_id, metadata_release_id)",
+        "enforced": true,
+        "noInherit": true,
+        "type": "u",
+        "validated": true
+      },
+      "constraint.operator_release_group_selection.operator_release_group_selection_origin_check": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (((selection_origin IS NULL) OR (selection_origin = ANY (ARRAY['manual_edition'::text, 'manual_inclusion'::text]))))",
+        "enforced": true,
+        "noInherit": false,
+        "type": "c",
+        "validated": true
+      },
+      "constraint.operator_release_group_selection.operator_release_group_selection_origin_source_check": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (((selection_origin IS NULL) OR (selection_source = 'manual'::text)))",
+        "enforced": true,
+        "noInherit": false,
+        "type": "c",
+        "validated": true
+      },
+      "constraint.operator_track_override.operator_track_override_identity_check": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (((track_mbid IS NOT NULL) OR ((recording_mbid IS NOT NULL) AND (medium_position IS NOT NULL) AND (track_position IS NOT NULL))))",
+        "enforced": true,
+        "noInherit": false,
+        "type": "c",
+        "validated": true
+      },
+      "constraint.operator_track_override.operator_track_override_remap_status_check": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK ((remap_status = ANY (ARRAY['resolved'::text, 'review_needed'::text, 'orphaned'::text])))",
+        "enforced": true,
+        "noInherit": false,
+        "type": "c",
+        "validated": true
+      },
+      "constraint.operator_track_receipt_invalidations.operator_track_receipt_invalidations_pkey": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "PRIMARY KEY (import_candidate_id, app_user_id)",
+        "enforced": true,
+        "noInherit": true,
+        "type": "p",
+        "validated": true
+      },
+      "constraint.operator_track_receipt_invalidations.operator_track_receipt_invalidations_revision_fkey": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "FOREIGN KEY (import_candidate_id, app_user_id, receipt_revision_id) REFERENCES public.operator_track_receipts(import_candidate_id, app_user_id, receipt_revision_id) ON DELETE CASCADE",
+        "enforced": true,
+        "noInherit": true,
+        "type": "f",
+        "validated": true
+      },
+      "constraint.operator_track_receipts.operator_track_receipts_binding_check": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK ((((jsonb_typeof(receipt) = 'object'::text) AND ((receipt -> 'version'::text) = '1'::jsonb) AND ((receipt ->> 'ownerId'::text) = (app_user_id)::text) AND ((receipt #>> '{scope,metadataReleaseId}'::text[]) = (metadata_release_id)::text)) IS TRUE))",
+        "enforced": true,
+        "noInherit": false,
+        "type": "c",
+        "validated": true
+      },
+      "constraint.operator_track_receipts.operator_track_receipts_import_candidate_id_fkey": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "FOREIGN KEY (import_candidate_id) REFERENCES public.import_candidates(id) ON DELETE CASCADE",
+        "enforced": true,
+        "noInherit": true,
+        "type": "f",
+        "validated": true
+      },
+      "constraint.operator_track_receipts.operator_track_receipts_pkey": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "PRIMARY KEY (import_candidate_id, app_user_id)",
+        "enforced": true,
+        "noInherit": true,
+        "type": "p",
+        "validated": true
+      },
+      "constraint.operator_track_receipts.operator_track_receipts_revision_unique": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "UNIQUE (import_candidate_id, app_user_id, receipt_revision_id)",
+        "enforced": true,
+        "noInherit": true,
+        "type": "u",
+        "validated": true
+      },
+      "constraint.schema_migrations.schema_migrations_filename_key": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "UNIQUE (filename)",
+        "enforced": true,
+        "noInherit": true,
+        "type": "u",
+        "validated": true
+      },
+      "constraint.slskd_search_intents.slskd_search_intents_discovery_request_id_fkey": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "FOREIGN KEY (discovery_request_id) REFERENCES public.library_discovery_requests(id) ON DELETE CASCADE",
+        "enforced": true,
+        "noInherit": true,
+        "type": "f",
+        "validated": true
+      },
+      "constraint.slskd_search_intents.slskd_search_intents_expiry_check": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK ((expires_at > created_at))",
+        "enforced": true,
+        "noInherit": false,
+        "type": "c",
+        "validated": true
+      },
+      "constraint.slskd_search_intents.slskd_search_intents_external_request_intent_id_fkey": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "FOREIGN KEY (external_request_intent_id) REFERENCES public.library_external_request_release_intents(id) ON DELETE CASCADE",
+        "enforced": true,
+        "noInherit": true,
+        "type": "f",
+        "validated": true
+      },
+      "constraint.slskd_search_intents.slskd_search_intents_fingerprint_check": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (((intent_fingerprint ~ '^[0-9a-f]{64}$'::text) AND (provider_fingerprint ~ '^[0-9a-f]{64}$'::text)))",
+        "enforced": true,
+        "noInherit": false,
+        "type": "c",
+        "validated": true
+      },
+      "constraint.slskd_search_intents.slskd_search_intents_owner_check": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK ((num_nonnulls(discovery_request_id, external_request_intent_id) = 1))",
+        "enforced": true,
+        "noInherit": false,
+        "type": "c",
+        "validated": true
+      }
+    },
+    "indexes": {
+      "index.admin_recovery_runs_one_armed_idx": {
+        "definition": "CREATE UNIQUE INDEX admin_recovery_runs_one_armed_idx ON public.admin_recovery_runs USING btree (status) WHERE (status = 'armed'::text)",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": true,
+        "valid": true
+      },
+      "index.external_collection_items_page_idx": {
+        "definition": "CREATE INDEX external_collection_items_page_idx ON public.library_external_request_collection_items USING btree (media_request_id, id)",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": false,
+        "valid": true
+      },
+      "index.idx_media_requests_created_at_id_desc": {
+        "definition": "CREATE INDEX idx_media_requests_created_at_id_desc ON public.media_requests USING btree (created_at DESC, id DESC)",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": false,
+        "valid": true
+      },
+      "index.import_candidates_quality_review_page_idx": {
+        "definition": "CREATE INDEX import_candidates_quality_review_page_idx ON public.import_candidates USING btree (source_search_id, id) WHERE (status = ANY (ARRAY['pending'::text, 'held'::text]))",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": false,
+        "valid": true
+      },
+      "index.library_wanted_releases_created_id_idx": {
+        "definition": "CREATE INDEX library_wanted_releases_created_id_idx ON public.library_wanted_releases USING btree (created_at DESC, id DESC)",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": false,
+        "valid": true
+      },
+      "index.library_wanted_releases_user_artist_idx": {
+        "definition": "CREATE INDEX library_wanted_releases_user_artist_idx ON public.library_wanted_releases USING btree (app_user_id, metadata_artist_id, last_reconciled_at DESC)",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": false,
+        "valid": true
+      },
+      "index.library_wanted_releases_user_created_id_idx": {
+        "definition": "CREATE INDEX library_wanted_releases_user_created_id_idx ON public.library_wanted_releases USING btree (app_user_id, created_at DESC, id DESC)",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": false,
+        "valid": true
+      },
+      "index.library_wanted_releases_user_status_idx": {
+        "definition": "CREATE INDEX library_wanted_releases_user_status_idx ON public.library_wanted_releases USING btree (app_user_id, wanted_status, last_reconciled_at DESC)",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": false,
+        "valid": true
+      },
+      "index.media_requests_musicbrainz_release_id_idx": {
+        "definition": "CREATE INDEX media_requests_musicbrainz_release_id_idx ON public.media_requests USING btree (musicbrainz_release_id) WHERE (musicbrainz_release_id IS NOT NULL)",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": false,
+        "valid": true
+      },
+      "index.media_requests_requested_for_user_created_at_idx": {
+        "definition": "CREATE INDEX media_requests_requested_for_user_created_at_idx ON public.media_requests USING btree (requested_for_user_id, created_at DESC)",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": false,
+        "valid": true
+      },
+      "index.metadata_artist_refresh_state_due_idx": {
+        "definition": "CREATE INDEX metadata_artist_refresh_state_due_idx ON public.metadata_artist_refresh_state USING btree (next_refresh_at, updated_at DESC)",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": false,
+        "valid": true
+      },
+      "index.metadata_provider_response_cache_fetched_at_idx": {
+        "definition": "CREATE INDEX metadata_provider_response_cache_fetched_at_idx ON public.metadata_provider_response_cache USING btree (fetched_at)",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": false,
+        "valid": true
+      },
+      "index.notification_queue_subscription_reference_idx": {
+        "definition": "CREATE INDEX notification_queue_subscription_reference_idx ON public.notification_queue USING btree (subscription_id) WHERE (subscription_id IS NOT NULL)",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": false,
+        "valid": true
+      },
+      "index.notification_queue_terminal_retention_idx": {
+        "definition": "CREATE INDEX notification_queue_terminal_retention_idx ON public.notification_queue USING btree (terminal_at, id) WHERE ((status = ANY (ARRAY['sent'::text, 'failed'::text, 'expired'::text])) AND (claim_token IS NULL))",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": false,
+        "valid": true
+      },
+      "index.operation_runs_active_quality_review_search_idx": {
+        "definition": "CREATE UNIQUE INDEX operation_runs_active_quality_review_search_idx ON public.operation_runs USING btree (((summary ->> 'wantedReleaseId'::text))) WHERE ((operation_type = 'quality_review_search'::text) AND (status = ANY (ARRAY['pending'::text, 'running'::text])))",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": true,
+        "valid": true
+      },
+      "index.operation_runs_operator_artist_reconciliation_pending_unique_id": {
+        "definition": "CREATE UNIQUE INDEX operation_runs_operator_artist_reconciliation_pending_unique_id ON public.operation_runs USING btree (((summary ->> 'appUserId'::text)), ((summary ->> 'metadataArtistId'::text))) WHERE ((operation_type = 'operator_artist_reconciliation'::text) AND (status = 'pending'::text) AND (summary ? 'appUserId'::text) AND (summary ? 'metadataArtistId'::text))",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": true,
+        "valid": true
+      },
+      "index.operation_runs_operator_artist_reconciliation_running_unique_id": {
+        "definition": "CREATE UNIQUE INDEX operation_runs_operator_artist_reconciliation_running_unique_id ON public.operation_runs USING btree (((summary ->> 'appUserId'::text)), ((summary ->> 'metadataArtistId'::text))) WHERE ((operation_type = 'operator_artist_reconciliation'::text) AND (status = 'running'::text) AND (summary ? 'appUserId'::text) AND (summary ? 'metadataArtistId'::text))",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": true,
+        "valid": true
+      },
+      "index.operation_runs_pending_dispatch_idx": {
+        "definition": "CREATE INDEX operation_runs_pending_dispatch_idx ON public.operation_runs USING btree (next_attempt_at, started_at, created_at) WHERE (status = 'pending'::text)",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": false,
+        "valid": true
+      },
+      "index.operation_runs_running_recovery_idx": {
+        "definition": "CREATE INDEX operation_runs_running_recovery_idx ON public.operation_runs USING btree (started_at, created_at) WHERE (status = 'running'::text)",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": false,
+        "valid": true
+      },
+      "index.operation_runs_type_started_idx": {
+        "definition": "CREATE INDEX operation_runs_type_started_idx ON public.operation_runs USING btree (operation_type, started_at DESC, created_at DESC)",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": false,
+        "valid": true
+      },
+      "index.operator_artist_monitoring_artist_idx": {
+        "definition": "CREATE INDEX operator_artist_monitoring_artist_idx ON public.operator_artist_monitoring USING btree (metadata_artist_id, updated_at DESC)",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": false,
+        "valid": true
+      },
+      "index.operator_artist_monitoring_refresh_eligibility_idx": {
+        "definition": "CREATE INDEX operator_artist_monitoring_refresh_eligibility_idx ON public.operator_artist_monitoring USING btree (metadata_artist_id, updated_at DESC) WHERE (is_monitored = true)",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": false,
+        "valid": true
+      },
+      "index.operator_artist_monitoring_user_monitored_idx": {
+        "definition": "CREATE INDEX operator_artist_monitoring_user_monitored_idx ON public.operator_artist_monitoring USING btree (app_user_id, is_monitored, updated_at DESC)",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": false,
+        "valid": true
+      },
+      "index.operator_artist_reconciliation_snapshot_latest_idx": {
+        "definition": "CREATE INDEX operator_artist_reconciliation_snapshot_latest_idx ON public.operator_artist_reconciliation_snapshot USING btree (app_user_id, metadata_artist_id, snapshot_revision DESC)",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": false,
+        "valid": true
+      },
+      "index.operator_library_release_visibility_release_idx": {
+        "definition": "CREATE INDEX operator_library_release_visibility_release_idx ON public.operator_library_release_visibility USING btree (metadata_release_id, updated_at DESC)",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": false,
+        "valid": true
+      },
+      "index.operator_library_release_visibility_user_state_idx": {
+        "definition": "CREATE INDEX operator_library_release_visibility_user_state_idx ON public.operator_library_release_visibility USING btree (app_user_id, visibility_state, updated_at DESC)",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": false,
+        "valid": true
+      },
+      "index.operator_track_override_artist_lookup_idx": {
+        "definition": "CREATE INDEX operator_track_override_artist_lookup_idx ON public.operator_track_override USING btree (app_user_id, metadata_artist_id, metadata_release_group_id)",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": false,
+        "valid": true
+      },
+      "index.operator_track_override_recording_fallback_unique": {
+        "definition": "CREATE UNIQUE INDEX operator_track_override_recording_fallback_unique ON public.operator_track_override USING btree (app_user_id, metadata_release_group_id, metadata_release_id, recording_mbid, medium_position, track_position) WHERE ((track_mbid IS NULL) AND (recording_mbid IS NOT NULL) AND (medium_position IS NOT NULL) AND (track_position IS NOT NULL))",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": true,
+        "valid": true
+      },
+      "index.operator_track_override_track_mbid_unique": {
+        "definition": "CREATE UNIQUE INDEX operator_track_override_track_mbid_unique ON public.operator_track_override USING btree (app_user_id, metadata_release_group_id, track_mbid) WHERE (track_mbid IS NOT NULL)",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": true,
+        "valid": true
+      },
+      "index.operator_track_receipts_owner_release_idx": {
+        "definition": "CREATE INDEX operator_track_receipts_owner_release_idx ON public.operator_track_receipts USING btree (app_user_id, metadata_release_id, import_candidate_id)",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": false,
+        "valid": true
+      },
+      "index.operator_track_receipts_scan_path_idx": {
+        "definition": "CREATE INDEX operator_track_receipts_scan_path_idx ON public.operator_track_receipts USING btree (lower(replace(library_path, chr(92), '/'::text)) text_pattern_ops)",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": false,
+        "valid": true
+      },
+      "index.provider_ingest_requests_identity_unique": {
+        "definition": "CREATE UNIQUE INDEX provider_ingest_requests_identity_unique ON public.provider_ingest_requests USING btree (media_request_id, ingest_key) WHERE (ingest_key IS NOT NULL)",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": true,
+        "valid": true
+      },
+      "index.slskd_search_intents_discovery_unique": {
+        "definition": "CREATE UNIQUE INDEX slskd_search_intents_discovery_unique ON public.slskd_search_intents USING btree (discovery_request_id, intent_fingerprint) WHERE (discovery_request_id IS NOT NULL)",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": true,
+        "valid": true
+      },
+      "index.slskd_search_intents_external_unique": {
+        "definition": "CREATE UNIQUE INDEX slskd_search_intents_external_unique ON public.slskd_search_intents USING btree (external_request_intent_id, intent_fingerprint) WHERE (external_request_intent_id IS NOT NULL)",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": true,
+        "valid": true
+      },
+      "index.user_push_subscriptions_invalidated_pruning_idx": {
+        "definition": "CREATE INDEX user_push_subscriptions_invalidated_pruning_idx ON public.user_push_subscriptions USING btree (invalidated_at, id) WHERE (invalidated_at IS NOT NULL)",
+        "live": true,
+        "nullsNotDistinct": false,
+        "ready": true,
+        "unique": false,
+        "valid": true
+      }
+    },
+    "tables": {
+      "table.activity_events": {
+        "forceRowSecurity": false,
+        "kind": "r",
+        "persistence": "p",
+        "rowSecurity": false
+      },
+      "table.import_candidate_search_revisions": {
+        "forceRowSecurity": false,
+        "kind": "r",
+        "persistence": "p",
+        "rowSecurity": false
+      },
+      "table.library_external_request_collection_items": {
+        "forceRowSecurity": false,
+        "kind": "r",
+        "persistence": "p",
+        "rowSecurity": false
+      },
+      "table.library_external_request_collections": {
+        "forceRowSecurity": false,
+        "kind": "r",
+        "persistence": "p",
+        "rowSecurity": false
+      },
+      "table.library_external_request_release_intents": {
+        "forceRowSecurity": false,
+        "kind": "r",
+        "persistence": "p",
+        "rowSecurity": false
+      },
+      "table.library_files": {
+        "forceRowSecurity": false,
+        "kind": "r",
+        "persistence": "p",
+        "rowSecurity": false
+      },
+      "table.library_wanted_releases": {
+        "forceRowSecurity": false,
+        "kind": "r",
+        "persistence": "p",
+        "rowSecurity": false
+      },
+      "table.media_requests": {
+        "forceRowSecurity": false,
+        "kind": "r",
+        "persistence": "p",
+        "rowSecurity": false
+      },
+      "table.metadata_artist_refresh_state": {
+        "forceRowSecurity": false,
+        "kind": "r",
+        "persistence": "p",
+        "rowSecurity": false
+      },
+      "table.metadata_provider_response_cache": {
+        "forceRowSecurity": false,
+        "kind": "r",
+        "persistence": "p",
+        "rowSecurity": false
+      },
+      "table.operation_runs": {
+        "forceRowSecurity": false,
+        "kind": "r",
+        "persistence": "p",
+        "rowSecurity": false
+      },
+      "table.operator_artist_monitoring": {
+        "forceRowSecurity": false,
+        "kind": "r",
+        "persistence": "p",
+        "rowSecurity": false
+      },
+      "table.operator_artist_reconciliation_snapshot": {
+        "forceRowSecurity": false,
+        "kind": "r",
+        "persistence": "p",
+        "rowSecurity": false
+      },
+      "table.operator_library_release_visibility": {
+        "forceRowSecurity": false,
+        "kind": "r",
+        "persistence": "p",
+        "rowSecurity": false
+      },
+      "table.operator_release_group_selection": {
+        "forceRowSecurity": false,
+        "kind": "r",
+        "persistence": "p",
+        "rowSecurity": false
+      },
+      "table.operator_track_override": {
+        "forceRowSecurity": false,
+        "kind": "r",
+        "persistence": "p",
+        "rowSecurity": false
+      },
+      "table.operator_track_receipt_invalidations": {
+        "forceRowSecurity": false,
+        "kind": "r",
+        "persistence": "p",
+        "rowSecurity": false
+      },
+      "table.operator_track_receipts": {
+        "forceRowSecurity": false,
+        "kind": "r",
+        "persistence": "p",
+        "rowSecurity": false
+      },
+      "table.schema_migrations": {
+        "forceRowSecurity": false,
+        "kind": "r",
+        "persistence": "p",
+        "rowSecurity": false
+      }
+    },
+    "triggers": {
+      "trigger.app_settings.app_settings_root_authority_admission": {
+        "definition": "CREATE TRIGGER app_settings_root_authority_admission BEFORE INSERT OR DELETE OR UPDATE ON public.app_settings FOR EACH STATEMENT EXECUTE FUNCTION public.harmoniarr_root_authority_admission()",
+        "enabled": "O",
+        "functionDefinition": "CREATE OR REPLACE FUNCTION public.harmoniarr_root_authority_admission()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'pg_catalog'\nAS $function$\nBEGIN\n  PERFORM pg_catalog.pg_advisory_xact_lock(\n    pg_catalog.hashtextextended('harmoniarr.library-request-projection', 0));\n  RETURN NULL;\nEND;\n$function$\n"
+      },
+      "trigger.app_users.app_users_root_authority_admission": {
+        "definition": "CREATE TRIGGER app_users_root_authority_admission BEFORE INSERT OR DELETE OR UPDATE OF id, is_disabled, managed_library_relative_root ON public.app_users FOR EACH STATEMENT EXECUTE FUNCTION public.harmoniarr_root_authority_admission()",
+        "enabled": "O",
+        "functionDefinition": "CREATE OR REPLACE FUNCTION public.harmoniarr_root_authority_admission()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'pg_catalog'\nAS $function$\nBEGIN\n  PERFORM pg_catalog.pg_advisory_xact_lock(\n    pg_catalog.hashtextextended('harmoniarr.library-request-projection', 0));\n  RETURN NULL;\nEND;\n$function$\n"
+      },
+      "trigger.import_candidates.import_candidates_search_revision_delete": {
+        "definition": "CREATE TRIGGER import_candidates_search_revision_delete AFTER DELETE ON public.import_candidates REFERENCING OLD TABLE AS old_candidates FOR EACH STATEMENT EXECUTE FUNCTION public.harmoniarr_rotate_candidate_search_revisions()",
+        "enabled": "O",
+        "functionDefinition": "CREATE OR REPLACE FUNCTION public.harmoniarr_rotate_candidate_search_revisions()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'pg_catalog', 'public'\nAS $function$\nDECLARE\n  search_ids text[];\n  search_id text;\nBEGIN\n  IF TG_OP = 'INSERT' THEN\n    SELECT array_agg(source_search_id ORDER BY source_search_id) INTO search_ids\n      FROM (SELECT DISTINCT source_search_id FROM new_candidates) affected;\n  ELSIF TG_OP = 'DELETE' THEN\n    SELECT array_agg(source_search_id ORDER BY source_search_id) INTO search_ids\n      FROM (SELECT DISTINCT source_search_id FROM old_candidates) affected;\n  ELSIF TG_OP = 'UPDATE' THEN\n    SELECT array_agg(source_search_id ORDER BY source_search_id) INTO search_ids\n      FROM (SELECT source_search_id FROM old_candidates UNION SELECT source_search_id FROM new_candidates) affected;\n  ELSE\n    SELECT array_agg(source_search_id ORDER BY source_search_id) INTO search_ids\n      FROM public.import_candidate_search_revisions;\n  END IF;\n  FOREACH search_id IN ARRAY COALESCE(search_ids, ARRAY[]::text[]) LOOP\n    INSERT INTO public.import_candidate_search_revisions (source_search_id, revision)\n      VALUES (search_id, public.harmoniarr_generate_uuid())\n      ON CONFLICT (source_search_id) DO UPDATE SET revision = EXCLUDED.revision;\n  END LOOP;\n  RETURN NULL;\nEND;\n$function$\n"
+      },
+      "trigger.import_candidates.import_candidates_search_revision_insert": {
+        "definition": "CREATE TRIGGER import_candidates_search_revision_insert AFTER INSERT ON public.import_candidates REFERENCING NEW TABLE AS new_candidates FOR EACH STATEMENT EXECUTE FUNCTION public.harmoniarr_rotate_candidate_search_revisions()",
+        "enabled": "O",
+        "functionDefinition": "CREATE OR REPLACE FUNCTION public.harmoniarr_rotate_candidate_search_revisions()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'pg_catalog', 'public'\nAS $function$\nDECLARE\n  search_ids text[];\n  search_id text;\nBEGIN\n  IF TG_OP = 'INSERT' THEN\n    SELECT array_agg(source_search_id ORDER BY source_search_id) INTO search_ids\n      FROM (SELECT DISTINCT source_search_id FROM new_candidates) affected;\n  ELSIF TG_OP = 'DELETE' THEN\n    SELECT array_agg(source_search_id ORDER BY source_search_id) INTO search_ids\n      FROM (SELECT DISTINCT source_search_id FROM old_candidates) affected;\n  ELSIF TG_OP = 'UPDATE' THEN\n    SELECT array_agg(source_search_id ORDER BY source_search_id) INTO search_ids\n      FROM (SELECT source_search_id FROM old_candidates UNION SELECT source_search_id FROM new_candidates) affected;\n  ELSE\n    SELECT array_agg(source_search_id ORDER BY source_search_id) INTO search_ids\n      FROM public.import_candidate_search_revisions;\n  END IF;\n  FOREACH search_id IN ARRAY COALESCE(search_ids, ARRAY[]::text[]) LOOP\n    INSERT INTO public.import_candidate_search_revisions (source_search_id, revision)\n      VALUES (search_id, public.harmoniarr_generate_uuid())\n      ON CONFLICT (source_search_id) DO UPDATE SET revision = EXCLUDED.revision;\n  END LOOP;\n  RETURN NULL;\nEND;\n$function$\n"
+      },
+      "trigger.import_candidates.import_candidates_search_revision_truncate": {
+        "definition": "CREATE TRIGGER import_candidates_search_revision_truncate AFTER TRUNCATE ON public.import_candidates FOR EACH STATEMENT EXECUTE FUNCTION public.harmoniarr_rotate_candidate_search_revisions()",
+        "enabled": "O",
+        "functionDefinition": "CREATE OR REPLACE FUNCTION public.harmoniarr_rotate_candidate_search_revisions()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'pg_catalog', 'public'\nAS $function$\nDECLARE\n  search_ids text[];\n  search_id text;\nBEGIN\n  IF TG_OP = 'INSERT' THEN\n    SELECT array_agg(source_search_id ORDER BY source_search_id) INTO search_ids\n      FROM (SELECT DISTINCT source_search_id FROM new_candidates) affected;\n  ELSIF TG_OP = 'DELETE' THEN\n    SELECT array_agg(source_search_id ORDER BY source_search_id) INTO search_ids\n      FROM (SELECT DISTINCT source_search_id FROM old_candidates) affected;\n  ELSIF TG_OP = 'UPDATE' THEN\n    SELECT array_agg(source_search_id ORDER BY source_search_id) INTO search_ids\n      FROM (SELECT source_search_id FROM old_candidates UNION SELECT source_search_id FROM new_candidates) affected;\n  ELSE\n    SELECT array_agg(source_search_id ORDER BY source_search_id) INTO search_ids\n      FROM public.import_candidate_search_revisions;\n  END IF;\n  FOREACH search_id IN ARRAY COALESCE(search_ids, ARRAY[]::text[]) LOOP\n    INSERT INTO public.import_candidate_search_revisions (source_search_id, revision)\n      VALUES (search_id, public.harmoniarr_generate_uuid())\n      ON CONFLICT (source_search_id) DO UPDATE SET revision = EXCLUDED.revision;\n  END LOOP;\n  RETURN NULL;\nEND;\n$function$\n"
+      },
+      "trigger.import_candidates.import_candidates_search_revision_update": {
+        "definition": "CREATE TRIGGER import_candidates_search_revision_update AFTER UPDATE ON public.import_candidates REFERENCING OLD TABLE AS old_candidates NEW TABLE AS new_candidates FOR EACH STATEMENT EXECUTE FUNCTION public.harmoniarr_rotate_candidate_search_revisions()",
+        "enabled": "O",
+        "functionDefinition": "CREATE OR REPLACE FUNCTION public.harmoniarr_rotate_candidate_search_revisions()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'pg_catalog', 'public'\nAS $function$\nDECLARE\n  search_ids text[];\n  search_id text;\nBEGIN\n  IF TG_OP = 'INSERT' THEN\n    SELECT array_agg(source_search_id ORDER BY source_search_id) INTO search_ids\n      FROM (SELECT DISTINCT source_search_id FROM new_candidates) affected;\n  ELSIF TG_OP = 'DELETE' THEN\n    SELECT array_agg(source_search_id ORDER BY source_search_id) INTO search_ids\n      FROM (SELECT DISTINCT source_search_id FROM old_candidates) affected;\n  ELSIF TG_OP = 'UPDATE' THEN\n    SELECT array_agg(source_search_id ORDER BY source_search_id) INTO search_ids\n      FROM (SELECT source_search_id FROM old_candidates UNION SELECT source_search_id FROM new_candidates) affected;\n  ELSE\n    SELECT array_agg(source_search_id ORDER BY source_search_id) INTO search_ids\n      FROM public.import_candidate_search_revisions;\n  END IF;\n  FOREACH search_id IN ARRAY COALESCE(search_ids, ARRAY[]::text[]) LOOP\n    INSERT INTO public.import_candidate_search_revisions (source_search_id, revision)\n      VALUES (search_id, public.harmoniarr_generate_uuid())\n      ON CONFLICT (source_search_id) DO UPDATE SET revision = EXCLUDED.revision;\n  END LOOP;\n  RETURN NULL;\nEND;\n$function$\n"
+      }
+    }
+  },
+  "provenance": {
+    "format": 1,
+    "lineageSha256": "32f1a096a3f2640b7e63b11d048421379cce176972589a2a6dc3bc6137be53d9",
+    "postgresMajor": 18,
+    "snapshotSha256": "92854560c17e063dfef809f5e984d8d9f510386395bafd510a39d32086a98573",
+    "specificationsSha256": "ce80223642da9aed14aaf7f04a7f9d68a39300ebe2de23748b36bc4713c06214"
+  }
+}

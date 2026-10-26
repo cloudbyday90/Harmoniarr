@@ -22,6 +22,7 @@ import { assertMigrationPreparationSafe } from './migration-preparation-service.
 import { withDatabasePreparation } from './database-preparation-owner-service.js';
 import { prepareSchemaSnapshotSql } from './schema-snapshot-plan-service.js';
 import { executeSchemaSnapshotTransaction } from './schema-snapshot-transaction-service.js';
+import { loadSchemaAnchorContract, assertSnapshotSchemaAnchors } from './schema-anchor-contract-service.js';
 
 export const defaultSchemaSnapshotPath = resolve(import.meta.dirname, 'schema-snapshot.sql');
 
@@ -41,6 +42,8 @@ export async function bootstrapDatabaseSchemaFromSnapshot({
   preparation,
   readFileFn = readFile,
   assertMigrationPreparationSafeFn = assertMigrationPreparationSafe,
+  loadSchemaAnchorContractFn = loadSchemaAnchorContract,
+  assertSnapshotSchemaAnchorsFn = assertSnapshotSchemaAnchors,
   schemaSnapshotPath = defaultSchemaSnapshotPath,
 } = {}) {
   return withDatabasePreparation({ getPoolFn, preparation }, async ({ client, markClientUnusable }) => {
@@ -62,7 +65,9 @@ export async function bootstrapDatabaseSchemaFromSnapshot({
     }
 
     const sql = prepareSchemaSnapshotSql({ snapshotSql, repoMigrations: plan.repoMigrations });
-    await executeSchemaSnapshotTransaction({ client, markClientUnusable, sql, repoMigrations: plan.repoMigrations });
+    const contract = await loadSchemaAnchorContractFn({ snapshotSql, repoMigrations: plan.repoMigrations });
+    await executeSchemaSnapshotTransaction({ client, markClientUnusable, sql, repoMigrations: plan.repoMigrations,
+      contract, assertSnapshotSchemaAnchorsFn });
 
     return {
       bootstrapped: true,

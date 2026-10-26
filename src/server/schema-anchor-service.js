@@ -156,8 +156,9 @@ export const criticalSchemaAnchors = Object.freeze({
     { index: 'operation_runs_pending_dispatch_idx' },
     { index: 'operation_runs_running_recovery_idx' },
     { index: 'operation_runs_type_started_idx' },
-    { index: 'operation_runs_operator_artist_reconciliation_pending_unique_idx' },
-    { index: 'operation_runs_operator_artist_reconciliation_running_unique_idx' },
+    // PostgreSQL stores these historical 64-byte identifiers at its 63-byte limit.
+    { index: 'operation_runs_operator_artist_reconciliation_pending_unique_id' },
+    { index: 'operation_runs_operator_artist_reconciliation_running_unique_id' },
     { index: 'media_requests_requested_for_user_created_at_idx' },
     { index: 'media_requests_musicbrainz_release_id_idx' },
     { index: 'idx_media_requests_created_at_id_desc' },
