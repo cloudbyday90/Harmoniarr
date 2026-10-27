@@ -3,16 +3,15 @@
  * Copyright (C) 2026 Harmoniarr Contributors
  * Licensed under GPL-3.0-or-later. See LICENSE.
  */
-import { getPool } from './database.js';
 import { lockAppUserEligibility } from './app-user-eligibility-lock-store.js';
 
 const credentialColumns = `id, username, role, must_change_password, last_login_at,
   is_disabled, password_hash, password_changed_at::text AS credential_epoch,
   failed_login_count, locked_until > clock_timestamp() AS login_locked`;
 
-export async function findPasswordLoginUser(identifier) {
+export async function findPasswordLoginUser(client, identifier) {
   const predicate = identifier.includes('@') ? 'lower(email)=$1' : 'username=$1';
-  const result = await getPool().query(`SELECT ${credentialColumns} FROM public.app_users WHERE ${predicate} LIMIT 1`, [identifier]);
+  const result = await client.query(`SELECT ${credentialColumns} FROM public.app_users WHERE ${predicate} LIMIT 1`, [identifier]);
   return result.rows[0] ?? null;
 }
 

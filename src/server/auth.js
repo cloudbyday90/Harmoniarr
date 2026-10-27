@@ -22,6 +22,7 @@ import { handleSessionReplay } from './session-replay-service.js';
 import { createSessionIssuanceService } from './session-issuance-service.js';
 import { createPasswordLoginService } from './password-login-service.js';
 import { createLoginFailureService } from './login-failure-service.js';
+import { readBootstrapRequired } from './auth-lookup-service.js';
 import { toSessionUser } from './session-user-policy.js';
 import { refreshTokenMaxAgeSeconds } from './session-issuance-policy.js';
 export { toSessionUser };
@@ -69,9 +70,8 @@ export function getRequestMetadata(request) {
   };
 }
 
-export async function isBootstrapRequired() {
-  const result = await getPool().query('SELECT EXISTS (SELECT 1 FROM app_users) AS has_users');
-  return !result.rows[0]?.has_users;
+export function isBootstrapRequired(options) {
+  return readBootstrapRequired(options);
 }
 
 export async function getSessionFromRequest(request) {

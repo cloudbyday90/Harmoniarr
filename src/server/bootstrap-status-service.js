@@ -26,8 +26,8 @@ export function createBootstrapStatusService({
   getBootstrapRequired = isBootstrapRequired,
   settingsService = createSettingsService(),
 } = {}) {
-  async function buildBootstrapStatusPayload() {
-    const bootstrapRequired = await getBootstrapRequired();
+  async function buildBootstrapStatusPayload({ signal } = {}) {
+    const bootstrapRequired = await getBootstrapRequired({ signal });
 
     if (!bootstrapRequired) {
       return {

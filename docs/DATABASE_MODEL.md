@@ -2,6 +2,12 @@
 
 ## Purpose
 
+Preliminary bootstrap and password-credential facts now use bounded read-only
+owners with cancellation and actual drainage. Read failures cannot authorize
+setup or become invalid-credential results. Security writes retain independent
+ownership. See the [read design](AUTH_LOOKUP_DESIGN.md) and
+[outcome](AUTH_LOOKUP_OUTCOME.md).
+
 Password login now binds the exact verified hash and credential epoch to current
 account admission, bookkeeping, root-session issuance and required audit in one
 bounded transaction without changing the schema. See the

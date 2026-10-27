@@ -12,7 +12,7 @@ function fixture(options = {}) {
   const accepted = { id: 'user', username: 'listener', password_hash: 'accepted-hash', credential_epoch: null,
     is_disabled: false, login_locked: false, failed_login_count: 3, ...options.accepted };
   const current = { ...accepted, role: 'requester', must_change_password: true, ...options.current };
-  const queries = [], events = [], failures = [], lookups = [];
+  const queries = [], events = [], failures = [], lookups = [], reads = [];
   let transactions = 0;
   const client = { async query(sql, values) {
     queries.push({ sql, values });
@@ -22,8 +22,8 @@ function fixture(options = {}) {
     if (sql.startsWith('INSERT')) return { rows: [{ id: 'token' }] };
     return { rows: [] };
   } };
-  const service = createPasswordLoginService({ isBootstrapRequiredFn: async () => options.bootstrap ?? false,
-    findUserFn: async identifier => { lookups.push(identifier); return options.missing ? null : accepted; },
+  const service = createPasswordLoginService({ isBootstrapRequiredFn: async readOptions => { reads.push(readOptions); return options.bootstrap ?? false; },
+    findUserFn: async (identifier, readOptions) => { reads.push(readOptions); lookups.push(identifier); return options.missing ? null : accepted; },
     verifyPasswordFn: async (...args) => { if (options.verify) return options.verify(...args); return options.valid ?? true; },
     handleLoginFailureFn: async (...args) => { failures.push(args); },
     startTransactionFn: work => { transactions++; return { result: Promise.resolve().then(async () => {
@@ -32,7 +32,7 @@ function fixture(options = {}) {
       return result;
     }) }; },
     recordAuditEventFn: async (event, queryable) => { assert.equal(queryable, client); events.push(event); if (options.auditError) throw options.auditError; } });
-  return { service, accepted, queries, events, failures, lookups, transactions: () => transactions };
+  return { service, accepted, queries, events, failures, lookups, reads, transactions: () => transactions };
 }
 
 test('password login publishes current role/forced-change state and an audit without credential secrets', async () => {
@@ -95,4 +95,11 @@ test('required audit or commit failure cannot return generated session credentia
     const f = fixture(options); await assert.rejects(f.service.loginUser(input()));
     assert.equal(f.events.length, 1); assert.equal(f.transactions(), 1);
   }
+});
+
+test('preliminary read cancellation is not passed to hashing or the admitted security-write owner', async () => {
+  const controller = new AbortController(), f = fixture({ verify: async () => { controller.abort(); return true; } });
+  const result = await f.service.loginUser({ ...input(), signal: controller.signal });
+  assert.deepEqual(f.reads, [{ signal: controller.signal }, { signal: controller.signal }]);
+  assert.equal(controller.signal.aborted, true); assert.equal(f.transactions(), 1); assert.equal(result.user.id, 'user');
 });

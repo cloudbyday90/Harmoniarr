@@ -1,5 +1,11 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 27 [authentication read rebuild](LOCAL_DOCKER_AUTH_LOOKUP_OUTCOME.md)
+records the current no-cache image, preserved administrator/data/five mounts and
+packaged PostgreSQL read/session/login/failure/rotation/replay qualification. See
+the [implementation outcome](AUTH_LOOKUP_OUTCOME.md) for bounded preliminary reads
+and independent verification/security writes.
+
 The October 27 [failed-login rebuild](LOCAL_DOCKER_LOGIN_FAILURE_OUTCOME.md)
 records the current no-cache image, preserved administrator/data/five mounts and
 packaged PostgreSQL failure/login/rotation/replay qualification. See the

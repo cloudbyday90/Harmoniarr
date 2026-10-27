@@ -12,7 +12,7 @@ import { getPool, closePool, buildConnectionConfig } from '/app/server-dist/data
 import { loginUser, handleLoginFailure } from '/app/server-dist/auth.js';
 import { createLoginFailureService } from '/app/server-dist/login-failure-service.js';
 import { createPasswordLoginService } from '/app/server-dist/password-login-service.js';
-import { findPasswordLoginUser } from '/app/server-dist/password-login-store.js';
+import { readPasswordLoginUser } from '/app/server-dist/auth-lookup-service.js';
 import { startSessionWriteTransaction } from '/app/server-dist/session-write-transaction-service.js';
 import { startServerRuntime } from '/app/server-dist/startup-runtime.js';
 import { drainApplicationWorkerOwners } from '/app/server-dist/application-worker-drain.js';
@@ -30,7 +30,7 @@ test('failed login owns current counters, lockout and required audit atomically'
   const metadata = { ipAddress: '127.0.0.1', userAgent: 'native-login-failure' };
   let runtime, userId, originalHash;
   function track(promise) { active.add(promise); promise.then(() => active.delete(promise), () => active.delete(promise)); return promise; }
-  const source = () => findPasswordLoginUser(username);
+  const source = () => readPasswordLoginUser(username);
   const fail = user => handleLoginFailure(user, metadata, username);
   const succeed = () => loginUser({ username, password, requestMetadata: metadata });
   const state = async () => (await observer.query(`SELECT failed_login_count, locked_until::text,

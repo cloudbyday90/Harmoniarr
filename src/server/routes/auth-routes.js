@@ -42,6 +42,7 @@ import {
 } from '../auth-response.js';
 import { asyncRoute, sanitizePageLimit } from '../http.js';
 import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
+import { withRequestReadSignal } from '../request-read-signal-service.js';
 
 const defaultAccountSecurityService = createAccountSecurityService();
 const defaultRequestAuthDependencies = createRequestAuthDependencies();
@@ -115,8 +116,9 @@ export function registerAuthRoutes(app, {
     return `${url.pathname}${url.search}`;
   }
 
-  app.get('/api/v1/bootstrap/status', asyncRoute(async (_request, response) => {
-    response.json(createBootstrapStatusResponse(await buildBootstrapStatusPayload()));
+  app.get('/api/v1/bootstrap/status', asyncRoute(async (request, response) => {
+    const payload = await withRequestReadSignal(request, signal => buildBootstrapStatusPayload({ signal }));
+    response.json(createBootstrapStatusResponse(payload));
   }));
 
   app.post('/api/v1/bootstrap/admin', limitBootstrapAdmin, asyncRoute(async (request, response) => {
@@ -135,11 +137,12 @@ export function registerAuthRoutes(app, {
 
   app.post('/api/v1/auth/login', limitLogin, asyncRoute(async (request, response) => {
     const requestMetadata = getRequestMetadata(request);
-    const { user, issuedSession } = await loginUser({
+    const { user, issuedSession } = await withRequestReadSignal(request, signal => loginUser({
       username: request.body?.username,
       password: request.body?.password,
       requestMetadata,
-    });
+      signal,
+    }));
     setAuthCookies(response, issuedSession.refreshToken, issuedSession.csrfToken);
 
     response.json(createAuthenticatedResponse(user, issuedSession));

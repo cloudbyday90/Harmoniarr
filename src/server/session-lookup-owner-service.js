@@ -10,11 +10,11 @@ import { createDatabaseClientRetirement } from './database-client-retirement-ser
 import { withWorkerTaskCleanup } from './worker-task-cleanup.js';
 
 export const sessionLookupTimeoutMs = 8_000;
-const unavailable = cause => Object.assign(createApiError(503, 'session_lookup_unavailable', 'Session verification is temporarily unavailable. Try again.'), { cause });
 
 /** Read authority on one checked-out client; never return an uncertain session to the pool. */
 export function startSessionLookup(work, { getPoolFn = getPool, signal, timeoutMs = sessionLookupTimeoutMs,
-  createRetirementFn = createDatabaseClientRetirement } = {}) {
+  createRetirementFn = createDatabaseClientRetirement, errorCode = 'session_lookup_unavailable' } = {}) {
+  const unavailable = cause => Object.assign(createApiError(503, errorCode, 'Session verification is temporarily unavailable. Try again.'), { cause });
   const task = startDeadlineTask(async scope => {
     scope.check();
     const client = await getPoolFn().connect();
@@ -61,5 +61,5 @@ export function startSessionLookup(work, { getPoolFn = getPool, signal, timeoutM
       }
     }));
   }, { signal, timeoutMs, createTimeoutError: () => unavailable() });
-  return { result: task.result.catch(cause => { if (cause?.code === 'session_lookup_unavailable') throw cause; throw unavailable(cause); }), drained: task.drained };
+  return { result: task.result.catch(cause => { if (cause?.code === errorCode) throw cause; throw unavailable(cause); }), drained: task.drained };
 }

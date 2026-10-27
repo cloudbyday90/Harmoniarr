@@ -171,14 +171,16 @@ test('auth login route passes request metadata to the injected shared login serv
     assert.equal(response.status, 200);
     assert.equal(loginUser.mock.callCount(), 1);
     assert.equal(setAuthCookies.mock.callCount(), 1);
-    assert.deepEqual(loginUser.mock.calls[0].arguments, [{
+    const [{ signal, ...loginInput }] = loginUser.mock.calls[0].arguments;
+    assert.ok(signal instanceof AbortSignal); assert.equal(signal.aborted, false);
+    assert.deepEqual(loginInput, {
       username: 'admin',
       password: 'secret-pass',
       requestMetadata: {
         ipAddress: '203.0.113.44',
         userAgent: 'HarmoniarrAuthTest/1.0',
       },
-    }]);
+    });
     assert.equal(setAuthCookies.mock.calls[0].arguments[1], 'refresh-4');
     assert.equal(setAuthCookies.mock.calls[0].arguments[2], 'csrf-4');
     assert.deepEqual(payload, {

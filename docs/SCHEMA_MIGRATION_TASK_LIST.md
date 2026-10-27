@@ -5,7 +5,7 @@ Database model source: `docs/DATABASE_MODEL.md`
 Recovery source: `docs/BACKUP_RESTORE_DESIGN.md`
 Security source: `docs/SECURITY_POLICY.md`
 
-## Current Status (2026-04-27)
+## Current Status (2026-10-27)
 
 October 26, 2026 preparation hardening: fresh snapshot publication now requires
 complete migration lineage and 164 independently generated critical schema facts
@@ -79,6 +79,14 @@ increments, lockout decisions and required audit commit together; active deadlin
 and reset credential epochs are preserved. No schema artifact changed. Next bound
 the preliminary login bootstrap/credential reads independently of security-write
 ownership. Provider/bootstrap issuance remains a separate later followup.
+
+Preliminary bootstrap/credential reads are now bounded in the
+[read design](AUTH_LOOKUP_DESIGN.md) and [outcome](AUTH_LOOKUP_OUTCOME.md), with
+[official research/tradeoffs](AUTH_LOOKUP_RESEARCH_2026_10.md). The existing read
+owner supplies local SQL limits, deadline, cancellation and retirement; required
+security writes remain independent. No schema artifact changed. Next bound
+password-verification admission and input size outside account locks, preserving
+password-manager compatibility. Non-password issuance remains later work.
 
 October 12 scan addition: `20261012_225951_scan_owned_receipt_invalidation.sql`
 adds UUID revision identity, generated path lookup and revision-bound negative

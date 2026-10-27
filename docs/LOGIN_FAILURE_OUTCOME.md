@@ -104,3 +104,9 @@ Next: bound preliminary bootstrap and credential reads independently of these
 security-write owners. Their current pool queries precede the transaction
 deadline. Keep successful verification outside account locks and preserve actual
 read cancellation/drainage. Non-password issuance/audit remains a later followup.
+
+October 27 follow-up: preliminary bootstrap and credential reads now use bounded
+read-only ownership, separate cancellation and actual native retirement. See the
+[read design](AUTH_LOOKUP_DESIGN.md) and [outcome](AUTH_LOOKUP_OUTCOME.md). The
+next-item paragraph above records this failure candidate's original scope;
+password-verification resource admission and non-password issuance remain separate.

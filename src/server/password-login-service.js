@@ -11,20 +11,21 @@ import { createSessionMaterial } from './session-issuance-policy.js';
 import { startSessionWriteTransaction } from './session-write-transaction-service.js';
 import { publishOwnedRootSession } from './session-root-publication-service.js';
 import { recordAuditEvent } from './audit.js';
-import { findPasswordLoginUser, lockPasswordLoginUser, recordSuccessfulPasswordLogin } from './password-login-store.js';
+import { lockPasswordLoginUser, recordSuccessfulPasswordLogin } from './password-login-store.js';
+import { readPasswordLoginUser } from './auth-lookup-service.js';
 
 const invalidCredentials = () => createApiError(401, 'invalid_credentials', 'Username or email and password combination is incorrect');
 const accountLocked = () => createApiError(423, 'account_locked', 'Account is temporarily locked after repeated failed logins');
 
 export function createPasswordLoginService({ isBootstrapRequiredFn, handleLoginFailureFn,
-  findUserFn = findPasswordLoginUser, verifyPasswordFn = verifyPassword,
+  findUserFn = readPasswordLoginUser, verifyPasswordFn = verifyPassword,
   startTransactionFn = startSessionWriteTransaction, recordAuditEventFn = recordAuditEvent,
   createMaterialFn = createSessionMaterial } = {}) {
-  return { async loginUser({ username, password, requestMetadata }) {
+  return { async loginUser({ username, password, requestMetadata, signal }) {
     const metadata = selectSessionAuditMetadata(requestMetadata);
-    if (await isBootstrapRequiredFn()) throw createApiError(409, 'bootstrap_required', 'Create the bootstrap admin account before logging in');
+    if (await isBootstrapRequiredFn({ signal })) throw createApiError(409, 'bootstrap_required', 'Create the bootstrap admin account before logging in');
     const identifier = normalizeLoginIdentifier(username), validatedPassword = validatePassword(password);
-    const user = await findUserFn(identifier);
+    const user = await findUserFn(identifier, { signal });
     const accepted = user ? { id: user.id, password_hash: user.password_hash, credential_epoch: user.credential_epoch } : null;
     if (!user || user.is_disabled) {
       await handleLoginFailureFn(accepted, metadata, identifier, { countFailure: false });
