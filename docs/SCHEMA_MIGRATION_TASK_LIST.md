@@ -63,6 +63,15 @@ Guarded startup migrations remain automatic; arbitrary drift is never repaired
 by diagnostics. No schema artifact changed. Next return to root login's verified
 credential epoch/required audit ownership; it remains postponed, not completed.
 
+That password-login transaction is now implemented in the
+[login design](PASSWORD_LOGIN_DESIGN.md) and [outcome](PASSWORD_LOGIN_OUTCOME.md),
+with [official research/tradeoffs](PASSWORD_LOGIN_RESEARCH_2026_10.md). Exact
+verified hash/epoch comparison, current account admission, successful-login
+bookkeeping, root issuance and required audit share one bounded owner. No schema
+artifact changed. Next give failed-login counters/lockout and required failure
+audit a bounded atomic account owner; their current stale count projection can
+lose concurrent failures. Provider/bootstrap issuance remains a separate followup.
+
 October 12 scan addition: `20261012_225951_scan_owned_receipt_invalidation.sql`
 adds UUID revision identity, generated path lookup and revision-bound negative
 observations. Replay preserves existing identities; snapshot/anchors include the

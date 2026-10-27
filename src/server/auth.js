@@ -20,10 +20,12 @@ import { getPool } from './database.js';
 import { readRequestSessionRow } from './session-lookup-service.js';
 import { handleSessionReplay } from './session-replay-service.js';
 import { createSessionIssuanceService } from './session-issuance-service.js';
+import { createPasswordLoginService } from './password-login-service.js';
 import { toSessionUser } from './session-user-policy.js';
 import { refreshTokenMaxAgeSeconds } from './session-issuance-policy.js';
 export { toSessionUser };
 const sessionIssuance = createSessionIssuanceService();
+const passwordLogin = createPasswordLoginService({ isBootstrapRequiredFn: isBootstrapRequired, handleLoginFailureFn: handleLoginFailure });
 import {
   csrfProtectionModeEnvVar,
   csrfProtectionModes,
@@ -35,7 +37,6 @@ import {
   hashToken,
   parseCookieHeader,
   serializeCookie,
-  verifyPassword,
 } from './security.js';
 export { csrfProtectionModeEnvVar, csrfProtectionModes, resolveCsrfProtectionMode };
 import { recordAuditEvent } from './audit.js';
@@ -381,61 +382,8 @@ export async function createBootstrapAdmin({
   };
 }
 
-export async function loginUser({ username, password, requestMetadata }) {
-  if (await isBootstrapRequired()) {
-    throw createApiError(409, 'bootstrap_required', 'Create the bootstrap admin account before logging in');
-  }
-
-  const normalizedIdentifier = normalizeLoginIdentifier(username);
-  const validatedPassword = validatePassword(password);
-  const user = await findUserByLoginIdentifier(normalizedIdentifier);
-
-  if (!user || user.is_disabled) {
-    await handleLoginFailure(user, requestMetadata, normalizedIdentifier);
-    throw createApiError(401, 'invalid_credentials', 'Username or email and password combination is incorrect');
-  }
-
-  if (user.locked_until && new Date(user.locked_until).getTime() > Date.now()) {
-    throw createApiError(423, 'account_locked', 'Account is temporarily locked after repeated failed logins');
-  }
-
-  if (!await verifyPassword(validatedPassword, user.password_hash)) {
-    await handleLoginFailure(user, requestMetadata, normalizedIdentifier);
-    throw createApiError(401, 'invalid_credentials', 'Username or email and password combination is incorrect');
-  }
-
-  await getPool().query(
-    `
-      UPDATE app_users
-      SET failed_login_count = 0,
-          locked_until = NULL,
-          last_login_at = NOW(),
-          updated_at = NOW()
-      WHERE id = $1
-    `,
-    [user.id],
-  );
-
-  const issuedSession = await issueSession({ userId: user.id, requestMetadata });
-
-  await recordAuditEvent({
-    actorUserId: user.id,
-    actorType: 'user',
-    eventType: 'login_succeeded',
-    summary: 'User login succeeded',
-    entityType: 'app_user',
-    entityId: user.id,
-    ipAddress: requestMetadata.ipAddress,
-    userAgent: requestMetadata.userAgent,
-  });
-
-  return {
-    user: {
-      ...user,
-      last_login_at: new Date().toISOString(),
-    },
-    issuedSession,
-  };
+export function loginUser(input) {
+  return passwordLogin.loginUser(input);
 }
 
 export function rotateSession(session, requestMetadata) {

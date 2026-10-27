@@ -117,3 +117,9 @@ currently remains a separate statement after issuance.
 See [design](SESSION_ROTATION_DESIGN.md),
 [Docker design](LOCAL_DOCKER_SESSION_ROTATION_DESIGN.md) and
 [Docker outcome](LOCAL_DOCKER_SESSION_ROTATION_OUTCOME.md).
+
+October 27 follow-up: password login's verified credential state, bookkeeping,
+root issuance and required audit now share a bounded transaction. See the
+[login design](PASSWORD_LOGIN_DESIGN.md) and [outcome](PASSWORD_LOGIN_OUTCOME.md).
+The next-item wording above records the original rotation candidate's remaining
+scope; failed-login and non-password issuance have separate followups.

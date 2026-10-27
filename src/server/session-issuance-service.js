@@ -11,6 +11,7 @@ import { lockSessionOwner, lockSessionFamily } from './session-family-lock-store
 import { selectSessionAuditMetadata } from './session-audit-metadata.js';
 import { createSessionMaterial, toIssuedSession } from './session-issuance-policy.js';
 import { toSessionUser } from './session-user-policy.js';
+import { publishOwnedRootSession } from './session-root-publication-service.js';
 import { applySessionReplay } from './session-replay-service.js';
 import { lockRotationParent, insertSessionToken, replaceSessionParent, assertRotationNotExpired } from './session-issuance-store.js';
 
@@ -28,9 +29,7 @@ export function createSessionIssuanceService({ startTransactionFn = startSession
     return publish(await startTransactionFn(async (client, check) => {
       const owner = await lockSessionOwner(client, userId); check();
       if (!owner || owner.is_disabled) return { refusal: 'auth_required' };
-      await lockSessionFamily(client, material.tokenFamilyId); check();
-      const id = await insertSessionToken(client, { userId, material, metadata });
-      return { issuedSession: toIssuedSession(material, id, toSessionUser(owner)) };
+      return { issuedSession: await publishOwnedRootSession(client, { owner, material, metadata }, check) };
     }).result);
   }
 

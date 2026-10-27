@@ -2,6 +2,12 @@
 
 ## Purpose
 
+Password login now binds the exact verified hash and credential epoch to current
+account admission, bookkeeping, root-session issuance and required audit in one
+bounded transaction without changing the schema. See the
+[login design](PASSWORD_LOGIN_DESIGN.md) and [outcome](PASSWORD_LOGIN_OUTCOME.md).
+Failed-login counter/audit ownership remains a followup.
+
 Routine schema observation now runs through automatic startup/hourly maintenance,
 with recovery pauses and cached administrator status. Guarded startup migration
 preparation remains the schema write owner; no repair or new table is introduced.
@@ -11,8 +17,8 @@ See the [maintenance design](AUTO_SCHEMA_MAINTENANCE_DESIGN.md) and
 Session rotation/root issuance now use bounded transactions with shared account/
 family locking and current parent CAS, without changing the schema. See the
 [rotation design](SESSION_ROTATION_DESIGN.md) and
-[outcome](SESSION_ROTATION_OUTCOME.md). Root login's verified credential epoch and
-required login audit still need one owner.
+[outcome](SESSION_ROTATION_OUTCOME.md). Password login's additional credential and
+audit ownership is recorded in the login design above.
 
 Rotated-token replay now owns family revocation and its required audit in one
 bounded transaction without changing the schema. See the

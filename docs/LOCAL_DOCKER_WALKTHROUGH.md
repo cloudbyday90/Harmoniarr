@@ -1,5 +1,11 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 27 [password login rebuild](LOCAL_DOCKER_PASSWORD_LOGIN_OUTCOME.md)
+records the current no-cache image, preserved administrator/data/five mounts and
+packaged PostgreSQL login/rotation/replay qualification. See the
+[implementation outcome](PASSWORD_LOGIN_OUTCOME.md) for exact verified credential
+binding and atomic successful-login bookkeeping/session/audit.
+
 The October 27 [automatic schema maintenance rebuild](LOCAL_DOCKER_AUTO_SCHEMA_MAINTENANCE_OUTCOME.md)
 records the current no-cache image, preserved administrator/data/five mounts and
 packaged PostgreSQL qualification. See the [implementation outcome](AUTO_SCHEMA_MAINTENANCE_OUTCOME.md)
