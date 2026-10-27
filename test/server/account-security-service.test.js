@@ -48,67 +48,13 @@ test('account security service lists active sessions with the current session fi
   assert.equal(sessions[1].isCurrent, false);
 });
 
-test('account security service changes password, clears must-change state, and issues a new session', async (t) => {
-  const pool = createPool(t, [
-    {
-      rows: [{
-        id: 'user-1',
-        username: 'admin',
-        role: 'admin',
-        password_hash: 'stored-hash',
-        must_change_password: true,
-        last_login_at: '2026-05-01T11:00:00.000Z',
-      }],
-    },
-    {
-      rows: [{
-        id: 'user-1',
-        username: 'admin',
-        role: 'admin',
-        must_change_password: false,
-        last_login_at: '2026-05-01T11:00:00.000Z',
-      }],
-    },
-    {
-      rowCount: 2,
-      rows: [],
-    },
-  ]);
-  const issueSessionFn = t.mock.fn(async () => ({
-    csrfToken: 'csrf-next',
-    refreshToken: 'refresh-next',
-  }));
-  const recordAuditEventFn = t.mock.fn(async () => {});
-  const verifyPasswordFn = t.mock.fn(async (candidate) => candidate === 'current-password');
-  const service = createAccountSecurityService({
-    getPoolFn: () => pool,
-    hashPasswordFn: t.mock.fn(async () => 'next-password-hash'),
-    issueSessionFn,
-    recordAuditEventFn,
-    validatePasswordFn: (value) => value,
-    verifyPasswordFn,
-  });
-
-  const result = await service.changePassword({
-    currentPassword: 'current-password',
-    newPassword: 'next-password',
-    requestMetadata: { ipAddress: '203.0.113.50', userAgent: 'AccountSecurityTest/1.0' },
-    session: { appUserId: 'user-1' },
-  });
-
-  assert.equal(pool.query.mock.callCount(), 3);
-  assert.equal(issueSessionFn.mock.callCount(), 1);
-  assert.equal(result.user.must_change_password, false);
-  assert.equal(result.issuedSession.refreshToken, 'refresh-next');
-  assert.equal(recordAuditEventFn.mock.callCount(), 1);
-  assert.deepEqual(recordAuditEventFn.mock.calls[0].arguments[0].details, {
-    revokedSessionCount: 2,
-  });
-  assert.deepEqual(issueSessionFn.mock.calls[0].arguments[0], {
-    requestMetadata: { ipAddress: '203.0.113.50', userAgent: 'AccountSecurityTest/1.0' },
-    userId: 'user-1',
-  });
-  assert.equal(verifyPasswordFn.mock.callCount(), 2);
+test('account security delegates password changes to its dedicated transaction owner', async (t) => {
+  const expected = { user: { id: 'user' }, issuedSession: { refreshToken: 'private' } };
+  const passwordChangeService = { changePassword: t.mock.fn(async () => expected) };
+  const service = createAccountSecurityService({ passwordChangeService });
+  const input = { currentPassword: 'current', newPassword: 'next', session: { appUserId: 'user' } };
+  assert.equal(await service.changePassword(input), expected);
+  assert.equal(passwordChangeService.changePassword.mock.calls[0].arguments[0], input);
 });
 
 test('account security service lists recent activity through the shared audit read service', async (t) => {

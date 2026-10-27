@@ -2,6 +2,13 @@
 
 ## Purpose
 
+Password changes now use a bounded transaction that fences the verified hash/full
+credential epoch and initiating token under account/family ownership. Credential
+replacement, complete prior-session revocation, a new root session and required
+audit commit together. KDF work stays outside SQL. See the
+[change design](PASSWORD_CHANGE_DESIGN.md) and [outcome](PASSWORD_CHANGE_OUTCOME.md).
+No schema artifact changed. External-provider login ownership is the next task.
+
 Password hashing and verification now share process-local admission with two
 submitted jobs and no application queue, plus a 4096-byte UTF-8 input limit.
 Legacy hash verification remains compatible. New hashes use versioned scrypt
@@ -10,7 +17,7 @@ conditionally publishes it with login/session/audit writes. The credential epoch
 and existing sessions remain valid. See the [hash design](PASSWORD_HASH_DESIGN.md)
 and [outcome](PASSWORD_HASH_OUTCOME.md), plus the
 [work design](PASSWORD_WORK_DESIGN.md). The existing TEXT column needs no schema
-change. Atomic current-credential-owned password change is the next boundary.
+change. Current-credential-owned password change is recorded above.
 
 Preliminary bootstrap and password-credential facts now use bounded read-only
 owners with cancellation and actual drainage. Read failures cannot authorize

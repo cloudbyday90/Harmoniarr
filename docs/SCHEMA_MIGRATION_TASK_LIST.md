@@ -107,6 +107,16 @@ current-credential transaction owner covering credential replacement, session
 revocation/reissuance and required audit. Its current multi-step writes can leave
 partial outcomes; hash preparation should remain outside the write owner.
 
+Atomic password change is now implemented in the
+[change design](PASSWORD_CHANGE_DESIGN.md) and [outcome](PASSWORD_CHANGE_OUTCOME.md),
+with [official research/tradeoffs](PASSWORD_CHANGE_RESEARCH_2026_10.md). Bounded
+preliminary reads/KDF preparation precede current account, exact credential epoch
+and exact initiating-token admission. Credential replacement, complete old-session
+revocation, new root issuance and required audit share one bounded transaction.
+No schema artifact changed. Next give external-provider login compatible current
+linked-account admission and atomic bookkeeping/root issuance/required audit;
+`loginLinkedUser` still performs those writes separately.
+
 October 12 scan addition: `20261012_225951_scan_owned_receipt_invalidation.sql`
 adds UUID revision identity, generated path lookup and revision-bound negative
 observations. Replay preserves existing identities; snapshot/anchors include the

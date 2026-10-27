@@ -1,5 +1,11 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 27 [atomic password-change rebuild](LOCAL_DOCKER_PASSWORD_CHANGE_OUTCOME.md)
+records the current no-cache image, preserved administrator/data/five mounts and
+packaged 2/3 GiB command qualification plus affected auth regressions. See the
+[implementation outcome](PASSWORD_CHANGE_OUTCOME.md) for credential/session/audit
+ownership, current-parent fencing and conservative retry behavior.
+
 The October 27 [versioned password-hash rebuild](LOCAL_DOCKER_PASSWORD_HASH_OUTCOME.md)
 records the current no-cache image, preserved administrator/data/five mounts and
 packaged 2/3 GiB upgrade/native-work qualification with auth transaction controls.

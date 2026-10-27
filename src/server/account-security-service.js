@@ -20,12 +20,10 @@ import { createAuditReadService } from './audit-read-service.js';
 import { recordAuditEvent } from './audit.js';
 import {
   createApiError,
-  issueSession,
   revokeRefreshToken,
 } from './auth.js';
 import { getPool } from './database.js';
-import { hashPassword, verifyPassword } from './security.js';
-import { validatePassword } from './validators/auth-validator.js';
+import { createPasswordChangeService } from './password-change-service.js';
 
 function toActiveSession(row, currentRefreshTokenId) {
   return {
@@ -42,18 +40,10 @@ function toActiveSession(row, currentRefreshTokenId) {
 export function createAccountSecurityService({
   auditReadService = createAuditReadService(),
   getPoolFn = getPool,
-  hashPasswordFn = hashPassword,
-  issueSessionFn = issueSession,
+  passwordChangeService = createPasswordChangeService(),
   recordAuditEventFn = recordAuditEvent,
   revokeRefreshTokenFn = revokeRefreshToken,
-  validatePasswordFn = validatePassword,
-  verifyPasswordFn = verifyPassword,
 } = {}) {
-  async function getUserById(userId) {
-    const result = await getPoolFn().query('SELECT * FROM app_users WHERE id = $1 LIMIT 1', [userId]);
-    return result.rows[0] ?? null;
-  }
-
   async function revokeAllUserSessions(appUserId, revokedReason) {
     const result = await getPoolFn().query(
       `
@@ -143,64 +133,6 @@ export function createAccountSecurityService({
     };
   }
 
-  async function changePassword({ currentPassword, newPassword, requestMetadata, session }) {
-    const user = await getUserById(session.appUserId);
-    if (!user || user.is_disabled) {
-      throw createApiError(401, 'auth_required', 'Authentication is required');
-    }
-
-    const validatedCurrentPassword = validatePasswordFn(currentPassword);
-    const validatedNewPassword = validatePasswordFn(newPassword);
-
-    if (!await verifyPasswordFn(validatedCurrentPassword, user.password_hash)) {
-      throw createApiError(401, 'current_password_invalid', 'Current password is incorrect');
-    }
-
-    if (await verifyPasswordFn(validatedNewPassword, user.password_hash)) {
-      throw createApiError(400, 'validation_error', 'New password must be different from the current password');
-    }
-
-    const passwordHash = await hashPasswordFn(validatedNewPassword);
-    const updateResult = await getPoolFn().query(
-      `
-        UPDATE app_users
-        SET password_hash = $2,
-            must_change_password = FALSE,
-            password_changed_at = NOW(),
-            updated_at = NOW()
-        WHERE id = $1
-        RETURNING *
-      `,
-      [session.appUserId, passwordHash],
-    );
-
-    const updatedUser = updateResult.rows[0];
-    const revokedSessionCount = await revokeAllUserSessions(session.appUserId, 'password_changed');
-    const issuedSession = await issueSessionFn({
-      requestMetadata,
-      userId: session.appUserId,
-    });
-
-    await recordAuditEventFn({
-      actorUserId: session.appUserId,
-      actorType: 'user',
-      entityId: session.appUserId,
-      entityType: 'app_user',
-      eventType: 'password_changed',
-      summary: 'User password changed',
-      details: {
-        revokedSessionCount,
-      },
-      ipAddress: requestMetadata?.ipAddress ?? null,
-      userAgent: requestMetadata?.userAgent ?? null,
-    });
-
-    return {
-      issuedSession,
-      user: updatedUser,
-    };
-  }
-
   async function adminRevokeUserSession({ adminUserId, refreshTokenId, requestMetadata }) {
     const tokenResult = await getPoolFn().query(
       `
@@ -285,7 +217,7 @@ export function createAccountSecurityService({
   return {
     adminRevokeAllUserSessions,
     adminRevokeUserSession,
-    changePassword,
+    changePassword: passwordChangeService.changePassword,
     listActiveSessions,
     listRecentActivity,
     revokeSession,

@@ -1,5 +1,10 @@
 # Versioned password hash outcome
 
+Followup on October 27: the recommended password-change owner is implemented in
+the [change design](PASSWORD_CHANGE_DESIGN.md) and [outcome](PASSWORD_CHANGE_OUTCOME.md).
+Credential replacement, old-session revocation, replacement issuance and required
+audit now share one bounded current-credential/current-parent transaction.
+
 October 27, 2026. The existing application now generates versioned scrypt hashes
 and upgrades legacy hashes during successful password login. Work remains on
 main with modular ESM files and no new service, dependency or schema migration.
