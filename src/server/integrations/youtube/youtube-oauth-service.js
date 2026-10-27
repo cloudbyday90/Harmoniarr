@@ -23,29 +23,18 @@ import { createProviderCredentialsService } from '../providers/provider-credenti
 import { getPool } from '../../database.js';
 import { loadSettings } from '../../settings.js';
 import { recordAuditEvent } from '../../audit.js';
-import { awaitProviderRequest } from '../provider-request-cancellation.js';
+import { createProviderHttpService } from '../providers/provider-http-service.js';
+import { createProviderJsonRequestService } from '../providers/provider-json-request-service.js';
 
 const googleAuthorizeUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
 const googleTokenUrl = 'https://oauth2.googleapis.com/token';
 const googleRevokeUrl = 'https://oauth2.googleapis.com/revoke';
 const defaultScopes = ['https://www.googleapis.com/auth/youtube.readonly'];
 
-async function revokeGoogleToken(accessToken, fetchFn = globalThis.fetch) {
-  const signal = AbortSignal.timeout(15_000);
-  const response = await awaitProviderRequest(fetchFn(googleRevokeUrl, {
-    body: new URLSearchParams({ token: accessToken }),
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    method: 'POST',
-    redirect: 'error', signal,
-  }), { signal });
-  // Revocation has no useful response body; cancel it rather than buffering it.
-  if (response.body) await awaitProviderRequest(response.body.cancel(), { signal });
-  if (!response.ok) throw new Error('Provider revocation was refused');
-}
-
 export function createYouTubeOAuthService({
   encryptedSecretService = createEncryptedSecretService(),
   fetchFn = globalThis.fetch,
+  providerHttpService,
   getNow = () => new Date(),
   getPoolFn = getPool,
   loadSettingsFn = loadSettings,
@@ -53,6 +42,7 @@ export function createYouTubeOAuthService({
   recordAuditEventFn = recordAuditEvent,
   commandService, stateService, startReadFn, startTransactionFn,
 } = {}) {
+  const httpService = providerHttpService ?? createProviderHttpService({ fetchFn });
   async function resolveClientCredentials({ settings, queryable }) {
     const clientId = settings.providers?.youtubeClientId;
     if (!clientId) {
@@ -83,6 +73,7 @@ export function createYouTubeOAuthService({
     defaultScopes,
     encryptedSecretService,
     fetchFn,
+    providerHttpService: httpService,
     getNow,
     getPoolFn,
     loadSettingsFn,
@@ -92,7 +83,8 @@ export function createYouTubeOAuthService({
     commandService, stateService, startReadFn, startTransactionFn,
     resolveClientCredentials,
     revokeTokenBeforeClear: async (accessToken) => {
-      await revokeGoogleToken(accessToken, fetchFn);
+      await createProviderJsonRequestService({ provider: 'youtube', providerHttpService: httpService, requestPolicy: { maxResponseBytes: 4096 } }).requestEmpty({
+        url: googleRevokeUrl, body: new URLSearchParams({ token: accessToken }), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, method: 'POST' });
     },
     tokenUrl: googleTokenUrl,
   });

@@ -23,17 +23,19 @@ import { createSpotifyClient } from '../spotify/spotify-client.js';
 import { createSpotifyOAuthService } from '../spotify/spotify-oauth-service.js';
 import { createYouTubeClient } from '../youtube/youtube-client.js';
 import { createYouTubeOAuthService } from '../youtube/youtube-oauth-service.js';
+import { createProviderHttpService } from './provider-http-service.js';
 import { createProviderCredentialsService } from './provider-credentials-service.js';
 
 export function createProviderClientResolverService({
   createAppleMusicClientFn = createAppleMusicClient,
   createSpotifyClientFn = createSpotifyClient,
   createYouTubeClientFn = createYouTubeClient,
+  providerHttpService = createProviderHttpService(),
   getPoolFn = getPool,
   loadSettingsFn = loadSettings,
   providerCredentialsService = createProviderCredentialsService(),
-  spotifyOAuthService = createSpotifyOAuthService(),
-  youtubeOAuthService = createYouTubeOAuthService({ providerCredentialsService }),
+  spotifyOAuthService = createSpotifyOAuthService({ providerHttpService }),
+  youtubeOAuthService = createYouTubeOAuthService({ providerCredentialsService, providerHttpService }),
 } = {}) {
   async function resolveProviderClient({ provider, requestPolicy = null, settings: suppliedSettings = null } = {}) {
     const settings = suppliedSettings ?? await loadSettingsFn();
@@ -43,7 +45,7 @@ export function createProviderClientResolverService({
     const result = { client: null, enabled: Boolean(providerSettings[`${settingPrefix}Enabled`]), configured: false, authMode: 'none' };
     if (!result.enabled) return result;
     const queryable = getPoolFn();
-    const options = { requestTimeoutMs: providerSettings.requestTimeoutMs, ...(requestPolicy ? { requestPolicy } : {}) };
+    const options = { ...(provider !== 'apple_music' ? { providerHttpService } : {}), requestTimeoutMs: providerSettings.requestTimeoutMs, ...(requestPolicy ? { requestPolicy } : {}) };
     try {
       if (provider === 'spotify' || provider === 'youtube') {
         result.authMode = 'oauth_user';

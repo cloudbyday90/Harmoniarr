@@ -49,6 +49,7 @@ import { createMediaToolingStatusService } from './media/media-tooling-status-se
 import { createMediaTranscodeExecutionService } from './media/media-transcode-execution-service.js';
 import { createOperationsModule } from './operations-module.js';
 import { createProviderModule } from './provider-module.js';
+import { createProviderHttpService } from './integrations/providers/provider-http-service.js';
 import { createPlexHttpClient } from './integrations/plex/plex-http-client.js';
 import { createPlexDirectSignInService } from './integrations/plex/plex-direct-sign-in-service.js';
 import { createPlexDirectoryImportService } from './integrations/plex/plex-directory-import-service.js';
@@ -186,6 +187,7 @@ export function createApp({
   createAppUserModule: buildAppUserModule = createAppUserModule,
   createAuthModule: buildAuthModule = createAuthModule,
   createPlexDirectSignInService: buildPlexDirectSignInService = createPlexDirectSignInService,
+  createProviderHttpService: buildProviderHttpService = createProviderHttpService,
   createPlexHttpClient: buildPlexHttpClient = createPlexHttpClient,
   createDeploymentSecurityService: buildDeploymentSecurityService = createDeploymentSecurityService,
   createDownloaderModule: buildDownloaderModule = createDownloaderModule,
@@ -252,7 +254,8 @@ export function createApp({
   const deploymentSecurityService = buildDeploymentSecurityService({ loadSettingsFn: loadSettings });
   const slskdConfigService = buildSlskdConfigService();
   const plexHttpClient = buildPlexHttpClient();
-  const providerModule = buildProviderModule({ plexHttpClient });
+  const providerHttpService = buildProviderHttpService();
+  const providerModule = buildProviderModule({ plexHttpClient, providerHttpService });
   const providerCredentialsService = buildProviderCredentialsService();
   let libraryModule = null;
   const settingsService = buildSettingsService({
@@ -1148,6 +1151,7 @@ export function createApp({
     operationsModule,
     providerModule,
     plexHttpClient,
+    providerHttpService,
     pushModule,
     runtimeResourceService,
     systemModule,

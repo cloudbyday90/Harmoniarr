@@ -2,6 +2,14 @@
 
 ## Purpose
 
+Spotify/YouTube HTTP now has one application-owned admission/deadline service
+covering API, token exchange/refresh and post-clear Google revocation. Native
+request, response, socket, codec and DNS retirement precedes successful local
+publication; uncertain retirement seals admission. Existing OAuth transaction
+fences and automatic pending-state maintenance remain. No schema artifact
+changed. See [HTTP design](PROVIDER_HTTP_DESIGN.md) and
+[outcome](PROVIDER_HTTP_OUTCOME.md).
+
 Spotify/YouTube linking now uses encrypted browser/session-bound pending envelopes
 and per-provider revisions in existing encrypted secrets. Callback, clear and
 refresh writes use bounded transaction ownership, exact record comparisons and

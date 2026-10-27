@@ -23,6 +23,7 @@ import { startAuthLookup } from '../../auth-lookup-service.js';
 import { startSessionWriteTransaction } from '../../session-write-transaction-service.js';
 import { createEncryptedSecretService } from '../../encrypted-secret-service.js';
 import { loadSettings } from '../../settings.js';
+import { createProviderHttpService } from './provider-http-service.js';
 import { createProviderJsonRequestService } from './provider-json-request-service.js';
 import { createProviderRequestError } from './provider-request-error.js';
 import { buildRedirectUri, createBase64UrlRandom, createCodeChallenge, toTokenPayload } from './oauth-helpers.js';
@@ -34,9 +35,10 @@ import { oauthLinkNames, oauthSessionAuthority, oauthBindingHash, oauthCredentia
 export function createOAuthPKCEService({ authorizeUrl, callbackPath, defaultScopes, encryptedSecretService = createEncryptedSecretService(),
   fetchFn = globalThis.fetch, getNow = () => new Date(), getPoolFn = getPool, loadSettingsFn = loadSettings, providerPrefix: provider,
   providerLabel, recordAuditEventFn = recordAuditEvent, resolveClientCredentials, revokeTokenBeforeClear = null, tokenUrl,
-  commandService, stateService, startReadFn = (work, options) => startAuthLookup(work, { ...options, getPoolFn }),
+  commandService, stateService, providerHttpService, startReadFn = (work, options) => startAuthLookup(work, { ...options, getPoolFn }),
   startTransactionFn = (work, options) => startSessionWriteTransaction(work, { ...options, getPoolFn }) }) {
   oauthLinkNames(provider);
+  const httpService = providerHttpService ?? createProviderHttpService({ fetchFn });
   const readCredentials = async client => resolveClientCredentials({ settings: await loadSettingsFn(client), queryable: client });
   const fingerprint = async client => oauthCredentialsFingerprint(provider, await readCredentials(client));
   const owner = createOAuthLinkOwnerService({ provider, startTransactionFn });
@@ -45,7 +47,7 @@ export function createOAuthPKCEService({ authorizeUrl, callbackPath, defaultScop
   const credentials = () => startReadFn(readCredentials).result;
   async function exchange(body, requestPolicy = {}, previous) {
     const now = getNow();
-    const response = await createProviderJsonRequestService({ provider, fetchFn, requestPolicy: { ...requestPolicy,
+    const response = await createProviderJsonRequestService({ provider, providerHttpService: httpService, requestPolicy: { ...requestPolicy,
       maxResponseBytes: Math.min(requestPolicy.maxResponseBytes ?? 65536, 65536) } }).requestJson({ url: tokenUrl,
       body: new URLSearchParams(body), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, method: 'POST', oauth: true });
     if (!Number.isSafeInteger(response.expires_in ?? 3600) || (response.expires_in ?? 3600) < 1 || (response.expires_in ?? 3600) > 31_536_000) throw createProviderRequestError(provider, 'response_invalid');

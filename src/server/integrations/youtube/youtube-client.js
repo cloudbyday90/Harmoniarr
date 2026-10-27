@@ -32,13 +32,14 @@ export function createYouTubeClient({
   apiKey,
   requestTimeoutMs = 15000,
   fetchFn = globalThis.fetch,
+  providerHttpService,
   requestPolicy = {},
 } = {}) {
   if (!apiKey && typeof accessTokenProvider !== 'function') {
     throw createYouTubeError('youtube_misconfigured', 'YouTube API key or OAuth access token provider is required');
   }
 
-  const { requestJson } = createProviderJsonRequestService({ provider: 'youtube', fetchFn, requestTimeoutMs, requestPolicy });
+  const { requestJson } = createProviderJsonRequestService({ provider: 'youtube', fetchFn, requestTimeoutMs, requestPolicy, providerHttpService });
 
   async function youtubeGet(path, params = {}) {
     const url = new URL(`${youtubeApiBaseUrl}${path}`);

@@ -34,13 +34,14 @@ export function createSpotifyClient({
   clientSecret,
   requestTimeoutMs = 15000,
   fetchFn = globalThis.fetch,
+  providerHttpService,
   requestPolicy = {},
 } = {}) {
   if (!accessTokenProvider && (!clientId || !clientSecret)) {
     throw createSpotifyError('spotify_misconfigured', 'Spotify client ID and client secret are required');
   }
 
-  const { requestJson } = createProviderJsonRequestService({ provider: 'spotify', fetchFn, requestTimeoutMs, requestPolicy });
+  const { requestJson } = createProviderJsonRequestService({ provider: 'spotify', fetchFn, requestTimeoutMs, requestPolicy, providerHttpService });
 
   // In-memory token cache is scoped to this client instance.
   let cachedToken = null;

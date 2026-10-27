@@ -3,6 +3,13 @@
 Implemented October 21, 2026 on main, following the
 [design](PROVIDER_HTTPS_DESIGN.md) and [official research](PROVIDER_HTTPS_RESEARCH_2026_10.md).
 
+October 27 follow-up: default Spotify/YouTube requests now use the application-owned
+[native HTTP boundary](PROVIDER_HTTP_OUTCOME.md). The original bundled-fetch/proxy
+cohort explicitly injects the retained fetch seam for those providers; Apple
+Music remains on that original implementation. Earlier fetch evidence does not
+establish the new native socket/codec/DNS lifetime. Current qualification and
+compatibility limits belong to the linked follow-up documents.
+
 ## Result
 
 The shared Spotify/YouTube/Apple Music request service now normalizes malformed

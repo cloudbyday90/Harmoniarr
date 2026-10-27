@@ -65,11 +65,13 @@ No PR was merged. Work stays on main without a release or separate branch.
 
 ## Next recommended item
 
-Harden and qualify Spotify/YouTube HTTP resource ownership through actual request,
-body, cancellation and socket retirement, including token exchange/refresh and
-Google revocation. `provider-json-request-service.js` bounds waiting and decoded
-JSON, but default fetch cancellation and fire-and-forget reader cancellation do
-not establish the native lifetime or global active-capacity guarantees now
-qualified for Plex. Preserve this change's local authority/publication checks;
-do not generalize Plex PIN contracts into OAuth or claim current native OAuth
-transport proof from controlled responses.
+That transport item is now implemented in the separate
+[Spotify/YouTube HTTP design](PROVIDER_HTTP_DESIGN.md) and
+[outcome](PROVIDER_HTTP_OUTCOME.md). Shared admission includes token exchange,
+refresh and post-clear Google revocation, with actual native TLS/body/codec/
+socket/DNS ownership. The existing local authority/publication checks remain;
+controlled OAuth fixtures and actual native transport evidence stay distinct.
+
+Next extend the same native owner to Apple Music while preserving developer-token
+signing and existing client contracts. Its separately retained bundled-fetch
+adapter still lacks the native-close/shared-admission guarantees of this item.

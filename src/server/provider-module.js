@@ -21,21 +21,24 @@ import { createPlexHttpClient } from './integrations/plex/plex-http-client.js';
 import { createPlexOwnerLinkService } from './integrations/plex/plex-owner-link-service.js';
 import { createSpotifyOAuthService } from './integrations/spotify/spotify-oauth-service.js';
 import { createYouTubeOAuthService } from './integrations/youtube/youtube-oauth-service.js';
+import { createProviderHttpService } from './integrations/providers/provider-http-service.js';
 import { createProviderClientResolverService } from './integrations/providers/provider-client-resolver-service.js';
 import { createProviderCollectionAccessCheckService } from './integrations/providers/provider-collection-access-check-service.js';
 
 export function createProviderModule({
+  providerHttpService = createProviderHttpService(),
   appleMusicStatusService = createAppleMusicStatusService(),
   plexHttpClient = createPlexHttpClient(),
   plexOwnerLinkService = createPlexOwnerLinkService({ plexHttpClient }),
-  spotifyOAuthService = createSpotifyOAuthService(),
-  youtubeOAuthService = createYouTubeOAuthService(),
-  providerClientResolverService = createProviderClientResolverService({ spotifyOAuthService, youtubeOAuthService }),
+  spotifyOAuthService = createSpotifyOAuthService({ providerHttpService }),
+  youtubeOAuthService = createYouTubeOAuthService({ providerHttpService }),
+  providerClientResolverService = createProviderClientResolverService({ spotifyOAuthService, youtubeOAuthService, providerHttpService }),
   providerCollectionAccessCheckService = createProviderCollectionAccessCheckService({
     resolveProviderClient: providerClientResolverService.resolveProviderClient,
   }),
 } = {}) {
   return {
+    providerHttpService,
     appleMusicStatusService,
     plexOwnerLinkService,
     spotifyOAuthService,

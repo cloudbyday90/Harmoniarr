@@ -11,8 +11,11 @@ import { createSpotifyClient } from '../../src/server/integrations/spotify/spoti
 import { createYouTubeClient } from '../../src/server/integrations/youtube/youtube-client.js';
 
 const secret = 'PUBLIC-TEST-ONLY-private-sentinel';
+// This retained cohort qualifies the explicit bundled-fetch seam and Apple Music.
+// The guarded provider-http native entry qualifies Spotify/YouTube's direct owner.
+const fetchFn = (...args) => fetch(...args);
 const base = 'https://api.spotify.com';
-const service = options => createProviderJsonRequestService({ provider: 'spotify', requestTimeoutMs: 3000, ...options });
+const service = options => createProviderJsonRequestService({ provider: 'spotify', fetchFn, requestTimeoutMs: 3000, ...options });
 const request = (client, path) => client.requestJson({ url: `${base}/${path}?private=${secret}`, headers: { Authorization: `Bearer ${secret}` } });
 let assertions = 0;
 async function rejected(operation, diagnosticCode, details) {
@@ -28,16 +31,16 @@ async function rejected(operation, diagnosticCode, details) {
 
 const scenarios = {
   async clients() {
-    const spotify = createSpotifyClient({ clientId: secret, clientSecret: secret });
+    const spotify = createSpotifyClient({ clientId: secret, clientSecret: secret, fetchFn });
     assert.deepEqual(await spotify.getTrack('first'), { id: 'first' });
     assert.deepEqual(await spotify.getTrack('second'), { id: 'second' });
-    const youtube = createYouTubeClient({ apiKey: secret });
+    const youtube = createYouTubeClient({ apiKey: secret, fetchFn });
     assert.deepEqual(await youtube.getVideos('video'), { items: [{ id: 'video' }] });
     const { privateKey } = generateKeyPairSync('ec', { namedCurve: 'P-256', privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
       publicKeyEncoding: { type: 'spki', format: 'pem' } });
     const apple = createAppleMusicClient({ teamId: 'TESTONLY', keyId: 'TESTONLY', privateKey });
     assert.deepEqual(await apple.getCatalogPlaylist('us', 'playlist'), { data: [{ id: 'playlist' }] });
-    const oauth = createProviderJsonRequestService({ provider: 'youtube' });
+    const oauth = createProviderJsonRequestService({ provider: 'youtube', fetchFn });
     assert.deepEqual(await oauth.requestJson({ url: 'https://oauth2.googleapis.com/token', method: 'POST', oauth: true,
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `refresh_token=${secret}` }), { access_token: secret });
     const response = await fetch('https://127.0.0.1/ip-control', { signal: AbortSignal.timeout(3000) });

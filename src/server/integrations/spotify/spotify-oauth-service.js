@@ -29,6 +29,7 @@ const defaultScopes = ['playlist-read-private', 'playlist-read-collaborative'];
 export function createSpotifyOAuthService({
   encryptedSecretService = createEncryptedSecretService(),
   fetchFn = globalThis.fetch,
+  providerHttpService,
   getNow = () => new Date(),
   getPoolFn = getPool,
   loadSettingsFn = loadSettings,
@@ -42,6 +43,7 @@ export function createSpotifyOAuthService({
     defaultScopes,
     encryptedSecretService,
     fetchFn,
+    providerHttpService,
     getNow,
     getPoolFn,
     loadSettingsFn,

@@ -27,12 +27,14 @@ test('selected provider refresh failure retains its auth mode without falling ba
 });
 
 test('resolveProviderClients builds enabled provider clients from settings and stored secrets', async (t) => {
+  const providerHttpService = { request() { assert.fail('Constructor wiring must not contact providers'); } };
   const createSpotifyClientFn = t.mock.fn((config) => ({ provider: 'spotify', config }));
   const createYouTubeClientFn = t.mock.fn((config) => ({ provider: 'youtube', config }));
   const createAppleMusicClientFn = t.mock.fn((config) => ({ provider: 'apple_music', config }));
   const queryable = {};
 
   const service = createProviderClientResolverService({
+    providerHttpService,
     createAppleMusicClientFn,
     createSpotifyClientFn,
     createYouTubeClientFn,
@@ -83,11 +85,13 @@ test('resolveProviderClients builds enabled provider clients from settings and s
   assert.equal(clients.settings.appleMusicStorefront, 'gb');
   assert.equal(clients.settings.playlistExpansionPolicy, 'artist_discovery');
   assert.deepEqual(clients.spotify.config, {
+    providerHttpService,
     clientId: 'spotify-client',
     clientSecret: 'spotify-secret',
     requestTimeoutMs: 12000,
   });
   assert.deepEqual(clients.youtube.config, {
+    providerHttpService,
     apiKey: 'youtube-key',
     requestTimeoutMs: 12000,
   });

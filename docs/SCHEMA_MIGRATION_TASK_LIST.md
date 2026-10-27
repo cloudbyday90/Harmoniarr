@@ -169,7 +169,13 @@ and [outcome](OAUTH_LINK_OUTCOME.md), with
 admission precedes exchange and publication. Token/state/revision/required-audit
 writes commit together; exact-token refresh fences prevent stale resurrection.
 The same automatic maintenance batch covers their canonical pending namespaces.
-No schema change. Next qualify native Spotify/YouTube HTTP resource ownership.
+No schema change. Native Spotify/YouTube HTTP ownership is now implemented in the
+[HTTP design](PROVIDER_HTTP_DESIGN.md) and [outcome](PROVIDER_HTTP_OUTCOME.md), with
+[official research/tradeoffs](PROVIDER_HTTP_RESEARCH_2026_10.md). One application
+owner bounds API/OAuth/revocation work and retains admission through request,
+socket, codec and issued-DNS retirement. Local OAuth publication fences remain;
+no schema artifact changed. Next extend owned native HTTP to Apple Music while
+preserving developer-token signing and client behavior.
 
 October 12 scan addition: `20261012_225951_scan_owned_receipt_invalidation.sql`
 adds UUID revision identity, generated path lookup and revision-bound negative

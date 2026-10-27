@@ -13,7 +13,7 @@ test('createYouTubeClient uses API key query authentication when no OAuth token 
 
   const requestUrl = new URL(fetchFn.mock.calls[0].arguments[0]);
   assert.equal(requestUrl.searchParams.get('key'), 'youtube-key');
-  assert.equal(fetchFn.mock.calls[0].arguments[1].headers, undefined);
+  assert.equal(new Headers(fetchFn.mock.calls[0].arguments[1].headers).get('authorization'), null);
 });
 
 test('createYouTubeClient prefers OAuth bearer authentication without adding API key', async (t) => {
@@ -28,7 +28,5 @@ test('createYouTubeClient prefers OAuth bearer authentication without adding API
 
   const requestUrl = new URL(fetchFn.mock.calls[0].arguments[0]);
   assert.equal(requestUrl.searchParams.has('key'), false);
-  assert.deepEqual(fetchFn.mock.calls[0].arguments[1].headers, {
-    Authorization: 'Bearer youtube-access-token',
-  });
+  assert.equal(new Headers(fetchFn.mock.calls[0].arguments[1].headers).get('authorization'), 'Bearer youtube-access-token');
 });

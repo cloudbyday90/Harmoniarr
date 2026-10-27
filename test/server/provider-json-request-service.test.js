@@ -98,15 +98,18 @@ test('request deadline includes a response body that never completes', async () 
 
 test('caller deadline includes a stalled fetch and strips its abort reason', async () => {
   const controller = new AbortController();
+  const release = Promise.withResolvers();
   const service = createProviderJsonRequestService({ provider: 'youtube', requestPolicy: { signal: controller.signal }, fetchFn: async () => {
     controller.abort(new Error(secret));
-    return new Promise(() => {});
+    return release.promise;
   } });
   await assert.rejects(service.requestJson({ url }), (error) => {
     assert.equal(error.diagnosticCode, 'timeout');
     assert.equal(serializeError(error).includes(secret), false);
     return true;
   });
+  assert.equal(service.getRequestState().active, 1);
+  release.resolve(new Response('{}')); assert.equal(await service.waitForDrain(), true);
 });
 
 for (const response of [() => new Response(`{"broken":"${secret}`), () => new Response(JSON.stringify({ secret }), { headers: { 'content-length': '9999999' } }),

@@ -1,5 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 27 [Spotify/YouTube HTTP rebuild](LOCAL_DOCKER_PROVIDER_HTTP_OUTCOME.md)
+records the current image, preserved administrator/five mounts and actual native
+TLS, compressed-body, cancellation and retirement evidence. See its separate
+[design](LOCAL_DOCKER_PROVIDER_HTTP_DESIGN.md) and the
+[implementation outcome](PROVIDER_HTTP_OUTCOME.md). Apple Music retains its
+existing fetch transport pending the next extension.
+
 The October 27 [Spotify/YouTube OAuth rebuild](LOCAL_DOCKER_OAUTH_LINK_OUTCOME.md)
 records the current image, preserved administrator/five mounts, real PostgreSQL
 publication/refresh fencing and both Secure-cookie Chromium flows. See the
