@@ -1,5 +1,10 @@
 # Password work admission outcome
 
+Followup on October 27: [versioned hash upgrades](PASSWORD_HASH_OUTCOME.md) now
+generate scrypt N=16384/r=8/p=5 and atomically upgrade successful legacy logins.
+The below-current-profile generation described in this historical outcome is
+superseded; legacy verification and the shared resource bounds are retained.
+
 October 27, 2026. Hashing and verification now share bounded process-local work
 admission and a 4096-byte UTF-8 input limit. Implementation stays on main without
 a release/tag or additional service container.

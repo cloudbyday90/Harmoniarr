@@ -6,6 +6,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createPasswordLoginService } from '../../src/server/password-login-service.js';
+import { formatCurrentPasswordHash } from '../../src/server/password-hash-policy.js';
+
+const legacy = 'scrypt$' + 'a'.repeat(32) + '$' + '00'.repeat(64);
+const replacement = formatCurrentPasswordHash('b'.repeat(32), Buffer.alloc(64));
 
 const input = () => ({ username: 'Listener', password: 'LoginFixturePassword123!', requestMetadata: { ipAddress: '127.0.0.1', userAgent: 'original' } });
 function fixture(options = {}) {
@@ -16,6 +20,7 @@ function fixture(options = {}) {
   let transactions = 0;
   const client = { async query(sql, values) {
     queries.push({ sql, values });
+    if (sql.includes('SET password_hash=$2')) return { rowCount: options.casMiss ? 0 : 1 };
     if (sql.includes('FROM public.app_users')) return { rows: options.absent ? [] : [current] };
     if (sql.startsWith('UPDATE')) return { rowCount: 1, rows: [{ id: current.id, username: current.username,
       role: current.role, must_change_password: current.must_change_password, last_login_at: 'now' }] };
@@ -25,6 +30,7 @@ function fixture(options = {}) {
   const service = createPasswordLoginService({ isBootstrapRequiredFn: async readOptions => { reads.push(readOptions); return options.bootstrap ?? false; },
     findUserFn: async (identifier, readOptions) => { reads.push(readOptions); lookups.push(identifier); return options.missing ? null : accepted; },
     verifyPasswordFn: async (...args) => { if (options.verify) return options.verify(...args); return options.valid ?? true; },
+    hashPasswordFn: options.hash ?? (async () => { throw new Error('Unexpected password rehash'); }),
     handleLoginFailureFn: async (...args) => { failures.push(args); },
     startTransactionFn: work => { transactions++; return { result: Promise.resolve().then(async () => {
       const result = await work(client, () => {});
@@ -44,6 +50,42 @@ test('password login publishes current role/forced-change state and an audit wit
   assert.equal(f.events[0].eventType, 'login_succeeded'); assert.equal(f.events[0].actorUserId, 'user');
   assert.doesNotMatch(JSON.stringify({ user: result.user, events: f.events }), /accepted-hash|password_hash|credential_epoch|csrfToken|refreshToken/u);
   assert.ok(f.queries[0].sql.includes('FOR NO KEY UPDATE'));
+});
+
+test('legacy login prepares current material outside SQL then fences its exact source and preserves the credential epoch', async () => {
+  const epoch = '2026-01-01 00:00:00.000100+00';
+  const f = fixture({ accepted: { password_hash: legacy, credential_epoch: epoch }, hash: async password => {
+    assert.equal(password, input().password); assert.equal(f.transactions(), 0); assert.equal(f.queries.length, 0);
+    return replacement;
+  } });
+  await f.service.loginUser(input());
+  const update = f.queries.find(row => row.sql.includes('SET password_hash=$2'));
+  assert.deepEqual(update.values, ['user', replacement, legacy, epoch]);
+  assert.match(update.sql, /password_changed_at IS NOT DISTINCT FROM \$4::timestamptz/u);
+  assert.doesNotMatch(update.sql, /password_changed_at\s*=/u);
+  assert.deepEqual(f.events[0].details, { passwordHashUpgraded: true, passwordHashProfile: 'scrypt-v2' });
+  assert.doesNotMatch(JSON.stringify(f.events), /scrypt\$/u);
+});
+
+test('legacy hash preparation refuses invalid material or overload before any SQL or failure counter write', async () => {
+  for (const value of [null, undefined, legacy, replacement.replace('p=5', 'p=1'), 'invalid']) {
+    const f = fixture({ accepted: { password_hash: legacy }, hash: async () => value });
+    await assert.rejects(f.service.loginUser(input()), { status: 503, code: 'password_work_unavailable' });
+    assert.equal(f.transactions(), 0); assert.equal(f.failures.length, 0);
+  }
+  const busy = Object.assign(new Error('busy'), { status: 503, code: 'password_work_busy' });
+  const f = fixture({ accepted: { password_hash: legacy }, hash: async () => { throw busy; } });
+  await assert.rejects(f.service.loginUser(input()), error => error === busy); assert.equal(f.transactions(), 0);
+});
+
+test('legacy hash upgrade refuses changed source and CAS misses before session publication', async () => {
+  for (const options of [{ current: { password_hash: replacement } }, { current: { credential_epoch: 'changed' } },
+    { current: { is_disabled: true } }, { current: { login_locked: true } }, { casMiss: true }]) {
+    const f = fixture({ accepted: { password_hash: legacy }, hash: async () => replacement, ...options });
+    await assert.rejects(f.service.loginUser(input()));
+    assert.equal(f.events.length, 0); assert.ok(!f.queries.some(row => row.sql.startsWith('INSERT')));
+    if (!options.casMiss) { assert.equal(f.failures.length, 1); assert.deepEqual(f.failures[0][3], { countFailure: false }); }
+  }
 });
 
 test('password login captures verification facts and metadata before asynchronous verification', async () => {

@@ -7,7 +7,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { scrypt as scryptCallback } from 'node:crypto';
 import { promisify } from 'node:util';
-import { createPasswordWorkService, compatibleScryptParameters } from '../../src/server/password-work-service.js';
+import { createPasswordWorkService } from '../../src/server/password-work-service.js';
+import { currentPasswordHashProfile, legacyPasswordHashProfile, parsePasswordHash, needsPasswordHashUpgrade, isCurrentPasswordHash, formatCurrentPasswordHash } from '../../src/server/password-hash-policy.js';
 import { hashPassword, verifyPassword } from '../../src/server/security.js';
 import { assertPasswordInput } from '../../src/server/password-input-policy.js';
 import { validatePassword } from '../../src/server/validators/auth-validator.js';
@@ -36,7 +37,8 @@ test('hash and verification share two active slots, refuse excess without queuei
   assert.deepEqual(work.getState(), { active: 2, maxConcurrent: 2, pending: 0 });
   await assert.rejects(work.hashPassword('RefusedPassword123!'), { status: 503, code: 'password_work_busy' });
   await assert.rejects(work.verifyPassword('RefusedPassword123!', stored), { status: 503, code: 'password_work_busy' });
-  assert.equal(calls.length, 2); assert.equal(calls[0][2], 64); assert.deepEqual(calls[0][3], compatibleScryptParameters);
+  assert.equal(calls.length, 2); assert.equal(calls[0][2], 64); assert.deepEqual(calls[0][3], currentPasswordHashProfile.parameters);
+  assert.deepEqual(calls[1][3], legacyPasswordHashProfile.parameters);
   gates[0].resolve(Buffer.alloc(64)); await first; assert.equal(work.getState().active, 1);
   gates[1].resolve(Buffer.alloc(64)); assert.equal(await second, true); assert.equal(work.getState().active, 0);
   assert.equal(work.getState().pending, 0);
@@ -68,6 +70,28 @@ test('real legacy scrypt records and full 64-character/Unicode passwords remain 
   const legacy = `scrypt$${salt}$${key.toString('hex')}`;
   assert.equal(await verifyPassword(password, legacy), true);
   assert.equal(await verifyPassword(password + 'x', legacy), false);
-  const current = await hashPassword(password); assert.match(current, /^scrypt\$[a-f0-9]{32}\$[a-f0-9]{128}$/u);
+  const current = await hashPassword(password); assert.equal(isCurrentPasswordHash(current), true);
+  const parsed = parsePasswordHash(current);
+  assert.equal(parsed.profile.parameters.p, 5);
+  const oracle = await promisify(scryptCallback)(password, parsed.salt, 64, { N: 16384, r: 8, p: 5, maxmem: 33554432 });
+  assert.equal(parsed.digest, oracle.toString('hex'));
   assert.equal(await verifyPassword(password, current), true); assert.equal(await verifyPassword(password.trim(), current), false);
+});
+
+test('version policy allowlists complete profiles and rejects attacker-selected KDF costs before admission', async () => {
+  const current = formatCurrentPasswordHash('a'.repeat(32), Buffer.alloc(64));
+  assert.equal(needsPasswordHashUpgrade(stored), true); assert.equal(needsPasswordHashUpgrade(current), false);
+  assert.equal(isCurrentPasswordHash(stored), false);
+  assert.equal(parsePasswordHash(stored).profile, legacyPasswordHashProfile);
+  assert.equal(parsePasswordHash(current).profile, currentPasswordHashProfile);
+  let calls = 0;
+  const work = createPasswordWorkService({ deriveFn: async () => { calls++; return Buffer.alloc(64); } });
+  for (const value of [current.replace('v2', 'v3'), current.replace('p=5', 'p=1'), current.replace('16384', '999999999'),
+    current.replace('r=8', 'r=9'), current.replace('n=', 'N='), current + '$extra', current.slice(0, -1) + 'g',
+    current + '\n', stored + '\n', 'scrypt$v2$' + 'x'.repeat(100000)]) {
+    assert.equal(parsePasswordHash(value), null); assert.equal(needsPasswordHashUpgrade(value), false);
+    assert.equal(await work.verifyPassword('Password123!', value), false);
+  }
+  assert.equal(calls, 0); assert.equal(work.getState().active, 0);
+  assert.throws(() => formatCurrentPasswordHash('invalid', Buffer.alloc(64)), TypeError);
 });

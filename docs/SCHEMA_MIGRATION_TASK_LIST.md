@@ -96,6 +96,17 @@ slots remain held through completion. No schema artifact changed. Next add
 versioned hash parameters and upgrade the below-current-profile legacy work
 factor with legacy verification and guarded upgrade-on-login.
 
+Versioned stronger hashes and successful-login upgrades are now implemented in
+the [hash design](PASSWORD_HASH_DESIGN.md) and [outcome](PASSWORD_HASH_OUTCOME.md),
+with [official research/tradeoffs](PASSWORD_HASH_RESEARCH_2026_10.md). Current
+scrypt N=16384/r=8/p=5 fits the existing nominal memory profile; the allowlisted
+legacy verifier remains. Upgrade/session/bookkeeping/audit commit together under
+the exact verified hash/epoch guard, preserving the password epoch and existing
+sessions. No schema artifact changed. Next give password change a bounded
+current-credential transaction owner covering credential replacement, session
+revocation/reissuance and required audit. Its current multi-step writes can leave
+partial outcomes; hash preparation should remain outside the write owner.
+
 October 12 scan addition: `20261012_225951_scan_owned_receipt_invalidation.sql`
 adds UUID revision identity, generated path lookup and revision-bound negative
 observations. Replay preserves existing identities; snapshot/anchors include the

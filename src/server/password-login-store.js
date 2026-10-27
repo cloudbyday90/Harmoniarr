@@ -29,3 +29,12 @@ export async function recordSuccessfulPasswordLogin(client, userId) {
   if (result.rowCount !== 1) throw new Error('Login account changed before publication');
   return result.rows[0];
 }
+
+export async function upgradePasswordLoginHash(client, accepted, replacement) {
+  // Rehashing the same secret must preserve its epoch and existing sessions.
+  const result = await client.query(`UPDATE public.app_users SET password_hash=$2, updated_at=clock_timestamp()
+    WHERE id=$1 AND password_hash=$3
+      AND password_changed_at IS NOT DISTINCT FROM $4::timestamptz AND is_disabled=FALSE`,
+  [accepted.id, replacement, accepted.password_hash, accepted.credential_epoch]);
+  if (result.rowCount !== 1) throw new Error('Login credential changed before hash upgrade');
+}

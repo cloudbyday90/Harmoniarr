@@ -4,9 +4,13 @@
 
 Password hashing and verification now share process-local admission with two
 submitted jobs and no application queue, plus a 4096-byte UTF-8 input limit.
-Canonical legacy hash encoding/cost remain compatible; versioned stronger work
-factors are the next security task. See the [work design](PASSWORD_WORK_DESIGN.md)
-and [outcome](PASSWORD_WORK_OUTCOME.md). No schema artifact changed.
+Legacy hash verification remains compatible. New hashes use versioned scrypt
+N=16384/r=8/p=5; successful legacy login prepares an upgrade outside SQL and
+conditionally publishes it with login/session/audit writes. The credential epoch
+and existing sessions remain valid. See the [hash design](PASSWORD_HASH_DESIGN.md)
+and [outcome](PASSWORD_HASH_OUTCOME.md), plus the
+[work design](PASSWORD_WORK_DESIGN.md). The existing TEXT column needs no schema
+change. Atomic current-credential-owned password change is the next boundary.
 
 Preliminary bootstrap and password-credential facts now use bounded read-only
 owners with cancellation and actual drainage. Read failures cannot authorize

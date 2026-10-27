@@ -14,6 +14,7 @@ import { isBootstrapRequired, handleLoginFailure } from '/app/server-dist/auth.j
 import { getPool, closePool } from '/app/server-dist/database.js';
 import { hashPassword, verifyPassword } from '/app/server-dist/security.js';
 import { createPasswordWorkService, getPasswordWorkState } from '/app/server-dist/password-work-service.js';
+import { parsePasswordHash } from '/app/server-dist/password-hash-policy.js';
 import { createPasswordLoginService } from '/app/server-dist/password-login-service.js';
 import { startServerRuntime } from '/app/server-dist/startup-runtime.js';
 import { drainApplicationWorkerOwners } from '/app/server-dist/application-worker-drain.js';
@@ -83,7 +84,8 @@ test('password work bounds native dispatch and preserves full credential verific
     assert.deepEqual(await state(), beforeOversize); results.push('actual-http-input-bound-refuses-before-authentication-mutations');
 
     const user = (await pool.query('SELECT password_hash FROM app_users WHERE username=$1', [username])).rows[0];
-    const key = await nativeScrypt(password, user.password_hash.split('$')[1], 64);
+    const parsed = parsePasswordHash(user.password_hash);
+    const key = await nativeScrypt(password, parsed.salt, 64, parsed.profile.parameters);
     const ready = Promise.withResolvers(), release = Promise.withResolvers(), controller = new AbortController(); releases.add(release);
     let loginTask;
     const heldWork = createPasswordWorkService({ deriveFn: () => { ready.resolve(); return release.promise; } });
