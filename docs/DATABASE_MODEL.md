@@ -2,6 +2,12 @@
 
 ## Purpose
 
+Password hashing and verification now share process-local admission with two
+submitted jobs and no application queue, plus a 4096-byte UTF-8 input limit.
+Canonical legacy hash encoding/cost remain compatible; versioned stronger work
+factors are the next security task. See the [work design](PASSWORD_WORK_DESIGN.md)
+and [outcome](PASSWORD_WORK_OUTCOME.md). No schema artifact changed.
+
 Preliminary bootstrap and password-credential facts now use bounded read-only
 owners with cancellation and actual drainage. Read failures cannot authorize
 setup or become invalid-credential results. Security writes retain independent

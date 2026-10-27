@@ -1,5 +1,11 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 27 [password work rebuild](LOCAL_DOCKER_PASSWORD_WORK_OUTCOME.md)
+records the current no-cache image, preserved administrator/data/five mounts and
+packaged 2/3 GiB password workload plus auth transaction qualification. See the
+[implementation outcome](PASSWORD_WORK_OUTCOME.md) for shared admission, byte
+limits, legacy compatibility and the work-factor followup.
+
 The October 27 [authentication read rebuild](LOCAL_DOCKER_AUTH_LOOKUP_OUTCOME.md)
 records the current no-cache image, preserved administrator/data/five mounts and
 packaged PostgreSQL read/session/login/failure/rotation/replay qualification. See

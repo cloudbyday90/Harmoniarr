@@ -17,6 +17,7 @@
  */
 
 import { createApiError } from '../api-error.js';
+import { assertPasswordInput } from '../password-input-policy.js';
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -81,5 +82,5 @@ export function validatePassword(value) {
     throw createApiError(400, 'validation_error', 'Password must be at least 10 characters long');
   }
 
-  return value;
+  return assertPasswordInput(value);
 }

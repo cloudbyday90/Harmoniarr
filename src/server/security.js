@@ -16,10 +16,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
-import { promisify } from 'node:util';
-
-const scrypt = promisify(scryptCallback);
+import { createHash, randomBytes } from 'node:crypto';
+export { hashPassword, verifyPassword } from './password-work-service.js';
 
 export function createOpaqueToken(size = 32) {
   return randomBytes(size).toString('base64url');
@@ -27,29 +25,6 @@ export function createOpaqueToken(size = 32) {
 
 export function hashToken(token) {
   return createHash('sha256').update(token).digest('hex');
-}
-
-export async function hashPassword(password) {
-  const salt = randomBytes(16).toString('hex');
-  const derived = await scrypt(password, salt, 64);
-  return `scrypt$${salt}$${Buffer.from(derived).toString('hex')}`;
-}
-
-export async function verifyPassword(password, storedHash) {
-  const [algorithm, salt, expected] = storedHash.split('$');
-  if (algorithm !== 'scrypt' || !salt || !expected) {
-    return false;
-  }
-
-  const derived = await scrypt(password, salt, 64);
-  const expectedBuffer = Buffer.from(expected, 'hex');
-  const actualBuffer = Buffer.from(derived);
-
-  if (expectedBuffer.length !== actualBuffer.length) {
-    return false;
-  }
-
-  return timingSafeEqual(expectedBuffer, actualBuffer);
 }
 
 export function parseCookieHeader(headerValue) {

@@ -88,6 +88,14 @@ security writes remain independent. No schema artifact changed. Next bound
 password-verification admission and input size outside account locks, preserving
 password-manager compatibility. Non-password issuance remains later work.
 
+Password resource admission is implemented in the
+[work design](PASSWORD_WORK_DESIGN.md) and [outcome](PASSWORD_WORK_OUTCOME.md), with
+[official research/tradeoffs](PASSWORD_WORK_RESEARCH_2026_10.md). Two submitted
+jobs, no application queue and full-input byte validation precede native work;
+slots remain held through completion. No schema artifact changed. Next add
+versioned hash parameters and upgrade the below-current-profile legacy work
+factor with legacy verification and guarded upgrade-on-login.
+
 October 12 scan addition: `20261012_225951_scan_owned_receipt_invalidation.sql`
 adds UUID revision identity, generated path lookup and revision-bound negative
 observations. Replay preserves existing identities; snapshot/anchors include the

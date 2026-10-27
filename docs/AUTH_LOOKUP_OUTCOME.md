@@ -97,3 +97,9 @@ and stale cleanup/rebase were inapplicable; no PR was merged.
 Next: bound password-verification admission and input size outside account locks,
 preserving password-manager compatibility and current credential rechecks after
 waiting. Non-password issuance/audit remains a separate later followup.
+
+October 27 follow-up: hash/verification admission and input size are now bounded
+by the [password work design](PASSWORD_WORK_DESIGN.md) and
+[outcome](PASSWORD_WORK_OUTCOME.md). The next-item paragraph above describes this
+read candidate's original scope; versioned stronger password work factors and
+non-password issuance remain followups.
