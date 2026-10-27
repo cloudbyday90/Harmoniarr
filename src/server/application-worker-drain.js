@@ -11,6 +11,7 @@ import { drainWorkerOwners } from './worker-owner-drain.js';
 export function drainApplicationWorkerOwners({ importCandidateModule, libraryModule, metadataModule,systemModule }) {
   return drainWorkerOwners([
     systemModule?.schemaMaintenanceService,
+    systemModule?.plexCallbackMaintenanceService,
     systemModule?.backupRecoveryWorker,
     systemModule?.healthReadinessService,
     metadataModule?.metadataArtistRefreshWorker,

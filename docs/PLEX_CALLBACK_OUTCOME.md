@@ -1,5 +1,9 @@
 # Plex callback implementation outcome
 
+Followup completed October 27: [automatic retention](PLEX_RETENTION_OUTCOME.md)
+now reclaims eligible expired/obsolete pending state through existing guarded
+maintenance. The original next-item note below describes the preceding commit.
+
 October 27, 2026. Plex pending login state is now browser-bound and single-use;
 its consumption commits with the local session and required audit. Implemented
 directly on main using modular ESM files, with no new dependency, schema artifact

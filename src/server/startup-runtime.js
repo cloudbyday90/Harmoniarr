@@ -217,6 +217,10 @@ export async function startServerRuntime({
   startupServiceSupervisor.registerService(fulfillmentCorrelationHeartbeat);
   startupServiceSupervisor.registerService(ledgerRetentionHeartbeat);
   if (systemModule.schemaMaintenanceService) startupServiceSupervisor.registerService(systemModule.schemaMaintenanceService);
+  if (systemModule.plexCallbackMaintenanceService) {
+    systemModule.plexCallbackMaintenanceService.setLogHandlers?.({ onWarning: runtimeReporter.writeWarning });
+    startupServiceSupervisor.registerService(systemModule.plexCallbackMaintenanceService);
+  }
   startupServiceSupervisor.registerService(systemModule.operatorNotificationFanoutHeartbeat);
   if (pushModule?.pushNotificationDeliveryHeartbeat) {
     startupServiceSupervisor.registerService(pushModule.pushNotificationDeliveryHeartbeat);

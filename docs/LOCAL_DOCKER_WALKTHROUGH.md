@@ -1,5 +1,11 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 27 [automatic Plex retention rebuild](LOCAL_DOCKER_PLEX_RETENTION_OUTCOME.md)
+records the current no-cache image, preserved administrator/data/five mounts,
+guarded retention/callback qualification and live automatic diagnostics. See the
+[implementation outcome](PLEX_RETENTION_OUTCOME.md) for batch eligibility,
+maintenance ownership, atomic auditing and the next provider-transport boundary.
+
 The October 27 [browser-bound Plex callback rebuild](LOCAL_DOCKER_PLEX_CALLBACK_OUTCOME.md)
 records the current no-cache image, preserved administrator/data/five mounts,
 packaged auth qualification and disposable HTTPS browser checks. See the

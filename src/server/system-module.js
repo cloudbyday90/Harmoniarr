@@ -54,6 +54,7 @@ import { createSystemService } from './system-service.js';
 import { createHealthReadinessService } from './readiness/health-readiness-service.js';
 import { createSchemaDiagnosticsService } from './schema-diagnostics-service.js';
 import { createSchemaMaintenanceService } from './schema-maintenance-service.js';
+import { createPlexCallbackMaintenanceService } from './integrations/plex/plex-callback-maintenance-service.js';
 
 export function createSystemModule({
   activityFeedService = null,
@@ -93,6 +94,7 @@ export function createSystemModule({
   recoveryDiagnosticsService = null,
   schemaDiagnosticsService = createSchemaDiagnosticsService({ respectMaintenance: true }),
   schemaMaintenanceService = null,
+  plexCallbackMaintenanceService = null,
   restoreScopeRuntimeSnapshotStore = createRestoreScopeRuntimeSnapshotStore(),
   libraryWantedReleaseStore = null,
   operatorNotificationService = null,
@@ -313,6 +315,7 @@ export function createSystemModule({
     systemService,
     healthReadinessService: resolvedHealthReadinessService,
     schemaMaintenanceService: systemSchemaMaintenanceService,
+    plexCallbackMaintenanceService: plexCallbackMaintenanceService ?? createPlexCallbackMaintenanceService(),
     routeDependencies: {
       appPort,
       checkHealth: resolvedHealthReadinessService.check,

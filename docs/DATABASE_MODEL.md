@@ -2,6 +2,12 @@
 
 ## Purpose
 
+Plex callback retention now runs automatically through guarded maintenance, with
+one bounded encrypted-envelope batch, conservative legacy grace, active-flow
+preservation and atomic aggregate audit. See the
+[retention design](PLEX_RETENTION_DESIGN.md) and [outcome](PLEX_RETENTION_OUTCOME.md).
+No schema artifact changed; callback-time expiry remains independent of cleanup.
+
 Linked Plex login now uses a bounded minimal candidate lookup and rechecks the
 exact primary provider/subject plus enabled account under its write lock.
 Bookkeeping, root issuance and a cardinality-checked required audit commit

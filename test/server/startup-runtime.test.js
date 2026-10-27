@@ -38,6 +38,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
   });
 
   const schemaMaintenanceService = { start() { callOrder.push('start:schema-maintenance'); }, async stop() { callOrder.push('stop:schema-maintenance'); } };
+  const plexCallbackMaintenanceService = { start() { callOrder.push('start:plex-maintenance'); }, async stop() { callOrder.push('stop:plex-maintenance'); } };
 
   const libraryDiscoveryHeartbeat = {
     start() {
@@ -346,6 +347,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
       },
       systemModule: {
         schemaMaintenanceService,
+        plexCallbackMaintenanceService,
         dependencyHealthService: {
           getDependencyHealth: async () => [],
         },
@@ -483,6 +485,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     fulfillmentCorrelationHeartbeat,
     ledgerRetentionHeartbeat,
     schemaMaintenanceService,
+    plexCallbackMaintenanceService,
     operatorNotificationFanoutHeartbeat,
     pushNotificationDeliveryHeartbeat,
     pushNotificationHistoryCleanupHeartbeat,
@@ -504,6 +507,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'start:fulfillment-correlation',
     'start:ledger-retention',
     'start:schema-maintenance',
+    'start:plex-maintenance',
     'start:operator-fanout',
     'start:push-delivery',
     'start:push-history-cleanup',
@@ -570,6 +574,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'start:fulfillment-correlation',
     'start:ledger-retention',
     'start:schema-maintenance',
+    'start:plex-maintenance',
     'start:operator-fanout',
     'start:push-delivery',
     'start:push-history-cleanup',
@@ -581,6 +586,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'stop:push-history-cleanup',
     'stop:push-delivery',
     'stop:operator-fanout',
+    'stop:plex-maintenance',
     'stop:schema-maintenance',
     'stop:ledger-retention',
     'stop:fulfillment-correlation',

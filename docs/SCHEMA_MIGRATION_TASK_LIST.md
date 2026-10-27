@@ -139,6 +139,15 @@ schema artifact changed. Next integrate bounded expired pending-state cleanup
 into existing maintenance, protecting active flows and the persistent Plex client
 identifier; avoid requiring a manual refresh or another deployed service.
 
+Automatic callback retention is now implemented in the
+[retention design](PLEX_RETENTION_DESIGN.md) and [outcome](PLEX_RETENTION_OUTCOME.md),
+with [official research/tradeoffs](PLEX_RETENTION_RESEARCH_2026_10.md). Existing
+maintenance ownership protects one bounded batch, retaining active and unknown/
+unreadable state while atomically auditing eligible deletion. No manual refresh,
+new deployed service or schema artifact is needed. Next bound Plex provider HTTP
+time/body/drain ownership; database/state expiry does not bound external resource
+use.
+
 October 12 scan addition: `20261012_225951_scan_owned_receipt_invalidation.sql`
 adds UUID revision identity, generated path lookup and revision-bound negative
 observations. Replay preserves existing identities; snapshot/anchors include the
