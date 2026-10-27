@@ -15,6 +15,7 @@ import ArtworkAdmissionDiagnostics from '../components/ArtworkAdmissionDiagnosti
 import RecoveryDiagnosticEvents from '../components/RecoveryDiagnosticEvents.vue';
 import BackupRecoveryStatus from '../components/BackupRecoveryStatus.vue';
 import ReadinessDiagnostics from '../components/ReadinessDiagnostics.vue';
+import SchemaDiagnostics from '../components/SchemaDiagnostics.vue';
 import { buildBackupExportDownloadUrl } from '../lib/recovery-api.js';
 import {
   buildRecoveryRouteQuery,
@@ -421,6 +422,7 @@ watch(hasActiveLocks, (nextHasActiveLocks) => {
           <RecoveryDiagnosticEvents :diagnostics="recoveryDiagnostics" />
         </template>
         <div v-else class="hx-empty"><p class="hx-empty-copy">No diagnostics data available. Refresh to load current state.</p></div>
+        <SchemaDiagnostics />
       </SettingsDisclosure>
     </section>
   </div>

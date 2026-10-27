@@ -91,3 +91,7 @@ current/attention/unavailable status. Keep repair and startup admission separate
 See [research/pros and cons](SCHEMA_DRIFT_RESEARCH.md),
 [design](SCHEMA_DRIFT_DESIGN.md) and
 [Docker outcome](LOCAL_DOCKER_SCHEMA_DRIFT_OUTCOME.md).
+
+The next administrator UI item is recorded separately in the
+[schema diagnostics UI design](SCHEMA_DIAGNOSTICS_UI_DESIGN.md) and
+[outcome](SCHEMA_DIAGNOSTICS_UI_OUTCOME.md).

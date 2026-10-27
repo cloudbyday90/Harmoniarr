@@ -52,6 +52,7 @@ import { createRuntimeResourceMonitor } from './runtime-resource-monitor.js';
 import { createRuntimeResourceService } from './runtime-resource-service.js';
 import { createSystemService } from './system-service.js';
 import { createHealthReadinessService } from './readiness/health-readiness-service.js';
+import { createSchemaDiagnosticsService } from './schema-diagnostics-service.js';
 
 export function createSystemModule({
   activityFeedService = null,
@@ -89,6 +90,7 @@ export function createSystemModule({
   operatorReleaseGroupSelectionStore = null,
   operatorTrackOverrideStore = null,
   recoveryDiagnosticsService = null,
+  schemaDiagnosticsService = createSchemaDiagnosticsService(),
   restoreScopeRuntimeSnapshotStore = createRestoreScopeRuntimeSnapshotStore(),
   libraryWantedReleaseStore = null,
   operatorNotificationService = null,
@@ -322,6 +324,7 @@ export function createSystemModule({
       releaseMaintenanceLockById: resolvedMaintenanceLockControlService.releaseMaintenanceLockById,
       getQueueDiagnostics: resolvedSystemRecoveryDiagnosticsService.getQueueDiagnostics,
       getRecoveryDiagnostics: resolvedSystemRecoveryDiagnosticsService.getRecoveryDiagnostics,
+      getSchemaDiagnostics: schemaDiagnosticsService.getSchemaDiagnostics,
       getDiagnosticsExportDownload: resolvedSystemDiagnosticsExportService.getDiagnosticsExportDownload,
       startBackupRestoreApply: systemBackupRestoreApplyService.startBackupRestoreApply,
       executeIdempotentMutation: controlPlaneIdempotencyService.executeIdempotentMutation,

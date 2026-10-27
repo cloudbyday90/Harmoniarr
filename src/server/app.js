@@ -1072,6 +1072,9 @@ export function createApp({
   });
   mountSystemRoutes(app, {
     ...systemModule.routeDependencies,
+    limitSchemaDiagnostics: requestRateLimiterService.createMiddleware({
+      bucketName: 'system-schema-diagnostics', limit: 12, windowMs: 60 * 1000,
+    }),
     limitBackupExport: requestRateLimiterService.createMiddleware({
       bucketName: 'backup-export',
       limit: 10,

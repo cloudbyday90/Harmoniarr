@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 26 [schema diagnostics UI rebuild](LOCAL_DOCKER_SCHEMA_DIAGNOSTICS_UI_OUTCOME.md)
+records the current no-cache image and preserved administrator/data/mounts. The
+[implementation outcome](SCHEMA_DIAGNOSTICS_UI_OUTCOME.md) records explicit
+administrator refresh, no-store summaries and accessible pending/result feedback.
+
 The October 26 [schema drift diagnostic rebuild](LOCAL_DOCKER_SCHEMA_DRIFT_OUTCOME.md)
 records the current no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](SCHEMA_DRIFT_OUTCOME.md) records restricted-role read-only

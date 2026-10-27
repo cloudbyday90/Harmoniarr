@@ -20,6 +20,12 @@ the bounded summary in existing administrator diagnostics with explicit refresh,
 no-store and accessible current/attention/unavailable feedback; retain repair and
 startup admission as separate decisions.
 
+That administrator summary is implemented in the
+[schema diagnostics UI design](SCHEMA_DIAGNOSTICS_UI_DESIGN.md) and
+[outcome](SCHEMA_DIAGNOSTICS_UI_OUTCOME.md). Next qualify and bound connection/
+end-to-end observation admission separately from the existing SQL transaction
+limits, retaining no-repair behavior and bounded unavailable results.
+
 October 12 scan addition: `20261012_225951_scan_owned_receipt_invalidation.sql`
 adds UUID revision identity, generated path lookup and revision-bound negative
 observations. Replay preserves existing identities; snapshot/anchors include the

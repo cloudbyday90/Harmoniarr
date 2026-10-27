@@ -22,6 +22,7 @@ import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
 import { readdir } from 'node:fs/promises';
 import { resolve, dirname, sep } from 'node:path';
 import { createHealthReadinessService } from '../readiness/health-readiness-service.js';
+import { registerSchemaDiagnosticsRoutes } from './schema-diagnostics-routes.js';
 
 const defaultRequestAuthDependencies = createRequestAuthDependencies();
 
@@ -38,6 +39,7 @@ export function registerSystemRoutes(app, {
   getMaintenanceLockStatus,
   getQueueDiagnostics,
   getRecoveryDiagnostics,
+  getSchemaDiagnostics,
   releaseMaintenanceLockById,
   startBackupRestoreApply,
   getOperatorNotifications,
@@ -45,6 +47,7 @@ export function registerSystemRoutes(app, {
   listBackupExports,
   limitBackupExport = skipRateLimitMiddleware,
   limitDiagnosticsExport = skipRateLimitMiddleware,
+  limitSchemaDiagnostics = skipRateLimitMiddleware,
   limitOperatorNotificationFanoutRun = skipRateLimitMiddleware,
   limitSettingsUpdate = skipRateLimitMiddleware,
   limitMaintenanceLockMutation = skipRateLimitMiddleware,
@@ -62,6 +65,7 @@ export function registerSystemRoutes(app, {
   requireCsrf = defaultRequestAuthDependencies.requireCsrf,
   requireFreshAdminSession = defaultRequestAuthDependencies.requireFreshAdminSession,
 }) {
+  registerSchemaDiagnosticsRoutes(app, { requireAdminSession, getSchemaDiagnostics, limitSchemaDiagnostics });
   async function runIdempotentMutation({
     actorUserId,
     executeMutation,

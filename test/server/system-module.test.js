@@ -24,6 +24,7 @@ test('createSystemModule exposes shared route dependencies from injected service
   const getMaintenanceLockStatus = () => {};
   const getQueueDiagnostics = () => {};
   const getRecoveryDiagnostics = () => {};
+  const getSchemaDiagnostics = () => {};
   const getDiagnosticsExportDownload = () => {};
   const listBackupExports = () => {};
   const enterMaintenanceLock = () => {};
@@ -98,6 +99,7 @@ test('createSystemModule exposes shared route dependencies from injected service
     },
     diagnosticsExportService,
     recoveryDiagnosticsService,
+    schemaDiagnosticsService: { getSchemaDiagnostics },
     dependencyHealthService,
     libraryScanSummaryService,
     onboardingSummaryService,
@@ -140,6 +142,7 @@ test('createSystemModule exposes shared route dependencies from injected service
     releaseMaintenanceLockById,
     getQueueDiagnostics,
     getRecoveryDiagnostics,
+    getSchemaDiagnostics,
     getDiagnosticsExportDownload,
     startBackupRestoreApply,
     executeIdempotentMutation,
