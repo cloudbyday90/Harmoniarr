@@ -14,11 +14,13 @@ import { waitForNativeResume } from './native-resume-client.js';
 import { nativeAudioFiles, nativeAudioDigest } from './native-audio-data.js';
 import { inspectDeclaredNativeBytes } from './native-file-read.js';
 import { assertNativeFileTree } from './native-completed-files.js';
+import { readNativeProviderObservation } from './native-observer-api.js';
 
 const phase = process.argv[2]; const raw = process.argv[3] ?? '{}'; assert.ok(Buffer.byteLength(raw) <= 16384);
 const input = JSON.parse(raw);
-const { apiKey } = JSON.parse(await readFile('/run/fixture.json', 'utf8'));
+const { apiKey, expectedVersion, observerApiKey } = JSON.parse(await readFile('/run/fixture.json', 'utf8'));
 const config = { baseUrl: 'http://provider:5030', apiKey, requestTimeoutMs: 2000 };
+const observationConfig = { ...config, observerApiKey };
 let posts = 0; let postStatus;
 const service = createSlskdService({ getClientConfig: async () => ({ ...config }), createSlskdClientFn: options =>
   createSlskdClient({ ...options, fetchImpl: async (url, request) => {
@@ -28,8 +30,8 @@ const service = createSlskdService({ getClientConfig: async () => ({ ...config }
   } }) });
 let result;
 if (phase === 'prepare') {
-  await waitForNativeResume(() => readNativePartialApi(config, 'server'), value => value.isLoggedIn === true);
-  const dispatch = await service.prepareDownloadDispatch(); assert.equal(dispatch.binding.version, '0.26.1.0');
+  await waitForNativeResume(() => readNativePartialApi(config, 'application'), value => value.server?.isLoggedIn === true);
+  const dispatch = await service.prepareDownloadDispatch(); assert.equal(dispatch.binding.version, expectedVersion);
   result = dispatch.binding;
 } else if (phase === 'enqueue') {
   const dispatch = await service.prepareDownloadDispatch();
@@ -38,7 +40,7 @@ if (phase === 'prepare') {
 else if (phase === 'bounds') result = await service.getBoundDownloads(input);
 else if (phase === 'list') result = await service.getDownloads(input);
 else if (phase === 'retire') {
-  await waitForNativeResume(() => readNativePartialApi(config, 'debug/transfers'), value => value.soulseek.downloads.length === 0);
+  await waitForNativeResume(() => readNativeProviderObservation(observationConfig, 'debug/transfers'), value => value.soulseek.downloads.length === 0);
   result = { nativeDownloadsRetired: true };
 } else if (phase === 'published' || phase === 'inspect') {
   if (phase === 'published') {

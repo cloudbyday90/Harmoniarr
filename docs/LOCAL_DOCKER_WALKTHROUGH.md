@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 27 [pool/session admission rebuild](LOCAL_DOCKER_POOL_SESSION_ADMISSION_OUTCOME.md)
+records the current no-cache image, preserved administrator/data/mounts and
+native qualification. See the [implementation outcome](POOL_SESSION_ADMISSION_OUTCOME.md)
+and separate [slskd 0.26.2 qualification](SLSKD_0262_QUALIFICATION_OUTCOME.md).
+
 The October 27 [schema diagnostic deadline rebuild](LOCAL_DOCKER_SCHEMA_DIAGNOSTIC_DEADLINES_OUTCOME.md)
 records the current no-cache image, preserved administrator/data/mounts and
 qualification scope. See the [implementation outcome](SCHEMA_DIAGNOSTIC_DEADLINES_OUTCOME.md)

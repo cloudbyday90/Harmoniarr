@@ -103,3 +103,12 @@ test('apiRequest tags aborted fetch errors with request_aborted', async (t) => {
     (error) => error?.name === 'AbortError' && error?.code === 'request_aborted',
   );
 });
+
+test('temporary session database refusal preserves authentication and exposes a retryable service error', async t => {
+  const authFailureHandler = t.mock.fn(async () => {}); setAuthFailureHandler(authFailureHandler);
+  t.after(() => setAuthFailureHandler(null));
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse({ ok: false, status: 503,
+    payload: { error: { code: 'session_lookup_unavailable', message: 'Session verification is temporarily unavailable. Try again.' } } }));
+  await assert.rejects(apiRequest('/api/v1/auth/session'), error => error.status === 503 && error.code === 'session_lookup_unavailable');
+  assert.equal(authFailureHandler.mock.callCount(), 0);
+});

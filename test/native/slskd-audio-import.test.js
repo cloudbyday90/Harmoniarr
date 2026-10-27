@@ -78,7 +78,7 @@ test('canonical discovery and selected-match commands retain ownership through n
     await media.runScenario(runtime, async ({ client, baseUrl, getPoolFn, workspaceDir }) => {
       await bootstrapAdminSession(client);
       const fixtures = await prepareNativeAudioDiscovery({ client, pool: getPoolFn(), workspaceDir, library });
-      result = await withNativeSlskdProvider({ ...images, signal: t.signal, mode: 'audio', expectedVersion: '0.26.1.0', runScenario: async native => {
+      result = await withNativeSlskdProvider({ ...images, signal: t.signal, mode: 'audio', expectedVersion: process.env.HARMONIARR_NATIVE_SLSKD_VERSION ?? '0.26.1.0', runScenario: async native => {
         bridge = createNativeAudioBridge(native);
         const nativeSearch = createNativeSearchBridge(native, fixtures);
         searchService = nativeSearch.service;

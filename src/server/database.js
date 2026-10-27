@@ -18,12 +18,13 @@
 
 import pg from 'pg';
 import { createDatabasePoolLifecycle } from './database-pool-lifecycle.js';
+import { attachPoolAdmissionLimit, buildPoolAdmissionPolicy, defaultPoolConnectionTimeoutMs } from './database-pool-admission-service.js';
 
 const { Pool } = pg;
 
 const poolLifecycle = createDatabasePoolLifecycle({
   createPool: ({ runtimeState }) => attachPoolErrorHandler(
-    new Pool(buildPoolConfig()),
+    attachPoolAdmissionLimit(new Pool(buildPoolConfig()), buildPoolAdmissionPolicy()),
     { runtimeState },
   ),
 });
@@ -58,8 +59,8 @@ function parseOptionalInteger(value, name) {
     return undefined;
   }
 
-  const parsed = Number.parseInt(String(value), 10);
-  if (!Number.isInteger(parsed)) {
+  const parsed = Number(value);
+  if (!/^\d+$/u.test(String(value)) || !Number.isSafeInteger(parsed)) {
     throw new Error(`${name} must be an integer when configured`);
   }
 
@@ -115,7 +116,8 @@ export function buildPoolConfig(env = process.env) {
   const connectionTimeoutMillis = parseOptionalPositiveInteger(
     env.HARMONIARR_PG_POOL_CONNECTION_TIMEOUT_MS ?? env.PGPOOL_CONNECTION_TIMEOUT_MS,
     'HARMONIARR_PG_POOL_CONNECTION_TIMEOUT_MS',
-  );
+  ) ?? defaultPoolConnectionTimeoutMs;
+  if (connectionTimeoutMillis > 2_147_483_647) throw new Error('HARMONIARR_PG_POOL_CONNECTION_TIMEOUT_MS exceeds the timer range');
   const idleTimeoutMillis = parseOptionalPositiveInteger(
     env.HARMONIARR_PG_POOL_IDLE_TIMEOUT_MS ?? env.PGPOOL_IDLE_TIMEOUT_MS,
     'HARMONIARR_PG_POOL_IDLE_TIMEOUT_MS',
@@ -132,7 +134,7 @@ export function buildPoolConfig(env = process.env) {
   return {
     ...connectionConfig,
     ...(allowExitOnIdle === undefined ? {} : { allowExitOnIdle }),
-    ...(connectionTimeoutMillis === undefined ? {} : { connectionTimeoutMillis }),
+    connectionTimeoutMillis,
     ...(idleTimeoutMillis === undefined ? {} : { idleTimeoutMillis }),
     ...(max === undefined ? {} : { max }),
     ...(maxUses === undefined ? {} : { maxUses }),

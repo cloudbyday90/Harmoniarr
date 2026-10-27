@@ -35,13 +35,20 @@ test('existing three-component batch and legacy bindings remain valid without re
 
 test('unreviewed revisions, canaries, metadata and coerced input cannot select or validate a transport', () => {
   const supported = createSlskdProviderBinding({ config, version: '0.26.0' });
-  for (const version of ['0.26.1', '0.26.2.0', '0.27.0.0', '0.25.1.0', '0.26.0.1', '0.26.1.1', '0.26.1.0-dev',
+  for (const version of ['0.26.1', '0.26.2', '0.26.2.1', '0.26.2.0-dev', '0.27.0.0', '0.25.1.0', '0.26.0.1', '0.26.1.1', '0.26.1.0-dev',
     '0.26.0.65534-abcd1234', '0.26.0.0-dev', '0.26.0.0+build', '0.26.0.0.0',
     '00.26.0.0', '0.26.00.0', 'v0.26.0.0', ' 0.26.0.0', '0.26.0.0\n', '',
     null, undefined, 0.26, ['0.26.0.0'], { version: '0.26.0.0' }, Object('0.26.0.0')]) {
     assert.throws(() => selectSlskdDownloadProtocol(version), { code: 'slskd_download_version_unsupported' });
     assert.equal(validateSlskdProviderBinding({ ...supported, version }), false);
   }
+});
+
+test('the qualified 0.26.2.0 wire identity retains exact saved binding and batch protocol', () => {
+  const binding = createSlskdProviderBinding({ config, version: '0.26.2.0' });
+  assert.equal(binding.protocol, 'batch'); assert.equal(binding.version, '0.26.2.0');
+  assert.equal(validateSlskdProviderBinding(JSON.parse(JSON.stringify(binding))), true);
+  assert.doesNotThrow(() => assertSlskdProviderBindingCurrent({ binding, config }));
 });
 
 test('the observed wire form keeps a distinct identity and cannot grant the legacy protocol', () => {

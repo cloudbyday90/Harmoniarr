@@ -16,7 +16,7 @@ import { fingerprintPostgresCohortSource } from '../../testing/integration/postg
 test('native EOF and reset preserve only incomplete prefixes and never succeed or recover as completed work', { timeout: 120_000 }, async t => {
   const source = await fingerprintPostgresCohortSource();
   const result = await withNativeSlskdProvider({ ...requireNativeSlskdImages(), signal: t.signal, mode: 'partial',
-    expectedVersion: '0.26.1.0', runScenario: runNativePartialScenario });
+    expectedVersion: process.env.HARMONIARR_NATIVE_SLSKD_VERSION ?? '0.26.1.0', runScenario: runNativePartialScenario });
   assert.deepEqual(await fingerprintPostgresCohortSource(), source);
   assert.equal(result.complete, true); assert.equal(result.cleanupVerified, true); assert.equal(result.scenarios.length, 3);
   assert.equal(result.nativeDownloadsRetired, true); assert.equal(result.providerStoppedBeforeInspection, true);

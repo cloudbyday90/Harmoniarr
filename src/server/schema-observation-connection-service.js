@@ -5,6 +5,7 @@
  */
 import pg from 'pg';
 import { buildConnectionConfig } from './database.js';
+import { createDatabaseClientRetirement } from './database-client-retirement-service.js';
 
 export const schemaObservationConnectionTimeoutMs = 2_000;
 
@@ -12,12 +13,5 @@ export const schemaObservationConnectionTimeoutMs = 2_000;
 export function createSchemaObservationConnection({ config = buildConnectionConfig(), Client = pg.Client,
   connectionTimeoutMs = schemaObservationConnectionTimeoutMs } = {}) {
   const client = new Client({ ...config, pipeline: false, connectionTimeoutMillis: connectionTimeoutMs });
-  let closing;
-  return { client, connect: () => client.connect(), close({ force = false } = {}) {
-    // pg 8.23.1: end() alone can wait for a graceful idle/startup flush. Abort must
-    // also destroy this owned transport. Keep the version-sensitive surface here.
-    if (force) client.connection.stream.destroy();
-    closing ??= client.end();
-    return closing;
-  } };
+  return { client, connect: () => client.connect(), ...createDatabaseClientRetirement(client) };
 }

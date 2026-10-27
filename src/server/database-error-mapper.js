@@ -27,6 +27,7 @@ const CONNECTION_ERROR_CODES = new Set([
   'ECONNRESET',
   'ENOTFOUND',
   'ETIMEDOUT',
+  'database_pool_busy',
 ]);
 
 const CONNECTION_ERROR_SQLSTATES = new Set([
@@ -38,6 +39,7 @@ const CONNECTION_ERROR_SQLSTATES = new Set([
 ]);
 
 function isDatabaseConnectionError(error) {
+  if (['timeout exceeded when trying to connect', 'Connection terminated due to connection timeout'].includes(error?.message)) return true;
   if (CONNECTION_ERROR_CODES.has(error?.code)) return true;
   if (CONNECTION_ERROR_SQLSTATES.has(error?.code)) return true;
   if (error?.syscall === 'connect') return true;
@@ -77,5 +79,5 @@ export function mapDatabaseErrorWithConstraints(constraintMap = {}) {
 
 export function normalizeDatabaseConnectionError(error) {
   if (!isDatabaseConnectionError(error)) return error;
-  return createApiError(503, 'database_unavailable', 'Database is temporarily unavailable');
+  return Object.assign(createApiError(503, 'database_unavailable', 'Database is temporarily unavailable'), { cause: error });
 }

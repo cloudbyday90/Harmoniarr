@@ -75,5 +75,11 @@ diagnostic policy silently change all database consumers.
 Manual screen-reader speech and physical-device checks remain deferred under the
 earlier acceptance decision. Browser assertions do not establish those results.
 
+October 27 follow-up: ordinary pool and session read admission is implemented in
+the [separate design](POOL_SESSION_ADMISSION_DESIGN.md) and
+[outcome](POOL_SESSION_ADMISSION_OUTCOME.md). Deadline and transport retirement
+mechanics now have shared modules while schema policy adapters retain their
+existing behavior. The next boundary above records this candidate's original scope.
+
 See [research](SCHEMA_DIAGNOSTIC_DEADLINES_RESEARCH.md) and
 [design](SCHEMA_DIAGNOSTIC_DEADLINES_DESIGN.md).

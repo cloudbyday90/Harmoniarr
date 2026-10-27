@@ -172,3 +172,7 @@ See [Managed slskd Docker Smoke Design](MANAGED_SLSKD_DOCKER_SMOKE_DESIGN.md)
 for the executed evidence and replay command. Settings now makes Managed,
 External, and Disabled provider modes explicit; see [Soulseek Provider-Mode
 Onboarding Design](SLSKD_PROVIDER_MODE_ONBOARDING_DESIGN.md).
+
+The October 27 [0.26.2 qualification design](SLSKD_0262_QUALIFICATION_DESIGN.md)
+and [outcome](SLSKD_0262_QUALIFICATION_OUTCOME.md) record the current example image
+and exact wire-protocol support, with restricted API credentials retained.

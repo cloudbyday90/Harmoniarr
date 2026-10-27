@@ -114,7 +114,7 @@ test('unreviewed fixture modes, versions and unbounded idle settings refuse befo
     await assert.rejects(openOwnedTcpServer({ idleTimeout }), TypeError);
   }
   await assert.rejects(openSoulseekFixture({ username, password, mode: 'unreviewed' }), TypeError);
-  for (const options of [{ mode: 'unreviewed' }, { expectedVersion: '0.26.2.0' }, { mode: 'cancellation' }]) {
+  for (const options of [{ mode: 'unreviewed' }, { expectedVersion: '0.26.3.0' }, { mode: 'cancellation' }]) {
     let executed = false;
     await assert.rejects(withNativeSlskdProvider({ ...options, execute: () => { executed = true; } }), TypeError);
     assert.equal(executed, false);

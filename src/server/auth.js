@@ -18,6 +18,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { getPool } from './database.js';
+import { readRequestSessionRow } from './session-lookup-service.js';
 import {
   csrfProtectionModeEnvVar,
   csrfProtectionModes,
@@ -84,33 +85,10 @@ export async function getSessionFromRequest(request) {
     return null;
   }
 
-  const result = await getPool().query(
-    `
-      SELECT
-        refresh_tokens.id AS refresh_token_id,
-        refresh_tokens.app_user_id,
-        refresh_tokens.token_family_id,
-        refresh_tokens.csrf_token_hash,
-        refresh_tokens.expires_at,
-        refresh_tokens.is_revoked,
-        refresh_tokens.revoked_reason,
-        refresh_tokens.replaced_by_refresh_token_id,
-        app_users.id,
-        app_users.username,
-        app_users.role,
-        app_users.must_change_password,
-        app_users.last_login_at,
-        app_users.is_disabled
-      FROM refresh_tokens
-      JOIN app_users ON app_users.id = refresh_tokens.app_user_id
-      WHERE refresh_tokens.token_hash = $1
-      LIMIT 1
-    `,
-    [hashToken(refreshToken)],
-  );
+  const row = await readRequestSessionRow(request, hashToken(refreshToken));
 
   return resolveSessionFromRefreshTokenLookup({
-    row: result.rows[0] ?? null,
+    row,
     refreshToken,
     csrfToken: cookies[csrfCookieName] ?? null,
     requestMetadata: getRequestMetadata(request),

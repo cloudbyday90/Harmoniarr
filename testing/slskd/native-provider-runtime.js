@@ -10,7 +10,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
-import { renderManagedSlskdConfig } from '../../docker/managed-slskd-config.js';
+import { renderNativeProviderConfig } from './native-provider-config.js';
 import { assertDockerProjectRemoved, removeOwnedDockerWorkspace } from '../../scripts/docker-smoke-cleanup.js';
 import { executeFixtureProbeCommand } from '../integration/fixture-probe-command.js';
 import { nativeProviderCompose } from './native-provider-compose.js';
@@ -48,7 +48,7 @@ async function acknowledgeService({ id, image, projectName, networkId, inspect }
 export async function withNativeSlskdProvider({ applicationImage, providerImage, signal,
   rootDir = process.cwd(), execute = executeFixtureProbeCommand, runScenario = null,
   mode = 'batch', expectedVersion = '0.26.0.0' } = {}) {
-  if (!['batch', 'cancellation', 'files', 'partial', 'resume', 'refusal', 'audio'].includes(mode) || !['0.26.0.0', '0.26.1.0'].includes(expectedVersion)) {
+  if (!['batch', 'cancellation', 'files', 'partial', 'resume', 'refusal', 'audio'].includes(mode) || !['0.26.0.0', '0.26.1.0', '0.26.2.0'].includes(expectedVersion)) {
     throw new TypeError('Unreviewed native fixture mode or version');
   }
   if (mode === 'cancellation' && typeof runScenario !== 'function') throw new TypeError('Cancellation requires its explicit scenario');
@@ -59,16 +59,15 @@ export async function withNativeSlskdProvider({ applicationImage, providerImage,
   const key = () => randomBytes(24).toString('hex');
   const secrets = { apiKey: key(), jwtKey: key(), soulseekUsername: 'fixture-client', soulseekPassword: key(),
     webUsername: 'fixture-web', webPassword: key() };
+  const observerApiKey = expectedVersion === '0.26.2.0' && ['partial', 'resume', 'refusal', 'audio'].includes(mode) ? key() : undefined;
   const composeArgs = ['compose', '-f', resolve(workspaceRoot, 'compose.json'), '-p', projectName];
   const docker = async (args, abort = signal) => (await execute('docker', args, { signal: abort })).stdout.trim();
   const inspect = async id => JSON.parse(await docker(['inspect', id]))[0];
   let failed = false; let failure; let result; let closed; let cleanupVerified = false; let startupAcknowledged = false;
   try {
     await writeFile(resolve(workspaceRoot, 'fixture.json'), JSON.stringify({ username: secrets.soulseekUsername,
-      password: secrets.soulseekPassword, apiKey: secrets.apiKey, mode, expectedVersion }), { mode: 0o600 });
-    const inactivity = mode === 'cancellation' ? '  connection:\n    timeout:\n      inactivity: 240000\n' : '';
-    const retries = mode === 'partial' ? 'transfers:\n  download:\n    retry:\n      attempts: 1\n' : '';
-    await writeFile(resolve(workspaceRoot, 'slskd.yml'), renderManagedSlskdConfig(secrets) + inactivity + retries, { mode: 0o600 });
+      password: secrets.soulseekPassword, apiKey: secrets.apiKey, mode, expectedVersion, observerApiKey }), { mode: 0o600 });
+    await writeFile(resolve(workspaceRoot, 'slskd.yml'), renderNativeProviderConfig({ secrets, mode, observerApiKey }), { mode: 0o600 });
     await writeFile(resolve(workspaceRoot, 'compose.json'), JSON.stringify(nativeProviderCompose({ rootDir,
       workspaceRoot, applicationImage, providerImage, mode })), { mode: 0o600 });
     await docker([...composeArgs, 'up', '--no-build', '--pull', 'never', '--detach', '--wait', '--wait-timeout', '20']);
@@ -92,7 +91,7 @@ export async function withNativeSlskdProvider({ applicationImage, providerImage,
     const storage = ['files', 'partial', 'resume', 'refusal', 'audio'].includes(mode) ? await acknowledgeNativeFileVolume({ provider: await inspect(providerId), fixture: await inspect(fixtureId),
       projectName, mode, inspectVolume: async name => JSON.parse(await docker(['volume', 'inspect', name]))[0] }) : null;
     result = runScenario ? await runScenario({ docker, fixtureId, providerId }) : JSON.parse(await docker(['exec', fixtureId, 'node', '/app/testing/slskd/native-batch-scenario.js']));
-    result = { ...result, runtime, applicationImage, providerImage, ...(storage ? { storage } : {}) };
+    result = { ...result, runtime, applicationImage, providerImage, observerCredential: Boolean(observerApiKey), ...(storage ? { storage } : {}) };
   } catch (error) { failed = true; failure = error; }
   for (const service of ['provider', 'fixture']) {
     try { await docker([...composeArgs, 'stop', '--timeout', '5', service], null); }

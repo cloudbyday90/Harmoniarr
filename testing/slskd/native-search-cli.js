@@ -32,7 +32,7 @@ if (phase === 'idle') {
   result = { searches: 0 };
 } else if (phase === 'start') {
   resolveNativeSearchPlan(input.query);
-  await waitForNativePartialState(() => readNativePartialApi(config, 'server'), value => value.isLoggedIn === true);
+  await waitForNativePartialState(() => readNativePartialApi(config, 'application'), value => value.server?.isLoggedIn === true);
   const search = await service.startSearch(input);
   assert.equal(calls.filter(call => call.method === 'POST').length, 1);
   assert.equal(calls.find(call => call.method === 'POST').status, 200);

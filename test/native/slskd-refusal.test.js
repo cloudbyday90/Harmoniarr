@@ -17,7 +17,7 @@ import { fingerprintPostgresCohortSource } from '../../testing/integration/postg
 test('native default exhaustion and changed-size refusal remain failed with incomplete-only bytes and one application POST', { timeout: 150_000 }, async t => {
   const source = await fingerprintPostgresCohortSource();
   const result = await withNativeSlskdProvider({ ...requireNativeSlskdImages(), signal: t.signal, mode: 'refusal',
-    expectedVersion: '0.26.1.0', runScenario: runNativeRefusalScenario });
+    expectedVersion: process.env.HARMONIARR_NATIVE_SLSKD_VERSION ?? '0.26.1.0', runScenario: runNativeRefusalScenario });
   assert.deepEqual(await fingerprintPostgresCohortSource(), source);
   assert.equal(result.complete, true); assert.equal(result.cleanupVerified, true);
   assert.equal(result.nativeDownloadsRetired, true); assert.equal(result.providerStoppedBeforeInspection, true);

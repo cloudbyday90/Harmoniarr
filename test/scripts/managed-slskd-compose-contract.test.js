@@ -36,7 +36,7 @@ test('managed slskd Compose overlay keeps the API private and persists generated
   assert.match(source, /expose:\n\s+- "5030"/u);
   assert.doesNotMatch(source, /SLSKD_WEB_PORT/u);
   assert.match(source, /target: 50300/u);
-  assert.match(source, /image: slskd\/slskd:0\.26\.1/u);
+  assert.match(source, /image: slskd\/slskd:0\.26\.2/u);
 });
 
 test('managed slskd Compose overlay grants secrets only to the services that need them', async () => {

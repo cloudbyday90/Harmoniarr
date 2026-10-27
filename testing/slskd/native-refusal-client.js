@@ -46,16 +46,24 @@ export async function runNativeRefusalBatch({ plan, config, expectedVersion }) {
   const first = await waitForNativeResume(read, batch => batch.transfers?.length === 1);
   const initial = first.transfers[0];
   if (direct) assert.equal(initial.id, direct.attempt.receipts[0].id);
-  const batch = await waitForNativeResume(read, value => value.transfers?.length === 1 && classifySlskdTransferState(value.transfers[0]).terminal);
+  const requestFor = row => ({ id: row.id, username: nativePeer, filename: file.filename, size: file.size, batchId: attempt.attemptId, providerBinding: dispatch.binding });
+  // An attempt can report terminal before its native retry is queued. Require
+  // exhaustion and a fresh bound failure, not the first intermediate terminal row.
+  const final = await waitForNativeResume(async () => {
+    const batch = await read(), row = batch.transfers?.[0];
+    if (batch.transfers?.length !== 1 || !classifySlskdTransferState(row).terminal) return {};
+    const raw = await readNativePartialApi(config, 'transfers/downloads/' + encodeURIComponent(nativePeer) + '/' + encodeURIComponent(row.id));
+    if (raw.attempts !== plan.maxAttempts || !classifySlskdTransferState(raw).terminal) return {};
+    return { batch, raw, bound: await service.getBoundDownload(requestFor(row)) };
+  }, value => value.bound?.id === initial.id && classifySlskdTransferState(value.bound).code === 'failed');
+  const { batch, raw, bound } = final;
   const row = batch.transfers[0];
   assert.equal(batch.id, attempt.attemptId); assert.equal(row.id, initial.id); assert.equal(row.batchId, attempt.attemptId);
-  const request = { id: row.id, username: nativePeer, filename: file.filename, size: file.size, batchId: attempt.attemptId, providerBinding: dispatch.binding };
-  const bound = await service.getBoundDownload(request);
+  const request = requestFor(row);
   assert.ok(bound); assert.equal(bound.id, row.id); assert.equal(bound.batchId, attempt.attemptId);
   assert.equal(classifySlskdTransferState(bound).code, 'failed'); assert.equal(hasProgressedDownloadEvidence(bound), false);
   assert.ok(bound.bytesTransferred > 0 && bound.bytesTransferred < file.size);
   assert.ok(typeof bound.exception === 'string' && bound.exception.length > 0);
-  const raw = await readNativePartialApi(config, 'transfers/downloads/' + encodeURIComponent(nativePeer) + '/' + encodeURIComponent(row.id));
   assert.equal(raw.attempts, plan.maxAttempts);
   if (lost) {
     assert.ok(bound.exception.includes('remote size of ' + (file.size + 1)));

@@ -33,6 +33,13 @@ Connection/inspection deadlines are implemented in the October 27
 Next qualify ordinary session/pool admission under exhaustion; diagnostic scans
 now have independently owned connections and retain admission through drainage.
 
+Ordinary pool/session read admission is implemented in the
+[October 27 design](POOL_SESSION_ADMISSION_DESIGN.md) and
+[outcome](POOL_SESSION_ADMISSION_OUTCOME.md), with
+[official research/tradeoffs](POOL_SESSION_ADMISSION_RESEARCH.md).
+Next bound rotated-token replay revocation/audit as its own transaction owner;
+the read-only deadline intentionally does not abandon these security writes.
+
 October 12 scan addition: `20261012_225951_scan_owned_receipt_invalidation.sql`
 adds UUID revision identity, generated path lookup and revision-bound negative
 observations. Replay preserves existing identities; snapshot/anchors include the

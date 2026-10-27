@@ -17,7 +17,7 @@ import { fingerprintPostgresCohortSource } from '../../testing/integration/postg
 test('native default retries resume exact partial offsets with one application POST and stable successful receipts', { timeout: 150_000 }, async t => {
   const source = await fingerprintPostgresCohortSource();
   const result = await withNativeSlskdProvider({ ...requireNativeSlskdImages(), signal: t.signal, mode: 'resume',
-    expectedVersion: '0.26.1.0', runScenario: runNativeResumeScenario });
+    expectedVersion: process.env.HARMONIARR_NATIVE_SLSKD_VERSION ?? '0.26.1.0', runScenario: runNativeResumeScenario });
   assert.deepEqual(await fingerprintPostgresCohortSource(), source);
   assert.equal(result.complete, true); assert.equal(result.cleanupVerified, true);
   assert.equal(result.nativeDownloadsRetired, true); assert.equal(result.providerStoppedBeforeInspection, true);

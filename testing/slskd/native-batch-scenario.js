@@ -31,12 +31,18 @@ async function eventually(read, accepted) {
   } while (performance.now() < deadline);
   throw new Error('Native provider did not reach the required state');
 }
+if (expectedVersion === '0.26.2.0') {
+  for (const path of ['server', 'options', 'debug/transfers']) {
+    const restricted = await fetch(config.baseUrl + '/api/v0/' + path, { headers: { 'X-API-Key': apiKey }, signal: AbortSignal.timeout(2000) });
+    assert.equal(restricted.status, 403); await restricted.arrayBuffer();
+  }
+}
 await eventually(async () => {
-  const response = await fetch(config.baseUrl + '/api/v0/server', {
+  const response = await fetch(config.baseUrl + '/api/v0/application', {
     headers: { 'X-API-Key': apiKey }, signal: AbortSignal.timeout(2000),
   });
   assert.equal(response.status, 200);
-  return response.json();
+  return (await response.json()).server;
 }, state => state.isLoggedIn === true);
 
 const scenarios = [];
