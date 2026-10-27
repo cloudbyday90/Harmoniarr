@@ -236,10 +236,36 @@ test('GET /api/v1/providers/plex/link/callback completes callback and redirects 
 
   await withServer(app, async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/v1/providers/plex/link/callback?state=state-1`, {
+      headers: { cookie: 'harmoniarr_plex_link_binding=' + Buffer.alloc(32, 1).toString('base64url') },
       redirect: 'manual',
     });
 
     assert.equal(response.status, 303);
     assert.equal(response.headers.get('location'), '/app/settings?plexOAuth=linked');
+  });
+});
+
+test('Plex owner start exposes only its public DTO and passes current session with the browser verifier', async t => {
+  const startPlexLink = t.mock.fn(async () => ({ provider: 'plex', authorizationUrl: 'https://app.plex.tv/auth', expiresAt: '2026-10-27T12:10:00.000Z', accessToken: 'must-not-leak', authority: { tokenHash: 'must-not-leak' } }));
+  await withServer(createProviderRouteTestApp({ startPlexLink }), async baseUrl => {
+    const response = await fetch(baseUrl + '/api/v1/providers/plex/link/start', { method: 'POST' });
+    assert.equal(response.status, 202);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
+    assert.match(response.headers.get('set-cookie'), /harmoniarr_plex_link_binding=.*HttpOnly; SameSite=Lax/u);
+    const body = await response.json(); assert.deepEqual(Object.keys(body).sort(), ['authorizationUrl', 'expiresAt', 'ok', 'provider']);
+    const input = startPlexLink.mock.calls[0].arguments[0];
+    assert.equal(input.session.appUserId, 'user-1'); assert.equal(input.browserBinding.length, 43);
+    assert.ok(!JSON.stringify(body).includes(input.browserBinding));
+  });
+});
+
+test('Plex owner callback requires its browser cookie before calling the completion owner', async t => {
+  const completePlexLink = t.mock.fn(async () => ({}));
+  await withServer(createProviderRouteTestApp({ completePlexLink }), async baseUrl => {
+    const response = await fetch(baseUrl + '/api/v1/providers/plex/link/callback?state=missing', { redirect: 'manual' });
+    assert.equal(response.status, 303); assert.match(response.headers.get('location'), /plex_link_state_invalid/u);
+    assert.equal(response.headers.get('cache-control'), 'no-store'); assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
+    assert.equal(completePlexLink.mock.callCount(), 0); assert.equal(response.headers.get('set-cookie'), null);
   });
 });

@@ -10,7 +10,7 @@ export const plexCallbackRetentionBatchSize = 100;
 export const plexCallbackRetentionIntervalMs = 5 * 60 * 1000;
 export const plexCallbackLegacyRetentionMs = 24 * 60 * 60 * 1000;
 export const plexCallbackRetentionLockKey = createHash('sha256').update('harmoniarr:plex-callback-retention:v1').digest().readBigInt64BE().toString();
-export const plexCallbackRetentionNamePattern = '^' + plexCallbackPrefix.replaceAll('.', '[.]') + '[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$';
+export const plexCallbackRetentionNamePattern = '^' + '(?:' + plexCallbackPrefix.replaceAll('.', '[.]') + '|providers[.]plex[.]link[.]pending[.])' + '[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$';
 
 /** Unknown/unreadable envelopes are not evidence of expiration. */
 export function classifyPlexCallbackRetention({ plaintext, createdAt, updatedAt, observedAt }) {

@@ -16,6 +16,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createPlexBrowserBinding, readPlexBrowserBinding, setPlexBrowserBindingCookie } from '../plex-browser-binding.js';
+import { invalidOwnerLink } from '../integrations/plex/plex-owner-link-policy.js';
 import { createRequestAuthDependencies } from '../auth-module.js';
 import { asyncRoute } from '../http.js';
 import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
@@ -102,13 +104,12 @@ export function registerProviderRoutes(app, {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
 
-    response.status(202).json({
-      ok: true,
-      ...(await startPlexLink({
-        actorUserId: session.appUserId,
-        requestMetadata: withRequestOrigin(request, getRequestMetadata),
-      })),
-    });
+    response.setHeader('Cache-Control', 'no-store'); response.setHeader('Referrer-Policy', 'no-referrer');
+    const browserBinding = readPlexBrowserBinding(request, 'owner_link') ?? createPlexBrowserBinding();
+    const result = await startPlexLink({ session, actorUserId: session.appUserId, browserBinding,
+      requestMetadata: withRequestOrigin(request, getRequestMetadata) });
+    setPlexBrowserBindingCookie(response, browserBinding, 'owner_link');
+    response.status(202).json({ ok: true, provider: result.provider, authorizationUrl: result.authorizationUrl, expiresAt: result.expiresAt });
   }));
 
   app.post('/api/v1/providers/spotify/oauth/start', limitProviderOAuthStart, asyncRoute(async (request, response) => {
@@ -170,6 +171,7 @@ export function registerProviderRoutes(app, {
     response.json({
       ok: true,
       ...(await clearPlexLink({
+        session,
         actorUserId: session.appUserId,
         requestMetadata: getRequestMetadata(request),
       })),
@@ -203,8 +205,12 @@ export function registerProviderRoutes(app, {
   }));
 
   app.get('/api/v1/providers/plex/link/callback', asyncRoute(async (request, response) => {
+    response.setHeader('Cache-Control', 'no-store'); response.setHeader('Referrer-Policy', 'no-referrer');
     try {
+      const browserBinding = readPlexBrowserBinding(request, 'owner_link');
+      if (!browserBinding) throw invalidOwnerLink();
       await completePlexLink({
+        browserBinding,
         requestMetadata: getRequestMetadata(request),
         state: request.query.state,
       });

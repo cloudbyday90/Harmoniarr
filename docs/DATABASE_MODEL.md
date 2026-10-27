@@ -2,6 +2,13 @@
 
 ## Purpose
 
+Plex owner linking now binds browser state to the exact initiating administrator
+session and publishes state consumption, token replacement, link revision and
+required audit atomically. Clear invalidates older flows. Existing guarded
+maintenance expires both Plex pending namespaces; no schema artifact changed.
+See the [owner-link design](PLEX_OWNER_LINK_DESIGN.md) and
+[outcome](PLEX_OWNER_LINK_OUTCOME.md).
+
 Plex provider HTTP now has one shared application owner with bounded admission,
 request deadlines, streamed JSON limits and actual native/DNS drainage. See the
 [HTTP design](PLEX_HTTP_DESIGN.md) and [outcome](PLEX_HTTP_OUTCOME.md). Transport

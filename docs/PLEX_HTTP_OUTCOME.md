@@ -134,7 +134,7 @@ GitHub MCP checks returned no open PRs, including Dependabot PRs. There was no
 random PR to apply locally or stale Dependabot PR to rebase/close. None was merged.
 Work remains on main with no release, tag or separate branch.
 
-**Next item:** harden the Plex owner-link callback with current-actor admission,
-browser-bound single-use pending state and atomic token/state/required-audit
-publication. Its existing callback completes from pending state and performs
-token persistence, pending deletion and audit as separate writes.
+The owner-link follow-up is now implemented with browser/current-session binding,
+atomic publication and clear/relink revision fencing. See the
+[owner-link outcome](PLEX_OWNER_LINK_OUTCOME.md). Its next recommendation evaluates
+the remaining Spotify/YouTube linking boundaries separately.

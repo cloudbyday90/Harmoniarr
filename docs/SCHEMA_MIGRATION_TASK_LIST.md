@@ -157,6 +157,14 @@ owner-link callback with current-actor authorization, browser-bound single-use
 state and atomic token/state/required-audit publication; HTTP bounds do not own
 those existing separate application writes.
 
+Plex owner linking is now implemented in the [design](PLEX_OWNER_LINK_DESIGN.md)
+and [outcome](PLEX_OWNER_LINK_OUTCOME.md), with
+[official research/tradeoffs](PLEX_OWNER_LINK_RESEARCH_2026_10.md). Browser-bound
+state, current exact-session administrator admission, token/revision/required-audit
+publication and clear invalidation share one bounded transaction owner. Existing
+maintenance expires both pending namespaces automatically. No schema change.
+Next evaluate remaining Spotify/YouTube linking callback ownership separately.
+
 October 12 scan addition: `20261012_225951_scan_owned_receipt_invalidation.sql`
 adds UUID revision identity, generated path lookup and revision-bound negative
 observations. Replay preserves existing identities; snapshot/anchors include the

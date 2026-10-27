@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 27 [Plex owner-link rebuild](LOCAL_DOCKER_PLEX_OWNER_LINK_OUTCOME.md)
+records the current image, preserved administrator/five mounts, real PostgreSQL
+publication/authority proof and Secure-cookie Chromium navigation. See the
+[implementation outcome](PLEX_OWNER_LINK_OUTCOME.md) for compatibility and next work.
+
 The October 27 [owned Plex HTTPS rebuild](LOCAL_DOCKER_PLEX_HTTP_OUTCOME.md) records
 the current no-cache image, preserved administrator/five mounts, real native TLS/
 HTTP bounds and callback publication proof. See the

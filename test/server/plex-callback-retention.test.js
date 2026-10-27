@@ -5,7 +5,7 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { classifyPlexCallbackRetention, plexCallbackLegacyRetentionMs } from '../../src/server/integrations/plex/plex-callback-retention-policy.js';
+import { classifyPlexCallbackRetention, plexCallbackLegacyRetentionMs, plexCallbackRetentionNamePattern } from '../../src/server/integrations/plex/plex-callback-retention-policy.js';
 import { createPlexCallbackRetentionService } from '../../src/server/integrations/plex/plex-callback-retention-service.js';
 import { createPlexCallbackMaintenanceService } from '../../src/server/integrations/plex/plex-callback-maintenance-service.js';
 import { drainApplicationWorkerOwners } from '../../src/server/application-worker-drain.js';
@@ -118,4 +118,13 @@ test('application drainage owns callback maintenance before pool consumers retir
     healthReadinessService: { close: async () => { downstream = true; } },
   } });
   await entered.promise; assert.equal(downstream, false); gate.resolve(); await draining; assert.equal(downstream, true);
+});
+
+
+test('retention includes canonical owner and sign-in state but excludes permanent link secrets', () => {
+  const pattern = new RegExp(plexCallbackRetentionNamePattern, 'u');
+  const id = '12345678-1234-1234-1234-123456789abc';
+  assert.equal(pattern.test('providers.plex.link.pending.' + id), true);
+  assert.equal(pattern.test('auth.plex.sign_in.pending.' + id), true);
+  for (const name of ['providers.plex.link.token', 'providers.plex.link.revision', 'providers.plex.link.client_identifier', 'providers.plex.link.pending.invalid']) assert.equal(pattern.test(name), false);
 });
