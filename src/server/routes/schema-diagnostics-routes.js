@@ -12,11 +12,17 @@ export function registerSchemaDiagnosticsRoutes(app, { requireAdminSession, getS
     await requireAdminSession(request);
     next();
   }), limitSchemaDiagnostics, asyncRoute(async (request, response) => {
+    const controller = new AbortController();
+    const disconnected = () => { if (!response.writableFinished) controller.abort(); };
+    response.once('close', disconnected);
     let result;
-    try { result = await getSchemaDiagnostics(); }
-    catch { result = unavailableSchemaDiagnostics(); }
+    try {
+      try { result = await getSchemaDiagnostics({ signal: controller.signal }); }
+      catch { result = unavailableSchemaDiagnostics(); }
+      if (response.destroyed) return;
     // A long scan must not publish after revocation or a role change.
-    await requireAdminSession(request);
-    response.json({ ok: true, schemaDiagnostics: result });
+      await requireAdminSession(request);
+      if (!response.destroyed) response.json({ ok: true, schemaDiagnostics: result });
+    } finally { response.off('close', disconnected); }
   }));
 }

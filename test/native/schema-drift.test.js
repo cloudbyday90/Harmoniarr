@@ -9,6 +9,9 @@ import { createHash, randomUUID } from 'node:crypto';
 import { promisify } from 'node:util';
 import test from 'node:test';
 import pg from 'pg';
+import { createServer } from 'node:net';
+import { createSchemaObservationConnection } from '/app/server-dist/schema-observation-connection-service.js';
+import { startSchemaDiagnosticTask } from '/app/server-dist/schema-diagnostic-task-service.js';
 import { getPool, closePool, buildConnectionConfig } from '/app/server-dist/database.js';
 import { bootstrapDatabaseSchemaFromSnapshot } from '/app/server-dist/schema-bootstrap.js';
 import { inspectDatabaseSchemaDrift } from '/app/server-dist/schema-drift-service.js';
@@ -53,7 +56,7 @@ test('restricted read-only schema diagnosis detects drift without repair and coo
     await owner.query(`GRANT USAGE ON SCHEMA public TO ${role}`); await owner.query(`GRANT SELECT ON schema_migrations TO ${role}`);
     reader = new pg.Pool({ ...buildConnectionConfig(), database, user: role, max: 2 }); reader.on('error', () => {});
     empty = new pg.Pool({ ...buildConnectionConfig(), database: emptyDatabase, user: role }); empty.on('error', () => {});
-    const options = { getPoolFn: () => reader }, before = await fingerprint();
+    const options = { createConnectionFn: () => createSchemaObservationConnection({ config: reader.options }) }, before = await fingerprint();
     const permission = (await reader.query("SELECT current_setting('transaction_read_only') AS readonly,rolsuper,rolcreatedb,rolcreaterole FROM pg_roles WHERE rolname=current_user")).rows[0];
     assert.deepEqual(permission, { readonly: 'on', rolsuper: false, rolcreatedb: false, rolcreaterole: false });
     assert.equal((await inspectDatabaseSchemaDrift(options)).current, true);
@@ -98,7 +101,7 @@ test('restricted read-only schema diagnosis detects drift without repair and coo
     await owner.query(`REVOKE SELECT ON schema_migrations FROM ${role}`);
     const denied = await cli(); assert.equal(denied.code, 1); assert.match(denied.stderr, /Schema diagnostics unavailable/u); assert.doesNotMatch(denied.stderr, /permission denied|SELECT|schema_migrations/u);
     await owner.query(`GRANT SELECT ON schema_migrations TO ${role}`); results.push('permission-denied-unavailable');
-    const blank = await inspectDatabaseSchemaDrift({ getPoolFn: () => empty });
+    const blank = await inspectDatabaseSchemaDrift({ createConnectionFn: () => createSchemaObservationConnection({ config: empty.options }) });
     assert.equal(blank.lineage.state, 'unavailable'); assert.equal(blank.anchors.missing.length, 164);
     assert.equal((await cli({ target: emptyDatabase })).code, 1); results.push('empty-not-repaired');
 
@@ -113,7 +116,7 @@ test('restricted read-only schema diagnosis detects drift without repair and coo
     assert.equal(await locksGone(), true); results.push('write-refused-and-lock-retired');
     const killed = new pg.Pool({ ...buildConnectionConfig(), database, user: role, max: 1 }); killed.on('error', () => {});
     await withWorkerTaskCleanup(async () => {
-      await assert.rejects(withSchemaObservation({ getPoolFn: () => killed }, async client => {
+      await assert.rejects(withSchemaObservation({ createConnectionFn: () => createSchemaObservationConnection({ config: killed.options }) }, async client => {
         const pid = (await client.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
         assert.equal((await admin.query('SELECT pg_terminate_backend($1) AS stopped', [pid])).rows[0].stopped, true);
         await client.query('SELECT 1');
@@ -123,6 +126,44 @@ test('restricted read-only schema diagnosis detects drift without repair and coo
       while (!await locksGone()) { t.signal.throwIfAborted(); assert.ok(Date.now() < deadline); await new Promise(resolve => { setTimeout(resolve, 10); }); }
       results.push('terminated-backend-discarded');
     }, () => killed.end());
+
+    // Saturating the ordinary reader pool cannot queue the single-use observer.
+    const held = await Promise.all([reader.connect(), reader.connect()]);
+    await withWorkerTaskCleanup(async () => {
+      assert.equal((await inspectDatabaseSchemaDrift(options)).current, true);
+      assert.equal(reader.waitingCount, 0); results.push('saturated-pool-bypassed');
+    }, () => { for (const client of held) client.release(); });
+
+    for (const reason of ['cancel', 'deadline']) {
+      const controller = new AbortController(), started = Promise.withResolvers(); let pid;
+      const task = startSchemaDiagnosticTask(scope => withSchemaObservation({ ...options, scope }, async client => {
+        pid = (await client.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+        const query = client.query('SELECT pg_sleep(30)'); started.resolve(); return query;
+      }), { signal: controller.signal, timeoutMs: reason === 'deadline' ? 3_000 : 10_000 });
+      const refused = assert.rejects(task.result, { code: 'schema_diagnostics_unavailable' });
+      await Promise.race([started.promise, task.result]);
+      if (reason === 'cancel') controller.abort();
+      await refused; await task.drained;
+      const limit = Date.now() + 5_000;
+      while ((await admin.query('SELECT count(*)::integer AS count FROM pg_stat_activity WHERE pid=$1', [pid])).rows[0].count) {
+        t.signal.throwIfAborted(); assert.ok(Date.now() < limit); await new Promise(resolve => { setTimeout(resolve, 10); });
+      }
+      assert.equal(await locksGone(), true); results.push(reason + '-query-backend-and-lock-retired');
+    }
+
+    // A peer accepting TCP without PostgreSQL startup must not hold a diagnostic.
+    const sockets = new Set();
+    const blackhole = createServer(socket => { sockets.add(socket); socket.resume(); socket.once('close', () => sockets.delete(socket)); });
+    await new Promise(resolve => { blackhole.listen(0, '127.0.0.1', resolve); });
+    await withWorkerTaskCleanup(async () => {
+      const started = Date.now();
+      await assert.rejects(withSchemaObservation({ createConnectionFn: () => createSchemaObservationConnection({
+        config: { ...buildConnectionConfig(), host: '127.0.0.1', port: blackhole.address().port, ssl: false }, connectionTimeoutMs: 100,
+      }) }, () => assert.fail('startup stall admitted')));
+      assert.ok(Date.now() - started < 5_000);
+      await new Promise(resolve => { setImmediate(resolve); });
+      results.push('startup-stall-bounded');
+    }, async () => { for (const socket of sockets) socket.destroy(); await new Promise(resolve => { blackhole.close(resolve); }); assert.equal(sockets.size, 0); });
   }, async () => {
     await withWorkerTaskCleanup(async () => {
       if (guard) { try { await guard.query('ROLLBACK'); } finally { guard.release(true); } }

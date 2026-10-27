@@ -39,7 +39,7 @@ test('schema diagnostic GET returns explicit no-store summary, no query-controll
   let fail = false, scans = 0, checks = 0;
   const app = createJsonTestApp(expressApp => registerSchemaDiagnosticsRoutes(expressApp, {
     requireAdminSession: async () => { checks++; },
-    getSchemaDiagnostics: async (...args) => { scans++; assert.equal(args.length, 0); if (fail) throw new Error('private SQL'); return { state: 'current' }; },
+    getSchemaDiagnostics: async options => { scans++; assert.deepEqual(Object.keys(options), ['signal']); assert.ok(options.signal instanceof AbortSignal); if (fail) throw new Error('private SQL'); return { state: 'current' }; },
     limitSchemaDiagnostics: (_request, _response, next) => next(),
   }));
   await withServer(app, async base => {
@@ -49,5 +49,22 @@ test('schema diagnostic GET returns explicit no-store summary, no query-controll
     fail = true; response = await fetch(base + path); assert.equal(response.status, 200);
     const body = await response.text(); assert.match(body, /unavailable/u); assert.doesNotMatch(body, /private|SQL/u);
     assert.equal(checks, 4); assert.equal(scans, 2);
+  });
+});
+
+test('disconnecting a held HTTP response cancels its scan and suppresses publication', async () => {
+  const started = Promise.withResolvers(), cancelled = Promise.withResolvers(), release = Promise.withResolvers(); let checks = 0;
+  const app = createJsonTestApp(expressApp => registerSchemaDiagnosticsRoutes(expressApp, {
+    requireAdminSession: async () => { checks++; }, limitSchemaDiagnostics: (_request, _response, next) => next(),
+    getSchemaDiagnostics: async ({ signal }) => {
+      signal.addEventListener('abort', () => cancelled.resolve(), { once: true }); started.resolve();
+      await release.promise; return { state: 'current' };
+    },
+  }));
+  await withServer(app, async base => {
+    const controller = new AbortController(), response = fetch(base + path, { signal: controller.signal });
+    const rejected = assert.rejects(response, { name: 'AbortError' });
+    try { await started.promise; controller.abort(); await rejected; await cancelled.promise; assert.equal(checks, 1); }
+    finally { release.resolve(); }
   });
 });

@@ -42,8 +42,8 @@ function fixture(options = {}) {
     }
     return { rows: [] };
   }, release(discard) { releases.push(discard); if (Object.hasOwn(options, 'releaseFailure')) throw options.releaseFailure; } });
-  const getPoolFn = () => ({ connect: async () => client });
-  return { client, calls, releases, getPoolFn, run: () => inspectDatabaseSchemaDrift({ getPoolFn }) };
+  const createConnectionFn = () => ({ client, connect: async () => {}, close: async ({ force }) => client.release(force || undefined) });
+  return { client, calls, releases, createConnectionFn, run: () => inspectDatabaseSchemaDrift({ createConnectionFn }) };
 }
 
 test('schema drift diagnosis bounds ledger reads and owns a read-only, locally timed, shared preparation observation', async () => {
@@ -93,14 +93,14 @@ test('busy preparation rolls back without reading ledger or anchor facts and inh
 test('original Error/null survives failed rollback/release; successful work requires acknowledged rollback and visible cleanup', async () => {
   for (const original of [new Error('private original'), null]) for (const secondary of [new Error('private cleanup'), null]) {
     const f = fixture({ rollbackFailure: secondary, releaseFailure: secondary });
-    await assert.rejects(withSchemaObservation({ getPoolFn: f.getPoolFn }, async () => { throw original; }), error => error === original);
+    await assert.rejects(withSchemaObservation({ createConnectionFn: f.createConnectionFn }, async () => { throw original; }), error => error === original);
     assert.deepEqual(f.releases, [true]);
   }
   for (const options of [{ rollbackFailure: null }, { rollbackCommand: 'COMMIT' }, { releaseFailure: null }]) {
     const f = fixture(options); await assert.rejects(f.run(), { code: 'schema_diagnostics_unavailable' });
   }
   const ended = fixture();
-  await assert.rejects(withSchemaObservation({ getPoolFn: ended.getPoolFn }, async () => { ended.client.emit('end'); return 'untrusted result'; }), { code: 'schema_observation_unavailable' });
+  await assert.rejects(withSchemaObservation({ createConnectionFn: ended.createConnectionFn }, async () => { ended.client.emit('end'); return 'untrusted result'; }), { code: 'schema_observation_unavailable' });
   assert.deepEqual(ended.releases, [true]);
 });
 
@@ -108,12 +108,12 @@ test('private query failures and stale packaged contracts yield bounded unavaila
   const f = fixture({ queryFailure: new Error('SELECT private credentials secret') });
   await assert.rejects(f.run(), error => { assert.equal(error.code, 'schema_diagnostics_unavailable'); assert.doesNotMatch(error.message, /private|credentials|SELECT/u); return true; });
   const cold = fixture();
-  await assert.rejects(inspectDatabaseSchemaDrift({ getPoolFn: cold.getPoolFn, loadSchemaAnchorContractFn: async () => { throw null; } }), { code: 'schema_diagnostics_unavailable' });
+  await assert.rejects(inspectDatabaseSchemaDrift({ createConnectionFn: cold.createConnectionFn, loadSchemaAnchorContractFn: async () => { throw null; } }), { code: 'schema_diagnostics_unavailable' });
   assert.equal(cold.calls.length, 0); assert.equal(cold.releases.length, 0);
 });
 
 test('failed BEGIN discards without querying facts or rolling back an unacknowledged start', async () => {
   const original = new Error('private BEGIN failure'), f = fixture({ beginFailure: original });
-  await assert.rejects(withSchemaObservation({ getPoolFn: f.getPoolFn }, async () => assert.fail('work entered')), error => error === original);
+  await assert.rejects(withSchemaObservation({ createConnectionFn: f.createConnectionFn }, async () => assert.fail('work entered')), error => error === original);
   assert.deepEqual(f.releases, [true]); assert.equal(f.calls.some(row => row.sql === 'ROLLBACK'), false);
 });

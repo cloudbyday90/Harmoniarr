@@ -7,7 +7,7 @@ import { computed, getCurrentScope, onScopeDispose, ref } from 'vue';
 import { fetchSchemaDiagnostics } from '../lib/schema-diagnostics-api.js';
 import { projectSchemaDiagnosticsPayload, schemaDiagnosticsMessages } from '../lib/schema-diagnostics-presentation.js';
 
-export function useSchemaDiagnostics({ fetchFn = fetchSchemaDiagnostics } = {}) {
+export function useSchemaDiagnostics({ fetchFn = fetchSchemaDiagnostics, timeoutMs = 25_000 } = {}) {
   const state = ref('idle'), report = ref(null);
   const message = computed(() => schemaDiagnosticsMessages[state.value]);
   let disposed = false, controller = null;
@@ -15,15 +15,20 @@ export function useSchemaDiagnostics({ fetchFn = fetchSchemaDiagnostics } = {}) 
     if (disposed || state.value === 'loading') return;
     state.value = 'loading'; report.value = null;
     controller = new AbortController();
+    const current = controller;
+    const timer = setTimeout(() => current.abort(), timeoutMs);
+    let rejectAbort;
+    const cancelled = new Promise((_resolve, reject) => { rejectAbort = () => reject(new Error('Schema diagnostics request cancelled')); });
+    current.signal.addEventListener('abort', rejectAbort, { once: true });
     try {
-      const result = projectSchemaDiagnosticsPayload(await fetchFn({ signal: controller.signal }));
+      const result = projectSchemaDiagnosticsPayload(await Promise.race([fetchFn({ signal: current.signal }), cancelled]));
       if (disposed) return;
       state.value = result.state;
       report.value = ['current', 'attention'].includes(result.state) ? result : null;
     } catch (error) {
       if (disposed) return;
       state.value = [401, 403].includes(error?.status) ? 'forbidden' : error?.status === 429 ? 'limited' : 'unavailable';
-    } finally { controller = null; }
+    } finally { clearTimeout(timer); current.signal.removeEventListener('abort', rejectAbort); controller = null; }
   }
   function dispose() { disposed = true; controller?.abort(); report.value = null; }
   if (getCurrentScope()) onScopeDispose(dispose);

@@ -10,7 +10,7 @@ import test from 'node:test';
 import { createApp } from '/app/server-dist/app.js';
 import { createSystemModule } from '/app/server-dist/system-module.js';
 import { createSchemaDiagnosticsService } from '/app/server-dist/schema-diagnostics-service.js';
-import { inspectDatabaseSchemaDrift } from '/app/server-dist/schema-drift-service.js';
+import { startDatabaseSchemaDriftInspection } from '/app/server-dist/schema-drift-service.js';
 import { withDatabasePreparation } from '/app/server-dist/database-preparation-owner-service.js';
 import { getPool, closePool } from '/app/server-dist/database.js';
 import { startServerRuntime } from '/app/server-dist/startup-runtime.js';
@@ -25,9 +25,14 @@ test('administrator HTTP schema diagnostics authorize twice, never repair, bound
   const pool = getPool(), path = '/api/v1/system/diagnostics/schema-state';
   const started = Promise.withResolvers(), release = Promise.withResolvers();
   let mode = 'current', scans = 0, active = 0, peak = 0, runtime, pending, renamed = false;
-  const service = createSchemaDiagnosticsService({ inspectFn: async () => {
+  const service = createSchemaDiagnosticsService({ inspectFn: async ({ signal }) => {
     scans++; active++; peak = Math.max(peak, active);
-    try { if (mode === 'hold') { started.resolve(); await release.promise; } if (mode === 'error') throw new Error('private SQL credentials'); return await inspectDatabaseSchemaDrift(); }
+    try {
+      if (mode === 'hold') { started.resolve(); await release.promise; }
+      if (mode === 'error') throw new Error('private SQL credentials');
+      const task = startDatabaseSchemaDriftInspection({ signal });
+      return await withWorkerTaskCleanup(() => task.result, () => task.drained);
+    }
     finally { active--; }
   } });
   const app = createApp({ appPort: 3000, clientDistDir: '/app/client-dist', packageJsonPath: '/app/package.json',

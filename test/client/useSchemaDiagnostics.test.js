@@ -48,3 +48,17 @@ test('unknown, malformed or contradictory schema payloads cannot display a curre
   }
   assert.deepEqual(projectSchemaDiagnosticsPayload({ schemaDiagnostics: { state: 'busy', secret: 'private' } }), { state: 'busy' });
 });
+
+test('request deadline aborts transport, clears stale counts and permits explicit retry without accepting a late result', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const late = Promise.withResolvers(); let calls = 0, signal;
+  const workflow = useSchemaDiagnostics({ timeoutMs: 100, fetchFn: options => {
+    signal = options.signal; return ++calls === 2 ? late.promise : Promise.resolve(payload);
+  } });
+  await workflow.refresh(); assert.equal(workflow.state.value, 'current');
+  const pending = workflow.refresh(); t.mock.timers.tick(100); await pending;
+  assert.equal(signal.aborted, true); assert.equal(workflow.state.value, 'unavailable'); assert.equal(workflow.report.value, null);
+  await workflow.refresh(); assert.equal(workflow.state.value, 'current');
+  late.resolve({ schemaDiagnostics: { state: 'attention' } }); await Promise.resolve();
+  assert.equal(workflow.state.value, 'current'); assert.equal(calls, 3);
+});

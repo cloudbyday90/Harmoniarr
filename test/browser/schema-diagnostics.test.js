@@ -79,10 +79,17 @@ test('schema checks are explicit, use real current data, announce held states an
       const other = page.getByRole('button', { name: 'Refresh diagnostics', exact: true }); await other.focus();
       release.resolve(); await status.filter({ hasText: 'are current' }).waitFor();
       assert.equal(await other.evaluate(node => node === globalThis.document.activeElement), true);
-      assert.equal(requests, 7); assert.deepEqual(errors, []);
+      await page.clock.install();
+      mode = 'held-current'; pending = Promise.withResolvers(); release = Promise.withResolvers(); gates.push(release);
+      await button.click(); await pending.promise; await page.clock.fastForward(25_000);
+      await status.filter({ hasText: 'are unavailable' }).waitFor();
+      assert.equal(await panel.locator('dd').count(), 0); assert.notEqual(await button.getAttribute('aria-disabled'), 'true');
+      assert.equal(await button.evaluate(node => node === globalThis.document.activeElement), true);
+      release.resolve(); mode = 'current'; await button.click(); await status.filter({ hasText: 'are current' }).waitFor();
+      assert.equal(requests, 9); assert.deepEqual(errors, []);
       t.diagnostic(JSON.stringify({ actualCurrentEndpoint: true, noStore: true, explicitOnly: true, duplicateActivationSuppressed: true,
         permanentPoliteStatus: true, statusOutsideBusy: true, focusPreserved: true, userFocusRespected: true,
-        staleResultsCleared: true, privateDetailsOmitted: true, lightDesktopAndDarkMobile: true, requests }));
+        staleResultsCleared: true, privateDetailsOmitted: true, lightDesktopAndDarkMobile: true, requestDeadlineAndExplicitRetry: true, requests }));
     } finally { for (const gate of gates) gate.resolve(); await liveNode.dispose(); }
   }, { scenarioName: 'schema_diagnostics_ui' });
 });

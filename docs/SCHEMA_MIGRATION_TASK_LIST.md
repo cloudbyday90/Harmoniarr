@@ -26,6 +26,13 @@ That administrator summary is implemented in the
 end-to-end observation admission separately from the existing SQL transaction
 limits, retaining no-repair behavior and bounded unavailable results.
 
+Connection/inspection deadlines are implemented in the October 27
+[deadline design](SCHEMA_DIAGNOSTIC_DEADLINES_DESIGN.md) and
+[outcome](SCHEMA_DIAGNOSTIC_DEADLINES_OUTCOME.md), with
+[official research and tradeoffs](SCHEMA_DIAGNOSTIC_DEADLINES_RESEARCH.md).
+Next qualify ordinary session/pool admission under exhaustion; diagnostic scans
+now have independently owned connections and retain admission through drainage.
+
 October 12 scan addition: `20261012_225951_scan_owned_receipt_invalidation.sql`
 adds UUID revision identity, generated path lookup and revision-bound negative
 observations. Replay preserves existing identities; snapshot/anchors include the

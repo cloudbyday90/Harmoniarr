@@ -3,7 +3,8 @@
  * Copyright (C) 2026 Harmoniarr Contributors
  * Licensed under GPL-3.0-or-later. See LICENSE.
  */
-import { inspectDatabaseSchemaDrift } from './schema-drift-service.js';
+import { startDatabaseSchemaDriftInspection } from './schema-drift-service.js';
+import { startSchemaDiagnosticTask } from './schema-diagnostic-task-service.js';
 
 export function unavailableSchemaDiagnostics(state = 'unavailable') {
   return { state, checkedAt: null, lineage: null, anchors: null };
@@ -27,13 +28,19 @@ export function projectSchemaDiagnostics(report, checkedAt) {
     anchors: { state: anchors.state, checkedCount: count(anchors.checkedCount), missingCount: anchors.missing.length, alteredCount: anchors.altered.length } };
 }
 
-export function createSchemaDiagnosticsService({ inspectFn = inspectDatabaseSchemaDrift, now = () => new Date() } = {}) {
+export function createSchemaDiagnosticsService({ inspectFn, now = () => new Date(), timeoutMs } = {}) {
   let running = false;
-  return { async getSchemaDiagnostics() {
+  return { async getSchemaDiagnostics({ signal } = {}) {
     if (running) return unavailableSchemaDiagnostics('busy');
     running = true;
-    try { return projectSchemaDiagnostics(await inspectFn(), now().toISOString()); }
+    let task;
+    try {
+      const options = { signal, timeoutMs };
+      task = inspectFn ? startSchemaDiagnosticTask(scope => inspectFn(scope), options) : startDatabaseSchemaDriftInspection(options);
+      task.drained.then(safeToReadmit => { if (safeToReadmit) running = false; });
+      return projectSchemaDiagnostics(await task.result, now().toISOString());
+    }
     catch (error) { return unavailableSchemaDiagnostics(error?.code === 'schema_observation_busy' ? 'busy' : 'unavailable'); }
-    finally { running = false; }
+    finally { if (!task) running = false; }
   } };
 }

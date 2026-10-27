@@ -86,3 +86,9 @@ from the existing server transaction limits, preserving bounded unavailable
 feedback and actual resource retirement. See [research/pros and cons](SCHEMA_DIAGNOSTICS_UI_RESEARCH.md),
 [design](SCHEMA_DIAGNOSTICS_UI_DESIGN.md) and
 [Docker outcome](LOCAL_DOCKER_SCHEMA_DIAGNOSTICS_UI_OUTCOME.md).
+
+October 27 follow-up: connection ownership, inspection/caller deadlines and
+drainage fencing are implemented in the
+[deadline design](SCHEMA_DIAGNOSTIC_DEADLINES_DESIGN.md) and
+[outcome](SCHEMA_DIAGNOSTIC_DEADLINES_OUTCOME.md). The connection/transport limits
+above describe this document's original October 26 candidate.

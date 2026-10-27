@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 27 [schema diagnostic deadline rebuild](LOCAL_DOCKER_SCHEMA_DIAGNOSTIC_DEADLINES_OUTCOME.md)
+records the current no-cache image, preserved administrator/data/mounts and
+qualification scope. See the [implementation outcome](SCHEMA_DIAGNOSTIC_DEADLINES_OUTCOME.md)
+for connection ownership, inspection deadlines, cancellation and explicit retry.
+
 The October 26 [schema diagnostics UI rebuild](LOCAL_DOCKER_SCHEMA_DIAGNOSTICS_UI_OUTCOME.md)
 records the current no-cache image and preserved administrator/data/mounts. The
 [implementation outcome](SCHEMA_DIAGNOSTICS_UI_OUTCOME.md) records explicit
