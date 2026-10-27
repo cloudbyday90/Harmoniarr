@@ -2,6 +2,12 @@
 
 ## Purpose
 
+Session rotation/root issuance now use bounded transactions with shared account/
+family locking and current parent CAS, without changing the schema. See the
+[rotation design](SESSION_ROTATION_DESIGN.md) and
+[outcome](SESSION_ROTATION_OUTCOME.md). Root login's verified credential epoch and
+required login audit still need one owner.
+
 Rotated-token replay now owns family revocation and its required audit in one
 bounded transaction without changing the schema. See the
 [session replay design](SESSION_REPLAY_DESIGN.md) and

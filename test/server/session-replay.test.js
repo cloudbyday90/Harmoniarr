@@ -44,7 +44,7 @@ test('replay revocation and required audit use one transaction and immutable sel
   const result = service(args);
   args.row.refresh_token_id = 'changed'; args.requestMetadata.userAgent = 'changed'; gate.resolve();
   assert.equal(await result, 1); assert.equal(eventClient, f.client);
-  assert.deepEqual(f.queries[2].values, ['token', 'user', 'family']);
+  assert.deepEqual(f.queries.find(row => row.sql.includes('WHERE replay.id')).values, ['token', 'user', 'family']);
   assert.equal(event.entityId, 'token'); assert.equal(event.userAgent, 'fixture');
   assert.deepEqual(event.details, { tokenFamilyId: 'family', previousRevokedReason: 'rotated' });
   assert.doesNotMatch(JSON.stringify(event), /private|token_hash/u);

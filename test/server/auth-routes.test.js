@@ -332,9 +332,11 @@ test('auth bootstrap admin route creates the bootstrap user through shared depen
 test('auth refresh route rotates the session through shared dependencies', async (t) => {
   const session = { appUserId: 'user-8', user: { id: 'user-8', username: 'refresh-user' } };
   const requireFreshSession = t.mock.fn(async () => session);
+  const requireCsrf = t.mock.fn();
   const rotateSession = t.mock.fn(async (activeSession, requestMetadata) => ({
     refreshToken: 'refresh-next',
     csrfToken: 'csrf-next',
+    user: { id: 'user-8', username: 'refresh-user', role: 'requester' },
     activeSession,
     requestMetadata,
   }));
@@ -342,6 +344,7 @@ test('auth refresh route rotates the session through shared dependencies', async
 
   const app = createAuthRouteTestApp({
     requireFreshSession,
+    requireCsrf,
     rotateSession,
     setAuthCookies,
     createRefreshResponse: (user, issuedSession) => ({
@@ -366,6 +369,7 @@ test('auth refresh route rotates the session through shared dependencies', async
     assert.equal(response.status, 200);
   assert.equal(requireFreshSession.mock.callCount(), 1);
     assert.equal(rotateSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
     assert.equal(setAuthCookies.mock.callCount(), 1);
     assert.equal(rotateSession.mock.calls[0].arguments[0], session);
     assert.deepEqual(rotateSession.mock.calls[0].arguments[1], {
@@ -377,7 +381,7 @@ test('auth refresh route rotates the session through shared dependencies', async
     assert.deepEqual(payload, {
       ok: true,
       bootstrapRequired: false,
-      user: { id: 'user-8', username: 'refresh-user' },
+      user: { id: 'user-8', username: 'refresh-user', role: 'requester' },
       csrfToken: 'csrf-next',
       requestMetadata: {
         ipAddress: '203.0.113.77',
@@ -385,6 +389,23 @@ test('auth refresh route rotates the session through shared dependencies', async
       },
     });
   });
+});
+
+test('auth refresh refusal never invokes issuance or sets cookies', async t => {
+  for (const phase of ['csrf', 'transaction']) {
+    const rotateSession = t.mock.fn(async () => { throw createApiError(503, 'session_write_unavailable', 'Session verification is temporarily unavailable. Try again.'); });
+    const setAuthCookies = t.mock.fn();
+    const app = createAuthRouteTestApp({ rotateSession, setAuthCookies, requireCsrf: () => {
+      if (phase === 'csrf') throw createApiError(403, 'csrf_required', 'CSRF token is required');
+    } });
+    await withServer(app, async baseUrl => {
+      const response = await fetch(baseUrl + '/api/v1/auth/refresh', { method: 'POST' });
+      assert.equal(response.status, phase === 'csrf' ? 403 : 503);
+      assert.equal(response.headers.get('set-cookie'), null);
+      assert.equal(rotateSession.mock.callCount(), phase === 'csrf' ? 0 : 1);
+      assert.equal(setAuthCookies.mock.callCount(), 0);
+    });
+  }
 });
 
 test('auth logout route enforces csrf, records logout, and clears auth cookies when a session exists', async (t) => {

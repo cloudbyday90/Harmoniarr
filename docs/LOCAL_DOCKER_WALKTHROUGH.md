@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 27 [session rotation rebuild](LOCAL_DOCKER_SESSION_ROTATION_OUTCOME.md)
+records the current no-cache image, preserved administrator/data/five mounts and
+packaged PostgreSQL races. See the [implementation outcome](SESSION_ROTATION_OUTCOME.md)
+for transactional issuance, shared family ownership and refresh CSRF protection.
+
 The October 27 [session replay rebuild](LOCAL_DOCKER_SESSION_REPLAY_OUTCOME.md)
 records the current no-cache image, preserved administrator/data/five mounts and
 packaged PostgreSQL qualification. See the [implementation outcome](SESSION_REPLAY_OUTCOME.md)

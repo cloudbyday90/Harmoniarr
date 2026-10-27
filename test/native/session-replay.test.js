@@ -33,7 +33,7 @@ test('replay security writes are atomic, bounded, idempotent and owned beyond HT
   const held = [];
   async function seed() {
     const parent = await issueSession({ userId, requestMetadata: metadata });
-    const child = await rotateSession({ refreshTokenId: parent.refreshTokenId, appUserId: userId, tokenFamilyId: parent.tokenFamilyId }, metadata);
+    const child = await rotateSession({ refreshTokenId: parent.refreshTokenId, appUserId: userId, tokenFamilyId: parent.tokenFamilyId, refreshToken: parent.refreshToken }, metadata);
     return { parent, child, row: await findRefreshTokenSession(pool, hashToken(parent.refreshToken)) };
   }
   const replay = data => handleSessionReplay({ row: data.row, requestMetadata: metadata });

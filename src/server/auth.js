@@ -16,10 +16,14 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { randomUUID } from 'node:crypto';
 import { getPool } from './database.js';
 import { readRequestSessionRow } from './session-lookup-service.js';
 import { handleSessionReplay } from './session-replay-service.js';
+import { createSessionIssuanceService } from './session-issuance-service.js';
+import { toSessionUser } from './session-user-policy.js';
+import { refreshTokenMaxAgeSeconds } from './session-issuance-policy.js';
+export { toSessionUser };
+const sessionIssuance = createSessionIssuanceService();
 import {
   csrfProtectionModeEnvVar,
   csrfProtectionModes,
@@ -29,7 +33,6 @@ import {
 import {
   hashPassword,
   hashToken,
-  createOpaqueToken,
   parseCookieHeader,
   serializeCookie,
   verifyPassword,
@@ -47,7 +50,6 @@ import {
 
 const refreshCookieName = 'harmoniarr_refresh';
 const csrfCookieName = 'harmoniarr_csrf';
-const refreshTokenMaxAgeSeconds = 60 * 60 * 24 * 14;
 
 import { createApiError } from './api-error.js';
 export { createApiError };
@@ -61,16 +63,6 @@ export function getRequestMetadata(request) {
   return {
     ipAddress,
     userAgent: request.headers['user-agent'] ?? null,
-  };
-}
-
-export function toSessionUser(row) {
-  return {
-    id: row.id,
-    username: row.username,
-    role: row.role,
-    mustChangePassword: row.must_change_password,
-    lastLoginAt: row.last_login_at,
   };
 }
 
@@ -227,54 +219,8 @@ export async function resolveSessionFromRefreshTokenLookup({
   };
 }
 
-export async function issueSession({ userId, parentRefreshTokenId = null, tokenFamilyId = null, requestMetadata }) {
-  const refreshToken = createOpaqueToken(32);
-  const csrfToken = createOpaqueToken(24);
-  const expiresAt = new Date(Date.now() + refreshTokenMaxAgeSeconds * 1000);
-  const familyId = tokenFamilyId ?? randomUUID();
-
-  const result = await getPool().query(
-    `
-      INSERT INTO refresh_tokens (
-        app_user_id,
-        token_hash,
-        token_family_id,
-        parent_refresh_token_id,
-        csrf_token_hash,
-        issued_at,
-        expires_at,
-        issued_ip,
-        issued_user_agent
-      )
-      VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8)
-      RETURNING id
-    `,
-    [
-      userId,
-      hashToken(refreshToken),
-      familyId,
-      parentRefreshTokenId,
-      hashToken(csrfToken),
-      expiresAt,
-      requestMetadata.ipAddress,
-      requestMetadata.userAgent,
-    ],
-  );
-
-  if (parentRefreshTokenId) {
-    await getPool().query(
-      'UPDATE refresh_tokens SET replaced_by_refresh_token_id = $2, last_used_at = NOW() WHERE id = $1',
-      [parentRefreshTokenId, result.rows[0].id],
-    );
-  }
-
-  return {
-    refreshToken,
-    csrfToken,
-    expiresAt,
-    refreshTokenId: result.rows[0].id,
-    tokenFamilyId: familyId,
-  };
+export function issueSession(input) {
+  return sessionIssuance.issueRootSession(input);
 }
 
 export async function findUserByUsername(username) {
@@ -492,17 +438,8 @@ export async function loginUser({ username, password, requestMetadata }) {
   };
 }
 
-export async function rotateSession(session, requestMetadata) {
-  await revokeRefreshToken(session.refreshTokenId, 'rotated');
-
-  const issuedSession = await issueSession({
-    userId: session.appUserId,
-    parentRefreshTokenId: session.refreshTokenId,
-    tokenFamilyId: session.tokenFamilyId,
-    requestMetadata,
-  });
-
-  return issuedSession;
+export function rotateSession(session, requestMetadata) {
+  return sessionIssuance.rotateSession(session, requestMetadata);
 }
 
 export async function logoutSession(session, requestMetadata) {

@@ -95,6 +95,11 @@ This step does not prevent a concurrently authorized late child insert after a
 replay transaction's snapshot. Qualify both orderings, parent CAS/current authority,
 required rollback, concurrency and uncertain commit before claiming family fencing.
 
+That issuance follow-up is now implemented and qualified in the separate
+[rotation design](SESSION_ROTATION_DESIGN.md), [research](SESSION_ROTATION_RESEARCH_2026_10.md)
+and [outcome](SESSION_ROTATION_OUTCOME.md). Root credential verification/login-audit
+ownership remains the next item.
+
 See [design](SESSION_REPLAY_DESIGN.md),
 [Docker design](LOCAL_DOCKER_SESSION_REPLAY_DESIGN.md) and
 [Docker outcome](LOCAL_DOCKER_SESSION_REPLAY_OUTCOME.md).

@@ -73,7 +73,7 @@ test('native default settings mutations reject anonymous callers and invalid CSR
   ]);
 }));
 
-test('native default protection preserves public login and refresh while refusing logout without its session token', {
+test('native default protection preserves public login while refresh and logout require their session token', {
   timeout: config.scenarioTimeoutMs,
 }, () => scenario(async ({ baseUrl, client, getPoolFn }) => {
   assert.equal((await bootstrapAdminSession(client)).response.status, 201);
@@ -84,7 +84,11 @@ test('native default protection preserves public login and refresh while refusin
   assert.deepEqual((await getPoolFn().query('SELECT id FROM refresh_tokens WHERE is_revoked = FALSE')).rows, rowsBefore.rows);
 
   const oldToken = client.getCsrfToken();
-  const refresh = await client.requestJson('/api/v1/auth/refresh', { method: 'POST', csrf: false });
+  const refusedRefresh = await client.requestJson('/api/v1/auth/refresh', { method: 'POST', csrf: false });
+  assert.equal(refusedRefresh.response.status, 403);
+  assert.equal(refusedRefresh.payload.error.code, 'csrf_required');
+  assert.deepEqual((await getPoolFn().query('SELECT id FROM refresh_tokens WHERE is_revoked = FALSE')).rows, rowsBefore.rows);
+  const refresh = await client.requestJson('/api/v1/auth/refresh', { method: 'POST' });
   assert.equal(refresh.response.status, 200);
   assert.notEqual(client.getCsrfToken(), oldToken);
   const stale = await client.requestJson('/api/v1/settings', {

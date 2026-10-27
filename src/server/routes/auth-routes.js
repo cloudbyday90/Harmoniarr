@@ -185,12 +185,13 @@ export function registerAuthRoutes(app, {
 
   app.post('/api/v1/auth/refresh', limitRefresh, asyncRoute(async (request, response) => {
     const session = await requireFreshSession(request);
+    requireCsrf(request, session);
     const requestMetadata = getRequestMetadata(request);
     const issuedSession = await rotateSession(session, requestMetadata);
 
     setAuthCookies(response, issuedSession.refreshToken, issuedSession.csrfToken);
 
-    response.json(createRefreshResponse(session.user, issuedSession));
+    response.json(createRefreshResponse(issuedSession.user ?? session.user, issuedSession));
   }));
 
   app.post('/api/v1/auth/change-password', limitChangePassword, asyncRoute(async (request, response) => {
