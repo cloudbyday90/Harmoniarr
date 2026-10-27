@@ -1,5 +1,9 @@
 # Automatic Plex callback retention outcome
 
+Followup completed October 27: [Plex HTTP ownership](PLEX_HTTP_OUTCOME.md) now
+bounds provider request time/body/admission and retains actual native/DNS drainage.
+The original next-item note below describes the preceding retention commit.
+
 October 27, 2026. Eligible abandoned Plex callback state is now removed
 automatically by the existing application's maintenance infrastructure. No user
 refresh, new endpoint, deployed service, dependency or schema artifact is added.

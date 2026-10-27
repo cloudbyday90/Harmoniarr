@@ -49,6 +49,7 @@ import { createMediaToolingStatusService } from './media/media-tooling-status-se
 import { createMediaTranscodeExecutionService } from './media/media-transcode-execution-service.js';
 import { createOperationsModule } from './operations-module.js';
 import { createProviderModule } from './provider-module.js';
+import { createPlexHttpClient } from './integrations/plex/plex-http-client.js';
 import { createPlexDirectSignInService } from './integrations/plex/plex-direct-sign-in-service.js';
 import { createPlexDirectoryImportService } from './integrations/plex/plex-directory-import-service.js';
 import { createPlexLinkedAccountManagementService } from './integrations/plex/plex-linked-account-management-service.js';
@@ -185,6 +186,7 @@ export function createApp({
   createAppUserModule: buildAppUserModule = createAppUserModule,
   createAuthModule: buildAuthModule = createAuthModule,
   createPlexDirectSignInService: buildPlexDirectSignInService = createPlexDirectSignInService,
+  createPlexHttpClient: buildPlexHttpClient = createPlexHttpClient,
   createDeploymentSecurityService: buildDeploymentSecurityService = createDeploymentSecurityService,
   createDownloaderModule: buildDownloaderModule = createDownloaderModule,
   createImportCandidateModule: buildImportCandidateModule = createImportCandidateModule,
@@ -249,7 +251,8 @@ export function createApp({
   });
   const deploymentSecurityService = buildDeploymentSecurityService({ loadSettingsFn: loadSettings });
   const slskdConfigService = buildSlskdConfigService();
-  const providerModule = buildProviderModule();
+  const plexHttpClient = buildPlexHttpClient();
+  const providerModule = buildProviderModule({ plexHttpClient });
   const providerCredentialsService = buildProviderCredentialsService();
   let libraryModule = null;
   const settingsService = buildSettingsService({
@@ -278,6 +281,7 @@ export function createApp({
   });
   const baseAppUserModule = buildAppUserModule();
   const plexDirectoryImportService = createPlexDirectoryImportService({
+    plexHttpClient,
     listAppUsers: baseAppUserModule.appUserService.listAppUsers,
     plexOwnerLinkService: providerModule.plexOwnerLinkService,
   });
@@ -384,7 +388,7 @@ export function createApp({
       },
     }),
   });
-  const plexDirectSignInService = buildPlexDirectSignInService();
+  const plexDirectSignInService = buildPlexDirectSignInService({ plexHttpClient });
   const importCandidateModule = buildImportCandidateModule({
     getAppUserById: appUserModule.appUserService.getAppUserById,
     getMediaToolingStatus: mediaToolingStatusService.getStatus,
@@ -1143,6 +1147,7 @@ export function createApp({
     metadataModule,
     operationsModule,
     providerModule,
+    plexHttpClient,
     pushModule,
     runtimeResourceService,
     systemModule,

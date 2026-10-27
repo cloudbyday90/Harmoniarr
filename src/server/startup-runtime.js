@@ -107,6 +107,7 @@ export async function startServerRuntime({
     maintenanceLockService,
     metadataModule,
     pushModule,
+    plexHttpClient,
     systemModule,
   } = buildApp();
   const maintenanceLockHeartbeatPauseService = createMaintenanceLockHeartbeatPauseService({
@@ -244,7 +245,7 @@ export async function startServerRuntime({
       await startupServiceSupervisor.shutdown({
         onShutdown: async () => {
           await closeServer(server);
-          await drainApplicationWorkerOwners({ importCandidateModule, libraryModule, metadataModule,systemModule });
+          await drainApplicationWorkerOwners({ importCandidateModule, libraryModule, metadataModule,systemModule,plexHttpClient });
           await closeDatabasePool();
         },
       });

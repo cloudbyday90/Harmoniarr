@@ -8,7 +8,7 @@
 import { drainWorkerOwners } from './worker-owner-drain.js';
 
 /** Capture producers before consumers; metadata refresh can queue artist reconciliation. */
-export function drainApplicationWorkerOwners({ importCandidateModule, libraryModule, metadataModule,systemModule }) {
+export function drainApplicationWorkerOwners({ importCandidateModule, libraryModule, metadataModule,systemModule,plexHttpClient }) {
   return drainWorkerOwners([
     systemModule?.schemaMaintenanceService,
     systemModule?.plexCallbackMaintenanceService,
@@ -27,5 +27,6 @@ export function drainApplicationWorkerOwners({ importCandidateModule, libraryMod
     importCandidateModule?.importCandidateApplyWorker,
     libraryModule?.libraryOrganizeApplyWorker,
     libraryModule?.libraryScanWorker,
+    plexHttpClient,
   ]);
 }

@@ -148,6 +148,15 @@ new deployed service or schema artifact is needed. Next bound Plex provider HTTP
 time/body/drain ownership; database/state expiry does not bound external resource
 use.
 
+Plex HTTP time/body/drain ownership is now implemented in the
+[HTTP design](PLEX_HTTP_DESIGN.md) and [outcome](PLEX_HTTP_OUTCOME.md), with
+[official research/tradeoffs](PLEX_HTTP_RESEARCH_2026_10.md). A shared application
+owner bounds active requests and streamed JSON, verifies TLS and retains capacity
+through native/DNS retirement. No schema artifact changed. Next extend the Plex
+owner-link callback with current-actor authorization, browser-bound single-use
+state and atomic token/state/required-audit publication; HTTP bounds do not own
+those existing separate application writes.
+
 October 12 scan addition: `20261012_225951_scan_owned_receipt_invalidation.sql`
 adds UUID revision identity, generated path lookup and revision-bound negative
 observations. Replay preserves existing identities; snapshot/anchors include the

@@ -27,6 +27,7 @@ import { startServerRuntime } from '/app/server-dist/startup-runtime.js';
 import { createStartupServiceSupervisor } from '/app/server-dist/startup-service-supervisor.js';
 import { drainApplicationWorkerOwners } from '/app/server-dist/application-worker-drain.js';
 import { withWorkerTaskCleanup } from '/app/server-dist/worker-task-cleanup.js';
+import { createPlexResponseTransport } from '../../testing/server/plex-response-transport.js';
 import { requireDeploymentMemoryProfile } from '../../testing/server/deployment-memory-profile.js';
 
 await requireDeploymentMemoryProfile();
@@ -160,7 +161,7 @@ test('Plex callback retention is bounded, maintenance-guarded, atomic and safe b
     const admitted = Promise.withResolvers(), release = Promise.withResolvers(); releases.add(release);
     const callbacks = createPlexDirectSignInService({ loadSettingsFn: async () => ({ system: { baseUrl: 'http://127.0.0.1:3000' } }),
       findLinkedUserFn: async input => { const user = await readLinkedPlexLoginUser(input); admitted.resolve(); await release.promise; return user; },
-      plexHttpClient: createPlexHttpClient({ fetchFn: async url => { const path = new URL(url).pathname; return Response.json(path === '/api/v2/pins' ? { id: 123, code: 'fixture-pin' } : path.startsWith('/api/v2/pins/') ? { authToken: 'fixture-token' } : { uuid: 'retention-subject', restricted: false }); } }) });
+      plexHttpClient: createPlexHttpClient({ transport: createPlexResponseTransport(async url => { const path = new URL(url).pathname; return Response.json(path === '/api/v2/pins' ? { id: 123, code: 'fixture-pin' } : path.startsWith('/api/v2/pins/') ? { authToken: 'fixture-token' } : { uuid: 'retention-subject', restricted: false }); }) }) });
     const browserBinding = Buffer.alloc(32, 1).toString('base64url'), started = await callbacks.startSignIn({ browserBinding });
     const state = new URL(new URLSearchParams(started.authorizationUrl.split('#?')[1]).get('forwardUrl')).searchParams.get('state');
     const completing = track(callbacks.completeSignIn({ state, browserBinding })); await ready(admitted.promise);

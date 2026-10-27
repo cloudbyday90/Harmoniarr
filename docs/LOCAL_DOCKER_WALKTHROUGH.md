@@ -1,5 +1,11 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 27 [owned Plex HTTPS rebuild](LOCAL_DOCKER_PLEX_HTTP_OUTCOME.md) records
+the current no-cache image, preserved administrator/five mounts, real native TLS/
+HTTP bounds and callback publication proof. See the
+[implementation outcome](PLEX_HTTP_OUTCOME.md) for request ownership, compatibility
+limits and the next owner-link callback boundary.
+
 The October 27 [automatic Plex retention rebuild](LOCAL_DOCKER_PLEX_RETENTION_OUTCOME.md)
 records the current no-cache image, preserved administrator/data/five mounts,
 guarded retention/callback qualification and live automatic diagnostics. See the

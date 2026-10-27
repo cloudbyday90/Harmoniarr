@@ -139,6 +139,12 @@ suite('createApp', () => {
   const createMetadataModule = t.mock.fn(() => metadataModule);
   const createOperationsModule = t.mock.fn(() => operationsModule);
   const createProviderModule = t.mock.fn(() => providerModule);
+  const plexHttpClient = { close: async () => {} };
+  const createPlexHttpClient = t.mock.fn(() => plexHttpClient);
+  const createPlexDirectSignInService = t.mock.fn(options => {
+    assert.equal(options.plexHttpClient, plexHttpClient);
+    return { startSignIn: async () => ({}), completeSignIn: async () => ({}) };
+  });
   const providerCredentialsService = {};
   const createProviderCredentialsService = t.mock.fn(() => providerCredentialsService);
   const createSettingsService = t.mock.fn(() => settingsService);
@@ -193,6 +199,8 @@ suite('createApp', () => {
     createMetadataModule,
     createOperationsModule,
     createProviderModule,
+    createPlexHttpClient,
+    createPlexDirectSignInService,
     createProviderCredentialsService,
     createSettingsService,
     createSlskdConfigService,
@@ -225,6 +233,9 @@ suite('createApp', () => {
   assert.equal(createMetadataModule.mock.callCount(), 1);
   assert.equal(createOperationsModule.mock.callCount(), 1);
   assert.equal(createProviderModule.mock.callCount(), 1);
+  assert.equal(createPlexHttpClient.mock.callCount(), 1);
+  assert.equal(createPlexDirectSignInService.mock.callCount(), 1);
+  assert.equal(createProviderModule.mock.calls[0].arguments[0].plexHttpClient, plexHttpClient);
   assert.equal(createSettingsService.mock.callCount(), 1);
   assert.equal(createSlskdConfigService.mock.callCount(), 1);
   assert.equal(createSlskdModule.mock.callCount(), 1);

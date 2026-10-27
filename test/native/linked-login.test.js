@@ -20,6 +20,7 @@ import { startSessionWriteTransaction } from '/app/server-dist/session-write-tra
 import { startServerRuntime } from '/app/server-dist/startup-runtime.js';
 import { drainApplicationWorkerOwners } from '/app/server-dist/application-worker-drain.js';
 import { withWorkerTaskCleanup } from '/app/server-dist/worker-task-cleanup.js';
+import { createPlexResponseTransport } from '../../testing/server/plex-response-transport.js';
 import { requireDeploymentMemoryProfile } from '../../testing/server/deployment-memory-profile.js';
 
 await requireDeploymentMemoryProfile();
@@ -33,7 +34,7 @@ test('linked login fences current provider identity and atomically owns bookkeep
   let runtime, userId, numericUserId, callbackService, callbackFailure, transportMode = 'normal', networkCalls = 0;
   const proof = () => ({ userId, provider: 'plex', subject, requestMetadata: metadata });
   function track(promise) { active.add(promise); promise.then(() => active.delete(promise), () => active.delete(promise)); return promise; }
-  const transport = createPlexHttpClient({ fetchFn: async (url, options) => {
+  const transport = createPlexHttpClient({ transport: createPlexResponseTransport(async (url, options) => {
     assert.equal(pool.idleCount, pool.totalCount, 'Provider network calls must not hold a checkout'); networkCalls++;
     const parsed = new URL(url); assert.equal(parsed.origin, 'https://plex.tv');
     assert.ok(options.headers['X-Plex-Client-Identifier']);
@@ -43,7 +44,7 @@ test('linked login fences current provider identity and atomically owns bookkeep
     if (transportMode === 'unauthorized') return Response.json({ message: 'fixture provider refusal' }, { status: 401 });
     if (transportMode === 'empty') return Response.json({});
     return Response.json({ id: plexId, uuid: subject, username: 'provider-name', email: 'provider@example.test', restricted: transportMode === 'restricted' });
-  } });
+  }) });
   const callbacks = options => createPlexDirectSignInService({ plexHttpClient: transport, loadSettingsFn: async () => ({ system: { baseUrl } }), ...options });
   const app = createApp({ appPort: 3000, clientDistDir: '/app/client-dist', packageJsonPath: '/app/package.json',
     createPlexDirectSignInService: () => ({ startSignIn: input => callbackService.startSignIn(input),

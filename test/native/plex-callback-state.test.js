@@ -22,6 +22,7 @@ import { recordAuditEvent } from '/app/server-dist/audit.js';
 import { startServerRuntime } from '/app/server-dist/startup-runtime.js';
 import { drainApplicationWorkerOwners } from '/app/server-dist/application-worker-drain.js';
 import { withWorkerTaskCleanup } from '/app/server-dist/worker-task-cleanup.js';
+import { createPlexResponseTransport } from '../../testing/server/plex-response-transport.js';
 import { requireDeploymentMemoryProfile } from '../../testing/server/deployment-memory-profile.js';
 
 await requireDeploymentMemoryProfile();
@@ -39,14 +40,14 @@ test('Plex callbacks are browser-bound and consume exact single-use state with l
     client.release = function (...args) { client.release = release; const result = Reflect.apply(release, this, args); context.clients--; return result; };
     return client;
   } };
-  const transport = createPlexHttpClient({ fetchFn: async (url, options) => {
+  const transport = createPlexHttpClient({ transport: createPlexResponseTransport(async (url, options) => {
     assert.equal(ownership.getStore()?.clients, 0, 'This callback must release its actual checkout before provider work');
     networkCalls++;
     const parsed = new URL(url); assert.equal(parsed.origin, 'https://plex.tv');
     if (parsed.pathname === '/api/v2/pins') return Response.json({ id: 123, code: 'fixture-pin' });
     if (parsed.pathname === '/api/v2/pins/123') return Response.json({ authToken: 'fixture-token' });
     assert.equal(options.headers['X-Plex-Token'], 'fixture-token'); return Response.json({ id: 123, uuid: subject, restricted: false });
-  } });
+  }) });
   const make = options => {
     const callbackStateService = createPlexCallbackStateService({ encryptedSecretService: secrets,
       startReadFn: (work, settings) => startAuthLookup(work, { ...settings, getPoolFn: () => trackedPool }),

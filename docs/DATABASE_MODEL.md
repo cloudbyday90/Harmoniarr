@@ -2,6 +2,11 @@
 
 ## Purpose
 
+Plex provider HTTP now has one shared application owner with bounded admission,
+request deadlines, streamed JSON limits and actual native/DNS drainage. See the
+[HTTP design](PLEX_HTTP_DESIGN.md) and [outcome](PLEX_HTTP_OUTCOME.md). Transport
+failure cannot publish a direct sign-in session. No schema artifact changed.
+
 Plex callback retention now runs automatically through guarded maintenance, with
 one bounded encrypted-envelope batch, conservative legacy grace, active-flow
 preservation and atomic aggregate audit. See the

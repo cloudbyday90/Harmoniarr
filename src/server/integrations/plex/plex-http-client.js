@@ -16,171 +16,31 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { createApiError } from '../../auth.js';
+import { createPlexRequestService } from './plex-request-service.js';
+import { validatePlexHeaders, plexHttpError } from './plex-http-policy.js';
 
-const plexApiBaseUrl = 'https://plex.tv';
-const plexClientsBaseUrl = 'https://clients.plex.tv';
-const plexProductName = 'Harmoniarr';
-
-function buildHeaders({ accessToken = null, clientIdentifier }) {
-  return {
-    Accept: 'application/json',
-    'X-Plex-Client-Identifier': clientIdentifier,
-    'X-Plex-Product': plexProductName,
-    ...(accessToken ? { 'X-Plex-Token': accessToken } : {}),
-  };
-}
-
-async function readJsonResponse(response, fallbackCode) {
-  const text = await response.text();
-  if (!text) {
-    return {};
-  }
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw createApiError(502, fallbackCode, 'Plex returned an invalid JSON payload');
-  }
-}
-
-function normalizePlexErrorBody(body, fallback) {
-  if (typeof body?.errors?.[0]?.detail === 'string' && body.errors[0].detail.trim()) {
-    return body.errors[0].detail.trim();
-  }
-
-  if (typeof body?.error === 'string' && body.error.trim()) {
-    return body.error.trim();
-  }
-
-  if (typeof body?.message === 'string' && body.message.trim()) {
-    return body.message.trim();
-  }
-
-  return fallback;
-}
-
-function unwrapPlexCollection(body, keys) {
+function unwrap(body, keys) {
   for (const key of keys) {
-    if (Array.isArray(body?.[key])) {
-      return body[key];
-    }
-
-    if (Array.isArray(body?.MediaContainer?.[key])) {
-      return body.MediaContainer[key];
-    }
+    if (Array.isArray(body?.[key])) return body[key];
+    if (Array.isArray(body?.MediaContainer?.[key])) return body.MediaContainer[key];
   }
-
-  if (Array.isArray(body)) {
-    return body;
-  }
-
-  return [];
+  return Array.isArray(body) ? body : [];
 }
 
-export function createPlexHttpClient({
-  fetchFn = globalThis.fetch,
-} = {}) {
-  async function createPin({ clientIdentifier }) {
-    const response = await fetchFn(`${plexApiBaseUrl}/api/v2/pins?strong=true`, {
-      headers: buildHeaders({ clientIdentifier }),
-      method: 'POST',
-    });
-    const body = await readJsonResponse(response, 'plex_pin_invalid_response');
-
-    if (!response.ok) {
-      throw createApiError(
-        response.status === 401 ? 401 : 502,
-        response.status === 401 ? 'plex_pin_unauthorized' : 'plex_pin_create_failed',
-        normalizePlexErrorBody(body, `Plex PIN creation failed with status ${response.status}`),
-      );
-    }
-
-    return body;
-  }
-
-  async function readPin({ clientIdentifier, pinId }) {
-    const response = await fetchFn(`${plexApiBaseUrl}/api/v2/pins/${encodeURIComponent(String(pinId))}`, {
-      headers: buildHeaders({ clientIdentifier }),
-      method: 'GET',
-    });
-    const body = await readJsonResponse(response, 'plex_pin_invalid_response');
-
-    if (!response.ok) {
-      throw createApiError(
-        response.status === 401 ? 401 : 502,
-        response.status === 401 ? 'plex_pin_unauthorized' : 'plex_pin_read_failed',
-        normalizePlexErrorBody(body, `Plex PIN lookup failed with status ${response.status}`),
-      );
-    }
-
-    return body;
-  }
-
-  async function fetchCurrentUser({ accessToken, clientIdentifier }) {
-    const response = await fetchFn(`${plexApiBaseUrl}/api/v2/user`, {
-      headers: buildHeaders({ accessToken, clientIdentifier }),
-      method: 'GET',
-    });
-    const body = await readJsonResponse(response, 'plex_user_invalid_response');
-
-    if (!response.ok) {
-      throw createApiError(
-        response.status === 401 ? 401 : 502,
-        response.status === 401 ? 'plex_token_invalid' : 'plex_user_fetch_failed',
-        normalizePlexErrorBody(body, `Plex user lookup failed with status ${response.status}`),
-      );
-    }
-
-    return body;
-  }
-
-  async function fetchHomeUsers({ accessToken, clientIdentifier }) {
-    const response = await fetchFn(`${plexApiBaseUrl}/api/v2/home/users`, {
-      headers: buildHeaders({ accessToken, clientIdentifier }),
-      method: 'GET',
-    });
-    const body = await readJsonResponse(response, 'plex_home_users_invalid_response');
-
-    if (!response.ok) {
-      throw createApiError(
-        response.status === 401 ? 401 : 502,
-        response.status === 401 ? 'plex_token_invalid' : 'plex_home_users_fetch_failed',
-        normalizePlexErrorBody(body, `Plex home user lookup failed with status ${response.status}`),
-      );
-    }
-
-    return unwrapPlexCollection(body, ['users', 'User']);
-  }
-
-  async function fetchResources({ accessToken, clientIdentifier }) {
-    const resourceUrl = new URL(`${plexClientsBaseUrl}/api/v2/resources`);
-    resourceUrl.searchParams.set('includeHttps', '1');
-    resourceUrl.searchParams.set('includeRelay', '1');
-    resourceUrl.searchParams.set('includeIPv6', '1');
-
-    const response = await fetchFn(resourceUrl, {
-      headers: buildHeaders({ accessToken, clientIdentifier }),
-      method: 'GET',
-    });
-    const body = await readJsonResponse(response, 'plex_resources_invalid_response');
-
-    if (!response.ok) {
-      throw createApiError(
-        response.status === 401 ? 401 : 502,
-        response.status === 401 ? 'plex_token_invalid' : 'plex_resources_fetch_failed',
-        normalizePlexErrorBody(body, `Plex resources lookup failed with status ${response.status}`),
-      );
-    }
-
-    return unwrapPlexCollection(body, ['resources', 'Resource']);
-  }
-
+export function createPlexHttpClient({ transport, timeoutMs, maxActive,
+  requestService = createPlexRequestService({ transport, timeoutMs, maxActive }) } = {}) {
+  const send = (url, operation, input, method = 'GET') => requestService.requestJson({ url, operation, method,
+    headers: validatePlexHeaders(input), signal: input.signal });
   return {
-    createPin,
-    fetchCurrentUser,
-    fetchHomeUsers,
-    fetchResources,
-    readPin,
+    createPin: async input => send('https://plex.tv/api/v2/pins?strong=true', 'createPin', { clientIdentifier: input.clientIdentifier, signal: input.signal }, 'POST'),
+    readPin: async input => {
+      const pinId = String(input.pinId ?? '');
+      if (!pinId || pinId.length > 256 || !/^[A-Za-z0-9_-]+$/u.test(pinId)) throw plexHttpError('invalid');
+      return send('https://plex.tv/api/v2/pins/' + encodeURIComponent(pinId), 'readPin', { clientIdentifier: input.clientIdentifier, signal: input.signal });
+    },
+    fetchCurrentUser: async input => send('https://plex.tv/api/v2/user', 'user', input),
+    fetchHomeUsers: async input => unwrap(await send('https://plex.tv/api/v2/home/users', 'home', input), ['users', 'User']),
+    fetchResources: async input => unwrap(await send('https://clients.plex.tv/api/v2/resources?includeHttps=1&includeRelay=1&includeIPv6=1', 'resources', input), ['resources', 'Resource']),
+    close: requestService.close, waitForDrain: requestService.waitForDrain, getRequestState: requestService.getState,
   };
 }

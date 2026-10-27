@@ -17,6 +17,7 @@
  */
 
 import { createAppleMusicStatusService } from './integrations/apple-music/apple-music-status-service.js';
+import { createPlexHttpClient } from './integrations/plex/plex-http-client.js';
 import { createPlexOwnerLinkService } from './integrations/plex/plex-owner-link-service.js';
 import { createSpotifyOAuthService } from './integrations/spotify/spotify-oauth-service.js';
 import { createYouTubeOAuthService } from './integrations/youtube/youtube-oauth-service.js';
@@ -25,7 +26,8 @@ import { createProviderCollectionAccessCheckService } from './integrations/provi
 
 export function createProviderModule({
   appleMusicStatusService = createAppleMusicStatusService(),
-  plexOwnerLinkService = createPlexOwnerLinkService(),
+  plexHttpClient = createPlexHttpClient(),
+  plexOwnerLinkService = createPlexOwnerLinkService({ plexHttpClient }),
   spotifyOAuthService = createSpotifyOAuthService(),
   youtubeOAuthService = createYouTubeOAuthService(),
   providerClientResolverService = createProviderClientResolverService({ spotifyOAuthService, youtubeOAuthService }),
