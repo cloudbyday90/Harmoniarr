@@ -21,10 +21,12 @@ import { readRequestSessionRow } from './session-lookup-service.js';
 import { handleSessionReplay } from './session-replay-service.js';
 import { createSessionIssuanceService } from './session-issuance-service.js';
 import { createPasswordLoginService } from './password-login-service.js';
+import { createLoginFailureService } from './login-failure-service.js';
 import { toSessionUser } from './session-user-policy.js';
 import { refreshTokenMaxAgeSeconds } from './session-issuance-policy.js';
 export { toSessionUser };
 const sessionIssuance = createSessionIssuanceService();
+const loginFailure = createLoginFailureService();
 const passwordLogin = createPasswordLoginService({ isBootstrapRequiredFn: isBootstrapRequired, handleLoginFailureFn: handleLoginFailure });
 import {
   csrfProtectionModeEnvVar,
@@ -294,33 +296,8 @@ export async function buildSessionPayload(request, session = null) {
   };
 }
 
-export async function handleLoginFailure(user, requestMetadata, username) {
-  if (user) {
-    const nextFailureCount = Number(user.failed_login_count ?? 0) + 1;
-    const lockedUntil = nextFailureCount >= 5
-      ? new Date(Date.now() + 15 * 60 * 1000)
-      : null;
-
-    await getPool().query(
-      `
-        UPDATE app_users
-        SET failed_login_count = $2,
-            locked_until = COALESCE($3, locked_until),
-            updated_at = NOW()
-        WHERE id = $1
-      `,
-      [user.id, nextFailureCount, lockedUntil],
-    );
-  }
-
-  await recordAuditEvent({
-    actorType: 'anonymous',
-    eventType: 'login_failed',
-    summary: 'Login failed',
-    details: { username },
-    ipAddress: requestMetadata.ipAddress,
-    userAgent: requestMetadata.userAgent,
-  });
+export function handleLoginFailure(user, requestMetadata, username, options) {
+  return loginFailure.handleLoginFailure(user, requestMetadata, username, options);
 }
 
 export async function createBootstrapAdmin({

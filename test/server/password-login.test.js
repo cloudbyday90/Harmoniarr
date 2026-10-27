@@ -65,6 +65,7 @@ test('password login refuses stale hash/epoch and current account restrictions b
     const f = fixture(options);
     await assert.rejects(f.service.loginUser(input()), { status: options.current?.login_locked ? 423 : 401 });
     assert.ok(!f.queries.some(row => /^(UPDATE|INSERT)/u.test(row.sql))); assert.equal(f.events.length, 0);
+    assert.equal(f.failures.length, 1); assert.deepEqual(f.failures[0][3], { countFailure: false });
   }
 });
 
@@ -74,8 +75,19 @@ test('bootstrap, unavailable account, lockout and wrong password never enter iss
     const f = fixture(options);
     await assert.rejects(f.service.loginUser(input()), { status: options.bootstrap ? 409 : options.accepted?.login_locked ? 423 : 401 });
     assert.equal(f.transactions(), 0);
-    assert.equal(f.failures.length, options.missing || options.accepted?.is_disabled || options.valid === false ? 1 : 0);
+    assert.equal(f.failures.length, options.bootstrap ? 0 : 1);
   }
+});
+
+test('wrong-password failure receives immutable accepted credentials rather than the mutable lookup row', async () => {
+  const gate = Promise.withResolvers(), ready = Promise.withResolvers();
+  const f = fixture({ verify: async () => { ready.resolve(); await gate.promise; return false; } });
+  const pending = f.service.loginUser(input());
+  await ready.promise;
+  f.accepted.id = 'changed'; f.accepted.password_hash = 'changed'; f.accepted.credential_epoch = 'changed'; gate.resolve();
+  await assert.rejects(pending, { status: 401 });
+  assert.deepEqual(f.failures[0][0], { id: 'user', password_hash: 'accepted-hash', credential_epoch: null });
+  assert.equal(f.failures[0][3], undefined);
 });
 
 test('required audit or commit failure cannot return generated session credentials', async () => {

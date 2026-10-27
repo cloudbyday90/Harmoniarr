@@ -72,6 +72,14 @@ artifact changed. Next give failed-login counters/lockout and required failure
 audit a bounded atomic account owner; their current stale count projection can
 lose concurrent failures. Provider/bootstrap issuance remains a separate followup.
 
+Failed-login ownership is implemented in the
+[failure design](LOGIN_FAILURE_DESIGN.md) and [outcome](LOGIN_FAILURE_OUTCOME.md),
+with [official research/tradeoffs](LOGIN_FAILURE_RESEARCH_2026_10.md). Current-row
+increments, lockout decisions and required audit commit together; active deadlines
+and reset credential epochs are preserved. No schema artifact changed. Next bound
+the preliminary login bootstrap/credential reads independently of security-write
+ownership. Provider/bootstrap issuance remains a separate later followup.
+
 October 12 scan addition: `20261012_225951_scan_owned_receipt_invalidation.sql`
 adds UUID revision identity, generated path lookup and revision-bound negative
 observations. Replay preserves existing identities; snapshot/anchors include the

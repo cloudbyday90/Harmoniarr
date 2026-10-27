@@ -6,7 +6,10 @@ Password login now binds the exact verified hash and credential epoch to current
 account admission, bookkeeping, root-session issuance and required audit in one
 bounded transaction without changing the schema. See the
 [login design](PASSWORD_LOGIN_DESIGN.md) and [outcome](PASSWORD_LOGIN_OUTCOME.md).
-Failed-login counter/audit ownership remains a followup.
+Failed-login counters, lockout and required failure audit now share the same
+account write guard and a bounded atomic owner. Stale credential failures and
+already-active lockouts do not mutate counters/deadlines. See the
+[failure design](LOGIN_FAILURE_DESIGN.md) and [outcome](LOGIN_FAILURE_OUTCOME.md).
 
 Routine schema observation now runs through automatic startup/hourly maintenance,
 with recovery pauses and cached administrator status. Guarded startup migration
@@ -23,8 +26,8 @@ audit ownership is recorded in the login design above.
 Rotated-token replay now owns family revocation and its required audit in one
 bounded transaction without changing the schema. See the
 [session replay design](SESSION_REPLAY_DESIGN.md) and
-[outcome](SESSION_REPLAY_OUTCOME.md). Rotation/issuance still needs compatible
-family ownership to fence a concurrently authorized late child insert.
+[outcome](SESSION_REPLAY_OUTCOME.md). Compatible rotation/issuance family
+ownership is recorded in the rotation design above.
 
 The [scan receipt design](SCAN_RECEIPT_INVALIDATION_DESIGN.md) adds receipt revision
 identity and exact-revision missing observations, with cascading obsolete-evidence

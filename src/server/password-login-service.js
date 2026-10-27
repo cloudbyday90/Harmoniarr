@@ -25,20 +25,23 @@ export function createPasswordLoginService({ isBootstrapRequiredFn, handleLoginF
     if (await isBootstrapRequiredFn()) throw createApiError(409, 'bootstrap_required', 'Create the bootstrap admin account before logging in');
     const identifier = normalizeLoginIdentifier(username), validatedPassword = validatePassword(password);
     const user = await findUserFn(identifier);
+    const accepted = user ? { id: user.id, password_hash: user.password_hash, credential_epoch: user.credential_epoch } : null;
     if (!user || user.is_disabled) {
-      await handleLoginFailureFn(user, metadata, identifier);
+      await handleLoginFailureFn(accepted, metadata, identifier, { countFailure: false });
       throw invalidCredentials();
     }
-    if (user.login_locked) throw accountLocked();
-    const accepted = { id: user.id, hash: user.password_hash, epoch: user.credential_epoch };
-    if (!await verifyPasswordFn(validatedPassword, accepted.hash)) {
-      await handleLoginFailureFn(user, metadata, identifier);
+    if (user.login_locked) {
+      await handleLoginFailureFn(accepted, metadata, identifier, { countFailure: false });
+      throw accountLocked();
+    }
+    if (!await verifyPasswordFn(validatedPassword, accepted.password_hash)) {
+      await handleLoginFailureFn(accepted, metadata, identifier);
       throw invalidCredentials();
     }
     const material = createMaterialFn();
     const result = await startTransactionFn(async (client, check) => {
       const current = await lockPasswordLoginUser(client, accepted.id); check();
-      if (!current || current.is_disabled || current.password_hash !== accepted.hash || current.credential_epoch !== accepted.epoch) return { refusal: 'invalid_credentials' };
+      if (!current || current.is_disabled || current.password_hash !== accepted.password_hash || current.credential_epoch !== accepted.credential_epoch) return { refusal: 'invalid_credentials' };
       if (current.login_locked) return { refusal: 'account_locked' };
       const owner = await recordSuccessfulPasswordLogin(client, accepted.id); check();
       const issuedSession = await publishOwnedRootSession(client, { owner, material, metadata }, check);
@@ -46,7 +49,10 @@ export function createPasswordLoginService({ isBootstrapRequiredFn, handleLoginF
         summary: 'User login succeeded', entityType: 'app_user', entityId: owner.id, ...metadata }, client); check();
       return { user: owner, issuedSession };
     }).result;
-    if (result.refusal) throw result.refusal === 'account_locked' ? accountLocked() : invalidCredentials();
+    if (result.refusal) {
+      await handleLoginFailureFn(accepted, metadata, identifier, { countFailure: false });
+      throw result.refusal === 'account_locked' ? accountLocked() : invalidCredentials();
+    }
     return result;
   } };
 }

@@ -95,3 +95,10 @@ atomic account owner. The current failure helper computes its count from a stale
 lookup row, so concurrent failures can be lost. Bootstrap and external-provider
 issuance/audit ownership require separate followups rather than a fabricated
 password-verification contract.
+
+October 27 follow-up: failed-login counters, lockout decisions and required audit
+now share a bounded atomic account owner. See the
+[failure design](LOGIN_FAILURE_DESIGN.md) and [outcome](LOGIN_FAILURE_OUTCOME.md).
+The next-item paragraph above describes this document's original candidate;
+preliminary credential-read admission and non-password issuance remain separate
+followups.
