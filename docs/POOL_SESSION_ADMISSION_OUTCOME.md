@@ -69,6 +69,11 @@ The session SELECT deadline deliberately does not abandon these security writes.
 Keep fresh authority checks, idempotent family handling and unknown-commit
 outcomes explicit. Manual screen-reader/device acceptance remains deferred.
 
+The replay follow-up is now implemented; see its separate
+[design](SESSION_REPLAY_DESIGN.md), [research](SESSION_REPLAY_RESEARCH_2026_10.md)
+and [outcome](SESSION_REPLAY_OUTCOME.md). Rotation/issuance family fencing remains
+the next owner to address.
+
 See [research](POOL_SESSION_ADMISSION_RESEARCH.md),
 [design](POOL_SESSION_ADMISSION_DESIGN.md) and
 [Docker outcome](LOCAL_DOCKER_POOL_SESSION_ADMISSION_OUTCOME.md).

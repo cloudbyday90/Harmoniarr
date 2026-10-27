@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 27 [session replay rebuild](LOCAL_DOCKER_SESSION_REPLAY_OUTCOME.md)
+records the current no-cache image, preserved administrator/data/five mounts and
+packaged PostgreSQL qualification. See the [implementation outcome](SESSION_REPLAY_OUTCOME.md)
+for atomic required audit, bounded waits and conservative commit uncertainty.
+
 The October 27 [pool/session admission rebuild](LOCAL_DOCKER_POOL_SESSION_ADMISSION_OUTCOME.md)
 records the current no-cache image, preserved administrator/data/mounts and
 native qualification. See the [implementation outcome](POOL_SESSION_ADMISSION_OUTCOME.md)

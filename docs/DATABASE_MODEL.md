@@ -2,6 +2,12 @@
 
 ## Purpose
 
+Rotated-token replay now owns family revocation and its required audit in one
+bounded transaction without changing the schema. See the
+[session replay design](SESSION_REPLAY_DESIGN.md) and
+[outcome](SESSION_REPLAY_OUTCOME.md). Rotation/issuance still needs compatible
+family ownership to fence a concurrently authorized late child insert.
+
 The [scan receipt design](SCAN_RECEIPT_INVALIDATION_DESIGN.md) adds receipt revision
 identity and exact-revision missing observations, with cascading obsolete-evidence
 cleanup. Historical JSON and live byte verification retain their separate roles.

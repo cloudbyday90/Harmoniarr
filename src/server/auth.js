@@ -19,6 +19,7 @@
 import { randomUUID } from 'node:crypto';
 import { getPool } from './database.js';
 import { readRequestSessionRow } from './session-lookup-service.js';
+import { handleSessionReplay } from './session-replay-service.js';
 import {
   csrfProtectionModeEnvVar,
   csrfProtectionModes,
@@ -195,8 +196,7 @@ export async function resolveSessionFromRefreshTokenLookup({
   csrfToken,
   requestMetadata,
   now = () => Date.now(),
-  revokeRefreshTokenFamilyFn = revokeRefreshTokenFamily,
-  recordAuditEventFn = recordAuditEvent,
+  handleSessionReplayFn = handleSessionReplay,
 }) {
   if (!row || row.is_disabled) {
     return null;
@@ -209,24 +209,7 @@ export async function resolveSessionFromRefreshTokenLookup({
 
   if (row.is_revoked) {
     if (row.replaced_by_refresh_token_id) {
-      const revokedSessions = await revokeRefreshTokenFamilyFn(row.token_family_id, 'reuse_detected');
-
-      if (revokedSessions > 0) {
-        await recordAuditEventFn({
-          actorUserId: row.app_user_id,
-          actorType: 'user',
-          eventType: 'refresh_token_reuse_detected',
-          summary: 'Refresh token reuse detected; active session family revoked',
-          entityType: 'refresh_token',
-          entityId: row.refresh_token_id,
-          details: {
-            tokenFamilyId: row.token_family_id,
-            previousRevokedReason: row.revoked_reason,
-          },
-          ipAddress: requestMetadata?.ipAddress ?? null,
-          userAgent: requestMetadata?.userAgent ?? null,
-        });
-      }
+      await handleSessionReplayFn({ row, requestMetadata });
     }
 
     return null;

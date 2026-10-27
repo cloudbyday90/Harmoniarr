@@ -60,63 +60,20 @@ test('resolveSessionFromRefreshTokenLookup returns the active session payload fo
   });
 });
 
-test('resolveSessionFromRefreshTokenLookup revokes the active token family when a rotated refresh token is replayed', async (t) => {
-  const revokeRefreshTokenFamilyFn = t.mock.fn(async () => 1);
-  const recordAuditEventFn = t.mock.fn(async () => {});
-
-  const session = await resolveSessionFromRefreshTokenLookup({
-    row: createRefreshTokenRow({
-      is_revoked: true,
-      revoked_reason: 'rotated',
-      replaced_by_refresh_token_id: 'token-2',
-    }),
-    refreshToken: 'stale-refresh-token',
-    csrfToken: 'csrf-token-value',
-    requestMetadata: { ipAddress: '198.51.100.25', userAgent: 'HarmoniarrAuthTest/1.0' },
-    now: () => Date.parse('2026-05-01T12:00:00.000Z'),
-    revokeRefreshTokenFamilyFn,
-    recordAuditEventFn,
-  });
-
-  assert.equal(session, null);
-  assert.deepEqual(revokeRefreshTokenFamilyFn.mock.calls[0].arguments, ['family-1', 'reuse_detected']);
-  assert.deepEqual(recordAuditEventFn.mock.calls[0].arguments[0], {
-    actorUserId: 'user-1',
-    actorType: 'user',
-    eventType: 'refresh_token_reuse_detected',
-    summary: 'Refresh token reuse detected; active session family revoked',
-    entityType: 'refresh_token',
-    entityId: 'token-1',
-    details: {
-      tokenFamilyId: 'family-1',
-      previousRevokedReason: 'rotated',
-    },
-    ipAddress: '198.51.100.25',
-    userAgent: 'HarmoniarrAuthTest/1.0',
-  });
-});
-
-test('resolveSessionFromRefreshTokenLookup skips audit when replay detection finds no remaining active session to revoke', async (t) => {
-  const revokeRefreshTokenFamilyFn = t.mock.fn(async () => 0);
-  const recordAuditEventFn = t.mock.fn(async () => {});
-
-  const session = await resolveSessionFromRefreshTokenLookup({
-    row: createRefreshTokenRow({
-      is_revoked: true,
-      revoked_reason: 'rotated',
-      replaced_by_refresh_token_id: 'token-2',
-    }),
-    refreshToken: 'stale-refresh-token',
-    csrfToken: 'csrf-token-value',
-    requestMetadata: { ipAddress: '198.51.100.25', userAgent: 'HarmoniarrAuthTest/1.0' },
-    now: () => Date.parse('2026-05-01T12:00:00.000Z'),
-    revokeRefreshTokenFamilyFn,
-    recordAuditEventFn,
-  });
-
-  assert.equal(session, null);
-  assert.equal(revokeRefreshTokenFamilyFn.mock.callCount(), 1);
-  assert.equal(recordAuditEventFn.mock.callCount(), 0);
+test('rotated-token replay delegates to the owned security transaction and never grants a session', async t => {
+  const row = createRefreshTokenRow({ is_revoked: true, revoked_reason: 'rotated', replaced_by_refresh_token_id: 'token-2' });
+  const requestMetadata = { ipAddress: '198.51.100.25', userAgent: 'HarmoniarrAuthTest/1.0' };
+  const handleSessionReplayFn = t.mock.fn(async () => 1);
+  const args = { row, requestMetadata, refreshToken: 'stale-secret', csrfToken: 'csrf-secret',
+    now: () => Date.parse('2026-05-01T12:00:00.000Z'), handleSessionReplayFn };
+  assert.equal(await resolveSessionFromRefreshTokenLookup(args), null);
+  assert.deepEqual(handleSessionReplayFn.mock.calls[0].arguments, [{ row, requestMetadata }]);
+  for (const overrides of [{ is_disabled: true }, { expires_at: '2026-01-01' }, { replaced_by_refresh_token_id: null }]) {
+    assert.equal(await resolveSessionFromRefreshTokenLookup({ ...args, row: { ...row, ...overrides } }), null);
+  }
+  assert.equal(handleSessionReplayFn.mock.callCount(), 1);
+  const unavailable = Object.assign(new Error('safe refusal'), { status: 503 });
+  await assert.rejects(resolveSessionFromRefreshTokenLookup({ ...args, handleSessionReplayFn: async () => { throw unavailable; } }), error => error === unavailable);
 });
 
 test('requireAdminSession rejects authenticated non-admin sessions', async (t) => {

@@ -40,6 +40,13 @@ Ordinary pool/session read admission is implemented in the
 Next bound rotated-token replay revocation/audit as its own transaction owner;
 the read-only deadline intentionally does not abandon these security writes.
 
+That replay transaction is implemented in the October 27
+[design](SESSION_REPLAY_DESIGN.md) and [outcome](SESSION_REPLAY_OUTCOME.md), with
+[official research/tradeoffs](SESSION_REPLAY_RESEARCH_2026_10.md).
+Next bring rotation/issuance into compatible family ownership, with current
+parent admission and atomic revoke/insert/link, so late issuance cannot escape
+a completed replay revocation. No schema changes were made for this step.
+
 October 12 scan addition: `20261012_225951_scan_owned_receipt_invalidation.sql`
 adds UUID revision identity, generated path lookup and revision-bound negative
 observations. Replay preserves existing identities; snapshot/anchors include the
