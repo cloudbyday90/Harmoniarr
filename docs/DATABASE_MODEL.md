@@ -7,7 +7,10 @@ exact primary provider/subject plus enabled account under its write lock.
 Bookkeeping, root issuance and a cardinality-checked required audit commit
 together. See the [linked-login design](LINKED_LOGIN_DESIGN.md) and
 [outcome](LINKED_LOGIN_OUTCOME.md). No schema artifact changed. Callback-state
-consumption/browser binding remains the next authentication boundary.
+consumption/browser binding is now implemented in the
+[Plex callback design](PLEX_CALLBACK_DESIGN.md) and
+[outcome](PLEX_CALLBACK_OUTCOME.md). The exact pending encrypted record is consumed
+with local publication; expiry is checked by the database before commit.
 
 Password changes now use a bounded transaction that fences the verified hash/full
 credential epoch and initiating token under account/family ownership. Credential

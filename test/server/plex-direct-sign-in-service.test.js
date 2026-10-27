@@ -1,225 +1,69 @@
 /*
  * Harmoniarr - Soulseek-native music library management
  * Copyright (C) 2026 Harmoniarr Contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ * Licensed under GPL-3.0-or-later. See LICENSE.
  */
-
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import test from 'node:test';
 import { createPlexDirectSignInService } from '../../src/server/integrations/plex/plex-direct-sign-in-service.js';
+import { invalidPlexCallback } from '../../src/server/integrations/plex/plex-callback-policy.js';
 
-function createEncryptedSecretServiceDouble() {
-  const records = new Map();
-
-  return {
-    records,
-    async clearSecretValue({ name }) {
-      records.delete(name);
-    },
-    async getSecretValue({ name }) {
-      return records.get(name) ?? null;
-    },
-    async setSecretValue({ name, plaintextValue }) {
-      records.set(name, plaintextValue);
-    },
+const browserBinding = Buffer.alloc(32, 1).toString('base64url');
+function fixture(options = {}) {
+  const records = new Map(), calls = [];
+  const callbackStateService = {
+    resolveClientIdentifier: async () => 'client-identifier',
+    create: async input => { records.set(input.state, { ...input, proof: { id: randomUUID() } }); return '2050-01-01T00:00:00.000Z'; },
+    read: async input => { const row = records.get(input.state); if (!row || input.browserBinding !== row.browserBinding) throw invalidPlexCallback(); return row; },
   };
+  const service = createPlexDirectSignInService({ callbackStateService,
+    loadSettingsFn: async () => ({ system: { baseUrl: 'https://harmoniarr.example.test' } }),
+    findLinkedUserFn: async input => { calls.push({ lookup: input }); return options.unlinked ? null : { id: 'user', auth_subject: 'plex-uuid' }; },
+    issueLinkedLogin: async input => { calls.push({ issue: input }); if (options.issueError) throw options.issueError; return { user: { id: 'user' }, issuedSession: { refreshToken: 'private-fixture' } }; },
+    plexHttpClient: { createPin: async () => ({ id: 123, code: 'PINCODE' }), readPin: async () => ({ authToken: options.noToken ? null : 'fixture-token' }),
+      fetchCurrentUser: async () => ({ id: 42, uuid: 'plex-uuid', restricted: options.restricted ?? false }) },
+  });
+  return { service, records, calls, state: () => [...records.keys()][0] };
 }
 
-function getPendingStateName(secretService) {
-  return [...secretService.records.keys()].find((key) => key.startsWith('auth.plex.sign_in.pending.')) ?? null;
-}
-
-function getPendingState(secretService) {
-  const name = getPendingStateName(secretService);
-  return name ? { name, value: JSON.parse(secretService.records.get(name)) } : null;
-}
-
-test('startSignIn creates a Plex auth URL and persists pending state', async () => {
-  const encryptedSecretService = createEncryptedSecretServiceDouble();
-  const service = createPlexDirectSignInService({
-    encryptedSecretService,
-    loadSettingsFn: async () => ({ system: { baseUrl: 'https://harmoniarr.example.test' } }),
-    plexHttpClient: {
-      async createPin() {
-        return { code: 'PINCODE', id: 123 };
-      },
-    },
-    recordAuditEventFn: async () => {},
-  });
-
-  const result = await service.startSignIn({
-    redirectTo: '/app/activity/blocklist',
-    requestMetadata: { ipAddress: '127.0.0.1', userAgent: 'test-agent' },
-  });
-
-  assert.equal(result.provider, 'plex');
-  assert.match(result.authorizationUrl, /^https:\/\/app\.plex\.tv\/auth#\?/);
-  assert.equal(result.redirectTo, '/app/activity/blocklist');
-
-  const pending = getPendingState(encryptedSecretService);
-  assert.ok(pending);
-  assert.equal(pending.value.redirectTo, '/app/activity/blocklist');
-  assert.equal(pending.value.pinId, '123');
+test('startSignIn preserves the authorization DTO and stores only the normalized app continuation', async () => {
+  const f = fixture(), result = await f.service.startSignIn({ browserBinding, redirectTo: '/app/activity/blocklist' });
+  assert.equal(result.provider, 'plex'); assert.match(result.authorizationUrl, /^https:\/\/app\.plex\.tv\/auth#\?/u);
+  assert.equal(result.redirectTo, '/app/activity/blocklist'); assert.equal(f.records.get(f.state()).pinId, '123');
+  assert.doesNotMatch(JSON.stringify(result), new RegExp(browserBinding, 'u'));
 });
 
-test('completeSignIn resolves a linked user and delegates session issuance', async (t) => {
-  const encryptedSecretService = createEncryptedSecretServiceDouble();
-  const linkedUser = {
-    id: 'user-1',
-    is_disabled: false,
-    auth_subject: 'plex-uuid-1',
-  };
-  const issueLinkedLogin = t.mock.fn(async ({ userId }) => ({
-    user: { id: userId, username: 'plex-user' },
-    issuedSession: { refreshToken: 'refresh-1', csrfToken: 'csrf-1' },
-  }));
-
-  const service = createPlexDirectSignInService({
-    encryptedSecretService,
-    findLinkedUserFn: async () => linkedUser,
-    issueLinkedLogin,
-    loadSettingsFn: async () => ({ system: { baseUrl: 'https://harmoniarr.example.test' } }),
-    plexHttpClient: {
-      async createPin() {
-        return { code: 'PINCODE', id: 123 };
-      },
-      async fetchCurrentUser() {
-        return {
-          email: 'plex@example.com',
-          id: 'plex-id-1',
-          restricted: false,
-          title: 'Plex User',
-          username: 'plexuser',
-          uuid: 'plex-uuid-1',
-        };
-      },
-      async readPin() {
-        return { authToken: 'plex-token' };
-      },
-    },
-    recordAuditEventFn: async () => {},
-  });
-
-  await service.startSignIn({ redirectTo: '/app/activity/blocklist', requestMetadata: {} });
-  const pending = getPendingState(encryptedSecretService);
-
-  const result = await service.completeSignIn({
-    requestMetadata: { ipAddress: '127.0.0.1', userAgent: 'test-agent' },
-    state: pending.name.replace('auth.plex.sign_in.pending.', ''),
-  });
-
-  assert.equal(issueLinkedLogin.mock.callCount(), 1);
-  assert.deepEqual(issueLinkedLogin.mock.calls[0].arguments[0], {
-    provider: 'plex',
-    subject: 'plex-uuid-1',
-    requestMetadata: { ipAddress: '127.0.0.1', userAgent: 'test-agent' },
-    userId: 'user-1',
-  });
-  assert.equal(result.redirectTo, '/app/activity/blocklist');
-  assert.equal(result.user.username, 'plex-user');
-  assert.equal(getPendingStateName(encryptedSecretService), null);
+test('completeSignIn delegates exact provider proof and state consumption without post-commit cleanup', async () => {
+  const f = fixture(); await f.service.startSignIn({ browserBinding, redirectTo: '/app/activity' });
+  const proof = f.records.get(f.state()).proof, metadata = { ipAddress: '127.0.0.1', userAgent: 'fixture' };
+  const result = await f.service.completeSignIn({ browserBinding, state: f.state(), requestMetadata: metadata });
+  assert.equal(result.redirectTo, '/app/activity');
+  assert.deepEqual(f.calls, [{ lookup: { plexId: '42', plexUuid: 'plex-uuid' } }, { issue: {
+    provider: 'plex', subject: 'plex-uuid', userId: 'user', requestMetadata: metadata, callbackState: proof,
+  } }]);
+  assert.equal(f.records.size, 1); // Only the real login owner may consume persisted state.
 });
 
-test('completeSignIn rejects restricted Plex accounts', async () => {
-  const encryptedSecretService = createEncryptedSecretServiceDouble();
-  const service = createPlexDirectSignInService({
-    encryptedSecretService,
-    loadSettingsFn: async () => ({ system: { baseUrl: 'https://harmoniarr.example.test' } }),
-    plexHttpClient: {
-      async createPin() {
-        return { code: 'PINCODE', id: 123 };
-      },
-      async fetchCurrentUser() {
-        return {
-          id: 'plex-id-1',
-          restricted: true,
-          username: 'managed-user',
-          uuid: 'plex-uuid-1',
-        };
-      },
-      async readPin() {
-        return { authToken: 'plex-token' };
-      },
-    },
-    recordAuditEventFn: async () => {},
-  });
-
-  await service.startSignIn({ requestMetadata: {} });
-  const pending = getPendingState(encryptedSecretService);
-
-  await assert.rejects(
-    () => service.completeSignIn({
-      requestMetadata: {},
-      state: pending.name.replace('auth.plex.sign_in.pending.', ''),
-    }),
-    (error) => error?.status === 403 && error?.code === 'plex_sign_in_restricted_account',
-  );
-  assert.equal(getPendingStateName(encryptedSecretService), null);
+test('binding rejection precedes provider work and provider refusals never invoke local issuance', async () => {
+  for (const options of [{ restricted: true }, { unlinked: true }, { noToken: true }]) {
+    const f = fixture(options); await f.service.startSignIn({ browserBinding });
+    await assert.rejects(f.service.completeSignIn({ browserBinding, state: f.state() }));
+    assert.ok(!f.calls.some(value => value.issue)); assert.equal(f.records.size, 1);
+  }
+  const f = fixture(); await f.service.startSignIn({ browserBinding });
+  await assert.rejects(f.service.completeSignIn({ browserBinding: Buffer.alloc(32, 2).toString('base64url'), state: f.state() }), { code: 'plex_sign_in_state_invalid' });
+  assert.equal(f.calls.length, 0); await assert.rejects(f.service.startSignIn({}), { code: 'plex_sign_in_state_invalid' });
 });
 
-test('completeSignIn rejects Plex accounts that are not linked to a local user', async () => {
-  const encryptedSecretService = createEncryptedSecretServiceDouble();
-  const service = createPlexDirectSignInService({
-    encryptedSecretService,
-    findLinkedUserFn: async () => null,
-    loadSettingsFn: async () => ({ system: { baseUrl: 'https://harmoniarr.example.test' } }),
-    plexHttpClient: {
-      async createPin() {
-        return { code: 'PINCODE', id: 123 };
-      },
-      async fetchCurrentUser() {
-        return {
-          id: 'plex-id-1',
-          restricted: false,
-          username: 'plexuser',
-          uuid: 'plex-uuid-1',
-        };
-      },
-      async readPin() {
-        return { authToken: 'plex-token' };
-      },
-    },
-    recordAuditEventFn: async () => {},
-  });
-
-  await service.startSignIn({ requestMetadata: {} });
-  const pending = getPendingState(encryptedSecretService);
-
-  await assert.rejects(
-    () => service.completeSignIn({
-      requestMetadata: {},
-      state: pending.name.replace('auth.plex.sign_in.pending.', ''),
-    }),
-    (error) => error?.status === 403 && error?.code === 'plex_sign_in_not_linked',
-  );
-  assert.equal(getPendingStateName(encryptedSecretService), null);
+test('local issuance uncertainty propagates without consuming or retrying state in the adapter', async () => {
+  const issueError = new Error('uncertain local commit'), f = fixture({ issueError }); await f.service.startSignIn({ browserBinding });
+  await assert.rejects(f.service.completeSignIn({ browserBinding, state: f.state() }), error => error === issueError);
+  assert.equal(f.calls.filter(value => value.issue).length, 1); assert.equal(f.records.size, 1);
 });
 
-test('startSignIn falls back to default redirect when redirect target is unsafe', async () => {
-  const encryptedSecretService = createEncryptedSecretServiceDouble();
-  const service = createPlexDirectSignInService({
-    encryptedSecretService,
-    loadSettingsFn: async () => ({ system: { baseUrl: 'https://harmoniarr.example.test' } }),
-    plexHttpClient: {
-      async createPin() {
-        return { code: 'PINCODE', id: 123 };
-      },
-    },
-    recordAuditEventFn: async () => {},
-  });
-
-  const result = await service.startSignIn({ redirectTo: 'https://evil.example', requestMetadata: {} });
-  assert.equal(result.redirectTo, '/app');
+test('startSignIn rejects external, backslash and encoded unsafe continuations', async () => {
+  for (const redirectTo of ['https://evil.test', '//evil.test', '/\\evil.test', '/app/../login', '/app/%2f%2fevil', '/api/v1']) {
+    const f = fixture(); assert.equal((await f.service.startSignIn({ browserBinding, redirectTo })).redirectTo, '/app');
+  }
 });

@@ -27,6 +27,8 @@ test('linked login fences current provider identity and atomically owns bookkeep
   process.env.HARMONIARR_PG_POOL_MAX = '4'; process.env.HARMONIARR_PG_POOL_CONNECTION_TIMEOUT_MS = '500'; process.env.HARMONIARR_SECRET_ENCRYPTION_KEY = '0'.repeat(64);
   const pool = getPool(), observer = new pg.Client(buildConnectionConfig()), results = [], releases = new Set(), active = new Set();
   const baseUrl = 'http://127.0.0.1:3000', subject = 'fixture-plex-uuid', plexId = '987654321';
+  const browserBinding = Buffer.alloc(32, 1).toString('base64url');
+  process.env.HARMONIARR_SECURE_COOKIES = 'false';
   const metadata = { ipAddress: '127.0.0.1', userAgent: 'native-linked-login' };
   let runtime, userId, numericUserId, callbackService, callbackFailure, transportMode = 'normal', networkCalls = 0;
   const proof = () => ({ userId, provider: 'plex', subject, requestMetadata: metadata });
@@ -56,7 +58,7 @@ test('linked login fences current provider identity and atomically owns bookkeep
       failed_login_count=3,locked_until=clock_timestamp()+interval '15 minutes',last_login_at='2026-01-01' WHERE id=$1`, [userId, subject]);
   }
   async function pending(service = callbackService) {
-    const started = await service.startSignIn({ redirectTo: '/app/activity', requestMetadata: { origin: baseUrl } });
+    const started = await service.startSignIn({ browserBinding, redirectTo: '/app/activity', requestMetadata: { origin: baseUrl } });
     return new URL(new URLSearchParams(started.authorizationUrl.split('#?')[1]).get('forwardUrl')).searchParams.get('state');
   }
   function candidateGate() {
@@ -90,7 +92,7 @@ test('linked login fences current provider identity and atomically owns bookkeep
     assert.equal(await readLinkedPlexLoginUser({ plexUuid: 'missing', plexId: 'missing-id' }), null);
     results.push('real-minimal-lookup-uuid-priority-numeric-fallback-and-missing');
 
-    const before = await state(), result = await callbackService.completeSignIn({ state: await pending(), requestMetadata: metadata }), after = await state();
+    const before = await state(), result = await callbackService.completeSignIn({ browserBinding, state: await pending(), requestMetadata: metadata }), after = await state();
     assert.equal(after.failed_login_count, 0); assert.equal(after.locked_until, null); assert.equal(after.tokens, before.tokens + 1); assert.equal(after.audits, before.audits + 1);
     assert.equal(result.user.last_login_at.getTime(), result.issuedSession.user.lastLoginAt.getTime());
     assert.equal((await findRefreshTokenSession(pool, hashToken(result.issuedSession.refreshToken))).app_user_id, userId);
@@ -106,7 +108,7 @@ test('linked login fences current provider identity and atomically owns bookkeep
     assert.deepEqual(await state(), readBefore); results.push('bounded-candidate-read-pool-exhaustion-has-no-login-writes');
 
     for (const kind of ['subject', 'provider', 'unlinked', 'disabled', 'relinked']) {
-      await reset(); const gate = candidateGate(), stateKey = await pending(gate.service), pendingResult = track(gate.service.completeSignIn({ state: stateKey, requestMetadata: metadata })); await gate.ready;
+      await reset(); const gate = candidateGate(), stateKey = await pending(gate.service), pendingResult = track(gate.service.completeSignIn({ browserBinding, state: stateKey, requestMetadata: metadata })); await gate.ready;
       const changes = { subject: ["auth_subject='changed-subject'"], provider: ["auth_provider='local'"], unlinked: ['auth_subject=NULL'], disabled: ['is_disabled=TRUE'], relinked: ["auth_subject='moved-subject'"] }[kind];
       await observer.query(`UPDATE app_users SET ${changes[0]} WHERE id=$1`, [userId]);
       if (kind === 'relinked') await observer.query('UPDATE app_users SET auth_subject=$2 WHERE id=$1', [numericUserId, subject]);
@@ -148,7 +150,7 @@ test('linked login fences current provider identity and atomically owns bookkeep
 
     await reset(); const auditStateKey = await pending(), auditBefore = await state();
     await auditTrigger("RAISE EXCEPTION 'fixture linked audit failure';", async () => {
-      const denied = await fetch(baseUrl + '/api/v1/auth/plex/callback?state=' + auditStateKey, { redirect: 'manual' });
+      const denied = await fetch(baseUrl + '/api/v1/auth/plex/callback?state=' + auditStateKey, { redirect: 'manual', headers: { cookie: 'harmoniarr_plex_binding='+browserBinding } });
       assert.equal(callbackFailure?.code, 'session_write_unavailable', callbackFailure?.stack);
       assert.equal(denied.status, 303); assert.equal(denied.headers.get('set-cookie'), null); assert.match(denied.headers.get('location'), /code=session_write_unavailable/u);
       assert.doesNotMatch(denied.headers.get('location'), /fixture|provider-token|password_hash/u); assert.deepEqual(await state(), auditBefore);
@@ -180,10 +182,10 @@ test('linked login fences current provider identity and atomically owns bookkeep
 
     for (const mode of ['restricted', 'unauthorized', 'empty']) {
       await reset(); const stateKey = await pending(); transportMode = mode; const stable = await state();
-      await assert.rejects(callbackService.completeSignIn({ state: stateKey, requestMetadata: metadata })); assert.deepEqual(await state(), stable);
+      await assert.rejects(callbackService.completeSignIn({ browserBinding, state: stateKey, requestMetadata: metadata })); assert.deepEqual(await state(), stable);
       results.push('controlled-provider-' + mode + '-refuses-before-login-writes');
     }
-    await reset(); const successful = await fetch(baseUrl + '/api/v1/auth/plex/callback?state=' + await pending(), { redirect: 'manual' });
+    await reset(); const successful = await fetch(baseUrl + '/api/v1/auth/plex/callback?state=' + await pending(), { redirect: 'manual', headers: { cookie: 'harmoniarr_plex_binding='+browserBinding } });
     assert.equal(successful.status, 303); assert.equal(successful.headers.get('location'), '/app/activity'); assert.ok(successful.headers.get('set-cookie'));
     results.push('ordinary-callback-delivers-cookies-after-confirmed-commit');
 

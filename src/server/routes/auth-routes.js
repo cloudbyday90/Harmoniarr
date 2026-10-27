@@ -43,6 +43,8 @@ import {
 import { asyncRoute, sanitizePageLimit } from '../http.js';
 import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
 import { withRequestReadSignal } from '../request-read-signal-service.js';
+import { createPlexBrowserBinding, readPlexBrowserBinding, setPlexBrowserBindingCookie } from '../plex-browser-binding.js';
+import { invalidPlexCallback } from '../integrations/plex/plex-callback-policy.js';
 
 const defaultAccountSecurityService = createAccountSecurityService();
 const defaultRequestAuthDependencies = createRequestAuthDependencies();
@@ -150,24 +152,31 @@ export function registerAuthRoutes(app, {
 
   if (typeof startPlexSignIn === 'function') {
     app.post('/api/v1/auth/plex/start', limitPlexSignInStart, asyncRoute(async (request, response) => {
+      response.setHeader('Cache-Control', 'no-store'); response.setHeader('Referrer-Policy', 'no-referrer');
+      const browserBinding = readPlexBrowserBinding(request) ?? createPlexBrowserBinding();
       const requestMetadata = getRequestMetadata(request);
-      response.status(202).json({
-        ok: true,
-        ...(await startPlexSignIn({
-          redirectTo: request.body?.redirect,
-          requestMetadata: {
-            ...requestMetadata,
-            origin: requestOrigin(request),
-          },
-        })),
+      const started = await startPlexSignIn({
+        browserBinding,
+        redirectTo: request.body?.redirect,
+        requestMetadata: {
+          ...requestMetadata,
+          origin: requestOrigin(request),
+        },
       });
+      setPlexBrowserBindingCookie(response, browserBinding);
+      response.status(202).json({ ok: true, authorizationUrl: started.authorizationUrl, expiresAt: started.expiresAt,
+        provider: started.provider, redirectTo: started.redirectTo });
     }));
   }
 
   if (typeof completePlexSignIn === 'function') {
     app.get('/api/v1/auth/plex/callback', limitPlexSignInCallback, asyncRoute(async (request, response) => {
+      response.setHeader('Cache-Control', 'no-store'); response.setHeader('Referrer-Policy', 'no-referrer');
       try {
+        const browserBinding = readPlexBrowserBinding(request);
+        if (!browserBinding) throw invalidPlexCallback();
         const { issuedSession, redirectTo } = await completePlexSignIn({
+          browserBinding,
           requestMetadata: getRequestMetadata(request),
           state: request.query.state,
         });

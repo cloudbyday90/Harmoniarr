@@ -13,6 +13,8 @@ import { createSessionMaterial } from './session-issuance-policy.js';
 import { startSessionWriteTransaction } from './session-write-transaction-service.js';
 import { publishOwnedRootSession } from './session-root-publication-service.js';
 import { recordAuditEvent } from './audit.js';
+import { capturePlexCallbackProof, invalidPlexCallback } from './integrations/plex/plex-callback-policy.js';
+import { consumePlexCallbackState, assertPlexCallbackNotExpired } from './integrations/plex/plex-callback-state-store.js';
 
 export function readLinkedPlexLoginUser(input, options) {
   const subjects = selectPlexLoginSubjects(input);
@@ -24,18 +26,23 @@ export function createLinkedLoginService({ startTransactionFn = startSessionWrit
   return { async loginLinkedUser(input) {
     const identity = selectLinkedLoginIdentity(input), metadata = selectSessionAuditMetadata(input?.requestMetadata);
     if (!identity) throw createApiError(403, 'plex_sign_in_not_linked', 'This Plex account is not linked to a direct sign-in capable Harmoniarr user');
+    const callbackState = Object.hasOwn(input, 'callbackState') ? capturePlexCallbackProof(input.callbackState) : null;
     const material = createMaterialFn();
     const result = await startTransactionFn(async (client, check) => {
       const current = await lockLinkedLoginUser(client, identity.userId); check();
       if (!current || current.auth_provider !== identity.provider || current.auth_subject !== identity.subject) return { refusal: 'not_linked' };
       if (current.is_disabled) return { refusal: 'unavailable' };
+      if (callbackState && !await consumePlexCallbackState(client, callbackState)) return { refusal: 'invalid_state' };
+      check();
       const owner = await recordSuccessfulLogin(client, identity.userId); check();
       const issuedSession = await publishOwnedRootSession(client, { owner, material, metadata }, check);
       await recordAuditEventFn({ actorUserId: owner.id, actorType: 'user', eventType: 'plex_sign_in_succeeded',
         summary: 'Plex direct sign-in succeeded', entityType: 'app_user', entityId: owner.id, required: true, ...metadata }, client); check();
+      if (callbackState) { await assertPlexCallbackNotExpired(client, callbackState); check(); }
       return { user: owner, issuedSession };
     }).result;
     if (result.refusal === 'unavailable') throw createApiError(403, 'account_unavailable', 'The linked Harmoniarr account is not available');
+    if (result.refusal === 'invalid_state') throw invalidPlexCallback();
     if (result.refusal) throw createApiError(403, 'plex_sign_in_not_linked', 'This Plex account is not linked to a direct sign-in capable Harmoniarr user');
     return result;
   } };

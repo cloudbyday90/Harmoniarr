@@ -5,6 +5,7 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { randomUUID } from 'node:crypto';
 import { createLinkedLoginService } from '../../src/server/linked-login-service.js';
 import { selectLinkedLoginIdentity, selectPlexLoginSubjects } from '../../src/server/linked-login-policy.js';
 import { findLinkedPlexLoginUser } from '../../src/server/linked-login-store.js';
@@ -16,6 +17,8 @@ function fixture(options = {}) {
   const client = { async query(sql, values) {
     queries.push({ sql, values });
     if (sql.includes('FROM public.app_users')) return { rows: options.absent ? [] : [current] };
+    if (sql.startsWith('DELETE')) return { rowCount: options.consumed ? 0 : 1 };
+    if (sql.startsWith('SELECT $1::timestamptz')) return { rows: [{ unexpired: !options.expiredCallback }] };
     if (sql.startsWith('UPDATE')) return { rowCount: options.noUpdate ? 0 : 1,
       rows: [{ id: 'user', username: 'listener', role: 'requester', must_change_password: true, last_login_at: 'database-time' }] };
     if (sql.startsWith('INSERT')) return { rows: [{ id: 'token' }] };
@@ -81,4 +84,26 @@ test('Plex lookup keeps UUID preference, exact numeric fallback and a minimal bo
   assert.equal(result, candidate); assert.deepEqual(queries[0].values, [['uuid', '123']]);
   assert.match(queries[0].sql, /array_position/u); assert.match(queries[0].sql, /LIMIT 1/u);
   assert.doesNotMatch(queries[0].sql, /SELECT \*|password_hash/u);
+});
+
+const callbackProof = () => ({ id: randomUUID(), name: 'auth.plex.sign_in.pending.' + randomUUID(),
+  encryptedValue: Buffer.from('owned-cipher'), revision: '2050-01-01 00:00:00.000100+00', expiresAt: '2050-01-01T00:10:00.000Z' });
+test('linked login captures and consumes callback state before required login writes on the same client', async () => {
+  const request = { ...input(), callbackState: callbackProof() }, expected = { ...request.callbackState, encryptedValue: Buffer.from(request.callbackState.encryptedValue) };
+  const f = fixture({ before: async () => { request.callbackState.id = randomUUID(); request.callbackState.encryptedValue.fill(0); } });
+  await f.service.loginLinkedUser(request);
+  const index = f.queries.findIndex(value => value.sql.startsWith('DELETE'));
+  assert.deepEqual(f.queries[index].values, [expected.id, 'integration_oauth', expected.name, expected.encryptedValue, expected.revision, expected.expiresAt]);
+  assert.equal(f.queries[index + 1].sql.startsWith('UPDATE'), true);
+  assert.equal(f.queries.at(-1).sql.startsWith('SELECT $1::timestamptz'), true);
+});
+
+test('already consumed or malformed state refuses before login writes; final expiry cannot return credentials', async () => {
+  const consumed = fixture({ consumed: true });
+  await assert.rejects(consumed.service.loginLinkedUser({ ...input(), callbackState: callbackProof() }), { code: 'plex_sign_in_state_invalid' });
+  assert.ok(!consumed.queries.some(value => /^(UPDATE|INSERT)/u.test(value.sql))); assert.equal(consumed.events.length, 0);
+  for (const callbackState of [null, {}, { ...callbackProof(), encryptedValue: Buffer.alloc(20000) }]) {
+    const f = fixture(); await assert.rejects(f.service.loginLinkedUser({ ...input(), callbackState }), { code: 'plex_sign_in_state_invalid' }); assert.equal(f.transactions(), 0);
+  }
+  const expired = fixture({ expiredCallback: true }); await assert.rejects(expired.service.loginLinkedUser({ ...input(), callbackState: callbackProof() })); assert.equal(expired.transactions(), 1);
 });

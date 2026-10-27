@@ -122,6 +122,10 @@ export function createEncryptedSecretService({
 
   async function getSecretValue({ secretType, name, queryable }) {
     const record = await getSecretRecord({ secretType, name, queryable });
+    return decryptSecretRecord(record);
+  }
+
+  function decryptSecretRecord(record) {
     if (!record) {
       return null;
     }
@@ -184,6 +188,7 @@ export function createEncryptedSecretService({
 
   return {
     clearSecretValue,
+    decryptSecretRecord,
     getSecretMetadata,
     getSecretRecord,
     getSecretValue,

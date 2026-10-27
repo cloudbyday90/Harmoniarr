@@ -128,6 +128,17 @@ atomic ownership alongside successful local publication. Its current separate
 post-login delete still permits independent callback completion and late cleanup
 failure after a durable login.
 
+Plex callback browser binding and atomic single-use consumption are now implemented
+in the [callback design](PLEX_CALLBACK_DESIGN.md) and
+[outcome](PLEX_CALLBACK_OUTCOME.md), with
+[official research/tradeoffs](PLEX_CALLBACK_RESEARCH_2026_10.md). Versioned encrypted
+state carries a browser-verifier hash and database expiry; exact-record deletion,
+bookkeeping, root issuance and required success audit share the bounded owner.
+Start-state persistence and its privacy-safe required audit are also atomic. No
+schema artifact changed. Next integrate bounded expired pending-state cleanup
+into existing maintenance, protecting active flows and the persistent Plex client
+identifier; avoid requiring a manual refresh or another deployed service.
+
 October 12 scan addition: `20261012_225951_scan_owned_receipt_invalidation.sql`
 adds UUID revision identity, generated path lookup and revision-bound negative
 observations. Replay preserves existing identities; snapshot/anchors include the

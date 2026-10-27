@@ -18,49 +18,13 @@
 
 import { randomUUID } from 'node:crypto';
 import { createApiError, loginLinkedUser } from '../../auth.js';
-import { recordAuditEvent } from '../../audit.js';
-import { getPool } from '../../database.js';
 import { readLinkedPlexLoginUser } from '../../linked-login-service.js';
-import { createEncryptedSecretService } from '../../encrypted-secret-service.js';
+import { createPlexCallbackStateService } from './plex-callback-state-service.js';
+import { normalizePlexRedirect as normalizeRedirectTarget, hashPlexBrowserBinding } from './plex-callback-policy.js';
 import { loadSettings } from '../../settings.js';
 import { createPlexHttpClient } from './plex-http-client.js';
 
-const secretType = 'integration_oauth';
-const pendingStateTtlMs = 10 * 60 * 1000;
-const pendingStatePrefix = 'auth.plex.sign_in.pending.';
-const clientIdentifierSecretName = 'auth.plex.sign_in.client_identifier';
 const plexAuthBaseUrl = 'https://app.plex.tv/auth#?';
-const defaultRedirectTarget = '/app';
-
-function pendingStateSecretName(state) {
-  return `${pendingStatePrefix}${state}`;
-}
-
-function safeJsonParse(value) {
-  if (typeof value !== 'string' || value.trim().length === 0) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(value);
-  } catch {
-    return null;
-  }
-}
-
-function normalizeRedirectTarget(value) {
-  if (typeof value !== 'string') {
-    return defaultRedirectTarget;
-  }
-
-  const trimmed = value.trim();
-  if (!trimmed || !trimmed.startsWith('/') || trimmed.startsWith('//') || trimmed.startsWith('/api/')) {
-    return defaultRedirectTarget;
-  }
-
-  return trimmed;
-}
-
 function buildForwardUrl(baseUrl, state) {
   if (typeof baseUrl !== 'string' || baseUrl.trim().length === 0) {
     return null;
@@ -114,38 +78,14 @@ export function buildPlexLoginRedirectUrl({ code = null, reason = null, redirect
 }
 
 export function createPlexDirectSignInService({
-  encryptedSecretService = createEncryptedSecretService(),
-  getNow = () => new Date(),
-  getPoolFn = getPool,
+  callbackStateService = createPlexCallbackStateService(),
   issueLinkedLogin = loginLinkedUser,
   findLinkedUserFn = readLinkedPlexLoginUser,
   loadSettingsFn = loadSettings,
   plexHttpClient = createPlexHttpClient(),
-  recordAuditEventFn = recordAuditEvent,
 } = {}) {
-  async function resolveClientIdentifier(queryable = getPoolFn()) {
-    const existing = await encryptedSecretService.getSecretValue({
-      name: clientIdentifierSecretName,
-      queryable,
-      secretType,
-    });
-
-    if (typeof existing === 'string' && existing.trim().length > 0) {
-      return existing.trim();
-    }
-
-    const clientIdentifier = randomUUID();
-    await encryptedSecretService.setSecretValue({
-      metadata: { createdAt: getNow().toISOString() },
-      name: clientIdentifierSecretName,
-      plaintextValue: clientIdentifier,
-      queryable,
-      secretType,
-    });
-    return clientIdentifier;
-  }
-
-  async function startSignIn({ redirectTo = null, requestMetadata = {} } = {}) {
+  async function startSignIn({ redirectTo = null, requestMetadata = {}, browserBinding } = {}) {
+    hashPlexBrowserBinding(browserBinding);
     const settings = await loadSettingsFn();
     const forwardBaseUrl = settings.system?.baseUrl ?? requestMetadata.origin ?? '';
     const state = randomUUID();
@@ -154,39 +94,17 @@ export function createPlexDirectSignInService({
       throw createApiError(400, 'plex_sign_in_base_url_required', 'Configure system.baseUrl before starting Plex sign-in');
     }
 
-    const queryable = getPoolFn();
-    const clientIdentifier = await resolveClientIdentifier(queryable);
+    const clientIdentifier = await callbackStateService.resolveClientIdentifier();
     const pin = await plexHttpClient.createPin({ clientIdentifier });
-    const expiresAt = new Date(getNow().getTime() + pendingStateTtlMs).toISOString();
     const pinCode = typeof pin?.code === 'string' ? pin.code.trim() : '';
     const pinId = pin?.id != null ? String(pin.id) : '';
-    if (!pinCode || !pinId) {
+    if (!pinCode || !pinId || pinCode.length > 256 || pinId.length > 256) {
       throw createApiError(502, 'plex_sign_in_pin_create_failed', 'Plex PIN creation did not return a usable id and code');
     }
 
     const normalizedRedirectTo = normalizeRedirectTarget(redirectTo);
-    await encryptedSecretService.setSecretValue({
-      metadata: { expiresAt, pinId, redirectTo: normalizedRedirectTo },
-      name: pendingStateSecretName(state),
-      plaintextValue: JSON.stringify({
-        clientIdentifier,
-        expiresAt,
-        pinId,
-        redirectTo: normalizedRedirectTo,
-      }),
-      queryable,
-      secretType,
-    });
-
-    await recordAuditEventFn({
-      actorType: 'anonymous',
-      details: { expiresAt, redirectTo: normalizedRedirectTo, state },
-      entityType: 'auth_flow',
-      eventType: 'plex_sign_in_started',
-      ipAddress: requestMetadata.ipAddress ?? null,
-      summary: 'Plex direct sign-in started',
-      userAgent: requestMetadata.userAgent ?? null,
-    });
+    const expiresAt = await callbackStateService.create({ state, browserBinding, clientIdentifier, pinId,
+      redirectTo: normalizedRedirectTo, requestMetadata });
 
     return {
       authorizationUrl: buildPlexAuthAppUrl({
@@ -200,28 +118,8 @@ export function createPlexDirectSignInService({
     };
   }
 
-  async function completeSignIn({ requestMetadata = {}, state } = {}) {
-    if (typeof state !== 'string' || state.trim().length === 0) {
-      throw createApiError(400, 'validation_error', 'Plex sign-in callback requires state');
-    }
-
-    const queryable = getPoolFn();
-    const pendingName = pendingStateSecretName(state.trim());
-    const pendingValue = await encryptedSecretService.getSecretValue({
-      name: pendingName,
-      queryable,
-      secretType,
-    });
-    const pendingState = safeJsonParse(pendingValue);
-    if (!pendingState?.pinId || !pendingState?.clientIdentifier) {
-      throw createApiError(400, 'plex_sign_in_state_invalid', 'Plex sign-in state is invalid or expired');
-    }
-
-    if (new Date(pendingState.expiresAt).getTime() <= getNow().getTime()) {
-      await encryptedSecretService.clearSecretValue({ name: pendingName, queryable, secretType });
-      throw createApiError(400, 'plex_sign_in_state_expired', 'Plex sign-in state expired before completion');
-    }
-
+  async function completeSignIn({ requestMetadata = {}, state, browserBinding } = {}) {
+    const pendingState = await callbackStateService.read({ state, browserBinding });
     const pin = await plexHttpClient.readPin({
       clientIdentifier: pendingState.clientIdentifier,
       pinId: pendingState.pinId,
@@ -237,7 +135,6 @@ export function createPlexDirectSignInService({
     }));
 
     if (currentUser.restricted) {
-      await encryptedSecretService.clearSecretValue({ name: pendingName, queryable, secretType });
       throw createApiError(403, 'plex_sign_in_restricted_account', 'Managed or restricted Plex accounts cannot sign in directly');
     }
 
@@ -246,7 +143,6 @@ export function createPlexDirectSignInService({
       plexUuid: currentUser.uuid,
     });
     if (!linkedUser) {
-      await encryptedSecretService.clearSecretValue({ name: pendingName, queryable, secretType });
       throw createApiError(403, 'plex_sign_in_not_linked', 'This Plex account is not linked to a direct sign-in capable Harmoniarr user');
     }
 
@@ -255,9 +151,8 @@ export function createPlexDirectSignInService({
       userId: linkedUser.id,
       provider: 'plex',
       subject: linkedUser.auth_subject,
+      callbackState: pendingState.proof,
     });
-
-    await encryptedSecretService.clearSecretValue({ name: pendingName, queryable, secretType });
 
     return {
       issuedSession,

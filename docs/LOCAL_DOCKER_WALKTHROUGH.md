@@ -1,5 +1,11 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 27 [browser-bound Plex callback rebuild](LOCAL_DOCKER_PLEX_CALLBACK_OUTCOME.md)
+records the current no-cache image, preserved administrator/data/five mounts,
+packaged auth qualification and disposable HTTPS browser checks. See the
+[implementation outcome](PLEX_CALLBACK_OUTCOME.md) for atomic state consumption,
+expiry, replay and the next maintenance item.
+
 The October 27 [linked-provider login rebuild](LOCAL_DOCKER_LINKED_LOGIN_OUTCOME.md)
 records the current no-cache image, preserved administrator/data/five mounts and
 packaged provider callback plus affected auth qualification. See the

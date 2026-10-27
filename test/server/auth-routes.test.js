@@ -238,6 +238,7 @@ test('auth Plex callback sets auth cookies and redirects to the resolved app rou
 
   await withServer(app, async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/v1/auth/plex/callback?state=state-1`, {
+      headers: { cookie: 'harmoniarr_plex_binding='+Buffer.alloc(32,1).toString('base64url') },
       redirect: 'manual',
     });
 
@@ -259,11 +260,36 @@ test('auth Plex callback redirects to login with failure reason when completion 
 
   await withServer(app, async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/v1/auth/plex/callback?state=state-1`, {
+      headers: { cookie: 'harmoniarr_plex_binding='+Buffer.alloc(32,1).toString('base64url') },
       redirect: 'manual',
     });
 
     assert.equal(response.status, 303);
     assert.equal(response.headers.get('location'), '/login?reason=plex-sign-in-not-linked&code=plex_sign_in_not_linked');
+  });
+});
+
+test('Plex start keeps its browser binding out of JSON, reuses it for tabs and disables caching', async (t) => {
+  const binding = Buffer.alloc(32, 1).toString('base64url');
+  const startPlexSignIn = t.mock.fn(async () => ({ authorizationUrl: 'https://app.plex.tv/auth', provider: 'plex', browserBinding: binding, privateField: 'private' }));
+  const app = createAuthRouteTestApp({ startPlexSignIn });
+  await withServer(app, async baseUrl => {
+    const response = await fetch(baseUrl + '/api/v1/auth/plex/start', { method: 'POST', headers: { 'Content-Type': 'application/json', cookie: 'harmoniarr_plex_binding=' + binding }, body: '{}' });
+    assert.equal(response.status, 202); assert.equal(response.headers.get('cache-control'), 'no-store'); assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
+    assert.match(response.headers.get('set-cookie'), /HttpOnly; SameSite=Lax/u);
+    assert.equal(startPlexSignIn.mock.calls[0].arguments[0].browserBinding, binding);
+    assert.doesNotMatch(JSON.stringify(await response.json()), /privateField|browserBinding|private/u);
+  });
+});
+
+test('Plex callback without its browser cookie refuses before provider/service work and sets no credentials', async (t) => {
+  const completePlexSignIn = t.mock.fn(async () => { throw new Error('Unexpected callback work'); });
+  const app = createAuthRouteTestApp({ completePlexSignIn });
+  await withServer(app, async baseUrl => {
+    const response = await fetch(baseUrl + '/api/v1/auth/plex/callback?state=untrusted', { redirect: 'manual' });
+    assert.equal(response.status, 303); assert.match(response.headers.get('location'), /plex_sign_in_state_invalid/u);
+    assert.equal(response.headers.get('set-cookie'), null); assert.equal(response.headers.get('cache-control'), 'no-store');
+    assert.equal(completePlexSignIn.mock.callCount(), 0);
   });
 });
 

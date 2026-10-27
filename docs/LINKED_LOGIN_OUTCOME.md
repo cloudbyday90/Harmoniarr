@@ -1,5 +1,10 @@
 # Linked-provider login outcome
 
+Followup completed October 27: [Plex callback outcome](PLEX_CALLBACK_OUTCOME.md)
+records browser binding, exact single-use consumption and expiry fences in the
+same local publication transaction. The evidence and original next-item note
+below describe the preceding linked-login commit.
+
 October 27, 2026. Linked Plex login now fences the current primary provider/
 subject link and owns bookkeeping, root issuance and its required audit in one
 bounded transaction. The implementation remains on main with modular ESM files,
