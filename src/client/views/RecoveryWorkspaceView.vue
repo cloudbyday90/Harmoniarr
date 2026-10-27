@@ -422,7 +422,7 @@ watch(hasActiveLocks, (nextHasActiveLocks) => {
           <RecoveryDiagnosticEvents :diagnostics="recoveryDiagnostics" />
         </template>
         <div v-else class="hx-empty"><p class="hx-empty-copy">No diagnostics data available. Refresh to load current state.</p></div>
-        <SchemaDiagnostics />
+        <SchemaDiagnostics v-if="isDiagnosticsOpen" />
       </SettingsDisclosure>
     </section>
   </div>

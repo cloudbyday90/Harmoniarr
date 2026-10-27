@@ -92,3 +92,11 @@ drainage fencing are implemented in the
 [deadline design](SCHEMA_DIAGNOSTIC_DEADLINES_DESIGN.md) and
 [outcome](SCHEMA_DIAGNOSTIC_DEADLINES_OUTCOME.md). The connection/transport limits
 above describe this document's original October 26 candidate.
+
+October 27 automatic maintenance follow-up: the manual schema control and
+request-owned inspection described here are superseded by the
+[automatic maintenance design](AUTO_SCHEMA_MAINTENANCE_DESIGN.md) and
+[outcome](AUTO_SCHEMA_MAINTENANCE_OUTCOME.md). The UI loads maintained status on
+opening; startup/hourly observation, recovery pauses, bounded retry and shutdown
+drainage belong to application maintenance. The earlier evidence remains a
+historical record of the explicit-check candidate.

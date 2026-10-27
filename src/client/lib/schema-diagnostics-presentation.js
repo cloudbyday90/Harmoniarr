@@ -4,19 +4,25 @@
  * Licensed under GPL-3.0-or-later. See LICENSE.
  */
 export const schemaDiagnosticsMessages = Object.freeze({
-  idle: 'Schema checks have not run in this view.',
-  loading: 'Checking database schema…',
-  current: 'Schema checks completed. Migration records and critical schema checks are current.',
-  attention: 'Schema checks completed. The database needs attention. Review the results below.',
-  busy: 'A schema check or database preparation is already running. Refresh after it finishes.',
-  unavailable: 'Schema checks are unavailable. Refresh to try again.',
+  idle: 'Schema maintenance status will load automatically.',
+  loading: 'Loading schema maintenance status…',
+  pending: 'Schema checks will run automatically through maintenance.',
+  running: 'Automatic schema checks are running…',
+  paused: 'Schema checks are paused during recovery maintenance and will resume automatically.',
+  stale: 'The previous schema check is out of date. Maintenance will check again automatically.',
+  current: 'Latest maintenance check: migration records and critical schema checks are current.',
+  attention: 'The latest maintenance check found changes that need attention. Review the results below.',
+  busy: 'Schema checks are waiting for database preparation. Maintenance will retry automatically.',
+  unavailable: 'Schema status is unavailable. Maintenance continues checking automatically.',
   forbidden: 'Administrator access is required to view schema checks.',
-  limited: 'Too many schema checks. Wait a minute, then refresh.',
+  limited: 'Schema status is temporarily limited. It will reload the next time this view opens.',
 });
 
 export function projectSchemaDiagnosticsPayload(payload) {
   const report = payload?.schemaDiagnostics;
-  if (['busy', 'unavailable'].includes(report?.state)) return { state: report.state };
+  if (['busy', 'unavailable', 'pending', 'running', 'paused', 'stale'].includes(report?.state)) {
+    return { state: report.state, ...(typeof report.checkedAt === 'string' && Number.isFinite(Date.parse(report.checkedAt)) ? { checkedAt: report.checkedAt } : {}) };
+  }
   const count = value => Number.isSafeInteger(value) && value >= 0;
   if (!['current', 'attention'].includes(report?.state) || !['current', 'not_current', 'unavailable'].includes(report.lineage?.state)
     || !['current', 'drift'].includes(report.anchors?.state) || !['checkedCount', 'missingCount', 'alteredCount'].every(key => count(report.anchors[key]))) return { state: 'unavailable' };

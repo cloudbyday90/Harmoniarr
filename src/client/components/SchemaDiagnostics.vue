@@ -4,11 +4,12 @@
   Licensed under GPL-3.0-or-later. See LICENSE.
 -->
 <script setup>
-import { useId } from 'vue';
+import { onMounted, useId } from 'vue';
 import { useSchemaDiagnostics } from '../composables/useSchemaDiagnostics.js';
 import { formatDiagnosticTimestamp } from '../lib/maintenance-lock-presentation.js';
 const id = useId();
 const { state, report, message, refresh } = useSchemaDiagnostics();
+onMounted(refresh);
 const labels = { current: 'Current', not_current: 'Needs attention', unavailable: 'Unavailable', drift: 'Needs attention' };
 const differences = [
   ['pendingCount', 'Pending migrations'], ['unknownAppliedCount', 'Unexpected applied records'],
@@ -19,12 +20,11 @@ const differences = [
 <template>
   <section class="hx-schema-diagnostics" :aria-labelledby="`${id}-title`">
     <h4 :id="`${id}-title`">Database schema</h4>
-    <p :id="`${id}-help`" class="hx-text-muted">Compare migration records and critical schema checks. This does not repair the database.</p>
-    <div><button type="button" class="hx-btn" :aria-controls="`${id}-results`" :aria-describedby="`${id}-help`" :aria-disabled="state === 'loading' ? 'true' : undefined" @click="refresh">Refresh schema checks</button></div>
+    <p :id="`${id}-help`" class="hx-text-muted">Maintenance checks migration records and critical schema facts automatically at startup and hourly. Recovery work pauses these checks. Unexpected changes require review.</p>
     <p role="status" aria-live="polite" aria-atomic="true">{{ message }}</p>
-    <div :id="`${id}-results`" :aria-busy="state === 'loading' ? 'true' : 'false'">
-      <template v-if="report">
-        <p v-if="report.checkedAt" class="hx-text-muted">Last completed check: <time :datetime="report.checkedAt">{{ formatDiagnosticTimestamp(report.checkedAt) }}</time></p>
+    <div :id="`${id}-results`" :aria-busy="['loading', 'pending', 'running'].includes(state) ? 'true' : 'false'">
+      <p v-if="report?.checkedAt" class="hx-text-muted">Last completed check: <time :datetime="report.checkedAt">{{ formatDiagnosticTimestamp(report.checkedAt) }}</time></p>
+      <template v-if="report?.lineage && report?.anchors">
         <dl class="hx-schema-diagnostics__values">
           <div><dt>Migration records</dt><dd>{{ labels[report.lineage.state] }}</dd></div>
           <div><dt>Critical schema checks</dt><dd>{{ labels[report.anchors.state] }}</dd></div>
@@ -46,8 +46,6 @@ const differences = [
 .hx-schema-diagnostics { border-top: 1px solid var(--hx-border-subtle); display: grid; gap: var(--hx-space-3); min-width: 0; padding-top: var(--hx-space-3); }
 .hx-schema-diagnostics h4, .hx-schema-diagnostics p { margin: 0; }
 .hx-schema-diagnostics h4 { color: var(--hx-text-strong); font-size: var(--hx-text-sm); }
-.hx-schema-diagnostics .hx-btn { min-height: 44px; }
-.hx-schema-diagnostics .hx-btn[aria-disabled='true'] { cursor: progress; opacity: 0.6; }
 .hx-schema-diagnostics__values { display: grid; gap: var(--hx-space-3); grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); margin: var(--hx-space-3) 0; }
 .hx-schema-diagnostics__values dt { color: var(--hx-text-muted); font-size: var(--hx-text-xs); }
 .hx-schema-diagnostics__values dd { color: var(--hx-text-strong); margin: var(--hx-space-1) 0 0; overflow-wrap: anywhere; }

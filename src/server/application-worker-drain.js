@@ -10,6 +10,7 @@ import { drainWorkerOwners } from './worker-owner-drain.js';
 /** Capture producers before consumers; metadata refresh can queue artist reconciliation. */
 export function drainApplicationWorkerOwners({ importCandidateModule, libraryModule, metadataModule,systemModule }) {
   return drainWorkerOwners([
+    systemModule?.schemaMaintenanceService,
     systemModule?.backupRecoveryWorker,
     systemModule?.healthReadinessService,
     metadataModule?.metadataArtistRefreshWorker,

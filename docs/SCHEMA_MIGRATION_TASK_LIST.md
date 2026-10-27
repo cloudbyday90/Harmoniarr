@@ -53,6 +53,16 @@ with [official research/tradeoffs](SESSION_ROTATION_RESEARCH_2026_10.md).
 Next bind root login's verified credential epoch and required audit to issuance;
 current enabled-account checks alone do not fence stale password verification.
 
+The user-prioritized automatic schema workflow is now implemented in the
+[maintenance design](AUTO_SCHEMA_MAINTENANCE_DESIGN.md) and
+[outcome](AUTO_SCHEMA_MAINTENANCE_OUTCOME.md), with
+[official research/tradeoffs](AUTO_SCHEMA_MAINTENANCE_RESEARCH.md). Checks run at
+startup/hourly, pause for recovery maintenance and retry without HTTP-owned scans.
+This supersedes the manual schema button described in the historical UI step.
+Guarded startup migrations remain automatic; arbitrary drift is never repaired
+by diagnostics. No schema artifact changed. Next return to root login's verified
+credential epoch/required audit ownership; it remains postponed, not completed.
+
 October 12 scan addition: `20261012_225951_scan_owned_receipt_invalidation.sql`
 adds UUID revision identity, generated path lookup and revision-bound negative
 observations. Replay preserves existing identities; snapshot/anchors include the

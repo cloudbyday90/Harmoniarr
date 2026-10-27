@@ -35,11 +35,11 @@ test('schema diagnostic GET rechecks authorization after the scan and suppresses
   });
 });
 
-test('schema diagnostic GET returns explicit no-store summary, no query-controlled scan options and bounded internal failures', async () => {
+test('schema diagnostic GET only reads the maintained no-store summary without request-controlled options', async () => {
   let fail = false, scans = 0, checks = 0;
   const app = createJsonTestApp(expressApp => registerSchemaDiagnosticsRoutes(expressApp, {
     requireAdminSession: async () => { checks++; },
-    getSchemaDiagnostics: async options => { scans++; assert.deepEqual(Object.keys(options), ['signal']); assert.ok(options.signal instanceof AbortSignal); if (fail) throw new Error('private SQL'); return { state: 'current' }; },
+    getSchemaDiagnostics: async options => { scans++; assert.equal(options, undefined); if (fail) throw new Error('private SQL'); return { state: 'current' }; },
     limitSchemaDiagnostics: (_request, _response, next) => next(),
   }));
   await withServer(app, async base => {
@@ -52,19 +52,19 @@ test('schema diagnostic GET returns explicit no-store summary, no query-controll
   });
 });
 
-test('disconnecting a held HTTP response cancels its scan and suppresses publication', async () => {
-  const started = Promise.withResolvers(), cancelled = Promise.withResolvers(), release = Promise.withResolvers(); let checks = 0;
+test('disconnecting a held summary read suppresses publication without cancelling maintenance', async () => {
+  const started = Promise.withResolvers(), release = Promise.withResolvers(); let checks = 0;
   const app = createJsonTestApp(expressApp => registerSchemaDiagnosticsRoutes(expressApp, {
     requireAdminSession: async () => { checks++; }, limitSchemaDiagnostics: (_request, _response, next) => next(),
-    getSchemaDiagnostics: async ({ signal }) => {
-      signal.addEventListener('abort', () => cancelled.resolve(), { once: true }); started.resolve();
+    getSchemaDiagnostics: async options => {
+      assert.equal(options, undefined); started.resolve();
       await release.promise; return { state: 'current' };
     },
   }));
   await withServer(app, async base => {
     const controller = new AbortController(), response = fetch(base + path, { signal: controller.signal });
     const rejected = assert.rejects(response, { name: 'AbortError' });
-    try { await started.promise; controller.abort(); await rejected; await cancelled.promise; assert.equal(checks, 1); }
+    try { await started.promise; controller.abort(); await rejected; assert.equal(checks, 1); }
     finally { release.resolve(); }
   });
 });

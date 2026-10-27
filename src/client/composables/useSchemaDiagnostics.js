@@ -12,7 +12,7 @@ export function useSchemaDiagnostics({ fetchFn = fetchSchemaDiagnostics, timeout
   const message = computed(() => schemaDiagnosticsMessages[state.value]);
   let disposed = false, controller = null;
   async function refresh() {
-    if (disposed || state.value === 'loading') return;
+    if (disposed || controller) return;
     state.value = 'loading'; report.value = null;
     controller = new AbortController();
     const current = controller;
@@ -21,12 +21,21 @@ export function useSchemaDiagnostics({ fetchFn = fetchSchemaDiagnostics, timeout
     const cancelled = new Promise((_resolve, reject) => { rejectAbort = () => reject(new Error('Schema diagnostics request cancelled')); });
     current.signal.addEventListener('abort', rejectAbort, { once: true });
     try {
-      const result = projectSchemaDiagnosticsPayload(await Promise.race([fetchFn({ signal: current.signal }), cancelled]));
-      if (disposed) return;
-      state.value = result.state;
-      report.value = ['current', 'attention'].includes(result.state) ? result : null;
+      // Only follow an already-running startup check within the existing request
+      // deadline. Reading status never starts a schema scan or permanent UI poll.
+      while (!disposed) {
+        const result = projectSchemaDiagnosticsPayload(await Promise.race([fetchFn({ signal: current.signal }), cancelled]));
+        if (disposed) return;
+        state.value = result.state;
+        report.value = ['current', 'attention', 'pending', 'running', 'paused', 'stale'].includes(result.state) ? result : null;
+        if (!['pending', 'running'].includes(result.state)) return;
+        let delay;
+        try { await Promise.race([new Promise(resolve => { delay = setTimeout(resolve, 5_000); }), cancelled]); }
+        finally { clearTimeout(delay); }
+      }
     } catch (error) {
       if (disposed) return;
+      report.value = null;
       state.value = [401, 403].includes(error?.status) ? 'forbidden' : error?.status === 429 ? 'limited' : 'unavailable';
     } finally { clearTimeout(timer); current.signal.removeEventListener('abort', rejectAbort); controller = null; }
   }

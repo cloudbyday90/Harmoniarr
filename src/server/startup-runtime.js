@@ -216,6 +216,7 @@ export async function startServerRuntime({
   startupServiceSupervisor.registerService(importExecutionHeartbeat);
   startupServiceSupervisor.registerService(fulfillmentCorrelationHeartbeat);
   startupServiceSupervisor.registerService(ledgerRetentionHeartbeat);
+  if (systemModule.schemaMaintenanceService) startupServiceSupervisor.registerService(systemModule.schemaMaintenanceService);
   startupServiceSupervisor.registerService(systemModule.operatorNotificationFanoutHeartbeat);
   if (pushModule?.pushNotificationDeliveryHeartbeat) {
     startupServiceSupervisor.registerService(pushModule.pushNotificationDeliveryHeartbeat);
@@ -250,6 +251,7 @@ export async function startServerRuntime({
   });
 
   return {
+    schemaMaintenanceService: systemModule?.schemaMaintenanceService ?? null,
     importExecutionHeartbeat,
     libraryDiscoveryHeartbeat,
     metadataRefreshHeartbeat,

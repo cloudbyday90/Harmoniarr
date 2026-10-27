@@ -13,13 +13,23 @@ const payload = { schemaDiagnostics: { state: 'current', checkedAt: '2026-10-26T
   lineage: { state: 'current', expectedRows: 115, observedRows: 115 },
   anchors: { state: 'current', checkedCount: 164, missingCount: 0, alteredCount: 0, sql: 'secret' } } };
 
-test('schema diagnostics only load explicitly and suppress repeated activation during one request', async () => {
+test('the schema status loader coalesces overlapping lifecycle reads', async () => {
   const gate = Promise.withResolvers(); let calls = 0;
   const workflow = useSchemaDiagnostics({ fetchFn: async () => { calls++; return gate.promise; } });
   assert.equal(workflow.state.value, 'idle'); assert.equal(calls, 0);
   const first = workflow.refresh(); assert.equal(workflow.state.value, 'loading');
   await workflow.refresh(); assert.equal(calls, 1); gate.resolve(payload); await first;
   assert.equal(workflow.state.value, 'current'); assert.doesNotMatch(JSON.stringify(workflow.report.value), /secret|sql/u);
+});
+
+test('automatic loading follows a running maintenance check then stops polling completed status', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] }); let calls = 0;
+  const workflow = useSchemaDiagnostics({ fetchFn: async () => ++calls === 1 ? { schemaDiagnostics: { state: 'running' } } : payload });
+  const pending = workflow.refresh(); await new Promise(resolve => { setImmediate(resolve); });
+  assert.equal(workflow.state.value, 'running'); await workflow.refresh(); assert.equal(calls, 1);
+  t.mock.timers.tick(5_000); await pending;
+  assert.equal(calls, 2); assert.equal(workflow.state.value, 'current');
+  t.mock.timers.tick(60_000); assert.equal(calls, 2);
 });
 
 test('failed refresh clears previous current results and exposes fixed safe messages for retry and authorization errors', async () => {

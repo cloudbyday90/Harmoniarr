@@ -4,6 +4,16 @@
  * Licensed under GPL-3.0-or-later. See LICENSE.
  */
 import { databasePreparationLockKey } from './database-preparation-lock-store.js';
+import { defaultBlockingMaintenanceLockTypes } from './recovery/maintenance-lock-policy.js';
+
+export async function hasBlockingSchemaMaintenance(client) {
+  const result = await client.query(`SELECT EXISTS (SELECT 1 FROM public.maintenance_locks
+    WHERE status='active' AND released_at IS NULL
+      AND (expires_at IS NULL OR expires_at>clock_timestamp()) AND lock_type=ANY($1::text[])) AS blocked`,
+  [defaultBlockingMaintenanceLockTypes]);
+  if (typeof result.rows[0]?.blocked !== 'boolean') throw new Error('Invalid schema maintenance admission result');
+  return result.rows[0].blocked;
+}
 
 export async function trySchemaObservationLock(client) {
   const result = await client.query('SELECT pg_catalog.pg_try_advisory_xact_lock_shared($1::integer,$2::integer) AS acquired', databasePreparationLockKey);

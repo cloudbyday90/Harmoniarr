@@ -2,6 +2,12 @@
 
 ## Purpose
 
+Routine schema observation now runs through automatic startup/hourly maintenance,
+with recovery pauses and cached administrator status. Guarded startup migration
+preparation remains the schema write owner; no repair or new table is introduced.
+See the [maintenance design](AUTO_SCHEMA_MAINTENANCE_DESIGN.md) and
+[outcome](AUTO_SCHEMA_MAINTENANCE_OUTCOME.md).
+
 Session rotation/root issuance now use bounded transactions with shared account/
 family locking and current parent CAS, without changing the schema. See the
 [rotation design](SESSION_ROTATION_DESIGN.md) and

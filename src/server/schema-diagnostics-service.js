@@ -28,19 +28,20 @@ export function projectSchemaDiagnostics(report, checkedAt) {
     anchors: { state: anchors.state, checkedCount: count(anchors.checkedCount), missingCount: anchors.missing.length, alteredCount: anchors.altered.length } };
 }
 
-export function createSchemaDiagnosticsService({ inspectFn, now = () => new Date(), timeoutMs } = {}) {
-  let running = false;
-  return { async getSchemaDiagnostics({ signal } = {}) {
+export function createSchemaDiagnosticsService({ inspectFn, now = () => new Date(), timeoutMs, respectMaintenance = false } = {}) {
+  let running = false, drainage = Promise.resolve(true);
+  return { waitForDrain: () => drainage, async getSchemaDiagnostics({ signal } = {}) {
     if (running) return unavailableSchemaDiagnostics('busy');
     running = true;
     let task;
     try {
-      const options = { signal, timeoutMs };
+      const options = { signal, timeoutMs, respectMaintenance };
       task = inspectFn ? startSchemaDiagnosticTask(scope => inspectFn(scope), options) : startDatabaseSchemaDriftInspection(options);
       task.drained.then(safeToReadmit => { if (safeToReadmit) running = false; });
+      drainage = task.drained;
       return projectSchemaDiagnostics(await task.result, now().toISOString());
     }
-    catch (error) { return unavailableSchemaDiagnostics(error?.code === 'schema_observation_busy' ? 'busy' : 'unavailable'); }
+    catch (error) { return unavailableSchemaDiagnostics(error?.code === 'schema_observation_busy' ? 'busy' : error?.code === 'schema_maintenance_paused' ? 'paused' : 'unavailable'); }
     finally { if (!task) running = false; }
   } };
 }

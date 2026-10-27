@@ -99,7 +99,7 @@ test('createSystemModule exposes shared route dependencies from injected service
     },
     diagnosticsExportService,
     recoveryDiagnosticsService,
-    schemaDiagnosticsService: { getSchemaDiagnostics },
+    schemaMaintenanceService: { getSchemaDiagnostics },
     dependencyHealthService,
     libraryScanSummaryService,
     onboardingSummaryService,

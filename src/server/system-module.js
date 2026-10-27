@@ -53,6 +53,7 @@ import { createRuntimeResourceService } from './runtime-resource-service.js';
 import { createSystemService } from './system-service.js';
 import { createHealthReadinessService } from './readiness/health-readiness-service.js';
 import { createSchemaDiagnosticsService } from './schema-diagnostics-service.js';
+import { createSchemaMaintenanceService } from './schema-maintenance-service.js';
 
 export function createSystemModule({
   activityFeedService = null,
@@ -90,7 +91,8 @@ export function createSystemModule({
   operatorReleaseGroupSelectionStore = null,
   operatorTrackOverrideStore = null,
   recoveryDiagnosticsService = null,
-  schemaDiagnosticsService = createSchemaDiagnosticsService(),
+  schemaDiagnosticsService = createSchemaDiagnosticsService({ respectMaintenance: true }),
+  schemaMaintenanceService = null,
   restoreScopeRuntimeSnapshotStore = createRestoreScopeRuntimeSnapshotStore(),
   libraryWantedReleaseStore = null,
   operatorNotificationService = null,
@@ -214,6 +216,7 @@ export function createSystemModule({
     settingsService,
   }),
 } = {}) {
+  const systemSchemaMaintenanceService = schemaMaintenanceService ?? createSchemaMaintenanceService({ diagnosticsService: schemaDiagnosticsService });
   const resolvedHealthReadinessService = healthReadinessService ?? createHealthReadinessService({ getOverview: systemService.getOverview, appPort });
   const resolvedMaintenanceLockControlService = maintenanceLockControlService
     ?? createMaintenanceLockControlService({
@@ -309,6 +312,7 @@ export function createSystemModule({
     settingsService,
     systemService,
     healthReadinessService: resolvedHealthReadinessService,
+    schemaMaintenanceService: systemSchemaMaintenanceService,
     routeDependencies: {
       appPort,
       checkHealth: resolvedHealthReadinessService.check,
@@ -324,7 +328,7 @@ export function createSystemModule({
       releaseMaintenanceLockById: resolvedMaintenanceLockControlService.releaseMaintenanceLockById,
       getQueueDiagnostics: resolvedSystemRecoveryDiagnosticsService.getQueueDiagnostics,
       getRecoveryDiagnostics: resolvedSystemRecoveryDiagnosticsService.getRecoveryDiagnostics,
-      getSchemaDiagnostics: schemaDiagnosticsService.getSchemaDiagnostics,
+      getSchemaDiagnostics: systemSchemaMaintenanceService.getSchemaDiagnostics,
       getDiagnosticsExportDownload: resolvedSystemDiagnosticsExportService.getDiagnosticsExportDownload,
       startBackupRestoreApply: systemBackupRestoreApplyService.startBackupRestoreApply,
       executeIdempotentMutation: controlPlaneIdempotencyService.executeIdempotentMutation,

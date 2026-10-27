@@ -37,6 +37,8 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     resolveShutdownComplete = resolve;
   });
 
+  const schemaMaintenanceService = { start() { callOrder.push('start:schema-maintenance'); }, async stop() { callOrder.push('stop:schema-maintenance'); } };
+
   const libraryDiscoveryHeartbeat = {
     start() {
       callOrder.push('start:library');
@@ -343,6 +345,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
         pushNotificationHistoryCleanupHeartbeat,
       },
       systemModule: {
+        schemaMaintenanceService,
         dependencyHealthService: {
           getDependencyHealth: async () => [],
         },
@@ -479,6 +482,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     importExecutionHeartbeat,
     fulfillmentCorrelationHeartbeat,
     ledgerRetentionHeartbeat,
+    schemaMaintenanceService,
     operatorNotificationFanoutHeartbeat,
     pushNotificationDeliveryHeartbeat,
     pushNotificationHistoryCleanupHeartbeat,
@@ -499,6 +503,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'start:import',
     'start:fulfillment-correlation',
     'start:ledger-retention',
+    'start:schema-maintenance',
     'start:operator-fanout',
     'start:push-delivery',
     'start:push-history-cleanup',
@@ -564,6 +569,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'start:import',
     'start:fulfillment-correlation',
     'start:ledger-retention',
+    'start:schema-maintenance',
     'start:operator-fanout',
     'start:push-delivery',
     'start:push-history-cleanup',
@@ -575,6 +581,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'stop:push-history-cleanup',
     'stop:push-delivery',
     'stop:operator-fanout',
+    'stop:schema-maintenance',
     'stop:ledger-retention',
     'stop:fulfillment-correlation',
     'stop:import',
