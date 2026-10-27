@@ -20,6 +20,7 @@ import { randomUUID } from 'node:crypto';
 import { createApiError, loginLinkedUser } from '../../auth.js';
 import { recordAuditEvent } from '../../audit.js';
 import { getPool } from '../../database.js';
+import { readLinkedPlexLoginUser } from '../../linked-login-service.js';
 import { createEncryptedSecretService } from '../../encrypted-secret-service.js';
 import { loadSettings } from '../../settings.js';
 import { createPlexHttpClient } from './plex-http-client.js';
@@ -97,35 +98,6 @@ function normalizeCurrentUserProfile(profile) {
   };
 }
 
-async function findLinkedPlexUser({ plexId, plexUuid, queryable = getPool() }) {
-  const subjects = [plexUuid, plexId]
-    .filter((value) => typeof value === 'string' && value.trim().length > 0)
-    .map((value) => value.trim());
-
-  if (subjects.length === 0) {
-    return null;
-  }
-
-  const result = await queryable.query(
-    `
-      SELECT *
-      FROM app_users
-      WHERE auth_provider = 'plex'
-        AND auth_subject = ANY($1::text[])
-      ORDER BY CASE
-        WHEN auth_subject = $2 THEN 0
-        WHEN auth_subject = $3 THEN 1
-        ELSE 2
-      END,
-      updated_at DESC
-      LIMIT 1
-    `,
-    [subjects, plexUuid ?? null, plexId ?? null],
-  );
-
-  return result.rows[0] ?? null;
-}
-
 export function buildPlexLoginRedirectUrl({ code = null, reason = null, redirectTo = null } = {}) {
   const url = new URL('/login', 'http://harmoniarr.local');
   if (reason) {
@@ -146,6 +118,7 @@ export function createPlexDirectSignInService({
   getNow = () => new Date(),
   getPoolFn = getPool,
   issueLinkedLogin = loginLinkedUser,
+  findLinkedUserFn = readLinkedPlexLoginUser,
   loadSettingsFn = loadSettings,
   plexHttpClient = createPlexHttpClient(),
   recordAuditEventFn = recordAuditEvent,
@@ -268,10 +241,9 @@ export function createPlexDirectSignInService({
       throw createApiError(403, 'plex_sign_in_restricted_account', 'Managed or restricted Plex accounts cannot sign in directly');
     }
 
-    const linkedUser = await findLinkedPlexUser({
+    const linkedUser = await findLinkedUserFn({
       plexId: currentUser.id,
       plexUuid: currentUser.uuid,
-      queryable,
     });
     if (!linkedUser) {
       await encryptedSecretService.clearSecretValue({ name: pendingName, queryable, secretType });
@@ -280,9 +252,9 @@ export function createPlexDirectSignInService({
 
     const { issuedSession, user } = await issueLinkedLogin({
       requestMetadata,
-      summary: 'Plex direct sign-in succeeded',
       userId: linkedUser.id,
-      eventType: 'plex_sign_in_succeeded',
+      provider: 'plex',
+      subject: linkedUser.auth_subject,
     });
 
     await encryptedSecretService.clearSecretValue({ name: pendingName, queryable, secretType });

@@ -28,8 +28,9 @@ export async function recordAuditEvent({
   entityId = null,
   ipAddress = null,
   userAgent = null,
+  required = false,
 }, queryable = null) {
-  await (queryable ?? getPool()).query(
+  const result = await (queryable ?? getPool()).query(
     `
       INSERT INTO audit_events (
         occurred_at,
@@ -57,4 +58,5 @@ export async function recordAuditEvent({
       userAgent,
     ],
   );
+  if (required && result?.rowCount !== 1) throw new Error('Required audit event was not recorded');
 }

@@ -37,18 +37,6 @@ function createEncryptedSecretServiceDouble() {
   };
 }
 
-function createQueryableDouble(userRow = null) {
-  return {
-    async query(sql) {
-      if (sql.includes("FROM app_users") && sql.includes("auth_provider = 'plex'")) {
-        return { rows: userRow ? [userRow] : [] };
-      }
-
-      throw new Error(`Unexpected query: ${sql}`);
-    },
-  };
-}
-
 function getPendingStateName(secretService) {
   return [...secretService.records.keys()].find((key) => key.startsWith('auth.plex.sign_in.pending.')) ?? null;
 }
@@ -88,10 +76,11 @@ test('startSignIn creates a Plex auth URL and persists pending state', async () 
 
 test('completeSignIn resolves a linked user and delegates session issuance', async (t) => {
   const encryptedSecretService = createEncryptedSecretServiceDouble();
-  const queryable = createQueryableDouble({
+  const linkedUser = {
     id: 'user-1',
     is_disabled: false,
-  });
+    auth_subject: 'plex-uuid-1',
+  };
   const issueLinkedLogin = t.mock.fn(async ({ userId }) => ({
     user: { id: userId, username: 'plex-user' },
     issuedSession: { refreshToken: 'refresh-1', csrfToken: 'csrf-1' },
@@ -99,7 +88,7 @@ test('completeSignIn resolves a linked user and delegates session issuance', asy
 
   const service = createPlexDirectSignInService({
     encryptedSecretService,
-    getPoolFn: () => queryable,
+    findLinkedUserFn: async () => linkedUser,
     issueLinkedLogin,
     loadSettingsFn: async () => ({ system: { baseUrl: 'https://harmoniarr.example.test' } }),
     plexHttpClient: {
@@ -133,9 +122,9 @@ test('completeSignIn resolves a linked user and delegates session issuance', asy
 
   assert.equal(issueLinkedLogin.mock.callCount(), 1);
   assert.deepEqual(issueLinkedLogin.mock.calls[0].arguments[0], {
-    eventType: 'plex_sign_in_succeeded',
+    provider: 'plex',
+    subject: 'plex-uuid-1',
     requestMetadata: { ipAddress: '127.0.0.1', userAgent: 'test-agent' },
-    summary: 'Plex direct sign-in succeeded',
     userId: 'user-1',
   });
   assert.equal(result.redirectTo, '/app/activity/blocklist');
@@ -182,10 +171,9 @@ test('completeSignIn rejects restricted Plex accounts', async () => {
 
 test('completeSignIn rejects Plex accounts that are not linked to a local user', async () => {
   const encryptedSecretService = createEncryptedSecretServiceDouble();
-  const queryable = createQueryableDouble(null);
   const service = createPlexDirectSignInService({
     encryptedSecretService,
-    getPoolFn: () => queryable,
+    findLinkedUserFn: async () => null,
     loadSettingsFn: async () => ({ system: { baseUrl: 'https://harmoniarr.example.test' } }),
     plexHttpClient: {
       async createPin() {

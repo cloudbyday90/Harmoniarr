@@ -1,5 +1,11 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 27 [linked-provider login rebuild](LOCAL_DOCKER_LINKED_LOGIN_OUTCOME.md)
+records the current no-cache image, preserved administrator/data/five mounts and
+packaged provider callback plus affected auth qualification. See the
+[implementation outcome](LINKED_LOGIN_OUTCOME.md) for exact current link admission,
+atomic local publication and the callback-state ownership followup.
+
 The October 27 [atomic password-change rebuild](LOCAL_DOCKER_PASSWORD_CHANGE_OUTCOME.md)
 records the current no-cache image, preserved administrator/data/five mounts and
 packaged 2/3 GiB command qualification plus affected auth regressions. See the

@@ -184,6 +184,7 @@ export function createApp({
   createActivityModule: buildActivityModule = createActivityModule,
   createAppUserModule: buildAppUserModule = createAppUserModule,
   createAuthModule: buildAuthModule = createAuthModule,
+  createPlexDirectSignInService: buildPlexDirectSignInService = createPlexDirectSignInService,
   createDeploymentSecurityService: buildDeploymentSecurityService = createDeploymentSecurityService,
   createDownloaderModule: buildDownloaderModule = createDownloaderModule,
   createImportCandidateModule: buildImportCandidateModule = createImportCandidateModule,
@@ -383,7 +384,7 @@ export function createApp({
       },
     }),
   });
-  const plexDirectSignInService = createPlexDirectSignInService();
+  const plexDirectSignInService = buildPlexDirectSignInService();
   const importCandidateModule = buildImportCandidateModule({
     getAppUserById: appUserModule.appUserService.getAppUserById,
     getMediaToolingStatus: mediaToolingStatusService.getStatus,

@@ -2,12 +2,19 @@
 
 ## Purpose
 
+Linked Plex login now uses a bounded minimal candidate lookup and rechecks the
+exact primary provider/subject plus enabled account under its write lock.
+Bookkeeping, root issuance and a cardinality-checked required audit commit
+together. See the [linked-login design](LINKED_LOGIN_DESIGN.md) and
+[outcome](LINKED_LOGIN_OUTCOME.md). No schema artifact changed. Callback-state
+consumption/browser binding remains the next authentication boundary.
+
 Password changes now use a bounded transaction that fences the verified hash/full
 credential epoch and initiating token under account/family ownership. Credential
 replacement, complete prior-session revocation, a new root session and required
 audit commit together. KDF work stays outside SQL. See the
 [change design](PASSWORD_CHANGE_DESIGN.md) and [outcome](PASSWORD_CHANGE_OUTCOME.md).
-No schema artifact changed. External-provider login ownership is the next task.
+No schema artifact changed. Linked-provider login ownership is recorded above.
 
 Password hashing and verification now share process-local admission with two
 submitted jobs and no application queue, plus a 4096-byte UTF-8 input limit.

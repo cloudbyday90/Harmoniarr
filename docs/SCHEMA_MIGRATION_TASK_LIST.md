@@ -117,6 +117,17 @@ No schema artifact changed. Next give external-provider login compatible current
 linked-account admission and atomic bookkeeping/root issuance/required audit;
 `loginLinkedUser` still performs those writes separately.
 
+Linked-provider local admission/publication is now implemented in the
+[linked-login design](LINKED_LOGIN_DESIGN.md) and [outcome](LINKED_LOGIN_OUTCOME.md),
+with [official research/tradeoffs](LINKED_LOGIN_RESEARCH_2026_10.md). Bounded minimal
+candidate lookup, exact current provider/subject and enabled-account checks,
+shared login bookkeeping, root issuance and required audit use compatible
+account/family ownership. No schema artifact changed. Next give Plex callback
+state bounded single-use consumption with explicit browser binding/expiry and
+atomic ownership alongside successful local publication. Its current separate
+post-login delete still permits independent callback completion and late cleanup
+failure after a durable login.
+
 October 12 scan addition: `20261012_225951_scan_owned_receipt_invalidation.sql`
 adds UUID revision identity, generated path lookup and revision-bound negative
 observations. Replay preserves existing identities; snapshot/anchors include the

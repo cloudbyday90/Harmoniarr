@@ -22,12 +22,14 @@ import { handleSessionReplay } from './session-replay-service.js';
 import { createSessionIssuanceService } from './session-issuance-service.js';
 import { createPasswordLoginService } from './password-login-service.js';
 import { createLoginFailureService } from './login-failure-service.js';
+import { createLinkedLoginService } from './linked-login-service.js';
 import { readBootstrapRequired } from './auth-lookup-service.js';
 import { toSessionUser } from './session-user-policy.js';
 import { refreshTokenMaxAgeSeconds } from './session-issuance-policy.js';
 export { toSessionUser };
 const sessionIssuance = createSessionIssuanceService();
 const loginFailure = createLoginFailureService();
+const linkedLogin = createLinkedLoginService();
 const passwordLogin = createPasswordLoginService({ isBootstrapRequiredFn: isBootstrapRequired, handleLoginFailureFn: handleLoginFailure });
 import {
   csrfProtectionModeEnvVar,
@@ -240,51 +242,8 @@ export async function findUserByLoginIdentifier(identifier) {
   return result.rows[0] ?? null;
 }
 
-export async function loginLinkedUser({
-  eventType = 'external_login_succeeded',
-  summary = 'External provider login succeeded',
-  requestMetadata,
-  userId,
-}) {
-  const result = await getPool().query('SELECT * FROM app_users WHERE id = $1 LIMIT 1', [userId]);
-  const user = result.rows[0] ?? null;
-
-  if (!user || user.is_disabled) {
-    throw createApiError(403, 'account_unavailable', 'The linked Harmoniarr account is not available');
-  }
-
-  await getPool().query(
-    `
-      UPDATE app_users
-      SET failed_login_count = 0,
-          locked_until = NULL,
-          last_login_at = NOW(),
-          updated_at = NOW()
-      WHERE id = $1
-    `,
-    [user.id],
-  );
-
-  const issuedSession = await issueSession({ userId: user.id, requestMetadata });
-
-  await recordAuditEvent({
-    actorUserId: user.id,
-    actorType: 'user',
-    eventType,
-    summary,
-    entityType: 'app_user',
-    entityId: user.id,
-    ipAddress: requestMetadata.ipAddress,
-    userAgent: requestMetadata.userAgent,
-  });
-
-  return {
-    user: {
-      ...user,
-      last_login_at: new Date().toISOString(),
-    },
-    issuedSession,
-  };
+export function loginLinkedUser(input) {
+  return linkedLogin.loginLinkedUser(input);
 }
 
 export async function buildSessionPayload(request, session = null) {

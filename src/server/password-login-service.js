@@ -12,7 +12,8 @@ import { createSessionMaterial } from './session-issuance-policy.js';
 import { startSessionWriteTransaction } from './session-write-transaction-service.js';
 import { publishOwnedRootSession } from './session-root-publication-service.js';
 import { recordAuditEvent } from './audit.js';
-import { lockPasswordLoginUser, recordSuccessfulPasswordLogin, upgradePasswordLoginHash } from './password-login-store.js';
+import { lockPasswordLoginUser, upgradePasswordLoginHash } from './password-login-store.js';
+import { recordSuccessfulLogin } from './login-bookkeeping-store.js';
 import { readPasswordLoginUser } from './auth-lookup-service.js';
 
 const invalidCredentials = () => createApiError(401, 'invalid_credentials', 'Username or email and password combination is incorrect');
@@ -50,7 +51,7 @@ export function createPasswordLoginService({ isBootstrapRequiredFn, handleLoginF
       if (!current || current.is_disabled || current.password_hash !== accepted.password_hash || current.credential_epoch !== accepted.credential_epoch) return { refusal: 'invalid_credentials' };
       if (current.login_locked) return { refusal: 'account_locked' };
       if (replacement !== null) { await upgradePasswordLoginHash(client, accepted, replacement); check(); }
-      const owner = await recordSuccessfulPasswordLogin(client, accepted.id); check();
+      const owner = await recordSuccessfulLogin(client, accepted.id); check();
       const issuedSession = await publishOwnedRootSession(client, { owner, material, metadata }, check);
       await recordAuditEventFn({ actorUserId: owner.id, actorType: 'user', eventType: 'login_succeeded',
         summary: 'User login succeeded', entityType: 'app_user', entityId: owner.id, ...metadata,

@@ -1,5 +1,10 @@
 # Atomic password change outcome
 
+Followup on October 27: the recommended linked-provider login owner is implemented
+in the [linked-login design](LINKED_LOGIN_DESIGN.md) and
+[outcome](LINKED_LOGIN_OUTCOME.md). Exact current provider/subject admission,
+bookkeeping, root issuance and required audit now share one bounded transaction.
+
 October 27, 2026. Password change now has one bounded transaction owner for
 credential replacement, prior-session revocation, replacement issuance and its
 required audit. Work remains on main with modular ESM services/stores, no new
