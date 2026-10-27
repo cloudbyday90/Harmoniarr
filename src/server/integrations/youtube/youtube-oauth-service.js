@@ -23,6 +23,7 @@ import { createProviderCredentialsService } from '../providers/provider-credenti
 import { getPool } from '../../database.js';
 import { loadSettings } from '../../settings.js';
 import { recordAuditEvent } from '../../audit.js';
+import { awaitProviderRequest } from '../provider-request-cancellation.js';
 
 const googleAuthorizeUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
 const googleTokenUrl = 'https://oauth2.googleapis.com/token';
@@ -30,11 +31,16 @@ const googleRevokeUrl = 'https://oauth2.googleapis.com/revoke';
 const defaultScopes = ['https://www.googleapis.com/auth/youtube.readonly'];
 
 async function revokeGoogleToken(accessToken, fetchFn = globalThis.fetch) {
-  await fetchFn(googleRevokeUrl, {
+  const signal = AbortSignal.timeout(15_000);
+  const response = await awaitProviderRequest(fetchFn(googleRevokeUrl, {
     body: new URLSearchParams({ token: accessToken }),
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     method: 'POST',
-  });
+    redirect: 'error', signal,
+  }), { signal });
+  // Revocation has no useful response body; cancel it rather than buffering it.
+  if (response.body) await awaitProviderRequest(response.body.cancel(), { signal });
+  if (!response.ok) throw new Error('Provider revocation was refused');
 }
 
 export function createYouTubeOAuthService({
@@ -45,6 +51,7 @@ export function createYouTubeOAuthService({
   loadSettingsFn = loadSettings,
   providerCredentialsService = createProviderCredentialsService(),
   recordAuditEventFn = recordAuditEvent,
+  commandService, stateService, startReadFn, startTransactionFn,
 } = {}) {
   async function resolveClientCredentials({ settings, queryable }) {
     const clientId = settings.providers?.youtubeClientId;
@@ -82,6 +89,7 @@ export function createYouTubeOAuthService({
     providerLabel: 'YouTube',
     providerPrefix: 'youtube',
     recordAuditEventFn,
+    commandService, stateService, startReadFn, startTransactionFn,
     resolveClientCredentials,
     revokeTokenBeforeClear: async (accessToken) => {
       await revokeGoogleToken(accessToken, fetchFn);

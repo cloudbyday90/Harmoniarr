@@ -36,7 +36,7 @@ export function createPlexCallbackRetentionService({ startTransactionFn = startS
       await deletePlexCallbackRetentionBatch(client, selected); check();
       if (selected.length) {
         await recordAuditEventFn({ actorType: 'system', eventType: 'plex_callback_state_pruned', required: true,
-          summary: 'Expired Plex callback state removed', details: { inspectedCount: rows.length, deletedCount: selected.length,
+          summary: 'Expired provider callback state removed', details: { inspectedCount: rows.length, deletedCount: selected.length,
             expiredCount: counts.expired, legacyCount: counts.legacy } }, client); check();
       }
       const last = rows.at(-1);

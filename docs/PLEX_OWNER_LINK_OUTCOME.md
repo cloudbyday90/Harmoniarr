@@ -53,11 +53,10 @@ release, tag or separate branch.
 
 ## Next recommended item
 
-Harden Spotify/YouTube linking callback ownership next, beginning with a focused
-review of `integrations/providers/oauth-pkce-service.js`. It currently exchanges
-the code, stores tokens, deletes pending state and writes audit separately, using
-the pending actor ID without a current actor/session publication gate. Preserve
-each provider's actual PKCE/redirect/refresh/revocation contract while adding
-browser-bound single-use state, current authorization, atomic publication and
-clear/relink invalidation. Research provider-specific official guidance before
-implementation; Plex PIN behavior is not an OAuth protocol template.
+The Spotify/YouTube follow-up is now implemented in the
+[OAuth outcome](OAUTH_LINK_OUTCOME.md), with separate
+[official research and tradeoffs](OAUTH_LINK_RESEARCH_2026_10.md). Their protocol
+parameters remain provider-specific while local authority, state consumption,
+clear/relink and refresh publication are transaction-owned. Next qualify native
+HTTP resource lifetime for those providers; Plex PIN behavior is not an OAuth
+protocol template.

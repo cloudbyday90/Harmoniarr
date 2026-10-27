@@ -2,6 +2,13 @@
 
 ## Purpose
 
+Spotify/YouTube linking now uses encrypted browser/session-bound pending envelopes
+and per-provider revisions in existing encrypted secrets. Callback, clear and
+refresh writes use bounded transaction ownership, exact record comparisons and
+required audit. Existing guarded maintenance also expires their pending state;
+no schema artifact changed. See [OAuth design](OAUTH_LINK_DESIGN.md) and
+[outcome](OAUTH_LINK_OUTCOME.md).
+
 Plex owner linking now binds browser state to the exact initiating administrator
 session and publishes state consumption, token replacement, link revision and
 required audit atomically. Clear invalidates older flows. Existing guarded

@@ -33,6 +33,7 @@ export function createSpotifyOAuthService({
   getPoolFn = getPool,
   loadSettingsFn = loadSettings,
   recordAuditEventFn = recordAuditEvent,
+  commandService, stateService, startReadFn, startTransactionFn,
 } = {}) {
   return createOAuthPKCEService({
     authorizeUrl: `${spotifyAccountsBaseUrl}/authorize`,
@@ -47,6 +48,7 @@ export function createSpotifyOAuthService({
     providerLabel: 'Spotify',
     providerPrefix: 'spotify',
     recordAuditEventFn,
+    commandService, stateService, startReadFn, startTransactionFn,
     resolveClientCredentials: async ({ settings }) => {
       const clientId = settings.providers?.spotifyClientId;
       if (!clientId) {

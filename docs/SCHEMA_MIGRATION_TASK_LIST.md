@@ -163,7 +163,13 @@ and [outcome](PLEX_OWNER_LINK_OUTCOME.md), with
 state, current exact-session administrator admission, token/revision/required-audit
 publication and clear invalidation share one bounded transaction owner. Existing
 maintenance expires both pending namespaces automatically. No schema change.
-Next evaluate remaining Spotify/YouTube linking callback ownership separately.
+Spotify/YouTube linking is now implemented in the [OAuth design](OAUTH_LINK_DESIGN.md)
+and [outcome](OAUTH_LINK_OUTCOME.md), with
+[official research/tradeoffs](OAUTH_LINK_RESEARCH_2026_10.md). Browser/current-session
+admission precedes exchange and publication. Token/state/revision/required-audit
+writes commit together; exact-token refresh fences prevent stale resurrection.
+The same automatic maintenance batch covers their canonical pending namespaces.
+No schema change. Next qualify native Spotify/YouTube HTTP resource ownership.
 
 October 12 scan addition: `20261012_225951_scan_owned_receipt_invalidation.sql`
 adds UUID revision identity, generated path lookup and revision-bound negative

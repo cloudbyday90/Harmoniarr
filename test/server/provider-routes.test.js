@@ -165,6 +165,7 @@ test('GET /api/v1/providers/spotify/oauth/callback completes callback and redire
 
   await withServer(app, async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/v1/providers/spotify/oauth/callback?code=code-1&state=state-1`, {
+      headers: { cookie: 'harmoniarr_spotify_binding=' + Buffer.alloc(32, 1).toString('base64url') },
       redirect: 'manual',
     });
 
@@ -178,6 +179,7 @@ test('GET /api/v1/providers/youtube/oauth/callback completes callback and redire
 
   await withServer(app, async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/v1/providers/youtube/oauth/callback?code=code-1&state=state-1`, {
+      headers: { cookie: 'harmoniarr_youtube_binding=' + Buffer.alloc(32, 1).toString('base64url') },
       redirect: 'manual',
     });
 
@@ -269,3 +271,24 @@ test('Plex owner callback requires its browser cookie before calling the complet
     assert.equal(completePlexLink.mock.callCount(), 0); assert.equal(response.headers.get('set-cookie'), null);
   });
 });
+
+for (const [provider, title] of [['spotify', 'Spotify'], ['youtube', 'Youtube']]) {
+  test(`${provider} OAuth start whitelists its DTO and supplies exact session/browser authority`, async t => {
+    const start = t.mock.fn(async () => ({ provider, authorizationUrl: 'https://provider.example/authorize', expiresAt: '2026-10-27T12:10:00.000Z', scopes: ['read'], accessToken: 'must-not-leak' }));
+    await withServer(createProviderRouteTestApp({ ['start' + title + 'Authorization']: start }), async baseUrl => {
+      const response = await fetch(baseUrl + '/api/v1/providers/' + provider + '/oauth/start', { method: 'POST' });
+      assert.equal(response.status, 202); assert.equal(response.headers.get('cache-control'), 'no-store'); assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
+      assert.match(response.headers.get('set-cookie'), new RegExp(`harmoniarr_${provider}_binding=.*HttpOnly; SameSite=Lax`, 'u'));
+      const body = await response.json(); assert.deepEqual(Object.keys(body).sort(), ['authorizationUrl', 'expiresAt', 'ok', 'provider', 'scopes']);
+      const input = start.mock.calls[0].arguments[0]; assert.equal(input.session.appUserId, 'user-1'); assert.equal(input.browserBinding.length, 43); assert.ok(!JSON.stringify(body).includes(input.browserBinding));
+    });
+  });
+  test(`${provider} OAuth callback refuses a missing provider binding before completion`, async t => {
+    const complete = t.mock.fn(async () => ({}));
+    await withServer(createProviderRouteTestApp({ ['complete' + title + 'Authorization']: complete }), async baseUrl => {
+      const response = await fetch(baseUrl + '/api/v1/providers/' + provider + '/oauth/callback?code=code&state=state', { redirect: 'manual' });
+      assert.equal(response.status, 303); assert.match(response.headers.get('location'), new RegExp(provider + '_oauth_state_invalid', 'u'));
+      assert.equal(response.headers.get('cache-control'), 'no-store'); assert.equal(response.headers.get('set-cookie'), null); assert.equal(complete.mock.callCount(), 0);
+    });
+  });
+}

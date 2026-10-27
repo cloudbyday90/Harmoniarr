@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 27 [Spotify/YouTube OAuth rebuild](LOCAL_DOCKER_OAUTH_LINK_OUTCOME.md)
+records the current image, preserved administrator/five mounts, real PostgreSQL
+publication/refresh fencing and both Secure-cookie Chromium flows. See the
+[implementation outcome](OAUTH_LINK_OUTCOME.md) for compatibility and next work.
+
 The October 27 [Plex owner-link rebuild](LOCAL_DOCKER_PLEX_OWNER_LINK_OUTCOME.md)
 records the current image, preserved administrator/five mounts, real PostgreSQL
 publication/authority proof and Secure-cookie Chromium navigation. See the

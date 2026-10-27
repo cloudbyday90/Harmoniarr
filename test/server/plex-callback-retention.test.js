@@ -62,7 +62,7 @@ test('one bounded pass owns maintenance guard, cross-process claim, row locks, e
   assert.deepEqual(f.calls[3].values[0], [row(1).id, row(2).id]);
   assert.match(f.calls[3].sql, /selected.delete_after<=clock_timestamp\(\)/u);
   assert.deepEqual(f.audits, [{ actorType: 'system', eventType: 'plex_callback_state_pruned', required: true,
-    summary: 'Expired Plex callback state removed', details: { inspectedCount: 2, deletedCount: 2, expiredCount: 1, legacyCount: 1 } }]);
+    summary: 'Expired provider callback state removed', details: { inspectedCount: 2, deletedCount: 2, expiredCount: 1, legacyCount: 1 } }]);
   assert.equal(f.committed.length, 1);
 });
 
@@ -126,5 +126,11 @@ test('retention includes canonical owner and sign-in state but excludes permanen
   const id = '12345678-1234-1234-1234-123456789abc';
   assert.equal(pattern.test('providers.plex.link.pending.' + id), true);
   assert.equal(pattern.test('auth.plex.sign_in.pending.' + id), true);
+  for (const provider of ['spotify', 'youtube']) {
+    assert.equal(pattern.test(`providers.${provider}.oauth.pending.${'a'.repeat(32)}`), true);
+    assert.equal(pattern.test(`providers.${provider}.oauth.token`), false);
+    assert.equal(pattern.test(`providers.${provider}.oauth.revision`), false);
+    assert.equal(pattern.test(`providers.${provider}.oauth.pending.invalid`), false);
+  }
   for (const name of ['providers.plex.link.token', 'providers.plex.link.revision', 'providers.plex.link.client_identifier', 'providers.plex.link.pending.invalid']) assert.equal(pattern.test(name), false);
 });

@@ -16,6 +16,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createOAuthBrowserBinding, readOAuthBrowserBinding, setOAuthBrowserBindingCookie } from '../oauth-browser-binding.js';
+import { invalidOAuthState } from '../integrations/providers/oauth-link-policy.js';
 import { createPlexBrowserBinding, readPlexBrowserBinding, setPlexBrowserBindingCookie } from '../plex-browser-binding.js';
 import { invalidOwnerLink } from '../integrations/plex/plex-owner-link-policy.js';
 import { createRequestAuthDependencies } from '../auth-module.js';
@@ -115,27 +117,23 @@ export function registerProviderRoutes(app, {
   app.post('/api/v1/providers/spotify/oauth/start', limitProviderOAuthStart, asyncRoute(async (request, response) => {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
-
-    response.status(202).json({
-      ok: true,
-      ...(await startSpotifyAuthorization({
-        actorUserId: session.appUserId,
-        requestMetadata: withRequestOrigin(request, getRequestMetadata),
-      })),
-    });
+    response.setHeader('Cache-Control', 'no-store'); response.setHeader('Referrer-Policy', 'no-referrer');
+    const browserBinding = readOAuthBrowserBinding(request, 'spotify') ?? createOAuthBrowserBinding();
+    const result = await startSpotifyAuthorization({ session, actorUserId: session.appUserId, browserBinding,
+      requestMetadata: withRequestOrigin(request, getRequestMetadata) });
+    setOAuthBrowserBindingCookie(response, 'spotify', browserBinding);
+    response.status(202).json({ ok: true, provider: result.provider, authorizationUrl: result.authorizationUrl, expiresAt: result.expiresAt, scopes: result.scopes });
   }));
 
   app.post('/api/v1/providers/youtube/oauth/start', limitProviderOAuthStart, asyncRoute(async (request, response) => {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
-
-    response.status(202).json({
-      ok: true,
-      ...(await startYoutubeAuthorization({
-        actorUserId: session.appUserId,
-        requestMetadata: withRequestOrigin(request, getRequestMetadata),
-      })),
-    });
+    response.setHeader('Cache-Control', 'no-store'); response.setHeader('Referrer-Policy', 'no-referrer');
+    const browserBinding = readOAuthBrowserBinding(request, 'youtube') ?? createOAuthBrowserBinding();
+    const result = await startYoutubeAuthorization({ session, actorUserId: session.appUserId, browserBinding,
+      requestMetadata: withRequestOrigin(request, getRequestMetadata) });
+    setOAuthBrowserBindingCookie(response, 'youtube', browserBinding);
+    response.status(202).json({ ok: true, provider: result.provider, authorizationUrl: result.authorizationUrl, expiresAt: result.expiresAt, scopes: result.scopes });
   }));
 
   app.post('/api/v1/providers/spotify/oauth/clear', limitProviderOAuthClear, asyncRoute(async (request, response) => {
@@ -145,6 +143,7 @@ export function registerProviderRoutes(app, {
     response.json({
       ok: true,
       ...(await clearSpotifyAuthorization({
+        session,
         actorUserId: session.appUserId,
         requestMetadata: getRequestMetadata(request),
       })),
@@ -158,6 +157,7 @@ export function registerProviderRoutes(app, {
     response.json({
       ok: true,
       ...(await clearYoutubeAuthorization({
+        session,
         actorUserId: session.appUserId,
         requestMetadata: getRequestMetadata(request),
       })),
@@ -179,8 +179,12 @@ export function registerProviderRoutes(app, {
   }));
 
   app.get('/api/v1/providers/spotify/oauth/callback', asyncRoute(async (request, response) => {
+    response.setHeader('Cache-Control', 'no-store'); response.setHeader('Referrer-Policy', 'no-referrer');
     try {
+      const browserBinding = readOAuthBrowserBinding(request, 'spotify');
+      if (!browserBinding) throw invalidOAuthState('spotify');
       await completeSpotifyAuthorization({
+        browserBinding,
         code: request.query.code,
         requestMetadata: getRequestMetadata(request),
         state: request.query.state,
@@ -192,8 +196,12 @@ export function registerProviderRoutes(app, {
   }));
 
   app.get('/api/v1/providers/youtube/oauth/callback', asyncRoute(async (request, response) => {
+    response.setHeader('Cache-Control', 'no-store'); response.setHeader('Referrer-Policy', 'no-referrer');
     try {
+      const browserBinding = readOAuthBrowserBinding(request, 'youtube');
+      if (!browserBinding) throw invalidOAuthState('youtube');
       await completeYoutubeAuthorization({
+        browserBinding,
         code: request.query.code,
         requestMetadata: getRequestMetadata(request),
         state: request.query.state,

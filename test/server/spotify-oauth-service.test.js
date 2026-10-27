@@ -1,157 +1,49 @@
+/*
+ * Harmoniarr - Soulseek-native music library management
+ * Copyright (C) 2026 Harmoniarr Contributors
+ * Licensed under GPL-3.0-or-later. See LICENSE.
+ */
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import test from 'node:test';
 import { createSpotifyOAuthService } from '../../src/server/integrations/spotify/spotify-oauth-service.js';
-
-function createMemoryEncryptedSecretService() {
-  const secrets = new Map();
-
-  return {
-    clearSecretValue: async ({ name }) => {
-      secrets.delete(name);
-    },
-    getSecretMetadata: async ({ name }) => ({
-      configured: secrets.has(name),
-      updatedAt: secrets.get(name)?.updatedAt ?? null,
-    }),
-    getSecretRecord: async ({ name }) => secrets.get(name) ?? null,
-    getSecretValue: async ({ name }) => secrets.get(name)?.plaintextValue ?? null,
-    secrets,
-    setSecretValue: async ({ metadata, name, plaintextValue }) => {
-      secrets.set(name, {
-        metadata,
-        plaintextValue,
-        updatedAt: '2026-05-02T12:00:00.000Z',
-      });
-    },
-  };
-}
-
-function createSettings() {
-  return {
-    providers: {
-      spotifyClientId: 'spotify-client',
-    },
-    system: {
-      baseUrl: 'https://harmoniarr.example',
-    },
-  };
-}
-
-test('startAuthorization stores PKCE state and returns Spotify authorize URL', async (t) => {
-  const encryptedSecretService = createMemoryEncryptedSecretService();
-  const recordAuditEventFn = t.mock.fn(async () => {});
-  const service = createSpotifyOAuthService({
-    encryptedSecretService,
-    getNow: () => new Date('2026-05-02T12:00:00.000Z'),
-    loadSettingsFn: async () => createSettings(),
-    recordAuditEventFn,
-  });
-
-  const result = await service.startAuthorization({
-    actorUserId: 'user-1',
-    requestMetadata: { ipAddress: '127.0.0.1', userAgent: 'test' },
-  });
-  const authorizeUrl = new URL(result.authorizationUrl);
-
-  assert.equal(authorizeUrl.origin, 'https://accounts.spotify.com');
-  assert.equal(authorizeUrl.pathname, '/authorize');
-  assert.equal(authorizeUrl.searchParams.get('client_id'), 'spotify-client');
-  assert.equal(authorizeUrl.searchParams.get('code_challenge_method'), 'S256');
-  assert.equal(authorizeUrl.searchParams.get('redirect_uri'), 'https://harmoniarr.example/api/v1/providers/spotify/oauth/callback');
-  assert.equal(authorizeUrl.searchParams.get('scope'), 'playlist-read-private playlist-read-collaborative');
-  assert.equal(result.expiresAt, '2026-05-02T12:10:00.000Z');
-  assert.equal(encryptedSecretService.secrets.size, 1);
-  assert.equal(recordAuditEventFn.mock.callCount(), 1);
+import { createOAuthFacadeFixture } from '../../testing/server/oauth-link-facade-fixture.js';
+const fixture = (t, options) => createOAuthFacadeFixture(t, createSpotifyOAuthService, 'spotify', options);
+test('Spotify start preserves scopes, S256 and exact redirect while keeping verifier and authority private', async t => {
+  const f = fixture(t), dto = await f.start(), url = new URL(dto.authorizationUrl);
+  assert.equal(url.origin, 'https://accounts.spotify.com'); assert.equal(url.pathname, '/authorize');
+  assert.equal(url.searchParams.get('scope'), 'playlist-read-private playlist-read-collaborative');
+  assert.equal(url.searchParams.get('code_challenge_method'), 'S256');
+  const accepted = f.commandService.createPending.mock.calls[0].arguments[0];
+  assert.equal(url.searchParams.get('code_challenge'), createHash('sha256').update(accepted.codeVerifier).digest('base64url'));
+  assert.equal(url.searchParams.get('redirect_uri'), 'https://harmoniarr.example/api/v1/providers/spotify/oauth/callback');
+  for (const secret of [accepted.codeVerifier, accepted.authority.tokenHash, f.browserBinding]) assert.ok(!JSON.stringify(dto).includes(secret));
 });
-
-test('completeAuthorization exchanges callback code and stores encrypted token payload', async (t) => {
-  const encryptedSecretService = createMemoryEncryptedSecretService();
-  const fetchFn = t.mock.fn(async () => new Response(JSON.stringify({
-    access_token: 'access-token',
-    expires_in: 3600,
-    refresh_token: 'refresh-token',
-    scope: 'playlist-read-private playlist-read-collaborative',
-    token_type: 'Bearer',
-  }), { status: 200 }));
-  const service = createSpotifyOAuthService({
-    encryptedSecretService,
-    fetchFn,
-    getNow: () => new Date('2026-05-02T12:00:00.000Z'),
-    getPoolFn: () => ({}),
-    loadSettingsFn: async () => createSettings(),
-    recordAuditEventFn: t.mock.fn(async () => {}),
-  });
-
-  const started = await service.startAuthorization({ actorUserId: 'user-1' });
-  const state = new URL(started.authorizationUrl).searchParams.get('state');
-  const result = await service.completeAuthorization({ code: 'callback-code', state });
-
-  assert.equal(result.status.linked, true);
-  assert.equal(result.status.tokenExpiresAt, '2026-05-02T13:00:00.000Z');
-  assert.equal(fetchFn.mock.callCount(), 1);
-  const tokenRequest = fetchFn.mock.calls[0].arguments;
-  assert.equal(tokenRequest[0], 'https://accounts.spotify.com/api/token');
-  assert.equal(tokenRequest[1].method, 'POST');
-  assert.match(String(tokenRequest[1].body), /grant_type=authorization_code/);
-  assert.match(String(tokenRequest[1].body), /code=callback-code/);
-  assert.equal(encryptedSecretService.secrets.has('providers.spotify.oauth.token'), true);
-  assert.equal([...encryptedSecretService.secrets.keys()].some((name) => name.startsWith('providers.spotify.oauth.pending.')), false);
+test('Spotify callback exchanges the exact stored redirect and verifier with no client secret', async t => {
+  const f = fixture(t), dto = await f.start(), accepted = f.commandService.createPending.mock.calls[0].arguments[0];
+  f.settings.system.baseUrl = 'https://new.example'; await f.complete(dto);
+  const [url, request] = f.fetchFn.mock.calls[0].arguments, body = new URLSearchParams(request.body);
+  assert.equal(url, 'https://accounts.spotify.com/api/token'); assert.equal(request.redirect, 'error');
+  assert.equal(body.get('code_verifier'), accepted.codeVerifier); assert.equal(body.get('redirect_uri'), accepted.redirectUri);
+  assert.equal(body.get('client_id'), 'spotify-client'); assert.equal(body.get('code'), 'fixture-code'); assert.equal(body.has('client_secret'), false);
+  assert.equal(f.commandService.complete.mock.callCount(), 1);
 });
-
-test('resolveAccessToken refreshes expired tokens and preserves refresh token when Spotify omits a new one', async (t) => {
-  const encryptedSecretService = createMemoryEncryptedSecretService();
-  await encryptedSecretService.setSecretValue({
-    metadata: { expiresAt: '2026-05-02T11:59:00.000Z', tokenType: 'Bearer' },
-    name: 'providers.spotify.oauth.token',
-    plaintextValue: JSON.stringify({
-      accessToken: 'old-access-token',
-      expiresAt: '2026-05-02T11:59:00.000Z',
-      refreshToken: 'refresh-token',
-      tokenType: 'Bearer',
-    }),
-  });
-  const fetchFn = t.mock.fn(async () => new Response(JSON.stringify({
-    access_token: 'new-access-token',
-    expires_in: 3600,
-    token_type: 'Bearer',
-  }), { status: 200 }));
-  const service = createSpotifyOAuthService({
-    encryptedSecretService,
-    fetchFn,
-    getNow: () => new Date('2026-05-02T12:00:00.000Z'),
-    loadSettingsFn: async () => createSettings(),
-  });
-
-  const accessToken = await service.resolveAccessToken({});
-  const storedToken = JSON.parse(encryptedSecretService.secrets.get('providers.spotify.oauth.token').plaintextValue);
-
-  assert.equal(accessToken, 'new-access-token');
-  assert.equal(storedToken.refreshToken, 'refresh-token');
-  assert.equal(fetchFn.mock.callCount(), 1);
-  assert.match(String(fetchFn.mock.calls[0].arguments[1].body), /grant_type=refresh_token/);
+test('Spotify refresh preserves omitted refresh token and granted scope', async t => {
+  const f = fixture(t); f.setToken({ accessToken: 'old', refreshToken: 'original-refresh', expiresAt: '2026-10-27T11:00:00.000Z', tokenType: 'Bearer', scope: 'old-scope' });
+  f.fetchFn.mock.mockImplementation(async () => Response.json({ access_token: 'new', expires_in: 3600 }));
+  assert.equal(await f.service.resolveAccessToken({}), 'new');
+  assert.equal(f.getToken().refreshToken, 'original-refresh'); assert.equal(f.getToken().scope, 'old-scope');
+  assert.equal(new URLSearchParams(f.fetchFn.mock.calls[0].arguments[1].body).get('grant_type'), 'refresh_token');
 });
-
-test('OAuth refresh participates in the access check budget and never returns provider error descriptions', async (t) => {
-  const encryptedSecretService = createMemoryEncryptedSecretService();
-  const plaintextValue = JSON.stringify({ accessToken: 'expired', refreshToken: 'PRIVATE-REFRESH-TOKEN', expiresAt: '2020-01-01T00:00:00Z' });
-  await encryptedSecretService.setSecretValue({ name: 'providers.spotify.oauth.token', plaintextValue });
+test('Spotify OAuth provider failure stays private and cannot publish a token', async t => {
+  const f = fixture(t); f.setToken({ accessToken: 'old', refreshToken: 'PRIVATE-REFRESH', expiresAt: '2020-01-01T00:00:00.000Z' });
   const beforeRequest = t.mock.fn(async () => {});
-  const fetchFn = t.mock.fn(async () => new Response(JSON.stringify({ error: 'invalid_grant', error_description: 'PRIVATE-REFRESH-TOKEN' }), { status: 400 }));
-  const service = createSpotifyOAuthService({ encryptedSecretService, fetchFn, loadSettingsFn: async () => createSettings() });
-  await assert.rejects(service.resolveAccessToken({}, { requestPolicy: { beforeRequest } }), (error) => {
-    assert.equal(error.code, 'spotify_oauth_token_exchange_failed');
-    assert.equal(error.diagnosticCode, 'credentials_rejected');
-    assert.equal(JSON.stringify({ ...error, message: error.message }).includes('PRIVATE-REFRESH-TOKEN'), false);
-    return true;
-  });
+  f.fetchFn.mock.mockImplementation(async () => Response.json({ error: 'invalid_grant', error_description: 'PRIVATE-REFRESH' }, { status: 400 }));
+  await assert.rejects(f.service.resolveAccessToken({}, { requestPolicy: { beforeRequest } }), error => error.diagnosticCode === 'credentials_rejected' && !JSON.stringify({ ...error, message: error.message }).includes('PRIVATE-REFRESH'));
   assert.equal(beforeRequest.mock.callCount(), 1);
-  assert.equal(encryptedSecretService.secrets.get('providers.spotify.oauth.token').plaintextValue, plaintextValue);
+  assert.equal(f.commandService.refresh.mock.callCount(), 0); assert.equal(f.getToken().accessToken, 'old');
 });
-
-test('an aborted access check cannot refresh or overwrite OAuth credentials', async (t) => {
-  const fetchFn = t.mock.fn(async () => assert.fail('An aborted check cannot contact the token endpoint'));
-  const service = createSpotifyOAuthService({ fetchFn });
-  const signal = AbortSignal.abort();
-  await assert.rejects(service.resolveAccessToken({}, { requestPolicy: { signal } }), { diagnosticCode: 'timeout' });
-  assert.equal(fetchFn.mock.callCount(), 0);
+test('an aborted access check never reads or refreshes Spotify credentials', async t => {
+  const f = fixture(t); await assert.rejects(f.service.resolveAccessToken({}, { requestPolicy: { signal: AbortSignal.abort() } }), { diagnosticCode: 'timeout' });
+  assert.equal(f.stateService.readToken.mock.callCount(), 0); assert.equal(f.fetchFn.mock.callCount(), 0);
 });

@@ -1,147 +1,43 @@
+/*
+ * Harmoniarr - Soulseek-native music library management
+ * Copyright (C) 2026 Harmoniarr Contributors
+ * Licensed under GPL-3.0-or-later. See LICENSE.
+ */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createYouTubeOAuthService } from '../../src/server/integrations/youtube/youtube-oauth-service.js';
-
-function createMemoryEncryptedSecretService() {
-  const secrets = new Map();
-
-  return {
-    clearSecretValue: async ({ name }) => {
-      secrets.delete(name);
-    },
-    getSecretMetadata: async ({ name }) => ({
-      configured: secrets.has(name),
-      updatedAt: secrets.get(name)?.updatedAt ?? null,
-    }),
-    getSecretRecord: async ({ name }) => secrets.get(name) ?? null,
-    getSecretValue: async ({ name }) => secrets.get(name)?.plaintextValue ?? null,
-    secrets,
-    setSecretValue: async ({ metadata, name, plaintextValue }) => {
-      secrets.set(name, {
-        metadata,
-        plaintextValue,
-        updatedAt: '2026-05-02T12:00:00.000Z',
-      });
-    },
-  };
-}
-
-function createSettings() {
-  return {
-    providers: {
-      youtubeClientId: 'youtube-client',
-    },
-    system: {
-      baseUrl: 'https://harmoniarr.example',
-    },
-  };
-}
-
-function createProviderCredentialsService() {
-  return {
-    resolveYoutubeClientSecret: async () => 'youtube-secret',
-  };
-}
-
-test('startAuthorization stores PKCE state and returns YouTube authorize URL', async (t) => {
-  const encryptedSecretService = createMemoryEncryptedSecretService();
-  const recordAuditEventFn = t.mock.fn(async () => {});
-  const service = createYouTubeOAuthService({
-    encryptedSecretService,
-    getNow: () => new Date('2026-05-02T12:00:00.000Z'),
-    getPoolFn: () => ({}),
-    loadSettingsFn: async () => createSettings(),
-    providerCredentialsService: createProviderCredentialsService(),
-    recordAuditEventFn,
-  });
-
-  const result = await service.startAuthorization({
-    actorUserId: 'user-1',
-    requestMetadata: { ipAddress: '127.0.0.1', userAgent: 'test' },
-  });
-  const authorizeUrl = new URL(result.authorizationUrl);
-
-  assert.equal(authorizeUrl.origin, 'https://accounts.google.com');
-  assert.equal(authorizeUrl.pathname, '/o/oauth2/v2/auth');
-  assert.equal(authorizeUrl.searchParams.get('access_type'), 'offline');
-  assert.equal(authorizeUrl.searchParams.get('client_id'), 'youtube-client');
-  assert.equal(authorizeUrl.searchParams.get('code_challenge_method'), 'S256');
-  assert.equal(authorizeUrl.searchParams.get('include_granted_scopes'), 'true');
-  assert.equal(authorizeUrl.searchParams.get('prompt'), 'consent');
-  assert.equal(authorizeUrl.searchParams.get('redirect_uri'), 'https://harmoniarr.example/api/v1/providers/youtube/oauth/callback');
-  assert.equal(authorizeUrl.searchParams.get('scope'), 'https://www.googleapis.com/auth/youtube.readonly');
-  assert.equal(result.expiresAt, '2026-05-02T12:10:00.000Z');
-  assert.equal(encryptedSecretService.secrets.size, 1);
-  assert.equal(recordAuditEventFn.mock.callCount(), 1);
+import { createOAuthFacadeFixture } from '../../testing/server/oauth-link-facade-fixture.js';
+const fixture = (t, options) => createOAuthFacadeFixture(t, createYouTubeOAuthService, 'youtube', options);
+test('YouTube start preserves read-only scope, offline consent and incremental authorization', async t => {
+  const f = fixture(t), dto = await f.start(), url = new URL(dto.authorizationUrl);
+  assert.equal(url.origin, 'https://accounts.google.com'); assert.equal(url.pathname, '/o/oauth2/v2/auth');
+  assert.equal(url.searchParams.get('scope'), 'https://www.googleapis.com/auth/youtube.readonly');
+  for (const [key, value] of Object.entries({ access_type: 'offline', prompt: 'consent', include_granted_scopes: 'true', code_challenge_method: 'S256' })) assert.equal(url.searchParams.get(key), value);
 });
-
-test('completeAuthorization exchanges callback code and stores encrypted token payload', async (t) => {
-  const encryptedSecretService = createMemoryEncryptedSecretService();
-  const fetchFn = t.mock.fn(async () => new Response(JSON.stringify({
-    access_token: 'access-token',
-    expires_in: 3600,
-    refresh_token: 'refresh-token',
-    scope: 'https://www.googleapis.com/auth/youtube.readonly',
-    token_type: 'Bearer',
-  }), { status: 200 }));
-  const service = createYouTubeOAuthService({
-    encryptedSecretService,
-    fetchFn,
-    getNow: () => new Date('2026-05-02T12:00:00.000Z'),
-    getPoolFn: () => ({}),
-    loadSettingsFn: async () => createSettings(),
-    providerCredentialsService: createProviderCredentialsService(),
-    recordAuditEventFn: t.mock.fn(async () => {}),
-  });
-
-  const started = await service.startAuthorization({ actorUserId: 'user-1' });
-  const state = new URL(started.authorizationUrl).searchParams.get('state');
-  const result = await service.completeAuthorization({ code: 'callback-code', state });
-
-  assert.equal(result.status.linked, true);
-  assert.equal(result.status.tokenExpiresAt, '2026-05-02T13:00:00.000Z');
-  assert.equal(fetchFn.mock.callCount(), 1);
-  const tokenRequest = fetchFn.mock.calls[0].arguments;
-  assert.equal(tokenRequest[0], 'https://oauth2.googleapis.com/token');
-  assert.equal(tokenRequest[1].method, 'POST');
-  assert.match(String(tokenRequest[1].body), /grant_type=authorization_code/);
-  assert.match(String(tokenRequest[1].body), /code=callback-code/);
-  assert.match(String(tokenRequest[1].body), /client_secret=youtube-secret/);
-  assert.equal(encryptedSecretService.secrets.has('providers.youtube.oauth.token'), true);
-  assert.equal([...encryptedSecretService.secrets.keys()].some((name) => name.startsWith('providers.youtube.oauth.pending.')), false);
+test('YouTube callback retains server client secret and PKCE verifier in the token request only', async t => {
+  const f = fixture(t), dto = await f.start(); await f.complete(dto);
+  const [url, request] = f.fetchFn.mock.calls[0].arguments, body = new URLSearchParams(request.body);
+  assert.equal(url, 'https://oauth2.googleapis.com/token'); assert.equal(body.get('client_secret'), 'youtube-secret');
+  assert.equal(body.get('code_verifier'), f.commandService.createPending.mock.calls[0].arguments[0].codeVerifier);
+  assert.ok(!JSON.stringify(dto).includes('youtube-secret'));
 });
-
-test('resolveAccessToken refreshes expired tokens and preserves refresh token when Google omits a new one', async (t) => {
-  const encryptedSecretService = createMemoryEncryptedSecretService();
-  await encryptedSecretService.setSecretValue({
-    metadata: { expiresAt: '2026-05-02T11:59:00.000Z', tokenType: 'Bearer' },
-    name: 'providers.youtube.oauth.token',
-    plaintextValue: JSON.stringify({
-      accessToken: 'old-access-token',
-      expiresAt: '2026-05-02T11:59:00.000Z',
-      refreshToken: 'refresh-token',
-      tokenType: 'Bearer',
-    }),
+test('YouTube refresh preserves the old refresh token and sends the configured server secret', async t => {
+  const f = fixture(t); f.setToken({ accessToken: 'old', refreshToken: 'original', expiresAt: '2026-10-27T11:00:00.000Z' });
+  f.fetchFn.mock.mockImplementation(async () => Response.json({ access_token: 'new', expires_in: 3600 }));
+  assert.equal(await f.service.resolveAccessToken(), 'new'); assert.equal(f.getToken().refreshToken, 'original');
+  assert.equal(new URLSearchParams(f.fetchFn.mock.calls[0].arguments[1].body).get('client_secret'), 'youtube-secret');
+});
+test('YouTube clear commits locally before bounded best-effort revocation and never returns the token', async t => {
+  const f = fixture(t); f.setToken({ accessToken: 'private-old', refreshToken: 'original', expiresAt: '2026-10-27T13:00:00.000Z' });
+  f.fetchFn.mock.mockImplementation(async (url, request) => {
+    assert.equal(f.getToken(), null); assert.equal(url, 'https://oauth2.googleapis.com/revoke');
+    assert.equal(new URLSearchParams(request.body).get('token'), 'private-old'); assert.equal(request.redirect, 'error'); assert.ok(request.signal instanceof AbortSignal);
+    return new Response('', { status: 200 });
   });
-  const fetchFn = t.mock.fn(async () => new Response(JSON.stringify({
-    access_token: 'new-access-token',
-    expires_in: 3600,
-    token_type: 'Bearer',
-  }), { status: 200 }));
-  const service = createYouTubeOAuthService({
-    encryptedSecretService,
-    fetchFn,
-    getNow: () => new Date('2026-05-02T12:00:00.000Z'),
-    loadSettingsFn: async () => createSettings(),
-    providerCredentialsService: createProviderCredentialsService(),
-  });
-
-  const accessToken = await service.resolveAccessToken({});
-  const storedToken = JSON.parse(encryptedSecretService.secrets.get('providers.youtube.oauth.token').plaintextValue);
-
-  assert.equal(accessToken, 'new-access-token');
-  assert.equal(storedToken.refreshToken, 'refresh-token');
-  assert.equal(fetchFn.mock.callCount(), 1);
-  assert.match(String(fetchFn.mock.calls[0].arguments[1].body), /grant_type=refresh_token/);
-  assert.match(String(fetchFn.mock.calls[0].arguments[1].body), /client_secret=youtube-secret/);
+  const result = await f.service.clearAuthorization({ session: f.session }); assert.deepEqual(result, { provider: 'youtube', status: { linked: false, tokenExpiresAt: null } });
+  assert.equal(f.fetchFn.mock.callCount(), 1); assert.ok(!JSON.stringify(result).includes('private-old'));
+});
+test('YouTube local clear failure cannot attempt remote revocation', async t => {
+  const f = fixture(t); f.commandService.clear.mock.mockImplementation(async () => { throw new Error('local rollback'); });
+  await assert.rejects(f.service.clearAuthorization({ session: f.session }), /local rollback/u); assert.equal(f.fetchFn.mock.callCount(), 0);
 });
