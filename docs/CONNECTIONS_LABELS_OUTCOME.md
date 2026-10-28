@@ -112,7 +112,10 @@ GitHub MCP found zero open repository PRs initially and at the final check,
 cleanup/rebasing were inapplicable. Work stays on main with no separate branch,
 PR merge, Git tag or release. All nine changed files are included in this commit.
 
-Next associate Library settings labels with their controls, starting with source
+The Library follow-up is implemented separately; see its
+[research](LIBRARY_LABELS_RESEARCH_2026_10.md), [design](LIBRARY_LABELS_DESIGN.md)
+and [outcome](LIBRARY_LABELS_OUTCOME.md). The original recommendation was to
+associate Library settings labels with their controls, starting with source
 safety cooldown, history retention and match-ranking fields. Source inspection in
 SettingsLibraryView and the built Library DOM found 24 sibling field labels
 without native associations, including these controls and naming templates.

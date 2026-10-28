@@ -7,6 +7,11 @@ Security source: `docs/SECURITY_POLICY.md`
 
 ## Current Status (2026-10-28)
 
+October 28 Library field labels now have native associations and retention groups
+use the existing fieldset/legend component. No schema refresh, migration or
+maintenance task is required. See [design](LIBRARY_LABELS_DESIGN.md) and
+[outcome](LIBRARY_LABELS_OUTCOME.md).
+
 October 28 Connections field labels now use matching native for/id associations.
 This client-only change needs no schema refresh, migration or maintenance task.
 See [design](CONNECTIONS_LABELS_DESIGN.md) and [outcome](CONNECTIONS_LABELS_OUTCOME.md).

@@ -189,8 +189,8 @@ onMounted(() => { void loadSettings(); });
             </label>
             <p class="cfg-field-hint">When enabled, Harmoniarr evaluates each source user's reputation after recording delivery outcomes. Peers that exceed the failure threshold are added to the ignore list after the cooldown period elapses.</p>
             <div class="hx-field">
-              <label class="hx-field-label">Cooldown (hours)</label>
-              <input class="hx-input" v-model.number="form.acquisition.autoIgnoreCooldownHours" type="number" min="0" max="8760" step="1" :disabled="!form.acquisition.autoIgnoreEnabled" />
+              <label class="hx-field-label" for="settings-library-auto-ignore-cooldown-hours">Cooldown (hours)</label>
+              <input id="settings-library-auto-ignore-cooldown-hours" class="hx-input" v-model.number="form.acquisition.autoIgnoreCooldownHours" type="number" min="0" max="8760" step="1" :disabled="!form.acquisition.autoIgnoreEnabled" />
               <p class="cfg-field-hint">Minimum hours between auto-ignore evaluations for the same peer. A longer cooldown reduces noise but delays ignoring problematic peers. Default is 24 hours. Range: 0–8760 (1 year).</p>
             </div>
           </div>
@@ -207,27 +207,29 @@ onMounted(() => { void loadSettings(); });
           :heading-level="3"
         >
           <div class="cfg-group" style="padding-top: 0; border-top: none">
-            <p class="cfg-group-title">Operation runs</p>
-            <div class="hx-form-row">
-              <div class="hx-field">
-                <label class="hx-field-label">Max age (days)</label>
-                <input class="hx-input" v-model.number="form.retention.operationRunMaxAgeDays" type="number" min="7" max="3650" step="1" />
-                <p class="cfg-field-hint">Operation runs older than this are eligible for cleanup. Default is 90 days. Range: 7–3650.</p>
+            <SettingsFormGroup title="Operation runs">
+              <div class="hx-form-row">
+                <div class="hx-field">
+                  <label class="hx-field-label" for="settings-library-operation-run-max-age-days">Max age (days)</label>
+                  <input id="settings-library-operation-run-max-age-days" class="hx-input" v-model.number="form.retention.operationRunMaxAgeDays" type="number" min="7" max="3650" step="1" />
+                  <p class="cfg-field-hint">Operation runs older than this are eligible for cleanup. Default is 90 days. Range: 7–3650.</p>
+                </div>
+                <div class="hx-field">
+                  <label class="hx-field-label" for="settings-library-operation-run-retain-count-per-type">Retain count per type</label>
+                  <input id="settings-library-operation-run-retain-count-per-type" class="hx-input" v-model.number="form.retention.operationRunRetainCountPerType" type="number" min="10" max="1000" step="1" />
+                  <p class="cfg-field-hint">Maximum operation runs to keep per type, regardless of age. Default is 50. Range: 10–1000.</p>
+                </div>
               </div>
-              <div class="hx-field">
-                <label class="hx-field-label">Retain count per type</label>
-                <input class="hx-input" v-model.number="form.retention.operationRunRetainCountPerType" type="number" min="10" max="1000" step="1" />
-                <p class="cfg-field-hint">Maximum operation runs to keep per type, regardless of age. Default is 50. Range: 10–1000.</p>
-              </div>
-            </div>
+            </SettingsFormGroup>
           </div>
           <div class="cfg-group">
-            <p class="cfg-group-title">Outcome events</p>
-            <div class="hx-field">
-              <label class="hx-field-label">Max age (days)</label>
-              <input class="hx-input" v-model.number="form.retention.outcomeEventMaxAgeDays" type="number" min="30" max="3650" step="1" />
-              <p class="cfg-field-hint">Delivery outcome events older than this are eligible for cleanup. Default is 180 days. Range: 30–3650.</p>
-            </div>
+            <SettingsFormGroup title="Outcome events">
+              <div class="hx-field">
+                <label class="hx-field-label" for="settings-library-outcome-event-max-age-days">Max age (days)</label>
+                <input id="settings-library-outcome-event-max-age-days" class="hx-input" v-model.number="form.retention.outcomeEventMaxAgeDays" type="number" min="30" max="3650" step="1" />
+                <p class="cfg-field-hint">Delivery outcome events older than this are eligible for cleanup. Default is 180 days. Range: 30–3650.</p>
+              </div>
+            </SettingsFormGroup>
           </div>
         </SettingsDisclosure>
 
@@ -250,8 +252,8 @@ onMounted(() => { void loadSettings(); });
                 <p class="cfg-field-hint">How much the file format (FLAC vs MP3) matters. Default is 0.25.</p>
               </div>
               <div class="hx-field">
-                <label class="hx-field-label">Track match</label>
-                <input class="hx-input" v-model.number="form.scoring.weightCandidateTrackMatch" type="number" min="0.01" max="1" step="0.01" />
+                <label class="hx-field-label" for="settings-library-weight-candidate-track-match">Track match</label>
+                <input id="settings-library-weight-candidate-track-match" class="hx-input" v-model.number="form.scoring.weightCandidateTrackMatch" type="number" min="0.01" max="1" step="0.01" />
                 <p class="cfg-field-hint">How much matching expected track titles matters. Default is 0.20.</p>
               </div>
             </div>
@@ -260,13 +262,13 @@ onMounted(() => { void loadSettings(); });
             <p class="cfg-group-title">Audio fidelity</p>
             <div class="hx-form-row">
               <div class="hx-field">
-                <label class="hx-field-label">Audio depth</label>
-                <input class="hx-input" v-model.number="form.scoring.weightAudioDepth" type="number" min="0.01" max="1" step="0.01" />
+                <label class="hx-field-label" for="settings-library-weight-audio-depth">Audio depth</label>
+                <input id="settings-library-weight-audio-depth" class="hx-input" v-model.number="form.scoring.weightAudioDepth" type="number" min="0.01" max="1" step="0.01" />
                 <p class="cfg-field-hint">How much audio bit depth and sample rate matters. Default is 0.12.</p>
               </div>
               <div class="hx-field">
-                <label class="hx-field-label">Duration</label>
-                <input class="hx-input" v-model.number="form.scoring.weightDuration" type="number" min="0.01" max="1" step="0.01" />
+                <label class="hx-field-label" for="settings-library-weight-duration">Duration</label>
+                <input id="settings-library-weight-duration" class="hx-input" v-model.number="form.scoring.weightDuration" type="number" min="0.01" max="1" step="0.01" />
                 <p class="cfg-field-hint">How much matching expected album duration matters. Default is 0.12.</p>
               </div>
             </div>
@@ -275,13 +277,13 @@ onMounted(() => { void loadSettings(); });
             <p class="cfg-group-title">Consistency and completeness</p>
             <div class="hx-form-row">
               <div class="hx-field">
-                <label class="hx-field-label">Format consistency</label>
-                <input class="hx-input" v-model.number="form.scoring.weightFormatConsistency" type="number" min="0.01" max="1" step="0.01" />
+                <label class="hx-field-label" for="settings-library-weight-format-consistency">Format consistency</label>
+                <input id="settings-library-weight-format-consistency" class="hx-input" v-model.number="form.scoring.weightFormatConsistency" type="number" min="0.01" max="1" step="0.01" />
                 <p class="cfg-field-hint">How much uniform file formats across the candidate matters. Default is 0.10.</p>
               </div>
               <div class="hx-field">
-                <label class="hx-field-label">Track count</label>
-                <input class="hx-input" v-model.number="form.scoring.weightTrackCount" type="number" min="0.01" max="1" step="0.01" />
+                <label class="hx-field-label" for="settings-library-weight-track-count">Track count</label>
+                <input id="settings-library-weight-track-count" class="hx-input" v-model.number="form.scoring.weightTrackCount" type="number" min="0.01" max="1" step="0.01" />
                 <p class="cfg-field-hint">How much matching expected track count matters. Default is 0.08.</p>
               </div>
             </div>
@@ -290,13 +292,13 @@ onMounted(() => { void loadSettings(); });
             <p class="cfg-group-title">Source reliability</p>
             <div class="hx-form-row">
               <div class="hx-field">
-                <label class="hx-field-label">Peer delivery</label>
-                <input class="hx-input" v-model.number="form.scoring.weightPeerDelivery" type="number" min="0.01" max="1" step="0.01" />
+                <label class="hx-field-label" for="settings-library-weight-peer-delivery">Peer delivery</label>
+                <input id="settings-library-weight-peer-delivery" class="hx-input" v-model.number="form.scoring.weightPeerDelivery" type="number" min="0.01" max="1" step="0.01" />
                 <p class="cfg-field-hint">How much the uploader's connection quality matters. Default is 0.08.</p>
               </div>
               <div class="hx-field">
-                <label class="hx-field-label">Uploader reputation</label>
-                <input class="hx-input" v-model.number="form.scoring.weightUploaderReputation" type="number" min="0.01" max="1" step="0.01" />
+                <label class="hx-field-label" for="settings-library-weight-uploader-reputation">Uploader reputation</label>
+                <input id="settings-library-weight-uploader-reputation" class="hx-input" v-model.number="form.scoring.weightUploaderReputation" type="number" min="0.01" max="1" step="0.01" />
                 <p class="cfg-field-hint">How much the uploader's historical reliability matters. Default is 0.05.</p>
               </div>
             </div>
@@ -332,25 +334,25 @@ onMounted(() => { void loadSettings(); });
             <p class="hx-text-muted">Frequency cutoffs determine how spectral fingerprints classify audio quality. Higher cutoffs are stricter — fewer files pass as authentic. The minimum sample rate filters out low-resolution sources entirely.</p>
             <div class="hx-form-row">
               <div class="hx-field">
-                <label class="hx-field-label">Authentic cutoff (Hz)</label>
-                <input class="hx-input" v-model.number="form.fidelity.spectralAuthenticMinCutoffHz" type="number" min="10000" max="24000" step="100" />
+                <label class="hx-field-label" for="settings-library-spectral-authentic-min-cutoff-hz">Authentic cutoff (Hz)</label>
+                <input id="settings-library-spectral-authentic-min-cutoff-hz" class="hx-input" v-model.number="form.fidelity.spectralAuthenticMinCutoffHz" type="number" min="10000" max="24000" step="100" />
                 <p class="cfg-field-hint">Files with spectral content above this cutoff are classified as authentic. Default is 20000 Hz. Range: 10000–24000.</p>
               </div>
               <div class="hx-field">
-                <label class="hx-field-label">Suspicious cutoff (Hz)</label>
-                <input class="hx-input" v-model.number="form.fidelity.spectralSuspiciousMinCutoffHz" type="number" min="8000" max="24000" step="100" />
+                <label class="hx-field-label" for="settings-library-spectral-suspicious-min-cutoff-hz">Suspicious cutoff (Hz)</label>
+                <input id="settings-library-spectral-suspicious-min-cutoff-hz" class="hx-input" v-model.number="form.fidelity.spectralSuspiciousMinCutoffHz" type="number" min="8000" max="24000" step="100" />
                 <p class="cfg-field-hint">Files below this cutoff are flagged as suspicious. Default is 19000 Hz. Range: 8000–24000.</p>
               </div>
             </div>
             <div class="hx-form-row">
               <div class="hx-field">
-                <label class="hx-field-label">Transcode cutoff (Hz)</label>
-                <input class="hx-input" v-model.number="form.fidelity.spectralTranscodeMidCutoffHz" type="number" min="4000" max="24000" step="100" />
+                <label class="hx-field-label" for="settings-library-spectral-transcode-mid-cutoff-hz">Transcode cutoff (Hz)</label>
+                <input id="settings-library-spectral-transcode-mid-cutoff-hz" class="hx-input" v-model.number="form.fidelity.spectralTranscodeMidCutoffHz" type="number" min="4000" max="24000" step="100" />
                 <p class="cfg-field-hint">Mid-range cutoff for detecting transcoded files. Default is 16000 Hz. Range: 4000–24000.</p>
               </div>
               <div class="hx-field">
-                <label class="hx-field-label">Min sample rate (Hz)</label>
-                <input class="hx-input" v-model.number="form.fidelity.spectralMinSampleRateHz" type="number" min="8000" max="192000" step="100" />
+                <label class="hx-field-label" for="settings-library-spectral-min-sample-rate-hz">Min sample rate (Hz)</label>
+                <input id="settings-library-spectral-min-sample-rate-hz" class="hx-input" v-model.number="form.fidelity.spectralMinSampleRateHz" type="number" min="8000" max="192000" step="100" />
                 <p class="cfg-field-hint">Files below this sample rate are rejected outright. Default is 44100 Hz (CD quality). Range: 8000–192000.</p>
               </div>
             </div>
@@ -360,31 +362,31 @@ onMounted(() => { void loadSettings(); });
             <p class="hx-text-muted">Trust thresholds control when a source user is promoted to healthy status or demoted to watch status based on delivery history.</p>
             <div class="hx-form-row">
               <div class="hx-field">
-                <label class="hx-field-label">Watch failure count</label>
-                <input class="hx-input" v-model.number="form.fidelity.trustWatchFailureCount" type="number" min="1" max="100" step="1" />
+                <label class="hx-field-label" for="settings-library-trust-watch-failure-count">Watch failure count</label>
+                <input id="settings-library-trust-watch-failure-count" class="hx-input" v-model.number="form.fidelity.trustWatchFailureCount" type="number" min="1" max="100" step="1" />
                 <p class="cfg-field-hint">Number of failed deliveries before a source is placed on watch. Default is 3. Range: 1–100.</p>
               </div>
               <div class="hx-field">
-                <label class="hx-field-label">Watch max success rate</label>
-                <input class="hx-input" v-model.number="form.fidelity.trustWatchMaxSuccessRate" type="number" min="0" max="1" step="0.01" />
+                <label class="hx-field-label" for="settings-library-trust-watch-max-success-rate">Watch max success rate</label>
+                <input id="settings-library-trust-watch-max-success-rate" class="hx-input" v-model.number="form.fidelity.trustWatchMaxSuccessRate" type="number" min="0" max="1" step="0.01" />
                 <p class="cfg-field-hint">Sources with a success rate at or below this value are watched. Default is 0.50. Range: 0–1.</p>
               </div>
             </div>
             <div class="hx-form-row">
               <div class="hx-field">
-                <label class="hx-field-label">Watch evidence count</label>
-                <input class="hx-input" v-model.number="form.fidelity.trustWatchEvidenceCount" type="number" min="1" max="1000" step="1" />
+                <label class="hx-field-label" for="settings-library-trust-watch-evidence-count">Watch evidence count</label>
+                <input id="settings-library-trust-watch-evidence-count" class="hx-input" v-model.number="form.fidelity.trustWatchEvidenceCount" type="number" min="1" max="1000" step="1" />
                 <p class="cfg-field-hint">Minimum delivery outcomes needed before evaluating watch status. Default is 3. Range: 1–1000.</p>
               </div>
               <div class="hx-field">
-                <label class="hx-field-label">Healthy evidence count</label>
-                <input class="hx-input" v-model.number="form.fidelity.trustHealthyEvidenceCount" type="number" min="1" max="1000" step="1" />
+                <label class="hx-field-label" for="settings-library-trust-healthy-evidence-count">Healthy evidence count</label>
+                <input id="settings-library-trust-healthy-evidence-count" class="hx-input" v-model.number="form.fidelity.trustHealthyEvidenceCount" type="number" min="1" max="1000" step="1" />
                 <p class="cfg-field-hint">Minimum delivery outcomes needed before promoting a source to healthy. Default is 5. Range: 1–1000.</p>
               </div>
             </div>
             <div class="hx-field">
-              <label class="hx-field-label">Healthy min success rate</label>
-              <input class="hx-input" v-model.number="form.fidelity.trustHealthyMinSuccessRate" type="number" min="0" max="1" step="0.01" />
+              <label class="hx-field-label" for="settings-library-trust-healthy-min-success-rate">Healthy min success rate</label>
+              <input id="settings-library-trust-healthy-min-success-rate" class="hx-input" v-model.number="form.fidelity.trustHealthyMinSuccessRate" type="number" min="0" max="1" step="0.01" />
               <p class="cfg-field-hint">Sources must meet or exceed this success rate to be classified as healthy. Default is 0.80. Range: 0–1.</p>
             </div>
           </div>
@@ -416,13 +418,13 @@ onMounted(() => { void loadSettings(); });
             <p class="hx-text-muted">Templates for artist and album folder names. These produce a single path segment each — path separators are not allowed.</p>
             <div class="hx-form-row">
               <div class="hx-field">
-                <label class="hx-field-label">Artist folder format</label>
-                <input class="hx-input" style="font-family: var(--hx-font-mono)" v-model="form.naming.artistFolderFormat" />
+                <label class="hx-field-label" for="settings-library-artist-folder-format">Artist folder format</label>
+                <input id="settings-library-artist-folder-format" class="hx-input" style="font-family: var(--hx-font-mono)" v-model="form.naming.artistFolderFormat" />
                 <p class="cfg-field-hint">Default is {ArtistName}.</p>
               </div>
               <div class="hx-field">
-                <label class="hx-field-label">Album folder format</label>
-                <input class="hx-input" style="font-family: var(--hx-font-mono)" v-model="form.naming.albumFolderFormat" />
+                <label class="hx-field-label" for="settings-library-album-folder-format">Album folder format</label>
+                <input id="settings-library-album-folder-format" class="hx-input" style="font-family: var(--hx-font-mono)" v-model="form.naming.albumFolderFormat" />
                 <p class="cfg-field-hint">Default is {AlbumTitle} ({ReleaseYear}).</p>
               </div>
             </div>
@@ -432,13 +434,13 @@ onMounted(() => { void loadSettings(); });
             <p class="hx-text-muted">Templates for track filenames. The file extension is appended automatically — do not include it in the template. The multi-disc template is used when a release has more than one disc.</p>
             <div class="hx-form-row">
               <div class="hx-field">
-                <label class="hx-field-label">Track filename format</label>
-                <input class="hx-input" style="font-family: var(--hx-font-mono)" v-model="form.naming.trackFilenameFormat" />
+                <label class="hx-field-label" for="settings-library-track-filename-format">Track filename format</label>
+                <input id="settings-library-track-filename-format" class="hx-input" style="font-family: var(--hx-font-mono)" v-model="form.naming.trackFilenameFormat" />
                 <p class="cfg-field-hint">Default is {TrackNumber} - {SongTitle}.</p>
               </div>
               <div class="hx-field">
-                <label class="hx-field-label">Multi-disc track format</label>
-                <input class="hx-input" style="font-family: var(--hx-font-mono)" v-model="form.naming.multiDiscTrackFilenameFormat" />
+                <label class="hx-field-label" for="settings-library-multi-disc-track-filename-format">Multi-disc track format</label>
+                <input id="settings-library-multi-disc-track-filename-format" class="hx-input" style="font-family: var(--hx-font-mono)" v-model="form.naming.multiDiscTrackFilenameFormat" />
                 <p class="cfg-field-hint">Default is {DiscNumber}-{TrackNumber} - {SongTitle}.</p>
               </div>
             </div>

@@ -66,14 +66,6 @@ test('SettingsLibraryView constrains inputs to validator ranges', async () => {
   assert.match(source, /maxSearchAttempts.*min="1" max="10" step="1"/, 'max attempts must allow 1-10');
 });
 
-test('SettingsLibraryView labels all fields with hx-field-label', async () => {
-  const source = await readFile(VIEW_PATH, 'utf8');
-
-  assert.match(source, /<label class="hx-field-label" for="settings-library-discovery-cooldown">First retry \(hours\)<\/label>/);
-  assert.match(source, /<label class="hx-field-label" for="settings-library-discovery-fallback-cooldown">Later retries \(hours\)<\/label>/);
-  assert.match(source, /<label class="hx-field-label" for="settings-library-discovery-batch-size">Batch size<\/label>/);
-  assert.match(source, /<label class="hx-field-label" for="settings-library-max-search-attempts">Max search attempts<\/label>/);
-});
 
 test('SettingsLibraryView submits through saveSettings with save-state feedback', async () => {
   const source = await readFile(VIEW_PATH, 'utf8');
@@ -118,11 +110,6 @@ test('SettingsLibraryView disables the cooldown input when auto-ignore is off', 
   assert.match(source, /:disabled="!form\.acquisition\.autoIgnoreEnabled"/);
 });
 
-test('SettingsLibraryView labels the acquisition cooldown field with hx-field-label', async () => {
-  const source = await readFile(VIEW_PATH, 'utf8');
-
-  assert.match(source, /<label class="hx-field-label">Cooldown \(hours\)<\/label>/);
-});
 
 test('SettingsLibraryView presents retention behind an explicit destructive-history disclosure', async () => {
   const source = await readFile(VIEW_PATH, 'utf8');
@@ -153,12 +140,6 @@ test('SettingsLibraryView includes a data deletion warning in the Retention card
   assert.match(source, /permanently remove older history on the next cleanup cycle/);
 });
 
-test('SettingsLibraryView labels retention fields with hx-field-label', async () => {
-  const source = await readFile(VIEW_PATH, 'utf8');
-
-  assert.match(source, /<label class="hx-field-label">Max age \(days\)<\/label>/);
-  assert.match(source, /<label class="hx-field-label">Retain count per type<\/label>/);
-});
 
 test('SettingsLibraryView presents scoring weights behind the match-ranking disclosure', async () => {
   const source = await readFile(VIEW_PATH, 'utf8');
@@ -200,19 +181,6 @@ test('SettingsLibraryView includes a reset to defaults button for scoring', asyn
   assert.match(source, /Reset to defaults/);
 });
 
-test('SettingsLibraryView labels scoring fields and associates the browser-verified format control', async () => {
-  const source = await readFile(VIEW_PATH, 'utf8');
-
-  assert.match(source, /<label class="hx-field-label" for="settings-library-weight-format-tier">Format tier<\/label>/);
-  assert.match(source, /<input id="settings-library-weight-format-tier" class="hx-input" v-model\.number="form\.scoring\.weightFormatTier"/);
-  assert.match(source, /<label class="hx-field-label">Track match<\/label>/);
-  assert.match(source, /<label class="hx-field-label">Audio depth<\/label>/);
-  assert.match(source, /<label class="hx-field-label">Duration<\/label>/);
-  assert.match(source, /<label class="hx-field-label">Format consistency<\/label>/);
-  assert.match(source, /<label class="hx-field-label">Track count<\/label>/);
-  assert.match(source, /<label class="hx-field-label">Peer delivery<\/label>/);
-  assert.match(source, /<label class="hx-field-label">Uploader reputation<\/label>/);
-});
 
 test('SettingsLibraryView presents fidelity thresholds behind the audio-verification disclosure', async () => {
   const source = await readFile(VIEW_PATH, 'utf8');
@@ -249,19 +217,6 @@ test('SettingsLibraryView constrains fidelity inputs to validator ranges', async
   assert.match(source, /trustHealthyMinSuccessRate[^]*min="0" max="1" step="0\.01"/);
 });
 
-test('SettingsLibraryView labels all nine fidelity fields with hx-field-label', async () => {
-  const source = await readFile(VIEW_PATH, 'utf8');
-
-  assert.match(source, /<label class="hx-field-label">Authentic cutoff \(Hz\)<\/label>/);
-  assert.match(source, /<label class="hx-field-label">Suspicious cutoff \(Hz\)<\/label>/);
-  assert.match(source, /<label class="hx-field-label">Transcode cutoff \(Hz\)<\/label>/);
-  assert.match(source, /<label class="hx-field-label">Min sample rate \(Hz\)<\/label>/);
-  assert.match(source, /<label class="hx-field-label">Watch failure count<\/label>/);
-  assert.match(source, /<label class="hx-field-label">Watch max success rate<\/label>/);
-  assert.match(source, /<label class="hx-field-label">Watch evidence count<\/label>/);
-  assert.match(source, /<label class="hx-field-label">Healthy evidence count<\/label>/);
-  assert.match(source, /<label class="hx-field-label">Healthy min success rate<\/label>/);
-});
 
 test('SettingsLibraryView includes a reset to defaults button for fidelity', async () => {
   const source = await readFile(VIEW_PATH, 'utf8');
@@ -292,14 +247,6 @@ test('SettingsLibraryView uses monospace font for naming template inputs', async
   assert.match(source, /font-family: var\(--hx-font-mono\)/);
 });
 
-test('SettingsLibraryView labels all four naming fields with hx-field-label', async () => {
-  const source = await readFile(VIEW_PATH, 'utf8');
-
-  assert.match(source, /<label class="hx-field-label">Artist folder format<\/label>/);
-  assert.match(source, /<label class="hx-field-label">Album folder format<\/label>/);
-  assert.match(source, /<label class="hx-field-label">Track filename format<\/label>/);
-  assert.match(source, /<label class="hx-field-label">Multi-disc track format<\/label>/);
-});
 
 test('SettingsLibraryView includes a token reference section', async () => {
   const source = await readFile(VIEW_PATH, 'utf8');

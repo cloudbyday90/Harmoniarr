@@ -1,5 +1,8 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 28 [Library labels outcome](LIBRARY_LABELS_OUTCOME.md) records the
+latest local walkthrough validation of native labels and retention groups.
+
 The October 28 [Connections labels outcome](CONNECTIONS_LABELS_OUTCOME.md) records
 the current local rebuild, preserved administrator/five mounts, native label
 activation and write-only secret checks. No release is created.
