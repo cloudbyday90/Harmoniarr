@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createApiError } from '../api-error.js';
 import { getPool } from '../database.js';
 import { createMetadataArtistDiscographyStore } from './metadata-artist-discography-store.js';
 import { encodeArtistDiscographyCursor, normalizeArtistDiscographyPage } from './metadata-artist-discography-policy.js';
@@ -27,7 +28,7 @@ export function createMetadataArtistDiscographyService({ getPoolFn = getPool, st
   async function getArtistDiscography(input) {
     const page = normalizeArtistDiscographyPage(input);
     if (!await readStore.artistExists(page.metadataArtistId)) {
-      throw Object.assign(new Error('Metadata artist was not found'), { status: 404, code: 'metadata_not_found' });
+      throw createApiError(404, 'metadata_not_found', 'Metadata artist was not found');
     }
     const rows = await readStore.readPage(page);
     const hasMore = rows[0]?.has_more === true;

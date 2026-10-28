@@ -31,9 +31,8 @@ import {
   createApiRequestContractMiddleware,
   createBrowserSecurityHeadersMiddleware,
   createHttpsEnforcementMiddleware,
-  normalizeApiParsingError,
 } from './http-hardening.js';
-import { normalizeDatabaseConnectionError } from './database-error-mapper.js';
+import { createHttpErrorHandler } from './http-error-response.js';
 import { createImportCandidateModule } from './import-candidates/import-candidate-module.js';
 import { createLibraryModule } from './library/library-module.js';
 import { createMissingMusicModule } from './missing-music/missing-music-module.js';
@@ -1124,17 +1123,7 @@ export function createApp({
     response.sendFile(resolve(resolvedClientDistDir, 'index.html'));
   });
 
-  app.use((error, _request, response, _next) => {
-    const normalizedError = normalizeDatabaseConnectionError(normalizeApiParsingError(error));
-    const status = Number.isInteger(normalizedError?.status) ? normalizedError.status : 500;
-    response.status(status).json({
-      ok: false,
-      error: {
-        code: normalizedError?.code ?? 'internal_error',
-        message: normalizedError?.message ?? 'Unexpected server error',
-      },
-    });
-  });
+  app.use(createHttpErrorHandler());
 
   return {
     app,

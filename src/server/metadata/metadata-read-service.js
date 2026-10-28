@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createApiError } from '../api-error.js';
 import { mapMetadataReleaseGroup as mapReleaseGroup } from './metadata-release-group-presentation.js';
 import { mapMetadataRelease as mapRelease } from './metadata-release-presentation.js';
 import { normalizeMetadataArtistReadView } from './metadata-artist-read-view.js';
@@ -41,10 +42,7 @@ import {
 } from './metadata-repository.js';
 
 function createMetadataNotFoundError(entityType, entityId) {
-  const error = new Error(`Metadata ${entityType} was not found: ${entityId}`);
-  error.status = 404;
-  error.code = 'metadata_not_found';
-  return error;
+  return createApiError(404, 'metadata_not_found', `Metadata ${entityType} was not found: ${entityId}`);
 }
 
 function mapArtist(row) {

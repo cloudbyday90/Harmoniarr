@@ -16,18 +16,14 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createApiError } from '../api-error.js';
+
 function createMetadataNotFoundError(entityType, entityId) {
-  const error = new Error(`Metadata ${entityType} was not found: ${entityId}`);
-  error.status = 404;
-  error.code = 'metadata_not_found';
-  return error;
+  return createApiError(404, 'metadata_not_found', `Metadata ${entityType} was not found: ${entityId}`);
 }
 
 function createSelectionConflictError(code, message) {
-  const error = new Error(message);
-  error.status = 409;
-  error.code = code;
-  return error;
+  return createApiError(409, code, message);
 }
 
 function copyReleaseGroupSelections(selections = []) {

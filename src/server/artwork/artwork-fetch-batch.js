@@ -3,6 +3,7 @@
  * Copyright (C) 2026 Harmoniarr Contributors
  * Licensed under GPL-3.0-or-later. See LICENSE.
  */
+import { createApiError } from '../api-error.js';
 import { ARTWORK_FETCH_BATCH_LIMIT, ARTWORK_FETCH_CONCURRENCY, isArtworkAdmissionError } from './artwork-fetch-admission.js';
 import { isArtworkWorkerError } from './artwork-worker-protocol.js';
 import { normalizeArtworkFetchRequest } from './artwork-fetch-request.js';
@@ -10,7 +11,7 @@ import { normalizeArtworkFetchRequest } from './artwork-fetch-request.js';
 /** Lazy bounded producers; admission errors escape only after every worker drains. */
 export async function resolveArtworkFetchBatch(requests, { resolveArtwork, emptyResult, signal }) {
   if (!Array.isArray(requests) || requests.length > ARTWORK_FETCH_BATCH_LIMIT) {
-    throw Object.assign(new Error('Artwork batch must contain at most 50 items'), { status: 400, code: 'validation_error' });
+    throw createApiError(400, 'validation_error', 'Artwork batch must contain at most 50 items');
   }
   const inputs = Array.from(requests, normalizeArtworkFetchRequest);
   const results = {};

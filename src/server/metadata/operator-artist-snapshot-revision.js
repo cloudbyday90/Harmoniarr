@@ -16,12 +16,11 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createApiError } from '../api-error.js';
+
 export function normalizeExpectedSnapshotRevision(value) {
   if (!Number.isSafeInteger(value) || value < 0) {
-    const error = new Error('expectedSnapshotRevision is required and must be a non-negative safe integer');
-    error.status = 400;
-    error.code = 'validation_error';
-    throw error;
+    throw createApiError(400, 'validation_error', 'expectedSnapshotRevision is required and must be a non-negative safe integer');
   }
   return value;
 }

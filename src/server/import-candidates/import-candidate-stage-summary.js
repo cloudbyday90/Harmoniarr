@@ -16,6 +16,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createApiError } from '../api-error.js';
+
 export function normalizeStageSummaryLimit(value) {
   if (value == null || value === '') {
     return 25;
@@ -23,10 +25,7 @@ export function normalizeStageSummaryLimit(value) {
 
   const parsed = Number.parseInt(String(value), 10);
   if (!Number.isInteger(parsed) || parsed < 1 || parsed > 1000) {
-    const error = new Error('limit must be an integer between 1 and 1000');
-    error.status = 400;
-    error.code = 'validation_error';
-    throw error;
+    throw createApiError(400, 'validation_error', 'limit must be an integer between 1 and 1000');
   }
 
   return parsed;

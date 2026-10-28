@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 28 [HTTP error rebuild](LOCAL_DOCKER_HTTP_ERROR_OUTCOME.md) records
+the current image, preserved administrator/five mounts, bounded unexpected
+responses and retained validation/authentication contracts. See the separate
+[implementation outcome](HTTP_ERROR_OUTCOME.md). No release is created.
+
 The October 28 [provider status rebuild](LOCAL_DOCKER_PROVIDER_STATUS_OUTCOME.md)
 records the current image and preserved administrator/five mounts, actual
 encrypted-read isolation, owned PostgreSQL termination and read-only browser

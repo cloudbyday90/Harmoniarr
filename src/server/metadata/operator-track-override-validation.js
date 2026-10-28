@@ -16,11 +16,13 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createApiError } from '../api-error.js';
+
 const POSTGRES_INTEGER_MAX = 2_147_483_647;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function invalidField(message) {
-  return Object.assign(new Error(message), { status: 400, code: 'validation_error' });
+  return createApiError(400, 'validation_error', message);
 }
 
 export function normalizeNullableTrackInteger(value, field, minimum = 1) {

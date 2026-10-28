@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createApiError } from '../api-error.js';
 import { createOperatorArtistActivityService } from './operator-artist-activity-service.js';
 import { createOperatorArtistPostSaveService } from './operator-artist-post-save-service.js';
 import { getPool } from '../database.js';
@@ -33,33 +34,19 @@ import { normalizeOperatorTrackOverridePatch } from './operator-track-override-s
 import { createOperatorTrackOverrideStore } from './operator-track-override-store.js';
 
 function createMetadataNotFoundError(entityType, entityId) {
-  const error = new Error(`Metadata ${entityType} was not found: ${entityId}`);
-  error.status = 404;
-  error.code = 'metadata_not_found';
-  return error;
+  return createApiError(404, 'metadata_not_found', `Metadata ${entityType} was not found: ${entityId}`);
 }
 
 function createUserNotFoundError(userId) {
-  const error = new Error(`App user was not found: ${userId}`);
-  error.status = 404;
-  error.code = 'app_user_not_found';
-  return error;
+  return createApiError(404, 'app_user_not_found', `App user was not found: ${userId}`);
 }
 
 function createValidationError(message) {
-  const error = new Error(message);
-  error.status = 400;
-  error.code = 'validation_error';
-  return error;
+  return createApiError(400, 'validation_error', message);
 }
 
 function createSnapshotConflictError({ expectedSnapshotRevision, snapshotRevision }) {
-  const error = new Error(
-    `Artist Policy changed since it was loaded: expected snapshot revision ${expectedSnapshotRevision}, received ${snapshotRevision}`,
-  );
-  error.status = 409;
-  error.code = 'operator_artist_snapshot_conflict';
-  return error;
+  return createApiError(409, 'operator_artist_snapshot_conflict', `Artist Policy changed since it was loaded: expected snapshot revision ${expectedSnapshotRevision}, received ${snapshotRevision}`);
 }
 
 function isUniqueViolation(error) {

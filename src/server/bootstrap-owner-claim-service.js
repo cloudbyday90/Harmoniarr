@@ -17,6 +17,7 @@
  */
 
 import { timingSafeEqual } from 'node:crypto';
+import { createApiError } from './api-error.js';
 import { hashToken } from './security.js';
 import {
   normalizeEmail,
@@ -31,10 +32,7 @@ export const bootstrapOwnerUsernameEnvVar = 'HARMONIARR_BOOTSTRAP_OWNER_USERNAME
 const minimumClaimCodeLength = 16;
 
 function createBootstrapClaimApiError(status, code, message) {
-  const error = new Error(message);
-  error.status = status;
-  error.code = code;
-  return error;
+  return createApiError(status, code, message);
 }
 
 function maskEmail(email) {

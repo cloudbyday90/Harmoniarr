@@ -16,9 +16,9 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createApiError } from '../api-error.js';
+
 export function normalizeMetadataArtistReadView(value = 'full') {
   if (value === 'full' || value === 'summary') return value;
-  throw Object.assign(new Error('view must be full or summary'), {
-    status: 400, code: 'validation_error',
-  });
+  throw createApiError(400, 'validation_error', 'view must be full or summary');
 }

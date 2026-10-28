@@ -69,15 +69,7 @@ merge, release, tag or release-workflow dispatch is part of this change.
 
 ## Next recommended item
 
-Centralize safe unexpected HTTP error projection in a narrow ESM presentation
-module. The [shared handler](../src/server/app.js) currently returns a normalized
-error's code and message even for unexpected errors. This is a source finding,
-not a newly reproduced disclosure. Inventory intentional API/validation errors,
-preserve their useful bounded contracts and current database 503 behavior, and
-return a generic 500 for unexpected failures. Qualify raw SQL/native/path/secret
-sentinels through the actual HTTP handler and retain field validation semantics.
-
-This follows [OWASP's error-handling guidance](https://cheatsheetseries.owasp.org/cheatsheets/Error_Handling_Cheat_Sheet).
-The benefit is consistent bounded output across routes; the cost is a careful
-compatibility review of existing error consumers. Keep it separate from this
-provider-read change and from internal diagnostic/logging policy.
+The shared unexpected HTTP error boundary is now implemented. See its separate
+[design](HTTP_ERROR_DESIGN.md), [official research](HTTP_ERROR_RESEARCH_2026_10.md)
+and [outcome](HTTP_ERROR_OUTCOME.md) for explicit public-error provenance,
+compatibility migration, qualification limits and the next recommendation.

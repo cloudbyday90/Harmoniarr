@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createApiError } from '../api-error.js';
 import { getPool } from '../database.js';
 import { createMetadataArtistDiscographyService } from './metadata-artist-discography-service.js';
 import { createOperatorArtistDiscographyStore } from './operator-artist-discography-store.js';
@@ -29,7 +30,7 @@ export function createOperatorArtistDiscographyService({
 } = {}) {
   async function getOperatorArtistDiscography({ appUserId, ...pageOptions } = {}) {
     if (typeof appUserId !== 'string' || !appUserId.trim()) {
-      throw Object.assign(new Error('An authenticated operator is required'), { status: 401, code: 'unauthorized' });
+      throw createApiError(401, 'unauthorized', 'An authenticated operator is required');
     }
     const page = await catalogService.getArtistDiscography(pageOptions);
     if (page.releaseGroups.length === 0) return page;

@@ -17,16 +17,14 @@
  */
 
 import express from 'express';
+import { createApiError } from './api-error.js';
 
 const jsonMediaType = 'application/json';
 const jsonMediaTypeSuffix = '+json';
 const defaultApiRequestBodyLimitBytes = 1024 * 1024;
 
 function createHttpError(status, code, message) {
-  const error = new Error(message);
-  error.status = status;
-  error.code = code;
-  return error;
+  return createApiError(status, code, message);
 }
 
 function parseBoolean(value, fallback = false) {

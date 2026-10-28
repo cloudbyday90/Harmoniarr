@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createApiError } from '../api-error.js';
 import { createOperatorArtistProjectionService } from './operator-artist-projection-service.js';
 import { createOperatorArtistSaveService } from './operator-artist-save-service.js';
 import {
@@ -24,10 +25,7 @@ import {
 } from './operator-artist-manual-selection-draft.js';
 
 function createValidationError(message) {
-  const error = new Error(message);
-  error.status = 400;
-  error.code = 'validation_error';
-  return error;
+  return createApiError(400, 'validation_error', message);
 }
 
 function normalizeRequiredIdentifier(value, field) {

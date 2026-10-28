@@ -7,6 +7,13 @@ Security source: `docs/SECURITY_POLICY.md`
 
 ## Current Status (2026-10-27)
 
+October 28 unexpected HTTP error projection is implemented without database or
+schema changes. Intentional public API errors retain their contracts, while
+unknown native details receive generic 500 responses. Automatic maintenance
+remains unchanged. See the [design](HTTP_ERROR_DESIGN.md) and
+[outcome](HTTP_ERROR_OUTCOME.md). Next review route-local error normalizers and
+redirect/direct-response boundaries; they remain separate projection owners.
+
 October 28 provider status aggregation is implemented without SQL/schema changes
 or a persisted status cache. Status GETs preserve settings/secrets/audit bytes;
 existing automatic schema maintenance remains. See the separate

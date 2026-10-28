@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createApiError } from '../api-error.js';
 import { normalizeExpectedSnapshotRevision } from './operator-artist-snapshot-revision.js';
 
 import { createOperatorArtistProjectionService } from './operator-artist-projection-service.js';
@@ -26,17 +27,11 @@ import {
 } from './operator-artist-manual-selection-draft.js';
 
 function createSelectionConflictError(message) {
-  const error = new Error(message);
-  error.status = 409;
-  error.code = 'manual_edition_selection_stale';
-  return error;
+  return createApiError(409, 'manual_edition_selection_stale', message);
 }
 
 function createValidationError(message) {
-  const error = new Error(message);
-  error.status = 400;
-  error.code = 'validation_error';
-  return error;
+  return createApiError(400, 'validation_error', message);
 }
 
 function normalizeRequiredIdentifier(value, field) {

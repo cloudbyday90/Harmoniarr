@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createApiError } from '../api-error.js';
 import { getPool } from '../database.js';
 import {
   defaultOperatorReleaseGroupSelectionPolicy,
@@ -26,24 +27,15 @@ import {
 import { createOperatorReleaseGroupSelectionStore } from './operator-release-group-selection-store.js';
 
 function createMetadataNotFoundError(entityType, entityId) {
-  const error = new Error(`Metadata ${entityType} was not found: ${entityId}`);
-  error.status = 404;
-  error.code = 'metadata_not_found';
-  return error;
+  return createApiError(404, 'metadata_not_found', `Metadata ${entityType} was not found: ${entityId}`);
 }
 
 function createUserNotFoundError(userId) {
-  const error = new Error(`App user was not found: ${userId}`);
-  error.status = 404;
-  error.code = 'app_user_not_found';
-  return error;
+  return createApiError(404, 'app_user_not_found', `App user was not found: ${userId}`);
 }
 
 function createValidationError(message) {
-  const error = new Error(message);
-  error.status = 400;
-  error.code = 'validation_error';
-  return error;
+  return createApiError(400, 'validation_error', message);
 }
 
 function normalizeEnumValue({ allowedValues, fallback, field, value }) {

@@ -16,15 +16,13 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createApiError } from '../api-error.js';
 import { getPool } from '../database.js';
 import { createOperatorArtistMonitoringStore } from './operator-artist-monitoring-store.js';
 import { createOperatorArtistProjectionService } from './operator-artist-projection-service.js';
 
 function createUserNotFoundError(userId) {
-  const error = new Error(`App user was not found: ${userId}`);
-  error.status = 404;
-  error.code = 'app_user_not_found';
-  return error;
+  return createApiError(404, 'app_user_not_found', `App user was not found: ${userId}`);
 }
 
 function normalizeLimit(limit, defaultValue = 25, maxValue = 50) {
@@ -34,10 +32,7 @@ function normalizeLimit(limit, defaultValue = 25, maxValue = 50) {
 
   const numericLimit = Number(limit);
   if (!Number.isInteger(numericLimit) || numericLimit <= 0) {
-    const error = new Error('limit must be a positive integer');
-    error.status = 400;
-    error.code = 'validation_error';
-    throw error;
+    throw createApiError(400, 'validation_error', 'limit must be a positive integer');
   }
 
   return Math.min(numericLimit, maxValue);

@@ -2,6 +2,12 @@
 
 ## Purpose
 
+The terminal HTTP error boundary now preserves explicit public API errors and
+returns generic unexpected failures, including native SQL diagnostics. Existing
+database connection normalization remains a bounded 503. No SQL/schema artifact,
+persisted diagnostic, maintenance job or transaction policy changes. See the
+[design](HTTP_ERROR_DESIGN.md) and [outcome](HTTP_ERROR_OUTCOME.md).
+
 Provider status now isolates failed local observations in a read-only aggregate.
 Healthy owner payloads pass through; recognized database/lookup failures remain
 503. No status cache, persisted validation, migration, schema artifact or new

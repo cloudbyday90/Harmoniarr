@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createApiError } from '../api-error.js';
 import { runParallelTasksAndDrain } from '../parallel-task-drain.js';
 import { getPool } from '../database.js';
 import {
@@ -30,17 +31,11 @@ import {
 import { createOperatorArtistMonitoringStore } from './operator-artist-monitoring-store.js';
 
 function createMetadataNotFoundError(entityType, entityId) {
-  const error = new Error(`Metadata ${entityType} was not found: ${entityId}`);
-  error.status = 404;
-  error.code = 'metadata_not_found';
-  return error;
+  return createApiError(404, 'metadata_not_found', `Metadata ${entityType} was not found: ${entityId}`);
 }
 
 function createUserNotFoundError(userId) {
-  const error = new Error(`App user was not found: ${userId}`);
-  error.status = 404;
-  error.code = 'app_user_not_found';
-  return error;
+  return createApiError(404, 'app_user_not_found', `App user was not found: ${userId}`);
 }
 
 function normalizeEnumValue({ field, value, allowedValues, fallback }) {
@@ -49,10 +44,7 @@ function normalizeEnumValue({ field, value, allowedValues, fallback }) {
     : fallback;
 
   if (!allowedValues.includes(resolved)) {
-    const error = new Error(`Unsupported ${field}: ${resolved}`);
-    error.status = 400;
-    error.code = 'validation_error';
-    throw error;
+    throw createApiError(400, 'validation_error', `Unsupported ${field}: ${resolved}`);
   }
 
   return resolved;
@@ -72,10 +64,7 @@ export function normalizeOperatorArtistMonitoringPatch(patch = {}) {
   } = patch;
 
   if (typeof isMonitored !== 'boolean') {
-    const error = new Error('isMonitored must be a boolean');
-    error.status = 400;
-    error.code = 'validation_error';
-    throw error;
+    throw createApiError(400, 'validation_error', 'isMonitored must be a boolean');
   }
 
   const normalizedTypes = Array.isArray(monitoredReleaseGroupTypes)
@@ -85,18 +74,12 @@ export function normalizeOperatorArtistMonitoringPatch(patch = {}) {
     : [...defaultOperatorArtistMonitoringPolicy.monitoredReleaseGroupTypes];
 
   if (normalizedTypes.length === 0) {
-    const error = new Error('monitoredReleaseGroupTypes must include at least one entry');
-    error.status = 400;
-    error.code = 'validation_error';
-    throw error;
+    throw createApiError(400, 'validation_error', 'monitoredReleaseGroupTypes must include at least one entry');
   }
 
   for (const type of normalizedTypes) {
     if (!operatorArtistMonitoringReleaseGroupTypes.includes(type)) {
-      const error = new Error(`Unsupported monitored release-group type: ${type}`);
-      error.status = 400;
-      error.code = 'validation_error';
-      throw error;
+      throw createApiError(400, 'validation_error', `Unsupported monitored release-group type: ${type}`);
     }
   }
 

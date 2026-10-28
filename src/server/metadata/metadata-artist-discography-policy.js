@@ -17,11 +17,12 @@
  */
 
 import { Buffer } from 'node:buffer';
+import { createApiError } from '../api-error.js';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 
 function invalid(message) {
-  return Object.assign(new Error(message), { status: 400, code: 'validation_error' });
+  return createApiError(400, 'validation_error', message);
 }
 
 export function encodeArtistDiscographyCursor(metadataArtistId, afterId) {

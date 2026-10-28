@@ -16,11 +16,10 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createApiError } from './api-error.js';
+
 function createValidationError(message) {
-  const error = new Error(message);
-  error.code = 'validation_error';
-  error.status = 400;
-  return error;
+  return createApiError(400, 'validation_error', message);
 }
 
 export function normalizeTimelinePageLimit(limit, { defaultLimit = 10, maxLimit = 25 } = {}) {
