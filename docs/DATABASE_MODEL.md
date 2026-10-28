@@ -2,6 +2,12 @@
 
 ## Purpose
 
+Provider status now isolates failed local observations in a read-only aggregate.
+Healthy owner payloads pass through; recognized database/lookup failures remain
+503. No status cache, persisted validation, migration, schema artifact or new
+maintenance job is introduced. Existing automatic maintenance remains. See the
+[design](PROVIDER_STATUS_DESIGN.md) and [outcome](PROVIDER_STATUS_OUTCOME.md).
+
 Settings now displays the existing saved Apple local-signing summary through a
 bounded client request owner, separately from credential drafts. It introduces
 no server, encryption, SQL/schema or persisted validation changes. See the

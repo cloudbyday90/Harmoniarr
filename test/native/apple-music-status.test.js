@@ -80,7 +80,9 @@ test('Apple status separates presence and local validity through read-only authe
     await stored(first);
     const encrypted = (await pool.query("SELECT encrypted_value FROM encrypted_secrets WHERE name='providers.appleMusic.privateKey'")).rows[0].encrypted_value;
     await pool.query("UPDATE encrypted_secrets SET encrypted_value=$1 WHERE name='providers.appleMusic.privateKey'", [Buffer.from('PRIVATE-status-sentinel')]);
-    assert.deepEqual((await read(path, 500)).error, { code: 'apple_music_status_unavailable', message: 'Apple Music signing status is unavailable' }); results.push('corrupt-storage-is-bounded-failure');
+    const partial = await read();
+    assert.deepEqual(partial.appleMusic, { provider: 'apple_music', availability: 'unavailable', code: 'provider_status_unavailable' });
+    assert.deepEqual(partial.statusSummary, { state: 'partial', unavailableProviders: ['appleMusic'] }); results.push('corrupt-storage-is-isolated-unavailable');
     await pool.query("UPDATE encrypted_secrets SET encrypted_value=$1 WHERE name='providers.appleMusic.privateKey'", [encrypted]);
     await status('valid', true, valid); results.push('recovery-after-storage-failure');
     const overview = await read('/api/v1/system/overview'); assert.deepEqual(overview.providers.appleMusic.localSigning, { state: 'valid', checks: valid }); results.push('administrator-system-overview-consumer');

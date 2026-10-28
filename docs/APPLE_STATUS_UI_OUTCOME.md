@@ -74,11 +74,8 @@ a release/tag or PR merge.
 
 ## Next recommended item
 
-Introduce a narrow provider-status aggregation service with bounded per-provider
-unavailable results for provider-specific credential failures. The current
-[route](../src/server/routes/provider-routes.js) uses Promise.all, so one owner
-failure rejects the whole response; this is a source finding, not a new reproduced
-vulnerability. Preserve authenticated/no-store access and common database-outage
-handling, and keep unavailable distinct from invalid credentials and remote
-connection rejection. The UI already refuses malformed/missing Apple checks as
-unavailable; define and test a deliberate shared response contract before changing it.
+The narrow provider-status aggregation service is now implemented in the
+[design](PROVIDER_STATUS_DESIGN.md) and [outcome](PROVIDER_STATUS_OUTCOME.md).
+It preserves healthy sibling observations, explicit unavailable state,
+authenticated/no-store access and recognized shared database failures as 503.
+See that outcome for the next recommendation and its qualification limits.

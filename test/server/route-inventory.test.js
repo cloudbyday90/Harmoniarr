@@ -300,10 +300,7 @@ function collectRegisteredRoutes() {
   });
 
   registerProviderRoutes(app, {
-    buildAppleMusicStatus: asyncNoopResult({}),
-    buildPlexLinkStatus: asyncNoopResult({}),
-    buildSpotifyOAuthStatus: asyncNoopResult({}),
-    buildYoutubeOAuthStatus: asyncNoopResult({}),
+    buildProviderStatuses: asyncNoopResult({}),
     clearPlexLink: asyncNoopResult({}),
     clearSpotifyAuthorization: asyncNoopResult({}),
     clearYoutubeAuthorization: asyncNoopResult({}),

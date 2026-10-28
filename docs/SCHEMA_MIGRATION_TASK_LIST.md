@@ -7,6 +7,13 @@ Security source: `docs/SECURITY_POLICY.md`
 
 ## Current Status (2026-10-27)
 
+October 28 provider status aggregation is implemented without SQL/schema changes
+or a persisted status cache. Status GETs preserve settings/secrets/audit bytes;
+existing automatic schema maintenance remains. See the separate
+[design](PROVIDER_STATUS_DESIGN.md) and [outcome](PROVIDER_STATUS_OUTCOME.md).
+Next: centralize bounded unexpected HTTP error projection while retaining
+intentional validation errors; no new schema maintenance action is needed.
+
 October 26, 2026 preparation hardening: fresh snapshot publication now requires
 complete migration lineage and 164 independently generated critical schema facts
 inside the same transaction. Historical SQL is unchanged. See the

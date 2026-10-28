@@ -17,6 +17,7 @@
  */
 
 import { readFile } from 'node:fs/promises';
+import { createProviderStatusService } from './integrations/providers/provider-status-service.js';
 import { buildHeartbeatOverviewList, resolveHeartbeatOverviewState } from './heartbeat/heartbeat-overview.js';
 import { getPool } from './database.js';
 import { createDependencyHealthService } from './dependency-health-service.js';
@@ -108,6 +109,11 @@ export function createSystemService({
   getPoolFn = getPool,
   readPackageMetadataFn = async (path) => JSON.parse(await readFile(path, 'utf8')),
   settingsService = createSettingsService(),
+  providerStatusService = createProviderStatusService({ readers: {
+    spotify: queryable => spotifyOAuthService?.buildStatus(queryable) ?? null,
+    youtube: queryable => youtubeOAuthService?.buildStatus(queryable) ?? null,
+    appleMusic: queryable => appleMusicStatusService?.buildStatus(queryable) ?? null,
+  } }),
 }) {
   let packageMetadata;
 
@@ -255,13 +261,9 @@ export function createSystemService({
       : 0;
 
     if (includeDependencies) observe('provider_status');
-    const [spotifyStatus, youtubeStatus, appleMusicStatus] = includeDependencies
-      ? await Promise.all([
-          spotifyOAuthService?.buildStatus(pool) ?? null,
-          youtubeOAuthService?.buildStatus(pool) ?? null,
-          appleMusicStatusService?.buildStatus(pool) ?? null,
-        ])
-      : [null, null, null];
+    const providerStatuses = includeDependencies
+      ? await providerStatusService.buildStatuses({ queryable: pool })
+      : { appleMusic: null, spotify: null, youtube: null, statusSummary: null };
 
     observe('overview_projection');
     const overview = {
@@ -296,11 +298,7 @@ export function createSystemService({
       },
       dependencies,
       pathValidation: createPathValidationSummary(settingsPayload),
-      providers: {
-        appleMusic: appleMusicStatus,
-        spotify: spotifyStatus,
-        youtube: youtubeStatus,
-      },
+      providers: providerStatuses,
       runtime: observeWork('runtime_projection', () => buildRuntimeOverview({
         artworkAdmission: getRuntimeDiagnostics().artworkAdmission,
         runtimeResourceMonitor,

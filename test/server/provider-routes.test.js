@@ -6,15 +6,14 @@ import { createJsonTestApp, withServer } from '../../testing/server/http-test-he
 function createProviderRouteTestApp(overrides = {}) {
   return createJsonTestApp((app) => {
     registerProviderRoutes(app, {
-      buildAppleMusicStatus: async () => ({
+      buildProviderStatuses: async () => ({ appleMusic: {
         configured: false,
         provider: 'apple_music',
         storefront: 'us',
         teamIdConfigured: false,
         keyIdConfigured: false,
         privateKeyConfigured: false,
-      }),
-      buildPlexLinkStatus: async () => ({
+      }, plex: {
         linked: false,
         linkedAt: null,
         linkedUserEmail: null,
@@ -24,21 +23,19 @@ function createProviderRouteTestApp(overrides = {}) {
         linkedUserUuid: null,
         thumbUrl: null,
         updatedAt: null,
-      }),
-      buildSpotifyOAuthStatus: async () => ({
+      }, spotify: {
         linked: false,
         scope: null,
         tokenExpiresAt: null,
         tokenType: null,
         updatedAt: null,
-      }),
-      buildYoutubeOAuthStatus: async () => ({
+      }, youtube: {
         linked: false,
         scope: null,
         tokenExpiresAt: null,
         tokenType: null,
         updatedAt: null,
-      }),
+      }, statusSummary: { state: 'complete', unavailableProviders: [] } }),
       clearPlexLink: async () => ({
         provider: 'plex',
         status: { linked: false },
@@ -97,6 +94,7 @@ test('GET /api/v1/providers/status returns unified provider status', async () =>
     assert.equal(body.appleMusic.configured, false);
     assert.equal(body.appleMusic.provider, 'apple_music');
     assert.equal(body.appleMusic.storefront, 'us');
+    assert.deepEqual(body.statusSummary, { state: 'complete', unavailableProviders: [] });
   });
 });
 

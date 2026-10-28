@@ -58,10 +58,7 @@ function settingsRedirectUrl(provider, status, code = null) {
 }
 
 export function registerProviderRoutes(app, {
-  buildAppleMusicStatus,
-  buildPlexLinkStatus,
-  buildSpotifyOAuthStatus,
-  buildYoutubeOAuthStatus,
+  buildProviderStatuses,
   checkProviderCollectionAccess,
   clearPlexLink,
   clearSpotifyAuthorization,
@@ -87,19 +84,7 @@ export function registerProviderRoutes(app, {
   app.get('/api/v1/providers/status', asyncRoute(async (request, response) => {
     await requireSession(request);
 
-    const [plex, spotify, youtube, appleMusic] = await Promise.all([
-      buildPlexLinkStatus(),
-      buildSpotifyOAuthStatus(),
-      buildYoutubeOAuthStatus(),
-      buildAppleMusicStatus(),
-    ]);
-
-    response.json({
-      appleMusic,
-      plex,
-      spotify,
-      youtube,
-    });
+    response.json(await buildProviderStatuses());
   }));
 
   app.post('/api/v1/providers/plex/link/start', limitProviderOAuthStart, asyncRoute(async (request, response) => {

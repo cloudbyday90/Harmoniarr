@@ -24,6 +24,7 @@ import { createYouTubeOAuthService } from './integrations/youtube/youtube-oauth-
 import { createProviderHttpService } from './integrations/providers/provider-http-service.js';
 import { createProviderClientResolverService } from './integrations/providers/provider-client-resolver-service.js';
 import { createProviderCollectionAccessCheckService } from './integrations/providers/provider-collection-access-check-service.js';
+import { createProviderStatusService } from './integrations/providers/provider-status-service.js';
 
 export function createProviderModule({
   providerHttpService = createProviderHttpService(),
@@ -32,6 +33,12 @@ export function createProviderModule({
   plexOwnerLinkService = createPlexOwnerLinkService({ plexHttpClient }),
   spotifyOAuthService = createSpotifyOAuthService({ providerHttpService }),
   youtubeOAuthService = createYouTubeOAuthService({ providerHttpService }),
+  providerStatusService = createProviderStatusService({ readers: {
+    plex: queryable => plexOwnerLinkService.buildStatus(queryable),
+    spotify: queryable => spotifyOAuthService.buildStatus(queryable),
+    youtube: queryable => youtubeOAuthService.buildStatus(queryable),
+    appleMusic: queryable => appleMusicStatusService.buildStatus(queryable),
+  } }),
   providerClientResolverService = createProviderClientResolverService({ spotifyOAuthService, youtubeOAuthService, providerHttpService }),
   providerCollectionAccessCheckService = createProviderCollectionAccessCheckService({
     resolveProviderClient: providerClientResolverService.resolveProviderClient,
@@ -39,6 +46,7 @@ export function createProviderModule({
 } = {}) {
   return {
     providerHttpService,
+    providerStatusService,
     appleMusicStatusService,
     plexOwnerLinkService,
     spotifyOAuthService,
@@ -46,10 +54,7 @@ export function createProviderModule({
     providerCollectionAccessCheckService,
     routeDependencies: {
       checkProviderCollectionAccess: providerCollectionAccessCheckService.checkCollectionAccess,
-      buildAppleMusicStatus: appleMusicStatusService.buildStatus,
-      buildPlexLinkStatus: plexOwnerLinkService.buildStatus,
-      buildSpotifyOAuthStatus: spotifyOAuthService.buildStatus,
-      buildYoutubeOAuthStatus: youtubeOAuthService.buildStatus,
+      buildProviderStatuses: providerStatusService.buildStatuses,
       clearPlexLink: plexOwnerLinkService.clearLink,
       clearSpotifyAuthorization: spotifyOAuthService.clearAuthorization,
       clearYoutubeAuthorization: youtubeOAuthService.clearAuthorization,
