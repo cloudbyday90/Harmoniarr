@@ -74,6 +74,7 @@ const {
   isSaving,
   isStartingSpotifyOAuth,
   isStartingYouTubeOAuth,
+  isProviderAuthorizationPending,
   isDirty,
   loadErrorMessage,
   loadSettings,
@@ -105,14 +106,14 @@ const soulseekProviderState = computed(() => buildSettingsSoulseekProviderState(
     ? secretStatus.value?.slskd?.providerModeState
     : null,
 }));
-const settingsSaveState = computed(() => buildSettingsSaveState({
+const settingsSaveState = computed(() => ({ ...buildSettingsSaveState({
   hasSaved: hasSaved.value,
   isDirty: isDirty.value,
   isSaving: isSaving.value,
   requiresVerification: requiresConnectionVerification.value,
   saveErrorMessage: saveErrorMessage.value,
   successMessage: successMessage.value,
-}));
+}), ...(isProviderAuthorizationPending.value ? { canSubmit: false } : {}) }));
 
 async function refreshProviderRepairConfirmation() {
   await Promise.all([
@@ -130,6 +131,7 @@ async function refreshProviderRepairConfirmation() {
 }
 
 async function handleSaveSettings() {
+  if (isProviderAuthorizationPending.value) return;
   clearConnectionActionFeedback();
   providerRepairConfirmation.value = null;
   const shouldVerifySavedConnection = isExternalSoulseek.value && isDirty.value;
@@ -380,11 +382,11 @@ onMounted(() => {
                   {{ secretStatus?.providers?.spotifyOAuth?.linked ? 'Linked' : 'Not linked' }}
                 </span>
               </div>
-              <div class="hx-card-actions">
-                <button type="button" class="hx-btn" @click="connectSpotifyOAuth" :disabled="isStartingSpotifyOAuth">
+              <div class="hx-card-actions settings-connections__authorization-actions">
+                <button type="button" class="hx-btn" @click="connectSpotifyOAuth" :aria-disabled="isProviderAuthorizationPending || isSaving">
                   {{ isStartingSpotifyOAuth ? 'Starting…' : 'Connect Spotify' }}
                 </button>
-                <button type="button" class="hx-btn" @click="disconnectSpotifyOAuth" :disabled="isClearingSpotifyOAuth || !secretStatus?.providers?.spotifyOAuth?.linked">
+                <button type="button" class="hx-btn" @click="disconnectSpotifyOAuth" :aria-disabled="isProviderAuthorizationPending || isSaving || !secretStatus?.providers?.spotifyOAuth?.linked">
                   {{ isClearingSpotifyOAuth ? 'Clearing…' : 'Clear authorization' }}
                 </button>
               </div>
@@ -432,11 +434,11 @@ onMounted(() => {
                   {{ secretStatus?.providers?.youtubeOAuth?.linked ? 'Linked' : 'Not linked' }}
                 </span>
               </div>
-              <div class="hx-card-actions">
-                <button type="button" class="hx-btn" @click="connectYouTubeOAuth" :disabled="isStartingYouTubeOAuth">
+              <div class="hx-card-actions settings-connections__authorization-actions">
+                <button type="button" class="hx-btn" @click="connectYouTubeOAuth" :aria-disabled="isProviderAuthorizationPending || isSaving">
                   {{ isStartingYouTubeOAuth ? 'Starting…' : 'Connect YouTube' }}
                 </button>
-                <button type="button" class="hx-btn" @click="disconnectYouTubeOAuth" :disabled="isClearingYouTubeOAuth || !secretStatus?.providers?.youtubeOAuth?.linked">
+                <button type="button" class="hx-btn" @click="disconnectYouTubeOAuth" :aria-disabled="isProviderAuthorizationPending || isSaving || !secretStatus?.providers?.youtubeOAuth?.linked">
                   {{ isClearingYouTubeOAuth ? 'Clearing…' : 'Clear authorization' }}
                 </button>
               </div>
@@ -519,12 +521,13 @@ onMounted(() => {
       </div>
 
       <p
-        v-if="connectionActionFeedback"
-        class="hx-alert"
-        :data-tone="connectionActionFeedback.tone"
-        :role="connectionActionFeedback.tone === 'danger' ? 'alert' : 'status'"
+        class="settings-connections__authorization-feedback"
+        :class="{ 'hx-alert': connectionActionFeedback }"
+        :data-tone="connectionActionFeedback?.tone"
+        role="status"
+        aria-atomic="true"
       >
-        {{ connectionActionFeedback.message }}
+        {{ connectionActionFeedback?.message ?? '' }}
       </p>
       <SettingsSaveBar :save-state="settingsSaveState" @verify="testProviderConnection" />
     </form>
@@ -532,6 +535,20 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.settings-connections__authorization-actions .hx-btn { min-height: 44px; }
+.settings-connections__authorization-actions .hx-btn[aria-disabled="true"] {
+  background: var(--hx-bg-surface-muted);
+  color: var(--hx-text-muted);
+  cursor: default;
+}
+.settings-connections__authorization-feedback { margin: 0; }
+.settings-connections__authorization-feedback.hx-alert {
+  background: var(--hx-bg-surface);
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-sm);
+  padding: var(--hx-space-3);
+}
+.settings-connections__authorization-feedback[data-tone="danger"] { border-color: var(--hx-danger); }
 .settings-connections__advanced-stack {
   display: grid;
   gap: var(--hx-space-4);

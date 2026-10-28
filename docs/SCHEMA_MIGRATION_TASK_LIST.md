@@ -7,6 +7,11 @@ Security source: `docs/SECURITY_POLICY.md`
 
 ## Current Status (2026-10-28)
 
+October 28 Spotify/YouTube start and clear actions now share scoped client pending
+ownership, preserving existing API/session/CSRF and transaction authority.
+No schema or maintenance changes. See the [design](PROVIDER_AUTHORIZATION_ACTIONS_DESIGN.md)
+and [outcome](PROVIDER_AUTHORIZATION_ACTIONS_OUTCOME.md).
+
 October 28 callback recovery feedback is implemented in the existing Settings
 workspace. The existing provider-status GET supplies last-check observations;
 query hints never establish saved state. No schema or maintenance changes are

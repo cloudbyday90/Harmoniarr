@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { readonly, ref } from 'vue';
+import { computed, readonly, ref } from 'vue';
 import {
   clearSpotifyOAuth,
   clearYouTubeOAuth,
@@ -24,6 +24,7 @@ import {
   startYouTubeOAuth,
 } from '../lib/settings-api.js';
 import { useSettingsForm } from './useSettingsForm.js';
+import { useProviderAuthorizationActions } from './useProviderAuthorizationActions.js';
 
 function defaultRedirectToUrl(url) {
   window.location.href = url;
@@ -35,10 +36,6 @@ function updateOAuthStatus(secretStatus, providerKey, status) {
   }
 }
 
-function buildOAuthActionFailureMessage(providerName, action) {
-  return `${providerName} authorization could not ${action}. Try again.`;
-}
-
 export function useConnections({
   clearSpotifyOAuthFn = clearSpotifyOAuth,
   clearYouTubeOAuthFn = clearYouTubeOAuth,
@@ -48,11 +45,6 @@ export function useConnections({
   useSettingsFormFn = useSettingsForm,
   onSaveSuccess,
 } = {}) {
-  const isStartingSpotifyOAuth = ref(false);
-  const isClearingSpotifyOAuth = ref(false);
-  const isStartingYouTubeOAuth = ref(false);
-  const isClearingYouTubeOAuth = ref(false);
-  const connectionActionFeedback = ref(null);
   const secretStatus = ref(null);
 
   const settingsForm = useSettingsFormFn({
@@ -74,87 +66,41 @@ export function useConnections({
     isLoading,
     isSaving,
     loadErrorMessage,
-    loadSettings,
+    loadSettings: loadSettingsForm,
     saveErrorMessage,
-    saveSettings,
+    saveSettings: saveSettingsForm,
     successMessage,
   } = settingsForm;
 
-  function clearConnectionActionFeedback() {
-    connectionActionFeedback.value = null;
-  }
-
-  async function connectSpotifyOAuth() {
-    isStartingSpotifyOAuth.value = true;
-    connectionActionFeedback.value = null;
-    errorMessage.value = '';
-    try {
-      const payload = await startSpotifyOAuthFn();
-      redirectToUrl(payload.authorizationUrl);
-    } catch {
-      const message = buildOAuthActionFailureMessage('Spotify', 'start');
-      errorMessage.value = message;
-      connectionActionFeedback.value = { message, tone: 'danger' };
-      isStartingSpotifyOAuth.value = false;
-    }
-  }
-
-  async function disconnectSpotifyOAuth() {
-    isClearingSpotifyOAuth.value = true;
-    connectionActionFeedback.value = null;
-    errorMessage.value = '';
-    try {
-      const payload = await clearSpotifyOAuthFn();
-      updateOAuthStatus(secretStatus, 'spotifyOAuth', payload.status);
-      successMessage.value = 'Spotify authorization cleared.';
-      connectionActionFeedback.value = { message: successMessage.value, tone: 'success' };
-    } catch {
-      const message = buildOAuthActionFailureMessage('Spotify', 'be cleared');
-      errorMessage.value = message;
-      connectionActionFeedback.value = { message, tone: 'danger' };
-    } finally {
-      isClearingSpotifyOAuth.value = false;
-    }
-  }
-
-  async function connectYouTubeOAuth() {
-    isStartingYouTubeOAuth.value = true;
-    connectionActionFeedback.value = null;
-    errorMessage.value = '';
-    try {
-      const payload = await startYouTubeOAuthFn();
-      redirectToUrl(payload.authorizationUrl);
-    } catch {
-      const message = buildOAuthActionFailureMessage('YouTube', 'start');
-      errorMessage.value = message;
-      connectionActionFeedback.value = { message, tone: 'danger' };
-      isStartingYouTubeOAuth.value = false;
-    }
-  }
-
-  async function disconnectYouTubeOAuth() {
-    isClearingYouTubeOAuth.value = true;
-    connectionActionFeedback.value = null;
-    errorMessage.value = '';
-    try {
-      const payload = await clearYouTubeOAuthFn();
-      updateOAuthStatus(secretStatus, 'youtubeOAuth', payload.status);
-      successMessage.value = 'YouTube authorization cleared.';
-      connectionActionFeedback.value = { message: successMessage.value, tone: 'success' };
-    } catch {
-      const message = buildOAuthActionFailureMessage('YouTube', 'be cleared');
-      errorMessage.value = message;
-      connectionActionFeedback.value = { message, tone: 'danger' };
-    } finally {
-      isClearingYouTubeOAuth.value = false;
-    }
-  }
+  const actions = useProviderAuthorizationActions({
+    start: { spotify: startSpotifyOAuthFn, youtube: startYouTubeOAuthFn },
+    clear: { spotify: clearSpotifyOAuthFn, youtube: clearYouTubeOAuthFn },
+    redirectToUrl,
+    canRun: (provider, kind) => !isLoading.value && !isSaving.value
+      && (kind === 'start' || secretStatus.value?.providers?.[`${provider}OAuth`]?.linked === true),
+    onCleared: (provider, status) => updateOAuthStatus(secretStatus, `${provider}OAuth`, status),
+    onFeedback: feedback => {
+      errorMessage.value = feedback?.tone === 'danger' ? feedback.message : '';
+      successMessage.value = feedback?.tone === 'success' ? feedback.message : '';
+    },
+  });
+  const isStartingSpotifyOAuth = computed(() => actions.pendingAction.value === 'spotify_start');
+  const isClearingSpotifyOAuth = computed(() => actions.pendingAction.value === 'spotify_clear');
+  const isStartingYouTubeOAuth = computed(() => actions.pendingAction.value === 'youtube_start');
+  const isClearingYouTubeOAuth = computed(() => actions.pendingAction.value === 'youtube_clear');
+  const connectSpotifyOAuth = () => actions.run('spotify', 'start');
+  const disconnectSpotifyOAuth = () => actions.run('spotify', 'clear');
+  const connectYouTubeOAuth = () => actions.run('youtube', 'start');
+  const disconnectYouTubeOAuth = () => actions.run('youtube', 'clear');
+  async function loadSettings() { if (!actions.isPending.value) return loadSettingsForm(); }
+  async function saveSettings() { return actions.isPending.value ? { ok: false } : saveSettingsForm(); }
 
   return {
     connectSpotifyOAuth,
     connectYouTubeOAuth,
-    clearConnectionActionFeedback,
-    connectionActionFeedback: readonly(connectionActionFeedback),
+    clearConnectionActionFeedback: actions.clearFeedback,
+    connectionActionFeedback: actions.feedback,
+    isProviderAuthorizationPending: actions.isPending,
     disconnectSpotifyOAuth,
     disconnectYouTubeOAuth,
     errorMessage,

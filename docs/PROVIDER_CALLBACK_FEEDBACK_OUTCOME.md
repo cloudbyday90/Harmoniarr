@@ -84,13 +84,13 @@ GitHub MCP found zero open PRs initially and at the final check recorded at
 **2026-10-28 13:39:14 UTC**. Random PR implementation and stale Dependabot cleanup/
 rebasing were inapplicable. Work is on main without a PR merge, release or Git tag.
 
-## Next recommended item
+## Next recommended item (implemented)
 
 Add an explicit pending owner for existing Spotify/YouTube connect and clear
 handlers in [useConnections](../src/client/composables/useConnections.js).
-They currently set independent UI flags without handler-level duplicate or
-competing-action admission. Their shared feedback can also be overwritten by
-overlapping actions. This is a source finding for the next task, not a reproduced
+They previously set independent UI flags without handler-level duplicate or
+competing-action admission. Their shared feedback could also be overwritten by
+overlapping actions. This was a source finding for this task, not a reproduced
 server publication failure; existing native authority/fence proof remains valid.
 
 Keep the orchestration modular, guard ordinary and programmatic activation,
@@ -98,3 +98,8 @@ preserve useful focus and current server-derived results, and retain the existin
 fresh-admin/CSRF/state owners. Do not retry uncertain POSTs automatically. Verify
 held start/clear responses, cross-action contention, failure/recovery and eventual
 navigation through the real built UI before extending the command behavior.
+
+This owner is now implemented; see the separate
+[research](PROVIDER_AUTHORIZATION_ACTIONS_RESEARCH_2026_10.md),
+[design](PROVIDER_AUTHORIZATION_ACTIONS_DESIGN.md) and
+[outcome](PROVIDER_AUTHORIZATION_ACTIONS_OUTCOME.md) for qualification and the next item.

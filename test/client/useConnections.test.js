@@ -7,7 +7,7 @@ function createSettingsFormStub() {
   return ({ extraApply } = {}) => ({
     errorMessage: ref(''),
     form: { providers: {}, slskd: {} },
-    isLoading: ref(true),
+    isLoading: ref(false),
     isSaving: ref(false),
     loadSettings: async () => {
       extraApply?.({
@@ -60,9 +60,9 @@ test('useConnections connectSpotifyOAuth resets state and surfaces error on fail
 
   await connections.connectSpotifyOAuth();
 
-  assert.equal(connections.errorMessage.value, 'Spotify authorization could not start. Try again.');
+  assert.equal(connections.errorMessage.value, 'Spotify authorization start could not be confirmed. Review Connections before trying again.');
   assert.deepEqual(connections.connectionActionFeedback.value, {
-    message: 'Spotify authorization could not start. Try again.',
+    message: 'Spotify authorization start could not be confirmed. Review Connections before trying again.',
     tone: 'danger',
   });
   assert.equal(connections.isStartingSpotifyOAuth.value, false);
@@ -110,9 +110,9 @@ test('useConnections disconnectYouTubeOAuth updates secretStatus and surfaces cl
   await connections.disconnectYouTubeOAuth();
 
   assert.equal(connections.secretStatus.value.providers.youtubeOAuth.linked, true);
-  assert.equal(connections.errorMessage.value, 'YouTube authorization could not be cleared. Try again.');
+  assert.equal(connections.errorMessage.value, 'YouTube authorization clear could not be confirmed. Review Connections before trying again.');
   assert.deepEqual(connections.connectionActionFeedback.value, {
-    message: 'YouTube authorization could not be cleared. Try again.',
+    message: 'YouTube authorization clear could not be confirmed. Review Connections before trying again.',
     tone: 'danger',
   });
   assert.equal(connections.isClearingYouTubeOAuth.value, false);
@@ -129,4 +129,30 @@ test('useConnections clears stale connection action feedback before another sett
   connections.clearConnectionActionFeedback();
 
   assert.equal(connections.connectionActionFeedback.value, null);
+});
+
+test('useConnections coordinates settings and authorization admission and requires saved clear eligibility', async () => {
+  let starts = 0, clears = 0, loads = 0, saves = 0;
+  const held = Promise.withResolvers();
+  const connections = useConnections({
+    startSpotifyOAuthFn: () => { starts++; return held.promise; },
+    clearSpotifyOAuthFn: async () => { clears++; return { status: { linked: false } }; },
+    useSettingsFormFn: options => {
+      const form = createSettingsFormStub()(options);
+      const load = form.loadSettings;
+      return { ...form, loadSettings: async () => { loads++; await load(); }, saveSettings: async () => { saves++; return { ok: true }; } };
+    },
+  });
+  await connections.disconnectSpotifyOAuth(); assert.equal(clears, 0);
+  connections.isLoading.value = true; await connections.connectSpotifyOAuth(); assert.equal(starts, 0);
+  connections.isLoading.value = false; connections.isSaving.value = true;
+  await connections.connectSpotifyOAuth(); assert.equal(starts, 0); connections.isSaving.value = false;
+  await connections.loadSettings(); assert.equal(loads, 1);
+  const work = connections.connectSpotifyOAuth();
+  await connections.loadSettings(); assert.deepEqual(await connections.saveSettings(), { ok: false });
+  const feedback = connections.connectionActionFeedback.value; connections.clearConnectionActionFeedback(); assert.deepEqual(connections.connectionActionFeedback.value, feedback);
+  assert.equal(loads, 1); assert.equal(saves, 0);
+  held.reject(new Error('PRIVATE')); await work; assert.equal(starts, 1); assert.equal(connections.isProviderAuthorizationPending.value, false);
+  await connections.disconnectSpotifyOAuth(); assert.equal(clears, 1); assert.equal(connections.secretStatus.value.providers.spotifyOAuth.linked, false);
+  await connections.disconnectSpotifyOAuth(); assert.equal(clears, 1); assert.deepEqual(await connections.saveSettings(), { ok: true }); assert.equal(saves, 1);
 });
