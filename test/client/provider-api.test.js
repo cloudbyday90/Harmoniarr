@@ -17,11 +17,14 @@ test('provider-api fetchProviderStatus sends GET to providers status endpoint', 
   globalThis.document = { cookie: '' };
   globalThis.fetch = t.mock.fn(async () => createJsonResponse());
 
-  await fetchProviderStatus();
+  const controller = new AbortController();
+  await fetchProviderStatus({ signal: controller.signal });
 
   assert.equal(globalThis.fetch.mock.callCount(), 1);
   assert.equal(globalThis.fetch.mock.calls[0].arguments[0], '/api/v1/providers/status');
   assert.equal(globalThis.fetch.mock.calls[0].arguments[1].method, 'GET');
+  assert.equal(globalThis.fetch.mock.calls[0].arguments[1].signal, controller.signal);
+  assert.equal(globalThis.fetch.mock.calls[0].arguments[1].body, undefined);
 });
 
 test('provider collection access check posts only the supplied source with CSRF and cancellation', async (t) => {

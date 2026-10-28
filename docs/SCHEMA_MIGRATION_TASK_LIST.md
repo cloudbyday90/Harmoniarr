@@ -206,6 +206,13 @@ settings/secret/audit writes. No schema artifact or refresh job changes. Next sh
 saved local validity in the existing Settings connection summary, with explicit
 saved-versus-draft and local-versus-provider feedback.
 
+That Settings display is implemented in the [UI design](APPLE_STATUS_UI_DESIGN.md)
+and [outcome](APPLE_STATUS_UI_OUTCOME.md), with [research/tradeoffs](APPLE_STATUS_UI_RESEARCH_2026_10.md).
+It consumes the existing authenticated status GET and keeps drafts out of reads.
+No schema artifact or maintenance job changes. Next review provider-status
+aggregation so a provider-specific credential-read failure does not hide every
+other status, while preserving common database outage handling and privacy.
+
 October 12 scan addition: `20261012_225951_scan_owned_receipt_invalidation.sql`
 adds UUID revision identity, generated path lookup and revision-bound negative
 observations. Replay preserves existing identities; snapshot/anchors include the

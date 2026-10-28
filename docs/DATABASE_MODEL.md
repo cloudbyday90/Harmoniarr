@@ -2,6 +2,11 @@
 
 ## Purpose
 
+Settings now displays the existing saved Apple local-signing summary through a
+bounded client request owner, separately from credential drafts. It introduces
+no server, encryption, SQL/schema or persisted validation changes. See the
+[UI design](APPLE_STATUS_UI_DESIGN.md) and [outcome](APPLE_STATUS_UI_OUTCOME.md).
+
 Apple status now adds local signing suitability separately from credential
 presence. Both reads use the supplied queryable; this does not create an atomic
 cross-store snapshot. It performs no credential/settings/audit writes and persists

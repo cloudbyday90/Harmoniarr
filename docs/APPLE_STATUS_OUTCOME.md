@@ -70,6 +70,10 @@ separate application branch.
 
 ## Next recommended item
 
+This display is now implemented in the [UI design](APPLE_STATUS_UI_DESIGN.md)
+and [outcome](APPLE_STATUS_UI_OUTCOME.md), with saved checks and credential drafts
+kept separate and no change to server signing or persistence.
+
 Show saved local signing validity in the existing Settings Apple connection
 summary, which currently displays secret presence/source only. Reuse the existing
 provider-status API, refresh after relevant successful saves, and distinguish

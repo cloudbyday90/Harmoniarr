@@ -29,6 +29,8 @@ import SettingsDisclosure from '../components/settings/SettingsDisclosure.vue';
 import SettingsFormGroup from '../components/settings/SettingsFormGroup.vue';
 import SettingsProviderConnectionStatus from '../components/settings/SettingsProviderConnectionStatus.vue';
 import SettingsProviderCollectionAccessCheck from '../components/settings/SettingsProviderCollectionAccessCheck.vue';
+import SettingsAppleSigningStatus from '../components/settings/SettingsAppleSigningStatus.vue';
+import { hasAppleMusicCredentialDraft } from '../lib/apple-music-signing-presentation.js';
 import SettingsRecoveryConfirmation from '../components/settings/SettingsRecoveryConfirmation.vue';
 import SettingsSaveBar from '../components/settings/SettingsSaveBar.vue';
 import SoulseekProviderModeGuidance from '../components/settings/SoulseekProviderModeGuidance.vue';
@@ -82,6 +84,11 @@ const {
 } = useConnections();
 
 const isManagedDeployment = computed(() => secretStatus.value?.slskd?.managedDeploymentDetected === true);
+const savedAppleIds = ref(null);
+const hasAppleCredentialDraft = computed(() => hasAppleMusicCredentialDraft(form.providers, savedAppleIds.value));
+function captureSavedAppleIds() {
+  savedAppleIds.value = { teamId: form.providers.appleMusicTeamId, keyId: form.providers.appleMusicKeyId };
+}
 const isSoulseekDisabled = computed(() => form.slskd.providerMode === 'disabled');
 const isExternalSoulseek = computed(() => form.slskd.providerMode === 'external');
 const isManagedSoulseek = computed(() => form.slskd.providerMode === 'managed');
@@ -128,6 +135,7 @@ async function handleSaveSettings() {
   const shouldVerifySavedConnection = isExternalSoulseek.value && isDirty.value;
   const outcome = await saveSettings();
   if (!outcome?.ok) return;
+  captureSavedAppleIds();
 
   requiresConnectionVerification.value = shouldVerifySavedConnection;
   if (!isProviderRecoveryReturn.value) return;
@@ -179,7 +187,7 @@ watch(
 );
 
 onMounted(() => {
-  void loadSettings();
+  void loadSettings().then(() => { if (!loadErrorMessage.value) captureSavedAppleIds(); });
   void loadConnectionStatus();
   void loadSetupProgress();
 });
@@ -448,26 +456,27 @@ onMounted(() => {
               </label>
               <div class="hx-form-row">
                 <div class="hx-field">
-                  <label class="hx-field-label">Team ID</label>
-                  <input class="hx-input" v-model="form.providers.appleMusicTeamId" autocomplete="off" />
+                  <label class="hx-field-label" for="settings-apple-team-id">Team ID</label>
+                  <input id="settings-apple-team-id" class="hx-input" v-model="form.providers.appleMusicTeamId" autocomplete="off" />
                 </div>
                 <div class="hx-field">
-                  <label class="hx-field-label">Key ID</label>
-                  <input class="hx-input" v-model="form.providers.appleMusicKeyId" autocomplete="off" />
+                  <label class="hx-field-label" for="settings-apple-key-id">Key ID</label>
+                  <input id="settings-apple-key-id" class="hx-input" v-model="form.providers.appleMusicKeyId" autocomplete="off" />
                 </div>
                 <div class="hx-field">
-                  <label class="hx-field-label">Storefront</label>
-                  <input class="hx-input" v-model="form.providers.appleMusicStorefront" maxlength="5" placeholder="us" />
+                  <label class="hx-field-label" for="settings-apple-storefront">Storefront</label>
+                  <input id="settings-apple-storefront" class="hx-input" v-model="form.providers.appleMusicStorefront" maxlength="5" placeholder="us" />
                 </div>
               </div>
               <div class="hx-field">
-                <label class="hx-field-label">Private key</label>
-                <textarea class="hx-textarea" v-model="form.providers.appleMusicPrivateKey" autocomplete="new-password" :disabled="form.providers.clearAppleMusicPrivateKey" placeholder="Leave blank to keep the current key" rows="4"></textarea>
+                <label class="hx-field-label" for="settings-apple-private-key">Private key</label>
+                <textarea id="settings-apple-private-key" class="hx-textarea" v-model="form.providers.appleMusicPrivateKey" autocomplete="new-password" :disabled="form.providers.clearAppleMusicPrivateKey" placeholder="Leave blank to keep the current key" rows="4"></textarea>
               </div>
               <label class="cfg-check">
                 <input type="checkbox" v-model="form.providers.clearAppleMusicPrivateKey" />
                 <span>Remove the stored Apple Music private key on save</span>
               </label>
+              <SettingsAppleSigningStatus :is-saving="isSaving" :has-credential-draft="hasAppleCredentialDraft" />
             </div>
 
             <!-- Fanart.tv -->

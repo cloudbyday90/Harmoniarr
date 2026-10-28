@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 28 [Apple saved-status UI rebuild](LOCAL_DOCKER_APPLE_STATUS_UI_OUTCOME.md)
+records the current image, preserved administrator/five mounts, saved-versus-draft
+feedback, actual API rendering and controlled retry/save/navigation checks. See
+the [implementation outcome](APPLE_STATUS_UI_OUTCOME.md). No release is created.
+
 The October 28 [Apple local status rebuild](LOCAL_DOCKER_APPLE_STATUS_OUTCOME.md)
 records the current image and preserved administrator/five mounts, authenticated
 read-only local signing checks, no-store behavior and privacy. See the

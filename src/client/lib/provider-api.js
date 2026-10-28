@@ -18,8 +18,8 @@
 
 import { apiRequest } from './api.js';
 
-export function fetchProviderStatus() {
-  return apiRequest('/api/v1/providers/status');
+export function fetchProviderStatus({ signal } = {}) {
+  return apiRequest('/api/v1/providers/status', { signal });
 }
 
 export function checkProviderCollectionAccess({ sourceUrl }, { signal } = {}) {
