@@ -136,8 +136,6 @@ GitHub MCP found zero open repository PRs initially and at the final check,
 cleanup/rebasing were inapplicable. Work stays on main with no separate branch,
 PR merge, Git tag or release. All sixteen changed files are included in this commit.
 
-Give the four folder Browse actions distinct accessible names and verify their
-FolderBrowserModal focus handoff/return behavior with drafts preserved. The built
-Storage UI exposes all four with the same name, Browse…. Existing input label
-links do not identify the adjacent buttons' different destinations. Keep dialog
-and server filesystem authorization at their existing owners.
+Completed by the [folder browser follow-up](FOLDER_BROWSER_OUTCOME.md): distinct
+Browse names, native dialog focus lifecycle, confirmed read ownership and draft
+preservation. Server filesystem authorization remains at its existing owner.

@@ -7,6 +7,11 @@ Security source: `docs/SECURITY_POLICY.md`
 
 ## Current Status (2026-10-28)
 
+October 28 Storage folder browsing now has named native dialog controls and a
+scoped client read owner. No database/schema refresh or maintenance changes are
+needed. See the [design](FOLDER_BROWSER_DESIGN.md) and
+[outcome](FOLDER_BROWSER_OUTCOME.md).
+
 October 28 Storage labels and repeatable row identity now use native labels,
 component-owned IDs and scoped client identity/focus helpers. Saved DTOs and
 server authority remain unchanged; no schema refresh, migration or maintenance

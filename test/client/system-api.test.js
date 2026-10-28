@@ -93,6 +93,14 @@ test('system-api browseFsDirectory omits params when none provided', async (t) =
   assert.equal(globalThis.fetch.mock.calls[0].arguments[0], '/api/v1/system/fs/browse');
 });
 
+test('folder reads forward the owning dialog AbortSignal', async (t) => {
+  globalThis.document = { cookie: '' };
+  const controller = new AbortController();
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse());
+  await browseFsDirectory({ path: '/fixture/music', signal: controller.signal });
+  assert.equal(globalThis.fetch.mock.calls[0].arguments[1].signal, controller.signal);
+});
+
 test('system-api acknowledgeAllOperatorNotifications sends POST with CSRF', async (t) => {
   globalThis.document = { cookie: '__Host-csrf=test-csrf-token' };
   globalThis.fetch = t.mock.fn(async () => createJsonResponse());

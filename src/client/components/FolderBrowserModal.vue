@@ -17,8 +17,8 @@
 -->
 
 <script setup>
-import { ref, onMounted } from 'vue';
-import { browseFsDirectory } from '../lib/system-api.js';
+import { computed, ref, onBeforeUnmount, onMounted, useId } from 'vue';
+import { useFolderBrowser } from '../composables/useFolderBrowser.js';
 
 const props = defineProps({
   initial: { type: String, default: '/' },
@@ -28,26 +28,22 @@ const props = defineProps({
 const emit = defineEmits(['select', 'close']);
 
 const dialogRef = ref(null);
-const currentPath = ref('/');
-const entries = ref([]);
-const parentPath = ref(null);
-const isLoading = ref(false);
-const errorMessage = ref('');
+const pathRef = ref(null);
+const titleId = useId();
+const { requestedPath, currentPath, entries, parentPath, isLoading, errorMessage,
+  canSelect, navigate, dispose } = useFolderBrowser();
+const displayedPath = computed(() => currentPath.value ?? requestedPath.value);
+const statusMessage = computed(() => isLoading.value ? 'Loading folders…'
+  : errorMessage.value || (currentPath.value === null ? ''
+    : entries.value.length ? `${entries.value.length} subfolders loaded.` : 'No subfolders here.'));
+let settled = false;
 
-async function navigate(path) {
-  isLoading.value = true;
-  errorMessage.value = '';
-  try {
-    const result = await browseFsDirectory({ path });
-    currentPath.value = result.path;
-    parentPath.value = result.parent ?? null;
-    entries.value = result.entries ?? [];
-    if (!result.ok) errorMessage.value = result.error ?? 'Could not read this folder.';
-  } catch {
-    errorMessage.value = 'Failed to load folder contents.';
-  } finally {
-    isLoading.value = false;
+function navigateFromControl(path, event) {
+  // Keep focus on a persistent target before the initiating control is replaced.
+  if (event.currentTarget === event.currentTarget.ownerDocument.activeElement) {
+    pathRef.value?.focus();
   }
+  void navigate(path);
 }
 
 onMounted(() => {
@@ -56,25 +52,38 @@ onMounted(() => {
 });
 
 function selectCurrent() {
-  emit('select', currentPath.value);
+  if (canSelect.value) finish(currentPath.value);
+}
+
+function finish(path) {
+  if (settled) return;
+  settled = true;
+  dispose();
+  // Native close returns focus while the invoker is still connected.
+  if (dialogRef.value?.open) dialogRef.value.close();
+  if (path !== undefined) emit('select', path);
   emit('close');
 }
 
-function handleClose() {
-  emit('close');
-}
+function handleClose() { finish(); }
 
 function handleBackdropClick(e) {
   if (e.target === dialogRef.value) handleClose();
 }
+
+onBeforeUnmount(() => {
+  settled = true;
+  dispose();
+  if (dialogRef.value?.open) dialogRef.value.close();
+});
 </script>
 
 <template>
-  <dialog ref="dialogRef" class="fb-dialog" @click="handleBackdropClick" @cancel.prevent="handleClose">
+  <dialog ref="dialogRef" class="fb-dialog" :aria-labelledby="titleId" @click="handleBackdropClick" @close="handleClose">
     <div class="fb-shell">
       <header class="fb-header">
-        <span class="fb-title">{{ label }}</span>
-        <button type="button" class="fb-close" @click="handleClose" aria-label="Close">✕</button>
+        <h2 :id="titleId" class="fb-title">{{ label }}</h2>
+        <button type="button" class="fb-close" autofocus @click="handleClose" aria-label="Close folder browser">✕</button>
       </header>
 
       <div class="fb-path-bar">
@@ -82,35 +91,29 @@ function handleBackdropClick(e) {
           type="button"
           class="fb-up-btn hx-btn"
           :disabled="!parentPath || isLoading"
-          @click="navigate(parentPath)"
+          @click="navigateFromControl(parentPath, $event)"
         >↑ Up</button>
-        <span class="fb-current-path" :title="currentPath">{{ currentPath }}</span>
+        <span ref="pathRef" class="fb-current-path" tabindex="-1" :title="displayedPath">{{ displayedPath }}</span>
       </div>
 
-      <div class="fb-body" role="listbox" aria-label="Folders">
-        <div v-if="isLoading" class="fb-loading">Loading…</div>
-        <div v-else-if="errorMessage" class="fb-error">{{ errorMessage }}</div>
-        <div v-else-if="!entries.length" class="fb-empty">No subfolders here.</div>
-        <button
-          v-else
-          v-for="entry in entries"
-          :key="entry.path"
-          type="button"
-          class="fb-entry"
-          role="option"
-          @click="navigate(entry.path)"
-          @dblclick="() => { navigate(entry.path); }"
-        >
-          <span class="fb-entry-icon">📁</span>
-          <span class="fb-entry-name">{{ entry.name }}</span>
-        </button>
+      <p class="fb-status" :class="{ 'fb-error': errorMessage }" role="status" aria-atomic="true">{{ statusMessage }}</p>
+      <div class="fb-body" :aria-busy="isLoading">
+        <button v-if="errorMessage" type="button" class="hx-btn" @click="navigateFromControl(requestedPath, $event)">Retry</button>
+        <ul v-else-if="entries.length" class="fb-entries" aria-label="Folders">
+          <li v-for="entry in entries" :key="entry.path">
+            <button type="button" class="fb-entry" @click="navigateFromControl(entry.path, $event)">
+              <span class="fb-entry-icon" aria-hidden="true">📁</span>
+              <span class="fb-entry-name">{{ entry.name }}</span>
+            </button>
+          </li>
+        </ul>
       </div>
 
       <footer class="fb-footer">
-        <span class="fb-selected-path" :title="currentPath">{{ currentPath }}</span>
+        <span class="fb-selected-path" :title="displayedPath">{{ displayedPath }}</span>
         <div class="fb-footer-actions">
           <button type="button" class="hx-btn" data-variant="ghost" @click="handleClose">Cancel</button>
-          <button type="button" class="hx-btn" data-variant="primary" @click="selectCurrent" :disabled="isLoading">
+          <button type="button" class="hx-btn" data-variant="primary" @click="selectCurrent" :disabled="!canSelect">
             Select this folder
           </button>
         </div>
@@ -118,3 +121,19 @@ function handleBackdropClick(e) {
     </div>
   </dialog>
 </template>
+
+<style scoped>
+.fb-dialog, .fb-shell { max-height: calc(100dvh - var(--hx-space-4)); }
+.fb-dialog:modal { overscroll-behavior: contain; }
+.fb-title { margin: 0; }
+.fb-close { min-width: 24px; min-height: 24px; }
+.fb-body { min-height: 0; flex: 1 1 auto; }
+.fb-status { margin: 0; padding: var(--hx-space-2) var(--hx-space-4); font-size: var(--hx-text-sm); flex-shrink: 0; }
+.fb-entries { list-style: none; margin: 0; padding: 0; }
+.fb-footer { flex-wrap: wrap; }
+.fb-selected-path { min-width: 0; }
+.fb-current-path:focus-visible, .fb-close:focus-visible, .fb-entry:focus-visible {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: -2px;
+}
+</style>

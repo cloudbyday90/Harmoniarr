@@ -1,5 +1,9 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 28 [folder browser outcome](FOLDER_BROWSER_OUTCOME.md) records the
+current packaged walkthrough, named modal navigation, scoped read retirement
+and preserved administrator, mounts and settings. No release is created.
+
 The October 28 [Storage labels outcome](STORAGE_LABELS_OUTCOME.md) records the
 latest local walkthrough validation of row identity, native labels and removal
 focus ownership.

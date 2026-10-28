@@ -107,6 +107,7 @@ function onBrowseSelect(path) {
 
 function onBrowseClose() {
   browseOpen.value = false;
+  browseTarget.value = null;
 }
 
 const maxOriginalFileSizeMb = computed({
@@ -206,7 +207,7 @@ onBeforeUnmount(() => { quotaHistory.destroy(); });
               <label class="hx-field-label" for="settings-downloads-folder">Downloads folder</label>
               <div class="hx-field-with-browse">
                 <input id="settings-downloads-folder" class="hx-input" v-model="form.paths.downloads" />
-                <button type="button" class="hx-btn fb-trigger" @click="openBrowse('Downloads folder', form.paths.downloads, v => form.paths.downloads = v)">Browse…</button>
+                <button type="button" class="hx-btn fb-trigger" aria-label="Browse downloads folder" @click="openBrowse('Downloads folder', form.paths.downloads, v => form.paths.downloads = v)">Browse…</button>
               </div>
               <p class="cfg-field-hint">{{ buildDownloadsPathHint() }}</p>
             </div>
@@ -214,14 +215,14 @@ onBeforeUnmount(() => { quotaHistory.destroy(); });
               <label class="hx-field-label" for="settings-music-library">Music library</label>
               <div class="hx-field-with-browse">
                 <input id="settings-music-library" class="hx-input" v-model="form.paths.music" />
-                <button type="button" class="hx-btn fb-trigger" @click="openBrowse('Music library', form.paths.music, v => form.paths.music = v)">Browse…</button>
+                <button type="button" class="hx-btn fb-trigger" aria-label="Browse music library" @click="openBrowse('Music library', form.paths.music, v => form.paths.music = v)">Browse…</button>
               </div>
             </div>
             <div class="hx-field">
               <label class="hx-field-label" for="settings-staging-area">Staging area</label>
               <div class="hx-field-with-browse">
                 <input id="settings-staging-area" class="hx-input" v-model="form.paths.staging" />
-                <button type="button" class="hx-btn fb-trigger" @click="openBrowse('Staging area', form.paths.staging, v => form.paths.staging = v)">Browse…</button>
+                <button type="button" class="hx-btn fb-trigger" aria-label="Browse staging area" @click="openBrowse('Staging area', form.paths.staging, v => form.paths.staging = v)">Browse…</button>
               </div>
             </div>
             <SettingsFolderReadiness :validation="pathValidation" />
@@ -282,7 +283,7 @@ onBeforeUnmount(() => { quotaHistory.destroy(); });
               <label class="hx-field-label" for="settings-transcode-workspace">Transcode workspace</label>
               <div class="hx-field-with-browse">
                 <input id="settings-transcode-workspace" class="hx-input" v-model="form.paths.transcodeTemp" />
-                <button type="button" class="hx-btn fb-trigger" @click="openBrowse('Transcode workspace', form.paths.transcodeTemp, v => form.paths.transcodeTemp = v)">Browse…</button>
+                <button type="button" class="hx-btn fb-trigger" aria-label="Browse transcode workspace" @click="openBrowse('Transcode workspace', form.paths.transcodeTemp, v => form.paths.transcodeTemp = v)">Browse…</button>
               </div>
               <p class="cfg-field-hint">Temporary space used when converting audio formats. It can point to fast storage.</p>
             </div>

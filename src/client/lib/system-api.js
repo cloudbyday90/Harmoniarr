@@ -45,6 +45,6 @@ export function acknowledgeAllOperatorNotifications() {
   });
 }
 
-export function browseFsDirectory({ path } = {}) {
-  return apiRequest(`/api/v1/system/fs/browse${buildQueryString({ path })}`);
+export function browseFsDirectory({ path, signal } = {}) {
+  return apiRequest(`/api/v1/system/fs/browse${buildQueryString({ path })}`, { signal });
 }
