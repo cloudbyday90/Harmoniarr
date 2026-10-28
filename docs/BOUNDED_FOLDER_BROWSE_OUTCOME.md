@@ -115,8 +115,7 @@ October 28, 2026. Random local PR implementation and stale Dependabot cleanup or
 rebasing were inapplicable. All 23 changed files are included directly on main;
 no branch, release, tag or PR merge is created.
 
-Next: qualify these limits on representative packaged local and network storage
-using owned fixtures, separate allocation/RSS and elapsed-work observations, and
-matched resource profiles. Measure repeated-page rescan cost before tuning the
-five-second/50,000-entry defaults or choosing retained-handle cursors. Do not
-promote synthetic bounds into a memory saving or network-storage guarantee.
+Local qualification is recorded in the [measurement outcome](FOLDER_BROWSE_PROFILE_OUTCOME.md),
+using owned fixtures and separate RSS/heap/container/timing observations. The user
+deferred network-storage checks. Local samples do not establish a network-storage
+guarantee or justify automatic changes to admission, scan or time limits.

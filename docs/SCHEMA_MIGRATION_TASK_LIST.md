@@ -7,6 +7,11 @@ Security source: `docs/SECURITY_POLICY.md`
 
 ## Current Status (2026-10-28)
 
+October 28 folder-browsing memory/rescan qualification is an opt-in developer
+benchmark using the unchanged packaged scanner. No production, schema,
+dependency or maintenance changes. See the [design](FOLDER_BROWSE_PROFILE_DESIGN.md)
+and [outcome](FOLDER_BROWSE_PROFILE_OUTCOME.md). Network checks are deferred.
+
 October 28 filesystem browsing now streams bounded pages through the existing
 administrator endpoint, with expiring signed continuation and scoped scan
 admission. No schema, database or maintenance changes. See the

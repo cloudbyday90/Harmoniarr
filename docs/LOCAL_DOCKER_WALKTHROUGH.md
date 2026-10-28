@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 28 [folder-browsing measurement outcome](FOLDER_BROWSE_PROFILE_OUTCOME.md)
+qualifies local volume/Windows-bind work using the existing immutable image and
+disposable benchmark consumers. The walkthrough is not redeployed; its image,
+administrator, settings and mounts remain separate from those owned fixtures.
+
 The October 28 [bounded folder browsing outcome](BOUNDED_FOLDER_BROWSE_OUTCOME.md)
 records the current streamed directory pager, packaged Linux scanner proof and
 preserved administrator, mounts and settings. No release is created.
