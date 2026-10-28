@@ -33,11 +33,15 @@ directory corrected those test-environment mismatches. No production mount or
 workflow security policy was changed. All three exact containers were removed
 and absence verified. Private logs are under `.tmp/apple-http-2026-10-28/`.
 
-## PR cleanup checkpoint
+## Verified PR cleanup
 
-At this document's initial commit, the tested pin is prepared on main locally.
-PR #60 cleanup is pending remote-main verification after push. It will be closed
-as superseded if GitHub/Dependabot has not already closed it. PR #59 was fresh,
-mergeable and not stale at inspection; its independent Buildx update is retained.
-Final cleanup state will be recorded after the push. No dependency ignore
-condition or bot-branch force-push is requested.
+Implementation commit `208c25bcd1f294090024e97d5fbdd4d8ccd13ac2` was pushed to
+main. GitHub MCP then read the updated workflow from remote main and confirmed
+the exact tested pin. A comment records the local application and validation;
+PR #60 was closed as superseded at 09:53:40 UTC on October 28, 2026, with
+`merged: false`. No PR merge or release dispatch occurred.
+
+PR #59 remains fresh and mergeable; its independent Buildx update is retained.
+It needed no stale/conflict rebase. No dependency ignore condition or bot-branch
+force-push was used. This documentation follow-up changes no frozen source,
+workflow, package or tested runtime bytes.
