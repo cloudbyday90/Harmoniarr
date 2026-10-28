@@ -184,6 +184,14 @@ now bounds all three providers, and the obsolete adapter is removed. No schema
 artifact changed. Next review P-256 key admission and developer-token lifetime;
 automatic schema maintenance needs no additional refresh command or service.
 
+Apple signing policy is now implemented in the [design](APPLE_SIGNING_DESIGN.md)
+and [outcome](APPLE_SIGNING_OUTCOME.md), with
+[official research/tradeoffs](APPLE_SIGNING_RESEARCH_2026_10.md). Private P-256
+admission and one-hour tokens use a small policy/signer/cache boundary; no SQL
+artifact or refresh job is added. Next validate saved Apple signing material and
+identifier shape at the protected settings mutation while preserving clear and
+replacement semantics.
+
 October 12 scan addition: `20261012_225951_scan_owned_receipt_invalidation.sql`
 adds UUID revision identity, generated path lookup and revision-bound negative
 observations. Replay preserves existing identities; snapshot/anchors include the

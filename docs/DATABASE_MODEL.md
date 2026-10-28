@@ -2,6 +2,11 @@
 
 ## Purpose
 
+Apple developer-token signing now admits private P-256 keys and issues one-hour
+tokens with bounded local renewal. Keys remain in existing encrypted storage;
+no tokens or new schema are persisted. See
+[signing design](APPLE_SIGNING_DESIGN.md) and [outcome](APPLE_SIGNING_OUTCOME.md).
+
 Apple Music now shares that provider HTTP owner through the existing resolver,
 including its default collection-access check using encrypted saved keys. Signing
 and the per-client token cache are a separate ESM factory. No SQL or schema

@@ -1,5 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 28 [Apple signing rebuild](LOCAL_DOCKER_APPLE_SIGNING_OUTCOME.md)
+records the current image, preserved administrator/five mounts, private-key
+admission, one-hour JWTs and existing native transport controls. See the
+[implementation outcome](APPLE_SIGNING_OUTCOME.md). The independent
+[Buildx PR outcome](DEPENDABOT_BUILDX_OUTCOME.md) covers local main/post cleanup;
+no release workflow was dispatched.
+
 The October 28 [Apple Music HTTP rebuild](LOCAL_DOCKER_APPLE_HTTP_OUTCOME.md)
 records the current image and preserved administrator/five mounts, actual Apple
 TLS/JWT/cancellation/drain evidence and exact retained-runtime comparison. See

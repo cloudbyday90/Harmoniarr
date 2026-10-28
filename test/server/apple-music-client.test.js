@@ -14,18 +14,18 @@ const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'P-256
 const credentials = { teamId: 'fixture-team', keyId: 'fixture-key', privateKey };
 const parts = token => token.split('.').map((value, index) => index < 2 ? JSON.parse(Buffer.from(value, 'base64url')) : Buffer.from(value, 'base64url'));
 
-test('Apple developer JWT preserves ES256 claims, P1363 signature and 180-day lifetime', () => {
+test('Apple developer JWT preserves ES256 claims, P1363 signature and one-hour lifetime', () => {
   const { token, expiresAt } = generateAppleMusicDeveloperToken(credentials), [header, payload, signature] = parts(token);
   assert.deepEqual(header, { alg: 'ES256', kid: credentials.keyId });
-  assert.equal(payload.iss, credentials.teamId); assert.equal(payload.exp - payload.iat, 15_552_000); assert.equal(expiresAt, payload.exp * 1000);
+  assert.equal(payload.iss, credentials.teamId); assert.equal(payload.exp - payload.iat, 3600); assert.equal(expiresAt, payload.exp * 1000);
   assert.equal(signature.length, 64); assert.equal(verify('SHA256', Buffer.from(token.split('.').slice(0, 2).join('.')), { key: publicKey, dsaEncoding: 'ieee-p1363' }, signature), true);
 });
 
-test('Apple token cache is per client and renews at the existing 30-day expiry buffer', t => {
+test('Apple token cache is per client and renews at the five-minute expiry buffer', t => {
   const start = Date.UTC(2026, 9, 28); t.mock.timers.enable({ apis: ['Date'], now: start });
   const first = createAppleMusicDeveloperTokenService(credentials), second = createAppleMusicDeveloperTokenService(credentials);
   const token = first.getToken(); assert.equal(first.getToken(), token); assert.notEqual(second.getToken(), token);
-  t.mock.timers.setTime(start + (15_552_000 - 2_592_000) * 1000 - 1); assert.equal(first.getToken(), token);
+  t.mock.timers.setTime(start + (3600 - 300) * 1000 - 1); assert.equal(first.getToken(), token);
   t.mock.timers.tick(1); const renewed = first.getToken(); assert.notEqual(renewed, token); assert.equal(parts(renewed)[1].iat, Math.floor(Date.now() / 1000));
 });
 

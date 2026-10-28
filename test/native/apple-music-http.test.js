@@ -34,7 +34,7 @@ test('Apple Music owns native HTTPS, developer authentication and shared retirem
       received++; assert.equal(_incoming.headers.host, 'api.music.apple.com'); assert.equal(_incoming.headers['accept-encoding'], 'gzip, deflate, br');
       const token = _incoming.headers.authorization?.slice(7), [header, payload, signature] = token.split('.');
       assert.deepEqual(JSON.parse(Buffer.from(header, 'base64url')), { alg: 'ES256', kid: credentials.keyId });
-      const claims = JSON.parse(Buffer.from(payload, 'base64url')); assert.equal(claims.iss, credentials.teamId); assert.equal(claims.exp - claims.iat, 15_552_000);
+      const claims = JSON.parse(Buffer.from(payload, 'base64url')); assert.equal(claims.iss, credentials.teamId); assert.equal(claims.exp - claims.iat, 3600);
       assert.equal(verify('SHA256', Buffer.from(header + '.' + payload), { key: publicKey, dsaEncoding: 'ieee-p1363' }, Buffer.from(signature, 'base64url')), true);
       tokens.add(token); paths.push(_incoming.url);
       if (mode === 'headers-stall') return;
@@ -99,8 +99,16 @@ test('Apple Music owns native HTTPS, developer authentication and shared retirem
     await resolved.client.getCatalogSong('us', 'song'); await resolved.client.getCatalogAlbum('de', 'album'); await resolved.client.getCatalogPlaylist('gb', 'playlist');
     await resolved.client.getCatalogPlaylistTracks('fr', 'playlist', { offset: 100 }); await resolved.client.getCatalogArtistAlbums('jp', 'artist', { offset: 25 }); await resolved.client.getCatalogArtist('ca', 'artist', { offset: 50 });
     assert.equal(tokens.size, 1); assert.equal(paths.length, 6); assert.ok(paths.some(path => path.includes('offset=100'))); await retired(shared); results.push('application-resolver-stored-key-six-methods-one-cached-jwt');
-    const beforeBadKey = issued; await secrets.setSecretValue({ secretType: 'integration_credential', name: 'providers.appleMusic.privateKey', plaintextValue: 'PRIVATE-response-sentinel' });
-    const changed = await resolver.resolveProviderClient({ provider: 'apple_music' }); await assert.rejects(changed.client.getCatalogSong('us', 'song'), { code: 'apple_music_misconfigured' }); assert.equal(issued, beforeBadKey); results.push('stored-invalid-key-refuses-before-network');
+    const invalidKeys = [['malformed', 'PRIVATE-response-sentinel'], ['rsa', generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({ type: 'pkcs8', format: 'pem' })],
+      ['p384', generateKeyPairSync('ec', { namedCurve: 'secp384r1' }).privateKey.export({ type: 'pkcs8', format: 'pem' })],
+      ['secp256k1', generateKeyPairSync('ec', { namedCurve: 'secp256k1' }).privateKey.export({ type: 'pkcs8', format: 'pem' })], ['public', publicKey.export({ type: 'spki', format: 'pem' })]];
+    for (const [kind, material] of invalidKeys) {
+      const beforeBadKey = issued; await secrets.setSecretValue({ secretType: 'integration_credential', name: 'providers.appleMusic.privateKey', plaintextValue: material });
+      const changed = await resolver.resolveProviderClient({ provider: 'apple_music' }); await assert.rejects(changed.client.getCatalogSong('us', 'song'), error => error.code === 'apple_music_misconfigured' && error.cause === undefined && !JSON.stringify({ ...error, message: error.message }).includes('PRIVATE-response-sentinel'));
+      assert.equal(issued, beforeBadKey); results.push('stored-' + kind + '-key-refuses-before-network');
+    }
+    await secrets.setSecretValue({ secretType: 'integration_credential', name: 'providers.appleMusic.privateKey', plaintextValue: privateKey.export({ type: 'pkcs8', format: 'pem' }) });
+    const recovered = await resolver.resolveProviderClient({ provider: 'apple_music' }); assert.equal((await recovered.client.getCatalogSong('us', 'song')).data[0].id, 'fixture'); await retired(shared); results.push('valid-saved-key-recovers-after-refusal');
     const active = owner(); mode = 'body-stall'; const bodyBeforeClose = bodyStarts, activeRequest = assert.rejects(client(active).getCatalogSong('us', 'fixture'), { diagnosticCode: 'timeout' }); await until(() => bodyStarts > bodyBeforeClose); await active.close(); await activeRequest; await retired(active); results.push('shutdown-cancels-active-native-body');
   }, async () => {
     for (const release of dnsReleases) release(new Error('fixture closing'));

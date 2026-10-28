@@ -5,6 +5,11 @@ October 28, 2026. Implements the next item from the
 cover [official research, pros/cons and stack](APPLE_HTTP_RESEARCH_2026_10.md),
 [design](APPLE_HTTP_DESIGN.md) and [Docker outcome](LOCAL_DOCKER_APPLE_HTTP_OUTCOME.md).
 
+October 28 follow-up: [signing hardening](APPLE_SIGNING_OUTCOME.md) now admits
+private P-256 keys and uses one-hour tokens with a five-minute renewal margin.
+The 180-day policy described below belongs to this preceding transport record
+and is superseded for newly issued tokens by that separate outcome.
+
 ## Delivered
 
 Apple Music now receives the same application-owned HTTP service as Spotify and
@@ -77,3 +82,8 @@ types, while Apple requires ES256; retain sanitized failure before dispatch.
 Consider shorter bounded token validity with compatible cache renewal rather
 than treating Apple's six-month maximum as the preferred lifetime. Keep that
 policy decision separate from this compatibility-preserving transport adoption.
+
+That item is implemented in the [signing design](APPLE_SIGNING_DESIGN.md) and
+[outcome](APPLE_SIGNING_OUTCOME.md). Next apply the same key policy at protected
+credential-save time and validate Apple identifier shape, preserving clear and
+replacement semantics; runtime refusal remains the final dispatch boundary.

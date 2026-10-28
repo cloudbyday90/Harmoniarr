@@ -31,7 +31,12 @@ test('release alias promotion requires complete acceptance and immutable publica
   }
   assert.doesNotMatch(promote, /^ {4}if:|continue-on-error:|contents: write|id-token:|attestations:/m);
   assert.match(promote, /packages: write/);
-  assert.match(promote, /docker\/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd/);
+  const pinnedBuildx = /uses: docker\/setup-buildx-action@([a-f0-9]{40})(?:\s|$)/u;
+  const buildSetup = getWorkflowStepBlock(getWorkflowJobBlock(source, 'publish-image'), 'Set up Buildx');
+  const promotionSetup = getWorkflowStepBlock(promote, 'Set up Buildx');
+  assert.match(buildSetup, pinnedBuildx);
+  assert.match(promotionSetup, pinnedBuildx);
+  assert.equal(promotionSetup.match(pinnedBuildx)[1], buildSetup.match(pinnedBuildx)[1]);
   const command = getWorkflowStepBlock(promote, 'Promote and verify accepted digest aliases');
   assert.match(command, /HARMONIARR_IMAGE: \$\{\{ needs.publish-image.outputs.image_ref \}\}/);
   assert.match(command, /run: node scripts\/promote-release-image-tags.js/);
