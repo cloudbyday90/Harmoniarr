@@ -7,6 +7,12 @@ Security source: `docs/SECURITY_POLICY.md`
 
 ## Current Status (2026-10-28)
 
+October 28 Storage labels and repeatable row identity now use native labels,
+component-owned IDs and scoped client identity/focus helpers. Saved DTOs and
+server authority remain unchanged; no schema refresh, migration or maintenance
+task is required. See [design](STORAGE_LABELS_DESIGN.md) and
+[outcome](STORAGE_LABELS_OUTCOME.md).
+
 October 28 Library field labels now have native associations and retention groups
 use the existing fieldset/legend component. No schema refresh, migration or
 maintenance task is required. See [design](LIBRARY_LABELS_DESIGN.md) and

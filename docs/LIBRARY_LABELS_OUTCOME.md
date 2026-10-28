@@ -103,8 +103,11 @@ GitHub MCP found zero open repository PRs initially and at the final check,
 cleanup/rebasing were inapplicable. Work stays on main with no new branch, PR
 merge, Git tag or release. All eleven changed files are included in this commit.
 
-Associate Storage field labels, including repeatable path-translation and
-per-user folder rows. The configured built Media & storage DOM currently has 11
+The Storage follow-up is implemented separately; see its
+[research](STORAGE_LABELS_RESEARCH_2026_10.md), [design](STORAGE_LABELS_DESIGN.md)
+and [outcome](STORAGE_LABELS_OUTCOME.md). The original recommendation was to
+associate Storage field labels, including repeatable path-translation and
+per-user folder rows. At that baseline, the configured built Media & storage DOM had 11
 unassociated labels, including two translation fields and artwork controls.
 The read-only inventory forwarded no mutation and had zero blocked writes; it
 includes controls inside closed disclosures. Additional per-user rows must be

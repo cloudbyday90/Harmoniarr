@@ -32,7 +32,6 @@ import {
   createEmptyUserMusicRoot,
 } from '../lib/settings-form.js';
 import {
-  buildDownloadMappingSourceLabel,
   buildDownloadsPathHint,
   buildPathTranslationSetupPrompt,
   buildPathTranslationsDescription,
@@ -44,6 +43,9 @@ import SettingsFolderReadiness from '../components/settings/SettingsFolderReadin
 import SettingsFormGroup from '../components/settings/SettingsFormGroup.vue';
 import SettingsRecoveryConfirmation from '../components/settings/SettingsRecoveryConfirmation.vue';
 import SettingsSaveBar from '../components/settings/SettingsSaveBar.vue';
+import SettingsDownloadMappingRow from '../components/settings/SettingsDownloadMappingRow.vue';
+import SettingsUserMusicRootRow from '../components/settings/SettingsUserMusicRootRow.vue';
+import { createSettingsRowKey } from '../lib/settings-row-key.js';
 import { useArtworkQuota } from '../composables/useArtworkQuota.js';
 import { useQuotaHistory } from '../composables/useQuotaHistory.js';
 import { useSettingsForm } from '../composables/useSettingsForm.js';
@@ -54,6 +56,9 @@ import {
 import { buildSettingsSaveState } from '../lib/settings-save-state-presentation.js';
 
 const route = useRoute();
+const rowKey = createSettingsRowKey();
+const mappingAddButton = ref(null);
+const userFolderAddButton = ref(null);
 const pathValidation = ref(null);
 const recoveryConfirmation = ref(null);
 
@@ -245,25 +250,21 @@ onBeforeUnmount(() => { quotaHistory.destroy(); });
           >
             <div class="cfg-subsection-header">
               <p class="cfg-group-title">Path translations</p>
-              <button type="button" class="hx-btn" @click="addDownloadMapping">Add path translation</button>
+              <button ref="mappingAddButton" type="button" class="hx-btn" @click="addDownloadMapping">Add path translation</button>
             </div>
             <div class="hx-empty" v-if="!form.paths.downloadMappings.length">
               <p class="hx-empty-copy">{{ buildPathTranslationsEmptyState() }}</p>
             </div>
             <div class="cfg-mapping-list" v-else>
-              <div class="cfg-mapping-card" v-for="(mapping, index) in form.paths.downloadMappings" :key="index">
-                <div class="hx-form-row">
-                  <div class="hx-field">
-                    <label class="hx-field-label">{{ buildDownloadMappingSourceLabel() }}</label>
-                    <input class="hx-input" v-model="mapping.slskdPrefix" placeholder="/downloads/complete" />
-                  </div>
-                  <div class="hx-field">
-                    <label class="hx-field-label">Harmoniarr sees it as</label>
-                    <input class="hx-input" v-model="mapping.harmoniarrPrefix" placeholder="/data/downloads/complete" />
-                  </div>
-                </div>
-                <button type="button" class="hx-btn" data-variant="ghost" @click="removeDownloadMapping(index)">Remove</button>
-              </div>
+              <SettingsDownloadMappingRow
+                v-for="(mapping, index) in form.paths.downloadMappings"
+                :key="rowKey(mapping)"
+                :position="index + 1"
+                :add-button="mappingAddButton"
+                v-model:source-prefix="mapping.slskdPrefix"
+                v-model:target-prefix="mapping.harmoniarrPrefix"
+                @remove="removeDownloadMapping(index)"
+              />
             </div>
           </SettingsDisclosure>
 
@@ -291,25 +292,21 @@ onBeforeUnmount(() => { quotaHistory.destroy(); });
                   <p class="cfg-group-title">Per-user library folders</p>
                   <p class="hx-text-muted">Give each user a subfolder inside the music library instead of using the shared root.</p>
                 </div>
-                <button type="button" class="hx-btn" @click="addUserMusicRoot">Add folder</button>
+                <button ref="userFolderAddButton" type="button" class="hx-btn" @click="addUserMusicRoot">Add folder</button>
               </div>
               <div class="hx-empty" v-if="!form.paths.userMusicRoots.length">
                 <p class="hx-empty-copy">Without a personal folder, everyone's imports land in the shared library root.</p>
               </div>
               <div class="cfg-mapping-list" v-else>
-                <div class="cfg-mapping-card" v-for="(userMusicRoot, index) in form.paths.userMusicRoots" :key="`user-music-root-${index}`">
-                  <div class="hx-form-row">
-                    <div class="hx-field">
-                      <label class="hx-field-label">User</label>
-                      <input class="hx-input" v-model="userMusicRoot.userId" placeholder="alice" />
-                    </div>
-                    <div class="hx-field">
-                      <label class="hx-field-label">Subfolder</label>
-                      <input class="hx-input" v-model="userMusicRoot.relativeRoot" placeholder="household/alice" />
-                    </div>
-                  </div>
-                  <button type="button" class="hx-btn" data-variant="ghost" @click="removeUserMusicRoot(index)">Remove</button>
-                </div>
+                <SettingsUserMusicRootRow
+                  v-for="(userMusicRoot, index) in form.paths.userMusicRoots"
+                  :key="rowKey(userMusicRoot)"
+                  :position="index + 1"
+                  :add-button="userFolderAddButton"
+                  v-model:user-id="userMusicRoot.userId"
+                  v-model:relative-root="userMusicRoot.relativeRoot"
+                  @remove="removeUserMusicRoot(index)"
+                />
               </div>
             </div>
           </SettingsDisclosure>
@@ -338,13 +335,13 @@ onBeforeUnmount(() => { quotaHistory.destroy(); });
               </label>
               <p class="cfg-field-hint">Searches online sources for album covers automatically.</p>
               <div class="hx-field" v-if="form.artwork.fetchEnabled">
-                <label class="hx-field-label">Sources to try</label>
-                <input class="hx-input" v-model="form.artwork.providerOrderText" placeholder="coverArtArchive" />
+                <label class="hx-field-label" for="settings-storage-provider-order-text">Sources to try</label>
+                <input id="settings-storage-provider-order-text" class="hx-input" v-model="form.artwork.providerOrderText" placeholder="coverArtArchive" />
                 <p class="cfg-field-hint">Try sources in order, separated by commas. <code>coverArtArchive</code> is the default and the main free option (Cover Art Archive).</p>
               </div>
               <div class="hx-field" v-if="form.artwork.fetchEnabled">
-                <label class="hx-field-label">Daily request limit</label>
-                <input class="hx-input" v-model.number="form.artwork.dailyQuotaLimit" type="number" min="1" max="100000" step="1" />
+                <label class="hx-field-label" for="settings-storage-daily-quota-limit">Daily request limit</label>
+                <input id="settings-storage-daily-quota-limit" class="hx-input" v-model.number="form.artwork.dailyQuotaLimit" type="number" min="1" max="100000" step="1" />
                 <p class="cfg-field-hint">Maximum external API calls per day across all providers. Prevents excessive usage. Resets at midnight UTC.</p>
               </div>
               <label class="cfg-check">
@@ -364,28 +361,28 @@ onBeforeUnmount(() => { quotaHistory.destroy(); });
               <p class="hx-text-muted">The app keeps small display copies of each cover so pages load quickly. These are <strong>cache files only</strong> — your actual artwork is stored separately and is never deleted just because a thumbnail expires. Leave everything in this section at the defaults.</p>
               <div class="hx-form-row">
                 <div class="hx-field">
-                  <label class="hx-field-label">Image format</label>
-                  <select class="hx-select" v-model="form.artwork.derivativeFormat">
+                  <label class="hx-field-label" for="settings-storage-derivative-format">Image format</label>
+                  <select id="settings-storage-derivative-format" class="hx-select" v-model="form.artwork.derivativeFormat">
                     <option value="webp">WebP — best choice for most people</option>
                     <option value="jpeg">JPEG — if you're seeing display issues</option>
                     <option value="png">PNG — lossless, largest file size</option>
                   </select>
                 </div>
                 <div class="hx-field">
-                  <label class="hx-field-label">Thumbnail sizes</label>
-                  <input class="hx-input" v-model="form.artwork.derivativeSizesText" placeholder="256, 512" />
+                  <label class="hx-field-label" for="settings-storage-derivative-sizes-text">Thumbnail sizes</label>
+                  <input id="settings-storage-derivative-sizes-text" class="hx-input" v-model="form.artwork.derivativeSizesText" placeholder="256, 512" />
                   <p class="cfg-field-hint">Leave this at the default. These are the sizes (in pixels) the app pre-generates so covers load quickly — changing it is rarely needed.</p>
                 </div>
               </div>
               <div class="hx-form-row">
                 <div class="hx-field">
-                  <label class="hx-field-label">Max thumbnail storage (MB)</label>
-                  <input class="hx-input" v-model.number="form.artwork.derivativeCacheSizeMb" type="number" min="64" max="16384" step="64" />
+                  <label class="hx-field-label" for="settings-storage-derivative-cache-size-mb">Max thumbnail storage (MB)</label>
+                  <input id="settings-storage-derivative-cache-size-mb" class="hx-input" v-model.number="form.artwork.derivativeCacheSizeMb" type="number" min="64" max="16384" step="64" />
                   <p class="cfg-field-hint">How much disk space thumbnails can use. 1,024 MB is plenty for most libraries. Old ones are deleted automatically when this limit is hit.</p>
                 </div>
                 <div class="hx-field">
-                  <label class="hx-field-label">Regenerate after (days)</label>
-                  <input class="hx-input" v-model.number="form.artwork.derivativeRetentionDays" type="number" min="1" max="3650" />
+                  <label class="hx-field-label" for="settings-storage-derivative-retention-days">Regenerate after (days)</label>
+                  <input id="settings-storage-derivative-retention-days" class="hx-input" v-model.number="form.artwork.derivativeRetentionDays" type="number" min="1" max="3650" />
                   <p class="cfg-field-hint">When a cached thumbnail is older than this, the app quietly regenerates it from the original. Your artwork is not deleted — only the small display copy is refreshed.</p>
                 </div>
               </div>
@@ -396,19 +393,19 @@ onBeforeUnmount(() => { quotaHistory.destroy(); });
               <p class="hx-text-muted">These guard against storing absurdly large or corrupt image files. You almost certainly don't need to change any of this.</p>
               <div class="hx-form-row">
                 <div class="hx-field">
-                  <label class="hx-field-label">Ignore images over this size (MB)</label>
-                  <input class="hx-input" v-model.number="maxOriginalFileSizeMb" type="number" min="1" max="100" step="1" />
+                  <label class="hx-field-label" for="settings-storage-max-original-file-size-mb">Ignore images over this size (MB)</label>
+                  <input id="settings-storage-max-original-file-size-mb" class="hx-input" v-model.number="maxOriginalFileSizeMb" type="number" min="1" max="100" step="1" />
                   <p class="cfg-field-hint">Leave this at the default (20 MB). Images bigger than this are probably not real album art.</p>
                 </div>
                 <div class="hx-field">
-                  <label class="hx-field-label">Ignore images wider than this (px)</label>
-                  <input class="hx-input" v-model.number="form.artwork.maxOriginalDimensionPixels" type="number" min="256" max="8192" step="1" />
+                  <label class="hx-field-label" for="settings-storage-max-original-dimension-pixels">Ignore images wider than this (px)</label>
+                  <input id="settings-storage-max-original-dimension-pixels" class="hx-input" v-model.number="form.artwork.maxOriginalDimensionPixels" type="number" min="256" max="8192" step="1" />
                   <p class="cfg-field-hint">Leave this at the default (4,000 px). Same idea — album art isn't that wide.</p>
                 </div>
               </div>
               <div class="hx-field">
-                <label class="hx-field-label">Remove art with no album attached after (days)</label>
-                <input class="hx-input" v-model.number="form.artwork.unassignedRetentionDays" type="number" min="1" max="3650" />
+                <label class="hx-field-label" for="settings-storage-unassigned-retention-days">Remove art with no album attached after (days)</label>
+                <input id="settings-storage-unassigned-retention-days" class="hx-input" v-model.number="form.artwork.unassignedRetentionDays" type="number" min="1" max="3650" />
                 <p class="cfg-field-hint">Art that is linked to an album in your library is <strong>never</strong> automatically deleted. This only removes stray image files that aren't attached to anything — for example leftovers from a failed import.</p>
               </div>
             </div>

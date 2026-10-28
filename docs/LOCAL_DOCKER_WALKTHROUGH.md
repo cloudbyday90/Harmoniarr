@@ -1,5 +1,9 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 28 [Storage labels outcome](STORAGE_LABELS_OUTCOME.md) records the
+latest local walkthrough validation of row identity, native labels and removal
+focus ownership.
+
 The October 28 [Library labels outcome](LIBRARY_LABELS_OUTCOME.md) records the
 latest local walkthrough validation of native labels and retention groups.
 
