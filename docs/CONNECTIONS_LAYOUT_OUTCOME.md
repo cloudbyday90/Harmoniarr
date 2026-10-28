@@ -110,12 +110,15 @@ GitHub MCP found zero open repository PRs initially and at the final check,
 cleanup/rebasing were inapplicable. Work stays on main without a PR merge, new
 branch, release or Git tag.
 
-## Next recommended item
+## Next item implemented
 
-Associate the visible Connections field labels with their controls using unique
-matching for/id values, preserving write-only secret behavior and current commands.
-The built Spotify Client ID and Client secret fields had no native label
-association, input ID, aria-label or aria-labelledby. Verify accessible names and
-label activation in the built UI using the published W3C H44 technique linked in
-the research. Keep the mobile-navigation edge finding and deferred manual AT/device
-acceptance visible as separate follow-up scope.
+The label-association follow-up is implemented separately. See its
+[research](CONNECTIONS_LABELS_RESEARCH_2026_10.md),
+[design](CONNECTIONS_LABELS_DESIGN.md) and [outcome](CONNECTIONS_LABELS_OUTCOME.md).
+
+The original finding was that built Spotify Client ID and Client secret fields
+had no native label association, input ID, aria-label or aria-labelledby. The
+follow-up implements unique matching for/id values and verifies names and label
+activation while preserving write-only secrets and current commands. The
+mobile-navigation edge finding and deferred manual AT/device acceptance remain
+separate follow-up scope.

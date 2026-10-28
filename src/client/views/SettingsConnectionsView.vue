@@ -315,15 +315,15 @@ onMounted(() => {
         >
           <div class="cfg-group" style="padding-top: 0; border-top: none">
             <div class="hx-field">
-              <label class="hx-field-label">Soulseek request timeout (milliseconds)</label>
-              <input class="hx-input" v-model.number="form.slskd.requestTimeoutMs" type="number" min="1000" max="120000" step="1000" />
+              <label class="hx-field-label" for="settings-slskd-request-timeout">Soulseek request timeout (milliseconds)</label>
+              <input id="settings-slskd-request-timeout" class="hx-input" v-model.number="form.slskd.requestTimeoutMs" type="number" min="1000" max="120000" step="1000" />
             </div>
             <p class="cfg-field-hint">Leave at the default (10,000 ms) unless you are troubleshooting repeated timeout errors.</p>
           </div>
           <div class="cfg-group">
             <div class="hx-field">
-              <label class="hx-field-label">Playlist discovery mode</label>
-              <select class="hx-select" v-model="form.providers.playlistExpansionPolicy">
+              <label class="hx-field-label" for="settings-playlist-discovery-mode">Playlist discovery mode</label>
+              <select id="settings-playlist-discovery-mode" class="hx-select" v-model="form.providers.playlistExpansionPolicy">
                 <option value="bounded">Bounded — only albums in the playlist</option>
                 <option value="artist_discovery">Artist discovery — include other albums by those artists</option>
               </select>
@@ -332,8 +332,8 @@ onMounted(() => {
           </div>
           <div class="cfg-group">
             <div class="hx-field">
-              <label class="hx-field-label">Playlist provider timeout (milliseconds)</label>
-              <input class="hx-input" v-model.number="form.providers.requestTimeoutMs" type="number" min="1000" max="60000" step="1000" />
+              <label class="hx-field-label" for="settings-playlist-provider-timeout">Playlist provider timeout (milliseconds)</label>
+              <input id="settings-playlist-provider-timeout" class="hx-input" v-model.number="form.providers.requestTimeoutMs" type="number" min="1000" max="60000" step="1000" />
             </div>
             <p class="cfg-field-hint">Leave at the default (15,000 ms) unless playlist providers are timing out consistently.</p>
           </div>
@@ -369,12 +369,12 @@ onMounted(() => {
               </label>
               <div class="hx-form-row">
                 <div class="hx-field">
-                  <label class="hx-field-label">Client ID</label>
-                  <input class="hx-input" v-model="form.providers.spotifyClientId" autocomplete="off" />
+                  <label class="hx-field-label" for="settings-spotify-client-id">Client ID</label>
+                  <input id="settings-spotify-client-id" class="hx-input" v-model="form.providers.spotifyClientId" autocomplete="off" />
                 </div>
                 <div class="hx-field">
-                  <label class="hx-field-label">Client secret</label>
-                  <input class="hx-input" v-model="form.providers.spotifyClientSecret" type="password" autocomplete="new-password" :disabled="form.providers.clearSpotifyClientSecret" placeholder="Leave blank to keep" />
+                  <label class="hx-field-label" for="settings-spotify-client-secret">Client secret</label>
+                  <input id="settings-spotify-client-secret" class="hx-input" v-model="form.providers.spotifyClientSecret" type="password" autocomplete="new-password" :disabled="form.providers.clearSpotifyClientSecret" placeholder="Leave blank to keep" />
                 </div>
               </div>
               <label class="cfg-check">
@@ -411,16 +411,16 @@ onMounted(() => {
               </label>
               <div class="hx-form-row">
                 <div class="hx-field">
-                  <label class="hx-field-label">API key</label>
-                  <input class="hx-input" v-model="form.providers.youtubeApiKey" type="password" autocomplete="new-password" :disabled="form.providers.clearYoutubeApiKey" placeholder="Leave blank to keep" />
+                  <label class="hx-field-label" for="settings-youtube-api-key">API key</label>
+                  <input id="settings-youtube-api-key" class="hx-input" v-model="form.providers.youtubeApiKey" type="password" autocomplete="new-password" :disabled="form.providers.clearYoutubeApiKey" placeholder="Leave blank to keep" />
                 </div>
                 <div class="hx-field">
-                  <label class="hx-field-label">OAuth client ID</label>
-                  <input class="hx-input" v-model="form.providers.youtubeClientId" autocomplete="off" />
+                  <label class="hx-field-label" for="settings-youtube-client-id">OAuth client ID</label>
+                  <input id="settings-youtube-client-id" class="hx-input" v-model="form.providers.youtubeClientId" autocomplete="off" />
                 </div>
                 <div class="hx-field">
-                  <label class="hx-field-label">OAuth client secret</label>
-                  <input class="hx-input" v-model="form.providers.youtubeClientSecret" type="password" autocomplete="new-password" :disabled="form.providers.clearYoutubeClientSecret" placeholder="Leave blank to keep" />
+                  <label class="hx-field-label" for="settings-youtube-client-secret">OAuth client secret</label>
+                  <input id="settings-youtube-client-secret" class="hx-input" v-model="form.providers.youtubeClientSecret" type="password" autocomplete="new-password" :disabled="form.providers.clearYoutubeClientSecret" placeholder="Leave blank to keep" />
                 </div>
               </div>
               <div class="hx-card-actions">
@@ -500,12 +500,12 @@ onMounted(() => {
               </label>
               <div class="hx-form-row">
                 <div class="hx-field">
-                  <label class="hx-field-label">Project API key</label>
-                  <input class="hx-input" v-model="form.providers.fanartTvApiKey" type="password" autocomplete="new-password" :disabled="form.providers.clearFanartTvApiKey" placeholder="Leave blank to keep" />
+                  <label class="hx-field-label" for="settings-fanart-project-key">Project API key</label>
+                  <input id="settings-fanart-project-key" class="hx-input" v-model="form.providers.fanartTvApiKey" type="password" autocomplete="new-password" :disabled="form.providers.clearFanartTvApiKey" placeholder="Leave blank to keep" />
                 </div>
                 <div class="hx-field">
-                  <label class="hx-field-label">Personal API key</label>
-                  <input class="hx-input" v-model="form.providers.fanartTvClientKey" type="password" autocomplete="new-password" :disabled="form.providers.clearFanartTvClientKey" placeholder="Leave blank to keep" />
+                  <label class="hx-field-label" for="settings-fanart-personal-key">Personal API key</label>
+                  <input id="settings-fanart-personal-key" class="hx-input" v-model="form.providers.fanartTvClientKey" type="password" autocomplete="new-password" :disabled="form.providers.clearFanartTvClientKey" placeholder="Leave blank to keep" />
                 </div>
               </div>
               <p class="cfg-field-hint">Project key provides application-level access (7-day delay). Personal key takes priority (2-day delay). At least one key is required. Get keys at <a href="https://fanart.tv/get-an-api-key/" target="_blank" rel="noopener">fanart.tv</a>.</p>

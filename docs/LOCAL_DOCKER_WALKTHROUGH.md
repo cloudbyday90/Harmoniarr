@@ -1,5 +1,9 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 28 [Connections labels outcome](CONNECTIONS_LABELS_OUTCOME.md) records
+the current local rebuild, preserved administrator/five mounts, native label
+activation and write-only secret checks. No release is created.
+
 The October 28 [Connections layout rebuild](LOCAL_DOCKER_CONNECTIONS_LAYOUT_OUTCOME.md)
 records the current image and preserved administrator/five mounts, with mobile
 field sizing and measured save-bar clearance. See the separate

@@ -7,6 +7,10 @@ Security source: `docs/SECURITY_POLICY.md`
 
 ## Current Status (2026-10-28)
 
+October 28 Connections field labels now use matching native for/id associations.
+This client-only change needs no schema refresh, migration or maintenance task.
+See [design](CONNECTIONS_LABELS_DESIGN.md) and [outcome](CONNECTIONS_LABELS_OUTCOME.md).
+
 October 28 Connections layout now uses content-sized mobile form rows and scoped
 save-bar scroll clearance, with normal flow on constrained viewports. No schema
 or maintenance work is needed. See [design](CONNECTIONS_LAYOUT_DESIGN.md) and
