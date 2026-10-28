@@ -2,6 +2,12 @@
 
 ## Purpose
 
+Settings callback feedback now checks the existing saved provider-status GET.
+URL hints cannot establish link success, and retrying this check performs no
+credential mutation or schema refresh. No SQL/persistence/maintenance policy
+changes. See the [design](PROVIDER_CALLBACK_FEEDBACK_DESIGN.md) and
+[outcome](PROVIDER_CALLBACK_FEEDBACK_OUTCOME.md).
+
 OAuth/Plex callback redirects now select public codes from fixed provider catalogs.
 The existing state/session/PKCE/publication services retain authority; this output
 policy adds no SQL, schema, persistence or maintenance behavior. See the separate

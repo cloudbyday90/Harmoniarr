@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 28 [callback-feedback rebuild](LOCAL_DOCKER_PROVIDER_CALLBACK_FEEDBACK_OUTCOME.md)
+records the current image, preserved administrator/five mounts and safe callback
+guidance with saved-status checks. See the separate
+[implementation outcome](PROVIDER_CALLBACK_FEEDBACK_OUTCOME.md). No release is created.
+
 The October 28 [callback-error rebuild](LOCAL_DOCKER_PROVIDER_CALLBACK_ERRORS_OUTCOME.md)
 records the current image, preserved administrator/five mounts and bounded
 OAuth/Plex failure redirects. See the separate

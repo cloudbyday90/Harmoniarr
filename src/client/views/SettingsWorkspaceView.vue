@@ -23,6 +23,7 @@ import { useTabbarOverflow } from '../composables/useTabbarOverflow.js';
 import { buildSettingsNavigation } from '../lib/settings-navigation.js';
 import { createUserCommandFocusTracker } from '../lib/user-command-focus.js';
 import { sessionStore } from '../state/session.js';
+import SettingsProviderCallbackFeedback from '../components/settings/SettingsProviderCallbackFeedback.vue';
 
 const navigation = computed(() => buildSettingsNavigation(sessionStore.state.user?.role));
 const primaryTabs = computed(() => navigation.value.primary);
@@ -116,6 +117,7 @@ onUnmounted(cleanup);
       </RouterLink>
     </nav>
 
+    <SettingsProviderCallbackFeedback :can-check="sessionStore.state.user?.role === 'admin'" />
     <RouterView />
   </section>
 </template>

@@ -79,7 +79,7 @@ GitHub MCP found **zero open PRs**, initially and at the final check recorded at
 rebasing were inapplicable. Work is on main without a PR merge, release, tag or
 release-workflow dispatch.
 
-## Next recommended item
+## Next recommended item (implemented)
 
 Present the fixed callback outcome in the settings connection journey. The current
 callback lands on Settings / Setup readiness, while the existing connection
@@ -93,3 +93,8 @@ Verify persistent status/error feedback, keyboard/focus behavior, safe query
 cleanup and success/refusal/reload through the actual built UI. Keep retry under
 explicit user activation and the existing fresh-admin/CSRF/state owners. This
 follow-up improves recovery guidance without changing credential authority.
+
+The workspace feedback is now implemented; see its separate
+[research](PROVIDER_CALLBACK_FEEDBACK_RESEARCH_2026_10.md),
+[design](PROVIDER_CALLBACK_FEEDBACK_DESIGN.md) and
+[outcome](PROVIDER_CALLBACK_FEEDBACK_OUTCOME.md) for qualification and the next item.
