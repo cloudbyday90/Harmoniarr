@@ -22,8 +22,8 @@ export function fetchBootstrapStatus() {
   return apiRequest('/api/v1/bootstrap/status');
 }
 
-export function fetchSession() {
-  return apiRequest('/api/v1/auth/session');
+export function fetchSession({ signal } = {}) {
+  return apiRequest('/api/v1/auth/session', { signal });
 }
 
 export function bootstrapAdmin(form) {

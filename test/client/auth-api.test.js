@@ -18,7 +18,7 @@
 
 import assert from 'node:assert/strict';
 import { suite, test } from 'node:test';
-import { startPlexSignIn } from '../../src/client/lib/auth-api.js';
+import { fetchSession, startPlexSignIn } from '../../src/client/lib/auth-api.js';
 
 function createJsonResponse({ ok = true, payload = { ok: true }, status = 200 } = {}) {
   return {
@@ -32,6 +32,15 @@ function createJsonResponse({ ok = true, payload = { ok: true }, status = 200 } 
 }
 
 suite('auth-api', () => {
+  test('session reads forward cancellation without a request body or mutation', async t => {
+    const controller = new AbortController();
+    t.mock.method(globalThis, 'fetch', async () => createJsonResponse());
+    await fetchSession({ signal: controller.signal });
+    const [url, options] = globalThis.fetch.mock.calls[0].arguments;
+    assert.equal(url, '/api/v1/auth/session'); assert.equal(options.method, 'GET');
+    assert.equal(options.signal, controller.signal); assert.equal(options.body, undefined);
+    assert.equal(options.credentials, 'same-origin');
+  });
   test('startPlexSignIn posts the redirect target to the shared auth route', async (t) => {
     globalThis.fetch = t.mock.fn(async () => createJsonResponse({ payload: { ok: true, provider: 'plex' } }));
 

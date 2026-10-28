@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 28 [saved-authorization rebuild](LOCAL_DOCKER_PROVIDER_AUTHORIZATION_STATUS_OUTCOME.md)
+records the current image and preserved administrator/five mounts, with bounded
+saved-link recovery that keeps settings drafts. See the separate
+[implementation outcome](PROVIDER_AUTHORIZATION_STATUS_OUTCOME.md). No release is created.
+
 The October 28 [authorization-action rebuild](LOCAL_DOCKER_PROVIDER_AUTHORIZATION_ACTIONS_OUTCOME.md)
 records the current image, preserved administrator/five mounts and single-owner
 connect/clear controls. See the separate

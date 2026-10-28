@@ -30,6 +30,7 @@ import SettingsFormGroup from '../components/settings/SettingsFormGroup.vue';
 import SettingsProviderConnectionStatus from '../components/settings/SettingsProviderConnectionStatus.vue';
 import SettingsProviderCollectionAccessCheck from '../components/settings/SettingsProviderCollectionAccessCheck.vue';
 import SettingsAppleSigningStatus from '../components/settings/SettingsAppleSigningStatus.vue';
+import SettingsProviderAuthorizationStatus from '../components/settings/SettingsProviderAuthorizationStatus.vue';
 import { hasAppleMusicCredentialDraft } from '../lib/apple-music-signing-presentation.js';
 import SettingsRecoveryConfirmation from '../components/settings/SettingsRecoveryConfirmation.vue';
 import SettingsSaveBar from '../components/settings/SettingsSaveBar.vue';
@@ -75,6 +76,10 @@ const {
   isStartingSpotifyOAuth,
   isStartingYouTubeOAuth,
   isProviderAuthorizationPending,
+  isProviderAuthorizationSessionBlocked,
+  providerAuthorizationStatusFeedback,
+  isCheckingProviderAuthorization,
+  checkProviderAuthorizationStatus,
   isDirty,
   loadErrorMessage,
   loadSettings,
@@ -383,10 +388,10 @@ onMounted(() => {
                 </span>
               </div>
               <div class="hx-card-actions settings-connections__authorization-actions">
-                <button type="button" class="hx-btn" @click="connectSpotifyOAuth" :aria-disabled="isProviderAuthorizationPending || isSaving">
+                <button type="button" class="hx-btn" @click="connectSpotifyOAuth" :aria-disabled="isProviderAuthorizationPending || isSaving || isProviderAuthorizationSessionBlocked">
                   {{ isStartingSpotifyOAuth ? 'Starting…' : 'Connect Spotify' }}
                 </button>
-                <button type="button" class="hx-btn" @click="disconnectSpotifyOAuth" :aria-disabled="isProviderAuthorizationPending || isSaving || !secretStatus?.providers?.spotifyOAuth?.linked">
+                <button type="button" class="hx-btn" @click="disconnectSpotifyOAuth" :aria-disabled="isProviderAuthorizationPending || isSaving || isProviderAuthorizationSessionBlocked || !secretStatus?.providers?.spotifyOAuth?.linked">
                   {{ isClearingSpotifyOAuth ? 'Clearing…' : 'Clear authorization' }}
                 </button>
               </div>
@@ -435,10 +440,10 @@ onMounted(() => {
                 </span>
               </div>
               <div class="hx-card-actions settings-connections__authorization-actions">
-                <button type="button" class="hx-btn" @click="connectYouTubeOAuth" :aria-disabled="isProviderAuthorizationPending || isSaving">
+                <button type="button" class="hx-btn" @click="connectYouTubeOAuth" :aria-disabled="isProviderAuthorizationPending || isSaving || isProviderAuthorizationSessionBlocked">
                   {{ isStartingYouTubeOAuth ? 'Starting…' : 'Connect YouTube' }}
                 </button>
-                <button type="button" class="hx-btn" @click="disconnectYouTubeOAuth" :aria-disabled="isProviderAuthorizationPending || isSaving || !secretStatus?.providers?.youtubeOAuth?.linked">
+                <button type="button" class="hx-btn" @click="disconnectYouTubeOAuth" :aria-disabled="isProviderAuthorizationPending || isSaving || isProviderAuthorizationSessionBlocked || !secretStatus?.providers?.youtubeOAuth?.linked">
                   {{ isClearingYouTubeOAuth ? 'Clearing…' : 'Clear authorization' }}
                 </button>
               </div>
@@ -529,6 +534,12 @@ onMounted(() => {
       >
         {{ connectionActionFeedback?.message ?? '' }}
       </p>
+      <SettingsProviderAuthorizationStatus
+        :feedback="providerAuthorizationStatusFeedback"
+        :is-checking="isCheckingProviderAuthorization"
+        :can-check="!isProviderAuthorizationPending && !isSaving && !isLoading"
+        @check="checkProviderAuthorizationStatus"
+      />
       <SettingsSaveBar :save-state="settingsSaveState" @verify="testProviderConnection" />
     </form>
   </div>

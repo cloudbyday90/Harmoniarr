@@ -45,7 +45,7 @@ test('acknowledged start keeps handoff ownership; only persisted return retires 
   for (const pair of commands) assert.equal(await owner.run(...pair), false);
   page.dispatchEvent(pageEvent(false)); assert.equal(owner.isPending.value, true);
   page.dispatchEvent(pageEvent(true)); assert.equal(owner.isPending.value, false); assert.equal(calls.length, 1);
-  assert.match(owner.feedback.value.message, /Reload Connections/u);
+  assert.match(owner.feedback.value.message, /Review the saved link/u);
   await owner.run('youtube', 'clear'); assert.equal(calls.length, 2); assert.equal(owner.feedback.value.tone, 'success'); owner.dispose();
 });
 test('navigation failure has fixed guidance, releases admission and does not replay the acknowledged start', async () => {

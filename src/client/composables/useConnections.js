@@ -25,6 +25,8 @@ import {
 } from '../lib/settings-api.js';
 import { useSettingsForm } from './useSettingsForm.js';
 import { useProviderAuthorizationActions } from './useProviderAuthorizationActions.js';
+import { useProviderAuthorizationStatus } from './useProviderAuthorizationStatus.js';
+import { sessionStore } from '../state/session.js';
 
 function defaultRedirectToUrl(url) {
   window.location.href = url;
@@ -43,6 +45,10 @@ export function useConnections({
   startSpotifyOAuthFn = startSpotifyOAuth,
   startYouTubeOAuthFn = startYouTubeOAuth,
   useSettingsFormFn = useSettingsForm,
+  getSession = () => sessionStore.state,
+  fetchSessionFn,
+  fetchStatusFn,
+  pageTarget,
   onSaveSuccess,
 } = {}) {
   const secretStatus = ref(null);
@@ -72,13 +78,20 @@ export function useConnections({
     successMessage,
   } = settingsForm;
 
+  const savedStatus = useProviderAuthorizationStatus({ getSession, fetchSessionFn, fetchStatusFn,
+    canCheck: () => !isLoading.value && !isSaving.value && !actions.isPending.value,
+    onObserved: (provider, linked) => updateOAuthStatus(secretStatus, `${provider}OAuth`, { linked }),
+  });
   const actions = useProviderAuthorizationActions({
+    pageTarget,
     start: { spotify: startSpotifyOAuthFn, youtube: startYouTubeOAuthFn },
     clear: { spotify: clearSpotifyOAuthFn, youtube: clearYouTubeOAuthFn },
     redirectToUrl,
-    canRun: (provider, kind) => !isLoading.value && !isSaving.value
+    canRun: (provider, kind) => !isLoading.value && !isSaving.value && !savedStatus.sessionBlocked.value
       && (kind === 'start' || secretStatus.value?.providers?.[`${provider}OAuth`]?.linked === true),
     onCleared: (provider, status) => updateOAuthStatus(secretStatus, `${provider}OAuth`, status),
+    onAdmitted: savedStatus.reset,
+    onReviewNeeded: provider => { void savedStatus.review(provider); },
     onFeedback: feedback => {
       errorMessage.value = feedback?.tone === 'danger' ? feedback.message : '';
       successMessage.value = feedback?.tone === 'success' ? feedback.message : '';
@@ -92,8 +105,8 @@ export function useConnections({
   const disconnectSpotifyOAuth = () => actions.run('spotify', 'clear');
   const connectYouTubeOAuth = () => actions.run('youtube', 'start');
   const disconnectYouTubeOAuth = () => actions.run('youtube', 'clear');
-  async function loadSettings() { if (!actions.isPending.value) return loadSettingsForm(); }
-  async function saveSettings() { return actions.isPending.value ? { ok: false } : saveSettingsForm(); }
+  async function loadSettings() { if (!actions.isPending.value) { savedStatus.reset(); return loadSettingsForm(); } }
+  async function saveSettings() { if (actions.isPending.value) return { ok: false }; savedStatus.reset(); return saveSettingsForm(); }
 
   return {
     connectSpotifyOAuth,
@@ -101,6 +114,10 @@ export function useConnections({
     clearConnectionActionFeedback: actions.clearFeedback,
     connectionActionFeedback: actions.feedback,
     isProviderAuthorizationPending: actions.isPending,
+    isProviderAuthorizationSessionBlocked: savedStatus.sessionBlocked,
+    providerAuthorizationStatusFeedback: savedStatus.feedback,
+    isCheckingProviderAuthorization: savedStatus.isChecking,
+    checkProviderAuthorizationStatus: savedStatus.check,
     disconnectSpotifyOAuth,
     disconnectYouTubeOAuth,
     errorMessage,

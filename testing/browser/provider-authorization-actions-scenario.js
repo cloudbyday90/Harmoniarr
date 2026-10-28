@@ -22,6 +22,10 @@ export async function runProviderAuthorizationActionsScenario({ page, browserCon
     await route.fulfill(json({ ...body, secretStatus: { ...body.secretStatus, providers: { ...body.secretStatus?.providers,
       spotifyOAuth: { linked: linked.spotify }, youtubeOAuth: { linked: linked.youtube } } } }));
   };
+  const statusRead = async route => {
+    assert.equal(route.request().method(), 'GET');
+    await route.fulfill(json({ spotify: { linked: linked.spotify }, youtube: { linked: linked.youtube }, statusSummary: { state: 'complete', unavailableProviders: [] } }));
+  };
   const commands = async route => {
     const request = route.request(), [, provider, kind] = new URL(request.url()).pathname.match(commandPath);
     assert.equal(request.method(), 'POST'); assert.equal(request.postData(), null);
@@ -58,6 +62,7 @@ export async function runProviderAuthorizationActionsScenario({ page, browserCon
   const onError = error => errors.push(error.name); page.on('pageerror', onError);
   await browserContext.addInitScript(() => { globalThis.addEventListener('pageshow', event => { globalThis.__authorizationPagePersisted = event.persisted; }); });
   await browserContext.route('**/api/v1/**', guard); await browserContext.route('**/api/v1/settings', settings);
+  await browserContext.route('**/api/v1/providers/status', statusRead);
   await browserContext.route(commandPath, commands); await browserContext.route(providerPath, provider);
   try {
     await open(); assert.equal(await status.getAttribute('role'), 'status'); assert.equal(await status.getAttribute('aria-atomic'), 'true');
@@ -115,5 +120,6 @@ export async function runProviderAuthorizationActionsScenario({ page, browserCon
     for (const hold of holds) hold.resolve(); page.off('pageerror', onError);
     await browserContext.unroute(providerPath, provider); await browserContext.unroute(commandPath, commands);
     await browserContext.unroute('**/api/v1/settings', settings); await browserContext.unroute('**/api/v1/**', guard);
+    await browserContext.unroute('**/api/v1/providers/status', statusRead);
   }
 }

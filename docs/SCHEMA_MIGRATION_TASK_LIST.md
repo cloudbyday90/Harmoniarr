@@ -7,6 +7,13 @@ Security source: `docs/SECURITY_POLICY.md`
 
 ## Current Status (2026-10-28)
 
+October 28 saved Spotify/YouTube authorization reconciliation uses existing
+session/status GETs with scoped read ownership and bounded target projection.
+Settings drafts and server command authority retain their owners. No schema
+refresh or maintenance change is needed. See the
+[design](PROVIDER_AUTHORIZATION_STATUS_DESIGN.md) and
+[outcome](PROVIDER_AUTHORIZATION_STATUS_OUTCOME.md).
+
 October 28 Spotify/YouTube start and clear actions now share scoped client pending
 ownership, preserving existing API/session/CSRF and transaction authority.
 No schema or maintenance changes. See the [design](PROVIDER_AUTHORIZATION_ACTIONS_DESIGN.md)

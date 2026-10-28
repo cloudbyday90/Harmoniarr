@@ -94,7 +94,7 @@ GitHub MCP found no open PRs at the initial and final checks, the latter at
 implementation and stale Dependabot cleanup/rebasing were therefore inapplicable.
 Work remains on main, with no PR merge, new branch, release or Git tag.
 
-## Next recommended item
+## Next recommended item (implemented)
 
 Add an owned, read-only saved-link/current-session reconciliation after an
 uncertain command result or persisted handoff return. Reuse the existing
@@ -116,3 +116,9 @@ sticky-save-bar occlusion when framing an entire card. The unchanged shared
 form CSS should receive a separate mobile flex-sizing/clearance audit. The
 authorization rows were separately centered, hit-tested and captured; this
 qualification does not claim complete Connections layout acceptance.
+
+The scoped saved-status follow-up is now implemented. See its separate
+[research](PROVIDER_AUTHORIZATION_STATUS_RESEARCH_2026_10.md),
+[design](PROVIDER_AUTHORIZATION_STATUS_DESIGN.md) and
+[outcome](PROVIDER_AUTHORIZATION_STATUS_OUTCOME.md). The mobile layout finding
+remains a separate follow-up.

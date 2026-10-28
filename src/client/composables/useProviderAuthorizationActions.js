@@ -8,7 +8,7 @@ import { computed, getCurrentScope, nextTick, onScopeDispose, readonly, ref } fr
 const labels = { spotify: 'Spotify', youtube: 'YouTube' };
 
 export function useProviderAuthorizationActions({ start, clear, redirectToUrl, canRun = () => true,
-  onCleared = () => {}, onFeedback = () => {}, pageTarget = globalThis.window } = {}) {
+  onCleared = () => {}, onFeedback = () => {}, onAdmitted = () => {}, onReviewNeeded = () => {}, pageTarget = globalThis.window } = {}) {
   const pendingAction = ref(null), feedback = ref(null);
   let active = null, disposed = false;
   const owns = request => !disposed && active === request;
@@ -18,8 +18,9 @@ export function useProviderAuthorizationActions({ start, clear, redirectToUrl, c
   function returned(event) {
     if (event.persisted !== true || !active || active.phase !== 'handoff' || disposed) return;
     const request = active;
-    publish({ message: `Returned from ${labels[request.provider]} authorization. Reload Connections to check the saved link before starting again.`, tone: 'info' });
+    publish({ message: `Returned from ${labels[request.provider]} authorization. Review the saved link before starting again.`, tone: 'info' });
     release(request);
+    if (!disposed) onReviewNeeded(request.provider);
   }
   async function run(provider, kind) {
     if (disposed || active || typeof provider !== 'string' || !Object.hasOwn(labels, provider)
@@ -27,6 +28,7 @@ export function useProviderAuthorizationActions({ start, clear, redirectToUrl, c
     const request = { provider, kind, phase: 'request' }, label = labels[provider];
     active = request; pendingAction.value = `${provider}_${kind}`;
     try {
+      onAdmitted();
       publish({ message: `${label} authorization ${kind === 'start' ? 'is starting' : 'is being cleared'}…`, tone: 'info' });
       await nextTick();
       if (!owns(request)) return false;
@@ -49,7 +51,9 @@ export function useProviderAuthorizationActions({ start, clear, redirectToUrl, c
       const message = request.phase === 'handoff'
         ? `${label} authorization could not be opened. Review Connections before trying again.`
         : `${label} authorization ${kind} could not be confirmed. Review Connections before trying again.`;
-      publish({ message, tone: 'danger' }); release(request); return false;
+      publish({ message, tone: 'danger' }); release(request);
+      if (!disposed) onReviewNeeded(provider);
+      return false;
     }
   }
   function dispose() {
