@@ -7,6 +7,11 @@ Security source: `docs/SECURITY_POLICY.md`
 
 ## Current Status (2026-10-28)
 
+October 28 Connections layout now uses content-sized mobile form rows and scoped
+save-bar scroll clearance, with normal flow on constrained viewports. No schema
+or maintenance work is needed. See [design](CONNECTIONS_LAYOUT_DESIGN.md) and
+[outcome](CONNECTIONS_LAYOUT_OUTCOME.md).
+
 October 28 saved Spotify/YouTube authorization reconciliation uses existing
 session/status GETs with scoped read ownership and bounded target projection.
 Settings drafts and server command authority retain their owners. No schema

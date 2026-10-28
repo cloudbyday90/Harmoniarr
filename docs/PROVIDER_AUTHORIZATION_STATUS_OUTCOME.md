@@ -108,7 +108,7 @@ GitHub MCP found zero open repository PRs initially and at the final check,
 cleanup/rebasing were inapplicable. Work stays on main without a PR merge, new
 branch, release or Git tag.
 
-## Next recommended item
+## Next recommended item (implemented)
 
 Audit and fix Connections mobile field flex sizing and sticky-save-bar clearance,
 the separate finding retained in the [preceding outcome](PROVIDER_AUTHORIZATION_ACTIONS_OUTCOME.md).
@@ -117,3 +117,7 @@ scrolling and zoom/reflow, not only centered screenshots, against the W3C
 focus-not-obscured guidance linked in the research. The scoped status checks here
 do not establish complete Connections layout acceptance. Manual AT/device work
 remains a separate acceptance step.
+
+The layout follow-up is now implemented; see the separate
+[research](CONNECTIONS_LAYOUT_RESEARCH_2026_10.md),
+[design](CONNECTIONS_LAYOUT_DESIGN.md) and [outcome](CONNECTIONS_LAYOUT_OUTCOME.md).

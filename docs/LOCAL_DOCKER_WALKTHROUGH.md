@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 28 [Connections layout rebuild](LOCAL_DOCKER_CONNECTIONS_LAYOUT_OUTCOME.md)
+records the current image and preserved administrator/five mounts, with mobile
+field sizing and measured save-bar clearance. See the separate
+[implementation outcome](CONNECTIONS_LAYOUT_OUTCOME.md). No release is created.
+
 The October 28 [saved-authorization rebuild](LOCAL_DOCKER_PROVIDER_AUTHORIZATION_STATUS_OUTCOME.md)
 records the current image and preserved administrator/five mounts, with bounded
 saved-link recovery that keeps settings drafts. See the separate

@@ -602,8 +602,12 @@ body,
   background: var(--hx-bg-canvas);
   overflow-x: clip;
   overflow-y: auto;
+  scroll-padding-top: var(--hx-settings-scroll-gap, 0px);
+  scroll-padding-bottom: calc(var(--hx-settings-save-bar-height, 0px) + var(--hx-settings-scroll-gap, 0px));
   -webkit-overflow-scrolling: touch;
 }
+
+.hx-main:has(.settings-save-bar) { --hx-settings-scroll-gap: var(--hx-space-4); }
 
 .hx-page {
   max-width: 1480px;
@@ -1185,7 +1189,7 @@ body,
   .hx-main {
     padding-bottom: calc(var(--hx-bottom-nav-height) + env(safe-area-inset-bottom, 0px));
     scroll-padding-top: var(--hx-space-4);
-    scroll-padding-bottom: calc(var(--hx-bottom-nav-height) + env(safe-area-inset-bottom, 0px) + var(--hx-space-4));
+    scroll-padding-bottom: calc(var(--hx-bottom-nav-height) + env(safe-area-inset-bottom, 0px) + var(--hx-settings-save-bar-height, 0px) + var(--hx-space-4));
   }
 
   /* ── Page layout ─────────────────────────────────────────────────────── */
@@ -1255,19 +1259,6 @@ body,
     padding: 11px var(--hx-space-3);
     min-height: 44px;
   }
-
-  /* ── Form rows ───────────────────────────────────────────────────────── */
-
-  /*
-   * .hx-form-row (used in Settings, SearchView network form, etc.) uses
-   * flex with flex: 1 1 200px fields — on narrow screens those fields will
-   * wrap but still try to reach 200px.  Override to always full-width.
-   */
-  .hx-form-row {
-    flex-direction: column;
-  }
-
-  .hx-form-row > .hx-field { flex: 1 1 auto; }
 
   /* ── Touch targets ───────────────────────────────────────────────────── */
 
@@ -1847,15 +1838,6 @@ body {
   font-weight: 600;
 }
 
-.hx-form-row {
-  display: flex;
-  gap: var(--hx-space-3);
-  flex-wrap: wrap;
-  align-items: flex-end;
-}
-
-.hx-form-row > .hx-field { flex: 1 1 200px; }
-
 /* ---------- Screen-reader-only utility ---------- */
 /* Hides content visually but keeps it in the accessibility tree for screen
    readers (live-region announcements, labels for AT). Standard clip pattern. */
@@ -1903,24 +1885,6 @@ body {
   .hx-skeleton {
     animation: none;
   }
-}
-
-/* ---------- Sticky settings save bar ---------- */
-/* The settings form is long (~7000px). Make the save bar sticky at the bottom
-   so users can commit changes without scrolling to the end of the page. */
-.settings-save-bar {
-  position: sticky;
-  bottom: 0;
-  z-index: 3;
-  background: var(--hx-bg-surface);
-  border-top: 1px solid var(--hx-border-subtle);
-  box-shadow: 0 -2px 8px rgba(15, 28, 36, 0.06);
-  /* Extend to the edges of the parent panel (panel has var(--hx-space-5) padding) */
-  margin-left: calc(-1 * var(--hx-space-5));
-  margin-right: calc(-1 * var(--hx-space-5));
-  margin-bottom: calc(-1 * var(--hx-space-5));
-  padding: var(--hx-space-3) var(--hx-space-5);
-  border-radius: 0 0 var(--hx-radius-lg) var(--hx-radius-lg);
 }
 
 /* Subtle shadow on the nav panel to give it visual lift over content

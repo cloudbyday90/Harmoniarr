@@ -1,0 +1,21 @@
+/*
+ * Harmoniarr - Soulseek-native music library management
+ * Copyright (C) 2026 Harmoniarr Contributors
+ * Licensed under GPL-3.0-or-later. See LICENSE.
+ */
+.hx-form-row {
+  display: flex;
+  gap: var(--hx-space-3);
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.hx-form-row > .hx-field {
+  flex: 1 1 200px;
+  min-inline-size: 0;
+}
+
+@media (max-width: 640px) {
+  .hx-form-row { flex-direction: column; align-items: stretch; }
+  .hx-form-row > .hx-field { flex: 0 1 auto; }
+}

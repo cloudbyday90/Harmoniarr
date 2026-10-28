@@ -17,7 +17,8 @@
 -->
 
 <script setup>
-import { computed } from 'vue';
+import { computed, onMounted, onUnmounted, onUpdated, ref } from 'vue';
+import { observeStickySaveBar } from '../../lib/sticky-save-bar-clearance.js';
 
 const props = defineProps({
   saveState: {
@@ -27,6 +28,11 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['verify']);
+const barRef = ref(null);
+let clearance;
+onMounted(() => { clearance = observeStickySaveBar(barRef.value); });
+onUpdated(() => clearance?.refresh());
+onUnmounted(() => clearance?.dispose());
 
 const statusRole = computed(() => (
   props.saveState?.state === 'save_failed' ? 'alert' : 'status'
@@ -34,7 +40,7 @@ const statusRole = computed(() => (
 </script>
 
 <template>
-  <div class="settings-save-bar" :data-save-state="saveState.state">
+  <div ref="barRef" class="settings-save-bar" :data-save-state="saveState.state">
     <div v-if="saveState.statusLabel" class="settings-save-bar__outcome">
       <span class="hx-pill" :data-tone="saveState.tone">{{ saveState.statusLabel }}</span>
       <p :role="statusRole" aria-atomic="true">{{ saveState.message }}</p>
@@ -98,6 +104,12 @@ const statusRole = computed(() => (
 
 .settings-save-bar[data-save-state="save_failed"] .settings-save-bar__outcome p {
   color: var(--hx-danger);
+}
+
+.settings-save-bar[data-sticky-overflow] { position: static; }
+
+@media (max-width: 640px), (max-height: 600px) {
+  .settings-save-bar { position: static; }
 }
 
 @media (max-width: 640px) {

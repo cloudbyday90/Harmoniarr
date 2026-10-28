@@ -25,6 +25,7 @@ import router from './router.js';
 import { sessionStore } from './state/session.js';
 import './styles.css';
 import './design-system.css';
+import './form-layout.css';
 
 setAuthFailureHandler(createAuthFailureHandler({ router, sessionStore }));
 
