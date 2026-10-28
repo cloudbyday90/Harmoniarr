@@ -2,6 +2,12 @@
 
 ## Purpose
 
+Apple credential replacements and submitted Team ID/key ID fields now validate
+before the existing settings transaction. PEM remains exclusively in the existing
+encrypted secret owner; rejected patches have no durable effects. No SQL/schema
+artifact changes. See [credential design](APPLE_CREDENTIALS_DESIGN.md) and
+[outcome](APPLE_CREDENTIALS_OUTCOME.md).
+
 Apple developer-token signing now admits private P-256 keys and issues one-hour
 tokens with bounded local renewal. Keys remain in existing encrypted storage;
 no tokens or new schema are persisted. See

@@ -121,9 +121,9 @@ test('normalizeSettingsPatch accepts provider intake configuration settings', ()
   const updates = normalizeSettingsPatch({
     providers: {
       appleMusicEnabled: true,
-      appleMusicKeyId: ' apple-key ',
+      appleMusicKeyId: ' TESTKEY001 ',
       appleMusicStorefront: 'GB',
-      appleMusicTeamId: ' apple-team ',
+      appleMusicTeamId: ' TESTTEAM01 ',
       playlistExpansionPolicy: 'artist_discovery',
       requestTimeoutMs: 12000,
       spotifyClientId: ' spotify-client ',
@@ -140,7 +140,7 @@ test('normalizeSettingsPatch accepts provider intake configuration settings', ()
   }, {
     namespace: 'providers',
     settingKey: 'appleMusicKeyId',
-    value: 'apple-key',
+    value: 'TESTKEY001',
   }, {
     namespace: 'providers',
     settingKey: 'appleMusicStorefront',
@@ -148,7 +148,7 @@ test('normalizeSettingsPatch accepts provider intake configuration settings', ()
   }, {
     namespace: 'providers',
     settingKey: 'appleMusicTeamId',
-    value: 'apple-team',
+    value: 'TESTTEAM01',
   }, {
     namespace: 'providers',
     settingKey: 'playlistExpansionPolicy',

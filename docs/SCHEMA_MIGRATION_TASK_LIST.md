@@ -192,6 +192,13 @@ artifact or refresh job is added. Next validate saved Apple signing material and
 identifier shape at the protected settings mutation while preserving clear and
 replacement semantics.
 
+That save boundary is now implemented in the [credential design](APPLE_CREDENTIALS_DESIGN.md)
+and [outcome](APPLE_CREDENTIALS_OUTCOME.md), with
+[research/tradeoffs](APPLE_CREDENTIALS_RESEARCH_2026_10.md). It reuses the encrypted
+owner and settings transaction, including native rollback proof. No migration,
+snapshot, anchor or refresh job changes. Next distinguish configured presence
+from local signing validity in the existing read-only Apple status service.
+
 October 12 scan addition: `20261012_225951_scan_owned_receipt_invalidation.sql`
 adds UUID revision identity, generated path lookup and revision-bound negative
 observations. Replay preserves existing identities; snapshot/anchors include the

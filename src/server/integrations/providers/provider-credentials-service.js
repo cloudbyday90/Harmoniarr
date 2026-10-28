@@ -18,6 +18,7 @@
 
 import { createApiError } from '../../auth.js';
 import { createEncryptedSecretService } from '../../encrypted-secret-service.js';
+import { normalizeAppleMusicPrivateKey } from '../apple-music/apple-music-credential-validation.js';
 
 const secretType = 'integration_credential';
 
@@ -36,7 +37,7 @@ function createNoopSecretMutation(patch) {
   };
 }
 
-function buildSingleSecretMutation({ encryptedSecretService, envFallback: _envFallback, fieldPath, patchNamespace, patchKey, clearPatchKey, secretName }) {
+function buildSingleSecretMutation({ encryptedSecretService, envFallback: _envFallback, fieldPath, patchNamespace, patchKey, clearPatchKey, secretName, normalizeValue = value => value.trim() }) {
   return function extractMutation(patch) {
     const namespacePatch = patch?.[patchNamespace];
     if (!namespacePatch || typeof namespacePatch !== 'object' || Array.isArray(namespacePatch)) {
@@ -51,7 +52,7 @@ function buildSingleSecretMutation({ encryptedSecretService, envFallback: _envFa
         throw createApiError(400, 'validation_error', `${fieldPath} must be a string`);
       }
 
-      const trimmed = namespacePatch[patchKey].trim();
+      const trimmed = normalizeValue(namespacePatch[patchKey]);
       if (trimmed.length > 0) {
         nextValue = trimmed;
       }
@@ -217,6 +218,7 @@ export function createProviderCredentialsService({
         encryptedSecretService,
         envFallback: env.APPLE_MUSIC_PRIVATE_KEY,
         fieldPath: 'providers.appleMusicPrivateKey',
+        normalizeValue: normalizeAppleMusicPrivateKey,
         patchKey: 'appleMusicPrivateKey',
         patchNamespace: 'providers',
         secretName: appleMusicPrivateKeySecretName,

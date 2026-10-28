@@ -37,6 +37,7 @@ import {
 } from '../integrations/slskd/slskd-provider-mode.js';
 import { normalizeDownloadPathMappings } from '../paths/download-path-mapping-service.js';
 import { normalizeUserMusicRoots } from '../paths/user-music-root-service.js';
+import { normalizeAppleMusicIdentifier } from '../integrations/apple-music/apple-music-credential-validation.js';
 
 function createSettingsValidationError(message) {
   return createApiError(400, 'validation_error', message);
@@ -345,11 +346,11 @@ const settingDefinitions = {
     },
     appleMusicTeamId: {
       defaultValue: process.env.APPLE_MUSIC_TEAM_ID ?? '',
-      normalize: normalizeStringAllowEmpty('providers.appleMusicTeamId'),
+      normalize: value => normalizeAppleMusicIdentifier(value, 'providers.appleMusicTeamId'),
     },
     appleMusicKeyId: {
       defaultValue: process.env.APPLE_MUSIC_KEY_ID ?? '',
-      normalize: normalizeStringAllowEmpty('providers.appleMusicKeyId'),
+      normalize: value => normalizeAppleMusicIdentifier(value, 'providers.appleMusicKeyId'),
     },
     appleMusicStorefront: {
       defaultValue: process.env.APPLE_MUSIC_STOREFRONT ?? 'us',

@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 28 [Apple credential-save rebuild](LOCAL_DOCKER_APPLE_CREDENTIALS_OUTCOME.md)
+records the current image and preserved administrator/five mounts, protected
+HTTP validation, encrypted persistence and native rollback proof. See the
+[implementation outcome](APPLE_CREDENTIALS_OUTCOME.md). No release is created.
+
 The October 28 [Apple signing rebuild](LOCAL_DOCKER_APPLE_SIGNING_OUTCOME.md)
 records the current image, preserved administrator/five mounts, private-key
 admission, one-hour JWTs and existing native transport controls. See the

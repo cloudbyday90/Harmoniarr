@@ -72,6 +72,10 @@ not diagnose or claim to repair it.
 
 ## Next recommended item
 
+This item is now implemented in the [credential-save design](APPLE_CREDENTIALS_DESIGN.md)
+and [outcome](APPLE_CREDENTIALS_OUTCOME.md). Existing runtime admission remains
+the final defense for saved and environment keys.
+
 Reuse this admission policy at the protected Apple credential-save boundary and
 validate Team ID/key ID shape there. The current generic secret mutation accepts
 nonempty strings, and status reports configured presence rather than key validity.
