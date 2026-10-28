@@ -34,9 +34,12 @@ The failed gate is retained separately. Only the later frozen passing gate is
 used for final qualification. Private records live under
 `.tmp/apple-signing-2026-10-28/`.
 
-## Cleanup checkpoint
+## Completed cleanup
 
-PR #59 remains open until the tested pins are committed/pushed and verified on
-remote main. It will then be closed as superseded without merging, with final
-state recorded in a documentation follow-up. No other open stale Dependabot PR
-was found, and no rebase/ignore command or bot-branch force-push was needed.
+Implementation commit `5e0c4b1e687df8641d98e8c82b3e26d908a4d72b` was pushed to
+main, and GitHub MCP verified both new pins in the remote workflow. A maintainer
+comment recorded local qualification and its limits. PR #59 was closed as
+superseded at 2026-10-28 10:20:33 UTC; the final MCP check confirms closed and
+not merged. The subsequent open-PR search returned zero results. No stale
+Dependabot PR remained to rebase, and no ignore command or bot-branch force-push
+was needed. This documentation follow-up records the completed remote action.
