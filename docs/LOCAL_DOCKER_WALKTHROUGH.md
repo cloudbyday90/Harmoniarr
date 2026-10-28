@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 28 [provider-route error rebuild](LOCAL_DOCKER_PROVIDER_ROUTE_ERRORS_OUTCOME.md)
+records the current image, preserved administrator/five mounts and fixed public
+provider failures across four adapter families. See the separate
+[implementation outcome](PROVIDER_ROUTE_ERRORS_OUTCOME.md). No release is created.
+
 The October 28 [HTTP error rebuild](LOCAL_DOCKER_HTTP_ERROR_OUTCOME.md) records
 the current image, preserved administrator/five mounts, bounded unexpected
 responses and retained validation/authentication contracts. See the separate

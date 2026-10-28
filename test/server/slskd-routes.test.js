@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createHttpErrorHandler } from '../../src/server/http-error-response.js';
 import { registerSlskdRoutes } from '../../src/server/routes/slskd-routes.js';
 import { createJsonTestApp, withServer } from '../../testing/server/http-test-helpers.js';
 
@@ -42,7 +43,7 @@ function createSlskdRouteTestApp(overrides = {}) {
       }),
       ...overrides,
     });
-  });
+  }, { errorHandler: createHttpErrorHandler() });
 }
 
 test('slskd status route returns shared connection status for authenticated admin sessions', async (t) => {
@@ -255,7 +256,7 @@ test('slskd routes normalize provider unavailable errors to 503 responses', asyn
       ok: false,
       error: {
         code: 'slskd_unavailable',
-        message: 'slskd is temporarily unavailable',
+        message: 'Soulseek is temporarily unavailable',
       },
     });
   });
@@ -286,7 +287,7 @@ test('slskd routes normalize provider authentication errors to 503 responses', a
       ok: false,
       error: {
         code: 'slskd_unauthorized',
-        message: 'slskd authentication failed',
+        message: 'Soulseek authentication failed',
       },
     });
   });

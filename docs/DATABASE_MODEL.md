@@ -2,6 +2,12 @@
 
 ## Purpose
 
+Provider route failures now use shared fixed public catalogs. Local validation
+retains its existing application-owned error descriptor; unknown/native failures
+retain the terminal handler's policy. No SQL/schema artifact, persisted catalog,
+transaction, operation-run or maintenance policy changes. See the
+[design](PROVIDER_ROUTE_ERRORS_DESIGN.md) and [outcome](PROVIDER_ROUTE_ERRORS_OUTCOME.md).
+
 The terminal HTTP error boundary now preserves explicit public API errors and
 returns generic unexpected failures, including native SQL diagnostics. Existing
 database connection normalization remains a bounded 503. No SQL/schema artifact,

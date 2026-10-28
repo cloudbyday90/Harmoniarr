@@ -89,18 +89,8 @@ or release-workflow dispatch.
 
 ## Next recommended item
 
-Review the route-local provider error normalizers in
-[metadata routes](../src/server/routes/metadata-routes.js),
-[downloader routes](../src/server/routes/downloader-routes.js) and
-[candidate routes](../src/server/routes/import-candidate-routes.js). Some branches
-explicitly pass an incoming error.message to createApiError after matching only
-its code. The new global boundary deliberately honors explicit public intent;
-it cannot decide whether that earlier message selection was safe.
-
-Introduce a narrow shared public-message catalog for these provider failures and
-preserve useful validation only from explicit application-owned errors. Prove
-that matching provider codes with raw response/path/credential sentinels do not
-become public text, while existing status/code and retry guidance remain useful.
-The benefit is consistent provider failure disclosure; the cost is reviewing
-compatibility for configuration and validation explanations. This is a source
-finding and next hardening step, not a newly reproduced remote disclosure.
+The shared provider-route catalogs are now implemented for metadata, downloader,
+candidate and Soulseek adapters. See the separate
+[design](PROVIDER_ROUTE_ERRORS_DESIGN.md), [research](PROVIDER_ROUTE_ERRORS_RESEARCH_2026_10.md)
+and [outcome](PROVIDER_ROUTE_ERRORS_OUTCOME.md) for bounded provider text,
+application-owned local validation, qualification limits and the next item.

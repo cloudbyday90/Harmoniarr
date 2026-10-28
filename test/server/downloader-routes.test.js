@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createHttpErrorHandler } from '../../src/server/http-error-response.js';
 import { registerDownloaderRoutes } from '../../src/server/routes/downloader-routes.js';
 import { createJsonTestApp, withServer } from '../../testing/server/http-test-helpers.js';
 
@@ -48,7 +49,7 @@ function createDownloaderRouteTestApp(overrides = {}) {
       requireFreshAdminSession: async () => ({ appUserId: 'admin-1' }),
       ...overrides,
     });
-  });
+  }, { errorHandler: createHttpErrorHandler() });
 }
 
 test('downloader queue route requires admin session and returns the read model', async (t) => {
@@ -174,7 +175,7 @@ test('downloader queue route normalizes slskd provider errors', async () => {
       ok: false,
       error: {
         code: 'slskd_unavailable',
-        message: 'slskd is temporarily unavailable',
+        message: 'Soulseek is temporarily unavailable',
       },
     });
   });

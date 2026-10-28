@@ -16,34 +16,19 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { createApiError } from '../auth.js';
+import { normalizeSlskdRouteError } from '../integrations/providers/provider-route-error-policy.js';
 import { createRequestAuthDependencies } from '../auth-module.js';
 import { asyncRoute } from '../http.js';
 import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
 
 const defaultRequestAuthDependencies = createRequestAuthDependencies();
 
-function normalizeSlskdError(error) {
-  switch (error?.code) {
-    case 'slskd_misconfigured':
-      return createApiError(503, error.code, 'Soulseek connection settings need review');
-    case 'slskd_unauthorized':
-      return createApiError(503, error.code, 'slskd authentication failed');
-    case 'slskd_unavailable':
-      return createApiError(503, error.code, 'slskd is temporarily unavailable');
-    case 'slskd_request_failed':
-      return createApiError(502, error.code, 'Soulseek request failed. Try again.');
-    default:
-      return error;
-  }
-}
-
 function slskdRoute(handler) {
   return asyncRoute(async (request, response, next) => {
     try {
       await handler(request, response, next);
     } catch (error) {
-      throw normalizeSlskdError(error);
+      throw normalizeSlskdRouteError(error);
     }
   });
 }

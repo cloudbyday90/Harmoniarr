@@ -81,6 +81,7 @@ const {
   data: downloaderQueue,
   errorMessage,
   isLoading,
+  isRevalidating,
   lastRefreshedAt,
   load,
 } = useAsyncResource({
@@ -284,6 +285,11 @@ function clearReleaseHandoff() {
   });
 }
 
+async function refreshQueue() {
+  if (isLoading.value || isRevalidating.value || providerDisabled.value) return;
+  await load();
+}
+
 async function performTransferAction(action) {
   if (!selectedTransfer.value || pendingAction.value || providerDisabled.value) return;
   actionErrorMessage.value = '';
@@ -340,7 +346,7 @@ async function clearCompletedTransfers() {
         >
           {{ pendingAction === 'clear_completed' ? 'Clearing...' : 'Clear Completed' }}
         </button>
-        <button type="button" class="hx-btn" @click="load" :disabled="isLoading || providerDisabled">
+        <button type="button" class="hx-btn" @click="refreshQueue" :disabled="providerDisabled" :aria-disabled="isLoading || isRevalidating || providerDisabled">
           {{ isLoading ? 'Loading…' : 'Refresh' }}
         </button>
       </div>

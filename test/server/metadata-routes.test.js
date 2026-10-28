@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createApiError } from '../../src/server/api-error.js';
+import { createHttpErrorHandler } from '../../src/server/http-error-response.js';
 import { registerMetadataRoutes } from '../../src/server/routes/metadata-routes.js';
 import { createMusicBrainzClient } from '../../src/server/integrations/musicbrainz/musicbrainz-client.js';
 import { createJsonTestApp, withServer } from '../../testing/server/http-test-helpers.js';
@@ -222,7 +224,7 @@ function createMetadataRouteTestApp(overrides = {}) {
       markCanonicalRelease: async () => null,
       ...overrides,
     });
-  });
+  }, { errorHandler: createHttpErrorHandler() });
 }
 
 test('metadata shared monitored artists route returns a retired endpoint response', async (t) => {
@@ -1193,12 +1195,10 @@ test('metadata release import route returns the shared imported release payload'
   });
 });
 
-test('metadata routes normalize shared metadata not found errors to 404 responses', async () => {
+test('metadata routes preserve application-owned metadata not-found errors', async () => {
   const app = createMetadataRouteTestApp({
     getMetadataArtist: async () => {
-      const error = new Error('Artist not found');
-      error.code = 'metadata_not_found';
-      throw error;
+      throw createApiError(404, 'metadata_not_found', 'Artist not found');
     },
   });
 
@@ -1259,7 +1259,7 @@ test('metadata routes normalize shared musicbrainz misconfigured errors to 503 r
       ok: false,
       error: {
         code: 'musicbrainz_misconfigured',
-        message: 'MusicBrainz requests require HARMONIARR_CONTACT_URL or HARMONIARR_CONTACT_EMAIL',
+        message: 'MusicBrainz configuration needs review',
       },
     });
   });
@@ -1283,7 +1283,7 @@ test('metadata routes normalize shared musicbrainz request failures to 502 respo
       ok: false,
       error: {
         code: 'musicbrainz_request_failed',
-        message: 'MusicBrainz release-group release browse request failed with status 502',
+        message: 'MusicBrainz request failed. Review the request and try again.',
       },
     });
   });
@@ -1303,10 +1303,7 @@ test('metadata routes expose a safe 502 for an actual malformed MusicBrainz resp
 test('metadata import route preserves auth-guard failures from the injected session guard', async () => {
   const app = createMetadataRouteTestApp({
     requireFreshSession: async () => {
-      throw Object.assign(new Error('Re-authentication is required before continuing'), {
-        status: 403,
-        code: 'reauth_required',
-      });
+      throw createApiError(403, 'reauth_required', 'Re-authentication is required before continuing');
     },
   });
 
@@ -1332,10 +1329,7 @@ test('metadata artist monitoring route does not invoke the admin session guard',
   // Regression guard: the retired route must not regress to requireFreshAdminSession.
   // It returns 410 (retired) after a normal session check.
   const requireFreshAdminSession = t.mock.fn(async () => {
-    throw Object.assign(new Error('Administrator access is required'), {
-      status: 403,
-      code: 'admin_required',
-    });
+    throw createApiError(403, 'admin_required', 'Administrator access is required');
   });
   const app = createMetadataRouteTestApp({ requireFreshAdminSession });
 
@@ -1358,10 +1352,7 @@ test('metadata artist import route does not invoke the admin session guard', asy
   // Regression guard: if the route regresses back to requireFreshAdminSession,
   // this mock would throw and the test would fail.
   const requireFreshAdminSession = t.mock.fn(async () => {
-    throw Object.assign(new Error('Administrator access is required'), {
-      status: 403,
-      code: 'admin_required',
-    });
+    throw createApiError(403, 'admin_required', 'Administrator access is required');
   });
   const app = createMetadataRouteTestApp({ requireFreshAdminSession });
 
@@ -1544,7 +1535,7 @@ test('operator discography route uses the session actor and returns only effecti
     assert.deepEqual(getOperatorArtistDiscography.mock.calls[0].arguments[0], { appUserId: 'user-1', metadataArtistId: 'artist', limit: '5', cursor: 'page' });
     assert.deepEqual(Object.keys(await response.json()).sort(), ['ok', 'pageInfo', 'releaseGroups']);
   });
-  const denied = createMetadataRouteTestApp({ getOperatorArtistDiscography, requireSession: async () => { throw Object.assign(new Error('Session required'), { status: 401 }); } });
+  const denied = createMetadataRouteTestApp({ getOperatorArtistDiscography, requireSession: async () => { throw createApiError(401, 'auth_required', 'Session required'); } });
   await withServer(denied, async (baseUrl) => {
     assert.equal((await fetch(`${baseUrl}/api/v1/metadata/artists/artist/operator/discography`)).status, 401);
   });

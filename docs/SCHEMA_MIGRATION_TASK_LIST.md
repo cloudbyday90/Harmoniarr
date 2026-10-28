@@ -7,6 +7,13 @@ Security source: `docs/SECURITY_POLICY.md`
 
 ## Current Status (2026-10-27)
 
+October 28 provider route catalogs now bound public failure text without SQL or
+schema changes. Guarded HTTP qualification preserves settings, secrets and
+operation rows around reads/refusals; no maintenance job is added. See the
+[design](PROVIDER_ROUTE_ERRORS_DESIGN.md) and [outcome](PROVIDER_ROUTE_ERRORS_OUTCOME.md).
+Next bound OAuth/Plex callback redirect error codes separately from JSON errors,
+preserving the existing callback/session ownership and automatic maintenance.
+
 October 28 unexpected HTTP error projection is implemented without database or
 schema changes. Intentional public API errors retain their contracts, while
 unknown native details receive generic 500 responses. Automatic maintenance

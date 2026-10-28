@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createHttpErrorHandler } from '../../src/server/http-error-response.js';
 import { createApiError } from '../../src/server/auth.js';
 import { registerImportCandidateRoutes } from '../../src/server/routes/import-candidate-routes.js';
 import { createJsonTestApp, withServer } from '../../testing/server/http-test-helpers.js';
@@ -511,7 +512,7 @@ function createImportCandidateRouteTestApp(overrides = {}) {
       }),
       ...overrides,
     });
-  });
+  }, { errorHandler: createHttpErrorHandler() });
 }
 
 test('import candidate list route returns filtered review queue results', async (t) => {
@@ -1668,9 +1669,7 @@ test('import candidate allow-lossy-derivative route enforces csrf and persists t
 test('import candidate detail route preserves shared not-found errors', async () => {
   const app = createImportCandidateRouteTestApp({
     getImportCandidate: async () => {
-      const error = new Error('Import candidate not found');
-      error.status = 404;
-      error.code = 'import_candidate_not_found';
+      const error = createApiError(404, 'import_candidate_not_found', 'Import candidate not found');
       throw error;
     },
   });
@@ -1823,9 +1822,7 @@ test('import candidate select reject and reopen routes delegate to shared transi
 test('import candidate review routes preserve stale transition conflicts', async () => {
   const app = createImportCandidateRouteTestApp({
     holdImportCandidate: async () => {
-      const error = new Error('Import candidate cannot transition from rejected to held');
-      error.status = 409;
-      error.code = 'import_candidate_status_conflict';
+      const error = createApiError(409, 'import_candidate_status_conflict', 'Import candidate cannot transition from rejected to held');
       throw error;
     },
   });
@@ -1945,10 +1942,7 @@ test('import candidate slskd ingestion route enforces csrf and returns stored ca
 test('import candidate execution start route preserves forced re-auth failures from the injected admin guard', async () => {
   const app = createImportCandidateRouteTestApp({
     requireFreshAdminSession: async () => {
-      throw Object.assign(new Error('Re-authentication is required before continuing'), {
-        status: 403,
-        code: 'reauth_required',
-      });
+      throw createApiError(403, 'reauth_required', 'Re-authentication is required before continuing');
     },
   });
 
@@ -2027,7 +2021,7 @@ test('import candidate slskd ingestion route normalizes provider failures', asyn
       ok: false,
       error: {
         code: 'slskd_unavailable',
-        message: 'slskd is temporarily unavailable',
+        message: 'Soulseek is temporarily unavailable',
       },
     });
   });
@@ -2193,7 +2187,7 @@ test('import candidate slskd ingestion route normalizes misconfigured provider f
       ok: false,
       error: {
         code: 'slskd_misconfigured',
-        message: 'slskd is not configured: SLSKD_API_KEY is missing',
+        message: 'Soulseek connection settings need review',
       },
     });
   });
@@ -2222,7 +2216,7 @@ test('import candidate slskd ingestion route normalizes unauthorized provider fa
       ok: false,
       error: {
         code: 'slskd_unauthorized',
-        message: 'slskd authentication failed',
+        message: 'Soulseek authentication failed',
       },
     });
   });
@@ -2246,7 +2240,7 @@ test('import candidate execution summary route normalizes slskd unavailable erro
       ok: false,
       error: {
         code: 'slskd_unavailable',
-        message: 'slskd is temporarily unavailable',
+        message: 'Soulseek is temporarily unavailable',
       },
     });
   });
@@ -2270,7 +2264,7 @@ test('import candidate execution summary route normalizes slskd misconfigured er
       ok: false,
       error: {
         code: 'slskd_misconfigured',
-        message: 'slskd is not configured: SLSKD_API_KEY is missing',
+        message: 'Soulseek connection settings need review',
       },
     });
   });
@@ -2294,7 +2288,7 @@ test('import candidate execution summary route normalizes slskd unauthorized err
       ok: false,
       error: {
         code: 'slskd_unauthorized',
-        message: 'slskd authentication failed',
+        message: 'Soulseek authentication failed',
       },
     });
   });
@@ -2318,7 +2312,7 @@ test('import candidate execution summary route normalizes slskd request-failed e
       ok: false,
       error: {
         code: 'slskd_request_failed',
-        message: 'slskd returned an invalid response for downloads',
+        message: 'Soulseek request failed. Try again.',
       },
     });
   });
@@ -2342,7 +2336,7 @@ test('import candidate execution run detail route normalizes slskd unavailable e
       ok: false,
       error: {
         code: 'slskd_unavailable',
-        message: 'slskd is temporarily unavailable',
+        message: 'Soulseek is temporarily unavailable',
       },
     });
   });
@@ -2366,7 +2360,7 @@ test('import candidate execution run detail route normalizes slskd request-faile
       ok: false,
       error: {
         code: 'slskd_request_failed',
-        message: 'slskd download request malformed',
+        message: 'Soulseek request failed. Try again.',
       },
     });
   });
@@ -2395,7 +2389,7 @@ test('import candidate slskd ingestion route normalizes request-failed provider 
       ok: false,
       error: {
         code: 'slskd_request_failed',
-        message: 'slskd returned an invalid response for search results',
+        message: 'Soulseek request failed. Try again.',
       },
     });
   });

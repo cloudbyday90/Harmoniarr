@@ -17,6 +17,7 @@
  */
 
 import { normalizeMetadataArtistReadView } from '../metadata/metadata-artist-read-view.js';
+import { normalizeMusicBrainzRouteError } from '../integrations/providers/provider-route-error-policy.js';
 import { createApiError, getRequestMetadata, requireCsrf, requireSession } from '../auth.js';
 import { createRequestAuthDependencies } from '../auth-module.js';
 import { asyncRoute, sanitizePageLimit, sanitizePageOffset } from '../http.js';
@@ -30,35 +31,12 @@ const defaultRequestAuthDependencies = createRequestAuthDependencies({
   requireSession,
 });
 
-function normalizeMetadataError(error) {
-  switch (error?.code) {
-    case 'validation_error':
-      return createApiError(400, error.code, error.message);
-    case 'app_user_not_found':
-      return createApiError(404, error.code, error.message);
-    case 'metadata_not_found':
-      return createApiError(404, error.code, error.message);
-    case 'musicbrainz_not_found':
-      return createApiError(404, error.code, error.message);
-    case 'musicbrainz_misconfigured':
-      return createApiError(503, error.code, error.message);
-    case 'musicbrainz_unavailable':
-      return createApiError(503, error.code, 'MusicBrainz is temporarily unavailable');
-    case 'musicbrainz_request_failed':
-      return createApiError(502, error.code, error.message);
-    case 'musicbrainz_invalid_response':
-      return createApiError(502, error.code, 'MusicBrainz returned an invalid response');
-    default:
-      return error;
-  }
-}
-
 function metadataRoute(handler) {
   return asyncRoute(async (request, response, next) => {
     try {
       await handler(request, response, next);
     } catch (error) {
-      throw normalizeMetadataError(error);
+      throw normalizeMusicBrainzRouteError(error);
     }
   });
 }

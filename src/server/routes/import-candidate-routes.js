@@ -16,7 +16,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { createApiError, getRequestMetadata, requireCsrf, requireSession } from '../auth.js';
+import { getRequestMetadata, requireCsrf, requireSession } from '../auth.js';
+import { normalizeSlskdRouteError } from '../integrations/providers/provider-route-error-policy.js';
 import { buildPublicImportCandidateExecution } from '../import-candidates/import-candidate-execution-public-projection.js';
 import { createRequestAuthDependencies } from '../auth-module.js';
 import { asyncRoute, sanitizePageLimit, sanitizePageOffset } from '../http.js';
@@ -37,27 +38,12 @@ const defaultRequestAuthDependencies = createRequestAuthDependencies({
   requireSession,
 });
 
-function normalizeImportCandidateError(error) {
-  switch (error?.code) {
-    case 'slskd_misconfigured':
-      return createApiError(503, error.code, error.message);
-    case 'slskd_unauthorized':
-      return createApiError(503, error.code, 'slskd authentication failed');
-    case 'slskd_unavailable':
-      return createApiError(503, error.code, 'slskd is temporarily unavailable');
-    case 'slskd_request_failed':
-      return createApiError(502, error.code, error.message);
-    default:
-      return error;
-  }
-}
-
 function importCandidateRoute(handler) {
   return asyncRoute(async (request, response, next) => {
     try {
       await handler(request, response, next);
     } catch (error) {
-      throw normalizeImportCandidateError(error);
+      throw normalizeSlskdRouteError(error);
     }
   });
 }
