@@ -31,19 +31,24 @@ const dialogRef = ref(null);
 const pathRef = ref(null);
 const titleId = useId();
 const { requestedPath, currentPath, entries, parentPath, isLoading, errorMessage,
-  canSelect, navigate, dispose } = useFolderBrowser();
+  page, canSelect, navigate, retry, dispose } = useFolderBrowser();
 const displayedPath = computed(() => currentPath.value ?? requestedPath.value);
 const statusMessage = computed(() => isLoading.value ? 'Loading folders…'
   : errorMessage.value || (currentPath.value === null ? ''
-    : entries.value.length ? `${entries.value.length} subfolders loaded.` : 'No subfolders here.'));
+    : page.value?.total ? `Folders ${page.value.from}–${page.value.to} of ${page.value.total}.` : 'No subfolders here.'));
 let settled = false;
 
-function navigateFromControl(path, event) {
+function navigateFromControl(path, event, cursor) {
   // Keep focus on a persistent target before the initiating control is replaced.
   if (event.currentTarget === event.currentTarget.ownerDocument.activeElement) {
     pathRef.value?.focus();
   }
-  void navigate(path);
+  void navigate(path, cursor);
+}
+
+function retryFromControl(event) {
+  if (event.currentTarget === event.currentTarget.ownerDocument.activeElement) pathRef.value?.focus();
+  void retry();
 }
 
 onMounted(() => {
@@ -98,7 +103,7 @@ onBeforeUnmount(() => {
 
       <p class="fb-status" :class="{ 'fb-error': errorMessage }" role="status" aria-atomic="true">{{ statusMessage }}</p>
       <div class="fb-body" :aria-busy="isLoading">
-        <button v-if="errorMessage" type="button" class="hx-btn" @click="navigateFromControl(requestedPath, $event)">Retry</button>
+        <button v-if="errorMessage" type="button" class="hx-btn" @click="retryFromControl($event)">Retry</button>
         <ul v-else-if="entries.length" class="fb-entries" aria-label="Folders">
           <li v-for="entry in entries" :key="entry.path">
             <button type="button" class="fb-entry" @click="navigateFromControl(entry.path, $event)">
@@ -108,6 +113,12 @@ onBeforeUnmount(() => {
           </li>
         </ul>
       </div>
+
+      <nav class="fb-pagination" aria-label="Folder pages">
+        <button type="button" class="hx-btn" :disabled="isLoading || !page?.previousCursor" @click="navigateFromControl(displayedPath, $event, page.previousCursor)">Previous folders</button>
+        <button type="button" class="hx-btn" :disabled="isLoading || !page?.nextCursor" @click="navigateFromControl(displayedPath, $event, page.nextCursor)">Next folders</button>
+        <button type="button" class="hx-btn" :disabled="isLoading" @click="navigateFromControl(displayedPath, $event)">Start again</button>
+      </nav>
 
       <footer class="fb-footer">
         <span class="fb-selected-path" :title="displayedPath">{{ displayedPath }}</span>
@@ -123,15 +134,17 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.fb-dialog, .fb-shell { max-height: calc(100dvh - var(--hx-space-4)); }
+.fb-dialog { max-height: calc(100dvh - var(--hx-space-4)); display: block; overflow: auto; }
+.fb-shell { height: auto; overflow: visible; }
 .fb-dialog:modal { overscroll-behavior: contain; }
 .fb-title { margin: 0; }
 .fb-close { min-width: 24px; min-height: 24px; }
-.fb-body { min-height: 0; flex: 1 1 auto; }
+.fb-body { min-height: 4rem; max-height: 35dvh; flex: none; }
 .fb-status { margin: 0; padding: var(--hx-space-2) var(--hx-space-4); font-size: var(--hx-text-sm); flex-shrink: 0; }
 .fb-entries { list-style: none; margin: 0; padding: 0; }
 .fb-footer { flex-wrap: wrap; }
 .fb-selected-path { min-width: 0; }
+.fb-pagination { display: flex; flex-wrap: wrap; gap: var(--hx-space-2); padding: var(--hx-space-2) var(--hx-space-4); flex-shrink: 0; }
 .fb-current-path:focus-visible, .fb-close:focus-visible, .fb-entry:focus-visible {
   outline: 2px solid var(--hx-accent);
   outline-offset: -2px;

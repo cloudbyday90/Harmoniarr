@@ -16,7 +16,8 @@ function fixture() {
   }) }));
   return { browser, requests, scope };
 }
-const result = path => ({ ok: true, path, parent: '/', entries: [{ name: 'Albums', path: `${path}/albums` }] });
+const result = path => ({ ok: true, path, parent: '/', entries: [{ name: 'Albums', path: `${path}/albums` }],
+  page: { limit: 100, total: 1, from: 1, to: 1, previousCursor: null, nextCursor: null } });
 
 test('folder selection requires the latest successful read, including an explicit root read', async () => {
   const { browser, requests, scope } = fixture();
@@ -106,4 +107,35 @@ for (const late of ['resolve', 'reject']) test(`scope retirement fences late ${l
   await browser.navigate('/new');
   assert.equal(requests.length, 1);
   browser.dispose();
+});
+
+test('page changes replace entries, revoke selection and retry the exact failed continuation', async () => {
+  const { browser, requests, scope } = fixture();
+  const first = browser.navigate('/music'); requests[0].resolve(result('/music')); await first;
+  const second = browser.navigate('/music', 'next.cursor');
+  assert.equal(browser.canSelect.value, false); assert.deepEqual(browser.entries.value, []); assert.equal(browser.page.value, null);
+  assert.equal(requests[1].cursor, 'next.cursor');
+  requests[1].reject(Object.assign(new Error('private'), { code: 'folder_browse_busy' })); await second;
+  assert.equal(browser.errorMessage.value, 'Folder browsing is busy. Try again shortly.');
+  const retry = browser.retry(); assert.equal(requests[2].cursor, 'next.cursor');
+  requests[2].resolve({ ...result('/music'), entries: [{ name: 'B', path: '/music/b' }],
+    page: { limit: 100, from: 101, to: 101, total: 101, previousCursor: 'previous.cursor', nextCursor: null } });
+  await retry; assert.equal(browser.entries.value.length, 1); assert.equal(browser.entries.value[0].name, 'B');
+  assert.equal(browser.page.value.from, 101); assert.equal(browser.canSelect.value, true);
+  scope.stop();
+});
+
+for (const page of [undefined, { limit: 101 }, { limit: 100, from: 1, to: 1, total: 2, previousCursor: null, nextCursor: null },
+  { limit: 100, from: 1, to: 1, total: 1, previousCursor: null, nextCursor: 'x'.repeat(8193) }]) {
+  test('missing or inconsistent page metadata refuses selection', async () => {
+    const { browser, requests, scope } = fixture();
+    const pending = browser.navigate('/music'); requests[0].resolve({ ...result('/music'), page }); await pending;
+    assert.equal(browser.canSelect.value, false); assert.equal(browser.page.value, null); scope.stop();
+  });
+}
+
+test('overlong response page is refused before retaining entries', async () => {
+  const { browser, requests, scope } = fixture();
+  const pending = browser.navigate('/music'); requests[0].resolve({ ...result('/music'), entries: Array.from({ length: 101 }, (_, index) => ({ name: String(index), path: '/music/' + index })) });
+  await pending; assert.equal(browser.canSelect.value, false); assert.deepEqual(browser.entries.value, []); scope.stop();
 });

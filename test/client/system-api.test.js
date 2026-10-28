@@ -101,6 +101,15 @@ test('folder reads forward the owning dialog AbortSignal', async (t) => {
   assert.equal(globalThis.fetch.mock.calls[0].arguments[1].signal, controller.signal);
 });
 
+test('folder continuation is encoded as an optional read query', async (t) => {
+  globalThis.document = { cookie: '' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse());
+  await browseFsDirectory({ path: '/fixture/music', cursor: 'signed.cursor' });
+  const url = new URL(globalThis.fetch.mock.calls[0].arguments[0], 'http://fixture');
+  assert.equal(url.searchParams.get('cursor'), 'signed.cursor');
+  assert.equal(url.searchParams.get('path'), '/fixture/music');
+});
+
 test('system-api acknowledgeAllOperatorNotifications sends POST with CSRF', async (t) => {
   globalThis.document = { cookie: '__Host-csrf=test-csrf-token' };
   globalThis.fetch = t.mock.fn(async () => createJsonResponse());

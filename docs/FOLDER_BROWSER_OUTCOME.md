@@ -91,10 +91,7 @@ GitHub MCP found no open repository PRs initially and on final review October 28
 inapplicable. All fifteen changed files are included, directly on main. No branch,
 release, tag or PR merge was created.
 
-Next: bound server directory enumeration and the rendered folder list, with
-explicit continuation/search for large directories. The current admin endpoint
-still materializes and sorts a full directory and the client renders all entries.
-Any follow-up must preserve administrator authority, distinguish complete from
-partial results and keep selection tied to a successfully confirmed directory.
-Do not silently truncate, add an external service or infer a memory improvement
-from this lifecycle fix; actual allocation/RSS qualification belongs to that task.
+Completed by the [bounded browsing follow-up](BOUNDED_FOLDER_BROWSE_OUTCOME.md):
+streamed sorted pages, explicit continuation and scan/admission limits, with
+administrator authority and confirmed draft selection preserved. The lifecycle
+fix above alone did not establish a measured memory/RSS improvement.

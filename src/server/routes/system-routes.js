@@ -19,8 +19,7 @@
 import { createRequestAuthDependencies } from '../auth-module.js';
 import { asyncRoute, sanitizePageLimit } from '../http.js';
 import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
-import { readdir } from 'node:fs/promises';
-import { resolve, dirname, sep } from 'node:path';
+import { registerFolderBrowseRoutes } from './folder-browse-routes.js';
 import { createHealthReadinessService } from '../readiness/health-readiness-service.js';
 import { registerSchemaDiagnosticsRoutes } from './schema-diagnostics-routes.js';
 
@@ -432,59 +431,5 @@ export function registerSystemRoutes(app, {
     response.json(await buildLibraryScanSummary());
   }));
 
-  app.get('/api/v1/system/fs/browse', asyncRoute(async (request, response) => {
-    await requireAdminSession(request);
-
-    const rawPath = String(request.query.path ?? '/');
-    const safePath = resolve(rawPath);
-    const parentPath = safePath === sep ? null : dirname(safePath);
-
-    let entries = [];
-    let errorMessage = null;
-    let errorStatus = null;
-
-    try {
-      const dirents = await readdir(safePath, { withFileTypes: true });
-      entries = dirents
-        .filter((d) => d.isDirectory())
-        .map((d) => ({ name: d.name, path: resolve(safePath, d.name) }))
-        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-    } catch (error) {
-      switch (error?.code) {
-        case 'EACCES':
-          errorStatus = 403;
-          errorMessage = 'Permission denied.';
-          break;
-        case 'ENOENT':
-          errorStatus = 404;
-          errorMessage = 'Folder not found.';
-          break;
-        case 'ENOTDIR':
-          errorStatus = 400;
-          errorMessage = 'That path is a file, not a folder.';
-          break;
-        default:
-          errorStatus = 500;
-          errorMessage = 'Could not read this folder.';
-          break;
-      }
-    }
-
-    if (errorStatus) {
-      return response.status(errorStatus).json({
-        ok: false,
-        path: safePath,
-        parent: parentPath,
-        entries,
-        error: errorMessage,
-      });
-    }
-
-    response.json({
-      ok: true,
-      path: safePath,
-      parent: parentPath,
-      entries,
-    });
-  }));
+  registerFolderBrowseRoutes(app, { requireAdminSession });
 }

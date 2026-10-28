@@ -1,5 +1,9 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 28 [bounded folder browsing outcome](BOUNDED_FOLDER_BROWSE_OUTCOME.md)
+records the current streamed directory pager, packaged Linux scanner proof and
+preserved administrator, mounts and settings. No release is created.
+
 The October 28 [folder browser outcome](FOLDER_BROWSER_OUTCOME.md) records the
 current packaged walkthrough, named modal navigation, scoped read retirement
 and preserved administrator, mounts and settings. No release is created.

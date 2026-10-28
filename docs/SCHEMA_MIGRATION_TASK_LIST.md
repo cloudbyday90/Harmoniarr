@@ -7,6 +7,12 @@ Security source: `docs/SECURITY_POLICY.md`
 
 ## Current Status (2026-10-28)
 
+October 28 filesystem browsing now streams bounded pages through the existing
+administrator endpoint, with expiring signed continuation and scoped scan
+admission. No schema, database or maintenance changes. See the
+[design](BOUNDED_FOLDER_BROWSE_DESIGN.md) and
+[outcome](BOUNDED_FOLDER_BROWSE_OUTCOME.md).
+
 October 28 Storage folder browsing now has named native dialog controls and a
 scoped client read owner. No database/schema refresh or maintenance changes are
 needed. See the [design](FOLDER_BROWSER_DESIGN.md) and

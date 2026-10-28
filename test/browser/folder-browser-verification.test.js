@@ -17,7 +17,7 @@ suite('Storage folder browser', () => {
     await runtime.runScenario(async ({ page, browserContext, baseUrl }) => {
       await bootstrapAdminThroughUi(page, { baseUrl });
       const proof = await runFolderBrowserScenario({ page, browserContext, baseUrl });
-      t.diagnostic(JSON.stringify({ scenes: proof.scenes.length, folderReads: proof.folderReads, dismissalPaths: proof.dismissalPaths, retryCases: proof.retryCases, blockedWrites: proof.blockedWrites }));
+      t.diagnostic(JSON.stringify({ scenes: proof.scenes.length, pageScenes: proof.pageScenes.length, folderReads: proof.folderReads, dismissalPaths: proof.dismissalPaths, retryCases: proof.retryCases, blockedWrites: proof.blockedWrites }));
     }, { scenarioName: 'folder_browser' });
   });
 });

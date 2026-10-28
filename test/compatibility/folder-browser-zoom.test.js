@@ -22,7 +22,7 @@ before(async () => { runtime = await createIntegrationAppRuntime({ clientDistDir
 after(async () => { await runtime?.cleanup(); }, { timeout: config.suiteTeardownTimeoutMs });
 
 test('actual 400% Chromium tab zoom preserves folder browser navigation, focus and drafts', { timeout: config.scenarioTimeoutMs }, async t => {
-  const root = '.tmp/folder-browser-2026-10-28'; await mkdir(root, { recursive: true });
+  const root = '.tmp/bounded-folder-browse-2026-10-28'; await mkdir(root, { recursive: true });
   const evidence = await mkdtemp(root + '/native-zoom-'); let retired = false, ownedProfile, result;
   await withFixtureWorkspace({ prefix: 'harmoniarr-storage-zoom-', removeDirectory: async (path, options) => {
     assert.equal(resolve(path), ownedProfile, 'Only the exact owned profile may be removed');
@@ -55,5 +55,5 @@ test('actual 400% Chromium tab zoom preserves folder browser navigation, focus a
     }), { scenarioName: 'storage_native_zoom' });
   });
   assert.equal(retired, true); await writeFile(evidence + '/result.json', JSON.stringify({ ...result, profileRetired: retired }, null, 2), { flag: 'wx' });
-  t.diagnostic(JSON.stringify({ evidence, zoom: result.zoom.factor, scenes: result.scenes.length, profileRetired: retired }));
+  t.diagnostic(JSON.stringify({ evidence, zoom: result.zoom.factor, scenes: result.scenes.length, pageScenes: result.pageScenes.length, profileRetired: retired }));
 });
