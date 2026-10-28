@@ -2,6 +2,12 @@
 
 ## Purpose
 
+Apple status now adds local signing suitability separately from credential
+presence. Both reads use the supplied queryable; this does not create an atomic
+cross-store snapshot. It performs no credential/settings/audit writes and persists
+no validation results. See [status design](APPLE_STATUS_DESIGN.md) and
+[outcome](APPLE_STATUS_OUTCOME.md). No SQL/schema artifact changes.
+
 Apple credential replacements and submitted Team ID/key ID fields now validate
 before the existing settings transaction. PEM remains exclusively in the existing
 encrypted secret owner; rejected patches have no durable effects. No SQL/schema

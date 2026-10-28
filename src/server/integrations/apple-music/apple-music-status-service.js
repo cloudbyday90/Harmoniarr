@@ -19,6 +19,9 @@
 import { createProviderCredentialsService } from '../providers/provider-credentials-service.js';
 import { loadSettings } from '../../settings.js';
 import { getPool } from '../../database.js';
+import { createApiError } from '../../auth.js';
+import { normalizeDatabaseConnectionError } from '../../database-error-mapper.js';
+import { buildAppleMusicSigningStatus } from './apple-music-signing-status-policy.js';
 
 export function createAppleMusicStatusService({
   getPoolFn = getPool,
@@ -26,22 +29,30 @@ export function createAppleMusicStatusService({
   providerCredentialsService = createProviderCredentialsService(),
 } = {}) {
   async function buildStatus(queryable = getPoolFn()) {
-    const settings = await loadSettingsFn();
-    const providerSettings = settings.providers ?? {};
-    const privateKey = await providerCredentialsService.resolveAppleMusicPrivateKey(queryable);
+    let teamId, keyId, storefront, privateKey;
+    try {
+      const settings = await loadSettingsFn(queryable);
+      ({ appleMusicTeamId: teamId, appleMusicKeyId: keyId, appleMusicStorefront: storefront } = settings.providers ?? {});
+      privateKey = await providerCredentialsService.resolveAppleMusicPrivateKey(queryable);
+    } catch (error) {
+      const mapped = normalizeDatabaseConnectionError(error);
+      if (mapped !== error) throw createApiError(mapped.status, mapped.code, mapped.message);
+      throw createApiError(500, 'apple_music_status_unavailable', 'Apple Music signing status is unavailable');
+    }
     const configured = Boolean(
-      providerSettings.appleMusicTeamId
-      && providerSettings.appleMusicKeyId
+      teamId
+      && keyId
       && privateKey,
     );
 
     return {
       configured,
       provider: 'apple_music',
-      storefront: providerSettings.appleMusicStorefront ?? 'us',
-      teamIdConfigured: Boolean(providerSettings.appleMusicTeamId),
-      keyIdConfigured: Boolean(providerSettings.appleMusicKeyId),
+      storefront: storefront ?? 'us',
+      teamIdConfigured: Boolean(teamId),
+      keyIdConfigured: Boolean(keyId),
       privateKeyConfigured: Boolean(privateKey),
+      localSigning: buildAppleMusicSigningStatus({ teamId, keyId, privateKey }),
     };
   }
 

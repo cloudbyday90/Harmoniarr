@@ -66,6 +66,10 @@ tag, PR merge or separate application branch.
 
 ## Next recommended item
 
+This item is now implemented in the [local status design](APPLE_STATUS_DESIGN.md)
+and [outcome](APPLE_STATUS_OUTCOME.md), preserving presence semantics while
+adding a separate bounded local signing summary.
+
 Make the existing read-only Apple status service distinguish configured presence
 from local signing validity. It currently treats any nonempty IDs/key as configured,
 including older saved or environment values. Reuse shared admission without

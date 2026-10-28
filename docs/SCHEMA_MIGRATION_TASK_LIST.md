@@ -199,6 +199,13 @@ owner and settings transaction, including native rollback proof. No migration,
 snapshot, anchor or refresh job changes. Next distinguish configured presence
 from local signing validity in the existing read-only Apple status service.
 
+That status summary is now implemented in the [design](APPLE_STATUS_DESIGN.md)
+and [outcome](APPLE_STATUS_OUTCOME.md), with [research/tradeoffs](APPLE_STATUS_RESEARCH_2026_10.md).
+It reuses local key/ID admission, preserves presence fields, and performs no
+settings/secret/audit writes. No schema artifact or refresh job changes. Next show
+saved local validity in the existing Settings connection summary, with explicit
+saved-versus-draft and local-versus-provider feedback.
+
 October 12 scan addition: `20261012_225951_scan_owned_receipt_invalidation.sql`
 adds UUID revision identity, generated path lookup and revision-bound negative
 observations. Replay preserves existing identities; snapshot/anchors include the
