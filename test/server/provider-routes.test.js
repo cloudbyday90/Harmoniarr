@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createApiError } from '../../src/server/api-error.js';
 import { registerProviderRoutes } from '../../src/server/routes/provider-routes.js';
 import { createJsonTestApp, withServer } from '../../testing/server/http-test-helpers.js';
 
@@ -76,6 +77,45 @@ function createProviderRouteTestApp(overrides = {}) {
         scopes: ['https://www.googleapis.com/auth/youtube.readonly'],
       }),
       ...overrides,
+    });
+  });
+}
+
+for (const [provider, owner, path, fallback, known] of [
+  ['spotify', 'completeSpotifyAuthorization', 'oauth', 'spotify_oauth_failed', 'spotify_oauth_token_exchange_failed'],
+  ['youtube', 'completeYoutubeAuthorization', 'oauth', 'youtube_oauth_failed', 'youtube_oauth_authorization_changed'],
+  ['plex', 'completePlexLink', 'link', 'plex_link_failed', 'plex_link_not_claimed'],
+]) {
+  test(`${provider} callback bounds redirect code, body and headers and recovers without reflecting callback input`, async t => {
+    let failure;
+    const complete = t.mock.fn(async () => { if (failure) throw failure; return {}; });
+    await withServer(createProviderRouteTestApp({ [owner]: complete }), async baseUrl => {
+      const binding = Buffer.alloc(32, 1).toString('base64url');
+      const cookie = provider === 'plex' ? 'harmoniarr_plex_link_binding' : `harmoniarr_${provider}_binding`;
+      const call = () => fetch(`${baseUrl}/api/v1/providers/${provider}/${path}/callback?code=PRIVATE-code&state=PRIVATE-state&error=PRIVATE-error&error_description=PRIVATE-description`,
+        { redirect: 'manual', headers: { cookie: cookie + '=' + binding, accept: 'text/html' } });
+      for (const [error, expected] of [
+        [Object.assign(new Error('PRIVATE /data/key.pem'), { code: known, headers: { 'x-secret': 'PRIVATE' } }), known],
+        [Object.assign(new Error('PRIVATE'), { code: 'PRIVATE\r\nX-Secret: PRIVATE' }), fallback],
+        [{ code: { toString() { assert.fail('Code coercion'); } } }, fallback],
+        [new Proxy({}, { get() { throw new Error('PRIVATE'); } }), fallback],
+        [createApiError(400, 'PRIVATE-public-code', 'PRIVATE-public-message'), fallback],
+        [Object.assign(new Error('PRIVATE'), { code: provider === 'plex' ? 'spotify_oauth_state_invalid' : 'plex_link_state_invalid' }), fallback],
+      ]) {
+        failure = error; const response = await call();
+        assert.equal(response.status, 303);
+        assert.equal(response.headers.get('location'), `/app/settings?${provider}OAuth=failed&code=${expected}`);
+        assert.equal(response.headers.get('cache-control'), 'no-store'); assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
+        assert.equal(response.headers.get('set-cookie'), null); assert.equal(response.headers.get('x-secret'), null);
+        assert.doesNotMatch(JSON.stringify([...response.headers]) + await response.text(), /PRIVATE|key\.pem/u);
+      }
+      failure = null; const recovered = await call();
+      assert.equal(recovered.status, 303); assert.equal(recovered.headers.get('location'), `/app/settings?${provider}OAuth=linked`);
+      assert.equal(complete.mock.callCount(), 7);
+      for (const { arguments: [input] } of complete.mock.calls) {
+        assert.equal(input.browserBinding, binding); assert.equal(input.state, 'PRIVATE-state');
+        if (provider !== 'plex') assert.equal(input.code, 'PRIVATE-code');
+      }
     });
   });
 }

@@ -18,6 +18,7 @@
 
 import { createOAuthBrowserBinding, readOAuthBrowserBinding, setOAuthBrowserBindingCookie } from '../oauth-browser-binding.js';
 import { invalidOAuthState } from '../integrations/providers/oauth-link-policy.js';
+import { selectProviderCallbackErrorCode } from '../integrations/providers/provider-callback-error-policy.js';
 import { createPlexBrowserBinding, readPlexBrowserBinding, setPlexBrowserBindingCookie } from '../plex-browser-binding.js';
 import { invalidOwnerLink } from '../integrations/plex/plex-owner-link-policy.js';
 import { createRequestAuthDependencies } from '../auth-module.js';
@@ -176,7 +177,7 @@ export function registerProviderRoutes(app, {
       });
       response.redirect(303, settingsRedirectUrl('spotify', 'linked'));
     } catch (error) {
-      response.redirect(303, settingsRedirectUrl('spotify', 'failed', error?.code ?? 'spotify_oauth_failed'));
+      response.redirect(303, settingsRedirectUrl('spotify', 'failed', selectProviderCallbackErrorCode('spotify', error)));
     }
   }));
 
@@ -193,7 +194,7 @@ export function registerProviderRoutes(app, {
       });
       response.redirect(303, settingsRedirectUrl('youtube', 'linked'));
     } catch (error) {
-      response.redirect(303, settingsRedirectUrl('youtube', 'failed', error?.code ?? 'youtube_oauth_failed'));
+      response.redirect(303, settingsRedirectUrl('youtube', 'failed', selectProviderCallbackErrorCode('youtube', error)));
     }
   }));
 
@@ -209,7 +210,7 @@ export function registerProviderRoutes(app, {
       });
       response.redirect(303, settingsRedirectUrl('plex', 'linked'));
     } catch (error) {
-      response.redirect(303, settingsRedirectUrl('plex', 'failed', error?.code ?? 'plex_link_failed'));
+      response.redirect(303, settingsRedirectUrl('plex', 'failed', selectProviderCallbackErrorCode('plex', error)));
     }
   }));
 }

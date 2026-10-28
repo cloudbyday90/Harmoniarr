@@ -2,6 +2,11 @@
 
 ## Purpose
 
+OAuth/Plex callback redirects now select public codes from fixed provider catalogs.
+The existing state/session/PKCE/publication services retain authority; this output
+policy adds no SQL, schema, persistence or maintenance behavior. See the separate
+[design](PROVIDER_CALLBACK_ERRORS_DESIGN.md) and [outcome](PROVIDER_CALLBACK_ERRORS_OUTCOME.md).
+
 Provider route failures now use shared fixed public catalogs. Local validation
 retains its existing application-owned error descriptor; unknown/native failures
 retain the terminal handler's policy. No SQL/schema artifact, persisted catalog,

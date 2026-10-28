@@ -5,7 +5,12 @@ Database model source: `docs/DATABASE_MODEL.md`
 Recovery source: `docs/BACKUP_RESTORE_DESIGN.md`
 Security source: `docs/SECURITY_POLICY.md`
 
-## Current Status (2026-10-27)
+## Current Status (2026-10-28)
+
+October 28 callback error-code catalogs now bound OAuth/Plex redirect output.
+No migration, schema refresh or maintenance job is needed; existing callback
+state and guarded credential publication retain their owners. See the separate
+[design](PROVIDER_CALLBACK_ERRORS_DESIGN.md) and [outcome](PROVIDER_CALLBACK_ERRORS_OUTCOME.md).
 
 October 28 provider route catalogs now bound public failure text without SQL or
 schema changes. Guarded HTTP qualification preserves settings, secrets and

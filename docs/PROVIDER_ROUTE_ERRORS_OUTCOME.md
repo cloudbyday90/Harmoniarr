@@ -87,7 +87,7 @@ GitHub MCP found **zero open PRs**, initially and at the final check recorded at
 rebase were inapplicable. Work is on main; no PR was merged and no release, tag
 or release workflow was created or dispatched.
 
-## Next recommended item
+## Next recommended item (implemented)
 
 Bound OAuth/Plex callback redirect error codes in
 [provider routes](../src/server/routes/provider-routes.js). Spotify, YouTube and
@@ -96,7 +96,10 @@ provider-specific fixed-code catalogs and fallback codes, then verify actual
 callback redirects and recovery while preserving callback state/browser binding,
 session, expiry, cookie and authentication ownership. Do not put diagnostic text
 in redirect queries or add retries. This is a source finding for the next item,
-not a newly reproduced disclosure claim.
+not a newly reproduced disclosure claim. The fixed provider-specific catalogs
+are now implemented; see the separate [callback design](PROVIDER_CALLBACK_ERRORS_DESIGN.md),
+[research](PROVIDER_CALLBACK_ERRORS_RESEARCH_2026_10.md) and
+[outcome](PROVIDER_CALLBACK_ERRORS_OUTCOME.md) for qualification and the next item.
 
 Later, preserve structured MusicBrainz configuration classification through the
 Discover feedback formatter so configuration guidance is distinguishable from
