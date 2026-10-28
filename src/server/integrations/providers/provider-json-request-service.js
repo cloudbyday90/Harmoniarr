@@ -6,10 +6,8 @@
  */
 
 import { createProviderHttpService } from './provider-http-service.js';
-import { createFetchProviderJsonRequestService } from './provider-fetch-json-request-service.js';
 
 export function createProviderJsonRequestService({ provider, fetchFn = globalThis.fetch, requestTimeoutMs = 15000, requestPolicy = {}, providerHttpService } = {}) {
-  if (provider === 'apple_music') return createFetchProviderJsonRequestService({ provider, fetchFn, requestTimeoutMs, requestPolicy });
   const owner = providerHttpService ?? createProviderHttpService({ fetchFn });
   function send(input, empty) {
     const timeoutMs = Number.isSafeInteger(requestTimeoutMs) ? Math.max(1, Math.min(requestTimeoutMs, 60000)) : 15000;

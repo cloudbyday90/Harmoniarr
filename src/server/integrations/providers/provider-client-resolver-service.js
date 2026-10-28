@@ -45,7 +45,7 @@ export function createProviderClientResolverService({
     const result = { client: null, enabled: Boolean(providerSettings[`${settingPrefix}Enabled`]), configured: false, authMode: 'none' };
     if (!result.enabled) return result;
     const queryable = getPoolFn();
-    const options = { ...(provider !== 'apple_music' ? { providerHttpService } : {}), requestTimeoutMs: providerSettings.requestTimeoutMs, ...(requestPolicy ? { requestPolicy } : {}) };
+    const options = { providerHttpService, requestTimeoutMs: providerSettings.requestTimeoutMs, ...(requestPolicy ? { requestPolicy } : {}) };
     try {
       if (provider === 'spotify' || provider === 'youtube') {
         result.authMode = 'oauth_user';

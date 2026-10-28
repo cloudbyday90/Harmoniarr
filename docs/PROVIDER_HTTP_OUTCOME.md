@@ -6,6 +6,11 @@ October 27, 2026. Implements the next item from the
 [design](PROVIDER_HTTP_DESIGN.md) and
 [Docker outcome](LOCAL_DOCKER_PROVIDER_HTTP_OUTCOME.md).
 
+October 28 follow-up: [Apple Music adoption](APPLE_HTTP_OUTCOME.md) now extends
+this same owner to all three providers and removes the legacy adapter. The
+following October 27 record describes the preceding Spotify/YouTube change;
+its Apple exclusion is superseded by that separate outcome.
+
 ## Delivered
 
 One application-owned ESM factory now limits Spotify and YouTube API, token
@@ -97,3 +102,8 @@ JWT signing/cache and API contracts. Qualify real TLS identity, compressed-body
 bounds, cancellation, shared admission and retirement for that caller before
 removing the legacy fetch adapter. This closes the remaining provider transport
 gap without another application or deployed service.
+
+That item is now implemented in the [Apple design](APPLE_HTTP_DESIGN.md) and
+[outcome](APPLE_HTTP_OUTCOME.md). Next review explicit P-256 key admission and
+developer-token lifetime policy, preserving compatible renewal and sanitized
+configuration failure.

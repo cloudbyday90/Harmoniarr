@@ -2,6 +2,12 @@
 
 ## Purpose
 
+Apple Music now shares that provider HTTP owner through the existing resolver,
+including its default collection-access check using encrypted saved keys. Signing
+and the per-client token cache are a separate ESM factory. No SQL or schema
+artifact changed; automatic maintenance remains. See
+[Apple HTTP design](APPLE_HTTP_DESIGN.md) and [outcome](APPLE_HTTP_OUTCOME.md).
+
 Spotify/YouTube HTTP now has one application-owned admission/deadline service
 covering API, token exchange/refresh and post-clear Google revocation. Native
 request, response, socket, codec and DNS retirement precedes successful local

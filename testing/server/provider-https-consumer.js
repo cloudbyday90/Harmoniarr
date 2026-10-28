@@ -11,7 +11,7 @@ import { createSpotifyClient } from '../../src/server/integrations/spotify/spoti
 import { createYouTubeClient } from '../../src/server/integrations/youtube/youtube-client.js';
 
 const secret = 'PUBLIC-TEST-ONLY-private-sentinel';
-// This retained cohort qualifies the explicit bundled-fetch seam and Apple Music.
+// This retained cohort qualifies the explicit bundled-fetch seam for all three providers.
 // The guarded provider-http native entry qualifies Spotify/YouTube's direct owner.
 const fetchFn = (...args) => fetch(...args);
 const base = 'https://api.spotify.com';
@@ -38,7 +38,7 @@ const scenarios = {
     assert.deepEqual(await youtube.getVideos('video'), { items: [{ id: 'video' }] });
     const { privateKey } = generateKeyPairSync('ec', { namedCurve: 'P-256', privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
       publicKeyEncoding: { type: 'spki', format: 'pem' } });
-    const apple = createAppleMusicClient({ teamId: 'TESTONLY', keyId: 'TESTONLY', privateKey });
+    const apple = createAppleMusicClient({ teamId: 'TESTONLY', keyId: 'TESTONLY', privateKey, fetchFn });
     assert.deepEqual(await apple.getCatalogPlaylist('us', 'playlist'), { data: [{ id: 'playlist' }] });
     const oauth = createProviderJsonRequestService({ provider: 'youtube', fetchFn });
     assert.deepEqual(await oauth.requestJson({ url: 'https://oauth2.googleapis.com/token', method: 'POST', oauth: true,

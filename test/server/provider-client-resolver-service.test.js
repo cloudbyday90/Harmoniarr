@@ -96,7 +96,7 @@ test('resolveProviderClients builds enabled provider clients from settings and s
     requestTimeoutMs: 12000,
   });
   assert.deepEqual(clients.appleMusic.config, {
-    keyId: 'apple-key',
+    providerHttpService,    keyId: 'apple-key',
     privateKey: 'apple-private-key',
     requestTimeoutMs: 12000,
     teamId: 'apple-team',

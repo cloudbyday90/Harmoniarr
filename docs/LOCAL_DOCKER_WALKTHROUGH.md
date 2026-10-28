@@ -1,5 +1,12 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 28 [Apple Music HTTP rebuild](LOCAL_DOCKER_APPLE_HTTP_OUTCOME.md)
+records the current image and preserved administrator/five mounts, actual Apple
+TLS/JWT/cancellation/drain evidence and exact retained-runtime comparison. See
+[implementation outcome](APPLE_HTTP_OUTCOME.md). The separate
+[ORAS PR outcome](DEPENDABOT_ORAS_OUTCOME.md) covers local action validation;
+the release workflow was not dispatched.
+
 The October 27 [Spotify/YouTube HTTP rebuild](LOCAL_DOCKER_PROVIDER_HTTP_OUTCOME.md)
 records the current image, preserved administrator/five mounts and actual native
 TLS, compressed-body, cancellation and retirement evidence. See its separate

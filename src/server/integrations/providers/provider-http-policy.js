@@ -5,7 +5,7 @@
  */
 import { createProviderRequestError } from './provider-request-error.js';
 
-const origins = { spotify: ['https://api.spotify.com', 'https://accounts.spotify.com'], youtube: ['https://www.googleapis.com', 'https://oauth2.googleapis.com'] };
+const origins = { spotify: ['https://api.spotify.com', 'https://accounts.spotify.com'], youtube: ['https://www.googleapis.com', 'https://oauth2.googleapis.com'], apple_music: ['https://api.music.apple.com'] };
 export function admitProviderDestination(value, provider) {
   let url;
   try { url = new URL(value); } catch { throw createProviderRequestError(provider, 'request_rejected'); }
