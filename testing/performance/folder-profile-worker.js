@@ -31,7 +31,7 @@ else if (input.phase === 'probe' || input.phase === 'sample') {
   } else {
     const path = await resolveFolderProfileCase({ parent, owner: input.owner, caseName: input.caseName });
     const filesystemType = (await statfs(path)).type;
-    const work = createFolderProfileWorkload({ createService: createFolderBrowseService, path, caseName: input.caseName, algorithm: input.algorithm, pages: input.pages });
+    const work = createFolderProfileWorkload({ createService: createFolderBrowseService, path, caseName: input.caseName, algorithm: input.algorithm, bufferSize: input.bufferSize, pages: input.pages });
     const hostLoadAverage = loadavg();
     result = { ...await measureFolderProfileWork(work, { observed: input.observed }), filesystemType, cgroupBefore: before, cgroupAfter: await readFolderProfileCgroup(), hostLoadAverage };
     assert.equal(result.cgroupAfter.events.oom_kill - before.events.oom_kill, 0);

@@ -7,6 +7,12 @@ Security source: `docs/SECURITY_POLICY.md`
 
 ## Current Status (2026-10-28)
 
+October 28 folder-buffer comparison extends the opt-in developer benchmark
+with fixed 32/128 variants of the unchanged packaged scanner. No production,
+schema, dependency or maintenance change. See the
+[design](FOLDER_BROWSE_BUFFERS_DESIGN.md) and
+[outcome](FOLDER_BROWSE_BUFFERS_OUTCOME.md). Network checks remain deferred.
+
 October 28 folder-browsing memory/rescan qualification is an opt-in developer
 benchmark using the unchanged packaged scanner. No production, schema,
 dependency or maintenance changes. See the [design](FOLDER_BROWSE_PROFILE_DESIGN.md)

@@ -9,12 +9,16 @@ import { performance } from 'node:perf_hooks';
 import { createHash } from 'node:crypto';
 import { folderProfileCases } from './folder-profile-policy.js';
 import { folderProfileName } from './folder-profile-fixture.js';
+import { assertFolderProfileVariant } from './folder-profile-variants.js';
 
-export function createFolderProfileWorkload({ createService, path, caseName, algorithm, pages, filesystem = { opendir, readdir, stat } }) {
+export function createFolderProfileWorkload({ createService, path, caseName, algorithm, bufferSize = algorithm === 'stream' ? 32 : null, pages, filesystem = { opendir, readdir, stat } }) {
   if (!Object.hasOwn(folderProfileCases, caseName) || !['stream', 'readdir'].includes(algorithm) || ![1, 3].includes(pages)) throw new TypeError('Invalid measured workload');
-  const counts = { directoryOpens: 0, directoryCloses: 0, directoryReads: 0, stats: 0, readdirCalls: 0, returnedDirents: 0, liveHandles: 0, peakHandles: 0 };
-  const service = createService({ readStat: (...args) => { counts.stats++; return filesystem.stat(...args); }, openDirectory: async (...args) => {
-    const directory = await filesystem.opendir(...args); counts.directoryOpens++; counts.liveHandles++; counts.peakHandles = Math.max(counts.peakHandles, counts.liveHandles);
+  assertFolderProfileVariant(algorithm, bufferSize);
+  const counts = { directoryOpens: 0, directoryCloses: 0, directoryReads: 0, bufferChecks: 0, stats: 0, readdirCalls: 0, returnedDirents: 0, liveHandles: 0, peakHandles: 0 };
+  const service = createService({ readStat: (...args) => { counts.stats++; return filesystem.stat(...args); }, openDirectory: async (directoryPath, options) => {
+    assert.deepEqual(options, { bufferSize: 32 }); counts.bufferChecks++;
+    const directory = await filesystem.opendir(directoryPath, { ...options, bufferSize: bufferSize ?? 32 });
+    counts.directoryOpens++; counts.liveHandles++; counts.peakHandles = Math.max(counts.peakHandles, counts.liveHandles);
     return { read: () => { counts.directoryReads++; return directory.read(); }, close: async () => { await directory.close(); counts.directoryCloses++; counts.liveHandles--; } };
   } });
   const profile = folderProfileCases[caseName];
@@ -42,11 +46,11 @@ export function createFolderProfileWorkload({ createService, path, caseName, alg
     assert.equal(counts.liveHandles, 0); assert.equal(counts.directoryOpens, counts.directoryCloses);
     if (!refusal) {
       if (algorithm === 'stream') {
-        assert.equal(counts.directoryOpens, pages); assert.equal(counts.stats, pages * 2);
+        assert.equal(counts.directoryOpens, pages); assert.equal(counts.bufferChecks, pages); assert.equal(counts.stats, pages * 2);
         assert.equal(counts.directoryReads, (profile.directories + profile.files + 1) * pages);
       } else { assert.equal(counts.readdirCalls, pages); assert.equal(counts.returnedDirents, (profile.directories + profile.files) * pages); }
     }
-    return { status: refusal ? 'refused' : 'success', refusal, completedPages, durations, digest: digest.digest('hex'), counts,
+    return { status: refusal ? 'refused' : 'success', refusal, bufferSize, completedPages, durations, digest: digest.digest('hex'), counts,
       rawEntriesPerScan: profile.directories + profile.files, comparatorOmitsProductionGuards: algorithm === 'readdir' };
   };
 }

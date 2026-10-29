@@ -3,6 +3,8 @@
  * Copyright (C) 2026 Harmoniarr Contributors
  * Licensed under GPL-3.0-or-later. See LICENSE.
  */
+import { folderProfileVariants } from './folder-profile-variants.js';
+
 export const folderProfileCases = Object.freeze({
   small: Object.freeze({ directories: 1000, files: 0 }),
   large: Object.freeze({ directories: 10_000, files: 0 }),
@@ -15,7 +17,7 @@ export function assertProfileOwner(owner) {
   if (typeof owner !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u.test(owner)) throw new TypeError('Invalid profile owner');
 }
 export function parseFolderProfileCommand(args) {
-  const values = {}, allowed = new Set(['image', 'output', 'storage', 'scratch-root', 'cases', 'repeats']);
+  const values = {}, allowed = new Set(['image', 'output', 'storage', 'scratch-root', 'cases', 'repeats', 'comparison']);
   for (let index = 0; index < args.length; index += 2) {
     const key = args[index]?.slice(2), value = args[index + 1];
     if (!args[index]?.startsWith('--') || !allowed.has(key) || Object.hasOwn(values, key) || !value || value.startsWith('--')) throw new TypeError('Invalid folder profile options');
@@ -27,15 +29,17 @@ export function parseFolderProfileCommand(args) {
   const cases = (values.cases ?? 'small,large').split(','), repeats = Number(values.repeats ?? 3);
   if (!cases.length || new Set(cases).size !== cases.length || cases.some(name => !Object.hasOwn(folderProfileCases, name))
     || !Number.isInteger(repeats) || repeats < 1 || repeats > 5) throw new TypeError('Invalid profile cases or repetition count');
-  return { image: values.image, output: values.output, storage: values.storage, scratchRoot: values['scratch-root'], cases, repeats };
+  const comparison = values.comparison ?? 'algorithms'; folderProfileVariants(comparison);
+  return { image: values.image, output: values.output, storage: values.storage, scratchRoot: values['scratch-root'], cases, repeats, comparison };
 }
-export function createFolderProfilePlan({ cases, repeats }) {
-  const rows = [];
+export function createFolderProfilePlan({ cases, repeats, comparison }) {
+  const rows = [], variants = folderProfileVariants(comparison);
+  const order = repeat => repeat % 2 ? [...variants].reverse() : variants;
   for (const caseName of cases) for (const pages of [1, 3]) for (let repeat = 0; repeat < repeats; repeat++) {
-    for (const algorithm of repeat % 2 ? ['readdir', 'stream'] : ['stream', 'readdir']) rows.push({ caseName, pages, repeat, algorithm, observed: true });
+    for (const variant of order(repeat)) rows.push({ caseName, pages, repeat, ...variant, observed: true });
   }
   if (cases.includes('large')) for (let repeat = 0; repeat < repeats; repeat++) {
-    for (const algorithm of repeat % 2 ? ['readdir', 'stream'] : ['stream', 'readdir']) rows.push({ caseName: 'large', pages: 3, repeat, algorithm, observed: false });
+    for (const variant of order(repeat)) rows.push({ caseName: 'large', pages: 3, repeat, ...variant, observed: false });
   }
   return rows;
 }

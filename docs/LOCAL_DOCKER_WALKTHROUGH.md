@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 28 [folder-buffer comparison](FOLDER_BROWSE_BUFFERS_OUTCOME.md)
+uses the same immutable walkthrough image in disposable benchmark consumers.
+It adds no application service or deployment and preserves the walkthrough's
+administrator, settings and five mounts. Network profiles remain deferred.
+
 The October 28 [folder-browsing measurement outcome](FOLDER_BROWSE_PROFILE_OUTCOME.md)
 qualifies local volume/Windows-bind work using the existing immutable image and
 disposable benchmark consumers. The walkthrough is not redeployed; its image,

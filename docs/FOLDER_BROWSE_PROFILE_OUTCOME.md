@@ -133,9 +133,11 @@ checks and separately reported memory scopes. Full research records alternatives
 and pros/cons. A three-page single-consumer experiment does not qualify full walks,
 four concurrent scans, actual HTTP response latency or production-wide memory.
 
-Next: compare bounded opendir buffer sizes 32 and 128 using this same method,
-while preserving page/scan/admission limits, metadata fences and actual close
-ownership. Measure the memory/elapsed tradeoff before changing a default. Real
+The bounded opendir 32/128 follow-up has its own
+[design](FOLDER_BROWSE_BUFFERS_DESIGN.md),
+[research/tradeoffs](FOLDER_BROWSE_BUFFERS_RESEARCH_2026_10.md) and
+[outcome/next recommendation](FOLDER_BROWSE_BUFFERS_OUTCOME.md). It preserves
+page/scan/admission limits, metadata fences and actual close ownership. Real
 network storage remains deferred at the user's explicit request and is not
 represented by the Windows bind profile.
 

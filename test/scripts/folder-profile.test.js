@@ -78,12 +78,15 @@ test('workload verifies independent page data and preserves explicit refusal aft
   await assert.rejects(invalid, error => error.code === 'ERR_ASSERTION');
 });
 test('read/stat observers preserve the original native Promise identity', async () => {
-  const nativeRead = Promise.resolve(null), nativeStat = Promise.resolve({}); let observer;
-  createFolderProfileWorkload({ path: '/unused', caseName: 'small', algorithm: 'stream', pages: 1,
-    filesystem: { stat: () => nativeStat, opendir: async () => ({ read: () => nativeRead, close: async () => {} }) },
-    createService: dependencies => { observer = dependencies; return {}; } });
-  assert.equal(observer.readStat('/unused'), nativeStat);
-  const directory = await observer.openDirectory('/unused'); assert.equal(directory.read(), nativeRead); await directory.close();
+  for (const bufferSize of [32, 128]) {
+    const nativeRead = Promise.resolve(null), nativeStat = Promise.resolve({}); let observer;
+    createFolderProfileWorkload({ path: '/unused', caseName: 'small', algorithm: 'stream', bufferSize, pages: 1,
+      filesystem: { stat: () => nativeStat, opendir: async (_path, options) => {
+        assert.deepEqual(options, { bufferSize }); return { read: () => nativeRead, close: async () => {} };
+      } }, createService: dependencies => { observer = dependencies; return {}; } });
+    assert.equal(observer.readStat('/unused'), nativeStat);
+    const directory = await observer.openDirectory('/unused', { bufferSize: 32 }); assert.equal(directory.read(), nativeRead); await directory.close();
+  }
 });
 
 function dockerFixture({ startFailure, abortBeforeStart, removalFailure = false } = {}) {
