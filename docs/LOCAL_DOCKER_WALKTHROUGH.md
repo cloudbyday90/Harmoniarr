@@ -1,5 +1,11 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 31 [development disk cleanup](WORKSPACE_HYGIENE_OUTCOME.md) protects
+this walkthrough image, rollback, data, settings and mounts while reclaiming
+reviewed retired development artifacts. The
+[AI hygiene skill](../.agents/skills/harmoniarr-workspace-hygiene/SKILL.md)
+maintains that boundary during future build/test work.
+
 The October 28 [folder-buffer comparison](FOLDER_BROWSE_BUFFERS_OUTCOME.md)
 uses the same immutable walkthrough image in disposable benchmark consumers.
 It adds no application service or deployment and preserves the walkthrough's

@@ -5,7 +5,14 @@ Database model source: `docs/DATABASE_MODEL.md`
 Recovery source: `docs/BACKUP_RESTORE_DESIGN.md`
 Security source: `docs/SECURITY_POLICY.md`
 
-## Current Status (2026-10-28)
+## Current Status (2026-10-31)
+
+October 31 development disk hygiene adds a maintained
+[AI skill](../.agents/skills/harmoniarr-workspace-hygiene/SKILL.md) and scoped
+[cleanup/retention guidance](WORKSPACE_HYGIENE_DESIGN.md). No production,
+schema, dependency or application maintenance job changes. See the
+[cleanup outcome](WORKSPACE_HYGIENE_OUTCOME.md); the previous buffer-variance
+qualification remains the next development item.
 
 October 28 folder-buffer comparison extends the opt-in developer benchmark
 with fixed 32/128 variants of the unchanged packaged scanner. No production,
