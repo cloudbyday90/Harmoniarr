@@ -7,6 +7,13 @@ Security source: `docs/SECURITY_POLICY.md`
 
 ## Current Status (2026-10-31)
 
+October 31 concurrent ceiling qualification adds an opt-in four-scan experiment
+with aggregate process/container accounting and separate lifecycle controls.
+Both local storage profiles pass; production buffer 32, schema and maintenance
+remain unchanged. See the [design](FOLDER_BROWSE_CONCURRENT_DESIGN.md) and
+[outcome/next item](FOLDER_BROWSE_CONCURRENT_OUTCOME.md). The next item is a
+separately packaged and qualified fixed-buffer promotion to 128.
+
 October 31 mixed-file first-page qualification extends the opt-in developer
 benchmark with balanced randomized blocks and explicit observer controls.
 Production buffer, scan/admission policy, schema and maintenance remain

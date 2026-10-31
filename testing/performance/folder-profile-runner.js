@@ -10,6 +10,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import { createFolderProfilePlan, folderProfileSources } from './folder-profile-policy.js';
 import { profileDocker, withFolderProfileContainer } from './folder-profile-docker.js';
 import { summarizeMixedFirstPage } from './folder-profile-block-summary.js';
+import { summarizeConcurrentCeiling } from './folder-profile-concurrent-plan.js';
 
 /** Explicit local measurement, separate from startup and the routine validation gate. */
 export async function runFolderProfile(selection, { signal, docker = profileDocker, onProgress = () => {} } = {}) {
@@ -25,7 +26,7 @@ export async function runFolderProfile(selection, { signal, docker = profileDock
     const args = ['--read-only', '--network', 'none', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges:true', '--no-healthcheck',
       '--cpus', '2', '--memory', '1g', '--memory-swap', '1g', '--pids-limit', '64', '--user', ['prepare', 'cleanup'].includes(phase) ? '0:0' : '1000:1000',
       '--entrypoint', 'node', '--mount', `type=bind,src=${benchmarkPath},dst=/app/benchmark,readonly`];
-    if (storageMount) args.push('--mount', storageMount + (['probe', 'sample'].includes(phase) ? ',readonly' : ''));
+    if (storageMount) args.push('--mount', storageMount + (['probe', 'sample', 'lifecycle'].includes(phase) ? ',readonly' : ''));
     const value = await withFolderProfileContainer({ args, command: ['--expose-gc', '/app/benchmark/folder-profile-worker.js', JSON.stringify({ ...row, phase, owner })],
       owner, image: selection.image, signal: cleanup ? undefined : signal, timeout: phase === 'prepare' ? 900_000 : 120_000, docker, onRetired: () => { retired++; } });
     assert.equal(value.phase, phase); return value.result;
@@ -60,6 +61,13 @@ export async function runFolderProfile(selection, { signal, docker = profileDock
       report.samples.push({ ...row, ...result });
     }
     if (selection.experiment === 'mixed-first-page') report.analysis = summarizeMixedFirstPage(report.samples);
+    if (selection.experiment === 'concurrent-ceiling') {
+      report.analysis = summarizeConcurrentCeiling(report.samples); report.lifecycle = [];
+      for (const bufferSize of [32, 128]) {
+        onProgress({ phase: 'lifecycle', bufferSize });
+        report.lifecycle.push(await run('lifecycle', { caseName: 'ceiling', bufferSize, observed: true }));
+      }
+    }
   } catch (error) { failed = true; failure = error; report.failure = { name: error?.name ?? 'Unknown', code: typeof error?.code === 'string' ? error.code : null, completedSamples: report.samples.length }; }
   try {
     if (attempted !== retired) throw new Error('Uncertain process retirement; fixture retained');

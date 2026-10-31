@@ -15,16 +15,18 @@ function balancedOrder(draw) {
   return values;
 }
 
-/** Adjacent equal-work pairs; each block balances both buffer and observer order. */
-export function createMixedFirstPagePlan({ draw = randomInt } = {}) {
+/** Adjacent equal-work pairs; balance both buffer and observer order. */
+export function createBalancedFolderProfileBlock({ draw = randomInt, block = 0 } = {}) {
   const rows = [];
-  for (let block = 0; block < 4; block++) {
-    const observedFirst = balancedOrder(draw), bufferFirst = [balancedOrder(draw), balancedOrder(draw)];
-    for (let repeat = 0; repeat < 4; repeat++) for (const observed of observedFirst[repeat] ? [true, false] : [false, true]) {
-      for (const bufferSize of bufferFirst[Number(observed)][repeat] ? [128, 32] : [32, 128]) {
-        rows.push({ sequence: rows.length, block, repeat, caseName: 'mixed', pages: 1, algorithm: 'stream', bufferSize, observed });
-      }
+  const observedFirst = balancedOrder(draw), bufferFirst = [balancedOrder(draw), balancedOrder(draw)];
+  for (let repeat = 0; repeat < 4; repeat++) for (const observed of observedFirst[repeat] ? [true, false] : [false, true]) {
+    for (const bufferSize of bufferFirst[Number(observed)][repeat] ? [128, 32] : [32, 128]) {
+      rows.push({ sequence: block * 16 + rows.length, block, repeat, caseName: 'mixed', pages: 1, algorithm: 'stream', bufferSize, observed });
     }
   }
   return rows;
+}
+
+export function createMixedFirstPagePlan({ draw = randomInt } = {}) {
+  return Array.from({ length: 4 }, (_, block) => createBalancedFolderProfileBlock({ draw, block })).flat();
 }

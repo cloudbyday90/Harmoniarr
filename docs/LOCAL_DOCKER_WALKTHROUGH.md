@@ -1,5 +1,11 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 31 [concurrent ceiling qualification](FOLDER_BROWSE_CONCURRENT_OUTCOME.md)
+checks four scans in one guarded service/process on local volume and Windows
+bind fixtures, including fifth-scan refusal, cancellation and actual close.
+All owned resources retire; the walkthrough image, settings and five mounts
+are preserved. Production buffer promotion is the next separately qualified item.
+
 The October 31 [mixed-file first-page qualification](FOLDER_BROWSE_MIXED_OUTCOME.md)
 uses the existing immutable image in owned disposable consumers. It adds no
 application service or deployment; production buffer and walkthrough state are

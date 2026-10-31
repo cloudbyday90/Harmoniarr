@@ -13,12 +13,13 @@ import { folderProfileSources, assertProfileOwner } from './folder-profile-polic
 import { prepareFolderProfileFixture, resolveFolderProfileCase, removeFolderProfileFixture } from './folder-profile-fixture.js';
 import { measureFolderProfileWork, readFolderProfileCgroup } from './folder-profile-memory.js';
 import { createFolderProfileWorkload } from './folder-profile-workload.js';
+import { createConcurrentFolderProfileWorkload, runConcurrentFolderProfileControls } from './folder-profile-concurrent-workload.js';
 
 const input = JSON.parse(process.argv[2]); assertProfileOwner(input.owner);
 const parent = '/fixtures'; let result;
 if (input.phase === 'prepare') result = await prepareFolderProfileFixture({ parent, owner: input.owner, cases: input.cases });
 else if (input.phase === 'cleanup') result = await removeFolderProfileFixture({ parent, owner: input.owner });
-else if (input.phase === 'probe' || input.phase === 'sample') {
+else if (['probe', 'sample', 'lifecycle'].includes(input.phase)) {
   if (typeof globalThis.gc !== 'function') throw new TypeError('Explicit profile GC is required');
   const before = await readFolderProfileCgroup();
   assert.equal(before.limitBytes, 1024 ** 3); assert.equal(before.swapMaxBytes, 0); assert.equal(before.cpus, 2);
@@ -31,7 +32,9 @@ else if (input.phase === 'probe' || input.phase === 'sample') {
   } else {
     const path = await resolveFolderProfileCase({ parent, owner: input.owner, caseName: input.caseName });
     const filesystemType = (await statfs(path)).type;
-    const work = createFolderProfileWorkload({ createService: createFolderBrowseService, path, caseName: input.caseName, algorithm: input.algorithm, bufferSize: input.bufferSize, pages: input.pages });
+    const options = { createService: createFolderBrowseService, path, caseName: input.caseName, algorithm: input.algorithm, bufferSize: input.bufferSize, pages: input.pages };
+    const work = input.phase === 'lifecycle' ? () => runConcurrentFolderProfileControls(options)
+      : input.concurrency === 4 ? createConcurrentFolderProfileWorkload(options) : createFolderProfileWorkload(options);
     const hostLoadAverage = loadavg();
     result = { ...await measureFolderProfileWork(work, { observed: input.observed }), filesystemType, cgroupBefore: before, cgroupAfter: await readFolderProfileCgroup(), hostLoadAverage };
     assert.equal(result.cgroupAfter.events.oom_kill - before.events.oom_kill, 0);

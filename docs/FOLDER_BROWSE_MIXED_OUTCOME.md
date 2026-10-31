@@ -131,3 +131,10 @@ choose a different balanced schedule.
 node --test test/scripts/folder-profile-blocks.test.js test/scripts/folder-profile-buffers.test.js test/scripts/folder-profile.test.js
 node scripts/measure-folder-browse.js --image sha256:7009c6d3335b1b6a74c504acb4a2d1761bc7ab6c33c231b24264f5b0dff28f60 --output .tmp/mixed-first-page.json --storage bind --scratch-root .tmp/mixed-first-page-scratch --experiment mixed-first-page
 ```
+
+The queued four-scan follow-up is completed in the
+[concurrent ceiling outcome](FOLDER_BROWSE_CONCURRENT_OUTCOME.md), with separate
+[design](FOLDER_BROWSE_CONCURRENT_DESIGN.md) and
+[current research/tradeoffs](FOLDER_BROWSE_CONCURRENT_RESEARCH_2026_10.md).
+It qualifies aggregate local scanner memory and lifecycle while retaining
+production buffer 32; fixed-buffer promotion is the next code item.
