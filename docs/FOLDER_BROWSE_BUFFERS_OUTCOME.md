@@ -136,6 +136,11 @@ changing a default. Four-concurrent-scan qualification remains necessary before
 using this single-consumer result as evidence about aggregate memory; network
 qualification stays deferred.
 
+The mixed-file first-page follow-up is implemented in a separate fixed
+[experiment design](FOLDER_BROWSE_MIXED_DESIGN.md), with
+[current research/tradeoffs](FOLDER_BROWSE_MIXED_RESEARCH_2026_10.md) and
+[results/next recommendation](FOLDER_BROWSE_MIXED_OUTCOME.md).
+
 GitHub MCP found zero open repository PRs initially and at final review on
 October 28, 2026. Random local PR implementation and stale Dependabot cleanup
 or rebasing were inapplicable. All 13 changed files are included on main;

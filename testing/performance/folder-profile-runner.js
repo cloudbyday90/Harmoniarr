@@ -9,11 +9,12 @@ import { basename, dirname, resolve } from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
 import { createFolderProfilePlan, folderProfileSources } from './folder-profile-policy.js';
 import { profileDocker, withFolderProfileContainer } from './folder-profile-docker.js';
+import { summarizeMixedFirstPage } from './folder-profile-block-summary.js';
 
 /** Explicit local measurement, separate from startup and the routine validation gate. */
 export async function runFolderProfile(selection, { signal, docker = profileDocker, onProgress = () => {} } = {}) {
   const owner = randomUUID(), plan = createFolderProfilePlan(selection);
-  const report = { version: 2, comparison: selection.comparison ?? 'algorithms', storage: selection.storage, image: selection.image, owner, cases: selection.cases,
+  const report = { version: 3, experiment: selection.experiment ?? 'standard', plan, comparison: selection.comparison ?? 'algorithms', storage: selection.storage, image: selection.image, owner, cases: selection.cases,
     repeats: selection.repeats, resources: { cpus: 2, memoryBytes: 1024 ** 3, swapBytes: 0 }, cacheCleared: false, samples: [], cleanup: {} };
   const benchmarkPath = await realpath(new URL('.', import.meta.url));
   if (/[,\r\n\0]/u.test(benchmarkPath)) throw new TypeError('Unsupported benchmark mount path');
@@ -58,6 +59,7 @@ export async function runFolderProfile(selection, { signal, docker = profileDock
       const result = await run('sample', row);
       report.samples.push({ ...row, ...result });
     }
+    if (selection.experiment === 'mixed-first-page') report.analysis = summarizeMixedFirstPage(report.samples);
   } catch (error) { failed = true; failure = error; report.failure = { name: error?.name ?? 'Unknown', code: typeof error?.code === 'string' ? error.code : null, completedSamples: report.samples.length }; }
   try {
     if (attempted !== retired) throw new Error('Uncertain process retirement; fixture retained');

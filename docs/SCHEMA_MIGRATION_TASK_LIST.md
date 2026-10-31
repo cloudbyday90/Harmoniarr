@@ -7,6 +7,12 @@ Security source: `docs/SECURITY_POLICY.md`
 
 ## Current Status (2026-10-31)
 
+October 31 mixed-file first-page qualification extends the opt-in developer
+benchmark with balanced randomized blocks and explicit observer controls.
+Production buffer, scan/admission policy, schema and maintenance remain
+unchanged. See the [design](FOLDER_BROWSE_MIXED_DESIGN.md) and
+[outcome](FOLDER_BROWSE_MIXED_OUTCOME.md).
+
 October 31 development disk hygiene adds a maintained
 [AI skill](../.agents/skills/harmoniarr-workspace-hygiene/SKILL.md) and scoped
 [cleanup/retention guidance](WORKSPACE_HYGIENE_DESIGN.md). No production,

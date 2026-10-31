@@ -1,5 +1,10 @@
 # Harmoniarr Local Docker Walkthrough
 
+The October 31 [mixed-file first-page qualification](FOLDER_BROWSE_MIXED_OUTCOME.md)
+uses the existing immutable image in owned disposable consumers. It adds no
+application service or deployment; production buffer and walkthrough state are
+preserved. Network storage remains deferred.
+
 The October 31 [development disk cleanup](WORKSPACE_HYGIENE_OUTCOME.md) protects
 this walkthrough image, rollback, data, settings and mounts while reclaiming
 reviewed retired development artifacts. The
