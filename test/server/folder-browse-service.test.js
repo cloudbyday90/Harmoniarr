@@ -18,7 +18,7 @@ const dirent = (name, folder = true) => ({ name, isDirectory: () => folder });
 function controlled({ count = 250, read, close = async () => {}, readStat = async () => facts(), now } = {}) {
   let opens = 0, closes = 0, reads = 0;
   const service = createFolderBrowseService({ now, readStat, openDirectory: async (_path, options) => {
-    assert.deepEqual(options, { bufferSize: 32 }); opens++; let index = 0;
+    assert.deepEqual(options, { bufferSize: 128 }); opens++; let index = 0;
     return { read: async () => { reads++; if (read) return read(); return index < count ? dirent(String(count - index++).padStart(6, '0')) : null; },
       close: async () => { closes++; await close(); } };
   } });

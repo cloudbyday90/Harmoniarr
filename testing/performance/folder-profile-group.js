@@ -24,7 +24,7 @@ export function createFolderProfileGroup({ createService, path, bufferSize, hold
   const service = createService({
     readStat: (...args) => { counts.stats++; return filesystem.stat(...args); },
     openDirectory: async (directoryPath, options) => {
-      assert.deepEqual(options, { bufferSize: 32 }); counts.bufferChecks++;
+    assert.deepEqual(options, { bufferSize: 128 }); counts.bufferChecks++;
       const directory = await filesystem.opendir(directoryPath, { ...options, bufferSize });
       counts.directoryOpens++; counts.liveHandles++; counts.peakHandles = Math.max(counts.peakHandles, counts.liveHandles);
       let first = true;
@@ -65,10 +65,10 @@ export function createFolderProfileGroup({ createService, path, bufferSize, hold
   };
 }
 
-export function verifyFolderProfilePage(result) {
+export function verifyFolderProfilePage(result, expectedNames = Array.from({ length: 100 }, (_, index) => folderProfileName(index))) {
   assert.equal(result.page.total, 50_000); assert.equal(result.page.from, 1); assert.equal(result.page.to, 100);
   const names = result.entries.map(entry => entry.name);
-  assert.deepEqual(names, Array.from({ length: 100 }, (_, index) => folderProfileName(index)));
+  assert.deepEqual(names, expectedNames);
   return createHash('sha256').update(names.map(name => name + '\n').join('')).digest('hex');
 }
 

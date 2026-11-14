@@ -85,7 +85,7 @@ test('read/stat observers preserve the original native Promise identity', async 
         assert.deepEqual(options, { bufferSize }); return { read: () => nativeRead, close: async () => {} };
       } }, createService: dependencies => { observer = dependencies; return {}; } });
     assert.equal(observer.readStat('/unused'), nativeStat);
-    const directory = await observer.openDirectory('/unused', { bufferSize: 32 }); assert.equal(directory.read(), nativeRead); await directory.close();
+    const directory = await observer.openDirectory('/unused', { bufferSize: 128 }); assert.equal(directory.read(), nativeRead); await directory.close();
   }
 });
 

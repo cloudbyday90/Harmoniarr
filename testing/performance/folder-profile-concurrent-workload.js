@@ -5,10 +5,13 @@
  */
 import assert from 'node:assert/strict';
 import { createFolderProfileGroup, verifyFolderProfilePage, verifyFolderProfileRetirement } from './folder-profile-group.js';
+import { expectedFolderProfilePage } from './folder-profile-names.js';
+import { folderProfileCases } from './folder-profile-policy.js';
 
 const refusals = new Set(['folder_browse_timeout', 'folder_scan_limit', 'folder_browse_busy', 'folder_page_changed']);
 
 export function createConcurrentFolderProfileWorkload(options) {
+  const expected = expectedFolderProfilePage(folderProfileCases[options.caseName ?? 'ceiling']);
   return async () => {
     const group = createFolderProfileGroup(options);
     let refused = false;
@@ -21,7 +24,7 @@ export function createConcurrentFolderProfileWorkload(options) {
     const outcomes = await group.settled;
     const digests = [], refusalCodes = [];
     for (const row of outcomes) {
-      if (row.status === 'fulfilled') digests.push(verifyFolderProfilePage(row.value));
+      if (row.status === 'fulfilled') digests.push(verifyFolderProfilePage(row.value, expected));
       else {
         if (!refusals.has(row.reason?.code)) throw row.reason;
         refusalCodes.push(row.reason.code);
@@ -40,6 +43,7 @@ export function createConcurrentFolderProfileWorkload(options) {
 
 /** Barrier controls are separate from the throughput/memory samples. */
 export async function runConcurrentFolderProfileControls(options) {
+  const expected = expectedFolderProfilePage(folderProfileCases[options.caseName ?? 'ceiling']);
   const group = createFolderProfileGroup({ ...options, holdCloses: true });
   return group.run(async () => {
     const assertBusy = async () => {
@@ -57,10 +61,10 @@ export async function runConcurrentFolderProfileControls(options) {
     const outcomes = await group.settled;
     assert.deepEqual(outcomes.map(row => row.status), ['rejected', 'rejected', 'fulfilled', 'fulfilled']);
     for (const row of outcomes.slice(0, 2)) assert.equal(row.reason?.name, 'AbortError');
-    const digests = outcomes.slice(2).map(row => verifyFolderProfilePage(row.value));
+    const digests = outcomes.slice(2).map(row => verifyFolderProfilePage(row.value, expected));
     verifyFolderProfileRetirement(group.counts);
     assert.equal(group.counts.directoryOpens, 4);
-    const resumedDigest = verifyFolderProfilePage(await group.browse());
+    const resumedDigest = verifyFolderProfilePage(await group.browse(), expected);
     assert.ok(digests.every(digest => digest === resumedDigest));
     verifyFolderProfileRetirement(group.counts); assert.equal(group.counts.directoryOpens, 5);
     return { bufferSize: options.bufferSize, busyBeforeReadRelease: true, busyBeforeNativeClose: true,

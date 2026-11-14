@@ -92,7 +92,7 @@ test('group observers preserve subsequent native Promises and await actual close
   } };
   const createService = injected => ({ browse: async () => {
     assert.equal(injected.readStat('/fixture'), stat);
-    const handle = await injected.openDirectory('/fixture', { bufferSize: 32 });
+    const handle = await injected.openDirectory('/fixture', { bufferSize: 128 });
     await handle.read(); const second = handle.read(); assert.ok(nativeSeconds.has(second));
     await second; await handle.close();
   } });

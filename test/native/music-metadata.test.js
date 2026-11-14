@@ -8,23 +8,31 @@ import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { extname, join, basename } from 'node:path';
 import test from 'node:test';
+import sharp from 'sharp';
 import { closePool } from '../../src/server/database.js';
 import { createMediaCommandService } from '../../src/server/media/media-command-service.js';
 import { createLibraryTagExtractionService } from '../../src/server/library/library-tag-extraction-service.js';
+import { createLibraryEmbeddedArtworkService } from '../../src/server/library/library-embedded-artwork-service.js';
 import { requireDeploymentMemoryProfile } from '../../testing/server/deployment-memory-profile.js';
 import { createOperationRunLeaseFixture } from '../../testing/operation-run-lease-fixtures.js';
 
 await requireDeploymentMemoryProfile();
 test('updated metadata parser preserves production tag projections and classifies unsupported bytes', { timeout: 60_000 }, async t => {
   t.after(closePool);
-  assert.equal(JSON.parse(await readFile('/app/node_modules/music-metadata/package.json')).version, '12.2.3');
+  assert.equal(JSON.parse(await readFile('/app/node_modules/music-metadata/package.json')).version, '12.3.2');
   assert.equal(JSON.parse(await readFile('/app/node_modules/strtok3/package.json')).version, '10.6.2');
   const root = await mkdtemp('/tmp/metadata-parser-');
   const libraryRoot = join(root, 'library'); await mkdir(libraryRoot);
   const command = createMediaCommandService({ allowedBinaries: ['ffmpeg'] });
   const runId = randomUUID(), libraryRootId = randomUUID();
   const projections = [];
-  const service = createLibraryTagExtractionService({ writeOwnedLibraryFileTagSnapshot: async input => { projections.push(input); } });
+  const captures = [], assignments = [];
+  const embedded = createLibraryEmbeddedArtworkService({
+    artworkIngestionService: { ingestArtworkBuffer: async input => { captures.push(input); return { asset: { id: randomUUID() } }; } },
+    artworkAssignmentService: { assignPreferredArtwork: async input => { assignments.push(input); return { id: randomUUID() }; } },
+  });
+  const service = createLibraryTagExtractionService({ libraryEmbeddedArtworkService: embedded,
+    writeOwnedLibraryFileTagSnapshot: async input => { projections.push(input); } });
   const formats = [['flac', 'flac'], ['mp3', 'libmp3lame'], ['opus', 'libopus'], ['wav', 'pcm_s16le'], ['m4a', 'aac']];
   const measurements = [];
   const hash = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -52,6 +60,15 @@ test('updated metadata parser preserves production tag projections and classifie
       assert.equal(hash(await readFile(path)), before);
       measurements.push({ extension, sourceBytesPreserved: true, projectedTagsVerified: true, channels: payload.channels, sampleRateHz: payload.sampleRateHz });
     }
+    const png = await sharp({ create: { width: 8, height: 8, channels: 3, background: '#123456' } }).png().toBuffer();
+    const coverPath = join(root, 'front.png'), coveredPath = join(libraryRoot, 'covered.flac'); await writeFile(coverPath, png);
+    await command.runCommand({ binary: 'ffmpeg', args: ['-v','error','-nostdin','-i',join(libraryRoot, 'track.flac'),'-i',coverPath,
+      '-map','0:a:0','-map','1:v:0','-c','copy','-disposition:v:0','attached_pic','-metadata:s:v:0','title=Front cover',
+      '-metadata:s:v:0','comment=Cover (front)',coveredPath], timeoutMs: 30_000 });
+    const coveredHash = hash(await readFile(coveredPath)); await extract(coveredPath);
+    assert.equal(projections.at(-1).payload.embeddedArtworkCount, 1); assert.equal(captures.length, 1); assert.equal(assignments.length, 1);
+    assert.equal(hash(captures[0].buffer), hash(png)); assert.equal(captures[0].sourceProvider, 'embedded');
+    assert.equal(assignments[0].sourceReference, 'Cover (front)'); assert.equal(hash(await readFile(coveredPath)), coveredHash);
     const truncated = join(libraryRoot, 'truncated.flac'); await writeFile(truncated, 'fLaC');
     await extract(truncated);
     assert.equal(projections.at(-1).payload.status, 'extracted');
@@ -61,7 +78,8 @@ test('updated metadata parser preserves production tag projections and classifie
     const result = await extract(unsupported);
     assert.equal(projections.at(-1).payload.status, 'failed'); assert.equal(result.files[0].tagPayload, null);
     assert.equal(await readFile(unsupported, 'utf8'), 'not an audio container');
-    t.diagnostic(JSON.stringify({ parserVersion: '12.2.3', tokenizerVersion: '10.6.2', measurements, unsupportedBytesFailed: true, headerOnlyFlacHasNoAudioFacts: true,
+    t.diagnostic(JSON.stringify({ parserVersion: '12.3.2', tokenizerVersion: '10.6.2', measurements, unsupportedBytesFailed: true, headerOnlyFlacHasNoAudioFacts: true,
+      parsedEmbeddedCoverSelected: true, embeddedBytesPreserved: true, artworkIngestionAndAssignmentControlled: true,
       productionParserAndProjection: true, snapshotWriterIsControlled: true, noDatabasePersistenceClaim: true }));
   } finally { await rm(root, { recursive: true, force: true }); }
 });

@@ -1,5 +1,13 @@
 # Harmoniarr Local Docker Walkthrough
 
+The November 14 [buffer-128 promotion qualification](FOLDER_BUFFER_PROMOTION_OUTCOME.md)
+uses a matching local candidate for long/Unicode native profiles and reviewed
+parser consumers. Source and candidate use buffer 128; the existing walkthrough
+stays stopped on its original image with all five mounts preserved. This work
+does not roll out or release the candidate.
+The candidate retains Node 24.22.1 for comparison; Node 24.22.3 security-patch
+qualification is required before rollout. See the outcome's next item.
+
 The October 31 [concurrent ceiling qualification](FOLDER_BROWSE_CONCURRENT_OUTCOME.md)
 checks four scans in one guarded service/process on local volume and Windows
 bind fixtures, including fifth-scan refusal, cancellation and actual close.

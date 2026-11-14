@@ -5,7 +5,17 @@ Database model source: `docs/DATABASE_MODEL.md`
 Recovery source: `docs/BACKUP_RESTORE_DESIGN.md`
 Security source: `docs/SECURITY_POLICY.md`
 
-## Current Status (2026-10-31)
+## Current Status (2026-11-14)
+
+November 14 fixed-buffer promotion adopts 128 in the built-in scanner, with
+long/Unicode paging, concurrent native profiles and actual overflow qualification.
+Random Dependabot PR #61's parser update is implemented and tested locally.
+See the [design](FOLDER_BUFFER_PROMOTION_DESIGN.md),
+[Astra review](FOLDER_BUFFER_PROMOTION_ASTRA_REVIEW.md) and
+[outcome/next item](FOLDER_BUFFER_PROMOTION_OUTCOME.md). Schema and runtime
+maintenance are unchanged; the existing walkthrough remains stopped.
+The next priority is coordinated Node 24.22.3 security qualification before
+rollout, followed by repeated browse/cancel memory-retention checks.
 
 October 31 concurrent ceiling qualification adds an opt-in four-scan experiment
 with aggregate process/container accounting and separate lifecycle controls.

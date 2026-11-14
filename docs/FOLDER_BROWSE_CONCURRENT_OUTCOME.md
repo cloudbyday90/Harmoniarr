@@ -174,3 +174,11 @@ GitHub MCP found zero open repository PRs at initial and final review on
 October 31. Random local PR implementation and stale Dependabot cleanup or
 rebasing were inapplicable. All changes are included on main; no PR is merged
 and no branch, release or tag is created.
+
+The queued promotion is completed in the November 14
+[buffer-128 outcome](FOLDER_BUFFER_PROMOTION_OUTCOME.md), with separate
+[current research](FOLDER_BUFFER_PROMOTION_RESEARCH_2026_11.md),
+[design](FOLDER_BUFFER_PROMOTION_DESIGN.md) and
+[Astra review](FOLDER_BUFFER_PROMOTION_ASTRA_REVIEW.md). That follow-up includes
+long/Unicode native qualification and a matching local package; deployment remains
+separate from this historical comparison.

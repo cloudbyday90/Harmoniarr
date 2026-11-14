@@ -6,8 +6,9 @@
 import { access, lstat, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { assertProfileOwner, folderProfileCases } from './folder-profile-policy.js';
+import { folderProfileDirectoryName, folderProfileName } from './folder-profile-names.js';
 
-export const folderProfileName = index => 'folder-' + String(index).padStart(5, '0');
+export { folderProfileName };
 function fixturePath(parent, owner) { assertProfileOwner(owner); return join(parent, owner); }
 async function assertDirectory(path) {
   if (!(await lstat(path)).isDirectory() || await realpath(path) !== path) throw new Error('Refuse noncanonical fixture directory');
@@ -31,7 +32,7 @@ export async function prepareFolderProfileFixture({ parent, owner, cases }) {
     // A fixed-size producer batch is outside the measured consumer window.
     for (let offset = 0; offset < count; offset += 16) await Promise.all(Array.from({ length: Math.min(16, count - offset) }, (_, step) => {
       const index = offset + step;
-      return index < profile.directories ? mkdir(join(path, folderProfileName(index)))
+      return index < profile.directories ? mkdir(join(path, folderProfileDirectoryName(profile, index)))
         : writeFile(join(path, 'file-' + String(index).padStart(5, '0')), '', { flag: 'wx' });
     }));
   }
@@ -42,6 +43,14 @@ export async function resolveFolderProfileCase({ parent, owner, caseName }) {
   const fixture = await readFolderProfileFixture({ parent, owner });
   if (!fixture.cases.includes(caseName)) throw new TypeError('Case was not prepared');
   const path = join(fixture.root, caseName); await assertDirectory(path); return path;
+}
+/** Only after prior consumers retire; the following read-only scan must refuse. */
+export async function seedFolderProfileOverflow({ parent, owner, caseName }) {
+  const profile = folderProfileCases[caseName];
+  if (profile?.directories !== 50_000 || profile.files !== 0) throw new TypeError('Require an exact ceiling fixture');
+  const path = await resolveFolderProfileCase({ parent, owner, caseName });
+  await writeFile(join(path, 'profile-overflow-file'), '', { flag: 'wx', mode: 0o644 });
+  return { overflowSeeded: true, caseName, extraOrdinaryFiles: 1 };
 }
 export async function removeFolderProfileFixture({ parent, owner }) {
   const root = fixturePath(parent, owner);

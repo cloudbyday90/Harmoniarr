@@ -14,6 +14,7 @@ import { FOLDER_PAGE_SIZE, FOLDER_PATH_LIMIT, FOLDER_SCAN_LIMIT } from '../../sh
 
 const metadata = row => [row.dev, row.ino, row.mtimeNs, row.ctimeNs].map(String).join(':');
 const digest = value => createHash('sha256').update(value).digest('hex');
+const DIRECTORY_BUFFER_SIZE = 128;
 const failure = (status, code, message) => createApiError(status, code, message);
 function publicFailure(error) {
   if (getPublicApiError(error) || error?.name === 'AbortError') return error;
@@ -25,7 +26,7 @@ function publicFailure(error) {
   }
 }
 
-/** No idle handles or queued work. Capacity retires only after actual close. */
+/** No idle handles or queued work. Capacity stays held through close settlement. */
 export function createFolderBrowseService({ openDirectory = opendir, readStat = stat,
   cursorPolicy = createFolderCursorPolicy(), now = () => performance.now() } = {}) {
   let active = 0;
@@ -54,7 +55,7 @@ export function createFolderBrowseService({ openDirectory = opendir, readStat = 
         const fingerprint = metadata(before);
         const context = digest(JSON.stringify([actorUserId, safePath, fingerprint]));
         if (continuation && continuation.context !== context) throw folderPageChanged();
-        directory = await openDirectory(safePath, { bufferSize: 32 }); checkpoint();
+        directory = await openDirectory(safePath, { bufferSize: DIRECTORY_BUFFER_SIZE }); checkpoint();
         const selector = createFolderPageSelector(continuation ?? {});
         let scanned = 0;
         for (;;) {

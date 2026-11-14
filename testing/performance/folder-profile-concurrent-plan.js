@@ -7,8 +7,10 @@ import assert from 'node:assert/strict';
 import { createBalancedFolderProfileBlock } from './folder-profile-blocks.js';
 
 /** One balanced block; each sample contains four calls in one service/process. */
-export const createConcurrentCeilingPlan = options => createBalancedFolderProfileBlock(options)
-  .map(row => ({ ...row, caseName: 'ceiling', concurrency: 4 }));
+export function createConcurrentCeilingPlan({ caseName = 'ceiling', ...options } = {}) {
+  if (!['ceiling', 'long-ceiling'].includes(caseName)) throw new TypeError('Invalid concurrent case');
+  return createBalancedFolderProfileBlock(options).map(row => ({ ...row, caseName, concurrency: 4 }));
+}
 
 const distribution = values => {
   if (!values.length) return null;
@@ -25,7 +27,8 @@ export function summarizeConcurrentCeiling(samples) {
     assert.equal(first.sequence, index); assert.equal(second.sequence, index + 1);
     assert.equal(first.block, 0); assert.equal(first.repeat, Math.floor(index / 4));
     for (const key of ['block', 'repeat', 'observed', 'caseName', 'pages', 'algorithm', 'concurrency']) assert.equal(first[key], second[key]);
-    assert.equal(first.caseName, 'ceiling'); assert.equal(first.pages, 1); assert.equal(first.algorithm, 'stream'); assert.equal(first.concurrency, 4);
+    assert.ok(['ceiling', 'long-ceiling'].includes(first.caseName)); assert.equal(first.caseName, samples[0].caseName);
+    assert.equal(first.pages, 1); assert.equal(first.algorithm, 'stream'); assert.equal(first.concurrency, 4);
     assert.equal(typeof first.observed, 'boolean'); assert.deepEqual(pair.map(row => row.bufferSize).toSorted((a, b) => a - b), [32, 128]);
     for (const row of pair) {
       assert.ok(['success', 'refused'].includes(row.value.status)); assert.equal(row.value.bufferSize, row.bufferSize);

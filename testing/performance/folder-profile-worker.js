@@ -10,16 +10,18 @@ import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { loadavg } from 'node:os';
 import { folderProfileSources, assertProfileOwner } from './folder-profile-policy.js';
-import { prepareFolderProfileFixture, resolveFolderProfileCase, removeFolderProfileFixture } from './folder-profile-fixture.js';
+import { prepareFolderProfileFixture, resolveFolderProfileCase, removeFolderProfileFixture, seedFolderProfileOverflow } from './folder-profile-fixture.js';
 import { measureFolderProfileWork, readFolderProfileCgroup } from './folder-profile-memory.js';
 import { createFolderProfileWorkload } from './folder-profile-workload.js';
 import { createConcurrentFolderProfileWorkload, runConcurrentFolderProfileControls } from './folder-profile-concurrent-workload.js';
+import { createFolderPromotionWorkload } from './folder-profile-promotion-workload.js';
 
 const input = JSON.parse(process.argv[2]); assertProfileOwner(input.owner);
 const parent = '/fixtures'; let result;
 if (input.phase === 'prepare') result = await prepareFolderProfileFixture({ parent, owner: input.owner, cases: input.cases });
 else if (input.phase === 'cleanup') result = await removeFolderProfileFixture({ parent, owner: input.owner });
-else if (['probe', 'sample', 'lifecycle'].includes(input.phase)) {
+else if (input.phase === 'overflow-seed') result = await seedFolderProfileOverflow({ parent, owner: input.owner, caseName: input.caseName });
+else if (['probe', 'sample', 'lifecycle', 'promotion', 'overflow'].includes(input.phase)) {
   if (typeof globalThis.gc !== 'function') throw new TypeError('Explicit profile GC is required');
   const before = await readFolderProfileCgroup();
   assert.equal(before.limitBytes, 1024 ** 3); assert.equal(before.swapMaxBytes, 0); assert.equal(before.cpus, 2);
@@ -33,7 +35,8 @@ else if (['probe', 'sample', 'lifecycle'].includes(input.phase)) {
     const path = await resolveFolderProfileCase({ parent, owner: input.owner, caseName: input.caseName });
     const filesystemType = (await statfs(path)).type;
     const options = { createService: createFolderBrowseService, path, caseName: input.caseName, algorithm: input.algorithm, bufferSize: input.bufferSize, pages: input.pages };
-    const work = input.phase === 'lifecycle' ? () => runConcurrentFolderProfileControls(options)
+    const work = ['promotion', 'overflow'].includes(input.phase) ? createFolderPromotionWorkload({ ...options, overflow: input.phase === 'overflow' })
+      : input.phase === 'lifecycle' ? () => runConcurrentFolderProfileControls(options)
       : input.concurrency === 4 ? createConcurrentFolderProfileWorkload(options) : createFolderProfileWorkload(options);
     const hostLoadAverage = loadavg();
     result = { ...await measureFolderProfileWork(work, { observed: input.observed }), filesystemType, cgroupBefore: before, cgroupAfter: await readFolderProfileCgroup(), hostLoadAverage };

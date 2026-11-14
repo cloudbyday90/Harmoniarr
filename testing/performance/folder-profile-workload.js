@@ -8,7 +8,7 @@ import { opendir, readdir, stat } from 'node:fs/promises';
 import { performance } from 'node:perf_hooks';
 import { createHash } from 'node:crypto';
 import { folderProfileCases } from './folder-profile-policy.js';
-import { folderProfileName } from './folder-profile-fixture.js';
+import { expectedFolderProfilePage } from './folder-profile-names.js';
 import { assertFolderProfileVariant } from './folder-profile-variants.js';
 
 export function createFolderProfileWorkload({ createService, path, caseName, algorithm, bufferSize = algorithm === 'stream' ? 32 : null, pages, filesystem = { opendir, readdir, stat } }) {
@@ -16,12 +16,13 @@ export function createFolderProfileWorkload({ createService, path, caseName, alg
   assertFolderProfileVariant(algorithm, bufferSize);
   const counts = { directoryOpens: 0, directoryCloses: 0, directoryReads: 0, bufferChecks: 0, stats: 0, readdirCalls: 0, returnedDirents: 0, liveHandles: 0, peakHandles: 0 };
   const service = createService({ readStat: (...args) => { counts.stats++; return filesystem.stat(...args); }, openDirectory: async (directoryPath, options) => {
-    assert.deepEqual(options, { bufferSize: 32 }); counts.bufferChecks++;
+    assert.deepEqual(options, { bufferSize: 128 }); counts.bufferChecks++;
     const directory = await filesystem.opendir(directoryPath, { ...options, bufferSize: bufferSize ?? 32 });
     counts.directoryOpens++; counts.liveHandles++; counts.peakHandles = Math.max(counts.peakHandles, counts.liveHandles);
     return { read: () => { counts.directoryReads++; return directory.read(); }, close: async () => { await directory.close(); counts.directoryCloses++; counts.liveHandles--; } };
   } });
   const profile = folderProfileCases[caseName];
+  const expected = Array.from({ length: pages }, (_, page) => expectedFolderProfilePage(profile, page));
   return async () => {
     const durations = [], digest = createHash('sha256'); let cursor, completedPages = 0, refusal = null;
     for (let index = 0; index < pages; index++) {
@@ -40,7 +41,7 @@ export function createFolderProfileWorkload({ createService, path, caseName, alg
       }
       durations.push({ status: 'success', ms: performance.now() - started });
       assert.equal(total, profile.directories);
-      assert.deepEqual(names, Array.from({ length: 100 }, (_, step) => folderProfileName(index * 100 + step)));
+      assert.deepEqual(names, expected[index]);
       for (const name of names) digest.update(name + '\n'); completedPages++;
     }
     assert.equal(counts.liveHandles, 0); assert.equal(counts.directoryOpens, counts.directoryCloses);

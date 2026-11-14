@@ -57,7 +57,7 @@ test('buffer substitution refuses unexpected production options before opening n
   let service, opens = 0;
   createFolderProfileWorkload({ createService: dependencies => { service = dependencies; return {}; },
     filesystem: { opendir: async () => { opens++; } }, path: '/fixture', caseName: 'small', algorithm: 'stream', bufferSize: 128, pages: 1 });
-  for (const options of [undefined, { bufferSize: 128 }, { bufferSize: 32, recursive: true }]) {
+  for (const options of [undefined, { bufferSize: 32 }, { bufferSize: 128, recursive: true }]) {
     await assert.rejects(service.openDirectory('/fixture', options), error => error.code === 'ERR_ASSERTION');
   }
   assert.equal(opens, 0);

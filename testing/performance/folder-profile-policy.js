@@ -12,6 +12,8 @@ export const folderProfileCases = Object.freeze({
   large: Object.freeze({ directories: 10_000, files: 0 }),
   mixed: Object.freeze({ directories: 1000, files: 9000 }),
   ceiling: Object.freeze({ directories: 50_000, files: 0 }),
+  'long-ceiling': Object.freeze({ directories: 50_000, files: 0, longNames: true }),
+  names: Object.freeze({ directories: 203, files: 1, longNames: true }),
 });
 export const folderProfileSources = Object.freeze(['filesystem/folder-browse-service.js', 'filesystem/folder-cursor-policy.js',
   'filesystem/folder-page-selector.js', 'api-error.js', '../shared/folder-browse-policy.js']);
@@ -35,13 +37,13 @@ export function parseFolderProfileCommand(args) {
     || !Number.isInteger(repeats) || repeats < 1 || repeats > 5) throw new TypeError('Invalid profile cases or repetition count');
   const comparison = values.comparison ?? (focused || concurrent ? 'buffers' : 'algorithms'); folderProfileVariants(comparison);
   if (focused && (values.storage !== 'bind' || cases.length !== 1 || cases[0] !== 'mixed' || repeats !== 4 || comparison !== 'buffers')) throw new TypeError('Require fixed mixed first-page bind experiment');
-  if (concurrent && (cases.length !== 1 || cases[0] !== 'ceiling' || repeats !== 4 || comparison !== 'buffers')) throw new TypeError('Require fixed concurrent ceiling experiment');
+  if (concurrent && (cases.length !== 1 || !['ceiling', 'long-ceiling'].includes(cases[0]) || repeats !== 4 || comparison !== 'buffers')) throw new TypeError('Require fixed concurrent ceiling experiment');
   return { image: values.image, output: values.output, storage: values.storage, scratchRoot: values['scratch-root'], cases, repeats, comparison, experiment };
 }
 export function createFolderProfilePlan({ cases, repeats, comparison, storage, experiment = 'standard' }) {
   if (experiment === 'concurrent-ceiling') {
-    if (!['volume', 'bind'].includes(storage) || cases.length !== 1 || cases[0] !== 'ceiling' || repeats !== 4 || comparison !== 'buffers') throw new TypeError('Invalid concurrent ceiling selection');
-    return createConcurrentCeilingPlan();
+    if (!['volume', 'bind'].includes(storage) || cases.length !== 1 || !['ceiling', 'long-ceiling'].includes(cases[0]) || repeats !== 4 || comparison !== 'buffers') throw new TypeError('Invalid concurrent ceiling selection');
+    return createConcurrentCeilingPlan({ caseName: cases[0] });
   }
   if (experiment === 'mixed-first-page') {
     if (storage !== 'bind' || cases.length !== 1 || cases[0] !== 'mixed' || repeats !== 4 || comparison !== 'buffers') throw new TypeError('Invalid mixed first-page selection');

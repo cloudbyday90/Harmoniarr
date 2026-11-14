@@ -15,7 +15,10 @@ import { summarizeConcurrentCeiling } from './folder-profile-concurrent-plan.js'
 /** Explicit local measurement, separate from startup and the routine validation gate. */
 export async function runFolderProfile(selection, { signal, docker = profileDocker, onProgress = () => {} } = {}) {
   const owner = randomUUID(), plan = createFolderProfilePlan(selection);
+  const promotion = selection.experiment === 'concurrent-ceiling' && selection.cases[0] === 'long-ceiling';
+  const fixtureCases = promotion ? [...selection.cases, 'names'] : selection.cases;
   const report = { version: 3, experiment: selection.experiment ?? 'standard', plan, comparison: selection.comparison ?? 'algorithms', storage: selection.storage, image: selection.image, owner, cases: selection.cases,
+    fixtureCases, productionBufferSize: 128, algorithmStreamIsHistorical32: (selection.comparison ?? 'algorithms') === 'algorithms',
     repeats: selection.repeats, resources: { cpus: 2, memoryBytes: 1024 ** 3, swapBytes: 0 }, cacheCleared: false, samples: [], cleanup: {} };
   const benchmarkPath = await realpath(new URL('.', import.meta.url));
   if (/[,\r\n\0]/u.test(benchmarkPath)) throw new TypeError('Unsupported benchmark mount path');
@@ -23,12 +26,13 @@ export async function runFolderProfile(selection, { signal, docker = profileDock
   const run = async (phase, row = {}, cleanup = false) => {
     if (!cleanup) signal?.throwIfAborted();
     attempted++;
+    const writesFixture = ['prepare', 'cleanup', 'overflow-seed'].includes(phase);
     const args = ['--read-only', '--network', 'none', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges:true', '--no-healthcheck',
-      '--cpus', '2', '--memory', '1g', '--memory-swap', '1g', '--pids-limit', '64', '--user', ['prepare', 'cleanup'].includes(phase) ? '0:0' : '1000:1000',
+      '--cpus', '2', '--memory', '1g', '--memory-swap', '1g', '--pids-limit', '64', '--user', writesFixture ? '0:0' : '1000:1000',
       '--entrypoint', 'node', '--mount', `type=bind,src=${benchmarkPath},dst=/app/benchmark,readonly`];
-    if (storageMount) args.push('--mount', storageMount + (['probe', 'sample', 'lifecycle'].includes(phase) ? ',readonly' : ''));
+    if (storageMount) args.push('--mount', storageMount + (writesFixture ? '' : ',readonly'));
     const value = await withFolderProfileContainer({ args, command: ['--expose-gc', '/app/benchmark/folder-profile-worker.js', JSON.stringify({ ...row, phase, owner })],
-      owner, image: selection.image, signal: cleanup ? undefined : signal, timeout: phase === 'prepare' ? 900_000 : 120_000, docker, onRetired: () => { retired++; } });
+      owner, image: selection.image, signal: cleanup ? undefined : signal, timeout: ['prepare', 'cleanup'].includes(phase) ? 900_000 : 120_000, docker, onRetired: () => { retired++; } });
     assert.equal(value.phase, phase); return value.result;
   };
   try {
@@ -52,9 +56,9 @@ export async function runFolderProfile(selection, { signal, docker = profileDock
       await writeFile(resolve(bindPath, '.folder-profile-owner.json'), JSON.stringify({ owner }), { flag: 'wx', mode: 0o600 });
       storageMount = `type=bind,src=${bindPath},dst=/fixtures`;
     }
-    onProgress({ phase: 'prepare', cases: selection.cases });
-    report.preparation = await run('prepare', { cases: selection.cases });
-    assert.equal(report.preparation.prepared, true); assert.deepEqual(report.preparation.cases, selection.cases);
+    onProgress({ phase: 'prepare', cases: fixtureCases });
+    report.preparation = await run('prepare', { cases: fixtureCases });
+    assert.equal(report.preparation.prepared, true); assert.deepEqual(report.preparation.cases, fixtureCases);
     for (const row of plan) {
       onProgress({ phase: 'sample', completed: report.samples.length, total: plan.length, ...row });
       const result = await run('sample', row);
@@ -65,7 +69,12 @@ export async function runFolderProfile(selection, { signal, docker = profileDock
       report.analysis = summarizeConcurrentCeiling(report.samples); report.lifecycle = [];
       for (const bufferSize of [32, 128]) {
         onProgress({ phase: 'lifecycle', bufferSize });
-        report.lifecycle.push(await run('lifecycle', { caseName: 'ceiling', bufferSize, observed: true }));
+        report.lifecycle.push(await run('lifecycle', { caseName: selection.cases[0], bufferSize, observed: true }));
+      }
+      if (promotion) {
+        onProgress({ phase: 'promotion' }); report.promotion = await run('promotion', { caseName: 'names', observed: true });
+        report.overflowSeed = await run('overflow-seed', { caseName: 'long-ceiling' }); assert.equal(report.overflowSeed.overflowSeeded, true);
+        onProgress({ phase: 'overflow' }); report.overflow = await run('overflow', { caseName: 'long-ceiling', observed: true });
       }
     }
   } catch (error) { failed = true; failure = error; report.failure = { name: error?.name ?? 'Unknown', code: typeof error?.code === 'string' ? error.code : null, completedSamples: report.samples.length }; }
