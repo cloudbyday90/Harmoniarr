@@ -20,6 +20,7 @@ import { createFixtureGate, waitForFixtureReady } from '../../testing/integratio
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 import { observeFixturePoolCheckouts } from '../../testing/integration/fixture-pool-checkout.js';
 import { withWorkerTaskCleanup } from '../../src/server/worker-task-cleanup.js';
+import { attachPoolAdmissionLimit, getPoolAdmissionState, hasPoolAdmissionConnect } from '../../src/server/database-pool-admission-service.js';
 
 const config = resolveIntegrationTestRuntimeConfig();
 let runtime; let checkouts; let servers; let primary; let poolUnderTest; let held; let entered;
@@ -57,6 +58,45 @@ suite('Owned fixture checkout capture across direct migration and later discover
       } });
   }, { timeout: config.suiteSetupTimeoutMs });
   after(async () => { await runtime?.cleanup(); }, { timeout: config.suiteTeardownTimeoutMs });
+
+  test('owned admission preserves native promise/callback queue attribution and busy refusal after observer restore', {
+    timeout: config.scenarioTimeoutMs,
+  }, async () => runtime.runIsolatedDatabase(async ({ databaseConfig }) => {
+    const pool = attachPoolAdmissionLimit(new pg.Pool({ ...databaseConfig, max: 1, connectionTimeoutMillis: 10_000 }), { maxPendingCheckouts: 1 });
+    const original = Object.getOwnPropertyDescriptor(pool, 'connect'), records = [];
+    const diagnostics = observeFixturePoolCheckouts({ pool, mode: 'all', expectedConfig: databaseConfig, onRecord: record => records.push(record) });
+    let heldCheckout; let pending;
+    try {
+      for (const callback of [false, true]) {
+        heldCheckout = await pool.connect();
+        pending = callback ? new Promise((resolve, reject) => {
+          pool.connect((error, client, release) => error ? reject(error) : resolve({ release }));
+        }) : pool.connect();
+        assert.equal(pool.waitingCount, 1); assert.equal(getPoolAdmissionState(pool).pendingCheckouts, 1);
+        if (callback) await new Promise(resolve => { pool.connect(error => { assert.equal(error.code, 'database_pool_busy'); resolve(); }); });
+        else await assert.rejects(pool.connect(), { code: 'database_pool_busy' });
+        assert.equal(pool.waitingCount, 1);
+        heldCheckout.release(); heldCheckout = null; const acquired = await pending; pending = null; acquired.release();
+        assert.equal(getPoolAdmissionState(pool).pendingCheckouts, 0);
+      }
+      const failures = records.filter(record => record.outcome === 'failed'); assert.equal(failures.length, 2);
+      for (const failure of failures) {
+        assert.equal(failure.acquisition.lastStage, 'unknown'); assert.equal(failure.acquisition.queuedMs, null);
+        assert.equal(failure.acquisition.newClientMs, null);
+      }
+      assert.ok(records.filter(record => record.outcome === 'passed' && record.acquisition.queuedMs !== null).length >= 2);
+      await diagnostics.restore(); assert.deepEqual(Object.getOwnPropertyDescriptor(pool, 'connect'), original);
+      heldCheckout = await pool.connect(); pending = pool.connect();
+      await assert.rejects(pool.connect(), { code: 'database_pool_busy' });
+      heldCheckout.release(); heldCheckout = null; const acquired = await pending; pending = null; acquired.release();
+      assert.equal(getPoolAdmissionState(pool).pendingCheckouts, 0);
+    } finally {
+      heldCheckout?.release(); if (pending) { const acquired = await pending.catch(() => null); acquired?.release(); }
+      await withWorkerTaskCleanup(async () => {
+        if (pool.connect !== original.value) await diagnostics.restore();
+      }, () => pool.end());
+    }
+  }));
 
   test('a direct migration cold connection timeout is captured before owning pool cleanup', {
     timeout: config.scenarioTimeoutMs,
@@ -136,7 +176,9 @@ suite('Owned fixture checkout capture across direct migration and later discover
         assert.equal(failed.acquisition.acquireEnteredMs, null);
         held.release(); await pending; assert.equal(caught, true);
         assertEvidence('application_pool', 'scenario_work');
-        assert.equal(poolUnderTest.ended, true); assert.equal(Object.hasOwn(poolUnderTest, 'connect'), false);
+        assert.equal(poolUnderTest.ended, true);
+        assert.equal(hasPoolAdmissionConnect(poolUnderTest, pg.Pool.prototype.connect), true);
+        assert.equal(getPoolAdmissionState(poolUnderTest).pendingCheckouts, 0);
       } finally { held.release(); await pending.catch(() => {}); await application?.cleanup(); held = null; entered = null; }
     });
   }

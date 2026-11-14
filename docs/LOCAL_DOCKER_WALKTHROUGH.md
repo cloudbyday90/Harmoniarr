@@ -1,5 +1,11 @@
 # Harmoniarr Local Docker Walkthrough
 
+The November 14 [Node security qualification](NODE_SECURITY_2026_11_OUTCOME.md)
+tests Node 24.22.3 in disposable application/media fixtures, including fresh data,
+restart and backup/restore. The existing walkthrough stays stopped on its original
+image, ports and five mounts. No rollout or release is performed. The current
+candidate supersedes the earlier comparison artifact's runtime prerequisite.
+
 The November 14 [buffer-128 promotion qualification](FOLDER_BUFFER_PROMOTION_OUTCOME.md)
 uses a matching local candidate for long/Unicode native profiles and reviewed
 parser consumers. Source and candidate use buffer 128; the existing walkthrough

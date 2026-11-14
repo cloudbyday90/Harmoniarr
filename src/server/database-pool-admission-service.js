@@ -16,13 +16,20 @@ export function getPoolAdmissionState(pool) {
   return state ? { pendingCheckouts: state.pendingCheckouts, maxPendingCheckouts: state.maxPendingCheckouts } : null;
 }
 
+/** Recognize this pool's installed wrapper without exposing or bypassing its delegate. */
+export function hasPoolAdmissionConnect(pool, expectedNativeConnect) {
+  const state = states.get(pool);
+  return Boolean(state && state.nativeConnect === expectedNativeConnect
+    && Object.getOwnPropertyDescriptor(pool, 'connect')?.value === state.admissionConnect);
+}
+
 /** Bound unresolved public checkouts, including calls made by native pool.query. */
 export function attachPoolAdmissionLimit(pool, { maxPendingCheckouts = 64 } = {}) {
   if (!Number.isSafeInteger(maxPendingCheckouts) || maxPendingCheckouts < 1) throw new TypeError('A positive pending checkout limit is required');
   if (states.has(pool)) throw new TypeError('Pool admission is already owned');
   const nativeConnect = pool.connect;
-  const state = { pendingCheckouts: 0, maxPendingCheckouts }; states.set(pool, state);
-  pool.connect = function connect(callback) {
+  const state = { pendingCheckouts: 0, maxPendingCheckouts, nativeConnect, admissionConnect: null }; states.set(pool, state);
+  const admissionConnect = function connect(callback) {
     if (pool.ending) return nativeConnect.call(pool, callback);
     if (state.pendingCheckouts >= maxPendingCheckouts) {
       const error = Object.assign(new Error('Database checkout capacity is temporarily unavailable'), { code: 'database_pool_busy' });
@@ -37,5 +44,7 @@ export function attachPoolAdmissionLimit(pool, { maxPendingCheckouts = 64 } = {}
       return nativeConnect.call(pool).then(value => { finish(); return value; }, error => { finish(); throw error; });
     } catch (error) { finish(); throw error; }
   };
+  state.admissionConnect = admissionConnect;
+  pool.connect = admissionConnect;
   return pool;
 }

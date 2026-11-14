@@ -1,5 +1,9 @@
 # Node 24.22.1 security patch outcome
 
+Successor: [November 14 Node 24.22.3 maintenance](NODE_SECURITY_2026_11_OUTCOME.md).
+The October evidence below remains historical; current pins and qualification
+belong to that separate outcome.
+
 Qualified October 21, 2026 on main. Implements the
 [design](NODE_24_SECURITY_PATCH_DESIGN.md) with the
 [official sources and tradeoffs](NODE_24_SECURITY_PATCH_RESEARCH_2026_10.md).

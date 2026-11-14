@@ -5,17 +5,17 @@
  */
 
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import test from 'node:test';
 import { runManualSignalLane } from '../../testing/manual/manual-signal-lane.js';
 import { waitForFixtureReady } from '../../testing/integration/fixture-lifecycle.js';
+import { checkNodeBaseline } from '../../scripts/node-baseline-policy.js';
 
 function fixture() {
   const entered = Promise.withResolvers(); const finish = Promise.withResolvers(); const calls = [];
   const id = 'a'.repeat(64); let container; let present = false;
   const state = { entered, finish, calls, foreign: false, failCreate: false, failRemove: false, failure: null,
-    env: {}, output: { write() {} }, readDockerfile: () => readFile('Dockerfile', 'utf8'),
+    env: {}, output: { write() {} }, readBaseline: checkNodeBaseline,
     async runDocker(args) {
       calls.push(args[0] === 'container' ? args[1] : args[0]);
       if (args[0] === 'context') return { stdout: 'unix:///var/run/docker.sock' };
@@ -53,6 +53,15 @@ async function rejectsOriginal(operation, expected) {
   try { await operation; } catch (error) { rejected = true; assert.equal(error, expected); }
   assert.equal(rejected, true);
 }
+
+test('Linux signal lane preserves baseline refusal before pulling or creating a container', async () => {
+  for (const reason of [new Error('baseline mismatch'), null]) {
+    const state = fixture();
+    await rejectsOriginal(runManualSignalLane({ ...state, readBaseline: async () => { throw reason; } }), reason);
+    assert.equal(state.calls.includes('pull'), false);
+    assert.equal(state.calls.includes('create'), false);
+  }
+});
 
 test('Linux signal lane refuses pre-aborted work and foreign acknowledged containers', async () => {
   for (const reason of [new Error('stop'), null]) {

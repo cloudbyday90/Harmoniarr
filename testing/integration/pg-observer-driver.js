@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import pg from 'pg';
 import pgPackage from 'pg/package.json' with { type: 'json' };
 import { supportsPgObserverVersions } from './pg-observer-driver-policy.js';
+import { hasPoolAdmissionConnect } from '../../src/server/database-pool-admission-service.js';
 
 // Internal adapters are reviewed together against these installed implementations.
 export function supportsPgObserverDriver() {
@@ -20,5 +21,6 @@ export function supportsPgObserverDriver() {
 
 export function supportsPgQueueObserver(pool) {
   return supportsPgObserverDriver() && pool instanceof pg.Pool && pool.Client === pg.Client
-    && ['connect', 'newClient', '_acquireClient', '_pulseQueue'].every(key => pool[key] === pg.Pool.prototype[key]);
+    && (pool.connect === pg.Pool.prototype.connect || hasPoolAdmissionConnect(pool, pg.Pool.prototype.connect))
+    && ['newClient', '_acquireClient', '_pulseQueue'].every(key => pool[key] === pg.Pool.prototype[key]);
 }

@@ -38,7 +38,7 @@ export async function runFolderProfile(selection, { signal, docker = profileDock
   try {
     const image = JSON.parse(await docker(['image', 'inspect', selection.image]))[0]; assert.equal(image.Id, selection.image);
     onProgress({ phase: 'probe' }); report.probe = await run('probe');
-    assert.equal(report.probe.node, '24.22.1'); assert.equal(report.probe.platform, 'linux'); assert.equal(report.probe.arch, 'x64');
+    assert.equal(report.probe.node, '24.22.3'); assert.equal(report.probe.platform, 'linux'); assert.equal(report.probe.arch, 'x64');
     const sourceRows = await Promise.all(folderProfileSources.map(async path => {
       const file = path.startsWith('../shared/') ? 'src/shared/' + basename(path) : 'src/server/' + path;
       return { path, sha256: createHash('sha256').update(await readFile(file)).digest('hex') };

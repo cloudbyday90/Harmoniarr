@@ -1,5 +1,5 @@
 # Trusted local validation runner only. Supply an immutable reviewed Node image.
-ARG NODE_IMAGE=node@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1
+ARG NODE_IMAGE=node:24.22.3-alpine3.23@sha256:3946fb783fdce8a2812136ea694bc95c698c4f4096f3fd18568dc27a8ac389dc
 FROM ${NODE_IMAGE}
 RUN apk add --no-cache ffmpeg docker-cli
 RUN npm install --global --ignore-scripts npm@12.0.2

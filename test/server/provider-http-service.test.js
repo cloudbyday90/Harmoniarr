@@ -12,6 +12,12 @@ import { drainApplicationWorkerOwners } from '../../src/server/application-worke
 const input = { provider: 'spotify', url: 'https://api.spotify.com/v1/tracks/fixture', timeoutMs: 1000 };
 const response = () => ({ status: 200, headers: new Headers(), body: Buffer.from('{"id":"fixture"}') });
 const tick = () => new Promise(resolve => { setImmediate(resolve); });
+function deadlineClock(t) {
+  let now = 0;
+  t.mock.method(performance, 'now', () => now);
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  return milliseconds => { now += milliseconds; t.mock.timers.tick(milliseconds); };
+}
 function held() {
   const result = Promise.withResolvers(), drain = Promise.withResolvers(), entered = Promise.withResolvers(); let accepted, calls = 0;
   return { result, drain, entered, get accepted() { return accepted; }, get calls() { return calls; },
@@ -24,9 +30,12 @@ test('provider success waits for actual retirement and shares capacity across pr
   await assert.rejects(owner.request({ ...input, provider: 'youtube', url: 'https://www.googleapis.com/youtube/v3/videos' }), { diagnosticCode: 'unavailable' });
   f.drain.resolve(true); assert.deepEqual(await pending, { id: 'fixture' }); assert.equal(await owner.waitForDrain(), true); await owner.close();
 });
-test('deadline refuses a late response but holds admission until its actual drain', async () => {
+test('deadline refuses a late response but holds admission until its actual drain', async t => {
+  const advance = deadlineClock(t);
   const f = held(), owner = createProviderHttpService({ transport: f.transport, maxActive: 1 });
-  const pending = assert.rejects(owner.request({ ...input, timeoutMs: 25 }), { diagnosticCode: 'timeout' }); await f.entered.promise; await pending;
+  t.after(async () => { f.result.resolve(response()); f.drain.resolve(true); await owner.close(); });
+  const pending = assert.rejects(owner.request({ ...input, timeoutMs: 25 }), { diagnosticCode: 'timeout' });
+  await f.entered.promise; advance(25); await pending;
   assert.equal(f.accepted.signal.aborted, true); assert.equal(owner.getState().active, 1);
   await assert.rejects(owner.request(input), { diagnosticCode: 'unavailable' });
   f.result.resolve(response()); f.drain.resolve(true); assert.equal(await owner.waitForDrain(), true); assert.equal(f.calls, 1); await owner.close();
@@ -43,10 +52,13 @@ test('uncertain retirement refuses valid JSON and seals subsequent admission', a
   await assert.rejects(owner.request(input), { diagnosticCode: 'unavailable' }); assert.equal(await owner.waitForDrain(), false);
   assert.equal(owner.getState().sealed, true); await assert.rejects(owner.request(input), { diagnosticCode: 'unavailable' }); await assert.rejects(owner.close(), /retirement is uncertain/u);
 });
-test('request preparation belongs to the deadline and cannot dispatch after expiry', async () => {
+test('request preparation belongs to the deadline and cannot dispatch after expiry', async t => {
+  const advance = deadlineClock(t);
   const f = held(), entered = Promise.withResolvers(), release = Promise.withResolvers(), owner = createProviderHttpService({ transport: f.transport, maxActive: 1 });
-  await assert.rejects(owner.request({ ...input, timeoutMs: 25, beforeRequest: async () => { entered.resolve(); await release.promise; } }), { diagnosticCode: 'timeout' });
-  await entered.promise; assert.equal(owner.getState().active, 1); release.resolve(); await owner.waitForDrain(); assert.equal(f.calls, 0); await owner.close();
+  t.after(async () => { release.resolve(); await owner.close(); });
+  const pending = assert.rejects(owner.request({ ...input, timeoutMs: 25, beforeRequest: async () => { entered.resolve(); await release.promise; } }), { diagnosticCode: 'timeout' });
+  await entered.promise; advance(25); await pending;
+  assert.equal(owner.getState().active, 1); release.resolve(); await owner.waitForDrain(); assert.equal(f.calls, 0); await owner.close();
 });
 test('headers and request body are captured before asynchronous admission', async () => {
   const f = held(), entered = Promise.withResolvers(), release = Promise.withResolvers(), owner = createProviderHttpService({ transport: f.transport });
@@ -65,11 +77,19 @@ test('native requests refuse proxy configuration and cross-provider origins befo
   await assert.rejects(owner.request({ ...input, headers: { Host: 'other.example' } }), { diagnosticCode: 'request_rejected' });
   assert.equal(calls, 0); await owner.close();
 });
-test('injected fetch cancellation remains owned until its cancellation promise settles', async () => {
-  const cancelled = Promise.withResolvers(), release = Promise.withResolvers();
-  const owner = createProviderHttpService({ maxActive: 1, fetchFn: async () => new Response(new ReadableStream({ start(controller) { controller.enqueue(Buffer.from('{')); },
-    cancel() { cancelled.resolve(); return release.promise; } })) });
-  await assert.rejects(owner.request({ ...input, timeoutMs: 25 }), { diagnosticCode: 'timeout' }); await cancelled.promise; assert.equal(owner.getState().active, 1);
+test('injected fetch cancellation remains owned until its cancellation promise settles', async t => {
+  const advance = deadlineClock(t);
+  const entered = Promise.withResolvers(), cancelled = Promise.withResolvers(), release = Promise.withResolvers();
+  const owner = createProviderHttpService({ maxActive: 1, fetchFn: async () => {
+    entered.resolve();
+    return new Response(new ReadableStream({ start(controller) { controller.enqueue(Buffer.from('{')); },
+      cancel() { cancelled.resolve(); return release.promise; } }));
+  } });
+  // Observe fetch entry independently of the abort clock.
+  const starting = owner.request({ ...input, timeoutMs: 25 });
+  t.after(async () => { release.resolve(); await owner.close(); });
+  const pending = assert.rejects(starting, { diagnosticCode: 'timeout' });
+  await entered.promise; await tick(); advance(25); await pending; await cancelled.promise; assert.equal(owner.getState().active, 1);
   await assert.rejects(owner.request(input), { diagnosticCode: 'unavailable' }); release.resolve(); assert.equal(await owner.waitForDrain(), true); await owner.close();
 });
 test('request adapters use the same supplied owner for OAuth, API and empty revocation', async () => {

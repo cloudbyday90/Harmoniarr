@@ -6,10 +6,10 @@
 
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createRecoveryDockerCommand } from '../../scripts/postgres-recovery-command.js';
 import { assertLocalRecoveryDocker } from '../../scripts/postgres-recovery-runtime.js';
+import { checkNodeBaseline } from '../../scripts/node-baseline-policy.js';
 
 const label = 'io.harmoniarr.manual-signals';
 const files = ['package.json', 'testing/manual/manual-session-input.js', 'testing/manual/manual-session-runner.js',
@@ -17,12 +17,12 @@ const files = ['package.json', 'testing/manual/manual-session-input.js', 'testin
 
 /** Explicit Linux qualification, with no daemon socket or application data in the container. */
 export async function runManualSignalLane({ env = process.env, runDocker = createRecoveryDockerCommand({ env }),
-  readDockerfile = () => readFile('Dockerfile', 'utf8'), output = process.stdout, signal } = {}) {
+  readBaseline = checkNodeBaseline, output = process.stdout, signal } = {}) {
   signal?.throwIfAborted();
   await assertLocalRecoveryDocker({ env, runDocker });
   signal?.throwIfAborted();
-  const image = (await readDockerfile()).match(/^ARG NODE_IMAGE=(node:24\.22\.1-alpine[\d.]+@sha256:[a-f0-9]{64})\r?$/mu)?.[1];
-  assert.ok(image, 'Signal lane requires the reviewed pinned Node image');
+  const { nodeImage: image } = await readBaseline();
+  signal?.throwIfAborted();
   const nonce = randomUUID(); const name = `harmoniarr-manual-signals-${nonce}`;
   let attempted = false; let id; let failed = false; let failure;
   async function inspectOwned() {

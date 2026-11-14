@@ -1,5 +1,10 @@
 # Folder buffer promotion outcome
 
+Follow-up November 14: [Node 24.22.3 qualification](NODE_SECURITY_2026_11_OUTCOME.md)
+completes the runtime-security next item below. This document's 24.22.1 timings
+remain historical. Next component work is persistent browse/cancel memory
+retention; no deployment has been performed.
+
 November 14, 2026. See [official research and tradeoffs](FOLDER_BUFFER_PROMOTION_RESEARCH_2026_11.md),
 [design](FOLDER_BUFFER_PROMOTION_DESIGN.md) and [Astra review](FOLDER_BUFFER_PROMOTION_ASTRA_REVIEW.md).
 

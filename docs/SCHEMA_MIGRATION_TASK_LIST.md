@@ -7,6 +7,14 @@ Security source: `docs/SECURITY_POLICY.md`
 
 ## Current Status (2026-11-14)
 
+November 14 Node security maintenance adopts coordinated 24.22.3 pins, shared
+lock/media guards, exact pool-admission observer ownership and deterministic
+deadline fixtures. Random PR #68's tooling/client group is implemented locally.
+See the [design](NODE_SECURITY_2026_11_DESIGN.md),
+[Astra review](NODE_SECURITY_2026_11_ASTRA_REVIEW.md) and
+[outcome/next item](NODE_SECURITY_2026_11_OUTCOME.md). Schema is unchanged;
+the walkthrough stays stopped. Next: persistent browse/cancel memory retention.
+
 November 14 fixed-buffer promotion adopts 128 in the built-in scanner, with
 long/Unicode paging, concurrent native profiles and actual overflow qualification.
 Random Dependabot PR #61's parser update is implemented and tested locally.

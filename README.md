@@ -4,10 +4,10 @@ Harmoniarr is a self-hosted, Docker-hosted music library manager inspired by Lid
 
 The repository contains the Node.js ESM server, Vue client, PostgreSQL schema, automated validation, and design documents. The platform is under active development toward its first release.
 
-The canonical runtime baseline is now Node 24.22.1, including the October 21
-security update. See the [design](docs/NODE_24_SECURITY_PATCH_DESIGN.md),
-[official research](docs/NODE_24_SECURITY_PATCH_RESEARCH_2026_10.md)
-and [qualification outcome](docs/NODE_24_SECURITY_PATCH_OUTCOME.md).
+The canonical runtime baseline is now Node 24.22.3, including the November 11
+security update. See the [design](docs/NODE_SECURITY_2026_11_DESIGN.md),
+[official research](docs/NODE_SECURITY_2026_11_RESEARCH.md)
+and [qualification outcome](docs/NODE_SECURITY_2026_11_OUTCOME.md).
 
 Provider HTTPS now has account-free native TLS, redirect, compression and deadline
 qualification, including sanitized malformed-URL refusal. See the
@@ -288,15 +288,15 @@ the [design](docs/EXTERNAL_SEARCH_RECOVERY_DESIGN.md),
 [official tradeoffs](docs/EXTERNAL_SEARCH_RECOVERY_RESEARCH_2026_10.md) and
 [validation outcome](docs/EXTERNAL_SEARCH_RECOVERY_OUTCOME.md).
 
-Canonical development/CI validation uses Node **24.22.1** from `.nvmrc` and npm
+Canonical development/CI validation uses Node **24.22.3** from `.nvmrc` and npm
 **12.0.2**. Select that Node version with your version manager or a verified local
 installation before `npm ci` and `npm run validate:fast`. `npm run check:node-baseline`
-checks the active runtime, engine floors and digest-pinned Docker defaults.
+checks the active runtime, package/lock engine floors and matching digest-pinned
+application/canonical-media Docker defaults.
 The package support range allows later Node 24 versions; canonical validation
 requires the exact pin so evidence stays reproducible. The
 [baseline design](docs/NODE_24_BASELINE_DESIGN.md) and
-[qualification outcome](docs/NODE_24_BASELINE_OUTCOME.md) explain scope and
-the pending October 21 security-release follow-up.
+[current qualification](docs/NODE_SECURITY_2026_11_OUTCOME.md) explain scope.
 
 Vue and Router are client build dependencies. Install development dependencies
 when building from source; the Docker builders do this before copying the static
