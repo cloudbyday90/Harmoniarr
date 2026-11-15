@@ -11,13 +11,16 @@ import { createFolderProfilePlan, folderProfileSources } from './folder-profile-
 import { profileDocker, withFolderProfileContainer } from './folder-profile-docker.js';
 import { summarizeMixedFirstPage } from './folder-profile-block-summary.js';
 import { summarizeConcurrentCeiling } from './folder-profile-concurrent-plan.js';
+import { folderRetentionPolicy } from './folder-retention-policy.js';
+import { decodeFolderRetentionOutput } from './folder-retention-protocol.js';
 
 /** Explicit local measurement, separate from startup and the routine validation gate. */
 export async function runFolderProfile(selection, { signal, docker = profileDocker, onProgress = () => {} } = {}) {
   const owner = randomUUID(), plan = createFolderProfilePlan(selection);
   const promotion = selection.experiment === 'concurrent-ceiling' && selection.cases[0] === 'long-ceiling';
   const fixtureCases = promotion ? [...selection.cases, 'names'] : selection.cases;
-  const report = { version: 3, experiment: selection.experiment ?? 'standard', plan, comparison: selection.comparison ?? 'algorithms', storage: selection.storage, image: selection.image, owner, cases: selection.cases,
+  const persistent = selection.experiment === 'persistent-retention';
+  const report = { version: 4, experiment: selection.experiment ?? 'standard', plan, comparison: selection.comparison ?? 'algorithms', storage: selection.storage, image: selection.image, owner, cases: selection.cases,
     fixtureCases, productionBufferSize: 128, algorithmStreamIsHistorical32: (selection.comparison ?? 'algorithms') === 'algorithms',
     repeats: selection.repeats, resources: { cpus: 2, memoryBytes: 1024 ** 3, swapBytes: 0 }, cacheCleared: false, samples: [], cleanup: {} };
   const benchmarkPath = await realpath(new URL('.', import.meta.url));
@@ -31,8 +34,11 @@ export async function runFolderProfile(selection, { signal, docker = profileDock
       '--cpus', '2', '--memory', '1g', '--memory-swap', '1g', '--pids-limit', '64', '--user', writesFixture ? '0:0' : '1000:1000',
       '--entrypoint', 'node', '--mount', `type=bind,src=${benchmarkPath},dst=/app/benchmark,readonly`];
     if (storageMount) args.push('--mount', storageMount + (writesFixture ? '' : ',readonly'));
-    const value = await withFolderProfileContainer({ args, command: ['--expose-gc', '/app/benchmark/folder-profile-worker.js', JSON.stringify({ ...row, phase, owner })],
-      owner, image: selection.image, signal: cleanup ? undefined : signal, timeout: ['prepare', 'cleanup'].includes(phase) ? 900_000 : 120_000, docker, onRetired: () => { retired++; } });
+    const gcFlags = phase === 'retention' && row.mode === 'natural' ? [] : ['--expose-gc'];
+    const value = await withFolderProfileContainer({ args, command: [...gcFlags, '/app/benchmark/folder-profile-worker.js', JSON.stringify({ ...row, phase, owner })],
+      owner, image: selection.image, signal: cleanup ? undefined : signal, timeout: ['prepare', 'cleanup'].includes(phase) ? 900_000 : phase === 'retention' ? folderRetentionPolicy.timeoutMs : 120_000, docker, onRetired: () => { retired++; },
+      ...(phase === 'retention' ? { decodeOutput: output => decodeFolderRetentionOutput(output, owner),
+        onOutputFailure: output => { report.partialRetention = { ...row, ...decodeFolderRetentionOutput(output, owner, true) }; } } : {}) });
     assert.equal(value.phase, phase); return value.result;
   };
   try {
@@ -60,8 +66,9 @@ export async function runFolderProfile(selection, { signal, docker = profileDock
     report.preparation = await run('prepare', { cases: fixtureCases });
     assert.equal(report.preparation.prepared, true); assert.deepEqual(report.preparation.cases, fixtureCases);
     for (const row of plan) {
-      onProgress({ phase: 'sample', completed: report.samples.length, total: plan.length, ...row });
-      const result = await run('sample', row);
+      const phase = persistent ? 'retention' : 'sample';
+      onProgress({ phase, completed: report.samples.length, total: plan.length, ...row });
+      const result = await run(phase, row);
       report.samples.push({ ...row, ...result });
     }
     if (selection.experiment === 'mixed-first-page') report.analysis = summarizeMixedFirstPage(report.samples);

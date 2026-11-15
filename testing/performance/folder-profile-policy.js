@@ -6,6 +6,7 @@
 import { folderProfileVariants } from './folder-profile-variants.js';
 import { createMixedFirstPagePlan } from './folder-profile-blocks.js';
 import { createConcurrentCeilingPlan } from './folder-profile-concurrent-plan.js';
+import { createFolderRetentionPlan } from './folder-retention-policy.js';
 
 export const folderProfileCases = Object.freeze({
   small: Object.freeze({ directories: 1000, files: 0 }),
@@ -30,17 +31,23 @@ export function parseFolderProfileCommand(args) {
   if (!/^sha256:[a-f0-9]{64}$/u.test(values.image ?? '') || !values.output?.endsWith('.json')
     || !['volume', 'bind'].includes(values.storage) || (values.storage === 'bind') !== Boolean(values['scratch-root'])
     || /[,\r\n\0]/u.test(values['scratch-root'] ?? '')) throw new TypeError('Require immutable image, exclusive JSON output and explicit storage');
-  const experiment = values.experiment ?? 'standard', focused = experiment === 'mixed-first-page', concurrent = experiment === 'concurrent-ceiling';
-  if (!['standard', 'mixed-first-page', 'concurrent-ceiling'].includes(experiment)) throw new TypeError('Invalid folder profile experiment');
-  const cases = (values.cases ?? (concurrent ? 'ceiling' : focused ? 'mixed' : 'small,large')).split(','), repeats = Number(values.repeats ?? (focused || concurrent ? 4 : 3));
+  const experiment = values.experiment ?? 'standard', focused = experiment === 'mixed-first-page', concurrent = experiment === 'concurrent-ceiling', persistent = experiment === 'persistent-retention';
+  if (!['standard', 'mixed-first-page', 'concurrent-ceiling', 'persistent-retention'].includes(experiment)) throw new TypeError('Invalid folder profile experiment');
+  const cases = (values.cases ?? (persistent ? 'long-ceiling' : concurrent ? 'ceiling' : focused ? 'mixed' : 'small,large')).split(','), repeats = Number(values.repeats ?? (persistent ? 1 : focused || concurrent ? 4 : 3));
   if (!cases.length || new Set(cases).size !== cases.length || cases.some(name => !Object.hasOwn(folderProfileCases, name))
     || !Number.isInteger(repeats) || repeats < 1 || repeats > 5) throw new TypeError('Invalid profile cases or repetition count');
-  const comparison = values.comparison ?? (focused || concurrent ? 'buffers' : 'algorithms'); folderProfileVariants(comparison);
+  const comparison = values.comparison ?? (persistent ? 'production' : focused || concurrent ? 'buffers' : 'algorithms');
+  if (!persistent) folderProfileVariants(comparison);
+  if (persistent && (cases.length !== 1 || cases[0] !== 'long-ceiling' || repeats !== 1 || comparison !== 'production')) throw new TypeError('Require fixed persistent retention experiment');
   if (focused && (values.storage !== 'bind' || cases.length !== 1 || cases[0] !== 'mixed' || repeats !== 4 || comparison !== 'buffers')) throw new TypeError('Require fixed mixed first-page bind experiment');
   if (concurrent && (cases.length !== 1 || !['ceiling', 'long-ceiling'].includes(cases[0]) || repeats !== 4 || comparison !== 'buffers')) throw new TypeError('Require fixed concurrent ceiling experiment');
   return { image: values.image, output: values.output, storage: values.storage, scratchRoot: values['scratch-root'], cases, repeats, comparison, experiment };
 }
 export function createFolderProfilePlan({ cases, repeats, comparison, storage, experiment = 'standard' }) {
+  if (experiment === 'persistent-retention') {
+    if (!['volume', 'bind'].includes(storage) || cases.length !== 1 || cases[0] !== 'long-ceiling' || repeats !== 1 || comparison !== 'production') throw new TypeError('Invalid persistent retention selection');
+    return createFolderRetentionPlan();
+  }
   if (experiment === 'concurrent-ceiling') {
     if (!['volume', 'bind'].includes(storage) || cases.length !== 1 || !['ceiling', 'long-ceiling'].includes(cases[0]) || repeats !== 4 || comparison !== 'buffers') throw new TypeError('Invalid concurrent ceiling selection');
     return createConcurrentCeilingPlan({ caseName: cases[0] });

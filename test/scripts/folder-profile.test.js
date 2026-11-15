@@ -111,11 +111,20 @@ function dockerFixture({ startFailure, abortBeforeStart, removalFailure = false 
 test('owned container failure retires the running process before removal and preserves Error/null', async () => {
   for (const original of [null, new Error('start')]) {
     const fixture = dockerFixture({ startFailure: original }); let retired = false, caught;
-    try { await withFolderProfileContainer({ args: [], command: ['--expose-gc', 'worker.js'], image, owner, docker: fixture.docker, onRetired: () => { retired = true; } }); }
+    try { await withFolderProfileContainer({ args: [], command: ['--expose-gc', 'worker.js'], image, owner, docker: fixture.docker, onRetired: () => { retired = true; },
+      onOutputFailure: () => { throw new Error('diagnostic sink failure'); } }); }
     catch (error) { caught = error; }
     assert.equal(caught, original); assert.equal(retired, true);
     assert.ok(fixture.calls.indexOf('kill') < fixture.calls.indexOf('wait')); assert.ok(fixture.calls.indexOf('wait') < fixture.calls.indexOf('rm'));
   }
+});
+
+test('failed attached output reaches the partial diagnostic sink before verified process retirement', async () => {
+  const original = Object.assign(new Error('bounded controller timeout'), { stdout: '{"checkpoint":0}\n' });
+  const fixture = dockerFixture({ startFailure: original }); let partial, retired = false;
+  await assert.rejects(withFolderProfileContainer({ args: [], command: ['worker.js', '{}'], image, owner, docker: fixture.docker,
+    onOutputFailure: output => { assert.equal(retired, false); partial = output; }, onRetired: () => { retired = true; } }), error => error === original);
+  assert.equal(partial, original.stdout); assert.equal(retired, true);
 });
 test('cancellation during creation skips launch and retires a never-started container without waiting', async () => {
   const fixture = dockerFixture({ abortBeforeStart: true }); let retired = false;

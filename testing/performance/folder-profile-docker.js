@@ -13,7 +13,8 @@ const execute = promisify(execFile);
 export const profileDocker = async (args, options = {}) => (await execute('docker', args, { windowsHide: true, maxBuffer: 2 * 1024 * 1024, timeout: 30_000, ...options })).stdout;
 
 /** A CLI completion is not retirement: inspect, stop if needed, await and remove. */
-export async function withFolderProfileContainer({ args, command, image, owner, signal, timeout = 120_000, docker = profileDocker, onRetired = () => {} }) {
+export async function withFolderProfileContainer({ args, command, image, owner, signal, timeout = 120_000, docker = profileDocker, onRetired = () => {},
+  decodeOutput = JSON.parse, onOutputFailure = () => {} }) {
   if (!Array.isArray(command) || command.length < 2) throw new TypeError('Require an explicit worker command');
   const name = 'harmoniarr-folder-profile-' + randomUUID();
   let id, admitted = false;
@@ -33,10 +34,16 @@ export async function withFolderProfileContainer({ args, command, image, owner, 
     assert.equal(created.Mounts.find(mount => mount.Destination === '/app/benchmark').RW, false);
     if (created.Config.User === '1000:1000' && created.Mounts.some(mount => mount.Destination === '/fixtures')) assert.equal(created.Mounts.find(mount => mount.Destination === '/fixtures').RW, false);
     signal?.throwIfAborted();
-    const output = await docker(['start', '--attach', id], { signal, timeout });
-    const finished = JSON.parse(await docker(['inspect', id]))[0];
-    assert.equal(finished.State.Running, false); assert.equal(finished.State.ExitCode, 0); assert.equal(finished.State.OOMKilled, false);
-    const value = JSON.parse(output.trim()); assert.equal(value.owner, owner); return value;
+    let output;
+    try {
+      output = await docker(['start', '--attach', id], { signal, timeout });
+      const finished = JSON.parse(await docker(['inspect', id]))[0];
+      assert.equal(finished.State.Running, false); assert.equal(finished.State.ExitCode, 0); assert.equal(finished.State.OOMKilled, false);
+      const value = decodeOutput(output.trim()); assert.equal(value.owner, owner); return value;
+    } catch (error) {
+      try { onOutputFailure(output ?? error?.stdout ?? ''); } catch { /* Optional partial diagnostics cannot replace the original failure, including null. */ }
+      throw error;
+    }
   }, async () => {
     if (!admitted) return;
     if (!id || !/^[a-f0-9]{64}$/u.test(id)) {

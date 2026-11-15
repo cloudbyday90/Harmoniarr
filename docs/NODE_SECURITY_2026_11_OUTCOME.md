@@ -127,6 +127,9 @@ and scoped cleanup.
 
 Next component work: repeated browse/cancel cycles in one persistent built-in
 service, verifying capacity reuse, idle handles and retained memory over time.
+That follow-up is now implemented and locally characterized in the
+[persistent retention outcome](FOLDER_RETENTION_OUTCOME.md); its finite scope and
+next memory investigation are recorded separately.
 Track moderate dev-tool updates separately. Network/NAS, physical assistive
 checks, arm64, full image scanning, hosted CI and live providers remain outside
 this local qualification. No release, deployment or PR merge was performed.
